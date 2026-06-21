@@ -372,9 +372,11 @@ export const layerStackExportParityProofSchema = z.object({
   exportParity: z.literal('ready'),
 });
 export const layerMaskPrivateRawReviewProofSchema = z.object({
+  brushCommandType: z.literal('layerMask.createBrushMask').optional(),
   exportArtifact: z.string().endsWith('/alaska-layer-mask-v1-refined-export.tiff'),
   fixtureId: z.literal('validation.layer-mask-real-raw.alaska-local-adjustment.v1'),
   metricCount: z.literal('5'),
+  refineCommandType: z.literal('layerMask.refineMask').optional(),
   refinedPreviewArtifact: z.string().endsWith('/alaska-layer-mask-v1-refined-preview.png'),
   runtimeStatus: z.literal('private_raw_tauri_runtime_proof'),
   unmaskedPreviewArtifact: z.string().endsWith('/alaska-layer-mask-v1-unmasked-preview.png'),

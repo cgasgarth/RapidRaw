@@ -88,9 +88,11 @@ interface PanoramaPrivateRawVisualProof {
 }
 
 interface LayerMaskPrivateRawVisualProof {
+  brushCommandType?: string;
   exportArtifact: string;
   fixtureId: string;
   metricCount: string;
+  refineCommandType?: string;
   refinedPreviewArtifact: string;
   refinedPreviewDataUrl: string;
   unmaskedPreviewArtifact: string;
@@ -1407,7 +1409,9 @@ function LayerMaskPrivateRawVisualSmoke() {
             className="sr-only"
             data-export-artifact={proof.exportArtifact}
             data-fixture-id={proof.fixtureId}
+            data-brush-command-type={proof.brushCommandType ?? 'layerMask.createBrushMask'}
             data-metric-count={proof.metricCount}
+            data-refine-command-type={proof.refineCommandType ?? 'layerMask.refineMask'}
             data-refined-preview-artifact={proof.refinedPreviewArtifact}
             data-runtime-status="private_raw_tauri_runtime_proof"
             data-testid="layer-mask-private-raw-review-proof"
