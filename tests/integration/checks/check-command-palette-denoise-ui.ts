@@ -17,9 +17,11 @@ const localeJson = JSON.parse(locale) as {
 const requiredModalSnippets = [
   "id: 'denoise'",
   'requiresEditorImage: true',
+  "command.id === 'denoise'",
+  'selectedCommandPaths.length > 0',
   'denoiseModalState',
-  'isRaw: selectedImage.isRaw',
-  'targetPaths: [selectedImage.path]',
+  'isRaw: selectedImage?.isRaw ?? false',
+  'targetPaths: selectedCommandPaths',
   'modals.commandPalette.commands.denoise',
 ];
 const failures = [

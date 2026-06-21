@@ -262,6 +262,7 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
       if (command.id === 'culling') return selectedCommandPaths.length > 0;
       if (command.id === 'negativeLab') return selectedCommandPaths.length > 0;
       if (command.id === 'collage') return selectedCommandImages.length > 0;
+      if (command.id === 'denoise') return selectedCommandPaths.length > 0;
       return !command.requiresEditorImage || selectedImage;
     });
 
@@ -336,17 +337,17 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
       return;
     }
 
-    if (command.id === 'denoise' && selectedImage) {
+    if (command.id === 'denoise' && selectedCommandPaths.length > 0) {
       closeAndRun(() => {
         setUI((state) => ({
           denoiseModalState: {
             ...state.denoiseModalState,
             error: null,
             isOpen: true,
-            isRaw: selectedImage.isRaw,
+            isRaw: selectedImage?.isRaw ?? false,
             previewBase64: null,
             progressMessage: null,
-            targetPaths: [selectedImage.path],
+            targetPaths: selectedCommandPaths,
           },
         }));
       });
