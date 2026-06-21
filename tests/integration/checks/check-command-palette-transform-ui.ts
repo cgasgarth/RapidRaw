@@ -38,7 +38,6 @@ if (localeJson.modals?.commandPalette?.commands?.transformTools === undefined) {
 if (!packageJson.includes('"check:command-palette-transform-ui"')) {
   failures.push('missing package script: check:command-palette-transform-ui');
 }
-
 if (failures.length > 0) {
   console.error('command palette transform UI check failed');
   for (const failure of failures.slice(0, 12)) console.error(`- ${failure}`);

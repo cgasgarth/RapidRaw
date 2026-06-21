@@ -28,7 +28,6 @@ if (localeJson.editor?.toolbar?.tooltips?.fileType === undefined) {
 if (!packageJson.includes('"check:editor-file-type-badge-ui"')) {
   failures.push('missing package script: check:editor-file-type-badge-ui');
 }
-
 if (failures.length > 0) {
   console.error('editor file type badge UI check failed');
   for (const failure of failures.slice(0, 12)) console.error(`- ${failure}`);

@@ -33,7 +33,6 @@ if (localeJson.modals?.commandPalette?.commands?.collage === undefined) {
 if (!packageJson.includes('"check:command-palette-collage-ui"')) {
   failures.push('missing package script: check:command-palette-collage-ui');
 }
-
 if (failures.length > 0) {
   console.error('command palette collage UI check failed');
   for (const failure of failures.slice(0, 12)) console.error(`- ${failure}`);

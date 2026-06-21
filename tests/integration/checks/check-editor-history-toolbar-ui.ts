@@ -28,7 +28,6 @@ if (toolbar?.tooltips?.history === undefined) failures.push('missing locale key:
 if (!packageJson.includes('"check:editor-history-toolbar-ui"')) {
   failures.push('missing package script: check:editor-history-toolbar-ui');
 }
-
 if (failures.length > 0) {
   console.error('editor history toolbar UI check failed');
   for (const failure of failures.slice(0, 12)) console.error(`- ${failure}`);

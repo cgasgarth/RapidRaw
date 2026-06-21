@@ -36,7 +36,6 @@ if (localeJson.modals?.commandPalette?.commands?.denoise === undefined) {
 if (!packageJson.includes('"check:command-palette-denoise-ui"')) {
   failures.push('missing package script: check:command-palette-denoise-ui');
 }
-
 if (failures.length > 0) {
   console.error('command palette denoise UI check failed');
   for (const failure of failures.slice(0, 12)) console.error(`- ${failure}`);

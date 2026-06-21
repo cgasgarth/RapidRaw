@@ -39,7 +39,6 @@ const failures = [
 if (!packageJson.includes('"check:presets-composition-ui"')) {
   failures.push('missing package script: check:presets-composition-ui');
 }
-
 if (failures.length > 0) {
   console.error('presets composition UI check failed');
   for (const failure of failures.slice(0, 12)) console.error(`- ${failure}`);

@@ -38,7 +38,6 @@ if (localeJson.modals?.commandPalette?.commands?.lensCorrection === undefined) {
 if (!packageJson.includes('"check:command-palette-lens-ui"')) {
   failures.push('missing package script: check:command-palette-lens-ui');
 }
-
 if (failures.length > 0) {
   console.error('command palette lens UI check failed');
   for (const failure of failures.slice(0, 12)) console.error(`- ${failure}`);

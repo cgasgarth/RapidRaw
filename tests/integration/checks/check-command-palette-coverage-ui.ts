@@ -40,7 +40,6 @@ const failures = [
 if (!packageJson.includes('"check:command-palette-coverage-ui"')) {
   failures.push('missing package script: check:command-palette-coverage-ui');
 }
-
 if (failures.length > 0) {
   console.error('command palette coverage UI check failed');
   for (const failure of failures.slice(0, 12)) console.error(`- ${failure}`);
