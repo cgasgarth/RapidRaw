@@ -491,6 +491,16 @@ export const agentReviewHandoffProofDatasetSchema = z.object({
   outputProofStatus: z.literal('runtime_apply_verified'),
   rollbackStatus: z.literal('available'),
 });
+export const agentSelectedFrameScopeProofDatasetSchema = z.object({
+  approvalState: z.literal('required'),
+  auditArtifactId: z.literal('audit-record-tool-2'),
+  dryRunToolCallId: z.literal('tool-2'),
+  excludedAssetCount: z.literal('2'),
+  noOverwriteTarget: z.literal('Virtual copy sidecar'),
+  policyCheckCount: z.literal('3'),
+  proofHref: z.string().endsWith('agent-expert-edit-demo-workflow-2026-06-21.html'),
+  selectedAssetCount: z.literal('2'),
+});
 export const agentAuditTranscriptViewerProofDatasetSchema = z.object({
   applyRecordCount: z.literal('1'),
   artifactLinkCount: z.literal('3'),

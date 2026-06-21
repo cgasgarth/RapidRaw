@@ -12,6 +12,7 @@ import type {
   AgentChatToolCall,
   AgentChatTranscript,
   AgentReviewHandoff,
+  AgentSelectedFrameScope,
 } from '../../../schemas/agentChatTranscriptSchemas';
 
 interface AgentChatShellProps {
@@ -67,6 +68,11 @@ const rollbackStatusStyles = {
   blocked: 'border-red-500/30 bg-red-500/10 text-red-100',
   not_required: 'border-white/10 bg-white/5 text-text-secondary',
 } satisfies Record<AgentReviewHandoff['rollback']['status'], string>;
+
+const scopePolicyStateStyles = {
+  passed: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100',
+  review_required: 'border-amber-500/30 bg-amber-500/10 text-amber-100',
+} satisfies Record<AgentSelectedFrameScope['policyChecks'][number]['state'], string>;
 
 type LocalReviewDecision = 'approved' | 'pending' | 'rejected';
 
@@ -245,6 +251,94 @@ function ReviewHandoffPanel({ handoff }: { handoff: AgentReviewHandoff }) {
 
       <div className="rounded border border-white/10 bg-black/15 px-2 py-1.5 text-[11px] leading-4 text-text-secondary">
         {handoff.nextAction}
+      </div>
+    </div>
+  );
+}
+
+function SelectedFrameScopePanel({ scope }: { scope: AgentSelectedFrameScope }) {
+  return (
+    <div
+      className="space-y-3 rounded-md border border-violet-500/20 bg-violet-500/5 p-3"
+      data-approval-state={scope.approvalState}
+      data-audit-artifact-id={scope.auditArtifactId}
+      data-dry-run-tool-call-id={scope.dryRunToolCallId}
+      data-excluded-asset-count={scope.excludedAssets.length}
+      data-no-overwrite-target={scope.noOverwriteTarget.value}
+      data-policy-check-count={scope.policyChecks.length}
+      data-proof-href={scope.proofHref}
+      data-selected-asset-count={scope.selectedAssets.length}
+      data-testid="agent-selected-frame-scope"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-text-primary">{scope.title}</div>
+          <p className="mt-1 text-[11px] leading-4 text-text-secondary">{scope.summary}</p>
+        </div>
+        <span
+          className={`shrink-0 rounded border px-2 py-0.5 text-[11px] ${handoffApprovalStyles[scope.approvalState]}`}
+        >
+          {scope.approvalLabel}
+        </span>
+      </div>
+
+      <div className="grid gap-2 md:grid-cols-2" data-testid="agent-selected-frame-assets">
+        {scope.selectedAssets.map((asset) => (
+          <div className="rounded border border-white/10 bg-black/15 p-2 text-[11px]" key={asset.id}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-text-primary">{asset.label}</span>
+              <span className="rounded border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-100">
+                {asset.stateLabel}
+              </span>
+            </div>
+            <div className="mt-1 truncate text-text-primary">{asset.value}</div>
+            <div className="mt-1 font-mono text-[10px] text-text-secondary">{asset.role}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-2 md:grid-cols-[1fr_1fr]" data-testid="agent-selected-frame-boundaries">
+        <div className="rounded border border-white/10 bg-black/15 p-2 text-[11px]">
+          <div className="font-semibold text-text-primary">{scope.noOverwriteTarget.label}</div>
+          <div className="mt-1 truncate font-mono text-text-secondary">{scope.noOverwriteTarget.value}</div>
+          <p className="mt-1 leading-4 text-text-secondary">{scope.noOverwriteTarget.summary}</p>
+        </div>
+        <a
+          className="rounded border border-sky-500/25 bg-sky-500/10 p-2 text-[11px] text-sky-100 hover:border-sky-300/70"
+          href={scope.proofHref}
+        >
+          <span className="block font-semibold text-text-primary">{scope.proofLabel}</span>
+          <span className="mt-1 block font-mono text-[10px] text-text-secondary">{scope.auditArtifactId}</span>
+          <span className="mt-1 block font-mono text-[10px] text-text-secondary">{scope.dryRunToolCallId}</span>
+        </a>
+      </div>
+
+      <div className="space-y-1" data-testid="agent-excluded-frame-assets">
+        {scope.excludedAssets.map((asset) => (
+          <div
+            className="grid grid-cols-[1fr_1.4fr] gap-2 rounded border border-white/10 bg-white/[0.03] p-2 text-[11px]"
+            key={asset.id}
+          >
+            <div className="min-w-0">
+              <div className="font-semibold text-text-primary">{asset.label}</div>
+              <div className="mt-1 truncate font-mono text-text-secondary">{asset.value}</div>
+            </div>
+            <p className="leading-4 text-text-secondary">{asset.reason}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-1.5" data-testid="agent-selected-frame-policy-checks">
+        {scope.policyChecks.map((check) => (
+          <span
+            className={`rounded border px-2 py-1 text-[11px] ${scopePolicyStateStyles[check.state]}`}
+            data-policy-state={check.state}
+            data-testid={`agent-selected-frame-policy-${check.id}`}
+            key={check.id}
+          >
+            {check.label}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -658,6 +752,8 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
           <ToolCallRow key={toolCall.id} toolCall={toolCall} />
         ))}
       </div>
+
+      {transcript.selectedFrameScope ? <SelectedFrameScopePanel scope={transcript.selectedFrameScope} /> : null}
 
       {transcript.artifactReview ? <ArtifactReviewPanel review={transcript.artifactReview} /> : null}
 

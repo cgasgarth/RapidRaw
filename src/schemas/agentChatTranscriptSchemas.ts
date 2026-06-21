@@ -9,6 +9,7 @@ export const agentArtifactReviewStatusSchema = z.enum(['audit_only', 'ready', 'r
 export const agentAuditTranscriptOutcomeSchema = z.enum(['blocked', 'success', 'warning']);
 export const agentReviewHandoffRollbackStatusSchema = z.enum(['available', 'blocked', 'not_required']);
 export const agentReviewHandoffOutputStatusSchema = z.enum(['review_artifact_ready', 'runtime_apply_verified']);
+export const agentSelectedFrameScopePolicyStateSchema = z.enum(['passed', 'review_required']);
 export const agentAuditEvidenceTierSchema = z.enum([
   'ui_only',
   'schema_only',
@@ -209,6 +210,63 @@ export const agentReviewHandoffSchema = z
   })
   .strict();
 
+export const agentSelectedFrameScopeSchema = z
+  .object({
+    approvalLabel: z.string().min(1),
+    approvalState: agentChatApprovalStateSchema,
+    auditArtifactId: z.string().min(1),
+    dryRunToolCallId: z.string().min(1),
+    excludedAssets: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1),
+            label: z.string().min(1),
+            reason: z.string().min(1),
+            value: z.string().min(1),
+          })
+          .strict(),
+      )
+      .min(1),
+    id: z.string().min(1),
+    noOverwriteTarget: z
+      .object({
+        label: z.string().min(1),
+        summary: z.string().min(1),
+        value: z.string().min(1),
+      })
+      .strict(),
+    policyChecks: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1),
+            label: z.string().min(1),
+            state: agentSelectedFrameScopePolicyStateSchema,
+          })
+          .strict(),
+      )
+      .min(1),
+    proofHref: z.string().min(1),
+    proofLabel: z.string().min(1),
+    selectedAssets: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1),
+            label: z.string().min(1),
+            role: z.string().min(1),
+            stateLabel: z.string().min(1),
+            value: z.string().min(1),
+          })
+          .strict(),
+      )
+      .min(1),
+    summary: z.string().min(1),
+    title: z.string().min(1),
+  })
+  .strict();
+
 export const agentChatTranscriptSchema = z
   .object({
     artifactReview: agentArtifactReviewSchema.optional(),
@@ -218,6 +276,7 @@ export const agentChatTranscriptSchema = z
     messages: z.array(agentChatMessageSchema).min(1),
     reviewHandoff: agentReviewHandoffSchema.optional(),
     runtimeStatus: agentChatRuntimeStatusSchema,
+    selectedFrameScope: agentSelectedFrameScopeSchema.optional(),
     sessionTitle: z.string().min(1),
     toolCalls: z.array(agentChatToolCallSchema).min(1),
   })
@@ -229,4 +288,5 @@ export type AgentAuditTranscript = z.infer<typeof agentAuditTranscriptSchema>;
 export type AgentChatToolCall = z.infer<typeof agentChatToolCallSchema>;
 export type AgentChatDryRunReview = z.infer<typeof agentChatDryRunReviewSchema>;
 export type AgentReviewHandoff = z.infer<typeof agentReviewHandoffSchema>;
+export type AgentSelectedFrameScope = z.infer<typeof agentSelectedFrameScopeSchema>;
 export type AgentChatTranscript = z.infer<typeof agentChatTranscriptSchema>;
