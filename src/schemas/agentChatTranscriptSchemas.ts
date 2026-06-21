@@ -12,8 +12,10 @@ export const agentAuditEvidenceTierSchema = z.enum([
   'schema_only',
   'dry_run_only',
   'runtime_apply',
+  'runtime_apply_demo',
   'e2e_verified',
 ]);
+export const agentChatRuntimeStatusSchema = z.enum(['ui_only_demo', 'runtime_apply_demo']);
 
 export const agentChatMessageSchema = z
   .object({
@@ -179,7 +181,7 @@ export const agentChatTranscriptSchema = z
     dryRunReview: agentChatDryRunReviewSchema.optional(),
     id: z.string().min(1),
     messages: z.array(agentChatMessageSchema).min(1),
-    runtimeStatus: z.literal('ui_only_demo'),
+    runtimeStatus: agentChatRuntimeStatusSchema,
     sessionTitle: z.string().min(1),
     toolCalls: z.array(agentChatToolCallSchema).min(1),
   })

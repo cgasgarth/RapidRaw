@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>RawEngine Agent Expert Edit Demo</title>
+    <style>
+      body {
+        margin: 0;
+        background: #111316;
+        color: #f3f4f1;
+        font-family: Inter, system-ui, sans-serif;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 32px;
+      }
+      h1 {
+        font-size: 28px;
+        margin: 0 0 8px;
+      }
+      .muted {
+        color: #aab2bd;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        margin: 24px 0;
+      }
+      .card {
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+        padding: 16px;
+      }
+      img {
+        width: 100%;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        display: block;
+      }
+      code {
+        color: #d6e4ff;
+      }
+      ol {
+        display: grid;
+        gap: 8px;
+        padding-left: 22px;
+      }
+      li {
+        padding: 8px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.035);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>RawEngine Agent Expert Edit Demo</h1>
+      <p class="muted">
+        Inspect DSC_2844.NEF, warm the scene slightly, lift shadows, protect highlights, preview it, then apply to a
+        virtual copy if approved.
+      </p>
+      <section class="grid">
+        <div class="card">
+          <h2>Before</h2>
+          <img
+            alt="Before RAW demo preview"
+            src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iNDI2IiB2aWV3Qm94PSIwIDAgNjQwIDQyNiI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeDI9IjEiIHkxPSIwIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjMmYzZDQ1Ii8+PHN0b3Agb2Zmc2V0PSIwLjU1IiBzdG9wLWNvbG9yPSIjNmU3ODZkIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYzQ5YjYzIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjY0MCIgaGVpZ2h0PSI0MjYiIGZpbGw9InVybCgjZykiLz48cmVjdCB4PSIzMiIgeT0iMzIiIHdpZHRoPSI1NzYiIGhlaWdodD0iMzYyIiByeD0iMTQiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjI4KSIgc3Ryb2tlLXdpZHRoPSIyIi8+PHRleHQgeD0iNDgiIHk9Ijc0IiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9IkludGVyLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMCIgZm9udC13ZWlnaHQ9IjcwMCI+QmVmb3JlIFJBVzwvdGV4dD48dGV4dCB4PSI0OCIgeT0iMzYwIiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9Ik1lbmxvLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iMTYiPmdyYXBoX3Jldl9hZ2VudF9leHBlcnRfZWRpdF9kZW1vX2luaXRpYWxfMjg0NDwvdGV4dD48L3N2Zz4="
+          />
+          <p><code>artifact_agent_expert_edit_demo_before_raw_2844</code></p>
+        </div>
+        <div class="card">
+          <h2>After</h2>
+          <img
+            alt="After virtual copy demo preview"
+            src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iNDI2IiB2aWV3Qm94PSIwIDAgNjQwIDQyNiI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeDI9IjEiIHkxPSIwIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNDc1YTVmIi8+PHN0b3Agb2Zmc2V0PSIwLjU1IiBzdG9wLWNvbG9yPSIjNmU3ODZkIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZjBjNDc4Ii8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjY0MCIgaGVpZ2h0PSI0MjYiIGZpbGw9InVybCgjZykiLz48cmVjdCB4PSIzMiIgeT0iMzIiIHdpZHRoPSI1NzYiIGhlaWdodD0iMzYyIiByeD0iMTQiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjI4KSIgc3Ryb2tlLXdpZHRoPSIyIi8+PHRleHQgeD0iNDgiIHk9Ijc0IiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9IkludGVyLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMCIgZm9udC13ZWlnaHQ9IjcwMCI+QWZ0ZXIgdmlydHVhbCBjb3B5PC90ZXh0Pjx0ZXh0IHg9IjQ4IiB5PSIzNjAiIGZpbGw9IndoaXRlIiBmb250LWZhbWlseT0iTWVubG8sIG1vbm9zcGFjZSIgZm9udC1zaXplPSIxNiI+Z3JhcGhfcmV2X2FnZW50X2V4cGVydF9lZGl0X2RlbW9faW5pdGlhbF8yODQ0OmFwcGx5OmNvbW1hbmRfYWdlbnRfZXhwZXJ0X2VkaXRfZGVtb19hcHBseV8yODQ0PC90ZXh0Pjwvc3ZnPg=="
+          />
+          <p><code>artifact_agent_expert_edit_demo_after_virtual_copy_2844</code></p>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Workflow</h2>
+        <ol>
+          <li>Inspect: rawengine.local.toolRegistry.query over 28 tools.</li>
+          <li>Plan: deterministic provider prepared expert tone edit.</li>
+          <li>
+            Dry-run: tonecolor.dry_run_command ->
+            graph_rev_agent_expert_edit_demo_initial_2844:preview:command_agent_expert_edit_demo_dry_run_2844.
+          </li>
+          <li>Approval: edit_apply approved.</li>
+          <li>
+            Apply: tonecolor.apply_command ->
+            graph_rev_agent_expert_edit_demo_initial_2844:apply:command_agent_expert_edit_demo_apply_2844.
+          </li>
+          <li>Audit: 3 events, rejected apply-before-dry-run preserved.</li>
+        </ol>
+      </section>
+      <p class="muted">
+        No overwrite policy: never_overwrite_original. Proof hash:
+        sha256:49d2af0f339401a3483e70d0383a931ff4bdf9e9e0faeeea14006dd4c7fc4ded.
+      </p>
+    </main>
+  </body>
+</html>

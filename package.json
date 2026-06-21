@@ -531,6 +531,8 @@
     "check:agent-app-server-raw-edit-proof:update": "bun tests/integration/checks/check-agent-app-server-raw-edit-proof.ts --update",
     "check:agent-app-server-private-raw-artifacts": "bun tests/integration/checks/check-agent-app-server-private-raw-artifacts.ts",
     "check:agent-app-server-private-raw-artifacts:update": "bun tests/integration/checks/check-agent-app-server-private-raw-artifacts.ts --update",
+    "check:agent-expert-edit-demo-workflow": "bun tests/integration/checks/check-agent-expert-edit-demo-workflow.ts",
+    "check:agent-expert-edit-demo-workflow:update": "bun tests/integration/checks/check-agent-expert-edit-demo-workflow.ts --update",
     "check:ui-api-coverage": "bun tests/integration/checks/check-ui-api-coverage.ts",
     "schema:focus-app-server": "bun packages/rawengine-schema/scripts/check-focus-app-server-command-bus.ts",
     "schema:hdr-app-server": "bun packages/rawengine-schema/scripts/check-hdr-app-server-command-bus.ts",

@@ -555,9 +555,12 @@
           "parameterDiffs": "Parameter diffs",
           "pendingApply": "Review decision required; runtime replay is unavailable.",
           "rejectedApply": "Rejected plans cannot be applied.",
+          "runtimeReplayApply": "Matching dry-run was accepted and applied to a virtual-copy edit graph.",
           "title": "Dry-run review",
           "uiOnly": "Approval controls are visible for review only; apply stays disabled until runtime replay proof exists."
         },
+        "runtimeApplyDemo": "Runtime apply demo",
+        "runtimeApplyProof": "Runtime apply proof",
         "title": "Expert Agent",
         "transcript": "Tool-call transcript",
         "uiOnly": "UI-only"
