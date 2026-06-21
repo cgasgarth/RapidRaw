@@ -1930,6 +1930,7 @@ function HdrVisualSmoke() {
         data-bracket-validation={hdrSettings.bracketValidation}
         data-command={copy.hdrDryRunTool}
         data-deghosting={hdrSettings.deghosting}
+        data-estimated-preview-megapixels={Math.round((3 * hdrSettings.maxPreviewDimensionPx ** 2) / 1_000_000)}
         data-max-preview-dimension-px={hdrSettings.maxPreviewDimensionPx}
         data-runtime-status="dry_run_preview"
         data-source-count="3"

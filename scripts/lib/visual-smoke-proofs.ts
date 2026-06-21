@@ -214,6 +214,7 @@ export const hdrReviewWorkspaceProofSchema = z.object({
   bracketValidation: z.literal('required'),
   command: z.literal(hdrRoutePair.dryRunToolName),
   deghosting: z.literal('high'),
+  estimatedPreviewMegapixels: z.literal('201'),
   runtimeStatus: z.literal('dry_run_preview'),
   sourceCount: z.literal('3'),
 });
