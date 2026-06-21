@@ -844,6 +844,17 @@ async function prepareScenario(page, mode) {
     panoramaReviewWorkspaceProofSchema.parse(
       await page.getByTestId('panorama-review-workspace-proof').evaluate((element) => ({ ...element.dataset })),
     );
+    const runtimePlanProof = await page
+      .getByTestId('panorama-runtime-plan-summary')
+      .evaluate((element) => ({ ...element.dataset }));
+    if (
+      runtimePlanProof.runtimePlanReady !== 'true' ||
+      runtimePlanProof.planStatus !== 'accepted' ||
+      runtimePlanProof.planScope !== 'geometry_memory_only' ||
+      runtimePlanProof.outputDimensions !== '9600 x 3200'
+    ) {
+      throw new Error(`Panorama runtime plan proof failed: ${JSON.stringify(runtimePlanProof)}`);
+    }
     await page.getByTestId('panorama-artifact-handoff').getByText('/tmp/panorama.tif', { exact: true }).waitFor({
       timeout: 10_000,
     });

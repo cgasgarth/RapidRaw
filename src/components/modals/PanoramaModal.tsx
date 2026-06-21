@@ -11,6 +11,7 @@ import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
 
 import type {
+  PanoramaRuntimePlan,
   PanoramaUiBlendMode,
   PanoramaUiBoundaryMode,
   PanoramaUiExposureMode,
@@ -32,6 +33,7 @@ interface PanoramaModalProps {
   onSettingsChange: (settings: PanoramaUiSettings) => void;
   onStitch: () => void;
   progressMessage: string | null;
+  runtimePlan: PanoramaRuntimePlan | null;
   settings: PanoramaUiSettings;
 }
 
@@ -48,6 +50,7 @@ export default function PanoramaModal({
   onSettingsChange,
   onStitch,
   progressMessage,
+  runtimePlan,
   settings,
 }: PanoramaModalProps) {
   const { t } = useTranslation();
@@ -90,6 +93,19 @@ export default function PanoramaModal({
     0,
     Math.round(((imageCount ?? 0) * settings.maxPreviewDimensionPx ** 2 * 4) / 1_000_000),
   );
+  const runtimePlanMemoryMb =
+    runtimePlan === null
+      ? null
+      : Math.round(runtimePlan.preflight.memory_components.total_estimated_peak_bytes / 1_000_000);
+  const runtimePlanOutput = runtimePlan
+    ? `${runtimePlan.output_dimensions.width} x ${runtimePlan.output_dimensions.height}`
+    : t('modals.panorama.summaryBlocked');
+  const runtimePlanStatus =
+    runtimePlan === null
+      ? t('modals.panorama.summaryBlocked')
+      : runtimePlan.preflight.status === 'blocked_plan_only'
+        ? t('modals.panorama.summaryBlocked')
+        : t('modals.panorama.summaryReady');
   const sourceReadinessLabel = `${t('modals.panorama.summarySourceCount', { count: imageCount ?? 0 })} - ${
     isSourceCountValid ? t('modals.panorama.summaryReady') : t('modals.panorama.summaryBlocked')
   }`;
@@ -311,6 +327,50 @@ export default function PanoramaModal({
                 key={item.label}
               >
                 <UiText as="span" variant={TextVariants.small} className="block truncate text-text-tertiary">
+                  {item.label}
+                </UiText>
+                <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                  {item.value}
+                </UiText>
+              </div>
+            ))}
+          </section>
+
+          <section
+            className="mb-5 grid grid-cols-3 gap-2 rounded-md border border-border-color bg-surface p-3 text-xs"
+            data-boundary-mode={settings.boundaryMode}
+            data-execution-mode={runtimePlan?.preflight.execution_mode ?? ''}
+            data-memory-budget-ratio={runtimePlan?.preflight.memory_budget_ratio ?? ''}
+            data-output-dimensions={runtimePlanOutput}
+            data-plan-scope="geometry_memory_only"
+            data-plan-status={runtimePlan?.preflight.status ?? 'pending'}
+            data-projection={settings.projection}
+            data-runtime-plan-ready={String(runtimePlan !== null)}
+            data-testid="panorama-runtime-plan-summary"
+          >
+            {[
+              {
+                label: t('modals.panorama.summaryQuality'),
+                value: runtimePlanStatus,
+              },
+              {
+                label: t('modals.panorama.summaryWorkload'),
+                value: runtimePlanOutput,
+              },
+              {
+                label: t('modals.panorama.summaryMemory'),
+                value:
+                  runtimePlanMemoryMb === null
+                    ? t('modals.panorama.summaryBlocked')
+                    : t('modals.panorama.previewMemory', { value: runtimePlanMemoryMb }),
+              },
+            ].map((item) => (
+              <div
+                className="rounded border border-border-color bg-bg-primary px-2 py-1.5"
+                data-testid="panorama-runtime-plan-summary-chip"
+                key={item.label}
+              >
+                <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
                   {item.label}
                 </UiText>
                 <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
