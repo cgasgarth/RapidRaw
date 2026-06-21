@@ -527,6 +527,7 @@
     "check:rawengine-app-server-host": "bun tests/integration/checks/check-rawengine-app-server-host.ts",
     "check:rawengine-local-app-server-bridge": "bun tests/integration/checks/check-rawengine-local-app-server-bridge.ts",
     "check:local-app-server-audit-events": "bun tests/integration/checks/check-local-app-server-audit-events.ts",
+    "check:agent-unavailable-provider-workflow": "bun tests/integration/checks/check-agent-unavailable-provider-workflow.ts",
     "check:agent-app-server-raw-edit-proof": "bun tests/integration/checks/check-agent-app-server-raw-edit-proof.ts",
     "check:agent-app-server-raw-edit-proof:update": "bun tests/integration/checks/check-agent-app-server-raw-edit-proof.ts --update",
     "check:agent-app-server-private-raw-artifacts": "bun tests/integration/checks/check-agent-app-server-private-raw-artifacts.ts",
