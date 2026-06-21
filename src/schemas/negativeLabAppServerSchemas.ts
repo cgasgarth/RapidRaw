@@ -5,6 +5,9 @@ import {
   negativeLabFrameHealthReportSchema,
 } from './negativeLabFrameHealthSchemas';
 import {
+  negativeLabMeasuredProfileIdSchema,
+  negativeLabMeasuredProfileRuntimeLimitationSchema,
+  negativeLabMeasuredProfileRuntimeStatusSchema,
   negativeLabResolvedRuntimeProfileSchema,
   negativeLabRuntimePresetIdSchema,
 } from './negativeLabMeasuredProfileSchemas';
@@ -12,6 +15,7 @@ import {
   negativeBaseFogDensitometerReadoutSchema,
   negativeBaseFogEstimateSchema,
   negativeLabBaseFogSampleRectSchema,
+  negativeLabPresetIdSchema,
   negativeLabPresetParamsSchema,
 } from './negativeLabPresetCatalogSchemas';
 import { negativeLabStockMetadataCatalogSchema } from './negativeLabStockMetadataCatalogSchemas';
@@ -66,6 +70,29 @@ export const negativeLabAppServerCommandSchema = z
   })
   .strict();
 
+export const negativeLabSelectedProfileSnapshotAppServerSchema = z
+  .object({
+    claimLevel: z.enum(['generic_starting_point_only', 'measured_profile']),
+    claimPolicy: z.enum([
+      'generic_starting_point_no_stock_claim',
+      'measured_profile_required_before_stock_claim',
+      'process_family_profile_no_stock_claim',
+      'named_stock_profile_requires_license_review',
+    ]),
+    displayName: z.string().trim().min(1).max(80),
+    doesNotProve: z.array(negativeLabMeasuredProfileRuntimeLimitationSchema),
+    evidenceFixtureCount: z.number().int().nonnegative(),
+    measurementProfileId: negativeLabMeasuredProfileIdSchema.nullable(),
+    params: negativeLabPresetParamsSchema,
+    presetId: negativeLabRuntimePresetIdSchema,
+    profileProvenanceHash: negativeLabProfileProvenanceHashSchema,
+    profileStatus: z.enum(['generic_unmeasured', 'fixture_measured']),
+    provenanceSummary: z.string().trim().min(1).max(220),
+    runtimeStatus: negativeLabMeasuredProfileRuntimeStatusSchema,
+    sourceGenericPresetId: negativeLabPresetIdSchema.nullable(),
+  })
+  .strict();
+
 export const negativeLabFrameHealthAppServerCommandSchema = z
   .object({
     activePathIndex: z.number().int().nonnegative(),
@@ -86,6 +113,7 @@ export const negativeLabAcceptedBatchApplyAppServerCommandSchema = z
       scope: z.literal('all'),
     }),
     dryRun: negativeLabAcceptBatchPlanAppServerCommandSchema,
+    selectedProfileSnapshot: negativeLabSelectedProfileSnapshotAppServerSchema.optional(),
   })
   .strict();
 
@@ -304,8 +332,10 @@ export const negativeLabAcceptedBatchApplyPlanSchema = z
         dryRunRequired: z.literal(true),
         generatedFrom: z.literal('src/utils/negativeLabAppServerRoutes.ts'),
         identityMatched: z.literal(true),
+        selectedProfileBound: z.boolean(),
       })
       .strict(),
+    selectedProfileSnapshot: negativeLabSelectedProfileSnapshotAppServerSchema.optional(),
   })
   .strict()
   .superRefine((plan, context) => {
@@ -319,6 +349,12 @@ export const negativeLabAcceptedBatchApplyPlanSchema = z
 
     if (plan.apply.options.profileProvenanceHash !== plan.conversionPlan.profileProvenanceHash) {
       context.addIssue({ code: 'custom', message: 'Apply options must preserve selected profile provenance hash.' });
+    }
+
+    if (plan.selectedProfileSnapshot !== undefined) {
+      if (plan.selectedProfileSnapshot.presetId !== plan.conversionPlan.presetId) {
+        context.addIssue({ code: 'custom', message: 'Selected profile snapshot must match conversion preset.' });
+      }
     }
   });
 

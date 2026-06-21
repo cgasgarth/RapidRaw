@@ -10,6 +10,11 @@ import {
   NegativeLabOutputFormatId,
   NEGATIVE_LAB_OUTPUT_FORMAT_IDS,
 } from '../../../src/utils/negativeLabOutputFormatIds.ts';
+import { buildNegativeLabRuntimeProfileBrowserRows } from '../../../src/utils/negativeLabMeasuredProfileRuntime.ts';
+import {
+  buildNegativeLabBrowserProfileProvenanceHash,
+  buildNegativeLabSelectedProfileSnapshot,
+} from '../../../src/utils/negativeLabProfileComparison.ts';
 import {
   buildNegativeLabBatchSummaryRouteResult,
   buildNegativeLabAcceptedBatchApplyRouteResult,
@@ -37,6 +42,16 @@ const expectedStockFamilyConversionCommandName = NegativeLabAppServerCommandName
 const expectedStockRegistryCommandName = NegativeLabAppServerCommandName.StockRegistry;
 const runtimeCheckScripts = ['check:negative-lab-agent-workflow', 'check:negative-lab-measured-render-proof'];
 const failures = [];
+const selectedRuntimeProfile = buildNegativeLabRuntimeProfileBrowserRows().find(
+  (profile) => profile.presetId === 'negative_lab.generic.c41.neutral.v1',
+);
+if (selectedRuntimeProfile === undefined) {
+  throw new Error('Missing selected Negative Lab runtime profile fixture.');
+}
+const selectedProfileSnapshot = buildNegativeLabSelectedProfileSnapshot(
+  selectedRuntimeProfile,
+  buildNegativeLabBrowserProfileProvenanceHash(selectedRuntimeProfile),
+);
 const acceptBatchPlanRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
   (candidate) => candidate.commandName === expectedAcceptBatchPlanCommandName,
 );
@@ -200,6 +215,7 @@ const acceptedBatchApplyResult = buildNegativeLabAcceptedBatchApplyRouteResult({
     previewReady: false,
     targetPaths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
   },
+  selectedProfileSnapshot,
 });
 const densitometerResult = densitometerReadoutSchema.parse(
   buildNegativeLabDensitometerRouteResult({
@@ -262,10 +278,14 @@ if (
   acceptedBatchApplyResult.apply.options.acceptedDryRunPlanId !== acceptedBatchPlanResult.acceptedDryRunPlanId ||
   acceptedBatchApplyResult.apply.options.profileProvenanceHash !==
     acceptedBatchApplyResult.conversionPlan.profileProvenanceHash ||
+  acceptedBatchApplyResult.proof.selectedProfileBound !== true ||
+  acceptedBatchApplyResult.selectedProfileSnapshot?.profileProvenanceHash !==
+    selectedProfileSnapshot.profileProvenanceHash ||
+  acceptedBatchApplyResult.selectedProfileSnapshot.presetId !== 'negative_lab.generic.c41.neutral.v1' ||
   acceptedBatchApplyResult.apply.paths.join('|') !== '/roll/001.CR3|/roll/002.CR3' ||
   acceptedBatchApplyResult.dryRunSummary.skippedFrameIds[0] !== 'negative-lab-frame-3'
 ) {
-  throw new Error('Negative Lab app-server accepted apply route did not replay dry-run apply/skip evidence.');
+  throw new Error('Negative Lab app-server accepted apply route did not replay profile-bound dry-run evidence.');
 }
 if (
   densitometerResult.dominantChannel !== 'blue' ||
@@ -340,10 +360,38 @@ try {
       previewReady: false,
       targetPaths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
     },
+    selectedProfileSnapshot,
   });
   throw new Error('Mismatched Negative Lab accepted apply plan was accepted.');
 } catch (error) {
   if (error instanceof Error && error.message === 'Mismatched Negative Lab accepted apply plan was accepted.') {
+    throw error;
+  }
+}
+
+try {
+  buildNegativeLabAcceptedBatchApplyRouteResult({
+    acceptedPlan: acceptedBatchPlanResult,
+    conversion: {
+      outputFormat: NegativeLabOutputFormatId.JpegProof,
+      paths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
+      presetId: 'negative_lab.generic.c41.portrait.v1',
+      sampleRect,
+      scope: 'all',
+      suffix: 'Positive',
+    },
+    dryRun: {
+      activePathIndex: 1,
+      baseFogConfidence: 0.82,
+      includedPaths: ['/roll/001.CR3', '/roll/002.CR3'],
+      previewReady: false,
+      targetPaths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
+    },
+    selectedProfileSnapshot,
+  });
+  throw new Error('Mismatched Negative Lab selected profile snapshot was accepted.');
+} catch (error) {
+  if (error instanceof Error && error.message === 'Mismatched Negative Lab selected profile snapshot was accepted.') {
     throw error;
   }
 }
