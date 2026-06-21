@@ -1911,6 +1911,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                         : 'border-surface bg-bg-secondary text-text-secondary hover:bg-surface',
                     )}
                     data-claim-policy={profile.claimPolicy}
+                    data-comparison-preview={candidate.previewSwatch.deltaCss}
                     data-delta-summary={candidate.deltaSummary}
                     data-evidence-fixture-count={profile.evidenceFixtureCount}
                     data-profile-provenance-hash={candidate.selectedProfileSnapshot.profileProvenanceHash}
@@ -1932,9 +1933,20 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                       >
                         {profile.claimLevel === 'measured_profile'
                           ? t('modals.negativeConversion.presetClaimMeasured')
-                          : t('modals.negativeConversion.presetClaimGeneric')}
+                          : profile.claimLevel === 'user_profile'
+                            ? t('modals.negativeConversion.presetClaimUser')
+                            : t('modals.negativeConversion.presetClaimGeneric')}
                       </span>
                     </span>
+                    <span
+                      aria-hidden="true"
+                      className="mt-2 block h-6 rounded border border-surface"
+                      data-preview-candidate-color={candidate.previewSwatch.candidateCss}
+                      data-preview-current-color={candidate.previewSwatch.currentCss}
+                      data-preview-tone-bias={candidate.previewSwatch.toneBias}
+                      data-testid={`negative-lab-profile-comparison-preview-${profile.presetId}`}
+                      style={{ background: candidate.previewSwatch.deltaCss }}
+                    />
                     <span className="mt-1 flex flex-wrap gap-1.5 text-[10px] text-text-tertiary">
                       <span data-testid={`negative-lab-profile-comparison-runtime-${profile.presetId}`}>
                         {profile.runtimeStatus === 'runtime_parameter_applied'
