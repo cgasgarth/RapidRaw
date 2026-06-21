@@ -3,19 +3,19 @@
   "diagnosticArtifacts": [
     {
       "artifactId": "artifact_focus_blend_sharpness",
-      "contentHash": "sha256:54666e8b",
+      "contentHash": "sha256:11ae7246",
       "diagnosticType": "source_selection",
       "kind": "mask"
     },
     {
       "artifactId": "artifact_focus_blend_depth_confidence",
-      "contentHash": "sha256:96324cb2",
+      "contentHash": "sha256:990138b1",
       "diagnosticType": "focus_confidence",
       "kind": "mask"
     },
     {
       "artifactId": "artifact_focus_blend_retouch",
-      "contentHash": "sha256:f10dd87e",
+      "contentHash": "sha256:c623758f",
       "diagnosticType": "retouch_risk",
       "kind": "mask"
     }
