@@ -95,6 +95,18 @@ const applied = bus.execute({
   toolName: superResolutionRoutePair.applyToolName,
 });
 if (applied.kind !== 'apply') throw new Error('Expected apply dispatch result.');
+if (applied.apply.sidecarArtifact.validationSummary.humanReviewStatus !== 'pending') {
+  throw new Error('Expected SR sidecar artifact to require pending human review.');
+}
+if (!applied.apply.sidecarArtifact.warningCodes.includes('human_review_required')) {
+  throw new Error('Expected SR sidecar artifact to include human_review_required warning.');
+}
+if (applied.apply.sidecarArtifact.outputArtifact.contentHash === undefined) {
+  throw new Error('Expected SR sidecar output artifact hash for review.');
+}
+if (applied.apply.sidecarArtifact.outputArtifact.dimensions?.width !== HIGH_WIDTH) {
+  throw new Error('Expected SR sidecar output width to match rendered output.');
+}
 
 expectThrows('unaccepted apply plan', () =>
   new SuperResolutionAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1).execute({
@@ -112,6 +124,7 @@ if (improvementRatio < 0.65) throw new Error(`Expected SR improvement ratio >= 0
 
 const result = {
   fixture: 'synthetic_sr_app_server_runtime_v1',
+  humanReviewStatus: applied.apply.sidecarArtifact.validationSummary.humanReviewStatus,
   improvementRatio,
   outputSha256: new Bun.CryptoHasher('sha256').update(new Uint8Array(applied.apply.outputPixels.buffer)).digest('hex'),
   planId: dryRun.dryRun.dryRunResult.mergePlan.planId,

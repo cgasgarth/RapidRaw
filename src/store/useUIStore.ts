@@ -14,6 +14,8 @@ import {
   type SuperResolutionUiSettings,
 } from '../schemas/superResolutionUiSchemas';
 
+import type { SuperResolutionOutputReviewWorkflow } from '../schemas/superResolutionOutputReviewSchemas';
+
 export interface CollapsibleSectionsState {
   basic: boolean;
   color: boolean;
@@ -80,6 +82,7 @@ export interface SuperResolutionModalState {
     sources: number;
     toolName: string;
   };
+  outputReview: SuperResolutionOutputReviewWorkflow | null;
   settings: SuperResolutionUiSettings;
   sourcePaths: Array<string>;
 }
@@ -150,6 +153,7 @@ export const createDefaultSuperResolutionModalState = (
   settings: SuperResolutionUiSettings = DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
 ): SuperResolutionModalState => ({
   isOpen: false,
+  outputReview: null,
   settings,
   sourcePaths: [],
 });

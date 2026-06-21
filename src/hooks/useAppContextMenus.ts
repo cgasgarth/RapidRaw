@@ -623,6 +623,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                 setUI({
                   superResolutionModalState: {
                     isOpen: true,
+                    outputReview: null,
                     settings: DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
                     sourcePaths: finalSelection,
                   },

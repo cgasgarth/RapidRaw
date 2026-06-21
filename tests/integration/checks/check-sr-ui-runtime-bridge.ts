@@ -11,6 +11,7 @@ import {
 } from '../../../packages/rawengine-schema/src/superResolutionUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
+import { buildSuperResolutionOutputReviewFromArtifact } from '../../../src/utils/superResolutionOutputReview.ts';
 
 const superResolutionRoutePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');
 const SCALE = 2;
@@ -84,6 +85,19 @@ if (applied.kind !== 'apply') throw new Error('Expected SR UI runtime bridge app
 if (applied.apply.provenance.acceptedDryRunPlanId !== dryRun.dryRun.dryRunResult.mergePlan.planId) {
   throw new Error('SR UI runtime bridge did not preserve accepted dry-run plan ID.');
 }
+const outputReview = buildSuperResolutionOutputReviewFromArtifact(applied.apply.sidecarArtifact);
+if (outputReview.editableGate !== 'blocked_review_required') {
+  throw new Error(`Expected SR output review to block editable handoff, got ${outputReview.editableGate}.`);
+}
+if (outputReview.humanReviewStatus !== 'pending') {
+  throw new Error(`Expected pending human review, got ${outputReview.humanReviewStatus}.`);
+}
+if (outputReview.outputArtifactHash !== applied.apply.sidecarArtifact.outputArtifact.contentHash) {
+  throw new Error('SR output review did not preserve output artifact hash.');
+}
+if (!outputReview.warningCodes.includes('human_review_required')) {
+  throw new Error('SR output review must keep human-review warning.');
+}
 
 expectThrows('mismatched accepted SR UI runtime plan', () =>
   bus.execute({
@@ -108,6 +122,8 @@ if (improvementRatio < 0.65) throw new Error(`Expected SR improvement ratio >= 0
 const result = {
   fixture: 'synthetic_sr_ui_runtime_bridge_v1',
   improvementRatio,
+  outputReviewEditableGate: outputReview.editableGate,
+  outputReviewStatus: outputReview.humanReviewStatus,
   outputSha256: new Bun.CryptoHasher('sha256').update(new Uint8Array(applied.apply.outputPixels.buffer)).digest('hex'),
   planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
 };
