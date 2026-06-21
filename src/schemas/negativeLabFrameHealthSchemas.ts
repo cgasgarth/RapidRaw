@@ -8,6 +8,13 @@ export const negativeLabFrameBaseScopeSchema = z.enum(['frame', 'roll']);
 export const negativeLabFrameConversionStatusSchema = z.enum(['preview_pending', 'preview_ready', 'queued', 'skipped']);
 export const negativeLabFrameCropStatusSchema = z.enum(['active_frame_editable', 'roll_default', 'skipped']);
 export const negativeLabFrameQcStatusSchema = z.enum(['ready', 'review', 'skipped']);
+export const negativeLabFrameBatchDispositionSchema = z.enum(['apply', 'review', 'skip']);
+export const negativeLabFrameBatchDispositionReasonSchema = z.enum([
+  'acquisition_review_required',
+  'excluded_from_batch',
+  'preview_required',
+  'ready_to_apply',
+]);
 export const negativeLabFrameWarningSeveritySchema = z.enum(['ok', 'info', 'review']);
 export const negativeLabFrameWarningCodeSchema = z.enum([
   'base_estimate_active_frame_only',
@@ -73,6 +80,8 @@ export const negativeLabFrameHealthEntrySchema = z
     baseConfidence: z.number().min(0).max(1).nullable(),
     baseScope: negativeLabFrameBaseScopeSchema,
     baseStatus: negativeLabFrameBaseStatusSchema,
+    batchDisposition: negativeLabFrameBatchDispositionSchema,
+    batchDispositionReason: negativeLabFrameBatchDispositionReasonSchema,
     conversionStatus: negativeLabFrameConversionStatusSchema,
     cropStatus: negativeLabFrameCropStatusSchema,
     frameId: z.string().trim().min(1),
@@ -157,8 +166,16 @@ export const negativeLabBatchDryRunSummarySchema = z
     affectedFrameIds: z.array(z.string().trim().min(1)),
     acquisitionReviewFrameIds: z.array(z.string().trim().min(1)),
     blocked: z.boolean(),
+    dispositionCounts: z
+      .object({
+        apply: z.number().int().nonnegative(),
+        review: z.number().int().nonnegative(),
+        skip: z.number().int().nonnegative(),
+      })
+      .strict(),
     frameHealthReport: negativeLabFrameHealthReportSchema,
     plannedApplyCount: z.number().int().nonnegative(),
+    reviewFrameIds: z.array(z.string().trim().min(1)),
     rollWarningCodes: z.array(negativeLabFrameWarningCodeSchema),
     schemaVersion: z.literal(NEGATIVE_LAB_FRAME_HEALTH_SCHEMA_VERSION),
     skippedFrameIds: z.array(z.string().trim().min(1)),
@@ -183,6 +200,25 @@ export const negativeLabBatchDryRunSummarySchema = z
       context.addIssue({ code: 'custom', message: 'Negative Lab dry-run apply count is stale.' });
     }
 
+    const dispositionCounts = summary.frameHealthReport.frames.reduce(
+      (counts, frame) => ({ ...counts, [frame.batchDisposition]: counts[frame.batchDisposition] + 1 }),
+      { apply: 0, review: 0, skip: 0 },
+    );
+    if (
+      summary.dispositionCounts.apply !== dispositionCounts.apply ||
+      summary.dispositionCounts.review !== dispositionCounts.review ||
+      summary.dispositionCounts.skip !== dispositionCounts.skip
+    ) {
+      context.addIssue({ code: 'custom', message: 'Negative Lab dry-run disposition counts are stale.' });
+    }
+
+    const reviewFrameIds = summary.frameHealthReport.frames
+      .filter((frame) => frame.batchDisposition === 'review')
+      .map((frame) => frame.frameId);
+    if (summary.reviewFrameIds.join('\n') !== reviewFrameIds.join('\n')) {
+      context.addIssue({ code: 'custom', message: 'Negative Lab dry-run review frames are stale.' });
+    }
+
     const acquisitionReviewFrameIds = summary.frameHealthReport.frames
       .filter((frame) => frame.acquisitionWarningCodes.length > 0)
       .map((frame) => frame.frameId);
@@ -199,6 +235,8 @@ export type NegativeLabFrameHealthStatus = z.infer<typeof negativeLabFrameHealth
 export type NegativeLabFrameBaseScope = z.infer<typeof negativeLabFrameBaseScopeSchema>;
 export type NegativeLabFrameWarningSeverity = z.infer<typeof negativeLabFrameWarningSeveritySchema>;
 export type NegativeLabFrameWarningCode = z.infer<typeof negativeLabFrameWarningCodeSchema>;
+export type NegativeLabFrameBatchDisposition = z.infer<typeof negativeLabFrameBatchDispositionSchema>;
+export type NegativeLabFrameBatchDispositionReason = z.infer<typeof negativeLabFrameBatchDispositionReasonSchema>;
 export type NegativeLabAcquisitionSourceFamily = z.infer<typeof negativeLabAcquisitionSourceFamilySchema>;
 export type NegativeLabAcquisitionWarningCode = z.infer<typeof negativeLabAcquisitionWarningCodeSchema>;
 export type NegativeLabFrameAcquisitionHealth = z.infer<typeof negativeLabFrameAcquisitionHealthSchema>;

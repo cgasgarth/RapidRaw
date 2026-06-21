@@ -1276,6 +1276,15 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-frame-source-0').getByText('JPEG/lossy', { exact: true }).waitFor({
     timeout: 10_000,
   });
+  await page.getByTestId('negative-lab-frame-disposition-0').getByText('Review', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-roll-frame-disposition-1').getByText('Review', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-review-frame-count').getByText('Review 1', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
   await page
     .getByTestId('negative-lab-frame-acquisition-warning-chip-lossy_source_for_negative_lab')
     .getByText('Lossy input', { exact: true })
@@ -1531,9 +1540,11 @@ async function prepareScenario(page, mode) {
   if (
     !copiedBatchPlan.includes('"plannedApplyCount"') ||
     !copiedBatchPlan.includes('"skippedFrameIds"') ||
-    !copiedBatchPlan.includes('"acquisitionReviewFrameIds"')
+    !copiedBatchPlan.includes('"acquisitionReviewFrameIds"') ||
+    !copiedBatchPlan.includes('"dispositionCounts"') ||
+    !copiedBatchPlan.includes('"reviewFrameIds"')
   ) {
-    throw new Error('Negative Lab batch plan copy did not include apply/skip/acquisition JSON.');
+    throw new Error('Negative Lab batch plan copy did not include apply/skip/acquisition/disposition JSON.');
   }
   await page.getByTestId('negative-lab-accept-batch-plan').click();
   await page

@@ -156,6 +156,15 @@ type AcquisitionWarningLabelKey =
   | 'modals.negativeConversion.acquisitionWarningLossy'
   | 'modals.negativeConversion.acquisitionWarningMixed'
   | 'modals.negativeConversion.acquisitionWarningUnknown';
+type BatchDispositionLabelKey =
+  | 'modals.negativeConversion.batchDispositionApply'
+  | 'modals.negativeConversion.batchDispositionReview'
+  | 'modals.negativeConversion.batchDispositionSkip';
+type BatchDispositionReasonLabelKey =
+  | 'modals.negativeConversion.batchDispositionReasonAcquisition'
+  | 'modals.negativeConversion.batchDispositionReasonExcluded'
+  | 'modals.negativeConversion.batchDispositionReasonPreview'
+  | 'modals.negativeConversion.batchDispositionReasonReady';
 
 const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
 const DEFAULT_SAVE_OPTIONS = {
@@ -307,6 +316,17 @@ const ACQUISITION_WARNING_LABEL_KEYS = {
   mixed_source_families: 'modals.negativeConversion.acquisitionWarningMixed',
   unknown_acquisition_state: 'modals.negativeConversion.acquisitionWarningUnknown',
 } satisfies Record<NegativeLabAcquisitionWarningCode, AcquisitionWarningLabelKey>;
+const BATCH_DISPOSITION_LABEL_KEYS = {
+  apply: 'modals.negativeConversion.batchDispositionApply',
+  review: 'modals.negativeConversion.batchDispositionReview',
+  skip: 'modals.negativeConversion.batchDispositionSkip',
+} satisfies Record<NegativeLabFrameHealthEntry['batchDisposition'], BatchDispositionLabelKey>;
+const BATCH_DISPOSITION_REASON_LABEL_KEYS = {
+  acquisition_review_required: 'modals.negativeConversion.batchDispositionReasonAcquisition',
+  excluded_from_batch: 'modals.negativeConversion.batchDispositionReasonExcluded',
+  preview_required: 'modals.negativeConversion.batchDispositionReasonPreview',
+  ready_to_apply: 'modals.negativeConversion.batchDispositionReasonReady',
+} satisfies Record<NegativeLabFrameHealthEntry['batchDispositionReason'], BatchDispositionReasonLabelKey>;
 const isNegativeLabFrameHealthFilter = (value: string): value is NegativeLabFrameHealthFilter =>
   NEGATIVE_LAB_FRAME_HEALTH_FILTERS.some((filter) => filter === value);
 const isNegativeLabFrameHealthSort = (value: string): value is NegativeLabFrameHealthSort =>
@@ -1155,6 +1175,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           options: {
             ...saveOptions,
             ...(requiresAcceptedBatchPlan ? acceptedBatchPlanIdentity : {}),
+            batchDisposition: batchDryRunSummary.dispositionCounts,
+            reviewFrameIds: batchDryRunSummary.reviewFrameIds,
             acquisitionSourceFamilies: frameHealthReport.acquisitionHealth.sourceFamilies,
             acquisitionWarningCodes: frameHealthReport.acquisitionHealth.warningCodes,
             ...(selectedProfileProvenanceHash === null ? {} : { profileProvenanceHash: selectedProfileProvenanceHash }),
@@ -1226,13 +1248,14 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             </span>
           </div>
           <div
-            className="mb-2 grid grid-cols-4 gap-1 text-[11px] text-white/70"
+            className="mb-2 grid grid-cols-5 gap-1 text-[11px] text-white/70"
             data-active-frame-id={activeFrame?.frameId ?? ''}
             data-base-scope={baseFogScope}
             data-base-status={activeFrame?.baseStatus ?? 'pending'}
             data-export-ready={String(workspaceProof.exportReady)}
             data-planned-apply-count={batchDryRunSummary.plannedApplyCount}
             data-profile-id={selectedProfile?.presetId ?? 'custom'}
+            data-review-frame-count={batchDryRunSummary.reviewFrameIds.length}
             data-testid="negative-lab-roll-queue-summary"
             data-warning-count={activeFrame === null ? 0 : getNegativeLabFrameWarningCount(activeFrame)}
           >
@@ -1261,7 +1284,15 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 : t('modals.negativeConversion.workflowExportBlocked')}
             </span>
             <span
-              className="col-span-4 truncate rounded bg-white/5 px-2 py-1"
+              className="truncate rounded bg-white/5 px-2 py-1"
+              data-testid="negative-lab-roll-selected-disposition"
+            >
+              {activeFrame === null
+                ? t('modals.negativeConversion.batchDispositionReview')
+                : t(BATCH_DISPOSITION_LABEL_KEYS[activeFrame.batchDisposition])}
+            </span>
+            <span
+              className="col-span-5 truncate rounded bg-white/5 px-2 py-1"
               data-testid="negative-lab-roll-selected-warnings"
             >
               {t('modals.negativeConversion.frameHealthWarningCount', {
@@ -1342,11 +1373,23 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                       ))}
                       <span
                         className="rounded bg-black/30 px-1.5 py-0.5 text-[11px]"
+                        data-disposition={frame.batchDisposition}
                         data-testid={`negative-lab-roll-frame-runtime-${index}`}
                       >
                         {framePreviewReady
                           ? t('modals.negativeConversion.previewReady')
                           : t('modals.negativeConversion.previewPending')}
+                      </span>
+                      <span
+                        className={cx(
+                          'rounded px-1.5 py-0.5 text-[11px]',
+                          frame.batchDisposition === 'apply' && 'bg-accent/15 text-white',
+                          frame.batchDisposition === 'review' && 'bg-yellow-500/15 text-yellow-100',
+                          frame.batchDisposition === 'skip' && 'bg-black/30 text-white/60',
+                        )}
+                        data-testid={`negative-lab-roll-frame-disposition-${index}`}
+                      >
+                        {t(BATCH_DISPOSITION_LABEL_KEYS[frame.batchDisposition])}
                       </span>
                     </span>
                   </button>
@@ -1506,6 +1549,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 skippedCount: batchDryRunSummary.skippedFrameIds.length,
               })}
             </span>
+            <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-review-frame-count">
+              {t('modals.negativeConversion.batchPlanReviewCount', {
+                reviewCount: batchDryRunSummary.reviewFrameIds.length,
+              })}
+            </span>
             <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-batch-workload-summary">
               {t('modals.negativeConversion.batchWorkloadSummary', {
                 applyCount: batchDryRunSummary.plannedApplyCount,
@@ -1599,10 +1647,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           <div className="grid gap-1">
             {visibleFrameHealthRows.map((row: NegativeLabFrameHealthEntry, index) => (
               <div
-                className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto] items-center gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
+                className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto_auto] items-center gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
                 data-acquisition-source={row.acquisitionSourceFamily}
                 data-conversion-status={row.conversionStatus}
                 data-crop-status={row.cropStatus}
+                data-disposition={row.batchDisposition}
                 data-qc-status={row.qcStatus}
                 data-severity={row.warningSeverity}
                 data-warning-count={getNegativeLabFrameWarningCount(row)}
@@ -1665,12 +1714,24 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 <span className="text-text-tertiary" data-testid={`negative-lab-frame-conversion-status-${index}`}>
                   {t(`modals.negativeConversion.frameConversionStatus.${row.conversionStatus}`)}
                 </span>
+                <span
+                  className={cx(
+                    'rounded px-1.5 py-0.5',
+                    row.batchDisposition === 'apply' && 'bg-accent/15 text-text-primary',
+                    row.batchDisposition === 'review' && 'bg-yellow-500/15 text-yellow-200',
+                    row.batchDisposition === 'skip' && 'bg-bg-primary text-text-tertiary',
+                  )}
+                  data-testid={`negative-lab-frame-disposition-${index}`}
+                  title={t(BATCH_DISPOSITION_REASON_LABEL_KEYS[row.batchDispositionReason])}
+                >
+                  {t(BATCH_DISPOSITION_LABEL_KEYS[row.batchDisposition])}
+                </span>
                 <span className="text-text-tertiary" data-testid={`negative-lab-frame-qc-status-${index}`}>
                   {t(`modals.negativeConversion.frameQcStatus.${row.qcStatus}`)}
                 </span>
                 {getNegativeLabFrameWarningCount(row) > 0 && (
                   <span
-                    className="col-span-7 flex flex-wrap gap-1"
+                    className="col-span-8 flex flex-wrap gap-1"
                     data-testid={`negative-lab-frame-warning-row-${index}`}
                   >
                     {row.warningCodes.map((warningCode) => (

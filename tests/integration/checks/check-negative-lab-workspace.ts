@@ -26,10 +26,11 @@ const mixedAcquisitionReport = buildNegativeLabFrameHealthReport({
   activePathIndex: 0,
   baseFogConfidence: null,
   includedPathSet: new Set(['/roll/001.CR3', '/roll/proof.jpg', '/roll/source.unknown']),
-  previewReady: false,
+  previewReady: true,
   targetPaths: ['/roll/001.CR3', '/roll/proof.jpg', '/roll/source.unknown'],
-}).acquisitionHealth;
+});
 const reviewReport = buildNegativeLabDustScratchReviewReport(frameHealthReport, true);
+const mixedReviewReport = buildNegativeLabDustScratchReviewReport(mixedAcquisitionReport, true);
 const qcProofReport = buildNegativeLabQcProofReport(reviewReport, true, true);
 const proof = negativeLabWorkspaceProofSchema.parse({
   activeStage: 'inspection',
@@ -59,9 +60,16 @@ for (const warningCode of [
   'mixed_source_families',
   'unknown_acquisition_state',
 ] as const) {
-  if (!mixedAcquisitionReport.warningCodes.includes(warningCode)) {
+  if (!mixedAcquisitionReport.acquisitionHealth.warningCodes.includes(warningCode)) {
     throw new Error(`Negative Lab acquisition health missing mixed-input warning: ${warningCode}`);
   }
+}
+
+if (
+  mixedAcquisitionReport.frames.filter((frame) => frame.batchDisposition === 'review').length !== 2 ||
+  !mixedReviewReport.frames.some((frame) => frame.findingCodes.includes('acquisition_review_required'))
+) {
+  throw new Error('Negative Lab acquisition warnings did not become actionable review dispositions.');
 }
 
 if (!proof.reviewReport.frames.some((frame) => frame.findingCodes.includes('base_fog_only_review'))) {
@@ -112,8 +120,15 @@ for (const marker of [
   'negative-lab-qc-proof-artifact',
   'data-contact-sheet-hash={qcProofArtifact.contactSheet.artifact.contentHash}',
   'data-planned-apply-count={batchDryRunSummary.plannedApplyCount}',
+  'data-review-frame-count={batchDryRunSummary.reviewFrameIds.length}',
   'data-review-count={dustScratchReviewReport.reviewCount}',
   'data-skipped-frame-count={batchDryRunSummary.skippedFrameIds.length}',
+  'negative-lab-review-frame-count',
+  'negative-lab-frame-disposition-',
+  'negative-lab-roll-frame-disposition-',
+  'negative-lab-roll-selected-disposition',
+  'batchDisposition: batchDryRunSummary.dispositionCounts',
+  'reviewFrameIds: batchDryRunSummary.reviewFrameIds',
   'data-preview-ready={String(workspaceProof.previewReady)}',
   'data-export-ready={String(workspaceProof.exportReady)}',
   'data-profile-status={selectedProfile.profileStatus}',

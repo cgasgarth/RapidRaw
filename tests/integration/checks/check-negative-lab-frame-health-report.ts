@@ -90,6 +90,28 @@ if (acquisitionReport.frames[1]?.warningSeverity !== 'review') {
 if (acquisitionDryRunSummary.acquisitionReviewFrameIds[0] !== 'negative-lab-frame-2') {
   failures.push('dry-run summary should identify acquisition review frame');
 }
+if (
+  acquisitionReport.frames[0]?.batchDisposition !== 'apply' ||
+  acquisitionReport.frames[0]?.batchDispositionReason !== 'ready_to_apply'
+) {
+  failures.push('TIFF acquisition should be ready to apply');
+}
+if (
+  acquisitionReport.frames[1]?.batchDisposition !== 'review' ||
+  acquisitionReport.frames[1]?.batchDispositionReason !== 'acquisition_review_required'
+) {
+  failures.push('JPEG acquisition should require batch review disposition');
+}
+if (
+  acquisitionDryRunSummary.dispositionCounts.apply !== 1 ||
+  acquisitionDryRunSummary.dispositionCounts.review !== 1 ||
+  acquisitionDryRunSummary.dispositionCounts.skip !== 0
+) {
+  failures.push('dry-run summary should count apply/review/skip dispositions');
+}
+if (acquisitionDryRunSummary.reviewFrameIds[0] !== 'negative-lab-frame-2') {
+  failures.push('dry-run summary should identify review disposition frame');
+}
 
 if (failures.length > 0) {
   console.error('Negative Lab frame health report validation failed:');
