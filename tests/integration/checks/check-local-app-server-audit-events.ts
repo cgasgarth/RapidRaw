@@ -6,6 +6,7 @@ import {
 } from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
 import { toneColorMutationResultV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
+  sampleAiEnhancementCommandEnvelopeV1,
   sampleToneColorApplyCommandEnvelopeV1,
   sampleToneColorCommandEnvelopeV1,
 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
@@ -30,6 +31,32 @@ if (!dryRun.ok) failures.push(`Dry-run failed: ${dryRun.message}`);
 const apply = await bridge.dispatch(sampleToneColorApplyCommandEnvelopeV1, context);
 if (!apply.ok) failures.push(`Apply failed after dry-run: ${apply.message}`);
 if (apply.ok) toneColorMutationResultV1Schema.parse(apply.result);
+
+const unavailableProviderBridge = createRawEngineLocalAppServerBridge();
+const unavailableProviderCommand = {
+  ...sampleAiEnhancementCommandEnvelopeV1,
+  parameters: {
+    ...sampleAiEnhancementCommandEnvelopeV1.parameters,
+    providerClass: 'self_hosted_connector',
+    providerId: 'missing-local-connector',
+    sourcePixelDisclosure: 'local_only',
+  },
+} as const;
+const unavailableProviderResult = await unavailableProviderBridge.dispatch(unavailableProviderCommand, context);
+if (unavailableProviderResult.ok) failures.push('Unavailable AI provider dry-run must be rejected.');
+const [unavailableProviderAudit] = unavailableProviderBridge.listAuditEvents();
+if (unavailableProviderAudit?.providerFallback?.fallbackReason !== 'provider_unavailable') {
+  failures.push('Unavailable provider rejection must record provider fallback metadata.');
+}
+if (unavailableProviderAudit?.providerFallback?.requestedProviderId !== 'missing-local-connector') {
+  failures.push('Unavailable provider audit must preserve requested provider id.');
+}
+if (unavailableProviderAudit?.mutates !== false || unavailableProviderAudit.dryRun !== true) {
+  failures.push('Unavailable provider audit must remain non-mutating dry-run evidence.');
+}
+if (!unavailableProviderAudit?.warnings.some((warning) => warning.includes('no pixels were sent'))) {
+  failures.push('Unavailable provider audit must include a user-visible non-disclosure warning.');
+}
 
 const auditEvents = bridge.listAuditEvents().map((event) => rawEngineLocalAppServerAuditEventV1Schema.parse(event));
 const [dryRunAudit, applyAudit] = auditEvents;
