@@ -194,7 +194,9 @@ export function MergeFooterActions({
         >
           {labels.close}
         </button>
-        <Button onClick={onOpen}>{labels.openInEditor}</Button>
+        <Button data-open-target-path={savedPath} data-testid="merge-open-saved-output" onClick={onOpen}>
+          {labels.openInEditor}
+        </Button>
       </>
     );
   }

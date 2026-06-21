@@ -135,6 +135,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi]: FocusPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FocusUi]: FocusStackVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawUi]: HdrPrivateRawVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.HdrSavedOutputEditorPath]: HdrSavedOutputEditorPathVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.HdrUi]: HdrVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LayerMaskPrivateRawUi]: LayerMaskPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LayerStackWorkflow]: LayerStackWorkflowVisualSmoke,
@@ -568,6 +569,7 @@ const copy = {
   createBwProofCopy: 'Create B&W proof copy',
   virtualCopyShort: 'VC',
   hdrReview: 'HDR review',
+  hdrSavedOutputEditorPath: 'HDR saved output editor path',
   hdrDryRunPreview: 'Dry-run preview',
   hdrArtifactHandoff: 'Artifact handoff',
   hdrApplyTool: getComputationalMergeAppServerRoutePairSummary('hdr').applyToolName,
@@ -1103,6 +1105,21 @@ const panoramaPreviewSvg = encodeURIComponent(`
 </svg>`);
 
 const panoramaPreviewUrl = `data:image/svg+xml,${panoramaPreviewSvg}`;
+const hdrPreviewSvg = encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640">
+  <defs>
+    <linearGradient id="hdr" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#101820"/>
+      <stop offset="0.45" stop-color="#4f6c73"/>
+      <stop offset="1" stop-color="#f7d08c"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="640" fill="url(#hdr)"/>
+  <circle cx="720" cy="130" r="70" fill="#fff5c4" opacity="0.9"/>
+  <rect x="80" y="300" width="800" height="210" rx="18" fill="#15242c" opacity="0.9"/>
+  <path d="M110 475 C280 390 390 420 520 345 C660 265 765 330 850 260" fill="none" stroke="#e7d6a1" stroke-width="18" opacity="0.8"/>
+</svg>`);
+const tinyPreviewDataUrl = `data:image/svg+xml,${hdrPreviewSvg}`;
 const filmSmokeMetricLabels = {
   contrast: 'Contrast',
   grain: 'Grain',
@@ -1976,6 +1993,51 @@ function HdrVisualSmoke() {
           </div>
         </div>
       </aside>
+    </main>
+  );
+}
+
+function HdrSavedOutputEditorPathVisualSmoke() {
+  const [savedPath, setSavedPath] = useState<string | null>(null);
+  const [openedPath, setOpenedPath] = useState<string | null>(null);
+  const expectedPath = '/tmp/rawengine-hdr-smoke.tif';
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.HdrSavedOutputEditorPath}
+    >
+      <div className="absolute inset-0 bg-[#0f1114]" data-visual-smoke-section="hdr-saved-output-editor-path" />
+      <div className="fixed left-4 top-4 z-50 rounded-md border border-white/10 bg-black/75 px-3 py-2 text-sm font-semibold">
+        {copy.hdrSavedOutputEditorPath}
+      </div>
+      <div
+        className="sr-only"
+        data-entered-normal-editor-path={String(openedPath === expectedPath)}
+        data-open-callback="handleImageSelect"
+        data-opened-path={openedPath ?? ''}
+        data-saved-path={savedPath ?? ''}
+        data-testid="hdr-saved-output-editor-path-proof"
+      />
+      <HdrModal
+        error={null}
+        finalImageBase64={tinyPreviewDataUrl}
+        imageCount={3}
+        isOpen
+        isProcessing={false}
+        loadingImageUrl={null}
+        onClose={() => {}}
+        onMerge={() => {}}
+        onOpenFile={setOpenedPath}
+        onSave={() => {
+          setSavedPath(expectedPath);
+          return Promise.resolve(expectedPath);
+        }}
+        onSettingsChange={() => {}}
+        progressMessage={null}
+        settings={DEFAULT_HDR_MERGE_UI_SETTINGS}
+      />
     </main>
   );
 }
