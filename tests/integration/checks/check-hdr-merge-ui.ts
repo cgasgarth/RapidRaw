@@ -21,6 +21,7 @@ const requiredLocaleKeys = [
   'deghostingLabel',
   'previewBudgetLabel',
   'previewPixels',
+  'previewWorkload',
   'quality.balanced',
   'quality.best',
   'quality.preview',
@@ -42,6 +43,7 @@ const requiredLocaleKeys = [
   'summarySources',
   'summaryStrategy',
   'summaryToneMapPreview',
+  'summaryWorkload',
   'toneMapPreview',
   'uiOnlyNotice',
   'workflowStatus',
@@ -77,6 +79,8 @@ const source = readFileSync('src/components/modals/HdrModal.tsx', 'utf8');
 for (const marker of [
   'hdr-setup-summary',
   'hdr-setup-summary-chip',
+  'data-estimated-preview-megapixels={estimatedPreviewMegapixels}',
+  'data-preview-source-count={imageCount ?? 0}',
   'hdr-readiness-summary',
   'hdr-readiness-sources',
   'hdr-readiness-validation',
@@ -89,6 +93,8 @@ for (const marker of [
   'modals.hdr.summaryReady',
   'modals.hdr.summaryStrategy',
   'modals.hdr.summaryToneMapPreview',
+  'modals.hdr.summaryWorkload',
+  'modals.hdr.previewWorkload',
   'modals.hdr.summaryAlignment',
   'settings.maxPreviewDimensionPx',
 ]) {

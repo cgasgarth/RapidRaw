@@ -1755,7 +1755,7 @@
       "openInEditor": "Otwórz w edytorze",
       "previewBudgetLabel": "Preview budget",
       "previewPixels": "{{value}} px",
-      "previewWorkload": "{{count}} MP",
+      "previewWorkload": "{{value}} MP",
       "quality": {
         "balanced": "Balanced",
         "best": "Best",
@@ -1789,6 +1789,7 @@
       "summaryStrategy": "Strategy",
       "summaryTitle": "Merge summary",
       "summaryToneMapPreview": "Tone map",
+      "summaryWorkload": "Workload",
       "title": "Scal do HDR",
       "toneMapPreview": "Tone-map preview",
       "uiOnlyNotice": "These controls define the requested HDR merge artifact. Runtime merge quality remains validated by fixture, sidecar, and image-processing checks.",
