@@ -64,11 +64,13 @@ const EditorToolbar = memo(
     const showResolution = !isAndroid && selectedImage.width > 0 && selectedImage.height > 0;
     const [displayedResolution, setDisplayedResolution] = useState('');
 
-    const { baseName, isVirtualCopy, vcId, exifData, hasExif } = useMemo(() => {
+    const { baseName, fileTypeLabel, isVirtualCopy, vcId, exifData, hasExif } = useMemo(() => {
       const path = selectedImage.path;
       const parts = path.split('?vc=');
       const imagePath = parts[0] ?? path;
       const fullFileName = imagePath.split(/[\\/]/).pop() || '';
+      const extensionMatch = /\.([a-z0-9]+)$/i.exec(fullFileName);
+      const fileType = extensionMatch?.[1]?.toUpperCase() ?? 'FILE';
 
       const exif = selectedImage.exif || {};
 
@@ -105,6 +107,7 @@ const EditorToolbar = memo(
 
       return {
         baseName: fullFileName,
+        fileTypeLabel: fileType,
         isVirtualCopy: parts.length > 1,
         vcId: parts.length > 1 ? (parts[1] ?? null) : null,
         exifData: data,
@@ -409,6 +412,18 @@ const EditorToolbar = memo(
                 className="truncate min-w-0 shrink"
               >
                 {baseName}
+              </UiText>
+
+              <UiText
+                as="span"
+                className="ml-2 shrink-0 rounded-full bg-bg-tertiary px-2 py-0.5"
+                color={TextColors.secondary}
+                data-testid="editor-file-type-badge"
+                data-tooltip={t('editor.toolbar.tooltips.fileType')}
+                variant={TextVariants.small}
+                weight={TextWeights.medium}
+              >
+                {fileTypeLabel}
               </UiText>
 
               {isVirtualCopy && (

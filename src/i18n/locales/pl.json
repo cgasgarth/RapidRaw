@@ -1128,6 +1128,7 @@
       "tooltips": {
         "aperture": "Przysłona",
         "backToLibrary": "Wróć do biblioteki",
+        "fileType": "",
         "focalLength": "Ogniskowa",
         "fullscreen": "Przełącz pełny ekran (F)",
         "history": "",

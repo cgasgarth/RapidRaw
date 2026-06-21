@@ -1060,6 +1060,7 @@
       "tooltips": {
         "aperture": "Aperture",
         "backToLibrary": "Back to Library",
+        "fileType": "File Type",
         "focalLength": "Focal Length",
         "fullscreen": "Toggle Fullscreen (F)",
         "history": "Show History Stack",
