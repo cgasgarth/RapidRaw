@@ -1066,6 +1066,25 @@
         "defaultBadge": "Domyślny",
         "title": "Style kolorów"
       },
+      "composition": {
+        "colorStyles_one": "",
+        "colorStyles_few": "",
+        "colorStyles_many": "",
+        "colorStyles_other": "",
+        "folders_one": "",
+        "folders_few": "",
+        "folders_many": "",
+        "folders_other": "",
+        "previewsGenerating": "",
+        "previewsReady_one": "",
+        "previewsReady_few": "",
+        "previewsReady_many": "",
+        "previewsReady_other": "",
+        "userPresets_one": "",
+        "userPresets_few": "",
+        "userPresets_many": "",
+        "userPresets_other": ""
+      },
       "dialog": {
         "allPresetFiles": "Wszystkie pliki presetów",
         "exportAllTitle": "Eksportuj wszystkie presety",

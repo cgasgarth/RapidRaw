@@ -1028,6 +1028,22 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
 
   const folders = useMemo<Array<FolderEntry>>(() => presets.filter(isFolderEntry), [presets]);
   const rootPresets = useMemo<Array<PresetEntry>>(() => presets.filter(isPresetEntry), [presets]);
+  const userPresetCount = useMemo(
+    () => rootPresets.length + folders.reduce((count, item) => count + item.folder.children.length, 0),
+    [folders, rootPresets.length],
+  );
+  const generatedPreviewCount = useMemo(
+    () => Object.values(previews).filter((url) => typeof url === 'string' && url.length > 0).length,
+    [previews],
+  );
+  const presetCompositionItems = [
+    t('editor.presets.composition.colorStyles', { count: BUILT_IN_COLOR_STYLE_PRESETS.length }),
+    t('editor.presets.composition.userPresets', { count: userPresetCount }),
+    t('editor.presets.composition.folders', { count: folders.length }),
+    isGeneratingPreviews
+      ? t('editor.presets.composition.previewsGenerating')
+      : t('editor.presets.composition.previewsReady', { count: generatedPreviewCount }),
+  ];
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -1073,6 +1089,23 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
               <Plus size={18} />
             </button>
           </div>
+        </div>
+        <div
+          className="flex flex-wrap gap-1.5 border-b border-surface px-4 py-2"
+          data-testid="presets-composition-summary"
+        >
+          {presetCompositionItems.map((item) => (
+            <UiText
+              as="span"
+              className="rounded bg-surface px-2 py-1"
+              color={TextColors.secondary}
+              data-presets-composition-item={item}
+              key={item}
+              variant={TextVariants.small}
+            >
+              {item}
+            </UiText>
+          ))}
         </div>
 
         <div

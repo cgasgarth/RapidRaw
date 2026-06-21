@@ -993,6 +993,13 @@
         "defaultBadge": "默认",
         "title": "色彩风格"
       },
+      "composition": {
+        "colorStyles_other": "",
+        "folders_other": "",
+        "previewsGenerating": "",
+        "previewsReady_other": "",
+        "userPresets_other": ""
+      },
       "dialog": {
         "allPresetFiles": "所有预设文件",
         "exportAllTitle": "导出所有预设",
