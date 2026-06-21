@@ -316,11 +316,16 @@ export const superResolutionReviewWorkspaceProofSchema = z.object({
   applyCommand: z.literal(superResolutionRoutePair.applyToolName),
   artifactPath: z.literal('/tmp/rawengine-super-resolution-smoke.tif'),
   command: z.literal(superResolutionRoutePair.dryRunToolName),
+  decision: z.literal('preview_only'),
   detailPolicy: z.literal('aggressive_preview_only'),
+  detailGainRatio: z.literal('1.21'),
   estimatedPreviewMegapixels: z.literal('336'),
   outputScale: z.literal('4'),
+  proofLevel: z.literal('synthetic_runtime'),
   runtimeStatus: z.literal('dry_run_preview'),
+  reviewCropCount: z.literal('4'),
   sourceCount: z.literal('5'),
+  warningCodes: z.literal('human_review_required,synthetic_runtime_only,texture_risk,aggressive_preview_only'),
 });
 export const superResolutionPrivateRawReviewProofSchema = z.object({
   applyCommand: z.literal(superResolutionRoutePair.applyToolName),

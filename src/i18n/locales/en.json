@@ -2258,15 +2258,38 @@
       "qualityLabel": "Quality",
       "qualityPreview": "Preview",
       "review": {
+        "acceptanceGate": "Acceptance gate",
+        "artifactWarnings": "Artifact warnings",
+        "decision": {
+          "blocked": "Blocked",
+          "human_review_required": "Human review required",
+          "preview_only": "Preview only"
+        },
         "detailGain": "Detail gain",
+        "detailGainValue": "{{ratio}}x synthetic detail gain",
         "limitation": "Runtime bridge proof only; private RAW decode, detail QA, and UI E2E remain open.",
         "privateRawPending": "Private RAW review pending",
         "proofStatus": "App-server bridge ready",
+        "provenance": "Provenance",
         "registration": "Registration",
+        "reviewCrops": "Review crops",
+        "reviewCropValue": "{{count}} required crops",
+        "reviewCropValue_one": "",
+        "reviewCropValue_other": "",
         "ringing": "Ringing/zipper artifacts",
         "runtimeBridge": "Dry-run/apply bridge",
+        "sourceSupport": "Source support",
+        "sourceSupportValue": "{{count}} frames + synthetic runtime proof",
+        "sourceSupportValue_one": "",
+        "sourceSupportValue_other": "",
         "title": "Quality review",
-        "uiE2ePending": "UI E2E pending"
+        "uiE2ePending": "UI E2E pending",
+        "warning": {
+          "aggressive_preview_only": "aggressive preview only",
+          "human_review_required": "human review required",
+          "synthetic_runtime_only": "synthetic runtime only",
+          "texture_risk": "texture risk"
+        }
       },
       "scaleLabel": "Scale",
       "scaleValue": "{{scale}}x",

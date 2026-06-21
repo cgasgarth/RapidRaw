@@ -11,6 +11,7 @@ import {
   ComputationalSetupStatusLine,
 } from './ComputationalSetupModalShell';
 import { TextColors, TextVariants } from '../../types/typography';
+import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
 import Button from '../ui/Button';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
@@ -33,6 +34,7 @@ interface SuperResolutionModalProps {
 
 const scaleOptions = [1.5, 2, 3, 4] as const;
 const previewDimensionOptions = [2400, 4096, 8192] as const;
+const reviewArtifactPath = '/tmp/rawengine-super-resolution-smoke.tif';
 
 export default function SuperResolutionModal({
   isOpen,
@@ -76,6 +78,15 @@ export default function SuperResolutionModal({
   const reconstructionReadinessLabel = isSourceCountValid
     ? t('modals.superResolution.preflight.ready')
     : t('modals.superResolution.preflight.blocked');
+  const outputReview = buildSuperResolutionOutputReviewWorkflow({
+    artifactPath: reviewArtifactPath,
+    settings,
+    sourceCount,
+  });
+  const outputReviewDecisionLabel = t(`modals.superResolution.review.decision.${outputReview.decision}`);
+  const outputReviewWarningsLabel = outputReview.warningCodes
+    .map((warningCode) => t(`modals.superResolution.review.warning.${warningCode}`))
+    .join(', ');
 
   const setSetting = useCallback(
     (patch: Partial<SuperResolutionUiSettings>) => {
@@ -330,14 +341,24 @@ export default function SuperResolutionModal({
             value: t('modals.superResolution.review.runtimeBridge'),
           },
           {
-            label: t('modals.superResolution.review.detailGain'),
+            label: t('modals.superResolution.review.acceptanceGate'),
             status: 'review',
-            value: t('modals.superResolution.review.privateRawPending'),
+            value: outputReviewDecisionLabel,
           },
           {
-            label: t('modals.superResolution.review.ringing'),
+            label: t('modals.superResolution.review.sourceSupport'),
+            status: 'ready',
+            value: t('modals.superResolution.review.sourceSupportValue', { count: outputReview.sourceCount }),
+          },
+          {
+            label: t('modals.superResolution.review.detailGain'),
+            status: 'review',
+            value: t('modals.superResolution.review.detailGainValue', { ratio: outputReview.detailGainRatio }),
+          },
+          {
+            label: t('modals.superResolution.review.artifactWarnings'),
             status: 'pending',
-            value: t('modals.superResolution.review.uiE2ePending'),
+            value: outputReviewWarningsLabel,
           },
         ]}
         sections={[
@@ -378,12 +399,28 @@ export default function SuperResolutionModal({
             title: t('modals.superResolution.review.title'),
             rows: [
               {
+                label: t('modals.superResolution.review.acceptanceGate'),
+                value: outputReviewDecisionLabel,
+              },
+              {
                 label: t('modals.superResolution.preflight.detail'),
                 value: t(`modals.superResolution.detailPolicy.${settings.detailPolicy}.label`),
               },
               {
                 label: t('modals.superResolution.review.detailGain'),
-                value: t('modals.superResolution.review.privateRawPending'),
+                value: t('modals.superResolution.review.detailGainValue', { ratio: outputReview.detailGainRatio }),
+              },
+              {
+                label: t('modals.superResolution.review.reviewCrops'),
+                value: t('modals.superResolution.review.reviewCropValue', { count: outputReview.reviewCropCount }),
+              },
+              {
+                label: t('modals.superResolution.review.provenance'),
+                value: outputReview.artifactPath,
+              },
+              {
+                label: t('modals.superResolution.review.artifactWarnings'),
+                value: outputReviewWarningsLabel,
               },
             ],
           },

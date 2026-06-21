@@ -27,8 +27,16 @@ for (const marker of [
   'outputPixelMultiplier = Number((settings.outputScale * settings.outputScale).toFixed(2))',
   'modals.superResolution.preflight.alignment',
   'modals.superResolution.qualityLabel',
+  'modals.superResolution.review.acceptanceGate',
+  'modals.superResolution.review.artifactWarnings',
+  'modals.superResolution.review.decision',
   'modals.superResolution.review.detailGain',
-  'modals.superResolution.review.privateRawPending',
+  'modals.superResolution.review.detailGainValue',
+  'modals.superResolution.review.reviewCrops',
+  'modals.superResolution.review.provenance',
+  'modals.superResolution.review.sourceSupport',
+  'modals.superResolution.review.warning',
+  'buildSuperResolutionOutputReviewWorkflow',
 ]) {
   if (!modalSource.includes(marker)) {
     failures.push(`SR review diagnostics missing ${marker}.`);
