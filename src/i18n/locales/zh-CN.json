@@ -1581,6 +1581,7 @@
       "groupSimilar": "分组相似图像",
       "noIssuesDesc": "所有图像似乎都是唯一且清晰的。",
       "noIssuesFound": "未发现问题！",
+      "progressCount": "{{current}} of {{total}} images analyzed",
       "representative": "代表图像",
       "score": "评分：{{score}}",
       "sharpness": "锐度：{{sharpness}}",

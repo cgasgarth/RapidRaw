@@ -1692,6 +1692,7 @@
       "groupSimilar": "Grupuj podobne obrazy",
       "noIssuesDesc": "Wszystkie obrazy wydają się być unikalne i ostre.",
       "noIssuesFound": "Nie znaleziono problemów!",
+      "progressCount": "{{current}} of {{total}} images analyzed",
       "representative": "Reprezentatywne zdjecie",
       "score": "Wynik: {{score}}",
       "sharpness": "Ostrość: {{sharpness}}",

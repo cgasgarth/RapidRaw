@@ -1594,6 +1594,7 @@
       "groupSimilar": "Ähnliche Bilder gruppieren",
       "noIssuesDesc": "Alle Bilder scheinen einzigartig und scharf zu sein.",
       "noIssuesFound": "Keine Probleme gefunden!",
+      "progressCount": "{{current}} of {{total}} images analyzed",
       "representative": "Reprasentatives Bild",
       "score": "Punktzahl: {{score}}",
       "sharpness": "Schärfe: {{sharpness}}",
