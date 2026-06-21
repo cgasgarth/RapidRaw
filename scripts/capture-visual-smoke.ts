@@ -845,10 +845,17 @@ async function prepareScenario(page, mode) {
     if (
       recipeDataset.active !== 'true' ||
       recipeDataset.cameraProfile !== 'camera_portrait' ||
-      recipeDataset.toneCurve !== 'soft_contrast'
+      recipeDataset.temperature !== '6' ||
+      recipeDataset.tint !== '3' ||
+      recipeDataset.toneCurve !== 'soft_contrast' ||
+      recipeDataset.vibrance !== '12'
     ) {
       throw new Error('Professional color recipe did not expose expected profile/tone metadata.');
     }
+    await recipe.getByTestId('professional-color-recipe-summary').getByText('Profile Portrait').waitFor({
+      timeout: 10_000,
+    });
+    await recipe.getByText('WB +6 / +3').waitFor({ timeout: 10_000 });
     await colorPanel.getByLabel('Temperature').fill('12');
     await colorPanel.getByLabel('Saturation').first().fill('18');
     const selectiveControls = colorPanel.getByTestId('selective-color-range-controls');

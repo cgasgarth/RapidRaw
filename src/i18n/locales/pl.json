@@ -167,7 +167,11 @@
         "landscapeDepthDescription": "Cooler shadows, richer blues and greens, and stronger scene contrast.",
         "neutralProduct": "Neutral Product",
         "neutralProductDescription": "Controlled contrast and neutral balance for product or catalog work.",
-        "title": "Workflow Recipes"
+        "profileChip": "Profile {{value}}",
+        "rangeChip": "Range {{value}}",
+        "title": "Workflow Recipes",
+        "toneChip": "Tone {{value}}",
+        "whiteBalanceChip": "WB {{temperature}} / {{tint}}"
       }
     },
     "curves": {
