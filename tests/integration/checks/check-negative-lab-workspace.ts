@@ -64,10 +64,15 @@ for (const marker of [
   'negative-lab-stock-readiness-profile',
   'negative-lab-stock-readiness-preview',
   'negative-lab-stock-readiness-export',
+  'negative-lab-batch-workload-summary',
+  'data-planned-apply-count={batchDryRunSummary.plannedApplyCount}',
+  'data-review-count={dustScratchReviewReport.reviewCount}',
+  'data-skipped-frame-count={batchDryRunSummary.skippedFrameIds.length}',
   'data-preview-ready={String(workspaceProof.previewReady)}',
   'data-export-ready={String(workspaceProof.exportReady)}',
   'data-profile-status={selectedProfile.profileStatus}',
   'data-runtime-status={selectedProfile.runtimeStatus}',
+  'modals.negativeConversion.batchWorkloadSummary',
   'modals.negativeConversion.workflowExportBlocked',
 ]) {
   if (!modalSource.includes(marker)) {

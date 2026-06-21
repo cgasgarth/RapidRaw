@@ -1784,6 +1784,7 @@
       "batchPlanCopied": "Copied plan",
       "batchPlanSkippedCount": "Skip {{skippedCount}}",
       "batchReadiness": "Batch readiness",
+      "batchWorkloadSummary": "{{applyCount}} apply / {{skippedCount}} skip / {{reviewCount}} review",
       "blueWeight": "蓝色（黄色）",
       "cancel": "取消",
       "colorTiming": "色彩时机",

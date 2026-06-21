@@ -1113,6 +1113,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const renderBatchReadiness = () => (
     <div
       className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+      data-planned-apply-count={batchDryRunSummary.plannedApplyCount}
+      data-review-count={dustScratchReviewReport.reviewCount}
+      data-skipped-frame-count={batchDryRunSummary.skippedFrameIds.length}
       data-testid="negative-lab-batch-readiness"
     >
       <div className="flex items-center justify-between gap-2">
@@ -1164,7 +1167,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               </span>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-1 text-[11px] text-text-tertiary">
+          <div className="grid grid-cols-3 gap-1 text-[11px] text-text-tertiary">
             <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-planned-apply-count">
               {t('modals.negativeConversion.batchPlanApplyCount', {
                 applyCount: batchDryRunSummary.plannedApplyCount,
@@ -1175,9 +1178,16 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 skippedCount: batchDryRunSummary.skippedFrameIds.length,
               })}
             </span>
+            <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-batch-workload-summary">
+              {t('modals.negativeConversion.batchWorkloadSummary', {
+                applyCount: batchDryRunSummary.plannedApplyCount,
+                reviewCount: dustScratchReviewReport.reviewCount,
+                skippedCount: batchDryRunSummary.skippedFrameIds.length,
+              })}
+            </span>
             <button
               type="button"
-              className="col-span-2 inline-flex items-center justify-center gap-1 rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary transition-colors hover:bg-surface"
+              className="col-span-3 inline-flex items-center justify-center gap-1 rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary transition-colors hover:bg-surface"
               data-testid="negative-lab-copy-batch-plan"
               onClick={() => {
                 void handleCopyBatchPlan();
@@ -1191,7 +1201,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             <button
               type="button"
               className={cx(
-                'col-span-2 inline-flex items-center justify-center rounded px-1.5 py-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                'col-span-3 inline-flex items-center justify-center rounded px-1.5 py-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-50',
                 isBatchPlanAccepted
                   ? 'bg-accent/15 text-text-primary'
                   : 'bg-bg-secondary text-text-secondary hover:bg-surface',
