@@ -265,6 +265,7 @@ export default function DenoiseModal({
       : aiModelDownloadStatus?.includes('NIND')
         ? t('modals.denoise.downloadingText', { status: aiModelDownloadStatus })
         : progressMessage || t('modals.denoise.initializing');
+  const batchProgressFileName = batchProgress?.path.split(/[\\/]/).pop() ?? '';
   const selectedMethodLabel = methodOptions.find((option) => option.value === method)?.label ?? '';
   const selectedMethodDescription =
     method === 'ai' ? t('modals.denoise.methodAiDescription') : t('modals.denoise.methodBm3dDescription');
@@ -407,6 +408,16 @@ export default function DenoiseModal({
               <UiText className="text-center font-mono h-6 flex justify-center items-center">
                 {currentStatusText}
               </UiText>
+              {isBatch && batchProgressFileName && (
+                <UiText
+                  variant={TextVariants.small}
+                  color={TextColors.secondary}
+                  className="mt-1 max-w-xs truncate text-center"
+                  data-testid="denoise-batch-progress-file"
+                >
+                  {t('modals.denoise.batchProgressFile', { fileName: batchProgressFileName })}
+                </UiText>
+              )}
 
               <div className="mt-8 w-64 relative">
                 <div className="h-1 bg-surface rounded-full overflow-hidden relative w-full shadow-xs">

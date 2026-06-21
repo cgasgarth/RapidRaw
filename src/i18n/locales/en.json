@@ -1623,6 +1623,7 @@
       "title": "Cull Images"
     },
     "denoise": {
+      "batchProgressFile": "Processing {{fileName}}",
       "batchProgressText": "Denoising {{current}} of {{total}}...",
       "btnBatchDenoise": "Batch Denoise & Save",
       "btnRetry": "Retry",

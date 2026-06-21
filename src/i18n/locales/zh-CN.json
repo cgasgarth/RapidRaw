@@ -1609,6 +1609,7 @@
       "title": "筛选图像"
     },
     "denoise": {
+      "batchProgressFile": "Processing {{fileName}}",
       "batchProgressText": "降噪中 {{current}} / {{total}}...",
       "btnBatchDenoise": "批量降噪并保存",
       "btnRetry": "重试",
