@@ -739,7 +739,9 @@
         "moveUp": "Move layer up",
         "show": "Show layer",
         "showAll": "Show all layers",
+        "showAllHidden": "Show all hidden",
         "solo": "Solo layer",
+        "soloActive": "Solo active",
         "ungroup": "Ungroup layers"
       },
       "blend": "Blend",

@@ -203,6 +203,14 @@ export default function LayerStackPanel({
     canGroupLayerWithNext(masks, activeRow.id);
   const canUngroupActiveLayer = activeGroupId !== null;
   const canShowAllLayers = masks.some((mask) => !mask.visible);
+  const isActiveLayerSoloed =
+    activeRow !== undefined &&
+    !activeRow.isBase &&
+    visibleLayerCount > 0 &&
+    masks.every(
+      (mask) =>
+        mask.visible === (activeRow.isGroupHeader ? mask.layerGroupId === activeRow.groupId : mask.id === activeRow.id),
+    );
 
   const selectRow = (row: LayerRowModel) => {
     setLocalSelectedLayerId(row.id);
@@ -621,7 +629,40 @@ export default function LayerStackPanel({
             })}
           </div>
 
-          <div className="flex items-center justify-end gap-1">
+          <div
+            className="grid grid-cols-2 gap-2 rounded-md border border-surface bg-bg-secondary p-2"
+            data-hidden-layer-count={hiddenLayerCount}
+            data-solo-active={String(isActiveLayerSoloed)}
+            data-testid="layer-active-action-strip"
+          >
+            <button
+              className={cx(
+                'flex min-w-0 items-center justify-center gap-1 rounded-md border px-2 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                isActiveLayerSoloed
+                  ? 'border-accent bg-accent/10 text-text-primary'
+                  : 'border-surface bg-surface text-text-secondary hover:bg-card-active',
+              )}
+              data-testid="layer-active-solo"
+              disabled={isBaseSelected}
+              onClick={soloActiveLayer}
+              type="button"
+            >
+              <Eye size={14} className="shrink-0" />
+              <span className="truncate">{t('editor.layers.actions.soloActive')}</span>
+            </button>
+            <button
+              className="flex min-w-0 items-center justify-center gap-1 rounded-md border border-surface bg-surface px-2 py-1.5 text-xs text-text-secondary transition-colors hover:bg-card-active disabled:cursor-not-allowed disabled:opacity-50"
+              data-testid="layer-show-all-hidden"
+              disabled={!canShowAllLayers}
+              onClick={showAllActiveLayers}
+              type="button"
+            >
+              <EyeOff size={14} className="shrink-0" />
+              <span className="truncate">{t('editor.layers.actions.showAllHidden')}</span>
+            </button>
+          </div>
+
+          <div className="flex items-center justify-end gap-1" data-testid="layer-icon-action-row">
             <button
               className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
               data-tooltip={t('editor.layers.actions.moveUp')}
@@ -643,24 +684,6 @@ export default function LayerStackPanel({
               type="button"
             >
               <ArrowDown size={16} className="mx-auto" />
-            </button>
-            <button
-              className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
-              data-tooltip={t('editor.layers.actions.solo')}
-              disabled={isBaseSelected}
-              onClick={soloActiveLayer}
-              type="button"
-            >
-              <Eye size={16} className="mx-auto" />
-            </button>
-            <button
-              className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
-              data-tooltip={t('editor.layers.actions.showAll')}
-              disabled={!canShowAllLayers}
-              onClick={showAllActiveLayers}
-              type="button"
-            >
-              <EyeOff size={16} className="mx-auto" />
             </button>
             <button
               className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
