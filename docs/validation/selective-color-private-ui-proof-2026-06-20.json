@@ -6,8 +6,11 @@
     "icc_colorimetric_accuracy",
     "public_raw_fixture"
   ],
+  "e2eIssue": 2476,
   "fixtureId": "validation.raw-open-edit-export.selective-color-orange.v1",
   "issue": 2476,
+  "proofBoundary": "private_raw_runtime_plus_visual_smoke_not_full_macos_e2e",
+  "proofStatus": "private_raw_preview_export_sidecar_with_ui_smoke",
   "rawRuntime": {
     "editCommandId": "command.raw-open-edit-export.selective-color-orange.v1",
     "metrics": {
