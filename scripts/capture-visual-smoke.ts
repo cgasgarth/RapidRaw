@@ -19,6 +19,7 @@ import {
   agentChatProofDatasetSchema,
   agentDryRunReviewProofDatasetSchema,
   agentReviewHandoffProofDatasetSchema,
+  agentSelectedFrameScopeProofDatasetSchema,
   colorBalanceCompareProofDatasetSchema,
   assertFilmLookExportProof,
   assertNegativeLabBaseFogPreviewExportProof,
@@ -490,6 +491,8 @@ async function prepareScenario(page, mode) {
     agentArtifactReviewProofDatasetSchema.parse(await artifacts.evaluate((element) => ({ ...element.dataset })));
     const handoff = page.getByTestId('agent-review-handoff');
     agentReviewHandoffProofDatasetSchema.parse(await handoff.evaluate((element) => ({ ...element.dataset })));
+    const scope = page.getByTestId('agent-selected-frame-scope');
+    agentSelectedFrameScopeProofDatasetSchema.parse(await scope.evaluate((element) => ({ ...element.dataset })));
     const review = page.getByTestId('agent-dry-run-review');
     agentDryRunReviewProofDatasetSchema.parse(await review.evaluate((element) => ({ ...element.dataset })));
     await page.getByTestId('agent-chat-messages').getByText('Runtime demo apply complete.', { exact: false }).waitFor({
@@ -554,6 +557,19 @@ async function prepareScenario(page, mode) {
       .waitFor({ timeout: 10_000 });
     await handoff.getByText('Runtime proof gallery', { exact: true }).waitFor({ timeout: 10_000 });
     await handoff.getByText('Rollback virtual copy', { exact: true }).waitFor({ timeout: 10_000 });
+    await scope.getByText('Selected-frame scope', { exact: true }).waitFor({ timeout: 10_000 });
+    await page.getByTestId('agent-selected-frame-assets').getByText('DSC_2844.NEF', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('agent-excluded-frame-assets').getByText('DSC_2845.NEF', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await scope.getByText('Virtual copy sidecar', { exact: true }).waitFor({ timeout: 10_000 });
+    await scope.getByText('Highlight clipping review', { exact: true }).waitFor({ timeout: 10_000 });
+    const selectedScopePolicyCount = await scope.locator('[data-policy-state]').count();
+    if (selectedScopePolicyCount !== 3) {
+      throw new Error(`Expected 3 selected-frame policy checks, found ${selectedScopePolicyCount}.`);
+    }
     const readyPreviewCount = await page
       .getByTestId('agent-preview-artifacts')
       .getByText('ready', { exact: true })

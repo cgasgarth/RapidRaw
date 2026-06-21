@@ -264,6 +264,70 @@ const fixture = {
     title: 'Before/after handoff',
   },
   runtimeStatus: 'runtime_apply_demo',
+  selectedFrameScope: {
+    approvalLabel: 'Approval required before apply',
+    approvalState: 'required',
+    auditArtifactId: 'audit-record-tool-2',
+    dryRunToolCallId: 'tool-2',
+    excludedAssets: [
+      {
+        id: 'excluded-adjacent-frame',
+        label: 'Excluded frame',
+        reason: 'Not selected for this expert edit request.',
+        value: 'DSC_2845.NEF',
+      },
+      {
+        id: 'excluded-original-raw',
+        label: 'Source RAW',
+        reason: 'Source pixels remain immutable; only edit graph and virtual-copy sidecar are targeted.',
+        value: 'DSC_2844.NEF',
+      },
+    ],
+    id: 'agent-selected-frame-scope-runtime-2844',
+    noOverwriteTarget: {
+      label: 'No-overwrite target',
+      summary:
+        'Apply path writes the accepted command to a virtual-copy edit graph and leaves source RAW bytes unchanged.',
+      value: 'Virtual copy sidecar',
+    },
+    policyChecks: [
+      {
+        id: 'single-selected-frame',
+        label: 'One selected frame',
+        state: 'passed',
+      },
+      {
+        id: 'source-raw-immutable',
+        label: 'Original RAW protected',
+        state: 'passed',
+      },
+      {
+        id: 'highlight-review-required',
+        label: 'Highlight clipping review',
+        state: 'review_required',
+      },
+    ],
+    proofHref: 'docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html',
+    proofLabel: 'Dry-run proof',
+    selectedAssets: [
+      {
+        id: 'selected-active-frame',
+        label: 'Selected frame',
+        role: 'active RAW input',
+        stateLabel: 'Selected',
+        value: 'DSC_2844.NEF',
+      },
+      {
+        id: 'selected-virtual-copy',
+        label: 'Write target',
+        role: 'editable virtual copy',
+        stateLabel: 'Selected',
+        value: 'graph_rev_agent_expert_edit_demo_initial_2844:virtual-copy',
+      },
+    ],
+    summary: 'Dry-run scope is limited to the active RAW frame and its virtual-copy edit graph.',
+    title: 'Selected-frame scope',
+  },
   sessionTitle: 'Expert RAW edit demo',
   toolCalls: [
     {
