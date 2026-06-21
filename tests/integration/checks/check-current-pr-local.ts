@@ -194,6 +194,7 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     (file) => file.includes('filmHalation') || file.includes('film-halation'),
     ['check:film-halation-runtime-proof'],
   );
+  addIf((file) => file === 'src/components/modals/DenoiseModal.tsx', ['check:denoise-ui-summary']);
   addIf((file) => file === 'src/components/adjustments/FilmLookBrowser.tsx', ['check:film-look-browser-ui']);
   addIf((file) => file === 'src/components/panel/MainLibrary.tsx', ['check:library-header-ui']);
   addIf((file) => file === 'src/components/panel/editor/Waveform.tsx', ['check:histogram-clipping-ui']);
@@ -385,6 +386,7 @@ if (process.argv.includes('--self-test')) {
   assertSelfTestRoute(['src/components/panel/MainLibrary.tsx'], ['check:library-header-ui']);
   assertSelfTestRoute(['src/components/panel/editor/Waveform.tsx'], ['check:histogram-clipping-ui']);
   assertSelfTestRoute(['src/components/panel/editor/EditorToolbar.tsx'], ['check:editor-history-toolbar-ui']);
+  assertSelfTestRoute(['src/components/modals/DenoiseModal.tsx'], ['check:denoise-ui-summary']);
   assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-coverage-ui']);
   assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-collage-ui']);
   assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-denoise-ui']);

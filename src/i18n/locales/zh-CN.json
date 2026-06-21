@@ -1610,6 +1610,7 @@
       "denoisingProgress": "降噪进行中",
       "description": "使用 AI 驱动或传统降噪技术去除图像中的噪声。",
       "downloadingText": "下载中 {{status}}...",
+      "emptyTarget": "Select one or more images before starting denoise.",
       "gpuWarningTooltip": "由于依赖项限制，NIND 降噪尚不支持 GPU 加速。",
       "initializing": "初始化中...",
       "methodAi": "NIND（AI - 最适合 RAW）",

@@ -1723,6 +1723,7 @@
       "denoisingProgress": "Odszumianie w toku",
       "description": "Usuń szum ze swojego obrazu używając metod opartych o AI lub tradycyjnych.",
       "downloadingText": "Pobieranie {{status}}...",
+      "emptyTarget": "Select one or more images before starting denoise.",
       "gpuWarningTooltip": "NIND Denoise nie obsługuje jeszcze akceleracji GPU z powodu ograniczeń zależności.",
       "initializing": "Inicjowanie...",
       "methodAi": "NIND (AI - Najlepsze dla RAW)",

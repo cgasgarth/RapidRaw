@@ -1623,6 +1623,7 @@
       "denoisingProgress": "Entrauschen in Arbeit",
       "description": "Entfernen Sie Rauschen aus Ihrem Bild mithilfe von KI-gestütztem oder traditionellem Entrauschen.",
       "downloadingText": "Wird heruntergeladen {{status}}...",
+      "emptyTarget": "Select one or more images before starting denoise.",
       "gpuWarningTooltip": "NIND Entrauschen unterstützt noch keine GPU-Beschleunigung aufgrund von Abhängigkeiten.",
       "initializing": "Wird initialisiert...",
       "methodAi": "NIND (KI - Am besten für RAW)",
