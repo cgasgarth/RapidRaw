@@ -12,6 +12,7 @@ import {
   calculateMeanAbsoluteErrorV1,
 } from '../../../packages/rawengine-schema/src/superResolutionPixelShift.ts';
 import { superResolutionReconstructionDiagnosticsV1Schema } from '../../../packages/rawengine-schema/src/superResolutionReconstructionDiagnostics.ts';
+import { superResolutionSyntheticReviewArtifacts } from '../../../src/utils/superResolutionOutputReview.ts';
 
 const WIDTH = 48;
 const HEIGHT = 36;
@@ -177,6 +178,29 @@ if (JSON.stringify(committedReport) !== JSON.stringify(report)) {
   throw new Error(
     'SR synthetic output artifact proof is stale. Run bun tests/integration/checks/check-sr-synthetic-output-artifact.ts --update',
   );
+}
+const expectedReviewArtifacts = [
+  {
+    contentHash: committedReport.artifacts.reconstructionPreview.contentHash,
+    kind: 'reconstruction_preview',
+    path: committedReport.artifacts.reconstructionPreview.path,
+    publicRepoAllowed: false,
+  },
+  {
+    contentHash: committedReport.artifacts.reconstructionReviewCrop.contentHash,
+    kind: 'reconstruction_review_crop',
+    path: committedReport.artifacts.reconstructionReviewCrop.path,
+    publicRepoAllowed: false,
+  },
+  {
+    contentHash: committedReport.artifacts.baselineReviewCrop.contentHash,
+    kind: 'baseline_review_crop',
+    path: committedReport.artifacts.baselineReviewCrop.path,
+    publicRepoAllowed: false,
+  },
+];
+if (JSON.stringify(superResolutionSyntheticReviewArtifacts) !== JSON.stringify(expectedReviewArtifacts)) {
+  throw new Error('SR synthetic review artifact metadata does not match the committed proof report.');
 }
 
 console.log(`sr synthetic output artifact ok (${report.artifacts.reconstructionPreview.contentHash})`);

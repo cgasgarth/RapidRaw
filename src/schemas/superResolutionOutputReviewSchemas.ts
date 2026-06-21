@@ -24,6 +24,18 @@ export const superResolutionOutputReviewEditableGateSchema = z.enum([
 
 export const superResolutionOutputReviewStaleStateSchema = z.enum(['current', 'stale', 'unknown']);
 
+export const superResolutionOutputReviewArtifactSchema = z
+  .object({
+    contentHash: z
+      .string()
+      .trim()
+      .regex(/^sha256:[a-f0-9]{64}$/u),
+    kind: z.enum(['baseline_review_crop', 'reconstruction_preview', 'reconstruction_review_crop']),
+    path: z.string().trim().min(1),
+    publicRepoAllowed: z.boolean(),
+  })
+  .strict();
+
 export const superResolutionOutputReviewWorkflowSchema = z
   .object({
     alignmentMode: superResolutionAlignmentModeSchema,
@@ -41,6 +53,7 @@ export const superResolutionOutputReviewWorkflowSchema = z
     overlapCoverageRatio: z.number().min(0).max(1).nullable(),
     proofLevel: z.literal('synthetic_runtime'),
     qualityPreference: superResolutionQualityPreferenceSchema,
+    reviewArtifacts: z.array(superResolutionOutputReviewArtifactSchema).min(1),
     reviewCropCount: z.number().int().nonnegative(),
     reviewPacketPath: z.string().min(1),
     sourceCount: z.number().int().min(2),

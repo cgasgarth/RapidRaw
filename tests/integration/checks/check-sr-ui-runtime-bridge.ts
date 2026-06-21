@@ -98,6 +98,20 @@ if (outputReview.outputArtifactHash !== applied.apply.sidecarArtifact.outputArti
 if (!outputReview.warningCodes.includes('human_review_required')) {
   throw new Error('SR output review must keep human-review warning.');
 }
+if (outputReview.reviewArtifacts.length !== 3) {
+  throw new Error(`Expected 3 SR review artifacts, got ${outputReview.reviewArtifacts.length}.`);
+}
+if (
+  !outputReview.reviewArtifacts.some(
+    (artifact) =>
+      artifact.kind === 'reconstruction_review_crop' &&
+      artifact.path === 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-review-crop-center.pgm' &&
+      artifact.contentHash === 'sha256:a11fafd6b4dac601c7afa6903f6f04a01e720c988fd20ef2fc7087e08e8a5326' &&
+      !artifact.publicRepoAllowed,
+  )
+) {
+  throw new Error('SR output review missing private reconstruction crop review artifact metadata.');
+}
 
 expectThrows('mismatched accepted SR UI runtime plan', () =>
   bus.execute({

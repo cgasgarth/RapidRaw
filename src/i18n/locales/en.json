@@ -2280,6 +2280,11 @@
       "qualityPreview": "Preview",
       "review": {
         "acceptanceGate": "Acceptance gate",
+        "artifactKind": {
+          "baseline_review_crop": "Baseline crop",
+          "reconstruction_preview": "Reconstruction preview",
+          "reconstruction_review_crop": "Reconstruction crop"
+        },
         "artifactWarnings": "Artifact warnings",
         "coverage": "Overlap coverage",
         "coverageValue": "{{value}}% source coverage",
