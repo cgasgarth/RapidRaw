@@ -1,4 +1,5 @@
 import { superResolutionOutputReviewWorkflowSchema } from '../schemas/superResolutionOutputReviewSchemas';
+import { getSuperResolutionModeForDetailPolicy } from '../schemas/superResolutionUiSchemas';
 
 import type { SuperResolutionOutputReviewWorkflow } from '../schemas/superResolutionOutputReviewSchemas';
 import type { SuperResolutionUiSettings } from '../schemas/superResolutionUiSchemas';
@@ -21,7 +22,9 @@ type SuperResolutionArtifactReviewInput = {
     state: SuperResolutionOutputReviewWorkflow['staleState'];
   };
   validationSummary: {
+    alignmentConfidence?: number;
     expectedDetailGainRatio?: number;
+    falseDetailRisk?: SuperResolutionOutputReviewWorkflow['falseDetailRisk'];
     humanReviewStatus: SuperResolutionOutputReviewWorkflow['humanReviewStatus'];
     overlapCoverageRatio?: number;
     sourceCount: number;
@@ -73,11 +76,21 @@ export const buildSuperResolutionOutputReviewFromArtifact = (
   return superResolutionOutputReviewWorkflowSchema.parse({
     alignmentMode: artifactValue.resolvedAlignmentMode,
     artifactPath: artifactValue.outputArtifact.artifactId,
+    alignmentConfidence: artifactValue.validationSummary.alignmentConfidence ?? null,
+    cropMetrics: {
+      outputHeight: outputDimensions.height,
+      outputWidth: outputDimensions.width,
+      overlapCoverageRatio: artifactValue.validationSummary.overlapCoverageRatio ?? null,
+      reviewCropCount,
+    },
     decision: deriveDecision(artifactValue),
     detailGainRatio: artifactValue.validationSummary.expectedDetailGainRatio ?? null,
     detailPolicy: artifactValue.detailPolicy,
     editableGate: deriveEditableGate(artifactValue),
+    falseDetailRisk: artifactValue.validationSummary.falseDetailRisk ?? 'unknown',
     humanReviewStatus: artifactValue.validationSummary.humanReviewStatus,
+    mode: getSuperResolutionModeForDetailPolicy(artifactValue.detailPolicy),
+    modePolicyVersion: 1,
     outputArtifactHash: outputHash,
     outputArtifactId: artifactValue.outputArtifact.artifactId,
     outputHeight: outputDimensions.height,
@@ -109,11 +122,21 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
   return superResolutionOutputReviewWorkflowSchema.parse({
     alignmentMode: settings.alignmentMode,
     artifactPath,
+    alignmentConfidence: null,
+    cropMetrics: {
+      outputHeight: 1,
+      outputWidth: 1,
+      overlapCoverageRatio: null,
+      reviewCropCount,
+    },
     decision,
     detailPolicy: settings.detailPolicy,
     detailGainRatio: null,
     editableGate: 'blocked_review_required',
+    falseDetailRisk: settings.detailPolicy === 'aggressive_preview_only' ? 'high' : 'unknown',
     humanReviewStatus: 'pending',
+    mode: getSuperResolutionModeForDetailPolicy(settings.detailPolicy),
+    modePolicyVersion: 1,
     outputArtifactHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
     outputArtifactId: artifactPath,
     outputHeight: 1,

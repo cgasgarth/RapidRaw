@@ -10,6 +10,10 @@ import {
   ComputationalSetupSourceWarning,
   ComputationalSetupStatusLine,
 } from './ComputationalSetupModalShell';
+import {
+  getSuperResolutionDetailPolicyForMode,
+  getSuperResolutionModeForDetailPolicy,
+} from '../../schemas/superResolutionUiSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
 import Button from '../ui/Button';
@@ -19,6 +23,7 @@ import UiText from '../ui/Text';
 import type { SuperResolutionOutputReviewWorkflow } from '../../schemas/superResolutionOutputReviewSchemas';
 import type {
   SuperResolutionAlignmentMode,
+  SuperResolutionMode,
   SuperResolutionQualityPreference,
   SuperResolutionUiSettings,
 } from '../../schemas/superResolutionUiSchemas';
@@ -77,10 +82,16 @@ export default function SuperResolutionModal({
     { label: t('modals.superResolution.qualityBalanced'), value: 'balanced' },
     { label: t('modals.superResolution.qualityBest'), value: 'best' },
   ];
+  const modeOptions: Array<{ mode: SuperResolutionMode; status: string }> = [
+    { mode: 'conservative', status: t('modals.superResolution.mode.conservative.status') },
+    { mode: 'standard', status: t('modals.superResolution.mode.standard.status') },
+    { mode: 'aggressive', status: t('modals.superResolution.mode.aggressive.status') },
+  ];
   const selectedAlignmentLabel =
     alignmentOptions.find((option) => option.value === settings.alignmentMode)?.label ?? '';
   const selectedQualityLabel =
     qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '';
+  const selectedMode = getSuperResolutionModeForDetailPolicy(settings.detailPolicy);
   const sourceReadinessLabel = `${t('modals.superResolution.sourceSummary', { count: sourceCount })} - ${
     isSourceCountValid ? t('modals.superResolution.preflight.ready') : t('modals.superResolution.preflight.blocked')
   }`;
@@ -129,6 +140,23 @@ export default function SuperResolutionModal({
   const outputReviewWarningsLabel = outputReview.warningCodes
     .map((warningCode) => t(`modals.superResolution.review.warning.${warningCode}`))
     .join(', ');
+  const outputReviewModeLabel = t(`modals.superResolution.mode.${outputReview.mode}.label`);
+  const outputReviewFalseDetailRiskLabel = t(
+    `modals.superResolution.review.falseDetailRiskValue.${outputReview.falseDetailRisk}`,
+  );
+  const outputReviewAlignmentConfidenceLabel =
+    outputReview.alignmentConfidence === null
+      ? t('modals.superResolution.review.notMeasured')
+      : t('modals.superResolution.review.confidenceValue', {
+          value: Math.round(outputReview.alignmentConfidence * 100),
+        });
+  const outputReviewCropMetricsLabel = t('modals.superResolution.review.cropMetricsValue', {
+    reviewCropCount: outputReview.cropMetrics.reviewCropCount,
+    coverage:
+      outputReview.cropMetrics.overlapCoverageRatio === null
+        ? t('modals.superResolution.review.notMeasured')
+        : `${Math.round(outputReview.cropMetrics.overlapCoverageRatio * 100)}%`,
+  });
   const isEditableHandoffReady = outputReview.editableGate === 'ready';
   const acceptanceGateStatus = isEditableHandoffReady ? 'ready' : 'review';
   const artifactWarningsStatus = outputReview.warningCodes.length === 0 ? 'ready' : 'pending';
@@ -245,8 +273,8 @@ export default function SuperResolutionModal({
           value={selectedAlignmentLabel}
         />
         <ComputationalSetupStatusLine
-          label={t('modals.superResolution.preflight.detail')}
-          value={t(`modals.superResolution.detailPolicy.${settings.detailPolicy}.label`)}
+          label={t('modals.superResolution.modeLabel')}
+          value={t(`modals.superResolution.mode.${selectedMode}.label`)}
         />
         <ComputationalSetupStatusLine
           label={t('modals.superResolution.workflowTitle')}
@@ -281,26 +309,27 @@ export default function SuperResolutionModal({
         </div>
       </section>
 
-      <ComputationalSetupOptionSection title={t('modals.superResolution.detailPolicyLabel')}>
+      <ComputationalSetupOptionSection title={t('modals.superResolution.modeLabel')}>
         <div className="grid grid-cols-3 gap-2">
-          {(['conservative', 'balanced', 'aggressive_preview_only'] as const).map((detailPolicy) => (
+          {modeOptions.map(({ mode, status }) => (
             <button
-              key={detailPolicy}
+              key={mode}
               className={`min-h-16 rounded-md border px-3 py-2 text-left transition-colors ${
-                settings.detailPolicy === detailPolicy
+                selectedMode === mode
                   ? 'border-accent bg-accent/15'
                   : 'border-border-color bg-bg-primary hover:bg-card-active'
               }`}
+              data-sr-mode={mode}
               onClick={() => {
-                setSetting({ detailPolicy });
+                setSetting({ detailPolicy: getSuperResolutionDetailPolicyForMode(mode) });
               }}
               type="button"
             >
               <UiText as="span" variant={TextVariants.label}>
-                {t(`modals.superResolution.detailPolicy.${detailPolicy}.label`)}
+                {t(`modals.superResolution.mode.${mode}.label`)}
               </UiText>
               <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="block mt-1">
-                {t(`modals.superResolution.detailPolicy.${detailPolicy}.status`)}
+                {status}
               </UiText>
             </button>
           ))}
@@ -381,6 +410,11 @@ export default function SuperResolutionModal({
         testId="sr-review-diagnostics"
         items={[
           {
+            label: t('modals.superResolution.modeLabel'),
+            status: outputReview.mode === 'aggressive' ? 'pending' : 'ready',
+            value: outputReviewModeLabel,
+          },
+          {
             label: t('modals.superResolution.review.registration'),
             status: hasRuntimeOutputReview ? 'ready' : 'pending',
             value: hasRuntimeOutputReview ? overlapCoverageLabel : t('modals.superResolution.review.notMeasured'),
@@ -399,6 +433,11 @@ export default function SuperResolutionModal({
             label: t('modals.superResolution.review.detailGain'),
             status: 'review',
             value: detailGainLabel,
+          },
+          {
+            label: t('modals.superResolution.review.cropMetrics'),
+            status: hasRuntimeOutputReview ? 'ready' : 'pending',
+            value: outputReviewCropMetricsLabel,
           },
           {
             label: t('modals.superResolution.review.artifactWarnings'),
@@ -452,8 +491,8 @@ export default function SuperResolutionModal({
                 value: t(`modals.superResolution.review.humanReviewStatusValue.${outputReview.humanReviewStatus}`),
               },
               {
-                label: t('modals.superResolution.preflight.detail'),
-                value: t(`modals.superResolution.detailPolicy.${settings.detailPolicy}.label`),
+                label: t('modals.superResolution.modeLabel'),
+                value: t(`modals.superResolution.mode.${selectedMode}.label`),
               },
               {
                 label: t('modals.superResolution.review.detailGain'),
@@ -462,6 +501,18 @@ export default function SuperResolutionModal({
               {
                 label: t('modals.superResolution.review.coverage'),
                 value: overlapCoverageLabel,
+              },
+              {
+                label: t('modals.superResolution.review.cropMetrics'),
+                value: outputReviewCropMetricsLabel,
+              },
+              {
+                label: t('modals.superResolution.review.alignmentConfidence'),
+                value: outputReviewAlignmentConfidenceLabel,
+              },
+              {
+                label: t('modals.superResolution.review.falseDetailRisk'),
+                value: outputReviewFalseDetailRiskLabel,
               },
               {
                 label: t('modals.superResolution.review.outputArtifact'),
@@ -567,8 +618,13 @@ export default function SuperResolutionModal({
 
       <div
         className="sr-only"
+        data-alignment-confidence={outputReview.alignmentConfidence ?? 'not_measured'}
+        data-crop-metrics={`${outputReview.cropMetrics.reviewCropCount}:${outputReview.cropMetrics.overlapCoverageRatio ?? 'not_measured'}`}
         data-editable-handoff-ready={String(isEditableHandoffReady)}
+        data-false-detail-risk={outputReview.falseDetailRisk}
         data-human-review-status={outputReview.humanReviewStatus}
+        data-mode={outputReview.mode}
+        data-mode-policy-version={outputReview.modePolicyVersion}
         data-output-artifact-id={outputReview.outputArtifactId}
         data-output-artifact-hash={outputReview.outputArtifactHash}
         data-review-artifact-count={outputReview.reviewArtifacts.length}

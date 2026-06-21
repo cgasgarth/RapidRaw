@@ -350,6 +350,8 @@ export const superResolutionReviewWorkspaceProofSchema = z.object({
   detailPolicy: z.literal('aggressive_preview_only'),
   detailGainRatio: z.literal('1.21'),
   estimatedPreviewMegapixels: z.literal('336'),
+  mode: z.literal('aggressive'),
+  modePolicyVersion: z.literal('1'),
   outputScale: z.literal('4'),
   proofLevel: z.literal('synthetic_runtime'),
   reviewPacketPath: z.literal('docs/validation/sr-synthetic-output-artifact-proof-2026-06-20.json'),

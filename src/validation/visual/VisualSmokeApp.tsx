@@ -1706,6 +1706,8 @@ function SuperResolutionVisualSmoke() {
           data-detail-policy={settings.detailPolicy}
           data-detail-gain-ratio="1.21"
           data-estimated-preview-megapixels={Math.round((5 * settings.maxPreviewDimensionPx ** 2) / 1_000_000)}
+          data-mode={settings.detailPolicy === 'aggressive_preview_only' ? 'aggressive' : 'conservative'}
+          data-mode-policy-version="1"
           data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
           data-output-scale={settings.outputScale}
           data-proof-level="synthetic_runtime"
