@@ -1,5 +1,17 @@
 import cx from 'clsx';
-import { ArrowLeft, Command, Images, PanelRight, Search, Sparkles, ScanSearch, Wand2, Waves, X } from 'lucide-react';
+import {
+  Aperture,
+  ArrowLeft,
+  Command,
+  Images,
+  PanelRight,
+  Search,
+  Sparkles,
+  ScanSearch,
+  Wand2,
+  Waves,
+  X,
+} from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -89,6 +101,12 @@ const commandPaletteCommands = commandPaletteCommandSchema.array().parse([
     searchTokens: ['import', 'ingest', 'files'],
   },
   {
+    category: 'workflow',
+    id: 'lensCorrection',
+    requiresEditorImage: true,
+    searchTokens: ['lens', 'correction', 'profile', 'vignette', 'distortion', 'chromatic'],
+  },
+  {
     category: 'merge',
     id: 'panorama',
     searchTokens: ['panorama', 'stitch', 'merge'],
@@ -123,6 +141,7 @@ const commandLabelKeys = {
   focusStack: 'modals.commandPalette.commands.focusStack',
   hdrMerge: 'modals.commandPalette.commands.hdrMerge',
   importFiles: 'modals.commandPalette.commands.importFiles',
+  lensCorrection: 'modals.commandPalette.commands.lensCorrection',
   negativeLab: 'modals.commandPalette.commands.negativeLab',
   panorama: 'modals.commandPalette.commands.panorama',
   panelAdjustments: 'modals.commandPalette.commands.panelAdjustments',
@@ -155,6 +174,8 @@ const getCommandIcon = (command: CommandPaletteCommand) => {
     case 'copyPasteSettings':
     case 'importFiles':
       return Command;
+    case 'lensCorrection':
+      return Aperture;
     case 'culling':
       return ScanSearch;
     case 'denoise':
@@ -311,6 +332,14 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
             suggestions: null,
           },
         }));
+      });
+      return;
+    }
+
+    if (command.id === 'lensCorrection' && selectedImage) {
+      closeAndRun(() => {
+        setRightPanel(Panel.Crop);
+        setUI({ isLensCorrectionModalOpen: true });
       });
       return;
     }

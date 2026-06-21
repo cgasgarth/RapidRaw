@@ -8,6 +8,7 @@ export const commandPaletteCommandIdSchema = z.enum([
   'focusStack',
   'hdrMerge',
   'importFiles',
+  'lensCorrection',
   'negativeLab',
   'panorama',
   'panelAdjustments',
