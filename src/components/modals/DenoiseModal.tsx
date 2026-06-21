@@ -231,8 +231,9 @@ export default function DenoiseModal({
   const [isSaving, setIsSaving] = useState(false);
   const [savedPath, setSavedPath] = useState<string | null>(null);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; path: string } | null>(null);
+  const hasDenoiseTargets = targetPaths.length > 0;
   const isBatch = targetPaths.length > 1;
-  const denoiseSourceCount = Math.max(1, targetPaths.length);
+  const denoiseSourceCount = targetPaths.length;
   const mouseDownTarget = useRef<EventTarget | null>(null);
 
   const methodOptions = useMemo<Array<{ label: string; value: 'ai' | 'bm3d' }>>(
@@ -304,6 +305,7 @@ export default function DenoiseModal({
   };
 
   const handleRunDenoise = async () => {
+    if (!hasDenoiseTargets) return;
     setSavedPath(null);
     if (isBatch) {
       setIsSaving(true);
@@ -489,6 +491,16 @@ export default function DenoiseModal({
             </div>
           ))}
         </section>
+        {!hasDenoiseTargets && (
+          <div
+            className="mt-3 w-full max-w-xl rounded-md border border-border-color bg-bg-primary p-3 text-center"
+            data-testid="denoise-empty-target-guard"
+          >
+            <UiText variant={TextVariants.small} color={TextColors.secondary}>
+              {t('modals.denoise.emptyTarget')}
+            </UiText>
+          </div>
+        )}
       </div>
     );
   };
@@ -517,6 +529,7 @@ export default function DenoiseModal({
     }
 
     const disabled = isProcessing || isSaving;
+    const canRunDenoise = hasDenoiseTargets && !disabled;
 
     return (
       <div className={`w-full flex items-center gap-4 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -565,7 +578,7 @@ export default function DenoiseModal({
             onClick={() => {
               void handleRunDenoise();
             }}
-            disabled={isProcessing || isSaving}
+            disabled={!canRunDenoise}
             variant={previewBase64 && !isBatch ? 'secondary' : 'primary'}
           >
             {isProcessing || (isBatch && isSaving) ? (

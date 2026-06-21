@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
 const denoiseLocale = locale.modals?.denoise;
 const requiredLocaleKeys = [
+  'emptyTarget',
   'summaryBatch',
   'summaryIntensity',
   'summaryIntensityValue',
@@ -36,6 +37,10 @@ for (const marker of [
   'modals.denoise.summarySourceFormat',
   'modals.denoise.summaryWorkload',
   'data-denoise-source-count={denoiseSourceCount}',
+  'const denoiseSourceCount = targetPaths.length',
+  'data-testid="denoise-empty-target-guard"',
+  'disabled={!canRunDenoise}',
+  'modals.denoise.emptyTarget',
   'data-denoise-method={method}',
   'selectedMethodLabel',
 ]) {
