@@ -21,6 +21,22 @@ export const negativeLabAcquisitionWarningCodeSchema = z.enum([
 ]);
 export const negativeLabAcquisitionSourceFamilySchema = z.enum(['jpeg_lossy', 'raw_like', 'tiff_scan', 'unknown']);
 export const negativeLabAcquisitionSeveritySchema = z.enum(['ok', 'review']);
+export const negativeLabFrameAcquisitionHealthSchema = z
+  .object({
+    severity: negativeLabAcquisitionSeveritySchema,
+    sourceFamily: negativeLabAcquisitionSourceFamilySchema,
+    warningCodes: z.array(z.enum(['lossy_source_for_negative_lab', 'unknown_acquisition_state'])),
+  })
+  .strict()
+  .superRefine((health, context) => {
+    if (health.severity === 'ok' && health.warningCodes.length > 0) {
+      context.addIssue({ code: 'custom', message: 'OK acquisition health cannot include warnings.' });
+    }
+
+    if (health.severity === 'review' && health.warningCodes.length === 0) {
+      context.addIssue({ code: 'custom', message: 'Review acquisition health requires warning codes.' });
+    }
+  });
 
 export const negativeLabAcquisitionHealthReportSchema = z
   .object({
@@ -52,6 +68,8 @@ export const negativeLabAcquisitionHealthReportSchema = z
 export const negativeLabFrameHealthEntrySchema = z
   .object({
     active: z.boolean(),
+    acquisitionSourceFamily: negativeLabAcquisitionSourceFamilySchema,
+    acquisitionWarningCodes: negativeLabFrameAcquisitionHealthSchema.shape.warningCodes,
     baseConfidence: z.number().min(0).max(1).nullable(),
     baseScope: negativeLabFrameBaseScopeSchema,
     baseStatus: negativeLabFrameBaseStatusSchema,
@@ -137,6 +155,7 @@ export const negativeLabFrameHealthReportSchema = z
 export const negativeLabBatchDryRunSummarySchema = z
   .object({
     affectedFrameIds: z.array(z.string().trim().min(1)),
+    acquisitionReviewFrameIds: z.array(z.string().trim().min(1)),
     blocked: z.boolean(),
     frameHealthReport: negativeLabFrameHealthReportSchema,
     plannedApplyCount: z.number().int().nonnegative(),
@@ -164,6 +183,13 @@ export const negativeLabBatchDryRunSummarySchema = z
       context.addIssue({ code: 'custom', message: 'Negative Lab dry-run apply count is stale.' });
     }
 
+    const acquisitionReviewFrameIds = summary.frameHealthReport.frames
+      .filter((frame) => frame.acquisitionWarningCodes.length > 0)
+      .map((frame) => frame.frameId);
+    if (summary.acquisitionReviewFrameIds.join('\n') !== acquisitionReviewFrameIds.join('\n')) {
+      context.addIssue({ code: 'custom', message: 'Negative Lab acquisition review frames are stale.' });
+    }
+
     if (summary.blocked && summary.affectedFrameIds.length > 0) {
       context.addIssue({ code: 'custom', message: 'Blocked Negative Lab dry-runs cannot include apply frames.' });
     }
@@ -175,6 +201,7 @@ export type NegativeLabFrameWarningSeverity = z.infer<typeof negativeLabFrameWar
 export type NegativeLabFrameWarningCode = z.infer<typeof negativeLabFrameWarningCodeSchema>;
 export type NegativeLabAcquisitionSourceFamily = z.infer<typeof negativeLabAcquisitionSourceFamilySchema>;
 export type NegativeLabAcquisitionWarningCode = z.infer<typeof negativeLabAcquisitionWarningCodeSchema>;
+export type NegativeLabFrameAcquisitionHealth = z.infer<typeof negativeLabFrameAcquisitionHealthSchema>;
 export type NegativeLabAcquisitionHealthReport = z.infer<typeof negativeLabAcquisitionHealthReportSchema>;
 export type NegativeLabFrameHealthEntry = z.infer<typeof negativeLabFrameHealthEntrySchema>;
 export type NegativeLabFrameHealthReport = z.infer<typeof negativeLabFrameHealthReportSchema>;

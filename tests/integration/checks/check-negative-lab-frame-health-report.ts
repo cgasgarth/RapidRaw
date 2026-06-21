@@ -25,6 +25,14 @@ const rollScopedReport = buildNegativeLabFrameHealthReport({
   previewReady: true,
   targetPaths: paths,
 });
+const acquisitionReport = buildNegativeLabFrameHealthReport({
+  activePathIndex: 0,
+  baseFogConfidence: null,
+  includedPathSet: new Set(['/roll/001.tif', '/roll/002.jpg']),
+  previewReady: true,
+  targetPaths: ['/roll/001.tif', '/roll/002.jpg'],
+});
+const acquisitionDryRunSummary = buildNegativeLabBatchDryRunSummary(acquisitionReport);
 
 if (report.frames.length !== 3) failures.push('expected 3 frame health entries');
 if (report.includedCount !== 2) failures.push('expected 2 included frames');
@@ -69,6 +77,18 @@ if (rollScopedReport.frames[0]?.warningCodes.includes('base_estimate_active_fram
 }
 if (rollScopedReport.frames[2]?.baseScope !== 'frame' || rollScopedReport.frames[2]?.baseConfidence !== null) {
   failures.push('roll-scoped base estimate must not apply to excluded frames');
+}
+if (acquisitionReport.frames[1]?.acquisitionSourceFamily !== 'jpeg_lossy') {
+  failures.push('JPEG frame should carry lossy acquisition source family');
+}
+if (!acquisitionReport.frames[1]?.acquisitionWarningCodes.includes('lossy_source_for_negative_lab')) {
+  failures.push('JPEG frame should carry lossy acquisition warning');
+}
+if (acquisitionReport.frames[1]?.warningSeverity !== 'review') {
+  failures.push('JPEG acquisition warning should promote frame severity to review');
+}
+if (acquisitionDryRunSummary.acquisitionReviewFrameIds[0] !== 'negative-lab-frame-2') {
+  failures.push('dry-run summary should identify acquisition review frame');
 }
 
 if (failures.length > 0) {
