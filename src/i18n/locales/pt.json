@@ -916,6 +916,12 @@
       }
     },
     "header": {
+      "compare": {
+        "original": "Original",
+        "ready": "Pronto para comparar",
+        "title": "Comparação A/B",
+        "virtualCopy": "Cópia virtual {{id}}"
+      },
       "search": {
         "addFilterOrSearch": "Adicionar filtro ou pesquisar...",
         "indexingImages": "Indexando Imagens...",

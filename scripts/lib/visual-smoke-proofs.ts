@@ -398,8 +398,12 @@ export const libraryWorkflowProofSchema = z.object({
   filterMode: z.literal('keepers'),
   minimumRating: z.literal('4'),
   selectedCount: z.literal('2'),
-  viewMode: z.literal('survey'),
+  sidecarSeparation: z.literal('independent'),
+  viewMode: z.literal('compare'),
+  virtualCompareReady: z.literal('true'),
   virtualCopyId: z.literal('vc-dsc-0002-bw-proof'),
+  virtualCopySourcePath: z.literal('/proof-roll/DSC_0002.NEF'),
+  virtualCopyVariantPath: z.literal('/proof-roll/DSC_0002.NEF?vc=vc-dsc-0002-bw-proof'),
 });
 export const detailWorkspaceProofSchema = z.object({
   artifactWarning: z.literal('ringing_review'),

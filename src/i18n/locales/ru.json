@@ -915,6 +915,12 @@
       }
     },
     "header": {
+      "compare": {
+        "original": "Оригинал",
+        "ready": "Готово к сравнению",
+        "title": "Сравнение A/B",
+        "virtualCopy": "Виртуальная копия {{id}}"
+      },
       "search": {
         "addFilterOrSearch": "Добавить фильтр или найти...",
         "indexingImages": "Индексация изображений...",

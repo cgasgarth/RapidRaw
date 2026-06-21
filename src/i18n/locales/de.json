@@ -1301,6 +1301,12 @@
       }
     },
     "header": {
+      "compare": {
+        "original": "Original",
+        "ready": "Bereit zum Vergleichen",
+        "title": "A/B-Vergleich",
+        "virtualCopy": "Virtuelle Kopie {{id}}"
+      },
       "search": {
         "addFilterOrSearch": "Filter oder Suche hinzufügen...",
         "indexingImages": "Bilder werden indiziert...",

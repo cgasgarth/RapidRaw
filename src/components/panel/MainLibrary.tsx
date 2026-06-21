@@ -6,7 +6,9 @@ import {
   Check,
   Folder,
   FolderInput,
+  GitCompareArrows,
   Home,
+  Image as ImageIcon,
   Loader2,
   RefreshCw,
   Settings,
@@ -23,6 +25,7 @@ import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../schemas/exportRecipeIds';
 import { buildLibrarySessionUiCard } from '../../schemas/librarySessionUiSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
+import { useProcessStore } from '../../store/useProcessStore';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { type ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
 import {
@@ -99,6 +102,13 @@ interface GitHubReleaseResponse {
   tag_name?: unknown;
 }
 
+const getPhysicalImagePath = (path: string): string => path.split('?vc=')[0] ?? path;
+
+const getVirtualCopyLabel = (path: string): string => {
+  const copyId = path.split('?vc=')[1];
+  return copyId ? copyId.slice(0, 6).toUpperCase() : '';
+};
+
 export default function MainLibrary(props: MainLibraryProps) {
   const { t } = useTranslation();
   const [showSettings, setShowSettings] = useState(false);
@@ -111,6 +121,8 @@ export default function MainLibrary(props: MainLibraryProps) {
   const searchCriteria = useLibraryStore((state) => state.searchCriteria);
   const filterCriteria = useLibraryStore((state) => state.filterCriteria);
   const sortCriteria = useLibraryStore((state) => state.sortCriteria);
+  const thumbnails = useProcessStore((state) => state.thumbnails);
+  const { onRequestThumbnails } = props;
 
   const translatedRatingFilterOptions = useMemo(
     () => [
@@ -257,6 +269,41 @@ export default function MainLibrary(props: MainLibraryProps) {
       t,
     ],
   );
+  const selectedCompareVariants = useMemo(() => {
+    const selectedImages = props.multiSelectedPaths
+      .map((path) => props.imageList.find((image) => image.path === path))
+      .filter((image): image is ImageFile => image !== undefined);
+
+    if (selectedImages.length < 2) return null;
+
+    const physicalPath = getPhysicalImagePath(selectedImages[0]?.path ?? '');
+    if (
+      physicalPath.length === 0 ||
+      selectedImages.some((image) => getPhysicalImagePath(image.path) !== physicalPath)
+    ) {
+      return null;
+    }
+
+    const ordered = [...selectedImages]
+      .sort((left, right) => Number(left.path.includes('?vc=')) - Number(right.path.includes('?vc=')))
+      .slice(0, 2);
+
+    if (ordered.length < 2) return null;
+
+    return ordered.map((image, index) => ({
+      slot: index === 0 ? 'A' : 'B',
+      image,
+      label: image.is_virtual_copy
+        ? t('library.header.compare.virtualCopy', { id: getVirtualCopyLabel(image.path) })
+        : t('library.header.compare.original'),
+      thumbnail: thumbnails[image.path] ?? null,
+    }));
+  }, [props.imageList, props.multiSelectedPaths, t, thumbnails]);
+
+  useEffect(() => {
+    if (!selectedCompareVariants) return;
+    onRequestThumbnails?.(selectedCompareVariants.map(({ image }) => image.path));
+  }, [onRequestThumbnails, selectedCompareVariants]);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -656,6 +703,59 @@ export default function MainLibrary(props: MainLibraryProps) {
               </div>
             ))}
           </div>
+          {selectedCompareVariants && (
+            <div
+              className="flex min-w-0 flex-wrap items-center gap-2 border-l border-surface pl-2"
+              data-testid="library-virtual-copy-compare-strip"
+              data-compare-source-path={getPhysicalImagePath(selectedCompareVariants[0]?.image.path ?? '')}
+              data-compare-variant-count={selectedCompareVariants.length}
+            >
+              <div className="flex items-center gap-1 rounded border border-accent/35 bg-accent/10 px-2 py-1">
+                <GitCompareArrows className="h-3.5 w-3.5 text-accent" />
+                <UiText as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
+                  {t('library.header.compare.title')}
+                </UiText>
+              </div>
+              {selectedCompareVariants.map(({ slot, image, label, thumbnail }) => (
+                <button
+                  key={image.path}
+                  type="button"
+                  className={`grid min-w-40 grid-cols-[44px_minmax(0,1fr)] items-center gap-2 rounded border p-1.5 text-left transition-colors ${
+                    props.activePath === image.path
+                      ? 'border-accent bg-accent/15'
+                      : 'border-surface bg-bg-secondary hover:bg-surface'
+                  }`}
+                  data-testid={`library-virtual-copy-compare-slot-${slot}`}
+                  data-compare-slot={slot}
+                  data-compare-path={image.path}
+                  data-compare-active={props.activePath === image.path}
+                  data-compare-has-thumbnail={thumbnail !== null}
+                  onClick={(event) => {
+                    props.onImageClick(image.path, event);
+                  }}
+                >
+                  <span className="flex h-10 w-11 items-center justify-center overflow-hidden rounded-sm bg-bg-primary">
+                    {thumbnail ? (
+                      <img alt="" className="h-full w-full object-cover" src={thumbnail} />
+                    ) : (
+                      <ImageIcon className="h-4 w-4 text-text-secondary" />
+                    )}
+                  </span>
+                  <span className="min-w-0">
+                    <UiText as="span" variant={TextVariants.small} color={TextColors.secondary}>
+                      {slot}
+                    </UiText>
+                    <UiText as="span" variant={TextVariants.small} className="ml-1 truncate">
+                      {label}
+                    </UiText>
+                  </span>
+                </button>
+              ))}
+              <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="truncate">
+                {t('library.header.compare.ready')}
+              </UiText>
+            </div>
+          )}
         </div>
       </section>
 
