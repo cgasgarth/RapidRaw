@@ -97,7 +97,7 @@ export const VISUAL_SMOKE_SCENARIOS = [
     sectionMinimum: 1,
   },
   {
-    marker: 'Super-resolution plan',
+    marker: 'Super Resolution Smoke',
     mode: VISUAL_SMOKE_SCENARIO_IDS.SrUi,
     outputFile: 'sr-ui.png',
     sectionMinimum: 1,

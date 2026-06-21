@@ -297,6 +297,7 @@ export const superResolutionReviewWorkspaceProofSchema = z.object({
   artifactPath: z.literal('/tmp/rawengine-super-resolution-smoke.tif'),
   command: z.literal(superResolutionRoutePair.dryRunToolName),
   detailPolicy: z.literal('aggressive_preview_only'),
+  estimatedPreviewMegapixels: z.literal('336'),
   outputScale: z.literal('4'),
   runtimeStatus: z.literal('dry_run_preview'),
   sourceCount: z.literal('5'),

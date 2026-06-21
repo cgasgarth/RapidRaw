@@ -2175,12 +2175,14 @@
         "ready": "Ready",
         "required": "Required",
         "scale": "Scale",
-        "sources": "Sources"
+        "sources": "Sources",
+        "workload": "Workload"
       },
       "preflightTitle": "Preflight",
       "previewBudgetLabel": "Preview budget",
       "previewBudgetValue": "{{value}} px",
       "previewPlan": "Preview plan",
+      "previewWorkloadValue": "{{value}} MP",
       "qualityBalanced": "Balanced",
       "qualityBest": "Best",
       "qualityLabel": "Quality",

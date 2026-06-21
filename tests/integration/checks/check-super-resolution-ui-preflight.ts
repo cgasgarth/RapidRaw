@@ -8,6 +8,8 @@ const requiredLocaleKeys = [
   'preflight.sources',
   'preflight.scale',
   'preflight.outputPixels',
+  'preflight.workload',
+  'previewWorkloadValue',
   'preflight.alignment',
   'preflight.detail',
   'qualityBalanced',
@@ -31,6 +33,9 @@ for (const marker of [
   'settings.qualityPreference',
   'qualityOptions.find',
   'ComputationalSetupStatusLine',
+  'data-estimated-preview-megapixels={estimatedPreviewMegapixels}',
+  'modals.superResolution.preflight.workload',
+  'modals.superResolution.previewWorkloadValue',
 ]) {
   if (!source.includes(marker)) {
     console.error(`Super-resolution preflight missing marker: ${marker}`);
