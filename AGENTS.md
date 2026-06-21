@@ -49,6 +49,8 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   foundation polish.
 - Prefer vertical feature delivery over planning, schema-only, proof-only, or
   meta-tooling PRs.
+- Avoid repo meta-tooling PRs unless they clearly improve product quality or
+  prevent a recurring real failure.
 - Proof scripts should live inside the actual feature PR they validate. Do not
   open PRs whose main value is only a probe, schema, inventory, or routing
   check.
@@ -77,6 +79,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   into PR-sized work, close obsolete/meta-only issues, update stale issues with
   current context, and move related work into milestones instead of keeping
   oversized catch-all issues open.
+- Audit the open backlog periodically for broad, stale, duplicate, or meta-only
+  issues. Close or rewrite them so each remaining issue maps cleanly to one
+  realistic PR.
 
 ## GitHub Repo Resolution
 
@@ -214,6 +219,11 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Remove validation inventory JSON from routine gates. Do not maintain broad
   validation inventory files as routine PR churn; prefer focused checks tied to
   changed product behavior.
+- Keep private RAW validation standardized around one reusable private-root and
+  report pattern. Prefer feature-specific runtime proofs that validate actual
+  image output over broad status ledgers.
+- Delete stale or low-value meta checks when they do not validate product
+  behavior.
 - Do not edit existing tests solely to reduce token output. Compact the
   commonly reused runner, package script, hook, or reporting layer instead.
 - Keep GitHub Actions current on supported major versions and maintain the
