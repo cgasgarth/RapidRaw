@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Command,
   Images,
+  LayoutTemplate,
   PanelRight,
   Scan,
   Search,
@@ -82,6 +83,11 @@ const commandPaletteCommands = commandPaletteCommandSchema.array().parse([
   },
   {
     category: 'workflow',
+    id: 'collage',
+    searchTokens: ['collage', 'frame', 'layout', 'contact', 'sheet'],
+  },
+  {
+    category: 'workflow',
     id: 'copyPasteSettings',
     searchTokens: ['copy', 'paste', 'settings'],
   },
@@ -142,6 +148,7 @@ const commandPaletteCommands = commandPaletteCommandSchema.array().parse([
 
 const commandLabelKeys = {
   backToLibrary: 'modals.commandPalette.commands.backToLibrary',
+  collage: 'modals.commandPalette.commands.collage',
   copyPasteSettings: 'modals.commandPalette.commands.copyPasteSettings',
   culling: 'modals.commandPalette.commands.culling',
   denoise: 'modals.commandPalette.commands.denoise',
@@ -182,6 +189,8 @@ const getCommandIcon = (command: CommandPaletteCommand) => {
     case 'copyPasteSettings':
     case 'importFiles':
       return Command;
+    case 'collage':
+      return LayoutTemplate;
     case 'lensCorrection':
       return Aperture;
     case 'transformTools':
@@ -225,6 +234,7 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const selectedImage = useEditorStore((state) => state.selectedImage);
+  const imageList = useLibraryStore((state) => state.imageList);
   const multiSelectedPaths = useLibraryStore((state) => state.multiSelectedPaths);
   const setUI = useUIStore((state) => state.setUI);
   const setRightPanel = useUIStore((state) => state.setRightPanel);
@@ -232,6 +242,10 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
     () => (multiSelectedPaths.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : []),
     [multiSelectedPaths, selectedImage],
   );
+  const selectedCommandImages = useMemo(() => {
+    const selectedPathSet = new Set(selectedCommandPaths);
+    return imageList.filter((image) => selectedPathSet.has(image.path)).slice(0, 9);
+  }, [imageList, selectedCommandPaths]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -246,6 +260,7 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
     const normalizedQuery = query.trim().toLowerCase();
     const availableCommands = commandPaletteCommands.filter((command) => {
       if (command.id === 'culling') return selectedCommandPaths.length > 0;
+      if (command.id === 'collage') return selectedCommandImages.length > 0;
       return !command.requiresEditorImage || selectedImage;
     });
 
@@ -261,7 +276,7 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
         .toLowerCase();
       return haystack.includes(normalizedQuery);
     });
-  }, [query, selectedCommandPaths.length, selectedImage, t]);
+  }, [query, selectedCommandImages.length, selectedCommandPaths.length, selectedImage, t]);
 
   const resolvedActiveIndex = Math.min(activeIndex, Math.max(visibleCommands.length - 1, 0));
   const coverageCategories = useMemo(
@@ -309,6 +324,13 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
     if (command.id === 'importFiles') {
       closeAndRun(() => {
         setUI({ isImportModalOpen: true });
+      });
+      return;
+    }
+
+    if (command.id === 'collage' && selectedCommandImages.length > 0) {
+      closeAndRun(() => {
+        setUI({ collageModalState: { isOpen: true, sourceImages: selectedCommandImages } });
       });
       return;
     }
