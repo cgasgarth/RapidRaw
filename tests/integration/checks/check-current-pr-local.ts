@@ -197,6 +197,14 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
   addIf((file) => file === 'src/components/modals/DenoiseModal.tsx', ['check:denoise-ui-summary']);
   addIf(
     (file) =>
+      file === 'src-tauri/src/denoise_real_raw_proof.rs' ||
+      file === 'scripts/run-denoise-real-raw-private-proof.ts' ||
+      file === 'tests/integration/checks/check-denoise-real-raw-private-proof-summary.ts' ||
+      file === 'docs/validation/denoise-real-raw-private-proof-2026-06-21.json',
+    ['check:denoise-real-raw-private-proof-summary', 'check:denoise-real-raw-private-proof'],
+  );
+  addIf(
+    (file) =>
       file === 'src/components/modals/CollageModal.tsx' ||
       file === 'src/utils/displayFilePath.ts' ||
       file === 'tests/integration/checks/check-collage-saved-output-ui.ts',

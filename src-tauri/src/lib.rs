@@ -22,6 +22,8 @@ pub mod deblur_cpu_reference;
 mod deblur_render;
 mod denoise_api;
 pub mod denoise_cpu_reference;
+#[cfg(all(test, feature = "tauri-test"))]
+mod denoise_real_raw_proof;
 mod denoise_render;
 mod denoising;
 mod events;
