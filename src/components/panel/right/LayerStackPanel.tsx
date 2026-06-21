@@ -25,6 +25,7 @@ import {
 } from '../../../utils/adjustments';
 import {
   buildLayerGroupSummaries,
+  buildLayerExportReadinessSummary,
   canGroupLayerWithNext,
   createAdjustmentLayer,
   deleteLayer,
@@ -175,6 +176,7 @@ export default function LayerStackPanel({
   const selectedLayerId = activeMaskContainerId ?? localSelectedLayerId;
   const visibleLayerCount = masks.filter((mask) => mask.visible).length;
   const hiddenLayerCount = masks.length - visibleLayerCount;
+  const exportReadiness = useMemo(() => buildLayerExportReadinessSummary(masks), [masks]);
   const groupCount = useMemo(() => {
     const groupIds = new Set<string>();
     for (const mask of masks) {
@@ -428,6 +430,26 @@ export default function LayerStackPanel({
           data-testid="layer-stack-count-summary"
         >
           {t('editor.layers.groupSummaryCount', { count: groupCount })}
+        </UiText>
+      </div>
+
+      <div
+        className="mx-3 mb-3 rounded-md border border-surface bg-bg-secondary/70 p-2"
+        data-exportable-layer-count={exportReadiness.exportableLayerCount}
+        data-hidden-layer-count={exportReadiness.hiddenLayerCount}
+        data-masked-layer-count={exportReadiness.maskedLayerCount}
+        data-testid="layer-export-readiness-summary"
+        data-total-layer-count={exportReadiness.totalLayerCount}
+      >
+        <UiText variant={TextVariants.small} weight={TextWeights.medium} className="block text-text-primary">
+          {t('editor.layers.exportReadiness.title')}
+        </UiText>
+        <UiText variant={TextVariants.small} className="block text-text-tertiary">
+          {t('editor.layers.exportReadiness.summary', {
+            exportable: exportReadiness.exportableLayerCount,
+            masked: exportReadiness.maskedLayerCount,
+            total: exportReadiness.totalLayerCount,
+          })}
         </UiText>
       </div>
 

@@ -767,6 +767,10 @@
       },
       "copyName": "{{name}} Copy",
       "defaultGroupName": "Layer Group",
+      "exportReadiness": {
+        "summary": "{{exportable}}/{{total}} layers export, {{masked}} masked",
+        "title": "Export readiness"
+      },
       "groupCount": "{{count}} layer",
       "groupCount_one": "{{count}} layer",
       "groupCount_other": "{{count}} layers",
