@@ -501,6 +501,27 @@ export default function DenoiseModal({
             </UiText>
           </div>
         )}
+        {hasDenoiseTargets && loadingImageUrl && (
+          <section
+            className="mt-3 flex w-full max-w-xl items-center gap-3 rounded-md border border-border-color bg-bg-primary p-3"
+            data-denoise-preview-source-count={denoiseSourceCount}
+            data-testid="denoise-setup-preview"
+          >
+            <img
+              src={loadingImageUrl}
+              alt={t('modals.denoise.setupPreviewAlt')}
+              className="h-16 w-16 shrink-0 rounded object-cover"
+            />
+            <div className="min-w-0">
+              <UiText variant={TextVariants.small} className="block text-text-tertiary">
+                {t('modals.denoise.setupPreview')}
+              </UiText>
+              <UiText variant={TextVariants.small} className="block truncate text-text-primary">
+                {t('modals.denoise.setupPreviewCount', { count: denoiseSourceCount })}
+              </UiText>
+            </div>
+          </section>
+        )}
       </div>
     );
   };

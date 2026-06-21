@@ -6,6 +6,10 @@ const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
 const denoiseLocale = locale.modals?.denoise;
 const requiredLocaleKeys = [
   'emptyTarget',
+  'setupPreview',
+  'setupPreviewAlt',
+  'setupPreviewCount_one',
+  'setupPreviewCount_other',
   'summaryBatch',
   'summaryIntensity',
   'summaryIntensityValue',
@@ -39,6 +43,10 @@ for (const marker of [
   'data-denoise-source-count={denoiseSourceCount}',
   'const denoiseSourceCount = targetPaths.length',
   'data-testid="denoise-empty-target-guard"',
+  'data-testid="denoise-setup-preview"',
+  'data-denoise-preview-source-count={denoiseSourceCount}',
+  'modals.denoise.setupPreview',
+  'modals.denoise.setupPreviewCount',
   'disabled={!canRunDenoise}',
   'modals.denoise.emptyTarget',
   'data-denoise-method={method}',
