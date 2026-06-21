@@ -28,12 +28,13 @@ import { type ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
 import {
   type AppSettings,
   type ImageFile,
-  type LibraryViewMode,
   type Progress,
   ThumbnailSize,
   ThumbnailAspectRatio,
   RawStatus,
   EditedStatus,
+  SortDirection,
+  LibraryViewMode,
   type Theme,
 } from '../ui/AppProperties';
 import Button from '../ui/Button';
@@ -108,6 +109,8 @@ export default function MainLibrary(props: MainLibraryProps) {
   const [isProgressHovered, setIsProgressHovered] = useState(false);
 
   const searchCriteria = useLibraryStore((state) => state.searchCriteria);
+  const filterCriteria = useLibraryStore((state) => state.filterCriteria);
+  const sortCriteria = useLibraryStore((state) => state.sortCriteria);
 
   const translatedRatingFilterOptions = useMemo(
     () => [
@@ -173,6 +176,62 @@ export default function MainLibrary(props: MainLibraryProps) {
     ],
     [t],
   );
+
+  const libraryHeaderStatusItems = useMemo(() => {
+    const activeSearchTokenCount = searchCriteria.tags.length + (searchCriteria.text.trim().length > 0 ? 1 : 0);
+    const activeFilterCount =
+      (filterCriteria.rating !== 0 ? 1 : 0) +
+      (filterCriteria.rawStatus !== RawStatus.All ? 1 : 0) +
+      ((filterCriteria.editedStatus || EditedStatus.All) !== EditedStatus.All ? 1 : 0) +
+      (filterCriteria.colors.length > 0 ? 1 : 0);
+    const sortLabel =
+      translatedSortOptions.find((option) => option.key === sortCriteria.key)?.label ?? t('library.sort.fileName');
+    const sortDirectionLabel =
+      sortCriteria.order === SortDirection.Ascending
+        ? t('library.header.status.ascending')
+        : t('library.header.status.descending');
+    const viewModeLabel =
+      props.libraryViewMode === LibraryViewMode.Recursive
+        ? t('library.header.viewOptions.recursive')
+        : t('library.header.viewOptions.currentFolder');
+
+    return [
+      {
+        label: t('library.header.status.searchLabel'),
+        value:
+          activeSearchTokenCount > 0
+            ? t('library.header.status.searchActive', { count: activeSearchTokenCount })
+            : t('library.header.status.searchReady'),
+      },
+      {
+        label: t('library.header.status.filterLabel'),
+        value:
+          activeFilterCount > 0
+            ? t('library.header.status.filterActive', { count: activeFilterCount })
+            : t('library.header.status.filterReady'),
+      },
+      {
+        label: t('library.header.status.sortLabel'),
+        value: t('library.header.status.sortValue', { direction: sortDirectionLabel, sort: sortLabel }),
+      },
+      {
+        label: t('library.header.status.viewLabel'),
+        value: viewModeLabel,
+      },
+    ];
+  }, [
+    filterCriteria.colors.length,
+    filterCriteria.editedStatus,
+    filterCriteria.rating,
+    filterCriteria.rawStatus,
+    props.libraryViewMode,
+    searchCriteria.tags.length,
+    searchCriteria.text,
+    sortCriteria.key,
+    sortCriteria.order,
+    t,
+    translatedSortOptions,
+  ]);
 
   const isBusy =
     props.isLoading ||
@@ -578,6 +637,25 @@ export default function MainLibrary(props: MainLibraryProps) {
               {label}
             </UiText>
           ))}
+          <div
+            className="flex min-w-0 flex-wrap items-center gap-2 border-l border-surface pl-2"
+            data-testid="library-header-workflow-status"
+          >
+            {libraryHeaderStatusItems.map((item) => (
+              <div
+                className="flex items-center gap-1 rounded border border-surface bg-bg-secondary px-2 py-1"
+                data-library-header-status={item.label}
+                key={item.label}
+              >
+                <UiText as="span" variant={TextVariants.small} color={TextColors.secondary}>
+                  {item.label}
+                </UiText>
+                <UiText as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
+                  {item.value}
+                </UiText>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

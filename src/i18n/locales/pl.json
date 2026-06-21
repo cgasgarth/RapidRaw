@@ -1330,6 +1330,25 @@
         "tooltipClearSearch": "Wyczyść wyszukiwanie",
         "tooltipSearchFilter": "Wyszukaj lub Filtruj"
       },
+      "status": {
+        "ascending": "",
+        "descending": "",
+        "filterActive_one": "",
+        "filterActive_few": "",
+        "filterActive_many": "",
+        "filterActive_other": "",
+        "filterLabel": "",
+        "filterReady": "",
+        "searchActive_one": "",
+        "searchActive_few": "",
+        "searchActive_many": "",
+        "searchActive_other": "",
+        "searchLabel": "",
+        "searchReady": "",
+        "sortLabel": "",
+        "sortValue": "",
+        "viewLabel": ""
+      },
       "title": "Biblioteka",
       "viewOptions": {
         "currentFolder": "Bieżący folder",
