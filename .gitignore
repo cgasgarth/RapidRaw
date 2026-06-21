@@ -19,10 +19,14 @@ private-fixtures/
 .rawengine-private-root/
 docs/validation/local/
 docs/validation/rawengine-goal-progress-report-*.html
+docs/validation/goal-progress-report-*.html
+docs/validation/*runtime-status*.json
+docs/validation/raw-color-management-runtime-proof-*.json
 docs/validation/*-local-*.html
 docs/validation/*-local-*.json
 docs/validation/*-local-*.png
 docs/validation/*-local-*.svg
+fixtures/validation/*run-reports*.json
 coverage/
 playwright-report/
 test-results/

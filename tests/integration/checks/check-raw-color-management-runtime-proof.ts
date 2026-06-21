@@ -7,11 +7,17 @@ import { z } from 'zod';
 import { parseRawOpenEditExportRunReportCollection } from '../../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
 
 const REQUEST_PATH = 'fixtures/validation/raw-open-edit-export-proof-request.json';
-const DEFAULT_RUN_REPORTS_PATH = 'fixtures/validation/raw-open-edit-export-run-reports.json';
 const REPORT_PATH = 'docs/validation/raw-color-management-runtime-proof-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 const VALIDATE_ONLY = process.argv.includes('--validate-only');
-const RUN_REPORTS_PATH = valueAfter('--run-reports') ?? DEFAULT_RUN_REPORTS_PATH;
+const RUN_REPORTS_PATH = valueAfter('--run-reports');
+
+if (RUN_REPORTS_PATH === undefined) {
+  console.error(
+    'Missing --run-reports <path>. Generate a private report first; committed run-report fixtures are not used.',
+  );
+  process.exit(1);
+}
 
 const whitePointSchema = z.object({ x: z.number().positive(), y: z.number().positive() }).strict();
 

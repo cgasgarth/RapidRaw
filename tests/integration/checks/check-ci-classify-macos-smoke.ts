@@ -249,22 +249,6 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     'check:raw-open-edit-export-private-proof-acceptance',
     new Set(['bun scripts/accept-raw-open-edit-export-private-proof.ts --self-test']),
   ],
-  [
-    'check:raw-open-edit-export-run-reports',
-    new Set(['bun tests/integration/checks/check-raw-open-edit-export-run-reports.ts']),
-  ],
-  [
-    'check:raw-color-management-runtime-proof',
-    new Set(['bun tests/integration/checks/check-raw-color-management-runtime-proof.ts']),
-  ],
-  [
-    'check:raw-open-edit-export-runtime-status',
-    new Set(['bun tests/integration/checks/check-raw-open-edit-export-runtime-status.ts']),
-  ],
-  [
-    'check:raw-open-edit-export-runtime-status:update',
-    new Set(['bun tests/integration/checks/check-raw-open-edit-export-runtime-status.ts --update']),
-  ],
   ['check:reference-images', new Set(['bun tests/integration/checks/check-reference-image-fixtures.ts'])],
   [
     'check:negative-lab-workspace-smoke',
@@ -862,17 +846,6 @@ function runSelfTest() {
     SMOKE_MODES.NONE,
   );
   assertChangeClassification(
-    'raw open edit export run report package script changes skip smoke',
-    [
-      {
-        filename: 'package.json',
-        patch:
-          '@@ -110,6 +110,7 @@\n+    "check:raw-open-edit-export-run-reports": "bun tests/integration/checks/check-raw-open-edit-export-run-reports.ts",',
-      },
-    ],
-    SMOKE_MODES.NONE,
-  );
-  assertChangeClassification(
     'pure TS test package script changes skip smoke',
     [
       {
@@ -946,11 +919,6 @@ function runSelfTest() {
   assertClassification(
     'validation proof request fixtures can skip smoke',
     ['fixtures/validation/raw-open-edit-export-proof-request.json'],
-    SMOKE_MODES.NONE,
-  );
-  assertClassification(
-    'validation run-report fixtures can skip smoke',
-    ['fixtures/validation/raw-open-edit-export-run-reports.json'],
     SMOKE_MODES.NONE,
   );
   assertClassification(

@@ -9,13 +9,20 @@ import { parseRawOpenEditExportRunReportCollection } from '../src/schemas/rawOpe
 
 const args = process.argv.slice(2);
 const selfTest = args.includes('--self-test');
-const runReportsPath = valueAfter('--run-reports') ?? 'fixtures/validation/raw-open-edit-export-run-reports.json';
+const runReportsPath = valueAfter('--run-reports');
 const manifestPath = valueAfter('--manifest') ?? 'fixtures/validation/raw-open-edit-export-proof.json';
 const outputPath = valueAfter('--output');
 
 if (selfTest) {
   await runSelfTest();
   process.exit(0);
+}
+
+if (runReportsPath === undefined) {
+  console.error(
+    'Missing --run-reports <path>. Generate a private report first; committed run-report fixtures are not used.',
+  );
+  process.exit(1);
 }
 
 const manifest = parseRawOpenEditExportProofManifest(JSON.parse(await readFile(manifestPath, 'utf8')));
