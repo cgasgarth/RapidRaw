@@ -588,6 +588,14 @@ export default function CullingModal({
               }}
               className="w-full"
             />
+            <UiText
+              variant={TextVariants.small}
+              color={TextColors.secondary}
+              className="mt-2 block"
+              data-testid="culling-selected-result-count"
+            >
+              {t('modals.culling.selectedResultCount', { count: selectedRejects.size })}
+            </UiText>
           </div>
           <div className="flex gap-3">
             <button

@@ -1584,6 +1584,8 @@
       "progressCount": "{{current}} of {{total}} images analyzed",
       "representative": "代表图像",
       "score": "评分：{{score}}",
+      "selectedResultCount_one": "已选择 {{count}} 个结果",
+      "selectedResultCount_other": "已选择 {{count}} 个结果",
       "sharpness": "锐度：{{sharpness}}",
       "similarGroupsTab": "相似组",
       "similarityThreshold": "相似度阈值",

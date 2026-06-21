@@ -1597,6 +1597,8 @@
       "progressCount": "{{current}} of {{total}} images analyzed",
       "representative": "Reprasentatives Bild",
       "score": "Punktzahl: {{score}}",
+      "selectedResultCount_one": "{{count}} Ergebnis ausgewählt",
+      "selectedResultCount_other": "{{count}} Ergebnisse ausgewählt",
       "sharpness": "Schärfe: {{sharpness}}",
       "similarGroupsTab": "Ähnliche Gruppen",
       "similarityThreshold": "Ähnlichkeits-Schwellenwert",
