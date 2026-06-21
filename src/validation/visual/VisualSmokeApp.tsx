@@ -1268,14 +1268,24 @@ function FocusStackVisualSmoke() {
           data-artifact-path={copy.focusArtifactPath}
           data-blend-method={settings.blendMethod}
           data-command={copy.focusDryRunTool}
+          data-decision={settings.blendMethod === 'depth_map' ? 'preview_only' : 'editable_review_required'}
           data-depth-mode={settings.blendMethod}
           data-estimated-preview-megapixels={Math.round((6 * settings.maxPreviewDimensionPx ** 2) / 1_000_000)}
+          data-halo-risk-cell-ratio="0.14"
           data-halo-policy="flattened_preview"
+          data-low-confidence-cell-ratio="0.08"
           data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
+          data-proof-level="synthetic_runtime"
           data-quality-preference={settings.qualityPreference}
           data-retouch-layer-policy={settings.retouchLayerPolicy}
           data-runtime-status="dry_run_preview"
+          data-sharpness-coverage-ratio="1"
           data-source-count="6"
+          data-warning-codes={
+            settings.blendMethod === 'depth_map'
+              ? 'human_review_required,synthetic_runtime_only,transition_halo_risk,depth_map_preview_only'
+              : 'human_review_required,synthetic_runtime_only,transition_halo_risk,retouch_layer_deferred'
+          }
           data-testid="focus-review-workspace-proof"
         />
         <div
