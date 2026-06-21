@@ -35,6 +35,17 @@ export const buildNegativeLabDustScratchReviewReport = (
       };
     }
 
+    if (frame.batchDisposition === 'review' && frame.batchDispositionReason === 'acquisition_review_required') {
+      return {
+        findingCodes: ['acquisition_review_required', 'edge_dust_check', 'emulsion_scratch_check'],
+        frameId: frame.frameId,
+        included: true,
+        recommendation: 'Review acquisition source before final export; lossy or unknown input can limit quality.',
+        scanLabel: frame.scanLabel,
+        severity: 'review',
+      };
+    }
+
     if (frame.warningCodes.includes('base_estimate_active_frame_only')) {
       return {
         findingCodes: ['base_fog_only_review', 'edge_dust_check', 'emulsion_scratch_check'],

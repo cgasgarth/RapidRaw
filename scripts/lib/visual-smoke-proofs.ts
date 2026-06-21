@@ -547,6 +547,7 @@ export const negativeLabRollQueueSummaryProofSchema = z.object({
   exportReady: z.enum(['false', 'true']),
   plannedApplyCount: z.literal('2'),
   profileId: z.string().min(1),
+  reviewFrameCount: z.string().regex(/^[0-9]+$/u),
   warningCount: z.string().regex(/^[0-9]+$/u),
 });
 

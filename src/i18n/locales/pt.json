@@ -1471,7 +1471,15 @@
       "baseReadyRoll": "Roll base {{confidence}}%",
       "baseScopeFrame": "Base applies to active frame",
       "baseScopeRoll": "Base applies to roll",
-      "promoteBaseToRoll": "Use base for roll"
+      "promoteBaseToRoll": "Use base for roll",
+      "batchPlanReviewCount": "Review {{reviewCount}}",
+      "batchDispositionApply": "Apply",
+      "batchDispositionReview": "Review",
+      "batchDispositionSkip": "Skip",
+      "batchDispositionReasonAcquisition": "Acquisition review required",
+      "batchDispositionReasonExcluded": "Excluded from batch",
+      "batchDispositionReasonPreview": "Preview required",
+      "batchDispositionReasonReady": "Ready to apply"
     },
     "panorama": {
       "cancel": "Cancelar",

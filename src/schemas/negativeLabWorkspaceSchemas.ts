@@ -12,6 +12,7 @@ export const negativeLabWorkspaceStageIdSchema = z.enum([
 ]);
 export const negativeLabDustScratchSeveritySchema = z.enum(['clear', 'review', 'retouch']);
 export const negativeLabDustScratchFindingCodeSchema = z.enum([
+  'acquisition_review_required',
   'base_fog_only_review',
   'edge_dust_check',
   'emulsion_scratch_check',

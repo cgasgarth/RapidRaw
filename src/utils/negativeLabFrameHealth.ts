@@ -5,6 +5,8 @@ import {
   negativeLabFrameAcquisitionHealthSchema,
   type NegativeLabAcquisitionHealthReport,
   type NegativeLabBatchDryRunSummary,
+  type NegativeLabFrameBatchDisposition,
+  type NegativeLabFrameBatchDispositionReason,
   type NegativeLabFrameAcquisitionHealth,
   type NegativeLabFrameBaseScope,
   type NegativeLabFrameHealthReport,
@@ -57,6 +59,33 @@ const getNegativeLabWarningSeverity = (
   }
 
   return warningCodes.length === 0 ? 'ok' : 'info';
+};
+
+const buildNegativeLabFrameBatchDisposition = ({
+  acquisitionHealth,
+  included,
+  previewReady,
+}: {
+  acquisitionHealth: NegativeLabFrameAcquisitionHealth;
+  included: boolean;
+  previewReady: boolean;
+}): {
+  batchDisposition: NegativeLabFrameBatchDisposition;
+  batchDispositionReason: NegativeLabFrameBatchDispositionReason;
+} => {
+  if (!included) {
+    return { batchDisposition: 'skip', batchDispositionReason: 'excluded_from_batch' };
+  }
+
+  if (!previewReady) {
+    return { batchDisposition: 'review', batchDispositionReason: 'preview_required' };
+  }
+
+  if (acquisitionHealth.severity === 'review') {
+    return { batchDisposition: 'review', batchDispositionReason: 'acquisition_review_required' };
+  }
+
+  return { batchDisposition: 'apply', batchDispositionReason: 'ready_to_apply' };
 };
 
 export const buildNegativeLabAcquisitionHealthReport = (
@@ -113,6 +142,11 @@ export const buildNegativeLabFrameHealthReport = ({
     const hasFrameBaseEstimate = active && baseFogConfidence !== null;
     const hasBaseEstimate = hasRollBaseEstimate || hasFrameBaseEstimate;
     const warningCodes: NegativeLabFrameWarningCode[] = [];
+    const batchDisposition = buildNegativeLabFrameBatchDisposition({
+      acquisitionHealth,
+      included,
+      previewReady,
+    });
 
     if (!included) warningCodes.push('excluded_from_batch');
     if (!previewReady && active) warningCodes.push('preview_not_ready');
@@ -129,6 +163,7 @@ export const buildNegativeLabFrameHealthReport = ({
       baseConfidence: hasBaseEstimate ? baseFogConfidence : null,
       baseScope: hasRollBaseEstimate ? 'roll' : 'frame',
       baseStatus: hasBaseEstimate ? 'estimated' : 'pending',
+      ...batchDisposition,
       conversionStatus: !included
         ? 'skipped'
         : active
@@ -169,6 +204,16 @@ export const buildNegativeLabBatchDryRunSummary = (
   const skippedFrameIds = frameHealthReport.frames
     .filter((frame) => frame.healthStatus === 'skipped')
     .map((frame) => frame.frameId);
+  const reviewFrameIds = frameHealthReport.frames
+    .filter((frame) => frame.batchDisposition === 'review')
+    .map((frame) => frame.frameId);
+  const dispositionCounts = frameHealthReport.frames.reduce(
+    (counts, frame) => ({
+      ...counts,
+      [frame.batchDisposition]: counts[frame.batchDisposition] + 1,
+    }),
+    { apply: 0, review: 0, skip: 0 },
+  );
 
   return parseNegativeLabBatchDryRunSummary({
     affectedFrameIds,
@@ -176,8 +221,10 @@ export const buildNegativeLabBatchDryRunSummary = (
       .filter((frame) => frame.acquisitionWarningCodes.length > 0)
       .map((frame) => frame.frameId),
     blocked: affectedFrameIds.length === 0,
+    dispositionCounts,
     frameHealthReport,
     plannedApplyCount: affectedFrameIds.length,
+    reviewFrameIds,
     rollWarningCodes: frameHealthReport.warningCodes,
     schemaVersion: NEGATIVE_LAB_FRAME_HEALTH_SCHEMA_VERSION,
     skippedFrameIds,
