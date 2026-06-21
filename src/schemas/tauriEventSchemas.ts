@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { panoramaRenderedReviewSchema } from './panoramaUiSchemas';
+
 import type { CullingSuggestions, Progress } from '../components/ui/AppProperties';
 
 const nonnegativeNumberSchema = z.number().nonnegative();
@@ -62,6 +64,13 @@ export const base64PayloadSchema = z
     base64: z.string(),
   })
   .loose();
+
+export const panoramaCompletePayloadSchema = z
+  .object({
+    base64: z.string(),
+    review: panoramaRenderedReviewSchema,
+  })
+  .strict();
 
 export const aiConnectorStatusPayloadSchema = z
   .object({
@@ -145,6 +154,7 @@ export const parsePathProgressPayload = (value: unknown) => pathProgressPayloadS
 export const parseDenoiseCompletePayload = (value: unknown) => denoiseCompletePayloadSchema.parse(value);
 export const parseRenderPathPayload = (value: unknown) => renderPathPayloadSchema.parse(value);
 export const parseBase64Payload = (value: unknown) => base64PayloadSchema.parse(value);
+export const parsePanoramaCompletePayload = (value: unknown) => panoramaCompletePayloadSchema.parse(value);
 export const parseAiConnectorStatusPayload = (value: unknown) => aiConnectorStatusPayloadSchema.parse(value);
 export const parseExportReceiptPayload = (value: unknown) => exportReceiptPayloadSchema.parse(value);
 export const parseCullingProgressPayload = (value: unknown): CullingProgressPayload => {

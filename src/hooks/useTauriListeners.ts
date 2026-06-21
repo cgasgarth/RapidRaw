@@ -11,6 +11,7 @@ import {
   parseExportReceiptPayload,
   parseImportProgressPayload,
   parseImportStartPayload,
+  parsePanoramaCompletePayload,
   parseProgressPayload,
   parseRenderPathPayload,
   parseStringPayload,
@@ -309,7 +310,7 @@ export function useTauriListeners({
         }
       }),
       listen<unknown>(PANORAMA_COMPLETE_EVENT, (event) => {
-        const payload = parseBase64Payload(event.payload);
+        const payload = parsePanoramaCompletePayload(event.payload);
         if (isEffectActive) {
           useUIStore.getState().setUI((state) => ({
             panoramaModalState: {
@@ -318,6 +319,7 @@ export function useTauriListeners({
               finalImageBase64: payload.base64,
               isProcessing: false,
               progressMessage: null,
+              renderedReview: payload.review,
             },
           }));
         }

@@ -6,6 +6,7 @@ import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../s
 import { DEFAULT_HDR_MERGE_UI_SETTINGS, type HdrMergeUiSettings } from '../schemas/hdrMergeUiSchemas';
 import {
   DEFAULT_PANORAMA_UI_SETTINGS,
+  type PanoramaRenderedReview,
   type PanoramaRuntimePlan,
   type PanoramaUiSettings,
 } from '../schemas/panoramaUiSchemas';
@@ -53,6 +54,7 @@ export interface PanoramaModalState {
     sourceCount: number;
   } | null;
   progressMessage: string | null;
+  renderedReview: PanoramaRenderedReview | null;
   runtimePlan: PanoramaRuntimePlan | null;
   settings: PanoramaUiSettings;
   stitchingSourcePaths: Array<string>;
@@ -132,6 +134,7 @@ export const createDefaultPanoramaModalState = (
   isProcessing: false,
   lastDryRunCommand: null,
   progressMessage: '',
+  renderedReview: null,
   runtimePlan: null,
   settings,
   stitchingSourcePaths: [],

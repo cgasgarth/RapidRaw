@@ -6,12 +6,14 @@ import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
 import { MergeErrorState, MergeFooterActions, MergeProcessingState, MergeResultPreview } from './MergeStatusViews';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { TextColors, TextVariants } from '../../types/typography';
+import { buildPanoramaSavedReviewSummary } from '../../utils/panoramaSavedReview';
 import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerBadge';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
 
 import type {
   PanoramaRuntimePlan,
+  PanoramaRenderedReview,
   PanoramaUiBlendMode,
   PanoramaUiBoundaryMode,
   PanoramaUiExposureMode,
@@ -33,6 +35,7 @@ interface PanoramaModalProps {
   onSettingsChange: (settings: PanoramaUiSettings) => void;
   onStitch: () => void;
   progressMessage: string | null;
+  renderedReview: PanoramaRenderedReview | null;
   runtimePlan: PanoramaRuntimePlan | null;
   settings: PanoramaUiSettings;
 }
@@ -50,6 +53,7 @@ export default function PanoramaModal({
   onSettingsChange,
   onStitch,
   progressMessage,
+  renderedReview,
   runtimePlan,
   settings,
 }: PanoramaModalProps) {
@@ -112,6 +116,14 @@ export default function PanoramaModal({
   const stitchReadinessLabel = isEngineApplyReady
     ? t('modals.panorama.summaryReady')
     : t('modals.panorama.summaryBlocked');
+  const savedReviewSummary =
+    savedPath === null || renderedReview === null
+      ? null
+      : buildPanoramaSavedReviewSummary({
+          outputPath: savedPath,
+          renderedReview,
+          settings,
+        });
 
   const setSetting = useCallback(
     (patch: Partial<PanoramaUiSettings>) => {
@@ -175,12 +187,68 @@ export default function PanoramaModal({
 
     if (finalImageBase64 && !isProcessing) {
       return (
-        <MergeResultPreview
-          alt={t('modals.panorama.stitchedAlt')}
-          imageBase64={finalImageBase64}
-          savedPath={savedPath}
-          savedSuccessLabel={t('modals.panorama.savedSuccess')}
-        />
+        <div>
+          <MergeResultPreview
+            alt={t('modals.panorama.stitchedAlt')}
+            imageBase64={finalImageBase64}
+            savedPath={savedPath}
+            savedSuccessLabel={t('modals.panorama.savedSuccess')}
+          />
+          {savedReviewSummary && (
+            <section
+              className="mx-auto mt-4 grid max-w-2xl grid-cols-5 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-left"
+              data-boundary-mode={savedReviewSummary.boundaryMode}
+              data-capability-level={savedReviewSummary.capabilityLevel}
+              data-crop-rectangle={`${savedReviewSummary.crop.x},${savedReviewSummary.crop.y},${savedReviewSummary.crop.width},${savedReviewSummary.crop.height}`}
+              data-output-dimensions={`${savedReviewSummary.outputDimensions.width} x ${savedReviewSummary.outputDimensions.height}`}
+              data-output-path={savedReviewSummary.outputPath}
+              data-projection={savedReviewSummary.projection}
+              data-source-count={savedReviewSummary.sourceCount}
+              data-testid="panorama-saved-review-summary"
+              data-warning-codes={savedReviewSummary.warningCodes.join(',')}
+            >
+              {[
+                {
+                  label: t('modals.panorama.summaryProjection'),
+                  value: selectedProjectionLabel,
+                },
+                {
+                  label: t('modals.panorama.summaryBoundary'),
+                  value: selectedBoundaryLabel,
+                },
+                {
+                  label: t('modals.panorama.review.projectionCrop'),
+                  value: `${savedReviewSummary.crop.x}, ${savedReviewSummary.crop.y} - ${savedReviewSummary.crop.width} x ${savedReviewSummary.crop.height}`,
+                },
+                {
+                  label: t('modals.panorama.summaryWorkload'),
+                  value: `${savedReviewSummary.outputDimensions.width} x ${savedReviewSummary.outputDimensions.height}`,
+                },
+                {
+                  label: t('modals.panorama.summarySources'),
+                  value: t('modals.panorama.summarySourceCount', { count: savedReviewSummary.sourceCount }),
+                },
+              ].map((item) => (
+                <div className="min-w-0 rounded border border-border-color bg-surface px-2 py-1.5" key={item.label}>
+                  <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                    {item.label}
+                  </UiText>
+                  <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                    {item.value}
+                  </UiText>
+                </div>
+              ))}
+              <UiText
+                as="p"
+                variant={TextVariants.small}
+                color={TextColors.secondary}
+                className="col-span-5 leading-relaxed"
+              >
+                {t('modals.panorama.uiOnlyNotice')}
+              </UiText>
+            </section>
+          )}
+        </div>
       );
     }
 

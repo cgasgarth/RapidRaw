@@ -37,6 +37,7 @@ import {
   layerStackWorkflowProofSchema,
   maskOverlayRawProofSchema,
   panoramaPrivateRawReviewProofSchema,
+  panoramaSavedReviewProofSchema,
   negativeLabWorkspaceProofDatasetSchema,
   negativeLabPublicExportReviewProofSchema,
   panoramaReviewWorkspaceProofSchema,
@@ -887,6 +888,22 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('panorama-artifact-handoff').getByText('/tmp/panorama.tif', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    return;
+  }
+
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.PanoramaSavedReview) {
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByTestId('merge-saved-output-detail').waitFor({ timeout: 10_000 });
+    panoramaSavedReviewProofSchema.parse(
+      await page.getByTestId('panorama-saved-review-summary').evaluate((element) => ({ ...element.dataset })),
+    );
+    await page.getByTestId('merge-open-saved-output').click();
+    const proof = await page
+      .getByTestId('panorama-saved-review-open-proof')
+      .evaluate((element) => ({ ...element.dataset }));
+    if (proof.openedPath !== '/tmp/panorama.tif') {
+      throw new Error(`Panorama saved output did not open editor path: ${JSON.stringify(proof)}`);
+    }
     return;
   }
 

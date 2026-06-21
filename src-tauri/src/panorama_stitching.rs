@@ -485,6 +485,7 @@ pub async fn stitch_panorama(
 
                 let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
                 let final_base64 = png_data_url(base64_str);
+                let render_review = build_panorama_render_review(&render_result.metadata);
 
                 *panorama_result_handle.lock().unwrap() = Some(PendingPanoramaResult {
                     image: render_result.image,
@@ -496,6 +497,7 @@ pub async fn stitch_panorama(
                     "panorama-complete",
                     serde_json::json!({
                         "base64": final_base64,
+                        "review": render_review,
                     }),
                 );
                 Ok(())
@@ -512,6 +514,39 @@ pub async fn stitch_panorama(
         Ok(Err(e)) => Err(e),
         Err(join_err) => Err(format!("Panorama task failed: {}", join_err)),
     }
+}
+
+fn build_panorama_render_review(metadata: &PanoramaRenderMetadata) -> serde_json::Value {
+    json!({
+        "boundary": {
+            "crop": {
+                "height": metadata.crop.height,
+                "mode": metadata.crop.mode,
+                "preCropHeight": metadata.crop.pre_crop_height,
+                "preCropWidth": metadata.crop.pre_crop_width,
+                "width": metadata.crop.width,
+                "x": metadata.crop.x,
+                "y": metadata.crop.y,
+            },
+            "effective": metadata.effective_boundary_mode.as_str(),
+            "requested": metadata.requested_boundary_mode.as_str(),
+        },
+        "capabilityLevel": "runtime_apply_capable",
+        "outputDimensions": {
+            "height": metadata.output_height,
+            "width": metadata.output_width,
+        },
+        "projection": {
+            "effective": metadata.effective_projection.as_str(),
+            "requested": metadata.requested_projection.as_str(),
+        },
+        "sources": {
+            "excludedSourceIndices": &metadata.excluded_source_indices,
+            "stitchedSourceIndices": &metadata.connected_source_indices,
+            "totalCount": metadata.sources.len(),
+        },
+        "warningCodes": &metadata.warnings,
+    })
 }
 
 fn load_panorama_source_metadata_for_plan(
