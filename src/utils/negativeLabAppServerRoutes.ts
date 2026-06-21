@@ -184,6 +184,10 @@ export const buildNegativeLabAcceptedBatchApplyRouteResult = (
     },
     runtimeCatalog,
   );
+  const selectedProfileSnapshot = parsedCommand.selectedProfileSnapshot;
+  if (selectedProfileSnapshot !== undefined && selectedProfileSnapshot.presetId !== conversionPlan.presetId) {
+    throw new Error('Selected Negative Lab profile snapshot does not match the accepted apply conversion profile.');
+  }
 
   return negativeLabAcceptedBatchApplyAppServerResultSchema.parse({
     acceptedDryRunPlanHash: expectedAcceptedPlan.acceptedDryRunPlanHash,
@@ -206,7 +210,9 @@ export const buildNegativeLabAcceptedBatchApplyRouteResult = (
       dryRunRequired: true,
       generatedFrom: 'src/utils/negativeLabAppServerRoutes.ts',
       identityMatched: true,
+      selectedProfileBound: selectedProfileSnapshot !== undefined,
     },
+    ...(selectedProfileSnapshot === undefined ? {} : { selectedProfileSnapshot }),
   });
 };
 
