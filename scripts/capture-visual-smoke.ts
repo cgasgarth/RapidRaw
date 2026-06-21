@@ -806,13 +806,17 @@ async function prepareScenario(page, mode) {
   }
 
   if (mode === 'panorama-ui') {
-    await page.getByRole('button', { name: 'Cylindrical' }).click();
-    await page.getByRole('option', { name: 'Spherical' }).click();
+    await page.getByTestId('panorama-projection-option-rectilinear').click();
+    if (!(await page.getByTestId('panorama-projection-option-spherical').isDisabled())) {
+      throw new Error('Unsupported spherical panorama projection must be disabled.');
+    }
     await page.getByRole('button', { exact: true, name: 'Best' }).click();
     await page.getByRole('option', { name: 'Preview' }).click();
     await page.getByRole('button', { name: /Feather/u }).click();
-    await page.getByRole('button', { name: 'Auto crop' }).click();
-    await page.getByRole('option', { name: 'Transparent edge' }).click();
+    await page.getByTestId('panorama-boundary-option-auto_crop').click();
+    if (!(await page.getByTestId('panorama-boundary-option-transparent').isDisabled())) {
+      throw new Error('Unsupported transparent panorama boundary must be disabled.');
+    }
     await page.getByRole('button', { name: 'Gain compensation' }).click();
     await page.getByRole('option', { name: 'None' }).click();
     await page.getByRole('button', { name: '8192 px' }).click();

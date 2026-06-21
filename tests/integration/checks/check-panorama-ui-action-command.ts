@@ -11,8 +11,11 @@ import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/uti
 const actionMetadataSchema = z
   .object({
     appServerToolName: z.literal(getComputationalMergeAppServerRoutePairSummary('panorama').dryRunToolName),
+    boundaryMode: z.literal('auto_crop'),
     commandType: z.literal('computationalMerge.createPanorama'),
     dryRun: z.literal(true),
+    maxPreviewDimensionPx: z.number().int().positive(),
+    projection: z.literal('rectilinear'),
     sourceCount: z.number().int().min(2),
   })
   .strict();
@@ -25,10 +28,10 @@ const sourcePaths = [
 const settings = {
   ...DEFAULT_PANORAMA_UI_SETTINGS,
   blendMode: 'feather',
-  boundaryMode: 'transparent',
+  boundaryMode: 'auto_crop',
   exposureMode: 'none',
   maxPreviewDimensionPx: 8192,
-  projection: 'spherical',
+  projection: 'rectilinear',
   qualityPreference: 'preview',
 } as const;
 const routePair = getComputationalMergeAppServerRoutePairSummary('panorama');
@@ -55,8 +58,11 @@ const packageCommand = buildPanoramaUiDryRunCommandV1(
 );
 const actionMetadata = actionMetadataSchema.parse({
   appServerToolName: routePair.dryRunToolName,
+  boundaryMode: settings.boundaryMode,
   commandType: packageCommand.commandType,
   dryRun: packageCommand.dryRun,
+  maxPreviewDimensionPx: settings.maxPreviewDimensionPx,
+  projection: settings.projection,
   sourceCount: packageCommand.parameters.sources.length,
 });
 const productivityActionsSource = await readFile('src/hooks/useProductivityActions.ts', 'utf8');
@@ -67,6 +73,15 @@ if (!productivityActionsSource.includes("getComputationalMergeAppServerRoutePair
 }
 if (!productivityActionsSource.includes('lastDryRunCommand: dryRunCommand')) {
   failures.push('Panorama start action must persist dry-run command metadata.');
+}
+for (const marker of [
+  'boundaryMode: settings.boundaryMode',
+  'projection: settings.projection',
+  'maxPreviewDimensionPx',
+]) {
+  if (!productivityActionsSource.includes(marker)) {
+    failures.push(`Panorama start action must persist runtime setting marker: ${marker}`);
+  }
 }
 if (actionMetadata.appServerToolName !== routePair.dryRunToolName) {
   failures.push('Panorama UI action command must use the typed app-server dry-run route.');
@@ -88,6 +103,9 @@ if (settings.projection !== packageCommand.parameters.projection) {
 }
 if (settings.boundaryMode !== packageCommand.parameters.boundaryMode) {
   failures.push('Panorama UI action boundary mode must match package command builder.');
+}
+if (actionMetadata.projection !== 'rectilinear' || actionMetadata.boundaryMode !== 'auto_crop') {
+  failures.push('Panorama UI action must use runtime-supported rectilinear auto-crop defaults.');
 }
 if ('none' !== packageCommand.parameters.exposureNormalization) {
   failures.push('Panorama UI action exposure normalization must match package command builder.');

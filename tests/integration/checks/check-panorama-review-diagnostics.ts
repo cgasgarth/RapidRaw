@@ -11,9 +11,13 @@ for (const marker of [
   'panorama-review-diagnostics',
   'panorama-stitch-readiness-summary',
   'panorama-stitch-readiness-chip',
-  'data-stitch-ready={String(isSourceCountValid)}',
+  'data-engine-apply-ready={String(isEngineApplyReady)}',
+  'data-stitch-ready={String(isEngineApplyReady)}',
   'data-exposure-mode={settings.exposureMode}',
   'data-boundary-mode={settings.boundaryMode}',
+  'panorama-engine-capability-blocker',
+  'panorama-projection-option-${option.value}',
+  'panorama-boundary-option-${option.value}',
   'stitchReadinessLabel',
   'sections={[',
   'sourceReadinessLabel',
@@ -25,7 +29,8 @@ for (const marker of [
   'modals.panorama.exposureLabel',
   'modals.panorama.previewBudgetLabel',
   'modals.panorama.review.privateRawPending',
-  'modals.panorama.review.uiE2ePending',
+  'modals.panorama.review.runtimeAutoCrop',
+  'modals.panorama.review.engineCapabilityBlocked',
 ]) {
   if (!modalSource.includes(marker)) {
     failures.push(`Panorama review diagnostics missing ${marker}.`);

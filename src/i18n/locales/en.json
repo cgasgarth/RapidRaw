@@ -2102,6 +2102,9 @@
       "descCount_one": "Combine {{count}} overlapping image into a seamless panorama.",
       "descCount_other": "Combine {{count}} overlapping images into a seamless panorama.",
       "descGeneric": "Combine your overlapping images into a seamless panorama.",
+      "engineCapabilityBlocked": "Current engine can render rectilinear panoramas with auto-crop. Other projection and boundary modes stay disabled until their runtime paths are proven.",
+      "engineSupported": "Runtime supported",
+      "engineUnsupported": "Runtime pending",
       "exposure": {
         "gainCompensation": "Gain compensation",
         "none": "None"
@@ -2129,10 +2132,12 @@
       "retry": "Retry",
       "review": {
         "alignment": "Alignment",
+        "engineCapabilityBlocked": "Engine capability blocked",
         "limitation": "Runtime bridge proof only; private RAW decode, visual seam QA, and UI E2E remain open.",
         "privateRawPending": "Private RAW review pending",
         "projectionCrop": "Projection/crop",
         "proofStatus": "App-server bridge ready",
+        "runtimeAutoCrop": "Runtime auto-crop",
         "runtimeBridge": "Dry-run/apply bridge",
         "seams": "Seams",
         "title": "Quality review",
@@ -2159,7 +2164,7 @@
       "summarySources": "Sources",
       "summaryWorkload": "Workload",
       "title": "Stitch Panorama",
-      "uiOnlyNotice": "These controls define the requested panorama artifact. Runtime projection and boundary support will be applied as engine capability checks land.",
+      "uiOnlyNotice": "Rectilinear projection and auto-crop are runtime-backed for this engine. Other projection and boundary modes stay disabled until their render, save, and reopen paths are proven.",
       "workflowStatus": "Projection, blend, boundary, and preview controls are recorded for the panorama request.",
       "workflowTitle": "Panorama setup"
     },

@@ -30,7 +30,7 @@ export const DEFAULT_PANORAMA_UI_SETTINGS = panoramaUiSettingsSchema.parse({
   boundaryMode: 'auto_crop',
   exposureMode: 'gain_compensation',
   maxPreviewDimensionPx: 4096,
-  projection: 'cylindrical',
+  projection: 'rectilinear',
   qualityPreference: 'best',
   sourceMode: 'overlap_sequence',
 });

@@ -38,7 +38,7 @@ const dryRunCommand = {
     maxPreviewDimensionPx: 1200,
     memoryBudgetBytes: COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES,
     outputName: 'Synthetic App Server Runtime Panorama',
-    projection: 'cylindrical',
+    projection: 'rectilinear',
     qualityPreference: 'balanced',
     sources: sourceFrames.map((frame) => ({
       colorSpaceHint: 'camera_rgb',
@@ -84,6 +84,12 @@ const applied = bus.execute({
 if (applied.kind !== 'apply') throw new Error('Expected panorama apply dispatch result.');
 if (applied.apply.outputPixels.length <= sourceFrames[0].width * sourceFrames[0].height * 3) {
   throw new Error('Expected panorama runtime output to be wider than one source frame.');
+}
+if (applied.apply.provenance.projectionSettings.effectiveProjection !== 'rectilinear') {
+  throw new Error('Expected panorama runtime to report rectilinear effective projection.');
+}
+if (applied.apply.provenance.boundaryMode !== 'auto_crop') {
+  throw new Error('Expected panorama runtime to preserve auto-crop boundary mode.');
 }
 
 expectThrows('unaccepted panorama apply plan', () =>

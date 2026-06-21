@@ -150,7 +150,7 @@ function buildControls(sample: z.infer<typeof runtimeSampleSchema>) {
     maxPreviewDimensionPx: 1200,
     memoryBudgetBytes: COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES,
     outputName: 'Private RAW Panorama runtime proof',
-    projection: 'cylindrical',
+    projection: 'rectilinear',
     qualityPreference: 'balanced',
     sources: sample.frames.map((frame) => ({
       colorSpaceHint: 'camera_rgb',
