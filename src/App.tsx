@@ -407,6 +407,12 @@ function App() {
     handleSaveDenoisedImage,
     handleSaveCollage,
   } = useProductivityActions(handleLibraryRefresh);
+  const handleStartPanoramaVoid = useCallback(
+    (paths: string[]) => {
+      void handleStartPanorama(paths);
+    },
+    [handleStartPanorama],
+  );
 
   const {
     handleEditorContextMenu,
@@ -837,7 +843,7 @@ function App() {
         <AppModals
           handleImageSelect={handleImageSelectVoid}
           handleSavePanorama={handleSavePanorama}
-          handleStartPanorama={handleStartPanorama}
+          handleStartPanorama={handleStartPanoramaVoid}
           handleSaveHdr={handleSaveHdr}
           handleStartHdr={handleStartHdr}
           refreshImageList={handleLibraryRefresh}
