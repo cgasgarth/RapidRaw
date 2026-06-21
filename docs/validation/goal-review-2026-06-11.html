@@ -364,6 +364,56 @@
       </section>
 
       <section>
+        <h2>Capability Status Buckets</h2>
+        <p>
+          These buckets prevent the review page from treating planning, schema, bridge, runtime, and UI proof as the
+          same level of completion.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Example area</th>
+              <th>Evidence</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="status gap">plan-only</span></td>
+              <td>Final review page</td>
+              <td><code>docs/validation/goal-review-2026-06-11.html</code></td>
+              <td>Tracked in the roadmap/review surface, but not proof of product runtime behavior.</td>
+            </tr>
+            <tr>
+              <td><span class="status gap">schema-only</span></td>
+              <td>RAW open/edit/export ledger</td>
+              <td><code>docs/validation/raw-open-edit-export-runtime-status-2026-06-18.json</code></td>
+              <td>Contracts and ledgers exist, but accepted private RAW run reports are still required.</td>
+            </tr>
+            <tr>
+              <td><span class="status partial">dry-run-only</span></td>
+              <td>Computational app-server bridges</td>
+              <td><code>docs/validation/computational-merge-runtime-status-2026-06-18.json</code></td>
+              <td>Tool/bridge path is checked without claiming final image-quality or UI walkthrough proof.</td>
+            </tr>
+            <tr>
+              <td><span class="status partial">runtime apply-capable</span></td>
+              <td>HDR/panorama/focus/SR synthetic outputs</td>
+              <td><code>bun run check:computational-merge-runtime-status</code></td>
+              <td>Executable runtime path produces artifacts, with real RAW and visual QA gaps tracked separately.</td>
+            </tr>
+            <tr>
+              <td><span class="status done">UI E2E-proven</span></td>
+              <td>Goal review screenshot</td>
+              <td><code>docs/validation/goal-review-screenshot-2026-06-18.png</code></td>
+              <td>Browser-rendered evidence exists for this review surface; feature UIs still need their own proof.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
         <h2>User-Visible Feature Proofs</h2>
         <table>
           <thead>

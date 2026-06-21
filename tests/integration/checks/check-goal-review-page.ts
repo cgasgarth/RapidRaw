@@ -22,6 +22,7 @@ const requirements = z.array(requirementSchema).parse([
     needles: [
       '<h2>Current Snapshot</h2>',
       '<h2>Review Checklist</h2>',
+      '<h2>Capability Status Buckets</h2>',
       '<h2>User-Visible Feature Proofs</h2>',
       '<h2>Artifacts</h2>',
       '<h2>Design Decisions To Track</h2>',
@@ -29,6 +30,11 @@ const requirements = z.array(requirementSchema).parse([
       '<h2>Missing Artifacts</h2>',
       'goal-review-data-2026-06-18.json',
       'goal-review-screenshot-2026-06-18.png',
+      'plan-only',
+      'schema-only',
+      'dry-run-only',
+      'runtime apply-capable',
+      'UI E2E-proven',
     ],
   },
   {
