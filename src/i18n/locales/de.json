@@ -1060,6 +1060,7 @@
       "tooltips": {
         "aperture": "Blende",
         "backToLibrary": "Zurück zur Bibliothek",
+        "fileType": "",
         "focalLength": "Brennweite",
         "fullscreen": "Vollbild umschalten (F)",
         "history": "",

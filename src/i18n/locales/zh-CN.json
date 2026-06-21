@@ -1055,6 +1055,7 @@
       "tooltips": {
         "aperture": "光圈",
         "backToLibrary": "返回图库",
+        "fileType": "",
         "focalLength": "焦距",
         "fullscreen": "切换全屏（F）",
         "history": "",
