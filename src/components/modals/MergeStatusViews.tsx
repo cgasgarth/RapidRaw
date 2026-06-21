@@ -1,7 +1,9 @@
 import { motion } from 'framer-motion';
 import { CheckCircle, Loader2, RefreshCw, Save, XCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { TextColors, TextVariants } from '../../types/typography';
+import { getDisplayFileName } from '../../utils/displayFilePath';
 import Button from '../ui/Button';
 import UiText from '../ui/Text';
 
@@ -34,6 +36,9 @@ interface MergeResultPreviewProps {
 }
 
 export function MergeResultPreview({ alt, imageBase64, savedPath, savedSuccessLabel }: MergeResultPreviewProps) {
+  const { t } = useTranslation();
+  const savedOutputName = savedPath ? getDisplayFileName(savedPath) : '';
+
   return (
     <div className="w-full">
       <div className="w-full max-h-[500px] bg-[#111] rounded-lg overflow-hidden border border-surface flex items-center justify-center">
@@ -47,8 +52,20 @@ export function MergeResultPreview({ alt, imageBase64, savedPath, savedSuccessLa
             color={TextColors.success}
             className="flex items-center justify-center gap-2 mt-4"
           >
-            <CheckCircle className="w-5 h-5" />
+            <CheckCircle aria-hidden="true" className="w-5 h-5" />
             <span>{savedSuccessLabel}</span>
+          </UiText>
+          <UiText
+            as="div"
+            variant={TextVariants.small}
+            color={TextColors.secondary}
+            className="mx-auto mt-2 block max-w-full truncate text-center font-mono"
+            data-saved-output-name={savedOutputName}
+            data-testid="merge-saved-output-detail"
+            title={savedPath}
+          >
+            {t('modals.common.savedOutputLabel', { name: savedOutputName })}
+            <span className="sr-only">{t('modals.common.savedOutputFullPath', { path: savedPath })}</span>
           </UiText>
         </motion.div>
       )}

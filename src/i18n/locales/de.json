@@ -1493,6 +1493,8 @@
       }
     },
     "common": {
+      "savedOutputFullPath": "Vollständiger gespeicherter Ausgabepfad: {{path}}",
+      "savedOutputLabel": "Gespeicherte Ausgabe: {{name}}",
       "sourcePreviewAlt": "Quellvorschau"
     },
     "configurePreset": {

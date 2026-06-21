@@ -1494,6 +1494,8 @@
       }
     },
     "common": {
+      "savedOutputFullPath": "Full saved output path: {{path}}",
+      "savedOutputLabel": "Saved output: {{name}}",
       "sourcePreviewAlt": "Source preview"
     },
     "configurePreset": {
