@@ -197,6 +197,7 @@ interface UIState {
   isCopyPasteSettingsModalOpen: boolean;
   isCommandPaletteOpen: boolean;
   isLensCorrectionModalOpen: boolean;
+  isTransformModalOpen: boolean;
   importTargetFolder: string | null;
   importSourcePaths: Array<string>;
   folderActionTarget: string | null;
@@ -252,6 +253,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   isCopyPasteSettingsModalOpen: false,
   isCommandPaletteOpen: false,
   isLensCorrectionModalOpen: false,
+  isTransformModalOpen: false,
   importTargetFolder: null,
   importSourcePaths: [],
   folderActionTarget: null,

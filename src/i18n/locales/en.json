@@ -1474,7 +1474,8 @@
         "panelMetadata": "Show metadata",
         "panelPresets": "Show presets",
         "panorama": "Open panorama stitching",
-        "superResolution": "Open super resolution"
+        "superResolution": "Open super resolution",
+        "transformTools": "Open transform tools"
       },
       "coverage": {
         "resultCount_one": "{{count}} command",
