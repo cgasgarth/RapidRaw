@@ -117,6 +117,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   tradeoffs, scope boundaries, validation strategy, UI direction, science/math,
   color/image quality, or whether a slice should close or only reference an
   issue.
+- Ask consult for the full target plan, risks, architecture, and validation
+  strategy for the topic. Do not ask consult to optimize for the smallest usable
+  PR; break the returned plan into PR-sized slices locally.
 - Use the consult skill heavily for design decisions, color science, negative
   processing, film simulations, deblur, denoise, sharpening/detail math,
   panorama stitching, HDR, focus stacking, super-resolution, app-server/agent

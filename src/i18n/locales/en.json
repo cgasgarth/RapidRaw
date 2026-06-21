@@ -254,6 +254,7 @@
       "creative": "Creative",
       "feather": "Feather",
       "filmLookBrowser": {
+        "activeLook": "Active look",
         "allFamilies": "All families",
         "allLooks": "All looks",
         "categoryFilter": "Look family",

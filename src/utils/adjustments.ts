@@ -201,6 +201,8 @@ export interface Adjustments {
   flipHorizontal: boolean;
   flipVertical: boolean;
   flareAmount: number;
+  filmLookId: string | null;
+  filmLookStrength: number;
   glowAmount: number;
   grainAmount: number;
   grainRoughness: number;
@@ -660,6 +662,8 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   flipHorizontal: false,
   flipVertical: false,
   flareAmount: 0,
+  filmLookId: null,
+  filmLookStrength: 100,
   glowAmount: 0,
   grainAmount: 0,
   grainRoughness: 50,
@@ -833,6 +837,8 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     ...INITIAL_ADJUSTMENTS,
     ...loadedAdjustments,
     flareAmount: loadedAdjustments.flareAmount ?? INITIAL_ADJUSTMENTS.flareAmount,
+    filmLookId: loadedAdjustments.filmLookId ?? INITIAL_ADJUSTMENTS.filmLookId,
+    filmLookStrength: loadedAdjustments.filmLookStrength ?? INITIAL_ADJUSTMENTS.filmLookStrength,
     glowAmount: loadedAdjustments.glowAmount ?? INITIAL_ADJUSTMENTS.glowAmount,
     halationAmount: loadedAdjustments.halationAmount ?? INITIAL_ADJUSTMENTS.halationAmount,
     lensCorrectionMode: loadedAdjustments.lensCorrectionMode || 'manual',

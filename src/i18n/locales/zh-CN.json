@@ -254,6 +254,7 @@
       "creative": "创意",
       "feather": "羽化",
       "filmLookBrowser": {
+        "activeLook": "Active look",
         "allFamilies": "All families",
         "allLooks": "All looks",
         "categoryFilter": "Look family",
