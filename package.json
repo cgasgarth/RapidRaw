@@ -23,8 +23,6 @@
     "hooks:check-staged": "bun tests/integration/checks/check-staged-files.ts",
     "check:gh-repo-resolution": "bun tests/integration/checks/check-gh-repo-resolution.ts",
     "repo:fix-gh-resolution": "bun tests/integration/checks/check-gh-repo-resolution.ts --fix",
-    "check:agent-preflight": "bun tests/integration/checks/check-agent-preflight.ts",
-    "check:agent-pr-queue": "bun tests/integration/checks/check-agent-pr-queue.ts",
     "check": "bun run check:quick:all && bun run check:bundle",
     "check:quick": "bun scripts/run-compact-checks.ts check:quick",
     "check:quick:all": "bun scripts/run-compact-checks.ts check:quick:all",
