@@ -345,6 +345,11 @@ const EditorToolbar = memo(
     };
 
     const isExpanded = isInfoHovered && (hasExif || isLoading);
+    const historyDepthTotal = Math.max(adjustmentsHistory.length, 1);
+    const historyDepthLabel = t('editor.toolbar.historyDepth', {
+      current: Math.min(adjustmentsHistoryIndex + 1, historyDepthTotal),
+      total: historyDepthTotal,
+    });
 
     return (
       <div className="relative shrink-0 flex items-center justify-between px-4 h-14 gap-4 z-40">
@@ -611,6 +616,20 @@ const EditorToolbar = memo(
               data-tooltip={t('editor.toolbar.tooltips.redo')}
             >
               <Redo size={20} />
+            </button>
+            <button
+              className="h-9 rounded-full bg-surface px-2.5 text-text-primary hover:bg-card-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={adjustmentsHistory.length <= 1}
+              onClick={() => {
+                setIsHistoryVisible((prev) => !prev);
+              }}
+              onKeyDown={handleButtonKeyDown}
+              data-testid="editor-history-depth-control"
+              data-tooltip={t('editor.toolbar.tooltips.history')}
+            >
+              <UiText as="span" variant={TextVariants.small} weight={TextWeights.medium}>
+                {historyDepthLabel}
+              </UiText>
             </button>
 
             <AnimatePresence>
