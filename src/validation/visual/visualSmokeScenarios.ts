@@ -9,6 +9,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   FocusPrivateRawUi: 'focus-private-raw-ui',
   FocusUi: 'focus-ui',
   HdrPrivateRawUi: 'hdr-private-raw-ui',
+  HdrSavedOutputEditorPath: 'hdr-saved-output-editor-path',
   HdrUi: 'hdr-ui',
   LayerMaskPrivateRawUi: 'layer-mask-private-raw-ui',
   LayerStackWorkflow: 'layer-stack-workflow',
@@ -88,6 +89,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'HDR merge setup',
     mode: VISUAL_SMOKE_SCENARIO_IDS.HdrUi,
     outputFile: 'hdr-ui.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'HDR saved output editor path',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.HdrSavedOutputEditorPath,
+    outputFile: 'hdr-saved-output-editor-path.png',
     sectionMinimum: 1,
   },
   {

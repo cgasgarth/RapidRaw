@@ -805,6 +805,24 @@ async function prepareScenario(page, mode) {
     return;
   }
 
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.HdrSavedOutputEditorPath) {
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByTestId('merge-saved-output-detail').waitFor({ timeout: 10_000 });
+    await page.getByTestId('merge-open-saved-output').click();
+    const proof = await page
+      .getByTestId('hdr-saved-output-editor-path-proof')
+      .evaluate((element) => ({ ...element.dataset }));
+    if (
+      proof.enteredNormalEditorPath !== 'true' ||
+      proof.openCallback !== 'handleImageSelect' ||
+      proof.openedPath !== '/tmp/rawengine-hdr-smoke.tif' ||
+      proof.savedPath !== '/tmp/rawengine-hdr-smoke.tif'
+    ) {
+      throw new Error(`HDR saved output did not enter editor path: ${JSON.stringify(proof)}`);
+    }
+    return;
+  }
+
   if (mode === 'panorama-ui') {
     await page.getByTestId('panorama-projection-option-rectilinear').click();
     if (!(await page.getByTestId('panorama-projection-option-spherical').isDisabled())) {
