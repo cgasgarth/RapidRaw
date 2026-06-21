@@ -47,6 +47,13 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Feature PRs may exceed cleanup/CI/tooling PRs, but cleanup/CI/tooling PRs
   must not exceed feature PRs. Keep vertical feature delivery ahead of
   foundation polish.
+- Prefer vertical feature delivery over planning, schema-only, proof-only, or
+  meta-tooling PRs.
+- Proof scripts should live inside the actual feature PR they validate. Do not
+  open PRs whose main value is only a probe, schema, inventory, or routing
+  check.
+- When something starts looking like slop, clean it up proactively instead of
+  building more work on top of it.
 
 ## Startup Preflight
 
@@ -66,6 +73,10 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   concise, but include enough context, links, expected checks, screenshots,
   artifacts, runtime proof, or explicit plan-only status for the next agent to
   understand the goal without rediscovering intent.
+- Existing GitHub issues should be periodically cleaned up: split broad issues
+  into PR-sized work, close obsolete/meta-only issues, update stale issues with
+  current context, and move related work into milestones instead of keeping
+  oversized catch-all issues open.
 
 ## GitHub Repo Resolution
 
@@ -142,6 +153,12 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 - Shift left as much as practical: prefer local checks, scripts, schemas,
   fixtures, and CI gates that catch mistakes before manual review.
+- Stop adding repo meta-tooling unless it clearly improves product quality or
+  prevents a recurring real failure.
+- Delete stale or low-value meta checks when they do not validate product
+  behavior.
+- If a helper script primarily exists to manage agent workflow rather than
+  product quality, remove it or keep it out of the repo.
 - Use Bun for TypeScript/React package management, scripts, tests, and CI where
   applicable.
 - Prefer Bun over inline Node commands when the task can be expressed as a repo
@@ -169,21 +186,34 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   output image or generated artifacts. Schemas, dry-runs, synthetic fixtures, or
   UI-only smoke checks are useful intermediate proof, but they are not enough to
   close a feature as complete.
+- For private RAW/image-editing features, validation must prove real runtime
+  behavior on image output, not just schema acceptance.
 - The user has explicitly allowed project validation to use their own RAW files
   under `/Users/cgas/Pictures/Capture One/Alaska`. Use that folder for private
   local RAW proof when it fits the feature, but do not commit those RAW files or
   generated private image artifacts.
+- Keep private RAW validation standardized around one reusable private-root and
+  report pattern.
 - Do not count planning, schema, API, or UI-only work as a complete feature
   unless end-to-end workflow proof exists in the same PR. If E2E proof is not
   included, state the runtime status explicitly and keep or create a follow-up
   issue for E2E validation.
+- Shift effort toward actual end-to-end feature slices with UI, runtime, and
+  output proof.
 - Keep frequently reused local checks and hooks token-efficient. On success,
   prefer compact summaries over full command/file lists; on failure, preserve
   actionable tool output.
+- Keep checks compact: success output should be short, and failure output should
+  show only actionable details.
 - Put new integration, validation, runtime-proof, fixture-proof, and E2E-style
   checks in `tests/integration/checks/`. Keep `scripts/` for reusable helpers,
   generators, CI classifiers, and command wrappers rather than adding new
   top-level `scripts/check-*.ts` files.
+- Avoid committed generated inventory/report JSON unless it is a human-review
+  artifact or required for a product validation gate.
+- Remove validation inventory JSON from routine gates. Do not maintain broad
+  validation inventory files as routine PR churn; prefer focused checks tied to
+  changed product behavior.
 - Do not edit existing tests solely to reduce token output. Compact the
   commonly reused runner, package script, hook, or reporting layer instead.
 - Keep GitHub Actions current on supported major versions and maintain the
