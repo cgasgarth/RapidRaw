@@ -178,6 +178,7 @@
     "check:session-import-reload-proof": "bun tests/integration/checks/check-session-import-reload-proof.ts",
     "check:library-session-ui": "bun tests/integration/checks/check-library-session-ui.ts",
     "check:library-header-ui": "bun tests/integration/checks/check-library-header-ui.ts",
+    "check:histogram-clipping-ui": "bun tests/integration/checks/check-histogram-clipping-ui.ts",
     "check:library-workflow-smoke": "bun scripts/capture-visual-smoke.ts --scenario library-workflow",
     "check:professional-workflow-status": "bun tests/integration/checks/check-professional-workflow-status.ts",
     "check:professional-workflow-status:update": "bun tests/integration/checks/check-professional-workflow-status.ts --update",

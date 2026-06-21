@@ -2643,6 +2643,10 @@
       "reset": "重置"
     },
     "waveform": {
+      "clippingReadouts": {
+        "highlights": "",
+        "shadows": ""
+      },
       "tooltips": {
         "hideClipping": "隐藏裁剪警告",
         "histogram": "直方图",
