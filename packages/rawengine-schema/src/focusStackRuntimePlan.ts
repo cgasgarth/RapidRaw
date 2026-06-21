@@ -132,6 +132,7 @@ type ParsedFocusStackRuntimePlanRequestV1 = Omit<FocusStackRuntimePlanRequestV1,
 };
 
 export interface FocusStackRuntimeDryRunResultV1 {
+  acceptedDryRunPlanHash: string;
   dryRunResult: ComputationalMergeDryRunResultV1;
   outputPixels: Float32Array;
   provenance: FocusStackRuntimeProvenanceV1;
@@ -147,7 +148,7 @@ export const buildFocusStackRuntimeDryRunV1 = (requestValue: unknown): FocusStac
   const request = parseFocusStackRuntimePlanRequest(requestValue, true);
   const runtime = renderFocusStackRuntime(request);
   const planId = `focus_stack_plan_${request.command.commandId}`;
-  const planHash = `sha256:${stableFocusRuntimeHash(`${planId}:${runtime.provenance.blendMethod}`)}`;
+  const planHash = buildFocusStackAcceptedPlanHashV1(request);
   const renderedContentHash = hashFocusRuntimePixels(runtime.outputPixels);
   const previewArtifacts = [
     buildComputationalMergeArtifactHandleV1({
@@ -189,6 +190,7 @@ export const buildFocusStackRuntimeDryRunV1 = (requestValue: unknown): FocusStac
   });
 
   return {
+    acceptedDryRunPlanHash: planHash,
     dryRunResult,
     outputPixels: runtime.outputPixels,
     provenance: runtime.provenance,
@@ -202,6 +204,10 @@ export const applyFocusStackRuntimePlanV1 = (requestValue: unknown): FocusStackR
   const acceptedDryRunPlanId = request.command.parameters.acceptedDryRunPlanId;
   if (acceptedDryRunPlanHash === undefined || acceptedDryRunPlanId === undefined) {
     throw new Error('Focus stack runtime apply requires an accepted dry-run plan id and hash.');
+  }
+  const expectedAcceptedDryRunPlanHash = buildFocusStackAcceptedPlanHashV1(request);
+  if (acceptedDryRunPlanHash !== expectedAcceptedDryRunPlanHash) {
+    throw new Error('Focus stack runtime apply rejected a stale or mismatched accepted dry-run plan hash.');
   }
 
   const renderedContentHash = hashFocusRuntimePixels(runtime.outputPixels);
@@ -275,6 +281,62 @@ export const applyFocusStackRuntimePlanV1 = (requestValue: unknown): FocusStackR
       runtimeStatus: 'apply_rendered',
     }),
   };
+};
+
+export const buildFocusStackAcceptedPlanHashV1 = (requestValue: unknown): string => {
+  const request = focusStackRuntimePlanRequestV1Schema.parse(requestValue);
+  if (!isFocusStackRuntimeCommand(request.command)) {
+    throw new Error('Focus stack accepted plan hash only supports computationalMerge.createFocusStack commands.');
+  }
+
+  return `sha256:${stableFocusRuntimeHash(
+    JSON.stringify({
+      algorithm: {
+        engineId: FOCUS_RUNTIME_ENGINE_ID,
+        engineVersion: FOCUS_RUNTIME_ENGINE_VERSION,
+      },
+      cells: request.cells.map((cell) => ({
+        height: cell.height,
+        lowConfidence: cell.lowConfidence,
+        sourceScores: cell.sourceScores.map((score) => ({
+          relativeConfidence: score.relativeConfidence,
+          sourceIndex: score.sourceIndex,
+        })),
+        width: cell.width,
+        x: cell.x,
+        y: cell.y,
+      })),
+      command: {
+        alignmentMode: request.command.parameters.alignmentMode,
+        blendMethod: request.command.parameters.blendMethod,
+        expectedGraphRevision: request.command.expectedGraphRevision,
+        maxPreviewDimensionPx: request.command.parameters.maxPreviewDimensionPx,
+        memoryBudgetBytes: request.command.parameters.memoryBudgetBytes,
+        outputName: request.command.parameters.outputName,
+        qualityPreference: request.command.parameters.qualityPreference,
+        retouchLayerPolicy: request.command.parameters.retouchLayerPolicy,
+        sources: request.command.parameters.sources.map((source) => ({
+          imageId: source.imageId,
+          imagePath: source.imagePath,
+          role: source.role,
+          sourceIndex: source.sourceIndex,
+        })),
+      },
+      frames: request.frames.map((frame) => ({
+        contentHash: frame.contentHash,
+        focusDistanceMm: frame.focusDistanceMm,
+        graphRevision: frame.graphRevision,
+        height: frame.height,
+        sourceIndex: frame.sourceIndex,
+        translationX: frame.translationX,
+        translationY: frame.translationY,
+        width: frame.width,
+      })),
+      lowConfidenceWeightFloor: request.lowConfidenceWeightFloor,
+      referenceSourceIndex: request.referenceSourceIndex ?? null,
+      weightPower: request.weightPower,
+    }),
+  )}`;
 };
 
 const parseFocusStackRuntimePlanRequest = (

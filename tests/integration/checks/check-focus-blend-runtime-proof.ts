@@ -162,7 +162,7 @@ const applied = applyFocusStackRuntimePlanV1({
     ...buildFocusCommand(false),
     parameters: {
       ...dryRunCommand.parameters,
-      acceptedDryRunPlanHash: `sha256:${dryRun.dryRunResult.mergePlan.planId}`,
+      acceptedDryRunPlanHash: dryRun.acceptedDryRunPlanHash,
       acceptedDryRunPlanId: dryRun.dryRunResult.mergePlan.planId,
     },
   },

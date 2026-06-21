@@ -13,6 +13,7 @@ export interface ComputationalMergeRuntimeRequestEnvelopeV1<TToolName extends st
 }
 
 export interface ComputationalMergeRuntimeDryRunLikeV1 {
+  acceptedDryRunPlanHash?: string;
   dryRunResult: {
     mergePlan: {
       planId: string;
@@ -116,7 +117,7 @@ export class ComputationalMergeAppServerRuntimeToolBusV1<
     }
 
     const dryRun = this.#options.dryRunBuilder(request);
-    const acceptedDryRunPlanHash = `sha256:${dryRun.dryRunResult.mergePlan.planId}`;
+    const acceptedDryRunPlanHash = dryRun.acceptedDryRunPlanHash ?? `sha256:${dryRun.dryRunResult.mergePlan.planId}`;
     this.#acceptedDryRunPlanHashesById.set(dryRun.dryRunResult.mergePlan.planId, acceptedDryRunPlanHash);
     return { acceptedDryRunPlanHash, dryRun, kind: 'dry_run', toolName };
   }

@@ -96,7 +96,7 @@ const applyCommand = {
   dryRun: false,
   parameters: {
     ...dryRunCommand.parameters,
-    acceptedDryRunPlanHash: `sha256:${dryRun.dryRunResult.mergePlan.planId}`,
+    acceptedDryRunPlanHash: dryRun.acceptedDryRunPlanHash,
     acceptedDryRunPlanId: dryRun.dryRunResult.mergePlan.planId,
   },
 };
@@ -111,6 +111,28 @@ const applied = applyFocusStackRuntimePlanV1({
   retouchLayerArtifactId: 'artifact_focus_runtime_retouch',
   sharpnessMapArtifactId: 'artifact_focus_runtime_sharpness',
 });
+
+try {
+  applyFocusStackRuntimePlanV1({
+    cells,
+    command: applyCommand,
+    depthConfidenceArtifactId: 'artifact_focus_runtime_depth_confidence',
+    frames,
+    outputArtifactId: 'artifact_focus_runtime_output',
+    previewArtifactId: 'artifact_focus_runtime_preview',
+    retouchLayerArtifactId: 'artifact_focus_runtime_retouch',
+    sharpnessMapArtifactId: 'artifact_focus_runtime_sharpness',
+    weightPower: 3,
+  });
+  throw new Error('Focus stack stale accepted plan was applied after settings changed.');
+} catch (error) {
+  if (
+    error instanceof Error &&
+    error.message === 'Focus stack stale accepted plan was applied after settings changed.'
+  ) {
+    throw error;
+  }
+}
 
 assertEqual(dryRun.provenance.focusCoverageRatio, 1, 'focus coverage');
 assertEqual(dryRun.provenance.alignmentTransforms.length, frames.length, 'alignment transform count');
