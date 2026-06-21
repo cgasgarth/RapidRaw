@@ -2280,10 +2280,18 @@
       "qualityPreview": "Preview",
       "review": {
         "acceptanceGate": "Acceptance gate",
+        "artifactComparatorLimitation": "Diagnostic comparison only; verify details before accepting the enhanced output.",
+        "artifactComparatorTitle": "Review artifact comparison",
+        "artifactFile": "File",
+        "artifactHash": "Hash",
         "artifactKind": {
           "baseline_review_crop": "Baseline crop",
           "reconstruction_preview": "Reconstruction preview",
           "reconstruction_review_crop": "Reconstruction crop"
+        },
+        "artifactStorage": {
+          "private": "Private",
+          "public": "Public"
         },
         "artifactWarnings": "Artifact warnings",
         "coverage": "Overlap coverage",
