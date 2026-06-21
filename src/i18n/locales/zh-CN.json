@@ -1473,7 +1473,11 @@
       "noResults": "No commands found",
       "searchLabel": "Search commands",
       "searchPlaceholder": "Search commands...",
-      "title": "Command Palette"
+      "title": "Command Palette",
+      "unavailable": {
+        "selectImage": "Select an image to use this command",
+        "selectSource": "Select one or more images to use this command"
+      }
     },
     "common": {
       "sourcePreviewAlt": "源预览"

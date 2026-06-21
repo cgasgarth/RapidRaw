@@ -10,7 +10,7 @@ const [source, locale, packageJson, currentPrLocal] = await Promise.all([
 ]);
 
 const localeJson = JSON.parse(locale) as {
-  modals?: { commandPalette?: { coverage?: Record<string, string> } };
+  modals?: { commandPalette?: { coverage?: Record<string, string>; unavailable?: Record<string, string> } };
 };
 
 const requiredSourceSnippets = [
@@ -19,15 +19,23 @@ const requiredSourceSnippets = [
   'data-command-palette-result-count={visibleCommands.length}',
   'data-command-palette-selected-source-count={selectedCommandPaths.length}',
   'data-command-palette-category={category}',
+  'data-command-palette-disabled-reason={disabledReasonKey ?? undefined}',
+  'disabled={disabledReasonKey !== null}',
   'modals.commandPalette.coverage.resultCount',
   'modals.commandPalette.coverage.selectedSourceCount',
+  'modals.commandPalette.unavailable.selectImage',
+  'modals.commandPalette.unavailable.selectSource',
 ];
 const coverage = localeJson.modals?.commandPalette?.coverage ?? {};
+const unavailable = localeJson.modals?.commandPalette?.unavailable ?? {};
 const failures = [
   ...requiredSourceSnippets.filter((snippet) => !source.includes(snippet)).map((snippet) => `missing: ${snippet}`),
   ...['resultCount_one', 'resultCount_other', 'selectedSourceCount_one', 'selectedSourceCount_other']
     .filter((key) => coverage[key] === undefined)
     .map((key) => `missing locale: ${key}`),
+  ...['selectImage', 'selectSource']
+    .filter((key) => unavailable[key] === undefined)
+    .map((key) => `missing unavailable locale: ${key}`),
 ];
 
 if (!packageJson.includes('"check:command-palette-coverage-ui"')) {
