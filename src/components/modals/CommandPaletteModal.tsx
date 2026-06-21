@@ -258,17 +258,9 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
 
   const visibleCommands = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    const availableCommands = commandPaletteCommands.filter((command) => {
-      if (command.id === 'culling') return selectedCommandPaths.length > 0;
-      if (command.id === 'negativeLab') return selectedCommandPaths.length > 0;
-      if (command.id === 'collage') return selectedCommandImages.length > 0;
-      if (command.id === 'denoise') return selectedCommandPaths.length > 0;
-      return !command.requiresEditorImage || selectedImage;
-    });
+    if (!normalizedQuery) return commandPaletteCommands;
 
-    if (!normalizedQuery) return availableCommands;
-
-    return availableCommands.filter((command) => {
+    return commandPaletteCommands.filter((command) => {
       const haystack = [
         t(commandLabelKeys[command.id]),
         t(commandCategoryKeys[command.category]),
@@ -278,7 +270,20 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
         .toLowerCase();
       return haystack.includes(normalizedQuery);
     });
-  }, [query, selectedCommandImages.length, selectedCommandPaths.length, selectedImage, t]);
+  }, [query, t]);
+
+  const getDisabledReasonKey = (command: CommandPaletteCommand) => {
+    if (command.id === 'collage' && selectedCommandImages.length === 0) {
+      return 'modals.commandPalette.unavailable.selectSource';
+    }
+    if (['culling', 'denoise', 'negativeLab'].includes(command.id) && selectedCommandPaths.length === 0) {
+      return 'modals.commandPalette.unavailable.selectSource';
+    }
+    if (command.requiresEditorImage && !selectedImage) {
+      return 'modals.commandPalette.unavailable.selectImage';
+    }
+    return null;
+  };
 
   const resolvedActiveIndex = Math.min(activeIndex, Math.max(visibleCommands.length - 1, 0));
   const coverageCategories = useMemo(
@@ -477,7 +482,7 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
     if (event.key === 'Enter') {
       event.preventDefault();
       const command = visibleCommands[resolvedActiveIndex];
-      if (command) executeCommand(command);
+      if (command && !getDisabledReasonKey(command)) executeCommand(command);
     }
   };
 
@@ -563,15 +568,20 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
             <div className="mt-1 space-y-1">
               {visibleCommands.map((command, index) => {
                 const Icon = getCommandIcon(command);
+                const disabledReasonKey = getDisabledReasonKey(command);
                 return (
                   <button
                     aria-current={index === resolvedActiveIndex ? 'true' : undefined}
+                    aria-disabled={disabledReasonKey !== null}
                     className={cx(
                       'flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors',
+                      disabledReasonKey && 'cursor-not-allowed opacity-55',
                       index === resolvedActiveIndex
                         ? 'bg-surface text-text-primary'
                         : 'text-text-secondary hover:bg-surface/70',
                     )}
+                    data-command-palette-disabled-reason={disabledReasonKey ?? undefined}
+                    disabled={disabledReasonKey !== null}
                     key={command.id}
                     onClick={() => {
                       executeCommand(command);
@@ -582,7 +592,12 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
                     type="button"
                   >
                     <Icon size={17} className="shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">{t(commandLabelKeys[command.id])}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">{t(commandLabelKeys[command.id])}</span>
+                      {disabledReasonKey && (
+                        <span className="block truncate text-xs text-text-tertiary">{t(disabledReasonKey)}</span>
+                      )}
+                    </span>
                     <span className="shrink-0 text-xs text-text-secondary">
                       {t(commandCategoryKeys[command.category])}
                     </span>
