@@ -1636,6 +1636,11 @@ function HdrPrivateRawVisualSmoke() {
 
 function SuperResolutionVisualSmoke() {
   const [settings, setSettings] = useState<SuperResolutionUiSettings>(DEFAULT_SUPER_RESOLUTION_UI_SETTINGS);
+  const reviewArtifactPreviewUrls = {
+    baseline_review_crop: buildSrReviewPreviewDataUrl('#2f3a42', '#596675', 'Baseline'),
+    reconstruction_preview: buildSrReviewPreviewDataUrl('#22384d', '#d6b46e', 'Preview'),
+    reconstruction_review_crop: buildSrReviewPreviewDataUrl('#273f38', '#93c47d', 'Crop'),
+  };
 
   return (
     <main
@@ -1689,6 +1694,7 @@ function SuperResolutionVisualSmoke() {
           loadingImageUrl={panoramaPreviewUrl}
           onClose={() => {}}
           onPreviewPlan={() => {}}
+          reviewArtifactPreviewUrls={reviewArtifactPreviewUrls}
           onSettingsChange={setSettings}
           settings={settings}
           sourceCount={5}
@@ -1716,6 +1722,11 @@ function SuperResolutionVisualSmoke() {
       </div>
     </main>
   );
+}
+
+function buildSrReviewPreviewDataUrl(baseColor: string, detailColor: string, label: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240"><rect width="320" height="240" fill="${baseColor}"/><path d="M0 188 C58 142 96 167 142 111 C190 54 238 83 320 32 L320 240 L0 240 Z" fill="${detailColor}" opacity="0.78"/><path d="M16 40 H304 M16 80 H304 M16 120 H304 M16 160 H304 M64 16 V224 M128 16 V224 M192 16 V224 M256 16 V224" stroke="#ffffff" stroke-opacity="0.14" stroke-width="2"/><text x="20" y="220" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="24">${label}</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 function SuperResolutionPrivateRawVisualSmoke() {

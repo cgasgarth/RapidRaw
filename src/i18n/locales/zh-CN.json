@@ -2260,6 +2260,8 @@
           "reconstruction_preview": "Reconstruction preview",
           "reconstruction_review_crop": "Reconstruction crop"
         },
+        "artifactPreviewAlt": "{{artifact}} review preview",
+        "artifactPreviewUnavailable": "Preview pending",
         "artifactStorage": {
           "private": "Private",
           "public": "Public"
