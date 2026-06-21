@@ -17,13 +17,15 @@ const requiredSourceSnippets = [
   'coverageCategories',
   'data-testid="command-palette-coverage-summary"',
   'data-command-palette-result-count={visibleCommands.length}',
+  'data-command-palette-selected-source-count={selectedCommandPaths.length}',
   'data-command-palette-category={category}',
   'modals.commandPalette.coverage.resultCount',
+  'modals.commandPalette.coverage.selectedSourceCount',
 ];
 const coverage = localeJson.modals?.commandPalette?.coverage ?? {};
 const failures = [
   ...requiredSourceSnippets.filter((snippet) => !source.includes(snippet)).map((snippet) => `missing: ${snippet}`),
-  ...['resultCount_one', 'resultCount_other']
+  ...['resultCount_one', 'resultCount_other', 'selectedSourceCount_one', 'selectedSourceCount_other']
     .filter((key) => coverage[key] === undefined)
     .map((key) => `missing locale: ${key}`),
 ];

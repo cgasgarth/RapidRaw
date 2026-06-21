@@ -1479,7 +1479,9 @@
       },
       "coverage": {
         "resultCount_one": "",
-        "resultCount_other": ""
+        "resultCount_other": "",
+        "selectedSourceCount_one": "",
+        "selectedSourceCount_other": ""
       },
       "noResults": "No commands found",
       "searchLabel": "Search commands",

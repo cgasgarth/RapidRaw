@@ -531,6 +531,17 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
             >
               {t('modals.commandPalette.coverage.resultCount', { count: visibleCommands.length })}
             </UiText>
+            {selectedCommandPaths.length > 0 && (
+              <UiText
+                as="span"
+                className="rounded bg-surface px-2 py-1"
+                color={TextColors.secondary}
+                data-command-palette-selected-source-count={selectedCommandPaths.length}
+                variant={TextVariants.small}
+              >
+                {t('modals.commandPalette.coverage.selectedSourceCount', { count: selectedCommandPaths.length })}
+              </UiText>
+            )}
             {coverageCategories.map((category) => (
               <UiText
                 as="span"
