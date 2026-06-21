@@ -62,14 +62,14 @@ packaging shape, not release shippability.
 1. Confirm the intended repo and dependencies:
 
    ```sh
-   bun run check:agent-preflight
+   bun run check:gh-repo-resolution
    bun install --frozen-lockfile
    ```
 
 2. Run focused local validation for any packaging-doc or workflow change:
 
    ```sh
-   bun run check:agent-preflight
+   bun run check:gh-repo-resolution
    bun run check:types
    bun run check:compact-commands
    ```

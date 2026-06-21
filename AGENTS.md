@@ -37,7 +37,8 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 ## Pull Requests
 
 - Max two active open PRs total.
-- Before opening a PR, run `bun run check:agent-pr-queue`.
+- Before opening a PR, check the open PR queue with `gh` and keep every open
+  PR moving toward merge, fix, close, or explicit deferral.
 - Every open PR must have a disposition: merge, fix, close, or explicitly
   preserve as deferred.
 - Do not leave PRs open for hours without checking status and taking the next
@@ -65,11 +66,11 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 ## Startup Preflight
 
-- Before implementation in a new turn or worktree, run
-  `bun run check:agent-preflight`.
-- The preflight must verify repo root, deps/tools, GitHub repo resolution,
-  remotes, branch/worktree state, and current open PR count.
-- If preflight fails, fix that before feature work.
+- Before implementation in a new turn or worktree, do one compact preflight
+  using standard tools: confirm the repo root, branch/worktree state, dependency
+  availability, GitHub repo resolution, remotes, and current open PR count.
+- If preflight fails, fix that before feature work. Do not add or preserve repo
+  scripts whose main purpose is managing agent workflow.
 
 ## GitHub Issues
 
@@ -166,6 +167,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   fixtures, and CI gates that catch mistakes before manual review.
 - Stop adding repo meta-tooling unless it clearly improves product quality or
   prevents a recurring real failure.
+- Prefer vertical feature delivery over planning, schema-only, proof-only, or
+  meta-tooling work. Proof scripts should be part of the feature PR they
+  validate, not standalone PR value.
 - Delete stale or low-value meta checks when they do not validate product
   behavior.
 - If a helper script primarily exists to manage agent workflow rather than
@@ -225,6 +229,8 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Remove validation inventory JSON from routine gates. Do not maintain broad
   validation inventory files as routine PR churn; prefer focused checks tied to
   changed product behavior.
+- Do not commit generated inventory or report JSON unless it is a human-review
+  artifact or required by a product validation gate.
 - Do not keep committed generated validation reports just to prove scripts are
   wired. Keep private RAW validation standardized around reusable private-root
   setup plus per-feature run reports that prove real output behavior.
@@ -232,6 +238,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   broad status ledgers.
 - Audit existing validation helpers when touching nearby code. Delete stale,
   duplicate, or low-value meta checks instead of carrying them forward.
+- Keep private RAW validation standardized around one reusable private-root and
+  report pattern. Shift new effort toward actual E2E feature slices with UI,
+  runtime, and output proof.
 - Do not edit existing tests solely to reduce token output. Compact the
   commonly reused runner, package script, hook, or reporting layer instead.
 - Keep GitHub Actions current on supported major versions and maintain the
