@@ -1085,6 +1085,7 @@ async function prepareScenario(page, mode) {
     .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-roll-frame-1').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-dust-review').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-qc-proof-artifact').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-retouch-count').getByText('Retouch 0', { exact: true }).waitFor({
     timeout: 10_000,
   });

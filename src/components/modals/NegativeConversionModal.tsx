@@ -56,6 +56,7 @@ import {
   NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG,
 } from '../../utils/negativeLabPresetCatalog';
 import { buildNegativeLabProfileBrowserRows } from '../../utils/negativeLabProfileBrowserRows';
+import { buildNegativeLabQcContactSheetArtifact } from '../../utils/negativeLabQcContactSheetArtifact';
 import {
   NEGATIVE_LAB_STOCK_METADATA_CATALOG,
   buildNegativeLabStockMetadataCounts,
@@ -570,6 +571,17 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       ),
     [canSave, dustScratchReviewReport, pathsToConvert.length, previewUrl, targetPaths.length],
   );
+  const qcProofArtifact = useMemo(() => {
+    const sourcePathsByFrameId = new Map(
+      frameHealthReport.frames.map((frame) => [frame.frameId, frame.sourcePath] as const),
+    );
+
+    return buildNegativeLabQcContactSheetArtifact({
+      report: qcProofReport,
+      sessionId: `negative_lab_session_${targetPaths.length}_${pathsToConvert.length}`,
+      sourcePathsByFrameId,
+    });
+  }, [frameHealthReport.frames, pathsToConvert.length, qcProofReport, targetPaths.length]);
   const workspaceProof = useMemo(
     (): NegativeLabWorkspaceProof => ({
       activeStage: canSave ? 'export' : previewUrl === null ? 'colorInversion' : 'inspection',
@@ -1460,6 +1472,33 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       <UiText variant={TextVariants.small} className="text-text-tertiary">
         {t('modals.negativeConversion.qcProofHint')}
       </UiText>
+      <div
+        className="grid grid-cols-2 gap-1 rounded-sm bg-bg-secondary p-2 text-[11px] text-text-tertiary"
+        data-contact-sheet-hash={qcProofArtifact.contactSheet.artifact.contentHash}
+        data-testid="negative-lab-qc-proof-artifact"
+      >
+        <span>
+          {t('modals.negativeConversion.qcProofArtifactHash', {
+            hash: qcProofArtifact.contactSheet.artifact.contentHash,
+          })}
+        </span>
+        <span>
+          {t('modals.negativeConversion.qcProofArtifactGrid', {
+            columns: qcProofArtifact.contactSheet.columns,
+            rows: qcProofArtifact.contactSheet.rows,
+          })}
+        </span>
+        <span>
+          {t('modals.negativeConversion.qcProofArtifactWarnings', {
+            warningCount: qcProofArtifact.warnings.length,
+          })}
+        </span>
+        <span>
+          {t('modals.negativeConversion.qcProofArtifactVariants', {
+            variantCount: qcProofArtifact.positiveVariants.length,
+          })}
+        </span>
+      </div>
       <div
         className="grid gap-1"
         data-contact-sheet-columns={qcProofReport.contactSheetColumnCount}

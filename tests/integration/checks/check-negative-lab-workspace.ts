@@ -95,6 +95,8 @@ for (const marker of [
   'negative-lab-acquisition-severity',
   'negative-lab-acquisition-source-${sourceFamily}',
   'negative-lab-acquisition-warning-${warningCode}',
+  'negative-lab-qc-proof-artifact',
+  'data-contact-sheet-hash={qcProofArtifact.contactSheet.artifact.contentHash}',
   'data-planned-apply-count={batchDryRunSummary.plannedApplyCount}',
   'data-review-count={dustScratchReviewReport.reviewCount}',
   'data-skipped-frame-count={batchDryRunSummary.skippedFrameIds.length}',
