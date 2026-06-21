@@ -1257,7 +1257,14 @@
       "toneMapPreview": "Tone-map preview",
       "uiOnlyNotice": "These controls define the requested HDR merge artifact. Runtime merge quality remains validated by fixture, sidecar, and image-processing checks.",
       "workflowStatus": "Bracket, alignment, deghosting, tone-map, and preview controls are recorded for the HDR request.",
-      "workflowTitle": "HDR merge setup"
+      "workflowTitle": "HDR merge setup",
+      "handoffColorSpace": "Color space",
+      "handoffDisplayReferredSrgb": "Display-referred sRGB",
+      "handoffEditableAsset": "Editable asset",
+      "handoffNoSourceRefs": "No source refs recorded",
+      "handoffSourceCount": "Source count",
+      "handoffSourceRefs": "Source refs",
+      "handoffToneMappedNotice": "Saved HDR opens as an editable derived source. The current output is display-referred and tone-mapped; RAW-quality HDR color claims require bracketed RAW validation."
     },
     "importSettings": {
       "cancel": "キャンセル",

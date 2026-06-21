@@ -20,6 +20,8 @@ for (const marker of [
 
 for (const marker of [
   'onOpenFile(savedPath);',
+  'buildHdrEditableHandoffSummary',
+  'data-testid="hdr-editable-handoff-provenance"',
   "openInEditor: t('modals.hdr.openInEditor')",
   'savedPath={savedPath}',
 ]) {
@@ -44,7 +46,12 @@ for (const marker of [
   }
 }
 
-for (const marker of ['hdr-artifact-handoff', '/tmp/rawengine-hdr-smoke.tif', 'hdr-private-raw-artifact-handoff']) {
+for (const marker of [
+  'hdr-artifact-handoff',
+  'hdr-editable-handoff-provenance',
+  '/tmp/rawengine-hdr-smoke.tif',
+  'hdr-private-raw-artifact-handoff',
+]) {
   if (!visualSmokeSource.includes(marker)) {
     throw new Error(`HDR visual handoff smoke marker missing: ${marker}`);
   }

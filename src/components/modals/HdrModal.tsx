@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { MergeErrorState, MergeFooterActions, MergeProcessingState, MergeResultPreview } from './MergeStatusViews';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { TextColors, TextVariants } from '../../types/typography';
+import { buildHdrEditableHandoffSummary } from '../../utils/hdrEditableHandoff';
 import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerBadge';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
@@ -31,6 +32,7 @@ interface HdrModalProps {
   onMerge: () => void;
   progressMessage: string | null;
   settings: HdrMergeUiSettings;
+  sourcePaths?: string[];
 }
 
 export default function HdrModal({
@@ -47,6 +49,7 @@ export default function HdrModal({
   onMerge,
   progressMessage,
   settings,
+  sourcePaths = [],
 }: HdrModalProps) {
   const { t } = useTranslation();
   const { isMounted, show } = useModalTransition(isOpen);
@@ -95,6 +98,8 @@ export default function HdrModal({
         ? t('modals.hdr.bracketValidation.warn')
         : t('modals.hdr.bracketValidation.disabled');
   const mergeReadinessLabel = isSourceCountValid ? t('modals.hdr.summaryReady') : t('modals.hdr.summaryBlocked');
+  const handoffSummary =
+    savedPath !== null ? buildHdrEditableHandoffSummary({ outputPath: savedPath, settings, sourcePaths }) : null;
 
   useEffect(() => {
     if (!isOpen) {
@@ -156,7 +161,64 @@ export default function HdrModal({
           imageBase64={finalImageBase64}
           savedPath={savedPath}
           savedSuccessLabel={t('modals.hdr.savedSuccess')}
-        />
+        >
+          {handoffSummary && (
+            <section
+              className="mx-auto mt-4 grid max-w-2xl grid-cols-3 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-left"
+              data-capability-level={handoffSummary.capabilityLevel}
+              data-editable-derived-asset-id={handoffSummary.editableDerivedAssetId}
+              data-merge-strategy={handoffSummary.mergeStrategy}
+              data-output-color-space={handoffSummary.outputColorSpace}
+              data-output-encoding={handoffSummary.outputEncoding}
+              data-preview-tone-mapped={String(handoffSummary.previewToneMapped)}
+              data-source-count={handoffSummary.sourceCount}
+              data-testid="hdr-editable-handoff-provenance"
+              data-warning-codes={handoffSummary.warningCodes.join(',')}
+              data-working-color-space={handoffSummary.workingColorSpace}
+            >
+              {[
+                {
+                  label: t('modals.hdr.handoffEditableAsset'),
+                  value: handoffSummary.editableDerivedAssetId,
+                },
+                {
+                  label: t('modals.hdr.handoffColorSpace'),
+                  value: t('modals.hdr.handoffDisplayReferredSrgb'),
+                },
+                {
+                  label: t('modals.hdr.handoffSourceCount'),
+                  value: t('modals.hdr.summarySourceCount', { count: handoffSummary.sourceCount }),
+                },
+              ].map((item) => (
+                <div className="min-w-0 rounded border border-border-color bg-surface px-2 py-1.5" key={item.label}>
+                  <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                    {item.label}
+                  </UiText>
+                  <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                    {item.value}
+                  </UiText>
+                </div>
+              ))}
+              <div className="col-span-3 rounded border border-border-color bg-surface px-2 py-1.5">
+                <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                  {t('modals.hdr.handoffSourceRefs')}
+                </UiText>
+                <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                  {handoffSummary.sourceRefs.map((source) => source.displayName).join(', ') ||
+                    t('modals.hdr.handoffNoSourceRefs')}
+                </UiText>
+              </div>
+              <UiText
+                as="p"
+                variant={TextVariants.small}
+                color={TextColors.secondary}
+                className="col-span-3 leading-relaxed"
+              >
+                {t('modals.hdr.handoffToneMappedNotice')}
+              </UiText>
+            </section>
+          )}
+        </MergeResultPreview>
       );
     }
 

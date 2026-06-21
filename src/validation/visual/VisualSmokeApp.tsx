@@ -2169,6 +2169,7 @@ function HdrSavedOutputEditorPathVisualSmoke() {
         onSettingsChange={() => {}}
         progressMessage={null}
         settings={DEFAULT_HDR_MERGE_UI_SETTINGS}
+        sourcePaths={['/proof-roll/DSC_1001.NEF', '/proof-roll/DSC_1002.NEF', '/proof-roll/DSC_1003.NEF']}
       />
     </main>
   );
