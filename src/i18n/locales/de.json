@@ -1789,6 +1789,7 @@
       "batchPlanCopied": "Copied plan",
       "batchPlanSkippedCount": "Skip {{skippedCount}}",
       "batchReadiness": "Batch readiness",
+      "batchWorkloadSummary": "{{applyCount}} apply / {{skippedCount}} skip / {{reviewCount}} review",
       "blueWeight": "Blau (Gelb)",
       "cancel": "Abbrechen",
       "colorTiming": "Color Timing",
