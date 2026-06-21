@@ -1681,6 +1681,7 @@
       "duplicatesHeader_few": "Duplikaty ({{count}})",
       "duplicatesHeader_many": "Duplikaty ({{count}})",
       "duplicatesHeader_other": "Duplikaty ({{count}})",
+      "emptyAnalysisModes": "Enable similar grouping, blur filtering, or both before starting culling.",
       "emptyBatch": "Select one or more images before starting culling.",
       "filterBlurry": "Filtruj rozmyte obrazy",
       "groupHeader": "Grupa {{index}}",

@@ -1584,6 +1584,7 @@
       "duplicatesHeader": "Duplicates ({{count}})",
       "duplicatesHeader_one": "Duplicates ({{count}})",
       "duplicatesHeader_other": "Duplicates ({{count}})",
+      "emptyAnalysisModes": "Enable similar grouping, blur filtering, or both before starting culling.",
       "emptyBatch": "Select one or more images before starting culling.",
       "filterBlurry": "Filter Blurry Images",
       "groupHeader": "Group {{index}}",

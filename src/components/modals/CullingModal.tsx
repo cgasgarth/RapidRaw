@@ -196,7 +196,8 @@ export default function CullingModal({
   const numBlurry = suggestions?.blurryImages.length || 0;
   const setupPreviewPaths = imagePaths.slice(0, SETUP_PREVIEW_LIMIT);
   const setupPreviewOverflowCount = Math.max(0, imagePaths.length - setupPreviewPaths.length);
-  const canStartCulling = imagePaths.length > 0;
+  const hasCullingAnalysisMode = settings.groupSimilar || settings.filterBlurry;
+  const canStartCulling = imagePaths.length > 0 && hasCullingAnalysisMode;
 
   const renderSettings = () => (
     <>
@@ -292,13 +293,23 @@ export default function CullingModal({
           </div>
         </section>
       )}
-      {!canStartCulling && (
+      {imagePaths.length === 0 && (
         <div
           className="mb-6 rounded-md border border-border-color bg-bg-primary p-3 text-center"
           data-testid="culling-empty-batch-guard"
         >
           <UiText variant={TextVariants.small} color={TextColors.secondary}>
             {t('modals.culling.emptyBatch')}
+          </UiText>
+        </div>
+      )}
+      {imagePaths.length > 0 && !hasCullingAnalysisMode && (
+        <div
+          className="mb-6 rounded-md border border-border-color bg-bg-primary p-3 text-center"
+          data-testid="culling-empty-analysis-mode-guard"
+        >
+          <UiText variant={TextVariants.small} color={TextColors.secondary}>
+            {t('modals.culling.emptyAnalysisModes')}
           </UiText>
         </div>
       )}
