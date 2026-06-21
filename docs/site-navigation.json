@@ -592,10 +592,6 @@
           "path": "docs/tooling/eslint-zero-warning-ci-2026-06-11.md"
         },
         {
-          "title": "Generated type drift checks",
-          "path": "docs/tooling/generated-type-drift-checks-2026-06-11.md"
-        },
-        {
           "title": "Schema command bus CI",
           "path": "docs/tooling/schema-command-bus-ci-2026-06-15.md"
         },

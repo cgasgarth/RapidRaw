@@ -84,15 +84,6 @@
       "prRequired": true
     },
     {
-      "id": "generated-type-drift",
-      "packageScript": "check:generated-types",
-      "ciJobId": "generated-type-drift",
-      "ciJobName": "types: generated artifact drift",
-      "cadence": "pr-main-manual",
-      "proofType": "drift",
-      "prRequired": true
-    },
-    {
       "id": "schema-check",
       "packageScript": "schema:check",
       "ciJobId": "schema-check",

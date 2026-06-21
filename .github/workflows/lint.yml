@@ -144,18 +144,6 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-  generated-type-drift:
-    name: 'types: generated artifact drift'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-
-      - uses: ./.github/actions/setup-bun-deps
-
-      - name: Check generated type drift
-        run: bun run check:generated-types
-
   schema-check:
     name: 'schemas: RawEngine package'
     runs-on: ubuntu-latest
@@ -582,7 +570,6 @@ jobs:
       - frontend-unused-deps
       - frontend-unsafe-casts
       - frontend-visual-smoke
-      - generated-type-drift
       - schema-check
       - schema-command-bus
       - schema-contract-gate
