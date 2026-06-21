@@ -741,7 +741,7 @@ async function prepareScenario(page, mode) {
     await page.getByRole('option', { name: 'Optical flow' }).click();
     await page.getByRole('button', { exact: true, name: 'Best' }).click();
     await page.getByRole('option', { name: 'Preview' }).click();
-    await page.getByRole('button', { name: /Aggressive preview/u }).click();
+    await page.getByRole('button', { name: 'Aggressive' }).click();
     await page.getByRole('button', { name: '8192 px' }).click();
     superResolutionUiSettingsProofSchema.parse(
       await page.getByTestId('sr-ui-settings-proof').evaluate((element) => ({ ...element.dataset })),

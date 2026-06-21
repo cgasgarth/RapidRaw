@@ -2310,6 +2310,21 @@
         }
       },
       "detailPolicyLabel": "Detail policy",
+      "mode": {
+        "aggressive": {
+          "label": "Aggressive",
+          "status": "Preview-only risk"
+        },
+        "conservative": {
+          "label": "Conservative",
+          "status": "Maximum trust"
+        },
+        "standard": {
+          "label": "Standard",
+          "status": "Balanced detail"
+        }
+      },
+      "modeLabel": "Mode",
       "outputPixelMultiplier": "{{multiplier}}x pixels",
       "planDependency": "Final apply requires an accepted dry-run plan from the super-resolution API.",
       "preflight": {
@@ -2338,6 +2353,7 @@
       "qualityPreview": "Preview",
       "review": {
         "acceptanceGate": "",
+        "alignmentConfidence": "Alignment confidence",
         "artifactComparatorLimitation": "Diagnostic comparison only; verify details before accepting the enhanced output.",
         "artifactComparatorTitle": "Review artifact comparison",
         "artifactFile": "File",
@@ -2354,8 +2370,11 @@
           "public": "Public"
         },
         "artifactWarnings": "",
+        "confidenceValue": "{{value}}% confidence",
         "coverage": "",
         "coverageValue": "",
+        "cropMetrics": "Crop metrics",
+        "cropMetricsValue": "{{reviewCropCount}} crops, {{coverage}} coverage",
         "decision": {
           "blocked": "Blocked",
           "human_review_required": "Human review required",
@@ -2367,6 +2386,13 @@
           "blocked_review_required": "Editable handoff blocked until review passes",
           "blocked_stale": "Editable handoff blocked by stale artifact",
           "ready": "Editable handoff ready"
+        },
+        "falseDetailRisk": "False detail risk",
+        "falseDetailRiskValue": {
+          "high": "High",
+          "low": "Low",
+          "medium": "Medium",
+          "unknown": "Unknown"
         },
         "humanReviewStatus": "",
         "humanReviewStatusValue": {

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   superResolutionAlignmentModeSchema,
   superResolutionDetailPolicySchema,
+  superResolutionModeSchema,
   superResolutionQualityPreferenceSchema,
 } from './superResolutionUiSchemas';
 
@@ -23,6 +24,7 @@ export const superResolutionOutputReviewEditableGateSchema = z.enum([
 ]);
 
 export const superResolutionOutputReviewStaleStateSchema = z.enum(['current', 'stale', 'unknown']);
+export const superResolutionFalseDetailRiskSchema = z.enum(['unknown', 'low', 'medium', 'high']);
 
 export const superResolutionOutputReviewArtifactSchema = z
   .object({
@@ -40,11 +42,23 @@ export const superResolutionOutputReviewWorkflowSchema = z
   .object({
     alignmentMode: superResolutionAlignmentModeSchema,
     artifactPath: z.string().min(1),
+    alignmentConfidence: z.number().min(0).max(1).nullable(),
+    cropMetrics: z
+      .object({
+        outputHeight: z.number().int().positive(),
+        outputWidth: z.number().int().positive(),
+        overlapCoverageRatio: z.number().min(0).max(1).nullable(),
+        reviewCropCount: z.number().int().nonnegative(),
+      })
+      .strict(),
     editableGate: superResolutionOutputReviewEditableGateSchema,
     decision: superResolutionOutputReviewDecisionSchema,
     detailPolicy: superResolutionDetailPolicySchema,
     detailGainRatio: z.number().positive().nullable(),
+    falseDetailRisk: superResolutionFalseDetailRiskSchema,
     humanReviewStatus: z.enum(['failed', 'not_required', 'passed', 'pending']),
+    mode: superResolutionModeSchema,
+    modePolicyVersion: z.literal(1),
     outputArtifactHash: z.string().trim().min(1),
     outputArtifactId: z.string().min(1),
     outputHeight: z.number().int().positive(),

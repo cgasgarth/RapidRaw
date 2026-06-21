@@ -1666,7 +1666,33 @@
         "uiE2ePending": "UI E2E pending",
         "registration": "Registration",
         "detailGain": "Detail gain",
-        "ringing": "Ringing/zipper artifacts"
+        "ringing": "Ringing/zipper artifacts",
+        "alignmentConfidence": "Alignment confidence",
+        "confidenceValue": "{{value}}% confidence",
+        "cropMetrics": "Crop metrics",
+        "cropMetricsValue": "{{reviewCropCount}} crops, {{coverage}} coverage",
+        "falseDetailRisk": "False detail risk",
+        "falseDetailRiskValue": {
+          "unknown": "Unknown",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        }
+      },
+      "modeLabel": "Mode",
+      "mode": {
+        "conservative": {
+          "label": "Conservative",
+          "status": "Maximum trust"
+        },
+        "standard": {
+          "label": "Standard",
+          "status": "Balanced detail"
+        },
+        "aggressive": {
+          "label": "Aggressive",
+          "status": "Preview-only risk"
+        }
       }
     },
     "focusStack": {
