@@ -872,12 +872,10 @@
       "addNewMask": "添加新蒙版",
       "brush": {
         "brush": "画笔",
-        "captureStroke": "",
         "eraser": "橡皮擦",
         "feather": "画笔羽化",
         "flow": "流量",
-        "size": "画笔大小",
-        "typedCommand": ""
+        "size": "画笔大小"
       },
       "comingSoon": "即将推出",
       "createNewTitle": "创建新蒙版",

@@ -250,7 +250,10 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
   );
   addIf(
     (file) =>
-      file.includes('brushMask') || file.includes('brush-mask') || file === 'src/components/panel/right/MasksPanel.tsx',
+      file.includes('brushMask') ||
+      file.includes('brush-mask') ||
+      file === 'src/components/panel/editor/ImageCanvas.tsx' ||
+      file === 'src/components/panel/right/MasksPanel.tsx',
     ['check:brush-mask', 'check:brush-mask-command', 'check:brush-mask-command-capture'],
   );
   addIf(
@@ -460,6 +463,10 @@ if (process.argv.includes('--self-test')) {
   );
   assertSelfTestRoute(
     ['src/utils/brushMaskCommandBridge.ts'],
+    ['check:brush-mask', 'check:brush-mask-command', 'check:brush-mask-command-capture'],
+  );
+  assertSelfTestRoute(
+    ['src/components/panel/editor/ImageCanvas.tsx'],
     ['check:brush-mask', 'check:brush-mask-command', 'check:brush-mask-command-capture'],
   );
   assertSelfTestRoute(['src/components/adjustments/FilmLookBrowser.tsx'], ['check:film-look-browser-ui']);

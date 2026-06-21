@@ -14,7 +14,6 @@ import {
   layerMaskDryRunResultV1Schema,
   layerMaskMutationResultV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { appendBrushStroke } from '../../../src/utils/brushMaskParameters.ts';
 import {
   BRUSH_MASK_COMMAND_COORDINATE_SPACE,
   buildBrushMaskCommandFromParameters,
@@ -41,13 +40,12 @@ const reportSchema = z
   })
   .strict();
 
-const sourcePanel = await readFile('src/components/panel/right/MasksPanel.tsx', 'utf8');
+const sourcePanel = await readFile('src/components/panel/editor/ImageCanvas.tsx', 'utf8');
 for (const marker of [
-  'data-testid="brush-mask-command-capture-status"',
-  'data-testid="brush-mask-capture-stroke-command"',
-  'data-command-type="layerMask.createBrushMask"',
-  'data-coordinate-space={coordinateSpace}',
-  'appendBrushStroke(activeSubMask.parameters',
+  'data-testid="image-canvas-brush-command-capture"',
+  'data-brush-command-type={lastBrushCommandCapture?.commandType',
+  'data-brush-command-coordinate-space={lastBrushCommandCapture?.coordinateSpace',
+  'recordBrushMaskCommandCapture(activeId, activeSubMask, nextParameters)',
   'buildBrushMaskCommandFromParameters(',
 ]) {
   if (!sourcePanel.includes(marker)) {
@@ -55,18 +53,20 @@ for (const marker of [
   }
 }
 
-const capturedParameters = appendBrushStroke(
-  { lines: [] },
-  {
-    feather: 35,
-    points: [
-      { pressure: 0.6, x: 256, y: 384 },
-      { pressure: 0.9, x: 768, y: 384 },
-    ],
-    size: 80,
-    tool: 'brush',
-  },
-);
+const capturedParameters = {
+  lines: [
+    {
+      brushSize: 80,
+      feather: 0.35,
+      flow: 75,
+      points: [
+        { x: 256, y: 384 },
+        { x: 768, y: 384 },
+      ],
+      tool: 'brush',
+    },
+  ],
+};
 
 const context = {
   expectedGraphRevision: 'graph_rev_brush_capture_source',
@@ -89,11 +89,11 @@ if (stroke === undefined) throw new Error('Brush capture command requires one st
 if (stroke.points[0]?.x !== 0.25 || stroke.points[1]?.x !== 0.75 || stroke.points[0]?.y !== 0.5) {
   throw new Error('Brush capture command did not normalize image coordinates.');
 }
-if (stroke.mode !== 'paint' || stroke.radiusPx !== 40 || stroke.hardness !== 0.65) {
-  throw new Error('Brush capture command did not preserve brush size, feather, and mode.');
+if (stroke.mode !== 'paint' || stroke.radiusPx !== 40 || stroke.hardness !== 0.65 || stroke.flow !== 0.75) {
+  throw new Error('Brush capture command did not preserve brush size, feather, flow, and mode.');
 }
-if (stroke.points[0]?.pressure !== 0.6 || stroke.points[1]?.pressure !== 0.9) {
-  throw new Error('Brush capture command did not preserve pressure values.');
+if ('pressure' in (stroke.points[0] ?? {})) {
+  throw new Error('Mouse brush capture must omit pressure when the input does not provide genuine pen pressure.');
 }
 
 const runtime = new BrushMaskCommandRuntime();
@@ -114,7 +114,8 @@ const report = reportSchema.parse({
   commandType: dryRunCommand.commandType,
   consultApplied: [
     'captured points normalize into image-relative command coordinates',
-    'paint/erase mode, feather-derived hardness, radius, flow, and pressure are command fields',
+    'paint/erase mode, feather-derived hardness, radius, and flow are command fields',
+    'mouse capture omits pressure unless real pen pressure is supplied',
     'dry-run must precede apply',
   ],
   coordinateSpace: BRUSH_MASK_COMMAND_COORDINATE_SPACE,
@@ -123,7 +124,7 @@ const report = reportSchema.parse({
   renderMaskHash: render.contentHash,
   schemaVersion: 1,
   strokeCount: dryRunCommand.parameters.strokes.length,
-  uiMarkers: ['brush-mask-command-capture-status', 'brush-mask-capture-stroke-command', 'layerMask.createBrushMask'],
+  uiMarkers: ['image-canvas-brush-command-capture', 'recordBrushMaskCommandCapture', 'layerMask.createBrushMask'],
   validationMode: 'brush_mask_ui_capture_to_typed_command_runtime_proof',
 });
 

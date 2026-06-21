@@ -1,11 +1,6 @@
 import { z } from 'zod';
 
-import {
-  brushMaskParametersSchema,
-  flowBrushMaskParametersSchema,
-  type BrushLine,
-  type BrushMaskParameters,
-} from '../schemas/maskParameterSchemas';
+import { brushMaskParametersSchema, flowBrushMaskParametersSchema } from '../schemas/maskParameterSchemas';
 
 export const BRUSH_MASK_COMMAND_SCHEMA_VERSION = 1;
 export const BRUSH_MASK_COMMAND_COORDINATE_SPACE = 'normalized_image' as const;
@@ -70,6 +65,44 @@ export const brushMaskCommandEnvelopeSchema = z
 
 export type BrushMaskCommandEnvelope = z.infer<typeof brushMaskCommandEnvelopeSchema>;
 
+const capturedBrushPointSchema = z
+  .object({
+    pressure: z.number().min(0).max(1).optional(),
+    x: z.number(),
+    y: z.number(),
+  })
+  .strict();
+
+const capturedBrushLineSchema = z.union([
+  z
+    .object({
+      brushSize: z.number().positive().max(4096),
+      feather: z.number().min(0).max(1).optional(),
+      flow: z.number().min(0).max(100).optional(),
+      points: z.array(capturedBrushPointSchema).min(1).max(4096),
+      tool: z.enum(['brush', 'eraser']),
+    })
+    .strict(),
+  z
+    .object({
+      feather: z.number().min(0).max(100),
+      points: z.array(capturedBrushPointSchema).min(1).max(4096),
+      size: z.number().positive().max(1024),
+      tool: z.enum(['brush', 'eraser']),
+    })
+    .strict(),
+]);
+
+const capturedBrushParametersSchema = z
+  .object({
+    flow: z.number().min(0).max(100).optional(),
+    lines: z.array(capturedBrushLineSchema).min(1).max(1024),
+  })
+  .strict();
+
+type CapturedBrushLine = z.infer<typeof capturedBrushLineSchema>;
+type CapturedBrushParameters = z.infer<typeof capturedBrushParametersSchema>;
+
 export interface BrushMaskCommandContext {
   expectedGraphRevision: string;
   imagePath: string;
@@ -93,7 +126,6 @@ export function buildBrushMaskCommandFromParameters(
   options: { dryRun: boolean },
 ): BrushMaskCommandEnvelope {
   const parsedParameters = parseBrushParameters(parameters);
-  const flow = 'flow' in parsedParameters ? parsedParameters.flow / 100 : 1;
   const envelope: BrushMaskCommandEnvelope = {
     actor: {
       id: 'rapidraw-ui',
@@ -114,7 +146,7 @@ export function buildBrushMaskCommandFromParameters(
     parameters: {
       baseMaskId: context.maskId,
       maskName: context.maskName,
-      strokes: parsedParameters.lines.map((line, index) => lineToCommandStroke(line, flow, context, index)),
+      strokes: parsedParameters.lines.map((line, index) => lineToCommandStroke(line, parsedParameters, context, index)),
     },
     schemaVersion: BRUSH_MASK_COMMAND_SCHEMA_VERSION,
     target: {
@@ -126,28 +158,39 @@ export function buildBrushMaskCommandFromParameters(
   return brushMaskCommandEnvelopeSchema.parse(envelope);
 }
 
-function parseBrushParameters(parameters: unknown): BrushMaskParameters & { flow?: number } {
+function parseBrushParameters(parameters: unknown): CapturedBrushParameters {
+  const capturedResult = capturedBrushParametersSchema.safeParse(parameters);
+  if (capturedResult.success) return capturedResult.data;
   const flowResult = flowBrushMaskParametersSchema.safeParse(parameters);
-  if (flowResult.success) return flowResult.data;
-  return brushMaskParametersSchema.parse(parameters);
+  if (flowResult.success) return capturedBrushParametersSchema.parse(flowResult.data);
+  return capturedBrushParametersSchema.parse(brushMaskParametersSchema.parse(parameters));
 }
 
 function lineToCommandStroke(
-  line: BrushLine,
-  flow: number,
+  line: CapturedBrushLine,
+  parameters: CapturedBrushParameters,
   context: BrushMaskCommandContext,
   index: number,
 ): BrushMaskCommandEnvelope['parameters']['strokes'][number] {
+  const flowPercent = 'flow' in line && line.flow !== undefined ? line.flow : (parameters.flow ?? 100);
+  const featherNormalized = 'brushSize' in line ? (line.feather ?? 0) : line.feather / 100;
+  const radiusPx = 'brushSize' in line ? line.brushSize * 0.5 : line.size * 0.5;
+  const firstPoint = line.points[0];
+  if (firstPoint === undefined) {
+    throw new Error('Brush command capture requires at least one point.');
+  }
+  const commandPoints = line.points.length === 1 ? [firstPoint, firstPoint] : line.points;
+
   return {
-    flow: roundMetric(clamp(flow, 0, 1)),
-    hardness: roundMetric(1 - line.feather / 100),
+    flow: roundMetric(clamp(flowPercent / 100, 0, 1)),
+    hardness: roundMetric(1 - featherNormalized),
     mode: line.tool === 'eraser' ? 'erase' : 'paint',
-    points: line.points.map((point) => ({
+    points: commandPoints.map((point) => ({
       ...(point.pressure !== undefined ? { pressure: roundMetric(clamp(point.pressure, 0, 1)) } : {}),
       x: roundMetric(normalizeCoordinate(point.x, context.imageSize.width)),
       y: roundMetric(normalizeCoordinate(point.y, context.imageSize.height)),
     })),
-    radiusPx: roundMetric(line.size * 0.5),
+    radiusPx: roundMetric(radiusPx),
     strokeId: `${context.maskId}_stroke_${index + 1}`,
   };
 }
