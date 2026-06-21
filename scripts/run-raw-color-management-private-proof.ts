@@ -31,12 +31,6 @@ const args = argsSchema.parse({
   requireAssets: process.argv.includes('--require-assets'),
 });
 
-await runRequired('committed RAW color-management proof check', [
-  'bun',
-  'run',
-  'check:raw-color-management-runtime-proof',
-]);
-
 if (args.privateRoot === undefined) {
   if (args.requireAssets) {
     console.error('RAWENGINE_PRIVATE_RAW_ROOT or --root is required with --require-assets.');

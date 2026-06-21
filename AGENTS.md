@@ -45,22 +45,19 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   action.
 - Do not rebase or force-push a healthy PR that is only waiting on required
   checks unless it is behind/conflicting or branch protection requires it.
+- Prefer vertical feature delivery over planning, schema-only, proof-only,
+  probe-only, inventory-only, routing-only, or meta-tooling PRs.
 - Feature PRs may exceed cleanup/CI/tooling PRs, but cleanup/CI/tooling PRs
   must not exceed feature PRs. Keep vertical feature delivery ahead of
   foundation polish.
-- Prefer vertical feature delivery over planning, schema-only, proof-only, or
-  meta-tooling PRs.
 - Avoid repo meta-tooling PRs unless they clearly improve product quality or
   prevent a recurring real failure.
-- Product-facing implementation should be the default. Planning, schema-only,
-  proof-only, probe-only, inventory-only, routing-only, and meta-tooling work is
-  supporting work, not a substitute for vertical product slices.
+- Product-facing implementation should be the default. Planning, schemas,
+  probes, inventories, reports, and routing checks are supporting work, not a
+  substitute for vertical product slices.
 - Proof scripts should live inside the actual feature PR they validate. Do not
-  open PRs whose main value is only a probe, schema, inventory, or routing
-  check.
-- Do not create proof-only PRs. Probes, schemas, route checks, screenshots, or
-  fixture reports are supporting evidence for a vertical feature PR, not the
-  product value of the PR by themselves.
+  open PRs whose main value is only a probe, schema, inventory, report, or
+  routing check.
 - When something starts looking like slop, clean it up proactively instead of
   building more work on top of it.
 
@@ -163,8 +160,8 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 ## Validation And Quality
 
-- Shift left as much as practical: prefer local checks, scripts, schemas,
-  fixtures, and CI gates that catch mistakes before manual review.
+- Shift left as much as practical with checks that catch real product defects
+  before manual review.
 - Stop adding repo meta-tooling unless it clearly improves product quality or
   prevents a recurring real failure.
 - Prefer vertical feature delivery over planning, schema-only, proof-only, or
@@ -229,8 +226,6 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Remove validation inventory JSON from routine gates. Do not maintain broad
   validation inventory files as routine PR churn; prefer focused checks tied to
   changed product behavior.
-- Do not commit generated inventory or report JSON unless it is a human-review
-  artifact or required by a product validation gate.
 - Do not keep committed generated validation reports just to prove scripts are
   wired. Keep private RAW validation standardized around reusable private-root
   setup plus per-feature run reports that prove real output behavior.

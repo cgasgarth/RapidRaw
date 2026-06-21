@@ -8,12 +8,17 @@ import { parseComputationalMergeE2eProofManifest } from '../../../src/schemas/co
 import { parseComputationalMergePrivateRunReportCollection } from '../../../src/schemas/computationalMergePrivateRunReportSchemas.ts';
 
 const requireAssets = process.argv.includes('--require-assets');
-const inputPath = valueAfter('--input') ?? 'fixtures/validation/computational-merge-private-run-reports.json';
+const inputPath = valueAfter('--input');
 const fixtureId = valueAfter('--fixture-id');
 const requiredRunId = valueAfter('--require-run-id');
 const root = process.env.RAWENGINE_PRIVATE_RAW_ROOT;
 const failures: string[] = [];
 
+if (inputPath === undefined) {
+  failures.push(
+    'Missing --input <path>. Generate a private run report first; committed run-report fixtures are not used.',
+  );
+}
 if (requireAssets && root === undefined) {
   failures.push('RAWENGINE_PRIVATE_RAW_ROOT is required with --require-assets.');
 }
@@ -21,9 +26,17 @@ if (requireAssets && root === undefined) {
 const manifest = parseComputationalMergeE2eProofManifest(
   JSON.parse(await readFile('fixtures/validation/computational-merge-e2e-proof.json', 'utf8')),
 );
-const reportCollection = parseComputationalMergePrivateRunReportCollection(
-  JSON.parse(await readFile(inputPath, 'utf8')),
-);
+const reportCollection =
+  inputPath === undefined
+    ? parseComputationalMergePrivateRunReportCollection({
+        $schema: 'https://rawengine.dev/schemas/computational-merge-private-run-reports-v1.json',
+        issue: 1809,
+        reports: [],
+        schemaVersion: 1,
+        snapshotDate: '1970-01-01',
+        validationMode: 'public_schema_private_reports',
+      })
+    : parseComputationalMergePrivateRunReportCollection(JSON.parse(await readFile(inputPath, 'utf8')));
 
 const proofCasesByFixtureId = new Map(manifest.proofCases.map((proofCase) => [proofCase.fixtureId, proofCase]));
 const reportsByFixtureId = new Map(reportCollection.reports.map((report) => [report.fixtureId, report]));

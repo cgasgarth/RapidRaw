@@ -63,7 +63,7 @@ async function expectRunnerFails({
   const output = `${stdout}\n${stderr}`;
   if (exitCode === 0) throw new Error(`${label}: expected runner to fail.`);
   if (!output.includes(expected)) {
-    throw new Error(`${label}: expected failure containing "${expected}".`);
+    throw new Error(`${label}: expected failure containing "${expected}". Actual output:\n${output.slice(-1200)}`);
   }
 }
 
@@ -153,6 +153,10 @@ function privateReportCollection({
             'private-artifacts/validation/computational-merge/hdr-bracket-alignment.json',
           ),
           artifact('merge_output_private', 'private-artifacts/validation/computational-merge/hdr-bracket-merge.tiff'),
+          artifact(
+            'app_server_runtime_report_private',
+            'private-artifacts/validation/computational-merge/hdr-bracket-app-server-runtime.json',
+          ),
           artifact('preview_after_private', 'private-artifacts/validation/computational-merge/hdr-bracket-preview.png'),
           artifact('export_after_private', 'private-artifacts/validation/computational-merge/hdr-bracket-export.tiff'),
           artifact(

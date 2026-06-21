@@ -131,8 +131,6 @@ const QUICK_SLOW_PROOF = [
   'check:raw-open-edit-export-command-wrapper',
   'check:raw-open-edit-export-private-report-collector',
   'check:raw-open-edit-export-private-proof-acceptance',
-  'check:raw-open-edit-export-run-reports',
-  'check:raw-color-management-runtime-proof',
   'check:deblur-real-raw-quality',
   'check:macos-colorsync-display-proof',
   'check:negative-lab-measured-render-proof',
