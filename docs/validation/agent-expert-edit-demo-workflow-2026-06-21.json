@@ -75,7 +75,7 @@
   },
   "evidence": {
     "htmlPath": "docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html",
-    "reportHash": "sha256:49d2af0f339401a3483e70d0383a931ff4bdf9e9e0faeeea14006dd4c7fc4ded",
+    "reportHash": "sha256:a347f4538dd588715e503675f3f66f7ee6ea8917e4c7ace50309ff764bc9545b",
     "reportPath": "docs/validation/agent-expert-edit-demo-workflow-2026-06-21.json"
   },
   "inspect": {
@@ -85,7 +85,7 @@
     "toolCount": 28,
     "virtualCopyId": "vc_agent_expert_edit_demo_2844"
   },
-  "issue": 2844,
+  "issue": 2983,
   "limits": [
     "Runs deterministic in-process local app-server bridge tools; it does not call a paid model provider.",
     "Shows before/after demo preview artifacts and graph revisions; it does not decode RAW pixels in this PR.",
@@ -97,6 +97,11 @@
     "userPrompt": "Inspect DSC_2844.NEF, warm the scene slightly, lift shadows, protect highlights, preview it, then apply to a virtual copy if approved."
   },
   "proofStatus": "runtime_apply_demo",
-  "refs": ["#2844"],
+  "runtimeWorkflow": {
+    "api": "runAgentColorEditWorkflowV1",
+    "applyAuditEventId": "audit_2_command_agent_expert_edit_demo_apply_2844",
+    "dryRunAuditEventId": "audit_1_command_agent_expert_edit_demo_dry_run_2844"
+  },
+  "refs": ["#2983"],
   "validationMode": "agent_expert_edit_demo_workflow"
 }
