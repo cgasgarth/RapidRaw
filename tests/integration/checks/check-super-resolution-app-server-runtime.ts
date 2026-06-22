@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 
+import { z } from 'zod';
+
 import { SuperResolutionAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/superResolutionAppServerRuntime.ts';
 import {
   calculateMeanAbsoluteErrorV1,
@@ -15,6 +17,20 @@ const LOW_WIDTH = 24;
 const LOW_HEIGHT = 18;
 const HIGH_WIDTH = LOW_WIDTH * SCALE;
 const HIGH_HEIGHT = LOW_HEIGHT * SCALE;
+const srSupportMapDryRunTranscriptSchema = z
+  .object({
+    downgradeReason: z.string().trim().min(1).optional(),
+    effectiveScale: z.number().min(1).max(4),
+    mutates: z.literal(false),
+    planId: z.string().trim().min(1),
+    requestedScale: z.number().min(1.1).max(4),
+    reviewStatus: z.enum(['apply_ready', 'blocked', 'review_required']),
+    scenario: z.enum(['blocked_apply', 'downgraded_scale', 'supported', 'weak_support']),
+    supportMapArtifactId: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+    weakSupportRatio: z.number().min(0).max(1),
+  })
+  .strict();
 
 const truth = createTruth();
 const frames = [
@@ -73,6 +89,61 @@ const dryRun = bus.execute({
   toolName: superResolutionRoutePair.dryRunToolName,
 });
 if (dryRun.kind !== 'dry_run') throw new Error('Expected dry-run dispatch result.');
+const supportedTranscript = buildSupportMapDryRunTranscript('supported', dryRun);
+if (
+  supportedTranscript.effectiveScale !== SCALE ||
+  supportedTranscript.requestedScale !== SCALE ||
+  supportedTranscript.reviewStatus !== 'apply_ready' ||
+  supportedTranscript.weakSupportRatio !== 0
+) {
+  throw new Error(`Unexpected supported SR dry-run transcript: ${JSON.stringify(supportedTranscript)}.`);
+}
+
+const downgradedDryRunCommand = {
+  ...dryRunCommand,
+  commandId: 'command_sr_app_server_runtime_downgraded',
+  parameters: {
+    ...dryRunCommand.parameters,
+    outputScale: 4,
+  },
+};
+const downgradedDryRun = bus.execute({
+  request: buildRequest(downgradedDryRunCommand),
+  toolName: superResolutionRoutePair.dryRunToolName,
+});
+if (downgradedDryRun.kind !== 'dry_run') throw new Error('Expected downgraded dry-run dispatch result.');
+const downgradedTranscript = buildSupportMapDryRunTranscript('downgraded_scale', downgradedDryRun);
+if (
+  downgradedTranscript.downgradeReason !== 'effective_scale_downgraded' ||
+  downgradedTranscript.effectiveScale !== SCALE ||
+  downgradedTranscript.requestedScale !== 4 ||
+  downgradedTranscript.reviewStatus !== 'review_required'
+) {
+  throw new Error(`Unexpected downgraded SR dry-run transcript: ${JSON.stringify(downgradedTranscript)}.`);
+}
+
+const weakSupportFrames = frames.slice(0, 2);
+const weakSupportDryRunCommand = {
+  ...dryRunCommand,
+  commandId: 'command_sr_app_server_runtime_weak_support',
+  parameters: {
+    ...dryRunCommand.parameters,
+    sources: dryRunCommand.parameters.sources.slice(0, weakSupportFrames.length),
+  },
+};
+const weakSupportDryRun = bus.execute({
+  request: buildRequest(weakSupportDryRunCommand, weakSupportFrames),
+  toolName: superResolutionRoutePair.dryRunToolName,
+});
+if (weakSupportDryRun.kind !== 'dry_run') throw new Error('Expected weak-support dry-run dispatch result.');
+const weakSupportTranscript = buildSupportMapDryRunTranscript('weak_support', weakSupportDryRun);
+if (
+  weakSupportTranscript.reviewStatus !== 'blocked' ||
+  !weakSupportTranscript.warnings.includes('support_map_blocked') ||
+  weakSupportTranscript.weakSupportRatio <= 0.25
+) {
+  throw new Error(`Unexpected weak-support SR dry-run transcript: ${JSON.stringify(weakSupportTranscript)}.`);
+}
 
 const applyCommand = {
   ...dryRunCommand,
@@ -114,6 +185,12 @@ expectThrows('unaccepted apply plan', () =>
     toolName: superResolutionRoutePair.applyToolName,
   }),
 );
+srSupportMapDryRunTranscriptSchema.parse({
+  ...supportedTranscript,
+  reviewStatus: 'blocked',
+  scenario: 'blocked_apply',
+  warnings: [...supportedTranscript.warnings, 'apply_rejected_without_accepted_plan'],
+});
 
 const nearestBaseline = createNearestNeighborBaselineV1(frames[0].pixels, LOW_WIDTH, LOW_HEIGHT, SCALE);
 const improvementRatio =
@@ -126,6 +203,12 @@ const result = {
   fixture: 'synthetic_sr_app_server_runtime_v1',
   humanReviewStatus: applied.apply.sidecarArtifact.validationSummary.humanReviewStatus,
   improvementRatio,
+  supportMapScenarios: [
+    supportedTranscript.scenario,
+    downgradedTranscript.scenario,
+    weakSupportTranscript.scenario,
+    'blocked_apply',
+  ],
   outputSha256: new Bun.CryptoHasher('sha256').update(new Uint8Array(applied.apply.outputPixels.buffer)).digest('hex'),
   planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
 };
@@ -135,14 +218,32 @@ if (process.argv.includes('--verbose')) {
   console.log(`SR app-server runtime ok (improvement=${result.improvementRatio.toFixed(3)})`);
 }
 
-function buildRequest(command) {
+function buildRequest(command, requestFrames = frames) {
   return {
     command,
-    confidenceMapArtifactId: 'artifact_sr_app_server_runtime_confidence',
-    frames,
+    confidenceMapArtifactId: `artifact_${command.commandId}_support_map`,
+    frames: requestFrames,
     outputArtifactId: 'artifact_sr_app_server_runtime_output',
     previewArtifactId: 'artifact_sr_app_server_runtime_preview',
   };
+}
+
+function buildSupportMapDryRunTranscript(scenario, toolResult) {
+  if (toolResult.kind !== 'dry_run') throw new Error(`Expected ${scenario} SR support-map dry-run.`);
+  const { provenance } = toolResult.dryRun;
+  const supportMap = provenance.supportMap;
+  return srSupportMapDryRunTranscriptSchema.parse({
+    ...(supportMap.downgradeReason === undefined ? {} : { downgradeReason: supportMap.downgradeReason }),
+    effectiveScale: supportMap.effectiveScale,
+    mutates: false,
+    planId: toolResult.dryRun.dryRunResult.mergePlan.planId,
+    requestedScale: supportMap.requestedScale,
+    reviewStatus: supportMap.reviewStatus,
+    scenario,
+    supportMapArtifactId: supportMap.artifactId,
+    warnings: toolResult.dryRun.dryRunResult.warnings,
+    weakSupportRatio: supportMap.weakSupportRatio,
+  });
 }
 
 function createTruth() {
