@@ -18,6 +18,7 @@
     "format": "bun scripts/run-compact-command.ts --label format -- prettier --write . --log-level warn",
     "format:check": "bun scripts/run-compact-command.ts --label format -- prettier --check .",
     "worktree:create": "bun scripts/create-codex-worktree.ts",
+    "check:worktree-create": "bun scripts/create-codex-worktree.ts --self-test",
     "hooks:install": "git config core.hooksPath .githooks",
     "hooks:verify": "bun tests/integration/checks/check-git-hooks.ts",
     "hooks:self-test": "bun tests/integration/checks/check-git-hooks.ts --self-test",
