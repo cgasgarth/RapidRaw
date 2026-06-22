@@ -1512,6 +1512,8 @@ async function prepareScenario(page, mode) {
   if (mode === 'library-workflow') {
     await page.getByRole('button', { name: 'Keepers' }).click();
     await page.getByRole('button', { name: 'Survey' }).click();
+    await page.getByRole('button', { name: 'Edit selected pick' }).click();
+    await page.getByRole('button', { name: 'Queue selected export' }).click();
     await page.getByRole('button', { name: 'Create B&W proof copy' }).click();
     await page.getByRole('button', { name: 'Compare virtual copy' }).click();
     libraryWorkflowProofSchema.parse(
@@ -1521,6 +1523,15 @@ async function prepareScenario(page, mode) {
       timeout: 10_000,
     });
     await page.getByTestId('library-virtual-copy-compare-proof').waitFor({ timeout: 10_000 });
+    await page
+      .getByTestId('library-editor-handoff-proof')
+      .getByText('DSC_0002.NEF opened in editor', { exact: false })
+      .waitFor({
+        timeout: 10_000,
+      });
+    await page.getByTestId('library-export-queue-proof').getByText('1 queued', { exact: false }).waitFor({
+      timeout: 10_000,
+    });
     return;
   }
 

@@ -11,12 +11,11 @@ const FORMAT_EXTENSIONS = new Set([
   '.jsx',
   '.md',
   '.ts',
-  '.ts',
   '.tsx',
   '.yaml',
   '.yml',
 ]);
-const ESLINT_EXTENSIONS = new Set(['.cjs', '.js', '.jsx', '.ts', '.ts', '.tsx']);
+const ESLINT_EXTENSIONS = new Set(['.cjs', '.js', '.jsx', '.ts', '.tsx']);
 
 const run = async (label, command, args) => {
   const proc = Bun.spawn([command, ...args], {
@@ -69,10 +68,41 @@ if (stagedFiles.length === 0) {
 
 const formatFiles = stagedFiles.filter((filePath) => FORMAT_EXTENSIONS.has(extensionOf(filePath)));
 const eslintFiles = stagedFiles.filter((filePath) => ESLINT_EXTENSIONS.has(extensionOf(filePath)));
+const fixFiles = Array.from(new Set([...formatFiles, ...eslintFiles]));
 const checks = [];
 
+const unstagedStagedFiles =
+  fixFiles.length === 0
+    ? []
+    : git(['diff', '--name-only', '--diff-filter=ACMR', '--', ...fixFiles])
+        .split(/\r?\n/u)
+        .map((filePath) => filePath.trim())
+        .filter(Boolean);
+
+if (unstagedStagedFiles.length > 0) {
+  console.error(`precommit autofix needs fully staged files: ${unstagedStagedFiles.slice(0, 8).join(', ')}`);
+  if (unstagedStagedFiles.length > 8) {
+    console.error(`...and ${unstagedStagedFiles.length - 8} more`);
+  }
+  process.exit(1);
+}
+
+if (eslintFiles.length > 0) {
+  checks.push(
+    await run('lint:fix', 'bun', ['eslint', '--fix', '--max-warnings', '0', '--no-warn-ignored', ...eslintFiles]),
+  );
+}
+
 if (formatFiles.length > 0) {
-  checks.push(await run('format', 'bun', ['prettier', '--list-different', '--log-level', 'warn', ...formatFiles]));
+  checks.push(await run('format:fix', 'bun', ['prettier', '--write', '--log-level', 'warn', ...formatFiles]));
+}
+
+if (fixFiles.length > 0) {
+  git(['add', '--', ...fixFiles]);
+}
+
+if (formatFiles.length > 0) {
+  checks.push(await run('format', 'bun', ['prettier', '--check', '--log-level', 'warn', ...formatFiles]));
 }
 
 if (eslintFiles.length > 0) {

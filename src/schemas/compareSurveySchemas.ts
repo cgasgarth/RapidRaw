@@ -80,6 +80,41 @@ export const compareSurveySessionSchema = z
 export type CompareSurveyCandidate = z.infer<typeof compareSurveyCandidateSchema>;
 export type CompareSurveySession = z.infer<typeof compareSurveySessionSchema>;
 
+export const compareSurveyPickExportHandoffSchema = z
+  .object({
+    editGraphRevision: z.string().trim().min(1),
+    editorOpenedPath: z.string().trim().min(1),
+    exportEditGraphRevision: z.string().trim().min(1),
+    exportJobId: z.string().trim().min(1),
+    exportRecipeId: z.string().trim().min(1),
+    exportStatus: z.literal('queued'),
+    pickedPath: z.string().trim().min(1),
+    selectionContext: z.literal('compare_survey_pick'),
+    sessionId: z.string().trim().min(1),
+    sourceMode: z.literal('survey'),
+    version: z.literal(1),
+  })
+  .strict()
+  .superRefine((handoff, context) => {
+    if (handoff.editorOpenedPath !== handoff.pickedPath) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Editor handoff path must match the picked survey path.',
+        path: ['editorOpenedPath'],
+      });
+    }
+
+    if (handoff.exportEditGraphRevision !== handoff.editGraphRevision) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Export job must preserve the editor edit graph revision.',
+        path: ['exportEditGraphRevision'],
+      });
+    }
+  });
+
+export type CompareSurveyPickExportHandoff = z.infer<typeof compareSurveyPickExportHandoffSchema>;
+
 export const visibleCompareSurveyCandidates = (session: CompareSurveySession): CompareSurveyCandidate[] => {
   const byPath = new Map(session.candidates.map((candidate) => [candidate.path, candidate]));
   const candidates = session.candidatePaths
@@ -103,3 +138,6 @@ export const visibleCompareSurveyCandidates = (session: CompareSurveySession): C
 
 export const parseCompareSurveySession = (value: unknown): CompareSurveySession =>
   compareSurveySessionSchema.parse(value);
+
+export const parseCompareSurveyPickExportHandoff = (value: unknown): CompareSurveyPickExportHandoff =>
+  compareSurveyPickExportHandoffSchema.parse(value);

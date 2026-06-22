@@ -18,8 +18,11 @@ import {
   buildSuperResolutionAlignmentDiagnosticsV1,
   superResolutionAlignmentDiagnosticsV1Schema,
 } from './superResolutionAlignmentDiagnostics.js';
-import { applyPixelShiftSuperResolutionV1 } from './superResolutionPixelShift.js';
-import { superResolutionReconstructionDiagnosticsV1Schema } from './superResolutionReconstructionDiagnostics.js';
+import { applyPixelShiftSuperResolutionV1, createNearestNeighborBaselineV1 } from './superResolutionPixelShift.js';
+import {
+  buildSuperResolutionReconstructionDiagnosticsV1,
+  superResolutionReconstructionDiagnosticsV1Schema,
+} from './superResolutionReconstructionDiagnostics.js';
 import { buildSuperResolutionArtifactSidecarRecordV1 } from './superResolutionSidecarProvenance.js';
 
 const SR_RUNTIME_ENGINE_ID = 'rawengine_sr_pixel_shift_runtime_v1';
@@ -293,6 +296,10 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
   }
   const scale = getEffectiveRuntimeScale(request.command.parameters.outputScale, request.frames.length);
   const alignmentDiagnostics = buildSuperResolutionAlignmentDiagnosticsV1(request.frames, scale);
+  const renderable = isSuperResolutionAlignmentRenderable(alignmentDiagnostics);
+  if (!renderable && request.command.dryRun) {
+    return renderDegradedSuperResolutionDryRun(request, alignmentDiagnostics, firstFrame, scale);
+  }
   assertSuperResolutionAlignmentDiagnosticsRenderableV1(alignmentDiagnostics);
   const result = applyPixelShiftSuperResolutionV1({
     frames: request.frames.map((frame) => ({
@@ -359,17 +366,88 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
   };
 };
 
+const renderDegradedSuperResolutionDryRun = (
+  request: ParsedSuperResolutionRuntimePlanRequestV1,
+  alignmentDiagnostics: SuperResolutionRuntimeProvenanceV1['alignmentDiagnostics'],
+  firstFrame: SuperResolutionRuntimeFrameV1,
+  scale: number,
+) => {
+  const outputWidth = firstFrame.width * scale;
+  const outputHeight = firstFrame.height * scale;
+  const outputPixels = createNearestNeighborBaselineV1(firstFrame.pixels, firstFrame.width, firstFrame.height, scale);
+  const confidenceMap = buildSrConfidenceMap(request.frames, outputWidth, outputHeight, scale);
+  const sampleCounts = buildSrSampleCounts(request.frames, outputWidth, outputHeight, scale);
+  const reconstructionDiagnostics = buildSuperResolutionReconstructionDiagnosticsV1({
+    outputPixelCount: outputWidth * outputHeight,
+    outputPixels,
+    outputScale: scale,
+    sampleCounts,
+  });
+  const warnings = ['support_map_blocked', ...deriveSrWarnings(0, request.command.parameters.detailPolicy)].sort();
+
+  return {
+    height: outputHeight,
+    outputPixels,
+    provenance: superResolutionRuntimeProvenanceV1Schema.parse({
+      alignmentDiagnostics,
+      changedPixelRatioAgainstNearest: 0,
+      confidenceMap,
+      detailPolicy: request.command.parameters.detailPolicy,
+      detailQuality: buildSrDetailQuality(request.frames, outputWidth, outputHeight, 0),
+      effectiveOutputScale: scale,
+      engineId: SR_RUNTIME_ENGINE_ID,
+      engineVersion: SR_RUNTIME_ENGINE_VERSION,
+      frameRegistrations: request.frames.map((frame) => ({
+        confidence: alignmentDiagnostics.confidence,
+        shiftX: frame.shiftX,
+        shiftY: frame.shiftY,
+        sourceIndex: frame.sourceIndex,
+      })),
+      mode: request.command.parameters.mode,
+      requestedAlignmentMode: request.command.parameters.alignmentMode,
+      requestedOutputScale: request.command.parameters.outputScale,
+      reconstructionDiagnostics,
+      resolvedAlignmentMode: request.command.parameters.alignmentMode,
+      runtimeStatus: 'dry_run_rendered',
+      sourceState: request.frames.map((frame) => ({
+        contentHash: frame.contentHash,
+        graphRevision: frame.graphRevision,
+        sourceIndex: frame.sourceIndex,
+      })),
+      supportMap: buildSrSupportMap(
+        request.confidenceMapArtifactId,
+        scale,
+        request.command.parameters.outputScale,
+        confidenceMap.completeSampleRatio,
+        request.command.parameters.detailPolicy,
+        true,
+      ),
+    }),
+    warnings,
+    width: outputWidth,
+  };
+};
+
+const isSuperResolutionAlignmentRenderable = (
+  diagnostics: SuperResolutionRuntimeProvenanceV1['alignmentDiagnostics'],
+): boolean =>
+  diagnostics.geometryConsistent &&
+  (diagnostics.missingShiftPhases === undefined || diagnostics.missingShiftPhases.length === 0) &&
+  (diagnostics.duplicateShiftPhases === undefined || diagnostics.duplicateShiftPhases.length === 0);
+
 const buildSrSupportMap = (
   artifactId: string,
   effectiveScale: number,
   requestedScale: number,
   coverageRatio: number,
   detailPolicy: SuperResolutionRuntimeProvenanceV1['detailPolicy'],
+  blocked = false,
 ): SuperResolutionRuntimeProvenanceV1['supportMap'] => {
   const weakSupportRatio = roundSrMetric(1 - coverageRatio);
   const downgradeReason = effectiveScale < requestedScale ? 'effective_scale_downgraded' : undefined;
-  const reviewStatus =
-    downgradeReason !== undefined || weakSupportRatio > 0.25 || detailPolicy === 'aggressive_preview_only'
+  const reviewStatus = blocked
+    ? 'blocked'
+    : downgradeReason !== undefined || weakSupportRatio > 0.25 || detailPolicy === 'aggressive_preview_only'
       ? 'review_required'
       : 'apply_ready';
 
@@ -382,6 +460,28 @@ const buildSrSupportMap = (
     reviewStatus,
     weakSupportRatio,
   };
+};
+
+const buildSrSampleCounts = (
+  frames: SuperResolutionRuntimeFrameV1[],
+  outputWidth: number,
+  outputHeight: number,
+  outputScale: number,
+): Uint8Array => {
+  const sampleCounts = new Uint8Array(outputWidth * outputHeight);
+  for (const frame of frames) {
+    for (let y = 0; y < frame.height; y += 1) {
+      for (let x = 0; x < frame.width; x += 1) {
+        const outputX = Math.trunc(x * outputScale + frame.shiftX);
+        const outputY = Math.trunc(y * outputScale + frame.shiftY);
+        const outputIndex = outputY * outputWidth + outputX;
+        if (outputIndex >= 0 && outputIndex < sampleCounts.length) {
+          sampleCounts[outputIndex] = Math.min(255, (sampleCounts[outputIndex] ?? 0) + 1);
+        }
+      }
+    }
+  }
+  return sampleCounts;
 };
 
 const getEffectiveRuntimeScale = (requestedScale: number, sourceCount: number): number => {

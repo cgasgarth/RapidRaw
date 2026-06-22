@@ -8,6 +8,7 @@ import {
 import { renderSyntheticPanoramaStitchV1, type PanoramaSyntheticSourceFrameV1 } from './panoramaSyntheticStitch.js';
 import {
   RAW_ENGINE_SCHEMA_VERSION,
+  artifactHandleV1Schema,
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeDryRunResultV1Schema,
   computationalMergeMutationResultV1Schema,
@@ -201,6 +202,22 @@ export const panoramaRuntimeProvenanceV1Schema = z
         seamMethod: z.enum(['adaptive_feather']),
       })
       .strict(),
+    seamReview: z
+      .object({
+        blockedReasons: z.array(z.string().trim().min(1)),
+        contributionMapArtifact: artifactHandleV1Schema,
+        disconnectedSourceIndices: z.array(z.number().int().nonnegative()),
+        nextActions: z.array(
+          z.enum(['adjust_source_selection', 'approve_plan', 'inspect_seams', 'reduce_projection_scope']),
+        ),
+        overlapEdgeCount: z.number().int().nonnegative(),
+        reviewStatus: z.enum(['apply_ready', 'blocked', 'review_required']),
+        seamMaskArtifact: artifactHandleV1Schema,
+        seamRisk: z.enum(['low', 'medium', 'high']),
+        warnings: z.array(z.string().trim().min(1)),
+        weakOverlapEdgeCount: z.number().int().nonnegative(),
+      })
+      .strict(),
     sourceState: z.array(
       z
         .object({
@@ -262,6 +279,8 @@ export const buildPanoramaRuntimeDryRunV1 = (requestValue: unknown): PanoramaRun
       kind: 'preview' as const,
       storage: 'temp_cache' as const,
     },
+    runtime.provenance.seamReview.contributionMapArtifact,
+    runtime.provenance.seamReview.seamMaskArtifact,
   ];
 
   const dryRunResult = computationalMergeDryRunResultV1Schema.parse({
@@ -312,6 +331,11 @@ export const applyPanoramaRuntimePlanV1 = (requestValue: unknown): PanoramaRunti
   const acceptedDryRunPlanId = request.command.parameters.acceptedDryRunPlanId;
   if (acceptedDryRunPlanHash === undefined || acceptedDryRunPlanId === undefined) {
     throw new Error('Panorama runtime apply requires an accepted dry-run plan id and hash.');
+  }
+  if (runtime.provenance.seamReview.reviewStatus === 'blocked') {
+    throw new Error(
+      `Panorama runtime apply blocked by seam review: ${runtime.provenance.seamReview.blockedReasons.join(', ')}.`,
+    );
   }
 
   const outputArtifacts = [
@@ -465,6 +489,11 @@ const parsePanoramaRuntimePlanRequest = (
 };
 
 const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
+  const alignment = buildPanoramaRuntimeAlignment(
+    request.sourceFrames,
+    request.connectedSourceIndices,
+    request.candidateTransformOverrides,
+  );
   const stitched = renderSyntheticPanoramaStitchV1({
     connectedSourceIndices: request.connectedSourceIndices,
     exposureNormalization: request.command.parameters.exposureNormalization,
@@ -477,16 +506,14 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
   if (stitched.outputPixels === null) {
     throw new Error('Panorama runtime plan expected renderable synthetic output pixels.');
   }
+  const seamReview = buildPanoramaSeamReview(request, alignment, stitched.output.width, stitched.output.height);
+  const warnings = [...new Set([...stitched.warningCodes, ...seamReview.warnings])].sort();
 
   return {
     height: stitched.output.height,
     outputPixels: stitched.outputPixels,
     provenance: panoramaRuntimeProvenanceV1Schema.parse({
-      alignment: buildPanoramaRuntimeAlignment(
-        request.sourceFrames,
-        request.connectedSourceIndices,
-        request.candidateTransformOverrides,
-      ),
+      alignment,
       boundaryMode: request.command.parameters.boundaryMode,
       crop: buildPanoramaRuntimeCrop(
         request.command.parameters.boundaryMode,
@@ -507,13 +534,19 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
       },
       projection: request.command.parameters.projection,
       projectionSettings: buildPanoramaRuntimeProjectionSettings(request.command.parameters.projection),
-      qualityMetrics: buildPanoramaRuntimeQualityMetrics(request, stitched.output.width, stitched.output.height),
+      qualityMetrics: buildPanoramaRuntimeQualityMetrics(
+        request,
+        stitched.output.width,
+        stitched.output.height,
+        alignment,
+      ),
       resolvedProjection: resolvePanoramaRuntimeProjection(request.command.parameters.projection),
       runtimeStatus: 'dry_run_rendered',
       seamBlend: {
         blendMode: request.command.parameters.blendMode ?? 'feather',
         seamMethod: 'adaptive_feather',
       },
+      seamReview,
       sourceState: request.sourceFrames.map((frame) => ({
         contentHash: frame.contentHash,
         graphRevision: frame.graphRevision,
@@ -521,7 +554,7 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
       })),
       stitchedSourceCount: stitched.stitchedSourceCount,
     }),
-    warnings: stitched.warningCodes,
+    warnings,
     width: stitched.output.width,
   };
 };
@@ -897,12 +930,8 @@ const buildPanoramaRuntimeQualityMetrics = (
   request: ParsedPanoramaRuntimePlanRequestV1,
   outputWidth: number,
   outputHeight: number,
+  alignment: PanoramaRuntimeProvenanceV1['alignment'],
 ): PanoramaRuntimeProvenanceV1['qualityMetrics'] => {
-  const alignment = buildPanoramaRuntimeAlignment(
-    request.sourceFrames,
-    request.connectedSourceIndices,
-    request.candidateTransformOverrides,
-  );
   const sourcePixelCount = request.sourceFrames.reduce((total, frame) => total + frame.width * frame.height, 0);
   const overlapAreaTotal = alignment.pairwiseMatches.reduce((total, match) => total + match.overlapAreaPx, 0);
   const crop = buildPanoramaRuntimeCrop(request.command.parameters.boundaryMode, outputWidth, outputHeight);
@@ -915,6 +944,73 @@ const buildPanoramaRuntimeQualityMetrics = (
     stitchedSourceRatio: roundPanoramaRuntimeMetric(
       request.connectedSourceIndices.length / request.sourceFrames.length,
     ),
+  };
+};
+
+const buildPanoramaSeamReview = (
+  request: ParsedPanoramaRuntimePlanRequestV1,
+  alignment: PanoramaRuntimeProvenanceV1['alignment'],
+  outputWidth: number,
+  outputHeight: number,
+): PanoramaRuntimeProvenanceV1['seamReview'] => {
+  const connected = new Set(request.connectedSourceIndices);
+  const disconnectedSourceIndices = request.sourceFrames
+    .map((frame) => frame.sourceIndex)
+    .filter((sourceIndex) => !connected.has(sourceIndex));
+  const weakOverlapEdgeCount = alignment.graph.selectedEdges.filter((edge) => {
+    const sourceFrame = request.sourceFrames.find((frame) => frame.sourceIndex === edge.fromSourceIndex);
+    const targetFrame = request.sourceFrames.find((frame) => frame.sourceIndex === edge.toSourceIndex);
+    const frameArea = Math.min(
+      sourceFrame === undefined ? 0 : sourceFrame.width * sourceFrame.height,
+      targetFrame === undefined ? 0 : targetFrame.width * targetFrame.height,
+    );
+    return edge.overlapAreaPx / Math.max(1, frameArea) < 0.2;
+  }).length;
+  const blockedReasons = [
+    ...(disconnectedSourceIndices.length > 0 ? ['source_selection_incomplete'] : []),
+    ...(alignment.graph.selectedEdgeCount < Math.max(0, request.connectedSourceIndices.length - 1)
+      ? ['alignment_graph_disconnected']
+      : []),
+  ];
+  const seamRisk =
+    blockedReasons.length > 0 || weakOverlapEdgeCount > 0 || alignment.graph.cycleConsistency.rejectedEdgeCount > 0
+      ? blockedReasons.length > 0
+        ? 'high'
+        : 'medium'
+      : 'low';
+  const warnings = [
+    ...(blockedReasons.length > 0 ? ['seam_review_blocked', 'source_excluded'] : []),
+    ...(weakOverlapEdgeCount > 0 ? ['weak_alignment'] : []),
+    ...(alignment.graph.cycleConsistency.rejectedEdgeCount > 0 ? ['ambiguous_matches'] : []),
+  ].sort();
+  const reviewStatus = blockedReasons.length > 0 ? 'blocked' : seamRisk === 'low' ? 'apply_ready' : 'review_required';
+
+  return {
+    blockedReasons,
+    contributionMapArtifact: {
+      artifactId: `${request.previewArtifactId}:contribution-map`,
+      dimensions: { height: outputHeight, width: outputWidth },
+      kind: 'preview',
+      storage: 'temp_cache',
+    },
+    disconnectedSourceIndices,
+    nextActions:
+      reviewStatus === 'apply_ready'
+        ? ['approve_plan']
+        : reviewStatus === 'blocked'
+          ? ['adjust_source_selection', 'inspect_seams']
+          : ['inspect_seams', 'reduce_projection_scope'],
+    overlapEdgeCount: alignment.graph.selectedEdgeCount,
+    reviewStatus,
+    seamMaskArtifact: {
+      artifactId: `${request.previewArtifactId}:seam-mask`,
+      dimensions: { height: outputHeight, width: outputWidth },
+      kind: 'mask',
+      storage: 'temp_cache',
+    },
+    seamRisk,
+    warnings,
+    weakOverlapEdgeCount,
   };
 };
 

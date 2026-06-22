@@ -893,6 +893,10 @@ const copy = {
   libraryKeepersCriteria: '4+ / green',
   librarySurvey: 'Survey',
   createBwProofCopy: 'Create B&W proof copy',
+  editSelectedPick: 'Edit selected pick',
+  editorHandoffReady: 'Editor handoff ready',
+  exportQueued: 'Export queued',
+  exportSelectedPick: 'Queue selected export',
   compareReady: 'A/B compare ready',
   compareSource: 'Source',
   compareSourceFile: 'DSC_0002.NEF',
@@ -917,7 +921,11 @@ const copy = {
   filter: 'Filter',
   virtualCopy: 'Virtual copy',
   repeatableProof: 'Repeatable proof',
+  editorHandoff: 'Editor handoff',
+  exportQueue: 'Export queue',
   allSessionFiles: 'All session files',
+  editorHandoffSummary: 'DSC_0002.NEF opened in editor with survey selection context.',
+  exportQueueSummary: '1 queued / TIFF 16-bit / current edit state',
   keeperFilterSummary: 'Keepers: rating 4+, green label',
   replayProofSummary: 'Fixture cull, filter, survey, and virtual-copy state are captured in one replay.',
   selectedCount: (count: number) => `${count} selected`,
@@ -1122,10 +1130,14 @@ function LibraryWorkflowVisualSmoke() {
   const [viewMode, setViewMode] = useState<'compare' | 'survey'>('compare');
   const [virtualCopyId, setVirtualCopyId] = useState('pending');
   const [isCompareReady, setIsCompareReady] = useState(false);
+  const [openedEditorPath, setOpenedEditorPath] = useState('');
+  const [queuedExportId, setQueuedExportId] = useState('');
   const visibleAssets =
     filterMode === 'keepers' ? libraryWorkflowAssets.filter((asset) => asset.rating >= 4) : libraryWorkflowAssets;
   const activeAsset = libraryWorkflowAssets[1];
   const selectedCount = visibleAssets.filter((asset) => asset.rating >= 4).length;
+  const editorHandoffReady = openedEditorPath === '/proof-roll/DSC_0002.NEF';
+  const exportQueued = queuedExportId === 'export-dsc-0002-current-edit-tiff16';
 
   return (
     <main
@@ -1147,9 +1159,13 @@ function LibraryWorkflowVisualSmoke() {
             data-active-asset={activeAsset.file}
             data-color-label={activeAsset.color}
             data-filter-mode={filterMode}
+            data-opened-editor-path={openedEditorPath}
             data-minimum-rating={filterMode === 'keepers' ? '4' : '0'}
+            data-queued-export-id={queuedExportId}
             data-selected-count={String(selectedCount)}
             data-sidecar-separation={isCompareReady ? 'independent' : 'pending'}
+            data-survey-pick-export-queued={String(exportQueued)}
+            data-survey-pick-opened-editor={String(editorHandoffReady)}
             data-testid="library-workflow-proof"
             data-view-mode={viewMode}
             data-virtual-compare-ready={isCompareReady ? 'true' : 'false'}
@@ -1197,6 +1213,30 @@ function LibraryWorkflowVisualSmoke() {
             >
               <span>{copy.compareVirtualCopy}</span>
               <span className="text-xs text-[#95d7a7]">{copy.compareReady}</span>
+            </button>
+            <button
+              className="flex w-full items-center justify-between rounded-md border border-[#6da7d8]/40 bg-[#1e2e3d] px-3 py-2 text-left text-sm hover:bg-[#27394b]"
+              disabled={viewMode !== 'survey'}
+              onClick={() => {
+                setOpenedEditorPath('/proof-roll/DSC_0002.NEF');
+              }}
+              type="button"
+            >
+              <span>{copy.editSelectedPick}</span>
+              <span className="text-xs text-[#9cc9ee]">
+                {editorHandoffReady ? copy.editorHandoffReady : activeAsset.file}
+              </span>
+            </button>
+            <button
+              className="flex w-full items-center justify-between rounded-md border border-[#c9a958]/40 bg-[#332c1a] px-3 py-2 text-left text-sm hover:bg-[#403620]"
+              disabled={!editorHandoffReady}
+              onClick={() => {
+                setQueuedExportId('export-dsc-0002-current-edit-tiff16');
+              }}
+              type="button"
+            >
+              <span>{copy.exportSelectedPick}</span>
+              <span className="text-xs text-[#e5cf88]">{exportQueued ? copy.exportQueued : copy.pending}</span>
             </button>
           </div>
         </aside>
@@ -1263,6 +1303,20 @@ function LibraryWorkflowVisualSmoke() {
             <div className="rounded-md border border-white/10 bg-white/5 p-3">
               <p className="text-xs text-[#9ba6b2]">{copy.repeatableProof}</p>
               <p>{copy.replayProofSummary}</p>
+            </div>
+            <div
+              className="rounded-md border border-[#6da7d8]/30 bg-[#172231] p-3"
+              data-testid="library-editor-handoff-proof"
+            >
+              <p className="text-xs text-[#9ba6b2]">{copy.editorHandoff}</p>
+              <p>{editorHandoffReady ? copy.editorHandoffSummary : copy.pending}</p>
+            </div>
+            <div
+              className="rounded-md border border-[#c9a958]/30 bg-[#2d2718] p-3"
+              data-testid="library-export-queue-proof"
+            >
+              <p className="text-xs text-[#9ba6b2]">{copy.exportQueue}</p>
+              <p>{exportQueued ? copy.exportQueueSummary : copy.pending}</p>
             </div>
           </div>
         </aside>
