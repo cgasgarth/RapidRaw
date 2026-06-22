@@ -75,11 +75,15 @@ for (const marker of [
   'data-testid="layer-stack-count-summary"',
   'data-collapsed-group-count={groupWorkflowProof.collapsedGroupCount}',
   'data-collapsed-group-ids={groupWorkflowProof.collapsedGroupIds.join',
+  'data-hidden-group-count={groupWorkflowProof.hiddenGroupCount}',
   'data-grouped-layer-count={groupWorkflowProof.groupedLayerCount}',
+  'data-mixed-group-count={groupWorkflowProof.mixedGroupCount}',
+  'data-visible-group-count={groupWorkflowProof.visibleGroupCount}',
   'data-visible-order={groupWorkflowProof.visibleOrder.join',
   "layer-stack-group-row-${row.groupId ?? 'unknown'}",
   'layer-stack-layer-row-${row.id}',
   'data-group-collapsed={String(row.isGroupCollapsed)}',
+  'data-group-visible-state={row.isGroupHeader ? row.visibleState :',
   'data-grouped-layer={String(row.isGroupedLayer)}',
   'buildLayerGroupWorkflowProof(masks, collapsedGroupIds)',
   'data-testid="layer-hidden-count"',
@@ -90,6 +94,7 @@ for (const marker of [
   'data-active-layer-adjustment-keys={activeRow.adjustmentKeys.join',
   'data-active-layer-opacity={activeRow.opacity}',
   'data-active-layer-visible={String(activeRow.visible)}',
+  'data-active-layer-visible-state={activeRow.visibleState}',
   'data-testid="layer-export-readiness-summary"',
   'data-testid="layer-operation-readiness-summary"',
   'data-layer-stack-graph-revision={layerGraphRevision}',
@@ -170,6 +175,8 @@ if (
   collapsedProof.groupCount !== 1 ||
   collapsedProof.groupedLayerCount !== 2 ||
   collapsedProof.collapsedGroupIds.join(',') !== 'group_alpha' ||
+  collapsedProof.visibleGroupCount !== 1 ||
+  collapsedProof.mixedGroupCount !== 0 ||
   collapsedProof.visibleOrder.join(',') !== 'layer_a,layer_b,layer_c'
 ) {
   console.error('Layer group workflow proof did not preserve group, collapse, and visible order metadata.');
@@ -179,6 +186,19 @@ if (
 const ungroupedProof = buildLayerGroupWorkflowProof(ungroupLayerGroup(groupedLayers, 'group_alpha'));
 if (ungroupedProof.groupCount !== 0 || ungroupedProof.groupedLayerCount !== 0) {
   console.error('Layer group workflow proof did not clear group metadata after ungroup.');
+  process.exit(1);
+}
+
+const mixedGroupProof = buildLayerGroupWorkflowProof(
+  groupedLayers.map((layer) => (layer.id === 'layer_b' ? { ...layer, visible: false } : layer)),
+);
+if (
+  mixedGroupProof.mixedGroupCount !== 1 ||
+  mixedGroupProof.visibleGroupCount !== 0 ||
+  mixedGroupProof.hiddenGroupCount !== 0 ||
+  mixedGroupProof.groups[0]?.visibleState !== 'mixed'
+) {
+  console.error('Layer group workflow proof did not expose mixed parent visibility state.');
   process.exit(1);
 }
 
