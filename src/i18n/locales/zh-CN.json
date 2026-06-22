@@ -1147,6 +1147,17 @@
       "removeGps": "移除 GPS 数据",
       "saveWithMetadata": "保存时包含元数据"
     },
+    "outputSharpening": {
+      "amount": "",
+      "enable": "",
+      "radius": "",
+      "targets": {
+        "custom": "",
+        "print": "",
+        "screen": ""
+      },
+      "threshold": ""
+    },
     "readiness": {
       "colorProfile": "",
       "format_other": "",
@@ -1154,6 +1165,8 @@
       "metadataOff": "",
       "metadataOn": "",
       "metadataWithoutGps": "",
+      "outputSharpeningOff": "",
+      "outputSharpeningOn": "",
       "resizeEnabled": "",
       "resizeOff": "",
       "watermarkOff": "",
@@ -1176,6 +1189,7 @@
       "fileSettings": "文件设置",
       "imageSizing": "图像大小",
       "metadata": "元数据",
+      "outputSharpening": "",
       "watermark": "水印"
     },
     "status": {

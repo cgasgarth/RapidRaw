@@ -146,4 +146,5 @@ export interface ExportPreset {
   watermarkSpacing: number;
   watermarkOpacity: number;
   lastExportPath?: string;
+  outputSharpening?: OutputSharpeningSettings | null;
 }

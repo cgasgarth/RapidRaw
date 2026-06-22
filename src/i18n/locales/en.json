@@ -1156,6 +1156,17 @@
       "removeGps": "Remove GPS Data",
       "saveWithMetadata": "Save with Metadata"
     },
+    "outputSharpening": {
+      "amount": "Amount",
+      "enable": "Apply output sharpening",
+      "radius": "Radius",
+      "targets": {
+        "custom": "Custom",
+        "print": "Print",
+        "screen": "Screen"
+      },
+      "threshold": "Threshold"
+    },
     "readiness": {
       "colorProfile": "{{profile}}",
       "format": "{{count}} × {{format}}",
@@ -1165,6 +1176,8 @@
       "metadataOff": "Metadata off",
       "metadataOn": "Metadata kept",
       "metadataWithoutGps": "GPS removed",
+      "outputSharpeningOff": "No output sharpening",
+      "outputSharpeningOn": "Output sharpen {{target}}",
       "resizeEnabled": "{{mode}} {{value}}px",
       "resizeOff": "Full size",
       "watermarkOff": "No watermark",
@@ -1187,6 +1200,7 @@
       "fileSettings": "File Settings",
       "imageSizing": "Image Sizing",
       "metadata": "Metadata",
+      "outputSharpening": "Output Sharpening",
       "watermark": "Watermark"
     },
     "status": {

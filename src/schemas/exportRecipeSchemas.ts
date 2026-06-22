@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { outputSharpeningSettingsSchema } from './outputSharpeningSchemas';
 import { EXPORT_RECIPE_FILE_FORMAT_IDS, ExportFileFormatId } from '../utils/exportFormatIds';
 
 export const exportFileFormatSchema = z.enum(EXPORT_RECIPE_FILE_FORMAT_IDS);
@@ -31,6 +32,7 @@ export const exportRecipeSchema = z
     keepMetadata: z.boolean(),
     lastExportPath: z.string().trim().min(1).optional(),
     name: z.string().trim().min(1),
+    outputSharpening: outputSharpeningSettingsSchema.nullable().default(null),
     preserveFolders: z.boolean().default(false),
     preserveTimestamps: z.boolean().default(false),
     resizeMode: exportResizeModeSchema,

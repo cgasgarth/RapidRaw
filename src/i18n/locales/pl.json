@@ -1234,6 +1234,17 @@
       "removeGps": "Usuń dane GPS",
       "saveWithMetadata": "Zapisz z metadanymi"
     },
+    "outputSharpening": {
+      "amount": "",
+      "enable": "",
+      "radius": "",
+      "targets": {
+        "custom": "",
+        "print": "",
+        "screen": ""
+      },
+      "threshold": ""
+    },
     "readiness": {
       "colorProfile": "",
       "format_one": "",
@@ -1244,6 +1255,8 @@
       "metadataOff": "",
       "metadataOn": "",
       "metadataWithoutGps": "",
+      "outputSharpeningOff": "",
+      "outputSharpeningOn": "",
       "resizeEnabled": "",
       "resizeOff": "",
       "watermarkOff": "",
@@ -1266,6 +1279,7 @@
       "fileSettings": "Ustawienia pliku",
       "imageSizing": "Rozmiar obrazu",
       "metadata": "Metadane",
+      "outputSharpening": "",
       "watermark": "Znak wodny"
     },
     "status": {

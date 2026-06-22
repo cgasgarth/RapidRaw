@@ -5,11 +5,18 @@ import {
   type ExportPreset,
   FILE_FORMATS,
   FileFormats,
+  type OutputSharpeningSettings,
   WatermarkAnchor,
 } from '../components/ui/ExportImportProperties';
 
 const FILE_FORMAT_IDS = new Set<string>(FILE_FORMATS.map((format) => format.id));
 const WATERMARK_ANCHORS = new Set<string>(Object.values(WatermarkAnchor));
+const DEFAULT_OUTPUT_SHARPENING: OutputSharpeningSettings = {
+  amount: 35,
+  radiusPx: 0.7,
+  target: 'screen',
+  threshold: 0.02,
+};
 
 const isFileFormat = (value: string): value is FileFormats => FILE_FORMAT_IDS.has(value);
 const isWatermarkAnchor = (value: string): value is WatermarkAnchor => WATERMARK_ANCHORS.has(value);
@@ -34,6 +41,7 @@ export function useExportSettings() {
   const [watermarkScale, setWatermarkScale] = useState(10);
   const [watermarkSpacing, setWatermarkSpacing] = useState(5);
   const [watermarkOpacity, setWatermarkOpacity] = useState(75);
+  const [outputSharpening, setOutputSharpening] = useState<OutputSharpeningSettings | null>(null);
 
   const handleApplyPreset = useCallback((preset: ExportPreset) => {
     setColorProfile(preset.colorProfile ?? ExportColorProfile.Srgb);
@@ -57,6 +65,7 @@ export function useExportSettings() {
     setWatermarkScale(preset.watermarkScale);
     setWatermarkSpacing(preset.watermarkSpacing);
     setWatermarkOpacity(preset.watermarkOpacity);
+    setOutputSharpening(preset.outputSharpening ?? null);
   }, []);
 
   const currentSettingsObject = useMemo(
@@ -80,6 +89,7 @@ export function useExportSettings() {
       watermarkScale,
       watermarkSpacing,
       watermarkOpacity,
+      outputSharpening,
     }),
     [
       colorProfile,
@@ -101,8 +111,17 @@ export function useExportSettings() {
       watermarkScale,
       watermarkSpacing,
       watermarkOpacity,
+      outputSharpening,
     ],
   );
+
+  const enableDefaultOutputSharpening = useCallback(() => {
+    setOutputSharpening(DEFAULT_OUTPUT_SHARPENING);
+  }, []);
+
+  const updateOutputSharpening = useCallback((updates: Partial<OutputSharpeningSettings>) => {
+    setOutputSharpening((current) => ({ ...DEFAULT_OUTPUT_SHARPENING, ...current, ...updates }));
+  }, []);
 
   return {
     colorProfile,
@@ -143,6 +162,10 @@ export function useExportSettings() {
     setWatermarkSpacing,
     watermarkOpacity,
     setWatermarkOpacity,
+    outputSharpening,
+    setOutputSharpening,
+    enableDefaultOutputSharpening,
+    updateOutputSharpening,
     handleApplyPreset,
     currentSettingsObject,
   };

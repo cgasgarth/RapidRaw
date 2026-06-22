@@ -217,6 +217,7 @@
     "check:reference-images": "bun tests/integration/checks/check-reference-image-fixtures.ts",
     "check:public-fixture-manifest": "bun tests/integration/checks/check-public-fixture-manifest.ts",
     "check:output-sharpening": "bun tests/integration/checks/check-output-sharpening-fixtures.ts",
+    "check:output-sharpening-export-ui": "bun tests/integration/checks/check-output-sharpening-export-ui.ts",
     "check:white-balance-picker": "bun tests/integration/checks/check-white-balance-picker-fixtures.ts",
     "check:white-balance-tone-runtime-proof": "bun tests/integration/checks/check-white-balance-tone-runtime-proof.ts",
     "check:curves-levels-runtime-proof": "bun tests/integration/checks/check-curves-levels-runtime-proof.ts",
