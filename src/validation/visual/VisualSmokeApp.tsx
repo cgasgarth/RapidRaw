@@ -565,7 +565,7 @@ const filmLookParityProofCases = [
   },
 ] as const;
 interface LayerWorkflowState {
-  blend: string;
+  blend: LayerWorkflowBlendMode;
   groupId?: string;
   groupName?: string;
   mask: string;
@@ -573,6 +573,9 @@ interface LayerWorkflowState {
   opacity: number;
   visible: boolean;
 }
+
+const layerWorkflowSupportedBlendModes = ['normal', 'multiply', 'screen', 'overlay', 'soft_light'] as const;
+type LayerWorkflowBlendMode = (typeof layerWorkflowSupportedBlendModes)[number];
 
 const layerWorkflowFallbackLayer: LayerWorkflowState = {
   blend: 'soft_light',
@@ -1396,6 +1399,7 @@ function LayerStackWorkflowVisualSmoke() {
   const [exportParity, setExportParity] = useState('pending');
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<string[]>([]);
   const [copyMaskApplied, setCopyMaskApplied] = useState(false);
+  const [blendModeHistory, setBlendModeHistory] = useState<Array<LayerWorkflowBlendMode>>([]);
 
   const addLayer = () => {
     const newLayer: LayerWorkflowState = {
@@ -1420,6 +1424,10 @@ function LayerStackWorkflowVisualSmoke() {
       currentLayers.map((layer) => (layer.name === selectedLayer ? { ...layer, ...update } : layer)),
     );
     if (update.name !== undefined) setSelectedLayer(update.name);
+  };
+  const selectBlendMode = (blend: LayerWorkflowBlendMode) => {
+    updateSelectedLayer({ blend });
+    setBlendModeHistory((currentHistory) => [...currentHistory, blend]);
   };
   const moveSelectedLayerDown = () => {
     setLayers((currentLayers) => {
@@ -1499,6 +1507,7 @@ function LayerStackWorkflowVisualSmoke() {
             className="space-y-2"
             data-active-layer={selectedLayerState.name}
             data-blend-mode={selectedLayerState.blend}
+            data-blend-mode-history={blendModeHistory.join(',')}
             data-collapsed-group-count={String(collapsedGroupIds.length)}
             data-copied-mask-editable={String(copyMaskApplied)}
             data-copied-mask-visible={String(copyMaskApplied && selectedLayerState.visible)}
@@ -1512,6 +1521,8 @@ function LayerStackWorkflowVisualSmoke() {
             data-mask={selectedLayerState.mask}
             data-mixed-group-count={localPolishVisibleState === 'mixed' ? '1' : '0'}
             data-opacity={String(selectedLayerState.opacity)}
+            data-supported-blend-mode-count={String(layerWorkflowSupportedBlendModes.length)}
+            data-supported-blend-modes={layerWorkflowSupportedBlendModes.join(',')}
             data-testid="layer-stack-workflow-proof"
             data-visible-group-count={localPolishVisibleState === 'visible' ? '1' : '0'}
             data-visible-count={String(visibleLayerCount)}
@@ -1595,12 +1606,30 @@ function LayerStackWorkflowVisualSmoke() {
             <button
               className="rounded-md border border-white/10 bg-[#20252b] px-3 py-2 text-sm"
               onClick={() => {
-                updateSelectedLayer({ blend: 'overlay' });
+                selectBlendMode('overlay');
               }}
               type="button"
             >
               {copy.layerBlendOverlay}
             </button>
+            <div className="col-span-2 grid grid-cols-5 gap-1" data-testid="layer-stack-blend-mode-picker">
+              {layerWorkflowSupportedBlendModes.map((blend) => (
+                <button
+                  className={`rounded-md border px-2 py-2 text-xs ${
+                    selectedLayerState.blend === blend
+                      ? 'border-[#78d4ff] bg-[#24303a] text-white'
+                      : 'border-white/10 bg-[#20252b] text-[#cbd5df]'
+                  }`}
+                  key={blend}
+                  onClick={() => {
+                    selectBlendMode(blend);
+                  }}
+                  type="button"
+                >
+                  {formatLayerBlend(blend)}
+                </button>
+              ))}
+            </div>
             <button
               className="rounded-md border border-white/10 bg-[#20252b] px-3 py-2 text-sm"
               onClick={copySkyMaskToSelectedLayer}

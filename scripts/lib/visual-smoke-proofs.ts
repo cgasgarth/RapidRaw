@@ -552,6 +552,7 @@ export const superResolutionPrivateRawReviewProofSchema = z.object({
 export const layerStackWorkflowProofSchema = z.object({
   activeLayer: z.literal('Proof polish'),
   blendMode: z.literal('overlay'),
+  blendModeHistory: z.literal('normal,multiply,screen,soft_light,overlay'),
   collapsedGroupCount: z.literal('0'),
   copiedMaskEditable: z.literal('true'),
   copiedMaskVisible: z.literal('true'),
@@ -565,6 +566,8 @@ export const layerStackWorkflowProofSchema = z.object({
   mask: z.literal('Sky gradient copy'),
   mixedGroupCount: z.literal('1'),
   opacity: z.literal('64'),
+  supportedBlendModeCount: z.literal('5'),
+  supportedBlendModes: z.literal('normal,multiply,screen,overlay,soft_light'),
   visibleGroupCount: z.literal('0'),
   visibleCount: z.literal('4'),
 });

@@ -1545,7 +1545,9 @@ async function prepareScenario(page, mode) {
     await page.getByRole('button', { name: 'Duplicate layer' }).click();
     await page.getByRole('button', { name: 'Rename proof' }).click();
     await page.getByRole('button', { name: 'Opacity 64%' }).click();
-    await page.getByRole('button', { name: 'Blend overlay' }).click();
+    for (const blendMode of ['normal', 'multiply', 'screen', 'soft light', 'overlay']) {
+      await page.getByTestId('layer-stack-blend-mode-picker').getByRole('button', { name: blendMode }).click();
+    }
     await page.getByRole('button', { name: 'Copy mask' }).click();
     layerStackWorkflowProofSchema.parse(
       await page.getByTestId('layer-stack-workflow-proof').evaluate((element) => ({ ...element.dataset })),
