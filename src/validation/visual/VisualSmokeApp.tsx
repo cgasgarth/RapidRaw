@@ -512,6 +512,8 @@ const filmLookParityProofCases = [
 ] as const;
 interface LayerWorkflowState {
   blend: string;
+  groupId?: string;
+  groupName?: string;
   mask: string;
   name: string;
   opacity: number;
@@ -526,8 +528,16 @@ const layerWorkflowFallbackLayer: LayerWorkflowState = {
   visible: true,
 };
 const layerWorkflowInitialStack = [
-  layerWorkflowFallbackLayer,
-  { blend: 'multiply', mask: 'Subject brush', name: 'Portrait burn', opacity: 42, visible: true },
+  { ...layerWorkflowFallbackLayer, groupId: 'group_local_polish', groupName: 'Local polish' },
+  {
+    blend: 'multiply',
+    groupId: 'group_local_polish',
+    groupName: 'Local polish',
+    mask: 'Subject brush',
+    name: 'Portrait burn',
+    opacity: 42,
+    visible: true,
+  },
   { blend: 'screen', mask: 'Window radial', name: 'Window lift', opacity: 36, visible: true },
 ] satisfies LayerWorkflowState[];
 const FILM_LOOK_PARITY_TITLE = 'Rendered parity proof';
@@ -803,7 +813,11 @@ const copy = {
   layerRenameProof: 'Rename proof',
   layerOpacity64: 'Opacity 64%',
   layerBlendOverlay: 'Blend overlay',
-  layerGroupingDeferred: 'Groups deferred',
+  layerCollapseGroup: 'Collapse group',
+  layerCreateGroup: 'Create group',
+  layerGroupCount: (count: number) => `${count} layers`,
+  layerGroupingActive: 'Group Local polish / {{count}} layers',
+  layerLocalPolish: 'Local polish',
   layeredPreview: 'Layered preview',
   layerWorkflowDescription: 'Mask, blend, opacity, and order state captured in one smoke path.',
   layerVisibleCount: (count: number) => `${count} visible`,
@@ -1175,6 +1189,7 @@ function LayerStackWorkflowVisualSmoke() {
   const [layers, setLayers] = useState<LayerWorkflowState[]>(() => [...layerWorkflowInitialStack]);
   const [selectedLayer, setSelectedLayer] = useState<string>(layerWorkflowFallbackLayer.name);
   const [exportParity, setExportParity] = useState('pending');
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<string[]>([]);
 
   const addLayer = () => {
     const newLayer: LayerWorkflowState = {
@@ -1218,9 +1233,24 @@ function LayerStackWorkflowVisualSmoke() {
       currentLayers.map((layer) => (layer.name === selectedLayer ? { ...layer, visible: !layer.visible } : layer)),
     );
   };
+  const createLocalPolishGroup = () => {
+    setLayers((currentLayers) =>
+      currentLayers.map((layer, index) =>
+        index < 2 ? { ...layer, groupId: 'group_local_polish', groupName: 'Local polish' } : layer,
+      ),
+    );
+    setSelectedLayer('Sky recovery');
+  };
+  const toggleLocalPolishCollapsed = () => {
+    setCollapsedGroupIds((currentGroupIds) =>
+      currentGroupIds.includes('group_local_polish') ? [] : ['group_local_polish'],
+    );
+  };
 
   const visibleLayerCount = layers.filter((layer) => layer.visible).length;
   const selectedLayerState = layers.find((layer) => layer.name === selectedLayer) ?? layerWorkflowFallbackLayer;
+  const groupedLayerCount = layers.filter((layer) => layer.groupId === 'group_local_polish').length;
+  const localPolishCollapsed = collapsedGroupIds.includes('group_local_polish');
 
   return (
     <main
@@ -1238,35 +1268,56 @@ function LayerStackWorkflowVisualSmoke() {
             className="space-y-2"
             data-active-layer={selectedLayerState.name}
             data-blend-mode={selectedLayerState.blend}
-            data-grouping-state="deferred"
+            data-collapsed-group-count={String(collapsedGroupIds.length)}
+            data-grouping-state={groupedLayerCount > 0 ? 'active' : 'ungrouped'}
+            data-grouped-layer-count={String(groupedLayerCount)}
             data-layer-count={String(layers.length)}
             data-mask={selectedLayerState.mask}
             data-opacity={String(selectedLayerState.opacity)}
             data-testid="layer-stack-workflow-proof"
             data-visible-count={String(visibleLayerCount)}
           >
-            {layers.map((layer, index) => (
+            {groupedLayerCount > 0 && (
               <button
-                className={`w-full rounded-md border px-3 py-2 text-left text-sm ${
-                  selectedLayer === layer.name
-                    ? 'border-[#78d4ff] bg-[#24303a] text-white'
-                    : 'border-white/10 bg-[#1b2026] text-[#cbd5df]'
-                }`}
-                key={layer.name}
-                onClick={() => {
-                  setSelectedLayer(layer.name);
-                }}
+                className="w-full rounded-md border border-[#f2be4e]/40 bg-[#2c2a20] px-3 py-2 text-left text-sm text-white"
+                data-collapsed={String(localPolishCollapsed)}
+                data-testid="layer-stack-visual-group-row"
+                onClick={toggleLocalPolishCollapsed}
                 type="button"
               >
                 <span className="flex items-center justify-between">
-                  <span>{layer.name}</span>
-                  <span className="text-xs text-[#8d97a3]">#{index + 1}</span>
-                </span>
-                <span className="mt-1 block text-xs text-[#8d97a3]">
-                  {layer.mask} / {formatLayerBlend(layer.blend)} / {layer.opacity}%
+                  <span>{copy.layerLocalPolish}</span>
+                  <span className="text-xs text-[#d7c37f]">{copy.layerGroupCount(groupedLayerCount)}</span>
                 </span>
               </button>
-            ))}
+            )}
+            {layers.map((layer, index) => {
+              if (layer.groupId === 'group_local_polish' && localPolishCollapsed) return null;
+              return (
+                <button
+                  className={`w-full rounded-md border px-3 py-2 text-left text-sm ${
+                    selectedLayer === layer.name
+                      ? 'border-[#78d4ff] bg-[#24303a] text-white'
+                      : 'border-white/10 bg-[#1b2026] text-[#cbd5df]'
+                  }`}
+                  data-group-id={layer.groupId ?? ''}
+                  data-testid={`layer-stack-visual-layer-row-${index}`}
+                  key={layer.name}
+                  onClick={() => {
+                    setSelectedLayer(layer.name);
+                  }}
+                  type="button"
+                >
+                  <span className="flex items-center justify-between">
+                    <span>{layer.name}</span>
+                    <span className="text-xs text-[#8d97a3]">#{index + 1}</span>
+                  </span>
+                  <span className="mt-1 block text-xs text-[#8d97a3]">
+                    {layer.mask} / {formatLayerBlend(layer.blend)} / {layer.opacity}%
+                  </span>
+                </button>
+              );
+            })}
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2">
             <button
@@ -1312,6 +1363,20 @@ function LayerStackWorkflowVisualSmoke() {
             </button>
             <button
               className="rounded-md border border-white/10 bg-[#20252b] px-3 py-2 text-sm"
+              onClick={createLocalPolishGroup}
+              type="button"
+            >
+              {copy.layerCreateGroup}
+            </button>
+            <button
+              className="rounded-md border border-white/10 bg-[#20252b] px-3 py-2 text-sm"
+              onClick={toggleLocalPolishCollapsed}
+              type="button"
+            >
+              {copy.layerCollapseGroup}
+            </button>
+            <button
+              className="rounded-md border border-white/10 bg-[#20252b] px-3 py-2 text-sm"
               onClick={moveSelectedLayerDown}
               type="button"
             >
@@ -1325,8 +1390,12 @@ function LayerStackWorkflowVisualSmoke() {
               {copy.layerToggle}
             </button>
           </div>
-          <div className="mt-3 rounded-md border border-white/10 bg-[#1b2026] px-3 py-2 text-xs text-[#aab2bd]">
-            {copy.layerGroupingDeferred}
+          <div
+            className="mt-3 rounded-md border border-white/10 bg-[#1b2026] px-3 py-2 text-xs text-[#aab2bd]"
+            data-collapsed-group-ids={collapsedGroupIds.join(',')}
+            data-testid="layer-stack-visual-group-proof"
+          >
+            {copy.layerGroupingActive.replace('{{count}}', String(groupedLayerCount))}
           </div>
         </aside>
 

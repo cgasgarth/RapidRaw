@@ -11,6 +11,11 @@
     "previewExportHash": "sha256:62b1a1a3b49900f19fe56696a457b5a35cdb1588bf0636af604b36d57745756e",
     "sidecarArtifactId": "layer_stack_preview_export_parity_v1"
   },
+  "layerGrouping": {
+    "collapsedGroupCount": 0,
+    "groupedLayerCount": 2,
+    "visualGroupingState": "active"
+  },
   "schemaVersion": 1,
   "validationCommands": [
     "bun run check:layer-stack-commands",
