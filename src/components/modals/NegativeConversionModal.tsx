@@ -1007,6 +1007,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setConversionScope('all');
       setIncludedPathSet(getInitialIncludedPaths(targetPaths));
       setFrameExposureOffsetByFrameId({});
+      setQcDecisionByFrameId({});
     }, 300);
     return () => {
       window.clearTimeout(timer);
@@ -1308,6 +1309,27 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       nextDecisions[frameId] = decision;
       return nextDecisions;
     });
+    setAcceptedBatchPlanJson(null);
+  };
+
+  const handleSetVisibleQcDecision = (decision: NegativeLabQcDecision) => {
+    const visibleFrameIds = visibleFrameHealthRows.map((row) => row.frameId);
+    if (visibleFrameIds.length === 0) return;
+
+    setQcDecisionByFrameId((currentDecisions) => {
+      if (decision === 'pending') {
+        const visibleFrameIdSet = new Set(visibleFrameIds);
+        return Object.fromEntries(
+          Object.entries(currentDecisions).filter(([frameId]) => !visibleFrameIdSet.has(frameId)),
+        );
+      }
+      const nextDecisions = { ...currentDecisions };
+      for (const frameId of visibleFrameIds) {
+        nextDecisions[frameId] = decision;
+      }
+      return nextDecisions;
+    });
+    setAcceptedBatchPlanJson(null);
   };
 
   const handleFrameExposureOffsetChange = (frameId: string, value: number) => {
@@ -1829,6 +1851,54 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 visibleCount: visibleFrameHealthRows.length,
               })}
             </span>
+            <div
+              className="col-span-2 grid grid-cols-3 gap-1"
+              data-visible-frame-count={visibleFrameHealthRows.length}
+              data-testid="negative-lab-qc-visible-actions"
+            >
+              {(
+                [
+                  {
+                    decision: 'approved',
+                    label: t('modals.negativeConversion.qcDecisionApproveVisible', {
+                      count: visibleFrameHealthRows.length,
+                    }),
+                    testId: 'negative-lab-qc-approved-visible',
+                  },
+                  {
+                    decision: 'rejected',
+                    label: t('modals.negativeConversion.qcDecisionRejectVisible', {
+                      count: visibleFrameHealthRows.length,
+                    }),
+                    testId: 'negative-lab-qc-rejected-visible',
+                  },
+                  {
+                    decision: 'pending',
+                    label: t('modals.negativeConversion.qcDecisionResetVisible', {
+                      count: visibleFrameHealthRows.length,
+                    }),
+                    testId: 'negative-lab-qc-pending-visible',
+                  },
+                ] satisfies Array<{
+                  decision: NegativeLabQcDecision;
+                  label: string;
+                  testId: string;
+                }>
+              ).map(({ decision, label, testId }) => (
+                <button
+                  className="rounded bg-bg-primary px-1.5 py-1 text-text-tertiary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                  data-testid={testId}
+                  disabled={visibleFrameHealthRows.length === 0}
+                  key={decision}
+                  onClick={() => {
+                    handleSetVisibleQcDecision(decision);
+                  }}
+                  type="button"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="grid gap-1">
             {visibleFrameHealthRows.map((row: NegativeLabFrameHealthEntry, index) => (
