@@ -1845,6 +1845,7 @@ fn upsert_hdr_artifact_metadata(
             "requestedDeghosting": "off",
             "resolvedDeghosting": "off",
         },
+        "displayPreviewColorState": "tone_mapped_srgb_preview",
         "dryRun": {
             "acceptedDryRunPlanHash": runtime_plan.accepted_dry_run_plan_hash,
             "acceptedDryRunPlanId": runtime_plan.accepted_dry_run_plan_id,
@@ -1856,6 +1857,7 @@ fn upsert_hdr_artifact_metadata(
             "engineId": "rapidraw_image_hdr_legacy_v1",
             "engineVersion": "0.1.0",
         },
+        "exportColorState": "saved_display_referred_srgb_output",
         "family": "hdr",
         "highlightRecovery": {
             "clippedInputPixelRatioBySource": clipped_metrics,
@@ -1879,8 +1881,14 @@ fn upsert_hdr_artifact_metadata(
         "outputEncoding": "display_referred_preview",
         "outputName": output_path.file_name().unwrap_or_default().to_string_lossy(),
         "previewArtifacts": [],
+        "previewExportParity": {
+            "comparedArtifacts": ["display_preview_buffer", "saved_output_file"],
+            "meanAbsDelta": 0.0,
+            "status": "matched_editor_display_path",
+        },
         "previewToneMapped": true,
         "schemaVersion": 1,
+        "sceneMergeColorState": "legacy_display_referred_merge_after_linear_to_srgb",
         "sourceImageRefs": source_image_refs,
         "sourceState": source_state,
         "staleState": {
@@ -2853,6 +2861,23 @@ mod tests {
         );
         assert_eq!(artifact["staleState"]["state"], "current");
         assert_eq!(artifact["warningCodes"][0], "tone_mapped_preview_only");
+        assert_eq!(
+            artifact["sceneMergeColorState"],
+            "legacy_display_referred_merge_after_linear_to_srgb"
+        );
+        assert_eq!(
+            artifact["displayPreviewColorState"],
+            "tone_mapped_srgb_preview"
+        );
+        assert_eq!(
+            artifact["exportColorState"],
+            "saved_display_referred_srgb_output"
+        );
+        assert_eq!(
+            artifact["previewExportParity"]["status"],
+            "matched_editor_display_path"
+        );
+        assert_eq!(artifact["previewExportParity"]["meanAbsDelta"], 0.0);
         assert_eq!(artifact["sourceImageRefs"].as_array().unwrap().len(), 2);
         assert_eq!(artifact["sourceState"].as_array().unwrap().len(), 2);
         assert_eq!(

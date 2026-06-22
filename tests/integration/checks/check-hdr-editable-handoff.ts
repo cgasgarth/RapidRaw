@@ -25,6 +25,10 @@ for (const marker of [
   'deghostReviewRequired: isDeghostReviewRequired',
   'data-deghost-review-accepted={String(handoffSummary.deghostReviewAccepted)}',
   'data-deghost-review-required={String(handoffSummary.deghostReviewRequired)}',
+  'data-display-preview-color-state={handoffSummary.displayPreviewColorState}',
+  'data-export-color-state={handoffSummary.exportColorState}',
+  'data-preview-export-parity-status={handoffSummary.previewExportParityStatus}',
+  'data-scene-merge-color-state={handoffSummary.sceneMergeColorState}',
   'data-testid="hdr-editable-handoff-provenance"',
   "openInEditor: t('modals.hdr.openInEditor')",
   'savedPath={savedPath}',
@@ -43,6 +47,8 @@ for (const marker of ['props.handleImageSelect(path);', 'onSave={props.handleSav
 for (const marker of [
   '"editableDerivedAssetId": artifact_id',
   '"capabilityLevel": "runtime_apply_capable"',
+  '"previewExportParity"',
+  '"sceneMergeColorState": "legacy_display_referred_merge_after_linear_to_srgb"',
   'write_hdr_output_sidecar_records_editable_artifact_provenance',
 ]) {
   if (!hdrRuntimeSource.includes(marker)) {
@@ -53,8 +59,10 @@ for (const marker of [
 for (const marker of [
   'hdr-artifact-handoff',
   'hdr-editable-handoff-provenance',
+  'displayPreviewColorState',
   '/tmp/rawengine-hdr-smoke.tif',
   'hdr-private-raw-artifact-handoff',
+  'previewExportParityStatus',
 ]) {
   if (!visualSmokeSource.includes(marker)) {
     throw new Error(`HDR visual handoff smoke marker missing: ${marker}`);
