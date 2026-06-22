@@ -1,11 +1,26 @@
 #!/usr/bin/env bun
 
+import { z } from 'zod';
+
 import { HdrAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/hdrAppServerRuntime.ts';
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
 
 const hdrRoutePair = getComputationalMergeAppServerRoutePairSummary('hdr');
+const hdrDerivedSourceDryRunTranscriptSchema = z
+  .object({
+    blockCodes: z.array(z.string().trim().min(1)),
+    bracketReadiness: z.enum(['accepted', 'blocked', 'warning']),
+    displayPreviewArtifactId: z.string().trim().min(1),
+    exportPreviewArtifactId: z.string().trim().min(1),
+    mutates: z.literal(false),
+    reviewStatus: z.enum(['apply_ready', 'blocked', 'review_required']),
+    scenario: z.enum(['blocked_apply', 'blocked_bracket', 'ready', 'warning_motion']),
+    sceneLinearArtifactId: z.string().trim().min(1),
+    warningCodes: z.array(z.string().trim().min(1)),
+  })
+  .strict();
 const WIDTH = 48;
 const HEIGHT = 36;
 const BRACKETS = [
@@ -65,6 +80,70 @@ const dryRun = bus.execute({
   toolName: hdrRoutePair.dryRunToolName,
 });
 if (dryRun.kind !== 'dry_run') throw new Error('Expected HDR dry-run dispatch result.');
+const warningTranscript = buildDerivedSourceTranscript('warning_motion', dryRun);
+if (
+  warningTranscript.reviewStatus !== 'review_required' ||
+  !warningTranscript.warningCodes.includes('motion_detected') ||
+  !warningTranscript.warningCodes.includes('tone_mapped_preview_only')
+) {
+  throw new Error(`Unexpected warning HDR dry-run transcript: ${JSON.stringify(warningTranscript)}.`);
+}
+assertPreviewArtifactHandle(dryRun, warningTranscript.sceneLinearArtifactId);
+assertPreviewArtifactHandle(dryRun, warningTranscript.displayPreviewArtifactId);
+assertPreviewArtifactHandle(dryRun, warningTranscript.exportPreviewArtifactId);
+
+const readyCommand = {
+  ...dryRunCommand,
+  commandId: 'command_hdr_app_server_runtime_ready',
+  correlationId: 'corr_hdr_app_server_runtime_ready',
+  parameters: {
+    ...dryRunCommand.parameters,
+    deghosting: 'off',
+    toneMapPreview: false,
+  },
+};
+const readyDryRun = bus.execute({
+  request: buildRequest(readyCommand, frames, 1_000_000_000),
+  toolName: hdrRoutePair.dryRunToolName,
+});
+if (readyDryRun.kind !== 'dry_run') throw new Error('Expected ready HDR dry-run dispatch result.');
+const readyTranscript = buildDerivedSourceTranscript('ready', readyDryRun);
+if (readyTranscript.reviewStatus !== 'apply_ready' || readyTranscript.warningCodes.length !== 0) {
+  throw new Error(`Unexpected ready HDR dry-run transcript: ${JSON.stringify(readyTranscript)}.`);
+}
+
+const narrowExposureValues = [-0.2, 0, 0.2];
+const narrowSources = dryRunCommand.parameters.sources.map((source, index) => ({
+  ...source,
+  exposureEv: narrowExposureValues[index] ?? 0,
+}));
+const narrowFrames = frames.map((frame, index) => ({
+  ...frame,
+  exposureEv: narrowExposureValues[index] ?? 0,
+}));
+const blockedCommand = {
+  ...dryRunCommand,
+  commandId: 'command_hdr_app_server_runtime_blocked',
+  correlationId: 'corr_hdr_app_server_runtime_blocked',
+  parameters: {
+    ...dryRunCommand.parameters,
+    sources: narrowSources,
+  },
+};
+const blockedBus = new HdrAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1);
+const blockedDryRun = blockedBus.execute({
+  request: buildRequest(blockedCommand, narrowFrames),
+  toolName: hdrRoutePair.dryRunToolName,
+});
+if (blockedDryRun.kind !== 'dry_run') throw new Error('Expected blocked HDR dry-run dispatch result.');
+const blockedTranscript = buildDerivedSourceTranscript('blocked_bracket', blockedDryRun);
+if (
+  blockedTranscript.reviewStatus !== 'blocked' ||
+  blockedTranscript.bracketReadiness !== 'blocked' ||
+  !blockedTranscript.blockCodes.includes('not_a_bracket')
+) {
+  throw new Error(`Unexpected blocked HDR dry-run transcript: ${JSON.stringify(blockedTranscript)}.`);
+}
 
 const applyCommand = {
   ...dryRunCommand,
@@ -97,6 +176,32 @@ expectThrows('unaccepted HDR apply plan', () =>
     toolName: hdrRoutePair.applyToolName,
   }),
 );
+expectThrows('blocked HDR derived-source apply', () =>
+  blockedBus.execute({
+    request: buildRequest(
+      {
+        ...blockedCommand,
+        approval: {
+          approvalClass: ApprovalClass.EditApply,
+          reason: 'HDR blocked derived-source review must not apply.',
+          state: 'approved',
+        },
+        dryRun: false,
+        parameters: {
+          ...blockedCommand.parameters,
+          acceptedDryRunPlanHash: blockedDryRun.acceptedDryRunPlanHash,
+          acceptedDryRunPlanId: blockedDryRun.dryRun.dryRunResult.mergePlan.planId,
+        },
+      },
+      narrowFrames,
+    ),
+    toolName: hdrRoutePair.applyToolName,
+  }),
+);
+hdrDerivedSourceDryRunTranscriptSchema.parse({
+  ...blockedTranscript,
+  scenario: 'blocked_apply',
+});
 
 console.log(
   JSON.stringify({
@@ -107,20 +212,49 @@ console.log(
       .update(new Uint8Array(applied.apply.mergedPixels.buffer))
       .digest('hex'),
     planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+    reviewScenarios: [
+      readyTranscript.scenario,
+      warningTranscript.scenario,
+      blockedTranscript.scenario,
+      'blocked_apply',
+    ],
   }),
 );
 
-function buildRequest(command) {
+function buildRequest(command, requestFrames = frames, requestMotionThreshold = 0.03) {
   return {
     clipThreshold: 0.99,
     command,
-    frames,
-    motionThreshold: 0.03,
+    frames: requestFrames,
+    motionThreshold: requestMotionThreshold,
     outputArtifactId: 'artifact_hdr_app_server_runtime_output',
     previewArtifactId: 'artifact_hdr_app_server_runtime_preview',
     searchRadiusPx: 5,
     sensorWhiteRadiance: 1,
   };
+}
+
+function buildDerivedSourceTranscript(scenario, toolResult) {
+  if (toolResult.kind !== 'dry_run') throw new Error(`Expected ${scenario} HDR dry-run.`);
+  const review = toolResult.dryRun.provenance.derivedSourceReview;
+  return hdrDerivedSourceDryRunTranscriptSchema.parse({
+    blockCodes: review.blockCodes,
+    bracketReadiness: review.bracketReadiness,
+    displayPreviewArtifactId: review.displayPreviewArtifact.artifactId,
+    exportPreviewArtifactId: review.exportPreviewArtifact.artifactId,
+    mutates: toolResult.dryRun.dryRunResult.mutates,
+    reviewStatus: review.reviewStatus,
+    scenario,
+    sceneLinearArtifactId: review.sceneLinearArtifact.artifactId,
+    warningCodes: review.warningCodes,
+  });
+}
+
+function assertPreviewArtifactHandle(toolResult, artifactId) {
+  if (toolResult.kind !== 'dry_run') throw new Error('Expected dry-run artifact handle source.');
+  if (!toolResult.dryRun.dryRunResult.previewArtifacts.some((artifact) => artifact.artifactId === artifactId)) {
+    throw new Error(`Expected HDR dry-run preview artifacts to include ${artifactId}.`);
+  }
 }
 
 function createScene(width, height) {

@@ -145,19 +145,26 @@ const narrowRequiredDryRunCommand = {
     sources: narrowBracketSources,
   },
 };
-assertThrows(
-  () =>
-    buildHdrRuntimeDryRunV1({
-      clipThreshold: CLIP_THRESHOLD,
-      command: narrowRequiredDryRunCommand,
-      frames: narrowBracketFrames,
-      motionThreshold: MOTION_THRESHOLD,
-      outputArtifactId: 'artifact_hdr_runtime_required_narrow_output',
-      previewArtifactId: 'artifact_hdr_runtime_required_narrow_preview',
-      searchRadiusPx: SEARCH_RADIUS_PX,
-      sensorWhiteRadiance: SENSOR_WHITE_RADIANCE,
-    }),
-  'required dry-run bracket policy',
+const blockedRequiredDryRun = buildHdrRuntimeDryRunV1({
+  clipThreshold: CLIP_THRESHOLD,
+  command: narrowRequiredDryRunCommand,
+  frames: narrowBracketFrames,
+  motionThreshold: MOTION_THRESHOLD,
+  outputArtifactId: 'artifact_hdr_runtime_required_narrow_output',
+  previewArtifactId: 'artifact_hdr_runtime_required_narrow_preview',
+  searchRadiusPx: SEARCH_RADIUS_PX,
+  sensorWhiteRadiance: SENSOR_WHITE_RADIANCE,
+});
+assertEqual(blockedRequiredDryRun.dryRunResult.mutates, false, 'blocked required dry-run mutates');
+assertEqual(
+  blockedRequiredDryRun.provenance.derivedSourceReview.reviewStatus,
+  'blocked',
+  'blocked required review status',
+);
+assertIncludes(
+  blockedRequiredDryRun.provenance.derivedSourceReview.blockCodes,
+  'not_a_bracket',
+  'blocked required bracket code',
 );
 
 const narrowRequiredApplyCommand = {

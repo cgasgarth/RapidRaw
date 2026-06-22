@@ -6,6 +6,7 @@ import { buildHdrDeghostConfidenceMapV1, countHdrMotionPixelsV1, detectHdrMotion
 import { mergeExposureWeightedRadianceV1 } from './hdrMergeWeightingRuntime.js';
 import {
   RAW_ENGINE_SCHEMA_VERSION,
+  artifactHandleV1Schema,
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeDryRunResultV1Schema,
   computationalMergeMutationResultV1Schema,
@@ -74,6 +75,18 @@ export const hdrRuntimeProvenanceV1Schema = z
       )
       .min(2),
     deghosting: z.enum(['off', 'low', 'medium', 'high']),
+    derivedSourceReview: z
+      .object({
+        blockCodes: z.array(z.string().trim().min(1)),
+        bracketReadiness: z.enum(['accepted', 'blocked', 'warning']),
+        displayPreviewArtifact: artifactHandleV1Schema,
+        exportPreviewArtifact: artifactHandleV1Schema,
+        nextActions: z.array(z.enum(['adjust_brackets', 'approve_plan', 'inspect_motion_mask', 'review_tone_map'])),
+        reviewStatus: z.enum(['apply_ready', 'blocked', 'review_required']),
+        sceneLinearArtifact: artifactHandleV1Schema,
+        warningCodes: z.array(z.string().trim().min(1)),
+      })
+      .strict(),
     engineId: z.literal(HDR_RUNTIME_ENGINE_ID),
     engineVersion: z.literal(HDR_RUNTIME_ENGINE_VERSION),
     mergeStrategy: z.enum(['scene_linear_radiance', 'exposure_fusion_preview']),
@@ -110,6 +123,7 @@ type HdrRuntimeCommandV1 = Extract<
   { commandType: 'computationalMerge.createHdr' }
 >;
 type ParsedHdrRuntimePlanRequestV1 = Omit<HdrRuntimePlanRequestV1, 'command'> & {
+  bracketPolicy: HdrBracketDetectionResultV1;
   bracketPolicyWarnings: string[];
   command: HdrRuntimeCommandV1;
 };
@@ -147,6 +161,9 @@ export const buildHdrRuntimeDryRunV1 = (requestValue: unknown): HdrRuntimeDryRun
       kind: 'preview' as const,
       storage: 'temp_cache' as const,
     },
+    runtime.provenance.derivedSourceReview.sceneLinearArtifact,
+    runtime.provenance.derivedSourceReview.displayPreviewArtifact,
+    runtime.provenance.derivedSourceReview.exportPreviewArtifact,
   ];
 
   const dryRunResult = computationalMergeDryRunResultV1Schema.parse({
@@ -200,6 +217,11 @@ export const applyHdrRuntimePlanV1 = (requestValue: unknown): HdrRuntimeApplyRes
   const acceptedDryRunPlanId = request.command.parameters.acceptedDryRunPlanId;
   if (acceptedDryRunPlanHash === undefined || acceptedDryRunPlanId === undefined) {
     throw new Error('HDR runtime apply requires an accepted dry-run plan id and hash.');
+  }
+  if (runtime.provenance.derivedSourceReview.reviewStatus === 'blocked') {
+    throw new Error(
+      `HDR runtime apply blocked by derived-source review: ${runtime.provenance.derivedSourceReview.blockCodes.join(', ')}.`,
+    );
   }
   const renderedContentHash = hashHdrRuntimePixels(runtime.mergedPixels);
   const outputArtifacts = [
@@ -396,12 +418,13 @@ const parseHdrRuntimePlanRequest = (requestValue: unknown, dryRun: boolean): Par
 
   const parsedRequest = { ...request, command: request.command };
   const bracketPolicy = evaluateHdrRuntimeBracketPolicy(parsedRequest);
-  if (request.command.parameters.bracketValidation === 'required' && !bracketPolicy.accepted) {
+  if (!dryRun && request.command.parameters.bracketValidation === 'required' && !bracketPolicy.accepted) {
     throw new Error(`HDR runtime bracket validation failed: ${bracketPolicy.blockCodes.join(', ')}`);
   }
 
   return {
     ...parsedRequest,
+    bracketPolicy,
     bracketPolicyWarnings: getHdrRuntimeBracketPolicyWarnings(request.command, bracketPolicy),
   };
 };
@@ -466,6 +489,7 @@ const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
       alignmentMode: request.command.parameters.alignmentMode,
       alignmentTransforms: alignment.transforms,
       deghosting: request.command.parameters.deghosting,
+      derivedSourceReview: buildHdrDerivedSourceReview(request, alignment.alignmentConfidence, motionCoverageRatio),
       engineId: HDR_RUNTIME_ENGINE_ID,
       engineVersion: HDR_RUNTIME_ENGINE_VERSION,
       mergeStrategy: request.command.parameters.mergeStrategy,
@@ -483,6 +507,66 @@ const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
     }),
     warnings,
     width: firstFrame.width,
+  };
+};
+
+const buildHdrDerivedSourceReview = (
+  request: ParsedHdrRuntimePlanRequestV1,
+  alignmentConfidence: number,
+  motionCoverageRatio: number,
+): HdrRuntimeProvenanceV1['derivedSourceReview'] => {
+  const blockCodes =
+    request.command.parameters.bracketValidation === 'required' && !request.bracketPolicy.accepted
+      ? request.bracketPolicy.blockCodes
+      : [];
+  const warningCodes = [
+    ...request.bracketPolicyWarnings,
+    ...(alignmentConfidence < 0.95 ? ['alignment_low_confidence'] : []),
+    ...(motionCoverageRatio > 0 ? ['motion_detected'] : []),
+    ...(request.command.parameters.toneMapPreview ? ['tone_mapped_preview_only'] : []),
+  ].sort();
+  const reviewStatus =
+    blockCodes.length > 0
+      ? 'blocked'
+      : warningCodes.length > 0 || motionCoverageRatio > 0
+        ? 'review_required'
+        : 'apply_ready';
+  const bracketReadiness =
+    blockCodes.length > 0 ? 'blocked' : request.bracketPolicy.warningCodes.length > 0 ? 'warning' : 'accepted';
+  const dimensions = {
+    height: request.frames[0]?.height ?? 1,
+    width: request.frames[0]?.width ?? 1,
+  };
+
+  return {
+    blockCodes,
+    bracketReadiness,
+    displayPreviewArtifact: {
+      artifactId: `${request.previewArtifactId}:display-preview`,
+      dimensions,
+      kind: 'preview',
+      storage: 'temp_cache',
+    },
+    exportPreviewArtifact: {
+      artifactId: `${request.previewArtifactId}:export-preview`,
+      dimensions,
+      kind: 'preview',
+      storage: 'temp_cache',
+    },
+    nextActions:
+      reviewStatus === 'blocked'
+        ? ['adjust_brackets', 'inspect_motion_mask']
+        : reviewStatus === 'review_required'
+          ? ['inspect_motion_mask', 'review_tone_map']
+          : ['approve_plan'],
+    reviewStatus,
+    sceneLinearArtifact: {
+      artifactId: `${request.previewArtifactId}:scene-linear`,
+      dimensions,
+      kind: 'preview',
+      storage: 'temp_cache',
+    },
+    warningCodes,
   };
 };
 
@@ -615,7 +699,7 @@ const deriveRuntimeWarnings = (
 };
 
 const evaluateHdrRuntimeBracketPolicy = (
-  request: Omit<ParsedHdrRuntimePlanRequestV1, 'bracketPolicyWarnings'>,
+  request: Omit<ParsedHdrRuntimePlanRequestV1, 'bracketPolicy' | 'bracketPolicyWarnings'>,
 ): HdrBracketDetectionResultV1 => {
   const framesBySourceIndex = new Map(request.frames.map((frame) => [frame.sourceIndex, frame]));
   const sources: HdrBracketDetectionSourceInputV1[] = request.command.parameters.sources.map((source) => {
