@@ -555,12 +555,21 @@ export const libraryWorkflowProofSchema = z.object({
 });
 export const detailWorkspaceProofSchema = z.object({
   artifactWarning: z.literal('ringing_review'),
+  comparisonMode: z.literal('original_current_recipe_export'),
+  cropClipped: z.literal('false'),
+  cropZoomPercent: z.literal('100'),
   deblurCommand: z.literal('detail.deblur.dry_run_command'),
   denoiseStage: z.literal('scene_linear_denoise'),
+  exportArtifactPath: z.string().endsWith('/high-iso-skin-shadow-v1-enabled-export.pgm'),
+  fixtureId: z.literal('detail.output.high-iso-denoise-detail-100.v1'),
   previewMode: z.literal('split'),
-  runtimeStatus: z.literal('fixture_runtime_paths'),
+  recipeApplied: z.literal('true'),
+  recipeId: z.literal('detail.output.denoise-detail-100.v1'),
+  renderFallback: z.literal('false'),
+  runtimeStatus: z.literal('synthetic_detail_output_comparison_artifact_rendered'),
+  warningCodes: z.literal('halo_risk_review,oversmoothing_review,crop_bounds_ok'),
   waveletMode: z.literal('luma_detail'),
-  zoom: z.literal('200'),
+  zoom: z.literal('100'),
 });
 export const detailDustSpotProofSchema = z.object({
   minRadius: z.literal('6'),

@@ -33,6 +33,20 @@ export const detailLimitationSchema = z.enum([
   'ui_api_wiring',
 ]);
 
+export const detailOutputComparisonLimitationSchema = z.enum([
+  'native_export_pipeline',
+  'real_raw_quality',
+  'tauri_app_e2e',
+  'user_tuned_recipe_quality',
+]);
+
+export const detailOutputComparisonWarningSchema = z.enum([
+  'crop_bounds_ok',
+  'fallback_render_mode_review',
+  'halo_risk_review',
+  'oversmoothing_review',
+]);
+
 export const detailPreviewExportParityClaimSchema = z.enum([
   'disabled_noop_parity',
   'enabled_synthetic_parity',
@@ -158,6 +172,127 @@ export const detailPreviewExportParityManifestSchema = z
       });
     }
   });
+
+const detailOutputComparisonArtifactSchema = z
+  .object({
+    contentHash: sha256Schema,
+    format: z.literal('pgm_u8_preview'),
+    kind: z.enum([
+      'current_baseline_crop',
+      'disabled_export_artifact',
+      'enabled_export_artifact',
+      'original_crop',
+      'recipe_preview_crop',
+    ]),
+    path: z.string().trim().min(1),
+    publicRepoAllowed: z.literal(false),
+  })
+  .strict();
+
+export const detailOutputComparisonProofReportSchema = z
+  .object({
+    $schema: z.url(),
+    artifacts: z
+      .object({
+        currentBaselineCrop: detailOutputComparisonArtifactSchema.extend({
+          kind: z.literal('current_baseline_crop'),
+        }),
+        disabledExportArtifact: detailOutputComparisonArtifactSchema.extend({
+          kind: z.literal('disabled_export_artifact'),
+        }),
+        enabledExportArtifact: detailOutputComparisonArtifactSchema.extend({
+          kind: z.literal('enabled_export_artifact'),
+        }),
+        originalCrop: detailOutputComparisonArtifactSchema.extend({
+          kind: z.literal('original_crop'),
+        }),
+        recipePreviewCrop: detailOutputComparisonArtifactSchema.extend({
+          kind: z.literal('recipe_preview_crop'),
+        }),
+      })
+      .strict(),
+    crop: z
+      .object({
+        clipped: z.literal(false),
+        height: z.number().int().positive(),
+        sourcePath: z.string().trim().min(1),
+        width: z.number().int().positive(),
+        x: z.number().int().nonnegative(),
+        y: z.number().int().nonnegative(),
+        zoomPercent: z.literal(100),
+      })
+      .strict(),
+    doesNotProve: z.array(detailOutputComparisonLimitationSchema).min(1),
+    fixtureId: z.literal('detail.output.high-iso-denoise-detail-100.v1'),
+    generatedAt: z.iso.datetime({ offset: true }),
+    issue: z.literal(3067),
+    metrics: z
+      .object({
+        currentToRecipeChangedPixelRatio: z.number().gt(0.05).lte(1),
+        currentToRecipeMeanAbsDelta: z.number().gt(0.005).lt(0.5),
+        disabledExportMatchesCurrentHash: z.literal(true),
+        enabledExportDiffersFromDisabled: z.literal(true),
+        originalToCurrentMeanAbsDelta: z.number().gt(0.001).lt(0.5),
+        recipeToExportMeanAbsDelta: z.number().min(0).max(0.002),
+      })
+      .strict(),
+    recipe: z
+      .object({
+        detailAmount: z.number().min(0).max(1),
+        label: z.literal('Denoise + detail 100% review'),
+        lumaNoiseReduction: z.number().min(0).max(1),
+        recipeId: z.literal('detail.output.denoise-detail-100.v1'),
+        stages: z.array(z.enum(['scene_linear_denoise', 'capture_sharpen', 'wavelet_luma_detail'])).length(3),
+      })
+      .strict(),
+    runtimeStatus: z.literal('synthetic_detail_output_comparison_artifact_rendered'),
+    schemaVersion: z.literal(1),
+    warnings: z.array(detailOutputComparisonWarningSchema).min(2),
+  })
+  .strict()
+  .superRefine((report, context) => {
+    const warnings = new Set(report.warnings);
+    for (const warning of ['halo_risk_review', 'oversmoothing_review'] as const) {
+      if (!warnings.has(warning)) {
+        context.addIssue({
+          code: 'custom',
+          message: `Detail output comparison proof must include ${warning}.`,
+          path: ['warnings'],
+        });
+      }
+    }
+
+    if (report.artifacts.disabledExportArtifact.contentHash !== report.artifacts.currentBaselineCrop.contentHash) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Disabled detail recipe export must match the current baseline crop hash.',
+        path: ['artifacts', 'disabledExportArtifact', 'contentHash'],
+      });
+    }
+
+    if (report.artifacts.enabledExportArtifact.contentHash === report.artifacts.disabledExportArtifact.contentHash) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Enabled detail recipe export must differ from the disabled export hash.',
+        path: ['artifacts', 'enabledExportArtifact', 'contentHash'],
+      });
+    }
+  });
+
+export const detailOutputComparisonVisualProofSchema = z
+  .object({
+    comparisonMode: z.literal('original_current_recipe_export'),
+    cropClipped: z.literal(false),
+    cropZoomPercent: z.literal(100),
+    exportArtifactPath: z.string().endsWith('/high-iso-skin-shadow-v1-enabled-export.pgm'),
+    fixtureId: z.literal('detail.output.high-iso-denoise-detail-100.v1'),
+    recipeApplied: z.literal(true),
+    recipeId: z.literal('detail.output.denoise-detail-100.v1'),
+    renderFallback: z.literal(false),
+    runtimeStatus: z.literal('synthetic_detail_output_comparison_artifact_rendered'),
+    warningCodes: z.array(detailOutputComparisonWarningSchema).min(2),
+  })
+  .strict();
 
 export const detailStageEntrySchema = z
   .object({
@@ -315,6 +450,8 @@ export const detailArtifactManifestSchema = z
   });
 
 export type DetailArtifactManifest = z.infer<typeof detailArtifactManifestSchema>;
+export type DetailOutputComparisonProofReport = z.infer<typeof detailOutputComparisonProofReportSchema>;
+export type DetailOutputComparisonVisualProof = z.infer<typeof detailOutputComparisonVisualProofSchema>;
 export type DetailPreviewExportParityManifest = z.infer<typeof detailPreviewExportParityManifestSchema>;
 export type DetailStageOrderManifest = z.infer<typeof detailStageOrderManifestSchema>;
 
@@ -323,6 +460,9 @@ export const parseDetailStageOrderManifest = (value: unknown): DetailStageOrderM
 
 export const parseDetailArtifactManifest = (value: unknown): DetailArtifactManifest =>
   detailArtifactManifestSchema.parse(value);
+
+export const parseDetailOutputComparisonProofReport = (value: unknown): DetailOutputComparisonProofReport =>
+  detailOutputComparisonProofReportSchema.parse(value);
 
 export const parseDetailPreviewExportParityManifest = (value: unknown): DetailPreviewExportParityManifest =>
   detailPreviewExportParityManifestSchema.parse(value);
