@@ -1,3 +1,5 @@
+import QuickLRU from 'quick-lru';
+
 import type { Adjustments } from './adjustments';
 import type { ChannelConfig } from '../components/adjustments/Curves';
 import type { SelectedImage, WaveformData } from '../components/ui/AppProperties';
@@ -14,20 +16,21 @@ export interface ImageCacheEntry {
 }
 
 export class ImageLRUCache {
-  private maxSize: number;
-  private cache = new Map<string, ImageCacheEntry>();
+  private cache: QuickLRU<string, ImageCacheEntry>;
   private protectedBlobUrls = new Set<string>();
 
   constructor(maxSize = 20) {
-    this.maxSize = maxSize;
+    this.cache = new QuickLRU({
+      maxSize,
+      onEviction: (_key, entry) => {
+        this.cleanupEntry(entry);
+      },
+    });
   }
 
   get(key: string): ImageCacheEntry | undefined {
     const entry = this.cache.get(key);
     if (!entry) return undefined;
-
-    this.cache.delete(key);
-    this.cache.set(key, entry);
 
     if (entry.finalPreviewUrl) this.protectedBlobUrls.delete(entry.finalPreviewUrl);
     if (entry.uncroppedPreviewUrl) this.protectedBlobUrls.delete(entry.uncroppedPreviewUrl);
@@ -36,23 +39,9 @@ export class ImageLRUCache {
   }
 
   set(key: string, entry: ImageCacheEntry): void {
-    if (this.cache.has(key)) {
-      const existingEntry = this.cache.get(key);
-      if (!existingEntry) {
-        throw new Error('Image cache entry invariant violated');
-      }
+    const existingEntry = this.cache.peek(key);
+    if (existingEntry) {
       this.cleanupEntry(existingEntry, entry);
-      this.cache.delete(key);
-    } else if (this.cache.size >= this.maxSize) {
-      const lruKey = this.cache.keys().next().value;
-      if (lruKey !== undefined) {
-        const lruEntry = this.cache.get(lruKey);
-        if (!lruEntry) {
-          throw new Error('Image cache LRU invariant violated');
-        }
-        this.cleanupEntry(lruEntry);
-        this.cache.delete(lruKey);
-      }
     }
 
     if (entry.finalPreviewUrl?.startsWith('blob:')) {
@@ -70,7 +59,7 @@ export class ImageLRUCache {
   }
 
   delete(key: string): void {
-    const entry = this.cache.get(key);
+    const entry = this.cache.peek(key);
     if (entry) {
       this.cleanupEntry(entry);
       this.cache.delete(key);
