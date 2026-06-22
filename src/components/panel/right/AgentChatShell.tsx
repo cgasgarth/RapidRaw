@@ -197,6 +197,9 @@ function ArtifactReviewPanel({ review }: { review: AgentArtifactReview }) {
 }
 
 function ReviewHandoffPanel({ handoff }: { handoff: AgentReviewHandoff }) {
+  const [rollbackRestoreState, setRollbackRestoreState] = useState<'available' | 'restored'>('available');
+  const rollbackCanRestore = handoff.rollback.status === 'available' && rollbackRestoreState === 'available';
+
   return (
     <div
       className="space-y-3 rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3"
@@ -204,6 +207,7 @@ function ReviewHandoffPanel({ handoff }: { handoff: AgentReviewHandoff }) {
       data-approval-state={handoff.approvalState}
       data-before-artifact-id={handoff.beforeArtifactId}
       data-output-proof-status={handoff.outputProof.status}
+      data-rollback-restore-state={rollbackRestoreState}
       data-rollback-status={handoff.rollback.status}
       data-testid="agent-review-handoff"
     >
@@ -280,7 +284,24 @@ function ReviewHandoffPanel({ handoff }: { handoff: AgentReviewHandoff }) {
             </span>
           </div>
           <div className="mt-1 truncate font-mono text-text-secondary">{handoff.rollback.targetRevision}</div>
-          <p className="mt-1 leading-4 text-text-secondary">{handoff.rollback.summary}</p>
+          <p className="mt-1 leading-4 text-text-secondary">
+            {rollbackRestoreState === 'restored'
+              ? handoff.rollback.restoreAction.restoredLabel
+              : handoff.rollback.summary}
+          </p>
+          <button
+            className="mt-2 w-full rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-1.5 text-left text-[11px] text-emerald-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+            data-command-id={handoff.rollback.restoreAction.commandId}
+            data-testid="agent-review-handoff-rollback-restore"
+            data-tool-name={handoff.rollback.restoreAction.toolName}
+            disabled={!rollbackCanRestore}
+            onClick={() => {
+              setRollbackRestoreState('restored');
+            }}
+            type="button"
+          >
+            {handoff.rollback.restoreAction.buttonLabel}
+          </button>
         </div>
       </div>
 

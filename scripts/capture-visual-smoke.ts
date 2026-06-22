@@ -1013,6 +1013,10 @@ async function prepareScenario(page, mode) {
       .waitFor({ timeout: 10_000 });
     await handoff.getByText('Runtime proof gallery', { exact: true }).waitFor({ timeout: 10_000 });
     await handoff.getByText('Rollback virtual copy', { exact: true }).waitFor({ timeout: 10_000 });
+    await handoff.getByTestId('agent-review-handoff-rollback-restore').click();
+    await handoff
+      .getByText('Restored graph_rev_agent_expert_edit_demo_initial_2844', { exact: false })
+      .waitFor({ timeout: 10_000 });
     await scope.getByText('Selected-frame scope', { exact: true }).waitFor({ timeout: 10_000 });
     await page.getByTestId('agent-selected-frame-assets').getByText('DSC_2844.NEF', { exact: true }).waitFor({
       timeout: 10_000,
