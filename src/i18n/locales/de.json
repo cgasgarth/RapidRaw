@@ -2687,6 +2687,12 @@
         },
         "detailGain": "Detail gain",
         "detailGainValue": "",
+        "detailReview": "",
+        "detailReviewHighlightCountValue_one": "",
+        "detailReviewHighlightCountValue_other": "",
+        "detailReviewMeanImprovementValue": "",
+        "detailReviewRegionImprovementValue": "",
+        "detailReviewTitle": "",
         "editableGate": {
           "blocked_review_required": "Editable handoff blocked until review passes",
           "blocked_stale": "Editable handoff blocked by stale artifact",

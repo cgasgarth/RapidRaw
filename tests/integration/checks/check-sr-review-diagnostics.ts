@@ -46,6 +46,10 @@ for (const marker of [
   'modals.superResolution.review.noArtifactWarnings',
   'modals.superResolution.review.detailGain',
   'modals.superResolution.review.detailGainValue',
+  'modals.superResolution.review.detailReview',
+  'modals.superResolution.review.detailReviewMeanImprovementValue',
+  'modals.superResolution.review.detailReviewRegionStatus',
+  'modals.superResolution.review.detailReviewTitle',
   'modals.superResolution.review.coverage',
   'modals.superResolution.review.humanReviewStatus',
   'modals.superResolution.review.outputArtifact',
@@ -65,6 +69,9 @@ for (const marker of [
   'isEditableHandoffReady',
   'sr-editable-handoff-proof',
   'data-editable-handoff-ready={String(isEditableHandoffReady)}',
+  'sr-detail-review',
+  'data-detail-review-status={outputReview.detailReview.reviewStatus}',
+  'data-detail-improvement-ratio={region.improvementRatio}',
   'sr-support-map-review',
   'data-support-map-review-status={outputReview.supportMap.reviewStatus}',
   'data-support-map-weak-ratio={outputReview.supportMap.weakSupportRatio}',
@@ -103,6 +110,7 @@ for (const marker of [
   'humanReviewStatus',
   'overlapCoverageRatio',
   'reviewArtifacts',
+  'detailReview',
   'supportMap',
 ]) {
   if (!adapterSource.includes(marker)) {
