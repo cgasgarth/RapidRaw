@@ -1438,6 +1438,14 @@ function LayerStackWorkflowVisualSmoke() {
   const selectedLayerState = layers.find((layer) => layer.name === selectedLayer) ?? layerWorkflowFallbackLayer;
   const groupedLayerCount = layers.filter((layer) => layer.groupId === 'group_local_polish').length;
   const localPolishCollapsed = collapsedGroupIds.includes('group_local_polish');
+  const localPolishLayers = layers.filter((layer) => layer.groupId === 'group_local_polish');
+  const localPolishVisibleCount = localPolishLayers.filter((layer) => layer.visible).length;
+  const localPolishVisibleState =
+    localPolishVisibleCount === 0
+      ? 'hidden'
+      : localPolishVisibleCount === localPolishLayers.length
+        ? 'visible'
+        : 'mixed';
 
   return (
     <main
@@ -1458,16 +1466,20 @@ function LayerStackWorkflowVisualSmoke() {
             data-collapsed-group-count={String(collapsedGroupIds.length)}
             data-grouping-state={groupedLayerCount > 0 ? 'active' : 'ungrouped'}
             data-grouped-layer-count={String(groupedLayerCount)}
+            data-hidden-group-count={localPolishVisibleState === 'hidden' ? '1' : '0'}
             data-layer-count={String(layers.length)}
             data-mask={selectedLayerState.mask}
+            data-mixed-group-count={localPolishVisibleState === 'mixed' ? '1' : '0'}
             data-opacity={String(selectedLayerState.opacity)}
             data-testid="layer-stack-workflow-proof"
+            data-visible-group-count={localPolishVisibleState === 'visible' ? '1' : '0'}
             data-visible-count={String(visibleLayerCount)}
           >
             {groupedLayerCount > 0 && (
               <button
                 className="w-full rounded-md border border-[#f2be4e]/40 bg-[#2c2a20] px-3 py-2 text-left text-sm text-white"
                 data-collapsed={String(localPolishCollapsed)}
+                data-visible-state={localPolishVisibleState}
                 data-testid="layer-stack-visual-group-row"
                 onClick={toggleLocalPolishCollapsed}
                 type="button"
@@ -1580,6 +1592,8 @@ function LayerStackWorkflowVisualSmoke() {
           <div
             className="mt-3 rounded-md border border-white/10 bg-[#1b2026] px-3 py-2 text-xs text-[#aab2bd]"
             data-collapsed-group-ids={collapsedGroupIds.join(',')}
+            data-local-polish-visible-count={String(localPolishVisibleCount)}
+            data-local-polish-visible-state={localPolishVisibleState}
             data-testid="layer-stack-visual-group-proof"
           >
             {copy.layerGroupingActive.replace('{{count}}', String(groupedLayerCount))}

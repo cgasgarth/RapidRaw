@@ -8,6 +8,7 @@ export interface LayerGroupSummary {
   layerIds: Array<string>;
   name: string;
   opacity: number;
+  visibleState: 'hidden' | 'mixed' | 'visible';
 }
 
 export interface LayerRenderPlanItem {
@@ -31,8 +32,11 @@ export interface LayerGroupWorkflowProof {
   collapsedGroupCount: number;
   collapsedGroupIds: Array<string>;
   groupCount: number;
+  hiddenGroupCount: number;
   groupedLayerCount: number;
   groups: Array<LayerGroupSummary & { collapsed: boolean }>;
+  mixedGroupCount: number;
+  visibleGroupCount: number;
   visibleOrder: Array<string>;
 }
 
@@ -341,6 +345,7 @@ export function buildLayerGroupSummaries(layers: Array<MaskContainer>): Array<La
       existing.opacity = clampLayerOpacity(
         (existing.opacity * (existing.layerCount - 1) + clampLayerOpacity(layer.opacity)) / existing.layerCount,
       );
+      existing.visibleState = mergeGroupVisibleState(existing.visibleState, layer.visible);
       continue;
     }
 
@@ -350,6 +355,7 @@ export function buildLayerGroupSummaries(layers: Array<MaskContainer>): Array<La
       layerIds: [layer.id],
       name: layer.layerGroupName?.trim() || 'Layer Group',
       opacity: clampLayerOpacity(layer.opacity),
+      visibleState: layer.visible ? 'visible' : 'hidden',
     });
   }
 
@@ -367,8 +373,11 @@ export function buildLayerGroupWorkflowProof(
     collapsedGroupCount: collapsedIds.length,
     collapsedGroupIds: collapsedIds,
     groupCount: groupSummaries.length,
+    hiddenGroupCount: groupSummaries.filter((group) => group.visibleState === 'hidden').length,
     groupedLayerCount: groupSummaries.reduce((count, group) => count + group.layerCount, 0),
     groups: groupSummaries.map((group) => ({ ...group, collapsed: collapsedGroupIds.has(group.id) })),
+    mixedGroupCount: groupSummaries.filter((group) => group.visibleState === 'mixed').length,
+    visibleGroupCount: groupSummaries.filter((group) => group.visibleState === 'visible').length,
     visibleOrder: layers.map((layer) => layer.id),
   };
 }
@@ -426,6 +435,16 @@ export function buildLayerExportReadinessSummary(layers: Array<MaskContainer>): 
 
 function groupFields(layerGroupId: string | undefined, layerGroupName: string | undefined) {
   return layerGroupId === undefined ? {} : { layerGroupId, layerGroupName };
+}
+
+function mergeGroupVisibleState(
+  currentState: LayerGroupSummary['visibleState'],
+  nextVisible: boolean,
+): LayerGroupSummary['visibleState'] {
+  if (currentState === 'mixed') return 'mixed';
+  if (currentState === 'visible' && nextVisible) return 'visible';
+  if (currentState === 'hidden' && !nextVisible) return 'hidden';
+  return 'mixed';
 }
 
 function findLayerGroupIndexes(layers: Array<MaskContainer>, groupId: string): Array<number> {

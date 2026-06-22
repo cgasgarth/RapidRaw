@@ -548,9 +548,12 @@ export const layerStackWorkflowProofSchema = z.object({
   collapsedGroupCount: z.literal('0'),
   groupedLayerCount: z.literal('2'),
   groupingState: z.literal('active'),
+  hiddenGroupCount: z.literal('0'),
   layerCount: z.literal('5'),
   mask: z.literal('Brush'),
+  mixedGroupCount: z.literal('1'),
   opacity: z.literal('64'),
+  visibleGroupCount: z.literal('0'),
   visibleCount: z.literal('4'),
 });
 export const layerStackExportParityProofSchema = z.object({

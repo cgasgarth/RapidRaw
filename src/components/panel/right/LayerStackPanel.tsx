@@ -69,6 +69,7 @@ interface LayerRowModel {
   name: string;
   opacity: number;
   visible: boolean;
+  visibleState: 'hidden' | 'mixed' | 'visible';
 }
 
 const BASE_LAYER_ID = 'base-raw-layer';
@@ -115,8 +116,8 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
         maskCount: groupSummary?.layerIds.length ?? 1,
         name: groupSummary?.name ?? tFallbackLayerGroupName(),
         opacity: groupSummary?.opacity ?? 100,
-        visible:
-          groupSummary?.layerIds.every((layerId) => masks.find((layer) => layer.id === layerId)?.visible) ?? true,
+        visible: groupSummary?.visibleState !== 'hidden',
+        visibleState: groupSummary?.visibleState ?? 'visible',
       });
     }
 
@@ -141,6 +142,7 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
       name: mask.name.trim() || `Layer ${String(index + 1)}`,
       opacity: mask.opacity,
       visible: mask.visible,
+      visibleState: mask.visible ? 'visible' : 'hidden',
     });
   });
 
@@ -160,6 +162,7 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
       name: 'Base RAW',
       opacity: 100,
       visible: true,
+      visibleState: 'visible',
     },
   ];
 }
@@ -437,9 +440,12 @@ export default function LayerStackPanel({
         data-collapsed-group-count={groupWorkflowProof.collapsedGroupCount}
         data-collapsed-group-ids={groupWorkflowProof.collapsedGroupIds.join(',')}
         data-group-count={groupCount}
+        data-hidden-group-count={groupWorkflowProof.hiddenGroupCount}
         data-grouped-layer-count={groupWorkflowProof.groupedLayerCount}
         data-hidden-layer-count={hiddenLayerCount}
+        data-mixed-group-count={groupWorkflowProof.mixedGroupCount}
         data-testid="layer-stack-composition-summary"
+        data-visible-group-count={groupWorkflowProof.visibleGroupCount}
         data-visible-layer-count={visibleLayerCount}
         data-visible-order={groupWorkflowProof.visibleOrder.join(',')}
       >
@@ -553,6 +559,7 @@ export default function LayerStackPanel({
               }}
               data-group-collapsed={String(row.isGroupCollapsed)}
               data-group-id={row.groupId ?? ''}
+              data-group-visible-state={row.isGroupHeader ? row.visibleState : ''}
               data-grouped-layer={String(row.isGroupedLayer)}
               data-layer-row-id={row.id}
               data-testid={
@@ -717,6 +724,7 @@ export default function LayerStackPanel({
             data-active-layer-id={activeRow.id}
             data-active-layer-opacity={activeRow.opacity}
             data-active-layer-visible={String(activeRow.visible)}
+            data-active-layer-visible-state={activeRow.visibleState}
             data-testid="layer-active-render-state"
           >
             <UiText variant={TextVariants.small} weight={TextWeights.medium} className="block text-text-primary">
