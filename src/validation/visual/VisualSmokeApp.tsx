@@ -33,6 +33,7 @@ import { INITIAL_ADJUSTMENTS, type Adjustments, type MaskContainer } from '../..
 import { agentChatTranscriptFixture } from '../../utils/agentChatTranscriptFixture';
 import { applyColorBalanceRgbToPixel } from '../../utils/colorBalanceRgbRuntime';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
+import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
 import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
 
 import type { MaskOverlaySettings } from '../../schemas/maskOverlaySchemas';
@@ -1465,6 +1466,41 @@ const hdrPreviewSvg = encodeURIComponent(`
   <path d="M110 475 C280 390 390 420 520 345 C660 265 765 330 850 260" fill="none" stroke="#e7d6a1" stroke-width="18" opacity="0.8"/>
 </svg>`);
 const tinyPreviewDataUrl = `data:image/svg+xml,${hdrPreviewSvg}`;
+const hdrVisualSmokeSourceMetadata: HdrBracketPreflightSourceMetadata[] = [
+  {
+    exif: {
+      ExposureTime: '1/250',
+      FNumber: '5.6',
+      ISO: '100',
+      LensModel: 'NIKKOR Z 24-70mm f/2.8 S',
+      Make: 'Nikon',
+      Model: 'Z8',
+    },
+    path: '/tmp/rawengine-hdr-under.nef',
+  },
+  {
+    exif: {
+      ExposureTime: '1/60',
+      FNumber: '5.6',
+      ISO: '100',
+      LensModel: 'NIKKOR Z 24-70mm f/2.8 S',
+      Make: 'Nikon',
+      Model: 'Z8',
+    },
+    path: '/tmp/rawengine-hdr-mid.nef',
+  },
+  {
+    exif: {
+      ExposureTime: '1/15',
+      FNumber: '5.6',
+      ISO: '100',
+      LensModel: 'NIKKOR Z 24-70mm f/2.8 S',
+      Make: 'Nikon',
+      Model: 'Z8',
+    },
+    path: '/tmp/rawengine-hdr-over.nef',
+  },
+];
 const filmSmokeMetricLabels = {
   contrast: 'Contrast',
   grain: 'Grain',
@@ -2389,6 +2425,7 @@ function PanoramaPrivateRawVisualSmoke() {
 
 function HdrVisualSmoke() {
   const [hdrSettings, setHdrSettings] = useState<HdrMergeUiSettings>(DEFAULT_HDR_MERGE_UI_SETTINGS);
+  const bracketPreflight = buildHdrBracketPreflight(hdrVisualSmokeSourceMetadata);
 
   return (
     <main
@@ -2401,6 +2438,10 @@ function HdrVisualSmoke() {
         className="sr-only"
         data-apply-command={copy.hdrApplyTool}
         data-artifact-path={copy.hdrArtifactPath}
+        data-bracket-accepted={bracketPreflight ? String(bracketPreflight.accepted) : ''}
+        data-bracket-confidence={bracketPreflight?.detectionConfidence ?? ''}
+        data-bracket-method={bracketPreflight?.detectionMethod ?? ''}
+        data-bracket-span-ev={bracketPreflight?.bracketSpanEv ?? ''}
         data-bracket-validation={hdrSettings.bracketValidation}
         data-command={copy.hdrDryRunTool}
         data-deghosting={hdrSettings.deghosting}
@@ -2431,6 +2472,7 @@ function HdrVisualSmoke() {
         onSettingsChange={setHdrSettings}
         progressMessage={null}
         settings={hdrSettings}
+        sourceMetadata={hdrVisualSmokeSourceMetadata}
       />
       <aside className="fixed right-4 top-14 z-50 w-72 rounded-md border border-white/10 bg-black/75 p-3 text-sm shadow-lg">
         <div className="mb-2 flex items-center justify-between">

@@ -5,11 +5,13 @@ import { useTranslation } from 'react-i18next';
 import { MergeErrorState, MergeFooterActions, MergeProcessingState, MergeResultPreview } from './MergeStatusViews';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { TextColors, TextVariants } from '../../types/typography';
+import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
 import { buildHdrEditableHandoffSummary } from '../../utils/hdrEditableHandoff';
 import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerBadge';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
 
+import type { HdrBracketDetectionMethodV1 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import type {
   HdrMergeAlignmentMode,
   HdrMergeDeghosting,
@@ -32,6 +34,7 @@ interface HdrModalProps {
   onMerge: () => void;
   progressMessage: string | null;
   settings: HdrMergeUiSettings;
+  sourceMetadata?: HdrBracketPreflightSourceMetadata[];
   sourcePaths?: string[];
 }
 
@@ -49,6 +52,7 @@ export default function HdrModal({
   onMerge,
   progressMessage,
   settings,
+  sourceMetadata,
   sourcePaths = [],
 }: HdrModalProps) {
   const { t } = useTranslation();
@@ -58,6 +62,10 @@ export default function HdrModal({
 
   const mouseDownTarget = useRef<EventTarget | null>(null);
   const isSourceCountValid = (imageCount ?? 0) >= 2;
+  const bracketPreflight = buildHdrBracketPreflight(sourceMetadata);
+  const isBracketBlocked =
+    bracketPreflight !== null && !bracketPreflight.accepted && settings.bracketValidation === 'required';
+  const isMergeReady = isSourceCountValid && !isBracketBlocked;
 
   const alignmentOptions: Array<OptionItem<HdrMergeAlignmentMode>> = [
     { label: t('modals.hdr.alignment.auto'), value: 'auto' },
@@ -97,7 +105,29 @@ export default function HdrModal({
       : settings.bracketValidation === 'warn'
         ? t('modals.hdr.bracketValidation.warn')
         : t('modals.hdr.bracketValidation.disabled');
-  const mergeReadinessLabel = isSourceCountValid ? t('modals.hdr.summaryReady') : t('modals.hdr.summaryBlocked');
+  const mergeReadinessLabel = isMergeReady ? t('modals.hdr.summaryReady') : t('modals.hdr.summaryBlocked');
+  const getBracketDetectionMethodLabel = (method: HdrBracketDetectionMethodV1) => {
+    switch (method) {
+      case 'caller_declared_ev':
+        return t('modals.hdr.bracketDetectionMethod.caller_declared_ev');
+      case 'luminance_estimate':
+        return t('modals.hdr.bracketDetectionMethod.luminance_estimate');
+      case 'manual_order':
+        return t('modals.hdr.bracketDetectionMethod.manual_order');
+      case 'metadata_exposure_compensation':
+        return t('modals.hdr.bracketDetectionMethod.metadata_exposure_compensation');
+      case 'metadata_exposure_time_iso_aperture':
+        return t('modals.hdr.bracketDetectionMethod.metadata_exposure_time_iso_aperture');
+    }
+  };
+  const bracketPreflightStatus =
+    bracketPreflight === null
+      ? t('modals.hdr.bracketPreflightManual')
+      : bracketPreflight.accepted
+        ? t('modals.hdr.bracketPreflightAccepted')
+        : settings.bracketValidation === 'required'
+          ? t('modals.hdr.bracketPreflightBlocked')
+          : t('modals.hdr.bracketPreflightWarning');
   const handoffSummary =
     savedPath !== null ? buildHdrEditableHandoffSummary({ outputPath: savedPath, settings, sourcePaths }) : null;
 
@@ -332,9 +362,15 @@ export default function HdrModal({
           <section
             className="mb-5 grid grid-cols-4 gap-2 rounded-md border border-border-color bg-bg-secondary/70 p-2"
             data-alignment-mode={settings.alignmentMode}
+            data-bracket-accepted={bracketPreflight ? String(bracketPreflight.accepted) : 'manual'}
+            data-bracket-block-codes={bracketPreflight?.blockCodes.join(',') ?? ''}
+            data-bracket-confidence={bracketPreflight?.detectionConfidence ?? ''}
+            data-bracket-method={bracketPreflight?.detectionMethod ?? 'manual_order'}
+            data-bracket-span-ev={bracketPreflight?.bracketSpanEv ?? ''}
             data-bracket-validation={settings.bracketValidation}
-            data-merge-ready={String(isSourceCountValid)}
+            data-merge-ready={String(isMergeReady)}
             data-source-count={imageCount ?? 0}
+            data-warning-codes={bracketPreflight?.warningCodes.join(',') ?? ''}
             data-testid="hdr-readiness-summary"
           >
             <div
@@ -356,7 +392,7 @@ export default function HdrModal({
                 {t('modals.hdr.bracketValidationLabel')}
               </UiText>
               <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
-                {bracketValidationLabel}
+                {bracketPreflightStatus}
               </UiText>
             </div>
             <div
@@ -372,7 +408,7 @@ export default function HdrModal({
             </div>
             <div
               className={`rounded border px-2 py-1.5 ${
-                isSourceCountValid ? 'border-accent/50 bg-accent/10' : 'border-red-500/40 bg-red-500/10'
+                isMergeReady ? 'border-accent/50 bg-accent/10' : 'border-red-500/40 bg-red-500/10'
               }`}
               data-testid="hdr-readiness-merge"
             >
@@ -385,10 +421,90 @@ export default function HdrModal({
             </div>
           </section>
 
-          {!isSourceCountValid && (
+          {bracketPreflight && (
+            <section
+              className="mb-5 rounded-md border border-border-color bg-surface p-3"
+              data-testid="hdr-bracket-preflight"
+            >
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <UiText variant={TextVariants.heading}>{t('modals.hdr.bracketPreflightTitle')}</UiText>
+                <UiText
+                  as="span"
+                  variant={TextVariants.small}
+                  className={`rounded px-2 py-0.5 ${
+                    bracketPreflight.accepted
+                      ? 'bg-accent/15 text-accent'
+                      : settings.bracketValidation === 'required'
+                        ? 'bg-red-500/15 text-red-300'
+                        : 'bg-yellow-500/15 text-yellow-200'
+                  }`}
+                >
+                  {bracketPreflightStatus}
+                </UiText>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                {[
+                  {
+                    label: t('modals.hdr.bracketPreflightMethod'),
+                    value: getBracketDetectionMethodLabel(bracketPreflight.detectionMethod),
+                  },
+                  {
+                    label: t('modals.hdr.bracketPreflightSpan'),
+                    value: t('modals.hdr.bracketPreflightSpanValue', {
+                      value: bracketPreflight.bracketSpanEv.toFixed(1),
+                    }),
+                  },
+                  {
+                    label: t('modals.hdr.bracketPreflightConfidence'),
+                    value: t('modals.hdr.bracketPreflightConfidenceValue', {
+                      value: Math.round(bracketPreflight.detectionConfidence * 100),
+                    }),
+                  },
+                ].map((item) => (
+                  <div className="rounded border border-border-color bg-bg-primary px-2 py-1.5" key={item.label}>
+                    <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                      {item.label}
+                    </UiText>
+                    <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                      {item.value}
+                    </UiText>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 grid gap-1.5">
+                {bracketPreflight.sourceMetadata.map((source) => (
+                  <div
+                    className="grid grid-cols-[48px_70px_1fr] gap-2 rounded border border-border-color bg-bg-primary px-2 py-1.5 text-xs"
+                    data-bracket-role={source.resolvedBracketRole}
+                    data-exposure-ev={source.resolvedExposureEv}
+                    data-source-index={source.sourceIndex}
+                    data-testid="hdr-bracket-source-row"
+                    key={`${source.sourceIndex}-${source.imagePath}`}
+                  >
+                    <span className="text-text-tertiary">#{source.sourceIndex + 1}</span>
+                    <span className="text-text-primary">
+                      {t('modals.hdr.bracketPreflightSourceEv', { value: source.resolvedExposureEv.toFixed(1) })}
+                    </span>
+                    <span className="truncate text-text-secondary">{source.imagePath.split('/').pop()}</span>
+                  </div>
+                ))}
+              </div>
+              {(bracketPreflight.warningCodes.length > 0 || bracketPreflight.blockCodes.length > 0) && (
+                <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-3 leading-relaxed">
+                  {[...bracketPreflight.blockCodes, ...bracketPreflight.warningCodes].join(', ')}
+                </UiText>
+              )}
+            </section>
+          )}
+
+          {!isMergeReady && (
             <div className="mb-5 flex gap-3 rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3">
               <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
-              <UiText className="leading-relaxed">{t('modals.hdr.sourceCountBlocked')}</UiText>
+              <UiText className="leading-relaxed">
+                {isSourceCountValid
+                  ? t('modals.hdr.bracketPreflightBlockedDetail')
+                  : t('modals.hdr.sourceCountBlocked')}
+              </UiText>
             </div>
           )}
 
@@ -530,7 +646,7 @@ export default function HdrModal({
         finalImageBase64={finalImageBase64}
         isProcessing={isProcessing}
         isSaving={isSaving}
-        isSourceCountValid={isSourceCountValid}
+        isSourceCountValid={isMergeReady}
         labels={{
           cancel: t('modals.hdr.cancel'),
           close: t('modals.hdr.close'),

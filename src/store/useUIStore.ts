@@ -16,6 +16,7 @@ import {
 } from '../schemas/superResolutionUiSchemas';
 
 import type { SuperResolutionOutputReviewWorkflow } from '../schemas/superResolutionOutputReviewSchemas';
+import type { HdrBracketPreflightSourceMetadata } from '../utils/hdrBracketPreflight';
 
 export interface CollapsibleSectionsState {
   basic: boolean;
@@ -73,6 +74,7 @@ export interface HdrModalState {
   };
   progressMessage: string | null;
   settings: HdrMergeUiSettings;
+  sourceMetadata: HdrBracketPreflightSourceMetadata[];
   stitchingSourcePaths: Array<string>;
 }
 
@@ -149,6 +151,7 @@ export const createDefaultHdrModalState = (
   isProcessing: false,
   progressMessage: '',
   settings,
+  sourceMetadata: [],
   stitchingSourcePaths: [],
 });
 

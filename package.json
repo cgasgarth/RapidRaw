@@ -363,6 +363,7 @@
     "check:hdr-runtime-plan-smoke": "bun tests/integration/checks/check-hdr-runtime-plan-smoke.ts",
     "check:hdr-merge-weighting-smoke": "bun tests/integration/checks/check-hdr-merge-weighting-smoke.ts",
     "check:hdr-merge-ui": "bun tests/integration/checks/check-hdr-merge-ui.ts",
+    "check:hdr-bracket-preflight-ui": "bun tests/integration/checks/check-hdr-bracket-preflight-ui.ts",
     "check:hdr-ui-action-command": "bun tests/integration/checks/check-hdr-ui-action-command.ts",
     "check:hdr-ui-api": "bun tests/integration/checks/check-hdr-ui-api.ts",
     "check:hdr-ui-runtime-bridge": "bun tests/integration/checks/check-hdr-ui-runtime-bridge.ts",

@@ -321,6 +321,10 @@ export const hdrUiSettingsProofSchema = z.object({
 export const hdrReviewWorkspaceProofSchema = z.object({
   applyCommand: z.literal(hdrRoutePair.applyToolName),
   artifactPath: z.literal('/tmp/rawengine-hdr-smoke.tif'),
+  bracketAccepted: z.literal('true'),
+  bracketConfidence: z.string().regex(/^(?:0\.\d+|1)$/u),
+  bracketMethod: z.literal('metadata_exposure_time_iso_aperture'),
+  bracketSpanEv: z.string().regex(/^4(?:\.\d+)?$/u),
   bracketValidation: z.literal('required'),
   command: z.literal(hdrRoutePair.dryRunToolName),
   deghosting: z.literal('high'),

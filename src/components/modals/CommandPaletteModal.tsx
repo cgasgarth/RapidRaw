@@ -411,6 +411,10 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
           hdrModalState: {
             ...state.hdrModalState,
             isOpen: true,
+            sourceMetadata:
+              selectedCommandPaths.length > 0
+                ? selectedCommandPaths.map((path) => ({ exif: null, path }))
+                : state.hdrModalState.sourceMetadata,
             stitchingSourcePaths:
               selectedCommandPaths.length > 0 ? selectedCommandPaths : state.hdrModalState.stitchingSourcePaths,
           },

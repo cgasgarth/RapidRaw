@@ -254,6 +254,7 @@ export default function AppModals(props: AppModalsProps) {
         }}
         progressMessage={hdrModalState.progressMessage}
         settings={hdrModalState.settings}
+        sourceMetadata={hdrModalState.sourceMetadata}
         sourcePaths={hdrModalState.stitchingSourcePaths}
       />
       <SuperResolutionModal
