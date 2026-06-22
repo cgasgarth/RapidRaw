@@ -87,10 +87,17 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   where practical.
 - Use milestones to group larger themes instead of making one issue represent
   several PRs.
+- After feature PR batches, run backlog refinement: review the active goal and
+  `RAW_EDITOR_PLAN.md`, consult at the milestone level, then create or update
+  milestones and PR-sized issues from that consult-backed plan.
 - Issue bodies should include `Why`, `How`, and `Validation` sections. Keep them
   concise, but include enough context, links, expected checks, screenshots,
   artifacts, runtime proof, or explicit plan-only status for the next agent to
   understand the goal without rediscovering intent.
+- When issues come from consult-backed milestone refinement, include the
+  relevant consult decision, constraints, validation expectations, and known
+  follow-ups directly in the issue so implementation can start from the issue
+  without reopening the same planning question.
 - Existing GitHub issues should be periodically cleaned up: split broad issues
   into PR-sized work, close obsolete/meta-only issues, update stale issues with
   current context, and move related work into milestones instead of keeping
@@ -156,6 +163,10 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   behavior, API/app-server editing capability, or workflow surface. If a feature
   is urgent and consult is still running, do independent prep only; do not claim
   the consult-backed decision until a usable response is available.
+- A fresh consult is not required when the issue already contains current,
+  specific consult-backed milestone guidance for the exact slice being
+  implemented. Reconsult if the scope, risk, UI, math, architecture, or
+  validation strategy changes.
 - Use consult for PRs that require decision making, including architecture,
   tradeoffs, scope boundaries, validation strategy, UI direction, science/math,
   color/image quality, or whether a slice should close or only reference an
