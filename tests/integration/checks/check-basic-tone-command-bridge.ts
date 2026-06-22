@@ -35,6 +35,10 @@ const adjustments = {
   shadows: 15,
   whites: 6,
 };
+const acceptedDryRun = {
+  acceptedDryRunPlanHash: 'sha256:basic-tone:bridge-plan',
+  acceptedDryRunPlanId: 'dryrun_basic_tone_bridge_plan',
+};
 
 const previewCommand = buildBasicToneCommandEnvelope(adjustments, context, { dryRun: true });
 const applyCommand = buildBasicToneCommandEnvelope(
@@ -45,7 +49,7 @@ const applyCommand = buildBasicToneCommandEnvelope(
     correlationId: 'corr_basic_tone_bridge_apply',
     idempotencyKey: 'idem_basic_tone_bridge_apply',
   },
-  { dryRun: false },
+  { ...acceptedDryRun, dryRun: false },
 );
 const runtimePreviewCommand = buildBasicToneCommandEnvelope(
   adjustments,
@@ -68,6 +72,12 @@ if (
 }
 if (applyCommand.approval.approvalClass !== ApprovalClass.EditApply || applyCommand.approval.state !== 'approved') {
   failures.push('Apply command must use approved edit-apply approval.');
+}
+if (applyCommand.parameters.acceptedDryRunPlanHash !== acceptedDryRun.acceptedDryRunPlanHash) {
+  failures.push('Apply command must carry accepted dry-run hash.');
+}
+if (applyCommand.parameters.acceptedDryRunPlanId !== acceptedDryRun.acceptedDryRunPlanId) {
+  failures.push('Apply command must carry accepted dry-run id.');
 }
 if (previewCommand.parameters.exposureEv !== adjustments.exposure) failures.push('Exposure did not map to exposureEv.');
 if (previewCommand.parameters.blackPoint !== adjustments.blacks) failures.push('Blacks did not map to blackPoint.');

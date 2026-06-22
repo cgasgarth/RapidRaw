@@ -42,6 +42,8 @@ export interface BasicToneCommandEnvelope {
   expectedGraphRevision: string;
   idempotencyKey?: string;
   parameters: {
+    acceptedDryRunPlanHash?: string;
+    acceptedDryRunPlanId?: string;
     blackPoint: number;
     clarity: number;
     contrast: number;
@@ -85,6 +87,8 @@ export interface BasicToneImageCommandContextOptions {
 }
 
 export interface BasicToneCommandBridgeOptions {
+  acceptedDryRunPlanHash?: string;
+  acceptedDryRunPlanId?: string;
   dryRun: boolean;
   reason?: string;
 }
@@ -168,6 +172,15 @@ export const buildBasicToneCommandEnvelope = (
     schemaVersion: BASIC_TONE_COMMAND_SCHEMA_VERSION,
     target: context.target,
   };
+
+  if (!options.dryRun) {
+    if (options.acceptedDryRunPlanHash === undefined || options.acceptedDryRunPlanId === undefined) {
+      throw new Error('Basic tone apply commands require accepted dry-run plan identity.');
+    }
+
+    envelope.parameters.acceptedDryRunPlanHash = options.acceptedDryRunPlanHash;
+    envelope.parameters.acceptedDryRunPlanId = options.acceptedDryRunPlanId;
+  }
 
   if (context.idempotencyKey !== undefined) {
     envelope.idempotencyKey = context.idempotencyKey;

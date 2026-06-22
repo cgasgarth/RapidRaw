@@ -210,6 +210,12 @@ export type RawEngineLocalAppServerAiEnhancementCommandV1 = z.infer<
   typeof rawEngineLocalAppServerAiEnhancementCommandV1Schema
 >;
 
+type BasicToneCommandV1 = Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.setBasicTone' }>;
+type BasicToneAdjustmentParameterKeyV1 = Exclude<
+  keyof BasicToneCommandV1['parameters'],
+  'acceptedDryRunPlanHash' | 'acceptedDryRunPlanId'
+>;
+
 const rawEngineLocalAppServerAuditCommandProbeV1Schema = z.looseObject({
   approval: z
     .looseObject({
@@ -220,8 +226,11 @@ const rawEngineLocalAppServerAuditCommandProbeV1Schema = z.looseObject({
   commandType: z.string().trim().min(1),
   correlationId: z.string().trim().min(1),
   dryRun: z.boolean(),
+  expectedGraphRevision: z.string().trim().min(1).optional(),
   parameters: z
     .looseObject({
+      acceptedDryRunPlanHash: z.string().trim().min(1).optional(),
+      acceptedDryRunPlanId: z.string().trim().min(1).optional(),
       providerClass: z.enum(['local_model', 'self_hosted_connector', 'cloud_service']).optional(),
       providerId: z.string().trim().min(1).optional(),
     })
@@ -245,6 +254,8 @@ const AI_COMMAND_TYPE_TO_APP_SERVER_TOOL_NAME_LOOKUP = new Map<string, string>(
 
 const rawEngineLocalAppServerAuditResultProbeV1Schema = z.looseObject({
   mutates: z.boolean().optional(),
+  appliedGraphRevision: z.string().trim().min(1).optional(),
+  sourceGraphRevision: z.string().trim().min(1).optional(),
   warnings: z.array(z.string().trim().min(1)),
 });
 
@@ -311,17 +322,27 @@ const DEFAULT_LOCAL_PROJECT_LIBRARY_SNAPSHOT: ProjectLibrarySnapshotV1 = project
 export const rawEngineLocalAppServerAuditEventV1Schema = z
   .object({
     approvalState: z.string().trim().min(1).optional(),
+    appliedGraphRevision: z.string().trim().min(1).optional(),
     commandId: z.string().trim().min(1),
     commandType: z.string().trim().min(1),
     correlationId: z.string().trim().min(1),
     dryRun: z.boolean(),
     eventId: z.string().trim().min(1),
+    expectedGraphRevision: z.string().trim().min(1).optional(),
     mutates: z.boolean(),
+    sourceGraphRevision: z.string().trim().min(1).optional(),
     requestId: z.string().trim().min(1).optional(),
     status: z.enum(['blocked', 'completed', 'rejected']),
     timestampIso: z.iso.datetime(),
     toolName: z.string().trim().min(1).optional(),
     warnings: z.array(z.string().trim().min(1)),
+    acceptedDryRun: z
+      .object({
+        planHash: z.string().trim().min(1),
+        planId: z.string().trim().min(1),
+      })
+      .strict()
+      .optional(),
     providerFallback: z
       .object({
         effectiveProviderClass: z.literal('local_model'),
@@ -350,25 +371,38 @@ const BASIC_TONE_PARAMETER_DIFF_PATHS = {
   saturation: '/parameters/saturation',
   shadows: '/parameters/shadows',
   whitePoint: '/parameters/whitePoint',
-} as const satisfies Record<
-  keyof Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.setBasicTone' }>['parameters'],
-  string
->;
+} as const satisfies Record<BasicToneAdjustmentParameterKeyV1, string>;
 
-const buildBasicToneDryRunResult = (
-  command: Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.setBasicTone' }>,
-): ToneColorDryRunResultV1 =>
+const stableBasicToneHash = (value: string): string => {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+
+  return (hash >>> 0).toString(16).padStart(8, '0');
+};
+
+const buildBasicTonePlanId = (command: BasicToneCommandV1): string =>
+  `dryrun_basic_tone_${stableBasicToneHash(buildBasicTonePlanKey(command))}`;
+
+const buildBasicTonePlanHash = (command: BasicToneCommandV1): string =>
+  `sha256:basic-tone:${stableBasicToneHash(`${buildBasicTonePlanId(command)}:${buildBasicTonePlanKey(command)}`)}`;
+
+const buildBasicToneDryRunResult = (command: BasicToneCommandV1): ToneColorDryRunResultV1 =>
   toneColorDryRunResultV1Schema.parse({
     colorPipeline: command.colorPipeline,
     commandId: command.commandId,
     commandType: command.commandType,
     correlationId: command.correlationId,
     dryRun: true,
+    dryRunPlanHash: buildBasicTonePlanHash(command),
+    dryRunPlanId: buildBasicTonePlanId(command),
     mutates: false,
     parameterDiff: Object.entries(BASIC_TONE_PARAMETER_DIFF_PATHS).map(([key, path]) => ({
       module: 'basic_tone',
       path,
-      value: command.parameters[key as keyof typeof BASIC_TONE_PARAMETER_DIFF_PATHS],
+      value: command.parameters[key as BasicToneAdjustmentParameterKeyV1],
     })),
     predictedGraphRevision: `${command.expectedGraphRevision}:preview:${command.commandId}`,
     previewArtifacts: [],
@@ -377,13 +411,19 @@ const buildBasicToneDryRunResult = (
     warnings: [],
   });
 
-const buildBasicTonePlanKey = (
-  command: Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.setBasicTone' }>,
-): string => JSON.stringify([command.expectedGraphRevision, command.target, command.parameters]);
+const buildBasicTonePlanKey = (command: BasicToneCommandV1): string =>
+  JSON.stringify([
+    command.expectedGraphRevision,
+    command.target,
+    Object.fromEntries(
+      Object.keys(BASIC_TONE_PARAMETER_DIFF_PATHS).map((key) => [
+        key,
+        command.parameters[key as BasicToneAdjustmentParameterKeyV1],
+      ]),
+    ),
+  ]);
 
-const buildBasicToneMutationResult = (
-  command: Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.setBasicTone' }>,
-): ToneColorMutationResultV1 =>
+const buildBasicToneMutationResult = (command: BasicToneCommandV1): ToneColorMutationResultV1 =>
   toneColorMutationResultV1Schema.parse({
     appliedGraphRevision: `${command.expectedGraphRevision}:apply:${command.commandId}`,
     changedNodeIds: [`tone_color_basic:${command.target.kind}`],
@@ -784,7 +824,7 @@ const buildEditorStateResult = (snapshot: ProjectLibrarySnapshotV1): RawEngineLo
 export class RawEngineLocalAppServerBridge {
   readonly #acceptedAiEnhancementDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedAiToolDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
-  readonly #acceptedBasicToneDryRunPlanKeys: Set<string> = new Set<string>();
+  readonly #acceptedBasicToneDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedHslDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #acceptedSkinToneUniformityDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #auditEvents: Array<RawEngineLocalAppServerAuditEventV1> = [];
@@ -844,15 +884,33 @@ export class RawEngineLocalAppServerBridge {
 
     this.#auditEvents.push(
       rawEngineLocalAppServerAuditEventV1Schema.parse({
+        ...(resultProbe.success && resultProbe.data.appliedGraphRevision !== undefined
+          ? { appliedGraphRevision: resultProbe.data.appliedGraphRevision }
+          : {}),
+        ...(commandProbe.data.parameters?.acceptedDryRunPlanHash === undefined ||
+        commandProbe.data.parameters.acceptedDryRunPlanId === undefined
+          ? {}
+          : {
+              acceptedDryRun: {
+                planHash: commandProbe.data.parameters.acceptedDryRunPlanHash,
+                planId: commandProbe.data.parameters.acceptedDryRunPlanId,
+              },
+            }),
         ...(commandProbe.data.approval?.state === undefined ? {} : { approvalState: commandProbe.data.approval.state }),
         commandId: commandProbe.data.commandId,
         commandType: commandProbe.data.commandType,
         correlationId: commandProbe.data.correlationId,
         dryRun: commandProbe.data.dryRun,
         eventId: `audit_${this.#auditEvents.length + 1}_${commandProbe.data.commandId}`,
+        ...(commandProbe.data.expectedGraphRevision === undefined
+          ? {}
+          : { expectedGraphRevision: commandProbe.data.expectedGraphRevision }),
         mutates,
         ...(providerFallback === undefined || result.ok ? {} : { providerFallback }),
         ...(context?.requestId === undefined ? {} : { requestId: context.requestId }),
+        ...(resultProbe.success && resultProbe.data.sourceGraphRevision !== undefined
+          ? { sourceGraphRevision: resultProbe.data.sourceGraphRevision }
+          : {}),
         status,
         timestampIso,
         ...(appServerToolName === undefined ? {} : { toolName: appServerToolName }),
@@ -942,13 +1000,24 @@ export class RawEngineLocalAppServerBridge {
         }
         if (parsedCommand.dryRun) {
           const dryRunResult = buildBasicToneDryRunResult(parsedCommand);
-          this.#acceptedBasicToneDryRunPlanKeys.add(buildBasicTonePlanKey(parsedCommand));
+          if (dryRunResult.dryRunPlanHash === undefined || dryRunResult.dryRunPlanId === undefined) {
+            throw new Error('Local app-server bridge basic-tone dry-run did not produce a plan identity.');
+          }
+
+          this.#acceptedBasicToneDryRunPlanKeys.set(buildBasicTonePlanKey(parsedCommand), {
+            planHash: dryRunResult.dryRunPlanHash,
+            planId: dryRunResult.dryRunPlanId,
+          });
           return dryRunResult;
         }
 
-        const planKey = buildBasicTonePlanKey(parsedCommand);
-        if (!this.#acceptedBasicToneDryRunPlanKeys.has(planKey)) {
-          throw new Error('Local app-server bridge rejected basic-tone apply without a matching dry-run.');
+        const plan = this.#acceptedBasicToneDryRunPlanKeys.get(buildBasicTonePlanKey(parsedCommand));
+        if (
+          plan === undefined ||
+          plan.planHash !== parsedCommand.parameters.acceptedDryRunPlanHash ||
+          plan.planId !== parsedCommand.parameters.acceptedDryRunPlanId
+        ) {
+          throw new Error('Local app-server bridge rejected basic-tone apply without a matching accepted dry-run.');
         }
 
         return buildBasicToneMutationResult(parsedCommand);

@@ -101,6 +101,8 @@ export function createToneColorSchemasV1(dependencies: ToneColorSchemaDependenci
               clarity: z.number().min(-100).max(100),
               contrast: z.number().min(-100).max(100),
               exposureEv: z.number().min(-10).max(10),
+              acceptedDryRunPlanHash: z.string().trim().min(1).optional(),
+              acceptedDryRunPlanId: z.string().trim().min(1).optional(),
               highlights: z.number().min(-100).max(100),
               saturation: z.number().min(-100).max(100),
               shadows: z.number().min(-100).max(100),
@@ -334,6 +336,24 @@ export function createToneColorSchemasV1(dependencies: ToneColorSchemaDependenci
         return;
       }
 
+      if (command.commandType === 'toneColor.setBasicTone') {
+        if (command.parameters.acceptedDryRunPlanId === undefined) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Applied basic tone commands require acceptedDryRunPlanId from a matching dry-run.',
+            path: ['parameters', 'acceptedDryRunPlanId'],
+          });
+        }
+
+        if (command.parameters.acceptedDryRunPlanHash === undefined) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Applied basic tone commands require acceptedDryRunPlanHash from a matching dry-run.',
+            path: ['parameters', 'acceptedDryRunPlanHash'],
+          });
+        }
+      }
+
       if (command.approval.approvalClass !== dependencies.approvalClass.EditApply) {
         context.addIssue({
           code: 'custom',
@@ -376,6 +396,8 @@ export function createToneColorSchemasV1(dependencies: ToneColorSchemaDependenci
       commandId: z.string().trim().min(1),
       commandType: toneColorCommandTypeV1Schema,
       correlationId: z.string().trim().min(1),
+      dryRunPlanHash: z.string().trim().min(1).optional(),
+      dryRunPlanId: z.string().trim().min(1).optional(),
       dryRun: z.literal(true),
       mutates: z.literal(false),
       parameterDiff: z.array(toneColorParameterDiffV1Schema),

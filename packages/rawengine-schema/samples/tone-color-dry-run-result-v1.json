@@ -2,6 +2,8 @@
   "commandId": "command_tone_color_basic_preview_sample",
   "commandType": "toneColor.setBasicTone",
   "correlationId": "corr_tone_color_basic_preview_sample",
+  "dryRunPlanHash": "sha256:basic-tone:74497b13",
+  "dryRunPlanId": "dryrun_basic_tone_7500c11a",
   "dryRun": true,
   "mutates": false,
   "parameterDiff": [

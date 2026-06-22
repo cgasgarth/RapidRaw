@@ -106,7 +106,11 @@ const context = buildBasicToneImageCommandContext({
   operationId: 'command_replay_render_001',
   sessionId: 'command-replay-render-proof',
 });
-const command = buildBasicToneCommandEnvelope(editedAdjustments, context, { dryRun: false });
+const command = buildBasicToneCommandEnvelope(editedAdjustments, context, {
+  acceptedDryRunPlanHash: 'sha256:basic-tone:command-replay-render',
+  acceptedDryRunPlanId: 'dryrun_basic_tone_command_replay_render',
+  dryRun: false,
+});
 const parsedCommand = toneColorCommandEnvelopeV1Schema.parse(command);
 const pushed = pushEditHistoryEntry([structuredClone(INITIAL_ADJUSTMENTS)], 0, commandToAdjustments(parsedCommand));
 const replayedAdjustments = pushed.history[pushed.historyIndex];
