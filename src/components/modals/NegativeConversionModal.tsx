@@ -954,6 +954,13 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       sourcePathsByFrameId,
     });
   }, [frameHealthReport.frames, pathsToConvert.length, qcProofReport, targetPaths.length]);
+  const activePositiveVariant = useMemo(
+    () =>
+      qcProofArtifact.positiveVariants.find((variant) => variant.frameId === frameHealthReport.activeFrameId) ??
+      qcProofArtifact.positiveVariants[0] ??
+      null,
+    [frameHealthReport.activeFrameId, qcProofArtifact.positiveVariants],
+  );
   const workspaceProof = useMemo(
     (): NegativeLabWorkspaceProof => ({
       activeStage: canSave ? 'export' : previewUrl === null ? 'colorInversion' : 'inspection',
@@ -2761,6 +2768,82 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     </div>
   );
 
+  const renderPositiveVariantHandoff = () => {
+    if (activePositiveVariant === null) return null;
+
+    const handoffReady = canSave && qcProofReport.exportReady && activePositiveVariant.warnings.length === 0;
+    const baseScopeLabelKey =
+      baseFogScope === 'roll' ? 'modals.negativeConversion.baseScopeRoll' : 'modals.negativeConversion.baseScopeFrame';
+    const selectedProfileId = selectedProfile?.presetId ?? 'custom';
+    const provenanceLink = qcProofArtifact.proofId;
+
+    return (
+      <div
+        className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+        data-base-scope={baseFogScope}
+        data-export-ready={handoffReady ? 'true' : 'false'}
+        data-output-format={saveOptions.outputFormat}
+        data-profile-id={selectedProfileId}
+        data-provenance-link={provenanceLink}
+        data-source-frame-id={activePositiveVariant.frameId}
+        data-testid="negative-lab-positive-handoff"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <UiText variant={TextVariants.small} className="font-medium text-text-primary">
+            {t('modals.negativeConversion.positiveHandoff')}
+          </UiText>
+          <span
+            className={cx(
+              'rounded px-1.5 py-0.5 text-[11px]',
+              handoffReady ? 'bg-accent/15 text-text-primary' : 'bg-bg-secondary text-text-tertiary',
+            )}
+            data-testid="negative-lab-positive-handoff-readiness"
+          >
+            {t(
+              handoffReady
+                ? 'modals.negativeConversion.positiveHandoffReady'
+                : 'modals.negativeConversion.positiveHandoffReview',
+            )}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-1 text-[11px] text-text-tertiary">
+          <span className="truncate rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-positive-frame">
+            {t('modals.negativeConversion.positiveHandoffFrame', { frameId: activePositiveVariant.frameId })}
+          </span>
+          <span
+            className="truncate rounded bg-bg-secondary px-1.5 py-0.5"
+            data-testid="negative-lab-positive-profile"
+            title={selectedProfileId}
+          >
+            {t('modals.negativeConversion.positiveHandoffProfile', { profileId: selectedProfileId })}
+          </span>
+          <span className="truncate rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-positive-base">
+            {t(baseScopeLabelKey)}
+          </span>
+          <span className="truncate rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-positive-format">
+            {t(`modals.negativeConversion.outputFormats.${saveOptions.outputFormat}`)}
+          </span>
+          <span
+            className="truncate rounded bg-bg-secondary px-1.5 py-0.5"
+            data-testid="negative-lab-positive-sidecar"
+            title={activePositiveVariant.outputArtifact.artifactId}
+          >
+            {t('modals.negativeConversion.positiveHandoffSidecar', {
+              artifactId: activePositiveVariant.outputArtifact.artifactId,
+            })}
+          </span>
+          <span
+            className="truncate rounded bg-bg-secondary px-1.5 py-0.5"
+            data-testid="negative-lab-positive-provenance"
+            title={provenanceLink}
+          >
+            {t('modals.negativeConversion.positiveHandoffProvenance', { proofId: provenanceLink })}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   const renderControls = () => (
     <div className="modal-adjustments-pane w-80 shrink-0 bg-bg-secondary flex flex-col border-l border-surface h-full z-10">
       <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
@@ -4230,6 +4313,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             </div>
             {renderDustScratchReview()}
             {renderQcProofReport()}
+            {renderPositiveVariantHandoff()}
             <Slider
               label={t('modals.negativeConversion.redWeight')}
               value={params.red_weight}

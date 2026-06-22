@@ -14,7 +14,7 @@
       "displayName": "C-41 Portrait",
       "presetId": "negative_lab.generic.c41.portrait.v1",
       "processFamily": "c41_color_negative",
-      "profileProvenanceHash": "fnv1a32:468872b8",
+      "profileProvenanceHash": "fnv1a32:9ed1e301",
       "runtimeStatus": "runtime_parameter_applied",
       "stockFamilyDescriptor": "Soft portrait color negative"
     },
@@ -47,7 +47,7 @@
       "acceptedDryRunPlanId": "negative_lab_batch_plan_2f4a91bc",
       "conversionBundle": true,
       "outputFormat": "jpeg_proof",
-      "profileProvenanceHash": "fnv1a32:468872b8",
+      "profileProvenanceHash": "fnv1a32:9ed1e301",
       "suffix": "Positive"
     },
     "preset": {
@@ -62,6 +62,15 @@
   "issue": 2311,
   "proofBoundary": "public_jpeg_scan_ui_smoke_not_raw_scan_e2e",
   "proofStatus": "public_scan_positive_export_ui_smoke",
+  "positiveHandoff": {
+    "baseSampleScope": "frame",
+    "exportReady": true,
+    "outputFormat": "jpeg_proof",
+    "profileId": "negative_lab.generic.c41.portrait.v1",
+    "provenanceLink": "fnv1a64:20cf2ca592bd20fc",
+    "sidecarPath": "src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg.rrdata",
+    "sourceFrameId": "negative_lab.real.public.cc0_110_ericht_negative_001"
+  },
   "schemaVersion": 1,
   "sourcePath": "fixtures/negative-lab/public/110-format-ericht-negative-cc0-320.jpg",
   "validationCommands": [

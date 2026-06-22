@@ -124,6 +124,19 @@ const uiProofReportSchema = z
     issue: z.literal(2311),
     proofBoundary: z.literal('public_jpeg_scan_ui_smoke_not_raw_scan_e2e'),
     proofStatus: z.literal('public_scan_positive_export_ui_smoke'),
+    positiveHandoff: z
+      .object({
+        baseSampleScope: z.literal('frame'),
+        exportReady: z.literal(true),
+        outputFormat: z.literal('jpeg_proof'),
+        profileId: z.literal('negative_lab.generic.c41.portrait.v1'),
+        provenanceLink: fnvHashSchema,
+        sidecarPath: z.literal(
+          'src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg.rrdata',
+        ),
+        sourceFrameId: z.literal('negative_lab.real.public.cc0_110_ericht_negative_001'),
+      })
+      .strict(),
     schemaVersion: z.literal(1),
     sourcePath: z.literal('fixtures/negative-lab/public/110-format-ericht-negative-cc0-320.jpg'),
     validationCommands: z
@@ -207,6 +220,15 @@ const expectedReport = uiProofReportSchema.parse({
   issue: 2311,
   proofBoundary: 'public_jpeg_scan_ui_smoke_not_raw_scan_e2e',
   proofStatus: 'public_scan_positive_export_ui_smoke',
+  positiveHandoff: {
+    baseSampleScope: 'frame',
+    exportReady: true,
+    outputFormat: exportReport.output.format,
+    profileId: exportReport.appliedProfile.presetId,
+    provenanceLink: exportReport.output.contentHash,
+    sidecarPath: exportReport.sidecar.path,
+    sourceFrameId: exportReport.fixtureId,
+  },
   schemaVersion: 1,
   sourcePath: exportReport.source.path,
   validationCommands: [
