@@ -236,11 +236,11 @@
     <main class="page">
       <header>
         <div class="meta">
-          <span class="pill">Snapshot: 2026-06-21</span>
-          <span class="pill">Issue: #1259</span>
-          <span class="pill">Issue: #1856</span>
-          <span class="pill">Issue: #2884</span>
-          <span class="pill">Issue: #2892</span>
+          <span class="pill">Snapshot: 2026-06-22</span>
+          <span class="pill">Issue: #3094</span>
+          <span class="pill">Issue: #3100</span>
+          <span class="pill">Issue: #3101</span>
+          <span class="pill">Issue: #3103</span>
           <span class="pill">Maintained: 2026-06-22</span>
           <span class="pill">Local review artifact</span>
           <span class="pill">Offline-first</span>
@@ -315,7 +315,7 @@
                 before/after handoff UI smoke.
               </td>
               <td>
-                Full expert-agent planning, live tool invocation, and broader rendered screenshots remain future work.
+                Issue #3100 still needs a live image-editing prompt walkthrough with audit replay and output proof.
               </td>
             </tr>
             <tr>
@@ -331,28 +331,28 @@
                 <code>bun run check:sidecar-roundtrip</code> validates sidecar fixture semantics for AI provenance, HDR,
                 panorama, focus-stack, super-resolution, and Negative Lab artifacts.
               </td>
-              <td>Rust-side sidecar integration and migration tests are not complete.</td>
+              <td>Rust-side sidecar integration and migration breadth remains future work.</td>
             </tr>
             <tr>
               <td>User-visible UI features</td>
-              <td><span class="status partial">In progress</span></td>
+              <td><span class="status partial">Runtime/UI proof</span></td>
               <td>
                 Visual-smoke scenarios now cover HDR, panorama, focus stack, super-resolution, film look browser,
                 Negative Lab workspace, color workflow, and library/editor shells.
               </td>
               <td>
-                Most computational-photo paths remain UI/API/dry-run or synthetic-smoke only, not final E2E apply.
+                Private RAW runs, image-output QA, and export parity remain required before Capture One-class claims.
               </td>
             </tr>
             <tr>
               <td>Image-processing proof</td>
-              <td><span class="status partial">Synthetic proof</span></td>
+              <td><span class="status partial">Runtime apply proof</span></td>
               <td>
                 Runtime apply checks now render synthetic HDR, panorama, focus stack, and super-resolution outputs with
                 app-server/UI bridge coverage, output-derived artifact hashes, and quality provenance for HDR/SR/focus
                 plus panorama quality metrics.
               </td>
-              <td>Real RAW before/after proof and export parity remain required before feature completion.</td>
+              <td>Real RAW before/after proof and final export parity remain required before feature completion.</td>
             </tr>
             <tr>
               <td>RAW open/edit/export proof</td>
@@ -362,9 +362,7 @@
                 <code>bun run check:raw-open-edit-export-run-reports</code> validate manifest-only public schema and
                 fail closed before a proof can be marked accepted without private artifact hashes and run reports.
               </td>
-              <td>
-                Actual private RAW open, typed edit command, preview/export, sidecar reload, and pixel-delta proof.
-              </td>
+              <td>Issue #3094 remains open for the full Negative Lab import-to-export walkthrough and output proof.</td>
             </tr>
           </tbody>
         </table>
@@ -388,19 +386,19 @@
           <tbody>
             <tr>
               <td><span class="status gap">plan-only</span></td>
-              <td>Final review page</td>
+              <td>Future roadmap-only rows</td>
               <td><code>docs/validation/goal-review-2026-06-11.html</code></td>
               <td>Tracked in the roadmap/review surface, but not proof of product runtime behavior.</td>
             </tr>
             <tr>
               <td><span class="status gap">schema-only</span></td>
-              <td>RAW open/edit/export ledger</td>
+              <td>Legacy RAW open/edit/export ledger</td>
               <td><code>docs/validation/raw-open-edit-export-runtime-status-2026-06-18.json</code></td>
               <td>Contracts and ledgers exist, but accepted private RAW run reports are still required.</td>
             </tr>
             <tr>
               <td><span class="status partial">dry-run-only</span></td>
-              <td>Computational app-server bridges</td>
+              <td>App-server bridges without image output</td>
               <td><code>docs/validation/computational-merge-runtime-status-2026-06-18.json</code></td>
               <td>Tool/bridge path is checked without claiming final image-quality or UI walkthrough proof.</td>
             </tr>
@@ -412,7 +410,7 @@
             </tr>
             <tr>
               <td><span class="status done">UI E2E-proven</span></td>
-              <td>Negative Lab QC contact sheet</td>
+              <td>Negative Lab QC contact sheet and positive handoff</td>
               <td><code>docs/validation/negative-lab-qc-contact-sheet-proof-2026-06-16.svg</code></td>
               <td>Committed user-visible feature artifact; feature UIs still need their own runtime proof.</td>
             </tr>
@@ -436,45 +434,53 @@
               <td>HDR merge workspace</td>
               <td><span class="status partial">Runtime apply proof</span></td>
               <td>
-                PRs #1586, #1592, and #1598, <code>bun run check:hdr-runtime-plan-smoke</code>,
-                <code>bun run check:hdr-app-server-runtime</code>, <code>bun run check:hdr-ui-runtime-bridge</code>.
-                Runtime smoke records clipping, motion pixels, and synthetic reconstruction MAE.
+                <code>bun run check:hdr-runtime-plan-smoke</code>, <code>bun run check:hdr-app-server-runtime</code>,
+                <code>bun run check:hdr-ui-runtime-bridge</code>,
+                <code>bun run check:hdr-synthetic-output-artifact</code>, and
+                <code>bun run check:hdr-editable-handoff</code>. Runtime smoke records clipping, motion pixels,
+                synthetic reconstruction MAE, saved artifact source, and editor handoff.
               </td>
-              <td>Real bracket merge, preview/export parity, tone mapping, and deghost quality gates.</td>
+              <td>More real bracket coverage, preview/export parity, tone mapping, and deghost quality gates.</td>
             </tr>
             <tr>
               <td>Panorama workspace</td>
               <td><span class="status partial">Runtime apply proof</span></td>
               <td>
-                PRs #1588, #1590, and #1805, <code>bun run check:panorama-runtime-plan-smoke</code>,
+                <code>bun run check:panorama-runtime-plan-smoke</code>,
                 <code>bun run check:panorama-app-server-runtime</code>,
-                <code>bun run check:panorama-ui-runtime-bridge</code>. Runtime smoke records crop coverage, overlap
-                area, output/source pixels, and stitched-source ratio.
+                <code>bun run check:panorama-ui-runtime-bridge</code>,
+                <code>bun run check:panorama-saved-review-smoke</code>, and
+                <code>bun run check:panorama-real-raw-private-proof-summary</code>. Runtime smoke records crop coverage,
+                overlap area, output/source pixels, stitched-source ratio, saved review path, and private proof summary
+                metadata.
               </td>
-              <td>Production seam search, projection engines, tiling path, and real photo validation.</td>
+              <td>Production seam search, projection engines, tiling path, and broader real photo validation.</td>
             </tr>
             <tr>
               <td>Focus stack workspace</td>
               <td><span class="status partial">Runtime apply proof</span></td>
               <td>
-                PRs #1587, #1591, #1599, #1805, and #1806,
                 <code>bun run check:focus-runtime-plan-smoke</code>,
                 <code>bun run check:focus-app-server-runtime</code>, <code>bun run check:focus-ui-runtime-bridge</code>,
-                and <code>bun run check:sidecar-roundtrip</code>. Runtime smoke records alignment, source coverage,
-                winning confidence, low-confidence area, retouch recommendation, and persisted sharpness settings.
+                <code>bun run check:focus-synthetic-output-artifact</code>,
+                <code>bun run check:focus-blend-runtime-proof</code>, and
+                <code>bun run check:focus-private-raw-modal-review-smoke</code>. Runtime smoke records alignment, source
+                coverage, winning confidence, low-confidence area, retouch recommendation, and persisted sharpness
+                settings.
               </td>
-              <td>Depth-map/laplacian production blending, halo controls, and RAW fixture proof.</td>
+              <td>More real focus-stack RAW proof, halo controls, and export parity.</td>
             </tr>
             <tr>
               <td>Super-resolution workspace</td>
               <td><span class="status partial">Runtime apply proof</span></td>
               <td>
-                PRs #1589 and #1597, <code>bun run check:sr-runtime-plan-smoke</code>,
-                <code>bun run check:sr-app-server-runtime</code>, <code>bun run check:sr-ui-runtime-bridge</code>.
-                Runtime smoke records confidence-map coverage, detail quality, frame registrations, and improvement
-                ratio.
+                <code>bun run check:sr-runtime-plan-smoke</code>, <code>bun run check:sr-app-server-runtime</code>,
+                <code>bun run check:sr-ui-runtime-bridge</code>, <code>bun run check:sr-sidecar-provenance</code>,
+                <code>bun run check:sr-synthetic-output-artifact</code>, and
+                <code>bun run check:sr-private-raw-modal-review-smoke</code>. Runtime smoke records confidence-map
+                coverage, detail quality, frame registrations, improvement ratio, sidecar provenance, and modal review.
               </td>
-              <td>Model/optical-flow SR, artifact quality review, and real burst RAW validation.</td>
+              <td>Model/optical-flow SR, richer artifact quality review, and broader real burst RAW validation.</td>
             </tr>
             <tr>
               <td>Layers and masks</td>
@@ -521,7 +527,7 @@
                 backed by Zod schema validation and app-server route coverage.
               </td>
               <td>
-                Major stock preset expansion, real scan processing, pixel retouch, contact-sheet export, and export
+                Issue #3094 remains open for the full import-to-export lab walkthrough, real scan export, and output
                 parity.
               </td>
             </tr>
@@ -585,6 +591,16 @@
               <a href="agent-replay-proof-gallery-2026-06-16.html">agent replay proof gallery</a> document the
               before/after artifact IDs, accepted app-server dry-run, virtual-copy apply, audit link, and rollback
               target used by the visible agent handoff.
+            </p>
+          </div>
+          <div class="artifact">
+            <h3>Computational Runtime Proofs</h3>
+            <p>
+              <a href="hdr-synthetic-output-artifact-proof-2026-06-20.json">HDR</a>,
+              <a href="panorama-real-raw-private-proof-2026-06-20.json">panorama</a>,
+              <a href="focus-synthetic-output-artifact-proof-2026-06-20.json">focus stack</a>, and
+              <a href="sr-synthetic-output-artifact-proof-2026-06-20.json">super-resolution</a> artifacts keep runtime
+              apply evidence visible without treating synthetic proof as final product-quality proof.
             </p>
           </div>
         </div>
@@ -845,16 +861,9 @@
           <li>Before/after renders for editing features.</li>
           <li>Golden image outputs and perceptual comparison reports.</li>
           <li>Live OpenAI app-server agent prompt walkthrough screenshots beyond the committed replay demo.</li>
-          <li>Negative Lab real-scan workflow screenshots and QC overlays.</li>
-          <li>
-            HDR private ARW bracket files for <code>private-fixtures/hdr/bracket-alignment-v1/</code>; the proof runner
-            is wired, but no private run report exists yet.
-          </li>
-          <li>
-            Focus CR3, super-resolution NEF, and panorama RAF private source files for the computational E2E proof
-            slots.
-          </li>
-          <li>Panorama, focus stack, and super-resolution real-image runtime reports.</li>
+          <li>Negative Lab full import-to-export workflow screenshots, QC overlays, and export comparison.</li>
+          <li>Broader private RAW fixture coverage beyond the current HDR/focus/SR/panorama proof summaries.</li>
+          <li>Panorama, focus stack, and super-resolution final-quality real-image runtime reports.</li>
           <li>Accessibility and high-DPI UI screenshots.</li>
         </ul>
       </section>
