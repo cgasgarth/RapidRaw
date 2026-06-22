@@ -7,6 +7,7 @@ import { useModalTransition } from '../../hooks/useModalTransition';
 import { TextColors, TextVariants } from '../../types/typography';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
 import { buildHdrEditableHandoffSummary } from '../../utils/hdrEditableHandoff';
+import { buildHdrReviewDiagnostics } from '../../utils/hdrReviewDiagnostics';
 import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerBadge';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
@@ -92,6 +93,12 @@ export default function HdrModal({
     0,
     Math.round(((imageCount ?? 0) * settings.maxPreviewDimensionPx ** 2 * 4) / 1_000_000),
   );
+  const reviewDiagnostics = buildHdrReviewDiagnostics({
+    bracketPreflight,
+    imageCount: imageCount ?? 0,
+    isMergeReady,
+    settings,
+  });
 
   const setSetting = useCallback(
     (patch: Partial<HdrMergeUiSettings>) => {
@@ -507,6 +514,83 @@ export default function HdrModal({
               </UiText>
             </div>
           )}
+
+          <section
+            className="mb-5 rounded-md border border-border-color bg-surface p-3"
+            data-alignment-confidence-percent={reviewDiagnostics.alignment.confidencePercent}
+            data-alignment-mode={reviewDiagnostics.alignment.mode}
+            data-clipping-risk={reviewDiagnostics.tone.clippingRisk}
+            data-deghost-level={reviewDiagnostics.deghost.level}
+            data-motion-risk={reviewDiagnostics.deghost.motionRisk}
+            data-non-claims={reviewDiagnostics.nonClaims.join(',')}
+            data-proof-level={reviewDiagnostics.proofLevel}
+            data-review-decision={reviewDiagnostics.reviewDecision}
+            data-tone-policy={reviewDiagnostics.tone.policy}
+            data-warning-codes={reviewDiagnostics.warningCodes.join(',')}
+            data-warning-severity={reviewDiagnostics.warningSeverity}
+            data-testid="hdr-review-diagnostics-panel"
+          >
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <UiText variant={TextVariants.heading}>{t('modals.hdr.reviewDiagnosticsTitle')}</UiText>
+              <UiText
+                as="span"
+                variant={TextVariants.small}
+                className={`rounded px-2 py-0.5 ${
+                  reviewDiagnostics.warningSeverity === 'blocked'
+                    ? 'bg-red-500/15 text-red-300'
+                    : reviewDiagnostics.warningSeverity === 'review'
+                      ? 'bg-yellow-500/15 text-yellow-200'
+                      : 'bg-accent/15 text-accent'
+                }`}
+              >
+                {t(`modals.hdr.reviewSeverity.${reviewDiagnostics.warningSeverity}`)}
+              </UiText>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              {[
+                {
+                  label: t('modals.hdr.reviewAlignment'),
+                  status: reviewDiagnostics.alignment.status,
+                  value: t('modals.hdr.reviewAlignmentValue', {
+                    confidence: reviewDiagnostics.alignment.confidencePercent,
+                    mode: selectedAlignmentLabel,
+                  }),
+                },
+                {
+                  label: t('modals.hdr.reviewDeghost'),
+                  status: reviewDiagnostics.deghost.status,
+                  value: t('modals.hdr.reviewDeghostValue', {
+                    level: t(`modals.hdr.deghosting.${reviewDiagnostics.deghost.level}`),
+                    risk: t(`modals.hdr.reviewRisk.${reviewDiagnostics.deghost.motionRisk}`),
+                  }),
+                },
+                {
+                  label: t('modals.hdr.reviewTone'),
+                  status: reviewDiagnostics.tone.status,
+                  value: t('modals.hdr.reviewToneValue', {
+                    risk: t(`modals.hdr.reviewRisk.${reviewDiagnostics.tone.clippingRisk}`),
+                  }),
+                },
+              ].map((item) => (
+                <div
+                  className="rounded border border-border-color bg-bg-primary px-2 py-1.5"
+                  data-review-status={item.status}
+                  data-testid="hdr-review-diagnostic-row"
+                  key={item.label}
+                >
+                  <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                    {item.label}
+                  </UiText>
+                  <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                    {item.value}
+                  </UiText>
+                </div>
+              ))}
+            </div>
+            <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-3 block leading-relaxed">
+              {t('modals.hdr.reviewDiagnosticsLimit')}
+            </UiText>
+          </section>
 
           <section className="grid grid-cols-2 gap-4">
             <div>

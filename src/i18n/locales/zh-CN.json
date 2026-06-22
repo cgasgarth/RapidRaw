@@ -1906,6 +1906,25 @@
       },
       "qualityLabel": "Quality",
       "retry": "重试",
+      "reviewAlignment": "",
+      "reviewAlignmentValue": "",
+      "reviewDeghost": "",
+      "reviewDeghostValue": "",
+      "reviewDiagnosticsLimit": "",
+      "reviewDiagnosticsTitle": "",
+      "reviewRisk": {
+        "high": "High",
+        "low": "Low",
+        "medium": "Medium",
+        "none": "None"
+      },
+      "reviewSeverity": {
+        "blocked": "Blocked",
+        "ok": "Ready",
+        "review": "Review"
+      },
+      "reviewTone": "",
+      "reviewToneValue": "",
       "save": "保存",
       "savedSuccess": "HDR 保存成功！",
       "sourceCountBlocked": "Select at least two bracketed exposures before merging.",

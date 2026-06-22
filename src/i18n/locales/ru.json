@@ -1264,7 +1264,18 @@
       "handoffNoSourceRefs": "No source refs recorded",
       "handoffSourceCount": "Source count",
       "handoffSourceRefs": "Source refs",
-      "handoffToneMappedNotice": "Saved HDR opens as an editable derived source. The current output is display-referred and tone-mapped; RAW-quality HDR color claims require bracketed RAW validation."
+      "handoffToneMappedNotice": "Saved HDR opens as an editable derived source. The current output is display-referred and tone-mapped; RAW-quality HDR color claims require bracketed RAW validation.",
+      "reviewRisk": {
+        "high": "High",
+        "low": "Low",
+        "medium": "Medium",
+        "none": "None"
+      },
+      "reviewSeverity": {
+        "blocked": "Blocked",
+        "ok": "Ready",
+        "review": "Review"
+      }
     },
     "importSettings": {
       "cancel": "Отмена",
