@@ -10,6 +10,7 @@ import {
   aiToolCommandEnvelopeV1Schema,
   aiToolDryRunResultV1Schema,
   projectLibrarySnapshotV1Schema,
+  rawEngineToolRegistryV1Schema,
   toneColorCommandEnvelopeV1Schema,
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
@@ -251,6 +252,27 @@ const AI_COMMAND_TYPE_TO_APP_SERVER_TOOL_NAME = {
 const AI_COMMAND_TYPE_TO_APP_SERVER_TOOL_NAME_LOOKUP = new Map<string, string>(
   Object.entries(AI_COMMAND_TYPE_TO_APP_SERVER_TOOL_NAME),
 );
+
+const RAW_ENGINE_LOCAL_APP_SERVER_EXECUTABLE_TOOL_NAMES = new Set([
+  'agent.editor_state.query',
+  'agent.image_metadata.query',
+  'agent.project_metadata.query',
+  'agent.selected_images.query',
+  'ai.enhancement.apply_command',
+  'ai.enhancement.dry_run_command',
+  'ai.mask.apply_subject',
+  'ai.mask.dry_run_subject',
+  'tonecolor.apply_command',
+  'tonecolor.dry_run_command',
+]);
+
+export const filterRawEngineLocalAppServerExecutableToolRegistry = (
+  registry: RawEngineToolRegistryV1,
+): RawEngineToolRegistryV1 =>
+  rawEngineToolRegistryV1Schema.parse({
+    ...registry,
+    tools: registry.tools.filter((tool) => RAW_ENGINE_LOCAL_APP_SERVER_EXECUTABLE_TOOL_NAMES.has(tool.toolName)),
+  });
 
 const rawEngineLocalAppServerAuditResultProbeV1Schema = z.looseObject({
   mutates: z.boolean().optional(),
@@ -846,7 +868,9 @@ export class RawEngineLocalAppServerBridge {
     this.#projectLibrarySnapshot = projectLibrarySnapshotV1Schema.parse(
       options.projectLibrarySnapshot ?? DEFAULT_LOCAL_PROJECT_LIBRARY_SNAPSHOT,
     );
-    this.#toolRegistry = options.toolRegistry ?? rawEngineDefaultToolRegistryV1;
+    this.#toolRegistry = filterRawEngineLocalAppServerExecutableToolRegistry(
+      options.toolRegistry ?? rawEngineDefaultToolRegistryV1,
+    );
     this.#registerHandlers();
   }
 
