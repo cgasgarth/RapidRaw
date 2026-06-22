@@ -16,6 +16,7 @@ type SuperResolutionArtifactReviewInput = {
     };
   };
   qualityPreference: SuperResolutionUiSettings['qualityPreference'];
+  reconstructionMode?: SuperResolutionUiSettings['reconstructionMode'];
   requestedOutputScale: number;
   resolvedAlignmentMode: SuperResolutionUiSettings['alignmentMode'];
   staleState: {
@@ -114,6 +115,7 @@ export const buildSuperResolutionOutputReviewFromArtifact = (
     overlapCoverageRatio: artifactValue.validationSummary.overlapCoverageRatio ?? null,
     proofLevel: 'synthetic_runtime',
     qualityPreference: artifactValue.qualityPreference,
+    reconstructionMode: artifactValue.reconstructionMode ?? 'model_detail',
     reviewArtifacts: superResolutionSyntheticReviewArtifacts,
     reviewCropCount,
     reviewPacketPath,
@@ -179,6 +181,7 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
     overlapCoverageRatio: null,
     proofLevel: 'synthetic_runtime',
     qualityPreference: settings.qualityPreference,
+    reconstructionMode: settings.reconstructionMode,
     reviewArtifacts: superResolutionSyntheticReviewArtifacts,
     reviewCropCount,
     reviewPacketPath,

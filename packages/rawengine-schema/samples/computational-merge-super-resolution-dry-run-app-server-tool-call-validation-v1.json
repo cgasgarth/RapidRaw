@@ -361,6 +361,7 @@
         "outputName": "Handheld Burst Super Resolution",
         "outputScale": 2,
         "qualityPreference": "best",
+        "reconstructionMode": "model_detail",
         "sources": [
           {
             "colorSpaceHint": "camera_rgb",

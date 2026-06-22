@@ -30,6 +30,7 @@ const settings = {
   maxPreviewDimensionPx: 4096,
   outputScale: 2,
   qualityPreference: 'balanced',
+  reconstructionMode: 'optical_flow',
 } as const;
 const routePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');
 const packageCommand = buildSuperResolutionUiDryRunCommandV1(
@@ -40,6 +41,7 @@ const packageCommand = buildSuperResolutionUiDryRunCommandV1(
     outputName: 'Super-resolution dry-run preview',
     outputScale: settings.outputScale,
     qualityPreference: settings.qualityPreference,
+    reconstructionMode: settings.reconstructionMode,
     sources: sourcePaths.map((imagePath, sourceIndex) => ({
       imagePath,
       sourceIndex,
@@ -96,6 +98,9 @@ if (settings.outputScale !== packageCommand.parameters.outputScale) {
 }
 if (settings.detailPolicy !== packageCommand.parameters.detailPolicy) {
   failures.push('Super-resolution UI action detail policy must match package command builder.');
+}
+if (settings.reconstructionMode !== packageCommand.parameters.reconstructionMode) {
+  failures.push('Super-resolution UI action reconstruction mode must match package command builder.');
 }
 
 if (failures.length > 0) {

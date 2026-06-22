@@ -44,6 +44,7 @@ const controls = {
   outputName: 'Synthetic UI Runtime SR',
   outputScale: SCALE,
   qualityPreference: 'best',
+  reconstructionMode: 'optical_flow',
   sources: frames.map((frame) => ({
     colorSpaceHint: 'camera_rgb',
     exposureEv: 0,
@@ -94,6 +95,9 @@ if (outputReview.humanReviewStatus !== 'pending') {
 }
 if (outputReview.outputArtifactHash !== applied.apply.sidecarArtifact.outputArtifact.contentHash) {
   throw new Error('SR output review did not preserve output artifact hash.');
+}
+if (outputReview.reconstructionMode !== 'optical_flow') {
+  throw new Error(`Expected sidecar artifact review reconstruction mode, got ${outputReview.reconstructionMode}.`);
 }
 if (!outputReview.warningCodes.includes('human_review_required')) {
   throw new Error('SR output review must keep human-review warning.');

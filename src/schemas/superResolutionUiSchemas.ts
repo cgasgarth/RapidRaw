@@ -4,6 +4,7 @@ export const superResolutionAlignmentModeSchema = z.enum(['auto', 'translation',
 export const superResolutionDetailPolicySchema = z.enum(['conservative', 'balanced', 'aggressive_preview_only']);
 export const superResolutionModeSchema = z.enum(['conservative', 'standard', 'aggressive']);
 export const superResolutionQualityPreferenceSchema = z.enum(['preview', 'balanced', 'best']);
+export const superResolutionReconstructionModeSchema = z.enum(['model_detail', 'optical_flow']);
 
 export const superResolutionUiSettingsSchema = z
   .object({
@@ -12,6 +13,7 @@ export const superResolutionUiSettingsSchema = z
     maxPreviewDimensionPx: z.number().int().positive().max(8192),
     outputScale: z.number().min(1.1).max(4),
     qualityPreference: superResolutionQualityPreferenceSchema,
+    reconstructionMode: superResolutionReconstructionModeSchema,
     sourceMode: z.literal('multi_image'),
   })
   .strict();
@@ -21,6 +23,7 @@ export type SuperResolutionAlignmentMode = z.infer<typeof superResolutionAlignme
 export type SuperResolutionDetailPolicy = z.infer<typeof superResolutionDetailPolicySchema>;
 export type SuperResolutionMode = z.infer<typeof superResolutionModeSchema>;
 export type SuperResolutionQualityPreference = z.infer<typeof superResolutionQualityPreferenceSchema>;
+export type SuperResolutionReconstructionMode = z.infer<typeof superResolutionReconstructionModeSchema>;
 
 export const DEFAULT_SUPER_RESOLUTION_UI_SETTINGS = superResolutionUiSettingsSchema.parse({
   alignmentMode: 'auto',
@@ -28,6 +31,7 @@ export const DEFAULT_SUPER_RESOLUTION_UI_SETTINGS = superResolutionUiSettingsSch
   maxPreviewDimensionPx: 2400,
   outputScale: 2,
   qualityPreference: 'best',
+  reconstructionMode: 'model_detail',
   sourceMode: 'multi_image',
 });
 
