@@ -1,0 +1,136 @@
+import { z } from 'zod';
+
+import { buildAgentBasicToneDryRunPreviewArtifacts } from './agentDryRunPreviewArtifacts';
+import { buildAgentImageContextSnapshot, type AgentImageContextSnapshot } from './agentImageContextSnapshot';
+import { useEditorStore } from '../store/useEditorStore';
+
+import type { AgentCoreEditCommandBundleStep } from './agentCoreEditCommandBundle';
+
+export type AgentPlannerLoopStopState = 'approval_ready' | 'blocked' | 'max_steps_reached';
+export type AgentPlannerLoopStage = 'inspect' | 'plan' | 'dry_run' | 'apply' | 'observe';
+
+export interface AgentPlannerLoopOptions {
+  maxSteps: number;
+  operationId: string;
+  prompt: string;
+  sessionId: string;
+}
+
+export interface AgentPlannerLoopResult {
+  dryRunAfterHash: string;
+  dryRunBeforeHash: string;
+  finalGraphRevision: string;
+  initialGraphRevision: string;
+  inspected: AgentImageContextSnapshot;
+  plannedSteps: readonly AgentCoreEditCommandBundleStep[];
+  stopState: AgentPlannerLoopStopState;
+  transcript: Array<{ detail: string; stage: AgentPlannerLoopStage }>;
+}
+
+const agentPlannerLoopResultProofSchema = z
+  .object({
+    dryRunAfterHash: z.string().trim().min(1),
+    dryRunBeforeHash: z.string().trim().min(1),
+    finalGraphRevision: z.string().trim().min(1),
+    initialGraphRevision: z.string().trim().min(1),
+    plannedStepCount: z.number().int().positive(),
+    stopState: z.enum(['approval_ready', 'blocked', 'max_steps_reached']),
+    transcriptLength: z.number().int().positive().max(6),
+  })
+  .strict();
+
+const classifyPrompt = (prompt: string): readonly AgentCoreEditCommandBundleStep[] => {
+  const normalized = prompt.toLowerCase();
+  const warm = normalized.includes('warm') || normalized.includes('skin') || normalized.includes('orange');
+  const contrast = normalized.includes('contrast') || normalized.includes('pop') || normalized.includes('flat');
+  const exposure = normalized.includes('bright') || normalized.includes('exposure') || normalized.includes('dark');
+
+  return [
+    {
+      kind: 'basic_tone',
+      payload: {
+        ...useEditorStore.getState().adjustments,
+        blacks: contrast ? -6 : -3,
+        brightness: useEditorStore.getState().adjustments.brightness,
+        clarity: contrast ? 12 : 6,
+        contrast: contrast ? 20 : 10,
+        exposure: exposure ? 0.32 : 0.12,
+        highlights: exposure ? -14 : -8,
+        saturation: warm ? 8 : 4,
+        shadows: exposure ? 10 : 5,
+        whites: contrast ? 5 : 2,
+      },
+    },
+    {
+      kind: 'selective_color',
+      payload: {
+        adjustment: { hue: warm ? -4 : 0, luminance: warm ? 5 : 2, saturation: warm ? 12 : 4 },
+        rangeKey: warm ? 'oranges' : 'blues',
+      },
+    },
+  ];
+};
+
+export const runAgentBoundedEditPlannerLoop = async ({
+  maxSteps,
+  operationId,
+  prompt,
+  sessionId,
+}: AgentPlannerLoopOptions): Promise<AgentPlannerLoopResult> => {
+  if (maxSteps < 5) throw new Error('Agent planner loop needs at least five bounded steps.');
+
+  const transcript: AgentPlannerLoopResult['transcript'] = [];
+  const inspected = buildAgentImageContextSnapshot();
+  transcript.push({ detail: `inspected ${inspected.activeImagePath}`, stage: 'inspect' });
+
+  const plannedSteps = classifyPrompt(prompt);
+  transcript.push({ detail: `planned ${plannedSteps.length} command steps`, stage: 'plan' });
+
+  const basicToneStep = plannedSteps.find((step) => step.kind === 'basic_tone');
+  if (basicToneStep?.kind !== 'basic_tone') {
+    transcript.push({ detail: 'no previewable basic-tone step', stage: 'observe' });
+    return {
+      dryRunAfterHash: '',
+      dryRunBeforeHash: '',
+      finalGraphRevision: inspected.graphRevision,
+      initialGraphRevision: inspected.graphRevision,
+      inspected,
+      plannedSteps,
+      stopState: 'blocked',
+      transcript,
+    };
+  }
+
+  const preview = await buildAgentBasicToneDryRunPreviewArtifacts({
+    operationId: `${operationId}_preview`,
+    requestedAdjustments: basicToneStep.payload,
+    sessionId,
+  });
+  transcript.push({ detail: `dry-run preview ${preview.afterArtifact.artifactId}`, stage: 'dry_run' });
+
+  const finalGraphRevision = `history_${useEditorStore.getState().historyIndex}`;
+  transcript.push({ detail: `observed non-mutating ${finalGraphRevision}`, stage: 'observe' });
+
+  const result: AgentPlannerLoopResult = {
+    dryRunAfterHash: preview.afterPreviewHash,
+    dryRunBeforeHash: preview.beforePreviewHash,
+    finalGraphRevision,
+    initialGraphRevision: inspected.graphRevision,
+    inspected,
+    plannedSteps,
+    stopState: 'approval_ready',
+    transcript,
+  };
+
+  agentPlannerLoopResultProofSchema.parse({
+    dryRunAfterHash: result.dryRunAfterHash,
+    dryRunBeforeHash: result.dryRunBeforeHash,
+    finalGraphRevision: result.finalGraphRevision,
+    initialGraphRevision: result.initialGraphRevision,
+    plannedStepCount: result.plannedSteps.length,
+    stopState: result.stopState,
+    transcriptLength: result.transcript.length,
+  });
+
+  return result;
+};
