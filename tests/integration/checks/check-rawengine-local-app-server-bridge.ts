@@ -60,19 +60,35 @@ if (!toolRegistry.ok) {
   failures.push(`Tool registry query failed: ${toolRegistry.message}`);
 } else {
   const parsedRegistry = rawEngineToolRegistryV1Schema.parse(toolRegistry.result);
+  const advertisedToolNames = new Set(parsedRegistry.tools.map((tool) => tool.toolName));
   if (!parsedRegistry.tools.some((tool) => tool.toolName === 'tonecolor.dry_run_command')) {
     failures.push('Tool registry does not expose tonecolor.dry_run_command.');
+  }
+  for (const toolName of [
+    'computationalmerge.panorama.dry_run_command',
+    'export.write_files',
+    'project.library_mutate',
+  ]) {
+    if (advertisedToolNames.has(toolName)) {
+      failures.push(`Local app-server bridge must not advertise unbound tool ${toolName}.`);
+    }
   }
   for (const toolName of [
     'agent.project_metadata.query',
     'agent.selected_images.query',
     'agent.image_metadata.query',
     'agent.editor_state.query',
+    'tonecolor.dry_run_command',
+    'tonecolor.apply_command',
+    'ai.mask.dry_run_subject',
+    'ai.mask.apply_subject',
+    'ai.enhancement.dry_run_command',
+    'ai.enhancement.apply_command',
   ]) {
     const tool = parsedRegistry.tools.find((candidate) => candidate.toolName === toolName);
     if (tool === undefined) {
       failures.push(`Tool registry does not expose ${toolName}.`);
-    } else if (tool.mutates || tool.toolKind !== 'read') {
+    } else if (toolName.startsWith('agent.') && (tool.mutates || tool.toolKind !== 'read')) {
       failures.push(`${toolName} must be a non-mutating read tool.`);
     }
   }
