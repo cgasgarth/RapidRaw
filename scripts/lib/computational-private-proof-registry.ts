@@ -132,6 +132,7 @@ export const computationalPrivateProofConfigs = {
     postPrivateChecks: [
       ['bun', 'run', 'check:sr-real-raw-private-app-server-proof'],
       ['bun', 'run', 'check:sr-private-raw-ui-smoke'],
+      ['bun', 'run', 'check:sr-private-raw-modal-review-smoke'],
     ],
     skipLabel: 'SR real RAW private proof',
   },
