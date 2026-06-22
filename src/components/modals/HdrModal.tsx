@@ -233,11 +233,16 @@ export default function HdrModal({
               data-deghost-review-accepted={String(handoffSummary.deghostReviewAccepted)}
               data-deghost-review-required={String(handoffSummary.deghostReviewRequired)}
               data-deghosting={handoffSummary.deghosting}
+              data-display-preview-color-state={handoffSummary.displayPreviewColorState}
               data-editable-derived-asset-id={handoffSummary.editableDerivedAssetId}
+              data-export-color-state={handoffSummary.exportColorState}
               data-merge-strategy={handoffSummary.mergeStrategy}
               data-output-color-space={handoffSummary.outputColorSpace}
               data-output-encoding={handoffSummary.outputEncoding}
+              data-preview-export-mean-abs-delta={handoffSummary.previewExportMeanAbsDelta}
+              data-preview-export-parity-status={handoffSummary.previewExportParityStatus}
               data-preview-tone-mapped={String(handoffSummary.previewToneMapped)}
+              data-scene-merge-color-state={handoffSummary.sceneMergeColorState}
               data-source-count={handoffSummary.sourceCount}
               data-testid="hdr-editable-handoff-provenance"
               data-warning-codes={handoffSummary.warningCodes.join(',')}
@@ -256,6 +261,10 @@ export default function HdrModal({
                   label: t('modals.hdr.handoffSourceCount'),
                   value: t('modals.hdr.summarySourceCount', { count: handoffSummary.sourceCount }),
                 },
+                {
+                  label: t('modals.hdr.handoffPreviewExportParity'),
+                  value: t('modals.hdr.handoffPreviewExportMatched'),
+                },
               ].map((item) => (
                 <div className="min-w-0 rounded border border-border-color bg-surface px-2 py-1.5" key={item.label}>
                   <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
@@ -266,6 +275,14 @@ export default function HdrModal({
                   </UiText>
                 </div>
               ))}
+              <div className="col-span-3 rounded border border-border-color bg-surface px-2 py-1.5">
+                <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                  {t('modals.hdr.handoffColorStates')}
+                </UiText>
+                <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                  {t('modals.hdr.handoffColorStatesValue')}
+                </UiText>
+              </div>
               <div className="col-span-3 rounded border border-border-color bg-surface px-2 py-1.5">
                 <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
                   {t('modals.hdr.handoffSourceRefs')}

@@ -1286,7 +1286,11 @@
         "blocked": "Blocked",
         "ok": "Ready",
         "review": "Review"
-      }
+      },
+      "handoffColorStates": "Color states",
+      "handoffColorStatesValue": "Scene merge -> display preview -> exported sRGB output",
+      "handoffPreviewExportMatched": "Preview/export matched",
+      "handoffPreviewExportParity": "Preview/export parity"
     },
     "importSettings": {
       "cancel": "Cancelar",
