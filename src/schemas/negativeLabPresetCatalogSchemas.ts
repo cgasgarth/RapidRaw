@@ -30,6 +30,7 @@ export const negativeLabBaseFogSampleRectSchema = z
 
 export const negativeLabPresetParamsSchema = z
   .object({
+    black_point: z.number().min(0).max(0.95).default(0),
     blue_weight: z.number().min(0.5).max(2),
     base_fog_strength: z.number().min(0).max(1.25).default(1),
     base_fog_sample: negativeLabBaseFogSampleRectSchema.nullable().default(null),
@@ -37,8 +38,18 @@ export const negativeLabPresetParamsSchema = z
     exposure: z.number().min(-2).max(2),
     green_weight: z.number().min(0.5).max(2),
     red_weight: z.number().min(0.5).max(2),
+    white_point: z.number().min(0.05).max(1).default(1),
   })
-  .strict();
+  .strict()
+  .superRefine((params, context) => {
+    if (params.white_point - params.black_point < 0.05) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab white point must stay at least 0.05 above black point.',
+        path: ['white_point'],
+      });
+    }
+  });
 
 export const negativeLabBuiltInUiPresetSchema = z
   .object({

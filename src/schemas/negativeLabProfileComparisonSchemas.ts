@@ -13,7 +13,16 @@ import { negativeLabPresetIdSchema, negativeLabPresetParamsSchema } from './nega
 
 export const negativeLabProfileComparisonDeltaSchema = z
   .object({
-    key: z.enum(['base_fog_strength', 'blue_weight', 'contrast', 'exposure', 'green_weight', 'red_weight']),
+    key: z.enum([
+      'base_fog_strength',
+      'black_point',
+      'blue_weight',
+      'contrast',
+      'exposure',
+      'green_weight',
+      'red_weight',
+      'white_point',
+    ]),
     value: z.number(),
   })
   .strict();

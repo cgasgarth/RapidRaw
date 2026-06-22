@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { negativeLabProfileProvenanceHashSchema } from './negativeLabAppServerSchemas';
+import { negativeLabFrameExposureOverrideSchema } from './negativeLabFrameExposureOverrideSchemas';
 import {
   negativeLabAcquisitionSourceFamilySchema,
   negativeLabAcquisitionWarningCodeSchema,
@@ -48,6 +49,7 @@ export const negativeLabConversionBundleSchema = z
           .string()
           .regex(/^negative_lab_batch_plan_[a-f0-9]{8}$/u)
           .nullable(),
+        frameExposureOverrides: z.array(negativeLabFrameExposureOverrideSchema).default([]),
         outputFormat: negativeLabOutputFormatIdSchema,
         params: negativeLabPresetParamsSchema,
         profileProvenanceHash: negativeLabProfileProvenanceHashSchema.nullable(),

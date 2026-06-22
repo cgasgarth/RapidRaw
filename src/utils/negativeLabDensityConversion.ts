@@ -30,8 +30,15 @@ export const NEGATIVE_LAB_DENSITY_ALGORITHM_ID = 'density_rgb_v1';
 const LOG_EPSILON = 0.000001;
 const MIN_DENSITY_RANGE = 0.0001;
 const DISPLAY_GAMMA_INV = 1 / 2.2;
+const MIN_ENDPOINT_SEPARATION = 0.05;
 
 export const clampNegativeLabUnitValue = (value: number): number => Math.min(1, Math.max(0, value));
+
+const applyPositiveEndpoints = (value: number, params: NegativeLabPresetParams): number => {
+  const blackPoint = clampNegativeLabUnitValue(params.black_point);
+  const whitePoint = clampNegativeLabUnitValue(Math.max(blackPoint + MIN_ENDPOINT_SEPARATION, params.white_point));
+  return clampNegativeLabUnitValue((value - blackPoint) / (whitePoint - blackPoint));
+};
 
 const toDensity = (value: number): number => -Math.log10(Math.max(LOG_EPSILON, clampNegativeLabUnitValue(value)));
 
@@ -100,7 +107,7 @@ const buildPositiveChannel = ({
 
   return {
     densitySignal,
-    positive: Math.pow(normalized, DISPLAY_GAMMA_INV),
+    positive: Math.pow(applyPositiveEndpoints(normalized, params), DISPLAY_GAMMA_INV),
   };
 };
 

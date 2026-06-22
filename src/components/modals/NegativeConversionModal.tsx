@@ -233,11 +233,13 @@ const getNegativeLabProfileSearchText = (profile: NegativeLabRuntimeProfileBrows
     profile.sourceGenericPresetId ?? '',
     String(profile.evidenceFixtureCount),
     String(profile.params.base_fog_strength),
+    String(profile.params.black_point),
     String(profile.params.blue_weight),
     String(profile.params.contrast),
     String(profile.params.exposure),
     String(profile.params.green_weight),
     String(profile.params.red_weight),
+    String(profile.params.white_point),
     ...profile.doesNotProve,
   ]
     .join(' ')
@@ -867,8 +869,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       },
       {
         detail: t('modals.negativeConversion.workflowPrintDetail', {
+          blackPoint: params.black_point.toFixed(2),
           contrast: params.contrast.toFixed(2),
           exposure: params.exposure.toFixed(2),
+          whitePoint: params.white_point.toFixed(2),
         }),
         id: 'printGrade',
         isComplete: true,
@@ -1030,11 +1034,19 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const handleParamChange = (key: keyof NegativeParams, value: number) => {
     const newParams = { ...params, [key]: value };
     setSelectedPresetId('');
-    if (key !== 'base_fog_strength') {
+    if (key === 'red_weight' || key === 'green_weight' || key === 'blue_weight') {
       setBaseFogConfidence(null);
       setBaseFogPreviewProof(null);
       setActiveBaseFogSampleLabel(null);
     }
+    setParams(newParams);
+    setAcceptedBatchPlanJson(null);
+    updatePreview(buildParamsWithFrameExposure(newParams));
+  };
+
+  const handleEndpointReset = () => {
+    const newParams = { ...params, black_point: DEFAULT_PARAMS.black_point, white_point: DEFAULT_PARAMS.white_point };
+    setSelectedPresetId('');
     setParams(newParams);
     setAcceptedBatchPlanJson(null);
     updatePreview(buildParamsWithFrameExposure(newParams));
@@ -3012,6 +3024,20 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               <span className="text-right tabular-nums text-text-secondary" data-testid="negative-lab-recipe-contrast">
                 {params.contrast.toFixed(2)}
               </span>
+              <span>{t('modals.negativeConversion.blackPoint')}</span>
+              <span
+                className="text-right tabular-nums text-text-secondary"
+                data-testid="negative-lab-recipe-black-point"
+              >
+                {params.black_point.toFixed(2)}
+              </span>
+              <span>{t('modals.negativeConversion.whitePoint')}</span>
+              <span
+                className="text-right tabular-nums text-text-secondary"
+                data-testid="negative-lab-recipe-white-point"
+              >
+                {params.white_point.toFixed(2)}
+              </span>
             </div>
             <Slider
               label={t('modals.negativeConversion.baseFogStrength')}
@@ -3450,6 +3476,52 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               }}
               fillOrigin="min"
             />
+            <div className="space-y-2 rounded-md border border-surface bg-bg-primary p-2">
+              <div className="flex items-center justify-between gap-2">
+                <UiText variant={TextVariants.small} className="text-text-secondary">
+                  {t('modals.negativeConversion.printEndpoints')}
+                </UiText>
+                <button
+                  className="rounded border border-surface bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                  data-testid="negative-lab-reset-print-endpoints"
+                  disabled={params.black_point === 0 && params.white_point === 1}
+                  onClick={handleEndpointReset}
+                  type="button"
+                >
+                  {t('modals.negativeConversion.resetPrintEndpoints')}
+                </button>
+              </div>
+              <div data-testid="negative-lab-black-point-control">
+                <Slider
+                  label={t('modals.negativeConversion.blackPoint')}
+                  value={params.black_point}
+                  min={0}
+                  max={0.95}
+                  step={0.01}
+                  defaultValue={0}
+                  onChange={(e) => {
+                    const nextBlackPoint = Math.min(Number(e.target.value), params.white_point - 0.05);
+                    handleParamChange('black_point', Number(nextBlackPoint.toFixed(2)));
+                  }}
+                  fillOrigin="min"
+                />
+              </div>
+              <div data-testid="negative-lab-white-point-control">
+                <Slider
+                  label={t('modals.negativeConversion.whitePoint')}
+                  value={params.white_point}
+                  min={0.05}
+                  max={1}
+                  step={0.01}
+                  defaultValue={1}
+                  onChange={(e) => {
+                    const nextWhitePoint = Math.max(Number(e.target.value), params.black_point + 0.05);
+                    handleParamChange('white_point', Number(nextWhitePoint.toFixed(2)));
+                  }}
+                  fillOrigin="min"
+                />
+              </div>
+            </div>
           </div>
         </div>
 

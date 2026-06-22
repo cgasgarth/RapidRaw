@@ -63,6 +63,9 @@ for (const marker of [
   'negative-lab-frame-exposure-override-control',
   'negative-lab-reset-frame-exposure',
   'negative-lab-recipe-frame-exposure-offset',
+  'negative-lab-black-point-control',
+  'negative-lab-white-point-control',
+  'negative-lab-reset-print-endpoints',
   'negative-lab-scope-ready',
   'negative-lab-copy-batch-plan',
   'negative-lab-accept-batch-plan',
@@ -116,6 +119,8 @@ for (const marker of [
   'negative-lab-accept-batch-plan',
   '"plannedApplyCount"',
   '"skippedFrameIds"',
+  '"black_point":0.16',
+  '"white_point":0.86',
 ]) {
   requireMarker(files.smoke, marker, 'visual smoke');
 }

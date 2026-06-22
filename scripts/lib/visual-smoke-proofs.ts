@@ -112,22 +112,26 @@ const negativeLabOrthoPresetParamsSchema = z
   .object({
     base_fog_sample: z.union([negativeLabLeftEdgeSampleSchema, negativeLabCustomBaseSampleSchema]),
     base_fog_strength: z.literal(1),
+    black_point: z.literal(0.16),
     blue_weight: z.literal(1.18),
     contrast: z.literal(1.2),
     exposure: z.literal(-0.05),
     green_weight: z.literal(0.96),
     red_weight: z.literal(1.07),
+    white_point: z.literal(0.86),
   })
   .passthrough();
 const negativeLabPreviewParamsSchema = z
   .object({
     base_fog_sample: z.union([z.null(), negativeLabLeftEdgeSampleSchema, negativeLabCustomBaseSampleSchema]),
     base_fog_strength: z.literal(1),
+    black_point: z.number(),
     blue_weight: z.number(),
     contrast: z.number(),
     exposure: z.number(),
     green_weight: z.number(),
     red_weight: z.number(),
+    white_point: z.number(),
   })
   .passthrough();
 const negativeLabFixturePathSchema = z.union([
@@ -159,7 +163,10 @@ const negativeLabConvertArgsSchema = z.object({
   options: z
     .object({
       outputFormat: z.literal(NegativeLabOutputFormatId.JpegProof),
-      profileProvenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+      profileProvenanceHash: z
+        .string()
+        .regex(/^fnv1a32:[a-f0-9]{8}$/u)
+        .optional(),
       writeConversionBundle: z.literal(true),
       acquisitionSourceFamilies: z.array(z.enum(['jpeg_lossy', 'raw_like', 'tiff_scan', 'unknown'])).min(1),
       acquisitionWarningCodes: z.array(
@@ -181,16 +188,23 @@ const negativeLabConvertArgsSchema = z.object({
       omittedDispositionFrameIds: z.array(z.literal('negative-lab-frame-2')).length(1),
       qcApprovedFrameIds: z.array(z.string()).length(0),
       qcRejectedFrameIds: z.array(z.literal('negative-lab-frame-2')).length(1),
-      selectedProfile: z.object({
-        claimLevel: z.literal('generic_starting_point_only'),
-        claimPolicy: z.literal('generic_starting_point_no_stock_claim'),
-        presetId: z.literal('negative_lab.generic.bw.ortho.v1'),
-        profileProvenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
-        runtimeStatus: z.literal('runtime_parameter_applied'),
-      }),
+      selectedProfile: z
+        .object({
+          claimLevel: z.literal('generic_starting_point_only'),
+          claimPolicy: z.literal('generic_starting_point_no_stock_claim'),
+          presetId: z.literal('negative_lab.generic.bw.ortho.v1'),
+          profileProvenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+          runtimeStatus: z.literal('runtime_parameter_applied'),
+        })
+        .optional(),
       suffix: z.literal('Positive'),
     })
-    .refine((options) => options.profileProvenanceHash === options.selectedProfile.profileProvenanceHash),
+    .refine(
+      (options) =>
+        options.profileProvenanceHash === undefined ||
+        options.selectedProfile === undefined ||
+        options.profileProvenanceHash === options.selectedProfile.profileProvenanceHash,
+    ),
   params: negativeLabOrthoPresetParamsSchema,
   paths: z.array(z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif')).length(1),
 });
@@ -198,11 +212,13 @@ const negativeLabBatchColorParamsSchema = z
   .object({
     base_fog_sample: z.null(),
     base_fog_strength: z.literal(1),
+    black_point: z.literal(0),
     blue_weight: z.literal(1.14),
     contrast: z.literal(1),
     exposure: z.literal(0),
     green_weight: z.literal(0.91),
     red_weight: z.literal(1.23),
+    white_point: z.literal(1),
   })
   .passthrough();
 const negativeLabBatchConvertArgsSchema = z.object({
