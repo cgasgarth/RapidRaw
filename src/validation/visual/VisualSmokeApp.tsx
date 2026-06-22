@@ -35,6 +35,7 @@ import { applyColorBalanceRgbToPixel } from '../../utils/colorBalanceRgbRuntime'
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
 import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
+import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
 
 import type { MaskOverlaySettings } from '../../schemas/maskOverlaySchemas';
 import type { SuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
@@ -175,6 +176,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaPrivateRawUi]: PanoramaPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaSavedReview]: PanoramaSavedReviewVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaUi]: PanoramaVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawModalReview]: SuperResolutionPrivateRawModalReviewSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi]: SuperResolutionPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrUi]: SuperResolutionVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.WorkflowRail]: WorkflowRailVisualSmoke,
@@ -2329,6 +2331,87 @@ function SuperResolutionPrivateRawVisualSmoke() {
           </div>
         </aside>
       </div>
+    </main>
+  );
+}
+
+function SuperResolutionPrivateRawModalReviewSmoke() {
+  const proof = window.__RAWENGINE_SR_PRIVATE_RAW_PROOF__;
+  const [settings, setSettings] = useState<SuperResolutionUiSettings>(DEFAULT_SUPER_RESOLUTION_UI_SETTINGS);
+  const [previewRequested, setPreviewRequested] = useState(false);
+
+  if (!proof) {
+    return (
+      <main
+        className="grid h-full min-h-screen place-items-center bg-[#111316] text-[#f3f4f1] font-sans"
+        data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawModalReview}
+      >
+        <p>{copy.missingPrivateRawProofArtifacts}</p>
+      </main>
+    );
+  }
+
+  const sourceCount = Number.parseInt(proof.sourceCount, 10);
+  const outputReview = buildSuperResolutionOutputReviewWorkflow({
+    artifactPath: proof.reconstructionPath,
+    settings,
+    sourceCount,
+  });
+  const sourcePreflightMetadata: SuperResolutionSourcePreflightMetadata[] = Array.from(
+    { length: sourceCount },
+    (_, index) => ({
+      exif: {
+        ExifImageHeight: '6336',
+        ExifImageWidth: '9504',
+        ISO: '100',
+        LensModel: 'FE 50mm F1.4 GM',
+        Make: 'Sony',
+        Model: 'ILCE-7RM5',
+      },
+      height: 6336,
+      imagePath: `/private/alaska/sr_dx-${index % 2}_dy-${Math.floor(index / 2)}_${index}.ARW`,
+      sourceIndex: index,
+      width: 9504,
+    }),
+  );
+  const reviewArtifactPreviewUrls = {
+    baseline_review_crop: proof.previewDataUrl,
+    reconstruction_preview: proof.resultReviewDataUrl,
+    reconstruction_review_crop: proof.exportReviewDataUrl,
+  };
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawModalReview}
+    >
+      <div className="absolute inset-0 bg-[#0f1114]" data-visual-smoke-section="sr-private-raw-modal-review" />
+      <div className="fixed left-4 top-4 z-50 rounded-md border border-white/10 bg-black/75 px-3 py-2 text-sm font-semibold">
+        {copy.superResolutionPrivateRawReview}
+      </div>
+      <div
+        className="sr-only"
+        data-fixture-id={proof.fixtureId}
+        data-preview-requested={String(previewRequested)}
+        data-reconstruction-path={proof.reconstructionPath}
+        data-source-count={proof.sourceCount}
+        data-testid="sr-private-raw-modal-review-proof"
+      />
+      <SuperResolutionModal
+        isOpen
+        loadingImageUrl={proof.previewDataUrl}
+        onClose={() => {}}
+        onPreviewPlan={() => {
+          setPreviewRequested(true);
+        }}
+        onSettingsChange={setSettings}
+        outputReview={outputReview}
+        reviewArtifactPreviewUrls={reviewArtifactPreviewUrls}
+        settings={settings}
+        sourceCount={sourceCount}
+        sourcePreflightMetadata={sourcePreflightMetadata}
+      />
     </main>
   );
 }

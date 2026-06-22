@@ -427,6 +427,7 @@
     "check:sr-review-diagnostics": "bun tests/integration/checks/check-sr-review-diagnostics.ts",
     "check:sr-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario sr-ui",
     "check:sr-private-raw-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario sr-private-raw-ui",
+    "check:sr-private-raw-modal-review-smoke": "bun scripts/capture-visual-smoke.ts --scenario sr-private-raw-modal-review",
     "check:negative-lab-base-fog": "bun tests/integration/checks/check-negative-lab-base-fog.ts",
     "check:negative-lab-fixtures": "bun tests/integration/checks/check-negative-lab-fixtures.ts",
     "check:negative-lab-fixtures:update": "bun tests/integration/checks/check-negative-lab-fixtures.ts --update",
