@@ -83,7 +83,9 @@ const highDpiTargets = [
 const selectedScenarios =
   requestedScenario === null ? scenarios : scenarios.filter((scenario) => scenario.mode === requestedScenario);
 const requiresSrPrivateRawProof = selectedScenarios.some(
-  (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi,
+  (scenario) =>
+    scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi ||
+    scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawModalReview,
 );
 const requiresFocusPrivateRawProof = selectedScenarios.some(
   (scenario) =>
@@ -1175,6 +1177,54 @@ async function prepareScenario(page, mode) {
       .getByTestId('sr-private-raw-artifact-handoff')
       .getByText('sr-subpixel-reconstruction.tiff', { exact: false })
       .waitFor({ timeout: 10_000 });
+    return;
+  }
+
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawModalReview) {
+    const proofBefore = await page
+      .getByTestId('sr-private-raw-modal-review-proof')
+      .evaluate((element) => ({ ...element.dataset }));
+    if (
+      proofBefore.fixtureId !== 'validation.computational-merge.super-resolution-subpixel.v1' ||
+      proofBefore.previewRequested !== 'false' ||
+      proofBefore.reconstructionPath?.endsWith('/sr-subpixel-reconstruction.tiff') !== true ||
+      proofBefore.sourceCount !== '4'
+    ) {
+      throw new Error(`SR private RAW modal proof payload failed: ${JSON.stringify(proofBefore)}`);
+    }
+    const reconstructionPath = proofBefore.reconstructionPath;
+    if (reconstructionPath === undefined) throw new Error('SR private RAW modal proof is missing reconstruction path.');
+    await page.getByRole('button', { exact: true, name: 'Preview plan' }).click();
+    const proofAfter = await page
+      .getByTestId('sr-private-raw-modal-review-proof')
+      .evaluate((element) => ({ ...element.dataset }));
+    if (proofAfter.previewRequested !== 'true') {
+      throw new Error(`SR private RAW preview plan was not requested: ${JSON.stringify(proofAfter)}`);
+    }
+    const readiness = await page.getByTestId('sr-readiness-summary').evaluate((element) => ({ ...element.dataset }));
+    if (readiness.reconstructionReady !== 'true' || readiness.sourceCount !== '4') {
+      throw new Error(`SR private RAW readiness failed: ${JSON.stringify(readiness)}`);
+    }
+    const preflight = await page.getByTestId('sr-source-preflight').evaluate((element) => ({ ...element.dataset }));
+    if (preflight.preflightStatus !== 'ready' || preflight.effectiveScale !== '2') {
+      throw new Error(`SR private RAW source preflight failed: ${JSON.stringify(preflight)}`);
+    }
+    const handoff = await page.getByTestId('sr-editable-handoff-proof').evaluate((element) => ({
+      ...element.dataset,
+    }));
+    if (handoff.outputArtifactId !== reconstructionPath || handoff.editableHandoffReady !== 'false') {
+      throw new Error(`SR private RAW editable handoff proof failed: ${JSON.stringify(handoff)}`);
+    }
+    await page.getByTestId('sr-review-diagnostics').getByText(reconstructionPath, { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    const previewReadyCount = await page
+      .getByTestId('sr-review-artifact-comparator')
+      .locator('[data-preview-ready="true"]')
+      .count();
+    if (previewReadyCount !== 3) {
+      throw new Error(`Expected 3 SR private RAW review previews, found ${previewReadyCount}.`);
+    }
     return;
   }
 

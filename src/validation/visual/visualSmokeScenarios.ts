@@ -25,6 +25,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   PanoramaPrivateRawUi: 'panorama-private-raw-ui',
   PanoramaSavedReview: 'panorama-saved-review',
   PanoramaUi: 'panorama-ui',
+  SrPrivateRawModalReview: 'sr-private-raw-modal-review',
   SrPrivateRawUi: 'sr-private-raw-ui',
   SrUi: 'sr-ui',
   WorkflowRail: 'workflow-rail',
@@ -142,6 +143,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Private RAW SR review',
     mode: VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi,
     outputFile: 'sr-private-raw-ui.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Private RAW SR review',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawModalReview,
+    outputFile: 'sr-private-raw-modal-review.png',
     sectionMinimum: 1,
   },
   {
