@@ -313,6 +313,8 @@
     "check:film-halation-runtime-proof:update": "bun tests/integration/checks/check-film-halation-runtime-proof.ts --update",
     "check:film-simulation-review-artifacts": "bun tests/integration/checks/check-film-simulation-review-artifacts.ts",
     "check:film-simulation-review-artifacts:update": "bun tests/integration/checks/check-film-simulation-review-artifacts.ts --update",
+    "check:governed-film-look-runtime": "bun tests/integration/checks/check-governed-film-look-runtime.ts",
+    "check:governed-film-look-runtime:update": "bun tests/integration/checks/check-governed-film-look-runtime.ts --update",
     "check:film-look-measured-fixtures": "bun tests/integration/checks/check-film-look-measured-fixtures.ts",
     "check:film-look-measured-fixtures:update": "bun tests/integration/checks/check-film-look-measured-fixtures.ts --update",
     "check:film-look-app-server-routes": "bun tests/integration/checks/check-film-look-app-server-routes.ts",

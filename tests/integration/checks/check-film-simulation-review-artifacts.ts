@@ -15,6 +15,10 @@ const height = 10;
 
 const hash16Schema = z.string().regex(/^[a-f0-9]{16}$/u);
 const hashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
+const provenanceStatusSchema = z.enum([
+  'generic_engineered_not_measured_stock',
+  'stock_family_reference_metadata_not_measured_stock',
+]);
 
 const parityManifestSchema = z
   .object({
@@ -44,10 +48,10 @@ const filmFixtureSchema = z
           id: z.string().trim().min(1),
           provenance: z
             .object({
-              claimLevel: z.literal('generic_engineered'),
-              legalNamingStatus: z.literal('generic_safe_name'),
+              claimLevel: z.enum(['generic_engineered', 'stock_family_reference_metadata']),
+              legalNamingStatus: z.enum(['generic_safe_name', 'descriptive_stock_family']),
               legalNote: z.string().trim().min(1),
-              measurementSource: z.literal('generic_engineered_starting_point'),
+              measurementSource: z.enum(['generic_engineered_starting_point', 'research_reference_metadata_only']),
             })
             .strict(),
           runtimeSupport: z.literal('adjustment_patch_preview_export'),
@@ -82,7 +86,7 @@ const reviewArtifactSchema = z
           displayName: z.string().trim().min(1),
           lookId: z.string().trim().min(1),
           previewExportMaxDelta: z.literal(0),
-          provenanceStatus: z.literal('generic_engineered_not_measured_stock'),
+          provenanceStatus: provenanceStatusSchema,
           runtimeStatus: z.literal('synthetic_preview_export_parity'),
           runtimeSupport: z.literal('adjustment_patch_preview_export'),
           strength: z.number().int().min(0).max(100),
@@ -153,7 +157,10 @@ const reviewArtifact = reviewArtifactSchema.parse({
       displayName: parityCase.displayName,
       lookId: parityCase.lookId,
       previewExportMaxDelta: parityCase.previewExportMaxDelta,
-      provenanceStatus: 'generic_engineered_not_measured_stock',
+      provenanceStatus:
+        lookFixture.provenance.claimLevel === 'stock_family_reference_metadata'
+          ? 'stock_family_reference_metadata_not_measured_stock'
+          : 'generic_engineered_not_measured_stock',
       runtimeStatus: 'synthetic_preview_export_parity',
       runtimeSupport: lookFixture.runtimeSupport,
       strength: parityCase.strength,
