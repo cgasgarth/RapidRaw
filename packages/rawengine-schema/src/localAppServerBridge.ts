@@ -9,9 +9,11 @@ import {
   aiToolApplyResultV1Schema,
   aiToolCommandEnvelopeV1Schema,
   aiToolDryRunResultV1Schema,
+  projectLibrarySnapshotV1Schema,
   toneColorCommandEnvelopeV1Schema,
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
+  type ProjectLibrarySnapshotV1,
   type RawEngineToolRegistryV1,
   type ToneColorHslBandV1,
   type ToneColorCommandEnvelopeV1,
@@ -21,6 +23,10 @@ import {
 import { rawEngineDefaultToolRegistryV1 } from './toolRegistry.js';
 
 export const RawEngineLocalAppServerCommandType = {
+  EditorStateQuery: 'rawengine.local.editorState.query',
+  ImageMetadataQuery: 'rawengine.local.imageMetadata.query',
+  ProjectMetadataQuery: 'rawengine.local.projectMetadata.query',
+  SelectedImagesQuery: 'rawengine.local.selectedImages.query',
   ToolRegistryQuery: 'rawengine.local.toolRegistry.query',
 } as const;
 
@@ -31,6 +37,68 @@ export const rawEngineLocalAppServerToolRegistryQueryV1Schema = z
   .object({
     commandType: z.literal(RawEngineLocalAppServerCommandType.ToolRegistryQuery),
     requestId: z.string().trim().min(1),
+  })
+  .strict();
+
+const rawEngineLocalAppServerReadQueryBaseV1Schema = z
+  .object({
+    commandId: z.string().trim().min(1),
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(false),
+    requestId: z.string().trim().min(1),
+  })
+  .strict();
+
+export const rawEngineLocalAppServerProjectMetadataQueryV1Schema = rawEngineLocalAppServerReadQueryBaseV1Schema.extend({
+  commandType: z.literal(RawEngineLocalAppServerCommandType.ProjectMetadataQuery),
+});
+
+export const rawEngineLocalAppServerSelectedImagesQueryV1Schema = rawEngineLocalAppServerReadQueryBaseV1Schema.extend({
+  commandType: z.literal(RawEngineLocalAppServerCommandType.SelectedImagesQuery),
+});
+
+export const rawEngineLocalAppServerImageMetadataQueryV1Schema = rawEngineLocalAppServerReadQueryBaseV1Schema.extend({
+  commandType: z.literal(RawEngineLocalAppServerCommandType.ImageMetadataQuery),
+  imagePath: z.string().trim().min(1),
+});
+
+export const rawEngineLocalAppServerEditorStateQueryV1Schema = rawEngineLocalAppServerReadQueryBaseV1Schema.extend({
+  commandType: z.literal(RawEngineLocalAppServerCommandType.EditorStateQuery),
+});
+
+export const rawEngineLocalAppServerProjectMetadataResultV1Schema = z
+  .object({
+    activeAlbumId: z.string().trim().min(1).nullable(),
+    currentFolderPath: z.string().trim().min(1).nullable(),
+    filterCriteria: projectLibrarySnapshotV1Schema.shape.filterCriteria,
+    imageCount: z.number().int().nonnegative(),
+    libraryActivePath: z.string().trim().min(1).nullable(),
+    pinnedFolderCount: z.number().int().nonnegative(),
+    rootPaths: z.array(z.string().trim().min(1)),
+    selectedCount: z.number().int().nonnegative(),
+    sortCriteria: projectLibrarySnapshotV1Schema.shape.sortCriteria,
+  })
+  .strict();
+
+export const rawEngineLocalAppServerSelectedImagesResultV1Schema = z
+  .object({
+    images: z.array(projectLibrarySnapshotV1Schema.shape.imageList.element),
+    selectedPaths: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
+export const rawEngineLocalAppServerImageMetadataResultV1Schema = z
+  .object({
+    image: projectLibrarySnapshotV1Schema.shape.imageList.element,
+  })
+  .strict();
+
+export const rawEngineLocalAppServerEditorStateResultV1Schema = z
+  .object({
+    activeImagePath: z.string().trim().min(1).nullable(),
+    currentFolderPath: z.string().trim().min(1).nullable(),
+    selectedImagePaths: z.array(z.string().trim().min(1)),
+    visibleImageCount: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -101,6 +169,28 @@ export const rawEngineLocalAppServerSkinToneUniformityCommandV1Schema = toneColo
 export type RawEngineLocalAppServerToolRegistryQueryV1 = z.infer<
   typeof rawEngineLocalAppServerToolRegistryQueryV1Schema
 >;
+export type RawEngineLocalAppServerProjectMetadataQueryV1 = z.infer<
+  typeof rawEngineLocalAppServerProjectMetadataQueryV1Schema
+>;
+export type RawEngineLocalAppServerSelectedImagesQueryV1 = z.infer<
+  typeof rawEngineLocalAppServerSelectedImagesQueryV1Schema
+>;
+export type RawEngineLocalAppServerImageMetadataQueryV1 = z.infer<
+  typeof rawEngineLocalAppServerImageMetadataQueryV1Schema
+>;
+export type RawEngineLocalAppServerEditorStateQueryV1 = z.infer<typeof rawEngineLocalAppServerEditorStateQueryV1Schema>;
+export type RawEngineLocalAppServerProjectMetadataResultV1 = z.infer<
+  typeof rawEngineLocalAppServerProjectMetadataResultV1Schema
+>;
+export type RawEngineLocalAppServerSelectedImagesResultV1 = z.infer<
+  typeof rawEngineLocalAppServerSelectedImagesResultV1Schema
+>;
+export type RawEngineLocalAppServerImageMetadataResultV1 = z.infer<
+  typeof rawEngineLocalAppServerImageMetadataResultV1Schema
+>;
+export type RawEngineLocalAppServerEditorStateResultV1 = z.infer<
+  typeof rawEngineLocalAppServerEditorStateResultV1Schema
+>;
 export type RawEngineLocalAppServerBasicToneDryRunCommandV1 = z.infer<
   typeof rawEngineLocalAppServerBasicToneDryRunCommandV1Schema
 >;
@@ -143,6 +233,10 @@ const AI_COMMAND_TYPE_TO_APP_SERVER_TOOL_NAME = {
   'ai.enhancement.dryRun': 'ai.enhancement.dry_run_command',
   'ai.mask.applySubject': 'ai.mask.apply_subject',
   'ai.mask.generateSubject': 'ai.mask.dry_run_subject',
+  [RawEngineLocalAppServerCommandType.EditorStateQuery]: 'agent.editor_state.query',
+  [RawEngineLocalAppServerCommandType.ImageMetadataQuery]: 'agent.image_metadata.query',
+  [RawEngineLocalAppServerCommandType.ProjectMetadataQuery]: 'agent.project_metadata.query',
+  [RawEngineLocalAppServerCommandType.SelectedImagesQuery]: 'agent.selected_images.query',
 } as const satisfies Partial<Record<string, string>>;
 
 const AI_COMMAND_TYPE_TO_APP_SERVER_TOOL_NAME_LOOKUP = new Map<string, string>(
@@ -152,6 +246,66 @@ const AI_COMMAND_TYPE_TO_APP_SERVER_TOOL_NAME_LOOKUP = new Map<string, string>(
 const rawEngineLocalAppServerAuditResultProbeV1Schema = z.looseObject({
   mutates: z.boolean().optional(),
   warnings: z.array(z.string().trim().min(1)),
+});
+
+const DEFAULT_LOCAL_PROJECT_LIBRARY_SNAPSHOT: ProjectLibrarySnapshotV1 = projectLibrarySnapshotV1Schema.parse({
+  activeAlbumId: 'album_selects',
+  albums: [
+    {
+      children: [
+        {
+          id: 'album_selects',
+          images: ['/photos/session/IMG_0001.CR3'],
+          name: 'Client Selects',
+          type: 'album',
+        },
+      ],
+      id: 'group_client',
+      name: 'Client',
+      type: 'group',
+    },
+  ],
+  currentFolderPath: '/photos/session',
+  filterCriteria: {
+    colors: ['green'],
+    editedStatus: 'all',
+    rating: 3,
+    rawStatus: 'rawOnly',
+  },
+  folders: [
+    {
+      children: [],
+      hasSubdirs: false,
+      imageCount: 1,
+      isDir: true,
+      name: 'session',
+      path: '/photos/session',
+    },
+  ],
+  imageList: [
+    {
+      exif: {
+        ISO: '400',
+        LensModel: 'Sample 50mm',
+      },
+      isEdited: true,
+      isVirtualCopy: false,
+      modified: 1_717_351_200,
+      path: '/photos/session/IMG_0001.CR3',
+      rating: 4,
+      tags: ['select', 'portrait'],
+    },
+  ],
+  libraryActivePath: '/photos/session/IMG_0001.CR3',
+  multiSelectedPaths: ['/photos/session/IMG_0001.CR3'],
+  pinnedFolders: [],
+  rootPaths: ['/photos/session'],
+  schemaVersion: 1,
+  sortCriteria: {
+    key: 'rating',
+    label: 'Rating',
+    order: 'desc',
+  },
 });
 
 export const rawEngineLocalAppServerAuditEventV1Schema = z
@@ -582,6 +736,51 @@ const buildAiEnhancementMutationResult = (
   });
 };
 
+const buildProjectMetadataResult = (
+  snapshot: ProjectLibrarySnapshotV1,
+): RawEngineLocalAppServerProjectMetadataResultV1 =>
+  rawEngineLocalAppServerProjectMetadataResultV1Schema.parse({
+    activeAlbumId: snapshot.activeAlbumId,
+    currentFolderPath: snapshot.currentFolderPath,
+    filterCriteria: snapshot.filterCriteria,
+    imageCount: snapshot.imageList.length,
+    libraryActivePath: snapshot.libraryActivePath,
+    pinnedFolderCount: snapshot.pinnedFolders.length,
+    rootPaths: snapshot.rootPaths,
+    selectedCount: snapshot.multiSelectedPaths.length,
+    sortCriteria: snapshot.sortCriteria,
+  });
+
+const buildSelectedImagesResult = (
+  snapshot: ProjectLibrarySnapshotV1,
+): RawEngineLocalAppServerSelectedImagesResultV1 => {
+  const selectedPaths = new Set(snapshot.multiSelectedPaths);
+  return rawEngineLocalAppServerSelectedImagesResultV1Schema.parse({
+    images: snapshot.imageList.filter((image) => selectedPaths.has(image.path)),
+    selectedPaths: snapshot.multiSelectedPaths,
+  });
+};
+
+const buildImageMetadataResult = (
+  snapshot: ProjectLibrarySnapshotV1,
+  imagePath: string,
+): RawEngineLocalAppServerImageMetadataResultV1 => {
+  const image = snapshot.imageList.find((candidate) => candidate.path === imagePath);
+  if (image === undefined) {
+    throw new Error(`Local app-server bridge has no image metadata for ${imagePath}.`);
+  }
+
+  return rawEngineLocalAppServerImageMetadataResultV1Schema.parse({ image });
+};
+
+const buildEditorStateResult = (snapshot: ProjectLibrarySnapshotV1): RawEngineLocalAppServerEditorStateResultV1 =>
+  rawEngineLocalAppServerEditorStateResultV1Schema.parse({
+    activeImagePath: snapshot.libraryActivePath,
+    currentFolderPath: snapshot.currentFolderPath,
+    selectedImagePaths: snapshot.multiSelectedPaths,
+    visibleImageCount: snapshot.imageList.length,
+  });
+
 export class RawEngineLocalAppServerBridge {
   readonly #acceptedAiEnhancementDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedAiToolDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
@@ -591,17 +790,22 @@ export class RawEngineLocalAppServerBridge {
   readonly #auditEvents: Array<RawEngineLocalAppServerAuditEventV1> = [];
   readonly #availableAiProviderIds: ReadonlySet<string>;
   readonly #commandBus: EditCommandBus;
+  readonly #projectLibrarySnapshot: ProjectLibrarySnapshotV1;
   readonly #toolRegistry: RawEngineToolRegistryV1;
 
   constructor(
     options: {
       availableAiProviderIds?: readonly string[];
       commandBus?: EditCommandBus;
+      projectLibrarySnapshot?: ProjectLibrarySnapshotV1;
       toolRegistry?: RawEngineToolRegistryV1;
     } = {},
   ) {
     this.#availableAiProviderIds = new Set(options.availableAiProviderIds ?? ['rawengine-local-ai']);
     this.#commandBus = options.commandBus ?? new EditCommandBus();
+    this.#projectLibrarySnapshot = projectLibrarySnapshotV1Schema.parse(
+      options.projectLibrarySnapshot ?? DEFAULT_LOCAL_PROJECT_LIBRARY_SNAPSHOT,
+    );
     this.#toolRegistry = options.toolRegistry ?? rawEngineDefaultToolRegistryV1;
     this.#registerHandlers();
   }
@@ -703,6 +907,30 @@ export class RawEngineLocalAppServerBridge {
       commandType: RawEngineLocalAppServerCommandType.ToolRegistryQuery,
       execute: () => this.#toolRegistry,
       schema: rawEngineLocalAppServerToolRegistryQueryV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: RawEngineLocalAppServerCommandType.ProjectMetadataQuery,
+      execute: () => buildProjectMetadataResult(this.#projectLibrarySnapshot),
+      schema: rawEngineLocalAppServerProjectMetadataQueryV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: RawEngineLocalAppServerCommandType.SelectedImagesQuery,
+      execute: () => buildSelectedImagesResult(this.#projectLibrarySnapshot),
+      schema: rawEngineLocalAppServerSelectedImagesQueryV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: RawEngineLocalAppServerCommandType.ImageMetadataQuery,
+      execute: (command) => buildImageMetadataResult(this.#projectLibrarySnapshot, command.imagePath),
+      schema: rawEngineLocalAppServerImageMetadataQueryV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: RawEngineLocalAppServerCommandType.EditorStateQuery,
+      execute: () => buildEditorStateResult(this.#projectLibrarySnapshot),
+      schema: rawEngineLocalAppServerEditorStateQueryV1Schema,
     });
 
     this.#commandBus.register({
