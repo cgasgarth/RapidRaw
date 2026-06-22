@@ -1468,7 +1468,12 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   };
 
   const handleApplyNeutralPatchRgbSuggestion = () => {
-    if (frameHealthReport.activeFrameId === null || neutralPatchSuggestion === null) return;
+    if (
+      frameHealthReport.activeFrameId === null ||
+      neutralPatchSuggestion === null ||
+      !neutralPatchSuggestion.applyAllowed
+    )
+      return;
     const nextOffset = snapNegativeLabFrameRgbBalanceOffsets({
       baselineParams: params,
       offsets: neutralPatchSuggestion.suggestedRgbBalanceOffset,
@@ -3567,6 +3572,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               {neutralPatchSuggestion !== null && (
                 <div
                   className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md border border-surface bg-bg-secondary p-2 text-xs text-text-tertiary"
+                  data-application-risk={neutralPatchSuggestion.applicationRisk}
+                  data-apply-allowed={String(neutralPatchSuggestion.applyAllowed)}
                   data-neutrality-risk={neutralPatchSuggestion.neutralityRisk}
                   data-testid="negative-lab-neutral-patch-rgb-suggestion"
                 >
@@ -3584,11 +3591,32 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                   <span className="text-right" data-testid="negative-lab-neutral-patch-risk">
                     {t(`modals.negativeConversion.neutralityRiskLevels.${neutralPatchSuggestion.neutralityRisk}`)}
                   </span>
+                  <span className="text-text-secondary">{t('modals.negativeConversion.applicationRisk')}</span>
+                  <span className="text-right" data-testid="negative-lab-neutral-patch-application-risk">
+                    {t(`modals.negativeConversion.neutralityRiskLevels.${neutralPatchSuggestion.applicationRisk}`)}
+                  </span>
+                  <span className="text-text-secondary">{t('modals.negativeConversion.correctionMagnitude')}</span>
+                  <span
+                    className="text-right tabular-nums"
+                    data-testid="negative-lab-neutral-patch-correction-magnitude"
+                  >
+                    {formatSignedRecipeValue(neutralPatchSuggestion.correctionMagnitude)}
+                  </span>
+                  {neutralPatchSuggestion.offsetClamped || !neutralPatchSuggestion.applyAllowed ? (
+                    <span
+                      className="col-span-2 text-[11px] text-warning"
+                      data-testid="negative-lab-neutral-patch-apply-warning"
+                    >
+                      {t('modals.negativeConversion.neutralPatchApplyWarning')}
+                    </span>
+                  ) : null}
                   <button
                     type="button"
                     className="col-span-2 mt-1 inline-flex items-center justify-center rounded border border-accent bg-accent/10 px-2 py-1 text-[11px] text-text-primary transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-50"
                     data-testid="negative-lab-apply-neutral-patch-rgb"
-                    disabled={frameHealthReport.activeFrameId === null || isSaving}
+                    disabled={
+                      frameHealthReport.activeFrameId === null || isSaving || !neutralPatchSuggestion.applyAllowed
+                    }
                     onClick={handleApplyNeutralPatchRgbSuggestion}
                   >
                     {t('modals.negativeConversion.applyNeutralPatchRgb')}

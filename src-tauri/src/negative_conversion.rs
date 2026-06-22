@@ -153,9 +153,13 @@ pub struct NegativeBaseFogEstimate {
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NegativeLabNeutralPatchSuggestion {
+    pub application_risk: String,
+    pub apply_allowed: bool,
     pub confidence: f32,
+    pub correction_magnitude: f32,
     pub effective_rgb_balance: NegativeLabFrameRgbBalance,
     pub neutrality_risk: String,
+    pub offset_clamped: bool,
     pub sample_density: [f32; 3],
     pub sample_rect: NegativeBaseFogSampleRect,
     pub sample_rgb: [f32; 3],
@@ -452,6 +456,10 @@ fn snap_negative_lab_rgb_offset(value: f32) -> f32 {
     ((value.clamp(-1.5, 1.5) * 100.0).round() / 100.0).clamp(-1.5, 1.5)
 }
 
+fn negative_lab_rgb_offset_was_clamped(value: f32) -> bool {
+    !(-1.5..=1.5).contains(&value)
+}
+
 fn negative_lab_neutrality_risk(sample_density: [f32; 3]) -> String {
     let min_density = sample_density.iter().copied().fold(f32::INFINITY, f32::min);
     let max_density = sample_density
@@ -468,28 +476,49 @@ fn negative_lab_neutrality_risk(sample_density: [f32; 3]) -> String {
     }
 }
 
+fn negative_lab_correction_risk(correction_magnitude: f32) -> String {
+    if correction_magnitude <= 0.15 {
+        "low".to_string()
+    } else if correction_magnitude <= 0.40 {
+        "medium".to_string()
+    } else {
+        "high".to_string()
+    }
+}
+
 fn build_negative_lab_neutral_patch_suggestion(
     params: NegativeConversionParams,
     sample_rect: NegativeBaseFogSampleRect,
     estimate: NegativeBaseFogEstimate,
 ) -> NegativeLabNeutralPatchSuggestion {
     let sanitized_params = params.sanitized();
+    let raw_blue_offset = estimate.blue_weight - sanitized_params.blue_weight;
+    let raw_green_offset = estimate.green_weight - sanitized_params.green_weight;
+    let raw_red_offset = estimate.red_weight - sanitized_params.red_weight;
     let suggested_rgb_balance_offset = NegativeLabFrameRgbBalance {
-        blue_weight: snap_negative_lab_rgb_offset(
-            estimate.blue_weight - sanitized_params.blue_weight,
-        ),
-        green_weight: snap_negative_lab_rgb_offset(
-            estimate.green_weight - sanitized_params.green_weight,
-        ),
-        red_weight: snap_negative_lab_rgb_offset(estimate.red_weight - sanitized_params.red_weight),
+        blue_weight: snap_negative_lab_rgb_offset(raw_blue_offset),
+        green_weight: snap_negative_lab_rgb_offset(raw_green_offset),
+        red_weight: snap_negative_lab_rgb_offset(raw_red_offset),
     };
+    let offset_clamped = negative_lab_rgb_offset_was_clamped(raw_blue_offset)
+        || negative_lab_rgb_offset_was_clamped(raw_green_offset)
+        || negative_lab_rgb_offset_was_clamped(raw_red_offset);
+    let correction_magnitude = suggested_rgb_balance_offset
+        .blue_weight
+        .abs()
+        .max(suggested_rgb_balance_offset.green_weight.abs())
+        .max(suggested_rgb_balance_offset.red_weight.abs());
     let effective_rgb_balance =
         negative_lab_effective_rgb_balance(&sanitized_params, &suggested_rgb_balance_offset);
 
     NegativeLabNeutralPatchSuggestion {
+        application_risk: negative_lab_correction_risk(correction_magnitude),
+        apply_allowed: !offset_clamped && correction_magnitude <= 0.75,
         confidence: estimate.confidence,
+        correction_magnitude,
         effective_rgb_balance,
         neutrality_risk: negative_lab_neutrality_risk(estimate.base_density),
+        offset_clamped,
         sample_density: estimate.base_density,
         sample_rect,
         sample_rgb: estimate.base_rgb,
@@ -1424,6 +1453,10 @@ mod tests {
         );
 
         assert_eq!(suggestion.neutrality_risk, "high");
+        assert_eq!(suggestion.application_risk, "low");
+        assert!(suggestion.apply_allowed);
+        assert!(!suggestion.offset_clamped);
+        assert_near(suggestion.correction_magnitude, 0.07);
         assert_near(suggestion.suggested_rgb_balance_offset.red_weight, 0.07);
         assert_near(suggestion.suggested_rgb_balance_offset.green_weight, -0.03);
         assert_near(suggestion.suggested_rgb_balance_offset.blue_weight, -0.02);
@@ -1437,6 +1470,38 @@ mod tests {
         assert_eq!(negative_lab_neutrality_risk([0.1, 0.15, 0.17]), "low");
         assert_eq!(negative_lab_neutrality_risk([0.1, 0.2, 0.28]), "medium");
         assert_eq!(negative_lab_neutrality_risk([0.1, 0.22, 0.31]), "high");
+    }
+
+    #[test]
+    fn negative_lab_neutral_patch_suggestion_blocks_extreme_clamped_offset() {
+        let suggestion = build_negative_lab_neutral_patch_suggestion(
+            NegativeConversionParams {
+                red_weight: 0.5,
+                green_weight: 1.0,
+                blue_weight: 1.0,
+                ..NegativeConversionParams::default()
+            },
+            NegativeBaseFogSampleRect {
+                x: 0.0,
+                y: 0.0,
+                width: 0.2,
+                height: 0.2,
+            },
+            NegativeBaseFogEstimate {
+                red_weight: 2.5,
+                green_weight: 1.22,
+                blue_weight: 1.08,
+                base_rgb: [0.7, 0.7, 0.7],
+                base_density: [0.16, 0.17, 0.18],
+                confidence: 0.7,
+            },
+        );
+
+        assert_eq!(suggestion.application_risk, "high");
+        assert!(!suggestion.apply_allowed);
+        assert!(suggestion.offset_clamped);
+        assert_near(suggestion.correction_magnitude, 1.5);
+        assert_near(suggestion.suggested_rgb_balance_offset.red_weight, 1.5);
     }
 
     #[test]

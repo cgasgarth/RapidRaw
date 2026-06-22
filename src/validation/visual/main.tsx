@@ -115,9 +115,13 @@ window.__TAURI_INTERNALS__ = {
     }
     if (command === suggestNegativeLabNeutralPatchCommand) {
       return Promise.resolve({
+        applicationRisk: 'low',
+        applyAllowed: true,
         confidence: 0.82,
+        correctionMagnitude: 0.07,
         effectiveRgbBalance: { blueWeight: 1.16, greenWeight: 0.93, redWeight: 1.14 },
         neutralityRisk: 'high',
+        offsetClamped: false,
         sampleDensity: [0.145, 0.238, 0.356],
         sampleRect: { height: 0.18, width: 0.18, x: 0.18, y: 0.62 },
         sampleRgb: [0.716, 0.578, 0.441],
