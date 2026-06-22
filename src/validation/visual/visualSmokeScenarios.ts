@@ -19,6 +19,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   LibraryWorkflow: 'library-workflow',
   MaskOverlayRawProof: 'mask-overlay-raw-proof',
   NegativeLabBatchColorWorkspace: 'negative-lab-batch-color-workspace',
+  NegativeLabEditorLayerHandoff: 'negative-lab-editor-layer-handoff',
   NegativeLabPublicExportReview: 'negative-lab-public-export-review',
   NegativeLabRealRawPrivateReview: 'negative-lab-real-raw-private-review',
   NegativeLabWorkspace: 'negative-lab-workspace',
@@ -41,6 +42,7 @@ export const VISUAL_SMOKE_PROOF_TEST_IDS = {
   NegativeLabAgentDryRunState: 'negative-lab-agent-dry-run-state',
   NegativeLabBatchReadiness: 'negative-lab-batch-readiness',
   NegativeLabExportJpegProof: 'negative-lab-export-jpeg-proof',
+  NegativeLabEditorLayerHandoffProof: 'negative-lab-editor-layer-handoff-proof',
   NegativeLabQueuedCount: 'negative-lab-queued-count',
   NegativeLabSavedPathProof: 'negative-lab-saved-path-proof',
   NegativeLabWorkflowRail: 'negative-lab-workflow-rail',
@@ -162,6 +164,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Negative Conversion',
     mode: VISUAL_SMOKE_SCENARIO_IDS.NegativeLabBatchColorWorkspace,
     outputFile: 'negative-lab-batch-color-workspace.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Negative Lab editor handoff',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.NegativeLabEditorLayerHandoff,
+    outputFile: 'negative-lab-editor-layer-handoff.png',
     sectionMinimum: 1,
   },
   {

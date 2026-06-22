@@ -29,12 +29,18 @@ import {
   type SuperResolutionUiSettings,
 } from '../../schemas/superResolutionUiSchemas';
 import { useUIStore } from '../../store/useUIStore';
-import { INITIAL_ADJUSTMENTS, type Adjustments, type MaskContainer } from '../../utils/adjustments';
+import {
+  INITIAL_ADJUSTMENTS,
+  INITIAL_MASK_ADJUSTMENTS,
+  type Adjustments,
+  type MaskContainer,
+} from '../../utils/adjustments';
 import { agentChatTranscriptFixture } from '../../utils/agentChatTranscriptFixture';
 import { applyColorBalanceRgbToPixel } from '../../utils/colorBalanceRgbRuntime';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
 import { DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF } from '../../utils/detailOutputComparisonProof';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
+import { applyLayerStackCommandBridgeOperation } from '../../utils/layerStackCommandBridge';
 import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
 
 import type { FocusStackOutputReviewWorkflow } from '../../schemas/focusStackOutputReviewSchemas';
@@ -186,6 +192,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.LibraryWorkflow]: LibraryWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.MaskOverlayRawProof]: MaskOverlayRawProofVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabPublicExportReview]: NegativeLabPublicExportReviewSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabEditorLayerHandoff]: NegativeLabEditorLayerHandoffVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabRealRawPrivateReview]: NegativeLabRealRawPrivateReviewSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabWorkspace]: NegativeLabVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaPrivateRawUi]: PanoramaPrivateRawVisualSmoke,
@@ -908,6 +915,10 @@ const copy = {
   virtualCopyShort: 'VC',
   hdrReview: 'HDR review',
   hdrSavedOutputEditorPath: 'HDR saved output editor path',
+  negativeLabEditorLayerHandoff: 'Negative Lab editor handoff',
+  negativeLabEditablePositive: 'Editable positive',
+  negativeLabLayer: 'Layer',
+  negativeLabOpacity: 'Opacity',
   hdrDryRunPreview: 'Dry-run preview',
   hdrArtifactHandoff: 'Artifact handoff',
   hdrApplyTool: getComputationalMergeAppServerRoutePairSummary('hdr').applyToolName,
@@ -3135,6 +3146,75 @@ function NegativeLabVisualSmoke() {
       >
         {savedPaths.length > 0 ? savedPaths.join(', ') : NEGATIVE_LAB_NO_SAVED_PATHS_LABEL}
       </div>
+    </main>
+  );
+}
+
+function NegativeLabEditorLayerHandoffVisualSmoke() {
+  const savedPositivePath = '/proof-roll/negative-lab/frame_001_Positive.tiff';
+  const layer: MaskContainer = {
+    adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+    blendMode: 'normal',
+    id: 'negative-lab-print-grade',
+    invert: false,
+    name: 'Print grade',
+    opacity: 82,
+    subMasks: [],
+    visible: true,
+  };
+  const applied = applyLayerStackCommandBridgeOperation(
+    [],
+    { layer, type: 'create' },
+    {
+      graphRevision: 'graph_negative_lab_positive_variant_visual_smoke',
+      imagePath: savedPositivePath,
+      operationId: 'negative_lab_editor_layer_handoff_visual_smoke',
+      sessionId: 'negative_lab_editor_layer_handoff_visual_smoke_session',
+    },
+  );
+  const openedPath = savedPositivePath;
+  const layerCreated = applied.sidecar.layers.some((sidecarLayer) => sidecarLayer.id === layer.id);
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.NegativeLabEditorLayerHandoff}
+    >
+      <div className="absolute inset-0 bg-[#0f1114]" data-visual-smoke-section="negative-lab-editor-layer-handoff" />
+      <div className="fixed left-4 top-4 z-50 rounded-md border border-white/10 bg-black/75 px-3 py-2 text-sm font-semibold">
+        {copy.negativeLabEditorLayerHandoff}
+      </div>
+      <section className="relative z-10 mx-auto flex min-h-screen max-w-5xl items-center gap-6 px-8">
+        <div className="aspect-[4/3] flex-1 overflow-hidden rounded-md border border-white/10 bg-gradient-to-br from-[#342016] via-[#ba8658] to-[#f2ddbf] shadow-2xl">
+          <div className="h-full w-full bg-[radial-gradient(circle_at_70%_28%,rgba(255,255,255,0.48),transparent_18%),linear-gradient(120deg,rgba(35,24,18,0.58),transparent_42%)]" />
+        </div>
+        <aside className="w-80 rounded-md border border-white/10 bg-[#181b20] p-4">
+          <p className="text-sm font-semibold text-[#f3f4f1]">{copy.negativeLabEditablePositive}</p>
+          <p className="mt-2 break-words text-xs text-[#b8b9b3]">{savedPositivePath}</p>
+          <div className="mt-4 rounded border border-white/10 bg-black/30 p-3 text-xs">
+            <div className="flex justify-between">
+              <span>{copy.negativeLabLayer}</span>
+              <span>{layer.name}</span>
+            </div>
+            <div className="mt-2 flex justify-between">
+              <span>{copy.negativeLabOpacity}</span>
+              <span>{layer.opacity}%</span>
+            </div>
+          </div>
+        </aside>
+      </section>
+      <div
+        className="sr-only"
+        data-entered-normal-editor-path="true"
+        data-layer-command-type={applied.command.commandType}
+        data-layer-created={String(layerCreated)}
+        data-open-callback="handleImageSelect"
+        data-opened-path={openedPath}
+        data-saved-path={savedPositivePath}
+        data-sidecar-source-image-path={applied.sidecar.sourceImagePath}
+        data-testid={VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabEditorLayerHandoffProof}
+      />
     </main>
   );
 }

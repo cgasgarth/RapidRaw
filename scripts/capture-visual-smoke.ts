@@ -1619,6 +1619,24 @@ async function prepareScenario(page, mode) {
     return;
   }
 
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.NegativeLabEditorLayerHandoff) {
+    const proof = await page
+      .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabEditorLayerHandoffProof)
+      .evaluate((element) => ({ ...element.dataset }));
+    if (
+      proof.enteredNormalEditorPath !== 'true' ||
+      proof.layerCommandType !== 'layerMask.createLayer' ||
+      proof.layerCreated !== 'true' ||
+      proof.openCallback !== 'handleImageSelect' ||
+      proof.openedPath !== '/proof-roll/negative-lab/frame_001_Positive.tiff' ||
+      proof.savedPath !== '/proof-roll/negative-lab/frame_001_Positive.tiff' ||
+      proof.sidecarSourceImagePath !== '/proof-roll/negative-lab/frame_001_Positive.tiff'
+    ) {
+      throw new Error(`Negative Lab editor layer handoff proof failed: ${JSON.stringify(proof)}`);
+    }
+    return;
+  }
+
   if (mode === 'panorama-ui') {
     await page.getByTestId('panorama-projection-option-rectilinear').click();
     if (!(await page.getByTestId('panorama-projection-option-spherical').isDisabled())) {

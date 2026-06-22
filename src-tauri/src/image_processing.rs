@@ -59,6 +59,8 @@ pub struct RawEngineArtifacts {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub negative_lab_artifacts: Vec<Value>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub layer_stack_sidecars: Vec<Value>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub panorama_artifacts: Vec<Value>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub stale_artifact_ids: Vec<String>,
@@ -71,6 +73,7 @@ impl RawEngineArtifacts {
             ai_provenance_entries: Vec::new(),
             hdr_merge_artifacts: Vec::new(),
             negative_lab_artifacts: Vec::new(),
+            layer_stack_sidecars: Vec::new(),
             panorama_artifacts: Vec::new(),
             stale_artifact_ids: Vec::new(),
         }

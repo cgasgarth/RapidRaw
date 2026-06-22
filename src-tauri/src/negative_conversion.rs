@@ -1090,6 +1090,7 @@ fn write_negative_lab_output_sidecar(
     let mut sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
     let artifact_id = format!("artifact_negative_lab_{}", Uuid::new_v4().simple());
     let output_artifact_id = format!("{}_output", artifact_id);
+    let positive_variant_id = format!("positive_variant_{}", Uuid::new_v4().simple());
     let content_hash = hash_negative_lab_output_file(output_path)?;
     let output_format = match save_options.output_format {
         NegativeConversionOutputFormat::JpegProof => "jpeg_proof",
@@ -1119,6 +1120,8 @@ fn write_negative_lab_output_sidecar(
                 "width": output_width,
             },
             "kind": "negative_lab_positive",
+            "outputIntent": "editable_positive",
+            "positiveVariantId": positive_variant_id,
             "storage": "sidecar_artifact",
         }],
         "provenance": {
@@ -1139,6 +1142,12 @@ fn write_negative_lab_output_sidecar(
         .get_or_insert_with(RawEngineArtifacts::new_v1);
     artifacts.schema_version = 1;
     artifacts.negative_lab_artifacts.push(artifact);
+    upsert_negative_lab_layer_stack_sidecar(
+        artifacts,
+        output_path,
+        &positive_variant_id,
+        &artifact_id,
+    );
     artifacts.stale_artifact_ids.retain(|id| !id.is_empty());
 
     let json = serde_json::to_string_pretty(&sidecar)
@@ -1150,6 +1159,29 @@ fn write_negative_lab_output_sidecar(
             e
         )
     })
+}
+
+fn upsert_negative_lab_layer_stack_sidecar(
+    artifacts: &mut RawEngineArtifacts,
+    output_path: &Path,
+    positive_variant_id: &str,
+    artifact_id: &str,
+) {
+    let output_image_path = output_path.to_string_lossy().to_string();
+    artifacts.layer_stack_sidecars.retain(|sidecar| {
+        sidecar
+            .get("sourceImagePath")
+            .and_then(|value| value.as_str())
+            .is_none_or(|source_image_path| source_image_path != output_image_path)
+    });
+    artifacts.layer_stack_sidecars.push(serde_json::json!({
+        "graphRevision": format!("graph_negative_lab_{}", positive_variant_id),
+        "layers": [],
+        "lastCommandId": format!("command_seed_layer_stack_{}", artifact_id),
+        "schemaVersion": 1,
+        "sourceImagePath": output_image_path,
+        "storage": "sidecar_artifact",
+    }));
 }
 
 impl NegativeConversionParams {
@@ -2569,10 +2601,12 @@ mod tests {
 
         let sidecar_path = negative_lab_output_sidecar_path(&output_path);
         let sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
-        let artifact = sidecar
+        let artifacts = sidecar
             .raw_engine_artifacts
-            .expect("rawEngineArtifacts should be present")
+            .expect("rawEngineArtifacts should be present");
+        let artifact = artifacts
             .negative_lab_artifacts
+            .clone()
             .pop()
             .expect("Negative Lab artifact should be present");
 
@@ -2603,11 +2637,35 @@ mod tests {
             artifact["outputArtifacts"][0]["storage"],
             "sidecar_artifact"
         );
+        assert_eq!(
+            artifact["outputArtifacts"][0]["outputIntent"],
+            "editable_positive"
+        );
+        assert!(
+            artifact["outputArtifacts"][0]["positiveVariantId"]
+                .as_str()
+                .unwrap_or_default()
+                .starts_with("positive_variant_")
+        );
         assert!(
             artifact["outputArtifacts"][0]["contentHash"]
                 .as_str()
                 .unwrap_or_default()
                 .starts_with("fnv1a64:")
+        );
+        assert_eq!(artifacts.layer_stack_sidecars.len(), 1);
+        let layer_stack = &artifacts.layer_stack_sidecars[0];
+        assert_eq!(
+            layer_stack["sourceImagePath"],
+            output_path.to_string_lossy().to_string()
+        );
+        assert_eq!(layer_stack["storage"], "sidecar_artifact");
+        assert_eq!(layer_stack["layers"].as_array().unwrap().len(), 0);
+        assert!(
+            layer_stack["graphRevision"]
+                .as_str()
+                .unwrap_or_default()
+                .starts_with("graph_negative_lab_positive_variant_")
         );
     }
 
