@@ -6,6 +6,12 @@ import { NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST } from './negativeLabAppServerRo
 import { ToneColorAppServerRouteStatus } from './toneColorAppServerRouteIds';
 import { TONE_COLOR_APP_SERVER_ROUTES } from './toneColorAppServerRoutes';
 import {
+  buildRawEngineLocalAppServerToolRegistryQuery,
+  createRawEngineLocalAppServerBridge,
+  RawEngineLocalAppServerCommandType,
+} from '../../packages/rawengine-schema/src/localAppServerBridge';
+import { rawEngineToolRegistryV1Schema } from '../../packages/rawengine-schema/src/rawEngineSchemas';
+import {
   AgentRuntimeId,
   RawEngineAppServerAuditOutcome,
   RawEngineAppServerHostToolName,
@@ -33,6 +39,7 @@ import {
   rawEngineAppServerHostRequestSchema,
   rawEngineAppServerHostResponseEnvelopeSchema,
   rawEngineAppServerHostResponseSchema,
+  rawEngineAppServerToolDispatchResponseSchema,
   type RawEngineAppServerClientInfo,
   type RawEngineAppServerAuditEntry,
   type RawEngineAppServerCapabilitiesReplay,
@@ -55,6 +62,8 @@ import {
   type RawEngineAppServerRouteCatalogResponse,
   type RawEngineAppServerRouteFamily,
   type RawEngineAppServerRouteMode as RawEngineAppServerRouteModeValue,
+  type RawEngineAppServerToolDispatchRequest,
+  type RawEngineAppServerToolDispatchResponse,
 } from '../schemas/agentRuntimeSchemas';
 
 export const RAW_ENGINE_APP_SERVER_HOST_MANIFEST = rawEngineAppServerHostManifestSchema.parse({
@@ -81,6 +90,13 @@ export const RAW_ENGINE_APP_SERVER_HOST_MANIFEST = rawEngineAppServerHostManifes
       outputSchemaName: 'RawEngineAppServerRouteCatalogResponseV1',
       toolKind: RawEngineAppServerToolKind.Read,
       toolName: RawEngineAppServerHostToolName.RouteCatalog,
+    },
+    {
+      inputSchemaName: 'RawEngineAppServerToolDispatchRequestV1',
+      mutates: true,
+      outputSchemaName: 'RawEngineAppServerToolDispatchResponseV1',
+      toolKind: RawEngineAppServerToolKind.Command,
+      toolName: RawEngineAppServerHostToolName.DispatchTool,
     },
   ],
   transport: RawEngineAppServerTransport.StdioJsonl,
@@ -554,6 +570,124 @@ export const buildRawEngineAppServerRouteCatalogResponse = ({
     transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
   });
 
+const getCommandType = (command: unknown): string | undefined => {
+  if (typeof command !== 'object' || command === null || !('commandType' in command)) return undefined;
+  const commandType = command.commandType;
+  return typeof commandType === 'string' && commandType.trim().length > 0 ? commandType : undefined;
+};
+
+const localBridgeToolMatchesCommand = ({
+  commandType,
+  dryRun,
+  runtimeToolName,
+}: {
+  commandType: string | undefined;
+  dryRun: boolean | undefined;
+  runtimeToolName: string;
+}): boolean => {
+  if (runtimeToolName === 'agent.project_metadata.query') {
+    return commandType === RawEngineLocalAppServerCommandType.ProjectMetadataQuery;
+  }
+  if (runtimeToolName === 'agent.selected_images.query') {
+    return commandType === RawEngineLocalAppServerCommandType.SelectedImagesQuery;
+  }
+  if (runtimeToolName === 'agent.image_metadata.query') {
+    return commandType === RawEngineLocalAppServerCommandType.ImageMetadataQuery;
+  }
+  if (runtimeToolName === 'agent.editor_state.query') {
+    return commandType === RawEngineLocalAppServerCommandType.EditorStateQuery;
+  }
+  if (runtimeToolName === 'tonecolor.dry_run_command') {
+    return commandType?.startsWith('toneColor.') === true && dryRun === true;
+  }
+  if (runtimeToolName === 'tonecolor.apply_command') {
+    return commandType?.startsWith('toneColor.') === true && dryRun === false;
+  }
+  if (runtimeToolName === 'ai.mask.dry_run_subject')
+    return commandType === 'ai.mask.generateSubject' && dryRun === true;
+  if (runtimeToolName === 'ai.mask.apply_subject') return commandType === 'ai.mask.applySubject' && dryRun === false;
+  if (runtimeToolName === 'ai.enhancement.dry_run_command') {
+    return commandType === 'ai.enhancement.dryRun' && dryRun === true;
+  }
+  if (runtimeToolName === 'ai.enhancement.apply_command') {
+    return commandType === 'ai.enhancement.apply' && dryRun === false;
+  }
+  return false;
+};
+
+const getDryRunFlag = (command: unknown): boolean | undefined => {
+  if (typeof command !== 'object' || command === null || !('dryRun' in command)) return undefined;
+  return typeof command.dryRun === 'boolean' ? command.dryRun : undefined;
+};
+
+export const buildRawEngineAppServerToolDispatchResponse = async (
+  request: RawEngineAppServerToolDispatchRequest,
+): Promise<RawEngineAppServerToolDispatchResponse> => {
+  const bridge = createRawEngineLocalAppServerBridge();
+  const registryResult = await bridge.dispatch(buildRawEngineLocalAppServerToolRegistryQuery(request.requestId));
+  if (!registryResult.ok) {
+    return rawEngineAppServerToolDispatchResponseSchema.parse({
+      dispatchStatus: 'rejected',
+      message: registryResult.message,
+      requestId: request.requestId,
+      runtime: AgentRuntimeId.AppServer,
+      runtimeToolName: request.runtimeToolName,
+      status: RawEngineAppServerResponseStatus.Ok,
+      transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
+    });
+  }
+
+  const registry = rawEngineToolRegistryV1Schema.parse(registryResult.result);
+  const tool = registry.tools.find((candidate) => candidate.toolName === request.runtimeToolName);
+  const commandType = getCommandType(request.arguments);
+  if (tool === undefined) {
+    return rawEngineAppServerToolDispatchResponseSchema.parse({
+      commandType,
+      dispatchStatus: 'rejected',
+      message: `Local app-server bridge does not advertise ${request.runtimeToolName}.`,
+      requestId: request.requestId,
+      runtime: AgentRuntimeId.AppServer,
+      runtimeToolName: request.runtimeToolName,
+      status: RawEngineAppServerResponseStatus.Ok,
+      transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
+    });
+  }
+
+  if (
+    !localBridgeToolMatchesCommand({
+      commandType,
+      dryRun: getDryRunFlag(request.arguments),
+      runtimeToolName: request.runtimeToolName,
+    })
+  ) {
+    return rawEngineAppServerToolDispatchResponseSchema.parse({
+      commandType,
+      dispatchStatus: 'rejected',
+      message: `${request.runtimeToolName} cannot dispatch command ${commandType ?? 'unknown'}.`,
+      requestId: request.requestId,
+      runtime: AgentRuntimeId.AppServer,
+      runtimeToolName: request.runtimeToolName,
+      status: RawEngineAppServerResponseStatus.Ok,
+      transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
+    });
+  }
+
+  const result = await bridge.dispatch(request.arguments, {
+    now: () => new Date('2026-06-22T12:00:00.000Z'),
+    requestId: request.requestId,
+  });
+  return rawEngineAppServerToolDispatchResponseSchema.parse({
+    commandType,
+    dispatchStatus: result.ok ? 'completed' : 'rejected',
+    ...(result.ok ? { result: result.result } : { message: result.message }),
+    requestId: request.requestId,
+    runtime: AgentRuntimeId.AppServer,
+    runtimeToolName: request.runtimeToolName,
+    status: RawEngineAppServerResponseStatus.Ok,
+    transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
+  });
+};
+
 export const handleRawEngineAppServerHostRequest = (request: unknown): RawEngineAppServerHostResponse => {
   const parsedRequest: RawEngineAppServerHostRequest = rawEngineAppServerHostRequestSchema.parse(request);
 
@@ -564,7 +698,19 @@ export const handleRawEngineAppServerHostRequest = (request: unknown): RawEngine
       return rawEngineAppServerHostResponseSchema.parse(buildRawEngineAppServerHealthResponse(parsedRequest));
     case RawEngineAppServerHostToolName.RouteCatalog:
       return rawEngineAppServerHostResponseSchema.parse(buildRawEngineAppServerRouteCatalogResponse(parsedRequest));
+    case RawEngineAppServerHostToolName.DispatchTool:
+      throw new Error('RawEngine app-server dispatch_tool requires the async host request handler.');
   }
+};
+
+export const handleRawEngineAppServerHostRequestAsync = async (
+  request: unknown,
+): Promise<RawEngineAppServerHostResponse> => {
+  const parsedRequest: RawEngineAppServerHostRequest = rawEngineAppServerHostRequestSchema.parse(request);
+  if (parsedRequest.toolName === RawEngineAppServerHostToolName.DispatchTool) {
+    return rawEngineAppServerHostResponseSchema.parse(await buildRawEngineAppServerToolDispatchResponse(parsedRequest));
+  }
+  return handleRawEngineAppServerHostRequest(parsedRequest);
 };
 
 export const buildRawEngineAppServerHostResponseEnvelope = (
@@ -577,6 +723,22 @@ export const buildRawEngineAppServerHostResponseEnvelope = (
     handledAtIso,
     request: parsedRequest,
     response: handleRawEngineAppServerHostRequest(parsedRequest),
+    schemaVersion: 1,
+    status: RawEngineAppServerResponseStatus.Ok,
+    transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
+  });
+};
+
+export const buildRawEngineAppServerHostResponseEnvelopeAsync = async (
+  request: unknown,
+  handledAtIso = '2026-06-17T00:00:00.000Z',
+): Promise<RawEngineAppServerHostResponseEnvelope> => {
+  const parsedRequest = rawEngineAppServerHostRequestSchema.parse(request);
+
+  return rawEngineAppServerHostResponseEnvelopeSchema.parse({
+    handledAtIso,
+    request: parsedRequest,
+    response: await handleRawEngineAppServerHostRequestAsync(parsedRequest),
     schemaVersion: 1,
     status: RawEngineAppServerResponseStatus.Ok,
     transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,

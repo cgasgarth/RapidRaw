@@ -35,10 +35,14 @@ export const RawEngineAppServerTransport = {
 export const rawEngineAppServerTransportSchema = z.enum([RawEngineAppServerTransport.StdioJsonl]);
 
 export const RawEngineAppServerToolKind = {
+  Command: 'command',
   Read: 'read',
 } as const;
 
-export const rawEngineAppServerToolKindSchema = z.enum([RawEngineAppServerToolKind.Read]);
+export const rawEngineAppServerToolKindSchema = z.enum([
+  RawEngineAppServerToolKind.Command,
+  RawEngineAppServerToolKind.Read,
+]);
 
 export const RawEngineAppServerAuditOutcome = {
   Rejected: 'rejected',
@@ -109,12 +113,14 @@ export const RawEngineAppServerResponseStatus = {
 
 export const RawEngineAppServerHostToolName = {
   Capabilities: 'rawengine.host.capabilities',
+  DispatchTool: 'rawengine.host.dispatch_tool',
   Health: 'rawengine.host.health',
   RouteCatalog: 'rawengine.host.route_catalog',
 } as const;
 
 export const rawEngineAppServerHostToolNameSchema = z.enum([
   RawEngineAppServerHostToolName.Capabilities,
+  RawEngineAppServerHostToolName.DispatchTool,
   RawEngineAppServerHostToolName.Health,
   RawEngineAppServerHostToolName.RouteCatalog,
 ]);
@@ -241,7 +247,7 @@ export const rawEngineAppServerSupervisorStateSchema = z
 export const rawEngineAppServerToolDefinitionSchema = z
   .object({
     inputSchemaName: z.string().trim().min(1),
-    mutates: z.literal(false),
+    mutates: z.boolean(),
     outputSchemaName: z.string().trim().min(1),
     toolKind: rawEngineAppServerToolKindSchema,
     toolName: z
@@ -278,6 +284,15 @@ export const rawEngineAppServerRouteCatalogRequestSchema = z
   .object({
     requestId: z.string().trim().min(1),
     toolName: z.literal(RawEngineAppServerHostToolName.RouteCatalog),
+  })
+  .strict();
+
+export const rawEngineAppServerToolDispatchRequestSchema = z
+  .object({
+    arguments: z.unknown(),
+    requestId: z.string().trim().min(1),
+    runtimeToolName: z.string().trim().min(1),
+    toolName: z.literal(RawEngineAppServerHostToolName.DispatchTool),
   })
   .strict();
 
@@ -345,10 +360,24 @@ export const rawEngineAppServerRouteCatalogResponseSchema = z
   })
   .strict();
 
+export const rawEngineAppServerToolDispatchResponseSchema = z
+  .object({
+    commandType: z.string().trim().min(1).optional(),
+    dispatchStatus: z.enum(['completed', 'rejected']),
+    message: z.string().trim().min(1).optional(),
+    requestId: z.string().trim().min(1),
+    result: z.unknown().optional(),
+    runtime: z.literal(AgentRuntimeId.AppServer),
+    runtimeToolName: z.string().trim().min(1),
+    status: z.literal(RawEngineAppServerResponseStatus.Ok),
+    transport: rawEngineAppServerTransportSchema,
+  })
+  .strict();
+
 export const rawEngineAppServerAuditEntrySchema = z
   .object({
     affectedArtifactIds: z.array(z.string().trim().min(1)),
-    mutates: z.literal(false),
+    mutates: z.boolean(),
     outcome: rawEngineAppServerAuditOutcomeSchema,
     requestId: z.string().trim().min(1),
     timestampIso: z.iso.datetime(),
@@ -393,6 +422,7 @@ export const rawEngineAppServerRouteCatalogReplaySchema = z
 
 export const rawEngineAppServerHostRequestSchema = z.discriminatedUnion('toolName', [
   rawEngineAppServerCapabilitiesRequestSchema,
+  rawEngineAppServerToolDispatchRequestSchema,
   rawEngineAppServerHealthRequestSchema,
   rawEngineAppServerRouteCatalogRequestSchema,
 ]);
@@ -401,6 +431,7 @@ export const rawEngineAppServerHostResponseSchema = z.union([
   rawEngineAppServerCapabilitiesResponseSchema,
   rawEngineAppServerHealthResponseSchema,
   rawEngineAppServerRouteCatalogResponseSchema,
+  rawEngineAppServerToolDispatchResponseSchema,
 ]);
 
 export const rawEngineAppServerHostResponseEnvelopeSchema = z
@@ -435,5 +466,7 @@ export type RawEngineAppServerRouteCatalogEntry = z.infer<typeof rawEngineAppSer
 export type RawEngineAppServerRouteCatalogReplay = z.infer<typeof rawEngineAppServerRouteCatalogReplaySchema>;
 export type RawEngineAppServerRouteCatalogRequest = z.infer<typeof rawEngineAppServerRouteCatalogRequestSchema>;
 export type RawEngineAppServerRouteCatalogResponse = z.infer<typeof rawEngineAppServerRouteCatalogResponseSchema>;
+export type RawEngineAppServerToolDispatchRequest = z.infer<typeof rawEngineAppServerToolDispatchRequestSchema>;
+export type RawEngineAppServerToolDispatchResponse = z.infer<typeof rawEngineAppServerToolDispatchResponseSchema>;
 export type RawEngineAppServerRouteFamily = z.infer<typeof rawEngineAppServerRouteFamilySchema>;
 export type RawEngineAppServerRouteMode = z.infer<typeof rawEngineAppServerRouteModeSchema>;
