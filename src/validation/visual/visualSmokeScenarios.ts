@@ -9,6 +9,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   FilmLookBrowser: 'film-look-browser',
   FocusPrivateRawUi: 'focus-private-raw-ui',
   FocusUi: 'focus-ui',
+  HdrPrivateRawEditorHandoff: 'hdr-private-raw-editor-handoff',
   HdrPrivateRawUi: 'hdr-private-raw-ui',
   HdrSavedOutputEditorPath: 'hdr-saved-output-editor-path',
   HdrUi: 'hdr-ui',
@@ -115,6 +116,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Private RAW HDR review',
     mode: VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawUi,
     outputFile: 'hdr-private-raw-ui.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Private RAW HDR editor handoff',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawEditorHandoff,
+    outputFile: 'hdr-private-raw-editor-handoff.png',
     sectionMinimum: 1,
   },
   {

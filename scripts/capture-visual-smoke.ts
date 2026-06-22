@@ -87,7 +87,9 @@ const requiresFocusPrivateRawProof = selectedScenarios.some(
   (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi,
 );
 const requiresHdrPrivateRawProof = selectedScenarios.some(
-  (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawUi,
+  (scenario) =>
+    scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawUi ||
+    scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawEditorHandoff,
 );
 const requiresPanoramaPrivateRawProof = selectedScenarios.some(
   (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.PanoramaPrivateRawUi,
@@ -935,6 +937,38 @@ async function prepareScenario(page, mode) {
       .getByTestId('hdr-private-raw-artifact-handoff')
       .getByText('hdr-bracket-merge.tiff', { exact: false })
       .waitFor({ timeout: 10_000 });
+    return;
+  }
+
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawEditorHandoff) {
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByTestId('merge-saved-output-detail').waitFor({ timeout: 10_000 });
+    const provenance = await page
+      .getByTestId('hdr-editable-handoff-provenance')
+      .evaluate((element) => ({ ...element.dataset }));
+    if (
+      provenance.capabilityLevel !== 'runtime_apply_capable' ||
+      provenance.outputColorSpace !== 'srgb_display_referred_v1' ||
+      provenance.sourceCount !== '3' ||
+      provenance.warningCodes !== 'tone_mapped_preview_only'
+    ) {
+      throw new Error(`HDR private RAW editable provenance proof failed: ${JSON.stringify(provenance)}`);
+    }
+    await page.getByTestId('merge-open-saved-output').click();
+    const proof = await page
+      .getByTestId('hdr-private-raw-editor-handoff-proof')
+      .evaluate((element) => ({ ...element.dataset }));
+    if (
+      proof.enteredNormalEditorPath !== 'true' ||
+      proof.fixtureId !== 'validation.computational-merge.hdr-bracket-alignment.v1' ||
+      proof.mergeArtifact?.endsWith('/hdr-bracket-merge.tiff') !== true ||
+      proof.openCallback !== 'handleImageSelect' ||
+      proof.openedPath !== proof.mergeArtifact ||
+      proof.savedPath !== proof.mergeArtifact ||
+      proof.sourceCount !== '3'
+    ) {
+      throw new Error(`HDR private RAW output did not enter editor path: ${JSON.stringify(proof)}`);
+    }
     return;
   }
 
