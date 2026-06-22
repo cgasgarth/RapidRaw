@@ -2133,6 +2133,43 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     );
   };
 
+  const renderScanInputGuidance = () => (
+    <div
+      className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+      data-preflight-basis="path_extension_only"
+      data-testid="negative-lab-scan-input-guidance"
+    >
+      <UiText variant={TextVariants.small} className="font-medium text-text-primary">
+        {t('modals.negativeConversion.scanInputGuidanceTitle')}
+      </UiText>
+      <ul className="space-y-1 text-xs text-text-tertiary">
+        <li className="flex gap-2" data-testid="negative-lab-scan-input-guidance-scanInputGuidancePreferred">
+          <span aria-hidden="true" className="mt-1 h-1 w-1 shrink-0 rounded-full bg-accent" />
+          <span>{t('modals.negativeConversion.scanInputGuidancePreferred')}</span>
+        </li>
+        <li className="flex gap-2" data-testid="negative-lab-scan-input-guidance-scanInputGuidanceDisableAuto">
+          <span aria-hidden="true" className="mt-1 h-1 w-1 shrink-0 rounded-full bg-accent" />
+          <span>{t('modals.negativeConversion.scanInputGuidanceDisableAuto')}</span>
+        </li>
+        <li className="flex gap-2" data-testid="negative-lab-scan-input-guidance-scanInputGuidancePreserveBorders">
+          <span aria-hidden="true" className="mt-1 h-1 w-1 shrink-0 rounded-full bg-accent" />
+          <span>{t('modals.negativeConversion.scanInputGuidancePreserveBorders')}</span>
+        </li>
+        <li className="flex gap-2" data-testid="negative-lab-scan-input-guidance-scanInputGuidanceAvoidPositive">
+          <span aria-hidden="true" className="mt-1 h-1 w-1 shrink-0 rounded-full bg-accent" />
+          <span>{t('modals.negativeConversion.scanInputGuidanceAvoidPositive')}</span>
+        </li>
+        <li className="flex gap-2" data-testid="negative-lab-scan-input-guidance-scanInputGuidanceAvoidProofs">
+          <span aria-hidden="true" className="mt-1 h-1 w-1 shrink-0 rounded-full bg-accent" />
+          <span>{t('modals.negativeConversion.scanInputGuidanceAvoidProofs')}</span>
+        </li>
+      </ul>
+      <UiText variant={TextVariants.small} className="text-text-tertiary">
+        {t('modals.negativeConversion.scanInputGuidanceLimit')}
+      </UiText>
+    </div>
+  );
+
   const renderBatchReadiness = () => (
     <div
       className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
@@ -2962,6 +2999,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               </div>
             )}
             {renderAcquisitionHealth()}
+            {renderScanInputGuidance()}
             {renderBatchReadiness()}
             {renderAgentActivityPanel()}
           </div>
