@@ -181,6 +181,7 @@ export const panoramaRuntimeProvenanceV1Schema = z
       .object({
         deferredReason: z.string().trim().min(1).optional(),
         effectiveProjection: z.enum(['rectilinear', 'cylindrical', 'spherical', 'planar']),
+        horizontalFovDegrees: z.number().positive().max(360).optional(),
         requestedProjection: z.enum(['rectilinear', 'cylindrical', 'spherical', 'planar']),
         support: z.enum(['implemented_current_engine', 'schema_only_deferred']),
       })
@@ -194,7 +195,7 @@ export const panoramaRuntimeProvenanceV1Schema = z
         stitchedSourceRatio: z.number().min(0).max(1),
       })
       .strict(),
-    resolvedProjection: z.enum(['rectilinear', 'planar']),
+    resolvedProjection: z.enum(['rectilinear', 'cylindrical', 'planar']),
     runtimeStatus: z.enum(['dry_run_rendered', 'apply_rendered']),
     seamBlend: z
       .object({
@@ -428,7 +429,7 @@ export const buildPanoramaRuntimeArtifactV1 = ({
         adaptiveSeamFeather: true,
         autoCrop: true,
         bundleAdjustment: false,
-        cylindricalProjection: false,
+        cylindricalProjection: true,
         exposureNormalization: true,
         planarHomography: true,
         tiledRender: false,
@@ -511,6 +512,7 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
     expectedWarningCodes: expectedWarningsForCommand(request.command),
     fixtureId: `panorama.runtime.${request.command.commandId}.v1`,
     memoryBudgetBytes: request.command.parameters.memoryBudgetBytes ?? 4_000_000_000,
+    projection: resolvePanoramaRuntimeProjection(request.command.parameters.projection),
     seed: request.seed,
     sourceFrames: request.sourceFrames.map((frame) => toSyntheticSourceFrame(frame, request.command)),
   });
@@ -628,7 +630,7 @@ const buildPanoramaPreflightEstimate = (request: ParsedPanoramaRuntimePlanReques
 
 const expectedWarningsForCommand = (command: PanoramaRuntimeCommandV1): string[] => {
   const warnings = new Set<string>(['legacy_full_frame_render']);
-  if (['cylindrical', 'spherical'].includes(command.parameters.projection)) warnings.add('projection_runtime_deferred');
+  if (command.parameters.projection === 'spherical') warnings.add('projection_runtime_deferred');
   if (command.parameters.boundaryMode === 'deferred_fill') warnings.add('boundary_runtime_deferred');
   return [...warnings].sort();
 };
@@ -645,6 +647,7 @@ const buildPanoramaRuntimeProjectionSettings = (
         }
       : {}),
     effectiveProjection,
+    ...(effectiveProjection === 'cylindrical' ? { horizontalFovDegrees: 86 } : {}),
     requestedProjection,
     support,
   };
@@ -652,7 +655,8 @@ const buildPanoramaRuntimeProjectionSettings = (
 
 const resolvePanoramaRuntimeProjection = (
   requestedProjection: PanoramaRuntimeCommandV1['parameters']['projection'],
-): 'rectilinear' | 'planar' => (requestedProjection === 'planar' ? 'planar' : 'rectilinear');
+): 'rectilinear' | 'cylindrical' | 'planar' =>
+  requestedProjection === 'planar' || requestedProjection === 'cylindrical' ? requestedProjection : 'rectilinear';
 
 const buildPanoramaRuntimeCrop = (
   boundaryMode: PanoramaRuntimeCommandV1['parameters']['boundaryMode'],
@@ -1190,6 +1194,9 @@ const projectionSettingsForPanoramaRuntimeArtifact = (
     ? { deferredReason: provenance.projectionSettings.deferredReason ?? 'Projection was resolved by runtime fallback.' }
     : {}),
   effectiveProjection: provenance.resolvedProjection,
+  ...(provenance.projectionSettings.horizontalFovDegrees === undefined
+    ? {}
+    : { horizontalFovDegrees: provenance.projectionSettings.horizontalFovDegrees }),
   requestedProjection: provenance.projection,
   support: provenance.projectionSettings.support,
 });

@@ -17,7 +17,7 @@ runComputationalUiApiSmoke({
       exposureMode: 'gain_compensation',
       maxPreviewDimensionPx: 4096,
       outputName: 'Ridge Overlook Panorama',
-      projection: 'rectilinear',
+      projection: 'cylindrical',
       qualityPreference: 'best',
       sources: [
         { exposureEv: 0, imagePath: '/photos/pano/PANO_0001.CR3', sourceIndex: 0 },
@@ -46,6 +46,9 @@ runComputationalUiApiSmoke({
     if (command.parameters.exposureNormalization !== 'auto') {
       failures.push('Panorama UI mapper must map gain compensation to API exposure normalization.');
     }
+    if (command.parameters.projection !== 'cylindrical') {
+      failures.push('Panorama UI mapper must preserve cylindrical projection.');
+    }
   },
   validApplyArgs: [
     {
@@ -53,7 +56,7 @@ runComputationalUiApiSmoke({
       boundaryMode: 'auto_crop',
       exposureMode: 'none',
       outputName: 'Ridge Overlook Panorama',
-      projection: 'rectilinear',
+      projection: 'cylindrical',
       sources: [
         { exposureEv: 0, imagePath: '/photos/pano/PANO_0001.CR3', sourceIndex: 0 },
         { exposureEv: 0, imagePath: '/photos/pano/PANO_0002.CR3', sourceIndex: 1 },
@@ -78,6 +81,9 @@ runComputationalUiApiSmoke({
     }
     if (command.parameters.exposureNormalization !== 'none' || command.parameters.blendMode !== 'feather') {
       failures.push('Panorama UI apply mapper must preserve UI control overrides.');
+    }
+    if (command.parameters.projection !== 'cylindrical') {
+      failures.push('Panorama UI apply mapper must preserve cylindrical projection.');
     }
   },
   invalidCases: [

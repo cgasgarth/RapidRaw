@@ -117,10 +117,10 @@ const derivedArtifact = buildPanoramaRuntimeArtifactV1({
 });
 
 assertEqual(dryRun.provenance.projection, 'cylindrical', 'requested projection');
-assertEqual(dryRun.provenance.resolvedProjection, 'rectilinear', 'resolved projection');
-assertEqual(dryRun.provenance.projectionSettings.support, 'schema_only_deferred', 'projection support');
+assertEqual(dryRun.provenance.resolvedProjection, 'cylindrical', 'resolved projection');
+assertEqual(dryRun.provenance.projectionSettings.support, 'implemented_current_engine', 'projection support');
 assertEqual(dryRun.provenance.projectionSettings.requestedProjection, 'cylindrical', 'requested projection setting');
-assertEqual(dryRun.provenance.projectionSettings.effectiveProjection, 'rectilinear', 'effective projection setting');
+assertEqual(dryRun.provenance.projectionSettings.effectiveProjection, 'cylindrical', 'effective projection setting');
 assertEqual(dryRun.provenance.exposureNormalization, 'auto', 'exposure normalization');
 assertEqual(dryRun.provenance.lensCorrectionPolicy, 'required_before_stitch', 'lens correction policy');
 assertEqual(dryRun.provenance.alignment.algorithmId, 'synthetic_offset_translation_v1', 'alignment algorithm');
@@ -130,7 +130,7 @@ assertEqual(dryRun.provenance.alignment.pairwiseMatches[0]?.translationPx.y, 2, 
 assertEqual(dryRun.provenance.crop.mode, 'auto', 'crop mode');
 assertEqual(dryRun.provenance.crop.width, dryRun.dryRunResult.mergePlan.outputDimensions.width, 'crop width');
 assertEqual(dryRun.provenance.qualityMetrics.cropCoverageRatio, 1, 'crop coverage');
-assertEqual(dryRun.provenance.qualityMetrics.outputPixelCount, 168 * 51, 'output pixels');
+assertEqual(dryRun.provenance.qualityMetrics.outputPixelCount, 158 * 51, 'output pixels');
 assertEqual(dryRun.provenance.qualityMetrics.sourcePixelCount, 72 * 48 * 3, 'source pixels');
 assertEqual(dryRun.provenance.qualityMetrics.stitchedSourceRatio, 1, 'stitched source ratio');
 assertEqual(dryRun.provenance.seamBlend.blendMode, 'feather', 'blend mode');
@@ -153,7 +153,7 @@ assertEqual(
 assertEqual(applied.sidecarArtifact.outputArtifacts[0]?.artifactId, outputArtifact.artifactId, 'apply sidecar output');
 assertEqual(applied.sidecarArtifact.sourceImageRefs.length, sourceFrames.length, 'apply sidecar source refs');
 assertEqual(applied.sidecarArtifact.sourceState.length, sourceFrames.length, 'apply sidecar source state');
-assertEqual(applied.sidecarArtifact.projection, 'rectilinear', 'apply sidecar effective projection');
+assertEqual(applied.sidecarArtifact.projection, 'cylindrical', 'apply sidecar effective projection');
 assertEqual(
   applied.sidecarArtifact.projectionSettings.requestedProjection,
   'cylindrical',
@@ -172,7 +172,7 @@ assertEqual(
 assertEqual(derivedArtifact.outputArtifacts[0]?.artifactId, outputArtifact.artifactId, 'derived output artifact id');
 assertEqual(derivedArtifact.sourceImageRefs.length, sourceFrames.length, 'derived source refs');
 assertEqual(derivedArtifact.sourceState.length, sourceFrames.length, 'derived source state');
-assertEqual(derivedArtifact.projection, 'rectilinear', 'derived effective projection');
+assertEqual(derivedArtifact.projection, 'cylindrical', 'derived effective projection');
 assertEqual(derivedArtifact.projectionSettings.requestedProjection, 'cylindrical', 'derived requested projection');
 assertEqual(derivedArtifact.staleState.state, 'current', 'derived stale state');
 
