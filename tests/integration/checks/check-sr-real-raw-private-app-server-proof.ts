@@ -198,6 +198,10 @@ async function upgradeReport(
     reports: await Promise.all(
       collection.reports.map(async (report) => {
         if (report.fixtureId !== FIXTURE_ID) return report;
+        const outputArtifact = report.artifacts.find((artifact) => artifact.kind === 'merge_output_private');
+        if (outputArtifact === undefined) {
+          throw new Error('SR private app-server proof requires merge output artifact for quality readout.');
+        }
         return {
           ...report,
           acceptanceStatus: 'runtime_apply_capable',
@@ -226,10 +230,28 @@ async function upgradeReport(
             { ...(await asset(SCREENSHOT_PATHS.resultReview)), label: 'result_review' },
             { ...(await asset(SCREENSHOT_PATHS.exportReview)), label: 'export_review' },
           ],
+          superResolutionQualityReadout: {
+            artifactScore: metricValue(report, 'superResolutionArtifactScore'),
+            detailGainRatio: metricValue(report, 'superResolutionDetailGainRatio'),
+            outputArtifactHash: outputArtifact.hash,
+            outputArtifactPath: outputArtifact.path,
+            outputPixelCount: metricValue(report, 'superResolutionOutputPixelCount'),
+            registrationResidualPx: metricValue(report, 'superResolutionRegistrationResidualPx'),
+            sourceCount: metricValue(report, 'decodedSourceCount'),
+            sourceCoverageRatio: metricValue(report, 'superResolutionSourceCoverageRatio'),
+          },
         };
       }),
     ),
   });
+}
+
+function metricValue(report: ComputationalMergePrivateRunReportCollection['reports'][number], name: string): number {
+  const metric = report.qualityMetrics.find((candidate) => candidate.name === name);
+  if (metric === undefined) {
+    throw new Error(`SR private app-server proof missing quality metric ${name}.`);
+  }
+  return metric.value;
 }
 
 async function sha256File(path: string): Promise<string> {
@@ -255,6 +277,15 @@ async function runSelfTest(): Promise<void> {
     const report = upgraded.reports.find((candidate) => candidate.fixtureId === FIXTURE_ID);
     if (report?.acceptanceStatus !== 'runtime_apply_capable') {
       throw new Error('Expected self-test report to be upgraded to runtime_apply_capable.');
+    }
+    if (report.superResolutionQualityReadout?.detailGainRatio !== 4) {
+      throw new Error('Expected self-test report to persist SR detail gain readout.');
+    }
+    if (
+      report.superResolutionQualityReadout.outputArtifactHash !==
+      report.artifacts.find((artifact) => artifact.kind === 'merge_output_private')?.hash
+    ) {
+      throw new Error('Expected SR quality readout to be tied to the merge output artifact hash.');
     }
     if (report.previewExportParity !== undefined) {
       throw new Error('SR runtime proof self-test must not synthesize preview/export parity.');

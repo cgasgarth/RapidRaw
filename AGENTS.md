@@ -230,8 +230,8 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Use Zod for TypeScript-facing runtime schemas and structured config validation.
 - Before push or PR creation, use the repo precommit hook as the default local
   validation path: stage the intended files and try the commit. If precommit
-  fails, fix the reported issue and retry the commit instead of manually
-  replaying every covered check.
+  fails, fix the reported issue and retry the commit. Do not manually replay
+  every check that precommit already covers unless debugging the failing hook.
 - Run extra focused local validation only when it proves changed runtime,
   preview/export, UI, or image-output behavior that precommit cannot cover.
   Record those extra commands as PR evidence.

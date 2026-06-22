@@ -61,11 +61,14 @@ interface VisualSmokeAppProps {
 }
 
 interface SrPrivateRawVisualProof {
+  detailGainRatio: string;
   exportReviewArtifact: string;
   exportReviewDataUrl: string;
   exportReviewHash: string;
   fixtureId: string;
+  outputArtifactScore: string;
   outputHeight: string;
+  outputPixelCount: string;
   outputScale: string;
   outputWidth: string;
   previewArtifact: string;
@@ -77,6 +80,7 @@ interface SrPrivateRawVisualProof {
   resultReviewArtifact: string;
   resultReviewDataUrl: string;
   resultReviewHash: string;
+  sourceCoverageRatio: string;
   sourceCount: string;
   sourceHashes: string;
   sourceHeights: string;
@@ -2645,11 +2649,15 @@ function SuperResolutionPrivateRawVisualSmoke() {
             data-apply-command={copy.superResolutionApplyTool}
             data-artifact-path={proof.reconstructionPath}
             data-command={copy.superResolutionDryRunTool}
+            data-detail-gain-ratio={proof.detailGainRatio}
             data-export-review-artifact={proof.exportReviewArtifact}
             data-fixture-id={proof.fixtureId}
+            data-output-artifact-score={proof.outputArtifactScore}
+            data-output-pixel-count={proof.outputPixelCount}
             data-preview-artifact={proof.previewArtifact}
             data-result-review-artifact={proof.resultReviewArtifact}
             data-runtime-status="private_raw_app_server_apply"
+            data-source-coverage-ratio={proof.sourceCoverageRatio}
             data-source-count={proof.sourceCount}
             data-testid="sr-private-raw-review-proof"
           />
@@ -2696,6 +2704,8 @@ function SuperResolutionPrivateRawModalReviewSmoke() {
   const outputHeight = Number.parseInt(proof.outputHeight, 10);
   const outputScale = Number.parseFloat(proof.outputScale);
   const outputWidth = Number.parseInt(proof.outputWidth, 10);
+  const detailGainRatio = Number.parseFloat(proof.detailGainRatio);
+  const sourceCoverageRatio = Number.parseFloat(proof.sourceCoverageRatio);
   const sourcePaths = proof.sourcePaths.split(',');
   const sourceWidths = proof.sourceWidths.split(',').map((width) => Number.parseInt(width, 10));
   const sourceHeights = proof.sourceHeights.split(',').map((height) => Number.parseInt(height, 10));
@@ -2710,13 +2720,13 @@ function SuperResolutionPrivateRawModalReviewSmoke() {
       reviewCropCount: 1,
     },
     decision: 'human_review_required',
-    detailGainRatio: null,
+    detailGainRatio,
     detailPolicy: settings.detailPolicy,
     detailReview: {
       artifactId: `${proof.reconstructionPath}:detail-review`,
       baselineArtifactId: proof.previewArtifact,
       improvementHighlightCount: 3,
-      meanImprovementRatio: 1.16,
+      meanImprovementRatio: detailGainRatio,
       reconstructedArtifactId: proof.reconstructionPath,
       regions: [
         {
@@ -2774,7 +2784,7 @@ function SuperResolutionPrivateRawModalReviewSmoke() {
     staleState: 'current',
     supportMap: {
       artifactId: `${proof.reconstructionPath}:support-map`,
-      coverageRatio: 0.74,
+      coverageRatio: sourceCoverageRatio,
       downgradeReason: 'effective_scale_downgraded',
       effectiveScale: 1.5,
       regions: [
@@ -2840,13 +2850,17 @@ function SuperResolutionPrivateRawModalReviewSmoke() {
       <div
         className="sr-only"
         data-fixture-id={proof.fixtureId}
+        data-detail-gain-ratio={proof.detailGainRatio}
+        data-output-artifact-score={proof.outputArtifactScore}
         data-output-height={proof.outputHeight}
+        data-output-pixel-count={proof.outputPixelCount}
         data-output-scale={proof.outputScale}
         data-output-width={proof.outputWidth}
         data-preview-requested={String(previewRequested)}
         data-private-run-report-path={proof.privateRunReportPath}
         data-reconstruction-hash={proof.reconstructionHash}
         data-reconstruction-path={proof.reconstructionPath}
+        data-source-coverage-ratio={proof.sourceCoverageRatio}
         data-source-count={proof.sourceCount}
         data-source-hashes={proof.sourceHashes}
         data-source-paths={proof.sourcePaths}
