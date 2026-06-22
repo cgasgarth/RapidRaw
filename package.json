@@ -297,6 +297,7 @@
     "check:film-look-strength-presets": "bun tests/integration/checks/check-film-look-strength-presets.ts",
     "check:film-look-browser-ui": "bun tests/integration/checks/check-film-look-browser-ui.ts",
     "check:film-look-compare-state": "bun tests/integration/checks/check-film-look-compare-state.ts",
+    "check:film-look-ab-color-pipeline": "bun tests/integration/checks/check-film-look-ab-color-pipeline.ts",
     "check:film-look-render-apply-proof": "bun tests/integration/checks/check-film-look-render-apply-proof.ts",
     "check:film-look-render-apply-proof:update": "bun tests/integration/checks/check-film-look-render-apply-proof.ts --update",
     "check:film-look-preview-export-parity": "bun tests/integration/checks/check-film-look-preview-export-parity.ts",
