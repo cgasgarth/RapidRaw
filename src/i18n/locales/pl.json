@@ -2037,6 +2037,25 @@
       },
       "qualityLabel": "Quality",
       "retry": "Spróbuj ponownie",
+      "reviewAlignment": "",
+      "reviewAlignmentValue": "",
+      "reviewDeghost": "",
+      "reviewDeghostValue": "",
+      "reviewDiagnosticsLimit": "",
+      "reviewDiagnosticsTitle": "",
+      "reviewRisk": {
+        "high": "High",
+        "low": "Low",
+        "medium": "Medium",
+        "none": "None"
+      },
+      "reviewSeverity": {
+        "blocked": "Blocked",
+        "ok": "Ready",
+        "review": "Review"
+      },
+      "reviewTone": "",
+      "reviewToneValue": "",
       "save": "Zapisz",
       "savedSuccess": "HDR zapisano pomyślnie!",
       "sourceCountBlocked": "Select at least two bracketed exposures before merging.",

@@ -1933,6 +1933,25 @@
       },
       "qualityLabel": "Quality",
       "retry": "Retry",
+      "reviewAlignment": "Alignment",
+      "reviewAlignmentValue": "{{mode}} · {{confidence}}%",
+      "reviewDeghost": "Deghost",
+      "reviewDeghostValue": "{{level}} · {{risk}} motion",
+      "reviewDiagnosticsLimit": "Diagnostics are synthetic/public proof until bracketed RAW output and photographer acceptance are validated.",
+      "reviewDiagnosticsTitle": "Merge diagnostics",
+      "reviewRisk": {
+        "high": "High",
+        "low": "Low",
+        "medium": "Medium",
+        "none": "None"
+      },
+      "reviewSeverity": {
+        "blocked": "Blocked",
+        "ok": "Ready",
+        "review": "Review"
+      },
+      "reviewTone": "Tone",
+      "reviewToneValue": "{{risk}} clipping risk",
       "save": "Save",
       "savedSuccess": "HDR Saved Successfully!",
       "sourceCountBlocked": "Select at least two bracketed exposures before merging.",
