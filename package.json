@@ -137,6 +137,7 @@
     "check:color-range-mask": "bun tests/integration/checks/check-color-range-mask-parameters.ts",
     "check:mask-compose": "bun tests/integration/checks/check-mask-compose-operations.ts",
     "check:mask-compose-command": "bun tests/integration/checks/check-mask-compose-command.ts",
+    "check:mask-compose-layer-output": "bun tests/integration/checks/check-mask-compose-layer-output.ts",
     "check:mask-refine": "bun tests/integration/checks/check-mask-refinement-parameters.ts",
     "check:mask-refine-controls": "bun tests/integration/checks/check-mask-refinement-controls.ts",
     "check:mask-refine-command-ui": "bun tests/integration/checks/check-mask-refinement-command-ui.ts",

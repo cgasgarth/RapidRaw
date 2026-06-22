@@ -9,7 +9,7 @@ import {
   type LayerMaskMutationResultV1,
 } from './rawEngineSchemas.js';
 
-const maskAlphaArtifactSchema = z
+export const maskAlphaArtifactSchema = z
   .object({
     alpha: z.array(z.number().min(0).max(1)).min(1),
     contentHash: z.string().trim().min(1).optional(),

@@ -29,6 +29,7 @@ export * from './layerStackCommandRuntime.js';
 export * from './layerStackSidecarPersistence.js';
 export * from './linearGradientMaskCommandRuntime.js';
 export * from './maskComposeCommandRuntime.js';
+export * from './maskComposeLayerApplication.js';
 export * from './negativeLabAppServerRuntime.js';
 export * from './localAppServerBridge.js';
 export * from './panoramaAppServerRuntime.js';
