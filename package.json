@@ -121,6 +121,8 @@
     "check:brush-mask-command": "bun tests/integration/checks/check-brush-mask-command.ts",
     "check:brush-mask-command-capture": "bun tests/integration/checks/check-brush-mask-command-capture.ts",
     "check:brush-mask-command-capture:update": "bun tests/integration/checks/check-brush-mask-command-capture.ts --update",
+    "check:brush-mask-canvas-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario brush-mask-canvas-ui",
+    "check:brush-mask-canvas-ui-proof": "bun tests/integration/checks/check-brush-mask-canvas-ui-proof.ts",
     "check:brush-mask-refine-workflow-e2e": "bun tests/integration/checks/check-brush-mask-refine-workflow-e2e.ts",
     "check:brush-mask-refine-workflow-e2e:update": "bun tests/integration/checks/check-brush-mask-refine-workflow-e2e.ts --update",
     "check:gradient-mask": "bun tests/integration/checks/check-gradient-mask-parameters.ts",
