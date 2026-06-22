@@ -454,6 +454,10 @@ export function FilmLookBrowser({
         </div>
         <div
           className="grid grid-cols-2 gap-2 rounded-md border border-surface bg-bg-secondary p-2 text-xs"
+          data-color-pipeline-input-domain="camera_linear_rgb"
+          data-color-pipeline-operation-domain="acescg_linear_v1"
+          data-color-pipeline-render-target="display_p3"
+          data-color-pipeline-view-transform="rawengine_agx_v1"
           data-compare-ready-count={comparisonReadyCount}
           data-compare-slot-count={FILM_LOOK_COMPARE_SLOTS.length}
           data-comparison-ready={String(isComparisonReady)}
@@ -511,6 +515,7 @@ export function FilmLookBrowser({
                     <div
                       className="h-20 overflow-hidden rounded-md border border-surface"
                       data-look-id={look.id}
+                      data-output-proof="filmLook.applyAbCandidate"
                       data-preview-strength={look.id === selectedLookId ? strengthPercent : look.strengthDefault}
                       data-preview-support={look.runtimeSupport}
                       data-testid="film-look-compare-render-preview"

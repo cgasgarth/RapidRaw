@@ -51,6 +51,8 @@ for (const [sourceName, source, markers] of [
       'data-testid="film-look-active-state"',
       'data-testid="film-look-active-render-preview"',
       'data-testid="film-look-compare-render-preview"',
+      'data-color-pipeline-operation-domain="acescg_linear_v1"',
+      'data-output-proof="filmLook.applyAbCandidate"',
       'getFilmLookComparePreviewStyle',
       'data-preview-support={look.runtimeSupport}',
     ],
