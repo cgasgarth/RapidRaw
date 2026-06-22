@@ -54,6 +54,7 @@ import {
   layerStackWorkflowProofSchema,
   maskOverlayRawProofSchema,
   panoramaPrivateRawReviewProofSchema,
+  panoramaQualityDiagnosticsProofSchema,
   panoramaSavedReviewProofSchema,
   negativeLabWorkspaceProofDatasetSchema,
   negativeLabPublicExportReviewProofSchema,
@@ -1658,6 +1659,9 @@ async function prepareScenario(page, mode) {
     );
     panoramaReviewWorkspaceProofSchema.parse(
       await page.getByTestId('panorama-review-workspace-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    panoramaQualityDiagnosticsProofSchema.parse(
+      await page.getByTestId('panorama-quality-diagnostics').evaluate((element) => ({ ...element.dataset })),
     );
     const overlayProof = await page
       .getByTestId('panorama-seam-contribution-overlay')
