@@ -21,6 +21,7 @@ import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../.
 import { DEFAULT_HDR_MERGE_UI_SETTINGS, type HdrMergeUiSettings } from '../../schemas/hdrMergeUiSchemas';
 import {
   DEFAULT_PANORAMA_UI_SETTINGS,
+  type PanoramaRenderedReview,
   type PanoramaRuntimePlan,
   type PanoramaUiSettings,
 } from '../../schemas/panoramaUiSchemas';
@@ -1685,6 +1686,54 @@ const panoramaRuntimePlanFixture: PanoramaRuntimePlan = {
   })),
   warnings: ['Panorama dry-run uses conservative source-dimension bounds before feature matching.'],
 };
+const panoramaRenderedReviewFixture: PanoramaRenderedReview = {
+  boundary: {
+    crop: {
+      height: 3200,
+      mode: 'coverage_bounds',
+      preCropHeight: 3400,
+      preCropWidth: 9800,
+      width: 9600,
+      x: 100,
+      y: 80,
+    },
+    effective: 'auto_crop',
+    requested: 'auto_crop',
+  },
+  capabilityLevel: 'runtime_apply_capable',
+  outputDimensions: { height: 3200, width: 9600 },
+  projection: { effective: 'rectilinear', requested: 'rectilinear' },
+  seamReview: {
+    policy: 'adaptive_dp_feather_v1',
+    reviewStatus: 'requires_review',
+    seamCount: 4,
+    seams: [
+      { confidence: 'high', featherWidthPx: 100, fromSourceIndex: 0, p95ErrorPx: 1.2, toSourceIndex: 1 },
+      { confidence: 'medium', featherWidthPx: 100, fromSourceIndex: 1, p95ErrorPx: 2.4, toSourceIndex: 2 },
+      { confidence: 'medium', featherWidthPx: 100, fromSourceIndex: 2, p95ErrorPx: 3.1, toSourceIndex: 3 },
+      { confidence: 'high', featherWidthPx: 100, fromSourceIndex: 3, p95ErrorPx: 1.6, toSourceIndex: 4 },
+    ],
+  },
+  sources: {
+    excludedSourceIndices: [],
+    stitchedSourceIndices: [0, 1, 2, 3, 4],
+    totalCount: 5,
+  },
+  sourceContribution: {
+    excludedSourceCount: 0,
+    regions: [0, 1, 2, 3, 4].map((sourceIndex) => ({
+      coverageRatio: 0.2,
+      role: 'stitched',
+      sourceIndex,
+    })),
+    stitchedSourceCount: 5,
+  },
+  exposureNormalizationSummary: {
+    appliedGainCount: 2,
+    mode: 'scalar_overlap_luminance_gain_v1',
+  },
+  warningCodes: ['geometry_estimate_low_confidence', 'legacy_full_frame_render'],
+};
 const hdrPreviewSvg = encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640">
   <defs>
@@ -2747,7 +2796,7 @@ function PanoramaVisualSmoke() {
           onSettingsChange={setSettings}
           onStitch={() => {}}
           progressMessage={null}
-          renderedReview={null}
+          renderedReview={panoramaRenderedReviewFixture}
           runtimePlan={panoramaRuntimePlanFixture}
           settings={settings}
         />
@@ -2804,54 +2853,7 @@ function PanoramaSavedReviewVisualSmoke() {
         onSettingsChange={() => {}}
         onStitch={() => {}}
         progressMessage={null}
-        renderedReview={{
-          boundary: {
-            crop: {
-              height: 3200,
-              mode: 'coverage_bounds',
-              preCropHeight: 3400,
-              preCropWidth: 9800,
-              width: 9600,
-              x: 100,
-              y: 80,
-            },
-            effective: 'auto_crop',
-            requested: 'auto_crop',
-          },
-          capabilityLevel: 'runtime_apply_capable',
-          outputDimensions: { height: 3200, width: 9600 },
-          projection: { effective: 'rectilinear', requested: 'rectilinear' },
-          seamReview: {
-            policy: 'adaptive_dp_feather_v1',
-            reviewStatus: 'requires_review',
-            seamCount: 4,
-            seams: [
-              { confidence: 'high', featherWidthPx: 100, fromSourceIndex: 0, p95ErrorPx: 1.2, toSourceIndex: 1 },
-              { confidence: 'medium', featherWidthPx: 100, fromSourceIndex: 1, p95ErrorPx: 2.4, toSourceIndex: 2 },
-              { confidence: 'medium', featherWidthPx: 100, fromSourceIndex: 2, p95ErrorPx: 3.1, toSourceIndex: 3 },
-              { confidence: 'high', featherWidthPx: 100, fromSourceIndex: 3, p95ErrorPx: 1.6, toSourceIndex: 4 },
-            ],
-          },
-          sources: {
-            excludedSourceIndices: [],
-            stitchedSourceIndices: [0, 1, 2, 3, 4],
-            totalCount: 5,
-          },
-          sourceContribution: {
-            excludedSourceCount: 0,
-            regions: [0, 1, 2, 3, 4].map((sourceIndex) => ({
-              coverageRatio: 0.2,
-              role: 'stitched',
-              sourceIndex,
-            })),
-            stitchedSourceCount: 5,
-          },
-          exposureNormalizationSummary: {
-            appliedGainCount: 2,
-            mode: 'scalar_overlap_luminance_gain_v1',
-          },
-          warningCodes: ['geometry_estimate_low_confidence', 'legacy_full_frame_render'],
-        }}
+        renderedReview={panoramaRenderedReviewFixture}
         runtimePlan={panoramaRuntimePlanFixture}
         settings={DEFAULT_PANORAMA_UI_SETTINGS}
       />

@@ -132,6 +132,21 @@ export default function PanoramaModal({
     })),
     stitchedSourceCount: imageCount ?? 0,
   };
+  const seamMaxP95ErrorPx =
+    seamReviewSummary.seams.length === 0 ? 0 : Math.max(...seamReviewSummary.seams.map((seam) => seam.p95ErrorPx));
+  const lowConfidenceSeamCount = seamReviewSummary.seams.filter((seam) => seam.confidence === 'low').length;
+  const inlierEdgeCount = seamReviewSummary.seams.filter((seam) => seam.confidence !== 'low').length;
+  const cropCoveragePercent =
+    renderedReview === null
+      ? null
+      : Math.round(
+          (renderedReview.boundary.crop.width * renderedReview.boundary.crop.height * 100) /
+            (renderedReview.boundary.crop.preCropWidth * renderedReview.boundary.crop.preCropHeight),
+        );
+  const cropCoverageLabel =
+    cropCoveragePercent === null
+      ? t('modals.panorama.summaryBlocked')
+      : t('modals.panorama.review.cropCoveragePercent', { value: cropCoveragePercent });
   const savedReviewSummary =
     savedPath === null || renderedReview === null
       ? null
@@ -219,6 +234,11 @@ export default function PanoramaModal({
               data-output-dimensions={`${savedReviewSummary.outputDimensions.width} x ${savedReviewSummary.outputDimensions.height}`}
               data-output-path={savedReviewSummary.outputPath}
               data-projection={savedReviewSummary.projection}
+              data-seam-max-p95-error-px={
+                savedReviewSummary.seamReview.seams.length === 0
+                  ? 0
+                  : Math.max(...savedReviewSummary.seamReview.seams.map((seam) => seam.p95ErrorPx))
+              }
               data-seam-count={savedReviewSummary.seamReview.seamCount}
               data-seam-review-status={savedReviewSummary.seamReview.reviewStatus}
               data-source-contribution-regions={savedReviewSummary.sourceContribution.regions.length}
@@ -511,6 +531,51 @@ export default function PanoramaModal({
                 data-testid="panorama-runtime-plan-summary-chip"
                 key={item.label}
               >
+                <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                  {item.label}
+                </UiText>
+                <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                  {item.value}
+                </UiText>
+              </div>
+            ))}
+          </section>
+
+          <section
+            className="mb-5 grid grid-cols-4 gap-2 rounded-md border border-border-color bg-surface p-3 text-xs"
+            data-crop-coverage-percent={cropCoveragePercent ?? ''}
+            data-excluded-source-count={sourceContributionSummary.excludedSourceCount}
+            data-inlier-edge-count={inlierEdgeCount}
+            data-low-confidence-seam-count={lowConfidenceSeamCount}
+            data-seam-count={seamReviewSummary.seamCount}
+            data-seam-max-p95-error-px={seamMaxP95ErrorPx}
+            data-seam-review-status={seamReviewSummary.reviewStatus}
+            data-stitched-source-count={sourceContributionSummary.stitchedSourceCount}
+            data-testid="panorama-quality-diagnostics"
+            data-warning-codes={renderedReview?.warningCodes.join(',') ?? ''}
+          >
+            {[
+              {
+                label: t('modals.panorama.review.maxSeamError'),
+                value: t('modals.panorama.review.maxSeamErrorValue', { value: seamMaxP95ErrorPx.toFixed(1) }),
+              },
+              {
+                label: t('modals.panorama.review.inlierEdges'),
+                value: t('modals.panorama.review.inlierEdgesValue', { count: inlierEdgeCount }),
+              },
+              {
+                label: t('modals.panorama.review.cropCoverage'),
+                value: cropCoverageLabel,
+              },
+              {
+                label: t('modals.panorama.review.sourceUsage'),
+                value: t('modals.panorama.review.sourceUsageValue', {
+                  excluded: sourceContributionSummary.excludedSourceCount,
+                  stitched: sourceContributionSummary.stitchedSourceCount,
+                }),
+              },
+            ].map((item) => (
+              <div className="rounded border border-border-color bg-bg-primary px-2 py-1.5" key={item.label}>
                 <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
                   {item.label}
                 </UiText>

@@ -398,6 +398,17 @@ export const panoramaReviewWorkspaceProofSchema = z.object({
   sourceCount: z.literal('5'),
   sourceOrder: z.literal('left,center,right,detail,sky'),
 });
+export const panoramaQualityDiagnosticsProofSchema = z.object({
+  cropCoveragePercent: z.literal('92'),
+  excludedSourceCount: z.literal('0'),
+  inlierEdgeCount: z.literal('4'),
+  lowConfidenceSeamCount: z.literal('0'),
+  seamCount: z.literal('4'),
+  seamMaxP95ErrorPx: z.literal('3.1'),
+  seamReviewStatus: z.literal('requires_review'),
+  stitchedSourceCount: z.literal('5'),
+  warningCodes: z.literal('geometry_estimate_low_confidence,legacy_full_frame_render'),
+});
 export const panoramaSavedReviewProofSchema = z.object({
   boundaryMode: z.literal('auto_crop'),
   capabilityLevel: z.literal('runtime_apply_capable'),
@@ -406,6 +417,7 @@ export const panoramaSavedReviewProofSchema = z.object({
   outputPath: z.literal('/tmp/panorama.tif'),
   projection: z.literal('rectilinear'),
   seamCount: z.literal('4'),
+  seamMaxP95ErrorPx: z.literal('3.1'),
   seamReviewStatus: z.literal('requires_review'),
   sourceContributionRegions: z.literal('5'),
   sourceExcludedCount: z.literal('0'),
