@@ -62,6 +62,40 @@ const dryRun = bus.execute({
   toolName: hdrRoutePair.dryRunToolName,
 });
 if (dryRun.kind !== 'dry_run') throw new Error('Expected HDR UI runtime bridge dry-run result.');
+const selectedWeightedControls = {
+  ...controls,
+  sources: controls.sources
+    .filter((source) => source.sourceIndex !== 1)
+    .map((source) => ({
+      ...source,
+      exposureWeightMultiplier: source.exposureEv < 0 ? 1.4 : 1,
+    })),
+};
+const selectedWeightedDryRunCommand = buildHdrMergeUiDryRunCommandV1(selectedWeightedControls, {
+  commandId: 'command_hdr_ui_runtime_selected_weighted_dry_run',
+  correlationId: 'corr_hdr_ui_runtime_selected_weighted',
+  expectedGraphRevision: 'graph_rev_hdr_ui_runtime',
+  targetId: 'project_hdr_ui_runtime',
+});
+const selectedWeightedDryRun = bus.execute({
+  request: buildRequest(selectedWeightedDryRunCommand),
+  toolName: hdrRoutePair.dryRunToolName,
+});
+if (selectedWeightedDryRun.kind !== 'dry_run') {
+  throw new Error('Expected selected HDR UI runtime bridge dry-run result.');
+}
+const baselineOutputSha256 = hashPixels(dryRun.dryRun.mergedPixels);
+const selectedWeightedOutputSha256 = hashPixels(selectedWeightedDryRun.dryRun.mergedPixels);
+if (baselineOutputSha256 === selectedWeightedOutputSha256) {
+  throw new Error('HDR source selection and exposure weighting did not change merged output pixels.');
+}
+if (selectedWeightedDryRun.dryRun.provenance.sourceState.length !== 2) {
+  throw new Error('HDR selected-source dry run did not persist the selected source set.');
+}
+const boostedSource = selectedWeightedDryRun.dryRun.provenance.sourceState.find((source) => source.sourceIndex === 0);
+if (boostedSource?.exposureWeightMultiplier !== 1.4) {
+  throw new Error('HDR selected-source dry run did not persist the requested exposure weight multiplier.');
+}
 
 const applyCommand = buildHdrMergeUiApplyCommandV1(controls, {
   acceptedDryRunPlanHash: dryRun.acceptedDryRunPlanHash,
@@ -116,13 +150,17 @@ expectThrows('mismatched accepted HDR UI runtime plan', () =>
 console.log(
   JSON.stringify({
     alignmentConfidence: applied.apply.provenance.alignmentConfidence,
+    baselineOutputSha256,
     fixture: 'synthetic_hdr_ui_runtime_bridge_v1',
-    outputSha256: new Bun.CryptoHasher('sha256')
-      .update(new Uint8Array(applied.apply.mergedPixels.buffer))
-      .digest('hex'),
+    outputSha256: hashPixels(applied.apply.mergedPixels),
     planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+    selectedWeightedOutputSha256,
   }),
 );
+
+function hashPixels(pixels: Float64Array) {
+  return new Bun.CryptoHasher('sha256').update(new Uint8Array(pixels.buffer)).digest('hex');
+}
 
 function buildRequest(command) {
   return {

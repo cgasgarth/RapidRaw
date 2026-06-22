@@ -119,6 +119,7 @@ export const hdrRuntimeProvenanceV1Schema = z
       z
         .object({
           contentHash: z.string().trim().min(1),
+          exposureWeightMultiplier: z.number().positive(),
           graphRevision: z.string().trim().min(1),
           resolvedExposureEv: z.number(),
           sourceIndex: z.number().int().nonnegative(),
@@ -162,8 +163,11 @@ export const buildHdrRuntimeDryRunV1 = (requestValue: unknown): HdrRuntimeDryRun
   const request = parseHdrRuntimePlanRequest(requestValue, true);
   const runtime = renderHdrRuntimePixels(request);
   const planId = `hdr_plan_${request.command.commandId}`;
+  const sourceSignature = request.command.parameters.sources
+    .map((source) => `${source.sourceIndex}:${source.exposureEv ?? 'none'}:${source.exposureWeightMultiplier ?? 1}`)
+    .join('|');
   const planHash = `sha256:${stableHdrRuntimeHash(
-    `${planId}:${runtime.provenance.alignmentMode}:${runtime.provenance.deghosting}:${
+    `${planId}:${sourceSignature}:${runtime.provenance.alignmentMode}:${runtime.provenance.deghosting}:${
       runtime.provenance.deghostRegionIntensityPercent
     }:${String(runtime.provenance.deghostConfidenceMap.visible)}`,
   )}`;
@@ -197,7 +201,7 @@ export const buildHdrRuntimeDryRunV1 = (requestValue: unknown): HdrRuntimeDryRun
       },
       outputName: request.command.parameters.outputName,
       performanceEstimate: {
-        estimatedPeakMemoryBytes: runtime.width * runtime.height * request.frames.length * 8,
+        estimatedPeakMemoryBytes: runtime.width * runtime.height * request.command.parameters.sources.length * 8,
         estimatedRuntimeMs: 1,
         requiresBackgroundJob: false,
       },
@@ -206,7 +210,7 @@ export const buildHdrRuntimeDryRunV1 = (requestValue: unknown): HdrRuntimeDryRun
       qualityMetrics: {
         alignmentConfidence: runtime.provenance.alignmentConfidence,
         deghostingRisk: motionRiskForCoverage(runtime.provenance.motionCoverageRatio),
-        sourceCount: request.frames.length,
+        sourceCount: request.command.parameters.sources.length,
       },
       sourceImageRefs: request.command.parameters.sources,
       warnings: runtime.warnings,
@@ -450,9 +454,13 @@ const parseHdrRuntimePlanRequest = (requestValue: unknown, dryRun: boolean): Par
 };
 
 const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
+  const commandSourcesByIndex = new Map(
+    request.command.parameters.sources.map((source) => [source.sourceIndex, source]),
+  );
+  const selectedFrames = request.frames.filter((frame) => commandSourcesByIndex.has(frame.sourceIndex));
   const referenceSourceIndex = findReferenceSourceIndex(request.command);
   const alignment = estimateHdrAlignmentTransformsV1({
-    frames: request.frames.map((frame) => ({
+    frames: selectedFrames.map((frame) => ({
       height: frame.height,
       pixels: normalizeFrameForAlignment(frame),
       sourceIndex: frame.sourceIndex,
@@ -461,9 +469,10 @@ const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
     referenceSourceIndex,
     searchRadiusPx: request.command.parameters.alignmentMode === 'none' ? 0 : request.searchRadiusPx,
   });
-  const alignedFrames = alignHdrRuntimeFrames(request.frames, alignment.transforms);
+  const alignedFrames = alignHdrRuntimeFrames(selectedFrames, alignment.transforms);
   const captures = alignedFrames.map((frame) => ({
     exposureEv: frame.exposureEv,
+    exposureWeightMultiplier: commandSourcesByIndex.get(frame.sourceIndex)?.exposureWeightMultiplier ?? 1,
     pixels: frame.pixels,
     sourceIndex: frame.sourceIndex,
   }));
@@ -501,7 +510,7 @@ const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
     request.command.parameters.deghosting,
     request.bracketPolicyWarnings,
   );
-  const firstFrame = request.frames[0];
+  const firstFrame = selectedFrames[0];
   if (firstFrame === undefined) {
     throw new Error('HDR runtime plan requires at least one frame.');
   }
@@ -529,8 +538,9 @@ const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
       qualityMetrics: buildHdrRuntimeQualityMetrics(request, mergedPixels, motionMask),
       referenceSourceIndex,
       runtimeStatus: 'dry_run_rendered',
-      sourceState: request.frames.map((frame) => ({
+      sourceState: selectedFrames.map((frame) => ({
         contentHash: frame.contentHash,
+        exposureWeightMultiplier: commandSourcesByIndex.get(frame.sourceIndex)?.exposureWeightMultiplier ?? 1,
         graphRevision: frame.graphRevision,
         resolvedExposureEv: frame.exposureEv,
         sourceIndex: frame.sourceIndex,
@@ -708,7 +718,7 @@ const buildHdrPreflightEstimate = (request: ParsedHdrRuntimePlanRequestV1, width
         x: 0,
         y: 0,
       },
-      sourceCount: request.frames.length,
+      sourceCount: request.command.parameters.sources.length,
       sourcePixelCount,
     },
     memoryBudgetBytes,
@@ -779,8 +789,10 @@ const buildHdrRuntimeQualityMetrics = (
   mergedPixels: Float64Array,
   motionMask: Uint8Array,
 ): HdrRuntimeProvenanceV1['qualityMetrics'] => {
-  const inputPixelCount = request.frames.reduce((total, frame) => total + frame.pixels.length, 0);
-  const clippedPixelCount = request.frames.reduce(
+  const commandSourceIndexes = new Set(request.command.parameters.sources.map((source) => source.sourceIndex));
+  const selectedFrames = request.frames.filter((frame) => commandSourceIndexes.has(frame.sourceIndex));
+  const inputPixelCount = selectedFrames.reduce((total, frame) => total + frame.pixels.length, 0);
+  const clippedPixelCount = selectedFrames.reduce(
     (total, frame) =>
       total + frame.pixels.reduce((count, pixel) => count + (pixel >= request.clipThreshold ? 1 : 0), 0),
     0,

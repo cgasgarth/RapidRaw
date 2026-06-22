@@ -3030,12 +3030,15 @@ function HdrVisualSmoke() {
         data-deghost-confidence-map-visible={String(hdrSettings.deghostConfidenceMapVisible)}
         data-deghost-region-intensity-percent={hdrSettings.deghostRegionIntensityPercent}
         data-deghosting={hdrSettings.deghosting}
-        data-estimated-preview-megapixels={Math.round((3 * hdrSettings.maxPreviewDimensionPx ** 2) / 1_000_000)}
+        data-estimated-preview-megapixels={Math.round(
+          (hdrSettings.selectedSourceIndexes.length * hdrSettings.maxPreviewDimensionPx ** 2) / 1_000_000,
+        )}
+        data-exposure-weighting-mode={hdrSettings.exposureWeightingMode}
         data-max-preview-dimension-px={hdrSettings.maxPreviewDimensionPx}
         data-merge-strategy={hdrSettings.mergeStrategy}
         data-quality-preference={hdrSettings.qualityPreference}
         data-runtime-status="dry_run_preview"
-        data-source-count="3"
+        data-source-count={hdrSettings.selectedSourceIndexes.length}
         data-testid="hdr-review-workspace-proof"
         data-tone-mapping-preset={hdrSettings.toneMappingPreset}
       />
@@ -3044,6 +3047,7 @@ function HdrVisualSmoke() {
         data-deghosting={hdrSettings.deghosting}
         data-deghost-confidence-map-visible={String(hdrSettings.deghostConfidenceMapVisible)}
         data-deghost-region-intensity-percent={hdrSettings.deghostRegionIntensityPercent}
+        data-exposure-weighting-mode={hdrSettings.exposureWeightingMode}
         data-max-preview-dimension-px={hdrSettings.maxPreviewDimensionPx}
         data-merge-strategy={hdrSettings.mergeStrategy}
         data-quality-preference={hdrSettings.qualityPreference}

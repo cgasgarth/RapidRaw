@@ -1551,6 +1551,8 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('hdr-tone-mapping-preset-highlight_detail').click();
     await page.getByTestId('hdr-deghost-confidence-map-toggle').click();
     await page.getByTestId('hdr-deghost-region-intensity').getByRole('button', { name: '85%' }).click();
+    await page.getByTestId('hdr-bracket-source-row').nth(1).click();
+    await page.getByTestId('hdr-exposure-weighting-mode').getByRole('button', { name: 'Protect highlights' }).click();
     hdrUiSettingsProofSchema.parse(
       await page.getByTestId('hdr-ui-settings-proof').evaluate((element) => ({ ...element.dataset })),
     );
@@ -1563,8 +1565,10 @@ async function prepareScenario(page, mode) {
     hdrBracketSourceRolesProofSchema.parse(
       await sourceRows.evaluateAll((rows) =>
         rows.map((row) => ({
+          bracketSelected: row.dataset.bracketSelected,
           bracketRole: row.dataset.bracketRole,
           exposureEv: row.dataset.exposureEv,
+          exposureWeightMultiplier: row.dataset.exposureWeightMultiplier,
           sourceIndex: row.dataset.sourceIndex,
         })),
       ),

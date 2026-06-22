@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const hdrMergeCaptureV1Schema = z
   .object({
     exposureEv: z.number(),
+    exposureWeightMultiplier: z.number().positive().default(1),
     pixels: z.instanceof(Float64Array),
     sourceIndex: z.number().int().nonnegative(),
   })
@@ -53,7 +54,7 @@ export const mergeExposureWeightedRadianceV1 = (requestValue: unknown): Float64A
 
     for (const capture of request.captures) {
       const normalized = capture.pixels[index] ?? 0;
-      const weight = getWellExposedWeight(normalized, request.clipThreshold);
+      const weight = getWellExposedWeight(normalized, request.clipThreshold) * capture.exposureWeightMultiplier;
       if (weight <= 0) continue;
 
       weightedRadiance += (normalized / 2 ** capture.exposureEv) * request.sensorWhiteRadiance * weight;

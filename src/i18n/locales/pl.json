@@ -2049,6 +2049,11 @@
       "descriptionWithCount_few": "Połącz {{count}} ujęcia z bracketingu w jeden obraz High Dynamic Range.",
       "descriptionWithCount_many": "Połącz {{count}} ujęć z bracketingu w jeden obraz High Dynamic Range.",
       "descriptionWithCount_other": "Połącz {{count}} ujęć z bracketingu w jeden obraz High Dynamic Range.",
+      "exposureWeighting": {
+        "balanced": "",
+        "liftShadows": "",
+        "protectHighlights": ""
+      },
       "failed": "Scalanie do HDR nie powiodło się",
       "handoffColorSpace": "Color space",
       "handoffColorStates": "Color states",

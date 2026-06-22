@@ -324,6 +324,7 @@ export const hdrUiSettingsProofSchema = z.object({
   deghostConfidenceMapVisible: z.literal('true'),
   deghostRegionIntensityPercent: z.literal('85'),
   deghosting: z.literal('high'),
+  exposureWeightingMode: z.literal('protect_highlights'),
   maxPreviewDimensionPx: z.literal('4096'),
   mergeStrategy: z.literal('scene_linear_radiance'),
   qualityPreference: z.literal('best'),
@@ -342,11 +343,12 @@ export const hdrReviewWorkspaceProofSchema = z.object({
   deghostConfidenceMapVisible: z.literal('true'),
   deghostRegionIntensityPercent: z.literal('85'),
   deghosting: z.literal('high'),
-  estimatedPreviewMegapixels: z.literal('50'),
+  estimatedPreviewMegapixels: z.literal('34'),
+  exposureWeightingMode: z.literal('protect_highlights'),
   mergeStrategy: z.literal('scene_linear_radiance'),
   qualityPreference: z.literal('best'),
   runtimeStatus: z.literal('dry_run_preview'),
-  sourceCount: z.literal('3'),
+  sourceCount: z.literal('2'),
   toneMappingPreset: z.literal('custom'),
 });
 const finiteDatasetNumberSchema = z
@@ -358,17 +360,23 @@ const finiteDatasetNumberSchema = z
 export const hdrBracketSourceRolesProofSchema = z.tuple([
   z.object({
     bracketRole: z.literal('under_exposed'),
+    bracketSelected: z.literal('true'),
     exposureEv: finiteDatasetNumberSchema.refine((value) => value < -0.25),
+    exposureWeightMultiplier: finiteDatasetNumberSchema.refine((value) => value > 1),
     sourceIndex: z.literal('0'),
   }),
   z.object({
     bracketRole: z.literal('reference'),
+    bracketSelected: z.literal('false'),
     exposureEv: finiteDatasetNumberSchema.refine((value) => value >= -0.25 && value <= 0.25),
+    exposureWeightMultiplier: finiteDatasetNumberSchema.refine((value) => value === 1),
     sourceIndex: z.literal('1'),
   }),
   z.object({
     bracketRole: z.literal('over_exposed'),
+    bracketSelected: z.literal('true'),
     exposureEv: finiteDatasetNumberSchema.refine((value) => value > 0.25),
+    exposureWeightMultiplier: finiteDatasetNumberSchema.refine((value) => value === 1),
     sourceIndex: z.literal('2'),
   }),
 ]);

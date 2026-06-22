@@ -12,6 +12,7 @@ const hdrMergeUiSourceV1Schema = z
   .object({
     colorSpaceHint: z.string().trim().min(1).default('camera_rgb'),
     exposureEv: z.number(),
+    exposureWeightMultiplier: z.number().positive().default(1),
     imageId: z.string().trim().min(1).optional(),
     imagePath: z.string().trim().min(1),
     rawDefaultsApplied: z.boolean().default(true),
@@ -94,6 +95,7 @@ export const buildHdrMergeUiDryRunCommandV1 = (
       sources: controls.sources.map((source) => ({
         colorSpaceHint: source.colorSpaceHint,
         exposureEv: source.exposureEv,
+        exposureWeightMultiplier: source.exposureWeightMultiplier,
         imageId: source.imageId,
         imagePath: source.imagePath,
         rawDefaultsApplied: source.rawDefaultsApplied,
@@ -144,6 +146,7 @@ export const buildHdrMergeUiApplyCommandV1 = (
       sources: controls.sources.map((source) => ({
         colorSpaceHint: source.colorSpaceHint,
         exposureEv: source.exposureEv,
+        exposureWeightMultiplier: source.exposureWeightMultiplier,
         imageId: source.imageId,
         imagePath: source.imagePath,
         rawDefaultsApplied: source.rawDefaultsApplied,

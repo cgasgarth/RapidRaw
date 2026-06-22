@@ -1961,6 +1961,11 @@
       "descriptionWithCount": "Combine {{count}} bracketed exposures into a single High Dynamic Range image.",
       "descriptionWithCount_one": "Combine {{count}} bracketed exposure into a single High Dynamic Range image.",
       "descriptionWithCount_other": "Combine {{count}} bracketed exposures into a single High Dynamic Range image.",
+      "exposureWeighting": {
+        "balanced": "Balanced",
+        "liftShadows": "Lift shadows",
+        "protectHighlights": "Protect highlights"
+      },
       "failed": "HDR Merge Failed",
       "handoffColorSpace": "Color space",
       "handoffColorStates": "Color states",

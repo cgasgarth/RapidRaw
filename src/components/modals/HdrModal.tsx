@@ -9,6 +9,7 @@ import {
   HDR_TONE_MAPPING_PRESETS,
   type HdrMergeAlignmentMode,
   type HdrMergeDeghosting,
+  type HdrMergeExposureWeightingMode,
   type HdrMergeQualityPreference,
   type HdrMergeStrategy,
   type HdrMergeUiSettings,
@@ -72,7 +73,6 @@ export default function HdrModal({
   const bracketPreflight = buildHdrBracketPreflight(sourceMetadata);
   const isBracketBlocked =
     bracketPreflight !== null && !bracketPreflight.accepted && settings.bracketValidation === 'required';
-  const isMergeReady = isSourceCountValid && !isBracketBlocked;
 
   const alignmentOptions: Array<OptionItem<HdrMergeAlignmentMode>> = [
     { label: t('modals.hdr.alignment.auto'), value: 'auto' },
@@ -109,10 +109,18 @@ export default function HdrModal({
     qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '';
   const selectedStrategyLabel = strategyOptions.find((option) => option.value === settings.mergeStrategy)?.label ?? '';
   const selectedPresetLabel = getToneMappingPresetLabel(settings.toneMappingPreset);
-  const estimatedPreviewMegapixels = Math.round(((imageCount ?? 0) * settings.maxPreviewDimensionPx ** 2) / 1_000_000);
+  const selectedSourceIndexes = new Set(settings.selectedSourceIndexes);
+  const selectedSourceCount =
+    bracketPreflight?.sourceMetadata.filter((source) => selectedSourceIndexes.has(source.sourceIndex)).length ??
+    Math.min(imageCount ?? 0, settings.selectedSourceIndexes.length);
+  const isSourceSelectionValid = selectedSourceCount >= 2;
+  const isMergeReady = isSourceCountValid && isSourceSelectionValid && !isBracketBlocked;
+  const estimatedPreviewMegapixels = Math.round(
+    (selectedSourceCount * settings.maxPreviewDimensionPx ** 2) / 1_000_000,
+  );
   const estimatedPreviewMemoryMb = Math.max(
     0,
-    Math.round(((imageCount ?? 0) * settings.maxPreviewDimensionPx ** 2 * 4) / 1_000_000),
+    Math.round((selectedSourceCount * settings.maxPreviewDimensionPx ** 2 * 4) / 1_000_000),
   );
   const reviewDiagnostics = buildHdrReviewDiagnostics({
     bracketPreflight,
@@ -176,6 +184,32 @@ export default function HdrModal({
       case 'unknown':
         return t('modals.hdr.bracketRole.unknown');
     }
+  };
+  const weightingOptions: Array<{
+    label: string;
+    value: HdrMergeExposureWeightingMode;
+  }> = [
+    { label: t('modals.hdr.exposureWeighting.balanced'), value: 'balanced' },
+    { label: t('modals.hdr.exposureWeighting.protectHighlights'), value: 'protect_highlights' },
+    { label: t('modals.hdr.exposureWeighting.liftShadows'), value: 'lift_shadows' },
+  ];
+  const getSourceWeightMultiplier = (source: HdrBracketSourceMetadataV1): number => {
+    if (settings.exposureWeightingMode === 'protect_highlights' && source.resolvedBracketRole === 'under_exposed') {
+      return 1.35;
+    }
+    if (settings.exposureWeightingMode === 'lift_shadows' && source.resolvedBracketRole === 'over_exposed') {
+      return 1.35;
+    }
+    return 1;
+  };
+  const toggleSourceSelection = (sourceIndex: number) => {
+    const next = new Set(settings.selectedSourceIndexes);
+    if (next.has(sourceIndex) && next.size > 2) {
+      next.delete(sourceIndex);
+    } else {
+      next.add(sourceIndex);
+    }
+    setManualSetting({ selectedSourceIndexes: [...next].sort((left, right) => left - right) });
   };
   const bracketPreflightStatus =
     bracketPreflight === null
@@ -415,14 +449,14 @@ export default function HdrModal({
             className="mb-5 grid grid-cols-3 gap-2 rounded-md border border-border-color bg-surface p-3 text-xs"
             data-estimated-preview-memory-mb={estimatedPreviewMemoryMb}
             data-estimated-preview-megapixels={estimatedPreviewMegapixels}
-            data-preview-source-count={imageCount ?? 0}
+            data-preview-source-count={selectedSourceCount}
             data-testid="hdr-setup-summary"
           >
             {[
               {
                 label: t('modals.hdr.summarySources'),
-                value: `${t('modals.hdr.summarySourceCount', { count: imageCount ?? 0 })} - ${
-                  isSourceCountValid ? t('modals.hdr.summaryReady') : t('modals.hdr.summaryBlocked')
+                value: `${t('modals.hdr.summarySourceCount', { count: selectedSourceCount })} - ${
+                  isSourceSelectionValid ? t('modals.hdr.summaryReady') : t('modals.hdr.summaryBlocked')
                 }`,
               },
               {
@@ -496,7 +530,7 @@ export default function HdrModal({
             data-bracket-span-ev={bracketPreflight?.bracketSpanEv ?? ''}
             data-bracket-validation={settings.bracketValidation}
             data-merge-ready={String(isMergeReady)}
-            data-source-count={imageCount ?? 0}
+            data-source-count={selectedSourceCount}
             data-warning-codes={bracketPreflight?.warningCodes.join(',') ?? ''}
             data-testid="hdr-readiness-summary"
           >
@@ -508,7 +542,7 @@ export default function HdrModal({
                 {t('modals.hdr.summarySources')}
               </UiText>
               <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
-                {t('modals.hdr.summarySourceCount', { count: imageCount ?? 0 })}
+                {t('modals.hdr.summarySourceCount', { count: selectedSourceCount })}
               </UiText>
             </div>
             <div
@@ -600,13 +634,19 @@ export default function HdrModal({
               </div>
               <div className="mt-3 grid gap-1.5">
                 {bracketPreflight.sourceMetadata.map((source) => (
-                  <div
+                  <button
                     className="grid grid-cols-[48px_78px_96px_1fr] gap-2 rounded border border-border-color bg-bg-primary px-2 py-1.5 text-xs"
+                    data-bracket-selected={String(selectedSourceIndexes.has(source.sourceIndex))}
                     data-bracket-role={source.resolvedBracketRole}
                     data-exposure-ev={source.resolvedExposureEv}
+                    data-exposure-weight-multiplier={getSourceWeightMultiplier(source)}
                     data-source-index={source.sourceIndex}
                     data-testid="hdr-bracket-source-row"
                     key={`${source.sourceIndex}-${source.imagePath}`}
+                    onClick={() => {
+                      toggleSourceSelection(source.sourceIndex);
+                    }}
+                    type="button"
                   >
                     <span className="text-text-tertiary">#{source.sourceIndex + 1}</span>
                     <span className="text-text-primary">
@@ -619,7 +659,26 @@ export default function HdrModal({
                       {getBracketRoleLabel(source.resolvedBracketRole)}
                     </span>
                     <span className="truncate text-text-secondary">{source.imagePath.split('/').pop()}</span>
-                  </div>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2" data-testid="hdr-exposure-weighting-mode">
+                {weightingOptions.map((option) => (
+                  <button
+                    className={`h-9 rounded-md border text-xs transition-colors ${
+                      settings.exposureWeightingMode === option.value
+                        ? 'border-accent bg-accent/15 text-text-primary'
+                        : 'border-border-color bg-bg-primary text-text-secondary hover:bg-card-active'
+                    }`}
+                    data-exposure-weighting-mode={option.value}
+                    key={option.value}
+                    onClick={() => {
+                      setManualSetting({ exposureWeightingMode: option.value });
+                    }}
+                    type="button"
+                  >
+                    {option.label}
+                  </button>
                 ))}
               </div>
               {(bracketPreflight.warningCodes.length > 0 || bracketPreflight.blockCodes.length > 0) && (
