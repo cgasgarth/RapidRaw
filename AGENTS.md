@@ -143,6 +143,14 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 ## Consult And Research
 
+- Use consult at the milestone level before creating or materially reshaping a
+  milestone. Ask for the full milestone plan: product goal, architecture,
+  sequencing, risks, validation strategy, and a PR-sized issue breakdown. Codex
+  then creates or updates the GitHub milestone and issues from that plan.
+- Consult should plan complete milestone work, not optimize for the smallest
+  possible PR. Break consult's milestone plan into individual GitHub issues
+  locally, with each issue sized for one realistic PR and grouped under the
+  milestone.
 - All feature PRs require consult before implementation is claimed or a PR is
   opened. Treat a feature as any user-visible product behavior, image-processing
   behavior, API/app-server editing capability, or workflow surface. If a feature
@@ -153,8 +161,8 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   color/image quality, or whether a slice should close or only reference an
   issue.
 - Ask consult for the full target plan, risks, architecture, and validation
-  strategy for the topic. Do not ask consult to optimize for the smallest usable
-  PR; break the returned plan into PR-sized slices locally.
+  strategy for the topic or milestone. Do not ask consult to optimize for the
+  smallest usable PR; break the returned plan into PR-sized slices locally.
 - Use the consult skill heavily for design decisions, color science, negative
   processing, film simulations, deblur, denoise, sharpening/detail math,
   panorama stitching, HDR, focus stacking, super-resolution, app-server/agent
