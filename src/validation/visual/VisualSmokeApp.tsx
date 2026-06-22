@@ -347,6 +347,7 @@ const buildBrushMaskCanvasOverlayUrl = (subMask: SubMask | undefined): string | 
 function BrushMaskCanvasVisualSmoke() {
   const [subMask, setSubMask] = useState(createBrushMaskCanvasSubMask);
   const [livePreview, setLivePreview] = useState<MaskContainer | null>(null);
+  const [brushSettings, setBrushSettings] = useState<BrushSettings>(brushMaskCanvasBrushSettings);
   const activeSubMask = livePreview?.subMasks[0] ?? subMask;
   const lines = readBrushMaskCanvasLines(subMask);
   const toolOrder = lines.map((line) => line.tool ?? 'unknown').join(',');
@@ -387,7 +388,7 @@ function BrushMaskCanvasVisualSmoke() {
                 activeMaskId={brushMaskCanvasSubMaskId}
                 adjustments={adjustments}
                 appSettings={null}
-                brushSettings={brushMaskCanvasBrushSettings}
+                brushSettings={brushSettings}
                 crop={null}
                 cursorStyle="crosshair"
                 finalPreviewUrl={brushMaskCanvasImageDataUrl}
@@ -440,6 +441,8 @@ function BrushMaskCanvasVisualSmoke() {
             data-lines-json={encodeURIComponent(JSON.stringify(lines))}
             data-mask-id={brushMaskCanvasSubMaskId}
             data-point-counts={pointCounts}
+            data-refine-brush-feather={brushSettings.feather}
+            data-refine-brush-size={brushSettings.size}
             data-stroke-count={lines.length}
             data-testid="brush-mask-canvas-ui-proof"
             data-tool-order={toolOrder}
@@ -447,6 +450,26 @@ function BrushMaskCanvasVisualSmoke() {
           <div className="mb-3 flex items-center justify-between">
             <span className="font-semibold">{copy.runtimeProof}</span>
             <span className="rounded bg-white/10 px-2 py-0.5 text-xs">{copy.strokeCount(lines.length)}</span>
+          </div>
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <button
+              className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs"
+              onClick={() => {
+                setBrushSettings((current) => ({ ...current, size: 96 }));
+              }}
+              type="button"
+            >
+              {copy.brushSize96}
+            </button>
+            <button
+              className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs"
+              onClick={() => {
+                setBrushSettings((current) => ({ ...current, feather: 64 }));
+              }}
+              type="button"
+            >
+              {copy.brushFeather64}
+            </button>
           </div>
           <div className="space-y-2">
             <div className="rounded border border-white/10 bg-white/5 p-2">
@@ -814,6 +837,8 @@ const copy = {
   layerStack: 'Layer stack',
   activeLayerCount: '3 active',
   brushMaskCanvasUi: 'Brush mask canvas UI',
+  brushFeather64: 'Feather 64',
+  brushSize96: 'Size 96',
   pointCounts: 'Point counts',
   runtimeProof: 'Runtime proof',
   strokeCount: (count: number) => `${count} strokes`,

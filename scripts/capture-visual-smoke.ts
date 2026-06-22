@@ -389,6 +389,8 @@ const brushMaskCanvasDatasetSchema = z
     linesJson: z.string().min(1),
     maskId: z.string().min(1),
     pointCounts: z.string().min(1),
+    refineBrushFeather: z.string().regex(/^\d+$/u),
+    refineBrushSize: z.string().regex(/^\d+$/u),
     strokeCount: z.string().regex(/^\d+$/u),
     toolOrder: z.string().min(1),
   })
@@ -469,6 +471,9 @@ async function writeBrushMaskCanvasProof(page): Promise<void> {
   if (paintRender.contentHash === finalRender.contentHash) {
     throw new Error('Paint and final brush mask hashes should differ after eraser stroke.');
   }
+  if (lines[0]?.brushSize !== Number(proofDataset.refineBrushSize) || lines[0]?.feather !== 0.64) {
+    throw new Error('Brush refine controls did not update the live canvas stroke parameters.');
+  }
   for (const stroke of dryRunCommand.parameters.strokes) {
     for (const point of stroke.points) {
       if ('pressure' in point) throw new Error('Mouse brush proof must not synthesize pressure.');
@@ -490,6 +495,8 @@ async function writeBrushMaskCanvasProof(page): Promise<void> {
       paintMaskHash: paintRender.contentHash,
       paintScreenshot: brushMaskCanvasPaintReportPath,
       pointCounts: proofDataset.pointCounts.split(',').map(Number),
+      refineBrushFeather: Number(proofDataset.refineBrushFeather),
+      refineBrushSize: Number(proofDataset.refineBrushSize),
       schemaVersion: 1,
       screenshot: brushMaskCanvasFinalReportPath,
       strokeCount: Number(proofDataset.strokeCount),
@@ -1088,6 +1095,8 @@ async function prepareScenario(page, mode) {
   }
 
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.BrushMaskCanvasUi) {
+    await page.getByRole('button', { name: 'Size 96' }).click();
+    await page.getByRole('button', { name: 'Feather 64' }).click();
     const capture = page.getByTestId('image-canvas-brush-command-capture');
     await capture.waitFor({ timeout: 10_000 });
     const canvas = capture.locator('canvas');
