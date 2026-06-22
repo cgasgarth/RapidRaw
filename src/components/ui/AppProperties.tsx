@@ -62,6 +62,7 @@ export enum Invokes {
   EstimateNegativeBaseFog = 'estimate_negative_base_fog',
   SuggestNegativeLabHighlightPatchExposure = 'suggest_negative_lab_highlight_patch_exposure',
   SuggestNegativeLabNeutralPatchRgbBalance = 'suggest_negative_lab_neutral_patch_rgb_balance',
+  SuggestNegativeLabShadowPatchBlackPoint = 'suggest_negative_lab_shadow_patch_black_point',
   EstimateExportSizes = 'estimate_export_sizes',
   ExportImages = 'export_images',
   FrontendLog = 'frontend_log',

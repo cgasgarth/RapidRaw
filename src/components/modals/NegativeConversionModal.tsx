@@ -40,6 +40,10 @@ import {
   type NegativeLabBaseFogSampleRect,
   type NegativeLabPresetParams,
 } from '../../schemas/negativeLabPresetCatalogSchemas';
+import {
+  negativeLabShadowPatchBlackPointSuggestionSchema,
+  type NegativeLabShadowPatchBlackPointSuggestion,
+} from '../../schemas/negativeLabShadowPatchBlackPointSuggestionSchemas';
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import { NegativeLabAppServerCommandName } from '../../utils/negativeLabAppServerCommandNames';
@@ -460,6 +464,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [highlightPatchExposureSuggestion, setHighlightPatchExposureSuggestion] =
     useState<NegativeLabHighlightPatchExposureSuggestion | null>(null);
   const [isSuggestingHighlightPatchExposure, setIsSuggestingHighlightPatchExposure] = useState(false);
+  const [shadowPatchBlackPointSuggestion, setShadowPatchBlackPointSuggestion] =
+    useState<NegativeLabShadowPatchBlackPointSuggestion | null>(null);
+  const [isSuggestingShadowPatchBlackPoint, setIsSuggestingShadowPatchBlackPoint] = useState(false);
   const [customBaseSampleRect, setCustomBaseSampleRect] =
     useState<NegativeLabBaseFogSampleRect>(CUSTOM_BASE_SAMPLE_DEFAULT);
   const [customBaseSampleEstimate, setCustomBaseSampleEstimate] = useState<NegativeBaseFogEstimate | null>(null);
@@ -1055,6 +1062,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setBaseFogPreviewProof(null);
       setBaseFogReadoutCopied(false);
       setNeutralPatchSuggestion(null);
+      setShadowPatchBlackPointSuggestion(null);
+      setHighlightPatchExposureSuggestion(null);
       setActiveBaseFogSampleLabel(null);
       setBaseFogSampleUndoStack([]);
       setCustomBaseSampleRect(CUSTOM_BASE_SAMPLE_DEFAULT);
@@ -1339,6 +1348,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setPatchProbeLabel(t(labelKey));
       setNeutralPatchSuggestion(null);
       setHighlightPatchExposureSuggestion(null);
+      setShadowPatchBlackPointSuggestion(null);
     } catch (e) {
       console.error('Patch probe sample failed', e);
     } finally {
@@ -1361,6 +1371,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       );
       setNeutralPatchSuggestion(suggestion);
       setHighlightPatchExposureSuggestion(null);
+      setShadowPatchBlackPointSuggestion(null);
     } catch (error) {
       console.error('Neutral patch RGB suggestion failed', error);
       setNeutralPatchSuggestion(null);
@@ -1385,11 +1396,36 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       );
       setHighlightPatchExposureSuggestion(suggestion);
       setNeutralPatchSuggestion(null);
+      setShadowPatchBlackPointSuggestion(null);
     } catch (error) {
       console.error('Highlight patch exposure suggestion failed', error);
       setHighlightPatchExposureSuggestion(null);
     } finally {
       setIsSuggestingHighlightPatchExposure(false);
+    }
+  };
+
+  const handleSuggestShadowPatchBlackPoint = async () => {
+    if (selectedImagePath === null || patchProbeRect === null) return;
+    setIsSuggestingShadowPatchBlackPoint(true);
+    try {
+      const suggestion = await invokeWithSchema(
+        Invokes.SuggestNegativeLabShadowPatchBlackPoint,
+        {
+          params,
+          path: selectedImagePath,
+          sampleRect: patchProbeRect,
+        },
+        negativeLabShadowPatchBlackPointSuggestionSchema,
+      );
+      setShadowPatchBlackPointSuggestion(suggestion);
+      setHighlightPatchExposureSuggestion(null);
+      setNeutralPatchSuggestion(null);
+    } catch (error) {
+      console.error('Shadow patch black point suggestion failed', error);
+      setShadowPatchBlackPointSuggestion(null);
+    } finally {
+      setIsSuggestingShadowPatchBlackPoint(false);
     }
   };
 
@@ -1539,6 +1575,20 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       frameHealthReport.activeFrameId,
       highlightPatchExposureSuggestion.suggestedFrameExposureOffset,
     );
+  };
+
+  const handleApplyShadowPatchBlackPointSuggestion = () => {
+    if (shadowPatchBlackPointSuggestion === null || !shadowPatchBlackPointSuggestion.applyAllowed) return;
+    const nextParams = {
+      ...params,
+      black_point: Number(
+        Math.min(shadowPatchBlackPointSuggestion.projectedBlackPoint, params.white_point - 0.05).toFixed(2),
+      ),
+    };
+    setSelectedPresetId('');
+    setParams(nextParams);
+    setAcceptedBatchPlanJson(null);
+    updatePreview(buildParamsWithFrameOverrides(nextParams));
   };
 
   const handleSave = async () => {
@@ -3625,8 +3675,70 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                       {isSuggestingHighlightPatchExposure ? <Loader2 size={12} className="animate-spin" /> : null}
                       {t('modals.negativeConversion.analyzeHighlightRecovery')}
                     </button>
+                    <button
+                      type="button"
+                      className="col-span-2 inline-flex items-center justify-center gap-1 rounded border border-surface bg-bg-primary px-2 py-1 text-[11px] text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                      data-testid="negative-lab-analyze-shadow-black-point"
+                      disabled={isSuggestingShadowPatchBlackPoint || isSaving}
+                      onClick={() => {
+                        void handleSuggestShadowPatchBlackPoint();
+                      }}
+                    >
+                      {isSuggestingShadowPatchBlackPoint ? <Loader2 size={12} className="animate-spin" /> : null}
+                      {t('modals.negativeConversion.analyzeShadowBlackPoint')}
+                    </button>
                   </div>
                 )}
+              {shadowPatchBlackPointSuggestion !== null && (
+                <div
+                  className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md border border-surface bg-bg-secondary p-2 text-xs text-text-tertiary"
+                  data-application-risk={shadowPatchBlackPointSuggestion.applicationRisk}
+                  data-apply-allowed={String(shadowPatchBlackPointSuggestion.applyAllowed)}
+                  data-status={shadowPatchBlackPointSuggestion.status}
+                  data-testid="negative-lab-shadow-black-point-suggestion"
+                >
+                  <span className="text-text-secondary">
+                    {t('modals.negativeConversion.shadowBlackPointSuggestion')}
+                  </span>
+                  <span className="text-right" data-testid="negative-lab-shadow-black-point-status">
+                    {t(`modals.negativeConversion.highlightRecoveryStatus.${shadowPatchBlackPointSuggestion.status}`)}
+                  </span>
+                  <span className="text-text-secondary">{t('modals.negativeConversion.blackPoint')}</span>
+                  <span className="text-right tabular-nums" data-testid="negative-lab-shadow-black-point-value">
+                    {shadowPatchBlackPointSuggestion.projectedBlackPoint.toFixed(2)}
+                  </span>
+                  <span className="text-text-secondary">{t('modals.negativeConversion.shadowBlackPointP01')}</span>
+                  <span className="text-right tabular-nums" data-testid="negative-lab-shadow-black-point-p01">
+                    {t('modals.negativeConversion.highlightRecoveryValueTransition', {
+                      from: shadowPatchBlackPointSuggestion.currentSampleP01MinChannel.toFixed(3),
+                      to: shadowPatchBlackPointSuggestion.projectedSampleP01MinChannel.toFixed(3),
+                    })}
+                  </span>
+                  <span className="text-text-secondary">{t('modals.negativeConversion.applicationRisk')}</span>
+                  <span className="text-right" data-testid="negative-lab-shadow-black-point-risk">
+                    {t(
+                      `modals.negativeConversion.neutralityRiskLevels.${shadowPatchBlackPointSuggestion.applicationRisk}`,
+                    )}
+                  </span>
+                  {shadowPatchBlackPointSuggestion.endpointClamped || !shadowPatchBlackPointSuggestion.applyAllowed ? (
+                    <span
+                      className="col-span-2 text-[11px] text-warning"
+                      data-testid="negative-lab-shadow-black-point-apply-warning"
+                    >
+                      {t('modals.negativeConversion.shadowBlackPointApplyWarning')}
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="col-span-2 mt-1 inline-flex items-center justify-center rounded border border-accent bg-accent/10 px-2 py-1 text-[11px] text-text-primary transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-50"
+                    data-testid="negative-lab-apply-shadow-black-point"
+                    disabled={isSaving || !shadowPatchBlackPointSuggestion.applyAllowed}
+                    onClick={handleApplyShadowPatchBlackPointSuggestion}
+                  >
+                    {t('modals.negativeConversion.applyShadowBlackPoint')}
+                  </button>
+                </div>
+              )}
               {highlightPatchExposureSuggestion !== null && (
                 <div
                   className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md border border-surface bg-bg-secondary p-2 text-xs text-text-tertiary"

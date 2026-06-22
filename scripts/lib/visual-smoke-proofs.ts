@@ -176,6 +176,15 @@ const negativeLabHighlightPatchExposureInvokeSchema = z.object({
   command: z.literal('suggest_negative_lab_highlight_patch_exposure'),
   options: z.unknown().optional(),
 });
+const negativeLabShadowPatchBlackPointInvokeSchema = z.object({
+  args: z.object({
+    params: negativeLabPreviewParamsSchema,
+    path: z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif'),
+    sampleRect: negativeLabShadowPatchSampleSchema,
+  }),
+  command: z.literal('suggest_negative_lab_shadow_patch_black_point'),
+  options: z.unknown().optional(),
+});
 const negativeLabConvertArgsSchema = z.object({
   options: z
     .object({
@@ -656,6 +665,9 @@ export async function assertNegativeLabBaseFogPreviewExportProof(page) {
   const highlightExposureCalls = z
     .array(negativeLabHighlightPatchExposureInvokeSchema)
     .parse(rawInvokeLog.filter((call) => call.command === 'suggest_negative_lab_highlight_patch_exposure'));
+  const shadowBlackPointCalls = z
+    .array(negativeLabShadowPatchBlackPointInvokeSchema)
+    .parse(rawInvokeLog.filter((call) => call.command === 'suggest_negative_lab_shadow_patch_black_point'));
   const previewReturns = negativeLabPreviewReturnProofSchema.parse(
     await page.evaluate(() => window.__RAWENGINE_NEGATIVE_LAB_PREVIEW_RETURNS__ ?? []),
   );
@@ -701,6 +713,12 @@ export async function assertNegativeLabBaseFogPreviewExportProof(page) {
         hasPatchProbeEstimate,
         highlightExposureCalls: highlightExposureCalls.length,
       })}`,
+    );
+  }
+
+  if (shadowBlackPointCalls.length !== 1) {
+    throw new Error(
+      `Negative Lab shadow black-point proof expected one suggestion call, got ${shadowBlackPointCalls.length}.`,
     );
   }
 

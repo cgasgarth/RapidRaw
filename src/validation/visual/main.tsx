@@ -83,6 +83,7 @@ const generatePreviewForPathCommand: string = Invokes.GeneratePreviewForPath;
 const estimateNegativeBaseFogCommand: string = Invokes.EstimateNegativeBaseFog;
 const suggestNegativeLabHighlightPatchCommand: string = Invokes.SuggestNegativeLabHighlightPatchExposure;
 const suggestNegativeLabNeutralPatchCommand: string = Invokes.SuggestNegativeLabNeutralPatchRgbBalance;
+const suggestNegativeLabShadowPatchCommand: string = Invokes.SuggestNegativeLabShadowPatchBlackPoint;
 const convertNegativesCommand: string = Invokes.ConvertNegatives;
 const saveCommunityPresetCommand: string = Invokes.SaveCommunityPreset;
 const handleExportPresetsToFileCommand: string = Invokes.HandleExportPresetsToFile;
@@ -150,6 +151,24 @@ window.__TAURI_INTERNALS__ = {
         status: 'suggested',
         suggestedExposureDeltaEv: -0.35,
         suggestedFrameExposureOffset: 0.15,
+      });
+    }
+    if (command === suggestNegativeLabShadowPatchCommand) {
+      return Promise.resolve({
+        applicationRisk: 'low',
+        applyAllowed: true,
+        correctionMagnitude: 0.12,
+        currentBlackPoint: 0,
+        currentSampleP01MinChannel: 0.12,
+        currentSampleRgb: [0.14, 0.13, 0.12],
+        endpointClamped: false,
+        projectedBlackPoint: 0.12,
+        projectedSampleP01MinChannel: 0.034,
+        projectedSampleRgb: [0.06, 0.05, 0.04],
+        role: 'shadow',
+        sampleRect: { height: 0.18, width: 0.18, x: 0.18, y: 0.62 },
+        status: 'suggested',
+        suggestedBlackPointDelta: 0.12,
       });
     }
     if (command === convertNegativesCommand) return Promise.resolve(['/tmp/rawengine-negative-smoke-positive.tif']);
