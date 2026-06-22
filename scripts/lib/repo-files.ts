@@ -1,38 +1,39 @@
-// @ts-check
+import { basename, extname, join, relative } from 'node:path';
 
-import { readdirSync, statSync } from 'node:fs';
-import { extname, join, relative } from 'node:path';
+export type RepoFile = {
+  absolutePath: string;
+  entry: string;
+  repoPath: string;
+};
+
+export type WalkRepoFilesOptions = {
+  include: (file: RepoFile) => boolean;
+  root?: string;
+  startDir?: string;
+};
 
 export const DEFAULT_IGNORED_DIRS = new Set(['.git', 'dist', 'node_modules', 'src-tauri/target', 'target']);
 
-export const getExtension = (path) => extname(path);
+export const getExtension = (path: string): string => extname(path);
 
-export const toRepoPath = (root, absolutePath) => relative(root, absolutePath).split('/').join('/');
+export const toRepoPath = (root: string, absolutePath: string): string =>
+  relative(root, absolutePath).split('/').join('/');
 
-export const isIgnoredRepoPath = (repoPath, ignoredDirs = DEFAULT_IGNORED_DIRS) =>
+export const isIgnoredRepoPath = (repoPath: string, ignoredDirs = DEFAULT_IGNORED_DIRS): boolean =>
   [...ignoredDirs].some((ignored) => repoPath === ignored || repoPath.startsWith(`${ignored}/`));
 
-export const walkRepoFiles = ({ include, root = process.cwd(), startDir = root }) => {
-  const files = [];
+export const walkRepoFiles = ({ include, root = process.cwd(), startDir = root }: WalkRepoFilesOptions): string[] => {
+  const files: string[] = [];
+  const glob = new Bun.Glob('**/*');
 
-  const walk = (dir) => {
-    for (const entry of readdirSync(dir)) {
-      const absolutePath = join(dir, entry);
-      const repoPath = toRepoPath(root, absolutePath);
-      if (isIgnoredRepoPath(repoPath)) continue;
+  for (const scannedPath of glob.scanSync({ cwd: startDir, dot: true, onlyFiles: true })) {
+    const absolutePath = join(startDir, scannedPath);
+    const repoPath = toRepoPath(root, absolutePath);
+    if (isIgnoredRepoPath(repoPath)) continue;
 
-      const stat = statSync(absolutePath);
-      if (stat.isDirectory()) {
-        walk(absolutePath);
-        continue;
-      }
+    const entry = basename(repoPath);
+    if (include({ absolutePath, entry, repoPath })) files.push(absolutePath);
+  }
 
-      if (stat.isFile() && include({ absolutePath, entry, repoPath })) {
-        files.push(absolutePath);
-      }
-    }
-  };
-
-  walk(startDir);
   return files;
 };
