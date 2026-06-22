@@ -154,6 +154,7 @@ export const panoramaRuntimeProvenanceV1Schema = z
               .strict(),
           )
           .optional(),
+        compensationStrengthPercent: z.number().int().min(0).max(100).optional(),
         mode: z.enum(['none', 'scalar_overlap_luminance_gain_v1']),
         overlapMetrics: z
           .object({
@@ -277,7 +278,9 @@ export const buildPanoramaRuntimeDryRunV1 = (requestValue: unknown): PanoramaRun
   const request = parsePanoramaRuntimePlanRequest(requestValue, true);
   const runtime = renderPanoramaRuntime(request);
   const planId = `panorama_plan_${request.command.commandId}`;
-  const planHash = `sha256:${stablePanoramaRuntimeHash(`${planId}:${runtime.provenance.resolvedProjection}`)}`;
+  const planHash = `sha256:${stablePanoramaRuntimeHash(
+    `${planId}:${runtime.provenance.resolvedProjection}:${request.command.parameters.seamExposureCompensationPercent}`,
+  )}`;
   const renderedContentHash = hashPanoramaRuntimePixels(runtime.outputPixels);
   const previewArtifacts = [
     {
@@ -514,6 +517,7 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
     memoryBudgetBytes: request.command.parameters.memoryBudgetBytes ?? 4_000_000_000,
     projection: resolvePanoramaRuntimeProjection(request.command.parameters.projection),
     seed: request.seed,
+    seamExposureCompensationPercent: request.command.parameters.seamExposureCompensationPercent,
     sourceFrames: request.sourceFrames.map((frame) => toSyntheticSourceFrame(frame, request.command)),
   });
   if (stitched.outputPixels === null) {
@@ -1216,6 +1220,7 @@ const exposureNormalizationForPanoramaRuntimeArtifact = (
   return {
     appliedGainCount: result.appliedGainCount,
     appliedLuminanceGains: result.appliedLuminanceGains,
+    compensationStrengthPercent: result.compensationStrengthPercent,
     mode: 'scalar_overlap_luminance_gain_v1',
     overlapMetrics: result.overlapMetrics,
     support: 'implemented_current_engine',

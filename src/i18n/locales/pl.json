@@ -2651,6 +2651,8 @@
       },
       "save": "Zapisz",
       "savedSuccess": "Panorama zapisana pomyślnie!",
+      "seamExposureCompensationLabel": "",
+      "seamExposureCompensationValue": "",
       "sourceCountBlocked": "Select at least two overlapping source images before stitching.",
       "speedNotice": "Może to potrwać kilka minut w zależności od liczby i rozmiaru obrazów.",
       "start": "Rozpocznij",

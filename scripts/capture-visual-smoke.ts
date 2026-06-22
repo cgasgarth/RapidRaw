@@ -1674,6 +1674,10 @@ async function prepareScenario(page, mode) {
     }
     await page.getByRole('button', { name: 'Gain compensation' }).click();
     await page.getByRole('option', { name: 'None' }).click();
+    await page.getByTestId('panorama-seam-exposure-compensation-slider').fill('60');
+    await page.getByTestId('panorama-seam-exposure-compensation-value').getByText('60%', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
     await page.getByRole('button', { name: '8192 px' }).click();
     panoramaUiSettingsProofSchema.parse(
       await page.getByTestId('panorama-ui-settings-proof').evaluate((element) => ({ ...element.dataset })),

@@ -393,6 +393,7 @@ export const panoramaUiSettingsProofSchema = z.object({
   maxPreviewDimensionPx: z.literal('8192'),
   projection: z.literal('cylindrical'),
   qualityPreference: z.literal('preview'),
+  seamExposureCompensationPercent: z.literal('60'),
 });
 export const panoramaReviewWorkspaceProofSchema = z.object({
   applyCommand: z.literal(panoramaRoutePair.applyToolName),
@@ -405,6 +406,7 @@ export const panoramaReviewWorkspaceProofSchema = z.object({
   planWidth: z.literal('9024'),
   projection: z.literal('cylindrical'),
   runtimeStatus: z.literal('dry_run_preview'),
+  seamExposureCompensationPercent: z.literal('60'),
   seamCount: z.literal('4'),
   sourceContributionCount: z.literal('5'),
   sourceCount: z.literal('5'),

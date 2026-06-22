@@ -20,6 +20,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
         dryRun: true as const,
         maxPreviewDimensionPx: settings.maxPreviewDimensionPx,
         projection: settings.projection,
+        seamExposureCompensationPercent: settings.seamExposureCompensationPercent,
         sourceCount: paths.length,
       };
       setUI((state) => ({
@@ -65,6 +66,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
             maxPreviewDimensionPx: settings.maxPreviewDimensionPx,
             projection: settings.projection,
             qualityPreference: settings.qualityPreference,
+            seamExposureCompensationPercent: settings.seamExposureCompensationPercent,
           },
           paths,
         });

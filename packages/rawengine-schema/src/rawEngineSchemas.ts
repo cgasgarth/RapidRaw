@@ -2351,6 +2351,7 @@ export const panoramaExposureNormalizationV1Schema = z
           .strict(),
       )
       .optional(),
+    compensationStrengthPercent: z.number().int().min(0).max(100).optional(),
     deferredReason: z.string().trim().min(1).optional(),
     mode: z.enum(['none', 'planned', 'gain_offset_v1', 'scalar_overlap_luminance_gain_v1']),
     overlapMetrics: z
@@ -3046,6 +3047,7 @@ export const computationalMergeCommandEnvelopeV1Schema = z
             outputName: z.string().trim().min(1),
             projection: panoramaProjectionSchema,
             qualityPreference: computationalMergeQualityPreferenceV1Schema,
+            seamExposureCompensationPercent: z.number().int().min(0).max(100).default(100),
             sources: computationalMergeSourcesSchema,
           })
           .strict()

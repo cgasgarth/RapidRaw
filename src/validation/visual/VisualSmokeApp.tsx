@@ -2805,6 +2805,7 @@ function PanoramaVisualSmoke() {
           data-source-geometry-support={panoramaRuntimePlanFixture.preflight.source_geometry?.support}
           data-source-row-count-estimate={panoramaRuntimePlanFixture.preflight.source_geometry?.row_count_estimate}
           data-runtime-status="dry_run_preview"
+          data-seam-exposure-compensation-percent={settings.seamExposureCompensationPercent}
           data-seam-count="4"
           data-source-contribution-count="5"
           data-source-count="5"
@@ -2819,6 +2820,7 @@ function PanoramaVisualSmoke() {
           data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
           data-projection={settings.projection}
           data-quality-preference={settings.qualityPreference}
+          data-seam-exposure-compensation-percent={settings.seamExposureCompensationPercent}
           data-testid="panorama-ui-settings-proof"
         />
         <div className="flex h-11 items-center justify-between border-b border-white/10 bg-[#181b1f] px-4">

@@ -26,6 +26,7 @@ export const panoramaSyntheticStitchRequestV1Schema = z
     memoryBudgetBytes: z.number().int().positive(),
     projection: z.enum(['rectilinear', 'cylindrical']).default('rectilinear'),
     seed: z.string().min(1),
+    seamExposureCompensationPercent: z.number().int().min(0).max(100).default(100),
     sourceFrames: z.array(panoramaSyntheticSourceFrameV1Schema).min(2),
   })
   .strict();
@@ -38,6 +39,7 @@ export interface PanoramaSyntheticExposureNormalizationV1 {
     gain: number;
     sourceIndex: number;
   }>;
+  compensationStrengthPercent?: number;
   mode: 'none' | 'scalar_overlap_luminance_gain_v1';
   overlapMetrics?: {
     medianLogLuminanceDeltaAfter?: number;
@@ -101,6 +103,7 @@ export const renderSyntheticPanoramaStitchV1 = (requestValue: unknown): Panorama
               weights,
               bounds,
               request.projection,
+              request.seamExposureCompensationPercent,
             );
       compositeSourceFrame(
         request.seed,
@@ -170,6 +173,7 @@ const buildSyntheticStitchResult = ({
       request.exposureNormalization,
       appliedLuminanceGains,
       exposureSamples,
+      request.seamExposureCompensationPercent,
     ),
     excludedSourceCount: request.sourceFrames.length - connectedFrames.length,
     output: {
@@ -267,6 +271,7 @@ const estimateSourceExposureGain = (
   weights: Uint8Array,
   bounds: ReturnType<typeof calculatePanoramaBounds>,
   projection: z.infer<typeof panoramaSyntheticStitchRequestV1Schema>['projection'],
+  compensationStrengthPercent: number,
 ): EstimatedExposureGain => {
   const offsetX = (sourceFrame.expectedOffsetX ?? 0) - minLeft;
   const offsetY = (sourceFrame.expectedOffsetY ?? 0) - minTop;
@@ -294,7 +299,8 @@ const estimateSourceExposureGain = (
   }
 
   if (ratios.length < MIN_EXPOSURE_OVERLAP_SAMPLES) return { gain: 1, sampleCount: ratios.length, samples: [] };
-  const gain = clamp(median(ratios), MIN_EXPOSURE_GAIN, MAX_EXPOSURE_GAIN);
+  const rawGain = clamp(median(ratios), MIN_EXPOSURE_GAIN, MAX_EXPOSURE_GAIN);
+  const gain = 1 + (rawGain - 1) * (compensationStrengthPercent / 100);
   return {
     gain,
     sampleCount: ratios.length,
@@ -309,6 +315,7 @@ const buildExposureNormalizationResult = (
   requestedMode: z.infer<typeof panoramaSyntheticStitchRequestV1Schema>['exposureNormalization'],
   appliedLuminanceGains: Array<{ gain: number; sourceIndex: number }>,
   exposureSamples: ExposureDeltaSample[],
+  compensationStrengthPercent: number,
 ): PanoramaSyntheticExposureNormalizationV1 => {
   if (requestedMode === 'none') {
     return {
@@ -327,6 +334,7 @@ const buildExposureNormalizationResult = (
   return {
     appliedGainCount: appliedLuminanceGains.length,
     appliedLuminanceGains,
+    compensationStrengthPercent,
     mode: 'scalar_overlap_luminance_gain_v1',
     overlapMetrics: {
       medianLogLuminanceDeltaAfter: roundMetric(median(exposureSamples.map((sample) => sample.after))),
