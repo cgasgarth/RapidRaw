@@ -101,6 +101,19 @@ const runtimeResultIdsSchema = z
   })
   .strict();
 
+const superResolutionRealPhotoQualityReadoutSchema = z
+  .object({
+    artifactScore: z.number().min(0),
+    detailGainRatio: z.number().min(0),
+    outputArtifactHash: sha256Schema,
+    outputArtifactPath: privatePathSchema,
+    outputPixelCount: z.number().int().positive(),
+    registrationResidualPx: z.number().min(0),
+    sourceCount: z.number().int().min(2),
+    sourceCoverageRatio: z.number().min(0).max(1),
+  })
+  .strict();
+
 const privateRunReportSchema = z
   .object({
     acceptanceStatus: z.enum([
@@ -132,6 +145,7 @@ const privateRunReportSchema = z
     runtimeResultIds: runtimeResultIdsSchema.optional(),
     screenshotArtifacts: z.array(screenshotArtifactSchema),
     sourceHashes: z.array(sourceHashSchema).min(2),
+    superResolutionQualityReadout: superResolutionRealPhotoQualityReadoutSchema.optional(),
     uiIssue: z.number().int().positive(),
   })
   .strict()
@@ -352,6 +366,17 @@ const privateRunReportSchema = z
           code: 'custom',
           message: 'Runtime/E2E report requires at least two screenshot artifacts.',
           path: ['screenshotArtifacts'],
+        });
+      }
+      if (
+        report.featureFamily === 'super_resolution' &&
+        report.acceptanceStatus === 'runtime_apply_capable' &&
+        report.superResolutionQualityReadout === undefined
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Super-resolution runtime reports require a real-photo quality readout.',
+          path: ['superResolutionQualityReadout'],
         });
       }
     }

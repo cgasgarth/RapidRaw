@@ -538,11 +538,15 @@ export const superResolutionPrivateRawReviewProofSchema = z.object({
   applyCommand: z.literal(superResolutionRoutePair.applyToolName),
   artifactPath: z.string().endsWith('/sr-subpixel-reconstruction.tiff'),
   command: z.literal(superResolutionRoutePair.dryRunToolName),
+  detailGainRatio: z.string().refine((value) => Number.parseFloat(value) > 1),
   exportReviewArtifact: z.string().endsWith('/sr-subpixel-export-review.png'),
   fixtureId: z.literal('validation.computational-merge.super-resolution-subpixel.v1'),
+  outputArtifactScore: z.string().refine((value) => Number.parseFloat(value) >= 0),
+  outputPixelCount: z.string().refine((value) => Number.parseInt(value, 10) > 0),
   previewArtifact: z.string().endsWith('/sr-subpixel-preview.png'),
   resultReviewArtifact: z.string().endsWith('/sr-subpixel-result-review.png'),
   runtimeStatus: z.literal('private_raw_app_server_apply'),
+  sourceCoverageRatio: z.string().refine((value) => Number.parseFloat(value) > 0),
   sourceCount: z.literal('4'),
 });
 export const layerStackWorkflowProofSchema = z.object({

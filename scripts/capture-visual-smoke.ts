@@ -122,11 +122,14 @@ const sleep = (milliseconds) => new Promise((resolveSleep) => setTimeout(resolve
 
 interface SrPrivateRawBrowserProof {
   artifactRoot: string;
+  detailGainRatio: string;
   exportReviewArtifact: string;
   exportReviewDataUrl: string;
   exportReviewHash: string;
   fixtureId: string;
+  outputArtifactScore: string;
   outputHeight: string;
+  outputPixelCount: string;
   outputScale: string;
   outputWidth: string;
   previewArtifact: string;
@@ -138,6 +141,7 @@ interface SrPrivateRawBrowserProof {
   resultReviewArtifact: string;
   resultReviewDataUrl: string;
   resultReviewHash: string;
+  sourceCoverageRatio: string;
   sourceCount: string;
   sourceHashes: string;
   sourceHeights: string;
@@ -561,6 +565,19 @@ const srPrivateRunReportSchema = z
                   .passthrough(),
               )
               .length(4),
+            superResolutionQualityReadout: z
+              .object({
+                artifactScore: z.number().min(0),
+                detailGainRatio: z.number().min(0),
+                outputArtifactHash: z
+                  .string()
+                  .trim()
+                  .regex(/^sha256:[a-f0-9]{64}$/u),
+                outputArtifactPath: z.string().trim().min(1),
+                outputPixelCount: z.number().int().positive(),
+                sourceCoverageRatio: z.number().min(0).max(1),
+              })
+              .strict(),
           })
           .passthrough(),
       )
@@ -673,14 +690,24 @@ async function loadSrPrivateRawProof(): Promise<SrPrivateRawBrowserProof> {
   ) {
     throw new Error('SR private proof artifact hashes do not match the private run report.');
   }
+  if (
+    report.superResolutionQualityReadout.outputArtifactHash !== reconstructionArtifact.hash ||
+    report.superResolutionQualityReadout.outputArtifactPath !== reconstructionArtifact.path
+  ) {
+    throw new Error('SR private proof quality readout is not tied to the reconstruction artifact.');
+  }
+  const qualityReadout = report.superResolutionQualityReadout;
 
   return {
     artifactRoot,
+    detailGainRatio: String(qualityReadout.detailGainRatio),
     exportReviewArtifact,
     exportReviewDataUrl: await readPngDataUrl(exportReviewArtifact),
     exportReviewHash,
     fixtureId: 'validation.computational-merge.super-resolution-subpixel.v1',
+    outputArtifactScore: String(qualityReadout.artifactScore),
     outputHeight: String(registrationReport.outputHeight),
+    outputPixelCount: String(qualityReadout.outputPixelCount),
     outputScale: String(registrationReport.outputScale),
     outputWidth: String(registrationReport.outputWidth),
     previewArtifact,
@@ -692,6 +719,7 @@ async function loadSrPrivateRawProof(): Promise<SrPrivateRawBrowserProof> {
     resultReviewArtifact,
     resultReviewDataUrl: await readPngDataUrl(resultReviewArtifact),
     resultReviewHash,
+    sourceCoverageRatio: String(qualityReadout.sourceCoverageRatio),
     sourceCount: '4',
     sourceHashes: sourceHashes.join(','),
     sourceHeights: decodeReport.decodedSources.map((source) => String(source.height)).join(','),
@@ -1409,13 +1437,17 @@ async function prepareScenario(page, mode) {
       .evaluate((element) => ({ ...element.dataset }));
     if (
       proofBefore.fixtureId !== 'validation.computational-merge.super-resolution-subpixel.v1' ||
+      Number.parseFloat(proofBefore.detailGainRatio ?? '0') <= 1 ||
+      Number.parseFloat(proofBefore.outputArtifactScore ?? '1') < 0 ||
       proofBefore.outputHeight !== '960' ||
+      Number.parseInt(proofBefore.outputPixelCount ?? '0', 10) <= 0 ||
       proofBefore.outputScale !== '2' ||
       proofBefore.outputWidth !== '1440' ||
       proofBefore.previewRequested !== 'false' ||
       proofBefore.privateRunReportPath?.endsWith('/sr-subpixel-private-run-report.json') !== true ||
       /^sha256:[a-f0-9]{64}$/u.test(proofBefore.reconstructionHash ?? '') !== true ||
       proofBefore.reconstructionPath?.endsWith('/sr-subpixel-reconstruction.tiff') !== true ||
+      Number.parseFloat(proofBefore.sourceCoverageRatio ?? '0') <= 0 ||
       proofBefore.sourceCount !== '4' ||
       proofBefore.sourceHashes?.split(',').length !== 4 ||
       proofBefore.sourcePaths?.split(',').length !== 4
@@ -1445,6 +1477,7 @@ async function prepareScenario(page, mode) {
     if (
       handoff.outputArtifactHash !== proofBefore.reconstructionHash ||
       handoff.outputArtifactId !== reconstructionPath ||
+      handoff.detailReviewMeanImprovementRatio !== proofBefore.detailGainRatio ||
       handoff.reviewArtifactCount !== '1' ||
       handoff.editableHandoffReady !== 'false' ||
       handoff.supportMapReviewStatus !== 'review_required' ||
@@ -1461,7 +1494,7 @@ async function prepareScenario(page, mode) {
       supportMap.effectiveScale !== '1.5' ||
       supportMap.requestedScale !== '2' ||
       supportMap.reviewStatus !== 'review_required' ||
-      supportMap.supportCoverageRatio !== '0.74' ||
+      supportMap.supportCoverageRatio !== proofBefore.sourceCoverageRatio ||
       supportMap.supportDowngradeReason !== 'effective_scale_downgraded' ||
       supportMap.weakSupportRatio !== '0.26' ||
       supportMap.regionCount !== 4
