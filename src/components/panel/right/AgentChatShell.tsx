@@ -11,6 +11,7 @@ import type {
   AgentChatMessage,
   AgentChatToolCall,
   AgentChatTranscript,
+  AgentPrivateRawArtifacts,
   AgentReviewHandoff,
   AgentSelectedFrameScope,
 } from '../../../schemas/agentChatTranscriptSchemas';
@@ -251,6 +252,61 @@ function ReviewHandoffPanel({ handoff }: { handoff: AgentReviewHandoff }) {
 
       <div className="rounded border border-white/10 bg-black/15 px-2 py-1.5 text-[11px] leading-4 text-text-secondary">
         {handoff.nextAction}
+      </div>
+    </div>
+  );
+}
+
+function PrivateRawArtifactsPanel({ proof }: { proof: AgentPrivateRawArtifacts }) {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      className="space-y-3 rounded-md border border-sky-500/20 bg-sky-500/5 p-3"
+      data-artifact-count={proof.artifactCount}
+      data-fixture-id={proof.fixtureId}
+      data-issue={proof.issue}
+      data-source-hash-unchanged={String(proof.sourceHashUnchanged)}
+      data-status={proof.status}
+      data-testid="agent-private-raw-artifacts"
+      data-validation-mode={proof.validationMode}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-text-primary">{proof.title}</div>
+          <p className="mt-1 text-[11px] leading-4 text-text-secondary">
+            {t('editor.ai.agent.privateRawArtifacts.summary')}
+          </p>
+        </div>
+        <span className="shrink-0 rounded border border-sky-500/25 bg-sky-500/10 px-2 py-0.5 text-[11px] text-sky-100">
+          {proof.status}
+        </span>
+      </div>
+      <div className="grid gap-2 text-[11px] md:grid-cols-2">
+        <div className="rounded border border-white/10 bg-black/15 p-2">
+          <div className="text-[10px] uppercase text-text-secondary">
+            {t('editor.ai.agent.privateRawArtifacts.fixture')}
+          </div>
+          <div className="mt-1 truncate font-mono text-text-primary">{proof.fixtureId}</div>
+        </div>
+        <div className="rounded border border-white/10 bg-black/15 p-2">
+          <div className="text-[10px] uppercase text-text-secondary">
+            {t('editor.ai.agent.privateRawArtifacts.artifacts')}
+          </div>
+          <div className="mt-1 font-mono text-text-primary">{proof.artifactCount}</div>
+        </div>
+        <div className="rounded border border-white/10 bg-black/15 p-2">
+          <div className="text-[10px] uppercase text-text-secondary">
+            {t('editor.ai.agent.privateRawArtifacts.report')}
+          </div>
+          <div className="mt-1 truncate font-mono text-text-primary">{proof.reportPath}</div>
+        </div>
+        <div className="rounded border border-white/10 bg-black/15 p-2">
+          <div className="text-[10px] uppercase text-text-secondary">
+            {t('editor.ai.agent.privateRawArtifacts.runtime')}
+          </div>
+          <div className="mt-1 truncate font-mono text-text-primary">{proof.workflowReportPath}</div>
+        </div>
       </div>
     </div>
   );
@@ -758,6 +814,8 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
       {transcript.artifactReview ? <ArtifactReviewPanel review={transcript.artifactReview} /> : null}
 
       {transcript.reviewHandoff ? <ReviewHandoffPanel handoff={transcript.reviewHandoff} /> : null}
+
+      {transcript.privateRawArtifacts ? <PrivateRawArtifactsPanel proof={transcript.privateRawArtifacts} /> : null}
 
       {transcript.auditTranscript ? <AuditTranscriptViewer auditTranscript={transcript.auditTranscript} /> : null}
 
