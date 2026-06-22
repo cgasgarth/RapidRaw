@@ -5,6 +5,7 @@ export const NegativeLabAppServerCommandName = {
   ConversionPlan: 'negative.lab.build_conversion_plan',
   Densitometer: 'negative.lab.build_densitometer_readout',
   FrameHealth: 'negative.lab.build_frame_health_report',
+  PlanRollNormalization: 'negative.lab.build_roll_normalization_plan',
   QcProof: 'negative.lab.build_qc_proof_report',
   StockFamilyConversion: 'negative.lab.build_stock_family_conversion_plan',
   StockMetadata: 'negative.lab.list_stock_metadata',

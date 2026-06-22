@@ -95,6 +95,7 @@ import {
   buildNegativeLabSelectedProfileSnapshot,
 } from '../../utils/negativeLabProfileComparison';
 import { buildNegativeLabQcContactSheetArtifact } from '../../utils/negativeLabQcContactSheetArtifact';
+import { buildNegativeLabRollNormalizationPlan } from '../../utils/negativeLabRollNormalizationPlan';
 import {
   NEGATIVE_LAB_STOCK_METADATA_CATALOG,
   buildNegativeLabStockMetadataCounts,
@@ -733,6 +734,20 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     return filteredRows;
   }, [frameHealthFilter, frameHealthReport.frames, frameHealthSort]);
   const batchDryRunSummary = useMemo(() => buildNegativeLabBatchDryRunSummary(frameHealthReport), [frameHealthReport]);
+  const rollNormalizationPlan = useMemo(
+    () =>
+      buildNegativeLabRollNormalizationPlan({
+        anchorFrameIds: [
+          frameHealthReport.activeFrameId ?? frameHealthReport.frames[0]?.frameId ?? 'negative-lab-frame-1',
+        ],
+        baselineExposure: params.exposure,
+        frameHealthReport,
+        mode: 'density_and_balance',
+        preserveCreativeAdjustments: true,
+        selectedFrameIds: batchDryRunSummary.affectedFrameIds,
+      }),
+    [batchDryRunSummary.affectedFrameIds, frameHealthReport, params.exposure],
+  );
   const frameExposureOverridePayload = useMemo(
     () =>
       buildNegativeLabFrameExposureOverridePayload({
@@ -860,6 +875,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           frameRgbBalanceOverrides: frameRgbBalanceOverridePayload,
           omittedDispositionFrameIds,
           qcDecisions: qcDecisionByFrameId,
+          rollNormalizationPlan,
           selectedProfile: selectedProfileSnapshot,
         },
         null,
@@ -873,6 +889,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       frameRgbBalanceOverridePayload,
       omittedDispositionFrameIds,
       qcDecisionByFrameId,
+      rollNormalizationPlan,
       selectedProfileSnapshot,
     ],
   );
@@ -1640,6 +1657,51 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setAcceptedBatchPlanJson(batchDryRunPlanJson);
   };
 
+  const handleApplyRollNormalizationPlan = () => {
+    if (rollNormalizationPlan.affectedFrameIds.length === 0) return;
+
+    const exposureOverrideFrameIds = new Set(
+      rollNormalizationPlan.exposureOverrides.overrides.map((override) => override.frameId),
+    );
+    const nextExposureOffsets = Object.fromEntries(
+      Object.entries(frameExposureOffsetByFrameId).filter(([frameId]) => !exposureOverrideFrameIds.has(frameId)),
+    );
+    for (const override of rollNormalizationPlan.exposureOverrides.overrides) {
+      const snappedOffset = snapNegativeLabFrameExposureOffset(override.exposureOffset);
+      if (snappedOffset !== 0) {
+        nextExposureOffsets[override.frameId] = snappedOffset;
+      }
+    }
+
+    const rgbOverrideFrameIds = new Set(
+      rollNormalizationPlan.rgbBalanceOverrides.overrides.map((override) => override.frameId),
+    );
+    const nextRgbOffsetsByFrameId = Object.fromEntries(
+      Object.entries(frameRgbBalanceOffsetByFrameId).filter(([frameId]) => !rgbOverrideFrameIds.has(frameId)),
+    );
+    for (const override of rollNormalizationPlan.rgbBalanceOverrides.overrides) {
+      const snappedOffset = snapNegativeLabFrameRgbBalanceOffsets({
+        baselineParams: params,
+        offsets: override.rgbBalanceOffset,
+      });
+      if (!negativeLabFrameRgbBalanceOffsetIsZero(snappedOffset)) {
+        nextRgbOffsetsByFrameId[override.frameId] = snappedOffset;
+      }
+    }
+
+    setFrameExposureOffsetByFrameId(nextExposureOffsets);
+    setFrameRgbBalanceOffsetByFrameId(nextRgbOffsetsByFrameId);
+    setAcceptedBatchPlanJson(null);
+    updatePreview(
+      buildParamsWithFrameOverrides(
+        params,
+        frameHealthReport.activeFrameId,
+        nextExposureOffsets,
+        nextRgbOffsetsByFrameId,
+      ),
+    );
+  };
+
   const handleSetQcDecision = (frameId: string, decision: NegativeLabQcDecision) => {
     setQcDecisionByFrameId((currentDecisions) => {
       if (decision === 'pending') {
@@ -2175,6 +2237,12 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
       data-planned-apply-count={batchDryRunSummary.plannedApplyCount}
       data-review-count={dustScratchReviewReport.reviewCount}
+      data-roll-normalization-affected-count={rollNormalizationPlan.affectedFrameIds.length}
+      data-roll-normalization-exposure-delta={rollNormalizationPlan.proposedExposureDeltaEv}
+      data-roll-normalization-mode={rollNormalizationPlan.mode}
+      data-roll-normalization-positive-count={rollNormalizationPlan.positiveVariantIds.length}
+      data-roll-normalization-unaffected-count={rollNormalizationPlan.unaffectedFrameIds.length}
+      data-roll-normalization-white-balance-delta={rollNormalizationPlan.proposedWhiteBalanceDelta}
       data-skipped-frame-count={batchDryRunSummary.skippedFrameIds.length}
       data-testid="negative-lab-batch-readiness"
     >
@@ -2260,6 +2328,22 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 skippedCount: batchDryRunSummary.skippedFrameIds.length,
               })}
             </span>
+            <span
+              className="col-span-3 rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary"
+              data-testid="negative-lab-roll-normalization-plan"
+            >
+              {`${rollNormalizationPlan.affectedFrameIds.length} frames ${rollNormalizationPlan.proposedExposureDeltaEv >= 0 ? '+' : ''}${rollNormalizationPlan.proposedExposureDeltaEv.toFixed(2)} EV / WB ${rollNormalizationPlan.proposedWhiteBalanceDelta.toFixed(2)}`}
+            </span>
+            <button
+              type="button"
+              className="col-span-3 inline-flex items-center justify-center gap-1 rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+              data-testid="negative-lab-apply-roll-normalization"
+              disabled={rollNormalizationPlan.affectedFrameIds.length === 0}
+              onClick={handleApplyRollNormalizationPlan}
+            >
+              <WandSparkles size={11} />
+              {t('modals.negativeConversion.applyRollNormalizationPlan')}
+            </button>
             <button
               type="button"
               className="col-span-3 inline-flex items-center justify-center gap-1 rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary transition-colors hover:bg-surface"
