@@ -185,6 +185,7 @@ type AcquisitionSourceFamilyLabelKey =
   | 'modals.negativeConversion.acquisitionSourceTiff'
   | 'modals.negativeConversion.acquisitionSourceUnknown';
 type AcquisitionWarningLabelKey =
+  | 'modals.negativeConversion.acquisitionWarningLabProcessed'
   | 'modals.negativeConversion.acquisitionWarningLossy'
   | 'modals.negativeConversion.acquisitionWarningMixed'
   | 'modals.negativeConversion.acquisitionWarningUnknown';
@@ -364,6 +365,7 @@ const ACQUISITION_SOURCE_FAMILY_LABEL_KEYS = {
   unknown: 'modals.negativeConversion.acquisitionSourceUnknown',
 } satisfies Record<NegativeLabAcquisitionSourceFamily, AcquisitionSourceFamilyLabelKey>;
 const ACQUISITION_WARNING_LABEL_KEYS = {
+  lab_processed_input_for_negative_lab: 'modals.negativeConversion.acquisitionWarningLabProcessed',
   lossy_source_for_negative_lab: 'modals.negativeConversion.acquisitionWarningLossy',
   mixed_source_families: 'modals.negativeConversion.acquisitionWarningMixed',
   unknown_acquisition_state: 'modals.negativeConversion.acquisitionWarningUnknown',
@@ -2073,6 +2075,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         data-tiff-scan-count={acquisitionHealth.tiffScanCount}
         data-unknown-count={acquisitionHealth.unknownCount}
         data-warning-count={acquisitionHealth.warningCodes.length}
+        data-warning-codes={acquisitionHealth.warningCodes.join(',')}
         data-testid="negative-lab-acquisition-health"
       >
         <div className="flex items-center justify-between gap-2">
@@ -2095,6 +2098,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         </div>
         <UiText variant={TextVariants.small} className="text-text-tertiary">
           {t('modals.negativeConversion.acquisitionHealthHint')}
+        </UiText>
+        <UiText variant={TextVariants.small} className="text-text-tertiary">
+          {t('modals.negativeConversion.acquisitionHealthLimit')}
         </UiText>
         <div className="flex flex-wrap gap-1 text-[11px] text-text-tertiary">
           <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-acquisition-total">

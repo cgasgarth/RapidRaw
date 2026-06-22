@@ -33,9 +33,9 @@ const acquisitionReport = buildNegativeLabFrameHealthReport({
   activePathIndex: 0,
   baseFogConfidence: 0.82,
   baseScope: 'roll',
-  includedPathSet: new Set(['/roll/001.tif', '/roll/002.jpg']),
+  includedPathSet: new Set(['/roll/001.tif', '/roll/lab-processed-proof-002.jpg']),
   previewReady: true,
-  targetPaths: ['/roll/001.tif', '/roll/002.jpg'],
+  targetPaths: ['/roll/001.tif', '/roll/lab-processed-proof-002.jpg'],
 });
 const acquisitionDryRunSummary = buildNegativeLabBatchDryRunSummary(acquisitionReport);
 
@@ -94,6 +94,12 @@ if (acquisitionReport.frames[1]?.acquisitionSourceFamily !== 'jpeg_lossy') {
 }
 if (!acquisitionReport.frames[1]?.acquisitionWarningCodes.includes('lossy_source_for_negative_lab')) {
   failures.push('JPEG frame should carry lossy acquisition warning');
+}
+if (!acquisitionReport.frames[1]?.acquisitionWarningCodes.includes('lab_processed_input_for_negative_lab')) {
+  failures.push('lab-processed proof frame should carry lab-processed acquisition warning');
+}
+if (!acquisitionReport.acquisitionHealth.warningCodes.includes('lab_processed_input_for_negative_lab')) {
+  failures.push('acquisition report should roll up lab-processed acquisition warning');
 }
 if (acquisitionReport.frames[1]?.warningSeverity !== 'review') {
   failures.push('JPEG acquisition warning should promote frame severity to review');

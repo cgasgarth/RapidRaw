@@ -57,6 +57,7 @@ if (
 }
 
 for (const warningCode of [
+  'lab_processed_input_for_negative_lab',
   'lossy_source_for_negative_lab',
   'mixed_source_families',
   'unknown_acquisition_state',
@@ -116,8 +117,10 @@ for (const marker of [
   'negative-lab-acquisition-health',
   'data-acquisition-severity={acquisitionHealth.severity}',
   'negative-lab-acquisition-severity',
+  'acquisitionHealthLimit',
   'negative-lab-acquisition-source-${sourceFamily}',
   'negative-lab-acquisition-warning-${warningCode}',
+  'acquisitionWarningLabProcessed',
   'negative-lab-qc-proof-artifact',
   'activePositiveVariant',
   'negative-lab-positive-handoff',

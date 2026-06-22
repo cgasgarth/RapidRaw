@@ -148,6 +148,7 @@ const negativeLabPreviewParamsSchema = z
   .passthrough();
 const negativeLabFixturePathSchema = z.union([
   z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif'),
+  z.literal('/fixtures/negative-lab/lab-processed-proof-negative-002.jpg'),
   z.literal('/fixtures/negative-lab/synthetic-gray-ramp-negative-002.jpg'),
 ]);
 const negativeLabPreviewInvokeSchema = z.object({
@@ -203,7 +204,12 @@ const negativeLabConvertArgsSchema = z.object({
       writeConversionBundle: z.literal(true),
       acquisitionSourceFamilies: z.array(z.enum(['jpeg_lossy', 'raw_like', 'tiff_scan', 'unknown'])).min(1),
       acquisitionWarningCodes: z.array(
-        z.enum(['lossy_source_for_negative_lab', 'mixed_source_families', 'unknown_acquisition_state']),
+        z.enum([
+          'lab_processed_input_for_negative_lab',
+          'lossy_source_for_negative_lab',
+          'mixed_source_families',
+          'unknown_acquisition_state',
+        ]),
       ),
       batchScope: z.literal('ready'),
       frameExposureOverrides: z.object({
@@ -289,6 +295,7 @@ const negativeLabBatchConvertArgsSchema = z.object({
     .array(
       z.union([
         z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif'),
+        z.literal('/fixtures/negative-lab/lab-processed-proof-negative-002.jpg'),
         z.literal('/fixtures/negative-lab/synthetic-gray-ramp-negative-002.jpg'),
       ]),
     )

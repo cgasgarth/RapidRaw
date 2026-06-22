@@ -1844,15 +1844,28 @@ async function prepareScenario(page, mode) {
   );
   await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabWorkflowRail).waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-acquisition-health').waitFor({ timeout: 10_000 });
+  z.object({
+    acquisitionSeverity: z.literal('review'),
+    lossyCount: z.literal('1'),
+    rawLikeCount: z.literal('0'),
+    tiffScanCount: z.literal('1'),
+    unknownCount: z.literal('0'),
+    warningCodes: z.literal('lossy_source_for_negative_lab,lab_processed_input_for_negative_lab,mixed_source_families'),
+    warningCount: z.literal('3'),
+  }).parse(await page.getByTestId('negative-lab-acquisition-health').evaluate((element) => ({ ...element.dataset })));
   await page
     .getByTestId('negative-lab-acquisition-severity')
-    .getByText('Review', { exact: true })
+    .getByText('Review source assumptions', { exact: true })
     .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-acquisition-source-tiff_scan').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-acquisition-source-jpeg_lossy').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-acquisition-warning-lab_processed_input_for_negative_lab').waitFor({
+    timeout: 10_000,
+  });
   await page.getByTestId('negative-lab-acquisition-warning-lossy_source_for_negative_lab').waitFor({
     timeout: 10_000,
   });
+  await page.getByTestId('negative-lab-acquisition-warning-mixed_source_families').waitFor({ timeout: 10_000 });
   await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabBatchReadiness).waitFor({ timeout: 10_000 });
   await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentActivity).waitFor({ timeout: 10_000 });
   await page

@@ -23,6 +23,8 @@ export const getNegativeLabScanLabel = (path: string, index: number) => {
 const RAW_LIKE_EXTENSIONS = new Set(['.arw', '.cr2', '.cr3', '.dng', '.nef', '.orf', '.raf', '.raw', '.rw2']);
 const TIFF_SCAN_EXTENSIONS = new Set(['.tif', '.tiff']);
 const JPEG_LOSSY_EXTENSIONS = new Set(['.jpg', '.jpeg']);
+const LAB_PROCESSED_PATH_TOKEN_PATTERN =
+  /(?:^|[._\-/\\\s])(?:auto[-_\s]?corrected|lab[-_\s]?processed|positive|proof)(?:$|[._\-/\\\s])/iu;
 
 const getPathExtension = (path: string) => {
   const name = getNegativeLabScanLabel(path, 0);
@@ -42,6 +44,7 @@ export const buildNegativeLabFrameAcquisitionHealth = (path: string): NegativeLa
   const sourceFamily = classifyAcquisitionSourceFamily(path);
   const warningCodes: NegativeLabFrameAcquisitionHealth['warningCodes'] = [];
 
+  if (LAB_PROCESSED_PATH_TOKEN_PATTERN.test(path)) warningCodes.push('lab_processed_input_for_negative_lab');
   if (sourceFamily === 'jpeg_lossy') warningCodes.push('lossy_source_for_negative_lab');
   if (sourceFamily === 'unknown') warningCodes.push('unknown_acquisition_state');
 
@@ -107,6 +110,13 @@ export const buildNegativeLabAcquisitionHealthReport = (
   const warningCodes: NegativeLabAcquisitionHealthReport['warningCodes'] = [];
 
   if (lossyCount > 0) warningCodes.push('lossy_source_for_negative_lab');
+  if (
+    targetPaths.some((path) =>
+      buildNegativeLabFrameAcquisitionHealth(path).warningCodes.includes('lab_processed_input_for_negative_lab'),
+    )
+  ) {
+    warningCodes.push('lab_processed_input_for_negative_lab');
+  }
   if (unknownCount > 0) warningCodes.push('unknown_acquisition_state');
   if (uniqueSourceFamilies.length > 1) warningCodes.push('mixed_source_families');
 

@@ -29,6 +29,7 @@ export const negativeLabFrameWarningCodeSchema = z.enum([
   'preview_not_ready',
 ]);
 export const negativeLabAcquisitionWarningCodeSchema = z.enum([
+  'lab_processed_input_for_negative_lab',
   'lossy_source_for_negative_lab',
   'mixed_source_families',
   'unknown_acquisition_state',
@@ -39,7 +40,9 @@ export const negativeLabFrameAcquisitionHealthSchema = z
   .object({
     severity: negativeLabAcquisitionSeveritySchema,
     sourceFamily: negativeLabAcquisitionSourceFamilySchema,
-    warningCodes: z.array(z.enum(['lossy_source_for_negative_lab', 'unknown_acquisition_state'])),
+    warningCodes: z.array(
+      z.enum(['lab_processed_input_for_negative_lab', 'lossy_source_for_negative_lab', 'unknown_acquisition_state']),
+    ),
   })
   .strict()
   .superRefine((health, context) => {
