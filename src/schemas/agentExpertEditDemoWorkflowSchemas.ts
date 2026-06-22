@@ -80,7 +80,7 @@ export const agentExpertEditDemoWorkflowSchema = z
         virtualCopyId: z.string().trim().min(1),
       })
       .strict(),
-    issue: z.literal(2844),
+    issue: z.literal(2983),
     limits: z.array(z.string().trim().min(1)).min(1),
     plan: z
       .object({
@@ -90,7 +90,14 @@ export const agentExpertEditDemoWorkflowSchema = z
       })
       .strict(),
     proofStatus: z.literal('runtime_apply_demo'),
-    refs: z.array(z.literal('#2844')).length(1),
+    runtimeWorkflow: z
+      .object({
+        api: z.literal('runAgentColorEditWorkflowV1'),
+        applyAuditEventId: z.string().trim().min(1),
+        dryRunAuditEventId: z.string().trim().min(1),
+      })
+      .strict(),
+    refs: z.array(z.literal('#2983')).length(1),
     validationMode: z.literal('agent_expert_edit_demo_workflow'),
   })
   .strict();

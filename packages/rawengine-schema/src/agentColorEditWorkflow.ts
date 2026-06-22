@@ -24,6 +24,7 @@ export const agentColorEditWorkflowSummaryV1Schema = z
         commandType: z.string().trim().min(1),
         mutates: z.literal(true),
         toolName: z.literal('tonecolor.apply_command'),
+        undoRevision: z.string().trim().min(1),
       })
       .strict(),
     audit: z
@@ -40,6 +41,7 @@ export const agentColorEditWorkflowSummaryV1Schema = z
         mutates: z.literal(false),
         parameterDiffPaths: z.array(z.string().trim().min(1)).min(1),
         predictedGraphRevision: z.string().trim().min(1),
+        sourceGraphRevision: z.string().trim().min(1),
         toolName: z.literal('tonecolor.dry_run_command'),
       })
       .strict(),
@@ -99,6 +101,7 @@ export const runAgentColorEditWorkflowV1 = async ({
       commandType: apply.commandType,
       mutates: apply.mutates,
       toolName: 'tonecolor.apply_command',
+      undoRevision: apply.undoRevision,
     },
     audit: {
       applyEventId: applyAudit.eventId,
@@ -111,6 +114,7 @@ export const runAgentColorEditWorkflowV1 = async ({
       mutates: dryRun.mutates,
       parameterDiffPaths: dryRun.parameterDiff.map((diff) => diff.path),
       predictedGraphRevision: dryRun.predictedGraphRevision,
+      sourceGraphRevision: dryRun.sourceGraphRevision,
       toolName: 'tonecolor.dry_run_command',
     },
     target: parsedApplyCommand.target,

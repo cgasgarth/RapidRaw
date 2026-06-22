@@ -6,6 +6,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import prettier from 'prettier';
 import type { z } from 'zod';
 
+import { runAgentColorEditWorkflowV1 } from '../../../packages/rawengine-schema/src/agentColorEditWorkflow.ts';
 import {
   buildRawEngineLocalAppServerToolRegistryQuery,
   createRawEngineLocalAppServerBridge,
@@ -16,8 +17,6 @@ import {
   RAW_ENGINE_SCHEMA_VERSION,
   rawEngineToolRegistryV1Schema,
   toneColorCommandEnvelopeV1Schema,
-  toneColorDryRunResultV1Schema,
-  toneColorMutationResultV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { agentExpertEditDemoWorkflowSchema } from '../../../src/schemas/agentExpertEditDemoWorkflowSchemas.ts';
 
@@ -93,23 +92,21 @@ const registryResult = await bridge.dispatch(buildRawEngineLocalAppServerToolReg
 if (!registryResult.ok) throw new Error(`Registry inspect failed: ${registryResult.message}`);
 const registry = rawEngineToolRegistryV1Schema.parse(registryResult.result);
 
-const dryRunResult = await bridge.dispatch(dryRunCommand, context);
-if (!dryRunResult.ok) throw new Error(`Expert edit dry-run failed: ${dryRunResult.message}`);
-const dryRun = toneColorDryRunResultV1Schema.parse(dryRunResult.result);
-if (dryRun.mutates) throw new Error('Expert edit dry-run must not mutate.');
-if (!dryRun.parameterDiff.some((diff) => diff.path === '/parameters/highlights')) {
+const workflowBridge = createRawEngineLocalAppServerBridge();
+const workflow = await runAgentColorEditWorkflowV1({
+  applyCommand,
+  bridge: workflowBridge,
+  context,
+  dryRunCommand,
+});
+if (!workflow.dryRun.parameterDiffPaths.includes('/parameters/highlights')) {
   throw new Error('Expert edit dry-run must protect highlights.');
 }
-if (!dryRun.parameterDiff.some((diff) => diff.path === '/parameters/shadows')) {
+if (!workflow.dryRun.parameterDiffPaths.includes('/parameters/shadows')) {
   throw new Error('Expert edit dry-run must lift shadows.');
 }
 
-const applyResult = await bridge.dispatch(applyCommand, context);
-if (!applyResult.ok) throw new Error(`Approved expert edit apply failed: ${applyResult.message}`);
-const apply = toneColorMutationResultV1Schema.parse(applyResult.result);
-if (!apply.mutates) throw new Error('Expert edit apply must mutate the virtual-copy graph.');
-
-const [dryRunAudit, applyAudit] = bridge
+const [dryRunAudit, applyAudit] = workflowBridge
   .listAuditEvents()
   .map((event) => rawEngineLocalAppServerAuditEventV1Schema.parse(event));
 if (dryRunAudit === undefined || applyAudit === undefined) {
@@ -118,11 +115,11 @@ if (dryRunAudit === undefined || applyAudit === undefined) {
 
 const beforeAfter = {
   afterArtifactId: 'artifact_agent_expert_edit_demo_after_virtual_copy_2844',
-  afterGraphRevision: apply.appliedGraphRevision,
-  afterPreviewDataUrl: svgDataUrl('After virtual copy', apply.appliedGraphRevision, '#f0c478', '#475a5f'),
+  afterGraphRevision: workflow.apply.appliedGraphRevision,
+  afterPreviewDataUrl: svgDataUrl('After virtual copy', workflow.apply.appliedGraphRevision, '#f0c478', '#475a5f'),
   beforeArtifactId: 'artifact_agent_expert_edit_demo_before_raw_2844',
-  beforeGraphRevision: dryRun.sourceGraphRevision,
-  beforePreviewDataUrl: svgDataUrl('Before RAW', dryRun.sourceGraphRevision, '#c49b63', '#2f3d45'),
+  beforeGraphRevision: workflow.dryRun.sourceGraphRevision,
+  beforePreviewDataUrl: svgDataUrl('Before RAW', workflow.dryRun.sourceGraphRevision, '#c49b63', '#2f3d45'),
   exportArtifactId: 'artifact_agent_expert_edit_demo_export_audit_2844',
   noOverwritePolicy: 'never_overwrite_original',
   virtualCopyId: target.virtualCopyId,
@@ -136,19 +133,19 @@ const reportWithoutEvidence = {
     state: applyCommand.approval.state,
   },
   apply: {
-    changedNodeIds: apply.changedNodeIds,
-    commandId: applyCommand.commandId,
-    commandType: applyCommand.commandType,
+    changedNodeIds: workflow.apply.changedNodeIds,
+    commandId: workflow.apply.commandId,
+    commandType: workflow.apply.commandType,
     contentHash: hashJson(applyCommand),
     dryRun: false,
-    graphRevision: apply.appliedGraphRevision,
-    mutates: true,
+    graphRevision: workflow.apply.appliedGraphRevision,
+    mutates: workflow.apply.mutates,
     status: applyAudit.status,
-    toolName: 'tonecolor.apply_command',
-    undoRevision: apply.undoRevision,
+    toolName: workflow.apply.toolName,
+    undoRevision: workflow.apply.undoRevision,
   },
   audit: {
-    eventCount: 3,
+    eventCount: workflow.audit.eventCount + 1,
     rejectedApplyBeforeDryRun: rejectedAudit.status === 'rejected',
     timeline: [rejectedAudit, dryRunAudit, applyAudit].map((event) => ({
       dryRun: event.dryRun,
@@ -159,16 +156,16 @@ const reportWithoutEvidence = {
   },
   beforeAfter,
   dryRun: {
-    commandId: dryRunCommand.commandId,
-    commandType: dryRunCommand.commandType,
+    commandId: workflow.dryRun.commandId,
+    commandType: workflow.dryRun.commandType,
     contentHash: hashJson(dryRunCommand),
     dryRun: true,
-    graphRevision: dryRun.predictedGraphRevision,
-    mutates: false,
-    parameterDiffPaths: dryRun.parameterDiff.map((diff) => diff.path),
+    graphRevision: workflow.dryRun.predictedGraphRevision,
+    mutates: workflow.dryRun.mutates,
+    parameterDiffPaths: workflow.dryRun.parameterDiffPaths,
     previewArtifactId: 'artifact_agent_expert_edit_demo_preview_dry_run_2844',
     status: dryRunAudit.status,
-    toolName: 'tonecolor.dry_run_command',
+    toolName: workflow.dryRun.toolName,
   },
   inspect: {
     imagePath: target.imagePath,
@@ -177,7 +174,7 @@ const reportWithoutEvidence = {
     toolCount: registry.tools.length,
     virtualCopyId: target.virtualCopyId,
   },
-  issue: 2844,
+  issue: 2983,
   limits: [
     'Runs deterministic in-process local app-server bridge tools; it does not call a paid model provider.',
     'Shows before/after demo preview artifacts and graph revisions; it does not decode RAW pixels in this PR.',
@@ -189,7 +186,12 @@ const reportWithoutEvidence = {
     userPrompt,
   },
   proofStatus: 'runtime_apply_demo',
-  refs: ['#2844'],
+  runtimeWorkflow: {
+    api: 'runAgentColorEditWorkflowV1',
+    applyAuditEventId: workflow.audit.applyEventId,
+    dryRunAuditEventId: workflow.audit.dryRunEventId,
+  },
+  refs: ['#2983'],
   validationMode: 'agent_expert_edit_demo_workflow',
 } satisfies Omit<z.input<typeof agentExpertEditDemoWorkflowSchema>, 'evidence'>;
 
