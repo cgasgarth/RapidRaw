@@ -82,6 +82,11 @@ const runSelfTest = async () => {
     await rm(tempRepo, { force: true, recursive: true });
   }
 
+  const stagedCheckerSource = await Bun.file('tests/integration/checks/check-staged-files.ts').text();
+  if (!stagedCheckerSource.includes("['run', 'i18n:lint']")) {
+    fail('pre-commit staged i18n path must run i18n:lint, not only i18n:check');
+  }
+
   console.log('hooks self-test ok');
 };
 
