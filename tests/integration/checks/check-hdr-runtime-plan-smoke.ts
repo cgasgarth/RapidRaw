@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { deriveArtifactInvalidationReasons } from '../../../packages/rawengine-schema/src/derivedArtifactInvalidation.ts';
 import {
   applyHdrRuntimePlanV1,
   buildHdrRuntimeDryRunV1,
@@ -232,6 +233,37 @@ const [outputArtifact] = applied.mutationResult.outputArtifacts;
 if (outputArtifact?.contentHash === undefined) {
   throw new Error('Expected HDR output artifact to include rendered content hash.');
 }
+assertEqual(applied.sidecarArtifact.family, 'hdr', 'sidecar artifact family');
+assertEqual(applied.sidecarArtifact.outputArtifact.storage, 'sidecar_artifact', 'sidecar artifact output storage');
+assertEqual(applied.sidecarArtifact.engine.capabilityLevel, 'runtime_apply_capable', 'sidecar artifact capability');
+assertEqual(
+  applied.sidecarArtifact.editableDerivedAssetId,
+  'derived_command_hdr_runtime_apply_smoke',
+  'editable asset id',
+);
+assertEqual(applied.sidecarArtifact.sourceImageRefs.length, BRACKETS.length, 'sidecar source refs');
+assertEqual(applied.sidecarArtifact.sourceState.length, BRACKETS.length, 'sidecar source state');
+assertEqual(applied.sidecarArtifact.staleState.state, 'current', 'sidecar current state');
+
+const currentArtifactState = {
+  outputContentHash: applied.sidecarArtifact.outputArtifact.contentHash,
+  sourceState: applied.sidecarArtifact.sourceState,
+};
+const unchangedArtifactReasons = deriveArtifactInvalidationReasons(applied.sidecarArtifact, currentArtifactState);
+assertEqual(unchangedArtifactReasons.length, 0, 'unchanged sidecar invalidation reasons');
+const sourceChangedReasons = deriveArtifactInvalidationReasons(applied.sidecarArtifact, {
+  ...currentArtifactState,
+  sourceState: [
+    { ...currentArtifactState.sourceState[0], contentHash: 'sha256:changed-hdr-source' },
+    ...currentArtifactState.sourceState.slice(1),
+  ],
+});
+assertIncludes(sourceChangedReasons, 'source_content_hash_changed', 'source hash invalidation');
+const outputChangedReasons = deriveArtifactInvalidationReasons(applied.sidecarArtifact, {
+  ...currentArtifactState,
+  outputContentHash: 'sha256:changed-hdr-output',
+});
+assertIncludes(outputChangedReasons, 'output_artifact_changed', 'output artifact invalidation');
 
 if (dryRun.provenance.alignmentConfidence < 0.99) {
   throw new Error(`Expected alignment confidence >= 0.99, got ${dryRun.provenance.alignmentConfidence}.`);
