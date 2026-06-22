@@ -466,7 +466,9 @@ export const superResolutionPrivateRawReviewProofSchema = z.object({
 export const layerStackWorkflowProofSchema = z.object({
   activeLayer: z.literal('Proof polish'),
   blendMode: z.literal('overlay'),
-  groupingState: z.literal('deferred'),
+  collapsedGroupCount: z.literal('0'),
+  groupedLayerCount: z.literal('2'),
+  groupingState: z.literal('active'),
   layerCount: z.literal('5'),
   mask: z.literal('Brush'),
   opacity: z.literal('64'),

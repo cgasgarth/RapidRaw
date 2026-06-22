@@ -27,6 +27,15 @@ export interface LayerExportReadinessSummary {
   totalLayerCount: number;
 }
 
+export interface LayerGroupWorkflowProof {
+  collapsedGroupCount: number;
+  collapsedGroupIds: Array<string>;
+  groupCount: number;
+  groupedLayerCount: number;
+  groups: Array<LayerGroupSummary & { collapsed: boolean }>;
+  visibleOrder: Array<string>;
+}
+
 export interface DuplicateLayerGroupLayerInput {
   duplicateName: string;
   layerId: string;
@@ -345,6 +354,23 @@ export function buildLayerGroupSummaries(layers: Array<MaskContainer>): Array<La
   }
 
   return [...groups.values()];
+}
+
+export function buildLayerGroupWorkflowProof(
+  layers: Array<MaskContainer>,
+  collapsedGroupIds: ReadonlySet<string> = new Set(),
+): LayerGroupWorkflowProof {
+  const groupSummaries = buildLayerGroupSummaries(layers);
+  const collapsedIds = groupSummaries.map((group) => group.id).filter((groupId) => collapsedGroupIds.has(groupId));
+
+  return {
+    collapsedGroupCount: collapsedIds.length,
+    collapsedGroupIds: collapsedIds,
+    groupCount: groupSummaries.length,
+    groupedLayerCount: groupSummaries.reduce((count, group) => count + group.layerCount, 0),
+    groups: groupSummaries.map((group) => ({ ...group, collapsed: collapsedGroupIds.has(group.id) })),
+    visibleOrder: layers.map((layer) => layer.id),
+  };
 }
 
 export function buildLayerRenderPlan(layers: Array<MaskContainer>): Array<LayerRenderPlanItem> {

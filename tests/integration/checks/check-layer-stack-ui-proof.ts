@@ -43,6 +43,13 @@ const proofReportSchema = z
         sidecarArtifactId: z.literal('layer_stack_preview_export_parity_v1'),
       })
       .strict(),
+    layerGrouping: z
+      .object({
+        collapsedGroupCount: z.literal(0),
+        groupedLayerCount: z.literal(2),
+        visualGroupingState: z.literal('active'),
+      })
+      .strict(),
     schemaVersion: z.literal(1),
     validationCommands: z
       .array(
@@ -95,6 +102,19 @@ runCommand(['bun', 'run', 'check:layer-preview-export-parity']);
 runCommand(['bun', 'run', 'check:layer-workflow-smoke']);
 
 const parityReport = parityReportSchema.parse(JSON.parse(await readFile(PARITY_REPORT_PATH, 'utf8')));
+const visualSource = await readFile('src/validation/visual/VisualSmokeApp.tsx', 'utf8');
+for (const marker of [
+  'data-testid="layer-stack-visual-group-row"',
+  'data-testid="layer-stack-visual-group-proof"',
+  "data-grouping-state={groupedLayerCount > 0 ? 'active' : 'ungrouped'}",
+  'data-grouped-layer-count={String(groupedLayerCount)}',
+  'data-collapsed-group-count={String(collapsedGroupIds.length)}',
+]) {
+  if (!visualSource.includes(marker)) {
+    throw new Error(`Layer stack visual smoke missing grouping marker: ${marker}`);
+  }
+}
+
 const expectedReport = proofReportSchema.parse({
   doesNotProve: [
     'full_macos_app_manual_session',
@@ -107,6 +127,11 @@ const expectedReport = proofReportSchema.parse({
     coverageLayerCount: parityReport.coverageByLayer.length,
     previewExportHash: parityReport.previewHash,
     sidecarArtifactId: parityReport.sidecarArtifactId,
+  },
+  layerGrouping: {
+    collapsedGroupCount: 0,
+    groupedLayerCount: 2,
+    visualGroupingState: 'active',
   },
   schemaVersion: 1,
   validationCommands: [

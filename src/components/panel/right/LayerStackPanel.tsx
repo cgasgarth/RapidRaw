@@ -25,6 +25,7 @@ import {
 } from '../../../utils/adjustments';
 import {
   buildLayerGroupSummaries,
+  buildLayerGroupWorkflowProof,
   buildLayerExportReadinessSummary,
   canGroupLayerWithNext,
   deleteLayerGroup,
@@ -177,6 +178,10 @@ export default function LayerStackPanel({
   const visibleLayerCount = masks.filter((mask) => mask.visible).length;
   const hiddenLayerCount = masks.length - visibleLayerCount;
   const exportReadiness = useMemo(() => buildLayerExportReadinessSummary(masks), [masks]);
+  const groupWorkflowProof = useMemo(
+    () => buildLayerGroupWorkflowProof(masks, collapsedGroupIds),
+    [collapsedGroupIds, masks],
+  );
   const groupCount = useMemo(() => {
     const groupIds = new Set<string>();
     for (const mask of masks) {
@@ -422,10 +427,14 @@ export default function LayerStackPanel({
 
       <div
         className="mx-3 mb-3 grid grid-cols-3 gap-2 rounded-md border border-surface bg-bg-secondary/70 p-2"
+        data-collapsed-group-count={groupWorkflowProof.collapsedGroupCount}
+        data-collapsed-group-ids={groupWorkflowProof.collapsedGroupIds.join(',')}
         data-group-count={groupCount}
+        data-grouped-layer-count={groupWorkflowProof.groupedLayerCount}
         data-hidden-layer-count={hiddenLayerCount}
         data-testid="layer-stack-composition-summary"
         data-visible-layer-count={visibleLayerCount}
+        data-visible-order={groupWorkflowProof.visibleOrder.join(',')}
       >
         <UiText
           variant={TextVariants.small}
@@ -535,6 +544,15 @@ export default function LayerStackPanel({
               onKeyDown={(event) => {
                 handleRowKeyDown(event, row);
               }}
+              data-group-collapsed={String(row.isGroupCollapsed)}
+              data-group-id={row.groupId ?? ''}
+              data-grouped-layer={String(row.isGroupedLayer)}
+              data-layer-row-id={row.id}
+              data-testid={
+                row.isGroupHeader
+                  ? `layer-stack-group-row-${row.groupId ?? 'unknown'}`
+                  : `layer-stack-layer-row-${row.id}`
+              }
               role="button"
               tabIndex={0}
             >

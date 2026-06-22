@@ -2,6 +2,13 @@
 
 import { readFileSync } from 'node:fs';
 
+import { buildLayerGroupWorkflowProof, groupLayerWithNext, ungroupLayerGroup } from '../../../src/utils/layerStack.ts';
+import {
+  DEFAULT_LAYER_BLEND_MODE,
+  INITIAL_MASK_ADJUSTMENTS,
+  type MaskContainer,
+} from '../../../src/utils/adjustments.ts';
+
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
 const layerLocale = locale.editor?.layers;
 const requiredLocaleKeys = [
@@ -66,6 +73,15 @@ const source = readFileSync('src/components/panel/right/LayerStackPanel.tsx', 'u
 for (const marker of [
   'data-testid="layer-stack-composition-summary"',
   'data-testid="layer-stack-count-summary"',
+  'data-collapsed-group-count={groupWorkflowProof.collapsedGroupCount}',
+  'data-collapsed-group-ids={groupWorkflowProof.collapsedGroupIds.join',
+  'data-grouped-layer-count={groupWorkflowProof.groupedLayerCount}',
+  'data-visible-order={groupWorkflowProof.visibleOrder.join',
+  "layer-stack-group-row-${row.groupId ?? 'unknown'}",
+  'layer-stack-layer-row-${row.id}',
+  'data-group-collapsed={String(row.isGroupCollapsed)}',
+  'data-grouped-layer={String(row.isGroupedLayer)}',
+  'buildLayerGroupWorkflowProof(masks, collapsedGroupIds)',
   'data-testid="layer-hidden-count"',
   'data-testid="layer-active-action-strip"',
   'data-testid="layer-active-render-state"',
@@ -112,6 +128,56 @@ for (const marker of [
     console.error(`Layer stack panel missing count summary marker: ${marker}`);
     process.exit(1);
   }
+}
+
+const sampleLayers: MaskContainer[] = [
+  {
+    adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+    blendMode: DEFAULT_LAYER_BLEND_MODE,
+    id: 'layer_a',
+    invert: false,
+    name: 'Layer A',
+    opacity: 100,
+    subMasks: [],
+    visible: true,
+  },
+  {
+    adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+    blendMode: DEFAULT_LAYER_BLEND_MODE,
+    id: 'layer_b',
+    invert: false,
+    name: 'Layer B',
+    opacity: 75,
+    subMasks: [],
+    visible: true,
+  },
+  {
+    adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+    blendMode: DEFAULT_LAYER_BLEND_MODE,
+    id: 'layer_c',
+    invert: false,
+    name: 'Layer C',
+    opacity: 50,
+    subMasks: [],
+    visible: true,
+  },
+];
+const groupedLayers = groupLayerWithNext(sampleLayers, 'layer_a', 'group_alpha', 'Proof group');
+const collapsedProof = buildLayerGroupWorkflowProof(groupedLayers, new Set(['group_alpha']));
+if (
+  collapsedProof.groupCount !== 1 ||
+  collapsedProof.groupedLayerCount !== 2 ||
+  collapsedProof.collapsedGroupIds.join(',') !== 'group_alpha' ||
+  collapsedProof.visibleOrder.join(',') !== 'layer_a,layer_b,layer_c'
+) {
+  console.error('Layer group workflow proof did not preserve group, collapse, and visible order metadata.');
+  process.exit(1);
+}
+
+const ungroupedProof = buildLayerGroupWorkflowProof(ungroupLayerGroup(groupedLayers, 'group_alpha'));
+if (ungroupedProof.groupCount !== 0 || ungroupedProof.groupedLayerCount !== 0) {
+  console.error('Layer group workflow proof did not clear group metadata after ungroup.');
+  process.exit(1);
 }
 
 console.log('layer stack panel UI ok');
