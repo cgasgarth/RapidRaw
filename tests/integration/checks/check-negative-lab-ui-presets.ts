@@ -2,6 +2,11 @@
 // @ts-check
 
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../../../src/utils/negativeLabPresetCatalog.ts';
+import {
+  DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID,
+  NEGATIVE_LAB_ACQUISITION_PROFILES,
+  getNegativeLabAcquisitionProfile,
+} from '../../../src/utils/negativeLabAcquisitionProfiles.ts';
 import { NEGATIVE_LAB_OUTPUT_FORMAT_IDS } from '../../../src/utils/negativeLabOutputFormatIds.ts';
 import { negativeLabMeasuredProfileCatalogSchema } from '../../../src/schemas/negativeLabMeasuredProfileSchemas.ts';
 import { parseNegativeLabBuiltInUiPresetCatalog } from '../../../src/schemas/negativeLabPresetCatalogSchemas.ts';
@@ -20,6 +25,23 @@ const failures = [];
 const ids = new Set();
 parseNegativeLabBuiltInUiPresetCatalog(NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG);
 const runtimeProfileRows = buildNegativeLabRuntimeProfileBrowserRows();
+const acquisitionProfileIds = new Set(NEGATIVE_LAB_ACQUISITION_PROFILES.map((profile) => profile.id));
+
+if (!acquisitionProfileIds.has(DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID)) {
+  failures.push('Negative Lab acquisition profile catalog must include the default profile.');
+}
+if (NEGATIVE_LAB_ACQUISITION_PROFILES.length < 4) {
+  failures.push('Negative Lab acquisition profile catalog must include RAW, DNG, TIFF, and JPEG review options.');
+}
+if (getNegativeLabAcquisitionProfile(DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID).channelBasis !== 'camera_rgb') {
+  failures.push('Default Negative Lab acquisition profile should use camera RGB basis.');
+}
+if (!NEGATIVE_LAB_ACQUISITION_PROFILES.some((profile) => profile.inputTransform === 'scanner_rgb_flat')) {
+  failures.push('Negative Lab acquisition profile catalog must include a flat scanner RGB TIFF profile.');
+}
+if (!NEGATIVE_LAB_ACQUISITION_PROFILES.some((profile) => profile.inputTransform === 'rendered_rgb_review_only')) {
+  failures.push('Negative Lab acquisition profile catalog must include a rendered RGB review-only profile.');
+}
 
 for (const preset of NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets) {
   ids.add(preset.presetId);

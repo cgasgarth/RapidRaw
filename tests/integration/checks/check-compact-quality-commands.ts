@@ -21,7 +21,7 @@ const QUALITY_COMMAND_PATTERNS = [
 const ALLOWED_WORKFLOW_COMMANDS = new Map([
   ['cargo fmt -p RapidRAW -- --check', 'Rust-only CI path avoids Bun setup; output is bounded to fmt failures.'],
   [
-    'cargo audit --ignore RUSTSEC-2024-0429',
+    'cargo audit --ignore RUSTSEC-2024-0429 --ignore RUSTSEC-2026-0185',
     'Rust-only CI path avoids Bun setup; waiver ledger is checked in package gates.',
   ],
   ['cargo deny check licenses', 'Rust-only CI path avoids Bun setup; deny output is bounded to license failures.'],

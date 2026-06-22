@@ -2085,6 +2085,7 @@
       "acquisitionHealth": "Acquisition health",
       "acquisitionHealthHint": "Estimated from filename extension and path tokens only; pixel quality is not inspected.",
       "acquisitionHealthLimit": "Not checked: clipping, bit depth, color profiles, lab processing, or final inversion quality.",
+      "acquisitionProfile": "Input profile",
       "acquisitionSeverityOk": "No file-type warnings",
       "acquisitionSeverityReview": "Review source assumptions",
       "acquisitionSourceJpeg": "JPEG/lossy",

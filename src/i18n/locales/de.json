@@ -2055,6 +2055,7 @@
       "acquisitionHealth": "",
       "acquisitionHealthHint": "",
       "acquisitionHealthLimit": "",
+      "acquisitionProfile": "",
       "acquisitionSeverityOk": "",
       "acquisitionSeverityReview": "",
       "acquisitionSourceJpeg": "",

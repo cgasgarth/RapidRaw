@@ -68,6 +68,9 @@ if (stagedFiles.length === 0) {
 
 const formatFiles = stagedFiles.filter((filePath) => FORMAT_EXTENSIONS.has(extensionOf(filePath)));
 const eslintFiles = stagedFiles.filter((filePath) => ESLINT_EXTENSIONS.has(extensionOf(filePath)));
+const i18nFiles = stagedFiles.filter(
+  (filePath) => filePath === 'src/i18n/locales/en.json' || /^src\/.*\.(?:js|jsx|ts|tsx)$/u.test(filePath),
+);
 const fixFiles = Array.from(new Set([...formatFiles, ...eslintFiles]));
 const checks = [];
 
@@ -107,6 +110,10 @@ if (formatFiles.length > 0) {
 
 if (eslintFiles.length > 0) {
   checks.push(await run('lint', 'bun', ['eslint', '--max-warnings', '0', '--no-warn-ignored', ...eslintFiles]));
+}
+
+if (i18nFiles.length > 0) {
+  checks.push(await run('i18n', 'bun', ['run', 'i18n:check']));
 }
 
 const checkSummary = checks.length > 0 ? `, ${checks.length} checks` : '';
