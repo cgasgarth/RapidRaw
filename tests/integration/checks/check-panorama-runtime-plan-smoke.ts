@@ -5,6 +5,7 @@ import {
   buildPanoramaRuntimeArtifactV1,
   buildPanoramaRuntimeDryRunV1,
 } from '../../../packages/rawengine-schema/src/panoramaRuntimePlan.ts';
+import { deriveArtifactInvalidationReasons } from '../../../packages/rawengine-schema/src/derivedArtifactInvalidation.ts';
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational-proof-budgets.ts';
 
@@ -100,6 +101,7 @@ const applyCommand = {
 };
 
 const applied = applyPanoramaRuntimePlanV1({
+  artifactCreatedAt: '2026-06-17T19:25:00.000Z',
   command: applyCommand,
   connectedSourceIndices: [0, 1, 2],
   outputArtifactId: 'artifact_panorama_runtime_output',
@@ -142,6 +144,25 @@ if (outputArtifact === undefined) {
 assertEqual(outputArtifact.artifactId, 'artifact_panorama_runtime_output', 'output artifact id');
 assertEqual(outputArtifact.kind, 'merge_output', 'output artifact kind');
 assertEqual(outputArtifact.storage, 'sidecar_artifact', 'output artifact storage');
+assertEqual(applied.sidecarArtifact.provenance.runtimeStatus, 'rendered', 'apply sidecar runtime status');
+assertEqual(
+  applied.sidecarArtifact.provenance.graphRevision,
+  applied.mutationResult.appliedGraphRevision,
+  'apply sidecar graph revision',
+);
+assertEqual(applied.sidecarArtifact.outputArtifacts[0]?.artifactId, outputArtifact.artifactId, 'apply sidecar output');
+assertEqual(applied.sidecarArtifact.sourceImageRefs.length, sourceFrames.length, 'apply sidecar source refs');
+assertEqual(applied.sidecarArtifact.sourceState.length, sourceFrames.length, 'apply sidecar source state');
+assertEqual(applied.sidecarArtifact.projection, 'rectilinear', 'apply sidecar effective projection');
+assertEqual(
+  applied.sidecarArtifact.projectionSettings.requestedProjection,
+  'cylindrical',
+  'apply sidecar requested projection',
+);
+assertEqual(applied.sidecarArtifact.boundaryMode, 'auto_crop', 'apply sidecar boundary mode');
+assertEqual(applied.sidecarArtifact.createdAt, '2026-06-17T19:25:00.000Z', 'apply sidecar created at');
+assertEqual(applied.sidecarArtifact.seamPolicy.mode, 'adaptive_dp_feather_v1', 'apply sidecar seam policy');
+assertEqual(applied.sidecarArtifact.staleState.state, 'current', 'apply sidecar stale state');
 assertEqual(derivedArtifact.provenance.runtimeStatus, 'rendered', 'derived artifact runtime status');
 assertEqual(
   derivedArtifact.provenance.graphRevision,
@@ -154,6 +175,38 @@ assertEqual(derivedArtifact.sourceState.length, sourceFrames.length, 'derived so
 assertEqual(derivedArtifact.projection, 'rectilinear', 'derived effective projection');
 assertEqual(derivedArtifact.projectionSettings.requestedProjection, 'cylindrical', 'derived requested projection');
 assertEqual(derivedArtifact.staleState.state, 'current', 'derived stale state');
+
+const currentArtifactState = {
+  outputContentHash: outputArtifact.contentHash,
+  sourceState: applied.sidecarArtifact.sourceState,
+};
+const unchangedReasons = deriveArtifactInvalidationReasons(
+  { outputArtifact: { contentHash: outputArtifact.contentHash }, sourceState: applied.sidecarArtifact.sourceState },
+  currentArtifactState,
+);
+assertEqual(unchangedReasons.length, 0, 'apply sidecar unchanged invalidation reasons');
+const sourceHashReasons = deriveArtifactInvalidationReasons(
+  { outputArtifact: { contentHash: outputArtifact.contentHash }, sourceState: applied.sidecarArtifact.sourceState },
+  {
+    ...currentArtifactState,
+    sourceState: applied.sidecarArtifact.sourceState.map((sourceState, index) =>
+      index === 0 ? { ...sourceState, contentHash: 'sha256:changed-panorama-source' } : sourceState,
+    ),
+  },
+);
+if (!sourceHashReasons.includes('source_content_hash_changed')) {
+  throw new Error('Expected panorama apply sidecar to invalidate when source content changes.');
+}
+const outputArtifactReasons = deriveArtifactInvalidationReasons(
+  { outputArtifact: { contentHash: outputArtifact.contentHash }, sourceState: applied.sidecarArtifact.sourceState },
+  {
+    ...currentArtifactState,
+    outputContentHash: 'sha256:changed-panorama-output',
+  },
+);
+if (!outputArtifactReasons.includes('output_artifact_changed')) {
+  throw new Error('Expected panorama apply sidecar to invalidate when output artifact changes.');
+}
 
 if (applied.outputPixels.length <= sourceFrames[0].width * sourceFrames[0].height * 3) {
   throw new Error('Expected panorama output to be wider than one source frame.');

@@ -36,6 +36,7 @@ export const panoramaRuntimeSourceFrameV1Schema = z
 
 export const panoramaRuntimePlanRequestV1Schema = z
   .object({
+    artifactCreatedAt: z.iso.datetime({ offset: true }).optional(),
     candidateTransformOverrides: z
       .array(
         z
@@ -234,10 +235,11 @@ export interface PanoramaRuntimeApplyResultV1 {
   mutationResult: ComputationalMergeMutationResultV1;
   outputPixels: Uint8Array;
   provenance: PanoramaRuntimeProvenanceV1;
+  sidecarArtifact: PanoramaArtifactV1;
 }
 
 export interface PanoramaRuntimeArtifactInputV1 {
-  applyResult: PanoramaRuntimeApplyResultV1;
+  applyResult: Pick<PanoramaRuntimeApplyResultV1, 'mutationResult' | 'provenance'>;
   command: PanoramaRuntimeCommandV1;
   createdAt: string;
   previewArtifacts?: ComputationalMergeDryRunResultV1['previewArtifacts'];
@@ -342,15 +344,24 @@ export const applyPanoramaRuntimePlanV1 = (requestValue: unknown): PanoramaRunti
     undoRevision: `${request.command.expectedGraphRevision}:undo-panorama-apply`,
     warnings: runtime.warnings,
   });
+  const provenance = panoramaRuntimeProvenanceV1Schema.parse({
+    ...runtime.provenance,
+    acceptedDryRunPlanHash,
+    acceptedDryRunPlanId,
+    runtimeStatus: 'apply_rendered',
+  });
 
   return {
     mutationResult,
     outputPixels: runtime.outputPixels,
-    provenance: panoramaRuntimeProvenanceV1Schema.parse({
-      ...runtime.provenance,
-      acceptedDryRunPlanHash,
-      acceptedDryRunPlanId,
-      runtimeStatus: 'apply_rendered',
+    provenance,
+    sidecarArtifact: buildPanoramaRuntimeArtifactV1({
+      applyResult: {
+        mutationResult,
+        provenance,
+      },
+      command: request.command,
+      createdAt: request.artifactCreatedAt ?? new Date(0).toISOString(),
     }),
   };
 };

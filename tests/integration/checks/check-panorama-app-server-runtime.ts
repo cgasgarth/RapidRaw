@@ -91,6 +91,15 @@ if (applied.apply.provenance.projectionSettings.effectiveProjection !== 'rectili
 if (applied.apply.provenance.boundaryMode !== 'auto_crop') {
   throw new Error('Expected panorama runtime to preserve auto-crop boundary mode.');
 }
+if (applied.apply.sidecarArtifact.sourceImageRefs.length !== sourceFrames.length) {
+  throw new Error('Expected panorama app-server apply to return editable sidecar source refs.');
+}
+if (applied.apply.sidecarArtifact.outputArtifacts[0]?.artifactId !== 'artifact_panorama_app_server_runtime_output') {
+  throw new Error('Expected panorama app-server apply to return sidecar output artifact.');
+}
+if (applied.apply.sidecarArtifact.createdAt !== '2026-06-17T19:30:00.000Z') {
+  throw new Error('Expected panorama app-server apply to preserve sidecar artifact timestamp.');
+}
 
 expectThrows('unaccepted panorama apply plan', () =>
   new PanoramaAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1).execute({
@@ -102,6 +111,7 @@ expectThrows('unaccepted panorama apply plan', () =>
 console.log(
   JSON.stringify({
     fixture: 'synthetic_panorama_app_server_runtime_v1',
+    editableArtifactId: applied.apply.sidecarArtifact.artifactId,
     output: dryRun.dryRun.dryRunResult.mergePlan.outputDimensions,
     outputSha256: new Bun.CryptoHasher('sha256').update(applied.apply.outputPixels).digest('hex'),
     planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
@@ -110,6 +120,7 @@ console.log(
 
 function buildRequest(command) {
   return {
+    artifactCreatedAt: '2026-06-17T19:30:00.000Z',
     command,
     connectedSourceIndices: [0, 1, 2],
     outputArtifactId: 'artifact_panorama_app_server_runtime_output',
