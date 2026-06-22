@@ -2060,9 +2060,11 @@
         "review": ""
       },
       "effectiveFrameExposure": "Effective frame exposure {{exposure}} EV",
+      "effectiveFrameRgbBalance": "Effective frame RGB R {{red}} / G {{green}} / B {{blue}}",
       "excludeScan": "Exclude",
       "exportOptions": "Exportoptionen",
       "exposure": "Belichtung",
+      "frameBlueWeightOffset": "Frame blue offset",
       "frameConversionStatus": {
         "preview_pending": "Preview pending",
         "preview_ready": "Preview ready",
@@ -2075,6 +2077,7 @@
         "skipped": "Skipped"
       },
       "frameExposureOffset": "Frame exposure offset",
+      "frameGreenWeightOffset": "Frame green offset",
       "frameHealth": "Frame health",
       "frameHealthActive": "Active",
       "frameHealthFilter": {
@@ -2099,6 +2102,9 @@
         "review": "Review",
         "skipped": "Skipped"
       },
+      "frameRedWeightOffset": "Frame red offset",
+      "frameRgbBalanceBadge": "RGB",
+      "frameRgbBalanceOffset": "Frame RGB balance offset",
       "frameWarningBaseEstimateActiveOnly": "Active base only",
       "frameWarningExcluded": "Excluded",
       "frameWarningPreviewNotReady": "Preview pending",
@@ -2180,6 +2186,7 @@
       "readoutCopied": "Copied readout",
       "redWeight": "Rot (Cyan)",
       "resetFrameExposure": "Reset frame",
+      "resetFrameRgbBalance": "Reset frame RGB",
       "resetPrintEndpoints": "Reset endpoints",
       "resetTooltip": "Zurücksetzen",
       "resetViewTooltip": "Ansicht zurücksetzen",

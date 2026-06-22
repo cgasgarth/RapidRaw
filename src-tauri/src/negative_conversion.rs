@@ -77,7 +77,16 @@ pub struct NegativeConversionSaveOptions {
     #[serde(default)]
     pub selected_profile: Option<NegativeLabSelectedProfileSnapshot>,
     #[serde(default)]
-    pub frame_exposure_overrides: Vec<NegativeLabFrameExposureOverride>,
+    pub frame_exposure_overrides: NegativeLabFrameExposureOverridePayload,
+    #[serde(default)]
+    pub frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabFrameExposureOverridePayload {
+    pub overrides: Vec<NegativeLabFrameExposureOverride>,
+    pub schema_version: u8,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -86,6 +95,29 @@ pub struct NegativeLabFrameExposureOverride {
     pub effective_exposure: f32,
     pub exposure_offset: f32,
     pub frame_id: String,
+    pub source_path: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabFrameRgbBalanceOverridePayload {
+    pub overrides: Vec<NegativeLabFrameRgbBalanceOverride>,
+    pub schema_version: u8,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabFrameRgbBalance {
+    pub blue_weight: f32,
+    pub green_weight: f32,
+    pub red_weight: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabFrameRgbBalanceOverride {
+    pub frame_id: String,
+    pub rgb_balance_offset: NegativeLabFrameRgbBalance,
     pub source_path: String,
 }
 
@@ -135,6 +167,24 @@ const DEFAULT_OUTPUT_SUFFIX: &str = "Positive";
 const JPEG_PROOF_QUALITY: u8 = 92;
 const NEGATIVE_LAB_CONVERSION_BUNDLE_SCHEMA_VERSION: u8 = 1;
 
+impl Default for NegativeLabFrameExposureOverridePayload {
+    fn default() -> Self {
+        Self {
+            overrides: Vec::new(),
+            schema_version: 1,
+        }
+    }
+}
+
+impl Default for NegativeLabFrameRgbBalanceOverridePayload {
+    fn default() -> Self {
+        Self {
+            overrides: Vec::new(),
+            schema_version: 1,
+        }
+    }
+}
+
 fn default_base_fog_strength() -> f32 {
     1.0
 }
@@ -163,7 +213,8 @@ impl Default for NegativeConversionSaveOptions {
             acquisition_source_families: Vec::new(),
             profile_provenance_hash: None,
             selected_profile: None,
-            frame_exposure_overrides: Vec::new(),
+            frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
+            frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
         }
     }
 }
@@ -183,11 +234,22 @@ impl NegativeConversionSaveOptions {
         });
         let frame_exposure_overrides = self
             .frame_exposure_overrides
+            .overrides
             .into_iter()
             .filter(|override_entry| {
                 override_entry.effective_exposure.is_finite()
                     && override_entry.exposure_offset.is_finite()
                     && (MIN_EXPOSURE..=MAX_EXPOSURE).contains(&override_entry.exposure_offset)
+                    && !override_entry.frame_id.trim().is_empty()
+                    && !override_entry.source_path.trim().is_empty()
+            })
+            .collect();
+        let frame_rgb_balance_overrides = self
+            .frame_rgb_balance_overrides
+            .overrides
+            .into_iter()
+            .filter(|override_entry| {
+                negative_lab_rgb_balance_offset_is_valid(&override_entry.rgb_balance_offset)
                     && !override_entry.frame_id.trim().is_empty()
                     && !override_entry.source_path.trim().is_empty()
             })
@@ -211,7 +273,14 @@ impl NegativeConversionSaveOptions {
                 .collect(),
             profile_provenance_hash,
             selected_profile,
-            frame_exposure_overrides,
+            frame_exposure_overrides: NegativeLabFrameExposureOverridePayload {
+                overrides: frame_exposure_overrides,
+                schema_version: 1,
+            },
+            frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload {
+                overrides: frame_rgb_balance_overrides,
+                schema_version: 1,
+            },
         }
     }
 
@@ -249,19 +318,38 @@ impl NegativeConversionSaveOptions {
         base_params: &NegativeConversionParams,
         source_path: &str,
     ) -> NegativeConversionParams {
+        let mut params = *base_params;
         if let Some(override_entry) = self
             .frame_exposure_overrides
+            .overrides
             .iter()
             .find(|candidate| candidate.source_path == source_path)
         {
-            return NegativeConversionParams {
+            params = NegativeConversionParams {
                 exposure: override_entry.effective_exposure,
-                ..*base_params
+                ..params
             }
             .sanitized();
         }
 
-        *base_params
+        if let Some(override_entry) = self
+            .frame_rgb_balance_overrides
+            .overrides
+            .iter()
+            .find(|candidate| candidate.source_path == source_path)
+        {
+            let effective_rgb_balance =
+                negative_lab_effective_rgb_balance(&params, &override_entry.rgb_balance_offset);
+            params = NegativeConversionParams {
+                blue_weight: effective_rgb_balance.blue_weight,
+                green_weight: effective_rgb_balance.green_weight,
+                red_weight: effective_rgb_balance.red_weight,
+                ..params
+            }
+            .sanitized();
+        }
+
+        params
     }
 }
 
@@ -322,6 +410,30 @@ fn build_negative_lab_plan_hash(value: &str) -> String {
         hash = hash.wrapping_mul(0x01000193);
     }
     format!("{hash:08x}")
+}
+
+fn negative_lab_rgb_balance_offset_is_valid(balance: &NegativeLabFrameRgbBalance) -> bool {
+    [
+        balance.blue_weight,
+        balance.green_weight,
+        balance.red_weight,
+    ]
+    .iter()
+    .all(|value| value.is_finite() && (-1.5..=1.5).contains(value))
+}
+
+fn negative_lab_effective_rgb_balance(
+    params: &NegativeConversionParams,
+    offset: &NegativeLabFrameRgbBalance,
+) -> NegativeLabFrameRgbBalance {
+    NegativeLabFrameRgbBalance {
+        blue_weight: (params.blue_weight + offset.blue_weight)
+            .clamp(MIN_CHANNEL_WEIGHT, MAX_CHANNEL_WEIGHT),
+        green_weight: (params.green_weight + offset.green_weight)
+            .clamp(MIN_CHANNEL_WEIGHT, MAX_CHANNEL_WEIGHT),
+        red_weight: (params.red_weight + offset.red_weight)
+            .clamp(MIN_CHANNEL_WEIGHT, MAX_CHANNEL_WEIGHT),
+    }
 }
 
 fn is_valid_negative_lab_acquisition_warning_code(warning_code: &str) -> bool {
@@ -447,6 +559,8 @@ fn write_negative_lab_conversion_bundle(
         .or_else(|| save_options.profile_provenance_hash.clone());
     let replay_seed = serde_json::json!({
         "outputFormat": output_format,
+        "frameExposureOverrides": save_options.frame_exposure_overrides.clone(),
+        "frameRgbBalanceOverrides": save_options.frame_rgb_balance_overrides.clone(),
         "params": params,
         "paths": outputs
             .iter()
@@ -466,6 +580,7 @@ fn write_negative_lab_conversion_bundle(
             "acceptedDryRunPlanHash": save_options.accepted_dry_run_plan_hash,
             "acceptedDryRunPlanId": save_options.accepted_dry_run_plan_id,
             "frameExposureOverrides": save_options.frame_exposure_overrides.clone(),
+            "frameRgbBalanceOverrides": save_options.frame_rgb_balance_overrides.clone(),
             "outputFormat": output_format,
             "params": params,
             "profileProvenanceHash": save_options.profile_provenance_hash,
@@ -523,6 +638,7 @@ fn write_negative_lab_output_sidecar(
             "acceptedDryRunPlanHash": save_options.accepted_dry_run_plan_hash,
             "acceptedDryRunPlanId": save_options.accepted_dry_run_plan_id,
             "frameExposureOverrides": save_options.frame_exposure_overrides.clone(),
+            "frameRgbBalanceOverrides": save_options.frame_rgb_balance_overrides.clone(),
             "outputFormat": output_format,
             "params": params,
             "profileProvenanceHash": save_options.profile_provenance_hash,
@@ -1195,6 +1311,13 @@ mod tests {
         format!("fnv1a64:{hash:016x}")
     }
 
+    fn assert_near(left: f32, right: f32) {
+        assert!(
+            (left - right).abs() <= 0.000_001,
+            "expected {left} to be within tolerance of {right}"
+        );
+    }
+
     #[test]
     fn negative_conversion_params_clamp_to_supported_api_range() {
         let sanitized = NegativeConversionParams {
@@ -1255,7 +1378,8 @@ mod tests {
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
             selected_profile: None,
-            frame_exposure_overrides: Vec::new(),
+            frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
+            frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
             suffix: " Proof / Final:01 ".to_string(),
         }
         .sanitized();
@@ -1282,7 +1406,8 @@ mod tests {
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
             selected_profile: None,
-            frame_exposure_overrides: Vec::new(),
+            frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
+            frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
             suffix: "///".to_string(),
         }
         .sanitized();
@@ -1302,7 +1427,8 @@ mod tests {
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
             selected_profile: None,
-            frame_exposure_overrides: Vec::new(),
+            frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
+            frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
             suffix: "Web Proof".to_string(),
         }
         .sanitized();
@@ -1315,7 +1441,8 @@ mod tests {
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
             selected_profile: None,
-            frame_exposure_overrides: Vec::new(),
+            frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
+            frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
             suffix: "".to_string(),
         }
         .sanitized();
@@ -1354,7 +1481,8 @@ mod tests {
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
             selected_profile: None,
-            frame_exposure_overrides: Vec::new(),
+            frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
+            frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
         assert!(accepted_plan.validate_accepted_batch_plan(2).is_ok());
@@ -1368,7 +1496,8 @@ mod tests {
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
             selected_profile: None,
-            frame_exposure_overrides: Vec::new(),
+            frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
+            frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
         assert!(mismatched_plan.validate_accepted_batch_plan(2).is_err());
@@ -1382,12 +1511,15 @@ mod tests {
         }
         .sanitized();
         let save_options = NegativeConversionSaveOptions {
-            frame_exposure_overrides: vec![NegativeLabFrameExposureOverride {
-                effective_exposure: 0.45,
-                exposure_offset: 0.5,
-                frame_id: "negative-lab-frame-1".to_string(),
-                source_path: "/roll/frame-001.tif".to_string(),
-            }],
+            frame_exposure_overrides: NegativeLabFrameExposureOverridePayload {
+                overrides: vec![NegativeLabFrameExposureOverride {
+                    effective_exposure: 0.45,
+                    exposure_offset: 0.5,
+                    frame_id: "negative-lab-frame-1".to_string(),
+                    source_path: "/roll/frame-001.tif".to_string(),
+                }],
+                schema_version: 1,
+            },
             ..NegativeConversionSaveOptions::default()
         }
         .sanitized();
@@ -1403,6 +1535,129 @@ mod tests {
                 .effective_params_for_path(&base_params, "/roll/frame-002.tif")
                 .exposure,
             -0.05
+        );
+    }
+
+    #[test]
+    fn negative_conversion_applies_path_scoped_frame_rgb_balance_override() {
+        let base_params = NegativeConversionParams {
+            blue_weight: 1.0,
+            exposure: -0.05,
+            green_weight: 0.95,
+            red_weight: 1.05,
+            ..NegativeConversionParams::default()
+        }
+        .sanitized();
+        let save_options = NegativeConversionSaveOptions {
+            frame_exposure_overrides: NegativeLabFrameExposureOverridePayload {
+                overrides: vec![NegativeLabFrameExposureOverride {
+                    effective_exposure: 0.25,
+                    exposure_offset: 0.3,
+                    frame_id: "negative-lab-frame-1".to_string(),
+                    source_path: "/roll/frame-001.tif".to_string(),
+                }],
+                schema_version: 1,
+            },
+            frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload {
+                overrides: vec![NegativeLabFrameRgbBalanceOverride {
+                    frame_id: "negative-lab-frame-1".to_string(),
+                    rgb_balance_offset: NegativeLabFrameRgbBalance {
+                        blue_weight: 0.12,
+                        green_weight: -0.04,
+                        red_weight: 0.13,
+                    },
+                    source_path: "/roll/frame-001.tif".to_string(),
+                }],
+                schema_version: 1,
+            },
+            ..NegativeConversionSaveOptions::default()
+        }
+        .sanitized();
+        let frame_one_params =
+            save_options.effective_params_for_path(&base_params, "/roll/frame-001.tif");
+        let frame_two_params =
+            save_options.effective_params_for_path(&base_params, "/roll/frame-002.tif");
+
+        assert_eq!(frame_one_params.exposure, 0.25);
+        assert_near(frame_one_params.red_weight, 1.18);
+        assert_near(frame_one_params.green_weight, 0.91);
+        assert_near(frame_one_params.blue_weight, 1.12);
+        assert_eq!(frame_two_params.exposure, -0.05);
+        assert_near(frame_two_params.red_weight, 1.05);
+
+        let bounds = [
+            ChannelBounds {
+                min: 0.02,
+                max: 1.5,
+            },
+            ChannelBounds {
+                min: 0.02,
+                max: 1.5,
+            },
+            ChannelBounds {
+                min: 0.02,
+                max: 1.5,
+            },
+        ];
+        let pixels = vec![
+            0.92, 0.72, 0.52, //
+            0.22, 0.16, 0.10, //
+            0.03, 0.02, 0.01,
+        ];
+        let baseline_render = render_fixture(pixels.clone(), base_params, bounds);
+        let override_render = render_fixture(pixels.clone(), frame_one_params, bounds);
+        let reset_render = render_fixture(pixels, base_params, bounds);
+
+        assert_ne!(
+            hash_rendered_image(&baseline_render),
+            hash_rendered_image(&override_render)
+        );
+        assert_eq!(
+            hash_rendered_image(&baseline_render),
+            hash_rendered_image(&reset_render)
+        );
+        assert!(mean_abs_delta(&baseline_render, &override_render) > 0.001);
+    }
+
+    #[test]
+    fn negative_conversion_save_options_deserialize_frame_override_payloads() {
+        let payload = json!({
+            "frameExposureOverrides": {
+                "overrides": [{
+                    "effectiveExposure": 0.25,
+                    "exposureOffset": 0.3,
+                    "frameId": "negative-lab-frame-1",
+                    "sourcePath": "/roll/frame-001.tif"
+                }],
+                "schemaVersion": 1
+            },
+            "frameRgbBalanceOverrides": {
+                "overrides": [{
+                    "frameId": "negative-lab-frame-1",
+                    "rgbBalanceOffset": {
+                        "blueWeight": 0.12,
+                        "greenWeight": -0.04,
+                        "redWeight": 0.13
+                    },
+                    "sourcePath": "/roll/frame-001.tif"
+                }],
+                "schemaVersion": 1
+            },
+            "outputFormat": "jpeg_proof",
+            "suffix": "Positive",
+            "writeConversionBundle": true
+        });
+        let save_options: NegativeConversionSaveOptions = serde_json::from_value(payload)
+            .expect("versioned frame override payloads should deserialize");
+
+        assert_eq!(save_options.frame_exposure_overrides.schema_version, 1);
+        assert_eq!(save_options.frame_exposure_overrides.overrides.len(), 1);
+        assert_eq!(save_options.frame_rgb_balance_overrides.schema_version, 1);
+        assert_eq!(
+            save_options.frame_rgb_balance_overrides.overrides[0]
+                .rgb_balance_offset
+                .red_weight,
+            0.13
         );
     }
 
@@ -1452,7 +1707,8 @@ mod tests {
                 runtime_status: "runtime_parameter_applied".to_string(),
                 source_generic_preset_id: Some("negative_lab.generic.c41.neutral.v1".to_string()),
             }),
-            frame_exposure_overrides: Vec::new(),
+            frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
+            frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
 
@@ -1539,7 +1795,8 @@ mod tests {
             acquisition_source_families: vec!["jpeg_lossy".to_string()],
             profile_provenance_hash: Some("fnv1a32:9ed1e301".to_string()),
             selected_profile: None,
-            frame_exposure_overrides: Vec::new(),
+            frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
+            frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
         let bundle_path = negative_lab_conversion_bundle_path(&output_path);
@@ -2060,7 +2317,8 @@ mod tests {
                 runtime_status: "runtime_parameter_applied".to_string(),
                 source_generic_preset_id: None,
             }),
-            frame_exposure_overrides: Vec::new(),
+            frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
+            frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
             suffix: "Positive".to_string(),
         };
         write_negative_lab_output_sidecar(

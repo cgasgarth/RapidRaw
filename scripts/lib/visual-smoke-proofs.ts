@@ -185,6 +185,21 @@ const negativeLabConvertArgsSchema = z.object({
           .length(1),
         schemaVersion: z.literal(1),
       }),
+      frameRgbBalanceOverrides: z.object({
+        overrides: z
+          .array(
+            z.object({
+              frameId: z.literal('negative-lab-frame-1'),
+              rgbBalanceOffset: z.object({
+                blueWeight: z.literal(-0.06),
+                greenWeight: z.literal(-0.02),
+                redWeight: z.literal(0.08),
+              }),
+            }),
+          )
+          .length(1),
+        schemaVersion: z.literal(1),
+      }),
       omittedDispositionFrameIds: z.array(z.literal('negative-lab-frame-2')).length(1),
       qcApprovedFrameIds: z.array(z.string()).length(0),
       qcRejectedFrameIds: z.array(z.literal('negative-lab-frame-2')).length(1),
