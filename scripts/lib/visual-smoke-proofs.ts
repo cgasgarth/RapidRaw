@@ -114,6 +114,12 @@ const negativeLabHighlightPatchSampleSchema = z.object({
   x: z.literal(0.66),
   y: z.literal(0.18),
 });
+const negativeLabPickedNeutralPatchSampleSchema = z.object({
+  height: z.number().min(0.24).max(0.26),
+  width: z.number().min(0.29).max(0.31),
+  x: z.number().min(0.19).max(0.21),
+  y: z.number().min(0.19).max(0.21),
+});
 const negativeLabOrthoPresetParamsSchema = z
   .object({
     base_fog_sample: z.union([negativeLabLeftEdgeSampleSchema, negativeLabCustomBaseSampleSchema]),
@@ -161,6 +167,7 @@ const negativeLabBaseFogEstimateInvokeSchema = z.object({
       negativeLabCustomBaseSampleSchema,
       negativeLabShadowPatchSampleSchema,
       negativeLabHighlightPatchSampleSchema,
+      negativeLabPickedNeutralPatchSampleSchema,
     ]),
   }),
   command: z.literal('estimate_negative_base_fog'),
@@ -682,6 +689,9 @@ export async function assertNegativeLabBaseFogPreviewExportProof(page) {
   const hasHighlightPatchEstimate = estimateCalls.some(
     (call) => negativeLabHighlightPatchSampleSchema.safeParse(call.args.sampleRect).success,
   );
+  const hasPickedNeutralPatchEstimate = estimateCalls.some(
+    (call) => negativeLabPickedNeutralPatchSampleSchema.safeParse(call.args.sampleRect).success,
+  );
   const hasAutoPreview = previewCalls.some((call) => call.args.params.base_fog_sample === null);
   const hasManualPreview = previewCalls.some(
     (call) => call.args.params.base_fog_sample !== null && call.args.params.blue_weight === 1.18,
@@ -696,6 +706,7 @@ export async function assertNegativeLabBaseFogPreviewExportProof(page) {
     !hasCustomBaseEstimate ||
     !hasPatchProbeEstimate ||
     !hasHighlightPatchEstimate ||
+    !hasPickedNeutralPatchEstimate ||
     highlightExposureCalls.length !== 1 ||
     !hasAutoPreview ||
     !hasManualPreview ||
@@ -710,6 +721,7 @@ export async function assertNegativeLabBaseFogPreviewExportProof(page) {
         hasHighlightPatchEstimate,
         hasManualEstimate,
         hasManualPreview,
+        hasPickedNeutralPatchEstimate,
         hasPatchProbeEstimate,
         highlightExposureCalls: highlightExposureCalls.length,
       })}`,

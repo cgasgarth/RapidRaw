@@ -2033,6 +2033,7 @@
       "blackPoint": "Black point",
       "blueWeight": "Blue (Yellow)",
       "cancel": "Cancel",
+      "cancelPatchPick": "Cancel patch pick",
       "colorTiming": "Color Timing",
       "compareTooltip": "Hold to View Original",
       "contrast": "Contrast (Grade)",
@@ -2166,9 +2167,15 @@
         "tiff16": "16-bit TIFF"
       },
       "outputSuffix": "Output suffix",
+      "patchPickDraftOverlayLabel": "Draft patch sample",
+      "patchRole": {
+        "highlight": "Highlight",
+        "neutral": "Neutral"
+      },
       "patchSampleOverlayLabel": "Densitometer patch sample",
       "patchSampler": "Patch sampler",
       "patchSamplerHint": "Probe shadows, highlights, and base strips without changing the active conversion.",
+      "pickViewerPatch": "Pick patch in viewer",
       "presetClaimGeneric": "Generic starting point",
       "presetClaimMeasured": "Measured profile",
       "presetClaimUser": "User profile",
