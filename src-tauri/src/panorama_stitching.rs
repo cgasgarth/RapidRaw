@@ -540,11 +540,14 @@ fn build_panorama_render_review(metadata: &PanoramaRenderMetadata) -> serde_json
             "effective": metadata.effective_projection.as_str(),
             "requested": metadata.requested_projection.as_str(),
         },
+        "seamReview": panorama_seam_review_metadata(metadata),
         "sources": {
             "excludedSourceIndices": &metadata.excluded_source_indices,
             "stitchedSourceIndices": &metadata.connected_source_indices,
             "totalCount": metadata.sources.len(),
         },
+        "sourceContribution": panorama_source_contribution_metadata(metadata),
+        "exposureNormalizationSummary": panorama_exposure_normalization_summary(metadata),
         "warningCodes": &metadata.warnings,
     })
 }
@@ -1354,6 +1357,7 @@ fn upsert_panorama_artifact_metadata(
             "lowDetailFeatherMultiplier": 5,
             "mode": "adaptive_dp_feather_v1",
         },
+        "seamReview": panorama_seam_review_metadata(metadata),
         "sourceImageRefs": source_refs.iter().map(|source| json!({
             "imagePath": source.image_path.clone(),
             "lensCorrectionState": "required_before_stitch",
@@ -1361,6 +1365,7 @@ fn upsert_panorama_artifact_metadata(
             "sourceIndex": source.source_index,
             "virtualCopyId": source.virtual_copy_id.clone(),
         })).collect::<Vec<_>>(),
+        "sourceContribution": panorama_source_contribution_metadata(metadata),
         "validationMetrics": {
             "estimatedPeakMemoryBytes": metadata.estimated_peak_memory_bytes,
             "excludedSourceCount": metadata.excluded_source_indices.len(),
@@ -1379,6 +1384,80 @@ fn upsert_panorama_artifact_metadata(
     artifacts.panorama_artifacts.push(artifact);
     artifacts.stale_artifact_ids.retain(|id| !id.is_empty());
     Ok(())
+}
+
+fn panorama_seam_review_metadata(metadata: &PanoramaRenderMetadata) -> serde_json::Value {
+    let seams = metadata
+        .selected_match_edges
+        .iter()
+        .map(|edge| {
+            let p95_error_px = metadata
+                .pairwise_matches
+                .iter()
+                .find(|pair| {
+                    pair.source_index == edge.source_index && pair.target_index == edge.target_index
+                })
+                .map(|pair| pair.p95_symmetric_transfer_error_px)
+                .unwrap_or(0.0);
+            let confidence = if p95_error_px <= 2.0 {
+                "high"
+            } else if p95_error_px <= 5.0 {
+                "medium"
+            } else {
+                "low"
+            };
+            json!({
+                "confidence": confidence,
+                "featherWidthPx": 100,
+                "fromSourceIndex": edge.source_index,
+                "p95ErrorPx": p95_error_px,
+                "toSourceIndex": edge.target_index,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    json!({
+        "policy": "adaptive_dp_feather_v1",
+        "reviewStatus": if seams.is_empty() { "ready" } else { "requires_review" },
+        "seamCount": seams.len(),
+        "seams": seams,
+    })
+}
+
+fn panorama_source_contribution_metadata(metadata: &PanoramaRenderMetadata) -> serde_json::Value {
+    let stitched_count = metadata.connected_source_indices.len().max(1);
+    let mut regions = metadata
+        .connected_source_indices
+        .iter()
+        .map(|source_index| {
+            json!({
+                "coverageRatio": 1.0 / stitched_count as f64,
+                "role": "stitched",
+                "sourceIndex": source_index,
+            })
+        })
+        .collect::<Vec<_>>();
+    regions.extend(metadata.excluded_source_indices.iter().map(|source_index| {
+        json!({
+            "coverageRatio": 0.0,
+            "role": "excluded",
+            "sourceIndex": source_index,
+        })
+    }));
+
+    json!({
+        "excludedSourceCount": metadata.excluded_source_indices.len(),
+        "regions": regions,
+        "stitchedSourceCount": metadata.connected_source_indices.len(),
+    })
+}
+
+fn panorama_exposure_normalization_summary(metadata: &PanoramaRenderMetadata) -> serde_json::Value {
+    let applied_gain_count = metadata.blend_diagnostics.overlap_gain_applications.len();
+    json!({
+        "appliedGainCount": applied_gain_count,
+        "mode": if applied_gain_count > 0 { "scalar_overlap_luminance_gain_v1" } else { "none" },
+    })
 }
 
 fn panorama_exposure_normalization_metadata(
@@ -2326,6 +2405,13 @@ mod tests {
         assert_eq!(
             artifact["exposureNormalization"]["appliedLuminanceGains"][0]["gain"],
             1.125
+        );
+        assert_eq!(artifact["seamReview"]["seamCount"], 1);
+        assert_eq!(artifact["seamReview"]["seams"][0]["confidence"], "high");
+        assert_eq!(artifact["sourceContribution"]["stitchedSourceCount"], 2);
+        assert_eq!(
+            artifact["sourceContribution"]["regions"][0]["coverageRatio"],
+            0.5
         );
     }
 

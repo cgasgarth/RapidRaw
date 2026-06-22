@@ -387,6 +387,8 @@ export const panoramaReviewWorkspaceProofSchema = z.object({
   planWidth: z.literal('9600'),
   projection: z.literal('rectilinear'),
   runtimeStatus: z.literal('dry_run_preview'),
+  seamCount: z.literal('4'),
+  sourceContributionCount: z.literal('5'),
   sourceCount: z.literal('5'),
   sourceOrder: z.literal('left,center,right,detail,sky'),
 });
@@ -397,6 +399,10 @@ export const panoramaSavedReviewProofSchema = z.object({
   outputDimensions: z.literal('9600 x 3200'),
   outputPath: z.literal('/tmp/panorama.tif'),
   projection: z.literal('rectilinear'),
+  seamCount: z.literal('4'),
+  seamReviewStatus: z.literal('requires_review'),
+  sourceContributionRegions: z.literal('5'),
+  sourceExcludedCount: z.literal('0'),
   sourceCount: z.literal('5'),
   warningCodes: z.literal('geometry_estimate_low_confidence,legacy_full_frame_render'),
 });
