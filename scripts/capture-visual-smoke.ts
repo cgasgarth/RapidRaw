@@ -1464,7 +1464,11 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-roll-frame-disposition-1').getByText('Review', { exact: true }).waitFor({
     timeout: 10_000,
   });
-  await page.getByTestId('negative-lab-frame-qc-approved-negative-lab-frame-2').click();
+  await page.getByTestId('negative-lab-frame-health-filter').selectOption('review');
+  await page.getByTestId('negative-lab-frame-health-visible-count').getByText('1/2 visible', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-qc-approved-visible').click();
   await page.getByTestId('negative-lab-qc-approved-count').getByText('Approved 1', { exact: true }).waitFor({
     timeout: 10_000,
   });
@@ -1473,7 +1477,7 @@ async function prepareScenario(page, mode) {
     .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabQueuedCount)
     .getByText('2 queued', { exact: true })
     .waitFor({ timeout: 10_000 });
-  await page.getByTestId('negative-lab-frame-qc-rejected-negative-lab-frame-2').click();
+  await page.getByTestId('negative-lab-qc-rejected-visible').click();
   await page.getByTestId('negative-lab-qc-rejected-count').getByText('Rejected 1', { exact: true }).waitFor({
     timeout: 10_000,
   });
@@ -1481,6 +1485,21 @@ async function prepareScenario(page, mode) {
     .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabQueuedCount)
     .getByText('1 queued', { exact: true })
     .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-qc-pending-visible').click();
+  await page.getByTestId('negative-lab-qc-rejected-count').getByText('Rejected 0', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-qc-approved-count').getByText('Approved 0', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page
+    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabQueuedCount)
+    .getByText('1 queued', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-qc-rejected-visible').click();
+  await page.getByTestId('negative-lab-qc-rejected-count').getByText('Rejected 1', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
   const rollBaseScopeDataset = await page
     .getByTestId('negative-lab-roll-queue-summary')
     .evaluate((element) => ({ ...element.dataset }));
