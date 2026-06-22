@@ -445,6 +445,12 @@ pub struct AppSettings {
     #[serde(default)]
     pub raw_preprocessing_sharpening: Option<f32>,
     #[serde(default)]
+    pub raw_preprocessing_sharpening_detail: Option<f32>,
+    #[serde(default)]
+    pub raw_preprocessing_sharpening_edge_masking: Option<f32>,
+    #[serde(default)]
+    pub raw_preprocessing_sharpening_radius: Option<f32>,
+    #[serde(default)]
     pub apply_preprocessing_to_non_raws: Option<bool>,
     #[serde(default)]
     pub exif_overlay: Option<String>,
@@ -532,6 +538,9 @@ impl Default for AppSettings {
             folder_icons: Some(HashMap::new()),
             raw_preprocessing_color_nr: Some(0.5),
             raw_preprocessing_sharpening: Some(0.35),
+            raw_preprocessing_sharpening_detail: Some(0.45),
+            raw_preprocessing_sharpening_edge_masking: Some(0.3),
+            raw_preprocessing_sharpening_radius: Some(2.0),
             apply_preprocessing_to_non_raws: Some(false),
             exif_overlay: Some("off".to_string()),
             language: Some("en".to_string()),

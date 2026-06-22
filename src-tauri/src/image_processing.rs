@@ -2573,11 +2573,46 @@ fn yc_to_rgb(y: f32, cb: f32, cr: f32) -> (f32, f32, f32) {
     (r, g, b)
 }
 
-pub fn remove_raw_artifacts_and_enhance(
+#[derive(Clone, Copy, Debug)]
+pub struct CapturePreSharpeningSettings {
+    pub amount: f32,
+    pub detail: f32,
+    pub edge_masking: f32,
+    pub radius_px: f32,
+}
+
+impl Default for CapturePreSharpeningSettings {
+    fn default() -> Self {
+        Self {
+            amount: 0.35,
+            detail: 0.45,
+            edge_masking: 0.3,
+            radius_px: 2.0,
+        }
+    }
+}
+
+impl CapturePreSharpeningSettings {
+    pub fn normalized(self) -> Self {
+        Self {
+            amount: self.amount.clamp(0.0, 1.0),
+            detail: self.detail.clamp(0.0, 1.0),
+            edge_masking: self.edge_masking.clamp(0.0, 1.0),
+            radius_px: self.radius_px.clamp(0.5, 3.0),
+        }
+    }
+
+    pub fn is_enabled(self) -> bool {
+        self.amount > 0.0
+    }
+}
+
+pub fn remove_raw_artifacts_and_enhance_with_settings(
     image: &mut DynamicImage,
     color_nr_inv_sigma: f32,
-    sharpening_amount: f32,
+    sharpening_settings: CapturePreSharpeningSettings,
 ) {
+    let sharpening_settings = sharpening_settings.normalized();
     let mut buffer = image.to_rgb32f();
     let w = buffer.width() as usize;
     let h = buffer.height() as usize;
@@ -2680,8 +2715,8 @@ pub fn remove_raw_artifacts_and_enhance(
             });
     }
 
-    if sharpening_amount > 0.0 {
-        apply_gentle_detail_enhance(&mut buffer, &ycbcr_buffer, sharpening_amount);
+    if sharpening_settings.is_enabled() {
+        apply_gentle_detail_enhance(&mut buffer, &ycbcr_buffer, sharpening_settings);
     }
 
     *image = DynamicImage::ImageRgb32F(buffer);
@@ -2823,13 +2858,16 @@ fn box_blur_luma(source: &[f32], width: usize, height: usize, radius: usize) -> 
 fn apply_gentle_detail_enhance(
     buffer: &mut image::ImageBuffer<image::Rgb<f32>, Vec<f32>>,
     ycbcr_source: &[f32],
-    amount: f32,
+    settings: CapturePreSharpeningSettings,
 ) {
     let w = buffer.width() as usize;
     let h = buffer.height() as usize;
 
     let mut temp_blur = vec![0.0; w * h];
-    let radius = 2i32;
+    let radius = settings.radius_px.round().clamp(1.0, 3.0) as i32;
+    let amount = settings.amount;
+    let detail_gain = 1.0 + (settings.detail - 0.45) * 0.8;
+    let edge_mask_threshold = settings.edge_masking * 0.08;
 
     temp_blur
         .par_chunks_mut(w)
@@ -2866,14 +2904,19 @@ fn apply_gentle_detail_enhance(
 
                 let original_luma = ycbcr_source[(y * w + x) * 3];
 
-                let detail = original_luma - blurred_val;
+                let detail = (original_luma - blurred_val) * detail_gain;
 
                 let edge_strength = detail.abs();
+                let low_edge_mask = if edge_mask_threshold <= f32::EPSILON {
+                    1.0
+                } else {
+                    (edge_strength / edge_mask_threshold).clamp(0.0, 1.0)
+                };
                 let adaptive_amount = if edge_strength > 0.1 {
                     amount * 0.3
                 } else {
                     amount
-                };
+                } * low_edge_mask;
                 let boost = detail * adaptive_amount;
 
                 let r_idx = x * 3;
@@ -3626,8 +3669,8 @@ pub fn calculate_auto_adjustments(
 #[cfg(test)]
 mod tests {
     use super::{
-        ImageMetadata, RawEngineArtifacts, WaveletDetailSettings, apply_wavelet_detail_by_scale,
-        remove_raw_artifacts_and_enhance,
+        CapturePreSharpeningSettings, ImageMetadata, RawEngineArtifacts, WaveletDetailSettings,
+        apply_wavelet_detail_by_scale, remove_raw_artifacts_and_enhance_with_settings,
     };
     use image::{DynamicImage, ImageBuffer, Rgb, Rgb32FImage};
     use serde_json::json;
@@ -3690,12 +3733,38 @@ mod tests {
             / luma_values.len() as f32
     }
 
+    fn mean_abs_luma_delta(left: &DynamicImage, right: &DynamicImage) -> f32 {
+        let left_rgb = left.to_rgb32f();
+        let right_rgb = right.to_rgb32f();
+        let left_raw = left_rgb.as_raw();
+        let right_raw = right_rgb.as_raw();
+        left_raw
+            .chunks_exact(3)
+            .zip(right_raw.chunks_exact(3))
+            .map(|(left_pixel, right_pixel)| {
+                let left_luma =
+                    0.299 * left_pixel[0] + 0.587 * left_pixel[1] + 0.114 * left_pixel[2];
+                let right_luma =
+                    0.299 * right_pixel[0] + 0.587 * right_pixel[1] + 0.114 * right_pixel[2];
+                (left_luma - right_luma).abs()
+            })
+            .sum::<f32>()
+            / (left_raw.len() / 3) as f32
+    }
+
     #[test]
     fn capture_pre_sharpening_enhances_synthetic_edge() {
         let before = synthetic_edge_image();
         let mut after = before.clone();
 
-        remove_raw_artifacts_and_enhance(&mut after, 0.0, 0.75);
+        remove_raw_artifacts_and_enhance_with_settings(
+            &mut after,
+            0.0,
+            CapturePreSharpeningSettings {
+                amount: 0.75,
+                ..CapturePreSharpeningSettings::default()
+            },
+        );
 
         let before_contrast = red_channel(&before, 4, 2) - red_channel(&before, 3, 2);
         let after_contrast = red_channel(&after, 4, 2) - red_channel(&after, 3, 2);
@@ -3711,13 +3780,84 @@ mod tests {
         let before = synthetic_edge_image();
         let mut after = before.clone();
 
-        remove_raw_artifacts_and_enhance(&mut after, 0.0, 0.0);
+        remove_raw_artifacts_and_enhance_with_settings(
+            &mut after,
+            0.0,
+            CapturePreSharpeningSettings {
+                amount: 0.0,
+                ..CapturePreSharpeningSettings::default()
+            },
+        );
 
         for y in 0..5 {
             for x in 0..9 {
                 assert_eq!(red_channel(&after, x, y), red_channel(&before, x, y));
             }
         }
+    }
+
+    #[test]
+    fn capture_pre_sharpening_advanced_settings_change_output() {
+        let mut narrow_detail = synthetic_texture_image();
+        let mut wide_detail = synthetic_texture_image();
+
+        remove_raw_artifacts_and_enhance_with_settings(
+            &mut narrow_detail,
+            0.0,
+            CapturePreSharpeningSettings {
+                amount: 0.7,
+                detail: 0.2,
+                edge_masking: 0.0,
+                radius_px: 1.0,
+            },
+        );
+        remove_raw_artifacts_and_enhance_with_settings(
+            &mut wide_detail,
+            0.0,
+            CapturePreSharpeningSettings {
+                amount: 0.7,
+                detail: 0.9,
+                edge_masking: 0.0,
+                radius_px: 3.0,
+            },
+        );
+
+        assert!(
+            mean_abs_luma_delta(&narrow_detail, &wide_detail) > 0.001,
+            "radius/detail controls should produce measurably different capture sharpening output"
+        );
+    }
+
+    #[test]
+    fn capture_pre_sharpening_edge_masking_protects_low_contrast_texture() {
+        let mut unmasked = synthetic_texture_image();
+        let mut masked = synthetic_texture_image();
+
+        remove_raw_artifacts_and_enhance_with_settings(
+            &mut unmasked,
+            0.0,
+            CapturePreSharpeningSettings {
+                amount: 0.8,
+                detail: 0.8,
+                edge_masking: 0.0,
+                radius_px: 1.0,
+            },
+        );
+        remove_raw_artifacts_and_enhance_with_settings(
+            &mut masked,
+            0.0,
+            CapturePreSharpeningSettings {
+                amount: 0.8,
+                detail: 0.8,
+                edge_masking: 1.0,
+                radius_px: 1.0,
+            },
+        );
+
+        assert!(
+            luma_variance(&masked) < luma_variance(&unmasked),
+            "edge masking should reduce sharpening energy in low-contrast texture"
+        );
     }
 
     #[test]

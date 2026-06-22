@@ -4,8 +4,7 @@ use crate::app_state::{AppState, LoadedImage};
 use crate::exif_processing;
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
-use crate::image_processing::ImageMetadata;
-use crate::image_processing::{apply_orientation, remove_raw_artifacts_and_enhance};
+use crate::image_processing::{ImageMetadata, apply_orientation};
 use crate::mask_generation::{MaskDefinition, SubMask, generate_mask_bitmap};
 use crate::raw_processing::develop_raw_image;
 use anyhow::{Context, Result, anyhow};
@@ -75,7 +74,14 @@ pub fn load_base_image_from_bytes(
         let x = color_nr_setting.clamp(0.01, 1.0);
         (12.0 / x - 10.0).max(0.1)
     };
-    let sharpening_amount = settings.raw_preprocessing_sharpening.unwrap_or(0.35);
+    let sharpening_settings = crate::image_processing::CapturePreSharpeningSettings {
+        amount: settings.raw_preprocessing_sharpening.unwrap_or(0.35),
+        detail: settings.raw_preprocessing_sharpening_detail.unwrap_or(0.45),
+        edge_masking: settings
+            .raw_preprocessing_sharpening_edge_masking
+            .unwrap_or(0.3),
+        radius_px: settings.raw_preprocessing_sharpening_radius.unwrap_or(2.0),
+    };
     let apply_to_non_raws = settings.apply_preprocessing_to_non_raws.unwrap_or(false);
 
     crate::exif_processing::persist_exif_if_missing(
@@ -95,12 +101,13 @@ pub fn load_base_image_from_bytes(
             )
         }) {
             Ok(Ok(mut image)) => {
-                if !use_fast_raw_dev && (color_nr_amount > 0.0 || sharpening_amount > 0.0) {
+                if !use_fast_raw_dev && (color_nr_amount > 0.0 || sharpening_settings.is_enabled())
+                {
                     let start = Instant::now();
-                    remove_raw_artifacts_and_enhance(
+                    crate::image_processing::remove_raw_artifacts_and_enhance_with_settings(
                         &mut image,
                         color_nr_amount,
-                        sharpening_amount,
+                        sharpening_settings,
                     );
                     let duration = start.elapsed();
                     log::info!(
@@ -133,10 +140,14 @@ pub fn load_base_image_from_bytes(
 
         if apply_to_non_raws
             && !use_fast_raw_dev
-            && (color_nr_amount > 0.0 || sharpening_amount > 0.0)
+            && (color_nr_amount > 0.0 || sharpening_settings.is_enabled())
         {
             let start = Instant::now();
-            remove_raw_artifacts_and_enhance(&mut image, color_nr_amount, sharpening_amount);
+            crate::image_processing::remove_raw_artifacts_and_enhance_with_settings(
+                &mut image,
+                color_nr_amount,
+                sharpening_settings,
+            );
             let duration = start.elapsed();
             log::info!(
                 "Enhancing non-RAW '{}' took {:?}",
