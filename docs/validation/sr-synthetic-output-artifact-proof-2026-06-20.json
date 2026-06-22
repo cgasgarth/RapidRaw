@@ -19,6 +19,12 @@
       "publicRepoAllowed": false
     }
   },
+  "conservativeOutputPolicy": {
+    "detailPolicy": "conservative",
+    "falseDetailPolicy": "human_review_required",
+    "outputScale": 2,
+    "qualityPreference": "best"
+  },
   "doesNotProve": [
     "app_ui_e2e",
     "demosaic_aware_detail_quality",
@@ -28,7 +34,7 @@
   ],
   "fixtureId": "sr.synthetic.public.pixel-shift-output.v1",
   "generatedAt": "2026-06-20T09:45:00.000Z",
-  "issue": 2314,
+  "issue": 2980,
   "metrics": {
     "changedPixelRatioAgainstNearest": 0.737703,
     "filledPixelRatio": 1,
@@ -52,6 +58,12 @@
     "status": "accepted",
     "warningCodes": []
   },
+  "reviewMetadata": {
+    "artifactCount": 3,
+    "baselineReviewCropPath": "artifacts/validation/sr-synthetic-output-artifact/sr-x2-baseline-crop-center.pgm",
+    "reconstructionPreviewPath": "artifacts/validation/sr-synthetic-output-artifact/sr-x2-preview.pgm",
+    "reconstructionReviewCropPath": "artifacts/validation/sr-synthetic-output-artifact/sr-x2-review-crop-center.pgm"
+  },
   "runtimeStatus": "synthetic_sr_output_artifact_rendered",
   "schemaVersion": 1,
   "sourceBurst": {
@@ -60,5 +72,39 @@
     "scale": 2,
     "sourceBurstHash": "sha256:fac1aabe8f50023d16e95374b27b03758f9702175bc3595386162bc6c7042f58",
     "width": 48
-  }
+  },
+  "sourceFrames": [
+    {
+      "contentHash": "sha256:7969af80962733db72021bdb1fc81cb414d50cca0574a5ca16efe2ebd23c068c",
+      "imagePath": "/synthetic/sr/conservative-output-proof-0.dng",
+      "publicRepoAllowed": true,
+      "shiftX": 0,
+      "shiftY": 0,
+      "sourceIndex": 0
+    },
+    {
+      "contentHash": "sha256:c8cdd340febdbcd8bc86fde9dabeee2aa39c0fab63f304c4b837fef1ca1739e6",
+      "imagePath": "/synthetic/sr/conservative-output-proof-1.dng",
+      "publicRepoAllowed": true,
+      "shiftX": 1,
+      "shiftY": 0,
+      "sourceIndex": 1
+    },
+    {
+      "contentHash": "sha256:1f8559aaccf3da92f7446ea0c4d7079042052b71f70cfe1b1e583c580e1de629",
+      "imagePath": "/synthetic/sr/conservative-output-proof-2.dng",
+      "publicRepoAllowed": true,
+      "shiftX": 0,
+      "shiftY": 1,
+      "sourceIndex": 2
+    },
+    {
+      "contentHash": "sha256:2419c912e9190b23d3f841bbeb66f8c694d43c6d326dd778d2d6bc4ee90a1b70",
+      "imagePath": "/synthetic/sr/conservative-output-proof-3.dng",
+      "publicRepoAllowed": true,
+      "shiftX": 1,
+      "shiftY": 1,
+      "sourceIndex": 3
+    }
+  ]
 }

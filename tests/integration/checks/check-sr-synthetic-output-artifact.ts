@@ -54,6 +54,14 @@ const reportSchema = z
           .strict(),
       })
       .strict(),
+    conservativeOutputPolicy: z
+      .object({
+        detailPolicy: z.literal('conservative'),
+        falseDetailPolicy: z.literal('human_review_required'),
+        outputScale: z.literal(SCALE),
+        qualityPreference: z.literal('best'),
+      })
+      .strict(),
     doesNotProve: z.array(
       z.enum([
         'app_ui_e2e',
@@ -65,7 +73,7 @@ const reportSchema = z
     ),
     fixtureId: z.literal('sr.synthetic.public.pixel-shift-output.v1'),
     generatedAt: z.iso.datetime({ offset: true }),
-    issue: z.literal(2314),
+    issue: z.literal(2980),
     metrics: z
       .object({
         changedPixelRatioAgainstNearest: z.number().gt(0.1),
@@ -77,6 +85,14 @@ const reportSchema = z
       })
       .strict(),
     reconstructionDiagnostics: superResolutionReconstructionDiagnosticsV1Schema,
+    reviewMetadata: z
+      .object({
+        artifactCount: z.literal(3),
+        baselineReviewCropPath: z.literal(BASELINE_CROP_PATH),
+        reconstructionPreviewPath: z.literal(OUTPUT_PATH),
+        reconstructionReviewCropPath: z.literal(REVIEW_CROP_PATH),
+      })
+      .strict(),
     runtimeStatus: z.literal('synthetic_sr_output_artifact_rendered'),
     schemaVersion: z.literal(1),
     sourceBurst: z
@@ -88,6 +104,20 @@ const reportSchema = z
         width: z.literal(WIDTH),
       })
       .strict(),
+    sourceFrames: z
+      .array(
+        z
+          .object({
+            contentHash: hashSchema,
+            imagePath: z.string().trim().min(1),
+            publicRepoAllowed: z.literal(true),
+            shiftX: z.number().int().nonnegative(),
+            shiftY: z.number().int().nonnegative(),
+            sourceIndex: z.number().int().nonnegative(),
+          })
+          .strict(),
+      )
+      .length(4),
   })
   .strict();
 
@@ -136,6 +166,12 @@ const report = reportSchema.parse({
       publicRepoAllowed: false,
     },
   },
+  conservativeOutputPolicy: {
+    detailPolicy: 'conservative',
+    falseDetailPolicy: 'human_review_required',
+    outputScale: SCALE,
+    qualityPreference: 'best',
+  },
   doesNotProve: [
     'app_ui_e2e',
     'demosaic_aware_detail_quality',
@@ -145,7 +181,7 @@ const report = reportSchema.parse({
   ],
   fixtureId: 'sr.synthetic.public.pixel-shift-output.v1',
   generatedAt: '2026-06-20T09:45:00.000Z',
-  issue: 2314,
+  issue: 2980,
   metrics: {
     changedPixelRatioAgainstNearest: roundMetric(result.changedPixelRatioAgainstNearest),
     filledPixelRatio: result.reconstructionDiagnostics.filledPixelRatio,
@@ -155,6 +191,12 @@ const report = reportSchema.parse({
     reviewCropMeanAbsoluteDelta: roundMetric(calculateMeanAbsoluteErrorV1(reviewCrop.pixels, baselineCrop.pixels)),
   },
   reconstructionDiagnostics: result.reconstructionDiagnostics,
+  reviewMetadata: {
+    artifactCount: 3,
+    baselineReviewCropPath: BASELINE_CROP_PATH,
+    reconstructionPreviewPath: OUTPUT_PATH,
+    reconstructionReviewCropPath: REVIEW_CROP_PATH,
+  },
   runtimeStatus: 'synthetic_sr_output_artifact_rendered',
   schemaVersion: 1,
   sourceBurst: {
@@ -164,6 +206,16 @@ const report = reportSchema.parse({
     sourceBurstHash: hashFloat32(source, ...frames.map((frame) => frame.pixels)),
     width: WIDTH,
   },
+  sourceFrames: await Promise.all(
+    frames.map(async (frame, sourceIndex) => ({
+      contentHash: hashFloat32(frame.pixels),
+      imagePath: `/synthetic/sr/conservative-output-proof-${sourceIndex}.dng`,
+      publicRepoAllowed: true,
+      shiftX: frame.shiftX,
+      shiftY: frame.shiftY,
+      sourceIndex,
+    })),
+  ),
 });
 const reportJson = `${JSON.stringify(report, null, 2)}\n`;
 
