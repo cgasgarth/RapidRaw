@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { existsSync, lstatSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs';
-import { basename, dirname, isAbsolute, resolve } from 'node:path';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import { strict as assert } from 'node:assert';
 import process from 'node:process';
 
@@ -14,6 +14,16 @@ type ParsedArgs = {
   branch: string;
   dryRun: boolean;
   path: string;
+};
+
+type GitWorktree = {
+  branch?: string;
+  path: string;
+};
+
+type WorktreeSource = {
+  hasMainWorktree: boolean;
+  root: string;
 };
 
 const REPO_OWNER = 'cgasgarth/RapidRaw';
@@ -105,13 +115,22 @@ const runSelfTest = (): void => {
   });
   assert.throws(() => parseArgs([]), /Missing --branch/u);
   assert.throws(() => parseArgs(['--branch', 'feature/example']), /codex\/ prefix/u);
+  assert.deepEqual(
+    parseWorktrees(
+      'worktree /repo/main\nbranch refs/heads/main\n\nworktree /repo/feature\nbranch refs/heads/codex/test',
+    ),
+    [
+      { branch: 'main', path: '/repo/main' },
+      { branch: 'codex/test', path: '/repo/feature' },
+    ],
+  );
   console.log('worktree helper self-test ok');
 };
 
 const ensureRepoRoot = (root: string): void => {
   const packageJsonPath = resolve(root, 'package.json');
-  if (!existsSync(packageJsonPath)) throw new Error('package.json not found; run from RapidRaw repo root');
-  if (!existsSync(resolve(root, 'bun.lock'))) throw new Error('bun.lock not found; run from RapidRaw repo root');
+  if (!existsSync(packageJsonPath)) throw new Error('package.json not found; run from a RapidRaw checkout root');
+  if (!existsSync(resolve(root, 'bun.lock'))) throw new Error('bun.lock not found; run from a RapidRaw checkout root');
 
   const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as { name?: string };
   if (packageJson.name !== 'rapidraw') {
@@ -119,12 +138,37 @@ const ensureRepoRoot = (root: string): void => {
   }
 
   const repoRoot = run(['git', 'rev-parse', '--show-toplevel'], { cwd: root });
-  if (basename(repoRoot) !== 'RapidRaw') throw new Error(`Expected RapidRaw repo root, found ${repoRoot}`);
+  if (repoRoot !== root) throw new Error(`Run from the checkout root, not a subdirectory: ${repoRoot}`);
 };
 
-const ensureMainClean = (root: string): void => {
-  const status = run(['git', 'status', '--short'], { cwd: root });
-  if (status) throw new Error('Working tree has uncommitted changes; commit/stash before creating a worktree');
+const parseWorktrees = (output: string): GitWorktree[] =>
+  output
+    .split(/\n\n/u)
+    .map((entry) => {
+      const lines = entry.split('\n');
+      const pathLine = lines.find((line) => line.startsWith('worktree '));
+      if (!pathLine) return undefined;
+      const branchLine = lines.find((line) => line.startsWith('branch refs/heads/'));
+      return {
+        branch: branchLine?.replace('branch refs/heads/', ''),
+        path: pathLine.replace('worktree ', ''),
+      };
+    })
+    .filter((worktree): worktree is GitWorktree => Boolean(worktree));
+
+const findWorktreeSource = (root: string): WorktreeSource => {
+  const worktrees = parseWorktrees(run(['git', 'worktree', 'list', '--porcelain'], { cwd: root }));
+  const mainWorktree = worktrees.find((worktree) => worktree.branch === 'main');
+  return mainWorktree ? { hasMainWorktree: true, root: mainWorktree.path } : { hasMainWorktree: false, root };
+};
+
+const ensureMainReady = (mainRoot: string): void => {
+  const currentBranch = run(['git', 'branch', '--show-current'], { cwd: mainRoot });
+  if (currentBranch !== 'main')
+    throw new Error(`Expected main worktree at ${mainRoot}, found ${currentBranch || 'detached HEAD'}`);
+
+  const status = run(['git', 'status', '--short'], { cwd: mainRoot });
+  if (status) throw new Error(`Main worktree has uncommitted changes: ${mainRoot}`);
 };
 
 const ensureTool = (tool: string): void => {
@@ -157,10 +201,15 @@ const ensurePrimaryDependencies = (root: string): void => {
   }
 };
 
-const updateMain = (root: string): void => {
-  run(['git', 'fetch', 'origin', 'main'], { cwd: root });
-  run(['git', 'switch', 'main'], { cwd: root });
-  run(['git', 'pull', '--ff-only', 'origin', 'main'], { cwd: root });
+const updateMain = (source: WorktreeSource): void => {
+  if (source.hasMainWorktree) {
+    ensureMainReady(source.root);
+    run(['git', 'fetch', 'origin', 'main'], { cwd: source.root });
+    run(['git', 'pull', '--ff-only', 'origin', 'main'], { cwd: source.root });
+    return;
+  }
+
+  run(['git', 'fetch', 'origin', 'main'], { cwd: source.root });
 };
 
 const linkNodeModules = (root: string, worktreePath: string): void => {
@@ -204,24 +253,24 @@ const main = (): void => {
   ensureTool('git');
   ensureTool('gh');
   ensureRepoRoot(root);
-  ensureMainClean(root);
-  ensureRemote(root, 'origin', ORIGIN_URL);
-  ensureRemote(root, 'upstream', UPSTREAM_URL);
-  ensurePrimaryDependencies(root);
+  const source = findWorktreeSource(root);
+  ensureRemote(source.root, 'origin', ORIGIN_URL);
+  ensureRemote(source.root, 'upstream', UPSTREAM_URL);
+  ensurePrimaryDependencies(source.root);
 
   if (existsSync(worktreePath)) throw new Error(`Worktree path already exists: ${worktreePath}`);
 
   if (dryRun) {
-    run(['git', 'fetch', 'origin', 'main'], { cwd: root });
+    run(['git', 'fetch', 'origin', 'main'], { cwd: source.root });
     console.log(`worktree create dry-run ok: ${worktreePath} (${branch})`);
     return;
   }
 
-  updateMain(root);
+  updateMain(source);
 
   mkdirSync(dirname(worktreePath), { recursive: true });
-  run(['git', 'worktree', 'add', '-b', branch, worktreePath, 'origin/main'], { cwd: root });
-  linkNodeModules(root, worktreePath);
+  run(['git', 'worktree', 'add', '-b', branch, worktreePath, 'origin/main'], { cwd: source.root });
+  linkNodeModules(source.root, worktreePath);
   run(['git', 'config', 'core.hooksPath', '.githooks'], { cwd: worktreePath });
   ensureGhResolution(worktreePath);
   ensureWorktreeReady(worktreePath);

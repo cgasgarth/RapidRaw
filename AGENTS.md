@@ -75,10 +75,13 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - When creating a new Codex worktree, use the package script:
   `bun run worktree:create -- --branch codex/name`. It updates local `main` from
   `origin/main`, creates the worktree from current `origin/main`, ensures Bun
-  dependencies are available, links `node_modules`, installs and verifies git
-  hooks, and verifies GitHub CLI repo resolution. Do not hand-roll worktree
-  setup unless this helper is blocked; fix the helper instead when it misses a
-  recurring setup need. Use
+  dependencies are available in the primary checkout, links `node_modules`,
+  installs and verifies git hooks, and verifies GitHub CLI repo resolution. The
+  helper can be run from any RapidRaw worktree; it locates a checked-out `main`
+  worktree when available and otherwise creates from a freshly fetched
+  `origin/main` using the current checkout as the dependency source. Do not
+  hand-roll worktree setup unless this helper is blocked; fix the helper instead
+  when it misses a recurring setup need. Use
   `bun run worktree:create -- --branch codex/name --dry-run` to validate the
   environment without creating the worktree.
 
