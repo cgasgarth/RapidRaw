@@ -166,6 +166,18 @@ const negativeLabConvertArgsSchema = z.object({
         z.enum(['lossy_source_for_negative_lab', 'mixed_source_families', 'unknown_acquisition_state']),
       ),
       batchScope: z.literal('ready'),
+      frameExposureOverrides: z.object({
+        overrides: z
+          .array(
+            z.object({
+              effectiveExposure: z.literal(0.45),
+              exposureOffset: z.literal(0.5),
+              frameId: z.literal('negative-lab-frame-1'),
+            }),
+          )
+          .length(1),
+        schemaVersion: z.literal(1),
+      }),
       omittedDispositionFrameIds: z.array(z.literal('negative-lab-frame-2')).length(1),
       qcApprovedFrameIds: z.array(z.string()).length(0),
       qcRejectedFrameIds: z.array(z.literal('negative-lab-frame-2')).length(1),

@@ -1501,6 +1501,47 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-dominant-density-channel').getByText('Blue', { exact: true }).waitFor({
     timeout: 10_000,
   });
+  const setFrameExposureOffset = async (value: number) => {
+    await page.getByTestId('negative-lab-frame-exposure-override-control').evaluate((element, nextValue) => {
+      const input = element.querySelector('input[type="range"]');
+      if (!(input instanceof HTMLInputElement)) {
+        throw new Error('Missing Negative Lab frame exposure range input.');
+      }
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      if (nextValue !== 0) {
+        valueSetter?.call(input, '0');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      valueSetter?.call(input, String(nextValue));
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }, value);
+  };
+  await setFrameExposureOffset(0.5);
+  await page
+    .getByTestId('negative-lab-recipe-frame-exposure-offset')
+    .getByText('+0.50', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-roll-frame-exposure-override-0').getByText('+0.50', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.waitForFunction(() =>
+    (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).some(
+      (call) =>
+        call.command === 'preview_negative_conversion' && JSON.stringify(call.args ?? {}).includes('"exposure":0.45'),
+    ),
+  );
+  await page.getByTestId('negative-lab-reset-frame-exposure').click();
+  await page
+    .getByTestId('negative-lab-recipe-frame-exposure-offset')
+    .getByText('0.00', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await setFrameExposureOffset(0.5);
+  await page
+    .getByTestId('negative-lab-recipe-frame-exposure-offset')
+    .getByText('+0.50', { exact: true })
+    .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-neutrality-status').getByText('Strong cast', { exact: true }).waitFor({
     timeout: 10_000,
   });
@@ -1570,17 +1611,20 @@ async function prepareScenario(page, mode) {
     timeout: 10_000,
   });
   const copiedBatchPlan = await page.evaluate(() => window.__RAWENGINE_NEGATIVE_LAB_CLIPBOARD_WRITES__?.at(-1) ?? '');
-  if (
-    !copiedBatchPlan.includes('"plannedApplyCount"') ||
-    !copiedBatchPlan.includes('"skippedFrameIds"') ||
-    !copiedBatchPlan.includes('"acquisitionReviewFrameIds"') ||
-    !copiedBatchPlan.includes('"batchScope": "ready"') ||
-    !copiedBatchPlan.includes('"dispositionCounts"') ||
-    !copiedBatchPlan.includes('"omittedDispositionFrameIds"') ||
-    !copiedBatchPlan.includes('"negative-lab-frame-2": "rejected"') ||
-    !copiedBatchPlan.includes('"reviewFrameIds"')
-  ) {
-    throw new Error('Negative Lab batch plan copy did not include apply/skip/acquisition/disposition JSON.');
+  const missingBatchPlanTokens = [
+    '"plannedApplyCount"',
+    '"skippedFrameIds"',
+    '"acquisitionReviewFrameIds"',
+    '"batchScope": "ready"',
+    '"dispositionCounts"',
+    '"frameExposureOverrides"',
+    '"effectiveExposure": 0.45',
+    '"omittedDispositionFrameIds"',
+    '"negative-lab-frame-2": "rejected"',
+    '"reviewFrameIds"',
+  ].filter((token) => !copiedBatchPlan.includes(token));
+  if (missingBatchPlanTokens.length > 0) {
+    throw new Error(`Negative Lab batch plan copy missing ${missingBatchPlanTokens.join(', ')}.`);
   }
   await page.getByTestId('negative-lab-accept-batch-plan').click();
   await page

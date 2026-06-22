@@ -2058,6 +2058,7 @@
         "retouch": "",
         "review": ""
       },
+      "effectiveFrameExposure": "Effective frame exposure {{exposure}} EV",
       "excludeScan": "Exclude",
       "exportOptions": "Exportoptionen",
       "exposure": "Belichtung",
@@ -2072,6 +2073,7 @@
         "roll_default": "Roll crop",
         "skipped": "Skipped"
       },
+      "frameExposureOffset": "Frame exposure offset",
       "frameHealth": "Frame health",
       "frameHealthActive": "Active",
       "frameHealthFilter": {
@@ -2169,6 +2171,7 @@
       "queuedScans": "{{queuedCount}} queued",
       "readoutCopied": "Copied readout",
       "redWeight": "Rot (Cyan)",
+      "resetFrameExposure": "Reset frame",
       "resetTooltip": "Zurücksetzen",
       "resetViewTooltip": "Ansicht zurücksetzen",
       "sampleCenterPatch": "Center patch",

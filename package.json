@@ -415,6 +415,7 @@
     "check:negative-lab-fixtures:update": "bun tests/integration/checks/check-negative-lab-fixtures.ts --update",
     "check:negative-lab-real-fixtures": "bun tests/integration/checks/check-negative-lab-real-fixtures.ts",
     "check:negative-lab-frame-health": "bun tests/integration/checks/check-negative-lab-frame-health-report.ts",
+    "check:negative-lab-frame-exposure-override": "bun tests/integration/checks/check-negative-lab-frame-exposure-override.ts",
     "check:negative-lab-stock-registry": "bun tests/integration/checks/check-negative-lab-stock-registry.ts",
     "check:negative-lab-stock-metadata-catalog": "bun tests/integration/checks/check-negative-lab-stock-metadata-catalog.ts",
     "check:negative-lab-stock-metadata-coverage": "bun tests/integration/checks/check-negative-lab-stock-metadata-coverage.ts",
