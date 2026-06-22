@@ -53,7 +53,7 @@ const reportSchema = z
       .strict(),
     cases: z.array(proofCaseSchema).length(4),
     consultApplied: z.array(z.string().min(1)).min(1),
-    issue: z.literal(2875),
+    issue: z.literal(3146),
     previewExportMaxDelta: z.literal(0),
     previewState: z
       .object({
@@ -145,7 +145,7 @@ const report = reportSchema.parse({
     'neutral suppression guard verified',
     'preview mode is transient UI state',
   ],
-  issue: 2875,
+  issue: 3146,
   previewExportMaxDelta,
   previewState: {
     mode: 'mask',

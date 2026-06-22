@@ -17,6 +17,11 @@ import {
 import { COLOR_GRADING_PRESETS } from '../../utils/colorGradingPresets';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../utils/profileTonePresets';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../utils/selectiveColorRanges';
+import {
+  applySelectiveColorToRgbPixel,
+  renderSelectiveColorMaskPreviewPixel,
+  type RgbPixel,
+} from '../../utils/selectiveColorRuntime';
 import ColorWheel from '../ui/ColorWheel';
 import UiText from '../ui/Text';
 
@@ -58,6 +63,18 @@ const getColorGradingSwatchColor = (value: HueSatLum) => {
 
 const areColorGradingWheelValuesEqual = (left: HueSatLum, right: HueSatLum) =>
   left.hue === right.hue && left.saturation === right.saturation && left.luminance === right.luminance;
+
+const hexColorToRgbPixel = (hexColor: string): RgbPixel => ({
+  blue: Number.parseInt(hexColor.slice(5, 7), 16) / 255,
+  green: Number.parseInt(hexColor.slice(3, 5), 16) / 255,
+  red: Number.parseInt(hexColor.slice(1, 3), 16) / 255,
+});
+
+const rgbPixelToCssColor = ({ blue, green, red }: RgbPixel): string =>
+  `rgb(${Math.round(red * 255)} ${Math.round(green * 255)} ${Math.round(blue * 255)})`;
+
+const formatSelectiveColorProofRgb = (pixel: RgbPixel): string =>
+  [pixel.red, pixel.green, pixel.blue].map((channel) => channel.toFixed(3)).join(',');
 
 const isColorGradingPresetApplied = (colorGrading: Adjustments['colorGrading'], preset: ColorGradingPreset): boolean =>
   colorGrading.balance === preset.balance &&
@@ -879,6 +896,21 @@ export default function ColorPanel({
   const activeChannelMixerRow = channelMixer[activeChannelMixerOutput];
   const activeSelectiveColorRange = getSelectiveColorRange(activeColor);
   const activeSelectiveColorRangeControl = adjustments.selectiveColorRangeControls[activeColor];
+  const activeSelectiveColorSamplePixel = hexColorToRgbPixel(activeSelectiveColorRange.color);
+  const activeSelectiveColorAdjustment = currentHsl;
+  const activeSelectiveColorMaskPreview = renderSelectiveColorMaskPreviewPixel(
+    activeSelectiveColorSamplePixel,
+    activeColor,
+    {
+      [activeColor]: activeSelectiveColorRangeControl,
+    },
+  );
+  const activeSelectiveColorAppliedPreview = applySelectiveColorToRgbPixel(
+    activeSelectiveColorSamplePixel,
+    activeColor,
+    activeSelectiveColorAdjustment,
+    { [activeColor]: activeSelectiveColorRangeControl },
+  );
   const baseHue = activeSelectiveColorRangeControl.centerHueDegrees;
   const activeSelectiveColorRangeLabel = t(activeSelectiveColorRange.labelKey);
   const activeSelectiveColorRangeCenter = `${Math.round(activeSelectiveColorRangeControl.centerHueDegrees)}°`;
@@ -1817,11 +1849,18 @@ export default function ColorPanel({
       <div
         className="p-2 bg-bg-tertiary rounded-md"
         data-active-range={activeColor}
+        data-apply-output-rgb={formatSelectiveColorProofRgb(activeSelectiveColorAppliedPreview.outputRgb)}
         data-command-type="toneColor.adjustHsl"
         data-dirty={String(isActiveSelectiveColorAdjusted)}
+        data-mask-preview-rgb={formatSelectiveColorProofRgb(activeSelectiveColorMaskPreview)}
+        data-mask-weight={activeSelectiveColorAppliedPreview.maskWeight.toFixed(3)}
         data-preview-mode={selectiveColorPreviewMode}
         data-preview-mutates-adjustments="false"
         data-preview-source="selectiveColorRuntime.renderSelectiveColorMaskPreviewPixel"
+        data-preview-to-apply-aligned={String(
+          formatSelectiveColorProofRgb(activeSelectiveColorAppliedPreview.outputRgb) !==
+            formatSelectiveColorProofRgb(activeSelectiveColorSamplePixel),
+        )}
         data-testid="selective-color-range-controls"
       >
         <UiText variant={TextVariants.heading} className="mb-3">
@@ -1929,6 +1968,29 @@ export default function ColorPanel({
             step={1}
             value={Math.round(activeSelectiveColorRangeControl.falloffSmoothness * 10)}
           />
+        </div>
+        <div className="mb-3 grid grid-cols-3 gap-2 rounded-md border border-surface bg-bg-primary p-2 text-[11px]">
+          <div className="grid gap-1" data-testid="selective-color-source-swatch">
+            <span className="text-text-tertiary">{activeSelectiveColorRangeLabel}</span>
+            <span
+              className="h-8 rounded border border-surface"
+              style={{ backgroundColor: rgbPixelToCssColor(activeSelectiveColorSamplePixel) }}
+            />
+          </div>
+          <div className="grid gap-1" data-testid="selective-color-mask-swatch">
+            <span className="text-text-tertiary">{t('adjustments.color.maskPreviewEnabled')}</span>
+            <span
+              className="h-8 rounded border border-surface"
+              style={{ backgroundColor: rgbPixelToCssColor(activeSelectiveColorMaskPreview) }}
+            />
+          </div>
+          <div className="grid gap-1" data-testid="selective-color-apply-swatch">
+            <span className="text-text-tertiary">{t('adjustments.color.adjustedPreviewEnabled')}</span>
+            <span
+              className="h-8 rounded border border-surface"
+              style={{ backgroundColor: rgbPixelToCssColor(activeSelectiveColorAppliedPreview.outputRgb) }}
+            />
+          </div>
         </div>
         <div className="flex justify-between mb-4 px-1">
           {HSL_COLORS.map(({ name, color, label }) => (

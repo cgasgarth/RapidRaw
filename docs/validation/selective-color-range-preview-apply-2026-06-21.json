@@ -101,7 +101,7 @@
     "neutral suppression guard verified",
     "preview mode is transient UI state"
   ],
-  "issue": 2875,
+  "issue": 3146,
   "previewExportMaxDelta": 0,
   "previewState": {
     "mode": "mask",
