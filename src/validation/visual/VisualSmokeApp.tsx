@@ -33,6 +33,7 @@ import { INITIAL_ADJUSTMENTS, type Adjustments, type MaskContainer } from '../..
 import { agentChatTranscriptFixture } from '../../utils/agentChatTranscriptFixture';
 import { applyColorBalanceRgbToPixel } from '../../utils/colorBalanceRgbRuntime';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
+import { DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF } from '../../utils/detailOutputComparisonProof';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
 import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
 
@@ -607,6 +608,16 @@ const detailReviewStages = [
   'capture_sharpen',
   'wavelet_luma_detail',
 ] as const;
+const detailOutputComparisonFrames = [
+  { label: 'Original', marker: 'source RAW', tone: 'linear-gradient(135deg, #3b4650, #626862, #ad9566)' },
+  { label: 'Current', marker: 'baseline render', tone: 'linear-gradient(135deg, #3a4852, #6a7169, #bda976)' },
+  { label: 'Recipe', marker: 'denoise + detail', tone: 'linear-gradient(135deg, #33434d, #758579, #d3c18b)' },
+] as const;
+const detailOutputComparisonMetrics = {
+  changedPixelRatio: '92.6%',
+  currentToRecipeDelta: '0.015477',
+  recipeToExportDelta: '0.000000',
+} as const;
 const maskOverlayRawProofSourcePath = 'private-fixtures/detail/high-iso-skin-shadow-v1.arw';
 const maskOverlayRawProofCopy = {
   fixtureLabel: 'private RAW fixture',
@@ -924,17 +935,27 @@ const copy = {
   dustOverlayInteractionProof: 'Overlay interaction proof',
   dustSpotVisualization: 'Dust Spot Visualization',
   dustUiOverlayContract: 'UI overlay contract',
-  detailZoom200: '200%',
+  detailZoom100: '100% crop',
   splitCompare: 'Split compare',
   lumaDetail: 'Luma detail',
+  applyDetailRecipe: 'Apply recipe',
   detailBefore: 'Before',
   detailAfter: 'After',
+  detailCurrent: 'Current',
+  detailCurrentRecipeDelta: 'Current/recipe delta',
+  detailExportArtifact: 'Export artifact',
+  detailOriginal: 'Original',
+  detailOutputComparison: 'Denoise + detail output compare',
+  detailRecipe: 'Recipe',
+  detailRecipeChangedPixels: 'Changed pixels',
+  detailRecipeExportHash: 'Recipe export hash differs from disabled',
+  detailRecipeExportParity: 'Recipe preview/export delta 0.000000',
   detailWavelet: 'Wavelet',
   detailWarningTitle: 'Artifact warning',
   detailRingingReview: 'Ringing review',
   detailDryRunTool: 'detail.deblur.dry_run_command',
   detailStageOrder: 'Stage order',
-  detailProofSummary: 'Zoom, split, warning, and existing detail runtime state are captured in one replay.',
+  detailProofSummary: '100% crop, split comparison, warning, recipe apply, and export artifact state are captured.',
 } as const;
 
 const scopes = [
@@ -948,6 +969,7 @@ function DetailWorkspaceVisualSmoke() {
   const [zoom, setZoom] = useState('100');
   const [previewMode, setPreviewMode] = useState<'single' | 'split'>('single');
   const [waveletMode, setWaveletMode] = useState<'off' | 'luma_detail'>('off');
+  const [recipeApplied, setRecipeApplied] = useState(false);
 
   return (
     <main
@@ -967,22 +989,31 @@ function DetailWorkspaceVisualSmoke() {
           <div
             className="space-y-3"
             data-artifact-warning="ringing_review"
+            data-comparison-mode={DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF.comparisonMode}
+            data-crop-clipped={String(DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF.cropClipped)}
+            data-crop-zoom-percent={String(DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF.cropZoomPercent)}
             data-deblur-command={copy.detailDryRunTool}
             data-denoise-stage="scene_linear_denoise"
+            data-export-artifact-path={DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF.exportArtifactPath}
+            data-fixture-id={DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF.fixtureId}
             data-preview-mode={previewMode}
-            data-runtime-status="fixture_runtime_paths"
+            data-recipe-applied={String(recipeApplied)}
+            data-recipe-id={DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF.recipeId}
+            data-render-fallback={String(DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF.renderFallback)}
+            data-runtime-status={DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF.runtimeStatus}
             data-testid="detail-workspace-proof"
             data-wavelet-mode={waveletMode}
+            data-warning-codes={DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF.warningCodes.join(',')}
             data-zoom={zoom}
           >
             <button
               className="flex w-full items-center justify-between rounded-md border border-white/10 bg-white/5 px-3 py-2 text-left text-sm hover:bg-white/10"
               onClick={() => {
-                setZoom('200');
+                setZoom('100');
               }}
               type="button"
             >
-              <span>{copy.detailZoom200}</span>
+              <span>{copy.detailZoom100}</span>
               <span className="text-xs text-[#aab2bd]">{zoom}%</span>
             </button>
             <button
@@ -999,10 +1030,11 @@ function DetailWorkspaceVisualSmoke() {
               className="flex w-full items-center justify-between rounded-md border border-[#6da7d8]/40 bg-[#1d2b35] px-3 py-2 text-left text-sm hover:bg-[#243746]"
               onClick={() => {
                 setWaveletMode('luma_detail');
+                setRecipeApplied(true);
               }}
               type="button"
             >
-              <span>{copy.lumaDetail}</span>
+              <span>{copy.applyDetailRecipe}</span>
               <Sparkles size={14} className="text-[#9ac5eb]" />
             </button>
           </div>
@@ -1011,35 +1043,35 @@ function DetailWorkspaceVisualSmoke() {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-xs uppercase text-[#9ba6b2]">{copy.detailWorkspace}</p>
-              <h2 className="text-lg font-semibold">{copy.detailReview}</h2>
+              <h2 className="text-lg font-semibold">{copy.detailOutputComparison}</h2>
             </div>
-            <div className="rounded border border-white/10 bg-white/5 px-3 py-1 text-sm">
-              {copy.detailRuntimeStatus}
-            </div>
+            <div className="rounded border border-white/10 bg-white/5 px-3 py-1 text-sm">{zoom}%</div>
           </div>
-          <div className="grid h-[680px] grid-cols-2 gap-3 overflow-hidden rounded-md border border-white/10 bg-[#11161b] p-3">
-            <div
-              className="relative overflow-hidden rounded"
-              style={{ background: 'linear-gradient(135deg, #39434a, #6d6f6b, #b8a475)' }}
-            >
-              <div className="absolute left-4 top-4 rounded bg-black/50 px-2 py-1 text-xs text-white">
-                {copy.detailBefore}
+          <div className="grid h-[680px] grid-cols-3 gap-3 overflow-hidden rounded-md border border-white/10 bg-[#11161b] p-3">
+            {detailOutputComparisonFrames.map((frame, index) => (
+              <div className="relative overflow-hidden rounded" key={frame.label} style={{ background: frame.tone }}>
+                <div className="absolute left-4 top-4 rounded bg-black/50 px-2 py-1 text-xs text-white">
+                  {frame.label}
+                </div>
+                <div className="absolute right-4 top-4 rounded bg-black/45 px-2 py-1 text-[11px] text-white/80">
+                  {frame.marker}
+                </div>
+                <div
+                  className="absolute inset-x-8 top-28 h-px bg-white/55"
+                  style={{ opacity: index === 2 && recipeApplied ? 0.85 : 0.45 }}
+                />
+                <div
+                  className="absolute inset-y-24 left-28 w-px bg-white/45"
+                  style={{ opacity: index === 2 && recipeApplied ? 0.7 : 0.36 }}
+                />
+                <div className="absolute bottom-8 left-8 right-8 h-20 rounded bg-black/20" />
+                {index === 2 && recipeApplied && (
+                  <div className="absolute bottom-8 right-8 rounded border border-[#6da7d8]/50 bg-[#162632]/85 px-2 py-1 text-xs text-[#d4ecff]">
+                    {copy.detailRecipe}
+                  </div>
+                )}
               </div>
-              <div className="absolute inset-x-8 top-28 h-px bg-white/40" />
-              <div className="absolute inset-y-24 left-28 w-px bg-white/30" />
-              <div className="absolute bottom-8 left-8 right-8 h-20 rounded bg-black/20" />
-            </div>
-            <div
-              className="relative overflow-hidden rounded"
-              style={{ background: 'linear-gradient(135deg, #33434d, #738176, #cfbe88)' }}
-            >
-              <div className="absolute left-4 top-4 rounded bg-black/50 px-2 py-1 text-xs text-white">
-                {copy.detailAfter}
-              </div>
-              <div className="absolute inset-x-8 top-28 h-px bg-white/70 shadow-lg" />
-              <div className="absolute inset-y-24 left-28 w-px bg-white/50" />
-              <div className="absolute bottom-8 left-8 right-8 h-20 rounded bg-black/15" />
-            </div>
+            ))}
           </div>
         </section>
         <aside className="border-l border-white/10 bg-[#181b20] p-4" data-visual-smoke-section="detail-review">
@@ -1067,10 +1099,24 @@ function DetailWorkspaceVisualSmoke() {
             <div className="rounded-md border border-[#d8a24d]/40 bg-[#2c2418] p-3" data-testid="detail-warning">
               <p className="text-xs text-[#d8b36f]">{copy.detailWarningTitle}</p>
               <p>{copy.detailRingingReview}</p>
+              <p className="mt-1 text-xs text-[#d8b36f]">
+                {DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF.warningCodes.join(' / ')}
+              </p>
             </div>
             <div className="rounded-md border border-white/10 bg-white/5 p-3">
-              <p className="text-xs text-[#9ba6b2]">{copy.detailDryRunTool}</p>
+              <p className="text-xs text-[#9ba6b2]">{copy.detailExportArtifact}</p>
+              <p className="break-all text-xs">{DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF.exportArtifactPath}</p>
+              <p className="mt-2 text-xs text-[#9ba6b2]">{copy.detailRecipeExportHash}</p>
+              <p className="text-xs">{copy.detailRecipeExportParity}</p>
+            </div>
+            <div className="rounded-md border border-white/10 bg-white/5 p-3 text-xs">
               <p>{copy.detailProofSummary}</p>
+              <p className="mt-2 text-[#9ba6b2]">
+                {copy.detailCurrentRecipeDelta} {detailOutputComparisonMetrics.currentToRecipeDelta}
+              </p>
+              <p className="text-[#9ba6b2]">
+                {copy.detailRecipeChangedPixels} {detailOutputComparisonMetrics.changedPixelRatio}
+              </p>
             </div>
           </div>
         </aside>

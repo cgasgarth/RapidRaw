@@ -1,0 +1,71 @@
+{
+  "$schema": "https://rawengine.dev/schemas/detail-output-comparison-proof-v1.json",
+  "artifacts": {
+    "currentBaselineCrop": {
+      "contentHash": "sha256:b3aafb10e457f5f0eeb00f195560a4a7cfbb7466c11ffc44aa06dbbd2b27c0f1",
+      "format": "pgm_u8_preview",
+      "kind": "current_baseline_crop",
+      "path": "artifacts/validation/detail-output-comparison/high-iso-skin-shadow-v1-current-baseline.pgm",
+      "publicRepoAllowed": false
+    },
+    "disabledExportArtifact": {
+      "contentHash": "sha256:b3aafb10e457f5f0eeb00f195560a4a7cfbb7466c11ffc44aa06dbbd2b27c0f1",
+      "format": "pgm_u8_preview",
+      "kind": "disabled_export_artifact",
+      "path": "artifacts/validation/detail-output-comparison/high-iso-skin-shadow-v1-disabled-export.pgm",
+      "publicRepoAllowed": false
+    },
+    "enabledExportArtifact": {
+      "contentHash": "sha256:7de682f0621634679595468a6fdfc775f7cddbe276f94109aaf3adc3926646fa",
+      "format": "pgm_u8_preview",
+      "kind": "enabled_export_artifact",
+      "path": "artifacts/validation/detail-output-comparison/high-iso-skin-shadow-v1-enabled-export.pgm",
+      "publicRepoAllowed": false
+    },
+    "originalCrop": {
+      "contentHash": "sha256:bbd1b0293552e237e65a9489340027b306459ddd11918278a0e6bc3714f468c2",
+      "format": "pgm_u8_preview",
+      "kind": "original_crop",
+      "path": "artifacts/validation/detail-output-comparison/high-iso-skin-shadow-v1-original-crop.pgm",
+      "publicRepoAllowed": false
+    },
+    "recipePreviewCrop": {
+      "contentHash": "sha256:7de682f0621634679595468a6fdfc775f7cddbe276f94109aaf3adc3926646fa",
+      "format": "pgm_u8_preview",
+      "kind": "recipe_preview_crop",
+      "path": "artifacts/validation/detail-output-comparison/high-iso-skin-shadow-v1-recipe-preview.pgm",
+      "publicRepoAllowed": false
+    }
+  },
+  "crop": {
+    "clipped": false,
+    "height": 48,
+    "sourcePath": "private-fixtures/detail/high-iso-skin-shadow-v1.arw",
+    "width": 64,
+    "x": 512,
+    "y": 384,
+    "zoomPercent": 100
+  },
+  "doesNotProve": ["native_export_pipeline", "real_raw_quality", "tauri_app_e2e", "user_tuned_recipe_quality"],
+  "fixtureId": "detail.output.high-iso-denoise-detail-100.v1",
+  "generatedAt": "2026-06-22T12:00:00.000Z",
+  "issue": 3067,
+  "metrics": {
+    "currentToRecipeChangedPixelRatio": 0.925781,
+    "currentToRecipeMeanAbsDelta": 0.015477,
+    "disabledExportMatchesCurrentHash": true,
+    "enabledExportDiffersFromDisabled": true,
+    "originalToCurrentMeanAbsDelta": 0.006382,
+    "recipeToExportMeanAbsDelta": 0
+  },
+  "recipe": {
+    "detailAmount": 0.42,
+    "label": "Denoise + detail 100% review",
+    "lumaNoiseReduction": 0.58,
+    "recipeId": "detail.output.denoise-detail-100.v1",
+    "stages": ["scene_linear_denoise", "capture_sharpen", "wavelet_luma_detail"]
+  },
+  "runtimeStatus": "synthetic_detail_output_comparison_artifact_rendered",
+  "schemaVersion": 1,
+  "warnings": ["halo_risk_review", "oversmoothing_review", "crop_bounds_ok"]
+}
