@@ -300,6 +300,7 @@ export default function AppModals(props: AppModalsProps) {
         outputReview={superResolutionModalState.outputReview}
         settings={superResolutionModalState.settings}
         sourceCount={superResolutionModalState.sourcePaths.length}
+        sourcePreflightMetadata={superResolutionModalState.sourcePreflightMetadata}
       />
       <FocusStackModal
         isOpen={focusStackModalState.isOpen}

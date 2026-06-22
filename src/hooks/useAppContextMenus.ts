@@ -75,6 +75,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { globalImageCache } from '../utils/ImageLRUCache';
+import { createSuperResolutionSourcePreflightMetadata } from '../utils/superResolutionSourcePreflight';
 
 export interface UseAppContextMenusProps {
   handleImageSelect: (path: string) => void;
@@ -625,6 +626,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     isOpen: true,
                     outputReview: null,
                     settings: DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
+                    sourcePreflightMetadata: createSuperResolutionSourcePreflightMetadata(finalSelection, imageList),
                     sourcePaths: finalSelection,
                   },
                 });

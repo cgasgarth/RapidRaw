@@ -447,6 +447,8 @@ export const superResolutionReviewWorkspaceProofSchema = z.object({
   reviewPacketPath: z.literal('docs/validation/sr-synthetic-output-artifact-proof-2026-06-20.json'),
   runtimeStatus: z.literal('dry_run_preview'),
   reviewCropCount: z.literal('4'),
+  sourcePreflightEffectiveScale: z.literal('2'),
+  sourcePreflightStatus: z.literal('ready'),
   sourceCount: z.literal('5'),
   warningCodes: z.literal('human_review_required,synthetic_runtime_only,texture_risk,aggressive_preview_only'),
 });

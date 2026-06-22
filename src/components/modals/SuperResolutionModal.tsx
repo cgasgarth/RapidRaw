@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { AlertTriangle, CheckCircle2, Layers3, ScanSearch, ShieldCheck } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
@@ -16,6 +16,7 @@ import {
 } from '../../schemas/superResolutionUiSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
+import { buildSuperResolutionSourcePreflight } from '../../utils/superResolutionSourcePreflight';
 import Button from '../ui/Button';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
@@ -27,6 +28,7 @@ import type {
   SuperResolutionQualityPreference,
   SuperResolutionUiSettings,
 } from '../../schemas/superResolutionUiSchemas';
+import type { SuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
 
 interface SuperResolutionModalProps {
   isOpen: boolean;
@@ -40,6 +42,7 @@ interface SuperResolutionModalProps {
   outputReview?: SuperResolutionOutputReviewWorkflow | null;
   settings: SuperResolutionUiSettings;
   sourceCount: number;
+  sourcePreflightMetadata?: SuperResolutionSourcePreflightMetadata[];
 }
 
 const scaleOptions = [1.5, 2, 3, 4] as const;
@@ -58,10 +61,24 @@ export default function SuperResolutionModal({
   outputReview: runtimeOutputReview,
   settings,
   sourceCount,
+  sourcePreflightMetadata = [],
 }: SuperResolutionModalProps) {
   const { t } = useTranslation();
 
-  const isSourceCountValid = sourceCount >= 2;
+  const sourcePreflight = useMemo(
+    () =>
+      sourcePreflightMetadata.length > 0
+        ? buildSuperResolutionSourcePreflight({
+            requestedScale: settings.outputScale,
+            sources: sourcePreflightMetadata,
+          })
+        : null,
+    [settings.outputScale, sourcePreflightMetadata],
+  );
+  const isSourceCountValid = sourceCount >= 2 && sourcePreflight?.status !== 'blocked';
+  const isSourcePreflightReady = sourcePreflight?.status === 'ready';
+  const isSourcePreflightBlocked = sourcePreflight?.status === 'blocked';
+  const isSourcePreflightMissingMetadata = sourcePreflight?.status === 'metadata_missing';
   const isAggressivePreviewOnly = settings.detailPolicy === 'aggressive_preview_only';
   const outputPixelMultiplier = Number((settings.outputScale * settings.outputScale).toFixed(2));
   const estimatedPreviewMegapixels = Math.round((sourceCount * settings.maxPreviewDimensionPx ** 2) / 1_000_000);
@@ -92,6 +109,35 @@ export default function SuperResolutionModal({
   const selectedQualityLabel =
     qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '';
   const selectedMode = getSuperResolutionModeForDetailPolicy(settings.detailPolicy);
+  const effectiveScale = sourcePreflight?.validation?.effectiveScale ?? settings.outputScale;
+  const validationConfidenceLabel =
+    sourcePreflight?.validation === null || sourcePreflight === null
+      ? t('modals.superResolution.preflight.notMeasured')
+      : t('modals.superResolution.review.confidenceValue', {
+          value: Math.round(sourcePreflight.validation.validationConfidence * 100),
+        });
+  const sourcePreflightStatusLabel = isSourcePreflightReady
+    ? t('modals.superResolution.preflight.ready')
+    : isSourcePreflightBlocked
+      ? t('modals.superResolution.preflight.blocked')
+      : isSourcePreflightMissingMetadata
+        ? t('modals.superResolution.preflight.metadataMissing', {
+            count: sourcePreflight.missingMetadataCount,
+          })
+        : t('modals.superResolution.preflight.notMeasured');
+  const sourcePreflightWarningsLabel =
+    sourcePreflight?.validation?.warningCodes
+      .map((warningCode) => t(`modals.superResolution.preflight.warning.${warningCode}`))
+      .join(', ') || t('modals.superResolution.preflight.noWarnings');
+  const sourcePreflightBlocksLabel =
+    sourcePreflight?.validation?.blockCodes
+      .map((blockCode) => t(`modals.superResolution.preflight.block.${blockCode}`))
+      .join(', ') || t('modals.superResolution.preflight.noBlocks');
+  const sourcePreflightDowngradesLabel =
+    sourcePreflight?.validation?.downgradeReasons
+      .map((downgradeReason) => t(`modals.superResolution.preflight.downgrade.${downgradeReason}`))
+      .join(', ') || t('modals.superResolution.preflight.noDowngrades');
+  const sourcePreflightSamples = sourcePreflight?.validation?.sourceMetadata.slice(0, 4) ?? [];
   const sourceReadinessLabel = `${t('modals.superResolution.sourceSummary', { count: sourceCount })} - ${
     isSourceCountValid ? t('modals.superResolution.preflight.ready') : t('modals.superResolution.preflight.blocked')
   }`;
@@ -361,6 +407,10 @@ export default function SuperResolutionModal({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         className="rounded-md border border-border-color bg-bg-primary p-4"
+        data-effective-scale={effectiveScale}
+        data-preflight-status={sourcePreflight?.status ?? 'not_measured'}
+        data-validation-confidence={sourcePreflight?.validation?.validationConfidence ?? ''}
+        data-testid="sr-source-preflight"
       >
         <div className="flex items-center gap-2 mb-3">
           <ShieldCheck className="w-5 h-5 text-accent" />
@@ -373,7 +423,10 @@ export default function SuperResolutionModal({
           />
           <ComputationalSetupStatusLine
             label={t('modals.superResolution.preflight.scale')}
-            value={t('modals.superResolution.scaleValue', { scale: settings.outputScale })}
+            value={t('modals.superResolution.preflight.effectiveScaleValue', {
+              effectiveScale,
+              requestedScale: settings.outputScale,
+            })}
           />
           <ComputationalSetupStatusLine
             label={t('modals.superResolution.preflight.outputPixels')}
@@ -400,7 +453,46 @@ export default function SuperResolutionModal({
             label={t('modals.superResolution.preflight.provenance')}
             value={t('modals.superResolution.preflight.required')}
           />
+          <ComputationalSetupStatusLine
+            label={t('modals.superResolution.preflight.status')}
+            value={sourcePreflightStatusLabel}
+          />
+          <ComputationalSetupStatusLine
+            label={t('modals.superResolution.preflight.confidence')}
+            value={validationConfidenceLabel}
+          />
+          <ComputationalSetupStatusLine
+            label={t('modals.superResolution.preflight.warnings')}
+            value={sourcePreflightWarningsLabel}
+          />
+          <ComputationalSetupStatusLine
+            label={t('modals.superResolution.preflight.blocks')}
+            value={sourcePreflightBlocksLabel}
+          />
+          <ComputationalSetupStatusLine
+            label={t('modals.superResolution.preflight.downgrades')}
+            value={sourcePreflightDowngradesLabel}
+          />
         </div>
+        {sourcePreflightSamples.length > 0 && (
+          <div className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-2">
+            {sourcePreflightSamples.map((source) => (
+              <div
+                className="rounded-md border border-border-color bg-card-background p-2 text-xs"
+                data-testid="sr-source-preflight-row"
+                key={`${source.imagePath}-${source.sourceIndex}`}
+              >
+                <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                  {t('modals.superResolution.preflight.sourceRoleValue', {
+                    role: t(`modals.superResolution.preflight.shiftRole.${source.resolvedShiftRole}`),
+                    sourceIndex: source.sourceIndex + 1,
+                  })}
+                </UiText>
+                <UiText className="truncate">{`${source.width}x${source.height}`}</UiText>
+              </div>
+            ))}
+          </div>
+        )}
       </motion.section>
 
       <ComputationalMergeReviewPanel
