@@ -2658,6 +2658,7 @@ export const computationalMergeSourceImageRefV1Schema = z
   .object({
     colorSpaceHint: z.string().trim().min(1).optional(),
     exposureEv: z.number().optional(),
+    exposureWeightMultiplier: z.number().positive().optional(),
     focusDistanceMm: z.number().positive().optional(),
     imageId: z.string().trim().min(1).optional(),
     imagePath: z.string().trim().min(1),
@@ -3536,6 +3537,7 @@ export const hdrHighlightRecoveryMetricsV1Schema = z
 const hdrSourceStateV1Schema = z
   .object({
     contentHash: z.string().trim().min(1),
+    exposureWeightMultiplier: z.number().positive().optional(),
     graphRevision: z.string().trim().min(1),
     resolvedExposureEv: z.number(),
     sourceIndex: z.number().int().nonnegative(),

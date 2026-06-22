@@ -1931,6 +1931,11 @@
       "descriptionWithCount": "Kombinieren Sie {{count}} Belichtungen zu einem einzigen High Dynamic Range Bild.",
       "descriptionWithCount_one": "Kombinieren Sie {{count}} Belichtung zu einem einzigen High Dynamic Range Bild.",
       "descriptionWithCount_other": "Kombinieren Sie {{count}} Belichtungen zu einem einzigen High Dynamic Range Bild.",
+      "exposureWeighting": {
+        "balanced": "",
+        "liftShadows": "",
+        "protectHighlights": ""
+      },
       "failed": "HDR-Zusammenfügung fehlgeschlagen",
       "handoffColorSpace": "Color space",
       "handoffColorStates": "Color states",

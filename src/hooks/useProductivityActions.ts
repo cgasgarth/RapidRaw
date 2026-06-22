@@ -101,14 +101,18 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
     (paths: string[]) => {
       const { hdrModalState } = useUIStore.getState();
       const { settings } = hdrModalState;
+      const selectedIndexSet = new Set(settings.selectedSourceIndexes);
+      const selectedPaths = paths.filter((_path, sourceIndex) => selectedIndexSet.has(sourceIndex));
       const dryRunCommand = {
         toolName: getComputationalMergeAppServerRoutePairSummary('hdr').dryRunToolName,
         commandType: 'computationalMerge.createHdr' as const,
         deghosting: settings.deghosting,
         dryRun: true as const,
+        exposureWeightingMode: settings.exposureWeightingMode,
         maxPreviewDimensionPx: settings.maxPreviewDimensionPx,
         mergeStrategy: settings.mergeStrategy,
-        sources: paths.length,
+        selectedSourceIndexes: settings.selectedSourceIndexes,
+        sources: selectedPaths.length,
         toneMappingPreset: settings.toneMappingPreset,
       };
       setUI((state) => ({
@@ -121,7 +125,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
           progressMessage: 'Starting HDR',
         },
       }));
-      invoke(Invokes.MergeHdr, { paths }).catch((err: unknown) => {
+      invoke(Invokes.MergeHdr, { paths: selectedPaths }).catch((err: unknown) => {
         setUI((state) => ({ hdrModalState: { ...state.hdrModalState, isProcessing: false, error: String(err) } }));
       });
     },

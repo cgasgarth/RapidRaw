@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const hdrMergeAlignmentModeSchema = z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']);
 export const hdrMergeBracketValidationSchema = z.enum(['required', 'warn', 'disabled']);
 export const hdrMergeDeghostingSchema = z.enum(['off', 'low', 'medium', 'high']);
+export const hdrMergeExposureWeightingModeSchema = z.enum(['balanced', 'protect_highlights', 'lift_shadows']);
 export const hdrMergeStrategySchema = z.enum(['scene_linear_radiance', 'exposure_fusion_preview']);
 export const hdrMergeQualityPreferenceSchema = z.enum(['preview', 'balanced', 'best']);
 export const hdrToneMappingPresetSchema = z.enum([
@@ -20,9 +21,11 @@ export const hdrMergeUiSettingsSchema = z
     deghostConfidenceMapVisible: z.boolean(),
     deghostRegionIntensityPercent: z.number().int().min(0).max(100),
     deghosting: hdrMergeDeghostingSchema,
+    exposureWeightingMode: hdrMergeExposureWeightingModeSchema,
     maxPreviewDimensionPx: z.number().int().positive().max(8192),
     mergeStrategy: hdrMergeStrategySchema,
     qualityPreference: hdrMergeQualityPreferenceSchema,
+    selectedSourceIndexes: z.array(z.number().int().nonnegative()).min(2),
     sourceMode: z.literal('exposure_bracket'),
     toneMapPreview: z.boolean(),
     toneMappingPreset: hdrToneMappingPresetSchema,
@@ -90,6 +93,7 @@ export type HdrMergeUiSettings = z.infer<typeof hdrMergeUiSettingsSchema>;
 export type HdrMergeAlignmentMode = z.infer<typeof hdrMergeAlignmentModeSchema>;
 export type HdrMergeBracketValidation = z.infer<typeof hdrMergeBracketValidationSchema>;
 export type HdrMergeDeghosting = z.infer<typeof hdrMergeDeghostingSchema>;
+export type HdrMergeExposureWeightingMode = z.infer<typeof hdrMergeExposureWeightingModeSchema>;
 export type HdrMergeStrategy = z.infer<typeof hdrMergeStrategySchema>;
 export type HdrMergeQualityPreference = z.infer<typeof hdrMergeQualityPreferenceSchema>;
 export type HdrToneMappingPreset = z.infer<typeof hdrToneMappingPresetSchema>;
@@ -100,6 +104,7 @@ type HdrToneMappingPresetPatch = Pick<
   | 'deghosting'
   | 'deghostConfidenceMapVisible'
   | 'deghostRegionIntensityPercent'
+  | 'exposureWeightingMode'
   | 'maxPreviewDimensionPx'
   | 'mergeStrategy'
   | 'qualityPreference'
@@ -119,6 +124,7 @@ export const HDR_TONE_MAPPING_PRESETS: Array<{
       deghosting: 'medium',
       deghostConfidenceMapVisible: false,
       deghostRegionIntensityPercent: 65,
+      exposureWeightingMode: 'balanced',
       maxPreviewDimensionPx: 2400,
       mergeStrategy: 'scene_linear_radiance',
       qualityPreference: 'balanced',
@@ -133,6 +139,7 @@ export const HDR_TONE_MAPPING_PRESETS: Array<{
       deghosting: 'high',
       deghostConfidenceMapVisible: false,
       deghostRegionIntensityPercent: 85,
+      exposureWeightingMode: 'protect_highlights',
       maxPreviewDimensionPx: 4096,
       mergeStrategy: 'scene_linear_radiance',
       qualityPreference: 'best',
@@ -147,6 +154,7 @@ export const HDR_TONE_MAPPING_PRESETS: Array<{
       deghosting: 'medium',
       deghostConfidenceMapVisible: false,
       deghostRegionIntensityPercent: 70,
+      exposureWeightingMode: 'lift_shadows',
       maxPreviewDimensionPx: 4096,
       mergeStrategy: 'exposure_fusion_preview',
       qualityPreference: 'balanced',
@@ -161,6 +169,7 @@ export const HDR_TONE_MAPPING_PRESETS: Array<{
       deghosting: 'low',
       deghostConfidenceMapVisible: false,
       deghostRegionIntensityPercent: 45,
+      exposureWeightingMode: 'balanced',
       maxPreviewDimensionPx: 2400,
       mergeStrategy: 'exposure_fusion_preview',
       qualityPreference: 'preview',
@@ -176,9 +185,11 @@ export const DEFAULT_HDR_MERGE_UI_SETTINGS = hdrMergeUiSettingsSchema.parse({
   deghostConfidenceMapVisible: false,
   deghostRegionIntensityPercent: 65,
   deghosting: 'medium',
+  exposureWeightingMode: 'balanced',
   maxPreviewDimensionPx: 2400,
   mergeStrategy: 'scene_linear_radiance',
   qualityPreference: 'balanced',
+  selectedSourceIndexes: [0, 1, 2],
   sourceMode: 'exposure_bracket',
   toneMapPreview: true,
   toneMappingPreset: 'natural',

@@ -81,6 +81,7 @@ export const buildHdrMergeApiCommandV1 = (requestValue: unknown): HdrMergeApiToo
       sources: bracketDetection.sourceMetadata.map((source) => ({
         colorSpaceHint: 'camera_rgb',
         exposureEv: source.resolvedExposureEv,
+        exposureWeightMultiplier: 1,
         imageId: source.imageId,
         imagePath: source.imagePath,
         rawDefaultsApplied: true,
