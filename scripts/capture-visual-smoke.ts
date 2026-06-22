@@ -1000,10 +1000,16 @@ async function prepareScenario(page, mode) {
         timeout: 10_000,
       });
     await handoff
+      .getByTestId('agent-review-handoff-artifacts')
       .getByText('artifact_agent_expert_edit_demo_before_raw_2844', { exact: true })
       .waitFor({ timeout: 10_000 });
     await handoff
+      .getByTestId('agent-review-handoff-artifacts')
       .getByText('artifact_agent_expert_edit_demo_after_virtual_copy_2844', { exact: true })
+      .waitFor({ timeout: 10_000 });
+    await handoff
+      .getByTestId('agent-review-handoff-audit-trail')
+      .getByText('tonecolor.apply_command', { exact: true })
       .waitFor({ timeout: 10_000 });
     await handoff.getByText('Runtime proof gallery', { exact: true }).waitFor({ timeout: 10_000 });
     await handoff.getByText('Rollback virtual copy', { exact: true }).waitFor({ timeout: 10_000 });
