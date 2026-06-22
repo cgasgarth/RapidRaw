@@ -1958,6 +1958,8 @@
         "privateRawPending": "Private RAW review pending",
         "proofStatus": "App-server bridge ready",
         "provenance": "",
+        "retouchedExportParity": "",
+        "retouchedExportParityPending": "",
         "retouchLayer": "Retouch layer",
         "runtimeBridge": "Dry-run/apply bridge",
         "sharpnessCoverage": "",

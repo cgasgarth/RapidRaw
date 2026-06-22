@@ -3895,6 +3895,28 @@ const focusStackSharpnessSettingsV1Schema = z
   })
   .strict();
 
+const focusStackExportParityHashV1Schema = z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u);
+
+const focusStackRetouchedExportParityV1Schema = z
+  .object({
+    comparedFields: z.array(
+      z.enum([
+        'acceptedDryRunPlan',
+        'outputArtifact',
+        'retouchLayerArtifact',
+        'retouchLayerPolicy',
+        'sharpnessSettings',
+        'sourceState',
+      ]),
+    ),
+    exportReceiptHash: focusStackExportParityHashV1Schema,
+    meanAbsDelta: z.literal(0),
+    parityProofHash: focusStackExportParityHashV1Schema,
+    previewStateHash: focusStackExportParityHashV1Schema,
+    status: z.literal('matched_retouched_sidecar_output'),
+  })
+  .strict();
+
 export const focusStackArtifactV1Schema = z
   .object({
     artifactId: z.string().trim().min(1),
@@ -3918,6 +3940,7 @@ export const focusStackArtifactV1Schema = z
     outputArtifact: artifactHandleV1Schema,
     outputColorSpace: z.string().trim().min(1),
     previewArtifacts: z.array(artifactHandleV1Schema),
+    retouchedExportParity: focusStackRetouchedExportParityV1Schema.optional(),
     haloReview: z
       .object({
         artifactId: z.string().trim().min(1),

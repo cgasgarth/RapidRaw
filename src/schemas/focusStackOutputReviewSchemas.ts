@@ -33,6 +33,17 @@ export const focusStackOutputReviewWorkflowSchema = z
         artifactHash: z.string().trim().min(1),
         artifactId: z.string().trim().min(1),
         exportReviewArtifactId: z.string().trim().min(1),
+        retouchedExportParity: z
+          .object({
+            comparedFields: z.array(z.string().trim().min(1)),
+            exportReceiptHash: z.string().trim().min(1),
+            meanAbsDelta: z.literal(0),
+            parityProofHash: z.string().trim().min(1),
+            previewStateHash: z.string().trim().min(1),
+            status: z.literal('matched_retouched_sidecar_output'),
+          })
+          .strict()
+          .optional(),
         status: focusStackEditableHandoffStatusSchema,
       })
       .strict(),

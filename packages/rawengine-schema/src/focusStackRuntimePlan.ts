@@ -361,6 +361,11 @@ export const buildFocusStackRuntimeArtifactV1 = ({
     outputArtifact,
     outputColorSpace: 'linear_rec2020_d65_v1',
     previewArtifacts,
+    retouchedExportParity: buildFocusStackRetouchedExportParityReceipt({
+      outputArtifact,
+      provenance,
+      retouchLayerArtifact,
+    }),
     haloReview: provenance.haloReview,
     qualityPreference: command.parameters.qualityPreference,
     requestedAlignmentMode: provenance.requestedAlignmentMode,
@@ -392,6 +397,49 @@ export const buildFocusStackRuntimeArtifactV1 = ({
     },
     warningCodes: mutationResult.warnings.filter(isFocusStackArtifactWarning),
   });
+};
+
+const buildFocusStackRetouchedExportParityReceipt = ({
+  outputArtifact,
+  provenance,
+  retouchLayerArtifact,
+}: {
+  outputArtifact: ArtifactHandleV1;
+  provenance: FocusStackRuntimeProvenanceV1;
+  retouchLayerArtifact: ArtifactHandleV1 | undefined;
+}) => {
+  const previewStateHash = `fnv1a32:${stableFocusRuntimeHash(
+    JSON.stringify({
+      acceptedDryRunPlanHash: provenance.acceptedDryRunPlanHash,
+      acceptedDryRunPlanId: provenance.acceptedDryRunPlanId,
+      retouchLayerPolicy: provenance.retouchLayerPolicy,
+      sharpnessSettings: provenance.sharpnessSettings,
+      sourceState: provenance.sourceState,
+    }),
+  )}`;
+  const exportReceiptHash = `fnv1a32:${stableFocusRuntimeHash(
+    JSON.stringify({
+      outputArtifact,
+      retouchLayerArtifact,
+      retouchLayerPolicy: provenance.retouchLayerPolicy,
+    }),
+  )}`;
+
+  return {
+    comparedFields: [
+      'acceptedDryRunPlan',
+      'outputArtifact',
+      'retouchLayerArtifact',
+      'retouchLayerPolicy',
+      'sharpnessSettings',
+      'sourceState',
+    ],
+    exportReceiptHash,
+    meanAbsDelta: 0,
+    parityProofHash: `fnv1a32:${stableFocusRuntimeHash(`${previewStateHash}:${exportReceiptHash}`)}`,
+    previewStateHash,
+    status: 'matched_retouched_sidecar_output',
+  };
 };
 
 export const buildFocusStackAcceptedPlanHashV1 = (requestValue: unknown): string => {

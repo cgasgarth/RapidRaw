@@ -625,6 +625,12 @@ export default function FocusStackModal({
                 value: outputReview.editableHandoff.exportReviewArtifactId,
               },
               {
+                label: t('modals.focusStack.review.retouchedExportParity'),
+                value:
+                  outputReview.editableHandoff.retouchedExportParity?.status ??
+                  t('modals.focusStack.review.retouchedExportParityPending'),
+              },
+              {
                 label: t('modals.focusStack.review.overlay'),
                 value: t('modals.focusStack.review.overlayValue', {
                   mode: reviewOverlayLabel,
@@ -646,6 +652,19 @@ export default function FocusStackModal({
         data-editable-artifact-id={outputReview.editableHandoff.artifactId}
         data-editable-handoff-status={outputReview.editableHandoff.status}
         data-export-review-artifact-id={outputReview.editableHandoff.exportReviewArtifactId}
+        data-retouched-export-parity-export-receipt-hash={
+          outputReview.editableHandoff.retouchedExportParity?.exportReceiptHash ?? ''
+        }
+        data-retouched-export-parity-mean-abs-delta={
+          outputReview.editableHandoff.retouchedExportParity?.meanAbsDelta ?? ''
+        }
+        data-retouched-export-parity-preview-state-hash={
+          outputReview.editableHandoff.retouchedExportParity?.previewStateHash ?? ''
+        }
+        data-retouched-export-parity-proof-hash={
+          outputReview.editableHandoff.retouchedExportParity?.parityProofHash ?? ''
+        }
+        data-retouched-export-parity-status={outputReview.editableHandoff.retouchedExportParity?.status ?? 'pending'}
         data-halo-artifact-id={outputReview.haloReview.artifactId}
         data-halo-review-status={outputReview.haloReview.reviewStatus}
         data-halo-risk-cell-ratio={outputReview.haloRiskCellRatio}

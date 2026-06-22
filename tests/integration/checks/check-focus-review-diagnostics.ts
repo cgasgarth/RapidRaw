@@ -32,6 +32,9 @@ for (const marker of [
   'modals.focusStack.review.editableArtifact',
   'modals.focusStack.review.editableHandoffStatus',
   'modals.focusStack.review.exportHandoff',
+  'modals.focusStack.review.retouchedExportParity',
+  'data-retouched-export-parity-status={outputReview.editableHandoff.retouchedExportParity?.status ??',
+  'data-retouched-export-parity-proof-hash=',
   'modals.focusStack.review.haloRegionRisk',
   'modals.focusStack.review.haloReviewStatus',
   'modals.focusStack.review.haloReviewTitle',
@@ -66,6 +69,7 @@ for (const marker of [
   'buildFocusStackOutputReviewFromArtifact',
   'artifact.haloReview',
   'editableHandoff',
+  'retouchedExportParity',
   'transitionRiskRegions',
   'settings.haloSuppressionStrengthPercent',
 ]) {

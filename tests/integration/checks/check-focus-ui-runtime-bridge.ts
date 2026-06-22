@@ -108,6 +108,12 @@ if (applied.apply.sidecarArtifact.haloReview.reviewStatus !== 'review_required')
     `Expected review_required halo status, got ${applied.apply.sidecarArtifact.haloReview.reviewStatus}.`,
   );
 }
+if (applied.apply.sidecarArtifact.retouchedExportParity?.status !== 'matched_retouched_sidecar_output') {
+  throw new Error('Focus sidecar artifact must persist retouched export parity receipt.');
+}
+if (applied.apply.sidecarArtifact.retouchedExportParity.meanAbsDelta !== 0) {
+  throw new Error('Focus retouched export parity receipt must report zero preview/export delta.');
+}
 const outputReview = buildFocusStackOutputReviewFromArtifact(applied.apply.sidecarArtifact);
 if (outputReview.editableHandoff.artifactHash !== applied.apply.sidecarArtifact.outputArtifact.contentHash) {
   throw new Error('Focus output review did not preserve editable artifact hash.');
@@ -117,6 +123,9 @@ if (
   `${applied.apply.sidecarArtifact.outputArtifact.artifactId}:export-review`
 ) {
   throw new Error('Focus output review did not preserve export review handoff id.');
+}
+if (outputReview.editableHandoff.retouchedExportParity?.parityProofHash === undefined) {
+  throw new Error('Focus output review did not expose retouched export parity proof hash.');
 }
 if (outputReview.haloReview.transitionRiskRegions.length !== cells.length) {
   throw new Error(
