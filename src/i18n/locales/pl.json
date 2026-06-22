@@ -77,6 +77,7 @@
       },
       "colorGrading": "Gradacja kolorów",
       "colorMixer": "Mikser kolorów",
+      "falloffSmoothness": "Falloff",
       "grading": {
         "applyPreset": "Zastosuj preset gradacji {{name}}. Kategoria {{category}}, mieszanie {{blending}}, balans {{balance}}.",
         "balance": "Balans",
@@ -144,6 +145,8 @@
           "soft_contrast": "Miękki kontrast"
         }
       },
+      "rangeCenter": "Środek zakresu",
+      "rangeWidth": "Szerokość zakresu",
       "resetActiveRange": "Reset active range",
       "runtimeStatus": {
         "apiLabel": "API",
