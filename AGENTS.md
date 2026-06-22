@@ -36,7 +36,7 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 ## Pull Requests
 
-- Max two active open PRs total.
+- Max three active open PRs total.
 - Before opening a PR, check the open PR queue with `gh` and keep every open
   PR moving toward merge, fix, close, or explicit deferral.
 - Every open PR must have a disposition: merge, fix, close, or explicitly
@@ -72,6 +72,10 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   availability, GitHub repo resolution, remotes, and current open PR count.
 - If preflight fails, fix that before feature work. Do not add or preserve repo
   scripts whose main purpose is managing agent workflow.
+- When creating a new Codex worktree, prefer the package script:
+  `bun run worktree:create -- --branch codex/name`. It updates local `main` from
+  `origin/main`, creates the worktree from current `origin/main`, links existing
+  dependencies, installs git hooks, and verifies GitHub CLI repo resolution.
 
 ## GitHub Issues
 
