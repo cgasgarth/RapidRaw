@@ -241,6 +241,7 @@
           <span class="pill">Issue: #1856</span>
           <span class="pill">Issue: #2884</span>
           <span class="pill">Issue: #2892</span>
+          <span class="pill">Maintained: 2026-06-22</span>
           <span class="pill">Local review artifact</span>
           <span class="pill">Offline-first</span>
         </div>
@@ -265,7 +266,10 @@
           </div>
           <div class="metric">
             <strong>Feature proofs</strong>
-            <span>HDR, panorama, focus stack, super-resolution, film, color, Negative Lab, and layer smoke paths.</span>
+            <span>
+              HDR, panorama, focus stack, super-resolution, film, color, Negative Lab, layer, mask, and agent proof
+              paths.
+            </span>
           </div>
         </div>
       </section>
@@ -474,17 +478,24 @@
             </tr>
             <tr>
               <td>Layers and masks</td>
-              <td><span class="status partial">Private RAW proof</span></td>
+              <td><span class="status partial">Runtime/UI proof</span></td>
               <td>
-                <code>bun run check:layer-mask-real-raw-proof</code> records private ARW mask-refinement metrics,
-                committed metadata hashes, and preview/export parity without publishing private artifacts.
+                <code>bun run check:layer-stack-ui-proof</code>,
+                <code>bun run check:layer-visibility-opacity-proof</code>,
+                <code>bun run check:brush-mask-canvas-ui-proof</code>, and
+                <code>bun run check:layer-mask-real-raw-proof</code> cover stack UI operations, visibility/opacity,
+                canvas brush output, and private ARW mask-refinement metrics without publishing private pixels.
               </td>
-              <td>Full UI-driven mask refinement walkthrough and broader real RAW layer stack coverage.</td>
+              <td>Blend-mode breadth, group workflows, and broader real RAW layer stack coverage.</td>
             </tr>
             <tr>
               <td>Color workflow</td>
               <td><span class="status partial">UI proof</span></td>
-              <td><code>bun run check:color-workflow-smoke</code>, color style preset and fixture checks.</td>
+              <td>
+                <code>bun run check:color-workflow-smoke</code>,
+                <code>bun run check:professional-color-workflow-private-proof</code>, and color style preset/fixture
+                checks.
+              </td>
               <td>Capture One-class color parity, skin-tone runtime, profile/input transform proof.</td>
             </tr>
             <tr>
@@ -540,6 +551,31 @@
               <code>bun run check:visual-smoke</code> to refresh local screenshots under
               <code>artifacts/visual-smoke/</code>; those generated screenshots remain ignored and are listed below
               until promoted into committed review artifacts.
+            </p>
+          </div>
+          <div class="artifact">
+            <h3>Brush Mask Canvas Proof</h3>
+            <p>
+              <a href="brush-mask-canvas-ui-proof-2026-06-22.json">Brush mask canvas UI proof</a> records a
+              drag-to-output path with paint mask coverage, command IDs, and bounded runtime output evidence.
+            </p>
+          </div>
+          <div class="artifact">
+            <h3>Layer Stack Proofs</h3>
+            <p>
+              <a href="layer-stack-ui-proof-2026-06-20.json">Layer stack UI proof</a> and
+              <a href="layer-visibility-opacity-proof-2026-06-21.json">visibility/opacity proof</a> document visible
+              layer state, operation coverage, and export-parity handoff status.
+            </p>
+          </div>
+          <div class="artifact">
+            <h3>Color And RAW Proofs</h3>
+            <p>
+              <a href="professional-color-workflow-cc-raw-proof-2026-06-20.json"
+                >Professional color private RAW proof</a
+              >
+              and <a href="skin-tone-uniformity-local-raw-proof-2026-06-21.json">skin-tone uniformity proof</a> keep
+              local RAW validation visible without committing private image artifacts.
             </p>
           </div>
           <div class="artifact">

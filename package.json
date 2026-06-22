@@ -39,6 +39,7 @@
     "check:script-extension-policy:self-test": "bun tests/integration/checks/check-script-extension-policy.ts --self-test",
     "check:proof-level-semantics": "bun tests/integration/checks/check-proof-level-semantics.ts",
     "check:proof-level-semantics:self-test": "bun tests/integration/checks/check-proof-level-semantics.ts --self-test",
+    "check:goal-review-dashboard": "bun tests/integration/checks/check-goal-review-dashboard.ts",
     "check:i18n": "bun scripts/run-compact-command.ts --label i18n -- i18next-cli extract --ci --dry-run",
     "check:unsafe-casts": "bun tests/integration/checks/check-unsafe-casts.ts",
     "check:pure-ts-tests": "bun scripts/run-compact-command.ts --label pure-ts-tests -- bun test --reporter=dot tests/pure-ts",
