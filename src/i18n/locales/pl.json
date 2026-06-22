@@ -628,7 +628,12 @@
         "runtimeApplyProof": "",
         "title": "",
         "transcript": "",
-        "uiOnly": ""
+        "uiOnly": "",
+        "walkthrough": {
+          "plan": "",
+          "target": "",
+          "title": ""
+        }
       },
       "approval": {
         "cloudMessage": "This will send the selected image area and prompt to the cloud AI provider and apply the returned edit.",

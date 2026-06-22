@@ -19,6 +19,7 @@ export const agentAuditEvidenceTierSchema = z.enum([
   'e2e_verified',
 ]);
 export const agentChatRuntimeStatusSchema = z.enum(['ui_only_demo', 'runtime_apply_demo']);
+export const agentLivePromptWalkthroughStageStateSchema = z.enum(['completed', 'current', 'pending']);
 
 export const agentChatMessageSchema = z
   .object({
@@ -93,6 +94,35 @@ export const agentChatDryRunReviewSchema = z
       )
       .min(1),
     warnings: z.array(z.string().min(1)).min(1),
+  })
+  .strict();
+
+export const agentLivePromptWalkthroughSchema = z
+  .object({
+    approval: z
+      .object({
+        label: z.string().min(1),
+        state: agentChatApprovalStateSchema,
+        summary: z.string().min(1),
+      })
+      .strict(),
+    id: z.string().min(1),
+    planSummary: z.string().min(1),
+    prompt: z.string().min(1),
+    stages: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1),
+            label: z.string().min(1),
+            state: agentLivePromptWalkthroughStageStateSchema,
+            summary: z.string().min(1),
+            toolCallId: z.string().min(1).optional(),
+          })
+          .strict(),
+      )
+      .min(3),
+    targetLabel: z.string().min(1),
   })
   .strict();
 
@@ -287,6 +317,7 @@ export const agentChatTranscriptSchema = z
     auditTranscript: agentAuditTranscriptSchema.optional(),
     dryRunReview: agentChatDryRunReviewSchema.optional(),
     id: z.string().min(1),
+    livePromptWalkthrough: agentLivePromptWalkthroughSchema.optional(),
     messages: z.array(agentChatMessageSchema).min(1),
     privateRawArtifacts: agentPrivateRawArtifactsSchema.optional(),
     reviewHandoff: agentReviewHandoffSchema.optional(),
@@ -302,6 +333,7 @@ export type AgentArtifactReview = z.infer<typeof agentArtifactReviewSchema>;
 export type AgentAuditTranscript = z.infer<typeof agentAuditTranscriptSchema>;
 export type AgentChatToolCall = z.infer<typeof agentChatToolCallSchema>;
 export type AgentChatDryRunReview = z.infer<typeof agentChatDryRunReviewSchema>;
+export type AgentLivePromptWalkthrough = z.infer<typeof agentLivePromptWalkthroughSchema>;
 export type AgentPrivateRawArtifacts = z.infer<typeof agentPrivateRawArtifactsSchema>;
 export type AgentReviewHandoff = z.infer<typeof agentReviewHandoffSchema>;
 export type AgentSelectedFrameScope = z.infer<typeof agentSelectedFrameScopeSchema>;

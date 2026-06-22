@@ -8,7 +8,7 @@
   "apply": {
     "commandId": "command_agent_expert_edit_demo_apply_2844",
     "commandType": "toneColor.setBasicTone",
-    "contentHash": "sha256:b8dff0d1569b3a105cd8f8c07ddf5f520ffa8c88a68c2ee63a4348d42cd9e8d9",
+    "contentHash": "sha256:89d21ab5e999052a500094ede601cda6c61b5c30d9a5e08a2ce72762b57edbed",
     "dryRun": false,
     "graphRevision": "graph_rev_agent_expert_edit_demo_initial_2844:apply:command_agent_expert_edit_demo_apply_2844",
     "mutates": true,
@@ -75,14 +75,14 @@
   },
   "evidence": {
     "htmlPath": "docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html",
-    "reportHash": "sha256:bd12c7db24adc64599ce281a1c19aef4036d65c44c1abe0b2664567c8f59352c",
+    "reportHash": "sha256:c3ee55da1ad5c2245eede64b5a772eb5b2348c122f6cac4384fae1198644a1bb",
     "reportPath": "docs/validation/agent-expert-edit-demo-workflow-2026-06-21.json"
   },
   "inspect": {
     "imagePath": "/photos/agent-demo/DSC_2844.NEF",
     "projectTool": "rawengine.local.toolRegistry.query",
     "rawFamily": "nikon_nef_private_style_fixture",
-    "toolCount": 32,
+    "toolCount": 10,
     "virtualCopyId": "vc_agent_expert_edit_demo_2844"
   },
   "issue": 3022,
