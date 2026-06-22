@@ -1,7 +1,7 @@
 {
   "generatedAt": "2026-06-18T00:00:00.000Z",
   "issue": 1927,
-  "proofHash": "6f55d19f2cc436ef9c1e96e44707b033615b93eba36525964ce3f93a3d1bb7ce",
+  "proofHash": "7b81e851517953ec0daba966958c9b7ca3b7cbd409c08ffbdf03f208a3477054",
   "rejectedScenarios": [
     {
       "accepted": false,
@@ -65,7 +65,7 @@
         }
       ],
       "validationPurpose": "Baseline static bracket with recoverable highlights and shadow detail.",
-      "warningCodes": []
+      "warningCodes": ["dimensions_match_but_raw_geometry_unverified"]
     },
     {
       "alignmentConfidence": 1,
@@ -120,7 +120,11 @@
         }
       ],
       "validationPurpose": "Alignment and deghosting metadata fixture for handheld HDR merge validation.",
-      "warningCodes": ["alignment_translation_required", "deghosting_required"]
+      "warningCodes": [
+        "alignment_translation_required",
+        "deghosting_required",
+        "dimensions_match_but_raw_geometry_unverified"
+      ]
     },
     {
       "alignmentConfidence": 1,
@@ -175,7 +179,7 @@
         }
       ],
       "validationPurpose": "Highlight clipping stress fixture for future scene-linear HDR merge weighting.",
-      "warningCodes": ["clipped_highlight_recovery"]
+      "warningCodes": ["clipped_highlight_recovery", "dimensions_match_but_raw_geometry_unverified"]
     }
   ]
 }
