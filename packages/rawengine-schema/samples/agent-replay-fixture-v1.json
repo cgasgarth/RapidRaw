@@ -21,6 +21,46 @@
         "toolName": "image.get_metadata"
       },
       {
+        "approvalClass": "safe_read",
+        "inputSchemaName": "RawEngineLocalAppServerProjectMetadataQueryV1",
+        "mutates": false,
+        "outputSchemaName": "RawEngineLocalAppServerProjectMetadataResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": false,
+        "toolKind": "read",
+        "toolName": "agent.project_metadata.query"
+      },
+      {
+        "approvalClass": "safe_read",
+        "inputSchemaName": "RawEngineLocalAppServerSelectedImagesQueryV1",
+        "mutates": false,
+        "outputSchemaName": "RawEngineLocalAppServerSelectedImagesResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": false,
+        "toolKind": "read",
+        "toolName": "agent.selected_images.query"
+      },
+      {
+        "approvalClass": "safe_read",
+        "inputSchemaName": "RawEngineLocalAppServerImageMetadataQueryV1",
+        "mutates": false,
+        "outputSchemaName": "RawEngineLocalAppServerImageMetadataResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": false,
+        "toolKind": "read",
+        "toolName": "agent.image_metadata.query"
+      },
+      {
+        "approvalClass": "safe_read",
+        "inputSchemaName": "RawEngineLocalAppServerEditorStateQueryV1",
+        "mutates": false,
+        "outputSchemaName": "RawEngineLocalAppServerEditorStateResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": false,
+        "toolKind": "read",
+        "toolName": "agent.editor_state.query"
+      },
+      {
         "approvalClass": "preview_only",
         "inputSchemaName": "CommandEnvelopeV1",
         "mutates": false,
