@@ -1639,6 +1639,88 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-patch-probe-dominant-channel').getByText('Blue', { exact: true }).waitFor({
     timeout: 10_000,
   });
+  const previewInvokeCountBeforeNeutralSuggestion = await page.evaluate(
+    () =>
+      (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).filter((call) => call.command === 'preview_negative_conversion')
+        .length,
+  );
+  await page.getByTestId('negative-lab-suggest-neutral-patch-rgb').click();
+  await page.getByTestId('negative-lab-neutral-patch-rgb-suggestion').waitFor({ timeout: 10_000 });
+  const previewInvokeCountAfterNeutralSuggestion = await page.evaluate(
+    () =>
+      (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).filter((call) => call.command === 'preview_negative_conversion')
+        .length,
+  );
+  if (previewInvokeCountAfterNeutralSuggestion !== previewInvokeCountBeforeNeutralSuggestion) {
+    throw new Error('Negative Lab neutral patch suggestion changed preview before explicit apply.');
+  }
+  await page
+    .getByTestId('negative-lab-neutral-patch-rgb-offset')
+    .getByText('Effective frame RGB R +0.07 / G -0.03 / B -0.02', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-neutral-patch-risk').getByText('High', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-apply-neutral-patch-rgb').click();
+  await page
+    .getByTestId('negative-lab-recipe-frame-rgb-balance-offset')
+    .getByText('Effective frame RGB R +0.07 / G -0.03 / B -0.02', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page.waitForFunction(() =>
+    (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).some((call) => {
+      const args = JSON.stringify(call.args ?? {});
+      return (
+        call.command === 'preview_negative_conversion' &&
+        args.includes('"red_weight":1.14') &&
+        args.includes('"green_weight":0.93') &&
+        args.includes('"blue_weight":1.16')
+      );
+    }),
+  );
+  await page.getByTestId('negative-lab-roll-frame-1').click();
+  await page.getByTestId('negative-lab-roll-frame-status-1').getByText('Active', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  if ((await page.locator('[data-testid="negative-lab-roll-frame-rgb-balance-override-1"]').count()) !== 0) {
+    throw new Error('Negative Lab neutral patch RGB suggestion leaked into neighboring frame.');
+  }
+  await page
+    .getByTestId('negative-lab-recipe-frame-rgb-balance-offset')
+    .getByText('Effective frame RGB R 0.00 / G 0.00 / B 0.00', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page.waitForFunction(() =>
+    (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).some((call) => {
+      const args = JSON.stringify(call.args ?? {});
+      return (
+        call.command === 'preview_negative_conversion' &&
+        args.includes('"red_weight":1.07') &&
+        args.includes('"green_weight":0.96') &&
+        args.includes('"blue_weight":1.18')
+      );
+    }),
+  );
+  await page.getByTestId('negative-lab-roll-frame-0').click();
+  await page.getByTestId('negative-lab-roll-frame-status-0').getByText('Active', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page
+    .getByTestId('negative-lab-recipe-frame-rgb-balance-offset')
+    .getByText('Effective frame RGB R +0.07 / G -0.03 / B -0.02', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-reset-frame-rgb-balance').click();
+  await page
+    .getByTestId('negative-lab-recipe-frame-rgb-balance-offset')
+    .getByText('Effective frame RGB R 0.00 / G 0.00 / B 0.00', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  if ((await page.locator('[data-testid="negative-lab-roll-frame-rgb-balance-override-0"]').count()) !== 0) {
+    throw new Error('Negative Lab frame RGB reset did not clear the active-frame badge.');
+  }
+  await page.getByTestId('negative-lab-suggest-neutral-patch-rgb').click();
+  await page.getByTestId('negative-lab-apply-neutral-patch-rgb').click();
+  await page
+    .getByTestId('negative-lab-recipe-frame-rgb-balance-offset')
+    .getByText('Effective frame RGB R +0.07 / G -0.03 / B -0.02', { exact: true })
+    .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-custom-base-overlay').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-custom-base-area').getByText('Area 3%', { exact: true }).waitFor({
     timeout: 10_000,
@@ -1704,7 +1786,7 @@ async function prepareScenario(page, mode) {
     '"effectiveExposure": 0.45',
     '"frameRgbBalanceOverrides"',
     '"rgbBalanceOffset"',
-    '"redWeight": 0.08',
+    '"redWeight": 0.07',
     '"omittedDispositionFrameIds"',
     '"negative-lab-frame-2": "rejected"',
     '"reviewFrameIds"',

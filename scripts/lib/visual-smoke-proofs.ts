@@ -191,9 +191,9 @@ const negativeLabConvertArgsSchema = z.object({
             z.object({
               frameId: z.literal('negative-lab-frame-1'),
               rgbBalanceOffset: z.object({
-                blueWeight: z.literal(-0.06),
-                greenWeight: z.literal(-0.02),
-                redWeight: z.literal(0.08),
+                blueWeight: z.literal(-0.02),
+                greenWeight: z.literal(-0.03),
+                redWeight: z.literal(0.07),
               }),
             }),
           )

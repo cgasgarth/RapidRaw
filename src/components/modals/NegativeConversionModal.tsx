@@ -24,6 +24,10 @@ import { useTranslation, Trans } from 'react-i18next';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { usePreviewViewport } from '../../hooks/usePreviewViewport';
 import {
+  negativeLabNeutralPatchSuggestionSchema,
+  type NegativeLabNeutralPatchSuggestion,
+} from '../../schemas/negativeLabNeutralPatchSuggestionSchemas';
+import {
   negativeBaseFogEstimateSchema,
   negativeBaseFogSampleReadoutSchema,
   negativeConversionSavedPathsSchema,
@@ -447,6 +451,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [patchProbeRect, setPatchProbeRect] = useState<NegativeLabBaseFogSampleRect | null>(null);
   const [patchProbeLabel, setPatchProbeLabel] = useState<string | null>(null);
   const [isSamplingPatchProbe, setIsSamplingPatchProbe] = useState(false);
+  const [neutralPatchSuggestion, setNeutralPatchSuggestion] = useState<NegativeLabNeutralPatchSuggestion | null>(null);
+  const [isSuggestingNeutralPatchRgb, setIsSuggestingNeutralPatchRgb] = useState(false);
   const [customBaseSampleRect, setCustomBaseSampleRect] =
     useState<NegativeLabBaseFogSampleRect>(CUSTOM_BASE_SAMPLE_DEFAULT);
   const [customBaseSampleEstimate, setCustomBaseSampleEstimate] = useState<NegativeBaseFogEstimate | null>(null);
@@ -1041,6 +1047,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setBaseFogScope('frame');
       setBaseFogPreviewProof(null);
       setBaseFogReadoutCopied(false);
+      setNeutralPatchSuggestion(null);
       setActiveBaseFogSampleLabel(null);
       setBaseFogSampleUndoStack([]);
       setCustomBaseSampleRect(CUSTOM_BASE_SAMPLE_DEFAULT);
@@ -1323,10 +1330,33 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setPatchProbeEstimate(estimate);
       setPatchProbeRect(sampleRect);
       setPatchProbeLabel(t(labelKey));
+      setNeutralPatchSuggestion(null);
     } catch (e) {
       console.error('Patch probe sample failed', e);
     } finally {
       setIsSamplingPatchProbe(false);
+    }
+  };
+
+  const handleSuggestNeutralPatchRgb = async () => {
+    if (selectedImagePath === null || patchProbeRect === null) return;
+    setIsSuggestingNeutralPatchRgb(true);
+    try {
+      const suggestion = await invokeWithSchema(
+        Invokes.SuggestNegativeLabNeutralPatchRgbBalance,
+        {
+          params,
+          path: selectedImagePath,
+          sampleRect: patchProbeRect,
+        },
+        negativeLabNeutralPatchSuggestionSchema,
+      );
+      setNeutralPatchSuggestion(suggestion);
+    } catch (error) {
+      console.error('Neutral patch RGB suggestion failed', error);
+      setNeutralPatchSuggestion(null);
+    } finally {
+      setIsSuggestingNeutralPatchRgb(false);
     }
   };
 
@@ -1435,6 +1465,29 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setFrameRgbBalanceOffsetByFrameId(nextOffsetsByFrameId);
     setAcceptedBatchPlanJson(null);
     updatePreview(buildParamsWithFrameOverrides(params, frameId, frameExposureOffsetByFrameId, nextOffsetsByFrameId));
+  };
+
+  const handleApplyNeutralPatchRgbSuggestion = () => {
+    if (frameHealthReport.activeFrameId === null || neutralPatchSuggestion === null) return;
+    const nextOffset = snapNegativeLabFrameRgbBalanceOffsets({
+      baselineParams: params,
+      offsets: neutralPatchSuggestion.suggestedRgbBalanceOffset,
+    });
+    const nextOffsetsByFrameId = negativeLabFrameRgbBalanceOffsetIsZero(nextOffset)
+      ? Object.fromEntries(
+          Object.entries(frameRgbBalanceOffsetByFrameId).filter(([key]) => key !== frameHealthReport.activeFrameId),
+        )
+      : { ...frameRgbBalanceOffsetByFrameId, [frameHealthReport.activeFrameId]: nextOffset };
+    setFrameRgbBalanceOffsetByFrameId(nextOffsetsByFrameId);
+    setAcceptedBatchPlanJson(null);
+    updatePreview(
+      buildParamsWithFrameOverrides(
+        params,
+        frameHealthReport.activeFrameId,
+        frameExposureOffsetByFrameId,
+        nextOffsetsByFrameId,
+      ),
+    );
   };
 
   const handleSave = async () => {
@@ -3497,8 +3550,51 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                     <span className="text-right" data-testid="negative-lab-patch-probe-dominant-channel">
                       {t(DENSITOMETER_CHANNEL_LABEL_KEYS[patchProbeDensitometerReadout.dominantChannel])}
                     </span>
+                    <button
+                      type="button"
+                      className="col-span-2 mt-1 inline-flex items-center justify-center gap-1 rounded border border-surface bg-bg-primary px-2 py-1 text-[11px] text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                      data-testid="negative-lab-suggest-neutral-patch-rgb"
+                      disabled={isSuggestingNeutralPatchRgb || isSaving}
+                      onClick={() => {
+                        void handleSuggestNeutralPatchRgb();
+                      }}
+                    >
+                      {isSuggestingNeutralPatchRgb ? <Loader2 size={12} className="animate-spin" /> : null}
+                      {t('modals.negativeConversion.suggestNeutralPatchRgb')}
+                    </button>
                   </div>
                 )}
+              {neutralPatchSuggestion !== null && (
+                <div
+                  className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md border border-surface bg-bg-secondary p-2 text-xs text-text-tertiary"
+                  data-neutrality-risk={neutralPatchSuggestion.neutralityRisk}
+                  data-testid="negative-lab-neutral-patch-rgb-suggestion"
+                >
+                  <span className="text-text-secondary">
+                    {t('modals.negativeConversion.neutralPatchRgbSuggestion')}
+                  </span>
+                  <span className="text-right tabular-nums" data-testid="negative-lab-neutral-patch-rgb-offset">
+                    {t('modals.negativeConversion.effectiveFrameRgbBalance', {
+                      blue: formatSignedRecipeValue(neutralPatchSuggestion.suggestedRgbBalanceOffset.blueWeight),
+                      green: formatSignedRecipeValue(neutralPatchSuggestion.suggestedRgbBalanceOffset.greenWeight),
+                      red: formatSignedRecipeValue(neutralPatchSuggestion.suggestedRgbBalanceOffset.redWeight),
+                    })}
+                  </span>
+                  <span className="text-text-secondary">{t('modals.negativeConversion.neutralityRisk')}</span>
+                  <span className="text-right" data-testid="negative-lab-neutral-patch-risk">
+                    {t(`modals.negativeConversion.neutralityRiskLevels.${neutralPatchSuggestion.neutralityRisk}`)}
+                  </span>
+                  <button
+                    type="button"
+                    className="col-span-2 mt-1 inline-flex items-center justify-center rounded border border-accent bg-accent/10 px-2 py-1 text-[11px] text-text-primary transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-50"
+                    data-testid="negative-lab-apply-neutral-patch-rgb"
+                    disabled={frameHealthReport.activeFrameId === null || isSaving}
+                    onClick={handleApplyNeutralPatchRgbSuggestion}
+                  >
+                    {t('modals.negativeConversion.applyNeutralPatchRgb')}
+                  </button>
+                </div>
+              )}
             </div>
             {renderDustScratchReview()}
             {renderQcProofReport()}
