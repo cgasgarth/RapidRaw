@@ -1866,6 +1866,26 @@ async function prepareScenario(page, mode) {
     timeout: 10_000,
   });
   await page.getByTestId('negative-lab-acquisition-warning-mixed_source_families').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-scan-input-guidance').waitFor({ timeout: 10_000 });
+  z.object({
+    preflightBasis: z.literal('path_extension_only'),
+  }).parse(await page.getByTestId('negative-lab-scan-input-guidance').evaluate((element) => ({ ...element.dataset })));
+  const scanGuidanceItemCount = await page
+    .locator('[data-testid^="negative-lab-scan-input-guidance-scanInputGuidance"]')
+    .count();
+  if (scanGuidanceItemCount !== 5) {
+    throw new Error(`Expected 5 scan input guidance items, got ${scanGuidanceItemCount}.`);
+  }
+  await page.getByText('Scan input guidance', { exact: true }).waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-scan-input-guidance-scanInputGuidancePreferred').waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-scan-input-guidance-scanInputGuidanceAvoidPositive').waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-scan-input-guidance-scanInputGuidanceAvoidProofs').waitFor({
+    timeout: 10_000,
+  });
   await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabBatchReadiness).waitFor({ timeout: 10_000 });
   await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentActivity).waitFor({ timeout: 10_000 });
   await page
