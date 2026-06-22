@@ -1029,12 +1029,21 @@ export default function ColorPanel({
   const handleBlackWhiteToggle = () => {
     setAdjustments((prev: Adjustments) => {
       const current = prev.blackWhiteMixer;
+      const enabling = !current.enabled;
+      const weightsHaveContribution = Object.values(current.weights).some((weight) => weight !== 0);
 
       return {
         ...prev,
         blackWhiteMixer: {
           ...current,
-          enabled: !current.enabled,
+          enabled: enabling,
+          weights:
+            enabling && !weightsHaveContribution
+              ? {
+                  ...current.weights,
+                  [activeColor]: 20,
+                }
+              : current.weights,
         },
       };
     });
@@ -1699,6 +1708,7 @@ export default function ColorPanel({
               className={`rounded px-2 py-1 text-xs font-medium ${
                 blackWhiteMixer.enabled ? 'bg-accent text-button-text' : 'bg-bg-secondary text-text-secondary'
               }`}
+              data-testid="black-white-mixer-toggle"
               onClick={handleBlackWhiteToggle}
               type="button"
             >

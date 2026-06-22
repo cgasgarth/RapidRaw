@@ -38,6 +38,7 @@ import {
   assertNegativeLabBaseFogPreviewExportProof,
   assertNegativeLabBatchColorInvokeProof,
   assertNegativeLabInvokeProof,
+  blackWhiteMixerParityProofDatasetSchema,
   commandPaletteWorkflowProofSchema,
   detailDustSpotProofSchema,
   detailWorkspaceProofSchema,
@@ -1818,6 +1819,7 @@ async function prepareScenario(page, mode) {
     await recipe.getByText('WB +6 / +3').waitFor({ timeout: 10_000 });
     await setRangeInput(colorPanel, 'Temperature', 12);
     await setRangeInput(colorPanel, 'Saturation', 18);
+    await colorPanel.getByTestId('black-white-mixer-toggle').click();
     const selectiveControls = colorPanel.getByTestId('selective-color-range-controls');
     await selectiveControls.getByTestId('selective-color-range-oranges').click();
     await setRangeInput(selectiveControls, 'Hue', 8);
@@ -1862,6 +1864,9 @@ async function prepareScenario(page, mode) {
     });
     colorBalanceCompareProofDatasetSchema.parse(
       await page.getByTestId('color-balance-compare-strip').evaluate((element) => ({ ...element.dataset })),
+    );
+    blackWhiteMixerParityProofDatasetSchema.parse(
+      await page.getByTestId('black-white-mixer-parity-strip').evaluate((element) => ({ ...element.dataset })),
     );
     cameraProfileInputTransformPreviewProofSchema.parse(
       await page.getByTestId('camera-profile-input-transform-preview').evaluate((element) => ({ ...element.dataset })),

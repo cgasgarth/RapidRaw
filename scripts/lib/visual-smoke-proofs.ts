@@ -690,6 +690,18 @@ export const colorBalanceCompareProofDatasetSchema = z
       context.addIssue({ code: z.ZodIssueCode.custom, message: 'Color balance comparison must change RGB output.' });
     }
   });
+export const blackWhiteMixerParityProofDatasetSchema = z
+  .object({
+    enabled: z.literal('true'),
+    exportRgb: z.string().regex(/^R [0-9]+ \/ G [0-9]+ \/ B [0-9]+$/u),
+    parityDelta: z.literal('0'),
+    previewRgb: z.string().regex(/^R [0-9]+ \/ G [0-9]+ \/ B [0-9]+$/u),
+  })
+  .superRefine((proof, context) => {
+    if (proof.previewRgb !== proof.exportRgb) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'B&W preview and export proof RGB must match.' });
+    }
+  });
 export const cameraProfileInputTransformPreviewProofSchema = z
   .object({
     cameraMetadata: z.literal('Sony ILCE-7M4'),
