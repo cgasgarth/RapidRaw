@@ -17,6 +17,7 @@ import {
   RAW_ENGINE_SCHEMA_VERSION,
   rawEngineToolRegistryV1Schema,
   toneColorCommandEnvelopeV1Schema,
+  toneColorDryRunResultV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { agentExpertEditDemoWorkflowSchema } from '../../../src/schemas/agentExpertEditDemoWorkflowSchemas.ts';
 
@@ -70,6 +71,14 @@ const dryRunCommand = toneColorCommandEnvelopeV1Schema.parse({
   target,
 });
 
+const planIdentityBridge = createRawEngineLocalAppServerBridge();
+const planIdentityDispatch = await planIdentityBridge.dispatch(dryRunCommand, context);
+if (!planIdentityDispatch.ok) throw new Error(`Plan identity dry-run failed: ${planIdentityDispatch.message}`);
+const planIdentity = toneColorDryRunResultV1Schema.parse(planIdentityDispatch.result);
+if (planIdentity.dryRunPlanHash === undefined || planIdentity.dryRunPlanId === undefined) {
+  throw new Error('Expert edit dry-run must produce a plan identity before apply.');
+}
+
 const applyCommand = toneColorCommandEnvelopeV1Schema.parse({
   ...dryRunCommand,
   approval: {
@@ -80,6 +89,11 @@ const applyCommand = toneColorCommandEnvelopeV1Schema.parse({
   commandId: 'command_agent_expert_edit_demo_apply_2844',
   dryRun: false,
   idempotencyKey: 'idem_agent_expert_edit_demo_apply_2844',
+  parameters: {
+    ...dryRunCommand.parameters,
+    acceptedDryRunPlanHash: planIdentity.dryRunPlanHash,
+    acceptedDryRunPlanId: planIdentity.dryRunPlanId,
+  },
 });
 
 const rejectedBridge = createRawEngineLocalAppServerBridge();

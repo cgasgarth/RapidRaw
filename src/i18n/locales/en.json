@@ -590,7 +590,12 @@
         "runtimeApplyProof": "Runtime apply proof",
         "title": "Expert Agent",
         "transcript": "Tool-call transcript",
-        "uiOnly": "UI-only"
+        "uiOnly": "UI-only",
+        "walkthrough": {
+          "plan": "Plan",
+          "target": "Target",
+          "title": "Live prompt walkthrough"
+        }
       },
       "approval": {
         "cloudMessage": "This will send the selected image area and prompt to the cloud AI provider and apply the returned edit.",

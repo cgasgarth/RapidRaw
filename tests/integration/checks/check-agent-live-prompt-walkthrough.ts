@@ -1,0 +1,61 @@
+#!/usr/bin/env bun
+
+import { readFileSync } from 'node:fs';
+
+import { z } from 'zod';
+
+import { agentChatTranscriptFixture } from '../../../src/utils/agentChatTranscriptFixture.ts';
+
+const failures: string[] = [];
+const walkthrough = agentChatTranscriptFixture.livePromptWalkthrough;
+
+if (walkthrough === undefined) {
+  failures.push('Agent transcript fixture must include a live prompt walkthrough.');
+} else {
+  if (walkthrough.approval.state !== 'approved') failures.push('Walkthrough must show an approved dry-run gate.');
+  if (!walkthrough.stages.some((stage) => stage.id === 'dry-run' && stage.toolCallId === 'tool-2')) {
+    failures.push('Walkthrough must link dry-run stage to tool-2.');
+  }
+  if (!walkthrough.stages.some((stage) => stage.id === 'apply' && stage.toolCallId === 'tool-3')) {
+    failures.push('Walkthrough must link apply stage to tool-3.');
+  }
+  if (walkthrough.stages.some((stage) => stage.state !== 'completed')) {
+    failures.push('Runtime demo walkthrough should show the prompt-to-apply path completed.');
+  }
+}
+
+const shellSource = readFileSync('src/components/panel/right/AgentChatShell.tsx', 'utf8');
+for (const marker of [
+  'data-testid="agent-live-prompt-walkthrough"',
+  'data-testid="agent-live-prompt-walkthrough-stages"',
+  'data-testid="agent-live-prompt-walkthrough-summary"',
+  'editor.ai.agent.walkthrough.title',
+]) {
+  if (!shellSource.includes(marker)) failures.push(`Agent chat shell missing marker: ${marker}`);
+}
+
+const localeSchema = z
+  .object({
+    editor: z.object({
+      ai: z.object({
+        agent: z.object({
+          walkthrough: z.object({
+            plan: z.string().min(1),
+            target: z.string().min(1),
+            title: z.string().min(1),
+          }),
+        }),
+      }),
+    }),
+  })
+  .passthrough();
+
+localeSchema.parse(JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8')));
+
+if (failures.length > 0) {
+  console.error(`agent live prompt walkthrough failed (${failures.length})`);
+  for (const failure of failures) console.error(`- ${failure}`);
+  process.exit(1);
+}
+
+console.log(`agent live prompt walkthrough ok (${walkthrough?.stages.length ?? 0} stages)`);
