@@ -339,6 +339,29 @@ export const hdrReviewWorkspaceProofSchema = z.object({
   runtimeStatus: z.literal('dry_run_preview'),
   sourceCount: z.literal('3'),
 });
+const finiteDatasetNumberSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .transform((value) => Number(value))
+  .pipe(z.number().finite());
+export const hdrBracketSourceRolesProofSchema = z.tuple([
+  z.object({
+    bracketRole: z.literal('under_exposed'),
+    exposureEv: finiteDatasetNumberSchema.refine((value) => value < -0.25),
+    sourceIndex: z.literal('0'),
+  }),
+  z.object({
+    bracketRole: z.literal('reference'),
+    exposureEv: finiteDatasetNumberSchema.refine((value) => value >= -0.25 && value <= 0.25),
+    sourceIndex: z.literal('1'),
+  }),
+  z.object({
+    bracketRole: z.literal('over_exposed'),
+    exposureEv: finiteDatasetNumberSchema.refine((value) => value > 0.25),
+    sourceIndex: z.literal('2'),
+  }),
+]);
 export const panoramaUiSettingsProofSchema = z.object({
   blendMode: z.literal('feather'),
   boundaryMode: z.literal('auto_crop'),

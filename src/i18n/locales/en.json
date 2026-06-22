@@ -1898,6 +1898,12 @@
       "bracketPreflightSpanValue": "{{value}} EV",
       "bracketPreflightTitle": "Bracket preflight",
       "bracketPreflightWarning": "Bracket warning",
+      "bracketRole": {
+        "over_exposed": "Over",
+        "reference": "Reference",
+        "under_exposed": "Under",
+        "unknown": "Unknown"
+      },
       "bracketValidation": {
         "disabled": "Disabled",
         "required": "Required",

@@ -12,7 +12,10 @@ import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerB
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
 
-import type { HdrBracketDetectionMethodV1 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import type {
+  HdrBracketDetectionMethodV1,
+  HdrBracketSourceMetadataV1,
+} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import type {
   HdrMergeAlignmentMode,
   HdrMergeDeghosting,
@@ -125,6 +128,18 @@ export default function HdrModal({
         return t('modals.hdr.bracketDetectionMethod.metadata_exposure_compensation');
       case 'metadata_exposure_time_iso_aperture':
         return t('modals.hdr.bracketDetectionMethod.metadata_exposure_time_iso_aperture');
+    }
+  };
+  const getBracketRoleLabel = (role: HdrBracketSourceMetadataV1['resolvedBracketRole']) => {
+    switch (role) {
+      case 'over_exposed':
+        return t('modals.hdr.bracketRole.over_exposed');
+      case 'reference':
+        return t('modals.hdr.bracketRole.reference');
+      case 'under_exposed':
+        return t('modals.hdr.bracketRole.under_exposed');
+      case 'unknown':
+        return t('modals.hdr.bracketRole.unknown');
     }
   };
   const bracketPreflightStatus =
@@ -481,7 +496,7 @@ export default function HdrModal({
               <div className="mt-3 grid gap-1.5">
                 {bracketPreflight.sourceMetadata.map((source) => (
                   <div
-                    className="grid grid-cols-[48px_70px_1fr] gap-2 rounded border border-border-color bg-bg-primary px-2 py-1.5 text-xs"
+                    className="grid grid-cols-[48px_78px_96px_1fr] gap-2 rounded border border-border-color bg-bg-primary px-2 py-1.5 text-xs"
                     data-bracket-role={source.resolvedBracketRole}
                     data-exposure-ev={source.resolvedExposureEv}
                     data-source-index={source.sourceIndex}
@@ -491,6 +506,12 @@ export default function HdrModal({
                     <span className="text-text-tertiary">#{source.sourceIndex + 1}</span>
                     <span className="text-text-primary">
                       {t('modals.hdr.bracketPreflightSourceEv', { value: source.resolvedExposureEv.toFixed(1) })}
+                    </span>
+                    <span
+                      className="rounded bg-surface px-1.5 py-0.5 text-center text-text-primary"
+                      data-testid="hdr-bracket-source-role"
+                    >
+                      {getBracketRoleLabel(source.resolvedBracketRole)}
                     </span>
                     <span className="truncate text-text-secondary">{source.imagePath.split('/').pop()}</span>
                   </div>

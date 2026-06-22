@@ -43,6 +43,7 @@ import {
   focusReviewWorkspaceProofSchema,
   focusPrivateRawReviewProofSchema,
   focusUiSettingsProofSchema,
+  hdrBracketSourceRolesProofSchema,
   hdrPrivateRawReviewProofSchema,
   hdrReviewWorkspaceProofSchema,
   hdrUiSettingsProofSchema,
@@ -1482,6 +1483,29 @@ async function prepareScenario(page, mode) {
     hdrReviewWorkspaceProofSchema.parse(
       await page.getByTestId('hdr-review-workspace-proof').evaluate((element) => ({ ...element.dataset })),
     );
+    const bracketPreflight = page.getByTestId('hdr-bracket-preflight');
+    await bracketPreflight.scrollIntoViewIfNeeded();
+    const sourceRows = page.getByTestId('hdr-bracket-source-row');
+    hdrBracketSourceRolesProofSchema.parse(
+      await sourceRows.evaluateAll((rows) =>
+        rows.map((row) => ({
+          bracketRole: row.dataset.bracketRole,
+          exposureEv: row.dataset.exposureEv,
+          sourceIndex: row.dataset.sourceIndex,
+        })),
+      ),
+    );
+    const expectedVisibleRoles = ['Under', 'Reference', 'Over'] as const;
+    for (const [index, expectedLabel] of expectedVisibleRoles.entries()) {
+      const role = sourceRows.nth(index).getByTestId('hdr-bracket-source-role');
+      await role.waitFor({ state: 'visible', timeout: 10_000 });
+      const actualLabel = (await role.textContent())?.trim();
+      if (actualLabel !== expectedLabel) {
+        throw new Error(
+          `HDR source ${index} role mismatch: expected ${expectedLabel}, got ${actualLabel ?? '<missing>'}.`,
+        );
+      }
+    }
     await page.getByTestId('hdr-artifact-handoff').getByText('/tmp/rawengine-hdr-smoke.tif', { exact: true }).waitFor({
       timeout: 10_000,
     });
