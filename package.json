@@ -375,6 +375,7 @@
     "check:hdr-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario hdr-ui",
     "check:hdr-saved-output-editor-path-smoke": "bun scripts/capture-visual-smoke.ts --scenario hdr-saved-output-editor-path",
     "check:hdr-private-raw-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario hdr-private-raw-ui",
+    "check:hdr-private-raw-editor-handoff-smoke": "bun scripts/capture-visual-smoke.ts --scenario hdr-private-raw-editor-handoff",
     "check:focus-fixtures": "bun tests/integration/checks/check-focus-synthetic-fixtures.ts",
     "check:focus-fixtures:update": "bun tests/integration/checks/check-focus-synthetic-fixtures.ts --update",
     "check:focus-source-validation": "bun tests/integration/checks/check-focus-source-validation.ts",

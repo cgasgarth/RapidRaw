@@ -160,6 +160,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.FilmLookBrowser]: FilmLookVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi]: FocusPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FocusUi]: FocusStackVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawEditorHandoff]: HdrPrivateRawEditorHandoffVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawUi]: HdrPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.HdrSavedOutputEditorPath]: HdrSavedOutputEditorPathVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.HdrUi]: HdrVisualSmoke,
@@ -787,6 +788,7 @@ const copy = {
   hdrPrivateRawRuntime: 'Private RAW',
   hdrPrivateRawBefore: 'Middle bracket preview',
   hdrPrivateRawAfter: 'Merged result review',
+  hdrPrivateRawEditorHandoff: 'Private RAW HDR editor handoff',
   hdrPrivateRawPreview: 'Tone-mapped preview',
   panoramaSmoke: 'Panorama UI Smoke',
   panoramaReview: 'Panorama review',
@@ -2642,6 +2644,66 @@ function HdrSavedOutputEditorPathVisualSmoke() {
         progressMessage={null}
         settings={DEFAULT_HDR_MERGE_UI_SETTINGS}
         sourcePaths={['/proof-roll/DSC_1001.NEF', '/proof-roll/DSC_1002.NEF', '/proof-roll/DSC_1003.NEF']}
+      />
+    </main>
+  );
+}
+
+function HdrPrivateRawEditorHandoffVisualSmoke() {
+  const proof = window.__RAWENGINE_HDR_PRIVATE_RAW_PROOF__;
+  const [savedPath, setSavedPath] = useState<string | null>(null);
+  const [openedPath, setOpenedPath] = useState<string | null>(null);
+
+  if (!proof) {
+    return (
+      <main
+        className="grid h-full min-h-screen place-items-center bg-[#111316] text-[#f3f4f1] font-sans"
+        data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawEditorHandoff}
+      >
+        <p>{copy.missingPrivateRawProofArtifacts}</p>
+      </main>
+    );
+  }
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawEditorHandoff}
+    >
+      <div className="absolute inset-0 bg-[#0f1114]" data-visual-smoke-section="hdr-private-raw-editor-handoff" />
+      <div className="fixed left-4 top-4 z-50 rounded-md border border-white/10 bg-black/75 px-3 py-2 text-sm font-semibold">
+        {copy.hdrPrivateRawEditorHandoff}
+      </div>
+      <div
+        className="sr-only"
+        data-entered-normal-editor-path={String(openedPath === proof.mergeArtifact)}
+        data-fixture-id={proof.fixtureId}
+        data-merge-artifact={proof.mergeArtifact}
+        data-open-callback="handleImageSelect"
+        data-opened-path={openedPath ?? ''}
+        data-saved-path={savedPath ?? ''}
+        data-source-count={proof.sourceCount}
+        data-testid="hdr-private-raw-editor-handoff-proof"
+      />
+      <HdrModal
+        error={null}
+        finalImageBase64={proof.previewDataUrl}
+        imageCount={Number.parseInt(proof.sourceCount, 10)}
+        isOpen
+        isProcessing={false}
+        loadingImageUrl={null}
+        onClose={() => {}}
+        onMerge={() => {}}
+        onOpenFile={setOpenedPath}
+        onSave={() => {
+          setSavedPath(proof.mergeArtifact);
+          return Promise.resolve(proof.mergeArtifact);
+        }}
+        onSettingsChange={() => {}}
+        progressMessage={null}
+        settings={DEFAULT_HDR_MERGE_UI_SETTINGS}
+        sourcePaths={[proof.beforeArtifact, proof.afterArtifact, proof.previewArtifact]}
       />
     </main>
   );
