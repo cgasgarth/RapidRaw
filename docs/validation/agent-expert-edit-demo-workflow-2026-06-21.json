@@ -75,17 +75,17 @@
   },
   "evidence": {
     "htmlPath": "docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html",
-    "reportHash": "sha256:a347f4538dd588715e503675f3f66f7ee6ea8917e4c7ace50309ff764bc9545b",
+    "reportHash": "sha256:bd12c7db24adc64599ce281a1c19aef4036d65c44c1abe0b2664567c8f59352c",
     "reportPath": "docs/validation/agent-expert-edit-demo-workflow-2026-06-21.json"
   },
   "inspect": {
     "imagePath": "/photos/agent-demo/DSC_2844.NEF",
     "projectTool": "rawengine.local.toolRegistry.query",
     "rawFamily": "nikon_nef_private_style_fixture",
-    "toolCount": 28,
+    "toolCount": 32,
     "virtualCopyId": "vc_agent_expert_edit_demo_2844"
   },
-  "issue": 2983,
+  "issue": 3022,
   "limits": [
     "Runs deterministic in-process local app-server bridge tools; it does not call a paid model provider.",
     "Shows before/after demo preview artifacts and graph revisions; it does not decode RAW pixels in this PR.",
@@ -102,6 +102,6 @@
     "applyAuditEventId": "audit_2_command_agent_expert_edit_demo_apply_2844",
     "dryRunAuditEventId": "audit_1_command_agent_expert_edit_demo_dry_run_2844"
   },
-  "refs": ["#2983"],
+  "refs": ["#2983", "#3022"],
   "validationMode": "agent_expert_edit_demo_workflow"
 }

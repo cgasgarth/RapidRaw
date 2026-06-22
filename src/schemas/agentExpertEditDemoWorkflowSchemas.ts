@@ -80,7 +80,7 @@ export const agentExpertEditDemoWorkflowSchema = z
         virtualCopyId: z.string().trim().min(1),
       })
       .strict(),
-    issue: z.literal(2983),
+    issue: z.literal(3022),
     limits: z.array(z.string().trim().min(1)).min(1),
     plan: z
       .object({
@@ -97,7 +97,7 @@ export const agentExpertEditDemoWorkflowSchema = z
         dryRunAuditEventId: z.string().trim().min(1),
       })
       .strict(),
-    refs: z.array(z.literal('#2983')).length(1),
+    refs: z.tuple([z.literal('#2983'), z.literal('#3022')]),
     validationMode: z.literal('agent_expert_edit_demo_workflow'),
   })
   .strict();
