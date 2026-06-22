@@ -25,6 +25,8 @@ export * from './hdrMergeWeightingRuntime.js';
 export * from './hdrMergeUiControls.js';
 export * from './hdrRuntimePlan.js';
 export * from './layerBlendRuntime.js';
+export * from './layerScopedToneRuntime.js';
+export * from './layerScopedToneSchemas.js';
 export * from './layerStackCommandRuntime.js';
 export * from './layerStackSidecarPersistence.js';
 export * from './linearGradientMaskCommandRuntime.js';
