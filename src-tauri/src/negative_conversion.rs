@@ -150,6 +150,18 @@ pub struct NegativeBaseFogEstimate {
     pub confidence: f32,
 }
 
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabNeutralPatchSuggestion {
+    pub confidence: f32,
+    pub effective_rgb_balance: NegativeLabFrameRgbBalance,
+    pub neutrality_risk: String,
+    pub sample_density: [f32; 3],
+    pub sample_rect: NegativeBaseFogSampleRect,
+    pub sample_rgb: [f32; 3],
+    pub suggested_rgb_balance_offset: NegativeLabFrameRgbBalance,
+}
+
 const MIN_CHANNEL_WEIGHT: f32 = 0.5;
 const MAX_CHANNEL_WEIGHT: f32 = 2.0;
 const MIN_BASE_FOG_STRENGTH: f32 = 0.0;
@@ -433,6 +445,55 @@ fn negative_lab_effective_rgb_balance(
             .clamp(MIN_CHANNEL_WEIGHT, MAX_CHANNEL_WEIGHT),
         red_weight: (params.red_weight + offset.red_weight)
             .clamp(MIN_CHANNEL_WEIGHT, MAX_CHANNEL_WEIGHT),
+    }
+}
+
+fn snap_negative_lab_rgb_offset(value: f32) -> f32 {
+    ((value.clamp(-1.5, 1.5) * 100.0).round() / 100.0).clamp(-1.5, 1.5)
+}
+
+fn negative_lab_neutrality_risk(sample_density: [f32; 3]) -> String {
+    let min_density = sample_density.iter().copied().fold(f32::INFINITY, f32::min);
+    let max_density = sample_density
+        .iter()
+        .copied()
+        .fold(f32::NEG_INFINITY, f32::max);
+    let spread = max_density - min_density;
+    if spread <= 0.08 {
+        "low".to_string()
+    } else if spread <= 0.18 {
+        "medium".to_string()
+    } else {
+        "high".to_string()
+    }
+}
+
+fn build_negative_lab_neutral_patch_suggestion(
+    params: NegativeConversionParams,
+    sample_rect: NegativeBaseFogSampleRect,
+    estimate: NegativeBaseFogEstimate,
+) -> NegativeLabNeutralPatchSuggestion {
+    let sanitized_params = params.sanitized();
+    let suggested_rgb_balance_offset = NegativeLabFrameRgbBalance {
+        blue_weight: snap_negative_lab_rgb_offset(
+            estimate.blue_weight - sanitized_params.blue_weight,
+        ),
+        green_weight: snap_negative_lab_rgb_offset(
+            estimate.green_weight - sanitized_params.green_weight,
+        ),
+        red_weight: snap_negative_lab_rgb_offset(estimate.red_weight - sanitized_params.red_weight),
+    };
+    let effective_rgb_balance =
+        negative_lab_effective_rgb_balance(&sanitized_params, &suggested_rgb_balance_offset);
+
+    NegativeLabNeutralPatchSuggestion {
+        confidence: estimate.confidence,
+        effective_rgb_balance,
+        neutrality_risk: negative_lab_neutrality_risk(estimate.base_density),
+        sample_density: estimate.base_density,
+        sample_rect,
+        sample_rgb: estimate.base_rgb,
+        suggested_rgb_balance_offset,
     }
 }
 
@@ -1125,6 +1186,25 @@ pub async fn estimate_negative_base_fog(
 }
 
 #[tauri::command]
+pub async fn suggest_negative_lab_neutral_patch_rgb_balance(
+    path: String,
+    params: NegativeConversionParams,
+    sample_rect: NegativeBaseFogSampleRect,
+    state: tauri::State<'_, AppState>,
+    app_handle: AppHandle,
+) -> Result<NegativeLabNeutralPatchSuggestion, String> {
+    let sanitized_rect = sanitize_sample_rect(sample_rect)
+        .ok_or_else(|| "Neutral patch sample rect is invalid.".to_string())?;
+    let estimate =
+        estimate_negative_base_fog(path, Some(sanitized_rect), state, app_handle).await?;
+    Ok(build_negative_lab_neutral_patch_suggestion(
+        params,
+        sanitized_rect,
+        estimate,
+    ))
+}
+
+#[tauri::command]
 pub async fn convert_negatives(
     paths: Vec<String>,
     params: NegativeConversionParams,
@@ -1316,6 +1396,47 @@ mod tests {
             (left - right).abs() <= 0.000_001,
             "expected {left} to be within tolerance of {right}"
         );
+    }
+
+    #[test]
+    fn negative_lab_neutral_patch_suggestion_snaps_and_applies_frame_rgb_offset() {
+        let suggestion = build_negative_lab_neutral_patch_suggestion(
+            NegativeConversionParams {
+                red_weight: 1.07,
+                green_weight: 0.96,
+                blue_weight: 1.18,
+                ..NegativeConversionParams::default()
+            },
+            NegativeBaseFogSampleRect {
+                x: 0.18,
+                y: 0.62,
+                width: 0.18,
+                height: 0.18,
+            },
+            NegativeBaseFogEstimate {
+                red_weight: 1.143,
+                green_weight: 0.934,
+                blue_weight: 1.159,
+                base_rgb: [0.716, 0.578, 0.441],
+                base_density: [0.145, 0.238, 0.356],
+                confidence: 0.82,
+            },
+        );
+
+        assert_eq!(suggestion.neutrality_risk, "high");
+        assert_near(suggestion.suggested_rgb_balance_offset.red_weight, 0.07);
+        assert_near(suggestion.suggested_rgb_balance_offset.green_weight, -0.03);
+        assert_near(suggestion.suggested_rgb_balance_offset.blue_weight, -0.02);
+        assert_near(suggestion.effective_rgb_balance.red_weight, 1.14);
+        assert_near(suggestion.effective_rgb_balance.green_weight, 0.93);
+        assert_near(suggestion.effective_rgb_balance.blue_weight, 1.16);
+    }
+
+    #[test]
+    fn negative_lab_neutrality_risk_uses_density_spread_thresholds() {
+        assert_eq!(negative_lab_neutrality_risk([0.1, 0.15, 0.17]), "low");
+        assert_eq!(negative_lab_neutrality_risk([0.1, 0.2, 0.28]), "medium");
+        assert_eq!(negative_lab_neutrality_risk([0.1, 0.22, 0.31]), "high");
     }
 
     #[test]

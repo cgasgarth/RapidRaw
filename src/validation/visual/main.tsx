@@ -81,6 +81,7 @@ const generatedPreviewBytes = [
 const previewNegativeConversionCommand: string = Invokes.PreviewNegativeConversion;
 const generatePreviewForPathCommand: string = Invokes.GeneratePreviewForPath;
 const estimateNegativeBaseFogCommand: string = Invokes.EstimateNegativeBaseFog;
+const suggestNegativeLabNeutralPatchCommand: string = Invokes.SuggestNegativeLabNeutralPatchRgbBalance;
 const convertNegativesCommand: string = Invokes.ConvertNegatives;
 const saveCommunityPresetCommand: string = Invokes.SaveCommunityPreset;
 const handleExportPresetsToFileCommand: string = Invokes.HandleExportPresetsToFile;
@@ -110,6 +111,17 @@ window.__TAURI_INTERNALS__ = {
         confidence: 0.91,
         greenWeight: 0.96,
         redWeight: 1.07,
+      });
+    }
+    if (command === suggestNegativeLabNeutralPatchCommand) {
+      return Promise.resolve({
+        confidence: 0.82,
+        effectiveRgbBalance: { blueWeight: 1.16, greenWeight: 0.93, redWeight: 1.14 },
+        neutralityRisk: 'high',
+        sampleDensity: [0.145, 0.238, 0.356],
+        sampleRect: { height: 0.18, width: 0.18, x: 0.18, y: 0.62 },
+        sampleRgb: [0.716, 0.578, 0.441],
+        suggestedRgbBalanceOffset: { blueWeight: -0.02, greenWeight: -0.03, redWeight: 0.07 },
       });
     }
     if (command === convertNegativesCommand) return Promise.resolve(['/tmp/rawengine-negative-smoke-positive.tif']);
