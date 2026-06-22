@@ -56,6 +56,7 @@ interface LayerStackPanelProps {
 }
 
 interface LayerRowModel {
+  adjustmentKeys: Array<string>;
   blendMode: LayerBlendMode | null;
   groupId: string | null;
   groupLayerCount: number;
@@ -102,6 +103,7 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
       const groupSummary = groupSummaries.find((group) => group.id === mask.layerGroupId);
       emittedGroupIds.add(mask.layerGroupId);
       rows.push({
+        adjustmentKeys: [],
         blendMode: null,
         groupId: mask.layerGroupId,
         groupLayerCount: groupSummary?.layerCount ?? 1,
@@ -123,6 +125,10 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
     }
 
     rows.push({
+      adjustmentKeys: Object.entries(mask.adjustments)
+        .filter(([, value]) => typeof value === 'number' && value !== 0)
+        .map(([key]) => key)
+        .toSorted(),
       blendMode: normalizeLayerBlendMode(mask.blendMode),
       groupId: mask.layerGroupId ?? null,
       groupLayerCount: 0,
@@ -141,6 +147,7 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
   return [
     ...rows,
     {
+      adjustmentKeys: [],
       blendMode: DEFAULT_LAYER_BLEND_MODE,
       groupId: null,
       groupLayerCount: 0,
@@ -705,6 +712,8 @@ export default function LayerStackPanel({
           />
           <div
             className="rounded-md border border-surface bg-bg-secondary p-2"
+            data-active-layer-adjustment-count={activeRow.adjustmentKeys.length}
+            data-active-layer-adjustment-keys={activeRow.adjustmentKeys.join(',')}
             data-active-layer-id={activeRow.id}
             data-active-layer-opacity={activeRow.opacity}
             data-active-layer-visible={String(activeRow.visible)}

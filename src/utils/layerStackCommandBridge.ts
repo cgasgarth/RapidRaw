@@ -7,6 +7,7 @@ import {
   dispatchLayerStackCommand,
   layerMaskCommandEnvelopeV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
+  type LayerScopedToneAdjustmentV1,
   type LayerMaskCommandEnvelopeV1,
   type LayerMaskMutationResultV1,
   type LayerStackSidecarLayerV1,
@@ -46,6 +47,11 @@ export type LayerStackCommandBridgeOperation =
     }
   | {
       layerId: string;
+      toneColor: LayerScopedToneAdjustmentV1;
+      type: 'applyToneAdjustment';
+    }
+  | {
+      layerId: string;
       type: 'delete';
     };
 
@@ -80,6 +86,9 @@ const clampOpacityFraction = (opacity: number): number => {
 
 const toSidecarLayer = (layer: MaskContainer): LayerStackSidecarLayerV1 => ({
   adjustmentPreset: 'empty_adjustment_layer_v1',
+  adjustments: {
+    toneColor: toLayerScopedToneAdjustment(layer.adjustments),
+  },
   blendMode: layer.blendMode ?? DEFAULT_LAYER_BLEND_MODE,
   id: layer.id,
   maskIds: layer.subMasks.map((subMask) => subMask.id),
@@ -209,6 +218,16 @@ function buildLayerStackCommand(
           position: 'below_source',
         },
       });
+    case 'applyToneAdjustment':
+      return layerMaskCommandEnvelopeV1Schema.parse({
+        ...base,
+        commandType: 'layerMask.applyLayerAdjustment',
+        parameters: {
+          adjustmentKind: 'tone_color',
+          adjustmentParameters: operation.toneColor,
+          layerId: operation.layerId,
+        },
+      });
     case 'delete':
       return layerMaskCommandEnvelopeV1Schema.parse({
         ...base,
@@ -249,6 +268,7 @@ function materializeMasksFromSidecar(
     const previous = previousById.get(layer.id) ?? cloneSourceForOperation(previousMasks, operation);
     return {
       ...previous,
+      adjustments: toMaskAdjustments(layer.adjustments?.toneColor, previous.adjustments),
       blendMode: layer.blendMode,
       id: layer.id,
       name: layer.name,
@@ -278,5 +298,37 @@ function cloneSourceForOperation(
     opacity: 100,
     subMasks: [],
     visible: true,
+  };
+}
+
+export function toLayerScopedToneAdjustment(adjustments: MaskContainer['adjustments']): LayerScopedToneAdjustmentV1 {
+  return {
+    blackPoint: adjustments.blacks,
+    clarity: adjustments.clarity,
+    contrast: adjustments.contrast,
+    exposureEv: adjustments.exposure,
+    highlights: adjustments.highlights,
+    saturation: adjustments.saturation,
+    shadows: adjustments.shadows,
+    whitePoint: adjustments.whites,
+  };
+}
+
+function toMaskAdjustments(
+  toneColor: LayerScopedToneAdjustmentV1 | undefined,
+  fallback: MaskContainer['adjustments'],
+): MaskContainer['adjustments'] {
+  if (toneColor === undefined) return fallback;
+
+  return {
+    ...fallback,
+    blacks: toneColor.blackPoint,
+    clarity: toneColor.clarity,
+    contrast: toneColor.contrast,
+    exposure: toneColor.exposureEv,
+    highlights: toneColor.highlights,
+    saturation: toneColor.saturation,
+    shadows: toneColor.shadows,
+    whites: toneColor.whitePoint,
   };
 }

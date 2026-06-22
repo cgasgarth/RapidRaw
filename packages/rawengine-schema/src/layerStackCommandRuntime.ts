@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { layerScopedAdjustmentStateV1Schema, layerScopedToneAdjustmentV1Schema } from './layerScopedToneSchemas.js';
 import {
   RAW_ENGINE_SCHEMA_VERSION,
   layerMaskBlendModeV1Schema,
@@ -15,6 +16,7 @@ import {
 export const layerStackSidecarLayerV1Schema = z
   .object({
     adjustmentPreset: z.literal('empty_adjustment_layer_v1'),
+    adjustments: layerScopedAdjustmentStateV1Schema.optional(),
     blendMode: layerMaskBlendModeV1Schema,
     id: z.string().trim().min(1),
     maskIds: z.array(z.string().trim().min(1)),
@@ -71,6 +73,7 @@ type LayerStackCommand = Extract<
       | 'layerMask.createLayer'
       | 'layerMask.deleteLayer'
       | 'layerMask.duplicateLayer'
+      | 'layerMask.applyLayerAdjustment'
       | 'layerMask.moveLayer'
       | 'layerMask.renameLayer'
       | 'layerMask.setLayerOpacity'
@@ -92,6 +95,7 @@ const isLayerStackCommand = (command: LayerMaskCommandEnvelopeV1): command is La
     'layerMask.setLayerVisibility',
     'layerMask.renameLayer',
     'layerMask.duplicateLayer',
+    'layerMask.applyLayerAdjustment',
     'layerMask.deleteLayer',
     'layerMask.moveLayer',
   ].includes(command.commandType);
@@ -186,6 +190,7 @@ const applyCommandToLayers = (
         layers,
         {
           adjustmentPreset: 'empty_adjustment_layer_v1',
+          adjustments: {},
           blendMode: command.parameters.blendMode,
           id: layerId,
           maskIds: [],
@@ -228,6 +233,20 @@ const applyCommandToLayers = (
       };
       const insertIndex = command.parameters.position === 'above_source' ? sourceIndex : sourceIndex + 1;
       return [...layers.slice(0, insertIndex), duplicate, ...layers.slice(insertIndex)];
+    }
+    case 'layerMask.applyLayerAdjustment': {
+      layerIndex(layers, command.parameters.layerId);
+      if (command.parameters.adjustmentKind !== 'tone_color') {
+        throw new LayerStackCommandRuntimeError(
+          `Unsupported layer adjustment kind ${command.parameters.adjustmentKind}.`,
+        );
+      }
+      const toneColor = layerScopedToneAdjustmentV1Schema.parse(command.parameters.adjustmentParameters);
+      return layers.map((layer) =>
+        layer.id === command.parameters.layerId
+          ? { ...layer, adjustments: { ...layer.adjustments, toneColor } }
+          : layer,
+      );
     }
     case 'layerMask.deleteLayer':
       layerIndex(layers, command.parameters.layerId);

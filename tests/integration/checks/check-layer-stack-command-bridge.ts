@@ -79,6 +79,28 @@ if (hidden.commandResult.changedLayerIds[0] !== 'layer-sky') {
   throw new Error('Expected visibility operation to report changed layer id.');
 }
 
+const tone = run('apply_sky_tone', {
+  layerId: 'layer-sky',
+  toneColor: {
+    blackPoint: 3,
+    clarity: 7,
+    contrast: 12,
+    exposureEv: 0.4,
+    highlights: -10,
+    saturation: 9,
+    shadows: 18,
+    whitePoint: 4,
+  },
+  type: 'applyToneAdjustment',
+});
+if (
+  tone.command.commandType !== 'layerMask.applyLayerAdjustment' ||
+  tone.sidecar.layers[0]?.adjustments?.toneColor?.exposureEv !== 0.4 ||
+  masks[0]?.adjustments.exposure !== 0.4
+) {
+  throw new Error('Expected layer tone adjustment to dispatch and roundtrip through typed sidecar state.');
+}
+
 run('rename_sky', { layerId: 'layer-sky', name: 'Sky copy', type: 'rename' });
 run('duplicate_foreground', {
   layerId: 'layer-foreground',

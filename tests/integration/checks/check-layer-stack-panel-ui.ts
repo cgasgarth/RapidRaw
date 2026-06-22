@@ -86,6 +86,8 @@ for (const marker of [
   'data-testid="layer-active-action-strip"',
   'data-testid="layer-active-render-state"',
   'data-active-layer-id={activeRow.id}',
+  'data-active-layer-adjustment-count={activeRow.adjustmentKeys.length}',
+  'data-active-layer-adjustment-keys={activeRow.adjustmentKeys.join',
   'data-active-layer-opacity={activeRow.opacity}',
   'data-active-layer-visible={String(activeRow.visible)}',
   'data-testid="layer-export-readiness-summary"',
