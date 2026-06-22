@@ -1342,6 +1342,7 @@
     },
     "negativeConversion": {
       "acceptBatchPlan": "Accept batch plan",
+      "applyRollNormalizationPlan": "Apply roll normalization",
       "acquisitionHealth": "Salud de adquisición",
       "acquisitionHealthHint": "Los supuestos de fuente se revisan antes de convertir y se incluyen en metadatos dry-run.",
       "acquisitionSeverityOk": "Listo",

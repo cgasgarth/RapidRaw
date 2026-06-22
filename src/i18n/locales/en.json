@@ -2113,6 +2113,7 @@
       "applyCustomBase": "Apply sample",
       "applyHighlightRecovery": "Apply highlight recovery",
       "applyNeutralPatchRgb": "Apply neutral RGB",
+      "applyRollNormalizationPlan": "Apply roll normalization",
       "applyShadowBlackPoint": "Apply shadow black point",
       "autoBaseFog": "Auto base",
       "autoBaseFogTooltip": "Estimate film base and balance color weights",

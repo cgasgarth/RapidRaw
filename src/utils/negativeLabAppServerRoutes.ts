@@ -11,6 +11,7 @@ import {
   resolveNegativeLabRuntimeProfile,
 } from './negativeLabMeasuredProfileRuntime';
 import { buildNegativeLabPlanHash } from './negativeLabPlanIdentity';
+import { buildNegativeLabRollNormalizationPlan } from './negativeLabRollNormalizationPlan';
 import {
   NEGATIVE_LAB_STOCK_METADATA_CATALOG,
   buildNegativeLabStockMetadataCounts,
@@ -30,6 +31,8 @@ import {
   negativeLabDensitometerAppServerResultSchema,
   negativeLabFrameHealthAppServerCommandSchema,
   negativeLabFrameHealthAppServerResultSchema,
+  negativeLabPlanRollNormalizationAppServerCommandSchema,
+  negativeLabPlanRollNormalizationAppServerResultSchema,
   negativeLabQcProofAppServerCommandSchema,
   negativeLabQcProofAppServerResultSchema,
   negativeLabStockMetadataAppServerCommandSchema,
@@ -51,6 +54,8 @@ import {
   type NegativeLabDensitometerAppServerResult,
   type NegativeLabFrameHealthAppServerCommand,
   type NegativeLabFrameHealthAppServerResult,
+  type NegativeLabPlanRollNormalizationAppServerCommand,
+  type NegativeLabPlanRollNormalizationAppServerResult,
   type NegativeLabQcProofAppServerCommand,
   type NegativeLabQcProofAppServerResult,
   type NegativeLabStockMetadataAppServerCommand,
@@ -121,6 +126,31 @@ export const buildNegativeLabBatchSummaryRouteResult = (
   const frameHealthReport = buildNegativeLabFrameHealthRouteResult(parsedCommand);
 
   return negativeLabBatchSummaryAppServerResultSchema.parse(buildNegativeLabBatchDryRunSummary(frameHealthReport));
+};
+
+export const buildNegativeLabPlanRollNormalizationRouteResult = (
+  command: NegativeLabPlanRollNormalizationAppServerCommand,
+): NegativeLabPlanRollNormalizationAppServerResult => {
+  const parsedCommand = negativeLabPlanRollNormalizationAppServerCommandSchema.parse(command);
+  const frameHealthCommand = {
+    activePathIndex: parsedCommand.activePathIndex,
+    baseFogConfidence: parsedCommand.baseFogConfidence,
+    includedPaths: parsedCommand.includedPaths,
+    previewReady: parsedCommand.previewReady,
+    targetPaths: parsedCommand.targetPaths,
+  };
+  const frameHealthReport = buildNegativeLabFrameHealthRouteResult(frameHealthCommand);
+
+  return negativeLabPlanRollNormalizationAppServerResultSchema.parse(
+    buildNegativeLabRollNormalizationPlan({
+      anchorFrameIds: parsedCommand.anchorFrameIds,
+      baselineExposure: 0,
+      frameHealthReport,
+      mode: parsedCommand.mode,
+      preserveCreativeAdjustments: parsedCommand.preserveCreativeAdjustments,
+      selectedFrameIds: parsedCommand.selectedFrameIds,
+    }),
+  );
 };
 
 export const buildNegativeLabQcProofRouteResult = (

@@ -2020,6 +2020,24 @@ async function prepareScenario(page, mode) {
     timeout: 10_000,
   });
   await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabBatchReadiness).waitFor({ timeout: 10_000 });
+  z.object({
+    rollNormalizationAffectedCount: z.literal('2'),
+    rollNormalizationExposureDelta: z.literal('0.15'),
+    rollNormalizationMode: z.literal('density_and_balance'),
+    rollNormalizationPositiveCount: z.literal('2'),
+    rollNormalizationUnaffectedCount: z.literal('0'),
+    rollNormalizationWhiteBalanceDelta: z.literal('0.04'),
+  }).parse(
+    await page
+      .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabBatchReadiness)
+      .evaluate((element) => ({ ...element.dataset })),
+  );
+  await page
+    .getByTestId('negative-lab-roll-normalization-plan')
+    .getByText('2 frames +0.15 EV / WB 0.04', {
+      exact: true,
+    })
+    .waitFor({ timeout: 10_000 });
   await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentActivity).waitFor({ timeout: 10_000 });
   await page
     .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentCommandSource)
@@ -2748,6 +2766,20 @@ async function prepareScenario(page, mode) {
     .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabSavedPathProof)
     .getByText('/tmp/rawengine-negative-smoke-positive.tif', { exact: true })
     .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-roll-frame-0').click();
+  await page.getByTestId('negative-lab-apply-roll-normalization').click();
+  await page.getByTestId('negative-lab-roll-frame-exposure-override-0').getByText('+0.15', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-roll-frame-rgb-balance-override-0').getByText('RGB', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.waitForFunction(() =>
+    (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).some(
+      (call) =>
+        call.command === 'preview_negative_conversion' && JSON.stringify(call.args ?? {}).includes('"exposure":0.1'),
+    ),
+  );
 }
 
 async function main() {

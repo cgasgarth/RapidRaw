@@ -1340,6 +1340,7 @@
     },
     "negativeConversion": {
       "acceptBatchPlan": "Accept batch plan",
+      "applyRollNormalizationPlan": "Apply roll normalization",
       "blueWeight": "Azul (Amarelo)",
       "autoBaseFog": "Auto base",
       "autoBaseFogTooltip": "Estimate film base and balance color weights",
