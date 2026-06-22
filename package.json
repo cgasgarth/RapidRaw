@@ -464,6 +464,8 @@
     "check:negative-lab-real-raw-private-proof": "bun scripts/run-negative-lab-real-raw-private-proof.ts",
     "check:negative-lab-real-raw-private-proof-summary": "bun tests/integration/checks/check-negative-lab-real-raw-private-proof-summary.ts",
     "check:negative-lab-real-raw-private-review-smoke": "bun run check:negative-lab-real-raw-private-proof && bun scripts/capture-visual-smoke.ts --scenario negative-lab-real-raw-private-review",
+    "check:negative-lab-editor-layer-handoff": "bun tests/integration/checks/check-negative-lab-editor-layer-handoff.ts",
+    "check:negative-lab-editor-layer-handoff-smoke": "bun scripts/capture-visual-smoke.ts --scenario negative-lab-editor-layer-handoff",
     "check:negative-lab-measured-profiles": "bun tests/integration/checks/check-negative-lab-measured-profiles.ts",
     "check:negative-lab-measured-render-proof": "bun tests/integration/checks/check-negative-lab-measured-render-proof.ts",
     "check:negative-lab-density-cpu": "bun tests/integration/checks/check-negative-lab-density-cpu.ts",
