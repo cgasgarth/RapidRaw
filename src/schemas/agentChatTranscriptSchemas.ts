@@ -267,6 +267,20 @@ export const agentSelectedFrameScopeSchema = z
   })
   .strict();
 
+export const agentPrivateRawArtifactsSchema = z
+  .object({
+    artifactCount: z.number().int().positive(),
+    fixtureId: z.string().min(1),
+    issue: z.number().int().positive(),
+    reportPath: z.string().min(1),
+    sourceHashUnchanged: z.literal(true),
+    status: z.literal('partial_agent_apply_plus_private_raw_artifacts'),
+    title: z.string().min(1),
+    validationMode: z.literal('agent_app_server_bridge_plus_private_raw_artifact_proof'),
+    workflowReportPath: z.string().min(1),
+  })
+  .strict();
+
 export const agentChatTranscriptSchema = z
   .object({
     artifactReview: agentArtifactReviewSchema.optional(),
@@ -274,6 +288,7 @@ export const agentChatTranscriptSchema = z
     dryRunReview: agentChatDryRunReviewSchema.optional(),
     id: z.string().min(1),
     messages: z.array(agentChatMessageSchema).min(1),
+    privateRawArtifacts: agentPrivateRawArtifactsSchema.optional(),
     reviewHandoff: agentReviewHandoffSchema.optional(),
     runtimeStatus: agentChatRuntimeStatusSchema,
     selectedFrameScope: agentSelectedFrameScopeSchema.optional(),
@@ -287,6 +302,7 @@ export type AgentArtifactReview = z.infer<typeof agentArtifactReviewSchema>;
 export type AgentAuditTranscript = z.infer<typeof agentAuditTranscriptSchema>;
 export type AgentChatToolCall = z.infer<typeof agentChatToolCallSchema>;
 export type AgentChatDryRunReview = z.infer<typeof agentChatDryRunReviewSchema>;
+export type AgentPrivateRawArtifacts = z.infer<typeof agentPrivateRawArtifactsSchema>;
 export type AgentReviewHandoff = z.infer<typeof agentReviewHandoffSchema>;
 export type AgentSelectedFrameScope = z.infer<typeof agentSelectedFrameScopeSchema>;
 export type AgentChatTranscript = z.infer<typeof agentChatTranscriptSchema>;

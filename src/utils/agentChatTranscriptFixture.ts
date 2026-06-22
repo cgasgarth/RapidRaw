@@ -237,6 +237,17 @@ const fixture = {
       timestamp: '14:22:24',
     },
   ],
+  privateRawArtifacts: {
+    artifactCount: 5,
+    fixtureId: 'validation.raw-open-edit-export.high-iso-skin-shadow.v1',
+    issue: 3033,
+    reportPath: 'docs/validation/agent-app-server-private-raw-artifacts-2026-06-20.json',
+    sourceHashUnchanged: true,
+    status: 'partial_agent_apply_plus_private_raw_artifacts',
+    title: 'Private RAW artifact lane',
+    validationMode: 'agent_app_server_bridge_plus_private_raw_artifact_proof',
+    workflowReportPath: 'private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-workflow-report.json',
+  },
   reviewHandoff: {
     afterArtifactId: 'artifact_agent_expert_edit_demo_after_virtual_copy_2844',
     afterLabel: 'After',

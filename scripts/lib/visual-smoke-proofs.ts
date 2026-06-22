@@ -618,6 +618,14 @@ export const agentDryRunReviewProofDatasetSchema = z.object({
   policyAvailability: z.literal('reviewable'),
   warningCount: z.literal('2'),
 });
+export const agentPrivateRawArtifactsProofDatasetSchema = z.object({
+  artifactCount: z.literal('5'),
+  fixtureId: z.literal('validation.raw-open-edit-export.high-iso-skin-shadow.v1'),
+  issue: z.literal('3033'),
+  sourceHashUnchanged: z.literal('true'),
+  status: z.literal('partial_agent_apply_plus_private_raw_artifacts'),
+  validationMode: z.literal('agent_app_server_bridge_plus_private_raw_artifact_proof'),
+});
 export const negativeLabWorkspaceProofDatasetSchema = z.object({
   activeStage: z.enum(['colorInversion', 'export', 'inspection']),
   exportReady: z.enum(['false', 'true']),
