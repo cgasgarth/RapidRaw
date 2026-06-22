@@ -1504,7 +1504,24 @@
       "frameGreenWeightOffset": "Frame green offset",
       "frameRedWeightOffset": "Frame red offset",
       "resetFrameRgbBalance": "Reset frame RGB",
-      "resetPrintEndpoints": "Reset endpoints"
+      "resetPrintEndpoints": "Reset endpoints",
+      "acceptBaseSample": "Accept sample",
+      "baseSampleActive": "Active sample",
+      "baseSampleConfidenceDelta": "Confidence delta",
+      "baseSampleDensityDelta": "Density delta",
+      "baseSampleNoWarnings": "No warnings",
+      "baseSampleWarningClipped": "Clipped base channel",
+      "baseSampleWarningLowConfidence": "Low confidence",
+      "baseSampleWarningMissingBase": "No visible base detected",
+      "baseSampleWarningUneven": "Uneven illumination",
+      "baseSampleWarnings": "Warnings",
+      "baseSamplingStudio": "Base Sampling Studio",
+      "rejectBaseSample": "Reject sample",
+      "baseSampleDecision": {
+        "accepted": "Accepted",
+        "candidate": "Candidate",
+        "rejected": "Rejected"
+      }
     },
     "panorama": {
       "cancel": "Annuler",
