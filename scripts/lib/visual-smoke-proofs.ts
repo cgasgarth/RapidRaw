@@ -666,7 +666,11 @@ export const negativeLabRealRawPrivateReviewProofSchema = z.object({
 });
 export const selectiveColorUiProofDatasetSchema = z.object({
   activeRange: z.literal('oranges'),
+  applyOutputRgb: z.string().regex(/^[0-1]\.[0-9]{3},[0-1]\.[0-9]{3},[0-1]\.[0-9]{3}$/u),
   commandType: z.literal('toneColor.adjustHsl'),
+  maskPreviewRgb: z.string().regex(/^[0-1]\.[0-9]{3},[0-1]\.[0-9]{3},[0-1]\.[0-9]{3}$/u),
+  maskWeight: z.string().regex(/^(?:0\.[0-9]{3}|1\.000)$/u),
+  previewToApplyAligned: z.literal('true'),
 });
 export const colorBalanceCompareProofDatasetSchema = z
   .object({
