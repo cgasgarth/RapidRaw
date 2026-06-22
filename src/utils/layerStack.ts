@@ -46,6 +46,13 @@ export interface DuplicateLayerGroupLayerInput {
   newLayerId: string;
 }
 
+export interface CopyLayerMasksInput {
+  createSubMaskId: (sourceSubMaskId: string, index: number) => string;
+  sourceLayerId: string;
+  syncLayerVisibility?: boolean;
+  targetLayerId: string;
+}
+
 export class LayerStackOperationError extends Error {
   constructor(message: string) {
     super(message);
@@ -187,6 +194,32 @@ export function duplicateLayer(
   }));
 
   return [...layers.slice(0, sourceIndex + 1), duplicate, ...layers.slice(sourceIndex + 1)];
+}
+
+export function copyLayerMasksToLayer(layers: Array<MaskContainer>, input: CopyLayerMasksInput): Array<MaskContainer> {
+  const sourceLayer = layers[findLayerIndex(layers, input.sourceLayerId)];
+  const targetLayer = layers[findLayerIndex(layers, input.targetLayerId)];
+  if (sourceLayer === undefined || targetLayer === undefined) {
+    throw new LayerStackOperationError('Copy mask source and target layers must exist.');
+  }
+  if (sourceLayer.subMasks.length === 0) {
+    throw new LayerStackOperationError(`Layer ${input.sourceLayerId} has no masks to copy.`);
+  }
+
+  const copiedSubMasks = sourceLayer.subMasks.map((subMask, index) => ({
+    ...structuredClone(subMask),
+    id: input.createSubMaskId(subMask.id, index),
+  }));
+
+  return layers.map((layer) =>
+    layer.id === input.targetLayerId
+      ? {
+          ...layer,
+          subMasks: copiedSubMasks,
+          visible: input.syncLayerVisibility === false ? layer.visible : sourceLayer.visible,
+        }
+      : layer,
+  );
 }
 
 export function duplicateLayerGroup(

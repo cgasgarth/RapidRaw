@@ -1545,6 +1545,7 @@ async function prepareScenario(page, mode) {
     await page.getByRole('button', { name: 'Rename proof' }).click();
     await page.getByRole('button', { name: 'Opacity 64%' }).click();
     await page.getByRole('button', { name: 'Blend overlay' }).click();
+    await page.getByRole('button', { name: 'Copy mask' }).click();
     layerStackWorkflowProofSchema.parse(
       await page.getByTestId('layer-stack-workflow-proof').evaluate((element) => ({ ...element.dataset })),
     );

@@ -886,6 +886,7 @@ const copy = {
   layerRenameProof: 'Rename proof',
   layerOpacity64: 'Opacity 64%',
   layerBlendOverlay: 'Blend overlay',
+  layerCopyMask: 'Copy mask',
   layerCollapseGroup: 'Collapse group',
   layerCreateGroup: 'Create group',
   layerGroupCount: (count: number) => `${count} layers`,
@@ -1389,6 +1390,7 @@ function LayerStackWorkflowVisualSmoke() {
   const [selectedLayer, setSelectedLayer] = useState<string>(layerWorkflowFallbackLayer.name);
   const [exportParity, setExportParity] = useState('pending');
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<string[]>([]);
+  const [copyMaskApplied, setCopyMaskApplied] = useState(false);
 
   const addLayer = () => {
     const newLayer: LayerWorkflowState = {
@@ -1431,6 +1433,23 @@ function LayerStackWorkflowVisualSmoke() {
     setLayers((currentLayers) =>
       currentLayers.map((layer) => (layer.name === selectedLayer ? { ...layer, visible: !layer.visible } : layer)),
     );
+  };
+  const copySkyMaskToSelectedLayer = () => {
+    setLayers((currentLayers) => {
+      const sourceLayer = currentLayers.find((layer) => layer.name === 'Sky recovery');
+      if (sourceLayer === undefined) return currentLayers;
+
+      return currentLayers.map((layer) =>
+        layer.name === selectedLayer
+          ? {
+              ...layer,
+              mask: `${sourceLayer.mask} copy`,
+              visible: sourceLayer.visible,
+            }
+          : layer,
+      );
+    });
+    setCopyMaskApplied(true);
   };
   const createLocalPolishGroup = () => {
     setLayers((currentLayers) =>
@@ -1476,6 +1495,11 @@ function LayerStackWorkflowVisualSmoke() {
             data-active-layer={selectedLayerState.name}
             data-blend-mode={selectedLayerState.blend}
             data-collapsed-group-count={String(collapsedGroupIds.length)}
+            data-copied-mask-editable={String(copyMaskApplied)}
+            data-copied-mask-visible={String(copyMaskApplied && selectedLayerState.visible)}
+            data-copy-mask-applied={String(copyMaskApplied)}
+            data-copy-mask-source-layer="Sky recovery"
+            data-copy-mask-target-layer={selectedLayerState.name}
             data-grouping-state={groupedLayerCount > 0 ? 'active' : 'ungrouped'}
             data-grouped-layer-count={String(groupedLayerCount)}
             data-hidden-group-count={localPolishVisibleState === 'hidden' ? '1' : '0'}
@@ -1571,6 +1595,13 @@ function LayerStackWorkflowVisualSmoke() {
               type="button"
             >
               {copy.layerBlendOverlay}
+            </button>
+            <button
+              className="rounded-md border border-white/10 bg-[#20252b] px-3 py-2 text-sm"
+              onClick={copySkyMaskToSelectedLayer}
+              type="button"
+            >
+              {copy.layerCopyMask}
             </button>
             <button
               className="rounded-md border border-white/10 bg-[#20252b] px-3 py-2 text-sm"

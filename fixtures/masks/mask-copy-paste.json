@@ -21,5 +21,15 @@
       "originalExposure": 0.75
     },
     "id": "reset-adjustments"
+  },
+  {
+    "expected": {
+      "copiedSubMaskEditable": true,
+      "copiedSubMaskId": "submask-original-target-copy",
+      "copiedSubMaskVisible": true,
+      "sourceSubMaskId": "submask-original",
+      "targetLayerVisible": true
+    },
+    "id": "copy-layer-mask-visible-state"
   }
 ]
