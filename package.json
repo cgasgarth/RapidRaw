@@ -418,6 +418,7 @@
     "check:negative-lab-frame-exposure-override": "bun tests/integration/checks/check-negative-lab-frame-exposure-override.ts",
     "check:negative-lab-frame-rgb-balance-override": "bun tests/integration/checks/check-negative-lab-frame-rgb-balance-override.ts",
     "check:negative-lab-highlight-patch-exposure-recovery": "bun tests/integration/checks/check-negative-lab-highlight-patch-exposure-recovery.ts",
+    "check:negative-lab-interactive-patch-picker": "bun tests/integration/checks/check-negative-lab-interactive-patch-picker.ts",
     "check:negative-lab-shadow-patch-black-point": "bun tests/integration/checks/check-negative-lab-shadow-patch-black-point.ts",
     "check:negative-lab-neutral-patch-rgb-suggestion": "bun tests/integration/checks/check-negative-lab-neutral-patch-rgb-suggestion.ts",
     "check:negative-lab-stock-registry": "bun tests/integration/checks/check-negative-lab-stock-registry.ts",

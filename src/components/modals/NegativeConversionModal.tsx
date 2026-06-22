@@ -18,7 +18,7 @@ import {
   ChevronRight,
   X,
 } from 'lucide-react';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, type PointerEvent } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 
 import { useModalTransition } from '../../hooks/useModalTransition';
@@ -79,6 +79,7 @@ import {
   NEGATIVE_LAB_OUTPUT_FORMAT_SELECTOR_IDS,
   type NegativeLabOutputFormatId as NegativeOutputFormat,
 } from '../../utils/negativeLabOutputFormatIds';
+import { buildNegativeLabPickedPatchRect, type NegativeLabPatchPickerPoint } from '../../utils/negativeLabPatchPicker';
 import { buildNegativeLabAcceptedPlanIdentity } from '../../utils/negativeLabPlanIdentity';
 import {
   DEFAULT_NEGATIVE_LAB_UI_PRESET,
@@ -121,6 +122,7 @@ type NegativeParams = NegativeLabPresetParams;
 type NegativeConversionScope = 'active' | 'all' | 'ready';
 type NegativeLabProfileFilter = 'all' | 'black_and_white_silver' | 'color_negative' | 'measured';
 type NegativeLabProfileSort = 'catalog' | 'evidence_desc' | 'name_asc' | 'runtime_applied';
+type NegativeLabPatchRole = 'highlight' | 'neutral';
 type NegativeLabQcDecision = 'approved' | 'pending' | 'rejected';
 type NegativeLabProfileFilterLabelKey =
   | 'modals.negativeConversion.profileFilterAll'
@@ -458,6 +460,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [patchProbeEstimate, setPatchProbeEstimate] = useState<NegativeBaseFogEstimate | null>(null);
   const [patchProbeRect, setPatchProbeRect] = useState<NegativeLabBaseFogSampleRect | null>(null);
   const [patchProbeLabel, setPatchProbeLabel] = useState<string | null>(null);
+  const [patchRole, setPatchRole] = useState<NegativeLabPatchRole>('neutral');
+  const [isPickingPatch, setIsPickingPatch] = useState(false);
+  const [patchDragStart, setPatchDragStart] = useState<NegativeLabPatchPickerPoint | null>(null);
+  const [draftPatchRect, setDraftPatchRect] = useState<NegativeLabBaseFogSampleRect | null>(null);
   const [isSamplingPatchProbe, setIsSamplingPatchProbe] = useState(false);
   const [neutralPatchSuggestion, setNeutralPatchSuggestion] = useState<NegativeLabNeutralPatchSuggestion | null>(null);
   const [isSuggestingNeutralPatchRgb, setIsSuggestingNeutralPatchRgb] = useState(false);
@@ -506,6 +512,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     zoomOut,
   } = usePreviewViewport({ maxZoom: 8, minZoom: 0.1, zoomStep: 0.25 });
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
+  const previewImageRef = useRef<HTMLImageElement | null>(null);
   const effectiveActivePathIndex = targetPaths[activePathIndex] === undefined ? 0 : activePathIndex;
   const selectedImagePath = targetPaths[effectiveActivePathIndex] ?? null;
   const hasMultipleScans = targetPaths.length > 1;
@@ -1064,6 +1071,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setNeutralPatchSuggestion(null);
       setShadowPatchBlackPointSuggestion(null);
       setHighlightPatchExposureSuggestion(null);
+      setPatchRole('neutral');
+      setIsPickingPatch(false);
+      setPatchDragStart(null);
+      setDraftPatchRect(null);
       setActiveBaseFogSampleLabel(null);
       setBaseFogSampleUndoStack([]);
       setCustomBaseSampleRect(CUSTOM_BASE_SAMPLE_DEFAULT);
@@ -1082,6 +1093,22 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       window.clearTimeout(timer);
     };
   }, [isOpen, resetViewport, selectedImagePath, targetPaths, updatePreview]);
+
+  useEffect(() => {
+    if (!isPickingPatch) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setIsPickingPatch(false);
+      setPatchDragStart(null);
+      setDraftPatchRect(null);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isPickingPatch]);
 
   const buildParamsWithFrameOverrides = (
     baseParams: NegativeParams,
@@ -1346,6 +1373,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setPatchProbeEstimate(estimate);
       setPatchProbeRect(sampleRect);
       setPatchProbeLabel(t(labelKey));
+      setPatchRole(labelKey === 'modals.negativeConversion.sampleHighlightPatch' ? 'highlight' : 'neutral');
       setNeutralPatchSuggestion(null);
       setHighlightPatchExposureSuggestion(null);
       setShadowPatchBlackPointSuggestion(null);
@@ -1353,6 +1381,49 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       console.error('Patch probe sample failed', e);
     } finally {
       setIsSamplingPatchProbe(false);
+    }
+  };
+
+  const buildPickedPatchRectFromPointer = (start: NegativeLabPatchPickerPoint, event: PointerEvent) => {
+    const imageBounds = previewImageRef.current?.getBoundingClientRect();
+    if (imageBounds === undefined) return null;
+
+    return buildNegativeLabPickedPatchRect(start, { x: event.clientX, y: event.clientY }, imageBounds);
+  };
+
+  const handlePatchPickPointerDown = (event: PointerEvent<HTMLImageElement>) => {
+    if (!isPickingPatch || event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const startPoint = { x: event.clientX, y: event.clientY };
+    setPatchDragStart(startPoint);
+    setDraftPatchRect(buildPickedPatchRectFromPointer(startPoint, event));
+  };
+
+  const handlePatchPickPointerMove = (event: PointerEvent<HTMLImageElement>) => {
+    if (!isPickingPatch || patchDragStart === null) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setDraftPatchRect(buildPickedPatchRectFromPointer(patchDragStart, event));
+  };
+
+  const handlePatchPickPointerUp = (event: PointerEvent<HTMLImageElement>) => {
+    if (!isPickingPatch || patchDragStart === null) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    const nextRect = buildPickedPatchRectFromPointer(patchDragStart, event);
+    setIsPickingPatch(false);
+    setPatchDragStart(null);
+    setDraftPatchRect(null);
+    if (nextRect !== null) {
+      void handleSamplePatchProbe(
+        patchRole === 'highlight'
+          ? 'modals.negativeConversion.sampleHighlightPatch'
+          : 'modals.negativeConversion.sampleCenterPatch',
+        nextRect,
+      );
     }
   };
 
@@ -3626,6 +3697,48 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                   </button>
                 ))}
               </div>
+              <div className="grid grid-cols-2 gap-2" data-testid="negative-lab-patch-role-selector">
+                {(['neutral', 'highlight'] satisfies NegativeLabPatchRole[]).map((role) => (
+                  <button
+                    key={role}
+                    type="button"
+                    className={cx(
+                      'rounded-md border px-2 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                      patchRole === role
+                        ? 'border-accent bg-accent/10 text-text-primary'
+                        : 'border-surface bg-bg-secondary text-text-secondary hover:bg-surface',
+                    )}
+                    data-testid={`negative-lab-patch-role-${role}`}
+                    disabled={isSaving}
+                    onClick={() => {
+                      setPatchRole(role);
+                      setNeutralPatchSuggestion(null);
+                      setHighlightPatchExposureSuggestion(null);
+                      setShadowPatchBlackPointSuggestion(null);
+                    }}
+                  >
+                    {t(`modals.negativeConversion.patchRole.${role}`)}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="inline-flex w-full items-center justify-center gap-1 rounded-md border border-surface bg-bg-secondary px-2 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                data-testid="negative-lab-pick-viewer-patch"
+                data-picking={String(isPickingPatch)}
+                disabled={!selectedImagePath || isSaving}
+                onClick={() => {
+                  setIsPickingPatch((current) => !current);
+                  setPatchDragStart(null);
+                  setDraftPatchRect(null);
+                }}
+              >
+                {t(
+                  isPickingPatch
+                    ? 'modals.negativeConversion.cancelPatchPick'
+                    : 'modals.negativeConversion.pickViewerPatch',
+                )}
+              </button>
               {patchProbeEstimate !== null &&
                 patchProbeDensitometerReadout !== null &&
                 patchProbeSampleReadout !== null && (
@@ -4350,6 +4463,24 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     );
   };
 
+  const renderDraftPatchOverlay = () => {
+    if (draftPatchRect === null) return null;
+
+    return (
+      <div
+        aria-label={t('modals.negativeConversion.patchPickDraftOverlayLabel')}
+        className="absolute border-2 border-dashed border-yellow-200 bg-yellow-200/10 shadow-[0_0_0_1px_rgba(0,0,0,0.8)]"
+        data-testid="negative-lab-patch-pick-draft-overlay"
+        style={{
+          height: `${draftPatchRect.height * 100}%`,
+          left: `${draftPatchRect.x * 100}%`,
+          top: `${draftPatchRect.y * 100}%`,
+          width: `${draftPatchRect.width * 100}%`,
+        }}
+      />
+    );
+  };
+
   const renderCustomBaseSampleOverlay = () => (
     <div
       aria-label={t('modals.negativeConversion.customBaseSampleOverlayLabel')}
@@ -4404,19 +4535,31 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           )}
 
           {(previewUrl || originalUrl) && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div
+              className={cx(
+                'absolute inset-0 flex items-center justify-center',
+                isPickingPatch ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none',
+              )}
+              data-testid="negative-lab-preview-image-layer"
+            >
               <div className="origin-center" style={imageTransformStyle}>
                 <div className="relative inline-block shadow-2xl">
                   <img
+                    ref={previewImageRef}
                     src={isCompareActive && originalUrl ? originalUrl : previewUrl || ''}
                     className="block object-contain"
+                    data-testid="negative-lab-preview-image"
                     style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto' }}
                     alt={t('modals.negativeConversion.previewAlt')}
                     draggable={false}
+                    onPointerDown={handlePatchPickPointerDown}
+                    onPointerMove={handlePatchPickPointerMove}
+                    onPointerUp={handlePatchPickPointerUp}
                   />
                   {renderCustomBaseSampleOverlay()}
                   {renderBaseFogSampleOverlay()}
                   {renderPatchProbeOverlay()}
+                  {renderDraftPatchOverlay()}
                   {isCompareActive && (
                     <UiText
                       as="div"

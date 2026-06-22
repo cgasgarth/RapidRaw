@@ -1561,6 +1561,40 @@ async function prepareScenario(page, mode) {
     .getByTestId('negative-lab-recipe-frame-exposure-offset')
     .getByText('+0.50', { exact: true })
     .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-patch-role-neutral').click();
+  await page.getByTestId('negative-lab-pick-viewer-patch').click();
+  const previewImageBox = await page.getByTestId('negative-lab-preview-image').boundingBox();
+  if (previewImageBox === null) {
+    throw new Error('Negative Lab preview image box missing for patch pick smoke.');
+  }
+  await page.mouse.move(
+    previewImageBox.x + previewImageBox.width * 0.2,
+    previewImageBox.y + previewImageBox.height * 0.2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    previewImageBox.x + previewImageBox.width * 0.5,
+    previewImageBox.y + previewImageBox.height * 0.45,
+    {
+      steps: 4,
+    },
+  );
+  await page.mouse.up();
+  await page.getByTestId('negative-lab-patch-probe-overlay').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-patch-probe-area').waitFor({ timeout: 10_000 });
+  await page.waitForFunction(() =>
+    (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).some((call) => {
+      const sampleRect = call.args?.sampleRect;
+      return (
+        call.command === 'estimate_negative_base_fog' &&
+        sampleRect !== null &&
+        Math.abs((sampleRect?.x ?? 0) - 0.2) < 0.01 &&
+        Math.abs((sampleRect?.y ?? 0) - 0.2) < 0.01 &&
+        Math.abs((sampleRect?.width ?? 0) - 0.3) < 0.01 &&
+        Math.abs((sampleRect?.height ?? 0) - 0.25) < 0.01
+      );
+    }),
+  );
   await page.getByTestId('negative-lab-patch-probe-highlight-patch').click();
   await page.getByTestId('negative-lab-patch-probe-overlay').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-patch-probe-readout').getByText('Highlight patch', { exact: true }).waitFor({
