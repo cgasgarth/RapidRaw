@@ -1563,7 +1563,8 @@
         "accepted": "Accepted",
         "candidate": "Candidate",
         "rejected": "Rejected"
-      }
+      },
+      "positiveHandoffOpenInEditor": "Open first saved positive in editor"
     },
     "panorama": {
       "cancel": "Annuler",

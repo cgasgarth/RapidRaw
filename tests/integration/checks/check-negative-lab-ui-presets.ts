@@ -390,6 +390,7 @@ const workflowStageKeys = [
   'profileSearchEmpty',
   'positiveHandoff',
   'positiveHandoffFrame',
+  'positiveHandoffOpenInEditor',
   'positiveHandoffProfile',
   'positiveHandoffProvenance',
   'positiveHandoffReady',
