@@ -186,6 +186,13 @@ const ensureRemote = (root: string, name: string, url: string): void => {
 };
 
 const ensurePrimaryDependencies = (root: string): void => {
+  ensureDependencyBins(root, () => {
+    console.log('deps missing; running bun install --frozen-lockfile');
+    run(['bun', 'install', '--frozen-lockfile'], { cwd: root });
+  });
+};
+
+const ensureDependencyBins = (root: string, install?: () => void): void => {
   const nodeModules = resolve(root, 'node_modules');
   const eslintBin = resolve(nodeModules, '.bin/eslint');
   const prettierBin = resolve(nodeModules, '.bin/prettier');
@@ -193,11 +200,10 @@ const ensurePrimaryDependencies = (root: string): void => {
 
   if (existsSync(eslintBin) && existsSync(prettierBin) && existsSync(i18nBin)) return;
 
-  console.log('deps missing; running bun install --frozen-lockfile');
-  run(['bun', 'install', '--frozen-lockfile'], { cwd: root });
+  install?.();
 
   if (!existsSync(eslintBin) || !existsSync(prettierBin) || !existsSync(i18nBin)) {
-    throw new Error('Dependency install finished, but required bins are missing');
+    throw new Error(`Required dependency bins are missing under ${nodeModules}`);
   }
 };
 
@@ -239,7 +245,18 @@ const ensureGhResolution = (worktreePath: string): void => {
   if (fixedRepo !== REPO_OWNER) throw new Error(`gh resolved ${fixedRepo || 'nothing'}, expected ${REPO_OWNER}`);
 };
 
-const ensureWorktreeReady = (worktreePath: string): void => {
+const configureWorktreeGit = (worktreePath: string, branch: string): void => {
+  run(['git', 'config', 'core.hooksPath', '.githooks'], { cwd: worktreePath });
+  run(['git', 'config', 'pull.ff', 'only'], { cwd: worktreePath });
+  run(['git', 'config', 'remote.pushDefault', 'origin'], { cwd: worktreePath });
+  run(['git', 'config', `branch.${branch}.remote`, 'origin'], { cwd: worktreePath });
+  run(['git', 'config', `branch.${branch}.merge`, `refs/heads/${branch}`], { cwd: worktreePath });
+};
+
+const ensureWorktreeReady = (worktreePath: string, branch: string): void => {
+  const currentBranch = run(['git', 'branch', '--show-current'], { cwd: worktreePath });
+  if (currentBranch !== branch) throw new Error(`Expected ${branch}, found ${currentBranch || 'detached HEAD'}`);
+  ensureDependencyBins(worktreePath);
   run(['bun', 'run', 'hooks:verify'], { cwd: worktreePath });
   run(['bun', 'run', 'check:gh-repo-resolution'], { cwd: worktreePath });
 };
@@ -271,9 +288,9 @@ const main = (): void => {
   mkdirSync(dirname(worktreePath), { recursive: true });
   run(['git', 'worktree', 'add', '-b', branch, worktreePath, 'origin/main'], { cwd: source.root });
   linkNodeModules(source.root, worktreePath);
-  run(['git', 'config', 'core.hooksPath', '.githooks'], { cwd: worktreePath });
+  configureWorktreeGit(worktreePath, branch);
   ensureGhResolution(worktreePath);
-  ensureWorktreeReady(worktreePath);
+  ensureWorktreeReady(worktreePath, branch);
 
   console.log(`worktree ready: ${worktreePath} (${branch})`);
 };
