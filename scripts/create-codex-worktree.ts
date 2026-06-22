@@ -82,6 +82,7 @@ const parseArgs = (): ParsedArgs => {
 const ensureRepoRoot = (root: string): void => {
   const packageJsonPath = resolve(root, 'package.json');
   if (!existsSync(packageJsonPath)) throw new Error('package.json not found; run from RapidRaw repo root');
+  if (!existsSync(resolve(root, 'bun.lock'))) throw new Error('bun.lock not found; run from RapidRaw repo root');
 
   const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as { name?: string };
   if (packageJson.name !== 'rapidraw') {
@@ -95,6 +96,10 @@ const ensureRepoRoot = (root: string): void => {
 const ensureMainClean = (root: string): void => {
   const status = run(['git', 'status', '--short'], { cwd: root });
   if (status) throw new Error('Working tree has uncommitted changes; commit/stash before creating a worktree');
+};
+
+const ensureTool = (tool: string): void => {
+  run([tool, '--version']);
 };
 
 const ensureRemote = (root: string, name: string, url: string): void => {
@@ -117,6 +122,10 @@ const ensurePrimaryDependencies = (root: string): void => {
 
   console.log('deps missing; running bun install --frozen-lockfile');
   run(['bun', 'install', '--frozen-lockfile'], { cwd: root });
+
+  if (!existsSync(eslintBin) || !existsSync(prettierBin) || !existsSync(i18nBin)) {
+    throw new Error('Dependency install finished, but required bins are missing');
+  }
 };
 
 const linkNodeModules = (root: string, worktreePath: string): void => {
@@ -146,11 +155,19 @@ const ensureGhResolution = (worktreePath: string): void => {
   if (fixedRepo !== REPO_OWNER) throw new Error(`gh resolved ${fixedRepo || 'nothing'}, expected ${REPO_OWNER}`);
 };
 
+const ensureWorktreeReady = (worktreePath: string): void => {
+  run(['bun', 'run', 'hooks:verify'], { cwd: worktreePath });
+  run(['bun', 'run', 'check:gh-repo-resolution'], { cwd: worktreePath });
+};
+
 const main = (): void => {
   const root = process.cwd();
   const { branch, path } = parseArgs();
   const worktreePath = isAbsolute(path) ? path : resolve(root, path);
 
+  ensureTool('bun');
+  ensureTool('git');
+  ensureTool('gh');
   ensureRepoRoot(root);
   ensureMainClean(root);
   ensureRemote(root, 'origin', ORIGIN_URL);
@@ -168,8 +185,9 @@ const main = (): void => {
   linkNodeModules(root, worktreePath);
   run(['git', 'config', 'core.hooksPath', '.githooks'], { cwd: worktreePath });
   ensureGhResolution(worktreePath);
+  ensureWorktreeReady(worktreePath);
 
-  console.log(`worktree ready: ${worktreePath}`);
+  console.log(`worktree ready: ${worktreePath} (${branch})`);
 };
 
 try {

@@ -72,10 +72,13 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   availability, GitHub repo resolution, remotes, and current open PR count.
 - If preflight fails, fix that before feature work. Do not add or preserve repo
   scripts whose main purpose is managing agent workflow.
-- When creating a new Codex worktree, prefer the package script:
+- When creating a new Codex worktree, use the package script:
   `bun run worktree:create -- --branch codex/name`. It updates local `main` from
-  `origin/main`, creates the worktree from current `origin/main`, links existing
-  dependencies, installs git hooks, and verifies GitHub CLI repo resolution.
+  `origin/main`, creates the worktree from current `origin/main`, ensures Bun
+  dependencies are available, links `node_modules`, installs and verifies git
+  hooks, and verifies GitHub CLI repo resolution. Do not hand-roll worktree
+  setup unless this helper is blocked; fix the helper instead when it misses a
+  recurring setup need.
 
 ## GitHub Issues
 
