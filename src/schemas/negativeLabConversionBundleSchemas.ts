@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { negativeLabAcquisitionProfileSchema } from './negativeLabAcquisitionProfileSchemas';
 import { negativeLabProfileProvenanceHashSchema } from './negativeLabAppServerSchemas';
 import { negativeLabFrameExposureOverridePayloadSchema } from './negativeLabFrameExposureOverrideSchemas';
 import {
@@ -36,6 +37,7 @@ export const negativeLabConversionBundleSchema = z
   .object({
     acquisition: z
       .object({
+        selectedProfile: negativeLabAcquisitionProfileSchema,
         sourceFamilies: z.array(negativeLabAcquisitionSourceFamilySchema),
         warningCodes: z.array(negativeLabAcquisitionWarningCodeSchema),
       })

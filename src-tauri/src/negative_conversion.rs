@@ -72,6 +72,8 @@ pub struct NegativeConversionSaveOptions {
     pub acquisition_warning_codes: Vec<String>,
     #[serde(default)]
     pub acquisition_source_families: Vec<String>,
+    #[serde(default = "default_negative_lab_acquisition_profile")]
+    pub selected_acquisition_profile: NegativeLabAcquisitionProfileSnapshot,
     #[serde(default)]
     pub profile_provenance_hash: Option<String>,
     #[serde(default)]
@@ -80,6 +82,17 @@ pub struct NegativeConversionSaveOptions {
     pub frame_exposure_overrides: NegativeLabFrameExposureOverridePayload,
     #[serde(default)]
     pub frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabAcquisitionProfileSnapshot {
+    pub channel_basis: String,
+    pub display_name: String,
+    pub id: String,
+    pub input_transform: String,
+    pub provenance_summary: String,
+    pub warning_codes: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -278,6 +291,19 @@ fn default_write_conversion_bundle() -> bool {
     true
 }
 
+fn default_negative_lab_acquisition_profile() -> NegativeLabAcquisitionProfileSnapshot {
+    NegativeLabAcquisitionProfileSnapshot {
+        channel_basis: "camera_rgb".to_string(),
+        display_name: "Camera RAW linear capture".to_string(),
+        id: "camera_raw_linear_v1".to_string(),
+        input_transform: "linear_camera_raw".to_string(),
+        provenance_summary:
+            "Camera RAW capture with scanner/lab auto corrections avoided; preferred for inversion."
+                .to_string(),
+        warning_codes: vec!["scanner_profile_unmeasured".to_string()],
+    }
+}
+
 impl Default for NegativeConversionSaveOptions {
     fn default() -> Self {
         Self {
@@ -288,6 +314,7 @@ impl Default for NegativeConversionSaveOptions {
             accepted_dry_run_plan_id: None,
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
+            selected_acquisition_profile: default_negative_lab_acquisition_profile(),
             profile_provenance_hash: None,
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
@@ -348,6 +375,9 @@ impl NegativeConversionSaveOptions {
                 .into_iter()
                 .filter(|family| is_valid_negative_lab_acquisition_source_family(family))
                 .collect(),
+            selected_acquisition_profile: sanitize_negative_lab_acquisition_profile(
+                self.selected_acquisition_profile,
+            ),
             profile_provenance_hash,
             selected_profile,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload {
@@ -915,6 +945,34 @@ fn is_valid_negative_lab_acquisition_source_family(source_family: &str) -> bool 
     )
 }
 
+fn is_valid_negative_lab_acquisition_profile(
+    profile: &NegativeLabAcquisitionProfileSnapshot,
+) -> bool {
+    matches!(
+        profile.id.as_str(),
+        "camera_raw_linear_v1"
+            | "dng_linear_camera_v1"
+            | "scanner_tiff_16bit_flat_v1"
+            | "scanner_rgb_jpeg_review_v1"
+    ) && matches!(
+        profile.channel_basis.as_str(),
+        "camera_rgb" | "scanner_rgb" | "rendered_rgb"
+    ) && matches!(
+        profile.input_transform.as_str(),
+        "linear_camera_raw" | "linear_dng" | "scanner_rgb_flat" | "rendered_rgb_review_only"
+    ) && !profile.display_name.trim().is_empty()
+        && !profile.provenance_summary.trim().is_empty()
+}
+
+fn sanitize_negative_lab_acquisition_profile(
+    profile: NegativeLabAcquisitionProfileSnapshot,
+) -> NegativeLabAcquisitionProfileSnapshot {
+    if is_valid_negative_lab_acquisition_profile(&profile) {
+        return profile;
+    }
+    default_negative_lab_acquisition_profile()
+}
+
 fn build_negative_output_path(
     real_path: &str,
     save_options: &NegativeConversionSaveOptions,
@@ -1033,11 +1091,13 @@ fn write_negative_lab_conversion_bundle(
             .collect::<Vec<_>>(),
         "profileProvenanceHash": profile_hash,
         "suffix": save_options.suffix,
+        "selectedAcquisitionProfile": save_options.selected_acquisition_profile.clone(),
     })
     .to_string();
     let replay_plan_hash = format!("fnv1a32:{}", build_negative_lab_plan_hash(&replay_seed));
     let bundle = serde_json::json!({
         "acquisition": {
+            "selectedProfile": save_options.selected_acquisition_profile,
             "sourceFamilies": save_options.acquisition_source_families,
             "warningCodes": save_options.acquisition_warning_codes,
         },
@@ -1109,6 +1169,7 @@ fn write_negative_lab_output_sidecar(
             "params": params,
             "profileProvenanceHash": save_options.profile_provenance_hash,
             "selectedProfile": save_options.selected_profile.clone(),
+            "selectedAcquisitionProfile": save_options.selected_acquisition_profile.clone(),
         },
         "operationId": "negative_lab.convert",
         "operationVersion": 1,
@@ -1127,6 +1188,7 @@ fn write_negative_lab_output_sidecar(
         "provenance": {
             "commandId": "command_negative_lab_convert",
             "profileProvenanceHash": save_options.profile_provenance_hash,
+            "selectedAcquisitionProfile": save_options.selected_acquisition_profile.clone(),
             "selectedProfile": save_options.selected_profile.clone(),
             "runtimeStatus": "rendered",
         },
@@ -2254,6 +2316,7 @@ mod tests {
             write_conversion_bundle: default_write_conversion_bundle(),
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
+            selected_acquisition_profile: default_negative_lab_acquisition_profile(),
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
@@ -2282,6 +2345,7 @@ mod tests {
             write_conversion_bundle: default_write_conversion_bundle(),
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
+            selected_acquisition_profile: default_negative_lab_acquisition_profile(),
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
@@ -2303,6 +2367,7 @@ mod tests {
             write_conversion_bundle: default_write_conversion_bundle(),
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
+            selected_acquisition_profile: default_negative_lab_acquisition_profile(),
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
@@ -2317,6 +2382,7 @@ mod tests {
             write_conversion_bundle: default_write_conversion_bundle(),
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
+            selected_acquisition_profile: default_negative_lab_acquisition_profile(),
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
@@ -2357,6 +2423,7 @@ mod tests {
             write_conversion_bundle: default_write_conversion_bundle(),
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
+            selected_acquisition_profile: default_negative_lab_acquisition_profile(),
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
@@ -2372,6 +2439,7 @@ mod tests {
             write_conversion_bundle: default_write_conversion_bundle(),
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
+            selected_acquisition_profile: default_negative_lab_acquisition_profile(),
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
@@ -2564,6 +2632,7 @@ mod tests {
             write_conversion_bundle: default_write_conversion_bundle(),
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
+            selected_acquisition_profile: default_negative_lab_acquisition_profile(),
             selected_profile: Some(NegativeLabSelectedProfileSnapshot {
                 claim_level: "measured_profile".to_string(),
                 claim_policy: "process_family_profile_no_stock_claim".to_string(),
@@ -2689,6 +2758,16 @@ mod tests {
             black_point: 0.0,
             white_point: 1.0,
         };
+        let selected_acquisition_profile = NegativeLabAcquisitionProfileSnapshot {
+            channel_basis: "scanner_rgb".to_string(),
+            display_name: "16-bit flatbed/film scanner TIFF".to_string(),
+            id: "scanner_tiff_16bit_flat_v1".to_string(),
+            input_transform: "scanner_rgb_flat".to_string(),
+            provenance_summary:
+                "Flat 16-bit scanner RGB input with automatic color, contrast, sharpening, and inversion off."
+                    .to_string(),
+            warning_codes: vec!["scanner_profile_unmeasured".to_string()],
+        };
         let save_options = NegativeConversionSaveOptions {
             accepted_dry_run_plan_hash: Some("fnv1a32:2f4a91bc".to_string()),
             accepted_dry_run_plan_id: Some("negative_lab_batch_plan_2f4a91bc".to_string()),
@@ -2696,6 +2775,7 @@ mod tests {
             write_conversion_bundle: true,
             acquisition_warning_codes: vec!["lossy_source_for_negative_lab".to_string()],
             acquisition_source_families: vec!["jpeg_lossy".to_string()],
+            selected_acquisition_profile,
             profile_provenance_hash: Some("fnv1a32:9ed1e301".to_string()),
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
@@ -2730,6 +2810,14 @@ mod tests {
         assert_eq!(
             bundle["acquisition"]["warningCodes"][0],
             "lossy_source_for_negative_lab"
+        );
+        assert_eq!(
+            bundle["acquisition"]["selectedProfile"]["id"],
+            "scanner_tiff_16bit_flat_v1"
+        );
+        assert_eq!(
+            bundle["acquisition"]["selectedProfile"]["inputTransform"],
+            "scanner_rgb_flat"
         );
         assert_eq!(bundle["outputs"][0]["filename"], "frame_001_Positive.jpg");
         assert_eq!(
@@ -3201,6 +3289,7 @@ mod tests {
             write_conversion_bundle: true,
             acquisition_warning_codes: vec!["lossy_source_for_negative_lab".to_string()],
             acquisition_source_families: vec!["jpeg_lossy".to_string()],
+            selected_acquisition_profile: default_negative_lab_acquisition_profile(),
             profile_provenance_hash: Some("fnv1a32:9ed1e301".to_string()),
             selected_profile: Some(NegativeLabSelectedProfileSnapshot {
                 claim_level: "generic_starting_point_only".to_string(),
@@ -3259,6 +3348,18 @@ mod tests {
         assert!(
             sidecar_path.exists(),
             "Negative Lab public export proof must write a sidecar"
+        );
+        let sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
+        let artifact = sidecar
+            .raw_engine_artifacts
+            .expect("rawEngineArtifacts should be present")
+            .negative_lab_artifacts
+            .into_iter()
+            .last()
+            .expect("Negative Lab sidecar artifact should be present");
+        assert_eq!(
+            artifact["conversion"]["selectedAcquisitionProfile"]["id"],
+            "camera_raw_linear_v1"
         );
         let bundle_path = negative_lab_conversion_bundle_path(&output_path);
         write_negative_lab_conversion_bundle(
@@ -3486,6 +3587,7 @@ mod tests {
             write_conversion_bundle: true,
             acquisition_warning_codes: vec!["raw_source_not_verified_negative_scan".to_string()],
             acquisition_source_families: vec!["camera_raw".to_string()],
+            selected_acquisition_profile: default_negative_lab_acquisition_profile(),
             profile_provenance_hash: Some("fnv1a32:9ed1e301".to_string()),
             selected_profile: Some(NegativeLabSelectedProfileSnapshot {
                 claim_level: "generic_starting_point_only".to_string(),

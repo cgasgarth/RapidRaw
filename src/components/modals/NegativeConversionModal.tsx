@@ -24,6 +24,7 @@ import { useTranslation, Trans } from 'react-i18next';
 
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { usePreviewViewport } from '../../hooks/usePreviewViewport';
+import { negativeLabAcquisitionProfileIdSchema } from '../../schemas/negativeLabAcquisitionProfileSchemas';
 import {
   negativeLabHighlightPatchExposureSuggestionSchema,
   type NegativeLabHighlightPatchExposureSuggestion,
@@ -47,6 +48,11 @@ import {
 } from '../../schemas/negativeLabShadowPatchBlackPointSuggestionSchemas';
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
+import {
+  DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID,
+  NEGATIVE_LAB_ACQUISITION_PROFILES,
+  getNegativeLabAcquisitionProfile,
+} from '../../utils/negativeLabAcquisitionProfiles';
 import { NegativeLabAppServerCommandName } from '../../utils/negativeLabAppServerCommandNames';
 import {
   buildNegativeLabBaseSamplePreviewProof,
@@ -109,6 +115,7 @@ import Button from '../ui/Button';
 import Slider from '../ui/Slider';
 import UiText from '../ui/Text';
 
+import type { NegativeLabAcquisitionProfileId } from '../../schemas/negativeLabAcquisitionProfileSchemas';
 import type {
   NegativeLabAcquisitionHealthReport,
   NegativeLabAcquisitionSourceFamily,
@@ -518,6 +525,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [saveOptions, setSaveOptions] = useState(DEFAULT_SAVE_OPTIONS);
   const [openSavedPositiveInEditor, setOpenSavedPositiveInEditor] = useState(true);
   const [conversionScope, setConversionScope] = useState<NegativeConversionScope>('all');
+  const [selectedAcquisitionProfileId, setSelectedAcquisitionProfileId] = useState<NegativeLabAcquisitionProfileId>(
+    DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID,
+  );
   const [includedPathSet, setIncludedPathSet] = useState<Set<string>>(() => getInitialIncludedPaths(targetPaths));
   const [activePathIndex, setActivePathIndex] = useState(0);
   const [profileSearchQuery, setProfileSearchQuery] = useState('');
@@ -628,6 +638,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const selectedProfile = useMemo(
     () => NEGATIVE_LAB_PROFILE_BROWSER_ROWS.find((profile) => profile.presetId === selectedPresetId) ?? null,
     [selectedPresetId],
+  );
+  const selectedAcquisitionProfile = useMemo(
+    () => getNegativeLabAcquisitionProfile(selectedAcquisitionProfileId),
+    [selectedAcquisitionProfileId],
   );
   const profileProvenanceHashById = useMemo(
     () =>
@@ -878,6 +892,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           omittedDispositionFrameIds,
           qcDecisions: qcDecisionByFrameId,
           rollNormalizationPlan,
+          selectedAcquisitionProfile,
           selectedProfile: selectedProfileSnapshot,
         },
         null,
@@ -892,6 +907,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       omittedDispositionFrameIds,
       qcDecisionByFrameId,
       rollNormalizationPlan,
+      selectedAcquisitionProfile,
       selectedProfileSnapshot,
     ],
   );
@@ -1159,6 +1175,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setOriginalUrl(null);
       setParams(DEFAULT_PARAMS);
       setSelectedPresetId(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
+      setSelectedAcquisitionProfileId(DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID);
       resetViewport();
       setBaseFogConfidence(null);
       setBaseFogEstimate(null);
@@ -1867,6 +1884,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             reviewFrameIds: batchDryRunSummary.reviewFrameIds,
             acquisitionSourceFamilies: frameHealthReport.acquisitionHealth.sourceFamilies,
             acquisitionWarningCodes: frameHealthReport.acquisitionHealth.warningCodes,
+            selectedAcquisitionProfile,
             ...(selectedProfileProvenanceHash === null ? {} : { profileProvenanceHash: selectedProfileProvenanceHash }),
             ...(selectedProfileSnapshot === null ? {} : { selectedProfile: selectedProfileSnapshot }),
           },
@@ -3075,6 +3093,38 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 );
               })}
             </div>
+            <label className="block space-y-1">
+              <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
+                {t('modals.negativeConversion.acquisitionProfile')}
+              </UiText>
+              <select
+                aria-label={t('modals.negativeConversion.acquisitionProfile')}
+                className="w-full rounded-md border border-surface bg-bg-primary px-3 py-2 text-sm text-text-primary outline-none transition-colors focus:border-accent"
+                data-channel-basis={selectedAcquisitionProfile.channelBasis}
+                data-input-transform={selectedAcquisitionProfile.inputTransform}
+                data-testid="negative-lab-acquisition-profile"
+                onChange={(event) => {
+                  setSelectedAcquisitionProfileId(
+                    negativeLabAcquisitionProfileIdSchema.parse(event.currentTarget.value),
+                  );
+                  setAcceptedBatchPlanJson(null);
+                }}
+                value={selectedAcquisitionProfileId}
+              >
+                {NEGATIVE_LAB_ACQUISITION_PROFILES.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.displayName}
+                  </option>
+                ))}
+              </select>
+              <UiText
+                variant={TextVariants.small}
+                className="text-text-tertiary"
+                data-testid="negative-lab-acquisition-profile-summary"
+              >
+                {selectedAcquisitionProfile.provenanceSummary}
+              </UiText>
+            </label>
             {hasMultipleScans && (
               <div className="grid grid-cols-3 gap-2" data-testid="negative-lab-conversion-scope">
                 {(['all', 'ready', 'active'] satisfies Array<NegativeConversionScope>).map((scope) => (
