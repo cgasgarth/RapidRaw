@@ -1,5 +1,6 @@
 export const VISUAL_SMOKE_SCENARIO_IDS = {
   AgentChatUi: 'agent-chat-ui',
+  BrushMaskCanvasUi: 'brush-mask-canvas-ui',
   ColorWorkflow: 'color-workflow',
   CommandPaletteWorkflows: 'command-palette-workflows',
   DetailDustSpot: 'detail-dust-spot',
@@ -61,6 +62,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     mode: VISUAL_SMOKE_SCENARIO_IDS.AgentChatUi,
     outputFile: 'agent-chat-ui.png',
     sectionMinimum: 1,
+  },
+  {
+    marker: 'Brush mask canvas UI',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.BrushMaskCanvasUi,
+    outputFile: 'brush-mask-canvas-ui.png',
+    sectionMinimum: 2,
   },
   {
     marker: 'Panorama review',

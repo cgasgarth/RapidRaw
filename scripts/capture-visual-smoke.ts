@@ -1,18 +1,29 @@
 import { chromium, type Locator } from '@playwright/test';
 import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
+import { format } from 'prettier';
 import { z } from 'zod';
 import { NegativeLabAppServerCommandName } from '../src/utils/negativeLabAppServerCommandNames.ts';
 import { sampleToneColorCommandEnvelopeV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
-import { toneColorCommandEnvelopeV1Schema } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { BrushMaskCommandRuntime, renderBrushMask } from '../packages/rawengine-schema/src/brushMaskCommandRuntime.ts';
+import {
+  layerMaskDryRunResultV1Schema,
+  layerMaskMutationResultV1Schema,
+  toneColorCommandEnvelopeV1Schema,
+} from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   VISUAL_SMOKE_PROOF_TEST_IDS,
   VISUAL_SMOKE_SCENARIOS,
   VISUAL_SMOKE_SCENARIO_IDS,
 } from '../src/validation/visual/visualSmokeScenarios.ts';
+import {
+  BRUSH_MASK_COMMAND_COORDINATE_SPACE,
+  buildBrushMaskCommandFromParameters,
+} from '../src/utils/brushMaskCommandBridge.ts';
 import {
   agentArtifactReviewProofDatasetSchema,
   agentAuditTranscriptViewerProofDatasetSchema,
@@ -316,6 +327,140 @@ async function readLayerMaskPreviewDataUrl(path) {
   } finally {
     await rm(tempDir, { force: true, recursive: true });
   }
+}
+
+const brushMaskCanvasReportPath = 'docs/validation/brush-mask-canvas-ui-proof-2026-06-22.json';
+const brushMaskCanvasPaintReportPath = 'artifacts/visual-smoke/brush-mask-canvas-paint.png';
+const brushMaskCanvasFinalReportPath = 'artifacts/visual-smoke/brush-mask-canvas-ui.png';
+const brushMaskCanvasPaintPath = resolve(brushMaskCanvasPaintReportPath);
+
+const brushMaskCanvasDatasetSchema = z
+  .object({
+    imageHeight: z.string().regex(/^\d+$/u),
+    imagePath: z.string().min(1),
+    imageWidth: z.string().regex(/^\d+$/u),
+    linesJson: z.string().min(1),
+    maskId: z.string().min(1),
+    pointCounts: z.string().min(1),
+    strokeCount: z.string().regex(/^\d+$/u),
+    toolOrder: z.string().min(1),
+  })
+  .passthrough();
+
+const brushCaptureDatasetSchema = z
+  .object({
+    brushCommandCoordinateSpace: z.literal(BRUSH_MASK_COMMAND_COORDINATE_SPACE),
+    brushCommandId: z.string().min(1),
+    brushCommandLastMode: z.enum(['paint', 'erase']),
+    brushCommandLastPointCount: z.string().regex(/^\d+$/u),
+    brushCommandStrokeCount: z.string().regex(/^\d+$/u),
+    brushCommandType: z.literal('layerMask.createBrushMask'),
+  })
+  .passthrough();
+
+const strokeLineSchema = z
+  .object({
+    brushSize: z.number().positive(),
+    feather: z.number().min(0).max(1).optional(),
+    flow: z.number().min(0).max(100).optional(),
+    points: z.array(z.object({ x: z.number(), y: z.number() }).strict()).min(2),
+    tool: z.enum(['brush', 'eraser']),
+  })
+  .strict();
+
+async function writeBrushMaskCanvasProof(page): Promise<void> {
+  const proofDataset = brushMaskCanvasDatasetSchema.parse(
+    await page.getByTestId('brush-mask-canvas-ui-proof').evaluate((element) => ({ ...element.dataset })),
+  );
+  const captureDataset = brushCaptureDatasetSchema.parse(
+    await page.getByTestId('image-canvas-brush-command-capture').evaluate((element) => ({ ...element.dataset })),
+  );
+  const lines = z
+    .array(strokeLineSchema)
+    .length(2)
+    .parse(JSON.parse(decodeURIComponent(proofDataset.linesJson)));
+  const imageSize = {
+    height: Number(proofDataset.imageHeight),
+    width: Number(proofDataset.imageWidth),
+  };
+  const context = {
+    expectedGraphRevision: 'graph_rev_brush_canvas_ui_proof',
+    imagePath: proofDataset.imagePath,
+    imageSize,
+    maskId: proofDataset.maskId,
+    maskName: 'Brush canvas proof',
+    operationId: 'brush_canvas_ui_2996',
+    sessionId: 'brush-mask-canvas-ui-proof',
+  };
+  const paintCommand = buildBrushMaskCommandFromParameters({ lines: [lines[0]] }, context, { dryRun: true });
+  const dryRunCommand = buildBrushMaskCommandFromParameters({ lines }, context, { dryRun: true });
+  const applyCommand = buildBrushMaskCommandFromParameters({ lines }, context, { dryRun: false });
+  const renderRequest = {
+    baseMask: {
+      alpha: new Array<number>(64 * 36).fill(0),
+      height: 36,
+      maskId: context.maskId,
+      width: 64,
+    },
+    height: 36,
+    width: 64,
+  };
+  const paintRender = renderBrushMask({ ...renderRequest, command: paintCommand });
+  const finalRender = renderBrushMask({ ...renderRequest, command: dryRunCommand });
+  const runtime = new BrushMaskCommandRuntime();
+  const dryRunResult = layerMaskDryRunResultV1Schema.parse(runtime.dispatch(dryRunCommand, renderRequest));
+  const applyResult = layerMaskMutationResultV1Schema.parse(runtime.dispatch(applyCommand, renderRequest));
+  const paintCoverage = alphaSum(paintRender.alpha);
+  const finalCoverage = alphaSum(finalRender.alpha);
+
+  if (lines[0]?.tool !== 'brush' || lines[1]?.tool !== 'eraser') {
+    throw new Error(`Expected brush,eraser stroke order; got ${proofDataset.toolOrder}`);
+  }
+  if (paintCoverage <= 0 || finalCoverage >= paintCoverage) {
+    throw new Error(`Expected eraser stroke to reduce coverage: paint=${paintCoverage}, final=${finalCoverage}`);
+  }
+  if (paintRender.contentHash === finalRender.contentHash) {
+    throw new Error('Paint and final brush mask hashes should differ after eraser stroke.');
+  }
+  for (const stroke of dryRunCommand.parameters.strokes) {
+    for (const point of stroke.points) {
+      if ('pressure' in point) throw new Error('Mouse brush proof must not synthesize pressure.');
+    }
+  }
+
+  const reportJson = await format(
+    JSON.stringify({
+      commandHash: hashJson(dryRunCommand),
+      commandType: captureDataset.brushCommandType,
+      coordinateSpace: captureDataset.brushCommandCoordinateSpace,
+      dryRunMaskHash: dryRunResult.maskArtifacts[0]?.contentHash,
+      finalCoverage,
+      finalMaskHash: finalRender.contentHash,
+      issue: 2996,
+      lastStrokeMode: captureDataset.brushCommandLastMode,
+      lastStrokePointCount: Number(captureDataset.brushCommandLastPointCount),
+      paintCoverage,
+      paintMaskHash: paintRender.contentHash,
+      paintScreenshot: brushMaskCanvasPaintReportPath,
+      pointCounts: proofDataset.pointCounts.split(',').map(Number),
+      schemaVersion: 1,
+      screenshot: brushMaskCanvasFinalReportPath,
+      strokeCount: Number(proofDataset.strokeCount),
+      toolOrder: proofDataset.toolOrder.split(','),
+      validationMode: 'brush_mask_canvas_ui_drag_to_runtime_output_proof',
+      changedMaskIds: applyResult.changedMaskIds,
+    }),
+    { parser: 'json' },
+  );
+  await writeFile(brushMaskCanvasReportPath, reportJson);
+}
+
+function alphaSum(alpha: ReadonlyArray<number>): number {
+  return Number(alpha.reduce((sum, value) => sum + value, 0).toFixed(6));
+}
+
+function hashJson(value: unknown): string {
+  return `sha256:${createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
 }
 
 async function readJpegDataUrl(path) {
@@ -633,6 +778,62 @@ async function prepareScenario(page, mode) {
     if (removedApplyActionCount !== 0) {
       throw new Error(`Agent UI-only smoke must not expose Approve apply, found ${removedApplyActionCount}.`);
     }
+    return;
+  }
+
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.BrushMaskCanvasUi) {
+    const capture = page.getByTestId('image-canvas-brush-command-capture');
+    await capture.waitFor({ timeout: 10_000 });
+    const canvas = capture.locator('canvas');
+    const canvasCount = await canvas.count();
+    if (canvasCount !== 1) throw new Error(`Expected one brush Konva canvas, found ${canvasCount}.`);
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('Brush mask canvas capture target has no bounding box.');
+
+    const toCanvasPoint = (x: number, y: number) => ({
+      x: box.width / 4 + x * (box.width / 2 / 640),
+      y: box.height / 4 + y * (box.height / 2 / 360),
+    });
+
+    const drag = async (
+      startX: number,
+      startY: number,
+      endX: number,
+      endY: number,
+      options: { alt?: boolean } = {},
+    ) => {
+      const start = toCanvasPoint(startX, startY);
+      const middle = toCanvasPoint((startX + endX) / 2, (startY + endY) / 2);
+      const end = toCanvasPoint(endX, endY);
+      if (options.alt === true) await page.keyboard.down('Alt');
+      await page.mouse.move(box.x + start.x, box.y + start.y);
+      await page.mouse.down();
+      await page.mouse.move(box.x + middle.x, box.y + middle.y, { steps: 8 });
+      await page.mouse.move(box.x + end.x, box.y + end.y, { steps: 8 });
+      await page.mouse.up();
+      if (options.alt === true) await page.keyboard.up('Alt');
+    };
+
+    await drag(130, 170, 430, 170);
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector('[data-testid="image-canvas-brush-command-capture"]')
+          ?.getAttribute('data-brush-command-stroke-count') === '1',
+    );
+    await page.screenshot({ path: brushMaskCanvasPaintPath, fullPage: false });
+
+    await drag(300, 95, 300, 250, { alt: true });
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector('[data-testid="image-canvas-brush-command-capture"]')
+          ?.getAttribute('data-brush-command-stroke-count') === '2' &&
+        document
+          .querySelector('[data-testid="image-canvas-brush-command-capture"]')
+          ?.getAttribute('data-brush-command-last-mode') === 'erase',
+    );
+    await writeBrushMaskCanvasProof(page);
     return;
   }
 

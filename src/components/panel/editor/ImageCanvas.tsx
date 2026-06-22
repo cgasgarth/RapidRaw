@@ -46,6 +46,8 @@ interface BrushMaskCommandCaptureSummary {
   commandId: string;
   commandType: 'layerMask.createBrushMask';
   coordinateSpace: typeof BRUSH_MASK_COMMAND_COORDINATE_SPACE;
+  lastPointCount: number;
+  lastStrokeMode: 'erase' | 'paint';
   strokeCount: number;
 }
 
@@ -1341,6 +1343,8 @@ const ImageCanvas = memo(
           commandId: command.commandId,
           commandType: command.commandType,
           coordinateSpace: BRUSH_MASK_COMMAND_COORDINATE_SPACE,
+          lastPointCount: command.parameters.strokes.at(-1)?.points.length ?? 0,
+          lastStrokeMode: command.parameters.strokes.at(-1)?.mode ?? 'paint',
           strokeCount: command.parameters.strokes.length,
         });
       },
@@ -2525,6 +2529,8 @@ const ImageCanvas = memo(
             <div
               data-brush-command-coordinate-space={lastBrushCommandCapture?.coordinateSpace ?? ''}
               data-brush-command-id={lastBrushCommandCapture?.commandId ?? ''}
+              data-brush-command-last-mode={lastBrushCommandCapture?.lastStrokeMode ?? ''}
+              data-brush-command-last-point-count={lastBrushCommandCapture?.lastPointCount ?? 0}
               data-brush-command-stroke-count={lastBrushCommandCapture?.strokeCount ?? 0}
               data-brush-command-type={lastBrushCommandCapture?.commandType ?? ''}
               data-testid="image-canvas-brush-command-capture"

@@ -1,0 +1,21 @@
+{
+  "commandHash": "sha256:6d4cf3deee4105e054aafbeda94983cf2a1dab939797f96237f56c10ceea60b7",
+  "commandType": "layerMask.createBrushMask",
+  "coordinateSpace": "normalized_image",
+  "dryRunMaskHash": "fnv1a32:4438297d",
+  "finalCoverage": 199.638131,
+  "finalMaskHash": "fnv1a32:4438297d",
+  "issue": 2996,
+  "lastStrokeMode": "erase",
+  "lastStrokePointCount": 17,
+  "paintCoverage": 1996.176699,
+  "paintMaskHash": "fnv1a32:662481fd",
+  "paintScreenshot": "artifacts/visual-smoke/brush-mask-canvas-paint.png",
+  "pointCounts": [17, 17],
+  "schemaVersion": 1,
+  "screenshot": "artifacts/visual-smoke/brush-mask-canvas-ui.png",
+  "strokeCount": 2,
+  "toolOrder": ["brush", "eraser"],
+  "validationMode": "brush_mask_canvas_ui_drag_to_runtime_output_proof",
+  "changedMaskIds": ["mask_brush_brush_canvas_proof"]
+}

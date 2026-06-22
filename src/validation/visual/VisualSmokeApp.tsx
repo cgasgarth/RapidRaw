@@ -11,10 +11,12 @@ import HdrModal from '../../components/modals/HdrModal';
 import { NegativeConversionModal } from '../../components/modals/NegativeConversionModal';
 import PanoramaModal from '../../components/modals/PanoramaModal';
 import SuperResolutionModal from '../../components/modals/SuperResolutionModal';
+import ImageCanvas from '../../components/panel/editor/ImageCanvas';
 import AgentChatShell from '../../components/panel/right/AgentChatShell';
 import { MaskOverlayReviewControls } from '../../components/panel/right/MaskOverlayReviewControls';
+import { Mask, SubMaskMode, ToolType, type SubMask } from '../../components/panel/right/Masks';
 import RightPanelSwitcher from '../../components/panel/right/RightPanelSwitcher';
-import { Panel } from '../../components/ui/AppProperties';
+import { Panel, type BrushSettings, type SelectedImage } from '../../components/ui/AppProperties';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../../schemas/focusStackUiSchemas';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS, type HdrMergeUiSettings } from '../../schemas/hdrMergeUiSchemas';
 import {
@@ -27,7 +29,7 @@ import {
   type SuperResolutionUiSettings,
 } from '../../schemas/superResolutionUiSchemas';
 import { useUIStore } from '../../store/useUIStore';
-import { INITIAL_ADJUSTMENTS, type Adjustments } from '../../utils/adjustments';
+import { INITIAL_ADJUSTMENTS, type Adjustments, type MaskContainer } from '../../utils/adjustments';
 import { agentChatTranscriptFixture } from '../../utils/agentChatTranscriptFixture';
 import { applyColorBalanceRgbToPixel } from '../../utils/colorBalanceRgbRuntime';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
@@ -134,6 +136,7 @@ declare global {
 
 const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.AgentChatUi]: AgentChatVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.BrushMaskCanvasUi]: BrushMaskCanvasVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ColorWorkflow]: ColorWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.CommandPaletteWorkflows]: CommandPaletteWorkflowSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.DetailDustSpot]: DetailDustSpotVisualSmoke,
@@ -168,6 +171,242 @@ const workflowRailRuntime = 'UI polish';
 const workflowRailTargetProof = 'Fixed 36px icon targets keep the rail compact without changing panel order.';
 const workflowRailActivePanelLabel = 'Active panel';
 const workflowRailNoPanelLabel = 'none';
+
+const brushMaskCanvasImageWidth = 640;
+const brushMaskCanvasImageHeight = 360;
+const brushMaskCanvasContainerId = 'brush-mask-canvas-container';
+const brushMaskCanvasSubMaskId = 'brush-mask-canvas-submask';
+const brushMaskCanvasImageDataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" width="${brushMaskCanvasImageWidth}" height="${brushMaskCanvasImageHeight}" viewBox="0 0 ${brushMaskCanvasImageWidth} ${brushMaskCanvasImageHeight}">
+  <defs>
+    <linearGradient id="sky" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#2d4a62"/>
+      <stop offset="0.45" stop-color="#496b7c"/>
+      <stop offset="1" stop-color="#101820"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#sky)"/>
+  <rect x="0" y="230" width="640" height="130" fill="#1c2a20"/>
+  <path d="M0 250 C120 210 190 250 290 205 C390 160 475 210 640 165 L640 360 L0 360 Z" fill="#35473a"/>
+  <circle cx="486" cy="72" r="38" fill="#e9d89a"/>
+</svg>`)}`;
+
+const brushMaskCanvasImage: SelectedImage = {
+  exif: null,
+  height: brushMaskCanvasImageHeight,
+  isRaw: false,
+  isReady: true,
+  originalUrl: brushMaskCanvasImageDataUrl,
+  path: '/validation/brush-mask-canvas-ui.jpg',
+  thumbnailUrl: brushMaskCanvasImageDataUrl,
+  width: brushMaskCanvasImageWidth,
+};
+
+const brushMaskCanvasBrushSettings: BrushSettings = {
+  feather: 35,
+  size: 72,
+  tool: ToolType.Brush,
+};
+
+interface BrushMaskCanvasPoint {
+  x: number;
+  y: number;
+}
+
+interface BrushMaskCanvasLine {
+  brushSize?: number;
+  points: Array<BrushMaskCanvasPoint>;
+  tool?: string;
+}
+
+const isBrushMaskCanvasPoint = (value: unknown): value is BrushMaskCanvasPoint => {
+  if (typeof value !== 'object' || value === null) return false;
+  const point = value as { x?: unknown; y?: unknown };
+  return typeof point.x === 'number' && typeof point.y === 'number';
+};
+
+const isBrushMaskCanvasLine = (value: unknown): value is BrushMaskCanvasLine => {
+  if (typeof value !== 'object' || value === null) return false;
+  const line = value as { brushSize?: unknown; points?: unknown; tool?: unknown };
+  return (
+    Array.isArray(line.points) &&
+    line.points.every(isBrushMaskCanvasPoint) &&
+    (line.brushSize === undefined || typeof line.brushSize === 'number') &&
+    (line.tool === undefined || typeof line.tool === 'string')
+  );
+};
+
+const readBrushMaskCanvasLines = (subMask: SubMask): Array<BrushMaskCanvasLine> => {
+  const rawLines = subMask.parameters?.['lines'];
+  return Array.isArray(rawLines) ? rawLines.filter(isBrushMaskCanvasLine) : [];
+};
+
+const isMaskContainer = (value: unknown): value is MaskContainer => {
+  if (typeof value !== 'object' || value === null) return false;
+  return Array.isArray((value as { subMasks?: unknown }).subMasks);
+};
+
+const createBrushMaskCanvasSubMask = (): SubMask => ({
+  id: brushMaskCanvasSubMaskId,
+  invert: false,
+  mode: SubMaskMode.Additive,
+  name: 'Brush canvas proof',
+  opacity: 100,
+  parameters: { lines: [] },
+  type: Mask.Brush,
+  visible: true,
+});
+
+const createBrushMaskCanvasContainer = (subMask: SubMask): MaskContainer => ({
+  adjustments: INITIAL_ADJUSTMENTS,
+  blendMode: 'normal',
+  id: brushMaskCanvasContainerId,
+  invert: false,
+  name: 'Brush canvas proof',
+  opacity: 100,
+  subMasks: [subMask],
+  visible: true,
+});
+
+const buildBrushMaskCanvasOverlayUrl = (subMask: SubMask | undefined): string | null => {
+  const lines = subMask ? readBrushMaskCanvasLines(subMask) : [];
+  if (lines.length === 0) return null;
+
+  const paths = lines
+    .map((line) => {
+      if (line.points.length === 0) {
+        return '';
+      }
+      const color = line.tool === ToolType.Eraser ? 'rgba(244,63,94,0.72)' : 'rgba(14,165,233,0.72)';
+      const width = line.brushSize ?? 48;
+      const points = line.points.map((point) => `${point.x},${point.y}`).join(' ');
+      return `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    })
+    .join('');
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${brushMaskCanvasImageWidth}" height="${brushMaskCanvasImageHeight}" viewBox="0 0 ${brushMaskCanvasImageWidth} ${brushMaskCanvasImageHeight}">${paths}</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+};
+
+function BrushMaskCanvasVisualSmoke() {
+  const [subMask, setSubMask] = useState(createBrushMaskCanvasSubMask);
+  const [livePreview, setLivePreview] = useState<MaskContainer | null>(null);
+  const activeSubMask = livePreview?.subMasks[0] ?? subMask;
+  const lines = readBrushMaskCanvasLines(subMask);
+  const toolOrder = lines.map((line) => line.tool ?? 'unknown').join(',');
+  const pointCounts = lines.map((line) => String(line.points.length)).join(',');
+
+  const updateSubMask = (id: string | null, patch: Partial<SubMask>) => {
+    if (id !== brushMaskCanvasSubMaskId) return;
+    setSubMask((current) => ({ ...current, ...patch }));
+    setLivePreview(null);
+  };
+
+  const adjustments: Adjustments = {
+    ...INITIAL_ADJUSTMENTS,
+    aiPatches: [],
+    masks: [createBrushMaskCanvasContainer(subMask)],
+  };
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.BrushMaskCanvasUi}
+    >
+      <div className="grid h-screen grid-cols-[1fr_320px] bg-[#0f1114]" data-visual-smoke-section="brush-canvas">
+        <section className="grid grid-rows-[44px_1fr] overflow-hidden">
+          <div className="flex items-center justify-between border-b border-white/10 bg-[#181b1f] px-4">
+            <span className="text-sm font-semibold tracking-normal">{copy.brand}</span>
+            <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">
+              {copy.brushMaskCanvasUi}
+            </span>
+          </div>
+          <div className="grid place-items-center bg-[#0b0d10] p-8">
+            <div className="relative h-[360px] w-[640px] overflow-hidden rounded border border-white/10 bg-black">
+              <ImageCanvas
+                activeAiPatchContainerId={null}
+                activeAiSubMaskId={null}
+                activeMaskContainerId={brushMaskCanvasContainerId}
+                activeMaskId={brushMaskCanvasSubMaskId}
+                adjustments={adjustments}
+                appSettings={null}
+                brushSettings={brushMaskCanvasBrushSettings}
+                crop={null}
+                cursorStyle="crosshair"
+                finalPreviewUrl={brushMaskCanvasImageDataUrl}
+                handleCropComplete={() => {}}
+                hasRenderedFirstFrame
+                imageRenderSize={{
+                  height: brushMaskCanvasImageHeight,
+                  offsetX: 0,
+                  offsetY: 0,
+                  scale: 1,
+                  width: brushMaskCanvasImageWidth,
+                }}
+                isAiEditing={false}
+                isCropping={false}
+                isMaskControlHovered={false}
+                isMasking
+                isMaxZoom={false}
+                isRotationActive={false}
+                isSliderDragging={false}
+                isStraightenActive={false}
+                maskOverlayUrl={buildBrushMaskCanvasOverlayUrl(activeSubMask)}
+                onGenerateAiMask={() => {}}
+                onLiveMaskPreview={(preview) => {
+                  if (isMaskContainer(preview)) setLivePreview(preview);
+                }}
+                onQuickErase={() => {}}
+                onSelectAiSubMask={() => {}}
+                onSelectMask={() => {}}
+                onStraighten={() => {}}
+                selectedImage={brushMaskCanvasImage}
+                setAdjustments={() => {}}
+                setCrop={() => {}}
+                setIsMaskHovered={() => {}}
+                setIsMaskTouchInteracting={() => {}}
+                showOriginal={false}
+                transformState={{ positionX: 0, positionY: 0, scale: 1 }}
+                transformedOriginalUrl={brushMaskCanvasImageDataUrl}
+                uncroppedAdjustedPreviewUrl={brushMaskCanvasImageDataUrl}
+                updateSubMask={updateSubMask}
+              />
+            </div>
+          </div>
+        </section>
+        <aside className="border-l border-white/10 bg-[#171a1f] p-4 text-sm" data-visual-smoke-section="brush-proof">
+          <div
+            className="sr-only"
+            data-image-height={brushMaskCanvasImageHeight}
+            data-image-path={brushMaskCanvasImage.path}
+            data-image-width={brushMaskCanvasImageWidth}
+            data-lines-json={encodeURIComponent(JSON.stringify(lines))}
+            data-mask-id={brushMaskCanvasSubMaskId}
+            data-point-counts={pointCounts}
+            data-stroke-count={lines.length}
+            data-testid="brush-mask-canvas-ui-proof"
+            data-tool-order={toolOrder}
+          />
+          <div className="mb-3 flex items-center justify-between">
+            <span className="font-semibold">{copy.runtimeProof}</span>
+            <span className="rounded bg-white/10 px-2 py-0.5 text-xs">{copy.strokeCount(lines.length)}</span>
+          </div>
+          <div className="space-y-2">
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.toolOrder}</p>
+              <p>{toolOrder || 'none'}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.pointCounts}</p>
+              <p>{pointCounts || 'none'}</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
 
 function WorkflowRailVisualSmoke() {
   const [activePanel, setActivePanel] = useState<Panel | null>(Panel.Adjustments);
@@ -490,6 +729,11 @@ const copy = {
   adjustments: 'Adjustments',
   layerStack: 'Layer stack',
   activeLayerCount: '3 active',
+  brushMaskCanvasUi: 'Brush mask canvas UI',
+  pointCounts: 'Point counts',
+  runtimeProof: 'Runtime proof',
+  strokeCount: (count: number) => `${count} strokes`,
+  toolOrder: 'Tool order',
   commandPaletteSmoke: 'Command Palette Workflows',
   filmLook: 'Film look',
   filmPreset: 'Neutral 400',
