@@ -536,6 +536,11 @@ export const sampleToneColorApplyCommandEnvelopeV1: ToneColorCommandEnvelopeV1 =
     correlationId: 'corr_tone_color_basic_apply_sample',
     dryRun: false,
     idempotencyKey: 'idem_tone_color_basic_apply_sample',
+    parameters: {
+      ...sampleToneColorCommandEnvelopeV1.parameters,
+      acceptedDryRunPlanHash: 'sha256:basic-tone:74497b13',
+      acceptedDryRunPlanId: 'dryrun_basic_tone_7500c11a',
+    },
   },
 );
 
@@ -544,6 +549,8 @@ export const sampleToneColorDryRunResultV1: ToneColorDryRunResultV1 = toneColorD
   commandType: sampleToneColorCommandEnvelopeV1.commandType,
   correlationId: sampleToneColorCommandEnvelopeV1.correlationId,
   dryRun: true,
+  dryRunPlanHash: 'sha256:basic-tone:74497b13',
+  dryRunPlanId: 'dryrun_basic_tone_7500c11a',
   mutates: false,
   parameterDiff: [
     {

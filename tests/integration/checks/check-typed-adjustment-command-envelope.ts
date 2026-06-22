@@ -44,13 +44,28 @@ const command = buildBasicToneCommandEnvelope(
     operationId: 'issue_2321_typed_adjustment_envelope',
     sessionId: 'typed-adjustment-envelope-check',
   }),
-  { dryRun: false },
+  {
+    acceptedDryRunPlanHash: 'sha256:basic-tone:typed-adjustment-envelope',
+    acceptedDryRunPlanId: 'dryrun_basic_tone_typed_adjustment_envelope',
+    dryRun: false,
+  },
 );
 const parsedCommand = toneColorCommandEnvelopeV1Schema.parse(command);
 const replayedAdjustments = applyBasicToneCommandEnvelopeToAdjustments(INITIAL_ADJUSTMENTS, parsedCommand);
 const failures = [];
 
-if (JSON.stringify(parsedCommand.parameters) !== JSON.stringify(fixture.expectedCommandParameters)) {
+const replayParameterKeys = [
+  'blackPoint',
+  'clarity',
+  'contrast',
+  'exposureEv',
+  'highlights',
+  'saturation',
+  'shadows',
+  'whitePoint',
+] as const;
+const replayParameters = Object.fromEntries(replayParameterKeys.map((key) => [key, parsedCommand.parameters[key]]));
+if (JSON.stringify(replayParameters) !== JSON.stringify(fixture.expectedCommandParameters)) {
   failures.push('Command parameters do not match the compatibility fixture.');
 }
 if (replayedAdjustments.exposure !== fixture.legacyAdjustmentPayload.exposure) {
