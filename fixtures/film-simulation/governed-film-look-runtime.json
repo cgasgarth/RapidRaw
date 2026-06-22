@@ -1,0 +1,52 @@
+{
+  "commandType": "filmLook.applyGovernedRecipe",
+  "doesNotProve": ["real_raw_quality", "measured_film_stock_emulation", "photochemical_density_domain", "gpu_parity"],
+  "fixtureInput": {
+    "colorSpace": "working-linear-rgb-d65",
+    "kind": "synthetic-governed-film-look-runtime-proof",
+    "scene": "ramp-color-chips-highlight-edge-specular"
+  },
+  "generatedFrom": "tests/integration/checks/check-governed-film-look-runtime.ts",
+  "proofId": "film.look.governed.runtime.synthetic.v1",
+  "result": {
+    "adjustmentPatch": {
+      "temperature": 6,
+      "contrast": 6,
+      "highlights": -7,
+      "shadows": 0,
+      "blacks": 0,
+      "saturation": 0,
+      "glowAmount": 0,
+      "grainAmount": 0,
+      "grainSize": 25
+    },
+    "afterHash": "rawengine-pixel-hash:3f1cebffa1edac45",
+    "beforeHash": "rawengine-pixel-hash:1f6c6d9fda9bfdb1",
+    "changedPixelRatio": 0.883333,
+    "grainHash": "fnv1a32:0c260477",
+    "halationHash": "fnv1a32:08c52e26",
+    "lookHash": "rawengine-pixel-hash:1d192b9884d03864",
+    "previewHash": "rawengine-pixel-hash:3f1cebffa1edac45",
+    "provenance": {
+      "claimBoundary": "governed_creative_look_not_measured_stock_emulation",
+      "colorDomain": "working_linear_rgb",
+      "grainProvenanceId": "film_grain_provenance_2b3848d6",
+      "halationClaimBoundary": "rgb_creative_approximation_not_physical_film_halation",
+      "lookId": "film_look.generic.warm_print.v1",
+      "recipeId": "film_look.governed.warm_print_grain_halation.v1",
+      "renderStages": [
+        "look_adjustment_patch",
+        "late_working_linear_before_output_transform",
+        "creative_final_after_glow"
+      ]
+    },
+    "runtimeStatus": "synthetic_runtime_apply_capable",
+    "warnings": [
+      "grain_cpu_reference_runtime",
+      "halation_creative_rgb_approximation",
+      "not_measured_stock_emulation",
+      "real_raw_review_required"
+    ]
+  },
+  "schemaVersion": 1
+}
