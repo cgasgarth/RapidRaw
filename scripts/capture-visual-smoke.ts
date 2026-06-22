@@ -2088,6 +2088,23 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-roll-frame-1').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-dust-review').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-qc-proof-artifact').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-qc-overlay-controls').waitFor({ timeout: 10_000 });
+  const qcProofArtifactBefore = await page
+    .getByTestId('negative-lab-qc-proof-artifact')
+    .evaluate((element) => ({ ...element.dataset }));
+  if (qcProofArtifactBefore.overlayFrameBounds !== 'true' || qcProofArtifactBefore.overlayDensityWarnings !== 'true') {
+    throw new Error(`Negative Lab QC overlays should default on: ${JSON.stringify(qcProofArtifactBefore)}`);
+  }
+  await page.getByTestId('negative-lab-qc-overlay-frame-bounds').click();
+  const qcProofRowAfterBoundsToggle = await page
+    .getByTestId('negative-lab-qc-proof-row-0')
+    .evaluate((element) => ({ ...element.dataset }));
+  if (qcProofRowAfterBoundsToggle.frameBoundaryOverlay !== 'hidden') {
+    throw new Error(
+      `Negative Lab frame-boundary overlay toggle failed: ${JSON.stringify(qcProofRowAfterBoundsToggle)}`,
+    );
+  }
+  await page.getByTestId('negative-lab-qc-overlay-frame-bounds').click();
   await page.getByTestId('negative-lab-retouch-count').getByText('Retouch 0', { exact: true }).waitFor({
     timeout: 10_000,
   });
@@ -2317,6 +2334,12 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-qc-rejected-count').getByText('Rejected 1', { exact: true }).waitFor({
     timeout: 10_000,
   });
+  const rejectedOverlayDataset = await page
+    .getByTestId('negative-lab-qc-proof-row-1')
+    .evaluate((element) => ({ ...element.dataset }));
+  if (rejectedOverlayDataset.rejectedMarkerOverlay !== 'visible') {
+    throw new Error(`Negative Lab rejected marker overlay failed: ${JSON.stringify(rejectedOverlayDataset)}`);
+  }
   await page
     .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabQueuedCount)
     .getByText('1 queued', { exact: true })

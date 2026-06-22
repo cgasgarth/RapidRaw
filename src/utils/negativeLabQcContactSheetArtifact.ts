@@ -38,7 +38,7 @@ export interface NegativeLabQcContactSheetArtifact {
     };
     label: string;
     overlayId: string;
-    overlayKind: 'base_sample' | 'warning_badge';
+    overlayKind: 'base_sample' | 'density_sample' | 'frame_boundary' | 'warning_badge';
     severity: 'info' | 'warning';
     warningCodes: Array<'contact_sheet_requires_split'>;
   }>;
@@ -78,9 +78,17 @@ export interface NegativeLabQcContactSheetArtifact {
   warnings: NegativeLabQcContactSheetWarning[];
 }
 
+export interface NegativeLabQcOverlayVisibility {
+  densityWarnings: boolean;
+  frameBounds: boolean;
+  rejectedMarkers: boolean;
+}
+
 interface BuildNegativeLabQcContactSheetArtifactParams {
   generatedAt?: string;
   outputIntent?: 'editable_positive' | 'export_ready_preview' | 'proof_preview';
+  overlayVisibility?: NegativeLabQcOverlayVisibility;
+  qcDecisionByFrameId?: Readonly<Record<string, 'approved' | 'pending' | 'rejected'>>;
   report: NegativeLabQcProofReport;
   sessionId: string;
   sourcePathsByFrameId?: ReadonlyMap<string, string>;
@@ -113,6 +121,12 @@ const warningForBlockedRow = (frameId: string, evidence: string): NegativeLabQcC
 export const buildNegativeLabQcContactSheetArtifact = ({
   generatedAt = '2026-06-21T00:00:00.000Z',
   outputIntent = 'proof_preview',
+  overlayVisibility = {
+    densityWarnings: true,
+    frameBounds: true,
+    rejectedMarkers: true,
+  },
+  qcDecisionByFrameId = {},
   report,
   sessionId,
   sourcePathsByFrameId = new Map(),
@@ -145,22 +159,64 @@ export const buildNegativeLabQcContactSheetArtifact = ({
     },
     frameIds: report.frames.map((frame) => frame.frameId),
     generatedAt,
-    overlays: report.frames.map((frame) => ({
-      frameId: frame.frameId,
-      geometry: {
-        coordinateSpace: 'normalized_frame',
-        height: 0.12,
-        kind: 'rect',
-        width: 0.18,
-        x: 0.04,
-        y: 0.84,
-      },
-      label: frame.exportBlockedReason ?? frame.recommendedAction,
-      overlayId: `overlay_negative_lab_qc_${frame.contactSheetSlot}`,
-      overlayKind: frame.needsReview ? 'warning_badge' : 'base_sample',
-      severity: frame.needsReview ? 'warning' : 'info',
-      warningCodes: frame.needsReview ? ['contact_sheet_requires_split'] : [],
-    })),
+    overlays: report.frames.flatMap((frame) => {
+      const overlays = [];
+      if (overlayVisibility.frameBounds) {
+        overlays.push({
+          frameId: frame.frameId,
+          geometry: {
+            coordinateSpace: 'normalized_frame' as const,
+            height: 0.92,
+            kind: 'rect' as const,
+            width: 0.92,
+            x: 0.04,
+            y: 0.04,
+          },
+          label: `Frame bounds: ${frame.scanLabel}`,
+          overlayId: `overlay_negative_lab_qc_bounds_${frame.contactSheetSlot}`,
+          overlayKind: 'frame_boundary' as const,
+          severity: 'info' as const,
+          warningCodes: [],
+        });
+      }
+      if (overlayVisibility.densityWarnings && frame.needsReview) {
+        overlays.push({
+          frameId: frame.frameId,
+          geometry: {
+            coordinateSpace: 'normalized_frame' as const,
+            height: 0.12,
+            kind: 'rect' as const,
+            width: 0.18,
+            x: 0.04,
+            y: 0.84,
+          },
+          label: frame.exportBlockedReason ?? frame.recommendedAction,
+          overlayId: `overlay_negative_lab_qc_density_${frame.contactSheetSlot}`,
+          overlayKind: 'density_sample' as const,
+          severity: 'warning' as const,
+          warningCodes: ['contact_sheet_requires_split' as const],
+        });
+      }
+      if (overlayVisibility.rejectedMarkers && qcDecisionByFrameId[frame.frameId] === 'rejected') {
+        overlays.push({
+          frameId: frame.frameId,
+          geometry: {
+            coordinateSpace: 'normalized_frame' as const,
+            height: 0.2,
+            kind: 'rect' as const,
+            width: 0.2,
+            x: 0.76,
+            y: 0.04,
+          },
+          label: `Rejected in QC: ${frame.scanLabel}`,
+          overlayId: `overlay_negative_lab_qc_rejected_${frame.contactSheetSlot}`,
+          overlayKind: 'warning_badge' as const,
+          severity: 'warning' as const,
+          warningCodes: ['contact_sheet_requires_split' as const],
+        });
+      }
+      return overlays;
+    }),
     positiveVariants: report.frames.map((frame) => {
       const sourcePath = sourcePathsByFrameId.get(frame.frameId) ?? frame.scanLabel;
       return {

@@ -23,6 +23,14 @@ const sourcePathsByFrameId = new Map(frameHealth.frames.map((frame) => [frame.fr
 const artifact = negativeLabQcProofArtifactV1Schema.parse(
   buildNegativeLabQcContactSheetArtifact({
     generatedAt: '2026-06-21T00:00:00.000Z',
+    overlayVisibility: {
+      densityWarnings: true,
+      frameBounds: true,
+      rejectedMarkers: true,
+    },
+    qcDecisionByFrameId: {
+      'negative-lab-frame-2': 'rejected',
+    },
     report,
     sessionId: 'negative_lab_session_live_qc_test',
     sourcePathsByFrameId,
@@ -50,6 +58,14 @@ if (artifact.warnings.length !== 1 || artifact.warnings[0]?.frameIds?.[0] !== 'n
   throw new Error('Negative Lab live QC artifact did not expose blocked-frame warning evidence.');
 }
 
+if (
+  !artifact.overlays.some((overlay) => overlay.overlayKind === 'frame_boundary') ||
+  !artifact.overlays.some((overlay) => overlay.overlayKind === 'density_sample') ||
+  !artifact.overlays.some((overlay) => overlay.overlayId === 'overlay_negative_lab_qc_rejected_2')
+) {
+  throw new Error('Negative Lab live QC artifact did not reflect enabled review overlays.');
+}
+
 if (artifact.positiveVariants[0]?.sourcePath !== sourcePaths[0]) {
   throw new Error('Negative Lab live QC artifact did not link source paths to positive variants.');
 }
@@ -62,6 +78,8 @@ const modalSource = await Bun.file('src/components/modals/NegativeConversionModa
 for (const marker of [
   'buildNegativeLabQcContactSheetArtifact',
   'negative-lab-qc-proof-artifact',
+  'negative-lab-qc-overlay-controls',
+  'data-overlay-count={qcProofArtifact.overlays.length}',
   'data-contact-sheet-hash={qcProofArtifact.contactSheet.artifact.contentHash}',
   'modals.negativeConversion.qcProofArtifactHash',
 ]) {
