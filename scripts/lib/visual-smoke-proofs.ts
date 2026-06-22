@@ -468,6 +468,7 @@ export const focusReviewWorkspaceProofSchema = z.object({
   sharpnessCoverageRatio: z.literal('1'),
   sourceContributionSummary: z.literal('S1 17% / S2 17% / S3 17% / S4 17% / S5 17% / S6 17%'),
   sourceCount: z.literal('6'),
+  sourceCoverageDetails: z.literal('6'),
   warningCodes: z.literal('human_review_required,synthetic_runtime_only,transition_halo_risk,depth_map_preview_only'),
 });
 export const focusPrivateRawReviewProofSchema = z.object({

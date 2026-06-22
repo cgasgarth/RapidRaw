@@ -1962,6 +1962,7 @@
         "runtimeBridge": "Dry-run/apply bridge",
         "sharpnessCoverage": "",
         "sharpnessMap": "Sharpness map",
+        "sourceConfidenceCoverageValue": "{{confidence}}% confidence / {{cells}} cells",
         "sourceContribution": "Source contribution",
         "sourceContributionValue": "S{{index}} {{value}}%",
         "sourceIndexValue": "",

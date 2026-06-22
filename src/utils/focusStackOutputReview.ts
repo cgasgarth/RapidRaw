@@ -127,13 +127,19 @@ const buildSourceContributionSummary = (
 const buildSourceContributionDetails = (
   sourceCount: number,
 ): FocusStackOutputReviewWorkflow['reviewOverlay']['sourceContributionDetails'] =>
-  buildSourceContributionSummary(sourceCount).map((source) => ({
-    artifactId: `artifact_focus_source_${source.sourceIndex + 1}_contribution`,
-    contributionRatio: source.winnerCellRatio,
-    sourceId: `S${source.sourceIndex + 1}`,
-    sourceIndex: source.sourceIndex,
-    warningState: 'artifact_review_required',
-  }));
+  buildSourceContributionSummary(sourceCount).map((source) => {
+    const coverageCellCount = Math.max(1, Math.round(source.winnerCellRatio * sourceCount * 12));
+    const confidencePercent = Math.max(62, Math.round((1 - lowConfidenceCellRatio) * 100 - source.sourceIndex * 2));
+    return {
+      artifactId: `artifact_focus_source_${source.sourceIndex + 1}_contribution`,
+      confidencePercent,
+      contributionRatio: source.winnerCellRatio,
+      coverageCellCount,
+      sourceId: `S${source.sourceIndex + 1}`,
+      sourceIndex: source.sourceIndex,
+      warningState: confidencePercent < 70 ? 'artifact_review_required' : 'clear',
+    };
+  });
 
 const buildDefaultTransitionRiskRegions = (
   sourceCount: number,
