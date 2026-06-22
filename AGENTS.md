@@ -58,6 +58,10 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Proof scripts should live inside the actual feature PR they validate. Do not
   open PRs whose main value is only a probe, schema, inventory, report, or
   routing check.
+- Avoid committed generated inventory/report JSON unless it is a human-review
+  artifact or required for a product validation gate.
+- Do not maintain broad validation inventory files as routine PR churn. Prefer
+  focused checks tied to changed product behavior.
 - When something starts looking like slop, clean it up proactively instead of
   building more work on top of it.
 
@@ -86,6 +90,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Audit the open backlog periodically for broad, stale, duplicate, or meta-only
   issues. Close or rewrite them so each remaining issue maps cleanly to one
   realistic PR.
+- When refining existing issues, remove obsolete meta-only work, split broad
+  catch-alls, and keep validation requirements tied to the product behavior the
+  PR will actually prove.
 
 ## GitHub Repo Resolution
 
@@ -173,6 +180,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   behavior.
 - If a helper script primarily exists to manage agent workflow rather than
   product quality, remove it or keep it out of the repo.
+- Remove validation inventory JSON from routine gates. Do not add or preserve
+  broad validation ledgers that are not directly required to prove changed
+  product behavior.
 - Use Bun for TypeScript/React package management, scripts, tests, and CI where
   applicable.
 - Prefer Bun over inline Node commands when the task can be expressed as a repo
@@ -208,6 +218,8 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   generated private image artifacts.
 - Keep private RAW validation standardized around one reusable private-root and
   report pattern.
+- Private RAW reports may be generated locally as evidence, but should not be
+  committed unless they are deliberate human-review artifacts.
 - Do not count planning, schema, API, or UI-only work as a complete feature
   unless end-to-end workflow proof exists in the same PR. If E2E proof is not
   included, state the runtime status explicitly and keep or create a follow-up
