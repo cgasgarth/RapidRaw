@@ -21,6 +21,10 @@ for (const marker of [
 for (const marker of [
   'onOpenFile(savedPath);',
   'buildHdrEditableHandoffSummary',
+  'deghostReviewAccepted: isDeghostReviewApproved',
+  'deghostReviewRequired: isDeghostReviewRequired',
+  'data-deghost-review-accepted={String(handoffSummary.deghostReviewAccepted)}',
+  'data-deghost-review-required={String(handoffSummary.deghostReviewRequired)}',
   'data-testid="hdr-editable-handoff-provenance"',
   "openInEditor: t('modals.hdr.openInEditor')",
   'savedPath={savedPath}',

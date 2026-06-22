@@ -362,6 +362,12 @@ export const hdrBracketSourceRolesProofSchema = z.tuple([
     sourceIndex: z.literal('2'),
   }),
 ]);
+export const hdrDeghostReviewGateProofSchema = z.object({
+  deghostLevel: z.literal('high'),
+  motionRisk: z.literal('high'),
+  reviewApproved: z.literal('true'),
+  reviewRequired: z.literal('true'),
+});
 export const panoramaUiSettingsProofSchema = z.object({
   blendMode: z.literal('feather'),
   boundaryMode: z.literal('auto_crop'),

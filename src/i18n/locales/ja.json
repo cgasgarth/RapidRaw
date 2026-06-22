@@ -1234,6 +1234,16 @@
         "disabled": "Disabled"
       },
       "deghostingLabel": "Deghosting",
+      "deghostReviewApproveAction": "Approve deghost review",
+      "deghostReviewApproved": "Approved",
+      "deghostReviewApprovedAction": "Deghost review approved",
+      "deghostReviewMask": "Mask",
+      "deghostReviewMaskValue": "Motion overlay",
+      "deghostReviewMotion": "Motion",
+      "deghostReviewReference": "Reference",
+      "deghostReviewReferenceValue": "Source #{{value}}",
+      "deghostReviewRequired": "Review required",
+      "deghostReviewTitle": "Deghost review",
       "deghosting": {
         "high": "High",
         "low": "Low",
