@@ -29,6 +29,7 @@
     "outputName": "Ridge Overlook Panorama",
     "projection": "cylindrical",
     "qualityPreference": "balanced",
+    "seamExposureCompensationPercent": 100,
     "sources": [
       {
         "colorSpaceHint": "camera_rgb",

@@ -2490,6 +2490,8 @@
       },
       "save": "保存",
       "savedSuccess": "全景图保存成功！",
+      "seamExposureCompensationLabel": "",
+      "seamExposureCompensationValue": "",
       "sourceCountBlocked": "Select at least two overlapping source images before stitching.",
       "speedNotice": "这可能需要几分钟，具体取决于图像的数量和大小。",
       "start": "开始",

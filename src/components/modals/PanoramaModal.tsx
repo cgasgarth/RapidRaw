@@ -451,6 +451,7 @@ export default function PanoramaModal({
             data-boundary-mode={settings.boundaryMode}
             data-exposure-mode={settings.exposureMode}
             data-projection={settings.projection}
+            data-seam-exposure-compensation-percent={settings.seamExposureCompensationPercent}
             data-source-count={imageCount ?? 0}
             data-engine-apply-ready={String(isEngineApplyReady)}
             data-stitch-ready={String(isEngineApplyReady)}
@@ -726,6 +727,35 @@ export default function PanoramaModal({
                   setSetting({ exposureMode });
                 }}
               />
+              <div className="mt-3" data-testid="panorama-seam-exposure-control">
+                <div className="mb-1 flex items-center justify-between gap-3">
+                  <UiText as="span" variant={TextVariants.small} color={TextColors.secondary}>
+                    {t('modals.panorama.seamExposureCompensationLabel')}
+                  </UiText>
+                  <UiText
+                    as="span"
+                    variant={TextVariants.small}
+                    color={TextColors.secondary}
+                    data-testid="panorama-seam-exposure-compensation-value"
+                  >
+                    {t('modals.panorama.seamExposureCompensationValue', {
+                      value: settings.seamExposureCompensationPercent,
+                    })}
+                  </UiText>
+                </div>
+                <input
+                  className="w-full accent-accent"
+                  data-testid="panorama-seam-exposure-compensation-slider"
+                  max={100}
+                  min={0}
+                  onChange={(event) => {
+                    setSetting({ seamExposureCompensationPercent: Number(event.target.value) });
+                  }}
+                  step={5}
+                  type="range"
+                  value={settings.seamExposureCompensationPercent}
+                />
+              </div>
             </div>
           </section>
 
@@ -804,6 +834,12 @@ export default function PanoramaModal({
                     {
                       label: t('modals.panorama.exposureLabel'),
                       value: selectedExposureLabel,
+                    },
+                    {
+                      label: t('modals.panorama.seamExposureCompensationLabel'),
+                      value: t('modals.panorama.seamExposureCompensationValue', {
+                        value: settings.seamExposureCompensationPercent,
+                      }),
                     },
                     {
                       label: t('modals.panorama.previewBudgetLabel'),

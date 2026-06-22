@@ -2554,6 +2554,8 @@
       },
       "save": "Save",
       "savedSuccess": "Panorama Saved Successfully!",
+      "seamExposureCompensationLabel": "Seam exposure",
+      "seamExposureCompensationValue": "{{value}}%",
       "sourceCountBlocked": "Select at least two overlapping source images before stitching.",
       "speedNotice": "This may take a few minutes depending on the number and size of images.",
       "start": "Start",

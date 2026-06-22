@@ -15,6 +15,7 @@ export const panoramaUiSettingsSchema = z
     maxPreviewDimensionPx: z.number().int().positive().max(8192),
     projection: panoramaUiProjectionSchema,
     qualityPreference: panoramaUiQualityPreferenceSchema,
+    seamExposureCompensationPercent: z.number().int().min(0).max(100),
     sourceMode: z.literal('overlap_sequence'),
   })
   .strict();
@@ -195,6 +196,7 @@ export const DEFAULT_PANORAMA_UI_SETTINGS = panoramaUiSettingsSchema.parse({
   maxPreviewDimensionPx: 4096,
   projection: 'rectilinear',
   qualityPreference: 'best',
+  seamExposureCompensationPercent: 100,
   sourceMode: 'overlap_sequence',
 });
 

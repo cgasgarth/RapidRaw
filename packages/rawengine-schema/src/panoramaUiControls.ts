@@ -35,6 +35,7 @@ export const panoramaUiControlsV1Schema = z
     outputName: z.string().trim().min(1),
     projection: panoramaProjectionSchema.exclude(['planar']),
     qualityPreference: computationalMergeQualityPreferenceV1Schema.default('best'),
+    seamExposureCompensationPercent: z.number().int().min(0).max(100).default(100),
     sources: z.array(panoramaUiSourceV1Schema).min(2),
   })
   .strict();
@@ -91,6 +92,7 @@ export const buildPanoramaUiDryRunCommandV1 = (
       outputName: controls.outputName,
       projection: controls.projection,
       qualityPreference: controls.qualityPreference,
+      seamExposureCompensationPercent: controls.seamExposureCompensationPercent,
       sources: controls.sources.map((source) => ({
         colorSpaceHint: source.colorSpaceHint,
         exposureEv: source.exposureEv,
@@ -139,6 +141,7 @@ export const buildPanoramaUiApplyCommandV1 = (
       outputName: controls.outputName,
       projection: controls.projection,
       qualityPreference: controls.qualityPreference,
+      seamExposureCompensationPercent: controls.seamExposureCompensationPercent,
       sources: controls.sources.map((source) => ({
         colorSpaceHint: source.colorSpaceHint,
         exposureEv: source.exposureEv,
