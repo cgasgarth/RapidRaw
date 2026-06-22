@@ -24,6 +24,10 @@ import { useTranslation, Trans } from 'react-i18next';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { usePreviewViewport } from '../../hooks/usePreviewViewport';
 import {
+  negativeLabHighlightPatchExposureSuggestionSchema,
+  type NegativeLabHighlightPatchExposureSuggestion,
+} from '../../schemas/negativeLabHighlightPatchExposureSuggestionSchemas';
+import {
   negativeLabNeutralPatchSuggestionSchema,
   type NegativeLabNeutralPatchSuggestion,
 } from '../../schemas/negativeLabNeutralPatchSuggestionSchemas';
@@ -453,6 +457,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [isSamplingPatchProbe, setIsSamplingPatchProbe] = useState(false);
   const [neutralPatchSuggestion, setNeutralPatchSuggestion] = useState<NegativeLabNeutralPatchSuggestion | null>(null);
   const [isSuggestingNeutralPatchRgb, setIsSuggestingNeutralPatchRgb] = useState(false);
+  const [highlightPatchExposureSuggestion, setHighlightPatchExposureSuggestion] =
+    useState<NegativeLabHighlightPatchExposureSuggestion | null>(null);
+  const [isSuggestingHighlightPatchExposure, setIsSuggestingHighlightPatchExposure] = useState(false);
   const [customBaseSampleRect, setCustomBaseSampleRect] =
     useState<NegativeLabBaseFogSampleRect>(CUSTOM_BASE_SAMPLE_DEFAULT);
   const [customBaseSampleEstimate, setCustomBaseSampleEstimate] = useState<NegativeBaseFogEstimate | null>(null);
@@ -1331,6 +1338,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setPatchProbeRect(sampleRect);
       setPatchProbeLabel(t(labelKey));
       setNeutralPatchSuggestion(null);
+      setHighlightPatchExposureSuggestion(null);
     } catch (e) {
       console.error('Patch probe sample failed', e);
     } finally {
@@ -1352,11 +1360,36 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         negativeLabNeutralPatchSuggestionSchema,
       );
       setNeutralPatchSuggestion(suggestion);
+      setHighlightPatchExposureSuggestion(null);
     } catch (error) {
       console.error('Neutral patch RGB suggestion failed', error);
       setNeutralPatchSuggestion(null);
     } finally {
       setIsSuggestingNeutralPatchRgb(false);
+    }
+  };
+
+  const handleSuggestHighlightPatchExposure = async () => {
+    if (selectedImagePath === null || patchProbeRect === null) return;
+    setIsSuggestingHighlightPatchExposure(true);
+    try {
+      const suggestion = await invokeWithSchema(
+        Invokes.SuggestNegativeLabHighlightPatchExposure,
+        {
+          currentFrameExposureOffset: activeFrameExposureOffset,
+          params,
+          path: selectedImagePath,
+          sampleRect: patchProbeRect,
+        },
+        negativeLabHighlightPatchExposureSuggestionSchema,
+      );
+      setHighlightPatchExposureSuggestion(suggestion);
+      setNeutralPatchSuggestion(null);
+    } catch (error) {
+      console.error('Highlight patch exposure suggestion failed', error);
+      setHighlightPatchExposureSuggestion(null);
+    } finally {
+      setIsSuggestingHighlightPatchExposure(false);
     }
   };
 
@@ -1492,6 +1525,19 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         frameExposureOffsetByFrameId,
         nextOffsetsByFrameId,
       ),
+    );
+  };
+
+  const handleApplyHighlightPatchExposureSuggestion = () => {
+    if (
+      frameHealthReport.activeFrameId === null ||
+      highlightPatchExposureSuggestion === null ||
+      !highlightPatchExposureSuggestion.applyAllowed
+    )
+      return;
+    handleFrameExposureOffsetChange(
+      frameHealthReport.activeFrameId,
+      highlightPatchExposureSuggestion.suggestedFrameExposureOffset,
     );
   };
 
@@ -3567,8 +3613,83 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                       {isSuggestingNeutralPatchRgb ? <Loader2 size={12} className="animate-spin" /> : null}
                       {t('modals.negativeConversion.suggestNeutralPatchRgb')}
                     </button>
+                    <button
+                      type="button"
+                      className="col-span-2 inline-flex items-center justify-center gap-1 rounded border border-surface bg-bg-primary px-2 py-1 text-[11px] text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                      data-testid="negative-lab-analyze-highlight-recovery"
+                      disabled={isSuggestingHighlightPatchExposure || isSaving}
+                      onClick={() => {
+                        void handleSuggestHighlightPatchExposure();
+                      }}
+                    >
+                      {isSuggestingHighlightPatchExposure ? <Loader2 size={12} className="animate-spin" /> : null}
+                      {t('modals.negativeConversion.analyzeHighlightRecovery')}
+                    </button>
                   </div>
                 )}
+              {highlightPatchExposureSuggestion !== null && (
+                <div
+                  className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md border border-surface bg-bg-secondary p-2 text-xs text-text-tertiary"
+                  data-application-risk={highlightPatchExposureSuggestion.applicationRisk}
+                  data-apply-allowed={String(highlightPatchExposureSuggestion.applyAllowed)}
+                  data-status={highlightPatchExposureSuggestion.status}
+                  data-testid="negative-lab-highlight-recovery-suggestion"
+                >
+                  <span className="text-text-secondary">
+                    {t('modals.negativeConversion.highlightRecoverySuggestion')}
+                  </span>
+                  <span className="text-right" data-testid="negative-lab-highlight-recovery-status">
+                    {t(`modals.negativeConversion.highlightRecoveryStatus.${highlightPatchExposureSuggestion.status}`)}
+                  </span>
+                  <span className="text-text-secondary">{t('modals.negativeConversion.highlightRecoveryOffset')}</span>
+                  <span className="text-right tabular-nums" data-testid="negative-lab-highlight-recovery-offset">
+                    {formatSignedRecipeValue(highlightPatchExposureSuggestion.suggestedFrameExposureOffset)}
+                  </span>
+                  <span className="text-text-secondary">{t('modals.negativeConversion.highlightRecoveryP99')}</span>
+                  <span className="text-right tabular-nums" data-testid="negative-lab-highlight-recovery-p99">
+                    {t('modals.negativeConversion.highlightRecoveryValueTransition', {
+                      from: highlightPatchExposureSuggestion.currentSampleP99MaxChannel.toFixed(3),
+                      to: highlightPatchExposureSuggestion.projectedSampleP99MaxChannel.toFixed(3),
+                    })}
+                  </span>
+                  <span className="text-text-secondary">
+                    {t('modals.negativeConversion.highlightRecoveryPatchClipped')}
+                  </span>
+                  <span className="text-right tabular-nums" data-testid="negative-lab-highlight-recovery-patch-clipped">
+                    {t('modals.negativeConversion.highlightRecoveryValueTransition', {
+                      from: formatPercentValue(highlightPatchExposureSuggestion.currentSampleClippedFraction * 100),
+                      to: formatPercentValue(highlightPatchExposureSuggestion.projectedSampleClippedFraction * 100),
+                    })}
+                  </span>
+                  <span className="text-text-secondary">{t('modals.negativeConversion.applicationRisk')}</span>
+                  <span className="text-right" data-testid="negative-lab-highlight-recovery-risk">
+                    {t(
+                      `modals.negativeConversion.neutralityRiskLevels.${highlightPatchExposureSuggestion.applicationRisk}`,
+                    )}
+                  </span>
+                  {highlightPatchExposureSuggestion.offsetClamped || !highlightPatchExposureSuggestion.applyAllowed ? (
+                    <span
+                      className="col-span-2 text-[11px] text-warning"
+                      data-testid="negative-lab-highlight-recovery-apply-warning"
+                    >
+                      {t('modals.negativeConversion.highlightRecoveryApplyWarning')}
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="col-span-2 mt-1 inline-flex items-center justify-center rounded border border-accent bg-accent/10 px-2 py-1 text-[11px] text-text-primary transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-50"
+                    data-testid="negative-lab-apply-highlight-recovery"
+                    disabled={
+                      frameHealthReport.activeFrameId === null ||
+                      isSaving ||
+                      !highlightPatchExposureSuggestion.applyAllowed
+                    }
+                    onClick={handleApplyHighlightPatchExposureSuggestion}
+                  >
+                    {t('modals.negativeConversion.applyHighlightRecovery')}
+                  </button>
+                </div>
+              )}
               {neutralPatchSuggestion !== null && (
                 <div
                   className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md border border-surface bg-bg-secondary p-2 text-xs text-text-tertiary"
