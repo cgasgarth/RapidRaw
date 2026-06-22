@@ -24,6 +24,7 @@ export const panoramaSyntheticStitchRequestV1Schema = z
     expectedWarningCodes: z.array(z.string().min(1)),
     fixtureId: z.string().min(1),
     memoryBudgetBytes: z.number().int().positive(),
+    projection: z.enum(['rectilinear', 'cylindrical']).default('rectilinear'),
     seed: z.string().min(1),
     sourceFrames: z.array(panoramaSyntheticSourceFrameV1Schema).min(2),
   })
@@ -62,7 +63,7 @@ export interface PanoramaSyntheticStitchResultV1 {
   excludedSourceCount: number;
   output: {
     height: number;
-    projection: 'rectilinear';
+    projection: 'rectilinear' | 'cylindrical';
     width: number;
   };
   outputPixels: Uint8Array | null;
@@ -78,13 +79,13 @@ export const renderSyntheticPanoramaStitchV1 = (requestValue: unknown): Panorama
     throw new Error('Synthetic panorama stitch requires at least one connected source.');
   }
 
-  const bounds = calculatePanoramaBounds(connectedFrames);
+  const bounds = calculatePanoramaBounds(connectedFrames, request.projection);
   const outputPixels = canRenderSyntheticPanorama(connectedFrames)
-    ? new Uint8Array(bounds.width * bounds.height * 3)
+    ? new Uint8Array(bounds.outputWidth * bounds.height * 3)
     : null;
 
   if (outputPixels !== null) {
-    const weights = new Uint8Array(bounds.width * bounds.height);
+    const weights = new Uint8Array(bounds.outputWidth * bounds.height);
     const exposureSamples: ExposureDeltaSample[] = [];
     const appliedLuminanceGains: Array<{ gain: number; sourceIndex: number }> = [];
     for (const sourceFrame of connectedFrames) {
@@ -98,7 +99,8 @@ export const renderSyntheticPanoramaStitchV1 = (requestValue: unknown): Panorama
               bounds.minTop,
               outputPixels,
               weights,
-              bounds.width,
+              bounds,
+              request.projection,
             );
       compositeSourceFrame(
         request.seed,
@@ -107,8 +109,9 @@ export const renderSyntheticPanoramaStitchV1 = (requestValue: unknown): Panorama
         bounds.minTop,
         outputPixels,
         weights,
-        bounds.width,
+        bounds,
         exposureGain.gain,
+        request.projection,
       );
       if (exposureGain.sampleCount >= MIN_EXPOSURE_OVERLAP_SAMPLES) {
         appliedLuminanceGains.push({ gain: roundMetric(exposureGain.gain), sourceIndex: sourceFrame.sourceIndex });
@@ -154,7 +157,7 @@ const buildSyntheticStitchResult = ({
   outputPixels: Uint8Array | null;
   request: z.infer<typeof panoramaSyntheticStitchRequestV1Schema>;
 }): PanoramaSyntheticStitchResultV1 => {
-  const estimatedOutputBytes = bounds.width * bounds.height * BYTES_PER_PIXEL_RGBA;
+  const estimatedOutputBytes = bounds.outputWidth * bounds.height * BYTES_PER_PIXEL_RGBA;
   const warningCodes = new Set(request.expectedWarningCodes);
   if (request.sourceFrames.length > connectedFrames.length) warningCodes.add('excluded_sources');
   if (estimatedOutputBytes > request.memoryBudgetBytes) {
@@ -171,8 +174,8 @@ const buildSyntheticStitchResult = ({
     excludedSourceCount: request.sourceFrames.length - connectedFrames.length,
     output: {
       height: bounds.height,
-      projection: 'rectilinear',
-      width: bounds.width,
+      projection: request.projection,
+      width: bounds.outputWidth,
     },
     outputPixels,
     stitchedSourceCount: connectedFrames.length,
@@ -187,7 +190,10 @@ const concatBytes = (left: Uint8Array, right: Uint8Array): Uint8Array => {
   return output;
 };
 
-const calculatePanoramaBounds = (connectedFrames: PanoramaSyntheticSourceFrameV1[]) => {
+const calculatePanoramaBounds = (
+  connectedFrames: PanoramaSyntheticSourceFrameV1[],
+  projection: z.infer<typeof panoramaSyntheticStitchRequestV1Schema>['projection'],
+) => {
   const maxRight = Math.max(
     ...connectedFrames.map((sourceFrame) => (sourceFrame.expectedOffsetX ?? 0) + sourceFrame.width),
   );
@@ -200,12 +206,26 @@ const calculatePanoramaBounds = (connectedFrames: PanoramaSyntheticSourceFrameV1
     height: maxBottom - minTop,
     minLeft,
     minTop,
+    outputWidth:
+      projection === 'cylindrical' ? Math.max(1, Math.round((maxRight - minLeft) * 0.94)) : maxRight - minLeft,
     width: maxRight - minLeft,
   };
 };
 
 const canRenderSyntheticPanorama = (connectedFrames: PanoramaSyntheticSourceFrameV1[]): boolean =>
   connectedFrames.every((sourceFrame) => sourceFrame.width * sourceFrame.height <= MAX_SYNTHETIC_SOURCE_PIXELS);
+
+const mapPanoramaProjectionX = (
+  rectilinearX: number,
+  bounds: ReturnType<typeof calculatePanoramaBounds>,
+  projection: z.infer<typeof panoramaSyntheticStitchRequestV1Schema>['projection'],
+): number => {
+  if (projection === 'rectilinear' || bounds.width <= 1) return rectilinearX;
+  const normalized = (rectilinearX / (bounds.width - 1)) * 2 - 1;
+  const halfFovRadians = 0.75;
+  const cylindrical = Math.atan(normalized * Math.tan(halfFovRadians)) / halfFovRadians;
+  return Math.round(((cylindrical + 1) / 2) * (bounds.outputWidth - 1));
+};
 
 const compositeSourceFrame = (
   seed: string,
@@ -214,14 +234,17 @@ const compositeSourceFrame = (
   minTop: number,
   outputPixels: Uint8Array,
   weights: Uint8Array,
-  outputWidth: number,
+  bounds: ReturnType<typeof calculatePanoramaBounds>,
   exposureGain: number,
+  projection: z.infer<typeof panoramaSyntheticStitchRequestV1Schema>['projection'],
 ): void => {
   const offsetX = (sourceFrame.expectedOffsetX ?? 0) - minLeft;
   const offsetY = (sourceFrame.expectedOffsetY ?? 0) - minTop;
   for (let y = 0; y < sourceFrame.height; y += 1) {
     for (let x = 0; x < sourceFrame.width; x += 1) {
-      const outputPixelIndex = (y + offsetY) * outputWidth + x + offsetX;
+      const mappedX = mapPanoramaProjectionX(x + offsetX, bounds, projection);
+      if (mappedX < 0 || mappedX >= bounds.outputWidth) continue;
+      const outputPixelIndex = (y + offsetY) * bounds.outputWidth + mappedX;
       const outputIndex = outputPixelIndex * 3;
       const oldWeight = weights[outputPixelIndex] ?? 0;
       const newWeight = oldWeight + 1;
@@ -242,14 +265,17 @@ const estimateSourceExposureGain = (
   minTop: number,
   outputPixels: Uint8Array,
   weights: Uint8Array,
-  outputWidth: number,
+  bounds: ReturnType<typeof calculatePanoramaBounds>,
+  projection: z.infer<typeof panoramaSyntheticStitchRequestV1Schema>['projection'],
 ): EstimatedExposureGain => {
   const offsetX = (sourceFrame.expectedOffsetX ?? 0) - minLeft;
   const offsetY = (sourceFrame.expectedOffsetY ?? 0) - minTop;
   const ratios: number[] = [];
   for (let y = 0; y < sourceFrame.height; y += 1) {
     for (let x = 0; x < sourceFrame.width; x += 1) {
-      const outputPixelIndex = (y + offsetY) * outputWidth + x + offsetX;
+      const mappedX = mapPanoramaProjectionX(x + offsetX, bounds, projection);
+      if (mappedX < 0 || mappedX >= bounds.outputWidth) continue;
+      const outputPixelIndex = (y + offsetY) * bounds.outputWidth + mappedX;
       if ((weights[outputPixelIndex] ?? 0) === 0) continue;
       const outputIndex = outputPixelIndex * 3;
       const targetLuminance = rgbLuminance(

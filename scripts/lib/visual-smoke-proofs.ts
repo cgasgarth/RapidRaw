@@ -379,7 +379,7 @@ export const panoramaUiSettingsProofSchema = z.object({
   boundaryMode: z.literal('auto_crop'),
   exposureMode: z.literal('none'),
   maxPreviewDimensionPx: z.literal('8192'),
-  projection: z.literal('rectilinear'),
+  projection: z.literal('cylindrical'),
   qualityPreference: z.literal('preview'),
 });
 export const panoramaReviewWorkspaceProofSchema = z.object({
@@ -390,8 +390,8 @@ export const panoramaReviewWorkspaceProofSchema = z.object({
   planMemoryMb: z.literal('952'),
   planScope: z.literal('geometry_memory_only'),
   planStatus: z.literal('accepted'),
-  planWidth: z.literal('9600'),
-  projection: z.literal('rectilinear'),
+  planWidth: z.literal('9024'),
+  projection: z.literal('cylindrical'),
   runtimeStatus: z.literal('dry_run_preview'),
   seamCount: z.literal('4'),
   sourceContributionCount: z.literal('5'),
@@ -412,10 +412,10 @@ export const panoramaQualityDiagnosticsProofSchema = z.object({
 export const panoramaSavedReviewProofSchema = z.object({
   boundaryMode: z.literal('auto_crop'),
   capabilityLevel: z.literal('runtime_apply_capable'),
-  cropRectangle: z.literal('100,80,9600,3200'),
-  outputDimensions: z.literal('9600 x 3200'),
+  cropRectangle: z.literal('100,80,9024,3200'),
+  outputDimensions: z.literal('9024 x 3200'),
   outputPath: z.literal('/tmp/panorama.tif'),
-  projection: z.literal('rectilinear'),
+  projection: z.literal('cylindrical'),
   seamCount: z.literal('4'),
   seamMaxP95ErrorPx: z.literal('3.1'),
   seamReviewStatus: z.literal('requires_review'),

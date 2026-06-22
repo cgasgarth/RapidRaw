@@ -80,7 +80,7 @@ export default function PanoramaModal({
     { label: t('modals.panorama.boundary.transparent'), value: 'transparent' },
     { label: t('modals.panorama.boundary.manualCrop'), value: 'manual_crop' },
   ];
-  const supportedProjection = settings.projection === 'rectilinear';
+  const supportedProjection = settings.projection === 'rectilinear' || settings.projection === 'cylindrical';
   const supportedBoundary = settings.boundaryMode === 'auto_crop';
   const isEngineApplyReady = isSourceCountValid && supportedProjection && supportedBoundary;
   const exposureOptions: Array<OptionItem<PanoramaUiExposureMode>> = [
@@ -609,7 +609,7 @@ export default function PanoramaModal({
               </UiText>
               <div className="grid gap-2" data-testid="panorama-projection-options">
                 {projectionOptions.map((option) => {
-                  const isSupported = option.value === 'rectilinear';
+                  const isSupported = option.value === 'rectilinear' || option.value === 'cylindrical';
                   const isSelected = settings.projection === option.value;
                   return (
                     <button

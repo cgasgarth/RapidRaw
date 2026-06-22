@@ -1637,7 +1637,7 @@ const panoramaPreviewUrl = `data:image/svg+xml,${panoramaPreviewSvg}`;
 const panoramaRuntimePlanFixture: PanoramaRuntimePlan = {
   dry_run: true,
   family: 'panorama',
-  output_dimensions: { height: 3200, width: 9600 },
+  output_dimensions: { height: 3200, width: 9024 },
   preflight: {
     blocked_reasons: [],
     engine_capabilities: {
@@ -1648,8 +1648,8 @@ const panoramaRuntimePlanFixture: PanoramaRuntimePlan = {
     },
     execution_mode: 'full_frame_legacy',
     geometry_estimate: {
-      output_pixel_count: 30_720_000,
-      projected_bounds: { height: 3200, width: 9600, x: 0, y: 0 },
+      output_pixel_count: 28_876_800,
+      projected_bounds: { height: 3200, width: 9024, x: 0, y: 0 },
       source_count: 5,
       source_pixel_count: 22_500_000,
     },
@@ -1693,8 +1693,8 @@ const panoramaRenderedReviewFixture: PanoramaRenderedReview = {
       height: 3200,
       mode: 'coverage_bounds',
       preCropHeight: 3400,
-      preCropWidth: 9800,
-      width: 9600,
+      preCropWidth: 9224,
+      width: 9024,
       x: 100,
       y: 80,
     },
@@ -1702,8 +1702,8 @@ const panoramaRenderedReviewFixture: PanoramaRenderedReview = {
     requested: 'auto_crop',
   },
   capabilityLevel: 'runtime_apply_capable',
-  outputDimensions: { height: 3200, width: 9600 },
-  projection: { effective: 'rectilinear', requested: 'rectilinear' },
+  outputDimensions: { height: 3200, width: 9024 },
+  projection: { effective: 'cylindrical', requested: 'cylindrical' },
   seamReview: {
     policy: 'adaptive_dp_feather_v1',
     reviewStatus: 'requires_review',

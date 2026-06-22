@@ -1642,13 +1642,13 @@ async function prepareScenario(page, mode) {
   }
 
   if (mode === 'panorama-ui') {
-    await page.getByTestId('panorama-projection-option-rectilinear').click();
+    await page.getByTestId('panorama-projection-option-cylindrical').click();
     if (!(await page.getByTestId('panorama-projection-option-spherical').isDisabled())) {
       throw new Error('Unsupported spherical panorama projection must be disabled.');
     }
     await page.getByRole('button', { exact: true, name: 'Best' }).click();
     await page.getByRole('option', { name: 'Preview' }).click();
-    await page.getByRole('button', { name: /Feather/u }).click();
+    await page.getByRole('button', { name: 'Feather', exact: false }).click();
     await page.getByTestId('panorama-boundary-option-auto_crop').click();
     if (!(await page.getByTestId('panorama-boundary-option-transparent').isDisabled())) {
       throw new Error('Unsupported transparent panorama boundary must be disabled.');
@@ -1682,7 +1682,7 @@ async function prepareScenario(page, mode) {
       runtimePlanProof.runtimePlanReady !== 'true' ||
       runtimePlanProof.planStatus !== 'accepted' ||
       runtimePlanProof.planScope !== 'geometry_memory_only' ||
-      runtimePlanProof.outputDimensions !== '9600 x 3200' ||
+      runtimePlanProof.outputDimensions !== '9024 x 3200' ||
       runtimePlanProof.sourceGeometryLayout !== 'single_row' ||
       runtimePlanProof.sourceGeometrySupport !== 'implemented_current_engine' ||
       runtimePlanProof.sourceRowCountEstimate !== '1'

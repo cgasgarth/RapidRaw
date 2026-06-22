@@ -30,7 +30,7 @@ const controls = {
   maxPreviewDimensionPx: 1200,
   memoryBudgetBytes: COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES,
   outputName: 'Synthetic UI Runtime Panorama',
-  projection: 'rectilinear',
+  projection: 'cylindrical',
   qualityPreference: 'balanced',
   sources: sourceFrames.map((frame) => ({
     colorSpaceHint: 'camera_rgb',
@@ -76,8 +76,11 @@ if (applied.apply.outputPixels.length <= sourceFrames[0].width * sourceFrames[0]
 if (applied.apply.provenance.acceptedDryRunPlanId !== dryRun.dryRun.dryRunResult.mergePlan.planId) {
   throw new Error('Panorama UI runtime bridge did not preserve accepted dry-run plan ID.');
 }
-if (applied.apply.provenance.projectionSettings.effectiveProjection !== 'rectilinear') {
-  throw new Error('Panorama UI runtime bridge must report rectilinear effective projection.');
+if (applied.apply.provenance.projectionSettings.effectiveProjection !== 'cylindrical') {
+  throw new Error('Panorama UI runtime bridge must report cylindrical effective projection.');
+}
+if (applied.apply.provenance.projectionSettings.support !== 'implemented_current_engine') {
+  throw new Error('Panorama UI runtime bridge must report implemented cylindrical support.');
 }
 if (applied.apply.provenance.boundaryMode !== 'auto_crop') {
   throw new Error('Panorama UI runtime bridge must preserve auto-crop boundary mode.');
