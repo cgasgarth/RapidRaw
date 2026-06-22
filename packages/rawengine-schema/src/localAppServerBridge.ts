@@ -1182,7 +1182,10 @@ export class RawEngineLocalAppServerBridge {
 }
 
 export const createRawEngineLocalAppServerBridge = (
-  options: { availableAiProviderIds?: readonly string[] } = {},
+  options: {
+    availableAiProviderIds?: readonly string[];
+    projectLibrarySnapshot?: ProjectLibrarySnapshotV1;
+  } = {},
 ): RawEngineLocalAppServerBridge => new RawEngineLocalAppServerBridge(options);
 
 export const buildRawEngineLocalAppServerBridgeCapabilities = (
