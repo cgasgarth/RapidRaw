@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, type PointerEvent } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
+import { z } from 'zod';
 
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { usePreviewViewport } from '../../hooks/usePreviewViewport';
@@ -137,6 +138,8 @@ type NegativeLabProfileSort = 'catalog' | 'evidence_desc' | 'name_asc' | 'runtim
 type NegativeLabPatchRole = 'highlight' | 'neutral';
 type NegativeLabBaseSampleStudioDecision = 'accepted' | 'candidate' | 'rejected';
 type NegativeLabQcDecision = 'approved' | 'pending' | 'rejected';
+type NegativeLabQcOverlayKey = 'densityWarnings' | 'frameBounds' | 'rejectedMarkers';
+type NegativeLabQcOverlayVisibility = Record<NegativeLabQcOverlayKey, boolean>;
 type NegativeLabProfileFilterLabelKey =
   | 'modals.negativeConversion.profileFilterAll'
   | 'modals.negativeConversion.profileFilterBlackAndWhite'
@@ -232,6 +235,40 @@ const DEFAULT_SAVE_OPTIONS = {
   suffix: 'Positive',
   writeConversionBundle: true,
 };
+const NEGATIVE_LAB_QC_OVERLAY_STORAGE_KEY = 'rawengine.negativeLab.qcOverlayVisibility.v1';
+const DEFAULT_NEGATIVE_LAB_QC_OVERLAY_VISIBILITY = {
+  densityWarnings: true,
+  frameBounds: true,
+  rejectedMarkers: true,
+} satisfies NegativeLabQcOverlayVisibility;
+const NEGATIVE_LAB_QC_OVERLAY_OPTIONS = [
+  {
+    key: 'frameBounds',
+    labelKey: 'modals.negativeConversion.qcOverlayFrameBounds',
+    testId: 'negative-lab-qc-overlay-frame-bounds',
+  },
+  {
+    key: 'densityWarnings',
+    labelKey: 'modals.negativeConversion.qcOverlayDensityWarnings',
+    testId: 'negative-lab-qc-overlay-density-warnings',
+  },
+  {
+    key: 'rejectedMarkers',
+    labelKey: 'modals.negativeConversion.qcOverlayRejectedMarkers',
+    testId: 'negative-lab-qc-overlay-rejected-markers',
+  },
+] satisfies Array<{
+  key: NegativeLabQcOverlayKey;
+  labelKey: `modals.negativeConversion.${string}`;
+  testId: string;
+}>;
+const negativeLabQcOverlayVisibilitySchema = z
+  .object({
+    densityWarnings: z.boolean().optional(),
+    frameBounds: z.boolean().optional(),
+    rejectedMarkers: z.boolean().optional(),
+  })
+  .strict();
 const CUSTOM_BASE_SAMPLE_DEFAULT = {
   height: 0.18,
   width: 0.18,
@@ -240,6 +277,31 @@ const CUSTOM_BASE_SAMPLE_DEFAULT = {
 } satisfies NegativeLabBaseFogSampleRect;
 const NEGATIVE_LAB_WORKSPACE_UI_SCHEMA_VERSION = 1 satisfies NegativeLabWorkspaceProof['schemaVersion'];
 const getInitialIncludedPaths = (paths: string[]) => new Set(paths);
+const readNegativeLabQcOverlayVisibility = (): NegativeLabQcOverlayVisibility => {
+  if (typeof window === 'undefined') return DEFAULT_NEGATIVE_LAB_QC_OVERLAY_VISIBILITY;
+
+  try {
+    const stored = window.localStorage.getItem(NEGATIVE_LAB_QC_OVERLAY_STORAGE_KEY);
+    if (stored === null) return DEFAULT_NEGATIVE_LAB_QC_OVERLAY_VISIBILITY;
+    const parsed = negativeLabQcOverlayVisibilitySchema.parse(JSON.parse(stored));
+    return {
+      densityWarnings:
+        typeof parsed.densityWarnings === 'boolean'
+          ? parsed.densityWarnings
+          : DEFAULT_NEGATIVE_LAB_QC_OVERLAY_VISIBILITY.densityWarnings,
+      frameBounds:
+        typeof parsed.frameBounds === 'boolean'
+          ? parsed.frameBounds
+          : DEFAULT_NEGATIVE_LAB_QC_OVERLAY_VISIBILITY.frameBounds,
+      rejectedMarkers:
+        typeof parsed.rejectedMarkers === 'boolean'
+          ? parsed.rejectedMarkers
+          : DEFAULT_NEGATIVE_LAB_QC_OVERLAY_VISIBILITY.rejectedMarkers,
+    };
+  } catch {
+    return DEFAULT_NEGATIVE_LAB_QC_OVERLAY_VISIBILITY;
+  }
+};
 const clampSampleValue = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 const normalizeSampleRect = (rect: NegativeLabBaseFogSampleRect): NegativeLabBaseFogSampleRect => {
   const width = clampSampleValue(rect.width, 0.02, 1);
@@ -535,6 +597,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [profileSort, setProfileSort] = useState<NegativeLabProfileSort>('catalog');
   const [frameHealthFilter, setFrameHealthFilter] = useState<NegativeLabFrameHealthFilter>('all');
   const [frameHealthSort, setFrameHealthSort] = useState<NegativeLabFrameHealthSort>('roll_order');
+  const [qcOverlayVisibility, setQcOverlayVisibility] = useState<NegativeLabQcOverlayVisibility>(
+    readNegativeLabQcOverlayVisibility,
+  );
   const [qcDecisionByFrameId, setQcDecisionByFrameId] = useState<Record<string, NegativeLabQcDecision>>({});
   const [cropStatusByFrameId, setCropStatusByFrameId] = useState<Record<string, NegativeLabFrameCropStatus>>({});
   const [frameExposureOffsetByFrameId, setFrameExposureOffsetByFrameId] = useState<Record<string, number>>({});
@@ -986,11 +1051,20 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     );
 
     return buildNegativeLabQcContactSheetArtifact({
+      overlayVisibility: qcOverlayVisibility,
+      qcDecisionByFrameId,
       report: qcProofReport,
       sessionId: `negative_lab_session_${targetPaths.length}_${pathsToConvert.length}`,
       sourcePathsByFrameId,
     });
-  }, [frameHealthReport.frames, pathsToConvert.length, qcProofReport, targetPaths.length]);
+  }, [
+    frameHealthReport.frames,
+    pathsToConvert.length,
+    qcDecisionByFrameId,
+    qcOverlayVisibility,
+    qcProofReport,
+    targetPaths.length,
+  ]);
   const activePositiveVariant = useMemo(
     () =>
       qcProofArtifact.positiveVariants.find((variant) => variant.frameId === frameHealthReport.activeFrameId) ??
@@ -1105,6 +1179,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         });
     };
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(NEGATIVE_LAB_QC_OVERLAY_STORAGE_KEY, JSON.stringify(qcOverlayVisibility));
+  }, [qcOverlayVisibility]);
 
   const updatePreview = useMemo(
     () =>
@@ -1752,6 +1830,14 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       }
       return nextDecisions;
     });
+    setAcceptedBatchPlanJson(null);
+  };
+
+  const handleToggleQcOverlay = (overlayKey: NegativeLabQcOverlayKey) => {
+    setQcOverlayVisibility((currentVisibility) => ({
+      ...currentVisibility,
+      [overlayKey]: !currentVisibility[overlayKey],
+    }));
     setAcceptedBatchPlanJson(null);
   };
 
@@ -2855,8 +2941,40 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         {t('modals.negativeConversion.qcProofHint')}
       </UiText>
       <div
+        className="grid grid-cols-3 gap-1 rounded-sm bg-bg-secondary p-2 text-[11px]"
+        data-density-warnings={qcOverlayVisibility.densityWarnings ? 'true' : 'false'}
+        data-frame-bounds={qcOverlayVisibility.frameBounds ? 'true' : 'false'}
+        data-rejected-markers={qcOverlayVisibility.rejectedMarkers ? 'true' : 'false'}
+        data-testid="negative-lab-qc-overlay-controls"
+      >
+        {NEGATIVE_LAB_QC_OVERLAY_OPTIONS.map((option) => (
+          <button
+            aria-pressed={qcOverlayVisibility[option.key]}
+            className={cx(
+              'rounded px-1.5 py-1 transition-colors',
+              qcOverlayVisibility[option.key]
+                ? 'bg-accent/15 text-text-primary'
+                : 'bg-bg-primary text-text-tertiary hover:bg-surface',
+            )}
+            data-overlay-enabled={qcOverlayVisibility[option.key] ? 'true' : 'false'}
+            data-testid={option.testId}
+            key={option.key}
+            onClick={() => {
+              handleToggleQcOverlay(option.key);
+            }}
+            type="button"
+          >
+            {t(option.labelKey)}
+          </button>
+        ))}
+      </div>
+      <div
         className="grid grid-cols-2 gap-1 rounded-sm bg-bg-secondary p-2 text-[11px] text-text-tertiary"
         data-contact-sheet-hash={qcProofArtifact.contactSheet.artifact.contentHash}
+        data-overlay-count={qcProofArtifact.overlays.length}
+        data-overlay-density-warnings={qcOverlayVisibility.densityWarnings ? 'true' : 'false'}
+        data-overlay-frame-bounds={qcOverlayVisibility.frameBounds ? 'true' : 'false'}
+        data-overlay-rejected-markers={qcOverlayVisibility.rejectedMarkers ? 'true' : 'false'}
         data-testid="negative-lab-qc-proof-artifact"
       >
         <span>
@@ -2890,6 +3008,15 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           <div
             className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
             data-blocked={frame.exportBlockedReason === null ? 'false' : 'true'}
+            data-density-warning-overlay={
+              qcOverlayVisibility.densityWarnings && frame.needsReview ? 'visible' : 'hidden'
+            }
+            data-frame-boundary-overlay={qcOverlayVisibility.frameBounds ? 'visible' : 'hidden'}
+            data-rejected-marker-overlay={
+              qcOverlayVisibility.rejectedMarkers && qcDecisionByFrameId[frame.frameId] === 'rejected'
+                ? 'visible'
+                : 'hidden'
+            }
             data-testid={`negative-lab-qc-proof-row-${frame.contactSheetSlot - 1}`}
             key={frame.frameId}
           >
