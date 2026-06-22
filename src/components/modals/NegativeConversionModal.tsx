@@ -141,15 +141,15 @@ type NegativeLabProfileSortLabelKey =
 type NegativeLabAgentCommitState = 'committing' | 'not_committed' | 'ready_to_commit';
 type NegativeLabAgentDryRunState = 'accepted' | 'blocked' | 'ready';
 const NEGATIVE_LAB_AGENT_DRY_RUN_LABELS = {
-  accepted: 'Dry-run accepted',
-  blocked: 'Dry-run blocked',
-  ready: 'Dry-run ready',
-} satisfies Record<NegativeLabAgentDryRunState, string>;
+  accepted: 'modals.negativeConversion.agentDryRunAccepted',
+  blocked: 'modals.negativeConversion.agentDryRunBlocked',
+  ready: 'modals.negativeConversion.agentDryRunReady',
+} satisfies Record<NegativeLabAgentDryRunState, `modals.negativeConversion.${string}`>;
 const NEGATIVE_LAB_AGENT_COMMIT_LABELS = {
-  committing: 'Committing',
-  not_committed: 'Not committed',
-  ready_to_commit: 'Ready to commit',
-} satisfies Record<NegativeLabAgentCommitState, string>;
+  committing: 'modals.negativeConversion.agentCommitCommitting',
+  not_committed: 'modals.negativeConversion.agentCommitNotCommitted',
+  ready_to_commit: 'modals.negativeConversion.agentCommitReady',
+} satisfies Record<NegativeLabAgentCommitState, `modals.negativeConversion.${string}`>;
 const NEGATIVE_LAB_PROFILE_FILTERS = [
   { id: 'all', labelKey: 'modals.negativeConversion.profileFilterAll' },
   { id: 'color_negative', labelKey: 'modals.negativeConversion.profileFilterColorNegative' },
@@ -918,6 +918,15 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const agentCommandSource = isBatchPlanAccepted
     ? NegativeLabAppServerCommandName.AcceptBatchPlan
     : NegativeLabAppServerCommandName.BatchSummary;
+  const agentPlanId = isBatchPlanAccepted
+    ? acceptedBatchPlanIdentity.acceptedDryRunPlanId
+    : 'negative_lab_batch_plan_pending_acceptance';
+  const agentProofHash = isBatchPlanAccepted
+    ? acceptedBatchPlanIdentity.acceptedDryRunPlanHash
+    : 'fnv1a32:pending_acceptance';
+  const agentRollbackTarget = isBatchPlanAccepted
+    ? acceptedBatchPlanIdentity.acceptedDryRunPlanId
+    : 'accept_dry_run_plan_first';
   const requiresAcceptedBatchPlan = hasMultipleScans && conversionScope !== 'active';
   const canSave =
     !isSaving &&
@@ -2568,7 +2577,15 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const renderAgentActivityPanel = () => (
     <div
       className="rounded-md border border-surface bg-bg-primary p-2 text-[11px] text-text-tertiary"
+      data-agent-command-source={agentCommandSource}
+      data-agent-commit-state={agentCommitState}
+      data-agent-dry-run-state={agentDryRunState}
+      data-agent-plan-id={agentPlanId}
+      data-agent-proof-hash={agentProofHash}
+      data-agent-rollback-target={agentRollbackTarget}
+      data-affected-frame-count={batchDryRunSummary.affectedFrameIds.length}
       data-testid="negative-lab-agent-activity"
+      data-warning-count={rollWarningCount}
     >
       <div className="mb-1 flex items-center justify-between gap-2">
         <span className="font-medium text-text-primary">{t('modals.negativeConversion.agentActivity')}</span>
@@ -2578,10 +2595,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       </div>
       <div className="mt-1 grid grid-cols-2 gap-1">
         <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-agent-dry-run-state">
-          {NEGATIVE_LAB_AGENT_DRY_RUN_LABELS[agentDryRunState]}
+          {t(NEGATIVE_LAB_AGENT_DRY_RUN_LABELS[agentDryRunState])}
         </span>
         <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-agent-commit-state">
-          {NEGATIVE_LAB_AGENT_COMMIT_LABELS[agentCommitState]}
+          {t(NEGATIVE_LAB_AGENT_COMMIT_LABELS[agentCommitState])}
         </span>
         <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-agent-affected-frames">
           {t('modals.negativeConversion.agentAffectedFrames', {
@@ -2592,6 +2609,27 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           {t('modals.negativeConversion.frameHealthWarningCount', {
             warningCount: rollWarningCount,
           })}
+        </span>
+        <span
+          className="truncate rounded bg-bg-secondary px-1.5 py-0.5"
+          data-testid="negative-lab-agent-plan-id"
+          title={agentPlanId}
+        >
+          {t('modals.negativeConversion.agentPlanId', { planId: agentPlanId })}
+        </span>
+        <span
+          className="truncate rounded bg-bg-secondary px-1.5 py-0.5"
+          data-testid="negative-lab-agent-proof-hash"
+          title={agentProofHash}
+        >
+          {t('modals.negativeConversion.agentProofHash', { proofHash: agentProofHash })}
+        </span>
+        <span
+          className="truncate rounded bg-bg-secondary px-1.5 py-0.5"
+          data-testid="negative-lab-agent-rollback-target"
+          title={agentRollbackTarget}
+        >
+          {t('modals.negativeConversion.agentRollbackTarget', { rollbackTarget: agentRollbackTarget })}
         </span>
       </div>
     </div>
