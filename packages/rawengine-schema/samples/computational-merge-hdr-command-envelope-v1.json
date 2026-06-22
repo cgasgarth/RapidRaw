@@ -23,6 +23,8 @@
   "parameters": {
     "alignmentMode": "auto",
     "bracketValidation": "required",
+    "deghostConfidenceMapVisible": false,
+    "deghostRegionIntensityPercent": 65,
     "deghosting": "medium",
     "maxPreviewDimensionPx": 2400,
     "mergeStrategy": "scene_linear_radiance",

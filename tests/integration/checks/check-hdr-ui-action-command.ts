@@ -27,6 +27,8 @@ const settings = {
   ...DEFAULT_HDR_MERGE_UI_SETTINGS,
   alignmentMode: 'auto',
   bracketValidation: 'required',
+  deghostConfidenceMapVisible: true,
+  deghostRegionIntensityPercent: 85,
   deghosting: 'medium',
   maxPreviewDimensionPx: 4096,
   mergeStrategy: 'scene_linear_radiance',
@@ -39,6 +41,8 @@ const packageCommand = buildHdrMergeUiDryRunCommandV1(
   {
     alignmentMode: settings.alignmentMode,
     bracketValidation: settings.bracketValidation,
+    deghostConfidenceMapVisible: settings.deghostConfidenceMapVisible,
+    deghostRegionIntensityPercent: settings.deghostRegionIntensityPercent,
     deghosting: settings.deghosting,
     maxPreviewDimensionPx: settings.maxPreviewDimensionPx,
     mergeStrategy: settings.mergeStrategy,
@@ -94,6 +98,12 @@ if (settings.alignmentMode !== packageCommand.parameters.alignmentMode) {
 }
 if (settings.deghosting !== packageCommand.parameters.deghosting) {
   failures.push('HDR UI action deghosting must match package command builder.');
+}
+if (
+  settings.deghostConfidenceMapVisible !== packageCommand.parameters.deghostConfidenceMapVisible ||
+  settings.deghostRegionIntensityPercent !== packageCommand.parameters.deghostRegionIntensityPercent
+) {
+  failures.push('HDR UI action deghost confidence map controls must match package command builder.');
 }
 if (settings.mergeStrategy !== packageCommand.parameters.mergeStrategy) {
   failures.push('HDR UI action merge strategy must match package command builder.');

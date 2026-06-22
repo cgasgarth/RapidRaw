@@ -17,7 +17,13 @@ runComputationalUiApiSmoke({
   buildDryRunCommand: buildHdrMergeUiDryRunCommandV1,
   label: 'hdr',
   validDryRunArgs: [
-    { outputName: 'Kitchen Window HDR', sources: hdrSources, toneMappingPreset: 'highlight_detail' },
+    {
+      deghostConfidenceMapVisible: true,
+      deghostRegionIntensityPercent: 85,
+      outputName: 'Kitchen Window HDR',
+      sources: hdrSources,
+      toneMappingPreset: 'highlight_detail',
+    },
     {
       commandId: 'command_hdr_ui_dry_run_001',
       correlationId: 'corr_hdr_ui_dry_run_001',
@@ -40,10 +46,15 @@ runComputationalUiApiSmoke({
     if (command.parameters.toneMappingPreset !== 'highlight_detail') {
       failures.push('HDR UI mapper must preserve the tone-mapping preset.');
     }
+    if (!command.parameters.deghostConfidenceMapVisible || command.parameters.deghostRegionIntensityPercent !== 85) {
+      failures.push('HDR UI mapper must preserve deghost confidence map controls.');
+    }
   },
   validApplyArgs: [
     {
       deghosting: 'high',
+      deghostConfidenceMapVisible: true,
+      deghostRegionIntensityPercent: 85,
       outputName: 'Kitchen Window HDR',
       sources: hdrSources,
       toneMappingPreset: 'highlight_detail',
@@ -67,6 +78,9 @@ runComputationalUiApiSmoke({
     }
     if (command.parameters.deghosting !== 'high') {
       failures.push('HDR UI apply mapper must preserve UI control overrides.');
+    }
+    if (!command.parameters.deghostConfidenceMapVisible || command.parameters.deghostRegionIntensityPercent !== 85) {
+      failures.push('HDR UI apply mapper must preserve deghost confidence map controls.');
     }
     if (command.parameters.toneMappingPreset !== 'highlight_detail') {
       failures.push('HDR UI apply mapper must preserve tone-mapping preset overrides.');

@@ -321,12 +321,14 @@ const panoramaRoutePair = getComputationalMergeAppServerRoutePairSummary('panora
 const focusStackRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
 
 export const hdrUiSettingsProofSchema = z.object({
+  deghostConfidenceMapVisible: z.literal('true'),
+  deghostRegionIntensityPercent: z.literal('85'),
   deghosting: z.literal('high'),
   maxPreviewDimensionPx: z.literal('4096'),
   mergeStrategy: z.literal('scene_linear_radiance'),
   qualityPreference: z.literal('best'),
   toneMapPreview: z.literal('true'),
-  toneMappingPreset: z.literal('highlight_detail'),
+  toneMappingPreset: z.literal('custom'),
 });
 export const hdrReviewWorkspaceProofSchema = z.object({
   applyCommand: z.literal(hdrRoutePair.applyToolName),
@@ -337,13 +339,15 @@ export const hdrReviewWorkspaceProofSchema = z.object({
   bracketSpanEv: z.string().regex(/^4(?:\.\d+)?$/u),
   bracketValidation: z.literal('required'),
   command: z.literal(hdrRoutePair.dryRunToolName),
+  deghostConfidenceMapVisible: z.literal('true'),
+  deghostRegionIntensityPercent: z.literal('85'),
   deghosting: z.literal('high'),
   estimatedPreviewMegapixels: z.literal('50'),
   mergeStrategy: z.literal('scene_linear_radiance'),
   qualityPreference: z.literal('best'),
   runtimeStatus: z.literal('dry_run_preview'),
   sourceCount: z.literal('3'),
-  toneMappingPreset: z.literal('highlight_detail'),
+  toneMappingPreset: z.literal('custom'),
 });
 const finiteDatasetNumberSchema = z
   .string()

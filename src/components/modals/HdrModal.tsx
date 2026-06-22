@@ -430,6 +430,16 @@ export default function HdrModal({
                 value: t(`modals.hdr.deghosting.${settings.deghosting}`),
               },
               {
+                label: t('modals.hdr.summaryDeghostConfidenceMap'),
+                value: settings.deghostConfidenceMapVisible ? t('modals.hdr.summaryOn') : t('modals.hdr.summaryOff'),
+              },
+              {
+                label: t('modals.hdr.summaryDeghostRegionIntensity'),
+                value: t('modals.hdr.deghostRegionIntensityValue', {
+                  value: settings.deghostRegionIntensityPercent,
+                }),
+              },
+              {
                 label: t('modals.hdr.summaryQuality'),
                 value: selectedQualityLabel,
               },
@@ -628,7 +638,9 @@ export default function HdrModal({
             data-alignment-confidence-percent={reviewDiagnostics.alignment.confidencePercent}
             data-alignment-mode={reviewDiagnostics.alignment.mode}
             data-clipping-risk={reviewDiagnostics.tone.clippingRisk}
+            data-deghost-confidence-map-visible={String(reviewDiagnostics.deghost.confidenceMapVisible)}
             data-deghost-level={reviewDiagnostics.deghost.level}
+            data-deghost-region-intensity-percent={reviewDiagnostics.deghost.regionIntensityPercent}
             data-motion-risk={reviewDiagnostics.deghost.motionRisk}
             data-non-claims={reviewDiagnostics.nonClaims.join(',')}
             data-proof-level={reviewDiagnostics.proofLevel}
@@ -706,6 +718,8 @@ export default function HdrModal({
                 isDeghostReviewApproved ? 'border-accent/50 bg-accent/10' : 'border-yellow-500/45 bg-yellow-500/10'
               }`}
               data-deghost-level={settings.deghosting}
+              data-deghost-confidence-map-visible={String(settings.deghostConfidenceMapVisible)}
+              data-deghost-region-intensity-percent={settings.deghostRegionIntensityPercent}
               data-motion-risk={reviewDiagnostics.deghost.motionRisk}
               data-review-approved={String(isDeghostReviewApproved)}
               data-review-required={String(isDeghostReviewRequired)}
@@ -729,7 +743,9 @@ export default function HdrModal({
                 {[
                   {
                     label: t('modals.hdr.deghostReviewMask'),
-                    value: t('modals.hdr.deghostReviewMaskValue'),
+                    value: settings.deghostConfidenceMapVisible
+                      ? t('modals.hdr.deghostReviewConfidenceMapValue')
+                      : t('modals.hdr.deghostReviewMaskValue'),
                   },
                   {
                     label: t('modals.hdr.deghostReviewMotion'),
@@ -861,6 +877,48 @@ export default function HdrModal({
                   {t(`modals.hdr.deghosting.${deghosting}`)}
                 </button>
               ))}
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                className={`h-10 rounded-md border text-sm transition-colors ${
+                  settings.deghostConfidenceMapVisible
+                    ? 'border-accent bg-accent/15 text-text-primary'
+                    : 'border-border-color bg-surface text-text-secondary hover:bg-card-active'
+                }`}
+                data-testid="hdr-deghost-confidence-map-toggle"
+                onClick={() => {
+                  setIsDeghostReviewApproved(false);
+                  setManualSetting({ deghostConfidenceMapVisible: !settings.deghostConfidenceMapVisible });
+                }}
+                type="button"
+              >
+                {t('modals.hdr.deghostConfidenceMapToggle')}
+              </button>
+              <div
+                className="grid grid-cols-3 gap-1"
+                data-deghost-region-intensity-percent={settings.deghostRegionIntensityPercent}
+                data-testid="hdr-deghost-region-intensity"
+              >
+                {[45, 65, 85].map((deghostRegionIntensityPercent) => (
+                  <button
+                    key={deghostRegionIntensityPercent}
+                    className={`h-10 rounded-md border text-sm transition-colors ${
+                      settings.deghostRegionIntensityPercent === deghostRegionIntensityPercent
+                        ? 'border-accent bg-accent/15 text-text-primary'
+                        : 'border-border-color bg-surface text-text-secondary hover:bg-card-active'
+                    }`}
+                    onClick={() => {
+                      setIsDeghostReviewApproved(false);
+                      setManualSetting({ deghostRegionIntensityPercent });
+                    }}
+                    type="button"
+                  >
+                    {t('modals.hdr.deghostRegionIntensityValue', {
+                      value: deghostRegionIntensityPercent,
+                    })}
+                  </button>
+                ))}
+              </div>
             </div>
           </section>
 

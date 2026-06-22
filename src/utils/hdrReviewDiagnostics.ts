@@ -34,6 +34,7 @@ export const buildHdrReviewDiagnostics = ({
       status: settings.alignmentMode === 'none' || alignmentConfidencePercent < 70 ? 'review' : 'ready',
     },
     deghost: {
+      confidenceMapVisible: settings.deghostConfidenceMapVisible,
       level: settings.deghosting,
       motionRisk:
         settings.deghosting === 'off'
@@ -43,6 +44,7 @@ export const buildHdrReviewDiagnostics = ({
             : settings.deghosting === 'medium'
               ? 'medium'
               : 'low',
+      regionIntensityPercent: settings.deghostRegionIntensityPercent,
       status: settings.deghosting === 'off' ? 'review' : 'ready',
     },
     nonClaims: ['not_real_raw_e2e_verified', 'not_photographer_accepted', 'not_export_parity_verified'],
