@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 
 import { INITIAL_MASK_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { copyLayerMasksToLayer } from '../../../src/utils/layerStack.ts';
 import {
   cloneMaskContainerForPaste,
   cloneSubMaskForPaste,
@@ -46,6 +47,20 @@ const fixtureSchema = z.discriminatedUnion('id', [
         })
         .strict(),
       id: z.literal('reset-adjustments'),
+    })
+    .strict(),
+  z
+    .object({
+      expected: z
+        .object({
+          copiedSubMaskEditable: z.literal(true),
+          copiedSubMaskId: z.string(),
+          copiedSubMaskVisible: z.literal(true),
+          sourceSubMaskId: z.string(),
+          targetLayerVisible: z.literal(true),
+        })
+        .strict(),
+      id: z.literal('copy-layer-mask-visible-state'),
     })
     .strict(),
 ]);
@@ -137,6 +152,44 @@ for (const fixture of fixtures) {
       process.exit(1);
     }
   } else {
+    if (fixture.id === 'copy-layer-mask-visible-state') {
+      const sourceLayer = {
+        ...originalContainer,
+        id: 'source-layer',
+        name: 'Source mask layer',
+        visible: true,
+      };
+      const targetLayer = {
+        ...originalContainer,
+        id: 'target-layer',
+        name: 'Target adjustment layer',
+        subMasks: [],
+        visible: false,
+      };
+      const layers = copyLayerMasksToLayer([sourceLayer, targetLayer], {
+        createSubMaskId: (sourceSubMaskId) => `${sourceSubMaskId}-target-copy`,
+        sourceLayerId: sourceLayer.id,
+        targetLayerId: targetLayer.id,
+      });
+      const target = layers.find((layer) => layer.id === targetLayer.id);
+      const copiedSubMask = target?.subMasks[0];
+
+      if (
+        target?.visible !== fixture.expected.targetLayerVisible ||
+        copiedSubMask?.id !== fixture.expected.copiedSubMaskId ||
+        copiedSubMask.visible !== fixture.expected.copiedSubMaskVisible ||
+        copiedSubMask.parameters === undefined ||
+        sourceLayer.subMasks[0]?.id !== fixture.expected.sourceSubMaskId
+      ) {
+        console.error(`${fixture.id}: copied mask visible/editable state mismatch`);
+        process.exit(1);
+      }
+      if (copiedSubMask === sourceLayer.subMasks[0]) {
+        console.error(`${fixture.id}: copied mask must be editable without mutating source.`);
+        process.exit(1);
+      }
+      continue;
+    }
     const clonedContainer = cloneMaskContainerForPaste(
       originalContainer,
       createIdFactory(['container-reset', 'reset-submask']),
