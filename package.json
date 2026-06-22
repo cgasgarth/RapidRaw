@@ -603,7 +603,8 @@
     "check:selective-color-range-preview-apply:update": "bun tests/integration/checks/check-selective-color-range-preview-apply.ts --update",
     "check:agent-basic-tone-live-apply": "bun tests/integration/checks/check-agent-basic-tone-live-apply.ts",
     "check:agent-image-context-snapshot": "bun tests/integration/checks/check-agent-image-context-snapshot.ts",
-    "check:agent-basic-tone-dry-run-preview-artifacts": "bun tests/integration/checks/check-agent-basic-tone-dry-run-preview-artifacts.ts"
+    "check:agent-basic-tone-dry-run-preview-artifacts": "bun tests/integration/checks/check-agent-basic-tone-dry-run-preview-artifacts.ts",
+    "check:agent-core-edit-command-bundle": "bun tests/integration/checks/check-agent-core-edit-command-bundle.ts"
   },
   "dependencies": {
     "@clerk/react": "^6.9.1",
