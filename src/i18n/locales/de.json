@@ -2628,6 +2628,17 @@
       "qualityBest": "Best",
       "qualityLabel": "Quality",
       "qualityPreview": "Preview",
+      "reconstructionMode": {
+        "model_detail": {
+          "label": "Model detail",
+          "status": "Learned detail prior"
+        },
+        "optical_flow": {
+          "label": "Optical-flow reconstruction",
+          "status": "Burst alignment"
+        }
+      },
+      "reconstructionModeLabel": "Reconstruction",
       "review": {
         "acceptanceGate": "",
         "alignmentConfidence": "Alignment confidence",

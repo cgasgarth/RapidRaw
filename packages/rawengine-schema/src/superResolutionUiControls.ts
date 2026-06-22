@@ -6,6 +6,7 @@ import {
   computationalMergeAlignmentModeV1Schema,
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeQualityPreferenceV1Schema,
+  superResolutionReconstructionModeV1Schema,
   superResolutionDetailPolicyV1Schema,
   type ComputationalMergeCommandEnvelopeV1,
 } from './rawEngineSchemas.js';
@@ -30,6 +31,7 @@ export const superResolutionUiControlsV1Schema = z
     outputName: z.string().trim().min(1),
     outputScale: z.number().min(1.1).max(4),
     qualityPreference: computationalMergeQualityPreferenceV1Schema.default('best'),
+    reconstructionMode: superResolutionReconstructionModeV1Schema.default('model_detail'),
     sources: z.array(superResolutionUiSourceV1Schema).min(2),
   })
   .strict();
@@ -84,6 +86,7 @@ export const buildSuperResolutionUiDryRunCommandV1 = (
       outputName: controls.outputName,
       outputScale: controls.outputScale,
       qualityPreference: controls.qualityPreference,
+      reconstructionMode: controls.reconstructionMode,
       sources: controls.sources.map((source) => ({
         colorSpaceHint: source.colorSpaceHint,
         exposureEv: source.exposureEv,
@@ -130,6 +133,7 @@ export const buildSuperResolutionUiApplyCommandV1 = (
       outputName: controls.outputName,
       outputScale: controls.outputScale,
       qualityPreference: controls.qualityPreference,
+      reconstructionMode: controls.reconstructionMode,
       sources: controls.sources.map((source) => ({
         colorSpaceHint: source.colorSpaceHint,
         exposureEv: source.exposureEv,

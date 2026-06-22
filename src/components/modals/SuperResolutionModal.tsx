@@ -26,6 +26,7 @@ import type {
   SuperResolutionAlignmentMode,
   SuperResolutionMode,
   SuperResolutionQualityPreference,
+  SuperResolutionReconstructionMode,
   SuperResolutionUiSettings,
 } from '../../schemas/superResolutionUiSchemas';
 import type { SuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
@@ -103,6 +104,10 @@ export default function SuperResolutionModal({
     { mode: 'conservative', status: t('modals.superResolution.mode.conservative.status') },
     { mode: 'standard', status: t('modals.superResolution.mode.standard.status') },
     { mode: 'aggressive', status: t('modals.superResolution.mode.aggressive.status') },
+  ];
+  const reconstructionModeOptions: Array<{ mode: SuperResolutionReconstructionMode; status: string }> = [
+    { mode: 'model_detail', status: t('modals.superResolution.reconstructionMode.model_detail.status') },
+    { mode: 'optical_flow', status: t('modals.superResolution.reconstructionMode.optical_flow.status') },
   ];
   const selectedAlignmentLabel =
     alignmentOptions.find((option) => option.value === settings.alignmentMode)?.label ?? '';
@@ -226,6 +231,20 @@ export default function SuperResolutionModal({
     },
     [onSettingsChange, settings],
   );
+  const setReconstructionMode = useCallback(
+    (reconstructionMode: SuperResolutionReconstructionMode) => {
+      setSetting({
+        alignmentMode:
+          reconstructionMode === 'optical_flow'
+            ? 'optical_flow'
+            : settings.alignmentMode === 'optical_flow'
+              ? 'auto'
+              : settings.alignmentMode,
+        reconstructionMode,
+      });
+    },
+    [setSetting, settings.alignmentMode],
+  );
 
   const handleClose = useCallback(() => {
     onClose();
@@ -316,9 +335,10 @@ export default function SuperResolutionModal({
       </ComputationalSetupOptionSection>
 
       <section
-        className="grid grid-cols-4 gap-2 rounded-md border border-border-color bg-bg-secondary/70 p-2 text-sm"
+        className="grid grid-cols-5 gap-2 rounded-md border border-border-color bg-bg-secondary/70 p-2 text-sm"
         data-alignment-mode={settings.alignmentMode}
         data-detail-policy={settings.detailPolicy}
+        data-reconstruction-mode={settings.reconstructionMode}
         data-reconstruction-ready={String(isSourceCountValid)}
         data-source-count={sourceCount}
         data-testid="sr-readiness-summary"
@@ -334,6 +354,10 @@ export default function SuperResolutionModal({
         <ComputationalSetupStatusLine
           label={t('modals.superResolution.modeLabel')}
           value={t(`modals.superResolution.mode.${selectedMode}.label`)}
+        />
+        <ComputationalSetupStatusLine
+          label={t('modals.superResolution.reconstructionModeLabel')}
+          value={t(`modals.superResolution.reconstructionMode.${settings.reconstructionMode}.label`)}
         />
         <ComputationalSetupStatusLine
           label={t('modals.superResolution.workflowTitle')}
@@ -367,6 +391,38 @@ export default function SuperResolutionModal({
           />
         </div>
       </section>
+
+      <ComputationalSetupOptionSection title={t('modals.superResolution.reconstructionModeLabel')}>
+        <div
+          className="grid grid-cols-2 gap-2"
+          data-alignment-mode={settings.alignmentMode}
+          data-reconstruction-mode={settings.reconstructionMode}
+          data-testid="sr-reconstruction-mode-selector"
+        >
+          {reconstructionModeOptions.map(({ mode, status }) => (
+            <button
+              key={mode}
+              className={`min-h-16 rounded-md border px-3 py-2 text-left transition-colors ${
+                settings.reconstructionMode === mode
+                  ? 'border-accent bg-accent/15'
+                  : 'border-border-color bg-bg-primary hover:bg-card-active'
+              }`}
+              data-sr-reconstruction-mode={mode}
+              onClick={() => {
+                setReconstructionMode(mode);
+              }}
+              type="button"
+            >
+              <UiText as="span" variant={TextVariants.label}>
+                {t(`modals.superResolution.reconstructionMode.${mode}.label`)}
+              </UiText>
+              <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="block mt-1">
+                {status}
+              </UiText>
+            </button>
+          ))}
+        </div>
+      </ComputationalSetupOptionSection>
 
       <ComputationalSetupOptionSection title={t('modals.superResolution.modeLabel')}>
         <div className="grid grid-cols-3 gap-2">

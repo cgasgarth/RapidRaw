@@ -1357,6 +1357,7 @@ async function prepareScenario(page, mode) {
     await page.getByRole('button', { name: '4x' }).click();
     await page.getByRole('button', { exact: true, name: 'Auto' }).click();
     await page.getByRole('option', { name: 'Optical flow' }).click();
+    await page.locator('[data-sr-reconstruction-mode="optical_flow"]').click();
     await page.getByRole('button', { exact: true, name: 'Best' }).click();
     await page.getByRole('option', { name: 'Preview' }).click();
     await page.getByRole('button', { name: 'Aggressive' }).click();

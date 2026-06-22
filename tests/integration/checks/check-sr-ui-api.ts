@@ -18,6 +18,7 @@ runComputationalUiApiSmoke({
       outputName: 'Burst Super Resolution',
       outputScale: 2,
       qualityPreference: 'best',
+      reconstructionMode: 'optical_flow',
       sources: [
         { exposureEv: 0, imagePath: '/photos/sr/SR_0001.CR3', sourceIndex: 0 },
         { exposureEv: 0, imagePath: '/photos/sr/SR_0002.CR3', sourceIndex: 1 },
@@ -47,6 +48,9 @@ runComputationalUiApiSmoke({
     if (command.parameters.outputScale !== 2 || command.parameters.detailPolicy !== 'balanced') {
       failures.push('SR UI mapper must preserve output scale and detail policy.');
     }
+    if (command.parameters.reconstructionMode !== 'optical_flow') {
+      failures.push('SR UI mapper must preserve reconstruction mode.');
+    }
   },
   validApplyArgs: [
     {
@@ -55,6 +59,7 @@ runComputationalUiApiSmoke({
       outputName: 'Burst Super Resolution',
       outputScale: 3,
       qualityPreference: 'balanced',
+      reconstructionMode: 'model_detail',
       sources: [
         { exposureEv: 0, imagePath: '/photos/sr/SR_0001.CR3', sourceIndex: 0 },
         { exposureEv: 0, imagePath: '/photos/sr/SR_0002.CR3', sourceIndex: 1 },
@@ -79,6 +84,9 @@ runComputationalUiApiSmoke({
     }
     if (command.parameters.outputScale !== 3 || command.parameters.detailPolicy !== 'balanced') {
       failures.push('SR UI apply mapper must preserve UI control overrides.');
+    }
+    if (command.parameters.reconstructionMode !== 'model_detail') {
+      failures.push('SR UI apply mapper must preserve reconstruction mode.');
     }
   },
   invalidCases: [

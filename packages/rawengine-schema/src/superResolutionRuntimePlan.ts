@@ -90,6 +90,7 @@ export const superResolutionRuntimeProvenanceV1Schema = z
       )
       .min(2),
     mode: z.enum(['single_image', 'multi_image']),
+    reconstructionMode: z.enum(['model_detail', 'optical_flow']),
     requestedAlignmentMode: z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']),
     requestedOutputScale: z.number().min(1.1).max(4),
     reconstructionDiagnostics: superResolutionReconstructionDiagnosticsV1Schema,
@@ -343,6 +344,7 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
         sourceIndex: frame.sourceIndex,
       })),
       mode: request.command.parameters.mode,
+      reconstructionMode: request.command.parameters.reconstructionMode,
       requestedAlignmentMode: request.command.parameters.alignmentMode,
       requestedOutputScale: request.command.parameters.outputScale,
       reconstructionDiagnostics: result.reconstructionDiagnostics,
@@ -404,6 +406,7 @@ const renderDegradedSuperResolutionDryRun = (
         sourceIndex: frame.sourceIndex,
       })),
       mode: request.command.parameters.mode,
+      reconstructionMode: request.command.parameters.reconstructionMode,
       requestedAlignmentMode: request.command.parameters.alignmentMode,
       requestedOutputScale: request.command.parameters.outputScale,
       reconstructionDiagnostics,

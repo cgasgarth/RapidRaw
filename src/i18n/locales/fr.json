@@ -1782,6 +1782,17 @@
           "label": "Aggressive",
           "status": "Preview-only risk"
         }
+      },
+      "reconstructionModeLabel": "Reconstruction",
+      "reconstructionMode": {
+        "model_detail": {
+          "label": "Model detail",
+          "status": "Learned detail prior"
+        },
+        "optical_flow": {
+          "label": "Optical-flow reconstruction",
+          "status": "Burst alignment"
+        }
       }
     },
     "focusStack": {

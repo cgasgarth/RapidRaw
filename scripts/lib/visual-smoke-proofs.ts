@@ -493,6 +493,7 @@ export const superResolutionUiSettingsProofSchema = z.object({
   maxPreviewDimensionPx: z.literal('8192'),
   outputScale: z.literal('4'),
   qualityPreference: z.literal('preview'),
+  reconstructionMode: z.literal('optical_flow'),
 });
 export const superResolutionReviewWorkspaceProofSchema = z.object({
   applyCommand: z.literal(superResolutionRoutePair.applyToolName),
@@ -506,6 +507,7 @@ export const superResolutionReviewWorkspaceProofSchema = z.object({
   modePolicyVersion: z.literal('1'),
   outputScale: z.literal('4'),
   proofLevel: z.literal('synthetic_runtime'),
+  reconstructionMode: z.literal('optical_flow'),
   reviewPacketPath: z.literal('docs/validation/sr-synthetic-output-artifact-proof-2026-06-20.json'),
   runtimeStatus: z.literal('dry_run_preview'),
   reviewCropCount: z.literal('4'),

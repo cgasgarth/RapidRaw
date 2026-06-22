@@ -5,6 +5,7 @@ import {
   superResolutionDetailPolicySchema,
   superResolutionModeSchema,
   superResolutionQualityPreferenceSchema,
+  superResolutionReconstructionModeSchema,
 } from './superResolutionUiSchemas';
 
 export const superResolutionOutputReviewDecisionSchema = z.enum(['human_review_required', 'preview_only', 'blocked']);
@@ -79,6 +80,7 @@ export const superResolutionOutputReviewWorkflowSchema = z
     overlapCoverageRatio: z.number().min(0).max(1).nullable(),
     proofLevel: z.literal('synthetic_runtime'),
     qualityPreference: superResolutionQualityPreferenceSchema,
+    reconstructionMode: superResolutionReconstructionModeSchema,
     reviewArtifacts: z.array(superResolutionOutputReviewArtifactSchema).min(1),
     reviewCropCount: z.number().int().nonnegative(),
     reviewPacketPath: z.string().min(1),

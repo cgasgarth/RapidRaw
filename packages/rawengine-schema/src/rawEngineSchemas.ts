@@ -2679,6 +2679,7 @@ export const computationalMergeAlignmentModeV1Schema = z.enum([
 export const computationalMergeQualityPreferenceV1Schema = z.enum(['preview', 'balanced', 'best']);
 
 export const superResolutionModeV1Schema = z.enum(['single_image', 'multi_image']);
+export const superResolutionReconstructionModeV1Schema = z.enum(['model_detail', 'optical_flow']);
 
 export const superResolutionDetailPolicyV1Schema = z.enum(['conservative', 'balanced', 'aggressive_preview_only']);
 
@@ -2722,6 +2723,7 @@ export const superResolutionInvalidationReasonV1Schema = z.enum([
   'engine_version_changed',
   'model_version_changed',
   'output_artifact_changed',
+  'reconstruction_mode_changed',
   'scale_changed',
   'source_content_hash_changed',
   'source_graph_revision_changed',
@@ -3125,6 +3127,7 @@ export const computationalMergeCommandEnvelopeV1Schema = z
             outputName: z.string().trim().min(1),
             outputScale: z.number().min(1.1).max(4),
             qualityPreference: computationalMergeQualityPreferenceV1Schema,
+            reconstructionMode: superResolutionReconstructionModeV1Schema.default('model_detail'),
             sources: superResolutionSourcesSchema,
           })
           .strict()
@@ -4213,6 +4216,7 @@ export const superResolutionArtifactV1Schema = z
       .optional(),
     qualityPreference: computationalMergeQualityPreferenceV1Schema,
     requestedAlignmentMode: computationalMergeAlignmentModeV1Schema,
+    reconstructionMode: superResolutionReconstructionModeV1Schema,
     requestedOutputScale: z.number().min(1.1).max(4),
     resolvedAlignmentMode: computationalMergeAlignmentModeV1Schema,
     schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
@@ -9338,6 +9342,7 @@ export type SuperResolutionDetailPolicyV1 = z.infer<typeof superResolutionDetail
 export type SuperResolutionDryRunSummaryV1 = z.infer<typeof superResolutionDryRunSummaryV1Schema>;
 export type SuperResolutionInvalidationReasonV1 = z.infer<typeof superResolutionInvalidationReasonV1Schema>;
 export type SuperResolutionModeV1 = z.infer<typeof superResolutionModeV1Schema>;
+export type SuperResolutionReconstructionModeV1 = z.infer<typeof superResolutionReconstructionModeV1Schema>;
 export type SuperResolutionReviewStatusV1 = z.infer<typeof superResolutionReviewStatusV1Schema>;
 export type SuperResolutionStaleStateV1 = z.infer<typeof superResolutionStaleStateV1Schema>;
 export type SuperResolutionWarningCodeV1 = z.infer<typeof superResolutionWarningCodeV1Schema>;

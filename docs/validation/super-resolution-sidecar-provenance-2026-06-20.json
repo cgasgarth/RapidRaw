@@ -2,10 +2,10 @@
   "doesNotProve": ["filesystem_sidecar_write", "ui_reload_badge", "real_raw_e2e"],
   "issue": 2359,
   "outputArtifactHash": "sha256:eaa523c7",
-  "provenanceRecordHash": "sha256:63a7923f660f80a6fdf2b6dc12ceac56c688ff302be416af84ab1e26707b343a",
+  "provenanceRecordHash": "sha256:eebad95c5a29bd840d07566d5d7e6cc63c696b35e06d262e258e0d9ba7240b54",
   "reloadedArtifactId": "artifact_record_artifact_sr_sidecar_output",
   "runtimeApplySidecarRecord": true,
-  "sidecarHash": "sha256:ff732c394106515ef9fe100dbd366515e4388f41aba9f62944760c8c47c4c6b3",
+  "sidecarHash": "sha256:1e2c4a44f74183a0c7d0453a68e0d74bb59cf3771e7dd9995fe5740e047abcbe",
   "staleReasons": [
     "source_content_hash_changed",
     "source_graph_revision_changed",
@@ -14,7 +14,8 @@
     "detail_policy_changed",
     "scale_changed",
     "alignment_settings_changed",
-    "engine_version_changed"
+    "engine_version_changed",
+    "reconstruction_mode_changed"
   ],
   "validationMode": "sr_sidecar_provenance_roundtrip"
 }

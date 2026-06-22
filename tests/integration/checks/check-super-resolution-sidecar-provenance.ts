@@ -46,6 +46,7 @@ const reportSchema = z
         'detail_policy_changed',
         'engine_version_changed',
         'output_artifact_changed',
+        'reconstruction_mode_changed',
         'scale_changed',
         'source_content_hash_changed',
         'source_graph_revision_changed',
@@ -170,6 +171,7 @@ const currentState = {
   detailPolicy: artifact.detailPolicy,
   engine: artifact.engine,
   outputContentHash: artifact.outputArtifact.contentHash,
+  reconstructionMode: artifact.reconstructionMode,
   requestedAlignmentMode: artifact.requestedAlignmentMode,
   requestedOutputScale: artifact.requestedOutputScale,
   resolvedAlignmentMode: artifact.resolvedAlignmentMode,
@@ -212,6 +214,10 @@ const engineState = classifySuperResolutionArtifactStaleState(artifact, {
   ...currentState,
   engine: { ...artifact.engine, engineVersion: `${artifact.engine.engineVersion}-next` },
 });
+const reconstructionModeState = classifySuperResolutionArtifactStaleState(artifact, {
+  ...currentState,
+  reconstructionMode: artifact.reconstructionMode === 'model_detail' ? 'optical_flow' : 'model_detail',
+});
 
 const staleReasons = [
   sourceHashState,
@@ -222,6 +228,7 @@ const staleReasons = [
   scaleState,
   alignmentState,
   engineState,
+  reconstructionModeState,
 ].flatMap((state) => state.invalidationReasons);
 for (const expectedReason of [
   'source_content_hash_changed',
@@ -232,6 +239,7 @@ for (const expectedReason of [
   'scale_changed',
   'alignment_settings_changed',
   'engine_version_changed',
+  'reconstruction_mode_changed',
 ]) {
   if (!staleReasons.includes(expectedReason)) throw new Error(`Missing stale reason ${expectedReason}.`);
 }

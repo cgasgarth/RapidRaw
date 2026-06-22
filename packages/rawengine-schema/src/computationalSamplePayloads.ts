@@ -579,6 +579,7 @@ export const sampleComputationalMergeSuperResolutionCommandEnvelopeV1: Computati
       outputName: 'Handheld Burst Super Resolution',
       outputScale: 2,
       qualityPreference: 'best',
+      reconstructionMode: 'model_detail',
       sources: [
         {
           colorSpaceHint: 'camera_rgb',
@@ -791,6 +792,7 @@ const sampleSuperResolutionDetailPolicy = 'conservative';
 const sampleSuperResolutionOutputScale = 2;
 const sampleSuperResolutionAlignmentMode = 'optical_flow';
 const sampleSuperResolutionQualityPreference = 'best';
+const sampleSuperResolutionReconstructionMode = 'model_detail';
 
 export const sampleSuperResolutionDryRunSummaryV1: SuperResolutionDryRunSummaryV1 =
   superResolutionDryRunSummaryV1Schema.parse({
@@ -885,6 +887,7 @@ export const sampleSuperResolutionArtifactV1: SuperResolutionArtifactV1 = superR
   ],
   qualityPreference: sampleSuperResolutionQualityPreference,
   requestedAlignmentMode: sampleSuperResolutionAlignmentMode,
+  reconstructionMode: sampleSuperResolutionReconstructionMode,
   requestedOutputScale: sampleSuperResolutionOutputScale,
   resolvedAlignmentMode: sampleSuperResolutionDryRunSummaryV1.resolvedAlignmentMode,
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,

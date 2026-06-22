@@ -48,6 +48,7 @@ export interface BuildSuperResolutionArtifactSidecarRecordOptions {
 export interface SuperResolutionArtifactCurrentStateV1 extends DerivedArtifactInvalidationInput {
   detailPolicy: SuperResolutionArtifactV1['detailPolicy'];
   engine: SuperResolutionArtifactV1['engine'];
+  reconstructionMode: SuperResolutionArtifactV1['reconstructionMode'];
   requestedAlignmentMode: SuperResolutionArtifactV1['requestedAlignmentMode'];
   requestedOutputScale: SuperResolutionArtifactV1['requestedOutputScale'];
   resolvedAlignmentMode: SuperResolutionArtifactV1['resolvedAlignmentMode'];
@@ -119,6 +120,7 @@ export const buildSuperResolutionArtifactSidecarRecordV1 = ({
       weakSupportRatio: provenance.supportMap.weakSupportRatio,
     },
     qualityPreference: parsedCommand.parameters.qualityPreference,
+    reconstructionMode: provenance.reconstructionMode,
     requestedAlignmentMode: provenance.requestedAlignmentMode,
     requestedOutputScale: provenance.requestedOutputScale,
     resolvedAlignmentMode: provenance.resolvedAlignmentMode,
@@ -194,6 +196,7 @@ export const classifySuperResolutionArtifactStaleState = (
     reasons.add('alignment_settings_changed');
   }
   if (parsedArtifact.detailPolicy !== current.detailPolicy) reasons.add('detail_policy_changed');
+  if (parsedArtifact.reconstructionMode !== current.reconstructionMode) reasons.add('reconstruction_mode_changed');
   if (
     parsedArtifact.engine.backendType !== current.engine.backendType ||
     parsedArtifact.engine.engineId !== current.engine.engineId ||

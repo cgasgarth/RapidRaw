@@ -2411,6 +2411,7 @@ function SuperResolutionVisualSmoke() {
           data-output-scale={settings.outputScale}
           data-proof-level="synthetic_runtime"
           data-quality-preference={settings.qualityPreference}
+          data-reconstruction-mode={settings.reconstructionMode}
           data-review-crop-count="4"
           data-review-packet-path="docs/validation/sr-synthetic-output-artifact-proof-2026-06-20.json"
           data-runtime-status="dry_run_preview"
@@ -2431,6 +2432,7 @@ function SuperResolutionVisualSmoke() {
           data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
           data-output-scale={settings.outputScale}
           data-quality-preference={settings.qualityPreference}
+          data-reconstruction-mode={settings.reconstructionMode}
           data-testid="sr-ui-settings-proof"
         />
         <div className="flex h-11 items-center justify-between border-b border-white/10 bg-[#181b1f] px-4">
@@ -2628,6 +2630,7 @@ function SuperResolutionPrivateRawModalReviewSmoke() {
     overlapCoverageRatio: null,
     proofLevel: 'synthetic_runtime',
     qualityPreference: settings.qualityPreference,
+    reconstructionMode: settings.reconstructionMode,
     reviewArtifacts: [
       {
         contentHash: proof.resultReviewHash,

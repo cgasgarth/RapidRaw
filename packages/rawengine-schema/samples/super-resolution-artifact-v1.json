@@ -38,6 +38,7 @@
   ],
   "qualityPreference": "best",
   "requestedAlignmentMode": "optical_flow",
+  "reconstructionMode": "model_detail",
   "requestedOutputScale": 2,
   "resolvedAlignmentMode": "optical_flow",
   "schemaVersion": 1,
