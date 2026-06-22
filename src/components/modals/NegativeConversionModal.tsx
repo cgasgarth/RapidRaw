@@ -110,6 +110,7 @@ import type {
   NegativeLabAcquisitionHealthReport,
   NegativeLabAcquisitionSourceFamily,
   NegativeLabAcquisitionWarningCode,
+  NegativeLabFrameCropStatus,
   NegativeLabFrameHealthEntry,
   NegativeLabFrameWarningSeverity,
 } from '../../schemas/negativeLabFrameHealthSchemas';
@@ -493,6 +494,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [frameHealthFilter, setFrameHealthFilter] = useState<NegativeLabFrameHealthFilter>('all');
   const [frameHealthSort, setFrameHealthSort] = useState<NegativeLabFrameHealthSort>('roll_order');
   const [qcDecisionByFrameId, setQcDecisionByFrameId] = useState<Record<string, NegativeLabQcDecision>>({});
+  const [cropStatusByFrameId, setCropStatusByFrameId] = useState<Record<string, NegativeLabFrameCropStatus>>({});
   const [frameExposureOffsetByFrameId, setFrameExposureOffsetByFrameId] = useState<Record<string, number>>({});
   const [frameRgbBalanceOffsetByFrameId, setFrameRgbBalanceOffsetByFrameId] = useState<
     Record<string, NegativeLabFrameRgbBalanceOffset>
@@ -650,11 +652,20 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         activePathIndex: effectiveActivePathIndex,
         baseFogConfidence,
         baseScope: baseFogScope,
+        cropStatusByFrameId,
         includedPathSet,
         previewReady: previewUrl !== null,
         targetPaths,
       }),
-    [baseFogConfidence, baseFogScope, effectiveActivePathIndex, includedPathSet, previewUrl, targetPaths],
+    [
+      baseFogConfidence,
+      baseFogScope,
+      cropStatusByFrameId,
+      effectiveActivePathIndex,
+      includedPathSet,
+      previewUrl,
+      targetPaths,
+    ],
   );
   const visibleFrameHealthRows = useMemo(() => {
     const filteredRows =
@@ -794,6 +805,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       JSON.stringify(
         {
           batchScope: conversionScope,
+          cropStatusByFrameId,
           dryRunSummary: batchDryRunSummary,
           frameExposureOverrides: frameExposureOverridePayload,
           frameRgbBalanceOverrides: frameRgbBalanceOverridePayload,
@@ -807,6 +819,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     [
       batchDryRunSummary,
       conversionScope,
+      cropStatusByFrameId,
       frameExposureOverridePayload,
       frameRgbBalanceOverridePayload,
       omittedDispositionFrameIds,
@@ -1569,6 +1582,19 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setAcceptedBatchPlanJson(null);
   };
 
+  const handleSetActiveFrameCropStatus = (cropStatus: NegativeLabFrameCropStatus) => {
+    const activeFrameId = frameHealthReport.activeFrameId;
+    if (activeFrameId === null) return;
+    setCropStatusByFrameId((currentStatuses) => {
+      if (cropStatus === 'active_frame_editable') {
+        const { [activeFrameId]: _removedStatus, ...nextStatuses } = currentStatuses;
+        return nextStatuses;
+      }
+      return { ...currentStatuses, [activeFrameId]: cropStatus };
+    });
+    setAcceptedBatchPlanJson(null);
+  };
+
   const handleFrameExposureOffsetChange = (frameId: string, value: number) => {
     const snappedOffset = snapNegativeLabFrameExposureOffset(value);
     const nextOffsets =
@@ -2297,8 +2323,48 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                       )
                     : t('modals.negativeConversion.basePending')}
                 </span>
-                <span className="text-text-tertiary" data-testid={`negative-lab-frame-crop-status-${index}`}>
-                  {t(`modals.negativeConversion.frameCropStatus.${row.cropStatus}`)}
+                <span
+                  className="flex items-center gap-1 text-text-tertiary"
+                  data-testid={`negative-lab-frame-crop-status-${index}`}
+                >
+                  <span>{t(`modals.negativeConversion.frameCropStatus.${row.cropStatus}`)}</span>
+                  {row.active && (
+                    <span className="inline-flex gap-1" data-testid="negative-lab-active-frame-crop-actions">
+                      <button
+                        className="rounded bg-bg-primary px-1 py-0.5 transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                        data-testid="negative-lab-accept-detected-crop"
+                        disabled={isSaving}
+                        onClick={() => {
+                          handleSetActiveFrameCropStatus('detected_frame');
+                        }}
+                        type="button"
+                      >
+                        {t('modals.negativeConversion.acceptDetectedCrop')}
+                      </button>
+                      <button
+                        className="rounded bg-bg-primary px-1 py-0.5 transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                        data-testid="negative-lab-set-manual-crop"
+                        disabled={isSaving}
+                        onClick={() => {
+                          handleSetActiveFrameCropStatus('manual_override');
+                        }}
+                        type="button"
+                      >
+                        {t('modals.negativeConversion.manualCrop')}
+                      </button>
+                      <button
+                        className="rounded bg-bg-primary px-1 py-0.5 transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                        data-testid="negative-lab-reset-frame-crop"
+                        disabled={isSaving || row.cropStatus === 'active_frame_editable'}
+                        onClick={() => {
+                          handleSetActiveFrameCropStatus('active_frame_editable');
+                        }}
+                        type="button"
+                      >
+                        {t('modals.negativeConversion.resetFrameCrop')}
+                      </button>
+                    </span>
+                  )}
                 </span>
                 <span className="text-text-tertiary" data-testid={`negative-lab-frame-conversion-status-${index}`}>
                   {t(`modals.negativeConversion.frameConversionStatus.${row.conversionStatus}`)}

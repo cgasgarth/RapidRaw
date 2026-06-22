@@ -6,7 +6,13 @@ export const negativeLabFrameHealthStatusSchema = z.enum(['active', 'queued', 's
 export const negativeLabFrameBaseStatusSchema = z.enum(['pending', 'estimated']);
 export const negativeLabFrameBaseScopeSchema = z.enum(['frame', 'roll']);
 export const negativeLabFrameConversionStatusSchema = z.enum(['preview_pending', 'preview_ready', 'queued', 'skipped']);
-export const negativeLabFrameCropStatusSchema = z.enum(['active_frame_editable', 'roll_default', 'skipped']);
+export const negativeLabFrameCropStatusSchema = z.enum([
+  'active_frame_editable',
+  'detected_frame',
+  'manual_override',
+  'roll_default',
+  'skipped',
+]);
 export const negativeLabFrameQcStatusSchema = z.enum(['ready', 'review', 'skipped']);
 export const negativeLabFrameBatchDispositionSchema = z.enum(['apply', 'review', 'skip']);
 export const negativeLabFrameBatchDispositionReasonSchema = z.enum([
@@ -234,6 +240,7 @@ export const negativeLabBatchDryRunSummarySchema = z
 
 export type NegativeLabFrameHealthStatus = z.infer<typeof negativeLabFrameHealthStatusSchema>;
 export type NegativeLabFrameBaseScope = z.infer<typeof negativeLabFrameBaseScopeSchema>;
+export type NegativeLabFrameCropStatus = z.infer<typeof negativeLabFrameCropStatusSchema>;
 export type NegativeLabFrameWarningSeverity = z.infer<typeof negativeLabFrameWarningSeveritySchema>;
 export type NegativeLabFrameWarningCode = z.infer<typeof negativeLabFrameWarningCodeSchema>;
 export type NegativeLabFrameBatchDisposition = z.infer<typeof negativeLabFrameBatchDispositionSchema>;

@@ -9,6 +9,7 @@ import {
   type NegativeLabFrameBatchDispositionReason,
   type NegativeLabFrameAcquisitionHealth,
   type NegativeLabFrameBaseScope,
+  type NegativeLabFrameCropStatus,
   type NegativeLabFrameHealthReport,
   type NegativeLabFrameWarningCode,
   type NegativeLabFrameWarningSeverity,
@@ -126,6 +127,7 @@ interface BuildNegativeLabFrameHealthReportParams {
   activePathIndex: number;
   baseFogConfidence: number | null;
   baseScope?: NegativeLabFrameBaseScope;
+  cropStatusByFrameId?: Readonly<Record<string, NegativeLabFrameCropStatus>>;
   includedPathSet: ReadonlySet<string>;
   previewReady: boolean;
   targetPaths: string[];
@@ -135,6 +137,7 @@ export const buildNegativeLabFrameHealthReport = ({
   activePathIndex,
   baseFogConfidence,
   baseScope = 'frame',
+  cropStatusByFrameId = {},
   includedPathSet,
   previewReady,
   targetPaths,
@@ -144,6 +147,7 @@ export const buildNegativeLabFrameHealthReport = ({
     const active = pathIndex === effectiveActivePathIndex;
     const included = includedPathSet.has(sourcePath);
     const acquisitionHealth = buildNegativeLabFrameAcquisitionHealth(sourcePath);
+    const frameId = `negative-lab-frame-${pathIndex + 1}`;
     const hasRollBaseEstimate = baseScope === 'roll' && included && baseFogConfidence !== null;
     const hasFrameBaseEstimate = active && baseFogConfidence !== null;
     const hasBaseEstimate = hasRollBaseEstimate || hasFrameBaseEstimate;
@@ -178,8 +182,10 @@ export const buildNegativeLabFrameHealthReport = ({
             ? 'preview_ready'
             : 'preview_pending'
           : 'queued',
-      cropStatus: !included ? 'skipped' : active ? 'active_frame_editable' : 'roll_default',
-      frameId: `negative-lab-frame-${pathIndex + 1}`,
+      cropStatus: !included
+        ? 'skipped'
+        : (cropStatusByFrameId[frameId] ?? (active ? 'active_frame_editable' : 'roll_default')),
+      frameId,
       healthStatus: !included ? 'skipped' : active ? 'active' : 'queued',
       included,
       pathIndex,
