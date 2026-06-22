@@ -20,9 +20,6 @@
     "worktree:create": "bun scripts/create-codex-worktree.ts",
     "check:worktree-create": "bun scripts/create-codex-worktree.ts --self-test",
     "hooks:install": "git config core.hooksPath .githooks",
-    "hooks:verify": "bun tests/integration/checks/check-git-hooks.ts",
-    "hooks:self-test": "bun tests/integration/checks/check-git-hooks.ts --self-test",
-    "hooks:check-staged": "bun tests/integration/checks/check-staged-files.ts",
     "check:gh-repo-resolution": "bun tests/integration/checks/check-gh-repo-resolution.ts",
     "repo:fix-gh-resolution": "bun tests/integration/checks/check-gh-repo-resolution.ts --fix",
     "check": "bun run check:quick:all && bun run check:bundle",
@@ -610,6 +607,12 @@
     "check:agent-session-audit-store": "bun tests/integration/checks/check-agent-session-audit-store.ts",
     "check:agent-session-replay": "bun tests/integration/checks/check-agent-session-replay.ts"
   },
+  "lint-staged": {
+    "*.{cjs,css,html,js,json,jsx,md,ts,tsx,yaml,yml}": "bun prettier --write --log-level warn",
+    "*.{cjs,js,jsx,ts,tsx}": "bun eslint --fix --max-warnings 0 --no-warn-ignored",
+    "src/**/*.{js,jsx,ts,tsx}": "sh -c 'bun run i18n:extract && bun run i18n:check && bun run i18n:lint'",
+    "src/i18n/locales/*.json": "sh -c 'bun run i18n:check && bun run i18n:lint'"
+  },
   "dependencies": {
     "@clerk/react": "^6.9.1",
     "@dnd-kit/core": "^6.3.1",
@@ -659,6 +662,7 @@
     "js-yaml": "^4.2.0",
     "knip": "6.16.1",
     "license-checker-rseidelsohn": "5.0.1",
+    "lint-staged": "^17.0.8",
     "prettier": "^3.8.4",
     "tailwindcss": "^4.3.1",
     "typescript": "^6.0.0",

@@ -264,7 +264,6 @@ const ensureWorktreeReady = (worktreePath: string, branch: string): void => {
   if (currentBranch !== branch) throw new Error(`Expected ${branch}, found ${currentBranch || 'detached HEAD'}`);
   ensureWorktreeBase(worktreePath);
   ensureDependencyBins(worktreePath);
-  run(['bun', 'run', 'hooks:verify'], { cwd: worktreePath });
   run(['bun', 'run', 'check:gh-repo-resolution'], { cwd: worktreePath });
 };
 

@@ -212,8 +212,12 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Prefer vertical feature delivery over planning, schema-only, proof-only,
   inventory-only, report-only, routing-only, or meta-tooling work.
 - Proof scripts should live inside the actual feature PR they validate. Do not
-  open PRs whose main value is only a probe, schema, inventory, report, or
-  routing check.
+  open PRs whose main value is only a probe, schema, inventory, plan, report, or
+  routing check. Include that work inside actual feature PRs when it is needed
+  to ship the product behavior.
+- Consult should return milestone-level plans and tradeoffs. The agent should
+  split that plan into PR-sized GitHub issues instead of prompting consult for
+  the smallest usable PR.
 - Delete stale or low-value meta checks when they do not validate product
   behavior.
 - If a helper script primarily exists to manage agent workflow rather than

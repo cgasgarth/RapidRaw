@@ -18,5 +18,4 @@ limited to ref protection so normal feature-branch pushes stay fast.
 
 ```sh
 bun run hooks:install
-bun run hooks:verify
 ```
