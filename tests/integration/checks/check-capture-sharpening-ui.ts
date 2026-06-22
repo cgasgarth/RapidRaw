@@ -24,6 +24,9 @@ if (fixtureIds !== runtimeIds) {
 const defaultPatch = buildCaptureSharpeningProcessingPatch(CAPTURE_SHARPENING_PRESETS[0]);
 if (
   defaultPatch.rawPreprocessingSharpening !== 0.35 ||
+  defaultPatch.rawPreprocessingSharpeningDetail !== 0.45 ||
+  defaultPatch.rawPreprocessingSharpeningEdgeMasking !== 0.3 ||
+  defaultPatch.rawPreprocessingSharpeningRadius !== 2 ||
   defaultPatch.rawPreprocessingColorNr !== 0.5 ||
   defaultPatch.applyPreprocessingToNonRaws !== false
 ) {
@@ -38,6 +41,12 @@ for (const marker of [
   'findMatchingCaptureSharpeningPreset',
   'settings.processing.preprocessing.captureSharpeningPreset',
   'settings.processing.preprocessing.captureSharpeningPresetDesc',
+  'settings.processing.preprocessing.sharpeningRadius',
+  'settings.processing.preprocessing.sharpeningDetail',
+  'settings.processing.preprocessing.sharpeningEdgeMasking',
+  "'rawPreprocessingSharpeningRadius'",
+  "'rawPreprocessingSharpeningDetail'",
+  "'rawPreprocessingSharpeningEdgeMasking'",
 ]) {
   if (!settingsSource.includes(marker)) failures.push(`SettingsPanel missing ${marker}`);
 }
@@ -46,7 +55,10 @@ const imageLoaderSource = read('src-tauri/src/image_loader.rs');
 for (const marker of [
   'settings.raw_preprocessing_color_nr.unwrap_or(0.5)',
   'settings.raw_preprocessing_sharpening.unwrap_or(0.35)',
-  'remove_raw_artifacts_and_enhance',
+  'raw_preprocessing_sharpening_detail',
+  'raw_preprocessing_sharpening_edge_masking',
+  'raw_preprocessing_sharpening_radius',
+  'remove_raw_artifacts_and_enhance_with_settings',
 ]) {
   if (!imageLoaderSource.includes(marker)) failures.push(`image_loader missing ${marker}`);
 }
@@ -55,6 +67,9 @@ const imageProcessingSource = read('src-tauri/src/image_processing.rs');
 for (const marker of [
   'fn capture_pre_sharpening_enhances_synthetic_edge()',
   'fn disabled_capture_pre_sharpening_preserves_synthetic_edge()',
+  'fn capture_pre_sharpening_advanced_settings_change_output()',
+  'fn capture_pre_sharpening_edge_masking_protects_low_contrast_texture()',
+  'CapturePreSharpeningSettings',
 ]) {
   if (!imageProcessingSource.includes(marker)) failures.push(`image_processing missing ${marker}`);
 }

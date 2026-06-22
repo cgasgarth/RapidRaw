@@ -46,6 +46,9 @@ export interface CaptureSharpeningProcessingPatch {
   applyPreprocessingToNonRaws: boolean;
   rawPreprocessingColorNr: number;
   rawPreprocessingSharpening: number;
+  rawPreprocessingSharpeningDetail: number;
+  rawPreprocessingSharpeningEdgeMasking: number;
+  rawPreprocessingSharpeningRadius: number;
 }
 
 export const buildCaptureSharpeningProcessingPatch = (
@@ -54,6 +57,9 @@ export const buildCaptureSharpeningProcessingPatch = (
   applyPreprocessingToNonRaws: preset.applyToNonRaw,
   rawPreprocessingColorNr: preset.colorNoiseReduction,
   rawPreprocessingSharpening: preset.amount,
+  rawPreprocessingSharpeningDetail: preset.detail,
+  rawPreprocessingSharpeningEdgeMasking: preset.edgeMasking,
+  rawPreprocessingSharpeningRadius: preset.radiusPx,
 });
 
 export const findMatchingCaptureSharpeningPreset = (
@@ -63,5 +69,8 @@ export const findMatchingCaptureSharpeningPreset = (
     (preset) =>
       preset.amount === settings.rawPreprocessingSharpening &&
       preset.colorNoiseReduction === settings.rawPreprocessingColorNr &&
+      preset.detail === settings.rawPreprocessingSharpeningDetail &&
+      preset.edgeMasking === settings.rawPreprocessingSharpeningEdgeMasking &&
+      preset.radiusPx === settings.rawPreprocessingSharpeningRadius &&
       preset.applyToNonRaw === settings.applyPreprocessingToNonRaws,
   ) ?? null;

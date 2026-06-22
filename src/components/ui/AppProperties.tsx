@@ -211,6 +211,9 @@ export interface AppSettings {
   rawHighlightCompression?: number;
   rawPreprocessingColorNr?: number;
   rawPreprocessingSharpening?: number;
+  rawPreprocessingSharpeningDetail?: number;
+  rawPreprocessingSharpeningEdgeMasking?: number;
+  rawPreprocessingSharpeningRadius?: number;
   processingBackend?: string;
   linuxGpuOptimization?: boolean;
   exportPresets?: ExportPreset[];

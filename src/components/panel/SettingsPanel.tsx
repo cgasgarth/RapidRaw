@@ -154,6 +154,9 @@ interface ProcessingSettings {
   rawHighlightCompression: number;
   rawPreprocessingColorNr: number;
   rawPreprocessingSharpening: number;
+  rawPreprocessingSharpeningDetail: number;
+  rawPreprocessingSharpeningEdgeMasking: number;
+  rawPreprocessingSharpeningRadius: number;
   thumbnailResolution: number;
   thumbnailWorkerThreads: number;
   useFullDpiRendering: boolean;
@@ -177,6 +180,9 @@ const buildProcessingSettings = (appSettings: AppSettings, osPlatform: string): 
   rawHighlightCompression: appSettings.rawHighlightCompression ?? 2.5,
   rawPreprocessingColorNr: appSettings.rawPreprocessingColorNr ?? 0.5,
   rawPreprocessingSharpening: appSettings.rawPreprocessingSharpening ?? 0.35,
+  rawPreprocessingSharpeningDetail: appSettings.rawPreprocessingSharpeningDetail ?? 0.45,
+  rawPreprocessingSharpeningEdgeMasking: appSettings.rawPreprocessingSharpeningEdgeMasking ?? 0.3,
+  rawPreprocessingSharpeningRadius: appSettings.rawPreprocessingSharpeningRadius ?? 2,
   thumbnailResolution: appSettings.thumbnailResolution || 720,
   thumbnailWorkerThreads: appSettings.thumbnailWorkerThreads ?? 4,
   useFullDpiRendering: appSettings.useFullDpiRendering ?? false,
@@ -830,6 +836,9 @@ export function SettingsPanel({
         key === 'rawHighlightCompression' ||
         key === 'rawPreprocessingColorNr' ||
         key === 'rawPreprocessingSharpening' ||
+        key === 'rawPreprocessingSharpeningDetail' ||
+        key === 'rawPreprocessingSharpeningEdgeMasking' ||
+        key === 'rawPreprocessingSharpeningRadius' ||
         key === 'applyPreprocessingToNonRaws'
       ) {
         await invokeWithSchema(Invokes.ClearImageCaches, {}, emptyResponseSchema);
@@ -2143,6 +2152,10 @@ export function SettingsPanel({
                             applyPreprocessingToNonRaws: processingSettings.applyPreprocessingToNonRaws,
                             rawPreprocessingColorNr: processingSettings.rawPreprocessingColorNr,
                             rawPreprocessingSharpening: processingSettings.rawPreprocessingSharpening,
+                            rawPreprocessingSharpeningDetail: processingSettings.rawPreprocessingSharpeningDetail,
+                            rawPreprocessingSharpeningEdgeMasking:
+                              processingSettings.rawPreprocessingSharpeningEdgeMasking,
+                            rawPreprocessingSharpeningRadius: processingSettings.rawPreprocessingSharpeningRadius,
                           })?.id ?? CUSTOM_CAPTURE_SHARPENING_PRESET_ID
                         }
                         onChange={handleCaptureSharpeningPresetChangeVoid}
@@ -2198,6 +2211,69 @@ export function SettingsPanel({
                         defaultValue={0.35}
                         onChange={(event: NumericChangeEvent) => {
                           handleProcessingSettingChangeVoid('rawPreprocessingSharpening', getNumericEventValue(event));
+                        }}
+                        fillOrigin="min"
+                      />
+                    </SettingItem>
+
+                    <SettingItem
+                      label={t('settings.processing.preprocessing.sharpeningRadius')}
+                      description={t('settings.processing.preprocessing.sharpeningRadiusDesc')}
+                    >
+                      <Slider
+                        label={t('settings.processing.preprocessing.radiusPx')}
+                        min={0.5}
+                        max={3}
+                        step={0.1}
+                        value={processingSettings.rawPreprocessingSharpeningRadius}
+                        defaultValue={2}
+                        onChange={(event: NumericChangeEvent) => {
+                          handleProcessingSettingChangeVoid(
+                            'rawPreprocessingSharpeningRadius',
+                            getNumericEventValue(event),
+                          );
+                        }}
+                        fillOrigin="min"
+                      />
+                    </SettingItem>
+
+                    <SettingItem
+                      label={t('settings.processing.preprocessing.sharpeningDetail')}
+                      description={t('settings.processing.preprocessing.sharpeningDetailDesc')}
+                    >
+                      <Slider
+                        label={t('settings.tagging.amount')}
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={processingSettings.rawPreprocessingSharpeningDetail}
+                        defaultValue={0.45}
+                        onChange={(event: NumericChangeEvent) => {
+                          handleProcessingSettingChangeVoid(
+                            'rawPreprocessingSharpeningDetail',
+                            getNumericEventValue(event),
+                          );
+                        }}
+                        fillOrigin="min"
+                      />
+                    </SettingItem>
+
+                    <SettingItem
+                      label={t('settings.processing.preprocessing.sharpeningEdgeMasking')}
+                      description={t('settings.processing.preprocessing.sharpeningEdgeMaskingDesc')}
+                    >
+                      <Slider
+                        label={t('settings.tagging.amount')}
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={processingSettings.rawPreprocessingSharpeningEdgeMasking}
+                        defaultValue={0.3}
+                        onChange={(event: NumericChangeEvent) => {
+                          handleProcessingSettingChangeVoid(
+                            'rawPreprocessingSharpeningEdgeMasking',
+                            getNumericEventValue(event),
+                          );
                         }}
                         fillOrigin="min"
                       />
