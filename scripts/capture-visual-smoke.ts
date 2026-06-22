@@ -1661,6 +1661,16 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-neutral-patch-risk').getByText('High', { exact: true }).waitFor({
     timeout: 10_000,
   });
+  await page.getByTestId('negative-lab-neutral-patch-application-risk').getByText('Low', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page
+    .getByTestId('negative-lab-neutral-patch-correction-magnitude')
+    .getByText('+0.07', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  if ((await page.locator('[data-testid="negative-lab-neutral-patch-apply-warning"]').count()) !== 0) {
+    throw new Error('Negative Lab neutral patch safe suggestion showed an apply warning.');
+  }
   await page.getByTestId('negative-lab-apply-neutral-patch-rgb').click();
   await page
     .getByTestId('negative-lab-recipe-frame-rgb-balance-offset')

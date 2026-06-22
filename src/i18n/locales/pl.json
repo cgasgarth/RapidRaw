@@ -2098,6 +2098,7 @@
       "acquisitionWarningUnknown": "",
       "agentActivity": "Agent activity",
       "agentAffectedFrames": "Affected {{frameCount}}",
+      "applicationRisk": "Application risk",
       "applyCustomBase": "Apply sample",
       "applyNeutralPatchRgb": "Apply neutral RGB",
       "autoBaseFog": "Auto base",
@@ -2157,6 +2158,7 @@
       "convertingProgress": "Konwertowanie {{current}}/{{total}}",
       "copyBatchPlan": "Copy batch plan JSON",
       "copyReadout": "Copy readout JSON",
+      "correctionMagnitude": "Correction magnitude",
       "customBaseSample": "Custom base sample",
       "customBaseSampleHint": "Measure a normalized base/fog rectangle, then explicitly apply it to conversion.",
       "customBaseSampleOverlayLabel": "Custom base sample overlay",
@@ -2249,6 +2251,7 @@
         "low": "Low",
         "medium": "Medium"
       },
+      "neutralPatchApplyWarning": "Sample correction is outside the safe apply gate.",
       "neutralPatchRgbSuggestion": "Neutral patch RGB",
       "nextFrameTooltip": "Next frame",
       "noticeText": "Logika inwersji inspirowana przez projekt <0>NegPy</0> stworzony przez marcinz606 (<1>GPL-3.0</1>).",

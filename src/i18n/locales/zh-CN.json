@@ -1964,6 +1964,7 @@
       "acquisitionWarningUnknown": "",
       "agentActivity": "Agent activity",
       "agentAffectedFrames": "Affected {{frameCount}}",
+      "applicationRisk": "Application risk",
       "applyCustomBase": "Apply sample",
       "applyNeutralPatchRgb": "Apply neutral RGB",
       "autoBaseFog": "Auto base",
@@ -2019,6 +2020,7 @@
       "convertingProgress": "转换中 {{current}}/{{total}}",
       "copyBatchPlan": "Copy batch plan JSON",
       "copyReadout": "Copy readout JSON",
+      "correctionMagnitude": "Correction magnitude",
       "customBaseSample": "Custom base sample",
       "customBaseSampleHint": "Measure a normalized base/fog rectangle, then explicitly apply it to conversion.",
       "customBaseSampleOverlayLabel": "Custom base sample overlay",
@@ -2111,6 +2113,7 @@
         "low": "Low",
         "medium": "Medium"
       },
+      "neutralPatchApplyWarning": "Sample correction is outside the safe apply gate.",
       "neutralPatchRgbSuggestion": "Neutral patch RGB",
       "nextFrameTooltip": "Next frame",
       "noticeText": "反转逻辑受 <0>NegPy</0>（作者 marcinz606，<1>GPL-3.0</1>）启发。",
