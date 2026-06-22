@@ -2014,6 +2014,7 @@
     },
     "negativeConversion": {
       "acceptBatchPlan": "Accept batch plan",
+      "acceptDetectedCrop": "Detected",
       "acquisitionHealth": "Acquisition health",
       "acquisitionHealthHint": "Source assumptions are checked before conversion and included in dry-run metadata.",
       "acquisitionSeverityOk": "Ready",
@@ -2131,6 +2132,8 @@
       },
       "frameCropStatus": {
         "active_frame_editable": "Editable",
+        "detected_frame": "Detected",
+        "manual_override": "Manual",
         "roll_default": "Roll crop",
         "skipped": "Skipped"
       },
@@ -2186,6 +2189,7 @@
       "highlightRecoveryValueTransition": "{{from}} to {{to}}",
       "includedScans": "{{includedCount}} included",
       "includeScan": "Include",
+      "manualCrop": "Manual crop",
       "measureCustomBase": "Measure sample",
       "neutralityRisk": "Neutrality risk",
       "neutralityRiskLevels": {
@@ -2268,6 +2272,7 @@
       "queuedScans": "{{queuedCount}} queued",
       "readoutCopied": "Copied readout",
       "redWeight": "Red (Cyan)",
+      "resetFrameCrop": "Reset crop",
       "resetFrameExposure": "Reset frame",
       "resetFrameRgbBalance": "Reset frame RGB",
       "resetPrintEndpoints": "Reset endpoints",

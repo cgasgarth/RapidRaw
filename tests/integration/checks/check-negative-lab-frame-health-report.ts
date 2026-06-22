@@ -21,6 +21,10 @@ const rollScopedReport = buildNegativeLabFrameHealthReport({
   activePathIndex: 1,
   baseFogConfidence: 0.82,
   baseScope: 'roll',
+  cropStatusByFrameId: {
+    'negative-lab-frame-1': 'detected_frame',
+    'negative-lab-frame-2': 'manual_override',
+  },
   includedPathSet,
   previewReady: true,
   targetPaths: paths,
@@ -75,6 +79,12 @@ if (rollScopedReport.frames[0]?.baseScope !== 'roll' || rollScopedReport.frames[
 }
 if (rollScopedReport.frames[0]?.warningCodes.includes('base_estimate_active_frame_only')) {
   failures.push('roll-scoped base estimate should clear active-frame-only warning');
+}
+if (
+  rollScopedReport.frames[0]?.cropStatus !== 'detected_frame' ||
+  rollScopedReport.frames[1]?.cropStatus !== 'manual_override'
+) {
+  failures.push('crop status overrides should expose detected and manual frame crop workflow state');
 }
 if (rollScopedReport.frames[2]?.baseScope !== 'frame' || rollScopedReport.frames[2]?.baseConfidence !== null) {
   failures.push('roll-scoped base estimate must not apply to excluded frames');
