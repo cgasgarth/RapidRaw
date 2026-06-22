@@ -625,6 +625,7 @@
     "@uiw/color-convert": "^2.10.3",
     "@uiw/react-color-wheel": "^2.10.3",
     "clsx": "^2.1.1",
+    "colorjs.io": "^0.6.1",
     "framer-motion": "^12.40.0",
     "i18next": "^26.3.1",
     "konva": "^10.3.0",
