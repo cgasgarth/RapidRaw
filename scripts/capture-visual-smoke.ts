@@ -32,6 +32,7 @@ import {
   agentPrivateRawArtifactsProofDatasetSchema,
   agentReviewHandoffProofDatasetSchema,
   agentSelectedFrameScopeProofDatasetSchema,
+  cameraProfileInputTransformPreviewProofSchema,
   colorBalanceCompareProofDatasetSchema,
   assertFilmLookExportProof,
   assertNegativeLabBaseFogPreviewExportProof,
@@ -1827,6 +1828,9 @@ async function prepareScenario(page, mode) {
     });
     colorBalanceCompareProofDatasetSchema.parse(
       await page.getByTestId('color-balance-compare-strip').evaluate((element) => ({ ...element.dataset })),
+    );
+    cameraProfileInputTransformPreviewProofSchema.parse(
+      await page.getByTestId('camera-profile-input-transform-preview').evaluate((element) => ({ ...element.dataset })),
     );
     await page.getByTestId('color-balance-before').getByText('R 173', { exact: false }).waitFor({
       timeout: 10_000,

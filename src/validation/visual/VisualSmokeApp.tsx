@@ -37,6 +37,11 @@ import {
   type MaskContainer,
 } from '../../utils/adjustments';
 import { agentChatTranscriptFixture } from '../../utils/agentChatTranscriptFixture';
+import {
+  applyCameraProfileInputTransform,
+  type CameraProfileMatrix3x3,
+} from '../../utils/cameraProfileInputTransformRuntime';
+import { lookupCameraProfile } from '../../utils/cameraProfileLookup';
 import { applyColorBalanceRgbToPixel } from '../../utils/colorBalanceRgbRuntime';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
 import { DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF } from '../../utils/detailOutputComparisonProof';
@@ -866,6 +871,9 @@ const copy = {
   colorAfter: 'After',
   colorGamutWarning: 'No gamut clipping',
   colorCompareReset: 'Reset available',
+  cameraProfilePreview: 'Camera profile',
+  cameraProfileInputRgb: 'Input camera RGB',
+  cameraProfileWorkingRgb: 'Working RGB',
   layerWorkflowTitle: 'Local Adjustment Stack',
   layerMoveDown: 'Move down',
   layerToggle: 'Toggle',
@@ -1843,6 +1851,44 @@ const colorSmokeMetricLabels = {
   saturation: 'Sat',
   skinTone: 'Skin',
   temperature: 'Temp',
+} as const;
+const cameraProfilePreviewCatalog = {
+  fallbacks: [
+    {
+      id: 'fallback.raw-decoder-neutral',
+      inputTransform: 'raw_decoder_neutral_matrix',
+      rawExtensions: ['arw', 'cr3', 'nef', 'raf'],
+      warning: 'camera_profile_generic_fallback',
+    },
+  ],
+  profiles: [
+    {
+      id: 'camera.sony-ilce-7m4.generic-arw-v1',
+      inputTransform: 'libraw_camera_matrix',
+      manufacturer: 'Sony',
+      models: ['ILCE-7M4', 'Alpha 7 IV', 'A7 IV'],
+      priority: 80,
+      profileClass: 'generic_camera_profile',
+      rawExtensions: ['arw'],
+      source: 'raw_decoder_metadata',
+    },
+  ],
+  schemaVersion: 1,
+} as const;
+const cameraProfilePreviewInputRgb = {
+  blue: 0.18,
+  green: 0.5,
+  red: 0.25,
+} as const;
+const cameraProfilePreviewMatrix = [
+  [1.12, -0.04, -0.02],
+  [-0.03, 1.05, -0.01],
+  [0.01, -0.08, 1.13],
+] satisfies CameraProfileMatrix3x3;
+const cameraProfilePreviewMetadata = {
+  manufacturer: 'Sony',
+  model: 'ILCE-7M4',
+  rawExtension: 'ARW',
 } as const;
 const skinToneProof = applySkinToneUniformityToRgbPixel(
   { blue: 0.34, green: 0.45, red: 0.72 },
@@ -3686,6 +3732,11 @@ function ColorWorkflowVisualSmoke() {
   };
   const colorBalanceSourcePixel = { blue: 0.34, green: 0.48, red: 0.68 };
   const colorBalanceResult = applyColorBalanceRgbToPixel(colorBalanceSourcePixel, adjustments.colorBalanceRgb);
+  const cameraProfileLookup = lookupCameraProfile(cameraProfilePreviewCatalog, cameraProfilePreviewMetadata);
+  const cameraProfileWorkingRgb = applyCameraProfileInputTransform(
+    cameraProfilePreviewInputRgb,
+    cameraProfilePreviewMatrix,
+  );
   const clipChannelCount = Object.values(colorBalanceResult.outputRgb).filter(
     (channel) => channel <= 0 || channel >= 1,
   ).length;
@@ -3702,6 +3753,34 @@ function ColorWorkflowVisualSmoke() {
           <div className="mx-auto flex h-full max-w-4xl flex-col justify-center gap-5">
             <div className="aspect-[4/3] overflow-hidden rounded-md border border-white/10 bg-[linear-gradient(135deg,#182629,#435b5a_42%,#c79c63_72%,#f4d6a1)] shadow-2xl">
               <div className="h-full w-full bg-[radial-gradient(circle_at_38%_32%,rgba(255,246,219,0.48),transparent_20%),linear-gradient(170deg,transparent_45%,rgba(24,43,50,0.72)_46%)]" />
+            </div>
+            <div
+              className="grid gap-2 rounded-md border border-white/10 bg-black/45 p-3 text-xs text-[#dce4ea]"
+              data-camera-metadata={`${cameraProfilePreviewMetadata.manufacturer} ${cameraProfilePreviewMetadata.model}`}
+              data-camera-profile-id={cameraProfileLookup.id}
+              data-input-camera-rgb={formatRgbTriplet(cameraProfilePreviewInputRgb)}
+              data-input-transform={cameraProfileLookup.inputTransform}
+              data-output-working-rgb={formatRgbTriplet(cameraProfileWorkingRgb)}
+              data-profile-warning={cameraProfileLookup.warning ?? ''}
+              data-runtime-stage="camera_profile_to_working_space"
+              data-testid="camera-profile-input-transform-preview"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-semibold text-white">{copy.cameraProfilePreview}</span>
+                <span className="rounded bg-white/10 px-2 py-1 text-[#aab5bd]">
+                  {cameraProfileLookup.inputTransform}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded border border-white/10 bg-white/5 p-2">
+                  <div className="mb-1 text-[11px] uppercase text-[#9ba6b2]">{copy.cameraProfileInputRgb}</div>
+                  <div className="font-mono">{formatRgbTriplet(cameraProfilePreviewInputRgb)}</div>
+                </div>
+                <div className="rounded border border-sky-500/25 bg-sky-500/10 p-2">
+                  <div className="mb-1 text-[11px] uppercase text-[#9ba6b2]">{copy.cameraProfileWorkingRgb}</div>
+                  <div className="font-mono">{formatRgbTriplet(cameraProfileWorkingRgb)}</div>
+                </div>
+              </div>
             </div>
             <div
               className="grid gap-2 rounded-md border border-white/10 bg-black/45 p-3 text-xs text-[#dce4ea]"

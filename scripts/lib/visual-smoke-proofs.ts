@@ -677,6 +677,21 @@ export const colorBalanceCompareProofDatasetSchema = z
       context.addIssue({ code: z.ZodIssueCode.custom, message: 'Color balance comparison must change RGB output.' });
     }
   });
+export const cameraProfileInputTransformPreviewProofSchema = z
+  .object({
+    cameraMetadata: z.literal('Sony ILCE-7M4'),
+    cameraProfileId: z.literal('camera.sony-ilce-7m4.generic-arw-v1'),
+    inputCameraRgb: z.string().regex(/^R [0-9]+ \/ G [0-9]+ \/ B [0-9]+$/u),
+    inputTransform: z.literal('libraw_camera_matrix'),
+    outputWorkingRgb: z.string().regex(/^R [0-9]+ \/ G [0-9]+ \/ B [0-9]+$/u),
+    profileWarning: z.literal(''),
+    runtimeStage: z.literal('camera_profile_to_working_space'),
+  })
+  .superRefine((proof, context) => {
+    if (proof.inputCameraRgb === proof.outputWorkingRgb) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Profile transform must change RGB preview.' });
+    }
+  });
 export const agentChatProofDatasetSchema = z.object({
   agentRuntimeStatus: z.literal('runtime_apply_demo'),
 });
