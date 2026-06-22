@@ -79,6 +79,28 @@ mod tests {
         DynamicImage::ImageRgb32F(image)
     }
 
+    fn separated_luma_chroma_noise_image() -> DynamicImage {
+        let image: Rgb32FImage = ImageBuffer::from_fn(24, 24, |x, y| {
+            let base = 0.42 + (x as f32 / 23.0) * 0.12;
+            let luma_noise = (((x * 17 + y * 11) % 11) as f32 - 5.0) * 0.006;
+            let chroma_noise = (((x * 5 + y * 19) % 13) as f32 - 6.0) * 0.004;
+            Rgb([
+                (base + luma_noise + chroma_noise).clamp(0.0, 1.0),
+                (base + luma_noise).clamp(0.0, 1.0),
+                (base + luma_noise - chroma_noise).clamp(0.0, 1.0),
+            ])
+        });
+        DynamicImage::ImageRgb32F(image)
+    }
+
+    fn luma(pixel: &[f32; 3]) -> f32 {
+        0.299 * pixel[0] + 0.587 * pixel[1] + 0.114 * pixel[2]
+    }
+
+    fn chroma(pixel: &[f32; 3]) -> f32 {
+        ((pixel[0] - pixel[1]).powi(2) + (pixel[2] - pixel[1]).powi(2)).sqrt()
+    }
+
     fn max_delta(a: &DynamicImage, b: &DynamicImage) -> f32 {
         a.to_rgb32f()
             .pixels()
@@ -91,6 +113,28 @@ mod tests {
                     .fold(0.0_f32, f32::max)
             })
             .fold(0.0_f32, f32::max)
+    }
+
+    fn mean_luma_delta(a: &DynamicImage, b: &DynamicImage) -> f32 {
+        let left = a.to_rgb32f();
+        let right = b.to_rgb32f();
+        let total = left
+            .pixels()
+            .zip(right.pixels())
+            .map(|(left, right)| (luma(&left.0) - luma(&right.0)).abs())
+            .sum::<f32>();
+        total / left.pixels().len() as f32
+    }
+
+    fn mean_chroma_delta(a: &DynamicImage, b: &DynamicImage) -> f32 {
+        let left = a.to_rgb32f();
+        let right = b.to_rgb32f();
+        let total = left
+            .pixels()
+            .zip(right.pixels())
+            .map(|(left, right)| (chroma(&left.0) - chroma(&right.0)).abs())
+            .sum::<f32>();
+        total / left.pixels().len() as f32
     }
 
     #[test]
@@ -147,6 +191,36 @@ mod tests {
         assert_ne!(
             calculate_denoise_render_hash(42, &disabled),
             calculate_denoise_render_hash(42, &enabled)
+        );
+    }
+
+    #[test]
+    fn luma_and_chroma_noise_controls_have_independent_output_effects() {
+        let image = separated_luma_chroma_noise_image();
+        let luma_only = json!({
+            "colorNoiseReduction": 0,
+            "lumaNoiseReduction": 80
+        });
+        let chroma_only = json!({
+            "colorNoiseReduction": 80,
+            "lumaNoiseReduction": 0
+        });
+
+        let luma_output = apply_denoise_stage(&image, &luma_only);
+        let chroma_output = apply_denoise_stage(&image, &chroma_only);
+
+        let luma_only_luma_delta = mean_luma_delta(&image, luma_output.as_ref());
+        let luma_only_chroma_delta = mean_chroma_delta(&image, luma_output.as_ref());
+        let chroma_only_luma_delta = mean_luma_delta(&image, chroma_output.as_ref());
+        let chroma_only_chroma_delta = mean_chroma_delta(&image, chroma_output.as_ref());
+
+        assert!(
+            luma_only_luma_delta > chroma_only_luma_delta * 2.0,
+            "luma-only denoise should primarily change luminance"
+        );
+        assert!(
+            chroma_only_chroma_delta > luma_only_chroma_delta * 2.0,
+            "chroma-only denoise should primarily change chroma"
         );
     }
 
