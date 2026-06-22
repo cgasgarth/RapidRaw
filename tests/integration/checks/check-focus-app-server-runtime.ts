@@ -99,6 +99,15 @@ const applied = bus.execute({
   toolName: focusRoutePair.applyToolName,
 });
 if (applied.kind !== 'apply') throw new Error('Expected focus apply dispatch result.');
+if (applied.apply.sidecarArtifact.sourceImageRefs.length !== frames.length) {
+  throw new Error('Expected focus app-server apply to return editable sidecar source refs.');
+}
+if (applied.apply.sidecarArtifact.outputArtifact.artifactId !== 'artifact_focus_app_server_runtime_output') {
+  throw new Error('Expected focus app-server apply to return sidecar output artifact.');
+}
+if (applied.apply.sidecarArtifact.createdAt !== '2026-06-17T20:15:00.000Z') {
+  throw new Error('Expected focus app-server apply to preserve sidecar artifact timestamp.');
+}
 
 const outputHash = new Bun.CryptoHasher('sha256')
   .update(new Uint8Array(applied.apply.outputPixels.buffer))
@@ -116,6 +125,7 @@ expectThrows('unaccepted focus apply plan', () =>
 );
 
 const result = {
+  editableArtifactId: applied.apply.sidecarArtifact.artifactId,
   fixture: 'synthetic_focus_app_server_runtime_v1',
   focusCoverageRatio: applied.apply.provenance.focusCoverageRatio,
   outputSha256: outputHash,
@@ -129,6 +139,7 @@ if (process.argv.includes('--verbose')) {
 
 function buildRequest(command) {
   return {
+    artifactCreatedAt: '2026-06-17T20:15:00.000Z',
     cells,
     command,
     depthConfidenceArtifactId: 'artifact_focus_app_server_runtime_depth_confidence',

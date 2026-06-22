@@ -11,10 +11,13 @@ import {
 } from './focusStackWeightedBlend.js';
 import {
   computationalMergeCommandEnvelopeV1Schema,
+  focusStackArtifactV1Schema,
+  RAW_ENGINE_SCHEMA_VERSION,
   type ArtifactHandleV1,
   type ComputationalMergeCommandEnvelopeV1,
   type ComputationalMergeDryRunResultV1,
   type ComputationalMergeMutationResultV1,
+  type FocusStackArtifactV1,
 } from './rawEngineSchemas.js';
 
 const FOCUS_RUNTIME_ENGINE_ID = 'rawengine_focus_stack_runtime_v1';
@@ -36,6 +39,7 @@ export const focusStackRuntimePlanFrameV1Schema = z
 
 export const focusStackRuntimePlanRequestV1Schema = z
   .object({
+    artifactCreatedAt: z.iso.datetime({ offset: true }).optional(),
     cells: z.array(focusStackRuntimeSharpnessCellV1Schema).min(1),
     command: computationalMergeCommandEnvelopeV1Schema,
     depthConfidenceArtifactId: z.string().trim().min(1),
@@ -142,6 +146,14 @@ export interface FocusStackRuntimeApplyResultV1 {
   mutationResult: ComputationalMergeMutationResultV1;
   outputPixels: Float32Array;
   provenance: FocusStackRuntimeProvenanceV1;
+  sidecarArtifact: FocusStackArtifactV1;
+}
+
+export interface FocusStackRuntimeArtifactInputV1 {
+  applyResult: Pick<FocusStackRuntimeApplyResultV1, 'mutationResult' | 'provenance'>;
+  command: FocusStackRuntimeCommandV1;
+  createdAt: string;
+  previewArtifacts?: ComputationalMergeDryRunResultV1['previewArtifacts'];
 }
 
 export const buildFocusStackRuntimeDryRunV1 = (requestValue: unknown): FocusStackRuntimeDryRunResultV1 => {
@@ -270,17 +282,94 @@ export const applyFocusStackRuntimePlanV1 = (requestValue: unknown): FocusStackR
     undoRevision: `${request.command.expectedGraphRevision}:undo-focus-apply`,
     warnings: runtime.warnings,
   });
+  const provenance = focusStackRuntimeProvenanceV1Schema.parse({
+    ...runtime.provenance,
+    acceptedDryRunPlanHash,
+    acceptedDryRunPlanId,
+    runtimeStatus: 'apply_rendered',
+  });
 
   return {
     mutationResult,
     outputPixels: runtime.outputPixels,
-    provenance: focusStackRuntimeProvenanceV1Schema.parse({
-      ...runtime.provenance,
-      acceptedDryRunPlanHash,
-      acceptedDryRunPlanId,
-      runtimeStatus: 'apply_rendered',
+    provenance,
+    sidecarArtifact: buildFocusStackRuntimeArtifactV1({
+      applyResult: {
+        mutationResult,
+        provenance,
+      },
+      command: request.command,
+      createdAt: request.artifactCreatedAt ?? new Date(0).toISOString(),
     }),
   };
+};
+
+export const buildFocusStackRuntimeArtifactV1 = ({
+  applyResult,
+  command,
+  createdAt,
+  previewArtifacts = [],
+}: FocusStackRuntimeArtifactInputV1): FocusStackArtifactV1 => {
+  const { mutationResult, provenance } = applyResult;
+  const outputArtifact = getRequiredArtifact(mutationResult.outputArtifacts, 'merge_output');
+  const sharpnessMapArtifact = mutationResult.outputArtifacts.find(
+    (artifact) => artifact.artifactId.includes('sharpness') && artifact.kind === 'mask',
+  );
+  const depthConfidenceMapArtifact = mutationResult.outputArtifacts.find(
+    (artifact) => artifact.artifactId.includes('depth') && artifact.kind === 'mask',
+  );
+  const retouchLayerArtifact = mutationResult.outputArtifacts.find(
+    (artifact) => artifact.artifactId.includes('retouch') && artifact.kind === 'mask',
+  );
+
+  return focusStackArtifactV1Schema.parse({
+    artifactId: `artifact_${mutationResult.derivedAssetId}`,
+    blendMethod: provenance.blendMethod,
+    createdAt,
+    depthConfidenceMapArtifact,
+    dryRun: {
+      acceptedDryRunPlanHash: provenance.acceptedDryRunPlanHash,
+      acceptedDryRunPlanId: provenance.acceptedDryRunPlanId,
+    },
+    engine: {
+      backendType: 'local_cpu',
+      engineId: provenance.engineId,
+      engineVersion: provenance.engineVersion,
+    },
+    family: 'focus_stack',
+    outputArtifact,
+    outputColorSpace: 'linear_rec2020_d65_v1',
+    previewArtifacts,
+    qualityPreference: command.parameters.qualityPreference,
+    requestedAlignmentMode: provenance.requestedAlignmentMode,
+    resolvedAlignmentMode: provenance.resolvedAlignmentMode,
+    retouchLayerArtifact,
+    retouchLayerPolicy: provenance.retouchLayerPolicy,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    sharpnessMapArtifact,
+    sharpnessSettings: {
+      cellCount: provenance.sharpnessSettings.cellCount,
+      lowConfidenceCellCount: provenance.sharpnessSettings.lowConfidenceCellCount,
+      lowConfidenceWeightFloor: provenance.sharpnessSettings.lowConfidenceWeightFloor,
+      weightPower: provenance.sharpnessSettings.weightPower,
+    },
+    sourceImageRefs: command.parameters.sources,
+    sourceState: provenance.sourceState,
+    staleState: {
+      checkedAt: createdAt,
+      invalidationReasons: [],
+      state: 'current',
+    },
+    validationSummary: {
+      alignmentConfidence: 1,
+      focusCoverageRatio: provenance.focusCoverageRatio,
+      parallaxRisk: 'unknown',
+      rejectedSourceIndexes: [],
+      retouchRequired: provenance.retouchLayerPolicy === 'generate_retouch_layer',
+      sourceCount: command.parameters.sources.length,
+    },
+    warningCodes: mutationResult.warnings.filter(isFocusStackArtifactWarning),
+  });
 };
 
 export const buildFocusStackAcceptedPlanHashV1 = (requestValue: unknown): string => {
@@ -338,6 +427,21 @@ export const buildFocusStackAcceptedPlanHashV1 = (requestValue: unknown): string
     }),
   )}`;
 };
+
+const getRequiredArtifact = (artifacts: ArtifactHandleV1[], kind: ArtifactHandleV1['kind']): ArtifactHandleV1 => {
+  const artifact = artifacts.find((candidate) => candidate.kind === kind);
+  if (artifact === undefined) {
+    throw new Error(`Focus stack runtime artifact missing ${kind} artifact.`);
+  }
+  return artifact;
+};
+
+const isFocusStackArtifactWarning = (
+  warningCode: string,
+): warningCode is FocusStackArtifactV1['warningCodes'][number] =>
+  warningCode === 'human_review_required' ||
+  warningCode === 'low_focus_coverage' ||
+  warningCode === 'retouch_layer_required';
 
 const parseFocusStackRuntimePlanRequest = (
   requestValue: unknown,

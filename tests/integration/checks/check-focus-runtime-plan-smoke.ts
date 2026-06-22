@@ -4,6 +4,7 @@ import {
   applyFocusStackRuntimePlanV1,
   buildFocusStackRuntimeDryRunV1,
 } from '../../../packages/rawengine-schema/src/focusStackRuntimePlan.ts';
+import { deriveArtifactInvalidationReasons } from '../../../packages/rawengine-schema/src/derivedArtifactInvalidation.ts';
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational-proof-budgets.ts';
 
@@ -102,6 +103,7 @@ const applyCommand = {
 };
 
 const applied = applyFocusStackRuntimePlanV1({
+  artifactCreatedAt: '2026-06-17T20:10:00.000Z',
   cells,
   command: applyCommand,
   depthConfidenceArtifactId: 'artifact_focus_runtime_depth_confidence',
@@ -163,6 +165,43 @@ for (const artifact of applied.mutationResult.outputArtifacts) {
   if (artifact.contentHash === undefined) {
     throw new Error(`Expected ${artifact.artifactId} to include rendered content hash.`);
   }
+}
+assertEqual(applied.sidecarArtifact.family, 'focus_stack', 'sidecar family');
+assertEqual(applied.sidecarArtifact.createdAt, '2026-06-17T20:10:00.000Z', 'sidecar created at');
+assertEqual(applied.sidecarArtifact.outputArtifact.artifactId, 'artifact_focus_runtime_output', 'sidecar output');
+assertEqual(applied.sidecarArtifact.sharpnessMapArtifact?.storage, 'sidecar_artifact', 'sidecar sharpness storage');
+assertEqual(applied.sidecarArtifact.depthConfidenceMapArtifact?.storage, 'sidecar_artifact', 'sidecar depth storage');
+assertEqual(applied.sidecarArtifact.retouchLayerArtifact?.storage, 'sidecar_artifact', 'sidecar retouch storage');
+assertEqual(applied.sidecarArtifact.sourceImageRefs.length, frames.length, 'sidecar source refs');
+assertEqual(applied.sidecarArtifact.sourceState.length, frames.length, 'sidecar source state');
+assertEqual(applied.sidecarArtifact.sharpnessSettings.cellCount, cells.length, 'sidecar sharpness cells');
+assertEqual(applied.sidecarArtifact.staleState.state, 'current', 'sidecar stale state');
+const currentArtifactState = {
+  outputContentHash: applied.sidecarArtifact.outputArtifact.contentHash,
+  sourceState: applied.sidecarArtifact.sourceState,
+};
+const unchangedReasons = deriveArtifactInvalidationReasons(
+  {
+    outputArtifact: { contentHash: applied.sidecarArtifact.outputArtifact.contentHash },
+    sourceState: applied.sidecarArtifact.sourceState,
+  },
+  currentArtifactState,
+);
+assertEqual(unchangedReasons.length, 0, 'sidecar unchanged invalidation reasons');
+const changedSourceReasons = deriveArtifactInvalidationReasons(
+  {
+    outputArtifact: { contentHash: applied.sidecarArtifact.outputArtifact.contentHash },
+    sourceState: applied.sidecarArtifact.sourceState,
+  },
+  {
+    ...currentArtifactState,
+    sourceState: applied.sidecarArtifact.sourceState.map((sourceState, index) =>
+      index === 0 ? { ...sourceState, contentHash: 'sha256:changed-focus-source' } : sourceState,
+    ),
+  },
+);
+if (!changedSourceReasons.includes('source_content_hash_changed')) {
+  throw new Error('Expected focus stack sidecar to invalidate when source content changes.');
 }
 
 const outputHash = new Bun.CryptoHasher('sha256').update(new Uint8Array(applied.outputPixels.buffer)).digest('hex');
