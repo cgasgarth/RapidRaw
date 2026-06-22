@@ -29,6 +29,7 @@ interface FocusStackModalProps {
   onClose: () => void;
   onPreviewPlan: () => void;
   onSettingsChange: (settings: FocusStackUiSettings) => void;
+  outputReviewArtifactPath?: string;
   settings: FocusStackUiSettings;
   sourceCount: number;
 }
@@ -43,6 +44,7 @@ export default function FocusStackModal({
   onClose,
   onPreviewPlan,
   onSettingsChange,
+  outputReviewArtifactPath = reviewArtifactPath,
   settings,
   sourceCount,
 }: FocusStackModalProps) {
@@ -85,7 +87,7 @@ export default function FocusStackModal({
     ? t('modals.focusStack.preflight.ready')
     : t('modals.focusStack.preflight.blocked');
   const outputReview = buildFocusStackOutputReviewWorkflow({
-    artifactPath: reviewArtifactPath,
+    artifactPath: outputReviewArtifactPath,
     settings,
     sourceCount,
   });

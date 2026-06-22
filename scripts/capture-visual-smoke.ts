@@ -86,7 +86,9 @@ const requiresSrPrivateRawProof = selectedScenarios.some(
   (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi,
 );
 const requiresFocusPrivateRawProof = selectedScenarios.some(
-  (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi,
+  (scenario) =>
+    scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi ||
+    scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawModalReview,
 );
 const requiresHdrPrivateRawProof = selectedScenarios.some(
   (scenario) =>
@@ -1005,6 +1007,41 @@ async function prepareScenario(page, mode) {
       .getByTestId('focus-private-raw-artifact-handoff')
       .getByText('focus-plane-merge.tiff', { exact: false })
       .waitFor({ timeout: 10_000 });
+    return;
+  }
+
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawModalReview) {
+    const proofBefore = await page
+      .getByTestId('focus-private-raw-modal-review-proof')
+      .evaluate((element) => ({ ...element.dataset }));
+    if (
+      proofBefore.fixtureId !== 'validation.computational-merge.focus-plane-transition.v1' ||
+      proofBefore.previewRequested !== 'false' ||
+      proofBefore.sourceCount !== '3' ||
+      proofBefore.stackPath?.endsWith('/focus-plane-merge.tiff') !== true
+    ) {
+      throw new Error(`Focus private RAW modal proof payload failed: ${JSON.stringify(proofBefore)}`);
+    }
+    const stackPath = proofBefore.stackPath;
+    if (stackPath === undefined) throw new Error('Focus private RAW modal proof is missing stack path.');
+    await page.getByRole('button', { exact: true, name: 'Preview plan' }).click();
+    const proofAfter = await page
+      .getByTestId('focus-private-raw-modal-review-proof')
+      .evaluate((element) => ({ ...element.dataset }));
+    if (proofAfter.previewRequested !== 'true') {
+      throw new Error(`Focus private RAW preview plan was not requested: ${JSON.stringify(proofAfter)}`);
+    }
+    const readiness = await page
+      .getByTestId('focus-stack-readiness-summary')
+      .evaluate((element) => ({ ...element.dataset }));
+    if (readiness.sourceCount !== '3' || readiness.stackReady !== 'true') {
+      throw new Error(`Focus private RAW readiness failed: ${JSON.stringify(readiness)}`);
+    }
+    await page
+      .getByTestId('focus-review-diagnostics')
+      .getByText(stackPath, { exact: true })
+      .waitFor({ timeout: 10_000 });
+    await page.getByTestId('focus-source-contribution-details').waitFor({ timeout: 10_000 });
     return;
   }
 
