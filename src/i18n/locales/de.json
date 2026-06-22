@@ -1939,6 +1939,7 @@
       "handoffNoSourceRefs": "No source refs recorded",
       "handoffPreviewExportMatched": "Preview/export matched",
       "handoffPreviewExportParity": "Preview/export parity",
+      "handoffPreviewExportProof": "Parity proof",
       "handoffSourceCount": "Source count",
       "handoffSourceRefs": "Source refs",
       "handoffToneMappedNotice": "Saved HDR opens as an editable derived source. The current output is display-referred and tone-mapped; RAW-quality HDR color claims require bracketed RAW validation.",

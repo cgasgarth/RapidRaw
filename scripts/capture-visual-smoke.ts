@@ -1284,7 +1284,11 @@ async function prepareScenario(page, mode) {
       provenance.displayPreviewColorState !== 'tone_mapped_srgb_preview' ||
       provenance.exportColorState !== 'saved_display_referred_srgb_output' ||
       provenance.outputColorSpace !== 'srgb_display_referred_v1' ||
+      provenance.previewExportComparedFields?.includes('outputPath') !== true ||
+      /^fnv1a32:[a-f0-9]{8}$/u.test(provenance.previewExportExportReceiptHash ?? '') !== true ||
       provenance.previewExportParityStatus !== 'matched_editor_display_path' ||
+      /^fnv1a32:[a-f0-9]{8}$/u.test(provenance.previewExportPreviewStateHash ?? '') !== true ||
+      /^fnv1a32:[a-f0-9]{8}$/u.test(provenance.previewExportProofHash ?? '') !== true ||
       provenance.sceneMergeColorState !== 'legacy_display_referred_merge_after_linear_to_srgb' ||
       provenance.sourceCount !== '3' ||
       provenance.warningCodes !== 'tone_mapped_preview_only'
@@ -1600,7 +1604,11 @@ async function prepareScenario(page, mode) {
       provenance.displayPreviewColorState !== 'tone_mapped_srgb_preview' ||
       provenance.exportColorState !== 'saved_display_referred_srgb_output' ||
       provenance.outputColorSpace !== 'srgb_display_referred_v1' ||
+      provenance.previewExportComparedFields?.includes('outputPath') !== true ||
+      /^fnv1a32:[a-f0-9]{8}$/u.test(provenance.previewExportExportReceiptHash ?? '') !== true ||
       provenance.previewExportParityStatus !== 'matched_editor_display_path' ||
+      /^fnv1a32:[a-f0-9]{8}$/u.test(provenance.previewExportPreviewStateHash ?? '') !== true ||
+      /^fnv1a32:[a-f0-9]{8}$/u.test(provenance.previewExportProofHash ?? '') !== true ||
       provenance.sceneMergeColorState !== 'legacy_display_referred_merge_after_linear_to_srgb' ||
       provenance.sourceCount !== '3' ||
       provenance.warningCodes !== 'tone_mapped_preview_only'
