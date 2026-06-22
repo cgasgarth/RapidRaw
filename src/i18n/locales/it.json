@@ -1320,6 +1320,7 @@
       "autoBaseFogTooltip": "Estimate film base and balance color weights",
       "baseFogConfidence": "Base estimate confidence {{confidence}}%",
       "baseFogStrength": "Base/Fog",
+      "blackPoint": "Black point",
       "baseFogSample": "Base sample",
       "sampleCenterPatch": "Center patch",
       "sampleFullFrame": "Full frame",
@@ -1341,6 +1342,7 @@
       "noticeText": "Logica di inversione ispirata a <0>NegPy</0> creata da marcinz606 (<1>GPL-3.0</1>).",
       "originalLabel": "Negativo Originale",
       "printGrade": "Print Grade",
+      "printEndpoints": "Print endpoints",
       "redWeight": "Rosso (Ciano)",
       "resetTooltip": "Ripristina",
       "resetViewTooltip": "Ripristina Visualizzazione",
@@ -1353,7 +1355,8 @@
       "workflowExport": "Esporta",
       "workflowExportConverting": "Conversione",
       "workflowPreset": "Preset",
-      "workflowPrintDetail": "EV {{exposure}}  C {{contrast}}",
+      "whitePoint": "White point",
+      "workflowPrintDetail": "EV {{exposure}}  C {{contrast}}  BP {{blackPoint}}  WP {{whitePoint}}",
       "workflowPrintGrade": "Grado",
       "workflowSetup": "Setup",
       "workflowSetupDetailSingle": "1 scansione",
@@ -1492,7 +1495,8 @@
       "qcRejectedCount": "Rejected {{rejectedCount}}",
       "effectiveFrameExposure": "Effective frame exposure {{exposure}} EV",
       "frameExposureOffset": "Frame exposure offset",
-      "resetFrameExposure": "Reset frame"
+      "resetFrameExposure": "Reset frame",
+      "resetPrintEndpoints": "Reset endpoints"
     },
     "panorama": {
       "cancel": "Annulla",

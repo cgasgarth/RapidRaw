@@ -37,14 +37,16 @@ const makeNegativeLabPreset = (
     | 'provenanceSummary'
     | 'runtimeStatus'
   > & {
-    params: Omit<NegativeLabPresetParams, 'base_fog_sample'>;
+    params: Omit<NegativeLabPresetParams, 'base_fog_sample' | 'black_point' | 'white_point'>;
   },
 ): NegativeLabBuiltInUiPreset => ({
   ...GENERIC_NEGATIVE_LAB_PRESET_METADATA,
   ...preset,
   params: {
     ...preset.params,
+    black_point: 0,
     base_fog_sample: null,
+    white_point: 1,
   },
 });
 

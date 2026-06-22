@@ -1561,6 +1561,34 @@ async function prepareScenario(page, mode) {
     .getByTestId('negative-lab-recipe-frame-exposure-offset')
     .getByText('+0.50', { exact: true })
     .waitFor({ timeout: 10_000 });
+  const setPrintEndpoint = async (testId: string, value: number) => {
+    await page.getByTestId(testId).evaluate((element, nextValue) => {
+      const input = element.querySelector('input[type="range"]');
+      if (!(input instanceof HTMLInputElement)) {
+        throw new Error('Missing Negative Lab print endpoint range input.');
+      }
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      valueSetter?.call(input, String(nextValue));
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }, value);
+  };
+  await setPrintEndpoint('negative-lab-black-point-control', 0.16);
+  await setPrintEndpoint('negative-lab-white-point-control', 0.86);
+  await page.getByTestId('negative-lab-recipe-black-point').getByText('0.16', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-recipe-white-point').getByText('0.86', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.waitForFunction(() =>
+    (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).some(
+      (call) =>
+        call.command === 'preview_negative_conversion' &&
+        JSON.stringify(call.args ?? {}).includes('"black_point":0.16') &&
+        JSON.stringify(call.args ?? {}).includes('"white_point":0.86'),
+    ),
+  );
   await page.getByTestId('negative-lab-neutrality-status').getByText('Strong cast', { exact: true }).waitFor({
     timeout: 10_000,
   });

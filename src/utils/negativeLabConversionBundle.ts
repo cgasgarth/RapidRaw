@@ -18,11 +18,13 @@ const paramsNear = (
   right: NegativeLabConversionBundle['conversion']['params'],
 ) =>
   numbersNear(left.base_fog_strength, right.base_fog_strength) &&
+  numbersNear(left.black_point, right.black_point) &&
   numbersNear(left.blue_weight, right.blue_weight) &&
   numbersNear(left.contrast, right.contrast) &&
   numbersNear(left.exposure, right.exposure) &&
   numbersNear(left.green_weight, right.green_weight) &&
   numbersNear(left.red_weight, right.red_weight) &&
+  numbersNear(left.white_point, right.white_point) &&
   JSON.stringify(left.base_fog_sample) === JSON.stringify(right.base_fog_sample);
 
 export const validateNegativeLabConversionBundleReplay = (value: unknown): NegativeLabConversionBundleReplayProof => {

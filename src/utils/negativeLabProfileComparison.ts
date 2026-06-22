@@ -12,6 +12,8 @@ import type { NegativeLabPresetParams } from '../schemas/negativeLabPresetCatalo
 const PROFILE_DELTA_KEYS = [
   'exposure',
   'contrast',
+  'black_point',
+  'white_point',
   'base_fog_strength',
   'red_weight',
   'green_weight',
@@ -25,8 +27,9 @@ const profileParamsToCssRgb = (params: NegativeLabPresetParams): `rgb(${number} 
   const densityLift = params.base_fog_strength * 18;
   const exposureLift = params.exposure * 22;
   const contrastLift = (params.contrast - 1) * 28;
+  const endpointLift = (params.black_point + (1 - params.white_point)) * 36;
 
-  return `rgb(${clampRgbChannel(118 + densityLift + exposureLift + contrastLift + params.red_weight * 22)} ${clampRgbChannel(116 + densityLift + exposureLift + params.green_weight * 18)} ${clampRgbChannel(112 + densityLift + exposureLift - contrastLift + params.blue_weight * 24)})`;
+  return `rgb(${clampRgbChannel(118 + densityLift + exposureLift + endpointLift + contrastLift + params.red_weight * 22)} ${clampRgbChannel(116 + densityLift + exposureLift + endpointLift + params.green_weight * 18)} ${clampRgbChannel(112 + densityLift + exposureLift + endpointLift - contrastLift + params.blue_weight * 24)})`;
 };
 
 const buildNegativeLabProfilePreviewSwatch = (

@@ -34,6 +34,10 @@ pub struct NegativeConversionParams {
     pub base_fog_sample: Option<NegativeBaseFogSampleRect>,
     pub exposure: f32,
     pub contrast: f32,
+    #[serde(default = "default_black_point")]
+    pub black_point: f32,
+    #[serde(default = "default_white_point")]
+    pub white_point: f32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -122,11 +126,24 @@ const MIN_EXPOSURE: f32 = -2.0;
 const MAX_EXPOSURE: f32 = 2.0;
 const MIN_CONTRAST: f32 = 0.5;
 const MAX_CONTRAST: f32 = 2.5;
+const MIN_BLACK_POINT: f32 = 0.0;
+const MAX_BLACK_POINT: f32 = 0.95;
+const MIN_WHITE_POINT: f32 = 0.05;
+const MAX_WHITE_POINT: f32 = 1.0;
+const MIN_ENDPOINT_SEPARATION: f32 = 0.05;
 const DEFAULT_OUTPUT_SUFFIX: &str = "Positive";
 const JPEG_PROOF_QUALITY: u8 = 92;
 const NEGATIVE_LAB_CONVERSION_BUNDLE_SCHEMA_VERSION: u8 = 1;
 
 fn default_base_fog_strength() -> f32 {
+    1.0
+}
+
+fn default_black_point() -> f32 {
+    0.0
+}
+
+fn default_white_point() -> f32 {
     1.0
 }
 
@@ -258,6 +275,8 @@ impl Default for NegativeConversionParams {
             base_fog_sample: None,
             exposure: 0.0,
             contrast: 1.0,
+            black_point: default_black_point(),
+            white_point: default_white_point(),
         }
     }
 }
@@ -577,7 +596,24 @@ impl NegativeConversionParams {
                 .clamp(MIN_EXPOSURE, MAX_EXPOSURE),
             contrast: finite_or_default(self.contrast, defaults.contrast)
                 .clamp(MIN_CONTRAST, MAX_CONTRAST),
+            black_point: finite_or_default(self.black_point, defaults.black_point)
+                .clamp(MIN_BLACK_POINT, MAX_BLACK_POINT),
+            white_point: finite_or_default(self.white_point, defaults.white_point)
+                .clamp(MIN_WHITE_POINT, MAX_WHITE_POINT),
         }
+        .with_sanitized_endpoints()
+    }
+
+    fn with_sanitized_endpoints(mut self) -> Self {
+        if self.white_point - self.black_point < MIN_ENDPOINT_SEPARATION {
+            self.white_point = (self.black_point + MIN_ENDPOINT_SEPARATION).min(MAX_WHITE_POINT);
+            self.black_point = self
+                .black_point
+                .min(self.white_point - MIN_ENDPOINT_SEPARATION)
+                .max(MIN_BLACK_POINT);
+        }
+
+        self
     }
 }
 
@@ -768,6 +804,9 @@ fn run_pipeline(
     let y0 = 1.0 / (1.0 + (k * x0).exp());
     let y1 = 1.0 / (1.0 + (-k * (1.0 - x0)).exp());
     let scale = 1.0 / (y1 - y0);
+    let endpoint_span = (params.white_point - params.black_point).max(MIN_ENDPOINT_SEPARATION);
+    let apply_endpoints =
+        |value: f32| -> f32 { ((value - params.black_point) / endpoint_span).clamp(0.0, 1.0) };
 
     out_buffer
         .par_chunks_mut(3)
@@ -809,9 +848,9 @@ fn run_pipeline(
                 b = b + (luma - b) * sat_reduction;
             }
 
-            out_pixel[0] = r.clamp(0.0, 1.0).powf(gamma_inv);
-            out_pixel[1] = g.clamp(0.0, 1.0).powf(gamma_inv);
-            out_pixel[2] = b.clamp(0.0, 1.0).powf(gamma_inv);
+            out_pixel[0] = apply_endpoints(r).powf(gamma_inv);
+            out_pixel[1] = apply_endpoints(g).powf(gamma_inv);
+            out_pixel[2] = apply_endpoints(b).powf(gamma_inv);
         });
 
     let out_img = Rgb32FImage::from_vec(width, height, out_buffer).unwrap();
@@ -1171,6 +1210,8 @@ mod tests {
             }),
             exposure: f32::INFINITY,
             contrast: f32::NEG_INFINITY,
+            black_point: f32::NAN,
+            white_point: f32::NEG_INFINITY,
         }
         .sanitized();
 
@@ -1192,6 +1233,14 @@ mod tests {
         assert_eq!(
             sanitized.contrast,
             NegativeConversionParams::default().contrast
+        );
+        assert_eq!(
+            sanitized.black_point,
+            NegativeConversionParams::default().black_point
+        );
+        assert_eq!(
+            sanitized.white_point,
+            NegativeConversionParams::default().white_point
         );
     }
 
@@ -1372,6 +1421,8 @@ mod tests {
             base_fog_sample: None,
             exposure: 0.1,
             contrast: 1.08,
+            black_point: 0.0,
+            white_point: 1.0,
         };
         let save_options = NegativeConversionSaveOptions {
             accepted_dry_run_plan_hash: Some("fnv1a32:2f4a91bc".to_string()),
@@ -1476,6 +1527,8 @@ mod tests {
             base_fog_sample: None,
             exposure: 0.05,
             contrast: 0.95,
+            black_point: 0.0,
+            white_point: 1.0,
         };
         let save_options = NegativeConversionSaveOptions {
             accepted_dry_run_plan_hash: Some("fnv1a32:2f4a91bc".to_string()),
@@ -1484,7 +1537,7 @@ mod tests {
             write_conversion_bundle: true,
             acquisition_warning_codes: vec!["lossy_source_for_negative_lab".to_string()],
             acquisition_source_families: vec!["jpeg_lossy".to_string()],
-            profile_provenance_hash: Some("fnv1a32:468872b8".to_string()),
+            profile_provenance_hash: Some("fnv1a32:9ed1e301".to_string()),
             selected_profile: None,
             frame_exposure_overrides: Vec::new(),
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
@@ -1512,7 +1565,7 @@ mod tests {
         assert_eq!(bundle["conversion"]["outputFormat"], "jpeg_proof");
         assert_eq!(
             bundle["conversion"]["profileProvenanceHash"],
-            "fnv1a32:468872b8"
+            "fnv1a32:9ed1e301"
         );
         assert_eq!(
             bundle["acquisition"]["warningCodes"][0],
@@ -1545,6 +1598,8 @@ mod tests {
                 base_fog_sample: None,
                 exposure: 50.0,
                 contrast: -50.0,
+                black_point: 0.99,
+                white_point: 0.01,
             },
             [
                 ChannelBounds {
@@ -1586,6 +1641,8 @@ mod tests {
                 base_fog_sample: None,
                 exposure: 0.0,
                 contrast: 1.0,
+                black_point: 0.0,
+                white_point: 1.0,
             },
             [
                 ChannelBounds {
@@ -1628,6 +1685,60 @@ mod tests {
         assert!(
             color_spread > 0.01,
             "color fixture should preserve channel-specific response"
+        );
+    }
+
+    #[test]
+    fn negative_conversion_black_white_points_remap() {
+        let pixels = vec![
+            0.82, 0.64, 0.46, //
+            0.36, 0.28, 0.20, //
+            0.09, 0.07, 0.05,
+        ];
+        let bounds = [
+            ChannelBounds {
+                min: 0.05,
+                max: 1.2,
+            },
+            ChannelBounds {
+                min: 0.08,
+                max: 1.25,
+            },
+            ChannelBounds {
+                min: 0.12,
+                max: 1.35,
+            },
+        ];
+
+        let baseline = render_fixture(pixels.clone(), NegativeConversionParams::default(), bounds);
+        let tightened = render_fixture(
+            pixels.clone(),
+            NegativeConversionParams {
+                black_point: 0.18,
+                white_point: 0.82,
+                ..NegativeConversionParams::default()
+            },
+            bounds,
+        );
+        let reset = render_fixture(
+            pixels,
+            NegativeConversionParams {
+                black_point: 0.0,
+                white_point: 1.0,
+                ..NegativeConversionParams::default()
+            },
+            bounds,
+        );
+
+        assert_ne!(
+            hash_rendered_image(&baseline),
+            hash_rendered_image(&tightened),
+            "non-default print endpoints should change rendered positive pixels"
+        );
+        assert_eq!(
+            hash_rendered_image(&baseline),
+            hash_rendered_image(&reset),
+            "reset endpoints should match default render identity"
         );
     }
 
@@ -1746,6 +1857,8 @@ mod tests {
             }),
             exposure: 0.05,
             contrast: 1.1,
+            black_point: 0.0,
+            white_point: 1.0,
         };
         let rgb = input.to_rgb32f();
         let (width, height) = rgb.dimensions();
@@ -1797,6 +1910,8 @@ mod tests {
             }),
             exposure: 0.05,
             contrast: 1.1,
+            black_point: 0.0,
+            white_point: 1.0,
         };
         let rendered = run_pipeline(&input, &params, None).to_rgb32f();
         let input_rgb = input.to_rgb32f();
@@ -1893,6 +2008,8 @@ mod tests {
             }),
             exposure: 0.05,
             contrast: 0.95,
+            black_point: 0.0,
+            white_point: 1.0,
         };
         let bounds_ref = downscale_f32_image(&input, 1080, 1080);
         let ref_rgb = bounds_ref.to_rgb32f();
@@ -1924,7 +2041,7 @@ mod tests {
             write_conversion_bundle: true,
             acquisition_warning_codes: vec!["lossy_source_for_negative_lab".to_string()],
             acquisition_source_families: vec!["jpeg_lossy".to_string()],
-            profile_provenance_hash: Some("fnv1a32:468872b8".to_string()),
+            profile_provenance_hash: Some("fnv1a32:9ed1e301".to_string()),
             selected_profile: Some(NegativeLabSelectedProfileSnapshot {
                 claim_level: "generic_starting_point_only".to_string(),
                 claim_policy: applied_profile_claim_policy.to_string(),
@@ -1937,7 +2054,7 @@ mod tests {
                 measurement_profile_id: None,
                 params,
                 preset_id: applied_profile_id.to_string(),
-                profile_provenance_hash: "fnv1a32:468872b8".to_string(),
+                profile_provenance_hash: "fnv1a32:9ed1e301".to_string(),
                 profile_status: "generic_unmeasured".to_string(),
                 provenance_summary: "Generic engineered C-41 portrait starting point.".to_string(),
                 runtime_status: "runtime_parameter_applied".to_string(),
@@ -2023,7 +2140,7 @@ mod tests {
                 },
                 "presetId": applied_profile_id,
                 "processFamily": "c41_color_negative",
-                "profileProvenanceHash": "fnv1a32:468872b8",
+                "profileProvenanceHash": "fnv1a32:9ed1e301",
                 "runtimeStatus": "runtime_parameter_applied",
                 "stockFamilyDescriptor": "Soft portrait color negative"
             },
@@ -2139,6 +2256,8 @@ mod tests {
             base_fog_sample: None,
             exposure: 0.0,
             contrast: 1.0,
+            black_point: 0.0,
+            white_point: 1.0,
         };
         let sampled_params = NegativeConversionParams {
             red_weight: sampled_estimate.red_weight,
@@ -2148,6 +2267,8 @@ mod tests {
             base_fog_sample: Some(sample_rect),
             exposure: 0.0,
             contrast: 1.0,
+            black_point: 0.0,
+            white_point: 1.0,
         };
         let rgb = input.to_rgb32f();
         let (width, height) = rgb.dimensions();

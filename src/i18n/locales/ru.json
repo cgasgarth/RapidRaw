@@ -1319,6 +1319,7 @@
       "autoBaseFogTooltip": "Estimate film base and balance color weights",
       "baseFogConfidence": "Base estimate confidence {{confidence}}%",
       "baseFogStrength": "Base/Fog",
+      "blackPoint": "Black point",
       "baseFogSample": "Base sample",
       "sampleCenterPatch": "Center patch",
       "sampleFullFrame": "Full frame",
@@ -1340,6 +1341,7 @@
       "noticeText": "Алгоритм инверсии разработан на основе проекта <0>NegPy</0> за авторством marcinz606 (<1>GPL-3.0</1>).",
       "originalLabel": "Исходный негатив",
       "printGrade": "Контрастность бумаги",
+      "printEndpoints": "Print endpoints",
       "redWeight": "Красный (голубой)",
       "resetTooltip": "Сбросить",
       "resetViewTooltip": "Сбросить вид",
@@ -1352,7 +1354,8 @@
       "workflowExport": "Экспорт",
       "workflowExportConverting": "Конвертация",
       "workflowPreset": "Пресет",
-      "workflowPrintDetail": "EV {{exposure}}  C {{contrast}}",
+      "whitePoint": "White point",
+      "workflowPrintDetail": "EV {{exposure}}  C {{contrast}}  BP {{blackPoint}}  WP {{whitePoint}}",
       "workflowPrintGrade": "Градация",
       "workflowSetup": "Setup",
       "workflowSetupDetailSingle": "1 скан",
@@ -1491,7 +1494,8 @@
       "qcRejectedCount": "Rejected {{rejectedCount}}",
       "effectiveFrameExposure": "Effective frame exposure {{exposure}} EV",
       "frameExposureOffset": "Frame exposure offset",
-      "resetFrameExposure": "Reset frame"
+      "resetFrameExposure": "Reset frame",
+      "resetPrintEndpoints": "Reset endpoints"
     },
     "panorama": {
       "cancel": "Отмена",

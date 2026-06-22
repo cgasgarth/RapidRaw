@@ -1334,6 +1334,7 @@
       "autoBaseFogTooltip": "Estimate film base and balance color weights",
       "baseFogConfidence": "Base estimate confidence {{confidence}}%",
       "baseFogStrength": "Base/Fog",
+      "blackPoint": "Black point",
       "baseFogSample": "Base sample",
       "sampleCenterPatch": "Center patch",
       "sampleFullFrame": "Full frame",
@@ -1355,6 +1356,7 @@
       "noticeText": "Lógica de inversión inspirada por <0>NegPy</0> creado por marcinz606 (<1>GPL-3.0</1>).",
       "originalLabel": "Negativo original",
       "printGrade": "Grado de impresión",
+      "printEndpoints": "Print endpoints",
       "redWeight": "Rojo (Cian)",
       "resetTooltip": "Restablecer",
       "resetViewTooltip": "Restablecer vista",
@@ -1367,7 +1369,8 @@
       "workflowExport": "Exportar",
       "workflowExportConverting": "Convirtiendo",
       "workflowPreset": "Ajuste",
-      "workflowPrintDetail": "EV {{exposure}}  C {{contrast}}",
+      "whitePoint": "White point",
+      "workflowPrintDetail": "EV {{exposure}}  C {{contrast}}  BP {{blackPoint}}  WP {{whitePoint}}",
       "workflowPrintGrade": "Grado",
       "workflowSetup": "Inicio",
       "workflowSetupDetailSingle": "1 escaneo",
@@ -1506,7 +1509,8 @@
       "qcRejectedCount": "Rejected {{rejectedCount}}",
       "effectiveFrameExposure": "Effective frame exposure {{exposure}} EV",
       "frameExposureOffset": "Frame exposure offset",
-      "resetFrameExposure": "Reset frame"
+      "resetFrameExposure": "Reset frame",
+      "resetPrintEndpoints": "Reset endpoints"
     },
     "panorama": {
       "cancel": "Cancelar",

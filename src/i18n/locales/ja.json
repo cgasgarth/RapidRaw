@@ -1319,6 +1319,7 @@
       "autoBaseFogTooltip": "Estimate film base and balance color weights",
       "baseFogConfidence": "Base estimate confidence {{confidence}}%",
       "baseFogStrength": "Base/Fog",
+      "blackPoint": "Black point",
       "baseFogSample": "Base sample",
       "sampleCenterPatch": "Center patch",
       "sampleFullFrame": "Full frame",
@@ -1340,6 +1341,7 @@
       "noticeText": "反転処理は marcinz606 氏が作成した <0>NegPy</0> (<1>GPL-3.0</1>) のアルゴリズムに着想を得ています。",
       "originalLabel": "オリジナルのネガ",
       "printGrade": "プリントグレード",
+      "printEndpoints": "Print endpoints",
       "redWeight": "レッド (シアン)",
       "resetTooltip": "リセット",
       "resetViewTooltip": "表示をリセット",
@@ -1352,7 +1354,8 @@
       "workflowExport": "書き出し",
       "workflowExportConverting": "変換中",
       "workflowPreset": "プリセット",
-      "workflowPrintDetail": "EV {{exposure}}  C {{contrast}}",
+      "whitePoint": "White point",
+      "workflowPrintDetail": "EV {{exposure}}  C {{contrast}}  BP {{blackPoint}}  WP {{whitePoint}}",
       "workflowPrintGrade": "グレード",
       "workflowSetup": "セットアップ",
       "workflowSetupDetailSingle": "1 件のスキャン",
@@ -1491,7 +1494,8 @@
       "qcRejectedCount": "Rejected {{rejectedCount}}",
       "effectiveFrameExposure": "Effective frame exposure {{exposure}} EV",
       "frameExposureOffset": "Frame exposure offset",
-      "resetFrameExposure": "Reset frame"
+      "resetFrameExposure": "Reset frame",
+      "resetPrintEndpoints": "Reset endpoints"
     },
     "panorama": {
       "cancel": "キャンセル",
