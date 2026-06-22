@@ -218,6 +218,12 @@ const updateMain = (source: WorktreeSource): void => {
   run(['git', 'fetch', 'origin', 'main'], { cwd: source.root });
 };
 
+const ensureWorktreeBase = (worktreePath: string): void => {
+  const head = run(['git', 'rev-parse', 'HEAD'], { cwd: worktreePath });
+  const originMain = run(['git', 'rev-parse', 'origin/main'], { cwd: worktreePath });
+  if (head !== originMain) throw new Error(`Worktree HEAD ${head} does not match origin/main ${originMain}`);
+};
+
 const linkNodeModules = (root: string, worktreePath: string): void => {
   const source = resolve(root, 'node_modules');
   const target = resolve(worktreePath, 'node_modules');
@@ -256,6 +262,7 @@ const configureWorktreeGit = (worktreePath: string, branch: string): void => {
 const ensureWorktreeReady = (worktreePath: string, branch: string): void => {
   const currentBranch = run(['git', 'branch', '--show-current'], { cwd: worktreePath });
   if (currentBranch !== branch) throw new Error(`Expected ${branch}, found ${currentBranch || 'detached HEAD'}`);
+  ensureWorktreeBase(worktreePath);
   ensureDependencyBins(worktreePath);
   run(['bun', 'run', 'hooks:verify'], { cwd: worktreePath });
   run(['bun', 'run', 'check:gh-repo-resolution'], { cwd: worktreePath });
