@@ -113,6 +113,7 @@ if (eslintFiles.length > 0) {
 }
 
 if (i18nFiles.length > 0) {
+  checks.push(await run('i18n:check', 'bun', ['run', 'i18n:check']));
   checks.push(await run('i18n:lint', 'bun', ['run', 'i18n:lint']));
 }
 
