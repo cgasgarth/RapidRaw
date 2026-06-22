@@ -215,6 +215,20 @@ export const agentReviewHandoffSchema = z
     approvalState: agentChatApprovalStateSchema,
     auditArtifactId: z.string().min(1),
     auditLabel: z.string().min(1),
+    auditTrail: z
+      .array(
+        z
+          .object({
+            approvalState: agentChatApprovalStateSchema,
+            artifactIds: z.array(z.string().min(1)),
+            id: z.string().min(1),
+            stage: agentChatToolCallModeSchema,
+            toolCallId: z.string().min(1),
+            toolName: z.string().min(1),
+          })
+          .strict(),
+      )
+      .min(1),
     beforeArtifactId: z.string().min(1),
     beforeLabel: z.string().min(1),
     commandSummary: z.string().min(1),

@@ -234,6 +234,33 @@ function ReviewHandoffPanel({ handoff }: { handoff: AgentReviewHandoff }) {
         </div>
       </div>
 
+      <div className="space-y-1" data-testid="agent-review-handoff-audit-trail">
+        {handoff.auditTrail.map((entry) => (
+          <div
+            className="grid gap-2 rounded border border-white/10 bg-black/15 p-2 text-[11px] md:grid-cols-[1fr_auto]"
+            data-approval-state={entry.approvalState}
+            data-artifact-ids={entry.artifactIds.join(',')}
+            data-stage={entry.stage}
+            data-tool-call-id={entry.toolCallId}
+            data-tool-name={entry.toolName}
+            key={entry.id}
+          >
+            <div className="min-w-0">
+              <div className="truncate font-mono text-text-primary">{entry.toolName}</div>
+              <div className="mt-1 truncate font-mono text-text-secondary">{entry.artifactIds.join(' -> ')}</div>
+            </div>
+            <div className="flex flex-wrap items-start justify-end gap-1.5">
+              <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-text-secondary">
+                {entry.stage}
+              </span>
+              <span className={`rounded border px-1.5 py-0.5 ${handoffApprovalStyles[entry.approvalState]}`}>
+                {entry.approvalState}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <div className="grid gap-2 md:grid-cols-[1fr_1fr]" data-testid="agent-review-handoff-next">
         <a
           className="rounded border border-sky-500/25 bg-sky-500/10 p-2 text-[11px] text-sky-100 hover:border-sky-300/70"
