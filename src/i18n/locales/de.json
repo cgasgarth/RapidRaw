@@ -1156,6 +1156,17 @@
       "removeGps": "GPS-Daten entfernen",
       "saveWithMetadata": "Mit Metadaten speichern"
     },
+    "outputSharpening": {
+      "amount": "",
+      "enable": "",
+      "radius": "",
+      "targets": {
+        "custom": "",
+        "print": "",
+        "screen": ""
+      },
+      "threshold": ""
+    },
     "readiness": {
       "colorProfile": "",
       "format_one": "",
@@ -1164,6 +1175,8 @@
       "metadataOff": "",
       "metadataOn": "",
       "metadataWithoutGps": "",
+      "outputSharpeningOff": "",
+      "outputSharpeningOn": "",
       "resizeEnabled": "",
       "resizeOff": "",
       "watermarkOff": "",
@@ -1186,6 +1199,7 @@
       "fileSettings": "Dateieinstellungen",
       "imageSizing": "Bildgröße",
       "metadata": "Metadaten",
+      "outputSharpening": "",
       "watermark": "Wasserzeichen"
     },
     "status": {

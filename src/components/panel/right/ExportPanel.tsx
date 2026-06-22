@@ -10,6 +10,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useExportSettings } from '../../../hooks/useExportSettings';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../../schemas/exportRecipeIds';
+import { outputSharpeningSettingsSchema } from '../../../schemas/outputSharpeningSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
@@ -27,6 +28,7 @@ import {
   Status,
   type ExportState,
   FileFormats,
+  type OutputSharpeningSettings,
   WatermarkAnchor,
 } from '../../ui/ExportImportProperties';
 import ExportPresetsList from '../../ui/ExportPresetsList';
@@ -214,6 +216,14 @@ export default function ExportPanel({
     ],
     [t],
   );
+  const outputSharpeningTargetOptions = useMemo<Array<{ label: string; value: OutputSharpeningSettings['target'] }>>(
+    () => [
+      { label: t('export.outputSharpening.targets.screen'), value: 'screen' },
+      { label: t('export.outputSharpening.targets.print'), value: 'print' },
+      { label: t('export.outputSharpening.targets.custom'), value: 'custom' },
+    ],
+    [t],
+  );
 
   const {
     fileFormat,
@@ -250,6 +260,10 @@ export default function ExportPanel({
     setWatermarkSpacing,
     watermarkOpacity,
     setWatermarkOpacity,
+    outputSharpening,
+    setOutputSharpening,
+    enableDefaultOutputSharpening,
+    updateOutputSharpening,
     preserveFolders,
     setPreserveFolders,
     colorProfile,
@@ -303,6 +317,10 @@ export default function ExportPanel({
   const isAndroid = osPlatform === 'android';
 
   const { status, progress, errorMessage, lastReceipt } = exportState;
+  const parsedOutputSharpening = useMemo(
+    () => (outputSharpening === null ? null : outputSharpeningSettingsSchema.parse(outputSharpening)),
+    [outputSharpening],
+  );
   const firstReceiptOutput = lastReceipt?.outputs[0];
   const firstReceiptFileName = firstReceiptOutput?.outputPath.split(/[\\/]/).pop() ?? '';
   const isExporting = status === Status.Exporting;
@@ -438,7 +456,7 @@ export default function ExportPanel({
       resize: enableResize ? { mode: resizeMode, value: resizeValue, dontEnlarge } : null,
       stripGps,
       exportMasks: !isLibraryContext ? exportMasks : undefined,
-      outputSharpening: null,
+      outputSharpening: parsedOutputSharpening,
       watermark:
         enableWatermark && watermarkPath
           ? {
@@ -480,6 +498,7 @@ export default function ExportPanel({
     exportMasks,
     preserveFolders,
     isLibraryContext,
+    parsedOutputSharpening,
   ]);
 
   const handleVariableClick = (variable: string) => {
@@ -519,7 +538,7 @@ export default function ExportPanel({
       resize: enableResize ? { mode: resizeMode, value: resizeValue, dontEnlarge } : null,
       stripGps,
       exportMasks: !isLibraryContext ? exportMasks : undefined,
-      outputSharpening: null,
+      outputSharpening: parsedOutputSharpening,
       watermark:
         enableWatermark && watermarkPath
           ? {
@@ -639,6 +658,9 @@ export default function ExportPanel({
       ? t('export.readiness.resizeEnabled', { mode: selectedResizeModeLabel, value: resizeValue })
       : t('export.readiness.resizeOff'),
     enableWatermark && watermarkPath ? t('export.readiness.watermarkOn') : t('export.readiness.watermarkOff'),
+    parsedOutputSharpening
+      ? t('export.readiness.outputSharpeningOn', { target: parsedOutputSharpening.target })
+      : t('export.readiness.outputSharpeningOff'),
     keepMetadata
       ? stripGps
         ? t('export.readiness.metadataWithoutGps')
@@ -881,6 +903,75 @@ export default function ExportPanel({
                           />
                         </>
                       )}
+                    </div>
+                  )}
+                </Section>
+
+                <Section title={t('export.sections.outputSharpening')}>
+                  <Switch
+                    checked={outputSharpening !== null}
+                    disabled={isExporting}
+                    label={t('export.outputSharpening.enable')}
+                    onChange={(checked) => {
+                      if (checked) {
+                        enableDefaultOutputSharpening();
+                      } else {
+                        setOutputSharpening(null);
+                      }
+                    }}
+                    trackClassName="bg-surface"
+                  />
+                  {outputSharpening !== null && (
+                    <div className="space-y-4 pl-2 border-l-2 border-surface">
+                      <Dropdown
+                        className="w-full"
+                        disabled={isExporting}
+                        onChange={(target) => {
+                          updateOutputSharpening({ target });
+                        }}
+                        options={outputSharpeningTargetOptions}
+                        value={outputSharpening.target}
+                      />
+                      <Slider
+                        defaultValue={35}
+                        disabled={isExporting}
+                        fillOrigin="min"
+                        label={t('export.outputSharpening.amount')}
+                        max={100}
+                        min={0}
+                        onChange={(e) => {
+                          updateOutputSharpening({ amount: parseInt(String(e.target.value), 10) });
+                        }}
+                        step={1}
+                        value={outputSharpening.amount}
+                      />
+                      <Slider
+                        defaultValue={0.7}
+                        disabled={isExporting}
+                        fillOrigin="min"
+                        label={t('export.outputSharpening.radius')}
+                        max={3}
+                        min={0.3}
+                        onChange={(e) => {
+                          updateOutputSharpening({ radiusPx: parseFloat(String(e.target.value)) });
+                        }}
+                        step={0.1}
+                        suffix=" px"
+                        value={outputSharpening.radiusPx}
+                      />
+                      <Slider
+                        defaultValue={2}
+                        disabled={isExporting}
+                        fillOrigin="min"
+                        label={t('export.outputSharpening.threshold')}
+                        max={100}
+                        min={0}
+                        onChange={(e) => {
+                          updateOutputSharpening({ threshold: parseInt(String(e.target.value), 10) / 100 });
+                        }}
+                        step={1}
+                        value={Math.round(outputSharpening.threshold * 100)}
+                      />
                     </div>
                   )}
                 </Section>
