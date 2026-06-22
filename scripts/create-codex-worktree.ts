@@ -2,6 +2,7 @@
 
 import { existsSync, lstatSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs';
 import { basename, dirname, isAbsolute, resolve } from 'node:path';
+import { strict as assert } from 'node:assert';
 import process from 'node:process';
 
 type RunOptions = {
@@ -11,6 +12,7 @@ type RunOptions = {
 
 type ParsedArgs = {
   branch: string;
+  dryRun: boolean;
   path: string;
 };
 
@@ -18,7 +20,7 @@ const REPO_OWNER = 'cgasgarth/RapidRaw';
 const ORIGIN_URL = 'https://github.com/cgasgarth/RapidRaw.git';
 const UPSTREAM_URL = 'https://github.com/CyberTimon/RapidRAW.git';
 
-const usage = `Usage: bun run worktree:create -- --branch codex/name [--path ../RapidRaw-name]
+const usage = `Usage: bun run worktree:create -- --branch codex/name [--path ../RapidRaw-name] [--dry-run]
 
 Creates a Codex-ready worktree from current origin/main, wires dependencies, hooks, and gh repo resolution.`;
 
@@ -39,9 +41,9 @@ const run = (command: readonly string[], options: RunOptions = {}): string => {
   return stdout;
 };
 
-const parseArgs = (): ParsedArgs => {
-  const args = process.argv.slice(2);
+const parseArgs = (args = process.argv.slice(2)): ParsedArgs => {
   let branch = '';
+  let dryRun = false;
   let path = '';
 
   for (let index = 0; index < args.length; index += 1) {
@@ -51,6 +53,16 @@ const parseArgs = (): ParsedArgs => {
     if (arg === '--help' || arg === '-h') {
       console.log(usage);
       process.exit(0);
+    }
+
+    if (arg === '--self-test') {
+      runSelfTest();
+      process.exit(0);
+    }
+
+    if (arg === '--dry-run') {
+      dryRun = true;
+      continue;
     }
 
     if (arg === '--branch') {
@@ -75,8 +87,25 @@ const parseArgs = (): ParsedArgs => {
 
   return {
     branch,
+    dryRun,
     path: path || `../RapidRaw-${branch.replace(/^codex\//u, '').replace(/[^a-zA-Z0-9._-]+/gu, '-')}`,
   };
+};
+
+const runSelfTest = (): void => {
+  assert.deepEqual(parseArgs(['--branch', 'codex/example']), {
+    branch: 'codex/example',
+    dryRun: false,
+    path: '../RapidRaw-example',
+  });
+  assert.deepEqual(parseArgs(['--branch', 'codex/issue-123', '--path', '../custom', '--dry-run']), {
+    branch: 'codex/issue-123',
+    dryRun: true,
+    path: '../custom',
+  });
+  assert.throws(() => parseArgs([]), /Missing --branch/u);
+  assert.throws(() => parseArgs(['--branch', 'feature/example']), /codex\/ prefix/u);
+  console.log('worktree helper self-test ok');
 };
 
 const ensureRepoRoot = (root: string): void => {
@@ -128,6 +157,12 @@ const ensurePrimaryDependencies = (root: string): void => {
   }
 };
 
+const updateMain = (root: string): void => {
+  run(['git', 'fetch', 'origin', 'main'], { cwd: root });
+  run(['git', 'switch', 'main'], { cwd: root });
+  run(['git', 'pull', '--ff-only', 'origin', 'main'], { cwd: root });
+};
+
 const linkNodeModules = (root: string, worktreePath: string): void => {
   const source = resolve(root, 'node_modules');
   const target = resolve(worktreePath, 'node_modules');
@@ -162,7 +197,7 @@ const ensureWorktreeReady = (worktreePath: string): void => {
 
 const main = (): void => {
   const root = process.cwd();
-  const { branch, path } = parseArgs();
+  const { branch, dryRun, path } = parseArgs();
   const worktreePath = isAbsolute(path) ? path : resolve(root, path);
 
   ensureTool('bun');
@@ -176,9 +211,13 @@ const main = (): void => {
 
   if (existsSync(worktreePath)) throw new Error(`Worktree path already exists: ${worktreePath}`);
 
-  run(['git', 'fetch', 'origin', 'main'], { cwd: root });
-  run(['git', 'switch', 'main'], { cwd: root });
-  run(['git', 'pull', '--ff-only', 'origin', 'main'], { cwd: root });
+  if (dryRun) {
+    run(['git', 'fetch', 'origin', 'main'], { cwd: root });
+    console.log(`worktree create dry-run ok: ${worktreePath} (${branch})`);
+    return;
+  }
+
+  updateMain(root);
 
   mkdirSync(dirname(worktreePath), { recursive: true });
   run(['git', 'worktree', 'add', '-b', branch, worktreePath, 'origin/main'], { cwd: root });

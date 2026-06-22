@@ -78,7 +78,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   dependencies are available, links `node_modules`, installs and verifies git
   hooks, and verifies GitHub CLI repo resolution. Do not hand-roll worktree
   setup unless this helper is blocked; fix the helper instead when it misses a
-  recurring setup need.
+  recurring setup need. Use
+  `bun run worktree:create -- --branch codex/name --dry-run` to validate the
+  environment without creating the worktree.
 
 ## GitHub Issues
 
