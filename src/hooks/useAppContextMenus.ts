@@ -670,6 +670,10 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               icon: Images,
               label: mergeLabel,
               onClick: () => {
+                const hdrSourceMetadata = finalSelection.map((path) => ({
+                  exif: imageList.find((image) => image.path === path)?.exif ?? null,
+                  path,
+                }));
                 setUI({
                   hdrModalState: {
                     error: null,
@@ -678,6 +682,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     isProcessing: false,
                     progressMessage: null,
                     settings: DEFAULT_HDR_MERGE_UI_SETTINGS,
+                    sourceMetadata: hdrSourceMetadata,
                     stitchingSourcePaths: finalSelection,
                   },
                 });
