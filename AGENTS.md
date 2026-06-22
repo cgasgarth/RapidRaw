@@ -158,19 +158,12 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   possible PR. Break consult's milestone plan into individual GitHub issues
   locally, with each issue sized for one realistic PR and grouped under the
   milestone.
-- All feature PRs require consult before implementation is claimed or a PR is
-  opened. Treat a feature as any user-visible product behavior, image-processing
-  behavior, API/app-server editing capability, or workflow surface. If a feature
-  is urgent and consult is still running, do independent prep only; do not claim
-  the consult-backed decision until a usable response is available.
-- A fresh consult is not required when the issue already contains current,
+- Do not consult separately for each PR by default. Issues should already carry
+  current milestone-level consult context before implementation starts.
+- A fresh consult is not required for an issue that already contains current,
   specific consult-backed milestone guidance for the exact slice being
-  implemented. Reconsult if the scope, risk, UI, math, architecture, or
-  validation strategy changes.
-- Use consult for PRs that require decision making, including architecture,
-  tradeoffs, scope boundaries, validation strategy, UI direction, science/math,
-  color/image quality, or whether a slice should close or only reference an
-  issue.
+  implemented. Reconsult only when milestone scope, risk, UI direction,
+  science/math, architecture, or validation strategy materially changes.
 - Ask consult for the full target plan, risks, architecture, and validation
   strategy for the topic or milestone. Do not ask consult to optimize for the
   smallest usable PR; break the returned plan into PR-sized slices locally.
@@ -191,6 +184,24 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   project with the GitHub repo attached when available.
 - Treat consult output as advice. Verify it against current repo state before
   implementing.
+
+## Subagent Usage
+
+- Use subagents to parallelize independent, clearly scoped work when it will not
+  confuse branch ownership or degrade review quality.
+- For straightforward implementation tasks, clear CI/pipeline failures, issue
+  refinement, backlog cleanup, log polling, or repeated status checks, prefer a
+  smaller/faster subagent model such as 5.4 mini when available.
+- Keep the main agent responsible for final design judgment, integration
+  review, validation evidence, PR creation, and merge decisions.
+- Delegate only work that has a clear expected output: patch, diagnosis, issue
+  list, validation summary, or recommended next action.
+- Do not let subagents open broad PRs, create meta-tooling churn, or mark
+  feature work complete without runtime/product proof.
+- Use worktrees for subagent implementation when changes are independent.
+- While CI runs for one PR, use subagents for independent next slices, CI
+  failure diagnosis, or PR queue monitoring instead of leaving the main agent
+  idle.
 
 ## Validation And Quality
 
