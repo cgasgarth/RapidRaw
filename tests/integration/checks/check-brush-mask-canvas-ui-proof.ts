@@ -25,6 +25,8 @@ const reportSchema = z
     paintMaskHash: z.string().min(1),
     paintScreenshot: z.literal(PAINT_SCREENSHOT_PATH),
     pointCounts: z.array(z.number().int().min(2)).length(2),
+    refineBrushFeather: z.literal(64),
+    refineBrushSize: z.literal(96),
     schemaVersion: z.literal(1),
     screenshot: z.literal(FINAL_SCREENSHOT_PATH),
     strokeCount: z.literal(2),
