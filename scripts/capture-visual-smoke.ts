@@ -1536,9 +1536,7 @@ async function prepareScenario(page, mode) {
   }
 
   if (mode === 'hdr-ui') {
-    await page.getByRole('button', { name: 'High' }).click();
-    await page.getByRole('button', { name: '8192 px' }).click();
-    await page.getByLabel('Tone-map preview').uncheck();
+    await page.getByTestId('hdr-tone-mapping-preset-highlight_detail').click();
     hdrUiSettingsProofSchema.parse(
       await page.getByTestId('hdr-ui-settings-proof').evaluate((element) => ({ ...element.dataset })),
     );

@@ -2984,16 +2984,22 @@ function HdrVisualSmoke() {
         data-deghosting={hdrSettings.deghosting}
         data-estimated-preview-megapixels={Math.round((3 * hdrSettings.maxPreviewDimensionPx ** 2) / 1_000_000)}
         data-max-preview-dimension-px={hdrSettings.maxPreviewDimensionPx}
+        data-merge-strategy={hdrSettings.mergeStrategy}
+        data-quality-preference={hdrSettings.qualityPreference}
         data-runtime-status="dry_run_preview"
         data-source-count="3"
         data-testid="hdr-review-workspace-proof"
+        data-tone-mapping-preset={hdrSettings.toneMappingPreset}
       />
       <div
         className="sr-only"
         data-deghosting={hdrSettings.deghosting}
         data-max-preview-dimension-px={hdrSettings.maxPreviewDimensionPx}
+        data-merge-strategy={hdrSettings.mergeStrategy}
+        data-quality-preference={hdrSettings.qualityPreference}
         data-testid="hdr-ui-settings-proof"
         data-tone-map-preview={hdrSettings.toneMapPreview}
+        data-tone-mapping-preset={hdrSettings.toneMappingPreset}
       />
       <HdrModal
         error={null}

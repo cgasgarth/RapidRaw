@@ -33,6 +33,9 @@ export const hdrMergeApiToolRequestV1Schema = z
     sources: z.array(hdrBracketDetectionSourceInputV1Schema).min(2),
     target: rawEngineTargetSchema.safeExtend({ kind: z.enum(['image', 'project']) }).strict(),
     toneMapPreview: z.boolean().default(true),
+    toneMappingPreset: z
+      .enum(['custom', 'natural', 'highlight_detail', 'interior_lift', 'fast_preview'])
+      .default('natural'),
   })
   .strict();
 
@@ -86,6 +89,7 @@ export const buildHdrMergeApiCommandV1 = (requestValue: unknown): HdrMergeApiToo
         virtualCopyId: source.virtualCopyId,
       })),
       toneMapPreview: request.toneMapPreview,
+      toneMappingPreset: request.toneMappingPreset,
     },
     schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     target: request.target,

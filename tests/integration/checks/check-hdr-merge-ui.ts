@@ -87,7 +87,14 @@ const requiredLocaleKeys = [
   'summarySources',
   'summaryStrategy',
   'summaryToneMapPreview',
+  'summaryToneMappingPreset',
   'summaryWorkload',
+  'toneMappingPreset.custom',
+  'toneMappingPreset.fastPreview',
+  'toneMappingPreset.highlightDetail',
+  'toneMappingPreset.interiorLift',
+  'toneMappingPreset.natural',
+  'toneMappingPresetLabel',
   'toneMapPreview',
   'uiOnlyNotice',
   'workflowStatus',
@@ -119,6 +126,15 @@ if (invalid.success) {
   process.exit(1);
 }
 
+const invalidPreset = hdrMergeUiSettingsSchema.safeParse({
+  ...DEFAULT_HDR_MERGE_UI_SETTINGS,
+  toneMappingPreset: 'tone_crush',
+});
+if (invalidPreset.success) {
+  console.error('HDR UI schema accepted an unknown tone-mapping preset.');
+  process.exit(1);
+}
+
 const source = readFileSync('src/components/modals/HdrModal.tsx', 'utf8');
 for (const marker of [
   'hdr-setup-summary',
@@ -141,6 +157,9 @@ for (const marker of [
   'hdr-deghost-review-gate',
   'hdr-deghost-motion-overlay',
   'hdr-deghost-review-approve',
+  'hdr-tone-mapping-presets',
+  'hdr-tone-mapping-preset-${preset.id}',
+  'applyHdrToneMappingPreset',
   'data-review-decision={reviewDiagnostics.reviewDecision}',
   'data-warning-severity={reviewDiagnostics.warningSeverity}',
   'data-review-approved={String(isDeghostReviewApproved)}',
@@ -160,6 +179,8 @@ for (const marker of [
   'modals.hdr.summaryReady',
   'modals.hdr.summaryStrategy',
   'modals.hdr.summaryToneMapPreview',
+  'modals.hdr.summaryToneMappingPreset',
+  'modals.hdr.toneMappingPresetLabel',
   'modals.hdr.summaryWorkload',
   'modals.hdr.summaryMemory',
   'modals.hdr.previewMemory',

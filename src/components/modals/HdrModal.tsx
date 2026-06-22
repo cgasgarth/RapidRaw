@@ -4,6 +4,16 @@ import { useTranslation } from 'react-i18next';
 
 import { MergeErrorState, MergeFooterActions, MergeProcessingState, MergeResultPreview } from './MergeStatusViews';
 import { useModalTransition } from '../../hooks/useModalTransition';
+import {
+  applyHdrToneMappingPreset,
+  HDR_TONE_MAPPING_PRESETS,
+  type HdrMergeAlignmentMode,
+  type HdrMergeDeghosting,
+  type HdrMergeQualityPreference,
+  type HdrMergeStrategy,
+  type HdrMergeUiSettings,
+  type HdrToneMappingPreset,
+} from '../../schemas/hdrMergeUiSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
 import { buildHdrEditableHandoffSummary } from '../../utils/hdrEditableHandoff';
@@ -16,13 +26,6 @@ import type {
   HdrBracketDetectionMethodV1,
   HdrBracketSourceMetadataV1,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import type {
-  HdrMergeAlignmentMode,
-  HdrMergeDeghosting,
-  HdrMergeQualityPreference,
-  HdrMergeStrategy,
-  HdrMergeUiSettings,
-} from '../../schemas/hdrMergeUiSchemas';
 
 interface HdrModalProps {
   error: string | null;
@@ -86,11 +89,26 @@ export default function HdrModal({
     { label: t('modals.hdr.strategy.sceneLinear'), value: 'scene_linear_radiance' },
     { label: t('modals.hdr.strategy.exposureFusion'), value: 'exposure_fusion_preview' },
   ];
+  const getToneMappingPresetLabel = (preset: HdrToneMappingPreset) => {
+    switch (preset) {
+      case 'custom':
+        return t('modals.hdr.toneMappingPreset.custom');
+      case 'fast_preview':
+        return t('modals.hdr.toneMappingPreset.fastPreview');
+      case 'highlight_detail':
+        return t('modals.hdr.toneMappingPreset.highlightDetail');
+      case 'interior_lift':
+        return t('modals.hdr.toneMappingPreset.interiorLift');
+      case 'natural':
+        return t('modals.hdr.toneMappingPreset.natural');
+    }
+  };
   const selectedAlignmentLabel =
     alignmentOptions.find((option) => option.value === settings.alignmentMode)?.label ?? '';
   const selectedQualityLabel =
     qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '';
   const selectedStrategyLabel = strategyOptions.find((option) => option.value === settings.mergeStrategy)?.label ?? '';
+  const selectedPresetLabel = getToneMappingPresetLabel(settings.toneMappingPreset);
   const estimatedPreviewMegapixels = Math.round(((imageCount ?? 0) * settings.maxPreviewDimensionPx ** 2) / 1_000_000);
   const estimatedPreviewMemoryMb = Math.max(
     0,
@@ -110,6 +128,19 @@ export default function HdrModal({
   const setSetting = useCallback(
     (patch: Partial<HdrMergeUiSettings>) => {
       onSettingsChange({ ...settings, ...patch });
+    },
+    [onSettingsChange, settings],
+  );
+  const setManualSetting = useCallback(
+    (patch: Partial<HdrMergeUiSettings>) => {
+      setSetting({ ...patch, toneMappingPreset: 'custom' });
+    },
+    [setSetting],
+  );
+  const selectToneMappingPreset = useCallback(
+    (preset: Exclude<HdrToneMappingPreset, 'custom'>) => {
+      setIsDeghostReviewApproved(false);
+      onSettingsChange(applyHdrToneMappingPreset(settings, preset));
     },
     [onSettingsChange, settings],
   );
@@ -385,6 +416,10 @@ export default function HdrModal({
                 value: `${t('modals.hdr.summarySourceCount', { count: imageCount ?? 0 })} - ${
                   isSourceCountValid ? t('modals.hdr.summaryReady') : t('modals.hdr.summaryBlocked')
                 }`,
+              },
+              {
+                label: t('modals.hdr.summaryToneMappingPreset'),
+                value: selectedPresetLabel,
               },
               {
                 label: t('modals.hdr.summaryAlignment'),
@@ -740,6 +775,43 @@ export default function HdrModal({
             </section>
           )}
 
+          <section
+            className="mb-5 rounded-md border border-border-color bg-surface p-3"
+            data-deghosting={settings.deghosting}
+            data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
+            data-merge-strategy={settings.mergeStrategy}
+            data-quality-preference={settings.qualityPreference}
+            data-testid="hdr-tone-mapping-presets"
+            data-tone-map-preview={String(settings.toneMapPreview)}
+            data-tone-mapping-preset={settings.toneMappingPreset}
+          >
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <UiText variant={TextVariants.heading}>{t('modals.hdr.toneMappingPresetLabel')}</UiText>
+              <UiText as="span" variant={TextVariants.small} color={TextColors.secondary}>
+                {selectedPresetLabel}
+              </UiText>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {HDR_TONE_MAPPING_PRESETS.map((preset) => (
+                <button
+                  className={`min-h-10 rounded-md border px-3 py-2 text-sm transition-colors ${
+                    settings.toneMappingPreset === preset.id
+                      ? 'border-accent bg-accent/15 text-text-primary'
+                      : 'border-border-color bg-bg-primary text-text-secondary hover:bg-card-active'
+                  }`}
+                  data-testid={`hdr-tone-mapping-preset-${preset.id}`}
+                  key={preset.id}
+                  onClick={() => {
+                    selectToneMappingPreset(preset.id);
+                  }}
+                  type="button"
+                >
+                  {getToneMappingPresetLabel(preset.id)}
+                </button>
+              ))}
+            </div>
+          </section>
+
           <section className="grid grid-cols-2 gap-4">
             <div>
               <UiText variant={TextVariants.heading} className="mb-2">
@@ -749,7 +821,7 @@ export default function HdrModal({
                 options={alignmentOptions}
                 value={settings.alignmentMode}
                 onChange={(alignmentMode) => {
-                  setSetting({ alignmentMode });
+                  setManualSetting({ alignmentMode });
                 }}
               />
             </div>
@@ -761,7 +833,7 @@ export default function HdrModal({
                 options={qualityOptions}
                 value={settings.qualityPreference}
                 onChange={(qualityPreference) => {
-                  setSetting({ qualityPreference });
+                  setManualSetting({ qualityPreference });
                 }}
               />
             </div>
@@ -782,7 +854,7 @@ export default function HdrModal({
                   }`}
                   onClick={() => {
                     setIsDeghostReviewApproved(false);
-                    setSetting({ deghosting });
+                    setManualSetting({ deghosting });
                   }}
                   type="button"
                 >
@@ -801,7 +873,7 @@ export default function HdrModal({
                 options={strategyOptions}
                 value={settings.mergeStrategy}
                 onChange={(mergeStrategy) => {
-                  setSetting({ mergeStrategy });
+                  setManualSetting({ mergeStrategy });
                 }}
               />
             </div>
@@ -816,7 +888,9 @@ export default function HdrModal({
                     : 'border-border-color bg-surface text-text-secondary hover:bg-card-active'
                 }`}
                 onClick={() => {
-                  setSetting({ bracketValidation: settings.bracketValidation === 'required' ? 'warn' : 'required' });
+                  setManualSetting({
+                    bracketValidation: settings.bracketValidation === 'required' ? 'warn' : 'required',
+                  });
                 }}
                 type="button"
               >
@@ -839,7 +913,7 @@ export default function HdrModal({
                       : 'border-border-color bg-surface text-text-secondary hover:bg-card-active'
                   }`}
                   onClick={() => {
-                    setSetting({ maxPreviewDimensionPx });
+                    setManualSetting({ maxPreviewDimensionPx });
                   }}
                   type="button"
                 >
@@ -855,7 +929,7 @@ export default function HdrModal({
               checked={settings.toneMapPreview}
               className="h-4 w-4 accent-accent"
               onChange={(event) => {
-                setSetting({ toneMapPreview: event.target.checked });
+                setManualSetting({ toneMapPreview: event.target.checked });
               }}
               type="checkbox"
             />

@@ -3066,6 +3066,9 @@ export const computationalMergeCommandEnvelopeV1Schema = z
             qualityPreference: computationalMergeQualityPreferenceV1Schema,
             sources: computationalMergeSourcesSchema,
             toneMapPreview: z.boolean(),
+            toneMappingPreset: z
+              .enum(['custom', 'natural', 'highlight_detail', 'interior_lift', 'fast_preview'])
+              .optional(),
           })
           .strict()
           .superRefine((parameters, context) => {

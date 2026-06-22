@@ -44,6 +44,7 @@ const controls = {
     sourceIndex: bracket.sourceIndex,
   })),
   toneMapPreview: true,
+  toneMappingPreset: 'highlight_detail',
 };
 
 const dryRunCommand = buildHdrMergeUiDryRunCommandV1(controls, {
@@ -80,6 +81,12 @@ if (applied.apply.provenance.acceptedDryRunPlanId !== dryRun.dryRun.dryRunResult
 }
 if (applied.apply.provenance.alignmentConfidence < 0.99) {
   throw new Error(`Expected alignment confidence >= 0.99, got ${applied.apply.provenance.alignmentConfidence}.`);
+}
+if (dryRunCommand.parameters.toneMappingPreset !== 'highlight_detail') {
+  throw new Error('HDR UI runtime bridge did not preserve the tone-mapping preset in dry-run parameters.');
+}
+if (applyCommand.parameters.toneMappingPreset !== 'highlight_detail') {
+  throw new Error('HDR UI runtime bridge did not preserve the tone-mapping preset in apply parameters.');
 }
 
 expectThrows('mismatched accepted HDR UI runtime plan', () =>

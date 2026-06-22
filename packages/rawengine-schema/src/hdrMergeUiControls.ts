@@ -20,6 +20,8 @@ const hdrMergeUiSourceV1Schema = z
   })
   .strict();
 
+const hdrToneMappingPresetV1Schema = z.enum(['custom', 'natural', 'highlight_detail', 'interior_lift', 'fast_preview']);
+
 export const hdrMergeUiControlsV1Schema = z
   .object({
     alignmentMode: z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']).default('auto'),
@@ -31,6 +33,7 @@ export const hdrMergeUiControlsV1Schema = z
     qualityPreference: computationalMergeQualityPreferenceV1Schema.default('balanced'),
     sources: z.array(hdrMergeUiSourceV1Schema).min(2),
     toneMapPreview: z.boolean().default(true),
+    toneMappingPreset: hdrToneMappingPresetV1Schema.default('natural'),
   })
   .strict();
 
@@ -95,6 +98,7 @@ export const buildHdrMergeUiDryRunCommandV1 = (
         virtualCopyId: source.virtualCopyId,
       })),
       toneMapPreview: controls.toneMapPreview,
+      toneMappingPreset: controls.toneMappingPreset,
     },
     schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     target: { id: context.targetId, kind: context.targetKind },
@@ -142,6 +146,7 @@ export const buildHdrMergeUiApplyCommandV1 = (
         virtualCopyId: source.virtualCopyId,
       })),
       toneMapPreview: controls.toneMapPreview,
+      toneMappingPreset: controls.toneMappingPreset,
     },
     schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     target: { id: context.targetId, kind: context.targetKind },

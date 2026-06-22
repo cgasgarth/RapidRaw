@@ -322,8 +322,11 @@ const focusStackRoutePair = getComputationalMergeAppServerRoutePairSummary('focu
 
 export const hdrUiSettingsProofSchema = z.object({
   deghosting: z.literal('high'),
-  maxPreviewDimensionPx: z.literal('8192'),
-  toneMapPreview: z.literal('false'),
+  maxPreviewDimensionPx: z.literal('4096'),
+  mergeStrategy: z.literal('scene_linear_radiance'),
+  qualityPreference: z.literal('best'),
+  toneMapPreview: z.literal('true'),
+  toneMappingPreset: z.literal('highlight_detail'),
 });
 export const hdrReviewWorkspaceProofSchema = z.object({
   applyCommand: z.literal(hdrRoutePair.applyToolName),
@@ -335,9 +338,12 @@ export const hdrReviewWorkspaceProofSchema = z.object({
   bracketValidation: z.literal('required'),
   command: z.literal(hdrRoutePair.dryRunToolName),
   deghosting: z.literal('high'),
-  estimatedPreviewMegapixels: z.literal('201'),
+  estimatedPreviewMegapixels: z.literal('50'),
+  mergeStrategy: z.literal('scene_linear_radiance'),
+  qualityPreference: z.literal('best'),
   runtimeStatus: z.literal('dry_run_preview'),
   sourceCount: z.literal('3'),
+  toneMappingPreset: z.literal('highlight_detail'),
 });
 const finiteDatasetNumberSchema = z
   .string()
