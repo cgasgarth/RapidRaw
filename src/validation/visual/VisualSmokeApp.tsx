@@ -158,6 +158,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.DetailDustSpot]: DetailDustSpotVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.DetailWorkspace]: DetailWorkspaceVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FilmLookBrowser]: FilmLookVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawModalReview]: FocusPrivateRawModalReviewSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi]: FocusPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FocusUi]: FocusStackVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawEditorHandoff]: HdrPrivateRawEditorHandoffVisualSmoke,
@@ -779,6 +780,7 @@ const copy = {
   focusArtifactPath: '/tmp/rawengine-focus-stack-smoke.tif',
   focusDepthMap: 'Depth map',
   focusPrivateRawReview: 'Private RAW focus review',
+  focusPrivateRawModalReview: 'Private RAW focus modal review',
   focusPrivateRawRuntime: 'app-server apply proof',
   focusPrivateRawPreview: 'RAW preview',
   focusPrivateRawResult: 'Result review',
@@ -1966,6 +1968,56 @@ function FocusPrivateRawVisualSmoke() {
           </div>
         </aside>
       </div>
+    </main>
+  );
+}
+
+function FocusPrivateRawModalReviewSmoke() {
+  const proof = window.__RAWENGINE_FOCUS_PRIVATE_RAW_PROOF__;
+  const [settings, setSettings] = useState<FocusStackUiSettings>(DEFAULT_FOCUS_STACK_UI_SETTINGS);
+  const [previewRequested, setPreviewRequested] = useState(false);
+
+  if (!proof) {
+    return (
+      <main
+        className="grid h-full min-h-screen place-items-center bg-[#111316] text-[#f3f4f1] font-sans"
+        data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawModalReview}
+      >
+        <p>{copy.missingPrivateRawProofArtifacts}</p>
+      </main>
+    );
+  }
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawModalReview}
+    >
+      <div className="absolute inset-0 bg-[#0f1114]" data-visual-smoke-section="focus-private-raw-modal-review" />
+      <div className="fixed left-4 top-4 z-50 rounded-md border border-white/10 bg-black/75 px-3 py-2 text-sm font-semibold">
+        {copy.focusPrivateRawModalReview}
+      </div>
+      <div
+        className="sr-only"
+        data-fixture-id={proof.fixtureId}
+        data-preview-requested={String(previewRequested)}
+        data-source-count={proof.sourceCount}
+        data-stack-path={proof.stackPath}
+        data-testid="focus-private-raw-modal-review-proof"
+      />
+      <FocusStackModal
+        isOpen
+        loadingImageUrl={proof.previewDataUrl}
+        onClose={() => {}}
+        onPreviewPlan={() => {
+          setPreviewRequested(true);
+        }}
+        onSettingsChange={setSettings}
+        outputReviewArtifactPath={proof.stackPath}
+        settings={settings}
+        sourceCount={Number.parseInt(proof.sourceCount, 10)}
+      />
     </main>
   );
 }

@@ -7,6 +7,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   DetailWorkspace: 'detail-workspace',
   EmptyLibrary: 'empty-library',
   FilmLookBrowser: 'film-look-browser',
+  FocusPrivateRawModalReview: 'focus-private-raw-modal-review',
   FocusPrivateRawUi: 'focus-private-raw-ui',
   FocusUi: 'focus-ui',
   HdrPrivateRawEditorHandoff: 'hdr-private-raw-editor-handoff',
@@ -99,6 +100,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Private RAW focus review',
     mode: VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi,
     outputFile: 'focus-private-raw-ui.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Private RAW focus modal review',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawModalReview,
+    outputFile: 'focus-private-raw-modal-review.png',
     sectionMinimum: 1,
   },
   {
