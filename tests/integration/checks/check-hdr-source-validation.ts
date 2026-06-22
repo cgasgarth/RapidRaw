@@ -110,6 +110,15 @@ expectOnlyBlocks(
   }),
   ['missing_required_exposure_metadata'],
 );
+const missingExposureDetection = detectHdrBracketV1({
+  sources: baseBracket().map(({ declaredExposureEv, ...source }) => {
+    void declaredExposureEv;
+    return source;
+  }),
+});
+if (missingExposureDetection.sourceMetadata.some((source) => source.resolvedBracketRole !== 'unknown')) {
+  failures.push('missing exposure: unresolved sources should expose unknown bracket roles.');
+}
 expectOnlyBlocks(
   'mixed exposure metadata strategies',
   [
