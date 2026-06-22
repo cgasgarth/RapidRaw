@@ -37,6 +37,7 @@ import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from
 import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
 
 import type { MaskOverlaySettings } from '../../schemas/maskOverlaySchemas';
+import type { SuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
 
 interface VisualSmokeAppProps {
   mode: string;
@@ -1978,6 +1979,20 @@ function HdrPrivateRawVisualSmoke() {
 
 function SuperResolutionVisualSmoke() {
   const [settings, setSettings] = useState<SuperResolutionUiSettings>(DEFAULT_SUPER_RESOLUTION_UI_SETTINGS);
+  const sourcePreflightMetadata: SuperResolutionSourcePreflightMetadata[] = Array.from({ length: 5 }, (_, index) => ({
+    exif: {
+      ExifImageHeight: '6336',
+      ExifImageWidth: '9504',
+      ISO: '100',
+      LensModel: 'FE 50mm F1.4 GM',
+      Make: 'Sony',
+      Model: 'ILCE-7RM5',
+    },
+    height: 6336,
+    imagePath: `/private/alaska/sr_dx-${index % 2}_dy-${Math.floor(index / 2)}_${index}.ARW`,
+    sourceIndex: index,
+    width: 9504,
+  }));
   const reviewArtifactPreviewUrls = {
     baseline_review_crop: buildSrReviewPreviewDataUrl('#2f3a42', '#596675', 'Baseline'),
     reconstruction_preview: buildSrReviewPreviewDataUrl('#22384d', '#d6b46e', 'Preview'),
@@ -2010,6 +2025,8 @@ function SuperResolutionVisualSmoke() {
           data-review-crop-count="4"
           data-review-packet-path="docs/validation/sr-synthetic-output-artifact-proof-2026-06-20.json"
           data-runtime-status="dry_run_preview"
+          data-source-preflight-effective-scale="2"
+          data-source-preflight-status="ready"
           data-source-count="5"
           data-warning-codes={
             settings.detailPolicy === 'aggressive_preview_only'
@@ -2041,6 +2058,7 @@ function SuperResolutionVisualSmoke() {
           reviewArtifactPreviewUrls={reviewArtifactPreviewUrls}
           onSettingsChange={setSettings}
           settings={settings}
+          sourcePreflightMetadata={sourcePreflightMetadata}
           sourceCount={5}
         />
         <aside className="fixed right-4 top-14 z-50 w-80 rounded-md border border-white/10 bg-black/75 p-3 text-sm shadow-lg">

@@ -17,6 +17,7 @@ import {
 
 import type { SuperResolutionOutputReviewWorkflow } from '../schemas/superResolutionOutputReviewSchemas';
 import type { HdrBracketPreflightSourceMetadata } from '../utils/hdrBracketPreflight';
+import type { SuperResolutionSourcePreflightMetadata } from '../utils/superResolutionSourcePreflight';
 
 export interface CollapsibleSectionsState {
   basic: boolean;
@@ -88,6 +89,7 @@ export interface SuperResolutionModalState {
   };
   outputReview: SuperResolutionOutputReviewWorkflow | null;
   settings: SuperResolutionUiSettings;
+  sourcePreflightMetadata: SuperResolutionSourcePreflightMetadata[];
   sourcePaths: Array<string>;
 }
 
@@ -161,6 +163,7 @@ export const createDefaultSuperResolutionModalState = (
   isOpen: false,
   outputReview: null,
   settings,
+  sourcePreflightMetadata: [],
   sourcePaths: [],
 });
 

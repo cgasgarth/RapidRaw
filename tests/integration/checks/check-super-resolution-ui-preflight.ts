@@ -12,7 +12,11 @@ const requiredLocaleKeys = [
   'previewWorkloadValue',
   'previewMemoryValue',
   'preflight.alignment',
+  'preflight.confidence',
   'preflight.detail',
+  'preflight.effectiveScaleValue',
+  'preflight.status',
+  'preflight.warnings',
   'qualityBalanced',
   'qualityBest',
   'qualityLabel',
@@ -41,6 +45,11 @@ for (const marker of [
   'modals.superResolution.previewMemoryValue',
   'modals.superResolution.preflight.workload',
   'modals.superResolution.previewWorkloadValue',
+  'data-testid="sr-source-preflight"',
+  'data-testid="sr-source-preflight-row"',
+  'buildSuperResolutionSourcePreflight',
+  'sourcePreflightMetadata',
+  'modals.superResolution.preflight.effectiveScaleValue',
 ]) {
   if (!source.includes(marker)) {
     console.error(`Super-resolution preflight missing marker: ${marker}`);
