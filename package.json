@@ -180,6 +180,7 @@
     "check:denoise-separation-runtime": "bun scripts/run-compact-command.ts --label denoise-separation-runtime --cwd src-tauri -- cargo test --quiet luma_and_chroma_noise_controls_have_independent_output_effects --no-default-features --features required-ci",
     "check:export-recipes-ui": "bun tests/integration/checks/check-export-recipes-ui.ts",
     "check:detail-preview-export-parity": "bun tests/integration/checks/check-detail-preview-export-parity.ts",
+    "check:detail-output-command-replay": "bun tests/integration/checks/check-detail-output-command-replay.ts",
     "check:detail-output-comparison-proof": "bun tests/integration/checks/check-detail-output-comparison-proof.ts",
     "check:detail-output-comparison-proof:update": "bun tests/integration/checks/check-detail-output-comparison-proof.ts --update",
     "check:detail-stage-order": "bun tests/integration/checks/check-detail-stage-order.ts",
