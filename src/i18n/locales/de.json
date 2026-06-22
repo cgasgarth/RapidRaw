@@ -1884,6 +1884,12 @@
       "bracketPreflightSpanValue": "",
       "bracketPreflightTitle": "",
       "bracketPreflightWarning": "",
+      "bracketRole": {
+        "over_exposed": "",
+        "reference": "",
+        "under_exposed": "",
+        "unknown": ""
+      },
       "bracketValidation": {
         "disabled": "Disabled",
         "required": "Required",
