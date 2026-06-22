@@ -174,7 +174,7 @@ const reportWithoutEvidence = {
     toolCount: registry.tools.length,
     virtualCopyId: target.virtualCopyId,
   },
-  issue: 2983,
+  issue: 3022,
   limits: [
     'Runs deterministic in-process local app-server bridge tools; it does not call a paid model provider.',
     'Shows before/after demo preview artifacts and graph revisions; it does not decode RAW pixels in this PR.',
@@ -191,7 +191,7 @@ const reportWithoutEvidence = {
     applyAuditEventId: workflow.audit.applyEventId,
     dryRunAuditEventId: workflow.audit.dryRunEventId,
   },
-  refs: ['#2983'],
+  refs: ['#2983', '#3022'],
   validationMode: 'agent_expert_edit_demo_workflow',
 } satisfies Omit<z.input<typeof agentExpertEditDemoWorkflowSchema>, 'evidence'>;
 
