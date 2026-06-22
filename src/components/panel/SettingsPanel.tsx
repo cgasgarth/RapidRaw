@@ -47,6 +47,11 @@ import { cloudUsageSchema, type CloudUsage } from '../../schemas/cloudUsageSchem
 import { normalizeKeyboardShortcutMap, parseKeyboardShortcutCombo } from '../../schemas/keyboardShortcutSchemas';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import {
+  buildCaptureSharpeningProcessingPatch,
+  CAPTURE_SHARPENING_PRESETS,
+  findMatchingCaptureSharpeningPreset,
+} from '../../utils/captureSharpeningPresets';
+import {
   formatKeyCode,
   type KeybindDefinition,
   KEYBIND_DEFINITIONS,
@@ -185,6 +190,7 @@ const countSchema = z.number().int().nonnegative();
 const emptyResponseSchema = z.unknown();
 const translateDynamicKey = (translate: TFunction, key: string): string => translate(key, { defaultValue: key });
 const KEYBIND_ACTIONS = new Set(KEYBIND_DEFINITIONS.map((definition) => definition.action));
+const CUSTOM_CAPTURE_SHARPENING_PRESET_ID = 'custom_capture_sharpening';
 
 const adjustmentVisibilityDefaults = {
   sharpening: true,
@@ -725,6 +731,19 @@ export function SettingsPanel({
     ],
     [t],
   );
+  const captureSharpeningPresetOptions = useMemo<OptionItem<string>[]>(
+    () => [
+      {
+        value: CUSTOM_CAPTURE_SHARPENING_PRESET_ID,
+        label: t('settings.processing.preprocessing.captureSharpeningCustom'),
+      },
+      ...CAPTURE_SHARPENING_PRESETS.map((preset) => ({
+        value: preset.id,
+        label: preset.name,
+      })),
+    ],
+    [t],
+  );
 
   const fontOptions = useMemo<OptionItem<string>[]>(
     () => [
@@ -820,6 +839,20 @@ export function SettingsPanel({
 
   const handleProcessingSettingChangeVoid = <K extends ProcessingSettingKey>(key: K, value: ProcessingSettings[K]) => {
     void handleProcessingSettingChange(key, value);
+  };
+
+  const handleCaptureSharpeningPresetChange = async (presetId: string) => {
+    const preset = CAPTURE_SHARPENING_PRESETS.find((candidate) => candidate.id === presetId);
+    if (!preset) return;
+
+    const patch = buildCaptureSharpeningProcessingPatch(preset);
+    setProcessingSettings((prev) => ({ ...prev, ...patch }));
+    await onSettingsChange({ ...appSettings, ...patch });
+    await invokeWithSchema(Invokes.ClearImageCaches, {}, emptyResponseSchema);
+  };
+
+  const handleCaptureSharpeningPresetChangeVoid = (presetId: string) => {
+    void handleCaptureSharpeningPresetChange(presetId);
   };
 
   const handleSaveAndRelaunch = async () => {
@@ -2100,6 +2133,22 @@ export function SettingsPanel({
                     {t('settings.processing.preprocessing.title')}
                   </UiText>
                   <div className="space-y-8">
+                    <div data-testid="capture-sharpening-preset-control">
+                      <DropdownSetting
+                        label={t('settings.processing.preprocessing.captureSharpeningPreset')}
+                        description={t('settings.processing.preprocessing.captureSharpeningPresetDesc')}
+                        options={captureSharpeningPresetOptions}
+                        value={
+                          findMatchingCaptureSharpeningPreset({
+                            applyPreprocessingToNonRaws: processingSettings.applyPreprocessingToNonRaws,
+                            rawPreprocessingColorNr: processingSettings.rawPreprocessingColorNr,
+                            rawPreprocessingSharpening: processingSettings.rawPreprocessingSharpening,
+                          })?.id ?? CUSTOM_CAPTURE_SHARPENING_PRESET_ID
+                        }
+                        onChange={handleCaptureSharpeningPresetChangeVoid}
+                      />
+                    </div>
+
                     <SettingItem
                       label={t('settings.processing.preprocessing.highlightRecovery')}
                       description={t('settings.processing.preprocessing.highlightRecoveryDesc')}

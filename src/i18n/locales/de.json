@@ -2834,6 +2834,9 @@
       "preprocessing": {
         "applyPreprocessing": "Vorverarbeitung auf Nicht-RAWs anwenden",
         "applyPreprocessingDesc": "Wenn aktiviert, wird die Rauschreduzierung und Vorschärfung auch auf Standardformate angewendet.",
+        "captureSharpeningCustom": "",
+        "captureSharpeningPreset": "",
+        "captureSharpeningPresetDesc": "",
         "colorNr": "Basis-Farbrauschreduzierung",
         "colorNrDesc": "Wendet früh in der Pipeline einen Filter an, um Farbrauschen zu entfernen. Höherer Wert = Stärkere Reduzierung.",
         "defaultNonRawTonemapper": "Standard-Tonemapper (Nicht-RAW)",

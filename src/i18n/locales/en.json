@@ -2859,6 +2859,9 @@
       "preprocessing": {
         "applyPreprocessing": "Apply Preprocessing to Non-RAWs",
         "applyPreprocessingDesc": "If enabled, the base color noise reduction and pre-sharpening above will also be applied to standard formats.",
+        "captureSharpeningCustom": "Custom current settings",
+        "captureSharpeningPreset": "Capture Sharpening Preset",
+        "captureSharpeningPresetDesc": "Applies a schema-backed starting point to the RAW preprocessing sharpening, chroma noise reduction, and non-RAW opt-in controls.",
         "colorNr": "Base Color Noise Reduction",
         "colorNrDesc": "Applies a cross-bilateral filter early in the pipeline to remove chroma noise. Higher value = Stronger NR.",
         "defaultNonRawTonemapper": "Default Non-RAW Tonemapper",

@@ -222,6 +222,7 @@
     "check:white-balance-tone-runtime-proof": "bun tests/integration/checks/check-white-balance-tone-runtime-proof.ts",
     "check:curves-levels-runtime-proof": "bun tests/integration/checks/check-curves-levels-runtime-proof.ts",
     "check:capture-sharpening": "bun tests/integration/checks/check-capture-sharpening-fixtures.ts",
+    "check:capture-sharpening-ui": "bun tests/integration/checks/check-capture-sharpening-ui.ts",
     "check:wavelet-detail": "bun tests/integration/checks/check-wavelet-detail-fixtures.ts",
     "check:wavelet-detail-runtime": "bun tests/integration/checks/check-wavelet-detail-runtime.ts",
     "check:noise-metrics": "bun tests/integration/checks/check-noise-metric-fixtures.ts",

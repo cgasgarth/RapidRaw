@@ -2982,6 +2982,9 @@
       "preprocessing": {
         "applyPreprocessing": "Zastosuj wstępne przetwarzanie do formatów innych niż RAW",
         "applyPreprocessingDesc": "Jeśli włączone, redukcja szumu kolorów i wstępne wyostrzanie powyżej zostaną również zastosowane do standardowych formatów.",
+        "captureSharpeningCustom": "",
+        "captureSharpeningPreset": "",
+        "captureSharpeningPresetDesc": "",
         "colorNr": "Bazowa redukcja szumu koloru",
         "colorNrDesc": "Stosuje filtr na wczesnym etapie w celu usunięcia szumu koloru (Chroma). Wyższa wartość = Silniejsza redukcja szumów.",
         "defaultNonRawTonemapper": "Domyślne mapowanie tonów (Non-RAW)",
