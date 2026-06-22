@@ -79,7 +79,9 @@ export const focusStackOutputReviewWorkflowSchema = z
             z
               .object({
                 artifactId: z.string().min(1),
+                confidencePercent: z.number().int().min(0).max(100),
                 contributionRatio: z.number().min(0).max(1),
+                coverageCellCount: z.number().int().positive(),
                 sourceId: z.string().min(1),
                 sourceIndex: z.number().int().nonnegative(),
                 warningState: focusStackSourceContributionWarningStateSchema,

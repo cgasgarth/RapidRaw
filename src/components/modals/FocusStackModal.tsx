@@ -424,7 +424,9 @@ export default function FocusStackModal({
               <div
                 className="rounded-md border border-border-color bg-bg-secondary/70 p-2 text-sm"
                 data-artifact-id={source.artifactId}
+                data-confidence-percent={source.confidencePercent}
                 data-contribution-percent={Math.round(source.contributionRatio * 100)}
+                data-coverage-cell-count={source.coverageCellCount}
                 data-source-id={source.sourceId}
                 data-warning-state={source.warningState}
                 data-testid={`focus-source-contribution-${source.sourceId}`}
@@ -442,6 +444,12 @@ export default function FocusStackModal({
                 </div>
                 <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1">
                   {getSourceContributionWarningLabel(source.warningState)}
+                </UiText>
+                <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1">
+                  {t('modals.focusStack.review.sourceConfidenceCoverageValue', {
+                    cells: source.coverageCellCount,
+                    confidence: source.confidencePercent,
+                  })}
                 </UiText>
                 <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 truncate font-mono">
                   {source.artifactId}

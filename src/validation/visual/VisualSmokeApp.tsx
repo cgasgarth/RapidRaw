@@ -1937,6 +1937,7 @@ function FocusStackVisualSmoke() {
           data-sharpness-coverage-ratio="1"
           data-source-contribution-summary="S1 17% / S2 17% / S3 17% / S4 17% / S5 17% / S6 17%"
           data-source-count="6"
+          data-source-coverage-details="6"
           data-source-detail-count="6"
           data-warning-codes={
             settings.blendMethod === 'depth_map'
@@ -2246,7 +2247,9 @@ function FocusPrivateRawModalReviewSmoke() {
       opacityPercent: settings.reviewOverlayOpacityPercent,
       sourceContributionDetails: Array.from({ length: sourceCount }, (_value, sourceIndex) => ({
         artifactId: `artifact_focus_private_source_${sourceIndex + 1}_contribution`,
+        confidencePercent: Math.max(62, 92 - sourceIndex * 2),
         contributionRatio: Number((1 / sourceCount).toFixed(6)),
+        coverageCellCount: 12,
         sourceId: `S${sourceIndex + 1}`,
         sourceIndex,
         warningState: 'artifact_review_required',

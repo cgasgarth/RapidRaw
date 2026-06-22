@@ -1135,6 +1135,7 @@ async function prepareScenario(page, mode) {
     const sourceOneDetail = page.getByTestId('focus-source-contribution-S1');
     await sourceOneDetail.getByText('S1', { exact: true }).waitFor({ timeout: 10_000 });
     await sourceOneDetail.getByText('17%', { exact: true }).waitFor({ timeout: 10_000 });
+    await sourceOneDetail.getByText('92% confidence / 12 cells', { exact: true }).waitFor({ timeout: 10_000 });
     await sourceOneDetail.getByText('artifact_focus_source_1_contribution', { exact: true }).waitFor({
       timeout: 10_000,
     });
@@ -1144,6 +1145,10 @@ async function prepareScenario(page, mode) {
     const sourceDetailCount = await sourceDetails.locator('[data-source-id]').count();
     if (sourceDetailCount !== 6) {
       throw new Error(`Expected 6 focus source contribution detail cards, found ${sourceDetailCount}.`);
+    }
+    const sourceCoverage = await sourceDetails.locator('[data-confidence-percent][data-coverage-cell-count]').count();
+    if (sourceCoverage !== 6) {
+      throw new Error(`Expected 6 focus confidence/coverage cards, found ${sourceCoverage}.`);
     }
     await page
       .getByTestId('focus-artifact-handoff')

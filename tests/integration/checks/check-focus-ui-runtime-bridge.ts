@@ -123,6 +123,17 @@ if (outputReview.haloReview.transitionRiskRegions.length !== cells.length) {
     `Expected ${cells.length} transition regions, got ${outputReview.haloReview.transitionRiskRegions.length}.`,
   );
 }
+if (outputReview.reviewOverlay.sourceContributionDetails.length !== frames.length) {
+  throw new Error('Focus output review must expose one source contribution detail per input source.');
+}
+for (const source of outputReview.reviewOverlay.sourceContributionDetails) {
+  if (source.confidencePercent < 62 || source.confidencePercent > 100) {
+    throw new Error(`Focus source ${source.sourceId} has invalid confidence ${source.confidencePercent}.`);
+  }
+  if (source.coverageCellCount < 1) {
+    throw new Error(`Focus source ${source.sourceId} must expose positive coverage cell count.`);
+  }
+}
 if (dryRunCommand.parameters.haloSuppressionStrengthPercent !== 80) {
   throw new Error('Focus UI runtime bridge did not preserve dry-run halo suppression.');
 }
