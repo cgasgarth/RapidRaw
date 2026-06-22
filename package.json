@@ -55,6 +55,7 @@
     "check:headless-render-command": "bun tests/integration/checks/check-headless-render-command.ts",
     "check:basic-tone-command-bridge": "bun tests/integration/checks/check-basic-tone-command-bridge.ts",
     "check:agent-basic-tone-apply-proof": "bun tests/integration/checks/check-agent-basic-tone-apply-proof.ts",
+    "check:agent-color-edit-workflow": "bun tests/integration/checks/check-agent-color-edit-workflow.ts",
     "check:tone-color-app-server-routes": "bun tests/integration/checks/check-tone-color-app-server-routes.ts",
     "check:derived-artifact-invalidation": "bun tests/integration/checks/check-derived-artifact-invalidation.ts",
     "check:tauri-schema-validation": "bun tests/integration/checks/check-tauri-schema-validation.ts",

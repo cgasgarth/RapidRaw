@@ -1,4 +1,5 @@
 export * from './appServerCommandSchemas.js';
+export * from './agentColorEditWorkflow.js';
 export * from './brushMaskCommandRuntime.js';
 export * from './focusStackPreflight.js';
 export * from './computationalMergeWarningCodes.js';
