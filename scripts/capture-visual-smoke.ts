@@ -1641,6 +1641,49 @@ async function prepareScenario(page, mode) {
       );
     }),
   );
+  await page.getByTestId('negative-lab-patch-probe-shadow-patch').click();
+  await page.getByTestId('negative-lab-patch-probe-overlay').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-patch-probe-readout').getByText('Shadow patch', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  const previewInvokeCountBeforeShadowBlackPoint = await page.evaluate(
+    () =>
+      (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).filter((call) => call.command === 'preview_negative_conversion')
+        .length,
+  );
+  await page.getByTestId('negative-lab-analyze-shadow-black-point').click();
+  await page.getByTestId('negative-lab-shadow-black-point-suggestion').waitFor({ timeout: 10_000 });
+  const previewInvokeCountAfterShadowBlackPoint = await page.evaluate(
+    () =>
+      (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).filter((call) => call.command === 'preview_negative_conversion')
+        .length,
+  );
+  if (previewInvokeCountAfterShadowBlackPoint !== previewInvokeCountBeforeShadowBlackPoint) {
+    throw new Error('Negative Lab shadow black-point suggestion changed preview before explicit apply.');
+  }
+  await page.getByTestId('negative-lab-shadow-black-point-value').getByText('0.12', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-shadow-black-point-status').getByText('Suggested', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-shadow-black-point-risk').getByText('Low', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  if ((await page.locator('[data-testid="negative-lab-shadow-black-point-apply-warning"]').count()) !== 0) {
+    throw new Error('Negative Lab shadow black-point safe suggestion showed an apply warning.');
+  }
+  await page.getByTestId('negative-lab-apply-shadow-black-point').click();
+  await page.getByTestId('negative-lab-recipe-black-point').getByText('0.12', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.waitForFunction(() =>
+    (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).some(
+      (call) =>
+        call.command === 'preview_negative_conversion' &&
+        JSON.stringify(call.args ?? {}).includes('"black_point":0.12'),
+    ),
+  );
   const setPrintEndpoint = async (testId: string, value: number) => {
     await page.getByTestId(testId).evaluate((element, nextValue) => {
       const input = element.querySelector('input[type="range"]');

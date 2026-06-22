@@ -2652,6 +2652,7 @@ pub fn run() {
             negative_conversion::estimate_negative_base_fog,
             negative_conversion::suggest_negative_lab_neutral_patch_rgb_balance,
             negative_conversion::suggest_negative_lab_highlight_patch_exposure,
+            negative_conversion::suggest_negative_lab_shadow_patch_black_point,
             negative_conversion::convert_negatives,
         ])
         .build(tauri::generate_context!())

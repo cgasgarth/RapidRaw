@@ -190,11 +190,36 @@ pub struct NegativeLabHighlightPatchExposureSuggestion {
     pub suggested_frame_exposure_offset: f32,
 }
 
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabShadowPatchBlackPointSuggestion {
+    pub application_risk: String,
+    pub apply_allowed: bool,
+    pub correction_magnitude: f32,
+    pub current_black_point: f32,
+    pub current_sample_p01_min_channel: f32,
+    pub current_sample_rgb: [f32; 3],
+    pub endpoint_clamped: bool,
+    pub projected_black_point: f32,
+    pub projected_sample_p01_min_channel: f32,
+    pub projected_sample_rgb: [f32; 3],
+    pub role: String,
+    pub sample_rect: NegativeBaseFogSampleRect,
+    pub status: String,
+    pub suggested_black_point_delta: f32,
+}
+
 #[derive(Debug, Clone, Copy)]
 struct NegativeLabHighlightPatchMetrics {
     frame_clipped_fraction: f32,
     sample_clipped_fraction: f32,
     sample_p99_max_channel: f32,
+    sample_rgb: [f32; 3],
+}
+
+#[derive(Debug, Clone, Copy)]
+struct NegativeLabShadowPatchMetrics {
+    sample_p01_min_channel: f32,
     sample_rgb: [f32; 3],
 }
 
@@ -216,6 +241,8 @@ const JPEG_PROOF_QUALITY: u8 = 92;
 const NEGATIVE_LAB_CONVERSION_BUNDLE_SCHEMA_VERSION: u8 = 1;
 const NEGATIVE_LAB_HIGHLIGHT_CLIPPING_CEILING: f32 = 0.98;
 const NEGATIVE_LAB_FRAME_EXPOSURE_STEP_EV: f32 = 0.05;
+const NEGATIVE_LAB_SHADOW_TARGET_FLOOR: f32 = 0.035;
+const NEGATIVE_LAB_BLACK_POINT_STEP: f32 = 0.01;
 
 impl Default for NegativeLabFrameExposureOverridePayload {
     fn default() -> Self {
@@ -754,6 +781,123 @@ fn build_negative_lab_highlight_patch_exposure_suggestion(
         status: status.to_string(),
         suggested_exposure_delta_ev,
         suggested_frame_exposure_offset: selected_offset,
+    }
+}
+
+fn negative_lab_shadow_patch_metrics(
+    rendered: &DynamicImage,
+    sample_rect: NegativeBaseFogSampleRect,
+) -> NegativeLabShadowPatchMetrics {
+    let rgb = rendered.to_rgb32f();
+    let (width, height) = rgb.dimensions();
+    let (start_x, end_x, start_y, end_y) = sample_rect_pixel_bounds(sample_rect, width, height);
+    let mut sample_min_channels = Vec::with_capacity(
+        (end_x.saturating_sub(start_x) * end_y.saturating_sub(start_y)) as usize,
+    );
+    let mut sample_rgb_sum = [0.0_f32; 3];
+    let mut sample_count = 0_usize;
+
+    for (x, y, pixel) in rgb.enumerate_pixels() {
+        if x >= start_x && x < end_x && y >= start_y && y < end_y {
+            let channels = pixel.0;
+            sample_rgb_sum[0] += channels[0];
+            sample_rgb_sum[1] += channels[1];
+            sample_rgb_sum[2] += channels[2];
+            sample_min_channels.push(channels[0].min(channels[1]).min(channels[2]));
+            sample_count += 1;
+        }
+    }
+
+    sample_min_channels.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+    let p01_index = ((sample_min_channels.len().saturating_sub(1)) as f32 * 0.01).round() as usize;
+    let sample_p01_min_channel = sample_min_channels.get(p01_index).copied().unwrap_or(0.0);
+    let safe_sample_count = sample_count.max(1) as f32;
+
+    NegativeLabShadowPatchMetrics {
+        sample_p01_min_channel,
+        sample_rgb: sample_rgb_sum.map(|value| value / safe_sample_count),
+    }
+}
+
+fn build_negative_lab_shadow_patch_black_point_suggestion(
+    input: &DynamicImage,
+    params: NegativeConversionParams,
+    sample_rect: NegativeBaseFogSampleRect,
+) -> NegativeLabShadowPatchBlackPointSuggestion {
+    let sanitized_params = params.sanitized();
+    let current_render = run_pipeline(input, &sanitized_params, None);
+    let current_metrics = negative_lab_shadow_patch_metrics(&current_render, sample_rect);
+
+    if current_metrics.sample_p01_min_channel <= NEGATIVE_LAB_SHADOW_TARGET_FLOOR {
+        return NegativeLabShadowPatchBlackPointSuggestion {
+            application_risk: "low".to_string(),
+            apply_allowed: false,
+            correction_magnitude: 0.0,
+            current_black_point: sanitized_params.black_point,
+            current_sample_p01_min_channel: current_metrics.sample_p01_min_channel,
+            current_sample_rgb: current_metrics.sample_rgb,
+            endpoint_clamped: false,
+            projected_black_point: sanitized_params.black_point,
+            projected_sample_p01_min_channel: current_metrics.sample_p01_min_channel,
+            projected_sample_rgb: current_metrics.sample_rgb,
+            role: "shadow".to_string(),
+            sample_rect,
+            status: "already_safe".to_string(),
+            suggested_black_point_delta: 0.0,
+        };
+    }
+
+    let max_black_point = (sanitized_params.white_point - MIN_ENDPOINT_SEPARATION)
+        .clamp(MIN_BLACK_POINT, MAX_BLACK_POINT);
+    let mut selected_black_point = sanitized_params.black_point;
+    let mut selected_metrics = current_metrics;
+    let mut suggested = false;
+
+    for step in 1..=95 {
+        let candidate_black_point = (sanitized_params.black_point
+            + step as f32 * NEGATIVE_LAB_BLACK_POINT_STEP)
+            .min(max_black_point);
+        let candidate_params = NegativeConversionParams {
+            black_point: candidate_black_point,
+            ..sanitized_params
+        };
+        let candidate_render = run_pipeline(input, &candidate_params, None);
+        let candidate_metrics = negative_lab_shadow_patch_metrics(&candidate_render, sample_rect);
+        selected_black_point = candidate_black_point;
+        selected_metrics = candidate_metrics;
+
+        if selected_metrics.sample_p01_min_channel <= NEGATIVE_LAB_SHADOW_TARGET_FLOOR {
+            suggested = true;
+            break;
+        }
+
+        if candidate_black_point >= max_black_point {
+            break;
+        }
+    }
+
+    let suggested_black_point_delta = selected_black_point - sanitized_params.black_point;
+    let correction_magnitude = suggested_black_point_delta.abs();
+    let endpoint_clamped = selected_black_point >= max_black_point;
+    let application_risk = negative_lab_correction_risk(correction_magnitude);
+    let apply_allowed = suggested && !endpoint_clamped && correction_magnitude <= 0.35;
+    let status = if suggested { "suggested" } else { "blocked" };
+
+    NegativeLabShadowPatchBlackPointSuggestion {
+        application_risk,
+        apply_allowed,
+        correction_magnitude,
+        current_black_point: sanitized_params.black_point,
+        current_sample_p01_min_channel: current_metrics.sample_p01_min_channel,
+        current_sample_rgb: current_metrics.sample_rgb,
+        endpoint_clamped,
+        projected_black_point: selected_black_point,
+        projected_sample_p01_min_channel: selected_metrics.sample_p01_min_channel,
+        projected_sample_rgb: selected_metrics.sample_rgb,
+        role: "shadow".to_string(),
+        sample_rect,
+        status: status.to_string(),
+        suggested_black_point_delta,
     }
 }
 
@@ -1523,6 +1667,62 @@ pub async fn suggest_negative_lab_highlight_patch_exposure(
 }
 
 #[tauri::command]
+pub async fn suggest_negative_lab_shadow_patch_black_point(
+    path: String,
+    params: NegativeConversionParams,
+    sample_rect: NegativeBaseFogSampleRect,
+    state: tauri::State<'_, AppState>,
+    app_handle: AppHandle,
+) -> Result<NegativeLabShadowPatchBlackPointSuggestion, String> {
+    let sanitized_rect = sanitize_sample_rect(sample_rect)
+        .ok_or_else(|| "Shadow patch sample rect is invalid.".to_string())?;
+    let (source_path, _) = parse_virtual_path(&path);
+    let source_path_str = source_path.to_string_lossy().to_string();
+    let image = {
+        let original_lock = state.original_image.lock().unwrap();
+        if let Some(loaded) = original_lock.as_ref() {
+            if loaded.path == source_path_str {
+                loaded.image.clone().as_ref().clone()
+            } else {
+                drop(original_lock);
+                let settings = load_settings_or_default(&app_handle);
+                match read_file_mapped(Path::new(&source_path_str)) {
+                    Ok(mmap) => {
+                        load_base_image_from_bytes(&mmap, &source_path_str, false, &settings, None)
+                    }
+                    Err(_) => {
+                        let bytes =
+                            fs::read(&source_path_str).map_err(|io_err| io_err.to_string())?;
+                        load_base_image_from_bytes(&bytes, &source_path_str, false, &settings, None)
+                    }
+                }
+                .map_err(|e| e.to_string())?
+            }
+        } else {
+            drop(original_lock);
+            let settings = load_settings_or_default(&app_handle);
+            match read_file_mapped(Path::new(&source_path_str)) {
+                Ok(mmap) => {
+                    load_base_image_from_bytes(&mmap, &source_path_str, false, &settings, None)
+                }
+                Err(_) => {
+                    let bytes = fs::read(&source_path_str).map_err(|io_err| io_err.to_string())?;
+                    load_base_image_from_bytes(&bytes, &source_path_str, false, &settings, None)
+                }
+            }
+            .map_err(|e| e.to_string())?
+        }
+    };
+    let downscaled = downscale_f32_image(&image, 1080, 1080);
+
+    Ok(build_negative_lab_shadow_patch_black_point_suggestion(
+        &downscaled,
+        params,
+        sanitized_rect,
+    ))
+}
+
+#[tauri::command]
 pub async fn convert_negatives(
     paths: Vec<String>,
     params: NegativeConversionParams,
@@ -1881,6 +2081,81 @@ mod tests {
         assert!(
             suggestion.current_sample_p99_max_channel <= NEGATIVE_LAB_HIGHLIGHT_CLIPPING_CEILING
         );
+    }
+
+    #[test]
+    fn negative_lab_shadow_patch_black_point_suggestion_recovers_lifted_shadow() {
+        let input = DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_vec(
+                4,
+                4,
+                vec![
+                    0.99, 0.99, 0.99, 0.72, 0.72, 0.72, 0.68, 0.68, 0.68, 0.22, 0.22, 0.22, 0.99,
+                    0.99, 0.99, 0.72, 0.72, 0.72, 0.68, 0.68, 0.68, 0.22, 0.22, 0.22, 0.99, 0.99,
+                    0.99, 0.72, 0.72, 0.72, 0.68, 0.68, 0.68, 0.22, 0.22, 0.22, 0.99, 0.99, 0.99,
+                    0.72, 0.72, 0.72, 0.68, 0.68, 0.68, 0.22, 0.22, 0.22,
+                ],
+            )
+            .unwrap(),
+        );
+        let suggestion = build_negative_lab_shadow_patch_black_point_suggestion(
+            &input,
+            NegativeConversionParams {
+                black_point: 0.0,
+                contrast: 1.0,
+                exposure: 0.0,
+                white_point: 1.0,
+                ..NegativeConversionParams::default()
+            },
+            NegativeBaseFogSampleRect {
+                x: 0.25,
+                y: 0.0,
+                width: 0.5,
+                height: 1.0,
+            },
+        );
+
+        assert_eq!(suggestion.role, "shadow");
+        assert_eq!(suggestion.status, "suggested");
+        assert!(suggestion.apply_allowed);
+        assert!(suggestion.suggested_black_point_delta > 0.0);
+        assert!(suggestion.correction_magnitude <= 0.35);
+        assert!(suggestion.projected_sample_p01_min_channel <= NEGATIVE_LAB_SHADOW_TARGET_FLOOR);
+    }
+
+    #[test]
+    fn negative_lab_shadow_patch_black_point_suggestion_reports_already_safe_patch() {
+        let input = DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_vec(
+                2,
+                2,
+                vec![
+                    0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99,
+                ],
+            )
+            .unwrap(),
+        );
+        let suggestion = build_negative_lab_shadow_patch_black_point_suggestion(
+            &input,
+            NegativeConversionParams {
+                black_point: 0.0,
+                contrast: 1.0,
+                exposure: 0.0,
+                white_point: 1.0,
+                ..NegativeConversionParams::default()
+            },
+            NegativeBaseFogSampleRect {
+                x: 0.0,
+                y: 0.0,
+                width: 1.0,
+                height: 1.0,
+            },
+        );
+
+        assert_eq!(suggestion.status, "already_safe");
+        assert!(!suggestion.apply_allowed);
+        assert_near(suggestion.suggested_black_point_delta, 0.0);
+        assert!(suggestion.current_sample_p01_min_channel <= NEGATIVE_LAB_SHADOW_TARGET_FLOOR);
     }
 
     #[test]
