@@ -44,6 +44,7 @@ const cells = sourceRegions.map((region) => ({
 const controls = {
   alignmentMode: 'translation',
   blendMethod: 'weighted_sharpness',
+  haloSuppressionStrengthPercent: 80,
   maxPreviewDimensionPx: 1200,
   memoryBudgetBytes: COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES,
   outputName: 'Synthetic UI Runtime Focus Stack',
@@ -121,6 +122,12 @@ if (outputReview.haloReview.transitionRiskRegions.length !== cells.length) {
   throw new Error(
     `Expected ${cells.length} transition regions, got ${outputReview.haloReview.transitionRiskRegions.length}.`,
   );
+}
+if (dryRunCommand.parameters.haloSuppressionStrengthPercent !== 80) {
+  throw new Error('Focus UI runtime bridge did not preserve dry-run halo suppression.');
+}
+if (applyCommand.parameters.haloSuppressionStrengthPercent !== 80) {
+  throw new Error('Focus UI runtime bridge did not preserve apply halo suppression.');
 }
 
 expectThrows('mismatched accepted focus UI runtime plan', () =>

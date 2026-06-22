@@ -1771,6 +1771,10 @@
       },
       "close": "Close",
       "depthMapNotice": "Depth-map blending is preview-only until validated depth estimation and edge refinement land.",
+      "haloSuppressionLabel": "Halo suppression",
+      "haloSuppressionOff": "No suppression",
+      "haloSuppressionOn": "Edge transition guard",
+      "haloSuppressionValue": "{{value}}%",
       "planDependency": "Final apply requires an accepted dry-run plan from the focus-stack API.",
       "preflight": {
         "alignment": "Alignment",

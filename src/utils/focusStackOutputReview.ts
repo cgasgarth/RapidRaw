@@ -13,6 +13,7 @@ interface BuildFocusStackOutputReviewOptions {
 const sharpnessCoverageRatio = 1;
 const lowConfidenceCellRatio = 0.08;
 const haloRiskCellRatio = 0.14;
+const haloSuppressionScale = 160;
 
 export const buildFocusStackOutputReviewWorkflow = ({
   artifactPath,
@@ -31,6 +32,9 @@ export const buildFocusStackOutputReviewWorkflow = ({
             'transition_halo_risk',
             'unsupported_blend_method_preview_only',
           ];
+  const effectiveHaloRiskCellRatio = roundRatio(
+    Math.max(0.03, haloRiskCellRatio * (1 - settings.haloSuppressionStrengthPercent / haloSuppressionScale)),
+  );
 
   return focusStackOutputReviewWorkflowSchema.parse({
     alignmentMode: settings.alignmentMode,
@@ -43,7 +47,7 @@ export const buildFocusStackOutputReviewWorkflow = ({
       exportReviewArtifactId: `${artifactPath}:export-review`,
       status: 'review_required',
     },
-    haloRiskCellRatio,
+    haloRiskCellRatio: effectiveHaloRiskCellRatio,
     haloReview: {
       artifactId: `${artifactPath}:halo-review`,
       reviewStatus: 'review_required',

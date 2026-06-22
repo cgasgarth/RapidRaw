@@ -14,6 +14,7 @@ runComputationalUiApiSmoke({
     {
       alignmentMode: 'homography',
       blendMethod: 'depth_map',
+      haloSuppressionStrengthPercent: 80,
       maxPreviewDimensionPx: 4096,
       outputName: 'Macro Focus Stack',
       qualityPreference: 'best',
@@ -42,6 +43,9 @@ runComputationalUiApiSmoke({
       failures.push('Focus UI mapper must assign focus_slice source roles.');
     }
     if (command.parameters.blendMethod !== 'depth_map') failures.push('Focus UI mapper must preserve blend method.');
+    if (command.parameters.haloSuppressionStrengthPercent !== 80) {
+      failures.push('Focus UI mapper must preserve halo suppression.');
+    }
     if (command.parameters.retouchLayerPolicy !== 'generate_retouch_layer') {
       failures.push('Focus UI mapper must preserve retouch layer policy.');
     }
@@ -50,6 +54,7 @@ runComputationalUiApiSmoke({
     {
       alignmentMode: 'translation',
       blendMethod: 'weighted_sharpness',
+      haloSuppressionStrengthPercent: 40,
       outputName: 'Macro Focus Stack',
       qualityPreference: 'balanced',
       retouchLayerPolicy: 'none',
@@ -77,6 +82,9 @@ runComputationalUiApiSmoke({
     }
     if (command.parameters.blendMethod !== 'weighted_sharpness') {
       failures.push('Focus UI apply mapper must preserve UI control overrides.');
+    }
+    if (command.parameters.haloSuppressionStrengthPercent !== 40) {
+      failures.push('Focus UI apply mapper must preserve halo suppression overrides.');
     }
   },
   invalidCases: [

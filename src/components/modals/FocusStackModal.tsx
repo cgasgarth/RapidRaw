@@ -37,6 +37,7 @@ interface FocusStackModalProps {
 }
 
 const previewDimensionOptions = [2400, 4096, 8192] as const;
+const haloSuppressionOptions = [0, 40, 80] as const;
 const reviewOverlayOpacityOptions = [40, 70, 100] as const;
 const reviewArtifactPath = '/tmp/rawengine-focus-stack-smoke.tif';
 
@@ -188,6 +189,10 @@ export default function FocusStackModal({
           value={t(`modals.focusStack.blendMethod.${settings.blendMethod}.label`)}
         />
         <ComputationalSetupStatusLine
+          label={t('modals.focusStack.haloSuppressionLabel')}
+          value={t('modals.focusStack.haloSuppressionValue', { value: settings.haloSuppressionStrengthPercent })}
+        />
+        <ComputationalSetupStatusLine
           label={t('modals.focusStack.preflight.retouch')}
           value={t(`modals.focusStack.retouchPolicy.${settings.retouchLayerPolicy}.label`)}
         />
@@ -288,6 +293,41 @@ export default function FocusStackModal({
               </UiText>
               <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="block mt-1">
                 {t(`modals.focusStack.retouchPolicy.${retouchLayerPolicy}.status`)}
+              </UiText>
+            </button>
+          ))}
+        </div>
+      </ComputationalSetupOptionSection>
+
+      <ComputationalSetupOptionSection title={t('modals.focusStack.haloSuppressionLabel')}>
+        <div
+          className="grid grid-cols-3 gap-2"
+          data-halo-risk-cell-ratio={outputReview.haloRiskCellRatio}
+          data-halo-suppression-strength-percent={settings.haloSuppressionStrengthPercent}
+          data-testid="focus-halo-suppression-controls"
+        >
+          {haloSuppressionOptions.map((haloSuppressionStrengthPercent) => (
+            <button
+              key={haloSuppressionStrengthPercent}
+              className={`min-h-16 rounded-md border px-3 py-2 text-left transition-colors ${
+                settings.haloSuppressionStrengthPercent === haloSuppressionStrengthPercent
+                  ? 'border-accent bg-accent/15'
+                  : 'border-border-color bg-bg-primary hover:bg-card-active'
+              }`}
+              onClick={() => {
+                setSetting({ haloSuppressionStrengthPercent });
+              }}
+              type="button"
+            >
+              <UiText as="span" variant={TextVariants.label}>
+                {t('modals.focusStack.haloSuppressionValue', { value: haloSuppressionStrengthPercent })}
+              </UiText>
+              <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+                {t(
+                  haloSuppressionStrengthPercent === 0
+                    ? 'modals.focusStack.haloSuppressionOff'
+                    : 'modals.focusStack.haloSuppressionOn',
+                )}
               </UiText>
             </button>
           ))}
@@ -431,6 +471,10 @@ export default function FocusStackModal({
             label={t('modals.focusStack.preflight.blend')}
             value={t(`modals.focusStack.blendMethod.${settings.blendMethod}.label`)}
           />
+          <ComputationalSetupStatusLine
+            label={t('modals.focusStack.haloSuppressionLabel')}
+            value={t('modals.focusStack.haloSuppressionValue', { value: settings.haloSuppressionStrengthPercent })}
+          />
           <ComputationalSetupStatusLine label={t('modals.focusStack.qualityLabel')} value={selectedQualityLabel} />
           <ComputationalSetupStatusLine
             label={t('modals.focusStack.preflight.retouch')}
@@ -529,6 +573,12 @@ export default function FocusStackModal({
                 label: t('modals.focusStack.preflight.blend'),
                 value: t(`modals.focusStack.blendMethod.${settings.blendMethod}.label`),
               },
+              {
+                label: t('modals.focusStack.haloSuppressionLabel'),
+                value: t('modals.focusStack.haloSuppressionValue', {
+                  value: settings.haloSuppressionStrengthPercent,
+                }),
+              },
             ],
           },
           {
@@ -591,6 +641,7 @@ export default function FocusStackModal({
         data-halo-artifact-id={outputReview.haloReview.artifactId}
         data-halo-review-status={outputReview.haloReview.reviewStatus}
         data-halo-risk-cell-ratio={outputReview.haloRiskCellRatio}
+        data-halo-suppression-strength-percent={settings.haloSuppressionStrengthPercent}
         data-low-confidence-cell-ratio={outputReview.lowConfidenceCellRatio}
         data-runtime-output-review={String(hasRuntimeOutputReview)}
         data-testid="focus-editable-handoff-proof"

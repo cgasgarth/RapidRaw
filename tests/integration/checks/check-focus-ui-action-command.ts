@@ -12,6 +12,7 @@ const actionMetadataSchema = z
   .object({
     commandType: z.literal('computationalMerge.createFocusStack'),
     dryRun: z.literal(true),
+    haloSuppressionStrengthPercent: z.literal(80),
     sources: z.number().int().min(2),
     toolName: z.literal(getComputationalMergeAppServerRoutePairSummary('focus_stack').dryRunToolName),
   })
@@ -26,6 +27,7 @@ const settings = {
   ...DEFAULT_FOCUS_STACK_UI_SETTINGS,
   alignmentMode: 'translation',
   blendMethod: 'weighted_sharpness',
+  haloSuppressionStrengthPercent: 80,
   maxPreviewDimensionPx: 4096,
   qualityPreference: 'balanced',
   retouchLayerPolicy: 'generate_retouch_layer',
@@ -35,6 +37,7 @@ const packageCommand = buildFocusStackUiDryRunCommandV1(
   {
     alignmentMode: settings.alignmentMode,
     blendMethod: settings.blendMethod,
+    haloSuppressionStrengthPercent: settings.haloSuppressionStrengthPercent,
     maxPreviewDimensionPx: settings.maxPreviewDimensionPx,
     outputName: 'Focus stack dry-run preview',
     qualityPreference: settings.qualityPreference,
@@ -55,6 +58,7 @@ const packageCommand = buildFocusStackUiDryRunCommandV1(
 const actionMetadata = actionMetadataSchema.parse({
   commandType: packageCommand.commandType,
   dryRun: packageCommand.dryRun,
+  haloSuppressionStrengthPercent: packageCommand.parameters.haloSuppressionStrengthPercent,
   sources: packageCommand.parameters.sources.length,
   toolName: routePair.dryRunToolName,
 });
@@ -76,6 +80,13 @@ if (!appModalsSource.includes("getComputationalMergeAppServerRoutePairSummary('f
 if (!appModalsSource.includes('lastDryRunCommand')) {
   failures.push('Focus stack preview-plan action must persist dry-run command metadata.');
 }
+if (
+  !appModalsSource.includes(
+    'haloSuppressionStrengthPercent: focusStackModalState.settings.haloSuppressionStrengthPercent',
+  )
+) {
+  failures.push('Focus stack preview-plan action must persist halo suppression metadata.');
+}
 if (actionMetadata.toolName !== routePair.dryRunToolName) {
   failures.push('Focus stack UI action command must use the typed app-server dry-run route.');
 }
@@ -93,6 +104,9 @@ if (packageCommand.parameters.sources.some((source) => source.role !== 'focus_sl
 }
 if (settings.blendMethod !== packageCommand.parameters.blendMethod) {
   failures.push('Focus stack UI action blend method must match package command builder.');
+}
+if (settings.haloSuppressionStrengthPercent !== packageCommand.parameters.haloSuppressionStrengthPercent) {
+  failures.push('Focus stack UI action halo suppression must match package command builder.');
 }
 if (settings.retouchLayerPolicy !== packageCommand.parameters.retouchLayerPolicy) {
   failures.push('Focus stack UI action retouch policy must match package command builder.');

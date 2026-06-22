@@ -25,6 +25,7 @@ export const focusStackUiControlsV1Schema = z
   .object({
     alignmentMode: computationalMergeAlignmentModeV1Schema.exclude(['optical_flow']),
     blendMethod: z.enum(['depth_map', 'laplacian_pyramid', 'weighted_sharpness']),
+    haloSuppressionStrengthPercent: z.number().int().min(0).max(100).default(0),
     maxPreviewDimensionPx: z.number().int().positive().max(8192).default(2400),
     memoryBudgetBytes: z.number().int().positive().optional(),
     outputName: z.string().trim().min(1),
@@ -79,6 +80,7 @@ export const buildFocusStackUiDryRunCommandV1 = (
     parameters: {
       alignmentMode: controls.alignmentMode,
       blendMethod: controls.blendMethod,
+      haloSuppressionStrengthPercent: controls.haloSuppressionStrengthPercent,
       maxPreviewDimensionPx: controls.maxPreviewDimensionPx,
       memoryBudgetBytes: controls.memoryBudgetBytes,
       outputName: controls.outputName,
@@ -125,6 +127,7 @@ export const buildFocusStackUiApplyCommandV1 = (
       acceptedDryRunPlanId: context.acceptedDryRunPlanId,
       alignmentMode: controls.alignmentMode,
       blendMethod: controls.blendMethod,
+      haloSuppressionStrengthPercent: controls.haloSuppressionStrengthPercent,
       maxPreviewDimensionPx: controls.maxPreviewDimensionPx,
       memoryBudgetBytes: controls.memoryBudgetBytes,
       outputName: controls.outputName,
