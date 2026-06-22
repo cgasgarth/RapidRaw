@@ -401,6 +401,7 @@
     "check:focus-review-diagnostics": "bun tests/integration/checks/check-focus-review-diagnostics.ts",
     "check:focus-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario focus-ui",
     "check:focus-private-raw-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario focus-private-raw-ui",
+    "check:focus-private-raw-modal-review-smoke": "bun scripts/capture-visual-smoke.ts --scenario focus-private-raw-modal-review",
     "check:sr-performance-fixtures": "bun tests/integration/checks/check-super-resolution-performance-fixtures.ts",
     "check:sr-app-server-runtime": "bun tests/integration/checks/check-super-resolution-app-server-runtime.ts",
     "check:super-resolution-app-server-runtime": "bun run check:sr-app-server-runtime",
