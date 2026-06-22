@@ -1846,8 +1846,13 @@ pub async fn convert_negatives(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app_settings::AppSettings;
+    use crate::formats::is_raw_file;
+    use crate::image_loader::load_base_image_from_bytes;
     use image::{DynamicImage, Pixel, Rgb32FImage};
     use serde_json::json;
+    use sha2::{Digest, Sha256};
+    use std::path::PathBuf;
 
     fn render_fixture(
         pixels: Vec<f32>,
@@ -3320,6 +3325,221 @@ mod tests {
         });
         fs::write(report_path, serde_json::to_vec_pretty(&report).unwrap())
             .expect("write Negative Lab public export report");
+    }
+
+    #[test]
+    fn negative_lab_private_raw_exports_positive_report_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_NEGATIVE_LAB_PRIVATE_RAW_PROOF")
+            .ok()
+            .as_deref()
+            != Some("1")
+        {
+            eprintln!("skipping Negative Lab private RAW proof");
+            return;
+        }
+
+        let private_root = PathBuf::from(
+            std::env::var("RAWENGINE_PRIVATE_RAW_ROOT")
+                .unwrap_or_else(|_| "/tmp/rawengine-private-root".to_string()),
+        );
+        let source_relative_path = "private-fixtures/negative-lab/alaska-negative-lab-v1.arw";
+        let source_path = private_root.join(source_relative_path);
+        let source_path_string = source_path.to_string_lossy().to_string();
+        assert!(
+            is_raw_file(&source_path_string),
+            "Negative Lab private proof source must be a RAW file"
+        );
+
+        let source_hash_before =
+            sha256_negative_lab_file(&source_path).expect("hash source before");
+        let source_bytes = fs::read(&source_path).expect("read private RAW source");
+        let settings = AppSettings::default();
+        let input =
+            load_base_image_from_bytes(&source_bytes, &source_path_string, false, &settings, None)
+                .expect("decode private RAW source through app loader");
+        let source_hash_after = sha256_negative_lab_file(&source_path).expect("hash source after");
+
+        let params = NegativeConversionParams {
+            red_weight: 1.03,
+            green_weight: 1.0,
+            blue_weight: 0.98,
+            base_fog_strength: 1.0,
+            base_fog_sample: Some(NegativeBaseFogSampleRect {
+                x: 0.0,
+                y: 0.0,
+                width: 0.35,
+                height: 0.35,
+            }),
+            exposure: 0.05,
+            contrast: 0.95,
+            black_point: 0.0,
+            white_point: 1.0,
+        };
+        let bounds_ref = downscale_f32_image(&input, 1080, 1080);
+        let ref_rgb = bounds_ref.to_rgb32f();
+        let (ref_w, ref_h) = ref_rgb.dimensions();
+        let log_pixels: Vec<f32> = ref_rgb
+            .as_raw()
+            .iter()
+            .map(|&value| -value.clamp(1e-6, 1.0).log10())
+            .collect();
+        let bounds = analyze_bounds(
+            &log_pixels,
+            ref_w as usize,
+            ref_h as usize,
+            params.base_fog_sample,
+        );
+        let rendered = run_pipeline(&input, &params, Some(bounds));
+        let input_rgb = input.to_rgb32f();
+        let rendered_rgb = rendered.to_rgb32f();
+        let changed_pixel_ratio = rendered_rgb
+            .pixels()
+            .zip(input_rgb.pixels())
+            .filter(|(rendered_pixel, input_pixel)| {
+                rendered_pixel
+                    .channels()
+                    .iter()
+                    .zip(input_pixel.channels())
+                    .any(|(rendered_channel, input_channel)| {
+                        (rendered_channel - input_channel).abs() > 0.01
+                    })
+            })
+            .count() as f32
+            / (rendered.width() * rendered.height()).max(1) as f32;
+        let input_to_output_delta = mean_abs_delta(&input_rgb, &rendered_rgb);
+        assert!(changed_pixel_ratio > 0.05);
+        assert!(input_to_output_delta > 0.01);
+        assert_eq!(source_hash_before, source_hash_after);
+
+        let artifact_root = private_root.join("private-artifacts/validation/negative-lab-real-raw");
+        fs::create_dir_all(&artifact_root).expect("create Negative Lab private RAW artifact dir");
+        let output_path = artifact_root.join("alaska-negative-lab-v1-Positive.jpg");
+        let mut buf = Cursor::new(Vec::new());
+        rendered
+            .to_rgb8()
+            .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, JPEG_PROOF_QUALITY))
+            .expect("encode private RAW Negative Lab positive JPEG");
+        fs::write(&output_path, buf.into_inner()).expect("write private RAW positive JPEG");
+
+        let save_options = NegativeConversionSaveOptions {
+            accepted_dry_run_plan_hash: Some("fnv1a32:3028e2e1".to_string()),
+            accepted_dry_run_plan_id: Some("negative_lab_private_raw_plan_3028e2e1".to_string()),
+            output_format: NegativeConversionOutputFormat::JpegProof,
+            write_conversion_bundle: true,
+            acquisition_warning_codes: vec!["raw_source_not_verified_negative_scan".to_string()],
+            acquisition_source_families: vec!["camera_raw".to_string()],
+            profile_provenance_hash: Some("fnv1a32:9ed1e301".to_string()),
+            selected_profile: Some(NegativeLabSelectedProfileSnapshot {
+                claim_level: "generic_starting_point_only".to_string(),
+                claim_policy: "generic_starting_point_no_stock_claim".to_string(),
+                display_name: "C-41 Portrait".to_string(),
+                does_not_prove: vec![
+                    "no_stock_emulation_claim".to_string(),
+                    "no_colorimetric_match_claim".to_string(),
+                ],
+                evidence_fixture_count: 0,
+                measurement_profile_id: None,
+                params,
+                preset_id: "negative_lab.generic.c41.portrait.v1".to_string(),
+                profile_provenance_hash: "fnv1a32:9ed1e301".to_string(),
+                profile_status: "generic_unmeasured".to_string(),
+                provenance_summary: "Generic engineered C-41 portrait starting point.".to_string(),
+                runtime_status: "runtime_parameter_applied".to_string(),
+                source_generic_preset_id: None,
+            }),
+            frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
+            frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            suffix: "Positive".to_string(),
+        };
+        write_negative_lab_output_sidecar(
+            &output_path,
+            &source_path,
+            &params,
+            &save_options,
+            rendered.width(),
+            rendered.height(),
+        )
+        .expect("write private RAW Negative Lab sidecar");
+        let sidecar_path = negative_lab_output_sidecar_path(&output_path);
+        assert!(sidecar_path.exists());
+        let bundle_path = negative_lab_conversion_bundle_path(&output_path);
+        write_negative_lab_conversion_bundle(
+            &bundle_path,
+            &params,
+            &save_options,
+            &[NegativeLabConversionBundleOutputRef {
+                output_height: rendered.height(),
+                output_path: output_path.clone(),
+                output_width: rendered.width(),
+                sidecar_path: sidecar_path.clone(),
+                source_path,
+            }],
+        )
+        .expect("write private RAW Negative Lab conversion bundle");
+        assert!(bundle_path.exists());
+
+        let report_path = artifact_root.join("alaska-negative-lab-v1-report.json");
+        let report = json!({
+            "artifacts": [
+                {
+                    "hash": source_hash_before,
+                    "kind": "source_raw_private",
+                    "path": source_relative_path,
+                    "publicRepoAllowed": false
+                },
+                {
+                    "hash": sha256_negative_lab_file(&output_path).expect("hash private output"),
+                    "kind": "positive_jpeg_private",
+                    "path": "private-artifacts/validation/negative-lab-real-raw/alaska-negative-lab-v1-Positive.jpg",
+                    "publicRepoAllowed": false
+                },
+                {
+                    "hash": sha256_negative_lab_file(&sidecar_path).expect("hash private sidecar"),
+                    "kind": "sidecar_private",
+                    "path": "private-artifacts/validation/negative-lab-real-raw/alaska-negative-lab-v1-Positive.jpg.rrdata",
+                    "publicRepoAllowed": false
+                },
+                {
+                    "hash": sha256_negative_lab_file(&bundle_path).expect("hash private bundle"),
+                    "kind": "conversion_bundle_private",
+                    "path": "private-artifacts/validation/negative-lab-real-raw/alaska-negative-lab-v1-Positive.jpg.conversion-bundle.json",
+                    "publicRepoAllowed": false
+                }
+            ],
+            "doesNotProve": [
+                "capture_one_class_quality",
+                "commercial_converter_parity",
+                "film_stock_emulation_accuracy",
+                "macos_app_ui_e2e_session",
+                "measured_negative_profile_accuracy",
+                "source_is_actual_film_negative"
+            ],
+            "fixtureId": "validation.negative-lab-real-raw.alaska.v1",
+            "issue": 3028,
+            "localRawRuntime": {
+                "decodePath": "load_base_image_from_bytes",
+                "execution": "tauri_test_negative_lab_private_raw_export",
+                "outputFormat": "jpeg_proof",
+                "sourceHashUnchanged": source_hash_before == source_hash_after,
+                "sourceIsRaw": true
+            },
+            "metrics": {
+                "changedPixelRatio": changed_pixel_ratio,
+                "inputToOutputMeanAbsDelta": input_to_output_delta
+            },
+            "proofBoundary": "private_raw_negative_lab_runtime_not_final_negative_quality",
+            "proofStatus": "private_raw_negative_lab_positive_export_rendered",
+            "schemaVersion": 1,
+            "validationMode": "local_alaska_raw_negative_lab_runtime"
+        });
+        fs::write(report_path, serde_json::to_vec_pretty(&report).unwrap())
+            .expect("write Negative Lab private RAW report");
+    }
+
+    fn sha256_negative_lab_file(path: &Path) -> Result<String, String> {
+        let bytes =
+            fs::read(path).map_err(|error| format!("read {}: {}", path.display(), error))?;
+        Ok(format!("sha256:{}", hex::encode(Sha256::digest(&bytes))))
     }
 
     #[test]
