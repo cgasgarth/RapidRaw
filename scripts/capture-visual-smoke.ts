@@ -1833,6 +1833,8 @@ async function prepareScenario(page, mode) {
   if (mode === 'detail-workspace') {
     await page.getByRole('button', { name: '100% crop' }).click();
     await page.getByRole('button', { name: 'Split compare' }).click();
+    await page.getByRole('button', { name: 'Denoise luma' }).click();
+    await page.getByRole('button', { name: 'Deblur strength' }).click();
     await page.getByRole('button', { name: 'Apply recipe' }).click();
     detailWorkspaceProofSchema.parse(
       await page.getByTestId('detail-workspace-proof').evaluate((element) => ({ ...element.dataset })),

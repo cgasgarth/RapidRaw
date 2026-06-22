@@ -95,6 +95,7 @@ const report = parseDetailOutputComparisonProofReport({
     recipeToExportMeanAbsDelta: roundMetric(meanAbsDelta(recipePreviewCrop, enabledExport)),
   },
   recipe: {
+    deblurStrength: 0.7,
     detailAmount: 0.42,
     label: 'Denoise + detail 100% review',
     lumaNoiseReduction: 0.58,
@@ -155,7 +156,8 @@ function applyDenoiseDetailRecipe(input: Float32Array, width: number, height: nu
   for (let index = 0; index < input.length; index += 1) {
     const preservedDetail = input[index] - denoised[index];
     const oversmoothingGuard = Math.abs(preservedDetail) > 0.028 ? 0.54 : 0.34;
-    output[index] = clamp01(denoised[index] + preservedDetail * oversmoothingGuard);
+    const deblurBoost = preservedDetail * 0.7 * 0.42;
+    output[index] = clamp01(denoised[index] + preservedDetail * oversmoothingGuard + deblurBoost);
   }
   const detailBase = boxBlur3x3(output, width, height);
   for (let index = 0; index < output.length; index += 1) {

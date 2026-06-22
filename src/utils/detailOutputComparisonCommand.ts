@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   ApprovalClass,
   RAW_ENGINE_SCHEMA_VERSION,
+  detailDeblurUiControlsV1Schema,
   detailDenoiseControlsV1Schema,
 } from '../../packages/rawengine-schema/src';
 import { waveletDetailRecipeSchema } from '../schemas/waveletDetailSchemas';
@@ -12,6 +13,7 @@ const normalizedCropPixelSchema = z.number().min(0).max(1);
 export const detailOutputComparisonRecipeV1Schema = z
   .object({
     denoise: detailDenoiseControlsV1Schema,
+    deblur: detailDeblurUiControlsV1Schema,
     label: z.literal('Denoise + detail 100% review'),
     recipeId: z.literal('detail.output.denoise-detail-100.v1'),
     stages: z.array(z.enum(['scene_linear_denoise', 'capture_sharpen', 'wavelet_luma_detail'])).length(3),
@@ -166,13 +168,17 @@ export const applyDetailOutputComparisonCommand = (value: unknown): DetailOutput
   const detailGain =
     (fineScale.enabled ? fineScale.amount : 0) / 100 + (mediumScale.enabled ? mediumScale.amount : 0) / 200;
   const lumaPreserve = 1 - input.command.parameters.recipe.denoise.lumaStrength * 0.62;
+  const deblurGain = input.command.parameters.recipe.deblur.deblurEnabled
+    ? input.command.parameters.recipe.deblur.deblurStrength / 100
+    : 0;
   const detailBase = blur3x3(denoised, width, height);
 
   const recipePreviewCrop = input.currentBaselineCrop.map((pixel, index) => {
     const smooth = denoised[index] ?? pixel;
     const detail = pixel - smooth;
     const wavelet = smooth - (detailBase[index] ?? smooth);
-    return Number(clamp01(smooth + detail * lumaPreserve + wavelet * detailGain).toFixed(6));
+    const deblur = detail * deblurGain * 0.42;
+    return Number(clamp01(smooth + detail * lumaPreserve + deblur + wavelet * detailGain).toFixed(6));
   });
   const changedPixels = recipePreviewCrop.filter(
     (pixel, index) => Math.abs(pixel - (input.currentBaselineCrop[index] ?? 0)) > 1 / 255,

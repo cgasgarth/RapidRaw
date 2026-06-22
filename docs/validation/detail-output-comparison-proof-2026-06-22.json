@@ -16,7 +16,7 @@
       "publicRepoAllowed": false
     },
     "enabledExportArtifact": {
-      "contentHash": "sha256:7de682f0621634679595468a6fdfc775f7cddbe276f94109aaf3adc3926646fa",
+      "contentHash": "sha256:80c36acdfd5cf650ebda17883b2c3dcf62d517593b3fd1eb411a888375de8934",
       "format": "pgm_u8_preview",
       "kind": "enabled_export_artifact",
       "path": "artifacts/validation/detail-output-comparison/high-iso-skin-shadow-v1-enabled-export.pgm",
@@ -30,7 +30,7 @@
       "publicRepoAllowed": false
     },
     "recipePreviewCrop": {
-      "contentHash": "sha256:7de682f0621634679595468a6fdfc775f7cddbe276f94109aaf3adc3926646fa",
+      "contentHash": "sha256:80c36acdfd5cf650ebda17883b2c3dcf62d517593b3fd1eb411a888375de8934",
       "format": "pgm_u8_preview",
       "kind": "recipe_preview_crop",
       "path": "artifacts/validation/detail-output-comparison/high-iso-skin-shadow-v1-recipe-preview.pgm",
@@ -51,14 +51,15 @@
   "generatedAt": "2026-06-22T12:00:00.000Z",
   "issue": 3067,
   "metrics": {
-    "currentToRecipeChangedPixelRatio": 0.925781,
-    "currentToRecipeMeanAbsDelta": 0.015477,
+    "currentToRecipeChangedPixelRatio": 0.747721,
+    "currentToRecipeMeanAbsDelta": 0.010515,
     "disabledExportMatchesCurrentHash": true,
     "enabledExportDiffersFromDisabled": true,
     "originalToCurrentMeanAbsDelta": 0.006382,
     "recipeToExportMeanAbsDelta": 0
   },
   "recipe": {
+    "deblurStrength": 0.7,
     "detailAmount": 0.42,
     "label": "Denoise + detail 100% review",
     "lumaNoiseReduction": 0.58,

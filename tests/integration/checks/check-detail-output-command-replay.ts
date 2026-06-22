@@ -35,6 +35,7 @@ const command = detailOutputComparisonCommandV1Schema.parse({
   parameters: {
     crop: { height, width, x: 512, y: 384, zoomPercent: 100 },
     recipe: {
+      deblur: { deblurEnabled: true, deblurSigmaPx: 0.8, deblurStrength: 70 },
       denoise: { chromaStrength: 0.32, lumaStrength: 0.58 },
       label: 'Denoise + detail 100% review',
       recipeId: 'detail.output.denoise-detail-100.v1',
@@ -58,6 +59,21 @@ const command = detailOutputComparisonCommandV1Schema.parse({
 
 const result = applyDetailOutputComparisonCommand({ command, currentBaselineCrop, originalCrop });
 const replay = applyDetailOutputComparisonCommand({ command, currentBaselineCrop, originalCrop });
+const deblurDisabled = applyDetailOutputComparisonCommand({
+  command: {
+    ...command,
+    commandId: 'detail_output_compare_without_deblur',
+    parameters: {
+      ...command.parameters,
+      recipe: {
+        ...command.parameters.recipe,
+        deblur: { ...command.parameters.recipe.deblur, deblurEnabled: false, deblurStrength: 0 },
+      },
+    },
+  },
+  currentBaselineCrop,
+  originalCrop,
+});
 const failures: Array<string> = [];
 
 if (JSON.stringify(result) !== JSON.stringify(replay)) failures.push('detail output command replay is not stable');
@@ -65,6 +81,7 @@ if (result.changedPixelRatio <= 0.25) failures.push('detail recipe changed too f
 if (result.enabledExportHash === result.disabledExportHash)
   failures.push('enabled export must differ from disabled export');
 if (result.previewHash !== result.enabledExportHash) failures.push('preview/export recipe hashes must match');
+if (result.previewHash === deblurDisabled.previewHash) failures.push('deblur control must change detail output');
 if (!result.warnings.includes('halo_risk_review') || !result.warnings.includes('oversmoothing_review')) {
   failures.push('detail output command must carry halo and oversmoothing review warnings');
 }
