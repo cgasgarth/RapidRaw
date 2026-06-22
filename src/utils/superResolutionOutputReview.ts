@@ -68,6 +68,12 @@ export const superResolutionSyntheticReviewArtifacts: SuperResolutionOutputRevie
     path: 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-baseline-crop-center.pgm',
     publicRepoAllowed: false,
   },
+  {
+    contentHash: 'sha256:fe26992fc8262f8ce81fd3f8a8c2fa19d9b1aa013ebd300b6348c7e3357a7823',
+    kind: 'crop_review_sheet',
+    path: 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-crop-review-sheet.html',
+    publicRepoAllowed: false,
+  },
 ];
 
 export const buildSuperResolutionOutputReviewFromArtifact = (

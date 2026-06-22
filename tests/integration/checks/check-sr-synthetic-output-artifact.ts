@@ -21,6 +21,7 @@ const REPORT_PATH = 'docs/validation/sr-synthetic-output-artifact-proof-2026-06-
 const OUTPUT_PATH = 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-preview.pgm';
 const REVIEW_CROP_PATH = 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-review-crop-center.pgm';
 const BASELINE_CROP_PATH = 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-baseline-crop-center.pgm';
+const CROP_REVIEW_SHEET_PATH = 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-crop-review-sheet.html';
 const update = process.argv.includes('--update');
 
 const hashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
@@ -34,6 +35,15 @@ const reportSchema = z
             format: z.literal('pgm_u8_preview'),
             path: z.literal(BASELINE_CROP_PATH),
             publicRepoAllowed: z.literal(false),
+          })
+          .strict(),
+        cropReviewSheet: z
+          .object({
+            contentHash: hashSchema,
+            format: z.literal('html_inline_review_sheet'),
+            path: z.literal(CROP_REVIEW_SHEET_PATH),
+            publicRepoAllowed: z.literal(false),
+            scaleViews: z.tuple([z.literal(100), z.literal(200)]),
           })
           .strict(),
         reconstructionPreview: z
@@ -87,8 +97,9 @@ const reportSchema = z
     reconstructionDiagnostics: superResolutionReconstructionDiagnosticsV1Schema,
     reviewMetadata: z
       .object({
-        artifactCount: z.literal(3),
+        artifactCount: z.literal(4),
         baselineReviewCropPath: z.literal(BASELINE_CROP_PATH),
+        cropReviewSheetPath: z.literal(CROP_REVIEW_SHEET_PATH),
         reconstructionPreviewPath: z.literal(OUTPUT_PATH),
         reconstructionReviewCropPath: z.literal(REVIEW_CROP_PATH),
       })
@@ -144,6 +155,16 @@ await mkdir(dirname(OUTPUT_PATH), { recursive: true });
 await writeFile(OUTPUT_PATH, encodePgmPreview(result.outputPixels, result.outputWidth, result.outputHeight));
 await writeFile(REVIEW_CROP_PATH, encodePgmPreview(reviewCrop.pixels, reviewCrop.width, reviewCrop.height));
 await writeFile(BASELINE_CROP_PATH, encodePgmPreview(baselineCrop.pixels, baselineCrop.width, baselineCrop.height));
+await writeFile(
+  CROP_REVIEW_SHEET_PATH,
+  encodeCropReviewSheet({
+    baselineCrop: baselineCrop.pixels,
+    height: reviewCrop.height,
+    reconstructionCrop: reviewCrop.pixels,
+    sourceCrop: cropCenter(frames[0]?.pixels ?? source, WIDTH, HEIGHT, 24, 18).pixels,
+    width: reviewCrop.width,
+  }),
+);
 
 const report = reportSchema.parse({
   artifacts: {
@@ -152,6 +173,13 @@ const report = reportSchema.parse({
       format: 'pgm_u8_preview',
       path: BASELINE_CROP_PATH,
       publicRepoAllowed: false,
+    },
+    cropReviewSheet: {
+      contentHash: await sha256File(CROP_REVIEW_SHEET_PATH),
+      format: 'html_inline_review_sheet',
+      path: CROP_REVIEW_SHEET_PATH,
+      publicRepoAllowed: false,
+      scaleViews: [100, 200],
     },
     reconstructionPreview: {
       contentHash: await sha256File(OUTPUT_PATH),
@@ -192,8 +220,9 @@ const report = reportSchema.parse({
   },
   reconstructionDiagnostics: result.reconstructionDiagnostics,
   reviewMetadata: {
-    artifactCount: 3,
+    artifactCount: 4,
     baselineReviewCropPath: BASELINE_CROP_PATH,
+    cropReviewSheetPath: CROP_REVIEW_SHEET_PATH,
     reconstructionPreviewPath: OUTPUT_PATH,
     reconstructionReviewCropPath: REVIEW_CROP_PATH,
   },
@@ -248,6 +277,12 @@ const expectedReviewArtifacts = [
     contentHash: committedReport.artifacts.baselineReviewCrop.contentHash,
     kind: 'baseline_review_crop',
     path: committedReport.artifacts.baselineReviewCrop.path,
+    publicRepoAllowed: false,
+  },
+  {
+    contentHash: committedReport.artifacts.cropReviewSheet.contentHash,
+    kind: 'crop_review_sheet',
+    path: committedReport.artifacts.cropReviewSheet.path,
     publicRepoAllowed: false,
   },
 ];
@@ -309,6 +344,67 @@ function cropCenter(values: Float32Array, width: number, height: number, cropWid
     }
   }
   return { height: cropHeight, pixels, width: cropWidth };
+}
+
+function encodeCropReviewSheet({
+  baselineCrop,
+  height,
+  reconstructionCrop,
+  sourceCrop,
+  width,
+}: {
+  baselineCrop: Float32Array;
+  height: number;
+  reconstructionCrop: Float32Array;
+  sourceCrop: Float32Array;
+  width: number;
+}): string {
+  const panels = [
+    ['Source 100%', sourceCrop, 1],
+    ['Baseline 100%', baselineCrop, 1],
+    ['SR 100%', reconstructionCrop, 1],
+    ['Source 200%', sourceCrop, 2],
+    ['Baseline 200%', baselineCrop, 2],
+    ['SR 200%', reconstructionCrop, 2],
+  ] as const;
+  return `<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>SR crop review sheet</title>
+<style>
+body{margin:16px;background:#111;color:#eee;font:12px system-ui,sans-serif}
+.grid{display:grid;grid-template-columns:repeat(3,max-content);gap:14px}
+.panel{border:1px solid #444;padding:8px;background:#181818}
+.pixels{display:grid;image-rendering:pixelated}
+.px{width:4px;height:4px}
+.x2 .px{width:8px;height:8px}
+</style>
+<h1>Super-resolution crop review</h1>
+<p>100% and 200% views compare source, nearest-neighbor baseline, and reconstructed SR output for false-detail review.</p>
+<div class="grid">
+${panels
+  .map(
+    ([label, pixels, scale]) => `<section class="panel">
+<h2>${label}</h2>
+<div class="pixels ${scale === 2 ? 'x2' : ''}" style="grid-template-columns:repeat(${width},max-content)">
+${Array.from(pixels)
+  .map(
+    (value) =>
+      `<span class="px" style="background:rgb(${formatGray(value)} ${formatGray(value)} ${formatGray(value)})"></span>`,
+  )
+  .join('')}
+</div>
+<p>${width}x${height} crop at ${scale * 100}% view</p>
+</section>`,
+  )
+  .join('\n')}
+</div>
+</html>
+`;
+}
+
+function formatGray(value: number): number {
+  return Math.round(Math.max(0, Math.min(1, value)) * 255);
 }
 
 async function sha256File(path: string): Promise<string> {

@@ -110,8 +110,8 @@ if (outputReview.supportMap.reviewStatus !== applied.apply.sidecarArtifact.suppo
 if (outputReview.supportMap.weakSupportRatio !== applied.apply.sidecarArtifact.supportMap.weakSupportRatio) {
   throw new Error('SR output review did not preserve support-map weak support ratio.');
 }
-if (outputReview.reviewArtifacts.length !== 3) {
-  throw new Error(`Expected 3 SR review artifacts, got ${outputReview.reviewArtifacts.length}.`);
+if (outputReview.reviewArtifacts.length !== 4) {
+  throw new Error(`Expected 4 SR review artifacts, got ${outputReview.reviewArtifacts.length}.`);
 }
 if (
   !outputReview.reviewArtifacts.some(
@@ -123,6 +123,17 @@ if (
   )
 ) {
   throw new Error('SR output review missing private reconstruction crop review artifact metadata.');
+}
+if (
+  !outputReview.reviewArtifacts.some(
+    (artifact) =>
+      artifact.kind === 'crop_review_sheet' &&
+      artifact.path === 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-crop-review-sheet.html' &&
+      artifact.contentHash === 'sha256:fe26992fc8262f8ce81fd3f8a8c2fa19d9b1aa013ebd300b6348c7e3357a7823' &&
+      !artifact.publicRepoAllowed,
+  )
+) {
+  throw new Error('SR output review missing private 100/200 crop sheet artifact metadata.');
 }
 
 expectThrows('mismatched accepted SR UI runtime plan', () =>

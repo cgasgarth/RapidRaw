@@ -6,6 +6,13 @@
       "path": "artifacts/validation/sr-synthetic-output-artifact/sr-x2-baseline-crop-center.pgm",
       "publicRepoAllowed": false
     },
+    "cropReviewSheet": {
+      "contentHash": "sha256:fe26992fc8262f8ce81fd3f8a8c2fa19d9b1aa013ebd300b6348c7e3357a7823",
+      "format": "html_inline_review_sheet",
+      "path": "artifacts/validation/sr-synthetic-output-artifact/sr-x2-crop-review-sheet.html",
+      "publicRepoAllowed": false,
+      "scaleViews": [100, 200]
+    },
     "reconstructionPreview": {
       "contentHash": "sha256:8ae4f09c9c12e8cccd3731f8a04a0fc75ec8ae0aab8bf999f79f2f3855053a74",
       "format": "pgm_u8_preview",
@@ -59,8 +66,9 @@
     "warningCodes": []
   },
   "reviewMetadata": {
-    "artifactCount": 3,
+    "artifactCount": 4,
     "baselineReviewCropPath": "artifacts/validation/sr-synthetic-output-artifact/sr-x2-baseline-crop-center.pgm",
+    "cropReviewSheetPath": "artifacts/validation/sr-synthetic-output-artifact/sr-x2-crop-review-sheet.html",
     "reconstructionPreviewPath": "artifacts/validation/sr-synthetic-output-artifact/sr-x2-preview.pgm",
     "reconstructionReviewCropPath": "artifacts/validation/sr-synthetic-output-artifact/sr-x2-review-crop-center.pgm"
   },

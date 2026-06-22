@@ -33,7 +33,7 @@ export const superResolutionOutputReviewArtifactSchema = z
       .string()
       .trim()
       .regex(/^sha256:[a-f0-9]{64}$/u),
-    kind: z.enum(['baseline_review_crop', 'reconstruction_preview', 'reconstruction_review_crop']),
+    kind: z.enum(['baseline_review_crop', 'crop_review_sheet', 'reconstruction_preview', 'reconstruction_review_crop']),
     path: z.string().trim().min(1),
     publicRepoAllowed: z.boolean(),
   })
