@@ -9,9 +9,12 @@ import {
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeDryRunResultV1Schema,
   computationalMergeMutationResultV1Schema,
+  hdrMergeArtifactV1Schema,
   type ComputationalMergeCommandEnvelopeV1,
   type ComputationalMergeDryRunResultV1,
   type ComputationalMergeMutationResultV1,
+  type ArtifactHandleV1,
+  type HdrMergeArtifactV1,
   type HdrBracketDetectionResultV1,
 } from './rawEngineSchemas.js';
 
@@ -124,6 +127,7 @@ export interface HdrRuntimeApplyResultV1 {
   motionConfidenceMap: Float64Array;
   mutationResult: ComputationalMergeMutationResultV1;
   provenance: HdrRuntimeProvenanceV1;
+  sidecarArtifact: HdrMergeArtifactV1;
 }
 
 export const buildHdrRuntimeDryRunV1 = (requestValue: unknown): HdrRuntimeDryRunResultV1 => {
@@ -212,6 +216,10 @@ export const applyHdrRuntimePlanV1 = (requestValue: unknown): HdrRuntimeApplyRes
       storage: 'sidecar_artifact' as const,
     },
   ];
+  const [outputArtifact] = outputArtifacts;
+  if (outputArtifact === undefined) {
+    throw new Error('HDR runtime apply did not produce an output artifact.');
+  }
 
   const mutationResult = computationalMergeMutationResultV1Schema.parse({
     appliedGraphRevision: `${request.command.expectedGraphRevision}:hdr-apply`,
@@ -228,18 +236,132 @@ export const applyHdrRuntimePlanV1 = (requestValue: unknown): HdrRuntimeApplyRes
     undoRevision: `${request.command.expectedGraphRevision}:undo-hdr-apply`,
     warnings: runtime.warnings,
   });
+  const provenance = hdrRuntimeProvenanceV1Schema.parse({
+    ...runtime.provenance,
+    acceptedDryRunPlanHash,
+    acceptedDryRunPlanId,
+    runtimeStatus: 'apply_rendered',
+  });
 
   return {
     mergedPixels: runtime.mergedPixels,
     motionConfidenceMap: runtime.motionConfidenceMap,
     mutationResult,
-    provenance: hdrRuntimeProvenanceV1Schema.parse({
-      ...runtime.provenance,
-      acceptedDryRunPlanHash,
-      acceptedDryRunPlanId,
-      runtimeStatus: 'apply_rendered',
+    provenance,
+    sidecarArtifact: buildHdrRuntimeSidecarArtifact({
+      command: request.command,
+      createdAt: new Date().toISOString(),
+      frames: request.frames,
+      outputArtifact,
+      provenance,
+      warningCodes: runtime.warnings,
     }),
   };
+};
+
+const buildHdrRuntimeSidecarArtifact = ({
+  command,
+  createdAt,
+  frames,
+  outputArtifact,
+  provenance,
+  warningCodes,
+}: {
+  command: HdrRuntimeCommandV1;
+  createdAt: string;
+  frames: HdrRuntimeFrameV1[];
+  outputArtifact: ArtifactHandleV1;
+  provenance: HdrRuntimeProvenanceV1;
+  warningCodes: string[];
+}): HdrMergeArtifactV1 => {
+  const sourceByIndex = new Map(command.parameters.sources.map((source) => [source.sourceIndex, source]));
+  const bracketDetection = detectHdrBracketV1({
+    sources: frames.map((frame) => {
+      const source = sourceByIndex.get(frame.sourceIndex);
+      return {
+        contentHash: frame.contentHash,
+        declaredExposureEv: frame.exposureEv,
+        graphRevision: frame.graphRevision,
+        height: frame.height,
+        imageId: source?.imageId,
+        imagePath: source?.imagePath ?? `source-${frame.sourceIndex}`,
+        rawBlackLevelKnown: true,
+        rawWhiteLevelKnown: true,
+        resolvedExposureEv: frame.exposureEv,
+        sourceIndex: frame.sourceIndex,
+        whiteBalanceComparable: true,
+        width: frame.width,
+      };
+    }),
+  });
+
+  return hdrMergeArtifactV1Schema.parse({
+    alignment: {
+      alignmentConfidence: provenance.alignmentConfidence,
+      referenceSourceIndex: provenance.referenceSourceIndex,
+      rejectedSourceIndexes: [],
+      requestedAlignmentMode: provenance.alignmentMode,
+      resolvedAlignmentMode: provenance.alignmentMode,
+      transforms: provenance.alignmentTransforms.map((transform) => ({
+        confidence: transform.confidence,
+        sourceIndex: transform.sourceIndex,
+        transformType: transform.transformType,
+        translationPx: transform.translationPx,
+      })),
+    },
+    artifactId: `artifact_record_${outputArtifact.artifactId}`,
+    blockCodes: bracketDetection.blockCodes,
+    bracketDetection,
+    createdAt,
+    deghosting: {
+      masks: [],
+      motionCoverageRatio: provenance.motionCoverageRatio,
+      motionRisk: motionRiskForCoverage(provenance.motionCoverageRatio),
+      referenceSourceIndex: provenance.referenceSourceIndex,
+      requestedDeghosting: provenance.deghosting,
+      resolvedDeghosting: provenance.deghosting,
+    },
+    dryRun: {
+      acceptedDryRunPlanHash: provenance.acceptedDryRunPlanHash,
+      acceptedDryRunPlanId: provenance.acceptedDryRunPlanId,
+    },
+    editableDerivedAssetId: `derived_${command.commandId}`,
+    engine: {
+      backendType: 'local_cpu',
+      capabilityLevel: 'runtime_apply_capable',
+      engineId: provenance.engineId,
+      engineVersion: provenance.engineVersion,
+    },
+    family: 'hdr',
+    highlightRecovery: {
+      clippedInputPixelRatioBySource: frames.map((frame) => ({
+        clippedHighRatio: provenance.qualityMetrics.clippedInputPixelRatio,
+        nearClippedHighRatio: provenance.qualityMetrics.clippedInputPixelRatio,
+        sourceIndex: frame.sourceIndex,
+      })),
+      highlightDetailGainRatio: 1,
+      recoveredHighlightPixelRatio: Math.max(0, 1 - provenance.qualityMetrics.clippedInputPixelRatio),
+      shadowNoiseAmplificationRisk: warningCodes.includes('noise_risk_in_shadow_recovery') ? 'medium' : 'low',
+      unrecoveredClippedPixelRatio: provenance.qualityMetrics.clippedInputPixelRatio,
+    },
+    mergeStrategy: provenance.mergeStrategy,
+    outputArtifact,
+    outputColorSpace: command.parameters.sources[0]?.colorSpaceHint ?? 'camera_linear_rgb',
+    outputEncoding: 'scene_linear_half_float',
+    outputName: command.parameters.outputName,
+    previewArtifacts: [],
+    previewToneMapped: provenance.toneMapPreview,
+    schemaVersion: command.schemaVersion,
+    sourceImageRefs: command.parameters.sources,
+    sourceState: provenance.sourceState,
+    staleState: {
+      checkedAt: createdAt,
+      invalidationReasons: [],
+      state: 'current',
+    },
+    warningCodes,
+    workingColorSpace: 'scene_linear_camera_rgb',
+  });
 };
 
 const parseHdrRuntimePlanRequest = (requestValue: unknown, dryRun: boolean): ParsedHdrRuntimePlanRequestV1 => {
