@@ -5,6 +5,11 @@ import { readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { z } from 'zod';
 import {
+  layerStackSidecarV1Schema,
+  readLayerStackSidecarsFromSidecar,
+  upsertLayerStackSidecarInSidecar,
+} from '../../../packages/rawengine-schema/src';
+import {
   aiSidecarProvenanceEntryV1Schema,
   focusStackArtifactV1Schema,
   hdrMergeArtifactV1Schema,
@@ -48,6 +53,7 @@ const RawEngineArtifactsSchema = z
     aiProvenanceEntries: z.array(aiSidecarProvenanceEntryV1Schema).default([]),
     focusStackArtifacts: z.array(focusStackArtifactV1Schema).default([]),
     hdrMergeArtifacts: z.array(hdrMergeArtifactV1Schema).default([]),
+    layerStackSidecars: z.array(layerStackSidecarV1Schema).default([]),
     negativeLabRollSessions: z.array(negativeLabRollSessionArtifactV1Schema).default([]),
     panoramaArtifacts: z.array(panoramaArtifactV1Schema).default([]),
     schemaVersion: z.literal(1),
@@ -237,6 +243,7 @@ assertEqual(primaryArtifacts.schemaVersion, 1, 'primary rawEngineArtifacts schem
 assertEqual(primaryArtifacts.aiProvenanceEntries.length, 2, 'primary AI provenance entry count');
 assertEqual(primaryArtifacts.focusStackArtifacts.length, 0, 'primary focus stack artifact count');
 assertEqual(primaryArtifacts.hdrMergeArtifacts.length, 0, 'primary HDR artifact count');
+assertEqual(primaryArtifacts.layerStackSidecars.length, 1, 'primary layer stack sidecar count');
 assertEqual(primaryArtifacts.negativeLabRollSessions.length, 1, 'primary Negative Lab roll session count');
 assertEqual(primaryArtifacts.panoramaArtifacts.length, 0, 'primary panorama artifact count');
 assertEqual(primaryArtifacts.superResolutionArtifacts.length, 0, 'primary super-resolution artifact count');
@@ -252,6 +259,33 @@ const roundtrippedPrimaryArtifacts = SidecarSchema.parse(
   JSON.parse(JSON.stringify(primary.metadata, null, 2)),
 ).rawEngineArtifacts;
 assertJsonEqual(roundtrippedPrimaryArtifacts, primaryArtifacts, 'AI provenance sidecar roundtrip');
+
+const [primaryLayerStack] = readLayerStackSidecarsFromSidecar(primary.metadata);
+if (primaryLayerStack === undefined) {
+  fail('primary sidecar fixture must persist one layer stack sidecar');
+}
+assertEqual(primaryLayerStack.sourceImagePath, PRIMARY_IMAGE_PATH, 'primary layer stack source image path');
+assertJsonEqual(
+  primaryLayerStack.layers.map((layer) => layer.id),
+  ['layer_local_contrast', 'layer_subject_dodge'],
+  'primary layer stack persisted order',
+);
+
+const updatedLayerStack = layerStackSidecarV1Schema.parse({
+  ...primaryLayerStack,
+  graphRevision: 'graph_rev_layer_stack_roundtrip_updated',
+  lastCommandId: 'command_layer_stack_set_visibility_fixture',
+  layers: primaryLayerStack.layers.map((layer) =>
+    layer.id === 'layer_subject_dodge' ? { ...layer, visible: false } : layer,
+  ),
+});
+const upsertedPrimary = upsertLayerStackSidecarInSidecar(primary.metadata, updatedLayerStack);
+const [reloadedLayerStack] = readLayerStackSidecarsFromSidecar(JSON.parse(JSON.stringify(upsertedPrimary)));
+if (reloadedLayerStack === undefined) {
+  fail('updated layer stack sidecar must reload after upsert');
+}
+assertEqual(reloadedLayerStack.lastCommandId, 'command_layer_stack_set_visibility_fixture', 'layer stack last command');
+assertEqual(reloadedLayerStack.layers[1]?.visible, false, 'layer stack visibility persistence');
 
 const [negativeLabRollSession] = primaryArtifacts.negativeLabRollSessions;
 assertEqual(negativeLabRollSession.rollId, 'negative_lab_roll_fixture_roll_001', 'Negative Lab roll id');

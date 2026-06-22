@@ -26,6 +26,7 @@ export * from './hdrMergeUiControls.js';
 export * from './hdrRuntimePlan.js';
 export * from './layerBlendRuntime.js';
 export * from './layerStackCommandRuntime.js';
+export * from './layerStackSidecarPersistence.js';
 export * from './linearGradientMaskCommandRuntime.js';
 export * from './maskComposeCommandRuntime.js';
 export * from './negativeLabAppServerRuntime.js';

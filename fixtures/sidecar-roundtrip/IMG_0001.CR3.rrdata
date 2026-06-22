@@ -74,6 +74,35 @@
         "outputArtifactIds": ["artifact_ai_denoise_sidecar"]
       }
     ],
+    "layerStackSidecars": [
+      {
+        "graphRevision": "graph_rev_layer_stack_roundtrip_fixture",
+        "lastCommandId": "command_layer_stack_move_fixture",
+        "layers": [
+          {
+            "adjustmentPreset": "empty_adjustment_layer_v1",
+            "blendMode": "soft_light",
+            "id": "layer_local_contrast",
+            "maskIds": ["mask_local_contrast_gradient"],
+            "name": "Local contrast",
+            "opacity": 0.64,
+            "visible": true
+          },
+          {
+            "adjustmentPreset": "empty_adjustment_layer_v1",
+            "blendMode": "normal",
+            "id": "layer_subject_dodge",
+            "maskIds": ["mask_subject_dodge_brush"],
+            "name": "Subject dodge",
+            "opacity": 0.42,
+            "visible": true
+          }
+        ],
+        "schemaVersion": 1,
+        "sourceImagePath": "/fixture-roll/IMG_0001.CR3",
+        "storage": "sidecar_artifact"
+      }
+    ],
     "negativeLabRollSessions": [
       {
         "schemaVersion": 1,
