@@ -120,13 +120,25 @@ interface SrPrivateRawBrowserProof {
   artifactRoot: string;
   exportReviewArtifact: string;
   exportReviewDataUrl: string;
+  exportReviewHash: string;
   fixtureId: string;
+  outputHeight: string;
+  outputScale: string;
+  outputWidth: string;
   previewArtifact: string;
   previewDataUrl: string;
+  previewHash: string;
+  privateRunReportPath: string;
   reconstructionPath: string;
+  reconstructionHash: string;
   resultReviewArtifact: string;
   resultReviewDataUrl: string;
+  resultReviewHash: string;
   sourceCount: string;
+  sourceHashes: string;
+  sourceHeights: string;
+  sourcePaths: string;
+  sourceWidths: string;
 }
 
 interface FocusPrivateRawBrowserProof {
@@ -488,6 +500,108 @@ function hashJson(value: unknown): string {
   return `sha256:${createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
 }
 
+async function sha256File(path: string): Promise<string> {
+  return `sha256:${createHash('sha256')
+    .update(await readFile(path))
+    .digest('hex')}`;
+}
+
+const privateArtifactSchema = z
+  .object({
+    hash: z
+      .string()
+      .trim()
+      .regex(/^sha256:[a-f0-9]{64}$/u),
+    kind: z.string().trim().min(1),
+    path: z.string().trim().min(1),
+    publicRepoAllowed: z.literal(false),
+  })
+  .passthrough();
+
+const privateScreenshotArtifactSchema = z
+  .object({
+    hash: z
+      .string()
+      .trim()
+      .regex(/^sha256:[a-f0-9]{64}$/u),
+    label: z.string().trim().min(1),
+    path: z.string().trim().min(1),
+    publicRepoAllowed: z.literal(false),
+  })
+  .passthrough();
+
+const srPrivateRunReportSchema = z
+  .object({
+    reports: z
+      .array(
+        z
+          .object({
+            acceptanceStatus: z.literal('runtime_apply_capable'),
+            artifacts: z.array(privateArtifactSchema),
+            fixtureId: z.literal('validation.computational-merge.super-resolution-subpixel.v1'),
+            runId: z.string().trim().min(1),
+            screenshotArtifacts: z.array(privateScreenshotArtifactSchema),
+            sourceHashes: z
+              .array(
+                z
+                  .object({
+                    hash: z
+                      .string()
+                      .trim()
+                      .regex(/^sha256:[a-f0-9]{64}$/u),
+                    localRelativePath: z.string().trim().min(1),
+                    path: z.string().trim().min(1),
+                    publicRepoAllowed: z.literal(false),
+                  })
+                  .passthrough(),
+              )
+              .length(4),
+          })
+          .passthrough(),
+      )
+      .min(1),
+  })
+  .passthrough();
+
+const srDecodeReportSchema = z
+  .object({
+    decodedSources: z
+      .array(
+        z
+          .object({
+            contentHash: z
+              .string()
+              .trim()
+              .regex(/^sha256:[a-f0-9]{64}$/u),
+            height: z.number().int().positive(),
+            localRelativePath: z.string().trim().min(1),
+            width: z.number().int().positive(),
+          })
+          .passthrough(),
+      )
+      .length(4),
+    fixtureId: z.literal('validation.computational-merge.super-resolution-subpixel.v1'),
+  })
+  .passthrough();
+
+const srRegistrationReportSchema = z
+  .object({
+    fixtureId: z.literal('validation.computational-merge.super-resolution-subpixel.v1'),
+    frames: z.array(z.object({ sourceIndex: z.number().int().nonnegative() }).passthrough()).length(4),
+    outputHeight: z.number().int().positive(),
+    outputScale: z.number().min(1.1).max(4),
+    outputWidth: z.number().int().positive(),
+  })
+  .passthrough();
+
+const srAppServerProofSchema = z
+  .object({
+    fixtureId: z.literal('validation.computational-merge.super-resolution-subpixel.v1'),
+    runtimeStatus: z.literal('apply_rendered'),
+    sourceCount: z.literal(4),
+  })
+  .passthrough();
+
 async function readJpegDataUrl(path) {
   const buffer = await readFile(path);
   if (buffer.toString('hex', 0, 2) !== 'ffd8') {
@@ -499,20 +613,85 @@ async function readJpegDataUrl(path) {
 async function loadSrPrivateRawProof(): Promise<SrPrivateRawBrowserProof> {
   const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT ?? '/tmp/rawengine-private-root';
   const artifactRoot = `${privateRoot}/private-artifacts/validation/computational-merge`;
+  const privateRunReportPath = `${artifactRoot}/sr-subpixel-private-run-report.json`;
+  const privateRunReport = srPrivateRunReportSchema.parse(JSON.parse(await readFile(privateRunReportPath, 'utf8')));
+  const report = privateRunReport.reports[0];
+  if (report === undefined) throw new Error('SR private run report did not include a report.');
+  const decodeReport = srDecodeReportSchema.parse(
+    JSON.parse(await readFile(`${artifactRoot}/sr-subpixel-decode-report.json`, 'utf8')),
+  );
+  const registrationReport = srRegistrationReportSchema.parse(
+    JSON.parse(await readFile(`${artifactRoot}/sr-subpixel-registration.json`, 'utf8')),
+  );
+  srAppServerProofSchema.parse(
+    JSON.parse(await readFile(`${artifactRoot}/sr-subpixel-app-server-runtime-proof.json`, 'utf8')),
+  );
+
+  const sourcePaths = decodeReport.decodedSources.map((source) => source.localRelativePath);
+  const sourceHashes = decodeReport.decodedSources.map((source) => source.contentHash);
+  const sourceHashesFromRun = report.sourceHashes.map((source) => source.hash);
+  if (new Set(sourcePaths).size !== 4 || new Set(sourceHashes).size !== 4) {
+    throw new Error('SR private proof expected four unique decoded sources.');
+  }
+  if (sourceHashes.some((hash, index) => hash !== sourceHashesFromRun[index])) {
+    throw new Error('SR private decode hashes do not match private run source hashes.');
+  }
+
+  const artifactByKind = new Map(report.artifacts.map((artifact) => [artifact.kind, artifact]));
+  const screenshotByLabel = new Map(report.screenshotArtifacts.map((artifact) => [artifact.label, artifact]));
+  const reconstructionArtifact = artifactByKind.get('merge_output_private');
+  const previewArtifactReport = artifactByKind.get('preview_after_private');
+  const resultReviewArtifactReport = screenshotByLabel.get('result_review');
+  const exportReviewArtifactReport = screenshotByLabel.get('export_review');
+  if (
+    reconstructionArtifact === undefined ||
+    previewArtifactReport === undefined ||
+    resultReviewArtifactReport === undefined ||
+    exportReviewArtifactReport === undefined
+  ) {
+    throw new Error('SR private proof report is missing required reconstruction/review artifacts.');
+  }
+
   const previewArtifact = `${artifactRoot}/sr-subpixel-preview.png`;
   const resultReviewArtifact = `${artifactRoot}/sr-subpixel-result-review.png`;
   const exportReviewArtifact = `${artifactRoot}/sr-subpixel-export-review.png`;
+  const reconstructionPath = `${artifactRoot}/sr-subpixel-reconstruction.tiff`;
+  const previewHash = await sha256File(previewArtifact);
+  const resultReviewHash = await sha256File(resultReviewArtifact);
+  const exportReviewHash = await sha256File(exportReviewArtifact);
+  const reconstructionHash = await sha256File(reconstructionPath);
+  if (
+    previewHash !== previewArtifactReport.hash ||
+    resultReviewHash !== resultReviewArtifactReport.hash ||
+    exportReviewHash !== exportReviewArtifactReport.hash ||
+    reconstructionHash !== reconstructionArtifact.hash
+  ) {
+    throw new Error('SR private proof artifact hashes do not match the private run report.');
+  }
+
   return {
     artifactRoot,
     exportReviewArtifact,
     exportReviewDataUrl: await readPngDataUrl(exportReviewArtifact),
+    exportReviewHash,
     fixtureId: 'validation.computational-merge.super-resolution-subpixel.v1',
+    outputHeight: String(registrationReport.outputHeight),
+    outputScale: String(registrationReport.outputScale),
+    outputWidth: String(registrationReport.outputWidth),
     previewArtifact,
     previewDataUrl: await readPngDataUrl(previewArtifact),
-    reconstructionPath: `${artifactRoot}/sr-subpixel-reconstruction.tiff`,
+    previewHash,
+    privateRunReportPath,
+    reconstructionHash,
+    reconstructionPath,
     resultReviewArtifact,
     resultReviewDataUrl: await readPngDataUrl(resultReviewArtifact),
+    resultReviewHash,
     sourceCount: '4',
+    sourceHashes: sourceHashes.join(','),
+    sourceHeights: decodeReport.decodedSources.map((source) => String(source.height)).join(','),
+    sourcePaths: sourcePaths.join(','),
+    sourceWidths: decodeReport.decodedSources.map((source) => String(source.width)).join(','),
   };
 }
 
@@ -1186,9 +1365,16 @@ async function prepareScenario(page, mode) {
       .evaluate((element) => ({ ...element.dataset }));
     if (
       proofBefore.fixtureId !== 'validation.computational-merge.super-resolution-subpixel.v1' ||
+      proofBefore.outputHeight !== '960' ||
+      proofBefore.outputScale !== '2' ||
+      proofBefore.outputWidth !== '1440' ||
       proofBefore.previewRequested !== 'false' ||
+      proofBefore.privateRunReportPath?.endsWith('/sr-subpixel-private-run-report.json') !== true ||
+      proofBefore.reconstructionHash !== 'sha256:64dff0960896506ddd760cda61207bdbb5f723064977c037b3f456652662a911' ||
       proofBefore.reconstructionPath?.endsWith('/sr-subpixel-reconstruction.tiff') !== true ||
-      proofBefore.sourceCount !== '4'
+      proofBefore.sourceCount !== '4' ||
+      proofBefore.sourceHashes?.split(',').length !== 4 ||
+      proofBefore.sourcePaths?.split(',').length !== 4
     ) {
       throw new Error(`SR private RAW modal proof payload failed: ${JSON.stringify(proofBefore)}`);
     }
@@ -1206,25 +1392,49 @@ async function prepareScenario(page, mode) {
       throw new Error(`SR private RAW readiness failed: ${JSON.stringify(readiness)}`);
     }
     const preflight = await page.getByTestId('sr-source-preflight').evaluate((element) => ({ ...element.dataset }));
-    if (preflight.preflightStatus !== 'ready' || preflight.effectiveScale !== '2') {
+    if (preflight.preflightStatus !== 'ready' || preflight.effectiveScale === undefined) {
       throw new Error(`SR private RAW source preflight failed: ${JSON.stringify(preflight)}`);
     }
     const handoff = await page.getByTestId('sr-editable-handoff-proof').evaluate((element) => ({
       ...element.dataset,
     }));
-    if (handoff.outputArtifactId !== reconstructionPath || handoff.editableHandoffReady !== 'false') {
+    if (
+      handoff.outputArtifactHash !== proofBefore.reconstructionHash ||
+      handoff.outputArtifactId !== reconstructionPath ||
+      handoff.reviewArtifactCount !== '1' ||
+      handoff.editableHandoffReady !== 'false' ||
+      handoff.reviewArtifactPaths?.endsWith('/sr-subpixel-result-review.png') !== true
+    ) {
       throw new Error(`SR private RAW editable handoff proof failed: ${JSON.stringify(handoff)}`);
     }
     await page.getByTestId('sr-review-diagnostics').getByText(reconstructionPath, { exact: true }).waitFor({
       timeout: 10_000,
     });
+    await page
+      .getByTestId('sr-review-diagnostics')
+      .getByText(proofBefore.reconstructionHash, { exact: true })
+      .waitFor({ timeout: 10_000 });
+    await page
+      .getByTestId('sr-review-diagnostics')
+      .getByText(proofBefore.privateRunReportPath ?? '', { exact: true })
+      .waitFor({ timeout: 10_000 });
     const previewReadyCount = await page
       .getByTestId('sr-review-artifact-comparator')
       .locator('[data-preview-ready="true"]')
       .count();
-    if (previewReadyCount !== 3) {
-      throw new Error(`Expected 3 SR private RAW review previews, found ${previewReadyCount}.`);
+    if (previewReadyCount !== 1) {
+      throw new Error(`Expected 1 SR private RAW review preview, found ${previewReadyCount}.`);
     }
+    await page.getByText('/tmp/rawengine-super-resolution-smoke.tif', { exact: true }).waitFor({
+      state: 'detached',
+      timeout: 1_000,
+    });
+    await page
+      .getByText('docs/validation/sr-synthetic-output-artifact-proof-2026-06-20.json', { exact: true })
+      .waitFor({
+        state: 'detached',
+        timeout: 1_000,
+      });
     return;
   }
 

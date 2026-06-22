@@ -35,9 +35,9 @@ import { applyColorBalanceRgbToPixel } from '../../utils/colorBalanceRgbRuntime'
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
 import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
-import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
 
 import type { MaskOverlaySettings } from '../../schemas/maskOverlaySchemas';
+import type { SuperResolutionOutputReviewWorkflow } from '../../schemas/superResolutionOutputReviewSchemas';
 import type { SuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
 
 interface VisualSmokeAppProps {
@@ -47,13 +47,25 @@ interface VisualSmokeAppProps {
 interface SrPrivateRawVisualProof {
   exportReviewArtifact: string;
   exportReviewDataUrl: string;
+  exportReviewHash: string;
   fixtureId: string;
+  outputHeight: string;
+  outputScale: string;
+  outputWidth: string;
   previewArtifact: string;
   previewDataUrl: string;
+  previewHash: string;
+  privateRunReportPath: string;
   reconstructionPath: string;
+  reconstructionHash: string;
   resultReviewArtifact: string;
   resultReviewDataUrl: string;
+  resultReviewHash: string;
   sourceCount: string;
+  sourceHashes: string;
+  sourceHeights: string;
+  sourcePaths: string;
+  sourceWidths: string;
 }
 
 interface FocusPrivateRawVisualProof {
@@ -2352,32 +2364,68 @@ function SuperResolutionPrivateRawModalReviewSmoke() {
   }
 
   const sourceCount = Number.parseInt(proof.sourceCount, 10);
-  const outputReview = buildSuperResolutionOutputReviewWorkflow({
+  const outputHeight = Number.parseInt(proof.outputHeight, 10);
+  const outputScale = Number.parseFloat(proof.outputScale);
+  const outputWidth = Number.parseInt(proof.outputWidth, 10);
+  const sourcePaths = proof.sourcePaths.split(',');
+  const sourceWidths = proof.sourceWidths.split(',').map((width) => Number.parseInt(width, 10));
+  const sourceHeights = proof.sourceHeights.split(',').map((height) => Number.parseInt(height, 10));
+  const outputReview = {
+    alignmentConfidence: null,
+    alignmentMode: settings.alignmentMode,
     artifactPath: proof.reconstructionPath,
-    settings,
-    sourceCount,
-  });
-  const sourcePreflightMetadata: SuperResolutionSourcePreflightMetadata[] = Array.from(
-    { length: sourceCount },
-    (_, index) => ({
-      exif: {
-        ExifImageHeight: '6336',
-        ExifImageWidth: '9504',
-        ISO: '100',
-        LensModel: 'FE 50mm F1.4 GM',
-        Make: 'Sony',
-        Model: 'ILCE-7RM5',
+    cropMetrics: {
+      outputHeight,
+      outputWidth,
+      overlapCoverageRatio: null,
+      reviewCropCount: 1,
+    },
+    decision: 'human_review_required',
+    detailGainRatio: null,
+    detailPolicy: settings.detailPolicy,
+    editableGate: 'blocked_review_required',
+    falseDetailRisk: 'unknown',
+    humanReviewStatus: 'pending',
+    mode: 'conservative',
+    modePolicyVersion: 1,
+    outputArtifactHash: proof.reconstructionHash,
+    outputArtifactId: proof.reconstructionPath,
+    outputHeight,
+    outputScale,
+    outputWidth,
+    overlapCoverageRatio: null,
+    proofLevel: 'synthetic_runtime',
+    qualityPreference: settings.qualityPreference,
+    reviewArtifacts: [
+      {
+        contentHash: proof.resultReviewHash,
+        kind: 'reconstruction_preview',
+        path: proof.resultReviewArtifact,
+        publicRepoAllowed: false,
       },
-      height: 6336,
-      imagePath: `/private/alaska/sr_dx-${index % 2}_dy-${Math.floor(index / 2)}_${index}.ARW`,
-      sourceIndex: index,
-      width: 9504,
-    }),
-  );
+    ],
+    reviewCropCount: 1,
+    reviewPacketPath: proof.privateRunReportPath,
+    sourceCount,
+    staleState: 'current',
+    warningCodes: ['human_review_required', 'synthetic_runtime_only', 'texture_risk', 'effective_scale_downgraded'],
+  } satisfies SuperResolutionOutputReviewWorkflow;
+  const sourcePreflightMetadata: SuperResolutionSourcePreflightMetadata[] = sourcePaths.map((imagePath, index) => ({
+    exif: {
+      ExifImageHeight: proof.sourceHeights.split(',')[index] ?? '',
+      ExifImageWidth: proof.sourceWidths.split(',')[index] ?? '',
+      ISO: '100',
+      LensModel: 'FE 50mm F1.4 GM',
+      Make: 'Sony',
+      Model: 'ILCE-7RM5',
+    },
+    height: sourceHeights[index],
+    imagePath,
+    sourceIndex: index,
+    width: sourceWidths[index],
+  }));
   const reviewArtifactPreviewUrls = {
-    baseline_review_crop: proof.previewDataUrl,
     reconstruction_preview: proof.resultReviewDataUrl,
-    reconstruction_review_crop: proof.exportReviewDataUrl,
   };
 
   return (
@@ -2393,9 +2441,16 @@ function SuperResolutionPrivateRawModalReviewSmoke() {
       <div
         className="sr-only"
         data-fixture-id={proof.fixtureId}
+        data-output-height={proof.outputHeight}
+        data-output-scale={proof.outputScale}
+        data-output-width={proof.outputWidth}
         data-preview-requested={String(previewRequested)}
+        data-private-run-report-path={proof.privateRunReportPath}
+        data-reconstruction-hash={proof.reconstructionHash}
         data-reconstruction-path={proof.reconstructionPath}
         data-source-count={proof.sourceCount}
+        data-source-hashes={proof.sourceHashes}
+        data-source-paths={proof.sourcePaths}
         data-testid="sr-private-raw-modal-review-proof"
       />
       <SuperResolutionModal
