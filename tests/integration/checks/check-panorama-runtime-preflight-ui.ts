@@ -25,7 +25,15 @@ const samplePlan = panoramaRuntimePlanSchema.parse({
       source_decode_bytes: 270_000_000,
       total_estimated_peak_bytes: 952_332_000,
     },
-    status: 'accepted',
+    source_geometry: {
+      blocked_reasons: ['multi_row_panorama_not_supported'],
+      layout: 'multi_row_candidate',
+      row_count_estimate: 2,
+      support: 'blocked_requires_multi_row_solver',
+      vertical_span_px: 480,
+      warning_codes: ['multi_row_runtime_deferred'],
+    },
+    status: 'blocked_plan_only',
     tile_count: 1,
     warning_codes: ['geometry_estimate_low_confidence'],
   },
@@ -58,6 +66,9 @@ for (const marker of [
   'data-runtime-plan-ready={String(runtimePlan !== null)}',
   'data-plan-scope="geometry_memory_only"',
   "data-plan-status={runtimePlan?.preflight.status ?? 'pending'}",
+  "data-source-geometry-layout={runtimePlanSourceGeometry?.layout ?? 'pending'}",
+  "data-source-geometry-support={runtimePlanSourceGeometry?.support ?? 'pending'}",
+  "data-source-row-count-estimate={runtimePlanSourceGeometry?.row_count_estimate ?? ''}",
   'runtimePlan.preflight.memory_components.total_estimated_peak_bytes',
 ]) {
   if (!modalSource.includes(marker)) {
@@ -78,6 +89,8 @@ for (const marker of [
   'panorama-runtime-plan-summary',
   "runtimePlanProof.planScope !== 'geometry_memory_only'",
   "runtimePlanProof.planStatus !== 'accepted'",
+  "runtimePlanProof.sourceGeometryLayout !== 'single_row'",
+  "runtimePlanProof.sourceGeometrySupport !== 'implemented_current_engine'",
 ]) {
   if (!visualSmokeSource.includes(marker)) {
     failures.push(`Panorama visual smoke missing runtime plan assertion: ${marker}`);

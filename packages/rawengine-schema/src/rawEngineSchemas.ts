@@ -2751,6 +2751,8 @@ export const computationalMergePreflightWarningCodeV1Schema = z.enum([
   'high_memory_estimate',
   'legacy_full_frame_render',
   'memory_budget_exceeded',
+  'multi_row_runtime_deferred',
+  'source_geometry_unverified',
   'tile_runtime_deferred',
   'tiled_render_required',
 ]);
@@ -2822,6 +2824,17 @@ export const computationalMergePreflightEstimateV1Schema = z
     memoryBudgetBytes: z.number().int().positive(),
     memoryBudgetRatio: z.number().nonnegative(),
     memoryComponents: computationalMergeMemoryComponentsV1Schema,
+    sourceGeometry: z
+      .object({
+        blockedReasons: z.array(z.string().trim().min(1)),
+        layout: z.enum(['multi_row_candidate', 'single_row', 'unknown']),
+        rowCountEstimate: z.number().int().positive(),
+        support: z.enum(['blocked_requires_multi_row_solver', 'implemented_current_engine', 'unverified']),
+        verticalSpanPx: z.number().int().nonnegative(),
+        warningCodes: z.array(computationalMergePreflightWarningCodeV1Schema),
+      })
+      .strict()
+      .optional(),
     status: computationalMergePreflightStatusV1Schema,
     tileCount: z.number().int().positive(),
     warningCodes: z.array(computationalMergePreflightWarningCodeV1Schema),

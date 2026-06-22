@@ -110,6 +110,7 @@ export default function PanoramaModal({
       : runtimePlan.preflight.status === 'blocked_plan_only'
         ? t('modals.panorama.summaryBlocked')
         : t('modals.panorama.summaryReady');
+  const runtimePlanSourceGeometry = runtimePlan?.preflight.source_geometry;
   const sourceReadinessLabel = `${t('modals.panorama.summarySourceCount', { count: imageCount ?? 0 })} - ${
     isSourceCountValid ? t('modals.panorama.summaryReady') : t('modals.panorama.summaryBlocked')
   }`;
@@ -482,6 +483,10 @@ export default function PanoramaModal({
             data-plan-status={runtimePlan?.preflight.status ?? 'pending'}
             data-projection={settings.projection}
             data-runtime-plan-ready={String(runtimePlan !== null)}
+            data-source-geometry-layout={runtimePlanSourceGeometry?.layout ?? 'pending'}
+            data-source-geometry-support={runtimePlanSourceGeometry?.support ?? 'pending'}
+            data-source-row-count-estimate={runtimePlanSourceGeometry?.row_count_estimate ?? ''}
+            data-source-vertical-span-px={runtimePlanSourceGeometry?.vertical_span_px ?? ''}
             data-testid="panorama-runtime-plan-summary"
           >
             {[
