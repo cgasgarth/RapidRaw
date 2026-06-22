@@ -601,7 +601,8 @@
     "check:panorama-private-raw-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario panorama-private-raw-ui",
     "check:selective-color-range-preview-apply": "bun tests/integration/checks/check-selective-color-range-preview-apply.ts",
     "check:selective-color-range-preview-apply:update": "bun tests/integration/checks/check-selective-color-range-preview-apply.ts --update",
-    "check:agent-basic-tone-live-apply": "bun tests/integration/checks/check-agent-basic-tone-live-apply.ts"
+    "check:agent-basic-tone-live-apply": "bun tests/integration/checks/check-agent-basic-tone-live-apply.ts",
+    "check:agent-image-context-snapshot": "bun tests/integration/checks/check-agent-image-context-snapshot.ts"
   },
   "dependencies": {
     "@clerk/react": "^6.9.1",
