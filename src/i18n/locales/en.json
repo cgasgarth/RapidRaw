@@ -559,6 +559,13 @@
           "read": "Read"
         },
         "noAppliedEdits": "No edits applied",
+        "privateRawArtifacts": {
+          "artifacts": "Artifacts",
+          "fixture": "Fixture",
+          "report": "Report",
+          "runtime": "Runtime",
+          "summary": "Agent apply proof is linked to a private RAW output lane; private files stay outside the public repo."
+        },
         "readiness": {
           "applies": "Applies",
           "appServer": "App-server",

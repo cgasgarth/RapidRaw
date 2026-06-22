@@ -558,6 +558,13 @@
           "read": ""
         },
         "noAppliedEdits": "",
+        "privateRawArtifacts": {
+          "artifacts": "",
+          "fixture": "",
+          "report": "",
+          "runtime": "",
+          "summary": ""
+        },
         "readiness": {
           "applies": "",
           "appServer": "",

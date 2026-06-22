@@ -29,6 +29,7 @@ import {
   agentAuditTranscriptViewerProofDatasetSchema,
   agentChatProofDatasetSchema,
   agentDryRunReviewProofDatasetSchema,
+  agentPrivateRawArtifactsProofDatasetSchema,
   agentReviewHandoffProofDatasetSchema,
   agentSelectedFrameScopeProofDatasetSchema,
   colorBalanceCompareProofDatasetSchema,
@@ -715,6 +716,10 @@ async function prepareScenario(page, mode) {
     agentSelectedFrameScopeProofDatasetSchema.parse(await scope.evaluate((element) => ({ ...element.dataset })));
     const review = page.getByTestId('agent-dry-run-review');
     agentDryRunReviewProofDatasetSchema.parse(await review.evaluate((element) => ({ ...element.dataset })));
+    const privateRawArtifacts = page.getByTestId('agent-private-raw-artifacts');
+    agentPrivateRawArtifactsProofDatasetSchema.parse(
+      await privateRawArtifacts.evaluate((element) => ({ ...element.dataset })),
+    );
     await page.getByTestId('agent-chat-messages').getByText('Runtime demo apply complete.', { exact: false }).waitFor({
       timeout: 10_000,
     });
@@ -849,6 +854,14 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('agent-review-warnings').getByText('Original RAW', { exact: false }).waitFor({
       timeout: 10_000,
     });
+    await privateRawArtifacts
+      .getByText('validation.raw-open-edit-export.high-iso-skin-shadow.v1', { exact: true })
+      .waitFor({ timeout: 10_000 });
+    await privateRawArtifacts
+      .getByText('private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-workflow-report.json', {
+        exact: true,
+      })
+      .waitFor({ timeout: 10_000 });
     const removedApplyActionCount = await page.getByText('Approve apply', { exact: true }).count();
     if (removedApplyActionCount !== 0) {
       throw new Error(`Agent UI-only smoke must not expose Approve apply, found ${removedApplyActionCount}.`);
