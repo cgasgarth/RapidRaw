@@ -1,0 +1,65 @@
+{
+  "doesNotProve": [
+    "capture_one_class_quality",
+    "commercial_converter_parity",
+    "film_stock_emulation_accuracy",
+    "macos_app_ui_e2e_session",
+    "measured_negative_profile_accuracy",
+    "source_is_actual_film_negative"
+  ],
+  "fixtureId": "validation.negative-lab-real-raw.alaska.v1",
+  "generatedAt": "2026-06-22T09:34:39.382Z",
+  "issue": 3028,
+  "localRawRuntime": {
+    "artifactRoot": "private-artifacts/validation/negative-lab-real-raw",
+    "command": "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-negative-lab-alaska-proof RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun run check:negative-lab-real-raw-private-proof -- --require-assets",
+    "metrics": {
+      "changedPixelRatio": 0.999962329864502,
+      "inputToOutputMeanAbsDelta": 0.23301689326763153,
+      "sourceHashUnchanged": true
+    },
+    "privateWorkflowReportPath": "private-artifacts/validation/negative-lab-real-raw/alaska-negative-lab-v1-report.json",
+    "status": "passed"
+  },
+  "proofBoundary": "private_raw_negative_lab_runtime_not_final_negative_quality",
+  "proofStatus": "private_raw_negative_lab_positive_export_rendered",
+  "schemaVersion": 1,
+  "sourceRaw": {
+    "licenseEvidence": "User explicitly provided /Users/cgas/Pictures/Capture One/Alaska as project-owned RAW validation input for this repo.",
+    "licenseSummary": "Project-owned local RAW sample for software development validation.",
+    "localPath": "private-fixtures/negative-lab/alaska-negative-lab-v1.arw",
+    "sha256": "sha256:b26b15620ea2c5c7c1db19f1f1c59b06806cf78ea398aa220ee27035d504cb3d",
+    "sourceFolder": "/Users/cgas/Pictures/Capture One/Alaska"
+  },
+  "validationCommands": [
+    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-negative-lab-alaska-proof RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun run check:negative-lab-real-raw-private-proof -- --require-assets",
+    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-negative-lab-alaska-proof bun run check:negative-lab-real-raw-private-proof -- --require-assets"
+  ],
+  "validationMode": "local_alaska_raw_negative_lab_runtime",
+  "workflowArtifacts": [
+    {
+      "hash": "sha256:b26b15620ea2c5c7c1db19f1f1c59b06806cf78ea398aa220ee27035d504cb3d",
+      "kind": "source_raw_private",
+      "path": "private-fixtures/negative-lab/alaska-negative-lab-v1.arw",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:8890a9fb5e0fe62fafeb38b9936d1d325279ad3f2f975ea802f9343b0000abc6",
+      "kind": "positive_jpeg_private",
+      "path": "private-artifacts/validation/negative-lab-real-raw/alaska-negative-lab-v1-Positive.jpg",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:5df09db2afe439b5aa6e2dbd11842ee1ab91afb9be220ab596c0735c2691bea1",
+      "kind": "sidecar_private",
+      "path": "private-artifacts/validation/negative-lab-real-raw/alaska-negative-lab-v1-Positive.jpg.rrdata",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:ab121eea06e7987572e476fedaac814640de0653e24fe20bb6647a69470ccc08",
+      "kind": "conversion_bundle_private",
+      "path": "private-artifacts/validation/negative-lab-real-raw/alaska-negative-lab-v1-Positive.jpg.conversion-bundle.json",
+      "publicRepoAllowed": false
+    }
+  ]
+}

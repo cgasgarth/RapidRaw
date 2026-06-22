@@ -125,12 +125,26 @@ interface NegativeLabPublicExportVisualProof {
   sourcePath: string;
 }
 
+interface NegativeLabRealRawPrivateVisualProof {
+  changedPixelRatio: string;
+  fixtureId: string;
+  inputToOutputMeanAbsDelta: string;
+  outputDataUrl: string;
+  outputFormat: string;
+  outputPath: string;
+  proofBoundary: string;
+  proofStatus: string;
+  sourceIsRaw: string;
+  sourcePath: string;
+}
+
 declare global {
   interface Window {
     __RAWENGINE_FOCUS_PRIVATE_RAW_PROOF__?: FocusPrivateRawVisualProof;
     __RAWENGINE_HDR_PRIVATE_RAW_PROOF__?: HdrPrivateRawVisualProof;
     __RAWENGINE_LAYER_MASK_PRIVATE_RAW_PROOF__?: LayerMaskPrivateRawVisualProof;
     __RAWENGINE_NEGATIVE_LAB_PUBLIC_EXPORT_PROOF__?: NegativeLabPublicExportVisualProof;
+    __RAWENGINE_NEGATIVE_LAB_REAL_RAW_PRIVATE_PROOF__?: NegativeLabRealRawPrivateVisualProof;
     __RAWENGINE_PANORAMA_PRIVATE_RAW_PROOF__?: PanoramaPrivateRawVisualProof;
     __RAWENGINE_SR_PRIVATE_RAW_PROOF__?: SrPrivateRawVisualProof;
   }
@@ -155,6 +169,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.LibraryWorkflow]: LibraryWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.MaskOverlayRawProof]: MaskOverlayRawProofVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabPublicExportReview]: NegativeLabPublicExportReviewSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabRealRawPrivateReview]: NegativeLabRealRawPrivateReviewSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabWorkspace]: NegativeLabVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaPrivateRawUi]: PanoramaPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaSavedReview]: PanoramaSavedReviewVisualSmoke,
@@ -552,6 +567,11 @@ const NEGATIVE_LAB_PUBLIC_EXPORT_RUNTIME_LABEL = 'Runtime';
 const NEGATIVE_LAB_PUBLIC_EXPORT_SOURCE_PATH_LABEL = 'Source';
 const NEGATIVE_LAB_PUBLIC_EXPORT_PROFILE_LABEL = 'Applied profile';
 const NEGATIVE_LAB_PUBLIC_EXPORT_PROFILE_CLAIM_POLICY_LABEL = 'Claim policy';
+const NEGATIVE_LAB_REAL_RAW_PRIVATE_REVIEW_TITLE = 'Private RAW negative review';
+const NEGATIVE_LAB_REAL_RAW_PRIVATE_OUTPUT_LABEL = 'Private RAW positive proof';
+const NEGATIVE_LAB_REAL_RAW_PRIVATE_METRICS_LABEL = 'Runtime metrics';
+const NEGATIVE_LAB_REAL_RAW_PRIVATE_CHANGED_PIXELS_LABEL = 'Changed pixels';
+const NEGATIVE_LAB_REAL_RAW_PRIVATE_MEAN_DELTA_LABEL = 'Mean delta';
 const formatFilmLookParityDelta = (maxDelta: string) => `Delta ${maxDelta}`;
 const formatLayerBlend = (blend: string) => blend.replace('_', ' ');
 const libraryWorkflowAssets = [
@@ -2815,6 +2835,100 @@ function NegativeLabPublicExportReviewSmoke() {
             <div
               className="rounded border border-white/10 bg-white/5 p-2"
               data-testid="negative-lab-public-export-artifact-handoff"
+            >
+              <p className="text-xs text-[#aab2bd]">{NEGATIVE_LAB_PUBLIC_EXPORT_HANDOFF_LABEL}</p>
+              <p className="break-all">{proof.outputPath}</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function NegativeLabRealRawPrivateReviewSmoke() {
+  const proof = window.__RAWENGINE_NEGATIVE_LAB_REAL_RAW_PRIVATE_PROOF__;
+
+  if (!proof) {
+    return (
+      <main
+        className="grid h-full min-h-screen place-items-center bg-[#111316] text-[#f3f4f1] font-sans"
+        data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.NegativeLabRealRawPrivateReview}
+      >
+        <p>{copy.missingPrivateRawProofArtifacts}</p>
+      </main>
+    );
+  }
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.NegativeLabRealRawPrivateReview}
+    >
+      <div
+        className="grid h-screen grid-cols-[1fr_380px] bg-[#0f1114]"
+        data-visual-smoke-section="negative-lab-real-raw-private-review"
+      >
+        <section className="grid grid-rows-[44px_1fr] overflow-hidden">
+          <div className="flex items-center justify-between border-b border-white/10 bg-[#181b1f] px-4">
+            <span className="text-sm font-semibold tracking-normal">{copy.brand}</span>
+            <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">
+              {NEGATIVE_LAB_REAL_RAW_PRIVATE_REVIEW_TITLE}
+            </span>
+          </div>
+          <figure className="min-h-0 p-4">
+            <figcaption className="mb-2 text-xs text-[#aab2bd]">
+              {NEGATIVE_LAB_REAL_RAW_PRIVATE_OUTPUT_LABEL}
+            </figcaption>
+            <img
+              alt={NEGATIVE_LAB_REAL_RAW_PRIVATE_OUTPUT_LABEL}
+              className="h-[calc(100%-1.5rem)] w-full rounded border border-white/10 bg-[#15191e] object-contain p-3"
+              data-testid="negative-lab-real-raw-private-output"
+              src={proof.outputDataUrl}
+            />
+          </figure>
+        </section>
+        <aside className="border-l border-white/10 bg-[#171a1f] p-4 text-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="font-semibold">{NEGATIVE_LAB_REAL_RAW_PRIVATE_REVIEW_TITLE}</span>
+            <span className="rounded bg-white/10 px-2 py-0.5 text-xs">{proof.outputFormat}</span>
+          </div>
+          <div
+            className="sr-only"
+            data-changed-pixel-ratio={proof.changedPixelRatio}
+            data-fixture-id={proof.fixtureId}
+            data-input-to-output-mean-abs-delta={proof.inputToOutputMeanAbsDelta}
+            data-output-format={proof.outputFormat}
+            data-output-path={proof.outputPath}
+            data-proof-boundary={proof.proofBoundary}
+            data-proof-status={proof.proofStatus}
+            data-source-is-raw={proof.sourceIsRaw}
+            data-source-path={proof.sourcePath}
+            data-testid="negative-lab-real-raw-private-review-proof"
+          />
+          <div className="space-y-2">
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{NEGATIVE_LAB_PUBLIC_EXPORT_RUNTIME_LABEL}</p>
+              <p>{proof.proofStatus}</p>
+              <p className="mt-1 text-xs text-[#aab2bd]">{proof.proofBoundary}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{NEGATIVE_LAB_REAL_RAW_PRIVATE_METRICS_LABEL}</p>
+              <p>
+                {NEGATIVE_LAB_REAL_RAW_PRIVATE_CHANGED_PIXELS_LABEL} {proof.changedPixelRatio}
+              </p>
+              <p>
+                {NEGATIVE_LAB_REAL_RAW_PRIVATE_MEAN_DELTA_LABEL} {proof.inputToOutputMeanAbsDelta}
+              </p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{NEGATIVE_LAB_PUBLIC_EXPORT_SOURCE_PATH_LABEL}</p>
+              <p className="break-all">{proof.sourcePath}</p>
+            </div>
+            <div
+              className="rounded border border-white/10 bg-white/5 p-2"
+              data-testid="negative-lab-real-raw-private-artifact-handoff"
             >
               <p className="text-xs text-[#aab2bd]">{NEGATIVE_LAB_PUBLIC_EXPORT_HANDOFF_LABEL}</p>
               <p className="break-all">{proof.outputPath}</p>

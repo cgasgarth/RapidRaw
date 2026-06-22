@@ -55,6 +55,7 @@ import {
   panoramaSavedReviewProofSchema,
   negativeLabWorkspaceProofDatasetSchema,
   negativeLabPublicExportReviewProofSchema,
+  negativeLabRealRawPrivateReviewProofSchema,
   negativeLabRollQueueSummaryProofSchema,
   panoramaReviewWorkspaceProofSchema,
   panoramaUiSettingsProofSchema,
@@ -100,6 +101,9 @@ const requiresLayerMaskPrivateRawProof = selectedScenarios.some(
 );
 const requiresNegativeLabPublicExportProof = selectedScenarios.some(
   (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.NegativeLabPublicExportReview,
+);
+const requiresNegativeLabRealRawPrivateProof = selectedScenarios.some(
+  (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.NegativeLabRealRawPrivateReview,
 );
 
 if (selectedScenarios.length === 0) {
@@ -190,6 +194,19 @@ interface NegativeLabPublicExportBrowserProof {
   sourcePath: string;
 }
 
+interface NegativeLabRealRawPrivateBrowserProof {
+  changedPixelRatio: string;
+  fixtureId: string;
+  inputToOutputMeanAbsDelta: string;
+  outputDataUrl: string;
+  outputFormat: string;
+  outputPath: string;
+  proofBoundary: string;
+  proofStatus: string;
+  sourceIsRaw: string;
+  sourcePath: string;
+}
+
 const negativeLabPublicExportReportSchema = z
   .object({
     appliedProfile: z
@@ -231,6 +248,7 @@ declare global {
     __RAWENGINE_HDR_PRIVATE_RAW_PROOF__?: HdrPrivateRawBrowserProof;
     __RAWENGINE_LAYER_MASK_PRIVATE_RAW_PROOF__?: LayerMaskPrivateRawBrowserProof;
     __RAWENGINE_NEGATIVE_LAB_PUBLIC_EXPORT_PROOF__?: NegativeLabPublicExportBrowserProof;
+    __RAWENGINE_NEGATIVE_LAB_REAL_RAW_PRIVATE_PROOF__?: NegativeLabRealRawPrivateBrowserProof;
     __RAWENGINE_PANORAMA_PRIVATE_RAW_PROOF__?: PanoramaPrivateRawBrowserProof;
     __RAWENGINE_SR_PRIVATE_RAW_PROOF__?: SrPrivateRawBrowserProof;
   }
@@ -596,6 +614,61 @@ async function loadNegativeLabPublicExportProof(): Promise<NegativeLabPublicExpo
     runtimeStatus: 'public_negative_scan_positive_export_rendered',
     sourceDataUrl: await readJpegDataUrl(sourcePath),
     sourcePath,
+  };
+}
+
+async function loadNegativeLabRealRawPrivateProof(): Promise<NegativeLabRealRawPrivateBrowserProof> {
+  const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT ?? '/tmp/rawengine-negative-lab-alaska-proof';
+  const report = z
+    .object({
+      fixtureId: z.literal('validation.negative-lab-real-raw.alaska.v1'),
+      localRawRuntime: z
+        .object({
+          metrics: z
+            .object({
+              changedPixelRatio: z.number().gt(0.05),
+              inputToOutputMeanAbsDelta: z.number().gt(0.01),
+            })
+            .passthrough(),
+        })
+        .passthrough(),
+      proofBoundary: z.literal('private_raw_negative_lab_runtime_not_final_negative_quality'),
+      proofStatus: z.literal('private_raw_negative_lab_positive_export_rendered'),
+      sourceRaw: z
+        .object({
+          localPath: z.literal('private-fixtures/negative-lab/alaska-negative-lab-v1.arw'),
+        })
+        .passthrough(),
+      workflowArtifacts: z
+        .array(
+          z
+            .object({
+              kind: z.enum([
+                'source_raw_private',
+                'positive_jpeg_private',
+                'sidecar_private',
+                'conversion_bundle_private',
+              ]),
+              path: z.string().trim().min(1),
+            })
+            .passthrough(),
+        )
+        .length(4),
+    })
+    .parse(JSON.parse(await readFile('docs/validation/negative-lab-real-raw-private-proof-2026-06-22.json', 'utf8')));
+  const outputArtifact = report.workflowArtifacts.find((artifact) => artifact.kind === 'positive_jpeg_private');
+  if (outputArtifact === undefined) throw new Error('Negative Lab private RAW output artifact missing.');
+  return {
+    changedPixelRatio: String(report.localRawRuntime.metrics.changedPixelRatio),
+    fixtureId: report.fixtureId,
+    inputToOutputMeanAbsDelta: String(report.localRawRuntime.metrics.inputToOutputMeanAbsDelta),
+    outputDataUrl: await readJpegDataUrl(resolve(privateRoot, outputArtifact.path)),
+    outputFormat: 'jpeg_proof',
+    outputPath: outputArtifact.path,
+    proofBoundary: report.proofBoundary,
+    proofStatus: report.proofStatus,
+    sourceIsRaw: 'true',
+    sourcePath: report.sourceRaw.localPath,
   };
 }
 
@@ -1441,6 +1514,24 @@ async function prepareScenario(page, mode) {
     return;
   }
 
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.NegativeLabRealRawPrivateReview) {
+    negativeLabRealRawPrivateReviewProofSchema.parse(
+      await page
+        .getByTestId('negative-lab-real-raw-private-review-proof')
+        .evaluate((element) => ({ ...element.dataset })),
+    );
+    const loaded = await page.getByTestId('negative-lab-real-raw-private-output').evaluate((element) => {
+      const image = element as HTMLImageElement;
+      return image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
+    });
+    if (!loaded) throw new Error('Negative Lab private RAW positive image did not load.');
+    await page
+      .getByTestId('negative-lab-real-raw-private-artifact-handoff')
+      .getByText('alaska-negative-lab-v1-Positive.jpg', { exact: false })
+      .waitFor({ timeout: 10_000 });
+    return;
+  }
+
   if (mode !== VISUAL_SMOKE_SCENARIO_IDS.NegativeLabWorkspace) return;
 
   await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabWorkspace).waitFor({ timeout: 10_000 });
@@ -2225,6 +2316,9 @@ async function main() {
     const negativeLabPublicExportProof = requiresNegativeLabPublicExportProof
       ? await loadNegativeLabPublicExportProof()
       : undefined;
+    const negativeLabRealRawPrivateProof = requiresNegativeLabRealRawPrivateProof
+      ? await loadNegativeLabRealRawPrivateProof()
+      : undefined;
 
     await waitForDevServer();
     browser = await chromium.launch({ headless: true });
@@ -2269,6 +2363,11 @@ async function main() {
       await page.addInitScript((proof: NegativeLabPublicExportBrowserProof) => {
         window.__RAWENGINE_NEGATIVE_LAB_PUBLIC_EXPORT_PROOF__ = proof;
       }, negativeLabPublicExportProof);
+    }
+    if (negativeLabRealRawPrivateProof !== undefined) {
+      await page.addInitScript((proof: NegativeLabRealRawPrivateBrowserProof) => {
+        window.__RAWENGINE_NEGATIVE_LAB_REAL_RAW_PRIVATE_PROOF__ = proof;
+      }, negativeLabRealRawPrivateProof);
     }
 
     page.on('pageerror', (error) => {
