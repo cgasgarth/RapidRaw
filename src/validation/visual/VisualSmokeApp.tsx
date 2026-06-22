@@ -2500,6 +2500,8 @@ function PanoramaVisualSmoke() {
           data-projection={settings.projection}
           data-quality-preference={settings.qualityPreference}
           data-runtime-status="dry_run_preview"
+          data-seam-count="4"
+          data-source-contribution-count="5"
           data-source-count="5"
           data-source-order={copy.panoramaSourceOrder}
           data-testid="panorama-review-workspace-proof"
@@ -2607,10 +2609,34 @@ function PanoramaSavedReviewVisualSmoke() {
           capabilityLevel: 'runtime_apply_capable',
           outputDimensions: { height: 3200, width: 9600 },
           projection: { effective: 'rectilinear', requested: 'rectilinear' },
+          seamReview: {
+            policy: 'adaptive_dp_feather_v1',
+            reviewStatus: 'requires_review',
+            seamCount: 4,
+            seams: [
+              { confidence: 'high', featherWidthPx: 100, fromSourceIndex: 0, p95ErrorPx: 1.2, toSourceIndex: 1 },
+              { confidence: 'medium', featherWidthPx: 100, fromSourceIndex: 1, p95ErrorPx: 2.4, toSourceIndex: 2 },
+              { confidence: 'medium', featherWidthPx: 100, fromSourceIndex: 2, p95ErrorPx: 3.1, toSourceIndex: 3 },
+              { confidence: 'high', featherWidthPx: 100, fromSourceIndex: 3, p95ErrorPx: 1.6, toSourceIndex: 4 },
+            ],
+          },
           sources: {
             excludedSourceIndices: [],
             stitchedSourceIndices: [0, 1, 2, 3, 4],
             totalCount: 5,
+          },
+          sourceContribution: {
+            excludedSourceCount: 0,
+            regions: [0, 1, 2, 3, 4].map((sourceIndex) => ({
+              coverageRatio: 0.2,
+              role: 'stitched',
+              sourceIndex,
+            })),
+            stitchedSourceCount: 5,
+          },
+          exposureNormalizationSummary: {
+            appliedGainCount: 2,
+            mode: 'scalar_overlap_luminance_gain_v1',
           },
           warningCodes: ['geometry_estimate_low_confidence', 'legacy_full_frame_render'],
         }}

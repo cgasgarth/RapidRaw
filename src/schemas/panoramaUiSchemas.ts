@@ -90,6 +90,48 @@ const panoramaRenderedReviewSourcesSchema = z
   })
   .strict();
 
+const panoramaSeamReviewSchema = z
+  .object({
+    policy: z.literal('adaptive_dp_feather_v1'),
+    reviewStatus: z.enum(['ready', 'requires_review']),
+    seamCount: z.number().int().nonnegative(),
+    seams: z.array(
+      z
+        .object({
+          confidence: z.enum(['high', 'medium', 'low']),
+          featherWidthPx: z.number().int().positive(),
+          fromSourceIndex: z.number().int().nonnegative(),
+          p95ErrorPx: z.number().nonnegative(),
+          toSourceIndex: z.number().int().nonnegative(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+const panoramaSourceContributionSchema = z
+  .object({
+    excludedSourceCount: z.number().int().nonnegative(),
+    regions: z.array(
+      z
+        .object({
+          coverageRatio: z.number().min(0).max(1),
+          role: z.enum(['stitched', 'excluded']),
+          sourceIndex: z.number().int().nonnegative(),
+        })
+        .strict(),
+    ),
+    stitchedSourceCount: z.number().int().nonnegative(),
+  })
+  .strict();
+
+const panoramaExposureNormalizationSummarySchema = z
+  .object({
+    appliedGainCount: z.number().int().nonnegative(),
+    mode: z.enum(['scalar_overlap_luminance_gain_v1', 'none']),
+  })
+  .strict();
+
 export const panoramaRenderedReviewSchema = z
   .object({
     boundary: z
@@ -107,7 +149,10 @@ export const panoramaRenderedReviewSchema = z
         requested: panoramaUiProjectionSchema,
       })
       .strict(),
+    seamReview: panoramaSeamReviewSchema,
     sources: panoramaRenderedReviewSourcesSchema,
+    sourceContribution: panoramaSourceContributionSchema,
+    exposureNormalizationSummary: panoramaExposureNormalizationSummarySchema,
     warningCodes: z.array(z.string()),
   })
   .strict();
@@ -119,10 +164,13 @@ export const panoramaSavedReviewSummarySchema = z
     boundaryMode: panoramaUiBoundaryModeSchema,
     capabilityLevel: z.literal('runtime_apply_capable'),
     crop: panoramaRenderedReviewCropSchema,
+    exposureNormalizationSummary: panoramaExposureNormalizationSummarySchema,
     outputDimensions: panoramaPlanDimensionsSchema,
     outputPath: z.string().min(1),
     projection: panoramaUiProjectionSchema,
+    seamReview: panoramaSeamReviewSchema,
     sourceCount: z.number().int().nonnegative(),
+    sourceContribution: panoramaSourceContributionSchema,
     warningCodes: z.array(z.string()),
   })
   .strict();

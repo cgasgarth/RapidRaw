@@ -116,6 +116,21 @@ export default function PanoramaModal({
   const stitchReadinessLabel = isEngineApplyReady
     ? t('modals.panorama.summaryReady')
     : t('modals.panorama.summaryBlocked');
+  const seamReviewSummary = renderedReview?.seamReview ?? {
+    policy: 'adaptive_dp_feather_v1' as const,
+    reviewStatus: 'requires_review' as const,
+    seamCount: Math.max(0, (imageCount ?? 0) - 1),
+    seams: [],
+  };
+  const sourceContributionSummary = renderedReview?.sourceContribution ?? {
+    excludedSourceCount: 0,
+    regions: Array.from({ length: imageCount ?? 0 }, (_, sourceIndex) => ({
+      coverageRatio: 1 / Math.max(1, imageCount ?? 1),
+      role: 'stitched' as const,
+      sourceIndex,
+    })),
+    stitchedSourceCount: imageCount ?? 0,
+  };
   const savedReviewSummary =
     savedPath === null || renderedReview === null
       ? null
@@ -203,6 +218,10 @@ export default function PanoramaModal({
               data-output-dimensions={`${savedReviewSummary.outputDimensions.width} x ${savedReviewSummary.outputDimensions.height}`}
               data-output-path={savedReviewSummary.outputPath}
               data-projection={savedReviewSummary.projection}
+              data-seam-count={savedReviewSummary.seamReview.seamCount}
+              data-seam-review-status={savedReviewSummary.seamReview.reviewStatus}
+              data-source-contribution-regions={savedReviewSummary.sourceContribution.regions.length}
+              data-source-excluded-count={savedReviewSummary.sourceContribution.excludedSourceCount}
               data-source-count={savedReviewSummary.sourceCount}
               data-testid="panorama-saved-review-summary"
               data-warning-codes={savedReviewSummary.warningCodes.join(',')}
@@ -227,6 +246,22 @@ export default function PanoramaModal({
                 {
                   label: t('modals.panorama.summarySources'),
                   value: t('modals.panorama.summarySourceCount', { count: savedReviewSummary.sourceCount }),
+                },
+                {
+                  label: t('modals.panorama.review.seams'),
+                  value: t('modals.panorama.review.seamCount', { count: savedReviewSummary.seamReview.seamCount }),
+                },
+                {
+                  label: t('modals.panorama.review.sourceContribution'),
+                  value: t('modals.panorama.review.sourceContributionCount', {
+                    count: savedReviewSummary.sourceContribution.regions.length,
+                  }),
+                },
+                {
+                  label: t('modals.panorama.summaryExposure'),
+                  value: t('modals.panorama.review.exposureGainCount', {
+                    count: savedReviewSummary.exposureNormalizationSummary.appliedGainCount,
+                  }),
                 },
               ].map((item) => (
                 <div className="min-w-0 rounded border border-border-color bg-surface px-2 py-1.5" key={item.label}>
@@ -278,6 +313,39 @@ export default function PanoramaModal({
             <div className="h-full w-full bg-bg-primary" />
           )}
           <div className="absolute inset-0 bg-linear-to-t from-black/75 via-black/10 to-black/30" />
+          {isSourceCountValid && (
+            <div
+              className="pointer-events-none absolute inset-0"
+              data-review-status={seamReviewSummary.reviewStatus}
+              data-seam-count={seamReviewSummary.seamCount}
+              data-source-contribution-count={sourceContributionSummary.regions.length}
+              data-testid="panorama-seam-contribution-overlay"
+            >
+              {Array.from({ length: Math.max(1, seamReviewSummary.seamCount) }, (_, index) => index).map((index) => (
+                <div
+                  className="absolute top-[16%] h-[68%] w-px rounded-full bg-cyan-200/75 shadow-[0_0_16px_rgba(125,211,252,0.75)]"
+                  data-testid="panorama-seam-line"
+                  key={index}
+                  style={{ left: `${22 + index * 14}%` }}
+                />
+              ))}
+              <div className="absolute left-5 top-5 flex max-w-[70%] flex-wrap gap-1.5">
+                {sourceContributionSummary.regions.slice(0, 5).map((region) => (
+                  <span
+                    className="rounded border border-white/25 bg-black/55 px-2 py-1 text-[11px] font-medium text-white"
+                    data-source-index={region.sourceIndex}
+                    data-testid="panorama-source-contribution-chip"
+                    key={region.sourceIndex}
+                  >
+                    {t('modals.panorama.review.sourceChip', {
+                      index: region.sourceIndex + 1,
+                      value: Math.round(region.coverageRatio * 100),
+                    })}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="absolute bottom-6 left-6 right-6">
             <UiText as="div" variant={TextVariants.title} className="mb-3 flex items-center gap-2 text-white">
               <Layers className="w-6 h-6 text-accent" />
@@ -630,7 +698,14 @@ export default function PanoramaModal({
                 {
                   label: t('modals.panorama.review.seams'),
                   status: 'review',
-                  value: t('modals.panorama.review.privateRawPending'),
+                  value: t('modals.panorama.review.seamCount', { count: seamReviewSummary.seamCount }),
+                },
+                {
+                  label: t('modals.panorama.review.sourceContribution'),
+                  status: 'review',
+                  value: t('modals.panorama.review.sourceContributionCount', {
+                    count: sourceContributionSummary.regions.length,
+                  }),
                 },
                 {
                   label: t('modals.panorama.review.projectionCrop'),
@@ -671,7 +746,13 @@ export default function PanoramaModal({
                   rows: [
                     {
                       label: t('modals.panorama.review.seams'),
-                      value: t('modals.panorama.review.privateRawPending'),
+                      value: t('modals.panorama.review.seamCount', { count: seamReviewSummary.seamCount }),
+                    },
+                    {
+                      label: t('modals.panorama.review.sourceContribution'),
+                      value: t('modals.panorama.review.sourceContributionCount', {
+                        count: sourceContributionSummary.regions.length,
+                      }),
                     },
                     {
                       label: t('modals.panorama.review.projectionCrop'),

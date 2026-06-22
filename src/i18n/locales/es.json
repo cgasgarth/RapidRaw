@@ -1643,7 +1643,12 @@
         "uiE2ePending": "UI E2E pending",
         "alignment": "Alignment",
         "seams": "Seams",
-        "projectionCrop": "Projection/crop"
+        "projectionCrop": "Projection/crop",
+        "exposureGainCount": "{{count}} exposure gains",
+        "seamCount": "{{count}} seams",
+        "sourceChip": "S{{index}} {{value}}%",
+        "sourceContribution": "Source contribution",
+        "sourceContributionCount": "{{count}} source regions"
       }
     },
     "renameAlbum": {

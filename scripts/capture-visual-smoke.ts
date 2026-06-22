@@ -1583,6 +1583,16 @@ async function prepareScenario(page, mode) {
     panoramaReviewWorkspaceProofSchema.parse(
       await page.getByTestId('panorama-review-workspace-proof').evaluate((element) => ({ ...element.dataset })),
     );
+    const overlayProof = await page
+      .getByTestId('panorama-seam-contribution-overlay')
+      .evaluate((element) => ({ ...element.dataset }));
+    if (
+      overlayProof.reviewStatus !== 'requires_review' ||
+      overlayProof.seamCount !== '4' ||
+      overlayProof.sourceContributionCount !== '5'
+    ) {
+      throw new Error(`Panorama seam contribution overlay proof failed: ${JSON.stringify(overlayProof)}`);
+    }
     const runtimePlanProof = await page
       .getByTestId('panorama-runtime-plan-summary')
       .evaluate((element) => ({ ...element.dataset }));

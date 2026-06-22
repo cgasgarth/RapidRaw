@@ -34,7 +34,12 @@ const requiredLocaleKeys = [
   'quality.preview',
   'qualityLabel',
   'review.engineCapabilityBlocked',
+  'review.exposureGainCount',
   'review.runtimeAutoCrop',
+  'review.seamCount',
+  'review.sourceChip',
+  'review.sourceContribution',
+  'review.sourceContributionCount',
   'sourceCountBlocked',
   'summaryBlend',
   'summaryBoundary',
@@ -94,6 +99,9 @@ for (const marker of [
   'modals.panorama.summaryMemory',
   'modals.panorama.previewMemory',
   'settings.maxPreviewDimensionPx',
+  'panorama-seam-contribution-overlay',
+  'panorama-seam-line',
+  'panorama-source-contribution-chip',
 ]) {
   if (!source.includes(marker)) {
     console.error(`Panorama modal missing setup summary marker: ${marker}`);
