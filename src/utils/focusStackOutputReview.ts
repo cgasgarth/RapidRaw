@@ -45,6 +45,24 @@ export const buildFocusStackOutputReviewWorkflow = ({
       artifactHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
       artifactId: artifactPath,
       exportReviewArtifactId: `${artifactPath}:export-review`,
+      retouchedExportParity:
+        settings.retouchLayerPolicy === 'generate_retouch_layer'
+          ? {
+              comparedFields: [
+                'acceptedDryRunPlan',
+                'outputArtifact',
+                'retouchLayerArtifact',
+                'retouchLayerPolicy',
+                'sharpnessSettings',
+                'sourceState',
+              ],
+              exportReceiptHash: 'fnv1a32:00000000',
+              meanAbsDelta: 0,
+              parityProofHash: 'fnv1a32:00000000',
+              previewStateHash: 'fnv1a32:00000000',
+              status: 'matched_retouched_sidecar_output',
+            }
+          : undefined,
       status: 'review_required',
     },
     haloRiskCellRatio: effectiveHaloRiskCellRatio,
@@ -87,6 +105,7 @@ export const buildFocusStackOutputReviewFromArtifact = (
       artifactHash: artifact.outputArtifact.contentHash,
       artifactId: artifact.outputArtifact.artifactId,
       exportReviewArtifactId: `${artifact.outputArtifact.artifactId}:export-review`,
+      retouchedExportParity: artifact.retouchedExportParity,
       status: artifact.haloReview?.editableHandoffStatus ?? 'review_required',
     },
     haloRiskCellRatio: artifact.haloReview?.haloRiskCellRatio ?? haloRiskCellRatio,
