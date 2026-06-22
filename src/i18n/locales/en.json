@@ -2760,6 +2760,23 @@
         },
         "detailGain": "Detail gain",
         "detailGainValue": "{{ratio}}x synthetic detail gain",
+        "detailReview": "Detail review",
+        "detailReviewHighlightCountValue": "{{count}} highlights",
+        "detailReviewHighlightCountValue_one": "{{count}} highlight",
+        "detailReviewHighlightCountValue_other": "{{count}} highlights",
+        "detailReviewMeanImprovementValue": "{{ratio}}x mean improvement",
+        "detailReviewRegionImprovementValue": "{{ratio}}x improvement",
+        "detailReviewRegionStatus": {
+          "accepted": "Accepted",
+          "needs_review": "Needs review",
+          "rejected": "Rejected"
+        },
+        "detailReviewStatus": {
+          "accepted": "Accepted",
+          "needs_review": "Needs review",
+          "rejected": "Rejected"
+        },
+        "detailReviewTitle": "Burst detail review",
         "editableGate": {
           "blocked_review_required": "Editable handoff blocked until review passes",
           "blocked_stale": "Editable handoff blocked by stale artifact",

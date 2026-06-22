@@ -208,6 +208,15 @@ export default function SuperResolutionModal({
     outputReview.supportMap.downgradeReason === null
       ? t('modals.superResolution.review.noSupportMapDowngrade')
       : t('modals.superResolution.review.warning.effective_scale_downgraded');
+  const detailReviewStatusLabel = t(
+    `modals.superResolution.review.detailReviewStatus.${outputReview.detailReview.reviewStatus}`,
+  );
+  const detailReviewMeanImprovementLabel = t('modals.superResolution.review.detailReviewMeanImprovementValue', {
+    ratio: outputReview.detailReview.meanImprovementRatio,
+  });
+  const detailReviewHighlightCountLabel = t('modals.superResolution.review.detailReviewHighlightCountValue', {
+    count: outputReview.detailReview.improvementHighlightCount,
+  });
   const outputReviewAlignmentConfidenceLabel =
     outputReview.alignmentConfidence === null
       ? t('modals.superResolution.review.notMeasured')
@@ -660,6 +669,10 @@ export default function SuperResolutionModal({
                 value: detailGainLabel,
               },
               {
+                label: t('modals.superResolution.review.detailReview'),
+                value: `${detailReviewStatusLabel} - ${detailReviewMeanImprovementLabel}`,
+              },
+              {
                 label: t('modals.superResolution.review.coverage'),
                 value: overlapCoverageLabel,
               },
@@ -709,6 +722,50 @@ export default function SuperResolutionModal({
           },
         ]}
       />
+
+      <section
+        className="rounded-md border border-border-color bg-bg-primary p-4"
+        data-baseline-artifact-id={outputReview.detailReview.baselineArtifactId}
+        data-detail-review-artifact-id={outputReview.detailReview.artifactId}
+        data-detail-review-highlight-count={outputReview.detailReview.improvementHighlightCount}
+        data-detail-review-mean-improvement-ratio={outputReview.detailReview.meanImprovementRatio}
+        data-detail-review-status={outputReview.detailReview.reviewStatus}
+        data-reconstructed-artifact-id={outputReview.detailReview.reconstructedArtifactId}
+        data-testid="sr-detail-review"
+      >
+        <div className="mb-3 flex items-start justify-between gap-4">
+          <div>
+            <UiText variant={TextVariants.heading}>{t('modals.superResolution.review.detailReviewTitle')}</UiText>
+            <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+              {`${detailReviewMeanImprovementLabel} - ${detailReviewHighlightCountLabel}`}
+            </UiText>
+          </div>
+          <UiText variant={TextVariants.small} color={TextColors.secondary} className="shrink-0">
+            {detailReviewStatusLabel}
+          </UiText>
+        </div>
+        <div className="grid gap-2 lg:grid-cols-3">
+          {outputReview.detailReview.regions.map((region) => (
+            <div
+              className="rounded-md border border-border-color bg-bg-secondary/70 p-3"
+              data-baseline-sharpness-score={region.baselineSharpnessScore}
+              data-detail-improvement-ratio={region.improvementRatio}
+              data-reconstructed-sharpness-score={region.reconstructedSharpnessScore}
+              data-region-id={region.regionId}
+              data-review-status={region.reviewStatus}
+              key={region.regionId}
+            >
+              <UiText variant={TextVariants.label}>{region.label}</UiText>
+              <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+                {t(`modals.superResolution.review.detailReviewRegionStatus.${region.reviewStatus}`)} -{' '}
+                {t('modals.superResolution.review.detailReviewRegionImprovementValue', {
+                  ratio: region.improvementRatio,
+                })}
+              </UiText>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <section
         className="rounded-md border border-border-color bg-bg-primary p-4"
@@ -855,6 +912,9 @@ export default function SuperResolutionModal({
         data-editable-handoff-ready={String(isEditableHandoffReady)}
         data-false-detail-risk={outputReview.falseDetailRisk}
         data-human-review-status={outputReview.humanReviewStatus}
+        data-detail-review-highlight-count={outputReview.detailReview.improvementHighlightCount}
+        data-detail-review-mean-improvement-ratio={outputReview.detailReview.meanImprovementRatio}
+        data-detail-review-status={outputReview.detailReview.reviewStatus}
         data-mode={outputReview.mode}
         data-mode-policy-version={outputReview.modePolicyVersion}
         data-output-artifact-id={outputReview.outputArtifactId}

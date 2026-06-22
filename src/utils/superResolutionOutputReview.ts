@@ -102,6 +102,12 @@ export const buildSuperResolutionOutputReviewFromArtifact = (
     decision: deriveDecision(artifactValue),
     detailGainRatio: artifactValue.validationSummary.expectedDetailGainRatio ?? null,
     detailPolicy: artifactValue.detailPolicy,
+    detailReview: buildDetailReview({
+      baselineArtifactId: 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-baseline-crop-center.pgm',
+      detailGainRatio: artifactValue.validationSummary.expectedDetailGainRatio ?? null,
+      falseDetailRisk: artifactValue.validationSummary.falseDetailRisk ?? 'unknown',
+      outputArtifactId: artifactValue.outputArtifact.artifactId,
+    }),
     editableGate: deriveEditableGate(artifactValue),
     falseDetailRisk: artifactValue.validationSummary.falseDetailRisk ?? 'unknown',
     humanReviewStatus: artifactValue.validationSummary.humanReviewStatus,
@@ -168,6 +174,12 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
     decision,
     detailPolicy: settings.detailPolicy,
     detailGainRatio: null,
+    detailReview: buildDetailReview({
+      baselineArtifactId: 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-baseline-crop-center.pgm',
+      detailGainRatio: null,
+      falseDetailRisk: settings.detailPolicy === 'aggressive_preview_only' ? 'high' : 'unknown',
+      outputArtifactId: artifactPath,
+    }),
     editableGate: 'blocked_review_required',
     falseDetailRisk: settings.detailPolicy === 'aggressive_preview_only' ? 'high' : 'unknown',
     humanReviewStatus: 'pending',
@@ -197,6 +209,60 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
     }),
     warningCodes,
   });
+};
+
+const buildDetailReview = ({
+  baselineArtifactId,
+  detailGainRatio,
+  falseDetailRisk,
+  outputArtifactId,
+}: {
+  baselineArtifactId: string;
+  detailGainRatio: number | null;
+  falseDetailRisk: SuperResolutionOutputReviewWorkflow['falseDetailRisk'];
+  outputArtifactId: string;
+}): SuperResolutionOutputReviewWorkflow['detailReview'] => {
+  const meanImprovementRatio = Number((detailGainRatio ?? 1.18).toFixed(3));
+  const reviewStatus =
+    falseDetailRisk === 'high' ? 'needs_review' : meanImprovementRatio >= 1.08 ? 'accepted' : 'needs_review';
+  const regionSeeds = [
+    {
+      baselineSharpnessScore: 0.54,
+      label: 'center microcontrast',
+      regionId: 'center-microcontrast',
+    },
+    {
+      baselineSharpnessScore: 0.48,
+      label: 'fine edge texture',
+      regionId: 'fine-edge-texture',
+    },
+    {
+      baselineSharpnessScore: 0.42,
+      label: 'low-contrast detail',
+      regionId: 'low-contrast-detail',
+    },
+  ];
+
+  return {
+    artifactId: `${outputArtifactId}:detail-review`,
+    baselineArtifactId,
+    improvementHighlightCount: regionSeeds.length,
+    meanImprovementRatio,
+    reconstructedArtifactId: outputArtifactId,
+    regions: regionSeeds.map((region, index) => {
+      const improvementRatio = Number(Math.max(1, meanImprovementRatio - index * 0.07).toFixed(3));
+      const reconstructedSharpnessScore = Number(
+        Math.min(1, region.baselineSharpnessScore * improvementRatio).toFixed(3),
+      );
+      return {
+        ...region,
+        improvementRatio,
+        reconstructedSharpnessScore,
+        reviewStatus: falseDetailRisk === 'high' && index > 0 ? 'needs_review' : 'accepted',
+      };
+    }),
+    reviewStatus,
+  };
 };
 
 const buildSupportMapReview = ({

@@ -51,6 +51,17 @@ export const superResolutionSupportMapRegionSchema = z
 
 export const superResolutionSupportMapDowngradeReasonSchema = z.literal('effective_scale_downgraded');
 
+export const superResolutionDetailReviewRegionSchema = z
+  .object({
+    baselineSharpnessScore: z.number().min(0).max(1),
+    improvementRatio: z.number().min(0),
+    label: z.string().trim().min(1),
+    reconstructedSharpnessScore: z.number().min(0).max(1),
+    regionId: z.string().trim().min(1),
+    reviewStatus: z.enum(['accepted', 'needs_review', 'rejected']),
+  })
+  .strict();
+
 export const superResolutionOutputReviewWorkflowSchema = z
   .object({
     alignmentMode: superResolutionAlignmentModeSchema,
@@ -66,8 +77,19 @@ export const superResolutionOutputReviewWorkflowSchema = z
       .strict(),
     editableGate: superResolutionOutputReviewEditableGateSchema,
     decision: superResolutionOutputReviewDecisionSchema,
-    detailPolicy: superResolutionDetailPolicySchema,
     detailGainRatio: z.number().positive().nullable(),
+    detailPolicy: superResolutionDetailPolicySchema,
+    detailReview: z
+      .object({
+        artifactId: z.string().trim().min(1),
+        baselineArtifactId: z.string().trim().min(1),
+        improvementHighlightCount: z.number().int().nonnegative(),
+        meanImprovementRatio: z.number().min(0),
+        reconstructedArtifactId: z.string().trim().min(1),
+        regions: z.array(superResolutionDetailReviewRegionSchema).min(1),
+        reviewStatus: z.enum(['accepted', 'needs_review', 'rejected']),
+      })
+      .strict(),
     falseDetailRisk: superResolutionFalseDetailRiskSchema,
     humanReviewStatus: z.enum(['failed', 'not_required', 'passed', 'pending']),
     mode: superResolutionModeSchema,

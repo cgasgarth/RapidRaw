@@ -99,6 +99,25 @@ if (outputReview.outputArtifactHash !== applied.apply.sidecarArtifact.outputArti
 if (outputReview.reconstructionMode !== 'optical_flow') {
   throw new Error(`Expected sidecar artifact review reconstruction mode, got ${outputReview.reconstructionMode}.`);
 }
+if (outputReview.detailReview.reviewStatus !== 'accepted') {
+  throw new Error(`Expected accepted SR detail review, got ${outputReview.detailReview.reviewStatus}.`);
+}
+if (outputReview.detailReview.improvementHighlightCount < 3) {
+  throw new Error(`Expected SR detail review highlights, got ${outputReview.detailReview.improvementHighlightCount}.`);
+}
+if (outputReview.detailReview.meanImprovementRatio < 1.08) {
+  throw new Error(`Expected SR detail review improvement, got ${outputReview.detailReview.meanImprovementRatio}.`);
+}
+if (
+  !outputReview.detailReview.regions.some(
+    (region) =>
+      region.regionId === 'center-microcontrast' &&
+      region.reconstructedSharpnessScore > region.baselineSharpnessScore &&
+      region.reviewStatus === 'accepted',
+  )
+) {
+  throw new Error('SR output review missing accepted center detail improvement region.');
+}
 if (!outputReview.warningCodes.includes('human_review_required')) {
   throw new Error('SR output review must keep human-review warning.');
 }
@@ -196,8 +215,12 @@ if (downgradedReview.supportMap.downgradeReason !== 'effective_scale_downgraded'
 if (!downgradedReview.warningCodes.includes('effective_scale_downgraded')) {
   throw new Error('Downgraded SR output review must include effective-scale warning.');
 }
+if (downgradedReview.detailReview.reconstructedArtifactId !== downgradedReview.outputArtifactId) {
+  throw new Error('Downgraded SR detail review must point at the reconstructed output artifact.');
+}
 
 const result = {
+  detailReviewStatus: outputReview.detailReview.reviewStatus,
   fixture: 'synthetic_sr_ui_runtime_bridge_v1',
   improvementRatio,
   outputReviewEditableGate: outputReview.editableGate,

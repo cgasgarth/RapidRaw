@@ -2450,6 +2450,9 @@ function SuperResolutionVisualSmoke() {
           data-decision={settings.detailPolicy === 'aggressive_preview_only' ? 'preview_only' : 'human_review_required'}
           data-detail-policy={settings.detailPolicy}
           data-detail-gain-ratio="1.21"
+          data-detail-review-highlight-count="3"
+          data-detail-review-mean-improvement-ratio="1.18"
+          data-detail-review-status="accepted"
           data-estimated-preview-megapixels={Math.round((5 * settings.maxPreviewDimensionPx ** 2) / 1_000_000)}
           data-mode={settings.detailPolicy === 'aggressive_preview_only' ? 'aggressive' : 'conservative'}
           data-mode-policy-version="1"
@@ -2663,6 +2666,40 @@ function SuperResolutionPrivateRawModalReviewSmoke() {
     decision: 'human_review_required',
     detailGainRatio: null,
     detailPolicy: settings.detailPolicy,
+    detailReview: {
+      artifactId: `${proof.reconstructionPath}:detail-review`,
+      baselineArtifactId: proof.previewArtifact,
+      improvementHighlightCount: 3,
+      meanImprovementRatio: 1.16,
+      reconstructedArtifactId: proof.reconstructionPath,
+      regions: [
+        {
+          baselineSharpnessScore: 0.55,
+          improvementRatio: 1.22,
+          label: 'center microcontrast',
+          reconstructedSharpnessScore: 0.67,
+          regionId: 'center-microcontrast',
+          reviewStatus: 'accepted',
+        },
+        {
+          baselineSharpnessScore: 0.47,
+          improvementRatio: 1.14,
+          label: 'fine edge texture',
+          reconstructedSharpnessScore: 0.54,
+          regionId: 'fine-edge-texture',
+          reviewStatus: 'needs_review',
+        },
+        {
+          baselineSharpnessScore: 0.41,
+          improvementRatio: 1.11,
+          label: 'low-contrast detail',
+          reconstructedSharpnessScore: 0.46,
+          regionId: 'low-contrast-detail',
+          reviewStatus: 'needs_review',
+        },
+      ],
+      reviewStatus: 'needs_review',
+    },
     editableGate: 'blocked_review_required',
     falseDetailRisk: 'unknown',
     humanReviewStatus: 'pending',
