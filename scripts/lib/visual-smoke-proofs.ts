@@ -108,6 +108,12 @@ const negativeLabShadowPatchSampleSchema = z.object({
   x: z.literal(0.18),
   y: z.literal(0.62),
 });
+const negativeLabHighlightPatchSampleSchema = z.object({
+  height: z.literal(0.16),
+  width: z.literal(0.16),
+  x: z.literal(0.66),
+  y: z.literal(0.18),
+});
 const negativeLabOrthoPresetParamsSchema = z
   .object({
     base_fog_sample: z.union([negativeLabLeftEdgeSampleSchema, negativeLabCustomBaseSampleSchema]),
@@ -154,9 +160,20 @@ const negativeLabBaseFogEstimateInvokeSchema = z.object({
       negativeLabLeftEdgeSampleSchema,
       negativeLabCustomBaseSampleSchema,
       negativeLabShadowPatchSampleSchema,
+      negativeLabHighlightPatchSampleSchema,
     ]),
   }),
   command: z.literal('estimate_negative_base_fog'),
+  options: z.unknown().optional(),
+});
+const negativeLabHighlightPatchExposureInvokeSchema = z.object({
+  args: z.object({
+    currentFrameExposureOffset: z.literal(0.5),
+    params: negativeLabPreviewParamsSchema,
+    path: z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif'),
+    sampleRect: negativeLabHighlightPatchSampleSchema,
+  }),
+  command: z.literal('suggest_negative_lab_highlight_patch_exposure'),
   options: z.unknown().optional(),
 });
 const negativeLabConvertArgsSchema = z.object({
@@ -177,8 +194,8 @@ const negativeLabConvertArgsSchema = z.object({
         overrides: z
           .array(
             z.object({
-              effectiveExposure: z.literal(0.45),
-              exposureOffset: z.literal(0.5),
+              effectiveExposure: z.literal(0.1),
+              exposureOffset: z.literal(0.15),
               frameId: z.literal('negative-lab-frame-1'),
             }),
           )
@@ -636,6 +653,9 @@ export async function assertNegativeLabBaseFogPreviewExportProof(page) {
   const estimateCalls = z
     .array(negativeLabBaseFogEstimateInvokeSchema)
     .parse(rawInvokeLog.filter((call) => call.command === 'estimate_negative_base_fog'));
+  const highlightExposureCalls = z
+    .array(negativeLabHighlightPatchExposureInvokeSchema)
+    .parse(rawInvokeLog.filter((call) => call.command === 'suggest_negative_lab_highlight_patch_exposure'));
   const previewReturns = negativeLabPreviewReturnProofSchema.parse(
     await page.evaluate(() => window.__RAWENGINE_NEGATIVE_LAB_PREVIEW_RETURNS__ ?? []),
   );
@@ -646,6 +666,9 @@ export async function assertNegativeLabBaseFogPreviewExportProof(page) {
   );
   const hasPatchProbeEstimate = estimateCalls.some(
     (call) => negativeLabShadowPatchSampleSchema.safeParse(call.args.sampleRect).success,
+  );
+  const hasHighlightPatchEstimate = estimateCalls.some(
+    (call) => negativeLabHighlightPatchSampleSchema.safeParse(call.args.sampleRect).success,
   );
   const hasAutoPreview = previewCalls.some((call) => call.args.params.base_fog_sample === null);
   const hasManualPreview = previewCalls.some(
@@ -660,6 +683,8 @@ export async function assertNegativeLabBaseFogPreviewExportProof(page) {
     !hasManualEstimate ||
     !hasCustomBaseEstimate ||
     !hasPatchProbeEstimate ||
+    !hasHighlightPatchEstimate ||
+    highlightExposureCalls.length !== 1 ||
     !hasAutoPreview ||
     !hasManualPreview ||
     !hasCustomBasePreview
@@ -670,9 +695,11 @@ export async function assertNegativeLabBaseFogPreviewExportProof(page) {
         hasAutoPreview,
         hasCustomBaseEstimate,
         hasCustomBasePreview,
+        hasHighlightPatchEstimate,
         hasManualEstimate,
         hasManualPreview,
         hasPatchProbeEstimate,
+        highlightExposureCalls: highlightExposureCalls.length,
       })}`,
     );
   }

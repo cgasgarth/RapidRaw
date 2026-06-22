@@ -417,6 +417,7 @@
     "check:negative-lab-frame-health": "bun tests/integration/checks/check-negative-lab-frame-health-report.ts",
     "check:negative-lab-frame-exposure-override": "bun tests/integration/checks/check-negative-lab-frame-exposure-override.ts",
     "check:negative-lab-frame-rgb-balance-override": "bun tests/integration/checks/check-negative-lab-frame-rgb-balance-override.ts",
+    "check:negative-lab-highlight-patch-exposure-recovery": "bun tests/integration/checks/check-negative-lab-highlight-patch-exposure-recovery.ts",
     "check:negative-lab-neutral-patch-rgb-suggestion": "bun tests/integration/checks/check-negative-lab-neutral-patch-rgb-suggestion.ts",
     "check:negative-lab-stock-registry": "bun tests/integration/checks/check-negative-lab-stock-registry.ts",
     "check:negative-lab-stock-metadata-catalog": "bun tests/integration/checks/check-negative-lab-stock-metadata-catalog.ts",

@@ -81,6 +81,7 @@ const generatedPreviewBytes = [
 const previewNegativeConversionCommand: string = Invokes.PreviewNegativeConversion;
 const generatePreviewForPathCommand: string = Invokes.GeneratePreviewForPath;
 const estimateNegativeBaseFogCommand: string = Invokes.EstimateNegativeBaseFog;
+const suggestNegativeLabHighlightPatchCommand: string = Invokes.SuggestNegativeLabHighlightPatchExposure;
 const suggestNegativeLabNeutralPatchCommand: string = Invokes.SuggestNegativeLabNeutralPatchRgbBalance;
 const convertNegativesCommand: string = Invokes.ConvertNegatives;
 const saveCommunityPresetCommand: string = Invokes.SaveCommunityPreset;
@@ -126,6 +127,29 @@ window.__TAURI_INTERNALS__ = {
         sampleRect: { height: 0.18, width: 0.18, x: 0.18, y: 0.62 },
         sampleRgb: [0.716, 0.578, 0.441],
         suggestedRgbBalanceOffset: { blueWeight: -0.02, greenWeight: -0.03, redWeight: 0.07 },
+      });
+    }
+    if (command === suggestNegativeLabHighlightPatchCommand) {
+      return Promise.resolve({
+        applicationRisk: 'low',
+        applyAllowed: true,
+        correctionMagnitudeEv: 0.35,
+        currentFrameClippedFraction: 0.08,
+        currentFrameExposureOffset: 0.5,
+        currentSampleClippedFraction: 0.42,
+        currentSampleP99MaxChannel: 1,
+        currentSampleRgb: [0.99, 0.97, 0.95],
+        effectiveExposure: 0.1,
+        offsetClamped: false,
+        projectedFrameClippedFraction: 0.04,
+        projectedSampleClippedFraction: 0,
+        projectedSampleP99MaxChannel: 0.97,
+        projectedSampleRgb: [0.91, 0.89, 0.86],
+        role: 'highlight',
+        sampleRect: { height: 0.16, width: 0.16, x: 0.66, y: 0.18 },
+        status: 'suggested',
+        suggestedExposureDeltaEv: -0.35,
+        suggestedFrameExposureOffset: 0.15,
       });
     }
     if (command === convertNegativesCommand) return Promise.resolve(['/tmp/rawengine-negative-smoke-positive.tif']);

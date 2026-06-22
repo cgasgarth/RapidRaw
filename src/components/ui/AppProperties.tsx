@@ -60,6 +60,7 @@ export enum Invokes {
   DryRunDeblurControls = 'dry_run_deblur_controls',
   DryRunDenoiseControls = 'dry_run_denoise_controls',
   EstimateNegativeBaseFog = 'estimate_negative_base_fog',
+  SuggestNegativeLabHighlightPatchExposure = 'suggest_negative_lab_highlight_patch_exposure',
   SuggestNegativeLabNeutralPatchRgbBalance = 'suggest_negative_lab_neutral_patch_rgb_balance',
   EstimateExportSizes = 'estimate_export_sizes',
   ExportImages = 'export_images',

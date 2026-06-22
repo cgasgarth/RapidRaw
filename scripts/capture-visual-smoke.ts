@@ -1561,6 +1561,50 @@ async function prepareScenario(page, mode) {
     .getByTestId('negative-lab-recipe-frame-exposure-offset')
     .getByText('+0.50', { exact: true })
     .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-patch-probe-highlight-patch').click();
+  await page.getByTestId('negative-lab-patch-probe-overlay').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-patch-probe-readout').getByText('Highlight patch', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  const previewInvokeCountBeforeHighlightRecovery = await page.evaluate(
+    () =>
+      (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).filter((call) => call.command === 'preview_negative_conversion')
+        .length,
+  );
+  await page.getByTestId('negative-lab-analyze-highlight-recovery').click();
+  await page.getByTestId('negative-lab-highlight-recovery-suggestion').waitFor({ timeout: 10_000 });
+  const previewInvokeCountAfterHighlightRecovery = await page.evaluate(
+    () =>
+      (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).filter((call) => call.command === 'preview_negative_conversion')
+        .length,
+  );
+  if (previewInvokeCountAfterHighlightRecovery !== previewInvokeCountBeforeHighlightRecovery) {
+    throw new Error('Negative Lab highlight recovery changed preview before explicit apply.');
+  }
+  await page
+    .getByTestId('negative-lab-highlight-recovery-offset')
+    .getByText('+0.15', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-highlight-recovery-status').getByText('Suggested', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-highlight-recovery-risk').getByText('Low', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  if ((await page.locator('[data-testid="negative-lab-highlight-recovery-apply-warning"]').count()) !== 0) {
+    throw new Error('Negative Lab highlight recovery safe suggestion showed an apply warning.');
+  }
+  await page.getByTestId('negative-lab-apply-highlight-recovery').click();
+  await page
+    .getByTestId('negative-lab-recipe-frame-exposure-offset')
+    .getByText('+0.15', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page.waitForFunction(() =>
+    (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).some(
+      (call) =>
+        call.command === 'preview_negative_conversion' && JSON.stringify(call.args ?? {}).includes('"exposure":0.1'),
+    ),
+  );
   const setFrameRgbBalanceOffset = async (channelIndex: number, value: number) => {
     await page.getByTestId('negative-lab-frame-rgb-balance-override-control').evaluate(
       (element, payload) => {
@@ -1793,7 +1837,7 @@ async function prepareScenario(page, mode) {
     '"batchScope": "ready"',
     '"dispositionCounts"',
     '"frameExposureOverrides"',
-    '"effectiveExposure": 0.45',
+    '"effectiveExposure": 0.1',
     '"frameRgbBalanceOverrides"',
     '"rgbBalanceOffset"',
     '"redWeight": 0.07',

@@ -166,6 +166,38 @@ pub struct NegativeLabNeutralPatchSuggestion {
     pub suggested_rgb_balance_offset: NegativeLabFrameRgbBalance,
 }
 
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabHighlightPatchExposureSuggestion {
+    pub application_risk: String,
+    pub apply_allowed: bool,
+    pub correction_magnitude_ev: f32,
+    pub current_frame_exposure_offset: f32,
+    pub current_frame_clipped_fraction: f32,
+    pub current_sample_clipped_fraction: f32,
+    pub current_sample_p99_max_channel: f32,
+    pub current_sample_rgb: [f32; 3],
+    pub effective_exposure: f32,
+    pub offset_clamped: bool,
+    pub projected_frame_clipped_fraction: f32,
+    pub projected_sample_clipped_fraction: f32,
+    pub projected_sample_p99_max_channel: f32,
+    pub projected_sample_rgb: [f32; 3],
+    pub role: String,
+    pub sample_rect: NegativeBaseFogSampleRect,
+    pub status: String,
+    pub suggested_exposure_delta_ev: f32,
+    pub suggested_frame_exposure_offset: f32,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct NegativeLabHighlightPatchMetrics {
+    frame_clipped_fraction: f32,
+    sample_clipped_fraction: f32,
+    sample_p99_max_channel: f32,
+    sample_rgb: [f32; 3],
+}
+
 const MIN_CHANNEL_WEIGHT: f32 = 0.5;
 const MAX_CHANNEL_WEIGHT: f32 = 2.0;
 const MIN_BASE_FOG_STRENGTH: f32 = 0.0;
@@ -182,6 +214,8 @@ const MIN_ENDPOINT_SEPARATION: f32 = 0.05;
 const DEFAULT_OUTPUT_SUFFIX: &str = "Positive";
 const JPEG_PROOF_QUALITY: u8 = 92;
 const NEGATIVE_LAB_CONVERSION_BUNDLE_SCHEMA_VERSION: u8 = 1;
+const NEGATIVE_LAB_HIGHLIGHT_CLIPPING_CEILING: f32 = 0.98;
+const NEGATIVE_LAB_FRAME_EXPOSURE_STEP_EV: f32 = 0.05;
 
 impl Default for NegativeLabFrameExposureOverridePayload {
     fn default() -> Self {
@@ -523,6 +557,203 @@ fn build_negative_lab_neutral_patch_suggestion(
         sample_rect,
         sample_rgb: estimate.base_rgb,
         suggested_rgb_balance_offset,
+    }
+}
+
+fn snap_negative_lab_frame_exposure_offset(value: f32) -> f32 {
+    ((value.clamp(MIN_EXPOSURE, MAX_EXPOSURE) / NEGATIVE_LAB_FRAME_EXPOSURE_STEP_EV).round()
+        * NEGATIVE_LAB_FRAME_EXPOSURE_STEP_EV)
+        .clamp(MIN_EXPOSURE, MAX_EXPOSURE)
+}
+
+fn negative_lab_exposure_risk(correction_magnitude_ev: f32) -> String {
+    if correction_magnitude_ev <= 0.35 {
+        "low".to_string()
+    } else if correction_magnitude_ev <= 0.75 {
+        "medium".to_string()
+    } else {
+        "high".to_string()
+    }
+}
+
+fn sample_rect_pixel_bounds(
+    rect: NegativeBaseFogSampleRect,
+    width: u32,
+    height: u32,
+) -> (u32, u32, u32, u32) {
+    let start_x = ((rect.x * width as f32).floor() as u32).min(width.saturating_sub(1));
+    let start_y = ((rect.y * height as f32).floor() as u32).min(height.saturating_sub(1));
+    let end_x = (((rect.x + rect.width) * width as f32).ceil() as u32).clamp(start_x + 1, width);
+    let end_y = (((rect.y + rect.height) * height as f32).ceil() as u32).clamp(start_y + 1, height);
+
+    (start_x, end_x, start_y, end_y)
+}
+
+fn negative_lab_highlight_patch_metrics(
+    rendered: &DynamicImage,
+    sample_rect: NegativeBaseFogSampleRect,
+) -> NegativeLabHighlightPatchMetrics {
+    let rgb = rendered.to_rgb32f();
+    let (width, height) = rgb.dimensions();
+    let (start_x, end_x, start_y, end_y) = sample_rect_pixel_bounds(sample_rect, width, height);
+    let mut sample_max_channels = Vec::with_capacity(
+        (end_x.saturating_sub(start_x) * end_y.saturating_sub(start_y)) as usize,
+    );
+    let mut sample_rgb_sum = [0.0_f32; 3];
+    let mut sample_clipped_count = 0_usize;
+    let mut frame_clipped_count = 0_usize;
+    let mut sample_count = 0_usize;
+
+    for (x, y, pixel) in rgb.enumerate_pixels() {
+        let channels = pixel.0;
+        let max_channel = channels[0].max(channels[1]).max(channels[2]);
+        if max_channel >= NEGATIVE_LAB_HIGHLIGHT_CLIPPING_CEILING {
+            frame_clipped_count += 1;
+        }
+
+        if x >= start_x && x < end_x && y >= start_y && y < end_y {
+            sample_rgb_sum[0] += channels[0];
+            sample_rgb_sum[1] += channels[1];
+            sample_rgb_sum[2] += channels[2];
+            sample_max_channels.push(max_channel);
+            sample_count += 1;
+            if max_channel >= NEGATIVE_LAB_HIGHLIGHT_CLIPPING_CEILING {
+                sample_clipped_count += 1;
+            }
+        }
+    }
+
+    sample_max_channels.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+    let p99_index = ((sample_max_channels.len().saturating_sub(1)) as f32 * 0.99).round() as usize;
+    let sample_p99_max_channel = sample_max_channels
+        .get(p99_index.min(sample_max_channels.len().saturating_sub(1)))
+        .copied()
+        .unwrap_or(0.0);
+    let safe_sample_count = sample_count.max(1) as f32;
+    let frame_count = (width as usize * height as usize).max(1) as f32;
+
+    NegativeLabHighlightPatchMetrics {
+        frame_clipped_fraction: frame_clipped_count as f32 / frame_count,
+        sample_clipped_fraction: sample_clipped_count as f32 / safe_sample_count,
+        sample_p99_max_channel,
+        sample_rgb: sample_rgb_sum.map(|value| value / safe_sample_count),
+    }
+}
+
+fn build_negative_lab_highlight_patch_exposure_suggestion(
+    input: &DynamicImage,
+    params: NegativeConversionParams,
+    current_frame_exposure_offset: f32,
+    sample_rect: NegativeBaseFogSampleRect,
+) -> NegativeLabHighlightPatchExposureSuggestion {
+    let sanitized_params = params.sanitized();
+    let current_offset = snap_negative_lab_frame_exposure_offset(current_frame_exposure_offset);
+    let effective_current_exposure =
+        (sanitized_params.exposure + current_offset).clamp(MIN_EXPOSURE, MAX_EXPOSURE);
+    let current_effective_params = NegativeConversionParams {
+        exposure: effective_current_exposure,
+        ..sanitized_params
+    };
+    let current_render = run_pipeline(input, &current_effective_params, None);
+    let current_metrics = negative_lab_highlight_patch_metrics(&current_render, sample_rect);
+
+    if current_metrics.sample_p99_max_channel <= NEGATIVE_LAB_HIGHLIGHT_CLIPPING_CEILING {
+        return NegativeLabHighlightPatchExposureSuggestion {
+            application_risk: "low".to_string(),
+            apply_allowed: false,
+            correction_magnitude_ev: 0.0,
+            current_frame_exposure_offset: current_offset,
+            current_frame_clipped_fraction: current_metrics.frame_clipped_fraction,
+            current_sample_clipped_fraction: current_metrics.sample_clipped_fraction,
+            current_sample_p99_max_channel: current_metrics.sample_p99_max_channel,
+            current_sample_rgb: current_metrics.sample_rgb,
+            effective_exposure: effective_current_exposure,
+            offset_clamped: false,
+            projected_frame_clipped_fraction: current_metrics.frame_clipped_fraction,
+            projected_sample_clipped_fraction: current_metrics.sample_clipped_fraction,
+            projected_sample_p99_max_channel: current_metrics.sample_p99_max_channel,
+            projected_sample_rgb: current_metrics.sample_rgb,
+            role: "highlight".to_string(),
+            sample_rect,
+            status: "already_safe".to_string(),
+            suggested_exposure_delta_ev: 0.0,
+            suggested_frame_exposure_offset: current_offset,
+        };
+    }
+
+    let mut selected_delta = None;
+    let mut selected_metrics = current_metrics;
+    let mut selected_effective_exposure = effective_current_exposure;
+    let mut selected_offset = current_offset;
+
+    for step in 1..=80 {
+        let exposure_delta = -(step as f32 * NEGATIVE_LAB_FRAME_EXPOSURE_STEP_EV);
+        let candidate_offset =
+            snap_negative_lab_frame_exposure_offset(current_offset + exposure_delta);
+        let candidate_effective_exposure =
+            (sanitized_params.exposure + candidate_offset).clamp(MIN_EXPOSURE, MAX_EXPOSURE);
+        let candidate_params = NegativeConversionParams {
+            exposure: candidate_effective_exposure,
+            ..sanitized_params
+        };
+        let candidate_render = run_pipeline(input, &candidate_params, None);
+        let candidate_metrics =
+            negative_lab_highlight_patch_metrics(&candidate_render, sample_rect);
+
+        if candidate_metrics.sample_p99_max_channel <= NEGATIVE_LAB_HIGHLIGHT_CLIPPING_CEILING {
+            selected_delta = Some(candidate_offset - current_offset);
+            selected_metrics = candidate_metrics;
+            selected_effective_exposure = candidate_effective_exposure;
+            selected_offset = candidate_offset;
+            break;
+        }
+
+        if candidate_offset <= MIN_EXPOSURE || candidate_effective_exposure <= MIN_EXPOSURE {
+            selected_delta = Some(candidate_offset - current_offset);
+            selected_metrics = candidate_metrics;
+            selected_effective_exposure = candidate_effective_exposure;
+            selected_offset = candidate_offset;
+            break;
+        }
+    }
+
+    let suggested_exposure_delta_ev = selected_delta.unwrap_or(0.0);
+    let correction_magnitude_ev = suggested_exposure_delta_ev.abs();
+    let offset_clamped =
+        selected_offset <= MIN_EXPOSURE || selected_effective_exposure <= MIN_EXPOSURE;
+    let application_risk = negative_lab_exposure_risk(correction_magnitude_ev);
+    let suggested_is_safe =
+        selected_metrics.sample_p99_max_channel <= NEGATIVE_LAB_HIGHLIGHT_CLIPPING_CEILING;
+    let apply_allowed = suggested_is_safe
+        && !offset_clamped
+        && correction_magnitude_ev <= 0.75
+        && selected_metrics.frame_clipped_fraction <= current_metrics.frame_clipped_fraction;
+    let status = if suggested_is_safe {
+        "suggested"
+    } else {
+        "blocked"
+    };
+
+    NegativeLabHighlightPatchExposureSuggestion {
+        application_risk,
+        apply_allowed,
+        correction_magnitude_ev,
+        current_frame_exposure_offset: current_offset,
+        current_frame_clipped_fraction: current_metrics.frame_clipped_fraction,
+        current_sample_clipped_fraction: current_metrics.sample_clipped_fraction,
+        current_sample_p99_max_channel: current_metrics.sample_p99_max_channel,
+        current_sample_rgb: current_metrics.sample_rgb,
+        effective_exposure: selected_effective_exposure,
+        offset_clamped,
+        projected_frame_clipped_fraction: selected_metrics.frame_clipped_fraction,
+        projected_sample_clipped_fraction: selected_metrics.sample_clipped_fraction,
+        projected_sample_p99_max_channel: selected_metrics.sample_p99_max_channel,
+        projected_sample_rgb: selected_metrics.sample_rgb,
+        role: "highlight".to_string(),
+        sample_rect,
+        status: status.to_string(),
+        suggested_exposure_delta_ev,
+        suggested_frame_exposure_offset: selected_offset,
     }
 }
 
@@ -1234,6 +1465,64 @@ pub async fn suggest_negative_lab_neutral_patch_rgb_balance(
 }
 
 #[tauri::command]
+pub async fn suggest_negative_lab_highlight_patch_exposure(
+    path: String,
+    params: NegativeConversionParams,
+    current_frame_exposure_offset: f32,
+    sample_rect: NegativeBaseFogSampleRect,
+    state: tauri::State<'_, AppState>,
+    app_handle: AppHandle,
+) -> Result<NegativeLabHighlightPatchExposureSuggestion, String> {
+    let sanitized_rect = sanitize_sample_rect(sample_rect)
+        .ok_or_else(|| "Highlight patch sample rect is invalid.".to_string())?;
+    let (source_path, _) = parse_virtual_path(&path);
+    let source_path_str = source_path.to_string_lossy().to_string();
+    let image = {
+        let original_lock = state.original_image.lock().unwrap();
+        if let Some(loaded) = original_lock.as_ref() {
+            if loaded.path == source_path_str {
+                loaded.image.clone().as_ref().clone()
+            } else {
+                drop(original_lock);
+                let settings = load_settings_or_default(&app_handle);
+                match read_file_mapped(Path::new(&source_path_str)) {
+                    Ok(mmap) => {
+                        load_base_image_from_bytes(&mmap, &source_path_str, false, &settings, None)
+                    }
+                    Err(_) => {
+                        let bytes =
+                            fs::read(&source_path_str).map_err(|io_err| io_err.to_string())?;
+                        load_base_image_from_bytes(&bytes, &source_path_str, false, &settings, None)
+                    }
+                }
+                .map_err(|e| e.to_string())?
+            }
+        } else {
+            drop(original_lock);
+            let settings = load_settings_or_default(&app_handle);
+            match read_file_mapped(Path::new(&source_path_str)) {
+                Ok(mmap) => {
+                    load_base_image_from_bytes(&mmap, &source_path_str, false, &settings, None)
+                }
+                Err(_) => {
+                    let bytes = fs::read(&source_path_str).map_err(|io_err| io_err.to_string())?;
+                    load_base_image_from_bytes(&bytes, &source_path_str, false, &settings, None)
+                }
+            }
+            .map_err(|e| e.to_string())?
+        }
+    };
+    let downscaled = downscale_f32_image(&image, 1080, 1080);
+
+    Ok(build_negative_lab_highlight_patch_exposure_suggestion(
+        &downscaled,
+        params,
+        current_frame_exposure_offset,
+        sanitized_rect,
+    ))
+}
+
+#[tauri::command]
 pub async fn convert_negatives(
     paths: Vec<String>,
     params: NegativeConversionParams,
@@ -1502,6 +1791,96 @@ mod tests {
         assert!(suggestion.offset_clamped);
         assert_near(suggestion.correction_magnitude, 1.5);
         assert_near(suggestion.suggested_rgb_balance_offset.red_weight, 1.5);
+    }
+
+    #[test]
+    fn negative_lab_highlight_patch_exposure_suggestion_recovers_clipped_patch() {
+        let input = DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_vec(
+                6,
+                4,
+                vec![
+                    0.004, 0.004, 0.004, 0.005, 0.005, 0.005, 0.007, 0.007, 0.007, 0.42, 0.38,
+                    0.34, 0.58, 0.52, 0.46, 0.001, 0.001, 0.001, 0.004, 0.004, 0.004, 0.005, 0.005,
+                    0.005, 0.007, 0.007, 0.007, 0.42, 0.38, 0.34, 0.58, 0.52, 0.46, 0.001, 0.001,
+                    0.001, 0.004, 0.004, 0.004, 0.005, 0.005, 0.005, 0.007, 0.007, 0.007, 0.42,
+                    0.38, 0.34, 0.58, 0.52, 0.46, 0.001, 0.001, 0.001, 0.004, 0.004, 0.004, 0.005,
+                    0.005, 0.005, 0.007, 0.007, 0.007, 0.42, 0.38, 0.34, 0.58, 0.52, 0.46, 0.001,
+                    0.001, 0.001,
+                ],
+            )
+            .unwrap(),
+        );
+        let suggestion = build_negative_lab_highlight_patch_exposure_suggestion(
+            &input,
+            NegativeConversionParams {
+                exposure: 2.0,
+                contrast: 1.2,
+                base_fog_sample: Some(NegativeBaseFogSampleRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 1.0,
+                    height: 1.0,
+                }),
+                ..NegativeConversionParams::default()
+            },
+            0.0,
+            NegativeBaseFogSampleRect {
+                x: 0.0,
+                y: 0.0,
+                width: 0.35,
+                height: 1.0,
+            },
+        );
+
+        assert_eq!(suggestion.role, "highlight");
+        assert_eq!(suggestion.status, "suggested");
+        assert!(suggestion.apply_allowed);
+        assert!(suggestion.suggested_exposure_delta_ev < 0.0);
+        assert!(suggestion.correction_magnitude_ev <= 0.75);
+        assert!(
+            suggestion.projected_sample_p99_max_channel <= NEGATIVE_LAB_HIGHLIGHT_CLIPPING_CEILING
+        );
+        assert!(
+            suggestion.projected_frame_clipped_fraction
+                <= suggestion.current_frame_clipped_fraction
+        );
+    }
+
+    #[test]
+    fn negative_lab_highlight_patch_exposure_suggestion_reports_already_safe_patch() {
+        let input = DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_vec(
+                2,
+                2,
+                vec![
+                    0.50, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50,
+                ],
+            )
+            .unwrap(),
+        );
+        let suggestion = build_negative_lab_highlight_patch_exposure_suggestion(
+            &input,
+            NegativeConversionParams {
+                exposure: -1.4,
+                contrast: 0.8,
+                ..NegativeConversionParams::default()
+            },
+            0.0,
+            NegativeBaseFogSampleRect {
+                x: 0.0,
+                y: 0.0,
+                width: 1.0,
+                height: 1.0,
+            },
+        );
+
+        assert_eq!(suggestion.status, "already_safe");
+        assert!(!suggestion.apply_allowed);
+        assert_near(suggestion.suggested_exposure_delta_ev, 0.0);
+        assert!(
+            suggestion.current_sample_p99_max_channel <= NEGATIVE_LAB_HIGHLIGHT_CLIPPING_CEILING
+        );
     }
 
     #[test]
