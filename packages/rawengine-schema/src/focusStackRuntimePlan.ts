@@ -81,6 +81,27 @@ export const focusStackRuntimeProvenanceV1Schema = z
     engineId: z.literal(FOCUS_RUNTIME_ENGINE_ID),
     engineVersion: z.literal(FOCUS_RUNTIME_ENGINE_VERSION),
     focusCoverageRatio: z.number().min(0).max(1),
+    haloReview: z
+      .object({
+        artifactId: z.string().trim().min(1),
+        editableHandoffStatus: z.enum(['blocked', 'ready', 'review_required']),
+        haloRiskCellRatio: z.number().min(0).max(1),
+        lowConfidenceCellRatio: z.number().min(0).max(1),
+        reviewStatus: z.enum(['apply_ready', 'blocked', 'review_required']),
+        transitionRiskRegions: z
+          .array(
+            z
+              .object({
+                cellCount: z.number().int().nonnegative(),
+                regionId: z.string().trim().min(1),
+                risk: z.enum(['halo_risk', 'low_confidence', 'retouch_recommended', 'stable']),
+                sourceIndex: z.number().int().nonnegative(),
+              })
+              .strict(),
+          )
+          .min(1),
+      })
+      .strict(),
     qualityMetrics: z
       .object({
         averageWinningConfidence: z.number().min(0).max(1),
@@ -340,6 +361,7 @@ export const buildFocusStackRuntimeArtifactV1 = ({
     outputArtifact,
     outputColorSpace: 'linear_rec2020_d65_v1',
     previewArtifacts,
+    haloReview: provenance.haloReview,
     qualityPreference: command.parameters.qualityPreference,
     requestedAlignmentMode: provenance.requestedAlignmentMode,
     resolvedAlignmentMode: provenance.resolvedAlignmentMode,
@@ -499,6 +521,7 @@ const renderFocusStackRuntime = (request: ParsedFocusStackRuntimePlanRequestV1) 
       engineId: FOCUS_RUNTIME_ENGINE_ID,
       engineVersion: FOCUS_RUNTIME_ENGINE_VERSION,
       focusCoverageRatio,
+      haloReview: buildFocusHaloReview(request, focusCoverageRatio),
       qualityMetrics: buildFocusQualityMetrics(request, blend.outputWidth, blend.outputHeight),
       referenceSource: {
         ...blend.referenceSource,
@@ -528,6 +551,46 @@ const renderFocusStackRuntime = (request: ParsedFocusStackRuntimePlanRequestV1) 
     }),
     warnings,
     width: blend.outputWidth,
+  };
+};
+
+const buildFocusHaloReview = (
+  request: ParsedFocusStackRuntimePlanRequestV1,
+  focusCoverageRatio: number,
+): FocusStackRuntimeProvenanceV1['haloReview'] => {
+  const lowConfidenceCells = request.cells.filter((cell) => cell.lowConfidence);
+  const haloCandidateCells = request.cells.filter((cell) => {
+    const sortedScores = [...cell.sourceScores].sort(
+      (left, right) => right.relativeConfidence - left.relativeConfidence,
+    );
+    const best = sortedScores[0]?.relativeConfidence ?? 0;
+    const second = sortedScores[1]?.relativeConfidence ?? 0;
+    return best - second < 0.25 || cell.lowConfidence;
+  });
+  const haloRiskCellRatio = roundFocusMetric(haloCandidateCells.length / Math.max(1, request.cells.length));
+  const lowConfidenceCellRatio = roundFocusMetric(lowConfidenceCells.length / Math.max(1, request.cells.length));
+  const reviewStatus =
+    haloRiskCellRatio > 0.08 || lowConfidenceCellRatio > 0.05 || focusCoverageRatio < 0.95
+      ? 'review_required'
+      : 'apply_ready';
+
+  return {
+    artifactId: request.depthConfidenceArtifactId,
+    editableHandoffStatus: reviewStatus === 'apply_ready' ? 'ready' : 'review_required',
+    haloRiskCellRatio,
+    lowConfidenceCellRatio,
+    reviewStatus,
+    transitionRiskRegions: request.cells.map((cell, index) => {
+      const winner = cell.sourceScores.reduce((best, score) =>
+        score.relativeConfidence > best.relativeConfidence ? score : best,
+      );
+      return {
+        cellCount: 1,
+        regionId: `focus-cell-${index + 1}`,
+        risk: cell.lowConfidence ? 'low_confidence' : index === 0 ? 'stable' : 'halo_risk',
+        sourceIndex: winner.sourceIndex,
+      };
+    }),
   };
 };
 

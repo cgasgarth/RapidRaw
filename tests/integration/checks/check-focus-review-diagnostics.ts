@@ -6,6 +6,7 @@ const failures: string[] = [];
 const modalSource = readFileSync('src/components/modals/FocusStackModal.tsx', 'utf8');
 const panelSource = readFileSync('src/components/modals/ComputationalMergeReviewPanel.tsx', 'utf8');
 const contractSource = readFileSync('src/utils/computationalMergeReviewPanels.ts', 'utf8');
+const reviewSource = readFileSync('src/utils/focusStackOutputReview.ts', 'utf8');
 
 for (const marker of [
   'focus-review-diagnostics',
@@ -27,6 +28,11 @@ for (const marker of [
   'modals.focusStack.preflight.blend',
   'modals.focusStack.review.decision',
   'modals.focusStack.review.editableArtifact',
+  'modals.focusStack.review.editableHandoffStatus',
+  'modals.focusStack.review.exportHandoff',
+  'modals.focusStack.review.haloRegionRisk',
+  'modals.focusStack.review.haloReviewStatus',
+  'modals.focusStack.review.haloReviewTitle',
   'modals.focusStack.review.haloRiskCells',
   'modals.focusStack.review.lowConfidenceCells',
   'modals.focusStack.review.overlay',
@@ -39,12 +45,27 @@ for (const marker of [
   'modals.focusStack.review.transitionRisk',
   'modals.focusStack.review.warning',
   'buildFocusStackOutputReviewWorkflow',
+  'focus-editable-handoff-proof',
+  'data-editable-artifact-id={outputReview.editableHandoff.artifactId}',
+  'data-export-review-artifact-id={outputReview.editableHandoff.exportReviewArtifactId}',
+  'data-halo-review-status={outputReview.haloReview.reviewStatus}',
   'focus-sharpness-overlay-controls',
   'settings.reviewOverlayMode',
   'settings.reviewOverlayOpacityPercent',
 ]) {
   if (!modalSource.includes(marker)) {
     failures.push(`Focus review diagnostics missing ${marker}.`);
+  }
+}
+
+for (const marker of [
+  'buildFocusStackOutputReviewFromArtifact',
+  'artifact.haloReview',
+  'editableHandoff',
+  'transitionRiskRegions',
+]) {
+  if (!reviewSource.includes(marker)) {
+    failures.push(`Focus output review adapter missing ${marker}.`);
   }
 }
 

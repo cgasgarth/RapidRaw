@@ -7,6 +7,7 @@ import {
 } from '../../../packages/rawengine-schema/src/focusStackUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
+import { buildFocusStackOutputReviewFromArtifact } from '../../../src/utils/focusStackOutputReview.ts';
 import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational-proof-budgets.ts';
 
 const focusRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
@@ -30,9 +31,9 @@ const frames = [0, 1, 2].map((sourceIndex) => ({
 }));
 const cells = sourceRegions.map((region) => ({
   height: region.height,
-  lowConfidence: false,
+  lowConfidence: region.sourceIndex === 1,
   sourceScores: [0, 1, 2].map((sourceIndex) => ({
-    relativeConfidence: sourceIndex === region.sourceIndex ? 1 : 0.01,
+    relativeConfidence: sourceIndex === region.sourceIndex ? 1 : region.sourceIndex === 1 ? 0.84 : 0.01,
     sourceIndex,
   })),
   width: region.width,
@@ -98,6 +99,29 @@ const sourceHashes = frames.map((frame) =>
 );
 if (sourceHashes.includes(outputHash))
   throw new Error('Expected focus UI runtime output to differ from source frames.');
+if (applied.apply.sidecarArtifact.haloReview === undefined) {
+  throw new Error('Focus sidecar artifact must persist halo review metadata.');
+}
+if (applied.apply.sidecarArtifact.haloReview.reviewStatus !== 'review_required') {
+  throw new Error(
+    `Expected review_required halo status, got ${applied.apply.sidecarArtifact.haloReview.reviewStatus}.`,
+  );
+}
+const outputReview = buildFocusStackOutputReviewFromArtifact(applied.apply.sidecarArtifact);
+if (outputReview.editableHandoff.artifactHash !== applied.apply.sidecarArtifact.outputArtifact.contentHash) {
+  throw new Error('Focus output review did not preserve editable artifact hash.');
+}
+if (
+  outputReview.editableHandoff.exportReviewArtifactId !==
+  `${applied.apply.sidecarArtifact.outputArtifact.artifactId}:export-review`
+) {
+  throw new Error('Focus output review did not preserve export review handoff id.');
+}
+if (outputReview.haloReview.transitionRiskRegions.length !== cells.length) {
+  throw new Error(
+    `Expected ${cells.length} transition regions, got ${outputReview.haloReview.transitionRiskRegions.length}.`,
+  );
+}
 
 expectThrows('mismatched accepted focus UI runtime plan', () =>
   bus.execute({
@@ -115,6 +139,8 @@ expectThrows('mismatched accepted focus UI runtime plan', () =>
 const result = {
   fixture: 'synthetic_focus_ui_runtime_bridge_v1',
   focusCoverageRatio: applied.apply.provenance.focusCoverageRatio,
+  haloReviewStatus: outputReview.haloReview.reviewStatus,
+  haloRiskCellRatio: outputReview.haloRiskCellRatio,
   outputSha256: outputHash,
   planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
 };

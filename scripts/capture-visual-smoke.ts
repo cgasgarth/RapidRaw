@@ -153,6 +153,7 @@ interface FocusPrivateRawBrowserProof {
   resultReviewArtifact: string;
   resultReviewDataUrl: string;
   sourceCount: string;
+  stackHash: string;
   stackPath: string;
 }
 
@@ -713,6 +714,7 @@ async function loadFocusPrivateRawProof(): Promise<FocusPrivateRawBrowserProof> 
     resultReviewArtifact,
     resultReviewDataUrl: await readPngDataUrl(resultReviewArtifact),
     sourceCount: '3',
+    stackHash: await sha256File(`${artifactRoot}/focus-plane-merge.tiff`),
     stackPath: `${artifactRoot}/focus-plane-merge.tiff`,
   };
 }
@@ -1201,6 +1203,7 @@ async function prepareScenario(page, mode) {
       proofBefore.fixtureId !== 'validation.computational-merge.focus-plane-transition.v1' ||
       proofBefore.previewRequested !== 'false' ||
       proofBefore.sourceCount !== '3' ||
+      /^sha256:[a-f0-9]{64}$/u.test(proofBefore.stackHash ?? '') !== true ||
       proofBefore.stackPath?.endsWith('/focus-plane-merge.tiff') !== true
     ) {
       throw new Error(`Focus private RAW modal proof payload failed: ${JSON.stringify(proofBefore)}`);
@@ -1224,6 +1227,28 @@ async function prepareScenario(page, mode) {
       .getByTestId('focus-review-diagnostics')
       .getByText(stackPath, { exact: true })
       .waitFor({ timeout: 10_000 });
+    const handoff = await page.getByTestId('focus-editable-handoff-proof').evaluate((element) => ({
+      regionCount: element.querySelectorAll('[data-region-risk]').length,
+      ...element.dataset,
+    }));
+    if (
+      handoff.editableArtifactId !== stackPath ||
+      handoff.editableArtifactHash !== proofBefore.stackHash ||
+      handoff.editableHandoffStatus !== 'review_required' ||
+      handoff.exportReviewArtifactId?.endsWith('/focus-plane-export-review.png') !== true ||
+      handoff.haloReviewStatus !== 'review_required' ||
+      handoff.runtimeOutputReview !== 'true' ||
+      handoff.regionCount !== 3
+    ) {
+      throw new Error(`Focus private RAW editable handoff proof failed: ${JSON.stringify(handoff)}`);
+    }
+    for (const risk of ['halo_risk', 'low_confidence', 'stable']) {
+      const riskCount = await page
+        .getByTestId('focus-editable-handoff-proof')
+        .locator(`[data-region-risk="${risk}"]`)
+        .count();
+      if (riskCount < 1) throw new Error(`Focus private RAW halo review missing ${risk} region.`);
+    }
     await page.getByTestId('focus-source-contribution-details').waitFor({ timeout: 10_000 });
     return;
   }

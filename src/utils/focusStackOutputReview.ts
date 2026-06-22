@@ -1,5 +1,6 @@
 import { focusStackOutputReviewWorkflowSchema } from '../schemas/focusStackOutputReviewSchemas';
 
+import type { FocusStackArtifactV1 } from '../../packages/rawengine-schema/src/rawEngineSchemas';
 import type { FocusStackOutputReviewWorkflow } from '../schemas/focusStackOutputReviewSchemas';
 import type { FocusStackUiSettings } from '../schemas/focusStackUiSchemas';
 
@@ -36,7 +37,18 @@ export const buildFocusStackOutputReviewWorkflow = ({
     artifactPath,
     blendMethod: settings.blendMethod,
     decision,
+    editableHandoff: {
+      artifactHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
+      artifactId: artifactPath,
+      exportReviewArtifactId: `${artifactPath}:export-review`,
+      status: 'review_required',
+    },
     haloRiskCellRatio,
+    haloReview: {
+      artifactId: `${artifactPath}:halo-review`,
+      reviewStatus: 'review_required',
+      transitionRiskRegions: buildDefaultTransitionRiskRegions(sourceCount),
+    },
     lowConfidenceCellRatio,
     proofLevel: 'synthetic_runtime',
     qualityPreference: settings.qualityPreference,
@@ -53,6 +65,49 @@ export const buildFocusStackOutputReviewWorkflow = ({
     warningCodes,
   });
 };
+
+export const buildFocusStackOutputReviewFromArtifact = (
+  artifact: FocusStackArtifactV1,
+): FocusStackOutputReviewWorkflow =>
+  focusStackOutputReviewWorkflowSchema.parse({
+    alignmentMode: artifact.resolvedAlignmentMode,
+    artifactPath: artifact.outputArtifact.artifactId,
+    blendMethod: artifact.blendMethod,
+    decision:
+      artifact.haloReview?.reviewStatus === 'blocked'
+        ? 'blocked'
+        : artifact.blendMethod === 'weighted_sharpness'
+          ? 'editable_review_required'
+          : 'preview_only',
+    editableHandoff: {
+      artifactHash: artifact.outputArtifact.contentHash,
+      artifactId: artifact.outputArtifact.artifactId,
+      exportReviewArtifactId: `${artifact.outputArtifact.artifactId}:export-review`,
+      status: artifact.haloReview?.editableHandoffStatus ?? 'review_required',
+    },
+    haloRiskCellRatio: artifact.haloReview?.haloRiskCellRatio ?? haloRiskCellRatio,
+    haloReview: {
+      artifactId: artifact.haloReview?.artifactId ?? `${artifact.outputArtifact.artifactId}:halo-review`,
+      reviewStatus: artifact.haloReview?.reviewStatus ?? 'review_required',
+      transitionRiskRegions:
+        artifact.haloReview?.transitionRiskRegions ??
+        buildDefaultTransitionRiskRegions(artifact.sourceImageRefs.length),
+    },
+    lowConfidenceCellRatio: artifact.haloReview?.lowConfidenceCellRatio ?? lowConfidenceCellRatio,
+    proofLevel: 'synthetic_runtime',
+    qualityPreference: artifact.qualityPreference,
+    retouchLayerPolicy: artifact.retouchLayerPolicy,
+    reviewOverlay: {
+      confidenceMarginThreshold: 0.12,
+      mode: 'halo_risk',
+      opacityPercent: 70,
+      sourceContributionDetails: buildSourceContributionDetails(artifact.sourceImageRefs.length),
+      sourceContributionSummary: buildSourceContributionSummary(artifact.sourceImageRefs.length),
+    },
+    sharpnessCoverageRatio: artifact.validationSummary.focusCoverageRatio,
+    sourceCount: artifact.sourceImageRefs.length,
+    warningCodes: ['human_review_required', 'synthetic_runtime_only', 'transition_halo_risk', 'retouch_layer_deferred'],
+  });
 
 const buildSourceContributionSummary = (
   sourceCount: number,
@@ -74,6 +129,16 @@ const buildSourceContributionDetails = (
     sourceId: `S${source.sourceIndex + 1}`,
     sourceIndex: source.sourceIndex,
     warningState: 'artifact_review_required',
+  }));
+
+const buildDefaultTransitionRiskRegions = (
+  sourceCount: number,
+): FocusStackOutputReviewWorkflow['haloReview']['transitionRiskRegions'] =>
+  Array.from({ length: sourceCount }, (_value, sourceIndex) => ({
+    cellCount: 1,
+    regionId: `focus-region-${sourceIndex + 1}`,
+    risk: sourceIndex === 0 ? 'stable' : sourceIndex === 1 ? 'low_confidence' : 'halo_risk',
+    sourceIndex,
   }));
 
 const roundRatio = (value: number): number => Number(value.toFixed(6));
