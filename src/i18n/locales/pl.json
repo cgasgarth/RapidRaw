@@ -2756,6 +2756,7 @@
         "artifactHash": "Hash",
         "artifactKind": {
           "baseline_review_crop": "Baseline crop",
+          "crop_review_sheet": "Crop review sheet",
           "reconstruction_preview": "Reconstruction preview",
           "reconstruction_review_crop": "Reconstruction crop"
         },
