@@ -270,8 +270,12 @@ export default function HdrModal({
               data-merge-strategy={handoffSummary.mergeStrategy}
               data-output-color-space={handoffSummary.outputColorSpace}
               data-output-encoding={handoffSummary.outputEncoding}
+              data-preview-export-compared-fields={handoffSummary.previewExportParity.comparedFields.join(',')}
+              data-preview-export-export-receipt-hash={handoffSummary.previewExportParity.exportReceiptHash}
               data-preview-export-mean-abs-delta={handoffSummary.previewExportMeanAbsDelta}
               data-preview-export-parity-status={handoffSummary.previewExportParityStatus}
+              data-preview-export-proof-hash={handoffSummary.previewExportParity.parityProofHash}
+              data-preview-export-preview-state-hash={handoffSummary.previewExportParity.previewStateHash}
               data-preview-tone-mapped={String(handoffSummary.previewToneMapped)}
               data-scene-merge-color-state={handoffSummary.sceneMergeColorState}
               data-source-count={handoffSummary.sourceCount}
@@ -295,6 +299,10 @@ export default function HdrModal({
                 {
                   label: t('modals.hdr.handoffPreviewExportParity'),
                   value: t('modals.hdr.handoffPreviewExportMatched'),
+                },
+                {
+                  label: t('modals.hdr.handoffPreviewExportProof'),
+                  value: handoffSummary.previewExportParity.parityProofHash,
                 },
               ].map((item) => (
                 <div className="min-w-0 rounded border border-border-color bg-surface px-2 py-1.5" key={item.label}>

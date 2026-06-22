@@ -2,6 +2,9 @@
 
 import { readFileSync } from 'node:fs';
 
+import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../../src/schemas/hdrMergeUiSchemas.ts';
+import { buildHdrEditableHandoffSummary } from '../../../src/utils/hdrEditableHandoff.ts';
+
 const mergeStatusSource = readFileSync('src/components/modals/MergeStatusViews.tsx', 'utf8');
 const hdrModalSource = readFileSync('src/components/modals/HdrModal.tsx', 'utf8');
 const appModalsSource = readFileSync('src/components/modals/AppModals.tsx', 'utf8');
@@ -27,6 +30,10 @@ for (const marker of [
   'data-deghost-review-required={String(handoffSummary.deghostReviewRequired)}',
   'data-display-preview-color-state={handoffSummary.displayPreviewColorState}',
   'data-export-color-state={handoffSummary.exportColorState}',
+  "data-preview-export-compared-fields={handoffSummary.previewExportParity.comparedFields.join(',')}",
+  'data-preview-export-export-receipt-hash={handoffSummary.previewExportParity.exportReceiptHash}',
+  'data-preview-export-proof-hash={handoffSummary.previewExportParity.parityProofHash}',
+  'data-preview-export-preview-state-hash={handoffSummary.previewExportParity.previewStateHash}',
   'data-preview-export-parity-status={handoffSummary.previewExportParityStatus}',
   'data-scene-merge-color-state={handoffSummary.sceneMergeColorState}',
   'data-testid="hdr-editable-handoff-provenance"',
@@ -67,6 +74,45 @@ for (const marker of [
   if (!visualSmokeSource.includes(marker)) {
     throw new Error(`HDR visual handoff smoke marker missing: ${marker}`);
   }
+}
+
+const handoffSummary = buildHdrEditableHandoffSummary({
+  deghostReviewAccepted: true,
+  deghostReviewRequired: true,
+  outputPath: '/tmp/rawengine-hdr-smoke.tif',
+  settings: {
+    ...DEFAULT_HDR_MERGE_UI_SETTINGS,
+    deghosting: 'high',
+    mergeStrategy: 'scene_linear_radiance',
+    toneMapPreview: true,
+  },
+  sourcePaths: [
+    '/private-fixtures/hdr/bracket-alignment-v1/frame-01-under.arw',
+    '/private-fixtures/hdr/bracket-alignment-v1/frame-02-mid.arw',
+    '/private-fixtures/hdr/bracket-alignment-v1/frame-03-over.arw',
+  ],
+});
+
+if (handoffSummary.previewExportParity.status !== handoffSummary.previewExportParityStatus) {
+  throw new Error('HDR preview/export parity status must match handoff status.');
+}
+if (handoffSummary.previewExportParity.meanAbsDelta !== handoffSummary.previewExportMeanAbsDelta) {
+  throw new Error('HDR preview/export parity delta must match handoff delta.');
+}
+for (const hash of [
+  handoffSummary.previewExportParity.previewStateHash,
+  handoffSummary.previewExportParity.exportReceiptHash,
+  handoffSummary.previewExportParity.parityProofHash,
+]) {
+  if (!/^fnv1a32:[a-f0-9]{8}$/u.test(hash)) {
+    throw new Error(`HDR preview/export parity hash is invalid: ${hash}`);
+  }
+}
+if (handoffSummary.previewExportParity.previewStateHash === handoffSummary.previewExportParity.exportReceiptHash) {
+  throw new Error('HDR preview state hash and export receipt hash should identify different states.');
+}
+if (!handoffSummary.previewExportParity.comparedFields.includes('outputPath')) {
+  throw new Error('HDR preview/export parity must link the export output path.');
 }
 
 console.log('hdr editable handoff ok');

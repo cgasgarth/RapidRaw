@@ -38,6 +38,29 @@ export const hdrEditableSourceRefSchema = z
   })
   .strict();
 
+const hdrParityHashSchema = z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u);
+
+export const hdrPreviewExportParitySummarySchema = z
+  .object({
+    comparedFields: z.array(
+      z.enum([
+        'deghosting',
+        'displayPreviewColorState',
+        'exportColorState',
+        'mergeStrategy',
+        'outputPath',
+        'sourceRefs',
+        'toneMapPreview',
+      ]),
+    ),
+    exportReceiptHash: hdrParityHashSchema,
+    meanAbsDelta: z.literal(0),
+    parityProofHash: hdrParityHashSchema,
+    previewStateHash: hdrParityHashSchema,
+    status: z.literal('matched_editor_display_path'),
+  })
+  .strict();
+
 export const hdrEditableHandoffSummarySchema = z
   .object({
     capabilityLevel: z.literal('runtime_apply_capable'),
@@ -51,6 +74,7 @@ export const hdrEditableHandoffSummarySchema = z
     outputColorSpace: z.literal('srgb_display_referred_v1'),
     outputEncoding: z.literal('display_referred_preview'),
     outputPath: z.string().min(1),
+    previewExportParity: hdrPreviewExportParitySummarySchema,
     previewExportMeanAbsDelta: z.literal(0),
     previewExportParityStatus: z.literal('matched_editor_display_path'),
     previewToneMapped: z.boolean(),
