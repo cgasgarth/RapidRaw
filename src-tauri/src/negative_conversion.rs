@@ -3472,7 +3472,7 @@ mod tests {
                 output_path: output_path.clone(),
                 output_width: rendered.width(),
                 sidecar_path: sidecar_path.clone(),
-                source_path: source_path.clone(),
+                source_path,
             }],
         )
         .expect("write private RAW Negative Lab conversion bundle");
