@@ -101,6 +101,17 @@ export const superResolutionRuntimeProvenanceV1Schema = z
         })
         .strict(),
     ),
+    supportMap: z
+      .object({
+        artifactId: z.string().trim().min(1),
+        coverageRatio: z.number().min(0).max(1),
+        downgradeReason: z.string().trim().min(1).optional(),
+        effectiveScale: z.number().min(1).max(4),
+        requestedScale: z.number().min(1.1).max(4),
+        reviewStatus: z.enum(['apply_ready', 'blocked', 'review_required']),
+        weakSupportRatio: z.number().min(0).max(1),
+      })
+      .strict(),
   })
   .strict();
 
@@ -280,7 +291,7 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
   if (firstFrame === undefined) {
     throw new Error('Super-resolution runtime requires at least one frame.');
   }
-  const scale = request.command.parameters.outputScale;
+  const scale = getEffectiveRuntimeScale(request.command.parameters.outputScale, request.frames.length);
   const alignmentDiagnostics = buildSuperResolutionAlignmentDiagnosticsV1(request.frames, scale);
   assertSuperResolutionAlignmentDiagnosticsRenderableV1(alignmentDiagnostics);
   const result = applyPixelShiftSuperResolutionV1({
@@ -294,6 +305,12 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
     width: firstFrame.width,
   });
   const warnings = deriveSrWarnings(result.changedPixelRatioAgainstNearest, request.command.parameters.detailPolicy);
+  const confidenceMap = buildSrConfidenceMap(
+    request.frames,
+    result.outputWidth,
+    result.outputHeight,
+    result.outputScale,
+  );
 
   return {
     height: result.outputHeight,
@@ -301,7 +318,7 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
     provenance: superResolutionRuntimeProvenanceV1Schema.parse({
       alignmentDiagnostics,
       changedPixelRatioAgainstNearest: roundSrMetric(result.changedPixelRatioAgainstNearest),
-      confidenceMap: buildSrConfidenceMap(request.frames, result.outputWidth, result.outputHeight, result.outputScale),
+      confidenceMap,
       detailPolicy: request.command.parameters.detailPolicy,
       detailQuality: buildSrDetailQuality(
         request.frames,
@@ -329,10 +346,47 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
         graphRevision: frame.graphRevision,
         sourceIndex: frame.sourceIndex,
       })),
+      supportMap: buildSrSupportMap(
+        request.confidenceMapArtifactId,
+        result.outputScale,
+        request.command.parameters.outputScale,
+        confidenceMap.completeSampleRatio,
+        request.command.parameters.detailPolicy,
+      ),
     }),
     warnings,
     width: result.outputWidth,
   };
+};
+
+const buildSrSupportMap = (
+  artifactId: string,
+  effectiveScale: number,
+  requestedScale: number,
+  coverageRatio: number,
+  detailPolicy: SuperResolutionRuntimeProvenanceV1['detailPolicy'],
+): SuperResolutionRuntimeProvenanceV1['supportMap'] => {
+  const weakSupportRatio = roundSrMetric(1 - coverageRatio);
+  const downgradeReason = effectiveScale < requestedScale ? 'effective_scale_downgraded' : undefined;
+  const reviewStatus =
+    downgradeReason !== undefined || weakSupportRatio > 0.25 || detailPolicy === 'aggressive_preview_only'
+      ? 'review_required'
+      : 'apply_ready';
+
+  return {
+    artifactId,
+    coverageRatio: roundSrMetric(coverageRatio),
+    downgradeReason,
+    effectiveScale,
+    requestedScale,
+    reviewStatus,
+    weakSupportRatio,
+  };
+};
+
+const getEffectiveRuntimeScale = (requestedScale: number, sourceCount: number): number => {
+  const sourceLimitedScale = Math.max(2, Math.floor(Math.sqrt(sourceCount)));
+  return Math.min(requestedScale, sourceLimitedScale);
 };
 
 const buildSrPreflightEstimate = (

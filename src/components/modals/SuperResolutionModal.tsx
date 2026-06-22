@@ -190,6 +190,19 @@ export default function SuperResolutionModal({
   const outputReviewFalseDetailRiskLabel = t(
     `modals.superResolution.review.falseDetailRiskValue.${outputReview.falseDetailRisk}`,
   );
+  const supportMapCoverageLabel = t('modals.superResolution.review.supportMapCoverageValue', {
+    value: Math.round(outputReview.supportMap.coverageRatio * 100),
+  });
+  const supportMapWeakSupportLabel = t('modals.superResolution.review.supportMapCoverageValue', {
+    value: Math.round(outputReview.supportMap.weakSupportRatio * 100),
+  });
+  const supportMapStatusLabel = t(
+    `modals.superResolution.review.supportMapStatus.${outputReview.supportMap.reviewStatus}`,
+  );
+  const supportMapDowngradeLabel =
+    outputReview.supportMap.downgradeReason === null
+      ? t('modals.superResolution.review.noSupportMapDowngrade')
+      : t('modals.superResolution.review.warning.effective_scale_downgraded');
   const outputReviewAlignmentConfidenceLabel =
     outputReview.alignmentConfidence === null
       ? t('modals.superResolution.review.notMeasured')
@@ -518,8 +531,8 @@ export default function SuperResolutionModal({
           },
           {
             label: t('modals.superResolution.review.sourceSupport'),
-            status: 'ready',
-            value: t('modals.superResolution.review.sourceSupportValue', { count: outputReview.sourceCount }),
+            status: outputReview.supportMap.reviewStatus === 'apply_ready' ? 'ready' : 'review',
+            value: `${supportMapStatusLabel} - ${supportMapCoverageLabel}`,
           },
           {
             label: t('modals.superResolution.review.detailGain'),
@@ -607,6 +620,10 @@ export default function SuperResolutionModal({
                 value: outputReviewFalseDetailRiskLabel,
               },
               {
+                label: t('modals.superResolution.review.supportMap'),
+                value: `${supportMapCoverageLabel} - ${supportMapDowngradeLabel}`,
+              },
+              {
                 label: t('modals.superResolution.review.outputArtifact'),
                 value: outputArtifactLabel,
               },
@@ -636,6 +653,73 @@ export default function SuperResolutionModal({
           },
         ]}
       />
+
+      <section
+        className="rounded-md border border-border-color bg-bg-primary p-4"
+        data-effective-scale={outputReview.supportMap.effectiveScale}
+        data-requested-scale={outputReview.supportMap.requestedScale}
+        data-review-status={outputReview.supportMap.reviewStatus}
+        data-support-artifact-id={outputReview.supportMap.artifactId}
+        data-support-coverage-ratio={outputReview.supportMap.coverageRatio}
+        data-support-downgrade-reason={outputReview.supportMap.downgradeReason ?? ''}
+        data-testid="sr-support-map-review"
+        data-weak-support-ratio={outputReview.supportMap.weakSupportRatio}
+      >
+        <div className="mb-3 flex items-start justify-between gap-4">
+          <div>
+            <UiText variant={TextVariants.heading}>{t('modals.superResolution.review.supportMapTitle')}</UiText>
+            <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+              {t('modals.superResolution.review.supportMapSummary', {
+                coverage: Math.round(outputReview.supportMap.coverageRatio * 100),
+                weak: Math.round(outputReview.supportMap.weakSupportRatio * 100),
+              })}
+            </UiText>
+          </div>
+          <UiText variant={TextVariants.small} color={TextColors.secondary} className="shrink-0">
+            {supportMapStatusLabel}
+          </UiText>
+        </div>
+        <div className="mb-3 grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
+          <ComputationalSetupStatusLine
+            label={t('modals.superResolution.review.supportMapCoverage')}
+            value={supportMapCoverageLabel}
+          />
+          <ComputationalSetupStatusLine
+            label={t('modals.superResolution.review.supportMapWeak')}
+            value={supportMapWeakSupportLabel}
+          />
+          <ComputationalSetupStatusLine
+            label={t('modals.superResolution.preflight.scale')}
+            value={t('modals.superResolution.preflight.effectiveScaleValue', {
+              effectiveScale: outputReview.supportMap.effectiveScale,
+              requestedScale: outputReview.supportMap.requestedScale,
+            })}
+          />
+          <ComputationalSetupStatusLine
+            label={t('modals.superResolution.preflight.downgrades')}
+            value={supportMapDowngradeLabel}
+          />
+        </div>
+        <div className="grid gap-2 lg:grid-cols-3">
+          {outputReview.supportMap.regions.map((region) => (
+            <div
+              className="rounded-md border border-border-color bg-bg-secondary/70 p-3"
+              data-region-coverage-ratio={region.coverageRatio}
+              data-region-id={region.regionId}
+              data-region-risk={region.risk}
+              key={region.regionId}
+            >
+              <UiText variant={TextVariants.label}>{region.label}</UiText>
+              <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+                {t(`modals.superResolution.review.supportMapRisk.${region.risk}`)} -{' '}
+                {t('modals.superResolution.review.supportMapCoverageValue', {
+                  value: Math.round(region.coverageRatio * 100),
+                })}
+              </UiText>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <section
         className="rounded-md border border-border-color bg-bg-primary p-4"
@@ -723,6 +807,9 @@ export default function SuperResolutionModal({
         data-review-artifact-hashes={outputReview.reviewArtifacts.map((artifact) => artifact.contentHash).join(',')}
         data-review-artifact-paths={outputReview.reviewArtifacts.map((artifact) => artifact.path).join(',')}
         data-stale-state={outputReview.staleState}
+        data-support-map-artifact-id={outputReview.supportMap.artifactId}
+        data-support-map-review-status={outputReview.supportMap.reviewStatus}
+        data-support-map-weak-ratio={outputReview.supportMap.weakSupportRatio}
         data-testid="sr-editable-handoff-proof"
       />
 

@@ -2704,6 +2704,7 @@
         },
         "limitation": "Runtime bridge proof only; private RAW decode, detail QA, and UI E2E remain open.",
         "noArtifactWarnings": "No artifact warnings",
+        "noSupportMapDowngrade": "No scale downgrade",
         "notMeasured": "Not measured",
         "outputArtifact": "Output artifact",
         "outputHash": "Output hash",
@@ -2722,12 +2723,30 @@
         "sourceSupportValue": "{{count}} frames + synthetic runtime proof",
         "sourceSupportValue_one": "",
         "sourceSupportValue_other": "",
+        "supportMap": "Support map",
+        "supportMapCoverage": "Supported pixels",
+        "supportMapCoverageValue": "{{value}}%",
+        "supportMapRisk": {
+          "edge_risk": "Edge risk",
+          "motion_rejected": "Motion rejected",
+          "supported": "Supported",
+          "weak_support": "Weak support"
+        },
+        "supportMapStatus": {
+          "apply_ready": "Apply ready",
+          "blocked": "Blocked",
+          "review_required": "Review required"
+        },
+        "supportMapSummary": "{{coverage}}% supported, {{weak}}% weak support",
+        "supportMapTitle": "Support map review",
+        "supportMapWeak": "Weak support",
         "title": "Quality review",
         "uiE2ePending": "UI E2E pending",
         "warning": {
           "aggressive_preview_only": "aggressive preview only",
           "effective_scale_downgraded": "effective scale downgraded",
           "human_review_required": "human review required",
+          "low_overlap_coverage": "low overlap coverage",
           "synthetic_runtime_only": "synthetic runtime only",
           "texture_risk": "texture risk"
         }

@@ -2408,6 +2408,41 @@ function SuperResolutionPrivateRawModalReviewSmoke() {
     reviewPacketPath: proof.privateRunReportPath,
     sourceCount,
     staleState: 'current',
+    supportMap: {
+      artifactId: `${proof.reconstructionPath}:support-map`,
+      coverageRatio: 0.74,
+      downgradeReason: 'effective_scale_downgraded',
+      effectiveScale: 1.5,
+      regions: [
+        {
+          coverageRatio: 0.82,
+          label: 'center detail',
+          regionId: 'center-detail',
+          risk: 'supported',
+        },
+        {
+          coverageRatio: 0.61,
+          label: 'edge texture',
+          regionId: 'edge-texture',
+          risk: 'weak_support',
+        },
+        {
+          coverageRatio: 0.38,
+          label: 'moving water',
+          regionId: 'moving-water',
+          risk: 'motion_rejected',
+        },
+        {
+          coverageRatio: 0.44,
+          label: 'frame edge',
+          regionId: 'frame-edge',
+          risk: 'edge_risk',
+        },
+      ],
+      requestedScale: outputScale,
+      reviewStatus: 'review_required',
+      weakSupportRatio: 0.26,
+    },
     warningCodes: ['human_review_required', 'synthetic_runtime_only', 'texture_risk', 'effective_scale_downgraded'],
   } satisfies SuperResolutionOutputReviewWorkflow;
   const sourcePreflightMetadata: SuperResolutionSourcePreflightMetadata[] = sourcePaths.map((imagePath, index) => ({

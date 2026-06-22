@@ -98,6 +98,18 @@ if (outputReview.outputArtifactHash !== applied.apply.sidecarArtifact.outputArti
 if (!outputReview.warningCodes.includes('human_review_required')) {
   throw new Error('SR output review must keep human-review warning.');
 }
+if (applied.apply.sidecarArtifact.supportMap === undefined) {
+  throw new Error('SR sidecar artifact must persist support-map metadata.');
+}
+if (outputReview.supportMap.artifactId !== applied.apply.sidecarArtifact.supportMap.artifactId) {
+  throw new Error('SR output review did not preserve support-map artifact id.');
+}
+if (outputReview.supportMap.reviewStatus !== applied.apply.sidecarArtifact.supportMap.reviewStatus) {
+  throw new Error('SR output review did not preserve support-map review status.');
+}
+if (outputReview.supportMap.weakSupportRatio !== applied.apply.sidecarArtifact.supportMap.weakSupportRatio) {
+  throw new Error('SR output review did not preserve support-map weak support ratio.');
+}
 if (outputReview.reviewArtifacts.length !== 3) {
   throw new Error(`Expected 3 SR review artifacts, got ${outputReview.reviewArtifacts.length}.`);
 }
@@ -133,11 +145,50 @@ const improvementRatio =
   calculateMeanAbsoluteErrorV1(nearestBaseline, truth);
 if (improvementRatio < 0.65) throw new Error(`Expected SR improvement ratio >= 0.65, got ${improvementRatio}.`);
 
+const downgradedControls = { ...controls, outputScale: 4 };
+const downgradedDryRunCommand = buildSuperResolutionUiDryRunCommandV1(downgradedControls, {
+  commandId: 'command_sr_ui_runtime_downgrade_dry_run',
+  correlationId: 'corr_sr_ui_runtime_downgrade',
+  expectedGraphRevision: 'graph_rev_sr_ui_runtime_downgrade',
+  targetId: 'project_sr_ui_runtime',
+});
+const downgradedDryRun = bus.execute({
+  request: buildRequest(downgradedDryRunCommand),
+  toolName: superResolutionRoutePair.dryRunToolName,
+});
+if (downgradedDryRun.kind !== 'dry_run') throw new Error('Expected downgraded SR dry-run result.');
+const downgradedApplyCommand = buildSuperResolutionUiApplyCommandV1(downgradedControls, {
+  acceptedDryRunPlanHash: downgradedDryRun.acceptedDryRunPlanHash,
+  acceptedDryRunPlanId: downgradedDryRun.dryRun.dryRunResult.mergePlan.planId,
+  commandId: 'command_sr_ui_runtime_downgrade_apply',
+  correlationId: 'corr_sr_ui_runtime_downgrade_apply',
+  expectedGraphRevision: 'graph_rev_sr_ui_runtime_downgrade',
+  idempotencyKey: 'idem_sr_ui_runtime_downgrade_apply',
+  targetId: 'project_sr_ui_runtime',
+});
+const downgradedApplied = bus.execute({
+  request: buildRequest(downgradedApplyCommand),
+  toolName: superResolutionRoutePair.applyToolName,
+});
+if (downgradedApplied.kind !== 'apply') throw new Error('Expected downgraded SR apply result.');
+const downgradedReview = buildSuperResolutionOutputReviewFromArtifact(downgradedApplied.apply.sidecarArtifact);
+if (downgradedReview.supportMap.requestedScale !== 4 || downgradedReview.supportMap.effectiveScale !== 2) {
+  throw new Error(`Expected requested x4/effective x2 support map, got ${JSON.stringify(downgradedReview.supportMap)}`);
+}
+if (downgradedReview.supportMap.downgradeReason !== 'effective_scale_downgraded') {
+  throw new Error(`Expected effective-scale downgrade reason, got ${downgradedReview.supportMap.downgradeReason}`);
+}
+if (!downgradedReview.warningCodes.includes('effective_scale_downgraded')) {
+  throw new Error('Downgraded SR output review must include effective-scale warning.');
+}
+
 const result = {
   fixture: 'synthetic_sr_ui_runtime_bridge_v1',
   improvementRatio,
   outputReviewEditableGate: outputReview.editableGate,
   outputReviewStatus: outputReview.humanReviewStatus,
+  supportMapReviewStatus: outputReview.supportMap.reviewStatus,
+  supportMapWeakSupportRatio: outputReview.supportMap.weakSupportRatio,
   outputSha256: new Bun.CryptoHasher('sha256').update(new Uint8Array(applied.apply.outputPixels.buffer)).digest('hex'),
   planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
 };
