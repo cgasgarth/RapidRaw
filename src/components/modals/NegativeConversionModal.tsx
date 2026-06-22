@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  CheckCircle2,
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, type PointerEvent } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
@@ -49,6 +50,7 @@ import { TextColors, TextVariants } from '../../types/typography';
 import { NegativeLabAppServerCommandName } from '../../utils/negativeLabAppServerCommandNames';
 import {
   buildNegativeLabBaseSamplePreviewProof,
+  type NegativeLabBaseSampleWarningCode,
   type NegativeLabBaseSamplePreviewProof,
   type NegativeLabBaseSamplePreviewProofContext,
 } from '../../utils/negativeLabBaseSampleCommandBridge';
@@ -124,6 +126,7 @@ type NegativeConversionScope = 'active' | 'all' | 'ready';
 type NegativeLabProfileFilter = 'all' | 'black_and_white_silver' | 'color_negative' | 'measured';
 type NegativeLabProfileSort = 'catalog' | 'evidence_desc' | 'name_asc' | 'runtime_applied';
 type NegativeLabPatchRole = 'highlight' | 'neutral';
+type NegativeLabBaseSampleStudioDecision = 'accepted' | 'candidate' | 'rejected';
 type NegativeLabQcDecision = 'approved' | 'pending' | 'rejected';
 type NegativeLabProfileFilterLabelKey =
   | 'modals.negativeConversion.profileFilterAll'
@@ -203,6 +206,15 @@ type QcDecisionLabelKey =
   | 'modals.negativeConversion.qcDecisionApproved'
   | 'modals.negativeConversion.qcDecisionPending'
   | 'modals.negativeConversion.qcDecisionRejected';
+type BaseSampleWarningLabelKey =
+  | 'modals.negativeConversion.baseSampleWarningClipped'
+  | 'modals.negativeConversion.baseSampleWarningLowConfidence'
+  | 'modals.negativeConversion.baseSampleWarningMissingBase'
+  | 'modals.negativeConversion.baseSampleWarningUneven';
+type BaseSampleDecisionLabelKey =
+  | 'modals.negativeConversion.baseSampleDecision.accepted'
+  | 'modals.negativeConversion.baseSampleDecision.candidate'
+  | 'modals.negativeConversion.baseSampleDecision.rejected';
 
 const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
 const DEFAULT_SAVE_OPTIONS = {
@@ -383,6 +395,17 @@ const QC_DECISION_LABEL_KEYS = {
   pending: 'modals.negativeConversion.qcDecisionPending',
   rejected: 'modals.negativeConversion.qcDecisionRejected',
 } satisfies Record<NegativeLabQcDecision, QcDecisionLabelKey>;
+const BASE_SAMPLE_WARNING_LABEL_KEYS = {
+  clipped_base_channel: 'modals.negativeConversion.baseSampleWarningClipped',
+  low_acquisition_confidence: 'modals.negativeConversion.baseSampleWarningLowConfidence',
+  missing_visible_base: 'modals.negativeConversion.baseSampleWarningMissingBase',
+  uneven_illumination: 'modals.negativeConversion.baseSampleWarningUneven',
+} satisfies Record<NegativeLabBaseSampleWarningCode, BaseSampleWarningLabelKey>;
+const BASE_SAMPLE_DECISION_LABEL_KEYS = {
+  accepted: 'modals.negativeConversion.baseSampleDecision.accepted',
+  candidate: 'modals.negativeConversion.baseSampleDecision.candidate',
+  rejected: 'modals.negativeConversion.baseSampleDecision.rejected',
+} satisfies Record<NegativeLabBaseSampleStudioDecision, BaseSampleDecisionLabelKey>;
 const isNegativeLabFrameHealthFilter = (value: string): value is NegativeLabFrameHealthFilter =>
   NEGATIVE_LAB_FRAME_HEALTH_FILTERS.some((filter) => filter === value);
 const isNegativeLabFrameHealthSort = (value: string): value is NegativeLabFrameHealthSort =>
@@ -442,6 +465,7 @@ interface BaseFogSampleUndoEntry {
   baseFogEstimate: NegativeBaseFogEstimate | null;
   baseFogPreviewProof: NegativeLabBaseSamplePreviewProof | null;
   baseFogScope: 'frame' | 'roll';
+  baseSampleStudioDecision: NegativeLabBaseSampleStudioDecision;
   params: NegativeParams;
   selectedPresetId: string;
 }
@@ -458,6 +482,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [baseFogEstimate, setBaseFogEstimate] = useState<NegativeBaseFogEstimate | null>(null);
   const [baseFogPreviewProof, setBaseFogPreviewProof] = useState<NegativeLabBaseSamplePreviewProof | null>(null);
   const [baseFogReadoutCopied, setBaseFogReadoutCopied] = useState(false);
+  const [baseSampleStudioDecision, setBaseSampleStudioDecision] =
+    useState<NegativeLabBaseSampleStudioDecision>('candidate');
+  const [rejectedBaseSampleLabel, setRejectedBaseSampleLabel] = useState<string | null>(null);
   const [patchProbeEstimate, setPatchProbeEstimate] = useState<NegativeBaseFogEstimate | null>(null);
   const [patchProbeRect, setPatchProbeRect] = useState<NegativeLabBaseFogSampleRect | null>(null);
   const [patchProbeLabel, setPatchProbeLabel] = useState<string | null>(null);
@@ -567,6 +594,26 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       }),
     [customBaseSampleEstimate, customBaseSampleRect, t],
   );
+  const baseSampleStudioComparison = useMemo(() => {
+    if (baseFogEstimate === null || customBaseSampleEstimate === null) return null;
+    const densityDelta = Math.max(
+      ...baseFogEstimate.baseDensity.map((density, index) =>
+        Math.abs(density - (customBaseSampleEstimate.baseDensity[index] ?? density)),
+      ),
+    );
+    const confidenceDelta = customBaseSampleEstimate.confidence - baseFogEstimate.confidence;
+
+    return {
+      confidenceDelta,
+      densityDelta,
+      rgbDelta: Math.max(
+        ...baseFogEstimate.baseRgb.map((channel, index) =>
+          Math.abs(channel - (customBaseSampleEstimate.baseRgb[index] ?? channel)),
+        ),
+      ),
+    };
+  }, [baseFogEstimate, customBaseSampleEstimate]);
+  const activeBaseSampleWarningCodes = baseFogPreviewProof?.warningCodes ?? [];
 
   const selectedPreset = useMemo(
     () =>
@@ -1179,6 +1226,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setBaseFogScope('frame');
     setBaseFogPreviewProof(null);
     setBaseFogReadoutCopied(false);
+    setBaseSampleStudioDecision('candidate');
+    setRejectedBaseSampleLabel(null);
     setActiveBaseFogSampleLabel(null);
     setBaseFogSampleUndoStack([]);
     setParams(preset.params);
@@ -1195,6 +1244,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         baseFogEstimate,
         baseFogPreviewProof,
         baseFogScope,
+        baseSampleStudioDecision,
         params,
         selectedPresetId,
       },
@@ -1210,6 +1260,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setBaseFogScope(previous.baseFogScope);
     setBaseFogPreviewProof(previous.baseFogPreviewProof);
     setBaseFogReadoutCopied(false);
+    setBaseSampleStudioDecision(previous.baseSampleStudioDecision);
+    setRejectedBaseSampleLabel(null);
     setActiveBaseFogSampleLabel(previous.activeBaseFogSampleLabel);
     setSelectedPresetId(previous.selectedPresetId);
     setParams(previous.params);
@@ -1250,6 +1302,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setBaseFogEstimate(estimate);
       setBaseFogScope('frame');
       setBaseFogReadoutCopied(false);
+      setBaseSampleStudioDecision('candidate');
+      setRejectedBaseSampleLabel(null);
       setActiveBaseFogSampleLabel(t('modals.negativeConversion.sampleFullFrame'));
       setParams(nextParams);
       setAcceptedBatchPlanJson(null);
@@ -1294,6 +1348,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setBaseFogEstimate(estimate);
       setBaseFogScope('frame');
       setBaseFogReadoutCopied(false);
+      setBaseSampleStudioDecision('candidate');
+      setRejectedBaseSampleLabel(null);
       setActiveBaseFogSampleLabel(t(labelKey));
       setParams(nextParams);
       setAcceptedBatchPlanJson(null);
@@ -1355,6 +1411,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setBaseFogEstimate(customBaseSampleEstimate);
     setBaseFogScope('frame');
     setBaseFogReadoutCopied(false);
+    setBaseSampleStudioDecision('candidate');
+    setRejectedBaseSampleLabel(null);
     setActiveBaseFogSampleLabel(t('modals.negativeConversion.customBaseSample'));
     setParams(nextParams);
     setAcceptedBatchPlanJson(null);
@@ -1365,7 +1423,22 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     if (baseFogConfidence === null || baseFogScope === 'roll') return;
     pushBaseFogSampleUndoEntry();
     setBaseFogScope('roll');
+    setBaseSampleStudioDecision('accepted');
     setAcceptedBatchPlanJson(null);
+  };
+
+  const handleAcceptBaseSample = () => {
+    if (baseFogConfidence === null) return;
+    setBaseSampleStudioDecision('accepted');
+    setRejectedBaseSampleLabel(null);
+  };
+
+  const handleRejectBaseSample = () => {
+    if (activeBaseFogSampleLabel === null) return;
+    const rejectedLabel = activeBaseFogSampleLabel;
+    handleUndoBaseFogSample();
+    setRejectedBaseSampleLabel(rejectedLabel);
+    setBaseSampleStudioDecision('rejected');
   };
 
   const handleSamplePatchProbe = async (
@@ -3522,6 +3595,87 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 <RotateCcw size={13} />
                 {t('contextMenus.editor.undo')}
               </button>
+            </div>
+            <div
+              className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+              data-decision={baseSampleStudioDecision}
+              data-testid="negative-lab-base-sampling-studio"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <UiText variant={TextVariants.small} className="text-text-secondary">
+                  {t('modals.negativeConversion.baseSamplingStudio')}
+                </UiText>
+                <span className="rounded border border-surface bg-bg-secondary px-1.5 py-0.5 text-[11px] text-text-tertiary">
+                  {t(BASE_SAMPLE_DECISION_LABEL_KEYS[baseSampleStudioDecision])}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-1 text-xs text-text-tertiary">
+                <span>{t('modals.negativeConversion.baseSampleActive')}</span>
+                <span className="truncate text-right" data-testid="negative-lab-base-sample-active-label">
+                  {activeBaseFogSampleLabel ?? rejectedBaseSampleLabel ?? t('modals.negativeConversion.basePending')}
+                </span>
+                <span>{t('modals.negativeConversion.baseSampleWarnings')}</span>
+                <span className="text-right" data-testid="negative-lab-base-sample-warning-count">
+                  {activeBaseSampleWarningCodes.length}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1" data-testid="negative-lab-base-sample-warning-list">
+                {activeBaseSampleWarningCodes.length === 0 ? (
+                  <span className="rounded border border-surface bg-bg-secondary px-1.5 py-0.5 text-[11px] text-text-tertiary">
+                    {t('modals.negativeConversion.baseSampleNoWarnings')}
+                  </span>
+                ) : (
+                  activeBaseSampleWarningCodes.map((warningCode) => (
+                    <span
+                      key={warningCode}
+                      className="rounded border border-yellow-300/40 bg-yellow-300/10 px-1.5 py-0.5 text-[11px] text-yellow-100"
+                      data-testid={`negative-lab-base-sample-warning-${warningCode}`}
+                    >
+                      {t(BASE_SAMPLE_WARNING_LABEL_KEYS[warningCode])}
+                    </span>
+                  ))
+                )}
+              </div>
+              {baseSampleStudioComparison !== null && (
+                <div
+                  className="grid grid-cols-2 gap-1 rounded-md border border-surface bg-bg-secondary p-2 text-xs text-text-tertiary"
+                  data-confidence-delta={baseSampleStudioComparison.confidenceDelta.toFixed(3)}
+                  data-density-delta={baseSampleStudioComparison.densityDelta.toFixed(3)}
+                  data-rgb-delta={baseSampleStudioComparison.rgbDelta.toFixed(3)}
+                  data-testid="negative-lab-base-sample-comparison"
+                >
+                  <span>{t('modals.negativeConversion.baseSampleDensityDelta')}</span>
+                  <span className="text-right tabular-nums">
+                    {formatDensityValue(baseSampleStudioComparison.densityDelta)}
+                  </span>
+                  <span>{t('modals.negativeConversion.baseSampleConfidenceDelta')}</span>
+                  <span className="text-right tabular-nums">
+                    {formatSignedRecipeValue(baseSampleStudioComparison.confidenceDelta)}
+                  </span>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center gap-1 rounded-md border border-accent bg-accent/10 px-2 py-1.5 text-xs text-text-primary transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-50"
+                  data-testid="negative-lab-accept-base-sample"
+                  disabled={baseFogConfidence === null || isSaving || baseSampleStudioDecision === 'accepted'}
+                  onClick={handleAcceptBaseSample}
+                >
+                  <CheckCircle2 size={13} />
+                  {t('modals.negativeConversion.acceptBaseSample')}
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center gap-1 rounded-md border border-surface bg-bg-secondary px-2 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                  data-testid="negative-lab-reject-base-sample"
+                  disabled={activeBaseFogSampleLabel === null || baseFogSampleUndoStack.length === 0 || isSaving}
+                  onClick={handleRejectBaseSample}
+                >
+                  <X size={13} />
+                  {t('modals.negativeConversion.rejectBaseSample')}
+                </button>
+              </div>
             </div>
             {baseFogConfidence !== null && (
               <div
