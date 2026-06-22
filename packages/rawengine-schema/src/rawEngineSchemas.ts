@@ -3890,6 +3890,28 @@ export const focusStackArtifactV1Schema = z
     outputArtifact: artifactHandleV1Schema,
     outputColorSpace: z.string().trim().min(1),
     previewArtifacts: z.array(artifactHandleV1Schema),
+    haloReview: z
+      .object({
+        artifactId: z.string().trim().min(1),
+        editableHandoffStatus: z.enum(['blocked', 'ready', 'review_required']),
+        haloRiskCellRatio: z.number().min(0).max(1),
+        lowConfidenceCellRatio: z.number().min(0).max(1),
+        reviewStatus: z.enum(['apply_ready', 'blocked', 'review_required']),
+        transitionRiskRegions: z
+          .array(
+            z
+              .object({
+                cellCount: z.number().int().nonnegative(),
+                regionId: z.string().trim().min(1),
+                risk: z.enum(['halo_risk', 'low_confidence', 'retouch_recommended', 'stable']),
+                sourceIndex: z.number().int().nonnegative(),
+              })
+              .strict(),
+          )
+          .min(1),
+      })
+      .strict()
+      .optional(),
     qualityPreference: computationalMergeQualityPreferenceV1Schema,
     requestedAlignmentMode: computationalMergeAlignmentModeV1Schema,
     resolvedAlignmentMode: computationalMergeAlignmentModeV1Schema,

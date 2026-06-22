@@ -1814,6 +1814,25 @@
           "preview_only": "Preview only"
         },
         "editableArtifact": "Editable artifact",
+        "editableHandoffStatus": {
+          "blocked": "Blocked",
+          "ready": "Editable handoff ready",
+          "review_required": "Review required"
+        },
+        "exportHandoff": "Export handoff",
+        "haloRegionRisk": {
+          "halo_risk": "Halo risk",
+          "low_confidence": "Low confidence",
+          "retouch_recommended": "Retouch recommended",
+          "stable": "Stable"
+        },
+        "haloReviewStatus": {
+          "apply_ready": "Apply ready",
+          "blocked": "Blocked",
+          "review_required": "Review required"
+        },
+        "haloReviewSummary": "{{halo}}% halo risk, {{low}}% low confidence",
+        "haloReviewTitle": "Halo and export handoff",
         "haloRiskCells": "Halo-risk cells",
         "limitation": "Runtime bridge proof only; private RAW decode, visual QA, and UI E2E remain open.",
         "lowConfidenceCells": "Low-confidence cells",
@@ -1849,6 +1868,7 @@
         "sharpnessMap": "Sharpness map",
         "sourceContribution": "Source contribution",
         "sourceContributionValue": "S{{index}} {{value}}%",
+        "sourceIndexValue": "Source {{index}}",
         "title": "Quality review",
         "transitionRisk": "Transition risk",
         "transitions": "Focus transitions",

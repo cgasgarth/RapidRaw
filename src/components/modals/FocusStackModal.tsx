@@ -16,6 +16,7 @@ import Button from '../ui/Button';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
 
+import type { FocusStackOutputReviewWorkflow } from '../../schemas/focusStackOutputReviewSchemas';
 import type {
   FocusStackAlignmentMode,
   FocusStackQualityPreference,
@@ -29,6 +30,7 @@ interface FocusStackModalProps {
   onClose: () => void;
   onPreviewPlan: () => void;
   onSettingsChange: (settings: FocusStackUiSettings) => void;
+  outputReview?: FocusStackOutputReviewWorkflow | null;
   outputReviewArtifactPath?: string;
   settings: FocusStackUiSettings;
   sourceCount: number;
@@ -44,6 +46,7 @@ export default function FocusStackModal({
   onClose,
   onPreviewPlan,
   onSettingsChange,
+  outputReview: runtimeOutputReview,
   outputReviewArtifactPath = reviewArtifactPath,
   settings,
   sourceCount,
@@ -86,16 +89,23 @@ export default function FocusStackModal({
   const stackReadinessLabel = isSourceCountValid
     ? t('modals.focusStack.preflight.ready')
     : t('modals.focusStack.preflight.blocked');
-  const outputReview = buildFocusStackOutputReviewWorkflow({
-    artifactPath: outputReviewArtifactPath,
-    settings,
-    sourceCount,
-  });
+  const outputReview =
+    runtimeOutputReview ??
+    buildFocusStackOutputReviewWorkflow({
+      artifactPath: outputReviewArtifactPath,
+      settings,
+      sourceCount,
+    });
+  const hasRuntimeOutputReview = runtimeOutputReview !== null && runtimeOutputReview !== undefined;
   const outputReviewDecisionLabel = t(`modals.focusStack.review.decision.${outputReview.decision}`);
   const outputReviewWarningsLabel = outputReview.warningCodes
     .map((warningCode) => t(`modals.focusStack.review.warning.${warningCode}`))
     .join(', ');
   const reviewOverlayLabel = t(`modals.focusStack.review.overlayMode.${outputReview.reviewOverlay.mode}.label`);
+  const haloReviewStatusLabel = t(`modals.focusStack.review.haloReviewStatus.${outputReview.haloReview.reviewStatus}`);
+  const editableHandoffStatusLabel = t(
+    `modals.focusStack.review.editableHandoffStatus.${outputReview.editableHandoff.status}`,
+  );
   const sourceContributionLabel = outputReview.reviewOverlay.sourceContributionSummary
     .map((source) =>
       t('modals.focusStack.review.sourceContributionValue', {
@@ -459,7 +469,7 @@ export default function FocusStackModal({
           {
             label: t('modals.focusStack.review.editableArtifact'),
             status: 'review',
-            value: outputReviewDecisionLabel,
+            value: `${outputReviewDecisionLabel} - ${editableHandoffStatusLabel}`,
           },
           {
             label: t('modals.focusStack.review.sharpnessCoverage'),
@@ -471,7 +481,7 @@ export default function FocusStackModal({
           {
             label: t('modals.focusStack.review.transitionRisk'),
             status: 'pending',
-            value: outputReviewWarningsLabel,
+            value: `${haloReviewStatusLabel} - ${outputReviewWarningsLabel}`,
           },
           {
             label: t('modals.focusStack.review.overlay'),
@@ -526,7 +536,7 @@ export default function FocusStackModal({
             rows: [
               {
                 label: t('modals.focusStack.review.editableArtifact'),
-                value: outputReviewDecisionLabel,
+                value: `${outputReviewDecisionLabel} - ${outputReview.editableHandoff.artifactId}`,
               },
               {
                 label: t('modals.focusStack.preflight.retouch'),
@@ -550,7 +560,11 @@ export default function FocusStackModal({
               },
               {
                 label: t('modals.focusStack.review.transitionRisk'),
-                value: outputReviewWarningsLabel,
+                value: `${haloReviewStatusLabel} - ${outputReviewWarningsLabel}`,
+              },
+              {
+                label: t('modals.focusStack.review.exportHandoff'),
+                value: outputReview.editableHandoff.exportReviewArtifactId,
               },
               {
                 label: t('modals.focusStack.review.overlay'),
@@ -567,6 +581,54 @@ export default function FocusStackModal({
           },
         ]}
       />
+
+      <section
+        className="rounded-md border border-border-color bg-bg-primary p-4"
+        data-editable-artifact-hash={outputReview.editableHandoff.artifactHash}
+        data-editable-artifact-id={outputReview.editableHandoff.artifactId}
+        data-editable-handoff-status={outputReview.editableHandoff.status}
+        data-export-review-artifact-id={outputReview.editableHandoff.exportReviewArtifactId}
+        data-halo-artifact-id={outputReview.haloReview.artifactId}
+        data-halo-review-status={outputReview.haloReview.reviewStatus}
+        data-halo-risk-cell-ratio={outputReview.haloRiskCellRatio}
+        data-low-confidence-cell-ratio={outputReview.lowConfidenceCellRatio}
+        data-runtime-output-review={String(hasRuntimeOutputReview)}
+        data-testid="focus-editable-handoff-proof"
+      >
+        <div className="mb-3 flex items-start justify-between gap-4">
+          <div>
+            <UiText variant={TextVariants.heading}>{t('modals.focusStack.review.haloReviewTitle')}</UiText>
+            <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+              {t('modals.focusStack.review.haloReviewSummary', {
+                halo: Math.round(outputReview.haloRiskCellRatio * 100),
+                low: Math.round(outputReview.lowConfidenceCellRatio * 100),
+              })}
+            </UiText>
+          </div>
+          <UiText variant={TextVariants.small} color={TextColors.secondary} className="shrink-0">
+            {editableHandoffStatusLabel}
+          </UiText>
+        </div>
+        <div className="grid gap-2 lg:grid-cols-3">
+          {outputReview.haloReview.transitionRiskRegions.map((region) => (
+            <div
+              className="rounded-md border border-border-color bg-bg-secondary/70 p-3"
+              data-region-cell-count={region.cellCount}
+              data-region-id={region.regionId}
+              data-region-risk={region.risk}
+              data-source-index={region.sourceIndex}
+              key={region.regionId}
+            >
+              <UiText variant={TextVariants.label}>
+                {t(`modals.focusStack.review.haloRegionRisk.${region.risk}`)}
+              </UiText>
+              <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+                {t('modals.focusStack.review.sourceIndexValue', { index: region.sourceIndex + 1 })}
+              </UiText>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {isDepthMapPreviewOnly && (
         <div className="rounded-md border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 flex gap-3">

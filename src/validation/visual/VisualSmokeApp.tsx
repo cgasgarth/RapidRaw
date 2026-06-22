@@ -36,6 +36,7 @@ import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/comp
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
 import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
 
+import type { FocusStackOutputReviewWorkflow } from '../../schemas/focusStackOutputReviewSchemas';
 import type { MaskOverlaySettings } from '../../schemas/maskOverlaySchemas';
 import type { SuperResolutionOutputReviewWorkflow } from '../../schemas/superResolutionOutputReviewSchemas';
 import type { SuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
@@ -77,6 +78,7 @@ interface FocusPrivateRawVisualProof {
   resultReviewArtifact: string;
   resultReviewDataUrl: string;
   sourceCount: string;
+  stackHash: string;
   stackPath: string;
 }
 
@@ -2001,6 +2003,52 @@ function FocusPrivateRawModalReviewSmoke() {
       </main>
     );
   }
+  const sourceCount = Number.parseInt(proof.sourceCount, 10);
+  const outputReview: FocusStackOutputReviewWorkflow = {
+    alignmentMode: settings.alignmentMode,
+    artifactPath: proof.stackPath,
+    blendMethod: settings.blendMethod,
+    decision: 'editable_review_required',
+    editableHandoff: {
+      artifactHash: proof.stackHash,
+      artifactId: proof.stackPath,
+      exportReviewArtifactId: proof.exportReviewArtifact,
+      status: 'review_required',
+    },
+    haloRiskCellRatio: 0.18,
+    haloReview: {
+      artifactId: `${proof.stackPath}:halo-review`,
+      reviewStatus: 'review_required',
+      transitionRiskRegions: [
+        { cellCount: 2, regionId: 'near-flower-edge', risk: 'halo_risk', sourceIndex: 0 },
+        { cellCount: 1, regionId: 'mid-stem-transition', risk: 'low_confidence', sourceIndex: 1 },
+        { cellCount: 1, regionId: 'far-background', risk: 'stable', sourceIndex: 2 },
+      ],
+    },
+    lowConfidenceCellRatio: 0.12,
+    proofLevel: 'synthetic_runtime',
+    qualityPreference: settings.qualityPreference,
+    retouchLayerPolicy: settings.retouchLayerPolicy,
+    reviewOverlay: {
+      confidenceMarginThreshold: 0.12,
+      mode: settings.reviewOverlayMode,
+      opacityPercent: settings.reviewOverlayOpacityPercent,
+      sourceContributionDetails: Array.from({ length: sourceCount }, (_value, sourceIndex) => ({
+        artifactId: `artifact_focus_private_source_${sourceIndex + 1}_contribution`,
+        contributionRatio: Number((1 / sourceCount).toFixed(6)),
+        sourceId: `S${sourceIndex + 1}`,
+        sourceIndex,
+        warningState: 'artifact_review_required',
+      })),
+      sourceContributionSummary: Array.from({ length: sourceCount }, (_value, sourceIndex) => ({
+        sourceIndex,
+        winnerCellRatio: Number((1 / sourceCount).toFixed(6)),
+      })),
+    },
+    sharpnessCoverageRatio: 0.91,
+    sourceCount,
+    warningCodes: ['human_review_required', 'synthetic_runtime_only', 'transition_halo_risk', 'retouch_layer_deferred'],
+  };
 
   return (
     <main
@@ -2017,6 +2065,7 @@ function FocusPrivateRawModalReviewSmoke() {
         data-fixture-id={proof.fixtureId}
         data-preview-requested={String(previewRequested)}
         data-source-count={proof.sourceCount}
+        data-stack-hash={proof.stackHash}
         data-stack-path={proof.stackPath}
         data-testid="focus-private-raw-modal-review-proof"
       />
@@ -2028,9 +2077,10 @@ function FocusPrivateRawModalReviewSmoke() {
           setPreviewRequested(true);
         }}
         onSettingsChange={setSettings}
+        outputReview={outputReview}
         outputReviewArtifactPath={proof.stackPath}
         settings={settings}
-        sourceCount={Number.parseInt(proof.sourceCount, 10)}
+        sourceCount={sourceCount}
       />
     </main>
   );
