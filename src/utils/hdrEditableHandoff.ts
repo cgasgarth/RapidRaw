@@ -18,16 +18,23 @@ const normalizeAssetId = (path: string): string =>
   }`;
 
 export const buildHdrEditableHandoffSummary = ({
+  deghostReviewAccepted,
+  deghostReviewRequired,
   outputPath,
   settings,
   sourcePaths,
 }: {
+  deghostReviewAccepted?: boolean;
+  deghostReviewRequired?: boolean;
   outputPath: string;
   settings: HdrMergeUiSettings;
   sourcePaths: string[];
 }): HdrEditableHandoffSummary =>
   hdrEditableHandoffSummarySchema.parse({
     capabilityLevel: 'runtime_apply_capable',
+    deghosting: settings.deghosting,
+    deghostReviewAccepted: deghostReviewAccepted ?? false,
+    deghostReviewRequired: deghostReviewRequired ?? false,
     editableDerivedAssetId: normalizeAssetId(outputPath),
     mergeStrategy: settings.mergeStrategy,
     outputColorSpace: 'srgb_display_referred_v1',

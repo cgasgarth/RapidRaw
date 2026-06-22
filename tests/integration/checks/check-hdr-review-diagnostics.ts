@@ -40,8 +40,12 @@ const modalSource = readFileSync('src/components/modals/HdrModal.tsx', 'utf8');
 for (const marker of [
   'hdr-review-diagnostics-panel',
   'hdr-review-diagnostic-row',
+  'hdr-deghost-review-gate',
+  'hdr-deghost-motion-overlay',
+  'hdr-deghost-review-approve',
   'data-review-decision={reviewDiagnostics.reviewDecision}',
   'data-warning-severity={reviewDiagnostics.warningSeverity}',
+  'data-review-approved={String(isDeghostReviewApproved)}',
   'data-clipping-risk={reviewDiagnostics.tone.clippingRisk}',
   'data-motion-risk={reviewDiagnostics.deghost.motionRisk}',
   'modals.hdr.reviewDiagnosticsTitle',
@@ -55,6 +59,8 @@ for (const marker of [
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
 for (const key of [
   'reviewDiagnosticsTitle',
+  'deghostReviewTitle',
+  'deghostReviewApproveAction',
   'reviewAlignment',
   'reviewDeghost',
   'reviewTone',

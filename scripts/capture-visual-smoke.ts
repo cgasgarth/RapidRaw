@@ -44,6 +44,7 @@ import {
   focusPrivateRawReviewProofSchema,
   focusUiSettingsProofSchema,
   hdrBracketSourceRolesProofSchema,
+  hdrDeghostReviewGateProofSchema,
   hdrPrivateRawReviewProofSchema,
   hdrReviewWorkspaceProofSchema,
   hdrUiSettingsProofSchema,
@@ -1506,6 +1507,18 @@ async function prepareScenario(page, mode) {
         );
       }
     }
+    const deghostGate = page.getByTestId('hdr-deghost-review-gate');
+    await deghostGate.scrollIntoViewIfNeeded();
+    await page.getByTestId('hdr-deghost-motion-overlay').waitFor({ state: 'visible', timeout: 10_000 });
+    const startButton = page.getByRole('button', { name: 'Start' });
+    if (await startButton.isEnabled()) {
+      throw new Error('HDR deghost review gate should block Start before approval.');
+    }
+    await page.getByTestId('hdr-deghost-review-approve').click();
+    if (!(await startButton.isEnabled())) {
+      throw new Error('HDR deghost review gate should enable Start after approval.');
+    }
+    hdrDeghostReviewGateProofSchema.parse(await deghostGate.evaluate((element) => ({ ...element.dataset })));
     await page.getByTestId('hdr-artifact-handoff').getByText('/tmp/rawengine-hdr-smoke.tif', { exact: true }).waitFor({
       timeout: 10_000,
     });

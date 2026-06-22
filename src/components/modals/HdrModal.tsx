@@ -1,4 +1,4 @@
-import { CheckCircle, Images, XCircle } from 'lucide-react';
+import { CheckCircle, Images, ShieldCheck, XCircle } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -102,6 +102,10 @@ export default function HdrModal({
     isMergeReady,
     settings,
   });
+  const isDeghostReviewRequired = isMergeReady && settings.deghosting !== 'off';
+  const [isDeghostReviewApproved, setIsDeghostReviewApproved] = useState(false);
+  const isDeghostReviewResolved = !isDeghostReviewRequired || isDeghostReviewApproved;
+  const isApplyReady = isMergeReady && isDeghostReviewResolved;
 
   const setSetting = useCallback(
     (patch: Partial<HdrMergeUiSettings>) => {
@@ -151,7 +155,15 @@ export default function HdrModal({
           ? t('modals.hdr.bracketPreflightBlocked')
           : t('modals.hdr.bracketPreflightWarning');
   const handoffSummary =
-    savedPath !== null ? buildHdrEditableHandoffSummary({ outputPath: savedPath, settings, sourcePaths }) : null;
+    savedPath !== null
+      ? buildHdrEditableHandoffSummary({
+          deghostReviewAccepted: isDeghostReviewApproved,
+          deghostReviewRequired: isDeghostReviewRequired,
+          outputPath: savedPath,
+          settings,
+          sourcePaths,
+        })
+      : null;
 
   useEffect(() => {
     if (!isOpen) {
@@ -218,6 +230,9 @@ export default function HdrModal({
             <section
               className="mx-auto mt-4 grid max-w-2xl grid-cols-3 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-left"
               data-capability-level={handoffSummary.capabilityLevel}
+              data-deghost-review-accepted={String(handoffSummary.deghostReviewAccepted)}
+              data-deghost-review-required={String(handoffSummary.deghostReviewRequired)}
+              data-deghosting={handoffSummary.deghosting}
               data-editable-derived-asset-id={handoffSummary.editableDerivedAssetId}
               data-merge-strategy={handoffSummary.mergeStrategy}
               data-output-color-space={handoffSummary.outputColorSpace}
@@ -300,6 +315,26 @@ export default function HdrModal({
             <div className="h-full w-full bg-bg-primary" />
           )}
           <div className="absolute inset-0 bg-linear-to-t from-black/75 via-black/10 to-black/30" />
+          {isDeghostReviewRequired && (
+            <div
+              className="pointer-events-none absolute inset-0"
+              data-motion-risk={reviewDiagnostics.deghost.motionRisk}
+              data-review-approved={String(isDeghostReviewApproved)}
+              data-testid="hdr-deghost-motion-overlay"
+            >
+              {[
+                'left-[18%] top-[22%] h-[22%] w-[24%]',
+                'right-[20%] top-[34%] h-[18%] w-[20%]',
+                'left-[42%] bottom-[20%] h-[16%] w-[28%]',
+              ].map((className, index) => (
+                <div
+                  className={`absolute rounded border border-yellow-300/70 bg-yellow-300/15 shadow-[0_0_20px_rgba(253,224,71,0.25)] ${className}`}
+                  data-testid="hdr-deghost-motion-region"
+                  key={index}
+                />
+              ))}
+            </div>
+          )}
           <div className="absolute bottom-6 left-6 right-6">
             <UiText as="div" variant={TextVariants.title} className="mb-3 flex items-center gap-2 text-white">
               <Images className="h-6 w-6 text-accent" />
@@ -613,6 +648,81 @@ export default function HdrModal({
             </UiText>
           </section>
 
+          {isDeghostReviewRequired && (
+            <section
+              className={`mb-5 rounded-md border p-3 ${
+                isDeghostReviewApproved ? 'border-accent/50 bg-accent/10' : 'border-yellow-500/45 bg-yellow-500/10'
+              }`}
+              data-deghost-level={settings.deghosting}
+              data-motion-risk={reviewDiagnostics.deghost.motionRisk}
+              data-review-approved={String(isDeghostReviewApproved)}
+              data-review-required={String(isDeghostReviewRequired)}
+              data-testid="hdr-deghost-review-gate"
+            >
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <UiText variant={TextVariants.heading}>{t('modals.hdr.deghostReviewTitle')}</UiText>
+                <UiText
+                  as="span"
+                  variant={TextVariants.small}
+                  className={`rounded px-2 py-0.5 ${
+                    isDeghostReviewApproved ? 'bg-accent/15 text-accent' : 'bg-yellow-500/15 text-yellow-200'
+                  }`}
+                >
+                  {isDeghostReviewApproved
+                    ? t('modals.hdr.deghostReviewApproved')
+                    : t('modals.hdr.deghostReviewRequired')}
+                </UiText>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                {[
+                  {
+                    label: t('modals.hdr.deghostReviewMask'),
+                    value: t('modals.hdr.deghostReviewMaskValue'),
+                  },
+                  {
+                    label: t('modals.hdr.deghostReviewMotion'),
+                    value: t(`modals.hdr.reviewRisk.${reviewDiagnostics.deghost.motionRisk}`),
+                  },
+                  {
+                    label: t('modals.hdr.deghostReviewReference'),
+                    value:
+                      bracketPreflight === null
+                        ? t('modals.hdr.bracketPreflightManual')
+                        : t('modals.hdr.deghostReviewReferenceValue', {
+                            value: bracketPreflight.referenceSourceIndex + 1,
+                          }),
+                  },
+                ].map((item) => (
+                  <div className="rounded border border-border-color bg-bg-primary px-2 py-1.5" key={item.label}>
+                    <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                      {item.label}
+                    </UiText>
+                    <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                      {item.value}
+                    </UiText>
+                  </div>
+                ))}
+              </div>
+              <button
+                className={`mt-3 flex w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                  isDeghostReviewApproved
+                    ? 'border-accent bg-accent/15 text-text-primary'
+                    : 'border-border-color bg-bg-primary text-text-secondary hover:bg-card-active'
+                }`}
+                data-testid="hdr-deghost-review-approve"
+                onClick={() => {
+                  setIsDeghostReviewApproved((approved) => !approved);
+                }}
+                type="button"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                {isDeghostReviewApproved
+                  ? t('modals.hdr.deghostReviewApprovedAction')
+                  : t('modals.hdr.deghostReviewApproveAction')}
+              </button>
+            </section>
+          )}
+
           <section className="grid grid-cols-2 gap-4">
             <div>
               <UiText variant={TextVariants.heading} className="mb-2">
@@ -654,6 +764,7 @@ export default function HdrModal({
                       : 'border-border-color bg-surface text-text-secondary hover:bg-card-active'
                   }`}
                   onClick={() => {
+                    setIsDeghostReviewApproved(false);
                     setSetting({ deghosting });
                   }}
                   type="button"
@@ -751,7 +862,7 @@ export default function HdrModal({
         finalImageBase64={finalImageBase64}
         isProcessing={isProcessing}
         isSaving={isSaving}
-        isSourceCountValid={isMergeReady}
+        isSourceCountValid={isApplyReady}
         labels={{
           cancel: t('modals.hdr.cancel'),
           close: t('modals.hdr.close'),

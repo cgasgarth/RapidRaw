@@ -31,6 +31,9 @@ export const hdrEditableSourceRefSchema = z
 export const hdrEditableHandoffSummarySchema = z
   .object({
     capabilityLevel: z.literal('runtime_apply_capable'),
+    deghosting: hdrMergeDeghostingSchema,
+    deghostReviewAccepted: z.boolean(),
+    deghostReviewRequired: z.boolean(),
     editableDerivedAssetId: z.string().min(1),
     mergeStrategy: hdrMergeStrategySchema,
     outputColorSpace: z.literal('srgb_display_referred_v1'),
