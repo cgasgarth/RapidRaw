@@ -17,6 +17,8 @@ export const hdrMergeUiSettingsSchema = z
   .object({
     alignmentMode: hdrMergeAlignmentModeSchema,
     bracketValidation: hdrMergeBracketValidationSchema,
+    deghostConfidenceMapVisible: z.boolean(),
+    deghostRegionIntensityPercent: z.number().int().min(0).max(100),
     deghosting: hdrMergeDeghostingSchema,
     maxPreviewDimensionPx: z.number().int().positive().max(8192),
     mergeStrategy: hdrMergeStrategySchema,
@@ -72,6 +74,8 @@ export type HdrEditableHandoffSummary = z.infer<typeof hdrEditableHandoffSummary
 type HdrToneMappingPresetPatch = Pick<
   HdrMergeUiSettings,
   | 'deghosting'
+  | 'deghostConfidenceMapVisible'
+  | 'deghostRegionIntensityPercent'
   | 'maxPreviewDimensionPx'
   | 'mergeStrategy'
   | 'qualityPreference'
@@ -89,6 +93,8 @@ export const HDR_TONE_MAPPING_PRESETS: Array<{
     labelKey: 'modals.hdr.toneMappingPreset.natural',
     patch: {
       deghosting: 'medium',
+      deghostConfidenceMapVisible: false,
+      deghostRegionIntensityPercent: 65,
       maxPreviewDimensionPx: 2400,
       mergeStrategy: 'scene_linear_radiance',
       qualityPreference: 'balanced',
@@ -101,6 +107,8 @@ export const HDR_TONE_MAPPING_PRESETS: Array<{
     labelKey: 'modals.hdr.toneMappingPreset.highlightDetail',
     patch: {
       deghosting: 'high',
+      deghostConfidenceMapVisible: false,
+      deghostRegionIntensityPercent: 85,
       maxPreviewDimensionPx: 4096,
       mergeStrategy: 'scene_linear_radiance',
       qualityPreference: 'best',
@@ -113,6 +121,8 @@ export const HDR_TONE_MAPPING_PRESETS: Array<{
     labelKey: 'modals.hdr.toneMappingPreset.interiorLift',
     patch: {
       deghosting: 'medium',
+      deghostConfidenceMapVisible: false,
+      deghostRegionIntensityPercent: 70,
       maxPreviewDimensionPx: 4096,
       mergeStrategy: 'exposure_fusion_preview',
       qualityPreference: 'balanced',
@@ -125,6 +135,8 @@ export const HDR_TONE_MAPPING_PRESETS: Array<{
     labelKey: 'modals.hdr.toneMappingPreset.fastPreview',
     patch: {
       deghosting: 'low',
+      deghostConfidenceMapVisible: false,
+      deghostRegionIntensityPercent: 45,
       maxPreviewDimensionPx: 2400,
       mergeStrategy: 'exposure_fusion_preview',
       qualityPreference: 'preview',
@@ -137,6 +149,8 @@ export const HDR_TONE_MAPPING_PRESETS: Array<{
 export const DEFAULT_HDR_MERGE_UI_SETTINGS = hdrMergeUiSettingsSchema.parse({
   alignmentMode: 'auto',
   bracketValidation: 'required',
+  deghostConfidenceMapVisible: false,
+  deghostRegionIntensityPercent: 65,
   deghosting: 'medium',
   maxPreviewDimensionPx: 2400,
   mergeStrategy: 'scene_linear_radiance',

@@ -3061,6 +3061,8 @@ export const computationalMergeCommandEnvelopeV1Schema = z
             ...computationalMergeAcceptedDryRunSchema.shape,
             alignmentMode: computationalMergeAlignmentModeV1Schema,
             bracketValidation: z.enum(['required', 'warn', 'disabled']),
+            deghostConfidenceMapVisible: z.boolean().default(false),
+            deghostRegionIntensityPercent: z.number().int().min(0).max(100).default(65),
             deghosting: z.enum(['off', 'low', 'medium', 'high']),
             maxPreviewDimensionPx: z.number().int().positive().max(8192),
             mergeStrategy: z.enum(['scene_linear_radiance', 'exposure_fusion_preview']),
@@ -3500,10 +3502,12 @@ export const hdrMaskArtifactV1Schema = z
 
 export const hdrDeghostingSummaryV1Schema = z
   .object({
+    confidenceMapVisible: z.boolean().optional(),
     masks: z.array(hdrMaskArtifactV1Schema),
     motionCoverageRatio: z.number().min(0).max(1),
     motionRisk: hdrMotionRiskV1Schema,
     referenceSourceIndex: z.number().int().nonnegative(),
+    regionIntensityPercent: z.number().int().min(0).max(100).optional(),
     requestedDeghosting: hdrDeghostingModeV1Schema,
     resolvedDeghosting: hdrDeghostingModeV1Schema,
   })

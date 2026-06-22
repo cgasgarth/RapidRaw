@@ -1540,6 +1540,8 @@ async function prepareScenario(page, mode) {
 
   if (mode === 'hdr-ui') {
     await page.getByTestId('hdr-tone-mapping-preset-highlight_detail').click();
+    await page.getByTestId('hdr-deghost-confidence-map-toggle').click();
+    await page.getByTestId('hdr-deghost-region-intensity').getByRole('button', { name: '85%' }).click();
     hdrUiSettingsProofSchema.parse(
       await page.getByTestId('hdr-ui-settings-proof').evaluate((element) => ({ ...element.dataset })),
     );

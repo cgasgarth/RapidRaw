@@ -2,7 +2,12 @@ import { z } from 'zod';
 
 import { estimateHdrAlignmentTransformsV1 } from './hdrAlignmentRuntime.js';
 import { detectHdrBracketV1, type HdrBracketDetectionSourceInputV1 } from './hdrBracketDetection.js';
-import { buildHdrDeghostConfidenceMapV1, countHdrMotionPixelsV1, detectHdrMotionMaskV1 } from './hdrDeghostRuntime.js';
+import {
+  buildHdrDeghostConfidenceMapV1,
+  countHdrMotionPixelsV1,
+  detectHdrMotionMaskV1,
+  summarizeHdrDeghostConfidenceMapV1,
+} from './hdrDeghostRuntime.js';
 import { mergeExposureWeightedRadianceV1 } from './hdrMergeWeightingRuntime.js';
 import {
   RAW_ENGINE_SCHEMA_VERSION,
@@ -75,6 +80,15 @@ export const hdrRuntimeProvenanceV1Schema = z
       )
       .min(2),
     deghosting: z.enum(['off', 'low', 'medium', 'high']),
+    deghostConfidenceMap: z
+      .object({
+        averageConfidence: z.number().min(0).max(1),
+        maxConfidence: z.number().min(0).max(1),
+        motionCoverageRatio: z.number().min(0).max(1),
+        visible: z.boolean(),
+      })
+      .strict(),
+    deghostRegionIntensityPercent: z.number().int().min(0).max(100),
     derivedSourceReview: z
       .object({
         blockCodes: z.array(z.string().trim().min(1)),
@@ -148,7 +162,11 @@ export const buildHdrRuntimeDryRunV1 = (requestValue: unknown): HdrRuntimeDryRun
   const request = parseHdrRuntimePlanRequest(requestValue, true);
   const runtime = renderHdrRuntimePixels(request);
   const planId = `hdr_plan_${request.command.commandId}`;
-  const planHash = `sha256:${stableHdrRuntimeHash(`${planId}:${runtime.provenance.alignmentMode}:${runtime.provenance.deghosting}`)}`;
+  const planHash = `sha256:${stableHdrRuntimeHash(
+    `${planId}:${runtime.provenance.alignmentMode}:${runtime.provenance.deghosting}:${
+      runtime.provenance.deghostRegionIntensityPercent
+    }:${String(runtime.provenance.deghostConfidenceMap.visible)}`,
+  )}`;
   const renderedContentHash = hashHdrRuntimePixels(runtime.mergedPixels);
   const previewArtifacts = [
     {
@@ -336,10 +354,12 @@ const buildHdrRuntimeSidecarArtifact = ({
     bracketDetection,
     createdAt,
     deghosting: {
+      confidenceMapVisible: provenance.deghostConfidenceMap.visible,
       masks: [],
       motionCoverageRatio: provenance.motionCoverageRatio,
       motionRisk: motionRiskForCoverage(provenance.motionCoverageRatio),
       referenceSourceIndex: provenance.referenceSourceIndex,
+      regionIntensityPercent: provenance.deghostRegionIntensityPercent,
       requestedDeghosting: provenance.deghosting,
       resolvedDeghosting: provenance.deghosting,
     },
@@ -466,8 +486,15 @@ const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
   };
   const motionMask = detectHdrMotionMaskV1(deghostRequest);
   const motionConfidenceMap = buildHdrDeghostConfidenceMapV1(deghostRequest);
+  const deghostConfidenceMap = summarizeHdrDeghostConfidenceMapV1(motionConfidenceMap, motionMask);
   const motionCoverageRatio = countHdrMotionPixelsV1(motionMask) / motionMask.length;
-  applyReferencePixelsInMotionRegions(mergedPixels, alignedFrames, motionMask, referenceSourceIndex);
+  applyReferencePixelsInMotionRegions(
+    mergedPixels,
+    alignedFrames,
+    motionMask,
+    referenceSourceIndex,
+    request.command.parameters.deghostRegionIntensityPercent,
+  );
   const warnings = deriveRuntimeWarnings(
     alignment.alignmentConfidence,
     motionCoverageRatio,
@@ -489,6 +516,11 @@ const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
       alignmentMode: request.command.parameters.alignmentMode,
       alignmentTransforms: alignment.transforms,
       deghosting: request.command.parameters.deghosting,
+      deghostConfidenceMap: {
+        ...deghostConfidenceMap,
+        visible: request.command.parameters.deghostConfidenceMapVisible,
+      },
+      deghostRegionIntensityPercent: request.command.parameters.deghostRegionIntensityPercent,
       derivedSourceReview: buildHdrDerivedSourceReview(request, alignment.alignmentConfidence, motionCoverageRatio),
       engineId: HDR_RUNTIME_ENGINE_ID,
       engineVersion: HDR_RUNTIME_ENGINE_VERSION,
@@ -609,15 +641,18 @@ const applyReferencePixelsInMotionRegions = (
   frames: HdrRuntimeFrameV1[],
   motionMask: Uint8Array,
   referenceSourceIndex: number,
+  regionIntensityPercent: number,
 ): void => {
   const referenceFrame = frames.find((frame) => frame.sourceIndex === referenceSourceIndex);
   if (referenceFrame === undefined) {
     throw new Error('HDR runtime plan reference frame was not found.');
   }
 
+  const referenceBlendRatio = regionIntensityPercent / 100;
   for (let index = 0; index < motionMask.length; index += 1) {
     if (motionMask[index] !== 1) continue;
-    mergedPixels[index] = (referenceFrame.pixels[index] ?? 0) / 2 ** referenceFrame.exposureEv;
+    const referencePixel = (referenceFrame.pixels[index] ?? 0) / 2 ** referenceFrame.exposureEv;
+    mergedPixels[index] = (mergedPixels[index] ?? 0) * (1 - referenceBlendRatio) + referencePixel * referenceBlendRatio;
   }
 };
 

@@ -31,6 +31,8 @@ const frames = BRACKETS.map((bracket) => ({
 const controls = {
   alignmentMode: 'translation',
   bracketValidation: 'required',
+  deghostConfidenceMapVisible: true,
+  deghostRegionIntensityPercent: 85,
   deghosting: 'high',
   maxPreviewDimensionPx: 1200,
   mergeStrategy: 'scene_linear_radiance',
@@ -87,6 +89,15 @@ if (dryRunCommand.parameters.toneMappingPreset !== 'highlight_detail') {
 }
 if (applyCommand.parameters.toneMappingPreset !== 'highlight_detail') {
   throw new Error('HDR UI runtime bridge did not preserve the tone-mapping preset in apply parameters.');
+}
+if (!applied.apply.provenance.deghostConfidenceMap.visible) {
+  throw new Error('HDR UI runtime bridge did not expose the requested deghost confidence map.');
+}
+if (applied.apply.provenance.deghostRegionIntensityPercent !== 85) {
+  throw new Error('HDR UI runtime bridge did not preserve deghost region intensity.');
+}
+if (applied.apply.sidecarArtifact.deghosting.regionIntensityPercent !== 85) {
+  throw new Error('HDR UI runtime bridge did not write deghost region intensity to the sidecar.');
 }
 
 expectThrows('mismatched accepted HDR UI runtime plan', () =>

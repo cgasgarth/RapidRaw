@@ -2995,6 +2995,8 @@ function HdrVisualSmoke() {
         data-bracket-span-ev={bracketPreflight?.bracketSpanEv ?? ''}
         data-bracket-validation={hdrSettings.bracketValidation}
         data-command={copy.hdrDryRunTool}
+        data-deghost-confidence-map-visible={String(hdrSettings.deghostConfidenceMapVisible)}
+        data-deghost-region-intensity-percent={hdrSettings.deghostRegionIntensityPercent}
         data-deghosting={hdrSettings.deghosting}
         data-estimated-preview-megapixels={Math.round((3 * hdrSettings.maxPreviewDimensionPx ** 2) / 1_000_000)}
         data-max-preview-dimension-px={hdrSettings.maxPreviewDimensionPx}
@@ -3008,6 +3010,8 @@ function HdrVisualSmoke() {
       <div
         className="sr-only"
         data-deghosting={hdrSettings.deghosting}
+        data-deghost-confidence-map-visible={String(hdrSettings.deghostConfidenceMapVisible)}
+        data-deghost-region-intensity-percent={hdrSettings.deghostRegionIntensityPercent}
         data-max-preview-dimension-px={hdrSettings.maxPreviewDimensionPx}
         data-merge-strategy={hdrSettings.mergeStrategy}
         data-quality-preference={hdrSettings.qualityPreference}

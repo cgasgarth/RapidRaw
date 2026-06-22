@@ -26,6 +26,8 @@ export const hdrMergeUiControlsV1Schema = z
   .object({
     alignmentMode: z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']).default('auto'),
     bracketValidation: z.enum(['required', 'warn', 'disabled']).default('required'),
+    deghostConfidenceMapVisible: z.boolean().default(false),
+    deghostRegionIntensityPercent: z.number().int().min(0).max(100).default(65),
     deghosting: z.enum(['off', 'low', 'medium', 'high']).default('medium'),
     maxPreviewDimensionPx: z.number().int().positive().max(8192).default(2400),
     mergeStrategy: z.enum(['scene_linear_radiance', 'exposure_fusion_preview']).default('scene_linear_radiance'),
@@ -82,6 +84,8 @@ export const buildHdrMergeUiDryRunCommandV1 = (
     parameters: {
       alignmentMode: controls.alignmentMode,
       bracketValidation: controls.bracketValidation,
+      deghostConfidenceMapVisible: controls.deghostConfidenceMapVisible,
+      deghostRegionIntensityPercent: controls.deghostRegionIntensityPercent,
       deghosting: controls.deghosting,
       maxPreviewDimensionPx: controls.maxPreviewDimensionPx,
       mergeStrategy: controls.mergeStrategy,
@@ -130,6 +134,8 @@ export const buildHdrMergeUiApplyCommandV1 = (
       acceptedDryRunPlanId: context.acceptedDryRunPlanId,
       alignmentMode: controls.alignmentMode,
       bracketValidation: controls.bracketValidation,
+      deghostConfidenceMapVisible: controls.deghostConfidenceMapVisible,
+      deghostRegionIntensityPercent: controls.deghostRegionIntensityPercent,
       deghosting: controls.deghosting,
       maxPreviewDimensionPx: controls.maxPreviewDimensionPx,
       mergeStrategy: controls.mergeStrategy,

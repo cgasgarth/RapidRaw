@@ -15,8 +15,10 @@ export const hdrReviewDiagnosticsSchema = z
       .strict(),
     deghost: z
       .object({
+        confidenceMapVisible: z.boolean(),
         level: z.enum(['off', 'low', 'medium', 'high']),
         motionRisk: z.enum(['none', 'low', 'medium', 'high']),
+        regionIntensityPercent: z.number().int().min(0).max(100),
         status: hdrReviewMetricStatusSchema,
       })
       .strict(),
