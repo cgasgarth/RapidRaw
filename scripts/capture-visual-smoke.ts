@@ -1877,6 +1877,16 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('skin-tone-uniformity-ui-proof').getByText('Skin 0.725', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    const skinToneInspector = await colorPanel
+      .getByTestId('skin-tone-uniformity-controls')
+      .evaluate((element) => ({ ...element.dataset }));
+    if (
+      Number.parseFloat(skinToneInspector.inspectorImprovement ?? '0') <= 0 ||
+      Number.parseFloat(skinToneInspector.inspectorDistanceAfter ?? '1') >=
+        Number.parseFloat(skinToneInspector.inspectorDistanceBefore ?? '0')
+    ) {
+      throw new Error('Skin-tone uniformity inspector did not prove measured improvement.');
+    }
     return;
   }
 
