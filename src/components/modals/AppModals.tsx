@@ -326,6 +326,7 @@ export default function AppModals(props: AppModalsProps) {
               lastDryRunCommand: {
                 commandType: 'computationalMerge.createFocusStack',
                 dryRun: true,
+                haloSuppressionStrengthPercent: focusStackModalState.settings.haloSuppressionStrengthPercent,
                 sources: focusStackModalState.sourcePaths.length,
                 toolName: getComputationalMergeAppServerRoutePairSummary('focus_stack').dryRunToolName,
               },

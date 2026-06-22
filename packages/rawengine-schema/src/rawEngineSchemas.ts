@@ -3098,6 +3098,7 @@ export const computationalMergeCommandEnvelopeV1Schema = z
             ...computationalMergeAcceptedDryRunSchema.shape,
             alignmentMode: computationalMergeAlignmentModeV1Schema,
             blendMethod: z.enum(['depth_map', 'laplacian_pyramid', 'weighted_sharpness']),
+            haloSuppressionStrengthPercent: z.number().int().min(0).max(100).optional(),
             maxPreviewDimensionPx: z.number().int().positive().max(8192),
             memoryBudgetBytes: z.number().int().positive().optional(),
             outputName: z.string().trim().min(1),

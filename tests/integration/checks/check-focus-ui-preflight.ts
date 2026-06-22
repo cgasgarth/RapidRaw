@@ -11,6 +11,10 @@ const requiredLocaleKeys = [
   'preflight.retouch',
   'preflight.workload',
   'preflight.memory',
+  'haloSuppressionLabel',
+  'haloSuppressionOff',
+  'haloSuppressionOn',
+  'haloSuppressionValue',
   'previewMemoryValue',
   'previewWorkloadValue',
   'qualityBalanced',
@@ -42,6 +46,9 @@ for (const marker of [
   'data-preview-source-count={sourceCount}',
   'modals.focusStack.preflight.workload',
   'modals.focusStack.previewWorkloadValue',
+  'focus-halo-suppression-controls',
+  'data-halo-suppression-strength-percent={settings.haloSuppressionStrengthPercent}',
+  'data-halo-risk-cell-ratio={outputReview.haloRiskCellRatio}',
 ]) {
   if (!source.includes(marker)) {
     console.error(`Focus preflight missing marker: ${marker}`);

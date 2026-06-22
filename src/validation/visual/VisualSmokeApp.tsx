@@ -40,6 +40,7 @@ import { agentChatTranscriptFixture } from '../../utils/agentChatTranscriptFixtu
 import { applyColorBalanceRgbToPixel } from '../../utils/colorBalanceRgbRuntime';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
 import { DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF } from '../../utils/detailOutputComparisonProof';
+import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
 import { applyLayerStackCommandBridgeOperation } from '../../utils/layerStackCommandBridge';
 import { handleNegativeConversionEditorHandoff } from '../../utils/negativeLabEditorHandoff';
@@ -1870,6 +1871,11 @@ function CommandPaletteWorkflowSmoke() {
 
 function FocusStackVisualSmoke() {
   const [settings, setSettings] = useState<FocusStackUiSettings>(DEFAULT_FOCUS_STACK_UI_SETTINGS);
+  const outputReview = buildFocusStackOutputReviewWorkflow({
+    artifactPath: copy.focusArtifactPath,
+    settings,
+    sourceCount: 6,
+  });
 
   return (
     <main
@@ -1888,9 +1894,10 @@ function FocusStackVisualSmoke() {
           data-decision={settings.blendMethod === 'depth_map' ? 'preview_only' : 'editable_review_required'}
           data-depth-mode={settings.blendMethod}
           data-estimated-preview-megapixels={Math.round((6 * settings.maxPreviewDimensionPx ** 2) / 1_000_000)}
-          data-halo-risk-cell-ratio="0.14"
+          data-halo-risk-cell-ratio={outputReview.haloRiskCellRatio}
           data-halo-policy="flattened_preview"
-          data-low-confidence-cell-ratio="0.08"
+          data-halo-suppression-strength-percent={settings.haloSuppressionStrengthPercent}
+          data-low-confidence-cell-ratio={outputReview.lowConfidenceCellRatio}
           data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
           data-proof-level="synthetic_runtime"
           data-quality-preference={settings.qualityPreference}
@@ -1913,6 +1920,7 @@ function FocusStackVisualSmoke() {
           className="sr-only"
           data-alignment-mode={settings.alignmentMode}
           data-blend-method={settings.blendMethod}
+          data-halo-suppression-strength-percent={settings.haloSuppressionStrengthPercent}
           data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
           data-quality-preference={settings.qualityPreference}
           data-review-overlay-mode={settings.reviewOverlayMode}
@@ -1932,6 +1940,7 @@ function FocusStackVisualSmoke() {
           onClose={() => {}}
           onPreviewPlan={() => {}}
           onSettingsChange={setSettings}
+          outputReview={outputReview}
           settings={settings}
           sourceCount={6}
         />

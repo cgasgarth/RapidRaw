@@ -15,6 +15,7 @@ export const focusStackUiSettingsSchema = z
   .object({
     alignmentMode: focusStackAlignmentModeSchema,
     blendMethod: focusStackBlendMethodSchema,
+    haloSuppressionStrengthPercent: z.number().int().min(0).max(100),
     maxPreviewDimensionPx: z.number().int().positive().max(8192),
     qualityPreference: focusStackQualityPreferenceSchema,
     reviewOverlayMode: focusStackReviewOverlayModeSchema,
@@ -34,6 +35,7 @@ export type FocusStackRetouchLayerPolicy = z.infer<typeof focusStackRetouchLayer
 export const DEFAULT_FOCUS_STACK_UI_SETTINGS = focusStackUiSettingsSchema.parse({
   alignmentMode: 'auto',
   blendMethod: 'laplacian_pyramid',
+  haloSuppressionStrengthPercent: 0,
   maxPreviewDimensionPx: 2400,
   qualityPreference: 'best',
   reviewOverlayMode: 'sharpness_map',

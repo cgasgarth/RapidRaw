@@ -26,6 +26,8 @@ for (const marker of [
   'modals.focusStack.preflight.previewBudget',
   'settings.maxPreviewDimensionPx',
   'modals.focusStack.preflight.blend',
+  'modals.focusStack.haloSuppressionLabel',
+  'modals.focusStack.haloSuppressionValue',
   'modals.focusStack.review.decision',
   'modals.focusStack.review.editableArtifact',
   'modals.focusStack.review.editableHandoffStatus',
@@ -50,6 +52,8 @@ for (const marker of [
   'data-export-review-artifact-id={outputReview.editableHandoff.exportReviewArtifactId}',
   'data-halo-review-status={outputReview.haloReview.reviewStatus}',
   'focus-sharpness-overlay-controls',
+  'focus-halo-suppression-controls',
+  'settings.haloSuppressionStrengthPercent',
   'settings.reviewOverlayMode',
   'settings.reviewOverlayOpacityPercent',
 ]) {
@@ -63,6 +67,7 @@ for (const marker of [
   'artifact.haloReview',
   'editableHandoff',
   'transitionRiskRegions',
+  'settings.haloSuppressionStrengthPercent',
 ]) {
   if (!reviewSource.includes(marker)) {
     failures.push(`Focus output review adapter missing ${marker}.`);

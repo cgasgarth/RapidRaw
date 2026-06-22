@@ -98,6 +98,7 @@ export interface FocusStackModalState {
   lastDryRunCommand?: {
     commandType: 'computationalMerge.createFocusStack';
     dryRun: true;
+    haloSuppressionStrengthPercent: number;
     sources: number;
     toolName: string;
   };

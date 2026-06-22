@@ -438,6 +438,7 @@ export const panoramaPrivateRawReviewProofSchema = z.object({
 export const focusUiSettingsProofSchema = z.object({
   alignmentMode: z.literal('homography'),
   blendMethod: z.literal('depth_map'),
+  haloSuppressionStrengthPercent: z.literal('80'),
   maxPreviewDimensionPx: z.literal('8192'),
   qualityPreference: z.literal('preview'),
   reviewOverlayMode: z.literal('halo_risk'),
@@ -451,8 +452,9 @@ export const focusReviewWorkspaceProofSchema = z.object({
   decision: z.literal('preview_only'),
   depthMode: z.literal('depth_map'),
   estimatedPreviewMegapixels: z.literal('403'),
-  haloRiskCellRatio: z.literal('0.14'),
+  haloRiskCellRatio: z.literal('0.07'),
   haloPolicy: z.literal('flattened_preview'),
+  haloSuppressionStrengthPercent: z.literal('80'),
   lowConfidenceCellRatio: z.literal('0.08'),
   proofLevel: z.literal('synthetic_runtime'),
   reviewOverlayMode: z.literal('halo_risk'),
