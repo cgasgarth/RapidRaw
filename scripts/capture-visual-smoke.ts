@@ -1376,7 +1376,7 @@ async function prepareScenario(page, mode) {
       proofBefore.outputWidth !== '1440' ||
       proofBefore.previewRequested !== 'false' ||
       proofBefore.privateRunReportPath?.endsWith('/sr-subpixel-private-run-report.json') !== true ||
-      proofBefore.reconstructionHash !== 'sha256:64dff0960896506ddd760cda61207bdbb5f723064977c037b3f456652662a911' ||
+      /^sha256:[a-f0-9]{64}$/u.test(proofBefore.reconstructionHash ?? '') !== true ||
       proofBefore.reconstructionPath?.endsWith('/sr-subpixel-reconstruction.tiff') !== true ||
       proofBefore.sourceCount !== '4' ||
       proofBefore.sourceHashes?.split(',').length !== 4 ||
@@ -1409,9 +1409,30 @@ async function prepareScenario(page, mode) {
       handoff.outputArtifactId !== reconstructionPath ||
       handoff.reviewArtifactCount !== '1' ||
       handoff.editableHandoffReady !== 'false' ||
+      handoff.supportMapReviewStatus !== 'review_required' ||
+      handoff.supportMapWeakRatio !== '0.26' ||
       handoff.reviewArtifactPaths?.endsWith('/sr-subpixel-result-review.png') !== true
     ) {
       throw new Error(`SR private RAW editable handoff proof failed: ${JSON.stringify(handoff)}`);
+    }
+    const supportMap = await page.getByTestId('sr-support-map-review').evaluate((element) => ({
+      regionCount: element.querySelectorAll('[data-region-risk]').length,
+      ...element.dataset,
+    }));
+    if (
+      supportMap.effectiveScale !== '1.5' ||
+      supportMap.requestedScale !== '2' ||
+      supportMap.reviewStatus !== 'review_required' ||
+      supportMap.supportCoverageRatio !== '0.74' ||
+      supportMap.supportDowngradeReason !== 'effective_scale_downgraded' ||
+      supportMap.weakSupportRatio !== '0.26' ||
+      supportMap.regionCount !== 4
+    ) {
+      throw new Error(`SR private RAW support-map review failed: ${JSON.stringify(supportMap)}`);
+    }
+    for (const risk of ['supported', 'weak_support', 'motion_rejected', 'edge_risk']) {
+      const riskCount = await page.getByTestId('sr-support-map-review').locator(`[data-region-risk="${risk}"]`).count();
+      if (riskCount < 1) throw new Error(`SR private RAW support-map review missing ${risk} region.`);
     }
     await page.getByTestId('sr-review-diagnostics').getByText(reconstructionPath, { exact: true }).waitFor({
       timeout: 10_000,

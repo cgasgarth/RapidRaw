@@ -4160,6 +4160,18 @@ export const superResolutionArtifactV1Schema = z
     outputArtifact: artifactHandleV1Schema,
     outputColorSpace: z.string().trim().min(1),
     previewArtifacts: z.array(artifactHandleV1Schema),
+    supportMap: z
+      .object({
+        artifactId: z.string().trim().min(1),
+        coverageRatio: z.number().min(0).max(1),
+        downgradeReason: z.string().trim().min(1).optional(),
+        effectiveScale: z.number().min(1).max(4),
+        requestedScale: z.number().min(1.1).max(4),
+        reviewStatus: z.enum(['apply_ready', 'blocked', 'review_required']),
+        weakSupportRatio: z.number().min(0).max(1),
+      })
+      .strict()
+      .optional(),
     qualityPreference: computationalMergeQualityPreferenceV1Schema,
     requestedAlignmentMode: computationalMergeAlignmentModeV1Schema,
     requestedOutputScale: z.number().min(1.1).max(4),

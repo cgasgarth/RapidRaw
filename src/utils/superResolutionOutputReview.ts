@@ -21,6 +21,15 @@ type SuperResolutionArtifactReviewInput = {
   staleState: {
     state: SuperResolutionOutputReviewWorkflow['staleState'];
   };
+  supportMap?: {
+    artifactId: string;
+    coverageRatio: number;
+    downgradeReason?: 'effective_scale_downgraded';
+    effectiveScale: number;
+    requestedScale: number;
+    reviewStatus: 'apply_ready' | 'blocked' | 'review_required';
+    weakSupportRatio: number;
+  };
   validationSummary: {
     alignmentConfidence?: number;
     expectedDetailGainRatio?: number;
@@ -104,6 +113,25 @@ export const buildSuperResolutionOutputReviewFromArtifact = (
     reviewPacketPath,
     sourceCount: artifactValue.validationSummary.sourceCount,
     staleState: artifactValue.staleState.state,
+    supportMap:
+      artifactValue.supportMap === undefined
+        ? buildSupportMapReview({
+            artifactId: `${artifactValue.outputArtifact.artifactId}:support-map`,
+            coverageRatio: artifactValue.validationSummary.overlapCoverageRatio ?? null,
+            detailPolicy: artifactValue.detailPolicy,
+            effectiveScale:
+              artifactValue.validationSummary.expectedDetailGainRatio ?? artifactValue.requestedOutputScale,
+            requestedScale: artifactValue.requestedOutputScale,
+            warningCodes: artifactValue.warningCodes,
+          })
+        : buildSupportMapReview({
+            artifactId: artifactValue.supportMap.artifactId,
+            coverageRatio: artifactValue.supportMap.coverageRatio,
+            detailPolicy: artifactValue.detailPolicy,
+            effectiveScale: artifactValue.supportMap.effectiveScale,
+            requestedScale: artifactValue.supportMap.requestedScale,
+            warningCodes: artifactValue.warningCodes,
+          }),
     warningCodes: artifactValue.warningCodes,
   });
 };
@@ -150,8 +178,76 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
     reviewPacketPath,
     sourceCount,
     staleState: 'unknown',
+    supportMap: buildSupportMapReview({
+      artifactId: `${artifactPath}:support-map`,
+      coverageRatio: null,
+      detailPolicy: settings.detailPolicy,
+      effectiveScale: settings.outputScale,
+      requestedScale: settings.outputScale,
+      warningCodes,
+    }),
     warningCodes,
   });
+};
+
+const buildSupportMapReview = ({
+  artifactId,
+  coverageRatio,
+  detailPolicy,
+  effectiveScale,
+  requestedScale,
+  warningCodes,
+}: {
+  artifactId: string;
+  coverageRatio: number | null;
+  detailPolicy: SuperResolutionUiSettings['detailPolicy'];
+  effectiveScale: number;
+  requestedScale: number;
+  warningCodes: SuperResolutionOutputReviewWorkflow['warningCodes'];
+}): SuperResolutionOutputReviewWorkflow['supportMap'] => {
+  const resolvedCoverageRatio = coverageRatio ?? (detailPolicy === 'conservative' ? 0.75 : 0.58);
+  const weakSupportRatio = Number(Math.max(0, 1 - resolvedCoverageRatio).toFixed(3));
+  const downgradeReason = warningCodes.includes('effective_scale_downgraded') ? 'effective_scale_downgraded' : null;
+  const reviewStatus =
+    warningCodes.includes('texture_risk') || weakSupportRatio > 0.25 || downgradeReason !== null
+      ? 'review_required'
+      : 'apply_ready';
+
+  return {
+    artifactId,
+    coverageRatio: Number(resolvedCoverageRatio.toFixed(3)),
+    downgradeReason,
+    effectiveScale,
+    regions: [
+      {
+        coverageRatio: Number(Math.max(0, resolvedCoverageRatio - 0.08).toFixed(3)),
+        label: 'center detail',
+        regionId: 'center-detail',
+        risk: 'supported',
+      },
+      {
+        coverageRatio: Number(Math.max(0, resolvedCoverageRatio - 0.22).toFixed(3)),
+        label: 'high frequency edge',
+        regionId: 'high-frequency-edge',
+        risk: weakSupportRatio > 0.2 ? 'weak_support' : 'supported',
+      },
+      {
+        coverageRatio: Number(Math.max(0, resolvedCoverageRatio - 0.36).toFixed(3)),
+        label: 'motion boundary',
+        regionId: 'motion-boundary',
+        risk: warningCodes.includes('texture_risk') ? 'motion_rejected' : 'edge_risk',
+      },
+      {
+        coverageRatio: Number(Math.max(0, resolvedCoverageRatio - 0.3).toFixed(3)),
+        label: 'output edge',
+        regionId: 'output-edge',
+        risk: 'edge_risk',
+      },
+    ],
+    requestedScale,
+    reviewStatus,
+    weakSupportRatio,
+  };
 };
 
 const deriveDecision = (

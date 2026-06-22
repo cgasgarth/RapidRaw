@@ -12,6 +12,7 @@ export const superResolutionOutputReviewDecisionSchema = z.enum(['human_review_r
 export const superResolutionOutputReviewWarningSchema = z.enum([
   'effective_scale_downgraded',
   'human_review_required',
+  'low_overlap_coverage',
   'synthetic_runtime_only',
   'texture_risk',
   'aggressive_preview_only',
@@ -37,6 +38,17 @@ export const superResolutionOutputReviewArtifactSchema = z
     publicRepoAllowed: z.boolean(),
   })
   .strict();
+
+export const superResolutionSupportMapRegionSchema = z
+  .object({
+    coverageRatio: z.number().min(0).max(1),
+    label: z.string().trim().min(1),
+    regionId: z.string().trim().min(1),
+    risk: z.enum(['edge_risk', 'motion_rejected', 'supported', 'weak_support']),
+  })
+  .strict();
+
+export const superResolutionSupportMapDowngradeReasonSchema = z.literal('effective_scale_downgraded');
 
 export const superResolutionOutputReviewWorkflowSchema = z
   .object({
@@ -72,6 +84,18 @@ export const superResolutionOutputReviewWorkflowSchema = z
     reviewPacketPath: z.string().min(1),
     sourceCount: z.number().int().min(2),
     staleState: superResolutionOutputReviewStaleStateSchema,
+    supportMap: z
+      .object({
+        artifactId: z.string().trim().min(1),
+        coverageRatio: z.number().min(0).max(1),
+        downgradeReason: superResolutionSupportMapDowngradeReasonSchema.nullable(),
+        effectiveScale: z.number().min(1).max(4),
+        regions: z.array(superResolutionSupportMapRegionSchema).min(1),
+        requestedScale: z.number().min(1.1).max(4),
+        reviewStatus: z.enum(['apply_ready', 'blocked', 'review_required']),
+        weakSupportRatio: z.number().min(0).max(1),
+      })
+      .strict(),
     warningCodes: z.array(superResolutionOutputReviewWarningSchema),
   })
   .strict();

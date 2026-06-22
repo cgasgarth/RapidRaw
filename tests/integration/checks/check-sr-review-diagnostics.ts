@@ -54,11 +54,20 @@ for (const marker of [
   'modals.superResolution.review.reviewPacket',
   'modals.superResolution.review.provenance',
   'modals.superResolution.review.sourceSupport',
+  'modals.superResolution.review.supportMap',
+  'modals.superResolution.review.supportMapCoverage',
+  'modals.superResolution.review.supportMapRisk',
+  'modals.superResolution.review.supportMapStatus',
+  'modals.superResolution.review.supportMapTitle',
+  'modals.superResolution.review.supportMapWeak',
   'modals.superResolution.review.warning',
   'hasRuntimeOutputReview',
   'isEditableHandoffReady',
   'sr-editable-handoff-proof',
   'data-editable-handoff-ready={String(isEditableHandoffReady)}',
+  'sr-support-map-review',
+  'data-support-map-review-status={outputReview.supportMap.reviewStatus}',
+  'data-support-map-weak-ratio={outputReview.supportMap.weakSupportRatio}',
   'data-review-artifact-count={outputReview.reviewArtifacts.length}',
   "data-review-artifact-hashes={outputReview.reviewArtifacts.map((artifact) => artifact.contentHash).join(',')}",
   "data-review-artifact-paths={outputReview.reviewArtifacts.map((artifact) => artifact.path).join(',')}",
@@ -94,6 +103,7 @@ for (const marker of [
   'humanReviewStatus',
   'overlapCoverageRatio',
   'reviewArtifacts',
+  'supportMap',
 ]) {
   if (!adapterSource.includes(marker)) {
     failures.push(`SR output review adapter missing ${marker}.`);

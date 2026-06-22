@@ -107,6 +107,17 @@ export const buildSuperResolutionArtifactSidecarRecordV1 = ({
     outputArtifact,
     outputColorSpace: resolvedOutputColorSpace,
     previewArtifacts,
+    supportMap: {
+      artifactId: provenance.supportMap.artifactId,
+      coverageRatio: provenance.supportMap.coverageRatio,
+      ...(provenance.supportMap.downgradeReason === undefined
+        ? {}
+        : { downgradeReason: provenance.supportMap.downgradeReason }),
+      effectiveScale: provenance.supportMap.effectiveScale,
+      requestedScale: provenance.supportMap.requestedScale,
+      reviewStatus: provenance.supportMap.reviewStatus,
+      weakSupportRatio: provenance.supportMap.weakSupportRatio,
+    },
     qualityPreference: parsedCommand.parameters.qualityPreference,
     requestedAlignmentMode: provenance.requestedAlignmentMode,
     requestedOutputScale: provenance.requestedOutputScale,
@@ -263,6 +274,8 @@ const deriveWarningCodes = (
   const warnings: SuperResolutionArtifactV1['warningCodes'] = [];
   if (provenance.changedPixelRatioAgainstNearest < 0.2) warnings.push('texture_risk');
   if (provenance.detailPolicy === 'aggressive_preview_only') warnings.push('aggressive_preview_only');
+  if (provenance.supportMap.downgradeReason !== undefined) warnings.push('effective_scale_downgraded');
+  if (provenance.supportMap.weakSupportRatio > 0.25) warnings.push('low_overlap_coverage');
   return warnings;
 };
 
