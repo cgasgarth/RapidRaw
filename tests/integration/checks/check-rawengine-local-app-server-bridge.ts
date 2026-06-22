@@ -3,6 +3,11 @@
 import {
   buildRawEngineLocalAppServerToolRegistryQuery,
   createRawEngineLocalAppServerBridge,
+  RawEngineLocalAppServerCommandType,
+  rawEngineLocalAppServerEditorStateResultV1Schema,
+  rawEngineLocalAppServerImageMetadataResultV1Schema,
+  rawEngineLocalAppServerProjectMetadataResultV1Schema,
+  rawEngineLocalAppServerSelectedImagesResultV1Schema,
   rawEngineLocalAppServerBridgeCapabilities,
 } from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
 import {
@@ -30,6 +35,18 @@ const bridge = createRawEngineLocalAppServerBridge();
 const commandTypes = bridge.listCommandTypes();
 
 if (!commandTypes.includes('rawengine.local.toolRegistry.query')) failures.push('Tool registry query not registered.');
+if (!commandTypes.includes(RawEngineLocalAppServerCommandType.ProjectMetadataQuery)) {
+  failures.push('Agent project metadata query not registered.');
+}
+if (!commandTypes.includes(RawEngineLocalAppServerCommandType.SelectedImagesQuery)) {
+  failures.push('Agent selected images query not registered.');
+}
+if (!commandTypes.includes(RawEngineLocalAppServerCommandType.ImageMetadataQuery)) {
+  failures.push('Agent image metadata query not registered.');
+}
+if (!commandTypes.includes(RawEngineLocalAppServerCommandType.EditorStateQuery)) {
+  failures.push('Agent editor state query not registered.');
+}
 if (!commandTypes.includes('toneColor.setBasicTone')) failures.push('Basic tone dry-run command not registered.');
 if (!commandTypes.includes('toneColor.adjustHsl')) failures.push('Selective color/HSL command not registered.');
 if (!commandTypes.includes('ai.enhancement.dryRun')) failures.push('AI enhancement dry-run command not registered.');
@@ -45,6 +62,84 @@ if (!toolRegistry.ok) {
   const parsedRegistry = rawEngineToolRegistryV1Schema.parse(toolRegistry.result);
   if (!parsedRegistry.tools.some((tool) => tool.toolName === 'tonecolor.dry_run_command')) {
     failures.push('Tool registry does not expose tonecolor.dry_run_command.');
+  }
+  for (const toolName of [
+    'agent.project_metadata.query',
+    'agent.selected_images.query',
+    'agent.image_metadata.query',
+    'agent.editor_state.query',
+  ]) {
+    const tool = parsedRegistry.tools.find((candidate) => candidate.toolName === toolName);
+    if (tool === undefined) {
+      failures.push(`Tool registry does not expose ${toolName}.`);
+    } else if (tool.mutates || tool.toolKind !== 'read') {
+      failures.push(`${toolName} must be a non-mutating read tool.`);
+    }
+  }
+}
+
+const projectMetadata = await bridge.dispatch(buildReadQuery(RawEngineLocalAppServerCommandType.ProjectMetadataQuery));
+if (!projectMetadata.ok) {
+  failures.push(`Agent project metadata query failed: ${projectMetadata.message}`);
+} else {
+  const parsedProjectMetadata = rawEngineLocalAppServerProjectMetadataResultV1Schema.parse(projectMetadata.result);
+  if (parsedProjectMetadata.imageCount < 1) failures.push('Agent project metadata must report visible images.');
+  if (parsedProjectMetadata.selectedCount !== 1) failures.push('Agent project metadata must report selected count.');
+}
+
+const selectedImages = await bridge.dispatch(buildReadQuery(RawEngineLocalAppServerCommandType.SelectedImagesQuery));
+if (!selectedImages.ok) {
+  failures.push(`Agent selected images query failed: ${selectedImages.message}`);
+} else {
+  const parsedSelectedImages = rawEngineLocalAppServerSelectedImagesResultV1Schema.parse(selectedImages.result);
+  if (parsedSelectedImages.selectedPaths[0] !== '/photos/session/IMG_0001.CR3') {
+    failures.push('Agent selected images query did not preserve selected path.');
+  }
+  if (parsedSelectedImages.images[0]?.rating !== 4) {
+    failures.push('Agent selected images query did not include rating metadata.');
+  }
+}
+
+const imageMetadata = await bridge.dispatch({
+  ...buildReadQuery(RawEngineLocalAppServerCommandType.ImageMetadataQuery),
+  imagePath: '/photos/session/IMG_0001.CR3',
+});
+if (!imageMetadata.ok) {
+  failures.push(`Agent image metadata query failed: ${imageMetadata.message}`);
+} else {
+  const parsedImageMetadata = rawEngineLocalAppServerImageMetadataResultV1Schema.parse(imageMetadata.result);
+  if (parsedImageMetadata.image.exif?.ISO !== '400') {
+    failures.push('Agent image metadata query did not include EXIF.');
+  }
+  if (!parsedImageMetadata.image.tags?.includes('portrait')) {
+    failures.push('Agent image metadata query did not include labels/tags.');
+  }
+}
+
+const editorState = await bridge.dispatch(buildReadQuery(RawEngineLocalAppServerCommandType.EditorStateQuery));
+if (!editorState.ok) {
+  failures.push(`Agent editor state query failed: ${editorState.message}`);
+} else {
+  const parsedEditorState = rawEngineLocalAppServerEditorStateResultV1Schema.parse(editorState.result);
+  if (parsedEditorState.activeImagePath !== '/photos/session/IMG_0001.CR3') {
+    failures.push('Agent editor state query did not report active image path.');
+  }
+  if (parsedEditorState.selectedImagePaths.length !== 1) {
+    failures.push('Agent editor state query did not report selected image paths.');
+  }
+}
+
+for (const toolName of [
+  'agent.project_metadata.query',
+  'agent.selected_images.query',
+  'agent.image_metadata.query',
+  'agent.editor_state.query',
+]) {
+  const event = bridge.listAuditEvents().find((auditEvent) => auditEvent.toolName === toolName);
+  if (event === undefined) {
+    failures.push(`Missing audit event for ${toolName}.`);
+  } else if (event.mutates || event.status !== 'completed') {
+    failures.push(`${toolName} audit event must be completed and non-mutating.`);
   }
 }
 
@@ -186,3 +281,14 @@ if (failures.length > 0) {
 }
 
 console.log('rawengine local app-server bridge ok (tool-registry + tone/hsl/ai dry-run/apply)');
+
+function buildReadQuery(commandType: RawEngineLocalAppServerCommandType) {
+  const suffix = commandType.replaceAll('.', '_');
+  return {
+    commandId: `command_${suffix}`,
+    commandType,
+    correlationId: `corr_${suffix}`,
+    dryRun: false,
+    requestId: `request_${suffix}`,
+  };
+}
