@@ -37,6 +37,7 @@ import {
   type MaskContainer,
 } from '../../utils/adjustments';
 import { agentChatTranscriptFixture } from '../../utils/agentChatTranscriptFixture';
+import { applyBlackWhiteMixerToRgbPixel } from '../../utils/blackWhiteMixerRuntime';
 import {
   applyCameraProfileInputTransform,
   type CameraProfileMatrix3x3,
@@ -878,6 +879,10 @@ const copy = {
   cameraProfilePreview: 'Camera profile',
   cameraProfileInputRgb: 'Input camera RGB',
   cameraProfileWorkingRgb: 'Working RGB',
+  blackWhiteParity: 'Black & white parity',
+  blackWhiteCommandSummary: 'toneColor.setBlackWhiteMixer',
+  previewRgb: 'Preview RGB',
+  exportRgb: 'Export RGB',
   layerWorkflowTitle: 'Local Adjustment Stack',
   layerMoveDown: 'Move down',
   layerToggle: 'Toggle',
@@ -1880,6 +1885,10 @@ const filmSmokeMetricLabels = {
 const formatSmokeMetric = (label: string, value: number | string) => `${label} ${value}`;
 const formatRgbTriplet = ({ blue, green, red }: { blue: number; green: number; red: number }) =>
   `R ${Math.round(red * 255)} / G ${Math.round(green * 255)} / B ${Math.round(blue * 255)}`;
+const maxRgbDelta = (
+  left: { blue: number; green: number; red: number },
+  right: { blue: number; green: number; red: number },
+) => Math.max(Math.abs(left.red - right.red), Math.abs(left.green - right.green), Math.abs(left.blue - right.blue));
 const colorSmokeMetricLabels = {
   channelMixer: 'CM',
   colorBalance: 'CB',
@@ -3777,6 +3786,9 @@ function ColorWorkflowVisualSmoke() {
   };
   const colorBalanceSourcePixel = { blue: 0.34, green: 0.48, red: 0.68 };
   const colorBalanceResult = applyColorBalanceRgbToPixel(colorBalanceSourcePixel, adjustments.colorBalanceRgb);
+  const blackWhiteSourcePixel = { blue: 0.12, green: 0.38, red: 0.9 };
+  const blackWhitePreviewResult = applyBlackWhiteMixerToRgbPixel(blackWhiteSourcePixel, adjustments.blackWhiteMixer);
+  const blackWhiteExportResult = applyBlackWhiteMixerToRgbPixel(blackWhiteSourcePixel, adjustments.blackWhiteMixer);
   const cameraProfileLookup = lookupCameraProfile(cameraProfilePreviewCatalog, cameraProfilePreviewMetadata);
   const cameraProfileWorkingRgb = applyCameraProfileInputTransform(
     cameraProfilePreviewInputRgb,
@@ -3824,6 +3836,31 @@ function ColorWorkflowVisualSmoke() {
                 <div className="rounded border border-sky-500/25 bg-sky-500/10 p-2">
                   <div className="mb-1 text-[11px] uppercase text-[#9ba6b2]">{copy.cameraProfileWorkingRgb}</div>
                   <div className="font-mono">{formatRgbTriplet(cameraProfileWorkingRgb)}</div>
+                </div>
+              </div>
+            </div>
+            <div
+              className="grid gap-2 rounded-md border border-white/10 bg-black/45 p-3 text-xs text-[#dce4ea]"
+              data-enabled={String(adjustments.blackWhiteMixer.enabled)}
+              data-export-rgb={formatRgbTriplet(blackWhiteExportResult.outputRgb)}
+              data-parity-delta={String(
+                maxRgbDelta(blackWhitePreviewResult.outputRgb, blackWhiteExportResult.outputRgb),
+              )}
+              data-preview-rgb={formatRgbTriplet(blackWhitePreviewResult.outputRgb)}
+              data-testid="black-white-mixer-parity-strip"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-semibold text-white">{copy.blackWhiteParity}</span>
+                <span className="rounded bg-white/10 px-2 py-1 text-[#aab5bd]">{copy.blackWhiteCommandSummary}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded border border-white/10 bg-white/5 p-2" data-testid="black-white-preview">
+                  <div className="mb-1 text-[11px] uppercase text-[#9ba6b2]">{copy.previewRgb}</div>
+                  <div className="font-mono">{formatRgbTriplet(blackWhitePreviewResult.outputRgb)}</div>
+                </div>
+                <div className="rounded border border-white/10 bg-white/5 p-2" data-testid="black-white-export">
+                  <div className="mb-1 text-[11px] uppercase text-[#9ba6b2]">{copy.exportRgb}</div>
+                  <div className="font-mono">{formatRgbTriplet(blackWhiteExportResult.outputRgb)}</div>
                 </div>
               </div>
             </div>
