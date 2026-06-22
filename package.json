@@ -97,6 +97,7 @@
     "check:selective-color-mask": "bun tests/integration/checks/check-selective-color-mask-fixtures.ts",
     "check:layer-stack": "bun tests/integration/checks/check-layer-stack-operations.ts",
     "check:layer-stack-commands": "bun tests/integration/checks/check-layer-stack-commands.ts",
+    "check:layer-stack-command-bridge": "bun tests/integration/checks/check-layer-stack-command-bridge.ts",
     "check:layer-opacity-presets": "bun tests/integration/checks/check-layer-opacity-presets.ts",
     "check:layer-stack-panel-ui": "bun tests/integration/checks/check-layer-stack-panel-ui.ts",
     "check:layer-stack-ui-proof": "bun tests/integration/checks/check-layer-stack-ui-proof.ts",

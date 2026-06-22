@@ -27,26 +27,23 @@ import {
   buildLayerGroupSummaries,
   buildLayerExportReadinessSummary,
   canGroupLayerWithNext,
-  createAdjustmentLayer,
-  deleteLayer,
   deleteLayerGroup,
-  duplicateLayer,
   duplicateLayerGroup,
   groupLayerWithNext,
-  moveLayer,
   moveLayerGroup,
   normalizeLayerBlendMode,
   setLayerBlendMode,
   setLayerGroupName,
   setLayerGroupOpacity,
-  setLayerName,
-  setLayerOpacity,
-  setLayerVisibility,
   showAllLayers,
   soloLayer,
   soloLayerGroup,
   ungroupLayerGroup,
 } from '../../../utils/layerStack';
+import {
+  applyLayerStackCommandBridgeOperation,
+  type LayerStackCommandBridgeOperation,
+} from '../../../utils/layerStackCommandBridge';
 import Slider, { type SliderChangeEvent } from '../../ui/Slider';
 import UiText from '../../ui/Text';
 
@@ -173,6 +170,9 @@ export default function LayerStackPanel({
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
   const rows = useMemo(() => getLayerRows(masks, collapsedGroupIds), [collapsedGroupIds, masks]);
   const [localSelectedLayerId, setLocalSelectedLayerId] = useState<string>(BASE_LAYER_ID);
+  const [layerGraphRevision, setLayerGraphRevision] = useState('layer_stack_panel_initial');
+  const [lastCommandType, setLastCommandType] = useState('none');
+  const [lastChangedLayerCount, setLastChangedLayerCount] = useState(0);
   const selectedLayerId = activeMaskContainerId ?? localSelectedLayerId;
   const visibleLayerCount = masks.filter((mask) => mask.visible).length;
   const hiddenLayerCount = masks.length - visibleLayerCount;
@@ -245,15 +245,30 @@ export default function LayerStackPanel({
       nextSelectedLayerId === BASE_LAYER_ID || nextSelectedLayerId.startsWith('group:') ? null : nextSelectedLayerId,
     );
   };
+  const applyLayerStackCommand = (
+    operation: LayerStackCommandBridgeOperation,
+    nextSelectedLayerId = selectedLayerId,
+  ) => {
+    const result = applyLayerStackCommandBridgeOperation(masks, operation, {
+      graphRevision: layerGraphRevision,
+      imagePath: 'rapidraw://current-image',
+      operationId: crypto.randomUUID(),
+      sessionId: 'rapidraw-layer-stack-panel',
+    });
+    setLayerGraphRevision(result.graphRevision);
+    setLastCommandType(result.command.commandType);
+    setLastChangedLayerCount(result.commandResult.changedLayerIds.length);
+    applyLayerStack(result.masks, nextSelectedLayerId);
+  };
   const updateLayerVisibility = (layerId: string, visible: boolean) => {
-    applyLayerStack(setLayerVisibility(masks, layerId, visible), layerId);
+    applyLayerStackCommand({ layerId, type: 'setVisibility', visible }, layerId);
   };
   const updateGroupVisibility = (groupId: string, visible: boolean) => {
     const nextMasks = masks.map((mask) => (mask.layerGroupId === groupId ? { ...mask, visible } : mask));
     applyLayerStack(nextMasks, `group:${groupId}`);
   };
   const updateLayerOpacity = (layerId: string, opacity: number) => {
-    applyLayerStack(setLayerOpacity(masks, layerId, opacity), layerId);
+    applyLayerStackCommand({ layerId, opacity, type: 'setOpacity' }, layerId);
   };
   const updateLayerBlendMode = (layerId: string, blendMode: LayerBlendMode) => {
     applyLayerStack(setLayerBlendMode(masks, layerId, blendMode), layerId);
@@ -277,7 +292,7 @@ export default function LayerStackPanel({
       applyLayerStack(setLayerGroupName(masks, activeRow.groupId, nextName), activeRow.id);
       return;
     }
-    applyLayerStack(setLayerName(masks, activeRow.id, nextName), activeRow.id);
+    applyLayerStackCommand({ layerId: activeRow.id, name: nextName, type: 'rename' }, activeRow.id);
   };
   const createActiveAdjustmentLayer = () => {
     const layerId = crypto.randomUUID();
@@ -291,7 +306,7 @@ export default function LayerStackPanel({
       subMasks: [],
       visible: true,
     };
-    applyLayerStack(createAdjustmentLayer(masks, layer), layerId);
+    applyLayerStackCommand({ layer, type: 'create' }, layerId);
   };
   const moveActiveLayer = (direction: 'down' | 'up') => {
     if (!activeRow || activeRow.isBase) return;
@@ -300,7 +315,7 @@ export default function LayerStackPanel({
       return;
     }
     if (activeRow.isGroupedLayer) return;
-    applyLayerStack(moveLayer(masks, activeRow.id, direction), activeRow.id);
+    applyLayerStackCommand({ direction, layerId: activeRow.id, type: 'move' }, activeRow.id);
   };
   const groupActiveLayer = () => {
     if (!activeRow || activeRow.isBase || activeRow.isGroupHeader || !canGroupActiveLayer) return;
@@ -347,8 +362,13 @@ export default function LayerStackPanel({
       return;
     }
     const newLayerId = crypto.randomUUID();
-    applyLayerStack(
-      duplicateLayer(masks, activeRow.id, newLayerId, t('editor.layers.copyName', { name: activeRow.name })),
+    applyLayerStackCommand(
+      {
+        layerId: activeRow.id,
+        name: t('editor.layers.copyName', { name: activeRow.name }),
+        newLayerId,
+        type: 'duplicate',
+      },
       newLayerId,
     );
   };
@@ -358,7 +378,7 @@ export default function LayerStackPanel({
       applyLayerStack(deleteLayerGroup(masks, activeRow.groupId), BASE_LAYER_ID);
       return;
     }
-    applyLayerStack(deleteLayer(masks, activeRow.id), BASE_LAYER_ID);
+    applyLayerStackCommand({ layerId: activeRow.id, type: 'delete' }, BASE_LAYER_ID);
   };
 
   return (
@@ -458,6 +478,9 @@ export default function LayerStackPanel({
         data-can-group-active-layer={String(canGroupActiveLayer)}
         data-can-move-active-layer={String(canMoveActiveLayerUp || canMoveActiveLayerDown)}
         data-can-ungroup-active-layer={String(canUngroupActiveLayer)}
+        data-layer-stack-graph-revision={layerGraphRevision}
+        data-layer-stack-last-changed-layer-count={lastChangedLayerCount}
+        data-layer-stack-last-command-type={lastCommandType}
         data-testid="layer-operation-readiness-summary"
       >
         <UiText
