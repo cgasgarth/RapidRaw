@@ -228,12 +228,13 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Keep TypeScript and linting strict. Do not introduce `as any` or
   `as unknown as`.
 - Use Zod for TypeScript-facing runtime schemas and structured config validation.
-- Run focused local validation before opening PRs and record evidence in the PR.
-- Before push or PR creation, run the standard local PR lane manually:
-  touched-file format/lint where applicable; typecheck/schema checks when
-  TypeScript or schema files changed; i18n check/lint when UI strings changed;
-  focused feature scripts; bundle budget when frontend bundle-impacting code
-  changed.
+- Before push or PR creation, use the repo precommit hook as the default local
+  validation path: stage the intended files and try the commit. If precommit
+  fails, fix the reported issue and retry the commit instead of manually
+  replaying every covered check.
+- Run extra focused local validation only when it proves changed runtime,
+  preview/export, UI, or image-output behavior that precommit cannot cover.
+  Record those extra commands as PR evidence.
 - Do not wait for CI to discover basic formatting, lint, i18n, missing
   dependency, or bundle-budget failures.
 - Do not treat narrow checks as proof of broad behavior. Match validation scope
