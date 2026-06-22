@@ -548,6 +548,17 @@ export const negativeLabPublicExportReviewProofSchema = z.object({
   runtimeStatus: z.literal('public_negative_scan_positive_export_rendered'),
   sourcePath: z.literal('fixtures/negative-lab/public/110-format-ericht-negative-cc0-320.jpg'),
 });
+export const negativeLabRealRawPrivateReviewProofSchema = z.object({
+  changedPixelRatio: z.string().regex(/^0\.[0-9]+|1$/u),
+  fixtureId: z.literal('validation.negative-lab-real-raw.alaska.v1'),
+  inputToOutputMeanAbsDelta: z.string().regex(/^0\.[0-9]+|1$/u),
+  outputFormat: z.literal('jpeg_proof'),
+  outputPath: z.string().endsWith('/alaska-negative-lab-v1-Positive.jpg'),
+  proofBoundary: z.literal('private_raw_negative_lab_runtime_not_final_negative_quality'),
+  proofStatus: z.literal('private_raw_negative_lab_positive_export_rendered'),
+  sourceIsRaw: z.literal('true'),
+  sourcePath: z.literal('private-fixtures/negative-lab/alaska-negative-lab-v1.arw'),
+});
 export const selectiveColorUiProofDatasetSchema = z.object({
   activeRange: z.literal('oranges'),
   commandType: z.literal('toneColor.adjustHsl'),

@@ -18,6 +18,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   MaskOverlayRawProof: 'mask-overlay-raw-proof',
   NegativeLabBatchColorWorkspace: 'negative-lab-batch-color-workspace',
   NegativeLabPublicExportReview: 'negative-lab-public-export-review',
+  NegativeLabRealRawPrivateReview: 'negative-lab-real-raw-private-review',
   NegativeLabWorkspace: 'negative-lab-workspace',
   PanoramaPrivateRawUi: 'panorama-private-raw-ui',
   PanoramaSavedReview: 'panorama-saved-review',
@@ -146,6 +147,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Public negative export review',
     mode: VISUAL_SMOKE_SCENARIO_IDS.NegativeLabPublicExportReview,
     outputFile: 'negative-lab-public-export-review.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Private RAW positive proof',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.NegativeLabRealRawPrivateReview,
+    outputFile: 'negative-lab-real-raw-private-review.png',
     sectionMinimum: 1,
   },
   {
