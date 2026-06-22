@@ -185,7 +185,7 @@ export const detectHdrBracketV1 = (requestValue: unknown): HdrBracketDetectionRe
       rawBlackLevelKnown: source.rawBlackLevelKnown,
       rawOrientation: source.rawOrientation,
       rawWhiteLevelKnown: source.rawWhiteLevelKnown,
-      resolvedBracketRole: getBracketRole(value),
+      resolvedBracketRole: exposureResolutionResolved ? getBracketRole(value) : 'unknown',
       resolvedExposureEv: value,
       sourceIndex: source.sourceIndex,
       virtualCopyId: source.virtualCopyId,

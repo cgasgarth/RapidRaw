@@ -785,6 +785,10 @@ if (
   throw new Error('Expected HDR bracket detector to reject missing exposure metadata.');
 }
 
+if (missingExposureHdrBracket.sourceMetadata.some((source) => source.resolvedBracketRole !== 'unknown')) {
+  throw new Error('Expected HDR bracket detector to mark unresolved exposure roles as unknown.');
+}
+
 const duplicateExposureHdrBracket = detectHdrBracketV1({
   sources: sampleHdrMergeArtifactV1.bracketDetection.sourceMetadata.map((source) => ({
     ...source,
