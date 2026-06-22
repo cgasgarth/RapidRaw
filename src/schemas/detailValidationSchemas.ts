@@ -238,6 +238,7 @@ export const detailOutputComparisonProofReportSchema = z
       .strict(),
     recipe: z
       .object({
+        deblurStrength: z.number().min(0).max(1),
         detailAmount: z.number().min(0).max(1),
         label: z.literal('Denoise + detail 100% review'),
         lumaNoiseReduction: z.number().min(0).max(1),
@@ -284,6 +285,8 @@ export const detailOutputComparisonVisualProofSchema = z
     comparisonMode: z.literal('original_current_recipe_export'),
     cropClipped: z.literal(false),
     cropZoomPercent: z.literal(100),
+    deblurStrength: z.literal(0.7),
+    denoiseLuma: z.literal(0.58),
     exportArtifactPath: z.string().endsWith('/high-iso-skin-shadow-v1-enabled-export.pgm'),
     fixtureId: z.literal('detail.output.high-iso-denoise-detail-100.v1'),
     recipeApplied: z.literal(true),

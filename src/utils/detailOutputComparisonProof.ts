@@ -10,6 +10,8 @@ export const DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF: DetailOutputComparisonVisual
     comparisonMode: 'original_current_recipe_export',
     cropClipped: false,
     cropZoomPercent: 100,
+    deblurStrength: 0.7,
+    denoiseLuma: 0.58,
     exportArtifactPath: `${DETAIL_OUTPUT_COMPARISON_ARTIFACT_ROOT}/high-iso-skin-shadow-v1-enabled-export.pgm`,
     fixtureId: 'detail.output.high-iso-denoise-detail-100.v1',
     recipeApplied: true,

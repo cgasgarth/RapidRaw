@@ -964,6 +964,8 @@ const copy = {
   detailExportArtifact: 'Export artifact',
   detailOriginal: 'Original',
   detailOutputComparison: 'Denoise + detail output compare',
+  detailDeblurControl: 'Deblur strength',
+  detailDenoiseControl: 'Denoise luma',
   detailRecipe: 'Recipe',
   detailRecipeChangedPixels: 'Changed pixels',
   detailRecipeExportHash: 'Recipe export hash differs from disabled',
@@ -984,6 +986,8 @@ const scopes = [
 ] as const;
 
 function DetailWorkspaceVisualSmoke() {
+  const [deblurStrength, setDeblurStrength] = useState(0);
+  const [denoiseLuma, setDenoiseLuma] = useState(0);
   const [zoom, setZoom] = useState('100');
   const [previewMode, setPreviewMode] = useState<'single' | 'split'>('single');
   const [waveletMode, setWaveletMode] = useState<'off' | 'luma_detail'>('off');
@@ -1011,6 +1015,9 @@ function DetailWorkspaceVisualSmoke() {
             data-crop-clipped={String(DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF.cropClipped)}
             data-crop-zoom-percent={String(DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF.cropZoomPercent)}
             data-deblur-command={copy.detailDryRunTool}
+            data-deblur-enabled={String(deblurStrength > 0)}
+            data-deblur-strength={deblurStrength}
+            data-denoise-luma={denoiseLuma}
             data-denoise-stage="scene_linear_denoise"
             data-export-artifact-path={DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF.exportArtifactPath}
             data-fixture-id={DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF.fixtureId}
@@ -1045,8 +1052,30 @@ function DetailWorkspaceVisualSmoke() {
               <span className="text-xs text-[#aab2bd]">{previewMode}</span>
             </button>
             <button
+              className="flex w-full items-center justify-between rounded-md border border-white/10 bg-white/5 px-3 py-2 text-left text-sm hover:bg-white/10"
+              onClick={() => {
+                setDenoiseLuma(58);
+              }}
+              type="button"
+            >
+              <span>{copy.detailDenoiseControl}</span>
+              <span className="text-xs text-[#aab2bd]">{denoiseLuma}%</span>
+            </button>
+            <button
+              className="flex w-full items-center justify-between rounded-md border border-white/10 bg-white/5 px-3 py-2 text-left text-sm hover:bg-white/10"
+              onClick={() => {
+                setDeblurStrength(70);
+              }}
+              type="button"
+            >
+              <span>{copy.detailDeblurControl}</span>
+              <span className="text-xs text-[#aab2bd]">{deblurStrength}%</span>
+            </button>
+            <button
               className="flex w-full items-center justify-between rounded-md border border-[#6da7d8]/40 bg-[#1d2b35] px-3 py-2 text-left text-sm hover:bg-[#243746]"
               onClick={() => {
+                setDeblurStrength(70);
+                setDenoiseLuma(58);
                 setWaveletMode('luma_detail');
                 setRecipeApplied(true);
               }}
