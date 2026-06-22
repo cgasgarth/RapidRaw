@@ -58,6 +58,17 @@ export const panoramaRuntimePlanSchema = z
         memory_budget_bytes: z.number().int().positive(),
         memory_budget_ratio: z.number().nonnegative(),
         memory_components: panoramaPlanMemoryComponentsSchema,
+        source_geometry: z
+          .object({
+            blocked_reasons: z.array(z.string()),
+            layout: z.enum(['multi_row_candidate', 'single_row', 'unknown']),
+            row_count_estimate: z.number().int().positive(),
+            support: z.enum(['blocked_requires_multi_row_solver', 'implemented_current_engine', 'unverified']),
+            vertical_span_px: z.number().int().nonnegative(),
+            warning_codes: z.array(z.string()),
+          })
+          .strict()
+          .optional(),
         status: panoramaRuntimePlanStatusSchema,
         tile_count: z.number().int().positive(),
         warning_codes: z.array(z.string()),

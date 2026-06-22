@@ -218,6 +218,16 @@ export const panoramaRuntimeProvenanceV1Schema = z
         weakOverlapEdgeCount: z.number().int().nonnegative(),
       })
       .strict(),
+    sourceGeometry: z
+      .object({
+        blockedReasons: z.array(z.string().trim().min(1)),
+        layout: z.enum(['multi_row_candidate', 'single_row', 'unknown']),
+        rowCountEstimate: z.number().int().positive(),
+        support: z.enum(['blocked_requires_multi_row_solver', 'implemented_current_engine', 'unverified']),
+        verticalSpanPx: z.number().int().nonnegative(),
+        warningCodes: z.array(z.enum(['multi_row_runtime_deferred', 'source_geometry_unverified'])),
+      })
+      .strict(),
     sourceState: z.array(
       z
         .object({
@@ -494,6 +504,7 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
     request.connectedSourceIndices,
     request.candidateTransformOverrides,
   );
+  const sourceGeometry = classifyPanoramaSourceGeometry(request.sourceFrames, request.connectedSourceIndices);
   const stitched = renderSyntheticPanoramaStitchV1({
     connectedSourceIndices: request.connectedSourceIndices,
     exposureNormalization: request.command.parameters.exposureNormalization,
@@ -506,7 +517,13 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
   if (stitched.outputPixels === null) {
     throw new Error('Panorama runtime plan expected renderable synthetic output pixels.');
   }
-  const seamReview = buildPanoramaSeamReview(request, alignment, stitched.output.width, stitched.output.height);
+  const seamReview = buildPanoramaSeamReview(
+    request,
+    alignment,
+    sourceGeometry,
+    stitched.output.width,
+    stitched.output.height,
+  );
   const warnings = [...new Set([...stitched.warningCodes, ...seamReview.warnings])].sort();
 
   return {
@@ -547,6 +564,7 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
         seamMethod: 'adaptive_feather',
       },
       seamReview,
+      sourceGeometry,
       sourceState: request.sourceFrames.map((frame) => ({
         contentHash: frame.contentHash,
         graphRevision: frame.graphRevision,
@@ -561,6 +579,7 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
 
 const buildPanoramaPreflightEstimate = (request: ParsedPanoramaRuntimePlanRequestV1, width: number, height: number) => {
   const sourcePixelCount = request.sourceFrames.reduce((total, frame) => total + frame.width * frame.height, 0);
+  const sourceGeometry = classifyPanoramaSourceGeometry(request.sourceFrames, request.connectedSourceIndices);
   const outputPixelCount = width * height;
   const sourceDecodeBytes = sourcePixelCount * 4;
   const outputCanvasBytes = outputPixelCount * 4;
@@ -576,8 +595,9 @@ const buildPanoramaPreflightEstimate = (request: ParsedPanoramaRuntimePlanReques
     totalEstimatedPeakBytes: sourceDecodeBytes + outputCanvasBytes + previewBytes + outputPixelCount * 3 + 4096,
   };
   const memoryBudgetBytes = Math.max(memoryComponents.totalEstimatedPeakBytes * 2, 1);
+  const warningCodes = [...new Set(['legacy_full_frame_render', ...sourceGeometry.warningCodes])].sort();
   return {
-    blockedReasons: [],
+    blockedReasons: sourceGeometry.blockedReasons,
     engineCapabilities: {
       fullFrameLegacy: true,
       maxPreviewDimensionPx: request.command.parameters.maxPreviewDimensionPx,
@@ -599,9 +619,10 @@ const buildPanoramaPreflightEstimate = (request: ParsedPanoramaRuntimePlanReques
     memoryBudgetBytes,
     memoryBudgetRatio: memoryComponents.totalEstimatedPeakBytes / memoryBudgetBytes,
     memoryComponents,
-    status: 'accepted',
+    sourceGeometry,
+    status: sourceGeometry.blockedReasons.length > 0 ? 'blocked_plan_only' : 'accepted',
     tileCount: 1,
-    warningCodes: ['legacy_full_frame_render'],
+    warningCodes,
   };
 };
 
@@ -693,6 +714,50 @@ const buildPanoramaRuntimeAlignment = (
       selectionMode: 'quality_ranked_spanning_graph_v1' as const,
     },
     pairwiseMatches: graphSelection.selectedEdges.map(({ edge }) => buildPanoramaPairwiseMatch(edge)),
+  };
+};
+
+type PanoramaSourceGeometry = PanoramaRuntimeProvenanceV1['sourceGeometry'];
+
+const classifyPanoramaSourceGeometry = (
+  sourceFrames: PanoramaRuntimeSourceFrameV1[],
+  connectedSourceIndices: number[],
+): PanoramaSourceGeometry => {
+  const connected = new Set(connectedSourceIndices);
+  const connectedFrames = sourceFrames.filter((frame) => connected.has(frame.sourceIndex));
+  if (connectedFrames.some((frame) => frame.expectedOffsetY === null)) {
+    return {
+      blockedReasons: [],
+      layout: 'unknown',
+      rowCountEstimate: 1,
+      support: 'unverified',
+      verticalSpanPx: 0,
+      warningCodes: ['source_geometry_unverified'],
+    };
+  }
+
+  const heights = connectedFrames.map((frame) => frame.height).toSorted((left, right) => left - right);
+  const medianHeight = heights[Math.floor(heights.length / 2)] ?? 1;
+  const rowBreakThresholdPx = Math.max(12, Math.round(medianHeight * 0.35));
+  const yOffsets = connectedFrames.map((frame) => frame.expectedOffsetY ?? 0).toSorted((left, right) => left - right);
+  const verticalSpanPx = Math.max(...yOffsets) - Math.min(...yOffsets);
+  const rows = yOffsets.reduce<number[]>((rowStarts, yOffset) => {
+    const previousRowStart = rowStarts.at(-1);
+    if (previousRowStart === undefined || Math.abs(yOffset - previousRowStart) > rowBreakThresholdPx) {
+      rowStarts.push(yOffset);
+    }
+    return rowStarts;
+  }, []);
+  const rowCountEstimate = Math.max(1, rows.length);
+  const isMultiRowCandidate = rowCountEstimate > 1 || verticalSpanPx > rowBreakThresholdPx;
+
+  return {
+    blockedReasons: isMultiRowCandidate ? ['multi_row_panorama_not_supported'] : [],
+    layout: isMultiRowCandidate ? 'multi_row_candidate' : 'single_row',
+    rowCountEstimate,
+    support: isMultiRowCandidate ? 'blocked_requires_multi_row_solver' : 'implemented_current_engine',
+    verticalSpanPx,
+    warningCodes: isMultiRowCandidate ? ['multi_row_runtime_deferred'] : [],
   };
 };
 
@@ -950,6 +1015,7 @@ const buildPanoramaRuntimeQualityMetrics = (
 const buildPanoramaSeamReview = (
   request: ParsedPanoramaRuntimePlanRequestV1,
   alignment: PanoramaRuntimeProvenanceV1['alignment'],
+  sourceGeometry: PanoramaRuntimeProvenanceV1['sourceGeometry'],
   outputWidth: number,
   outputHeight: number,
 ): PanoramaRuntimeProvenanceV1['seamReview'] => {
@@ -967,6 +1033,7 @@ const buildPanoramaSeamReview = (
     return edge.overlapAreaPx / Math.max(1, frameArea) < 0.2;
   }).length;
   const blockedReasons = [
+    ...sourceGeometry.blockedReasons,
     ...(disconnectedSourceIndices.length > 0 ? ['source_selection_incomplete'] : []),
     ...(alignment.graph.selectedEdgeCount < Math.max(0, request.connectedSourceIndices.length - 1)
       ? ['alignment_graph_disconnected']
@@ -980,6 +1047,7 @@ const buildPanoramaSeamReview = (
       : 'low';
   const warnings = [
     ...(blockedReasons.length > 0 ? ['seam_review_blocked', 'source_excluded'] : []),
+    ...sourceGeometry.warningCodes,
     ...(weakOverlapEdgeCount > 0 ? ['weak_alignment'] : []),
     ...(alignment.graph.cycleConsistency.rejectedEdgeCount > 0 ? ['ambiguous_matches'] : []),
   ].sort();

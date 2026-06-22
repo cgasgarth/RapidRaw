@@ -1675,7 +1675,10 @@ async function prepareScenario(page, mode) {
       runtimePlanProof.runtimePlanReady !== 'true' ||
       runtimePlanProof.planStatus !== 'accepted' ||
       runtimePlanProof.planScope !== 'geometry_memory_only' ||
-      runtimePlanProof.outputDimensions !== '9600 x 3200'
+      runtimePlanProof.outputDimensions !== '9600 x 3200' ||
+      runtimePlanProof.sourceGeometryLayout !== 'single_row' ||
+      runtimePlanProof.sourceGeometrySupport !== 'implemented_current_engine' ||
+      runtimePlanProof.sourceRowCountEstimate !== '1'
     ) {
       throw new Error(`Panorama runtime plan proof failed: ${JSON.stringify(runtimePlanProof)}`);
     }

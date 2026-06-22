@@ -1658,6 +1658,14 @@ const panoramaRuntimePlanFixture: PanoramaRuntimePlan = {
       source_decode_bytes: 270_000_000,
       total_estimated_peak_bytes: 952_332_000,
     },
+    source_geometry: {
+      blocked_reasons: [],
+      layout: 'single_row',
+      row_count_estimate: 1,
+      support: 'implemented_current_engine',
+      vertical_span_px: 3,
+      warning_codes: [],
+    },
     status: 'accepted',
     tile_count: 1,
     warning_codes: ['geometry_estimate_low_confidence', 'legacy_full_frame_render'],
@@ -2695,6 +2703,9 @@ function PanoramaVisualSmoke() {
           data-plan-width={panoramaRuntimePlanFixture.output_dimensions.width}
           data-projection={settings.projection}
           data-quality-preference={settings.qualityPreference}
+          data-source-geometry-layout={panoramaRuntimePlanFixture.preflight.source_geometry?.layout}
+          data-source-geometry-support={panoramaRuntimePlanFixture.preflight.source_geometry?.support}
+          data-source-row-count-estimate={panoramaRuntimePlanFixture.preflight.source_geometry?.row_count_estimate}
           data-runtime-status="dry_run_preview"
           data-seam-count="4"
           data-source-contribution-count="5"
