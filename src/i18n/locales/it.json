@@ -1494,8 +1494,14 @@
       "qcDecisionRejected": "Rejected",
       "qcRejectedCount": "Rejected {{rejectedCount}}",
       "effectiveFrameExposure": "Effective frame exposure {{exposure}} EV",
+      "effectiveFrameRgbBalance": "Effective frame RGB R {{red}} / G {{green}} / B {{blue}}",
       "frameExposureOffset": "Frame exposure offset",
+      "frameRgbBalanceOffset": "Frame RGB balance offset",
       "resetFrameExposure": "Reset frame",
+      "frameBlueWeightOffset": "Frame blue offset",
+      "frameGreenWeightOffset": "Frame green offset",
+      "frameRedWeightOffset": "Frame red offset",
+      "resetFrameRgbBalance": "Reset frame RGB",
       "resetPrintEndpoints": "Reset endpoints"
     },
     "panorama": {

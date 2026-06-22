@@ -56,6 +56,13 @@ import {
   getNegativeLabScanLabel,
 } from '../../utils/negativeLabFrameHealth';
 import {
+  DEFAULT_NEGATIVE_LAB_FRAME_RGB_BALANCE_OFFSET,
+  buildNegativeLabFrameRgbBalanceOverridePayload,
+  getNegativeLabEffectiveFrameRgbBalance,
+  negativeLabFrameRgbBalanceOffsetIsZero,
+  snapNegativeLabFrameRgbBalanceOffsets,
+} from '../../utils/negativeLabFrameRgbBalanceOverrides';
+import {
   NegativeLabOutputFormatId,
   NEGATIVE_LAB_OUTPUT_FORMAT_SELECTOR_IDS,
   type NegativeLabOutputFormatId as NegativeOutputFormat,
@@ -93,6 +100,7 @@ import type {
   NegativeLabFrameHealthEntry,
   NegativeLabFrameWarningSeverity,
 } from '../../schemas/negativeLabFrameHealthSchemas';
+import type { NegativeLabFrameRgbBalanceOffset } from '../../schemas/negativeLabFrameRgbBalanceOverrideSchemas';
 import type { NegativeLabRuntimeProfileBrowserRow } from '../../schemas/negativeLabMeasuredProfileSchemas';
 import type { NegativeLabSelectedProfileSnapshot } from '../../schemas/negativeLabProfileComparisonSchemas';
 import type { NegativeLabWorkspaceProof } from '../../schemas/negativeLabWorkspaceSchemas';
@@ -460,6 +468,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [frameHealthSort, setFrameHealthSort] = useState<NegativeLabFrameHealthSort>('roll_order');
   const [qcDecisionByFrameId, setQcDecisionByFrameId] = useState<Record<string, NegativeLabQcDecision>>({});
   const [frameExposureOffsetByFrameId, setFrameExposureOffsetByFrameId] = useState<Record<string, number>>({});
+  const [frameRgbBalanceOffsetByFrameId, setFrameRgbBalanceOffsetByFrameId] = useState<
+    Record<string, NegativeLabFrameRgbBalanceOffset>
+  >({});
 
   const { isMounted, show } = useModalTransition(isOpen);
   const [isCompareActive, setIsCompareActive] = useState(false);
@@ -644,6 +655,15 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       }),
     [frameExposureOffsetByFrameId, frameHealthReport.frames, params.exposure],
   );
+  const frameRgbBalanceOverridePayload = useMemo(
+    () =>
+      buildNegativeLabFrameRgbBalanceOverridePayload({
+        baselineParams: params,
+        frameHealthRows: frameHealthReport.frames,
+        offsetsByFrameId: frameRgbBalanceOffsetByFrameId,
+      }),
+    [frameHealthReport.frames, frameRgbBalanceOffsetByFrameId, params],
+  );
   const activeFrameExposureOffset = useMemo(
     () =>
       frameHealthReport.activeFrameId === null
@@ -659,6 +679,25 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         offsetsByFrameId: frameExposureOffsetByFrameId,
       }),
     [frameExposureOffsetByFrameId, frameHealthReport.activeFrameId, params.exposure],
+  );
+  const activeFrameRgbBalanceOffset = useMemo(
+    () =>
+      frameHealthReport.activeFrameId === null
+        ? DEFAULT_NEGATIVE_LAB_FRAME_RGB_BALANCE_OFFSET
+        : snapNegativeLabFrameRgbBalanceOffsets({
+            baselineParams: params,
+            offsets: frameRgbBalanceOffsetByFrameId[frameHealthReport.activeFrameId],
+          }),
+    [frameHealthReport.activeFrameId, frameRgbBalanceOffsetByFrameId, params],
+  );
+  const effectiveActiveFrameRgbBalance = useMemo(
+    () =>
+      getNegativeLabEffectiveFrameRgbBalance({
+        baselineParams: params,
+        frameId: frameHealthReport.activeFrameId,
+        offsetsByFrameId: frameRgbBalanceOffsetByFrameId,
+      }),
+    [frameHealthReport.activeFrameId, frameRgbBalanceOffsetByFrameId, params],
   );
   const approvedQcFrameIds = useMemo(
     () =>
@@ -730,6 +769,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           batchScope: conversionScope,
           dryRunSummary: batchDryRunSummary,
           frameExposureOverrides: frameExposureOverridePayload,
+          frameRgbBalanceOverrides: frameRgbBalanceOverridePayload,
           omittedDispositionFrameIds,
           qcDecisions: qcDecisionByFrameId,
           selectedProfile: selectedProfileSnapshot,
@@ -741,6 +781,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       batchDryRunSummary,
       conversionScope,
       frameExposureOverridePayload,
+      frameRgbBalanceOverridePayload,
       omittedDispositionFrameIds,
       qcDecisionByFrameId,
       selectedProfileSnapshot,
@@ -1011,6 +1052,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setConversionScope('all');
       setIncludedPathSet(getInitialIncludedPaths(targetPaths));
       setFrameExposureOffsetByFrameId({});
+      setFrameRgbBalanceOffsetByFrameId({});
       setQcDecisionByFrameId({});
     }, 300);
     return () => {
@@ -1018,12 +1060,25 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     };
   }, [isOpen, resetViewport, selectedImagePath, targetPaths, updatePreview]);
 
-  const buildParamsWithFrameExposure = (
+  const buildParamsWithFrameOverrides = (
     baseParams: NegativeParams,
     frameId: string | null = frameHealthReport.activeFrameId,
     offsetsByFrameId: Readonly<Record<string, number>> = frameExposureOffsetByFrameId,
+    rgbOffsetsByFrameId: Readonly<Record<string, NegativeLabFrameRgbBalanceOffset>> = frameRgbBalanceOffsetByFrameId,
   ): NegativeParams => ({
     ...baseParams,
+    ...(() => {
+      const effectiveRgbBalance = getNegativeLabEffectiveFrameRgbBalance({
+        baselineParams: baseParams,
+        frameId,
+        offsetsByFrameId: rgbOffsetsByFrameId,
+      });
+      return {
+        blue_weight: effectiveRgbBalance.blueWeight,
+        green_weight: effectiveRgbBalance.greenWeight,
+        red_weight: effectiveRgbBalance.redWeight,
+      };
+    })(),
     exposure: getNegativeLabEffectiveFrameExposure({
       baselineExposure: baseParams.exposure,
       frameId,
@@ -1041,7 +1096,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     }
     setParams(newParams);
     setAcceptedBatchPlanJson(null);
-    updatePreview(buildParamsWithFrameExposure(newParams));
+    updatePreview(buildParamsWithFrameOverrides(newParams));
   };
 
   const handleEndpointReset = () => {
@@ -1049,7 +1104,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setSelectedPresetId('');
     setParams(newParams);
     setAcceptedBatchPlanJson(null);
-    updatePreview(buildParamsWithFrameExposure(newParams));
+    updatePreview(buildParamsWithFrameOverrides(newParams));
   };
 
   const handlePresetSelect = (preset: NegativeLabRuntimeProfileBrowserRow) => {
@@ -1065,7 +1120,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setBaseFogSampleUndoStack([]);
     setParams(preset.params);
     setAcceptedBatchPlanJson(null);
-    updatePreview(buildParamsWithFrameExposure(preset.params));
+    updatePreview(buildParamsWithFrameOverrides(preset.params));
   };
 
   const pushBaseFogSampleUndoEntry = () => {
@@ -1096,7 +1151,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setSelectedPresetId(previous.selectedPresetId);
     setParams(previous.params);
     setAcceptedBatchPlanJson(null);
-    updatePreview(buildParamsWithFrameExposure(previous.params));
+    updatePreview(buildParamsWithFrameOverrides(previous.params));
   };
 
   const handleAutoBaseFog = async () => {
@@ -1135,7 +1190,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setActiveBaseFogSampleLabel(t('modals.negativeConversion.sampleFullFrame'));
       setParams(nextParams);
       setAcceptedBatchPlanJson(null);
-      updatePreview(buildParamsWithFrameExposure(nextParams), false, proofContext);
+      updatePreview(buildParamsWithFrameOverrides(nextParams), false, proofContext);
     } catch (e) {
       console.error('Negative base/fog estimate failed', e);
     } finally {
@@ -1179,7 +1234,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setActiveBaseFogSampleLabel(t(labelKey));
       setParams(nextParams);
       setAcceptedBatchPlanJson(null);
-      updatePreview(buildParamsWithFrameExposure(nextParams), false, proofContext);
+      updatePreview(buildParamsWithFrameOverrides(nextParams), false, proofContext);
     } catch (e) {
       console.error('Base/fog sample failed', e);
     } finally {
@@ -1240,7 +1295,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setActiveBaseFogSampleLabel(t('modals.negativeConversion.customBaseSample'));
     setParams(nextParams);
     setAcceptedBatchPlanJson(null);
-    updatePreview(buildParamsWithFrameExposure(nextParams), false, proofContext);
+    updatePreview(buildParamsWithFrameOverrides(nextParams), false, proofContext);
   };
 
   const handlePromoteBaseFogToRoll = () => {
@@ -1352,7 +1407,34 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         : { ...frameExposureOffsetByFrameId, [frameId]: snappedOffset };
     setFrameExposureOffsetByFrameId(nextOffsets);
     setAcceptedBatchPlanJson(null);
-    updatePreview(buildParamsWithFrameExposure(params, frameId, nextOffsets));
+    updatePreview(buildParamsWithFrameOverrides(params, frameId, nextOffsets));
+  };
+
+  const handleFrameRgbBalanceOffsetChange = (
+    frameId: string,
+    channel: keyof NegativeLabFrameRgbBalanceOffset,
+    value: number,
+  ) => {
+    const currentOffsets = frameRgbBalanceOffsetByFrameId[frameId] ?? DEFAULT_NEGATIVE_LAB_FRAME_RGB_BALANCE_OFFSET;
+    const nextOffset = snapNegativeLabFrameRgbBalanceOffsets({
+      baselineParams: params,
+      offsets: { ...currentOffsets, [channel]: value },
+    });
+    const nextOffsetsByFrameId = negativeLabFrameRgbBalanceOffsetIsZero(nextOffset)
+      ? Object.fromEntries(Object.entries(frameRgbBalanceOffsetByFrameId).filter(([key]) => key !== frameId))
+      : { ...frameRgbBalanceOffsetByFrameId, [frameId]: nextOffset };
+    setFrameRgbBalanceOffsetByFrameId(nextOffsetsByFrameId);
+    setAcceptedBatchPlanJson(null);
+    updatePreview(buildParamsWithFrameOverrides(params, frameId, frameExposureOffsetByFrameId, nextOffsetsByFrameId));
+  };
+
+  const handleResetFrameRgbBalance = (frameId: string) => {
+    const nextOffsetsByFrameId = Object.fromEntries(
+      Object.entries(frameRgbBalanceOffsetByFrameId).filter(([key]) => key !== frameId),
+    );
+    setFrameRgbBalanceOffsetByFrameId(nextOffsetsByFrameId);
+    setAcceptedBatchPlanJson(null);
+    updatePreview(buildParamsWithFrameOverrides(params, frameId, frameExposureOffsetByFrameId, nextOffsetsByFrameId));
   };
 
   const handleSave = async () => {
@@ -1371,6 +1453,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             batchDisposition: batchDryRunSummary.dispositionCounts,
             batchScope: conversionScope,
             frameExposureOverrides: frameExposureOverridePayload,
+            frameRgbBalanceOverrides: frameRgbBalanceOverridePayload,
             omittedDispositionFrameIds,
             qcApprovedFrameIds: approvedQcFrameIds,
             qcRejectedFrameIds: rejectedQcFrameIds,
@@ -1409,7 +1492,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     if (targetPaths[frameIndex] === undefined) return;
     const nextFrameId = frameHealthReport.frames.find((frame) => frame.pathIndex === frameIndex)?.frameId ?? null;
     setActivePathIndex(frameIndex);
-    updatePreview(buildParamsWithFrameExposure(params, nextFrameId));
+    updatePreview(buildParamsWithFrameOverrides(params, nextFrameId));
     resetViewport();
   };
 
@@ -1599,6 +1682,19 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                           {formatSignedRecipeValue(
                             snapNegativeLabFrameExposureOffset(frameExposureOffsetByFrameId[frame.frameId] ?? 0),
                           )}
+                        </span>
+                      )}
+                      {!negativeLabFrameRgbBalanceOffsetIsZero(
+                        snapNegativeLabFrameRgbBalanceOffsets({
+                          baselineParams: params,
+                          offsets: frameRgbBalanceOffsetByFrameId[frame.frameId],
+                        }),
+                      ) && (
+                        <span
+                          className="rounded bg-fuchsia-500/15 px-1.5 py-0.5 text-[11px] text-fuchsia-100"
+                          data-testid={`negative-lab-roll-frame-rgb-balance-override-${index}`}
+                        >
+                          {t('modals.negativeConversion.frameRgbBalanceBadge')}
                         </span>
                       )}
                     </span>
@@ -1915,7 +2011,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           <div className="grid gap-1">
             {visibleFrameHealthRows.map((row: NegativeLabFrameHealthEntry, index) => (
               <div
-                className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto_auto_auto] items-center gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
+                className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto_auto_auto_auto] items-center gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
                 data-acquisition-source={row.acquisitionSourceFamily}
                 data-conversion-status={row.conversionStatus}
                 data-crop-status={row.cropStatus}
@@ -2014,7 +2110,35 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                   )}
                 </span>
                 <span
-                  className="col-span-9 flex flex-wrap items-center gap-1 text-[11px]"
+                  className={cx(
+                    'rounded px-1.5 py-0.5 tabular-nums',
+                    negativeLabFrameRgbBalanceOffsetIsZero(
+                      snapNegativeLabFrameRgbBalanceOffsets({
+                        baselineParams: params,
+                        offsets: frameRgbBalanceOffsetByFrameId[row.frameId],
+                      }),
+                    )
+                      ? 'bg-bg-primary text-text-tertiary'
+                      : 'bg-fuchsia-500/15 text-fuchsia-200',
+                  )}
+                  data-testid={`negative-lab-frame-rgb-balance-override-${index}`}
+                >
+                  {negativeLabFrameRgbBalanceOffsetIsZero(
+                    snapNegativeLabFrameRgbBalanceOffsets({
+                      baselineParams: params,
+                      offsets: frameRgbBalanceOffsetByFrameId[row.frameId],
+                    }),
+                  )
+                    ? 'RGB 0.00'
+                    : `RGB ${formatSignedRecipeValue(
+                        snapNegativeLabFrameRgbBalanceOffsets({
+                          baselineParams: params,
+                          offsets: frameRgbBalanceOffsetByFrameId[row.frameId],
+                        }).redWeight,
+                      )}`}
+                </span>
+                <span
+                  className="col-span-10 flex flex-wrap items-center gap-1 text-[11px]"
                   data-qc-decision={qcDecisionByFrameId[row.frameId] ?? 'pending'}
                   data-testid={`negative-lab-frame-qc-decision-${index}`}
                 >
@@ -3020,6 +3144,20 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               >
                 {formatSignedRecipeValue(activeFrameExposureOffset)}
               </span>
+              <span>{t('modals.negativeConversion.frameRgbBalanceOffset')}</span>
+              <span
+                className="text-right tabular-nums text-text-secondary"
+                data-effective-blue-weight={effectiveActiveFrameRgbBalance.blueWeight}
+                data-effective-green-weight={effectiveActiveFrameRgbBalance.greenWeight}
+                data-effective-red-weight={effectiveActiveFrameRgbBalance.redWeight}
+                data-testid="negative-lab-recipe-frame-rgb-balance-offset"
+              >
+                {t('modals.negativeConversion.effectiveFrameRgbBalance', {
+                  blue: formatSignedRecipeValue(activeFrameRgbBalanceOffset.blueWeight),
+                  green: formatSignedRecipeValue(activeFrameRgbBalanceOffset.greenWeight),
+                  red: formatSignedRecipeValue(activeFrameRgbBalanceOffset.redWeight),
+                })}
+              </span>
               <span>{t('modals.negativeConversion.contrast')}</span>
               <span className="text-right tabular-nums text-text-secondary" data-testid="negative-lab-recipe-contrast">
                 {params.contrast.toFixed(2)}
@@ -3400,6 +3538,98 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               }}
               fillOrigin="min"
             />
+            <div
+              className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+              data-active-frame-id={frameHealthReport.activeFrameId ?? ''}
+              data-effective-blue-weight={effectiveActiveFrameRgbBalance.blueWeight}
+              data-effective-green-weight={effectiveActiveFrameRgbBalance.greenWeight}
+              data-effective-red-weight={effectiveActiveFrameRgbBalance.redWeight}
+              data-testid="negative-lab-frame-rgb-balance-override-control"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <UiText variant={TextVariants.small} className="text-text-secondary">
+                  {t('modals.negativeConversion.frameRgbBalanceOffset')}
+                </UiText>
+                <button
+                  className="rounded border border-surface bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                  data-testid="negative-lab-reset-frame-rgb-balance"
+                  disabled={
+                    frameHealthReport.activeFrameId === null ||
+                    negativeLabFrameRgbBalanceOffsetIsZero(activeFrameRgbBalanceOffset) ||
+                    isSaving
+                  }
+                  onClick={() => {
+                    if (frameHealthReport.activeFrameId !== null) {
+                      handleResetFrameRgbBalance(frameHealthReport.activeFrameId);
+                    }
+                  }}
+                  type="button"
+                >
+                  {t('modals.negativeConversion.resetFrameRgbBalance')}
+                </button>
+              </div>
+              <Slider
+                label={t('modals.negativeConversion.frameRedWeightOffset')}
+                value={activeFrameRgbBalanceOffset.redWeight}
+                min={-1.5}
+                max={1.5}
+                step={0.01}
+                defaultValue={0}
+                disabled={frameHealthReport.activeFrameId === null || isSaving}
+                onChange={(event) => {
+                  if (frameHealthReport.activeFrameId !== null) {
+                    handleFrameRgbBalanceOffsetChange(
+                      frameHealthReport.activeFrameId,
+                      'redWeight',
+                      Number(event.target.value),
+                    );
+                  }
+                }}
+              />
+              <Slider
+                label={t('modals.negativeConversion.frameGreenWeightOffset')}
+                value={activeFrameRgbBalanceOffset.greenWeight}
+                min={-1.5}
+                max={1.5}
+                step={0.01}
+                defaultValue={0}
+                disabled={frameHealthReport.activeFrameId === null || isSaving}
+                onChange={(event) => {
+                  if (frameHealthReport.activeFrameId !== null) {
+                    handleFrameRgbBalanceOffsetChange(
+                      frameHealthReport.activeFrameId,
+                      'greenWeight',
+                      Number(event.target.value),
+                    );
+                  }
+                }}
+              />
+              <Slider
+                label={t('modals.negativeConversion.frameBlueWeightOffset')}
+                value={activeFrameRgbBalanceOffset.blueWeight}
+                min={-1.5}
+                max={1.5}
+                step={0.01}
+                defaultValue={0}
+                disabled={frameHealthReport.activeFrameId === null || isSaving}
+                onChange={(event) => {
+                  if (frameHealthReport.activeFrameId !== null) {
+                    handleFrameRgbBalanceOffsetChange(
+                      frameHealthReport.activeFrameId,
+                      'blueWeight',
+                      Number(event.target.value),
+                    );
+                  }
+                }}
+              />
+              <UiText variant={TextVariants.small} className="text-text-tertiary">
+                {t('modals.negativeConversion.effectiveFrameRgbBalance', {
+                  blue: effectiveActiveFrameRgbBalance.blueWeight.toFixed(2),
+                  green: effectiveActiveFrameRgbBalance.greenWeight.toFixed(2),
+                  red: effectiveActiveFrameRgbBalance.redWeight.toFixed(2),
+                })}
+              </UiText>
+            </div>
           </div>
         </div>
 

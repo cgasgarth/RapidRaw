@@ -2046,9 +2046,11 @@
         "review": ""
       },
       "effectiveFrameExposure": "Effective frame exposure {{exposure}} EV",
+      "effectiveFrameRgbBalance": "Effective frame RGB R {{red}} / G {{green}} / B {{blue}}",
       "excludeScan": "Exclude",
       "exportOptions": "导出选项",
       "exposure": "曝光",
+      "frameBlueWeightOffset": "Frame blue offset",
       "frameConversionStatus": {
         "preview_pending": "Preview pending",
         "preview_ready": "Preview ready",
@@ -2061,6 +2063,7 @@
         "skipped": "Skipped"
       },
       "frameExposureOffset": "Frame exposure offset",
+      "frameGreenWeightOffset": "Frame green offset",
       "frameHealth": "Frame health",
       "frameHealthActive": "Active",
       "frameHealthFilter": {
@@ -2085,6 +2088,9 @@
         "review": "Review",
         "skipped": "Skipped"
       },
+      "frameRedWeightOffset": "Frame red offset",
+      "frameRgbBalanceBadge": "RGB",
+      "frameRgbBalanceOffset": "Frame RGB balance offset",
       "frameWarningBaseEstimateActiveOnly": "Active base only",
       "frameWarningExcluded": "Excluded",
       "frameWarningPreviewNotReady": "Preview pending",
@@ -2163,6 +2169,7 @@
       "readoutCopied": "Copied readout",
       "redWeight": "红色（青色）",
       "resetFrameExposure": "Reset frame",
+      "resetFrameRgbBalance": "Reset frame RGB",
       "resetPrintEndpoints": "Reset endpoints",
       "resetTooltip": "重置",
       "resetViewTooltip": "重置视图",

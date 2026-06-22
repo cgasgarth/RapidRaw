@@ -1561,6 +1561,42 @@ async function prepareScenario(page, mode) {
     .getByTestId('negative-lab-recipe-frame-exposure-offset')
     .getByText('+0.50', { exact: true })
     .waitFor({ timeout: 10_000 });
+  const setFrameRgbBalanceOffset = async (channelIndex: number, value: number) => {
+    await page.getByTestId('negative-lab-frame-rgb-balance-override-control').evaluate(
+      (element, payload) => {
+        const input = element.querySelectorAll('input[type="range"]').item(payload.channelIndex);
+        if (!(input instanceof HTMLInputElement)) {
+          throw new Error('Missing Negative Lab frame RGB balance range input.');
+        }
+        const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+        valueSetter?.call(input, String(payload.value));
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      },
+      { channelIndex, value },
+    );
+  };
+  await setFrameRgbBalanceOffset(0, 0.08);
+  await setFrameRgbBalanceOffset(1, -0.02);
+  await setFrameRgbBalanceOffset(2, -0.06);
+  await page
+    .getByTestId('negative-lab-recipe-frame-rgb-balance-offset')
+    .getByText('Effective frame RGB R +0.08 / G -0.02 / B -0.06', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-roll-frame-rgb-balance-override-0').getByText('RGB', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.waitForFunction(() =>
+    (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).some((call) => {
+      const args = JSON.stringify(call.args ?? {});
+      return (
+        call.command === 'preview_negative_conversion' &&
+        args.includes('"red_weight":1.15') &&
+        args.includes('"green_weight":0.94') &&
+        args.includes('"blue_weight":1.12')
+      );
+    }),
+  );
   const setPrintEndpoint = async (testId: string, value: number) => {
     await page.getByTestId(testId).evaluate((element, nextValue) => {
       const input = element.querySelector('input[type="range"]');
@@ -1666,6 +1702,9 @@ async function prepareScenario(page, mode) {
     '"dispositionCounts"',
     '"frameExposureOverrides"',
     '"effectiveExposure": 0.45',
+    '"frameRgbBalanceOverrides"',
+    '"rgbBalanceOffset"',
+    '"redWeight": 0.08',
     '"omittedDispositionFrameIds"',
     '"negative-lab-frame-2": "rejected"',
     '"reviewFrameIds"',
