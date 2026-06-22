@@ -15,6 +15,9 @@ const requiredLocaleKeys = [
   'maskPreview',
   'maskPreviewEnabled',
   'previewMode',
+  'falloffSmoothness',
+  'rangeCenter',
+  'rangeWidth',
   'resetActiveRange',
   'saturation',
 ];
@@ -33,6 +36,8 @@ for (const marker of [
   'data-testid="selective-color-reset-active-range"',
   'data-testid="selective-color-mask-preview-toggle"',
   'data-testid="selective-color-preview-mode"',
+  'data-testid="selective-color-range-shape-controls"',
+  'data-testid="selective-color-range-summary-falloff"',
   'data-dirty={String(isActiveSelectiveColorAdjusted)}',
   'data-preview-mutates-adjustments="false"',
   'data-preview-source="selectiveColorRuntime.renderSelectiveColorMaskPreviewPixel"',
@@ -42,6 +47,9 @@ for (const marker of [
   'adjustments.color.activeRangeDeltas',
   'adjustments.color.maskPreview',
   'adjustments.color.previewMode',
+  'adjustments.color.rangeCenter',
+  'adjustments.color.rangeWidth',
+  'adjustments.color.falloffSmoothness',
   'adjustments.color.resetActiveRange',
 ]) {
   if (!source.includes(marker)) {

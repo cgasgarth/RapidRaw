@@ -878,10 +878,12 @@ export default function ColorPanel({
   const channelMixer = adjustments.channelMixer;
   const activeChannelMixerRow = channelMixer[activeChannelMixerOutput];
   const activeSelectiveColorRange = getSelectiveColorRange(activeColor);
-  const baseHue = activeSelectiveColorRange.centerHueDegrees;
+  const activeSelectiveColorRangeControl = adjustments.selectiveColorRangeControls[activeColor];
+  const baseHue = activeSelectiveColorRangeControl.centerHueDegrees;
   const activeSelectiveColorRangeLabel = t(activeSelectiveColorRange.labelKey);
-  const activeSelectiveColorRangeCenter = `${Math.round(activeSelectiveColorRange.centerHueDegrees)}°`;
-  const activeSelectiveColorRangeWidth = `${Math.round(activeSelectiveColorRange.widthDegrees)}°`;
+  const activeSelectiveColorRangeCenter = `${Math.round(activeSelectiveColorRangeControl.centerHueDegrees)}°`;
+  const activeSelectiveColorRangeWidth = `${Math.round(activeSelectiveColorRangeControl.widthDegrees)}°`;
+  const activeSelectiveColorRangeFalloff = activeSelectiveColorRangeControl.falloffSmoothness.toFixed(2);
   const effectiveHue = baseHue + (currentHsl.hue || 0);
   const activeSelectiveColorAdjustedHue = `${Math.round(((effectiveHue % 360) + 360) % 360)}°`;
   const activeSelectiveColorDeltaSummary = [
@@ -896,7 +898,13 @@ export default function ColorPanel({
   const isActiveSelectiveColorAdjusted =
     currentHsl.hue !== INITIAL_ADJUSTMENTS.hsl[activeColor].hue ||
     currentHsl.saturation !== INITIAL_ADJUSTMENTS.hsl[activeColor].saturation ||
-    currentHsl.luminance !== INITIAL_ADJUSTMENTS.hsl[activeColor].luminance;
+    currentHsl.luminance !== INITIAL_ADJUSTMENTS.hsl[activeColor].luminance ||
+    activeSelectiveColorRangeControl.centerHueDegrees !==
+      INITIAL_ADJUSTMENTS.selectiveColorRangeControls[activeColor].centerHueDegrees ||
+    activeSelectiveColorRangeControl.widthDegrees !==
+      INITIAL_ADJUSTMENTS.selectiveColorRangeControls[activeColor].widthDegrees ||
+    activeSelectiveColorRangeControl.falloffSmoothness !==
+      INITIAL_ADJUSTMENTS.selectiveColorRangeControls[activeColor].falloffSmoothness;
   const levels = adjustments.levels;
   const inputBlackMax = Math.max(0, Math.min(99, Math.round(levels.inputWhite * 100) - 1));
   const inputWhiteMin = Math.min(100, Math.max(1, Math.round(levels.inputBlack * 100) + 1));
@@ -939,6 +947,26 @@ export default function ColorPanel({
       hsl: {
         ...prev.hsl,
         [activeColor]: { ...INITIAL_ADJUSTMENTS.hsl[activeColor] },
+      },
+      selectiveColorRangeControls: {
+        ...prev.selectiveColorRangeControls,
+        [activeColor]: { ...INITIAL_ADJUSTMENTS.selectiveColorRangeControls[activeColor] },
+      },
+    }));
+  };
+
+  const handleSelectiveColorRangeControlChange = (
+    key: keyof Adjustments['selectiveColorRangeControls'][BlackWhiteMixerChannel],
+    value: number,
+  ) => {
+    setAdjustments((prev: Adjustments) => ({
+      ...prev,
+      selectiveColorRangeControls: {
+        ...prev.selectiveColorRangeControls,
+        [activeColor]: {
+          ...prev.selectiveColorRangeControls[activeColor],
+          [key]: value,
+        },
       },
     }));
   };
@@ -1827,6 +1855,13 @@ export default function ColorPanel({
           <span className="text-right tabular-nums text-text-secondary" data-testid="selective-color-preview-mode">
             {selectiveColorPreviewSummary}
           </span>
+          <span className="text-text-tertiary">{t('adjustments.color.falloffSmoothness')}</span>
+          <span
+            className="text-right tabular-nums text-text-secondary"
+            data-testid="selective-color-range-summary-falloff"
+          >
+            {activeSelectiveColorRangeFalloff}
+          </span>
           <button
             aria-pressed={selectiveColorPreviewMode === 'mask'}
             className={`col-span-2 inline-flex h-7 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors ${
@@ -1851,6 +1886,49 @@ export default function ColorPanel({
             <RotateCcw size={13} />
             <span>{t('adjustments.color.resetActiveRange')}</span>
           </button>
+        </div>
+        <div
+          className="mb-3 grid gap-2 rounded-md border border-surface bg-bg-primary p-2"
+          data-testid="selective-color-range-shape-controls"
+        >
+          <AdjustmentSlider
+            defaultValue={Math.round(activeSelectiveColorRange.centerHueDegrees)}
+            label={t('adjustments.color.rangeCenter')}
+            max={359}
+            min={0}
+            onDragStateChange={onDragStateChange}
+            onValueChange={(value) => {
+              handleSelectiveColorRangeControlChange('centerHueDegrees', value);
+            }}
+            step={1}
+            suffix="°"
+            value={Math.round(activeSelectiveColorRangeControl.centerHueDegrees)}
+          />
+          <AdjustmentSlider
+            defaultValue={Math.round(activeSelectiveColorRange.widthDegrees)}
+            label={t('adjustments.color.rangeWidth')}
+            max={180}
+            min={10}
+            onDragStateChange={onDragStateChange}
+            onValueChange={(value) => {
+              handleSelectiveColorRangeControlChange('widthDegrees', value);
+            }}
+            step={1}
+            suffix="°"
+            value={Math.round(activeSelectiveColorRangeControl.widthDegrees)}
+          />
+          <AdjustmentSlider
+            defaultValue={15}
+            label={t('adjustments.color.falloffSmoothness')}
+            max={40}
+            min={3}
+            onDragStateChange={onDragStateChange}
+            onValueChange={(value) => {
+              handleSelectiveColorRangeControlChange('falloffSmoothness', value / 10);
+            }}
+            step={1}
+            value={Math.round(activeSelectiveColorRangeControl.falloffSmoothness * 10)}
+          />
         </div>
         <div className="flex justify-between mb-4 px-1">
           {HSL_COLORS.map(({ name, color, label }) => (

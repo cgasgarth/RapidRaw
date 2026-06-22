@@ -1,4 +1,9 @@
 import { toMaskParameterRecord } from './maskParameterAccess';
+import {
+  DEFAULT_SELECTIVE_COLOR_RANGE_CONTROLS,
+  type SelectiveColorRangeControl,
+  type SelectiveColorRangeKey,
+} from './selectiveColorRanges';
 import { Mask, type SubMask, SubMaskMode } from '../components/panel/right/Masks';
 
 import type { LevelsSettings } from '../schemas/levelsSchemas';
@@ -249,6 +254,7 @@ export interface Adjustments {
   sharpness: number;
   sharpnessThreshold: number;
   showClipping: boolean;
+  selectiveColorRangeControls: Record<SelectiveColorRangeKey, SelectiveColorRangeControl>;
   skinToneUniformity: SkinToneUniformitySettings;
   structure: number;
   temperature: number;
@@ -599,6 +605,7 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
     reds: { hue: 0, saturation: 0, luminance: 0 },
     yellows: { hue: 0, saturation: 0, luminance: 0 },
   },
+  selectiveColorRangeControls: structuredClone(DEFAULT_SELECTIVE_COLOR_RANGE_CONTROLS),
   lumaNoiseReduction: 0,
   saturation: 0,
   sectionVisibility: {
@@ -680,6 +687,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
     reds: { hue: 0, saturation: 0, luminance: 0 },
     yellows: { hue: 0, saturation: 0, luminance: 0 },
   },
+  selectiveColorRangeControls: structuredClone(DEFAULT_SELECTIVE_COLOR_RANGE_CONTROLS),
   levels: structuredClone(INITIAL_LEVELS),
   lensCorrectionMode: 'manual',
   lensDistortionAmount: 100,
@@ -899,6 +907,10 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     colorCalibration: { ...INITIAL_ADJUSTMENTS.colorCalibration, ...(loadedAdjustments.colorCalibration || {}) },
     colorGrading: { ...INITIAL_ADJUSTMENTS.colorGrading, ...(loadedAdjustments.colorGrading || {}) },
     hsl: { ...INITIAL_ADJUSTMENTS.hsl, ...(loadedAdjustments.hsl || {}) },
+    selectiveColorRangeControls: {
+      ...INITIAL_ADJUSTMENTS.selectiveColorRangeControls,
+      ...(loadedAdjustments.selectiveColorRangeControls || {}),
+    },
     skinToneUniformity: {
       ...INITIAL_ADJUSTMENTS.skinToneUniformity,
       ...(loadedAdjustments.skinToneUniformity || {}),

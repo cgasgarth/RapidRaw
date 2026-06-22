@@ -1,5 +1,10 @@
-import { calculateDefaultSelectiveColorInfluence } from './selectiveColorFalloff';
-import { getSelectiveColorRange, type SelectiveColorRangeKey } from './selectiveColorRanges';
+import { calculateDefaultSelectiveColorInfluence, calculateSelectiveColorInfluence } from './selectiveColorFalloff';
+import {
+  getSelectiveColorRange,
+  normalizeSelectiveColorRangeControl,
+  type SelectiveColorRangeControl,
+  type SelectiveColorRangeKey,
+} from './selectiveColorRanges';
 
 export interface RgbPixel {
   blue: number;
@@ -12,6 +17,8 @@ export interface SelectiveColorAdjustment {
   luminance: number;
   saturation: number;
 }
+
+export type SelectiveColorRangeControls = Partial<Record<SelectiveColorRangeKey, Partial<SelectiveColorRangeControl>>>;
 
 export interface SelectiveColorRuntimeResult {
   hueDegrees: number;
@@ -71,9 +78,10 @@ export function applySelectiveColorToRgbPixel(
   pixel: RgbPixel,
   rangeKey: SelectiveColorRangeKey,
   adjustment: SelectiveColorAdjustment,
+  rangeControls?: SelectiveColorRangeControls,
 ): SelectiveColorRuntimeResult {
   const hsl = rgbToHsl(pixel);
-  const maskWeight = calculateSelectiveColorMaskWeight(pixel, rangeKey);
+  const maskWeight = calculateSelectiveColorMaskWeight(pixel, rangeKey, rangeControls);
   const influence = maskWeight;
   const outputRgb = hslToRgb({
     hue: wrapHue(hsl.hue + adjustment.hue * influence),
@@ -90,20 +98,37 @@ export function applySelectiveColorToRgbPixel(
   };
 }
 
-export function calculateSelectiveColorMaskWeight(pixel: RgbPixel, rangeKey: SelectiveColorRangeKey): number {
+export function calculateSelectiveColorMaskWeight(
+  pixel: RgbPixel,
+  rangeKey: SelectiveColorRangeKey,
+  rangeControls?: SelectiveColorRangeControls,
+): number {
   const hsl = rgbToHsl(pixel);
   const range = getSelectiveColorRange(rangeKey);
-  const hueInfluence = calculateDefaultSelectiveColorInfluence({
-    centerHueDegrees: range.centerHueDegrees,
-    hueDegrees: hsl.hue,
-    widthDegrees: range.widthDegrees,
-  });
+  const control = normalizeSelectiveColorRangeControl(rangeKey, rangeControls?.[rangeKey]);
+  const hueInfluence =
+    rangeControls?.[rangeKey] === undefined
+      ? calculateDefaultSelectiveColorInfluence({
+          centerHueDegrees: range.centerHueDegrees,
+          hueDegrees: hsl.hue,
+          widthDegrees: range.widthDegrees,
+        })
+      : calculateSelectiveColorInfluence({
+          centerHueDegrees: control.centerHueDegrees,
+          hueDegrees: hsl.hue,
+          smoothness: control.falloffSmoothness,
+          widthDegrees: control.widthDegrees,
+        });
 
   return hueInfluence * calculateNeutralSelectiveColorWeight(hsl.saturation);
 }
 
-export function renderSelectiveColorMaskPreviewPixel(pixel: RgbPixel, rangeKey: SelectiveColorRangeKey): RgbPixel {
-  const maskWeight = calculateSelectiveColorMaskWeight(pixel, rangeKey);
+export function renderSelectiveColorMaskPreviewPixel(
+  pixel: RgbPixel,
+  rangeKey: SelectiveColorRangeKey,
+  rangeControls?: SelectiveColorRangeControls,
+): RgbPixel {
+  const maskWeight = calculateSelectiveColorMaskWeight(pixel, rangeKey, rangeControls);
   return { blue: maskWeight, green: maskWeight, red: maskWeight };
 }
 
