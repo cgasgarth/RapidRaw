@@ -22,6 +22,7 @@ import {
   renderSelectiveColorMaskPreviewPixel,
   type RgbPixel,
 } from '../../utils/selectiveColorRuntime';
+import { applySkinToneUniformity, type SkinToneUniformityInput } from '../../utils/skinToneUniformity';
 import ColorWheel from '../ui/ColorWheel';
 import UiText from '../ui/Text';
 
@@ -75,6 +76,24 @@ const rgbPixelToCssColor = ({ blue, green, red }: RgbPixel): string =>
 
 const formatSelectiveColorProofRgb = (pixel: RgbPixel): string =>
   [pixel.red, pixel.green, pixel.blue].map((channel) => channel.toFixed(3)).join(',');
+
+const skinToneInspectorSample: SkinToneUniformityInput = {
+  hueDegrees: 18,
+  luminance: 0.5,
+  saturation: 0.45,
+};
+
+const skinToneTargetDistance = (
+  input: SkinToneUniformityInput,
+  settings: Pick<Adjustments['skinToneUniformity'], 'targetHueDegrees' | 'targetLuminance' | 'targetSaturation'>,
+): number => {
+  const hueDelta = Math.abs((((settings.targetHueDegrees - input.hueDegrees + 540) % 360) - 180) / 180);
+  return (
+    hueDelta +
+    Math.abs(settings.targetLuminance - input.luminance) +
+    Math.abs(settings.targetSaturation - input.saturation)
+  );
+};
 
 const isColorGradingPresetApplied = (colorGrading: Adjustments['colorGrading'], preset: ColorGradingPreset): boolean =>
   colorGrading.balance === preset.balance &&
@@ -1165,6 +1184,16 @@ export default function ColorPanel({
     };
   };
   const skinTonePreview = skinTonePreviewHsl(adjustments.skinToneUniformity);
+  const skinToneInspectorOutput = applySkinToneUniformity(skinToneInspectorSample, adjustments.skinToneUniformity);
+  const skinToneInspectorBeforeDistance = skinToneTargetDistance(
+    skinToneInspectorSample,
+    adjustments.skinToneUniformity,
+  );
+  const skinToneInspectorAfterDistance = skinToneTargetDistance(
+    skinToneInspectorOutput,
+    adjustments.skinToneUniformity,
+  );
+  const skinToneInspectorImprovement = skinToneInspectorBeforeDistance - skinToneInspectorAfterDistance;
 
   const syncSkinToneUniformity = (nextSettings: Adjustments['skinToneUniformity']) => {
     const nextPreview = skinTonePreviewHsl(nextSettings);
@@ -1288,6 +1317,10 @@ export default function ColorPanel({
           data-hsl-preview-hue={skinTonePreview.hue}
           data-hsl-preview-luminance={skinTonePreview.luminance}
           data-hsl-preview-saturation={skinTonePreview.saturation}
+          data-inspector-distance-after={skinToneInspectorAfterDistance.toFixed(3)}
+          data-inspector-distance-before={skinToneInspectorBeforeDistance.toFixed(3)}
+          data-inspector-improvement={skinToneInspectorImprovement.toFixed(3)}
+          data-inspector-output-hue={skinToneInspectorOutput.hueDegrees.toFixed(1)}
           data-skin-tone-runtime-proof="private-raw-preview-export"
           data-testid="skin-tone-uniformity-controls"
         >
@@ -1322,6 +1355,10 @@ export default function ColorPanel({
                 lightness: skinTonePreview.luminance,
                 saturation: skinTonePreview.saturation,
               })}
+            </span>
+            <span className="flex justify-between gap-2" data-testid="skin-tone-uniformity-inspector">
+              <span>{skinToneInspectorBeforeDistance.toFixed(3)}</span>
+              <span>{skinToneInspectorAfterDistance.toFixed(3)}</span>
             </span>
           </div>
           <AdjustmentSlider
