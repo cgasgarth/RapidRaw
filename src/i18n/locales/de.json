@@ -1993,9 +1993,18 @@
       "summarySources": "Sources",
       "summaryStrategy": "Strategy",
       "summaryTitle": "Merge summary",
+      "summaryToneMappingPreset": "",
       "summaryToneMapPreview": "Tone map",
       "summaryWorkload": "Workload",
       "title": "Zu HDR zusammenfügen",
+      "toneMappingPreset": {
+        "custom": "",
+        "fastPreview": "",
+        "highlightDetail": "",
+        "interiorLift": "",
+        "natural": ""
+      },
+      "toneMappingPresetLabel": "",
       "toneMapPreview": "Tone-map preview",
       "uiOnlyNotice": "These controls define the requested HDR merge artifact. Runtime merge quality remains validated by fixture, sidecar, and image-processing checks.",
       "workflowStatus": "Bracket, alignment, deghosting, tone-map, and preview controls are recorded for the HDR request.",

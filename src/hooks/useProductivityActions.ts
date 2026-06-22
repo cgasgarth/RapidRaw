@@ -99,11 +99,17 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
 
   const handleStartHdr = useCallback(
     (paths: string[]) => {
+      const { hdrModalState } = useUIStore.getState();
+      const { settings } = hdrModalState;
       const dryRunCommand = {
         toolName: getComputationalMergeAppServerRoutePairSummary('hdr').dryRunToolName,
         commandType: 'computationalMerge.createHdr' as const,
+        deghosting: settings.deghosting,
         dryRun: true as const,
+        maxPreviewDimensionPx: settings.maxPreviewDimensionPx,
+        mergeStrategy: settings.mergeStrategy,
         sources: paths.length,
+        toneMappingPreset: settings.toneMappingPreset,
       };
       setUI((state) => ({
         hdrModalState: {

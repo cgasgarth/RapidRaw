@@ -5,6 +5,13 @@ export const hdrMergeBracketValidationSchema = z.enum(['required', 'warn', 'disa
 export const hdrMergeDeghostingSchema = z.enum(['off', 'low', 'medium', 'high']);
 export const hdrMergeStrategySchema = z.enum(['scene_linear_radiance', 'exposure_fusion_preview']);
 export const hdrMergeQualityPreferenceSchema = z.enum(['preview', 'balanced', 'best']);
+export const hdrToneMappingPresetSchema = z.enum([
+  'custom',
+  'natural',
+  'highlight_detail',
+  'interior_lift',
+  'fast_preview',
+]);
 
 export const hdrMergeUiSettingsSchema = z
   .object({
@@ -16,6 +23,7 @@ export const hdrMergeUiSettingsSchema = z
     qualityPreference: hdrMergeQualityPreferenceSchema,
     sourceMode: z.literal('exposure_bracket'),
     toneMapPreview: z.boolean(),
+    toneMappingPreset: hdrToneMappingPresetSchema,
   })
   .strict();
 
@@ -58,7 +66,73 @@ export type HdrMergeBracketValidation = z.infer<typeof hdrMergeBracketValidation
 export type HdrMergeDeghosting = z.infer<typeof hdrMergeDeghostingSchema>;
 export type HdrMergeStrategy = z.infer<typeof hdrMergeStrategySchema>;
 export type HdrMergeQualityPreference = z.infer<typeof hdrMergeQualityPreferenceSchema>;
+export type HdrToneMappingPreset = z.infer<typeof hdrToneMappingPresetSchema>;
 export type HdrEditableHandoffSummary = z.infer<typeof hdrEditableHandoffSummarySchema>;
+
+type HdrToneMappingPresetPatch = Pick<
+  HdrMergeUiSettings,
+  | 'deghosting'
+  | 'maxPreviewDimensionPx'
+  | 'mergeStrategy'
+  | 'qualityPreference'
+  | 'toneMapPreview'
+  | 'toneMappingPreset'
+>;
+
+export const HDR_TONE_MAPPING_PRESETS: Array<{
+  id: Exclude<HdrToneMappingPreset, 'custom'>;
+  labelKey: string;
+  patch: HdrToneMappingPresetPatch;
+}> = [
+  {
+    id: 'natural',
+    labelKey: 'modals.hdr.toneMappingPreset.natural',
+    patch: {
+      deghosting: 'medium',
+      maxPreviewDimensionPx: 2400,
+      mergeStrategy: 'scene_linear_radiance',
+      qualityPreference: 'balanced',
+      toneMapPreview: true,
+      toneMappingPreset: 'natural',
+    },
+  },
+  {
+    id: 'highlight_detail',
+    labelKey: 'modals.hdr.toneMappingPreset.highlightDetail',
+    patch: {
+      deghosting: 'high',
+      maxPreviewDimensionPx: 4096,
+      mergeStrategy: 'scene_linear_radiance',
+      qualityPreference: 'best',
+      toneMapPreview: true,
+      toneMappingPreset: 'highlight_detail',
+    },
+  },
+  {
+    id: 'interior_lift',
+    labelKey: 'modals.hdr.toneMappingPreset.interiorLift',
+    patch: {
+      deghosting: 'medium',
+      maxPreviewDimensionPx: 4096,
+      mergeStrategy: 'exposure_fusion_preview',
+      qualityPreference: 'balanced',
+      toneMapPreview: true,
+      toneMappingPreset: 'interior_lift',
+    },
+  },
+  {
+    id: 'fast_preview',
+    labelKey: 'modals.hdr.toneMappingPreset.fastPreview',
+    patch: {
+      deghosting: 'low',
+      maxPreviewDimensionPx: 2400,
+      mergeStrategy: 'exposure_fusion_preview',
+      qualityPreference: 'preview',
+      toneMapPreview: true,
+      toneMappingPreset: 'fast_preview',
+    },
+  },
+];
 
 export const DEFAULT_HDR_MERGE_UI_SETTINGS = hdrMergeUiSettingsSchema.parse({
   alignmentMode: 'auto',
@@ -69,9 +143,19 @@ export const DEFAULT_HDR_MERGE_UI_SETTINGS = hdrMergeUiSettingsSchema.parse({
   qualityPreference: 'balanced',
   sourceMode: 'exposure_bracket',
   toneMapPreview: true,
+  toneMappingPreset: 'natural',
 });
 
 export const normalizeHdrMergeUiSettings = (value: unknown): HdrMergeUiSettings => {
   const parsed = hdrMergeUiSettingsSchema.safeParse(value);
   return parsed.success ? parsed.data : DEFAULT_HDR_MERGE_UI_SETTINGS;
+};
+
+export const applyHdrToneMappingPreset = (
+  settings: HdrMergeUiSettings,
+  preset: Exclude<HdrToneMappingPreset, 'custom'>,
+): HdrMergeUiSettings => {
+  const selectedPreset = HDR_TONE_MAPPING_PRESETS.find((candidate) => candidate.id === preset);
+  if (!selectedPreset) return settings;
+  return hdrMergeUiSettingsSchema.parse({ ...settings, ...selectedPreset.patch });
 };

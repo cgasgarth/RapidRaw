@@ -17,7 +17,7 @@ runComputationalUiApiSmoke({
   buildDryRunCommand: buildHdrMergeUiDryRunCommandV1,
   label: 'hdr',
   validDryRunArgs: [
-    { outputName: 'Kitchen Window HDR', sources: hdrSources },
+    { outputName: 'Kitchen Window HDR', sources: hdrSources, toneMappingPreset: 'highlight_detail' },
     {
       commandId: 'command_hdr_ui_dry_run_001',
       correlationId: 'corr_hdr_ui_dry_run_001',
@@ -37,9 +37,17 @@ runComputationalUiApiSmoke({
     if (command.parameters.sources.some((source) => source.exposureEv === undefined)) {
       failures.push('HDR UI mapper must preserve exposure EV values.');
     }
+    if (command.parameters.toneMappingPreset !== 'highlight_detail') {
+      failures.push('HDR UI mapper must preserve the tone-mapping preset.');
+    }
   },
   validApplyArgs: [
-    { deghosting: 'high', outputName: 'Kitchen Window HDR', sources: hdrSources },
+    {
+      deghosting: 'high',
+      outputName: 'Kitchen Window HDR',
+      sources: hdrSources,
+      toneMappingPreset: 'highlight_detail',
+    },
     {
       acceptedDryRunPlanHash: 'sha256:hdr-ui-plan-001',
       acceptedDryRunPlanId: 'hdr_ui_plan_001',
@@ -59,6 +67,9 @@ runComputationalUiApiSmoke({
     }
     if (command.parameters.deghosting !== 'high') {
       failures.push('HDR UI apply mapper must preserve UI control overrides.');
+    }
+    if (command.parameters.toneMappingPreset !== 'highlight_detail') {
+      failures.push('HDR UI apply mapper must preserve tone-mapping preset overrides.');
     }
   },
   invalidCases: [

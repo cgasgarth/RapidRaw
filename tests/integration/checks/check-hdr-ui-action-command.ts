@@ -32,6 +32,7 @@ const settings = {
   mergeStrategy: 'scene_linear_radiance',
   qualityPreference: 'balanced',
   toneMapPreview: true,
+  toneMappingPreset: 'highlight_detail',
 } as const;
 const routePair = getComputationalMergeAppServerRoutePairSummary('hdr');
 const packageCommand = buildHdrMergeUiDryRunCommandV1(
@@ -49,6 +50,7 @@ const packageCommand = buildHdrMergeUiDryRunCommandV1(
       sourceIndex,
     })),
     toneMapPreview: settings.toneMapPreview,
+    toneMappingPreset: settings.toneMappingPreset,
   },
   {
     commandId: 'command_hdr_ui_action_boundary_dry_run',
@@ -95,6 +97,9 @@ if (settings.deghosting !== packageCommand.parameters.deghosting) {
 }
 if (settings.mergeStrategy !== packageCommand.parameters.mergeStrategy) {
   failures.push('HDR UI action merge strategy must match package command builder.');
+}
+if (settings.toneMappingPreset !== packageCommand.parameters.toneMappingPreset) {
+  failures.push('HDR UI action tone-mapping preset must match package command builder.');
 }
 
 if (failures.length > 0) {
