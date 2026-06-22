@@ -8,6 +8,7 @@ import {
   buildRawEngineAppServerCapabilitiesReplay,
   buildRawEngineAppServerHealthReplay,
   buildRawEngineAppServerHostResponseEnvelope,
+  buildRawEngineAppServerHostResponseEnvelopeAsync,
   buildRawEngineAppServerLifecycleReplay,
   buildRawEngineAppServerRouteCatalogReplay,
   cancelRawEngineAppServerSupervisor,
@@ -15,6 +16,7 @@ import {
   createRawEngineAppServerSupervisorState,
   failRawEngineAppServerSupervisor,
   handleRawEngineAppServerHostRequest,
+  handleRawEngineAppServerHostRequestAsync,
   initializeRawEngineAppServerLifecycle,
   assertRawEngineAppServerLifecycleReady,
   markRawEngineAppServerSupervisorReady,
@@ -22,6 +24,7 @@ import {
   stopRawEngineAppServerLifecycle,
   stopRawEngineAppServerSupervisor,
 } from '../../../src/utils/rawEngineAppServerHost.ts';
+import { sampleToneColorCommandEnvelopeV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import {
   RawEngineAppServerHostToolName,
   RawEngineAppServerLifecyclePhase,
@@ -46,6 +49,7 @@ const manifest = rawEngineAppServerHostManifestSchema.parse(RAW_ENGINE_APP_SERVE
 const healthTool = manifest.tools.find((tool) => tool.toolName === RawEngineAppServerHostToolName.Health);
 const capabilitiesTool = manifest.tools.find((tool) => tool.toolName === RawEngineAppServerHostToolName.Capabilities);
 const routeCatalogTool = manifest.tools.find((tool) => tool.toolName === RawEngineAppServerHostToolName.RouteCatalog);
+const dispatchTool = manifest.tools.find((tool) => tool.toolName === RawEngineAppServerHostToolName.DispatchTool);
 const clientInfo = {
   name: 'rawengine_desktop',
   title: 'RawEngine Desktop',
@@ -77,6 +81,18 @@ const fixtureThreadNotificationSchema = z
       .strict(),
   })
   .strict();
+const fixtureDispatchEnvelopeSchema = rawEngineAppServerHostResponseEnvelopeSchema.extend({
+  request: z.object({ runtimeToolName: z.literal('tonecolor.dry_run_command') }).passthrough(),
+  response: z
+    .object({ dispatchStatus: z.literal('completed'), runtimeToolName: z.literal('tonecolor.dry_run_command') })
+    .passthrough(),
+});
+const dispatchRequest = {
+  arguments: sampleToneColorCommandEnvelopeV1,
+  requestId: 'dispatch_tonecolor_dry_run_001',
+  runtimeToolName: 'tonecolor.dry_run_command',
+  toolName: RawEngineAppServerHostToolName.DispatchTool,
+};
 
 const lifecycleCreated = createRawEngineAppServerLifecycleState({ connectionId: 'conn_stdio_001' });
 try {
@@ -244,6 +260,7 @@ const runStdioLaunchProof = async () => {
     })}\n`,
   );
   proc.stdin.write(`${JSON.stringify({ method: 'initialized', params: {} })}\n`);
+  proc.stdin.write(`${JSON.stringify(dispatchRequest)}\n`);
   proc.stdin.end();
 
   const stdoutPromise = new Response(proc.stdout).text();
@@ -270,12 +287,13 @@ const runStdioLaunchProof = async () => {
     .filter((line) => line.length > 0);
   const initializeResponseLine = responseLines[0];
   const threadStartedLine = responseLines[1];
+  const dispatchEnvelopeLine = responseLines[2];
 
-  if (initializeResponseLine === undefined || threadStartedLine === undefined) {
+  if (initializeResponseLine === undefined || threadStartedLine === undefined || dispatchEnvelopeLine === undefined) {
     return failRawEngineAppServerSupervisor({
       error: {
         code: RawEngineAppServerStructuredErrorCode.HealthTimeout,
-        message: 'stdio fixture did not emit initialize response and thread notification.',
+        message: 'stdio fixture did not emit initialize response, thread notification, and dispatch envelope.',
         recoverable: true,
       },
       state,
@@ -285,6 +303,7 @@ const runStdioLaunchProof = async () => {
 
   fixtureResponseSchema.parse(JSON.parse(initializeResponseLine));
   fixtureThreadNotificationSchema.parse(JSON.parse(threadStartedLine));
+  fixtureDispatchEnvelopeSchema.parse(JSON.parse(dispatchEnvelopeLine));
   const running = markRawEngineAppServerSupervisorReady({
     state,
     timestampIso: '2026-06-17T12:03:02.000Z',
@@ -327,6 +346,14 @@ if (routeCatalogTool === undefined) {
   if (routeCatalogTool.mutates) failures.push('Route catalog tool must be read-only.');
   if (routeCatalogTool.toolKind !== RawEngineAppServerToolKind.Read) {
     failures.push('Route catalog tool must use read kind.');
+  }
+}
+if (dispatchTool === undefined) {
+  failures.push(`Missing ${RawEngineAppServerHostToolName.DispatchTool} tool.`);
+} else {
+  if (!dispatchTool.mutates) failures.push('Dispatch tool must be marked mutating-capable.');
+  if (dispatchTool.toolKind !== RawEngineAppServerToolKind.Command) {
+    failures.push('Dispatch tool must use command kind.');
   }
 }
 
@@ -441,6 +468,26 @@ if (dispatchedRouteCatalog.status !== RawEngineAppServerResponseStatus.Ok) {
   failures.push('Dispatched route catalog request failed.');
 }
 
+const dispatchedToolCall = await handleRawEngineAppServerHostRequestAsync(dispatchRequest);
+if (
+  dispatchedToolCall.status !== RawEngineAppServerResponseStatus.Ok ||
+  !('dispatchStatus' in dispatchedToolCall) ||
+  dispatchedToolCall.dispatchStatus !== 'completed'
+) {
+  failures.push('Dispatched typed local tool call failed.');
+}
+const rejectedMismatchedToolCall = await handleRawEngineAppServerHostRequestAsync({
+  ...dispatchRequest,
+  runtimeToolName: 'tonecolor.apply_command',
+});
+if (
+  !('dispatchStatus' in rejectedMismatchedToolCall) ||
+  rejectedMismatchedToolCall.dispatchStatus !== 'rejected' ||
+  rejectedMismatchedToolCall.message?.includes('cannot dispatch') !== true
+) {
+  failures.push('Mismatched host tool dispatch must fail closed.');
+}
+
 const envelopeRequests = [
   {
     requestId: 'envelope_health_001',
@@ -471,6 +518,17 @@ for (const request of envelopeRequests) {
   if (envelope.transport !== manifest.transport) failures.push(`${request.toolName} envelope transport mismatch.`);
 }
 
+const dispatchEnvelope = rawEngineAppServerHostResponseEnvelopeSchema.parse(
+  await buildRawEngineAppServerHostResponseEnvelopeAsync(dispatchRequest, '2026-06-17T12:00:00.000Z'),
+);
+if (
+  !('dispatchStatus' in dispatchEnvelope.response) ||
+  dispatchEnvelope.response.dispatchStatus !== 'completed' ||
+  dispatchEnvelope.response.runtimeToolName !== 'tonecolor.dry_run_command'
+) {
+  failures.push('Async dispatch envelope did not return completed typed tool result.');
+}
+
 const source = [
   'src/utils/rawEngineAppServerHost.ts',
   'src/schemas/agentRuntimeSchemas.ts',
@@ -484,7 +542,9 @@ for (const marker of [
   RawEngineAppServerHostToolName.Health,
   RawEngineAppServerHostToolName.Capabilities,
   RawEngineAppServerHostToolName.RouteCatalog,
+  RawEngineAppServerHostToolName.DispatchTool,
   'buildRawEngineAppServerHostResponseEnvelope',
+  'buildRawEngineAppServerHostResponseEnvelopeAsync',
   'buildRawEngineAppServerLifecycleReplay',
   'assertRawEngineAppServerLifecycleReady',
   'createRawEngineAppServerSupervisorState',

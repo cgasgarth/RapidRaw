@@ -2,6 +2,8 @@
 
 import { z } from 'zod';
 
+import { buildRawEngineAppServerHostResponseEnvelopeAsync } from '../../src/utils/rawEngineAppServerHost.ts';
+
 const clientInfoSchema = z
   .object({
     name: z.string().trim().min(1),
@@ -66,3 +68,7 @@ console.log(
     },
   }),
 );
+
+for (const requestLine of lines.slice(2)) {
+  console.log(JSON.stringify(await buildRawEngineAppServerHostResponseEnvelopeAsync(JSON.parse(requestLine))));
+}
