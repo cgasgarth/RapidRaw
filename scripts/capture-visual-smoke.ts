@@ -1629,6 +1629,9 @@ async function prepareScenario(page, mode) {
       proof.layerCreated !== 'true' ||
       proof.openCallback !== 'handleImageSelect' ||
       proof.openedPath !== '/proof-roll/negative-lab/frame_001_Positive.tiff' ||
+      proof.sourceNegativePath !== '/proof-roll/negative-lab/frame_001.CR3' ||
+      proof.rollSessionId !== 'roll_session_negative_lab_visual_smoke' ||
+      proof.conversionReportId !== 'negative_lab_conversion_report_visual_smoke' ||
       proof.savedPath !== '/proof-roll/negative-lab/frame_001_Positive.tiff' ||
       proof.sidecarSourceImagePath !== '/proof-roll/negative-lab/frame_001_Positive.tiff'
     ) {
@@ -1923,6 +1926,19 @@ async function prepareScenario(page, mode) {
       .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabSavedPathProof)
       .getByText('/tmp/rawengine-negative-smoke-positive.tif', { exact: true })
       .waitFor({ timeout: 10_000 });
+    const batchSavedPathProof = await page
+      .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabSavedPathProof)
+      .evaluate((element) => ({ ...element.dataset }));
+    if (
+      batchSavedPathProof.openedPositiveInEditor !== 'true' ||
+      batchSavedPathProof.openedPath !== '/tmp/rawengine-negative-smoke-positive.tif' ||
+      batchSavedPathProof.refreshBeforeOpen !== 'true' ||
+      batchSavedPathProof.optOutRefreshed !== 'true' ||
+      batchSavedPathProof.optOutOpenedPath !== '' ||
+      batchSavedPathProof.startedFromNonTargetEditorImage !== 'true'
+    ) {
+      throw new Error('Negative Lab batch save did not open the saved positive in the editor handoff.');
+    }
     return;
   }
 
@@ -2766,6 +2782,19 @@ async function prepareScenario(page, mode) {
     .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabSavedPathProof)
     .getByText('/tmp/rawengine-negative-smoke-positive.tif', { exact: true })
     .waitFor({ timeout: 10_000 });
+  const savedPathProof = await page
+    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabSavedPathProof)
+    .evaluate((element) => ({ ...element.dataset }));
+  if (
+    savedPathProof.openedPositiveInEditor !== 'true' ||
+    savedPathProof.openedPath !== '/tmp/rawengine-negative-smoke-positive.tif' ||
+    savedPathProof.refreshBeforeOpen !== 'true' ||
+    savedPathProof.optOutRefreshed !== 'true' ||
+    savedPathProof.optOutOpenedPath !== '' ||
+    savedPathProof.startedFromNonTargetEditorImage !== 'true'
+  ) {
+    throw new Error('Negative Lab save did not open the saved positive in the editor handoff.');
+  }
   await page.getByTestId('negative-lab-roll-frame-0').click();
   await page.getByTestId('negative-lab-apply-roll-normalization').click();
   await page.getByTestId('negative-lab-roll-frame-exposure-override-0').getByText('+0.15', { exact: true }).waitFor({

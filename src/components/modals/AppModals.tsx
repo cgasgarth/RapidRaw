@@ -30,6 +30,7 @@ import {
   useUIStore,
 } from '../../store/useUIStore';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
+import { handleNegativeConversionEditorHandoff } from '../../utils/negativeLabEditorHandoff';
 
 import type { CopyPasteSettings } from '../../utils/adjustments';
 import type { AppSettings, AlbumItem } from '../ui/AppProperties';
@@ -350,22 +351,16 @@ export default function AppModals(props: AppModalsProps) {
               setUI((state) => ({ negativeModalState: { ...state.negativeModalState, isOpen: false } }));
             }}
             targetPaths={negativeModalState.targetPaths}
-            onSave={(savedPaths) => {
-              void props
-                .refreshImageList()
-                .then(() => {
-                  if (
-                    selectedImage &&
-                    negativeModalState.targetPaths.includes(selectedImage.path) &&
-                    savedPaths.length > 0
-                  ) {
-                    const savedPath = savedPaths[0];
-                    if (savedPath) props.handleImageSelect(savedPath);
-                  }
-                })
-                .catch((err: unknown) => {
+            onSave={(savedPaths, handoff) => {
+              void handleNegativeConversionEditorHandoff({
+                handleImageSelect: props.handleImageSelect,
+                handoff,
+                onRefreshError: (err) => {
                   console.error('Failed to refresh image list after negative conversion:', err);
-                });
+                },
+                refreshImageList: props.refreshImageList,
+                savedPaths,
+              });
             }}
           />
         </Suspense>

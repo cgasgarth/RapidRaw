@@ -1,32 +1,27 @@
 #!/usr/bin/env bun
 
+import { readFileSync } from 'node:fs';
+
 import { z } from 'zod';
 
 import { INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../src/utils/adjustments.ts';
 import { applyLayerStackCommandBridgeOperation } from '../../../src/utils/layerStackCommandBridge.ts';
-import { layerStackSidecarV1Schema, readLayerStackSidecarsFromSidecar } from '../../../packages/rawengine-schema/src';
+import {
+  layerStackSidecarV1Schema,
+  negativeLabPositiveArtifactHandleV1Schema,
+  readLayerStackSidecarsFromSidecar,
+} from '../../../packages/rawengine-schema/src';
 
-const outputArtifactSchema = z
-  .object({
-    artifactId: z.string().trim().min(1),
-    contentHash: z.string().regex(/^fnv1a64:[a-f0-9]{16}$/u),
-    dimensions: z
-      .object({
-        height: z.number().int().positive(),
-        width: z.number().int().positive(),
-      })
-      .strict(),
-    kind: z.literal('negative_lab_positive'),
-    outputIntent: z.literal('editable_positive'),
-    positiveVariantId: z.string().trim().min(1),
-    storage: z.literal('sidecar_artifact'),
-  })
-  .strict();
+const appModalsSource = readFileSync('src/components/modals/AppModals.tsx', 'utf8');
+const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
+const handoffSource = readFileSync('src/utils/negativeLabEditorHandoff.ts', 'utf8');
+const visualSmokeSource = readFileSync('src/validation/visual/VisualSmokeApp.tsx', 'utf8');
+const visualSmokeCaptureSource = readFileSync('scripts/capture-visual-smoke.ts', 'utf8');
 
 const negativeLabArtifactSchema = z
   .object({
     artifactId: z.string().trim().min(1),
-    outputArtifacts: z.array(outputArtifactSchema).min(1),
+    outputArtifacts: z.array(negativeLabPositiveArtifactHandleV1Schema).min(1),
   })
   .passthrough();
 
@@ -120,6 +115,26 @@ if (applied.sidecar.sourceImagePath !== savedPositivePath) {
 
 if (applied.sidecar.layers[0]?.id !== layer.id) {
   throw new Error('Expected layer stack command to create an editable print-grade layer.');
+}
+
+for (const [label, source, marker] of [
+  ['modal save contract', modalSource, 'onSave(savedPaths, { openInEditor: openSavedPositiveInEditor });'],
+  ['modal handoff control', modalSource, 'negative-lab-positive-open-in-editor'],
+  ['app handoff route', appModalsSource, 'handleNegativeConversionEditorHandoff({'],
+  ['refresh best effort', handoffSource, 'onRefreshError?.(error);'],
+  ['handoff exact first path', handoffSource, 'handleImageSelect(firstSavedPath);'],
+  ['visual smoke handoff state', visualSmokeSource, 'data-opened-positive-in-editor='],
+  ['visual smoke shared helper', visualSmokeSource, 'handleNegativeConversionEditorHandoff({'],
+  ['visual smoke opt out', visualSmokeSource, 'handoff: { openInEditor: false }'],
+  ['visual smoke order proof', visualSmokeSource, 'data-refresh-before-open='],
+  ['visual smoke provenance source', visualSmokeSource, 'data-source-negative-path={sourceNegativePath}'],
+  ['visual smoke provenance roll', visualSmokeSource, 'data-roll-session-id={rollSessionId}'],
+  ['visual smoke provenance report', visualSmokeSource, 'data-conversion-report-id={conversionReportId}'],
+  ['visual smoke capture proof', visualSmokeCaptureSource, 'Negative Lab save did not open the saved positive'],
+] as const) {
+  if (!source.includes(marker)) {
+    throw new Error(`Negative Lab positive editor handoff marker missing: ${label}`);
+  }
 }
 
 console.log('negative lab editor layer handoff ok (editable positive + layer command)');

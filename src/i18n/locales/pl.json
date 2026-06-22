@@ -2397,6 +2397,7 @@
       "pickViewerPatch": "",
       "positiveHandoff": "Positive handoff",
       "positiveHandoffFrame": "Frame {{frameId}}",
+      "positiveHandoffOpenInEditor": "Open first saved positive in editor",
       "positiveHandoffProfile": "Profile {{profileId}}",
       "positiveHandoffProvenance": "Proof {{proofId}}",
       "positiveHandoffReady": "Ready",

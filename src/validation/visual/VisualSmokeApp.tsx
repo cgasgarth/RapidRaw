@@ -41,6 +41,7 @@ import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/comp
 import { DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF } from '../../utils/detailOutputComparisonProof';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
 import { applyLayerStackCommandBridgeOperation } from '../../utils/layerStackCommandBridge';
+import { handleNegativeConversionEditorHandoff } from '../../utils/negativeLabEditorHandoff';
 import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
 
 import type { FocusStackOutputReviewWorkflow } from '../../schemas/focusStackOutputReviewSchemas';
@@ -919,6 +920,10 @@ const copy = {
   negativeLabEditablePositive: 'Editable positive',
   negativeLabLayer: 'Layer',
   negativeLabOpacity: 'Opacity',
+  negativeLabProvenance: 'Provenance',
+  negativeLabReport: 'Report',
+  negativeLabRoll: 'Roll',
+  negativeLabSource: 'Source',
   hdrDryRunPreview: 'Dry-run preview',
   hdrArtifactHandoff: 'Artifact handoff',
   hdrApplyTool: getComputationalMergeAppServerRoutePairSummary('hdr').applyToolName,
@@ -3134,6 +3139,11 @@ function HdrPrivateRawEditorHandoffVisualSmoke() {
 
 function NegativeLabVisualSmoke() {
   const [savedPaths, setSavedPaths] = useState<Array<string>>([]);
+  const [openedPath, setOpenedPath] = useState<string | null>(null);
+  const [handoffOrder, setHandoffOrder] = useState('');
+  const [refreshCount, setRefreshCount] = useState(0);
+  const [optOutOpenedPath, setOptOutOpenedPath] = useState<string | null>(null);
+  const [optOutRefreshCount, setOptOutRefreshCount] = useState(0);
 
   return (
     <main
@@ -3145,7 +3155,38 @@ function NegativeLabVisualSmoke() {
       <NegativeConversionModal
         isOpen
         onClose={() => {}}
-        onSave={setSavedPaths}
+        onSave={(nextSavedPaths, handoff) => {
+          setSavedPaths(nextSavedPaths);
+          void (async () => {
+            const defaultOnEvents: string[] = [];
+            await handleNegativeConversionEditorHandoff({
+              handleImageSelect: (path) => {
+                defaultOnEvents.push(`select:${path}`);
+                setOpenedPath(path);
+              },
+              handoff,
+              refreshImageList: async () => {
+                await Promise.resolve();
+                defaultOnEvents.push('refresh');
+                setRefreshCount((currentCount) => currentCount + 1);
+              },
+              savedPaths: nextSavedPaths,
+            });
+            setHandoffOrder(defaultOnEvents.join('>'));
+
+            await handleNegativeConversionEditorHandoff({
+              handleImageSelect: (path) => {
+                setOptOutOpenedPath(path);
+              },
+              handoff: { openInEditor: false },
+              refreshImageList: async () => {
+                await Promise.resolve();
+                setOptOutRefreshCount((currentCount) => currentCount + 1);
+              },
+              savedPaths: nextSavedPaths,
+            });
+          })();
+        }}
         targetPaths={[
           '/fixtures/negative-lab/synthetic-color-negative-001.tif',
           '/fixtures/negative-lab/lab-processed-proof-negative-002.jpg',
@@ -3153,6 +3194,14 @@ function NegativeLabVisualSmoke() {
       />
       <div
         className="absolute bottom-4 left-4 z-30 rounded-md border border-white/10 bg-black/70 px-3 py-2 text-xs text-[#f3f4f1]"
+        data-handoff-order={handoffOrder}
+        data-opened-path={openedPath ?? ''}
+        data-opened-positive-in-editor={openedPath !== null && openedPath === savedPaths[0] ? 'true' : 'false'}
+        data-opt-out-opened-path={optOutOpenedPath ?? ''}
+        data-opt-out-refreshed={optOutRefreshCount > 0 ? 'true' : 'false'}
+        data-refresh-before-open={handoffOrder === `refresh>select:${savedPaths[0] ?? ''}` ? 'true' : 'false'}
+        data-refresh-count={String(refreshCount)}
+        data-started-from-non-target-editor-image="true"
         data-testid={VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabSavedPathProof}
       >
         {savedPaths.length > 0 ? savedPaths.join(', ') : NEGATIVE_LAB_NO_SAVED_PATHS_LABEL}
@@ -3163,6 +3212,9 @@ function NegativeLabVisualSmoke() {
 
 function NegativeLabEditorLayerHandoffVisualSmoke() {
   const savedPositivePath = '/proof-roll/negative-lab/frame_001_Positive.tiff';
+  const sourceNegativePath = '/proof-roll/negative-lab/frame_001.CR3';
+  const rollSessionId = 'roll_session_negative_lab_visual_smoke';
+  const conversionReportId = 'negative_lab_conversion_report_visual_smoke';
   const layer: MaskContainer = {
     adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
     blendMode: 'normal',
@@ -3213,17 +3265,35 @@ function NegativeLabEditorLayerHandoffVisualSmoke() {
               <span>{layer.opacity}%</span>
             </div>
           </div>
+          <div className="mt-3 rounded border border-white/10 bg-black/30 p-3 text-xs">
+            <p className="font-semibold text-[#f3f4f1]">{copy.negativeLabProvenance}</p>
+            <div className="mt-2 flex justify-between gap-3">
+              <span>{copy.negativeLabSource}</span>
+              <span className="break-all text-right">{sourceNegativePath}</span>
+            </div>
+            <div className="mt-2 flex justify-between gap-3">
+              <span>{copy.negativeLabRoll}</span>
+              <span className="break-all text-right">{rollSessionId}</span>
+            </div>
+            <div className="mt-2 flex justify-between gap-3">
+              <span>{copy.negativeLabReport}</span>
+              <span className="break-all text-right">{conversionReportId}</span>
+            </div>
+          </div>
         </aside>
       </section>
       <div
         className="sr-only"
+        data-conversion-report-id={conversionReportId}
         data-entered-normal-editor-path="true"
         data-layer-command-type={applied.command.commandType}
         data-layer-created={String(layerCreated)}
         data-open-callback="handleImageSelect"
         data-opened-path={openedPath}
+        data-roll-session-id={rollSessionId}
         data-saved-path={savedPositivePath}
         data-sidecar-source-image-path={applied.sidecar.sourceImagePath}
+        data-source-negative-path={sourceNegativePath}
         data-testid={VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabEditorLayerHandoffProof}
       />
     </main>

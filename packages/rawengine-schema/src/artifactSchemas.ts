@@ -17,3 +17,12 @@ export const artifactHandleV1Schema = z
   .strict();
 
 export type ArtifactHandleV1 = z.infer<typeof artifactHandleV1Schema>;
+
+export const negativeLabPositiveArtifactHandleV1Schema = artifactHandleV1Schema.extend({
+  kind: z.literal('negative_lab_positive'),
+  outputIntent: z.literal('editable_positive'),
+  positiveVariantId: z.string().trim().min(1),
+  storage: z.literal('sidecar_artifact'),
+});
+
+export type NegativeLabPositiveArtifactHandleV1 = z.infer<typeof negativeLabPositiveArtifactHandleV1Schema>;

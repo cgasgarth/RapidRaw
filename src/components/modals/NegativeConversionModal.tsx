@@ -121,6 +121,7 @@ import type { NegativeLabFrameRgbBalanceOffset } from '../../schemas/negativeLab
 import type { NegativeLabRuntimeProfileBrowserRow } from '../../schemas/negativeLabMeasuredProfileSchemas';
 import type { NegativeLabSelectedProfileSnapshot } from '../../schemas/negativeLabProfileComparisonSchemas';
 import type { NegativeLabWorkspaceProof } from '../../schemas/negativeLabWorkspaceSchemas';
+import type { NegativeConversionEditorHandoff } from '../../utils/negativeLabEditorHandoff';
 
 type NegativeParams = NegativeLabPresetParams;
 type NegativeConversionScope = 'active' | 'all' | 'ready';
@@ -459,7 +460,7 @@ interface NegativeConversionModalProps {
   isOpen: boolean;
   onClose: () => void;
   targetPaths: string[];
-  onSave: (savedPaths: string[]) => void;
+  onSave: (savedPaths: string[], handoff: NegativeConversionEditorHandoff) => void;
 }
 
 interface BaseFogSampleUndoEntry {
@@ -515,6 +516,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [baseFogSampleUndoStack, setBaseFogSampleUndoStack] = useState<BaseFogSampleUndoEntry[]>([]);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [saveOptions, setSaveOptions] = useState(DEFAULT_SAVE_OPTIONS);
+  const [openSavedPositiveInEditor, setOpenSavedPositiveInEditor] = useState(true);
   const [conversionScope, setConversionScope] = useState<NegativeConversionScope>('all');
   const [includedPathSet, setIncludedPathSet] = useState<Set<string>>(() => getInitialIncludedPaths(targetPaths));
   const [activePathIndex, setActivePathIndex] = useState(0);
@@ -1178,6 +1180,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setIsLoading(true);
       setProgress(null);
       setSaveOptions(DEFAULT_SAVE_OPTIONS);
+      setOpenSavedPositiveInEditor(true);
       setConversionScope('all');
       setIncludedPathSet(getInitialIncludedPaths(targetPaths));
       setFrameExposureOffsetByFrameId({});
@@ -1870,7 +1873,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         },
         negativeConversionSavedPathsSchema,
       );
-      onSave(savedPaths);
+      onSave(savedPaths, { openInEditor: openSavedPositiveInEditor });
       onClose();
     } catch (e) {
       console.error('Failed to batch save negatives', e);
@@ -2910,6 +2913,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         data-base-scope={baseFogScope}
         data-export-ready={handoffReady ? 'true' : 'false'}
         data-output-format={saveOptions.outputFormat}
+        data-open-saved-positive-in-editor={openSavedPositiveInEditor ? 'true' : 'false'}
         data-profile-id={selectedProfileId}
         data-provenance-link={provenanceLink}
         data-source-frame-id={activePositiveVariant.frameId}
@@ -2966,6 +2970,18 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           >
             {t('modals.negativeConversion.positiveHandoffProvenance', { proofId: provenanceLink })}
           </span>
+          <label className="col-span-2 flex items-center justify-between gap-2 rounded bg-bg-secondary px-1.5 py-0.5">
+            <span className="truncate">{t('modals.negativeConversion.positiveHandoffOpenInEditor')}</span>
+            <input
+              checked={openSavedPositiveInEditor}
+              className="h-3 w-3 accent-accent"
+              data-testid="negative-lab-positive-open-in-editor"
+              onChange={(event) => {
+                setOpenSavedPositiveInEditor(event.currentTarget.checked);
+              }}
+              type="checkbox"
+            />
+          </label>
         </div>
       </div>
     );
