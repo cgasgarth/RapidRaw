@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 
+import { z } from 'zod';
+
 import { PanoramaAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/panoramaAppServerRuntime.ts';
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
@@ -7,6 +9,20 @@ import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/uti
 import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational-proof-budgets.ts';
 
 const panoramaRoutePair = getComputationalMergeAppServerRoutePairSummary('panorama');
+const panoramaSeamReviewTranscriptSchema = z
+  .object({
+    blockedReasons: z.array(z.string().trim().min(1)),
+    contributionMapArtifactId: z.string().trim().min(1),
+    disconnectedSourceIndices: z.array(z.number().int().nonnegative()),
+    mutates: z.literal(false),
+    reviewStatus: z.enum(['apply_ready', 'blocked', 'review_required']),
+    scenario: z.enum(['blocked_apply', 'source_mismatch_blocked', 'supported', 'weak_overlap_warning']),
+    seamMaskArtifactId: z.string().trim().min(1),
+    seamRisk: z.enum(['low', 'medium', 'high']),
+    warnings: z.array(z.string().trim().min(1)),
+    weakOverlapEdgeCount: z.number().int().nonnegative(),
+  })
+  .strict();
 const sourceFrames = [
   { expectedOffsetX: 0, expectedOffsetY: 0, sourceIndex: 0 },
   { expectedOffsetX: 48, expectedOffsetY: 2, sourceIndex: 1 },
@@ -60,6 +76,63 @@ const dryRun = bus.execute({
   toolName: panoramaRoutePair.dryRunToolName,
 });
 if (dryRun.kind !== 'dry_run') throw new Error('Expected panorama dry-run dispatch result.');
+const supportedTranscript = buildSeamReviewTranscript('supported', dryRun);
+if (
+  supportedTranscript.reviewStatus !== 'apply_ready' ||
+  supportedTranscript.seamRisk !== 'low' ||
+  supportedTranscript.blockedReasons.length !== 0
+) {
+  throw new Error(`Unexpected supported panorama seam-review transcript: ${JSON.stringify(supportedTranscript)}.`);
+}
+assertPreviewArtifactHandle(dryRun, supportedTranscript.contributionMapArtifactId);
+assertPreviewArtifactHandle(dryRun, supportedTranscript.seamMaskArtifactId);
+
+const weakOverlapFrames = sourceFrames.map((frame) =>
+  frame.sourceIndex === 1
+    ? { ...frame, expectedOffsetX: 70, expectedOffsetY: 1 }
+    : frame.sourceIndex === 2
+      ? { ...frame, expectedOffsetX: 140, expectedOffsetY: 2 }
+      : frame,
+);
+const weakOverlapCommand = {
+  ...dryRunCommand,
+  commandId: 'command_panorama_app_server_runtime_weak_overlap',
+  correlationId: 'corr_panorama_app_server_runtime_weak_overlap',
+};
+const weakOverlapDryRun = bus.execute({
+  request: buildRequest(weakOverlapCommand, weakOverlapFrames),
+  toolName: panoramaRoutePair.dryRunToolName,
+});
+if (weakOverlapDryRun.kind !== 'dry_run') throw new Error('Expected weak-overlap panorama dry-run.');
+const weakOverlapTranscript = buildSeamReviewTranscript('weak_overlap_warning', weakOverlapDryRun);
+if (
+  weakOverlapTranscript.reviewStatus !== 'review_required' ||
+  weakOverlapTranscript.seamRisk !== 'medium' ||
+  !weakOverlapTranscript.warnings.includes('weak_alignment') ||
+  weakOverlapTranscript.weakOverlapEdgeCount < 1
+) {
+  throw new Error(`Unexpected weak-overlap panorama seam-review transcript: ${JSON.stringify(weakOverlapTranscript)}.`);
+}
+
+const blockedBus = new PanoramaAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1);
+const sourceMismatchCommand = {
+  ...dryRunCommand,
+  commandId: 'command_panorama_app_server_runtime_source_mismatch',
+  correlationId: 'corr_panorama_app_server_runtime_source_mismatch',
+};
+const sourceMismatchDryRun = blockedBus.execute({
+  request: buildRequest(sourceMismatchCommand, sourceFrames, [0, 1]),
+  toolName: panoramaRoutePair.dryRunToolName,
+});
+if (sourceMismatchDryRun.kind !== 'dry_run') throw new Error('Expected source-mismatch panorama dry-run.');
+const sourceMismatchTranscript = buildSeamReviewTranscript('source_mismatch_blocked', sourceMismatchDryRun);
+if (
+  sourceMismatchTranscript.reviewStatus !== 'blocked' ||
+  !sourceMismatchTranscript.blockedReasons.includes('source_selection_incomplete') ||
+  !sourceMismatchTranscript.warnings.includes('source_excluded')
+) {
+  throw new Error(`Unexpected blocked panorama seam-review transcript: ${JSON.stringify(sourceMismatchTranscript)}.`);
+}
 
 const applyCommand = {
   ...dryRunCommand,
@@ -107,6 +180,33 @@ expectThrows('unaccepted panorama apply plan', () =>
     toolName: panoramaRoutePair.applyToolName,
   }),
 );
+expectThrows('blocked panorama seam review apply', () =>
+  blockedBus.execute({
+    request: buildRequest(
+      {
+        ...sourceMismatchCommand,
+        approval: {
+          approvalClass: ApprovalClass.EditApply,
+          reason: 'Panorama source-mismatch apply should stay blocked.',
+          state: 'approved',
+        },
+        dryRun: false,
+        parameters: {
+          ...sourceMismatchCommand.parameters,
+          acceptedDryRunPlanHash: sourceMismatchDryRun.acceptedDryRunPlanHash,
+          acceptedDryRunPlanId: sourceMismatchDryRun.dryRun.dryRunResult.mergePlan.planId,
+        },
+      },
+      sourceFrames,
+      [0, 1],
+    ),
+    toolName: panoramaRoutePair.applyToolName,
+  }),
+);
+panoramaSeamReviewTranscriptSchema.parse({
+  ...sourceMismatchTranscript,
+  scenario: 'blocked_apply',
+});
 
 console.log(
   JSON.stringify({
@@ -115,19 +215,49 @@ console.log(
     output: dryRun.dryRun.dryRunResult.mergePlan.outputDimensions,
     outputSha256: new Bun.CryptoHasher('sha256').update(applied.apply.outputPixels).digest('hex'),
     planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+    seamReviewScenarios: [
+      supportedTranscript.scenario,
+      weakOverlapTranscript.scenario,
+      sourceMismatchTranscript.scenario,
+      'blocked_apply',
+    ],
   }),
 );
 
-function buildRequest(command) {
+function buildRequest(command, requestSourceFrames = sourceFrames, connectedSourceIndices = [0, 1, 2]) {
   return {
     artifactCreatedAt: '2026-06-17T19:30:00.000Z',
     command,
-    connectedSourceIndices: [0, 1, 2],
+    connectedSourceIndices,
     outputArtifactId: 'artifact_panorama_app_server_runtime_output',
     previewArtifactId: 'artifact_panorama_app_server_runtime_preview',
     seed: 'rawengine-panorama-app-server-runtime-v1',
-    sourceFrames,
+    sourceFrames: requestSourceFrames,
   };
+}
+
+function buildSeamReviewTranscript(scenario, toolResult) {
+  if (toolResult.kind !== 'dry_run') throw new Error(`Expected ${scenario} panorama dry-run.`);
+  const seamReview = toolResult.dryRun.provenance.seamReview;
+  return panoramaSeamReviewTranscriptSchema.parse({
+    blockedReasons: seamReview.blockedReasons,
+    contributionMapArtifactId: seamReview.contributionMapArtifact.artifactId,
+    disconnectedSourceIndices: seamReview.disconnectedSourceIndices,
+    mutates: toolResult.dryRun.dryRunResult.mutates,
+    reviewStatus: seamReview.reviewStatus,
+    scenario,
+    seamMaskArtifactId: seamReview.seamMaskArtifact.artifactId,
+    seamRisk: seamReview.seamRisk,
+    warnings: toolResult.dryRun.dryRunResult.warnings,
+    weakOverlapEdgeCount: seamReview.weakOverlapEdgeCount,
+  });
+}
+
+function assertPreviewArtifactHandle(toolResult, artifactId) {
+  if (toolResult.kind !== 'dry_run') throw new Error('Expected dry-run artifact handle source.');
+  if (!toolResult.dryRun.dryRunResult.previewArtifacts.some((artifact) => artifact.artifactId === artifactId)) {
+    throw new Error(`Expected panorama dry-run preview artifacts to include ${artifactId}.`);
+  }
 }
 
 function expectThrows(label, callback) {
