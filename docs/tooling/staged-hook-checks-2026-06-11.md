@@ -8,23 +8,24 @@ blocking direct commits on `main`.
 ## Command
 
 ```sh
-bun run hooks:check-staged
+bun lint-staged --quiet
 ```
 
-The command inspects `git diff --cached --name-only --diff-filter=ACMR` and runs:
+The command uses `lint-staged` to run changed-file scoped checks:
 
-- Prettier check on staged files with supported formatter extensions.
-- ESLint with `--max-warnings 0` on staged JavaScript and TypeScript files.
+- Prettier write on staged files with supported formatter extensions.
+- ESLint `--fix` with `--max-warnings 0` on staged JavaScript and TypeScript
+  files.
+- i18n extraction, dry-run verification, and linting when source or locale
+  files change.
 
 ## Activation
 
 ```sh
 bun run hooks:install
-bun run hooks:verify
 ```
 
 The hook is intentionally changed-file scoped so commits are not blocked by
 unrelated baseline files.
 
-Hook output is compact by default. Successful commits print only a short staged
-summary, while failures keep bounded head/tail output for the failing command.
+Hook output is compact by default through `lint-staged --quiet`.

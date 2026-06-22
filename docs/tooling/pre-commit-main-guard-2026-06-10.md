@@ -12,20 +12,13 @@ repo hook directory.
 bun run hooks:install
 ```
 
-## Verify
-
-```sh
-bun run hooks:verify
-```
-
 ## Behavior
 
 - Commits on `main` fail before the commit is created.
 - Commits on feature branches continue.
 - Detached HEAD states continue, because release and bisect workflows can use
   detached checkouts.
-- Staged lint/format checks are intentionally not part of this hook yet; they
-  are tracked by #41.
+- Staged lint, format, and i18n checks run through `lint-staged`.
 
 The hook error is:
 

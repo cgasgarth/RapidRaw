@@ -20,7 +20,7 @@
   ],
   "ignore": ["dist/**", "node_modules/**", "src-tauri/**"],
   "ignoreBinaries": ["scripts/run-compact-command.ts", "sips"],
-  "ignoreDependencies": ["i18next-cli", "license-checker-rseidelsohn"],
+  "ignoreDependencies": ["i18next-cli", "license-checker-rseidelsohn", "lint-staged"],
   "ignoreIssues": {
     "packages/rawengine-schema/src/**/*.ts": ["exports", "types"],
   },
