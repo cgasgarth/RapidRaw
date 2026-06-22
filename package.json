@@ -606,7 +606,8 @@
     "check:agent-basic-tone-dry-run-preview-artifacts": "bun tests/integration/checks/check-agent-basic-tone-dry-run-preview-artifacts.ts",
     "check:agent-core-edit-command-bundle": "bun tests/integration/checks/check-agent-core-edit-command-bundle.ts",
     "check:agent-bounded-planner-loop": "bun tests/integration/checks/check-agent-bounded-planner-loop.ts",
-    "check:agent-atomic-approval": "bun tests/integration/checks/check-agent-atomic-approval.ts"
+    "check:agent-atomic-approval": "bun tests/integration/checks/check-agent-atomic-approval.ts",
+    "check:agent-session-audit-store": "bun tests/integration/checks/check-agent-session-audit-store.ts"
   },
   "dependencies": {
     "@clerk/react": "^6.9.1",
