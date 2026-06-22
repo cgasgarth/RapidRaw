@@ -36,7 +36,7 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 ## Pull Requests
 
-- Max two active open PRs total.
+- Max three active open PRs total.
 - Before opening a PR, check the open PR queue with `gh` and keep every open
   PR moving toward merge, fix, close, or explicit deferral.
 - Every open PR must have a disposition: merge, fix, close, or explicitly
