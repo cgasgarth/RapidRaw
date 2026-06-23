@@ -16,6 +16,14 @@ interface BrowserTauriInvokeCall {
 }
 
 declare global {
+  interface ImportMetaEnv {
+    VITE_RAWENGINE_BROWSER_TAURI_HARNESS?: string | undefined;
+  }
+
+  interface ImportMeta {
+    env: ImportMetaEnv;
+  }
+
   interface Window {
     __RAWENGINE_BROWSER_TAURI_HARNESS__?: {
       calls: Array<BrowserTauriInvokeCall>;
@@ -26,9 +34,12 @@ declare global {
   }
 }
 
-declare const __RAWENGINE_BROWSER_TAURI_HARNESS__: boolean;
+declare const __RAWENGINE_BROWSER_TAURI_HARNESS__: boolean | undefined;
 
-const harnessEnabled = __RAWENGINE_BROWSER_TAURI_HARNESS__;
+const harnessEnabled =
+  typeof __RAWENGINE_BROWSER_TAURI_HARNESS__ === 'boolean'
+    ? __RAWENGINE_BROWSER_TAURI_HARNESS__
+    : import.meta.env.VITE_RAWENGINE_BROWSER_TAURI_HARNESS === '1';
 const browserHarnessRoot = '/tmp/rawengine-browser-harness';
 const commandNames: Record<
   | 'cancelThumbnailGeneration'
