@@ -29,6 +29,7 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { calculateCenteredCrop } from '../../utils/cropUtils';
+import { getEditorPreviewDimensions } from '../../utils/editorPreviewDimensions';
 import { normalizeMaskOverlaySettings } from '../../utils/maskOverlayModes';
 import { toMaskParameterRecord } from '../../utils/maskParameterAccess';
 import { debounce } from '../../utils/timing';
@@ -339,17 +340,10 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const isAiEditing = activeRightPanel === Panel.Ai;
 
   const croppedDimensions = useMemo<ImageDimensions | null>(() => {
-    if (!selectedImage || !selectedImage.width || !selectedImage.height) {
-      return null;
-    }
     if (adjustments.crop) {
       return { width: adjustments.crop.width, height: adjustments.crop.height };
     }
-    const orientationSteps = adjustments.orientationSteps || 0;
-    const isSwapped = orientationSteps === 1 || orientationSteps === 3;
-    const width = isSwapped ? selectedImage.height : selectedImage.width;
-    const height = isSwapped ? selectedImage.width : selectedImage.height;
-    return { width, height };
+    return getEditorPreviewDimensions(selectedImage, adjustments.orientationSteps || 0);
   }, [selectedImage, adjustments.crop, adjustments.orientationSteps]);
 
   const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions);
