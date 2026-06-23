@@ -643,6 +643,7 @@ export const commandPaletteWorkflowProofSchema = z.object({
   hdrOpen: z.literal('true'),
   negativeOpen: z.literal('true'),
   panoramaOpen: z.literal('true'),
+  selectedSourceCount: z.literal('1'),
   srOpen: z.literal('true'),
 });
 export const negativeLabPublicExportReviewProofSchema = z.object({
