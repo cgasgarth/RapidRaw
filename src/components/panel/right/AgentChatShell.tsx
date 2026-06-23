@@ -13,6 +13,7 @@ import type {
   AgentChatToolCall,
   AgentChatTranscript,
   AgentFailureRecovery,
+  AgentLongEditProgress,
   AgentPrivateRawArtifacts,
   AgentReviewHandoff,
   AgentSelectedFrameScope,
@@ -82,6 +83,12 @@ const walkthroughStageStyles = {
   current: 'border-sky-500/30 bg-sky-500/10 text-sky-100',
   pending: 'border-white/10 bg-white/5 text-text-secondary',
 } satisfies Record<AgentLivePromptWalkthrough['stages'][number]['state'], string>;
+
+const longEditProgressStageStyles = {
+  completed: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100',
+  current: 'border-sky-500/30 bg-sky-500/10 text-sky-100',
+  pending: 'border-white/10 bg-white/5 text-text-secondary',
+} satisfies Record<AgentLongEditProgress['stages'][number]['state'], string>;
 
 type LocalReviewDecision = 'approved' | 'pending' | 'rejected';
 
@@ -926,6 +933,64 @@ function FailureRecoveryPanel({ recovery }: { recovery: AgentFailureRecovery }) 
   );
 }
 
+function LongEditProgressPanel({ progress }: { progress: AgentLongEditProgress }) {
+  const { t } = useTranslation();
+  const completedPercent = Math.round((progress.completedStageCount / progress.stages.length) * 100);
+
+  return (
+    <div
+      className="space-y-3 rounded-md border border-sky-500/20 bg-sky-500/5 p-3"
+      data-completed-percent={completedPercent}
+      data-completed-stage-count={progress.completedStageCount}
+      data-estimated-total-ms={progress.estimatedTotalMs}
+      data-stage-count={progress.stages.length}
+      data-testid="agent-long-edit-progress"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-text-primary">{progress.title}</div>
+          <p className="mt-1 text-[11px] leading-4 text-text-secondary">
+            {t('editor.ai.agent.progress.stagesComplete', {
+              completed: progress.completedStageCount,
+              total: progress.stages.length,
+            })}
+          </p>
+        </div>
+        <span className="shrink-0 rounded border border-sky-500/25 bg-sky-500/10 px-2 py-0.5 text-[11px] text-sky-100">
+          {completedPercent}%
+        </span>
+      </div>
+
+      <div className="h-1.5 overflow-hidden rounded bg-white/10" data-testid="agent-long-edit-progress-bar">
+        <div className="h-full bg-sky-300" style={{ width: `${completedPercent}%` }} />
+      </div>
+
+      <div className="grid gap-2 text-[11px]" data-testid="agent-long-edit-progress-stages">
+        {progress.stages.map((stage) => (
+          <div
+            className="rounded border border-white/10 bg-black/15 p-2"
+            data-duration-ms={stage.durationMs}
+            data-stage-state={stage.state}
+            key={stage.id}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-text-primary">{stage.label}</span>
+              <span className={`rounded border px-1.5 py-0.5 ${longEditProgressStageStyles[stage.state]}`}>
+                {stage.state}
+              </span>
+            </div>
+            <p className="mt-1 leading-4 text-text-secondary">{stage.summary}</p>
+            <div className="mt-1 flex justify-between gap-2 font-mono text-[10px] text-text-secondary">
+              <span>{stage.toolCallId ?? t('editor.ai.agent.progress.local')}</span>
+              <span>{t('editor.ai.agent.progress.durationMs', { duration: stage.durationMs })}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AgentChatShell({ transcript }: AgentChatShellProps) {
   const { t } = useTranslation();
   const runtimeBadge = agentRuntimeBadge[transcript.runtimeStatus];
@@ -964,6 +1029,8 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
       ) : null}
 
       {transcript.failureRecovery ? <FailureRecoveryPanel recovery={transcript.failureRecovery} /> : null}
+
+      {transcript.longEditProgress ? <LongEditProgressPanel progress={transcript.longEditProgress} /> : null}
 
       <div className="space-y-2" data-testid="agent-tool-transcript">
         <div className="flex items-center justify-between text-xs">
