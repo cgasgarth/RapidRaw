@@ -12,7 +12,9 @@ import { useOsPlatform } from '../../../hooks/useOsPlatform';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../../schemas/exportRecipeIds';
 import { outputSharpeningSettingsSchema } from '../../../schemas/outputSharpeningSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
+import { useProcessStore } from '../../../store/useProcessStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { hasStaleOrOfflineSmartPreview } from '../../../utils/exportSmartPreviewReadiness';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import { debounce } from '../../../utils/timing';
 import { Invokes, type SelectedImage, type AppSettings } from '../../ui/AppProperties';
@@ -277,6 +279,7 @@ export default function ExportPanel({
       adjustments: state.adjustments,
     })),
   );
+  const thumbnailSmartPreviews = useProcessStore((state) => state.thumbnailSmartPreviews);
 
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
   const initDone = useRef(false);
@@ -343,6 +346,11 @@ export default function ExportPanel({
   );
   const numImages = pathsToExport.length;
   const isOfflineSmartPreviewExport = !isLibraryContext && selectedImage?.isOfflineSmartPreview === true;
+  const isLibrarySmartPreviewExport = useMemo(
+    () => isLibraryContext && hasStaleOrOfflineSmartPreview(pathsToExport, thumbnailSmartPreviews),
+    [isLibraryContext, pathsToExport, thumbnailSmartPreviews],
+  );
+  const isSmartPreviewExportBlocked = isOfflineSmartPreviewExport || isLibrarySmartPreviewExport;
 
   useEffect(() => {
     const fetchDims = async () => {
@@ -521,7 +529,7 @@ export default function ExportPanel({
   };
 
   const handleExport = async () => {
-    if (numImages === 0 || isExporting || isOfflineSmartPreviewExport) return;
+    if (numImages === 0 || isExporting || isSmartPreviewExportBlocked) return;
 
     let finalFilenameTemplate = filenameTemplate;
     if (
@@ -642,7 +650,7 @@ export default function ExportPanel({
     }
   };
 
-  const canExport = numImages > 0 && !isOfflineSmartPreviewExport;
+  const canExport = numImages > 0 && !isSmartPreviewExportBlocked;
   const isLut = fileFormat === FileFormats.Cube;
   const itemLabel = isLut ? t('export.labels.lut') : t('export.labels.image');
   const itemLabelPlural = isLut ? t('export.labels.lut_plural') : t('export.labels.image_plural');
@@ -1067,7 +1075,7 @@ export default function ExportPanel({
             weight={TextWeights.normal}
             className="text-center mt-4"
           >
-            {isOfflineSmartPreviewExport
+            {isSmartPreviewExportBlocked
               ? t('export.status.offlineSmartPreviewBlocked')
               : isLibraryContext
                 ? t('export.status.noImagesSelected')
