@@ -1172,6 +1172,70 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       targetPaths.length,
     ],
   );
+  const walkthroughClosureReady =
+    workspaceProof.previewReady &&
+    workspaceProof.exportReady &&
+    selectedProfile !== null &&
+    qcProofReport.exportReady &&
+    activePositiveVariant !== null;
+  const walkthroughClosureRows = [
+    {
+      id: 'setup',
+      isReady: targetPaths.length > 0,
+      label: t('modals.negativeConversion.workflowSetup'),
+      value:
+        targetPaths.length === 1
+          ? t('modals.negativeConversion.workflowSetupDetailSingle')
+          : t('modals.negativeConversion.workflowSetupDetailMultiple', { scanCount: targetPaths.length }),
+    },
+    {
+      id: 'profile',
+      isReady: selectedProfile !== null,
+      label: t('modals.negativeConversion.workflowPreset'),
+      value: selectedProfile?.displayName ?? t('modals.negativeConversion.workflowCustomPresetDetail'),
+    },
+    {
+      id: 'inversion',
+      isReady: workspaceProof.previewReady,
+      label: t('modals.negativeConversion.workflowColorTiming'),
+      value: workspaceProof.previewReady
+        ? t('modals.negativeConversion.previewReady')
+        : t('modals.negativeConversion.previewPending'),
+    },
+    {
+      id: 'qc',
+      isReady: qcProofReport.exportReady,
+      label: t('modals.negativeConversion.workflowInspection'),
+      value: t('modals.negativeConversion.workflowInspectionDetail', {
+        reviewCount: qcProofReport.reviewFrameCount,
+        retouchCount: dustScratchReviewReport.retouchCount,
+      }),
+    },
+    {
+      id: 'handoff',
+      isReady: activePositiveVariant !== null,
+      label: t('modals.negativeConversion.positiveHandoff'),
+      value:
+        activePositiveVariant === null
+          ? t('modals.negativeConversion.positiveHandoffReview')
+          : t('modals.negativeConversion.positiveHandoffReady'),
+    },
+    {
+      id: 'export',
+      isReady: workspaceProof.exportReady,
+      label: t('modals.negativeConversion.workflowExport'),
+      value: workspaceProof.exportReady
+        ? t('modals.negativeConversion.workflowExportReadyCount', {
+            format: t(
+              saveOptions.outputFormat === NegativeLabOutputFormatId.Tiff16
+                ? 'modals.negativeConversion.outputFormats.tiff16'
+                : 'modals.negativeConversion.outputFormats.jpeg_proof',
+            ),
+            queuedCount: workspaceProof.queuedCount,
+          })
+        : t('modals.negativeConversion.workflowExportBlocked'),
+    },
+  ] as const;
 
   useEffect(() => {
     const unlisten = listen<unknown>('negative-batch-progress', (event) => {
@@ -2824,6 +2888,61 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     </div>
   );
 
+  const renderWalkthroughClosure = () => (
+    <div
+      className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+      data-export-ready={String(workspaceProof.exportReady)}
+      data-handoff-ready={String(activePositiveVariant !== null)}
+      data-preview-ready={String(workspaceProof.previewReady)}
+      data-profile-ready={String(selectedProfile !== null)}
+      data-qc-export-ready={String(qcProofReport.exportReady)}
+      data-ready={String(walkthroughClosureReady)}
+      data-testid="negative-lab-import-export-walkthrough"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <UiText variant={TextVariants.small} className="font-medium text-text-primary">
+            {t('modals.negativeConversion.walkthroughClosureTitle')}
+          </UiText>
+          <UiText variant={TextVariants.small} className="text-text-tertiary">
+            {t('modals.negativeConversion.walkthroughClosureHint')}
+          </UiText>
+        </div>
+        <span
+          className={cx(
+            'shrink-0 rounded px-1.5 py-0.5 text-[11px]',
+            walkthroughClosureReady ? 'bg-accent/15 text-text-primary' : 'bg-bg-secondary text-text-secondary',
+          )}
+          data-testid="negative-lab-walkthrough-status"
+        >
+          {walkthroughClosureReady
+            ? t('modals.negativeConversion.walkthroughClosureReady')
+            : t('modals.negativeConversion.walkthroughClosureReview')}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-1 text-[11px] text-text-tertiary">
+        {walkthroughClosureRows.map((row) => (
+          <span
+            className="min-w-0 rounded bg-bg-secondary px-1.5 py-1"
+            data-ready={String(row.isReady)}
+            data-testid={`negative-lab-walkthrough-${row.id}`}
+            key={row.id}
+          >
+            <span className="block truncate font-medium text-text-secondary">{row.label}</span>
+            <span className="block truncate">{row.value}</span>
+          </span>
+        ))}
+      </div>
+      <UiText
+        variant={TextVariants.small}
+        className="text-text-tertiary"
+        data-testid="negative-lab-walkthrough-proof-boundary"
+      >
+        {t('modals.negativeConversion.walkthroughClosureProofBoundary')}
+      </UiText>
+    </div>
+  );
+
   const renderAgentActivityPanel = () => (
     <div
       className="rounded-md border border-surface bg-bg-primary p-2 text-[11px] text-text-tertiary"
@@ -3310,6 +3429,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             {renderAcquisitionHealth()}
             {renderScanInputGuidance()}
             {renderBatchReadiness()}
+            {renderWalkthroughClosure()}
             {renderAgentActivityPanel()}
           </div>
         </div>
