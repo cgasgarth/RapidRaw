@@ -74,6 +74,35 @@ function needsEyeSharpnessReview(analysis: ImageAnalysisResult): boolean {
   return analysis.focusConfidence >= 0.4 && getEyeFaceBalancePercent(analysis) < 75;
 }
 
+function normalizeFocusMetricForDisplay(metric: number): number {
+  return Math.min(metric / 1000, 1);
+}
+
+function getFocusConfidenceInputs(analysis: ImageAnalysisResult): Array<{
+  key: 'center' | 'exposure' | 'eye' | 'face';
+  valuePercent: number;
+  weightPercent: number;
+}> {
+  return [
+    {
+      key: 'eye',
+      valuePercent: Math.round(normalizeFocusMetricForDisplay(analysis.eyeSharpnessMetric) * 100),
+      weightPercent: 60,
+    },
+    {
+      key: 'face',
+      valuePercent: Math.round(normalizeFocusMetricForDisplay(analysis.faceSharpnessMetric) * 100),
+      weightPercent: 20,
+    },
+    {
+      key: 'center',
+      valuePercent: Math.round(normalizeFocusMetricForDisplay(analysis.centerFocusMetric) * 100),
+      weightPercent: 10,
+    },
+    { key: 'exposure', valuePercent: Math.round(analysis.exposureMetric * 100), weightPercent: 10 },
+  ];
+}
+
 interface ImageThumbnailProps {
   children?: ReactNode;
   isSelected: boolean;
@@ -935,11 +964,24 @@ export default function CullingModal({
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
                   {suggestions.focusRankings.map((img, index) => {
                     const confidenceBand = getFocusConfidenceBand(img.focusConfidence);
+                    const focusConfidenceInputs = getFocusConfidenceInputs(img);
                     const eyeFaceBalancePercent = getEyeFaceBalancePercent(img);
                     const showEyeSharpnessReview = needsEyeSharpnessReview(img);
                     return (
                       <div
                         className="rounded-md border border-border-color bg-bg-secondary p-2"
+                        data-focus-confidence-center-input={focusConfidenceInputs
+                          .find((input) => input.key === 'center')
+                          ?.valuePercent.toString()}
+                        data-focus-confidence-exposure-input={focusConfidenceInputs
+                          .find((input) => input.key === 'exposure')
+                          ?.valuePercent.toString()}
+                        data-focus-confidence-eye-input={focusConfidenceInputs
+                          .find((input) => input.key === 'eye')
+                          ?.valuePercent.toString()}
+                        data-focus-confidence-face-input={focusConfidenceInputs
+                          .find((input) => input.key === 'face')
+                          ?.valuePercent.toString()}
                         data-focus-confidence={img.focusConfidence.toFixed(2)}
                         data-focus-confidence-band={confidenceBand}
                         data-focus-eye-sharpness={img.eyeSharpnessMetric.toFixed(2)}
@@ -983,6 +1025,46 @@ export default function CullingModal({
                           <UiText variant={TextVariants.small} className="col-span-2">
                             {t('modals.culling.eyeFaceBalanceValue', { balance: eyeFaceBalancePercent })}
                           </UiText>
+                          <div
+                            className="col-span-2 rounded border border-border-color/70 bg-bg-primary/40 px-2 py-1"
+                            data-testid="culling-focus-confidence-inputs"
+                          >
+                            <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                              {t('modals.culling.focusConfidenceInputsTitle')}
+                            </UiText>
+                            <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5">
+                              {focusConfidenceInputs.map((input) => (
+                                <UiText
+                                  key={input.key}
+                                  variant={TextVariants.small}
+                                  color={TextColors.secondary}
+                                  data-focus-confidence-input={input.key}
+                                  data-focus-confidence-input-value={input.valuePercent}
+                                  data-focus-confidence-input-weight={input.weightPercent}
+                                >
+                                  {input.key === 'eye'
+                                    ? t('modals.culling.focusConfidenceInputs.eye', {
+                                        value: input.valuePercent,
+                                        weight: input.weightPercent,
+                                      })
+                                    : input.key === 'face'
+                                      ? t('modals.culling.focusConfidenceInputs.face', {
+                                          value: input.valuePercent,
+                                          weight: input.weightPercent,
+                                        })
+                                      : input.key === 'center'
+                                        ? t('modals.culling.focusConfidenceInputs.center', {
+                                            value: input.valuePercent,
+                                            weight: input.weightPercent,
+                                          })
+                                        : t('modals.culling.focusConfidenceInputs.exposure', {
+                                            value: input.valuePercent,
+                                            weight: input.weightPercent,
+                                          })}
+                                </UiText>
+                              ))}
+                            </div>
+                          </div>
                           {showEyeSharpnessReview && (
                             <UiText
                               variant={TextVariants.small}
