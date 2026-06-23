@@ -165,6 +165,7 @@
     "check:denoise-ui-summary": "bun tests/integration/checks/check-denoise-ui-summary.ts",
     "check:denoise-separation-runtime-proof": "bun tests/integration/checks/check-denoise-separation-runtime.ts",
     "check:culling-ui-summary": "bun tests/integration/checks/check-culling-ui-summary.ts",
+    "check:culling-focus-private-raw-proof": "RAWENGINE_RUN_PRIVATE_CULLING_FOCUS_RAW_PROOF=1 bun scripts/run-compact-command.ts --label culling-focus-private-raw-proof --cwd src-tauri -- cargo +1.95.0 test --locked --no-default-features --features required-ci,tauri-test private_runtime_smoke_generates_culling_focus_raw_report_when_enabled -- --nocapture",
     "check:collage-saved-output-ui": "bun tests/integration/checks/check-collage-saved-output-ui.ts",
     "check:merge-saved-output-ui": "bun tests/integration/checks/check-merge-saved-output-ui.ts",
     "check:denoise-ui-api": "bun tests/integration/checks/check-denoise-ui-api.ts",
