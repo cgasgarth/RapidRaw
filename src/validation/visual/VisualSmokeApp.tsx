@@ -988,6 +988,10 @@ const copy = {
   hdrSourceSet: 'HDR bracket',
   libraryRating: (rating: number) => `Rating ${rating}`,
   libraryStars: (rating: number) => `${rating} stars`,
+  libraryStackBadge: (kind: string, count: number) => `${kind} ${count}`,
+  libraryStackCollapsed: 'Auto stack collapsed',
+  libraryStackExpanded: 'Auto stack expanded',
+  libraryStackToggle: 'Toggle burst stack',
   libraryColorLabel: (label: string) => `Color label ${label}`,
   selectionState: 'Selection State',
   filter: 'Filter',
@@ -1228,6 +1232,7 @@ function DetailWorkspaceVisualSmoke() {
 
 function LibraryWorkflowVisualSmoke() {
   const [filterMode, setFilterMode] = useState<'all' | 'keepers'>('all');
+  const [isAutoStackExpanded, setIsAutoStackExpanded] = useState(false);
   const [viewMode, setViewMode] = useState<'compare' | 'survey'>('compare');
   const [virtualCopyId, setVirtualCopyId] = useState('pending');
   const [isCompareReady, setIsCompareReady] = useState(false);
@@ -1262,6 +1267,9 @@ function LibraryWorkflowVisualSmoke() {
             data-filter-mode={filterMode}
             data-opened-editor-path={openedEditorPath}
             data-minimum-rating={filterMode === 'keepers' ? '4' : '0'}
+            data-auto-stack-expanded={String(isAutoStackExpanded)}
+            data-auto-stack-kind="burst"
+            data-auto-stack-visible-count={String(isAutoStackExpanded ? 3 : 1)}
             data-queued-export-id={queuedExportId}
             data-selected-count={String(selectedCount)}
             data-sidecar-separation={isCompareReady ? 'independent' : 'pending'}
@@ -1293,6 +1301,18 @@ function LibraryWorkflowVisualSmoke() {
             >
               <span>{copy.librarySurvey}</span>
               <span className="text-xs text-[#aab2bd]">{copy.selectedCount(selectedCount)}</span>
+            </button>
+            <button
+              className="flex w-full items-center justify-between rounded-md border border-[#8bb8ff]/40 bg-[#1c2a42] px-3 py-2 text-left text-sm hover:bg-[#263755]"
+              onClick={() => {
+                setIsAutoStackExpanded((current) => !current);
+              }}
+              type="button"
+            >
+              <span>{copy.libraryStackToggle}</span>
+              <span className="text-xs text-[#b7cdf9]">
+                {isAutoStackExpanded ? copy.libraryStackExpanded : copy.libraryStackCollapsed}
+              </span>
             </button>
             <button
               className="flex w-full items-center justify-between rounded-md border border-[#d7a84f]/40 bg-[#302b20] px-3 py-2 text-left text-sm hover:bg-[#3b3323]"
@@ -1360,8 +1380,20 @@ function LibraryWorkflowVisualSmoke() {
               >
                 <div className="flex items-center justify-between text-sm font-semibold">
                   <span>{asset.file}</span>
-                  <span>{copy.libraryStars(asset.rating)}</span>
+                  <div className="flex items-center gap-2">
+                    {asset.file === 'DSC_0001.NEF' && (
+                      <span className="rounded-full bg-black/50 px-2 py-1 text-[10px] uppercase text-white">
+                        {copy.libraryStackBadge('Burst', 3)}
+                      </span>
+                    )}
+                    <span>{copy.libraryStars(asset.rating)}</span>
+                  </div>
                 </div>
+                {asset.file === 'DSC_0001.NEF' && (
+                  <div className="rounded bg-black/25 px-3 py-2 text-xs text-white">
+                    {isAutoStackExpanded ? copy.libraryStackExpanded : copy.libraryStackCollapsed}
+                  </div>
+                )}
                 <div className="rounded bg-white/70 p-3">
                   <p className="text-sm font-semibold">{asset.status}</p>
                   <p className="text-xs">{copy.libraryColorLabel(asset.color)}</p>

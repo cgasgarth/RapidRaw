@@ -1400,6 +1400,12 @@
       "progress": "Wird importiert... ({{current}}/{{total}})"
     },
     "items": {
+      "autoStackBurst": "Serie",
+      "autoStackCollapse_one": "{{kind}}-Stapel mit {{count}} Bild zuklappen",
+      "autoStackCollapse_other": "{{kind}}-Stapel mit {{count}} Bildern zuklappen",
+      "autoStackExpand_one": "{{kind}}-Stapel mit {{count}} Bild aufklappen",
+      "autoStackExpand_other": "{{kind}}-Stapel mit {{count}} Bildern aufklappen",
+      "autoStackHdr": "HDR",
       "collapseFolder": "Ordner zuklappen",
       "currentFolder": "Aktueller Ordner",
       "expandFolder": "Ordner aufklappen",

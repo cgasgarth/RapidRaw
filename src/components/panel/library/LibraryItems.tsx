@@ -1,5 +1,5 @@
 import cx from 'clsx';
-import { Image as ImageIcon, Folder, FolderOpen, Star as StarIcon, SlidersHorizontal } from 'lucide-react';
+import { Image as ImageIcon, Folder, FolderOpen, Star as StarIcon, SlidersHorizontal, Images } from 'lucide-react';
 import {
   memo,
   useState,
@@ -22,7 +22,9 @@ import { ThumbnailAspectRatio, type ImageFile, ExifOverlay } from '../../ui/AppP
 import UiText from '../../ui/Text';
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
 
+import type { LibraryAutoStackDisplay, LibraryAutoStackItem } from '../../../utils/libraryAutoStacks';
 import type { ColumnWidths } from '../MainLibrary';
+import type { TFunction } from 'i18next';
 
 interface ImageLayer {
   id: string;
@@ -39,8 +41,10 @@ type LibraryImageDoubleClickHandler = (path: string) => void;
 type LibraryImageLoadHandler = (path: string) => void;
 
 interface LibraryItemBaseProps {
+  autoStack?: LibraryAutoStackDisplay | undefined;
   isActive: boolean;
   isSelected: boolean;
+  onAutoStackToggle?: ((stackId: string) => void) | undefined;
   onContextMenu: LibraryImageContextMenuHandler;
   onImageClick: LibraryImageClickHandler;
   onImageDoubleClick: LibraryImageDoubleClickHandler;
@@ -70,7 +74,7 @@ export interface LibraryHeaderRow {
 
 export interface LibraryImagesRow {
   type: 'images';
-  images: ImageFile[];
+  images: LibraryAutoStackItem[];
   startIndex: number;
 }
 
@@ -101,6 +105,7 @@ export interface LibraryRowProps {
   columnWidths: ColumnWidths;
   queueThumbnailRequest: (path: string) => void;
   onToggleRecursiveFolder: (path: string) => void;
+  onToggleAutoStack: (stackId: string) => void;
 }
 
 const getExifOverlayValues = (exif: ImageFile['exif']) => {
@@ -116,9 +121,51 @@ const getExifOverlayValues = (exif: ImageFile['exif']) => {
   };
 };
 
+const getStackLabel = (stack: LibraryAutoStackDisplay, t: TFunction) =>
+  stack.kind === 'bracket' ? t('library.items.autoStackHdr') : t('library.items.autoStackBurst');
+
+const AutoStackBadge = ({
+  stack,
+  onToggle,
+}: {
+  stack: LibraryAutoStackDisplay;
+  onToggle?: ((stackId: string) => void) | undefined;
+}) => {
+  const { t } = useTranslation();
+  const label = getStackLabel(stack, t);
+
+  return (
+    <button
+      type="button"
+      className={cx(
+        'inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-white/15 bg-black/50 px-2 text-[10px] font-semibold uppercase tracking-normal text-white shadow-md backdrop-blur transition-colors hover:bg-black/70',
+        !stack.isCover && 'bg-bg-primary text-text-secondary shadow-none hover:bg-bg-primary',
+      )}
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggle?.(stack.id);
+      }}
+      data-tooltip={t(stack.isExpanded ? 'library.items.autoStackCollapse' : 'library.items.autoStackExpand', {
+        count: stack.count,
+        kind: label,
+      })}
+      aria-label={t(stack.isExpanded ? 'library.items.autoStackCollapse' : 'library.items.autoStackExpand', {
+        count: stack.count,
+        kind: label,
+      })}
+    >
+      <Images size={12} />
+      <span>{label}</span>
+      <span>{stack.count}</span>
+    </button>
+  );
+};
+
 const ThumbnailComponent = ({
+  autoStack,
   isActive,
   isSelected,
+  onAutoStackToggle,
   onContextMenu,
   onImageClick,
   onImageDoubleClick,
@@ -310,6 +357,11 @@ const ThumbnailComponent = ({
       />
 
       <div className="absolute top-1.5 right-1.5 flex items-center justify-end z-10 pointer-events-none">
+        {autoStack && (
+          <div className="pointer-events-auto mr-1.5">
+            <AutoStackBadge stack={autoStack} onToggle={onAutoStackToggle} />
+          </div>
+        )}
         <div
           className={cx(
             'rounded-full h-5 px-1.5 flex items-center justify-center gap-0 shadow-md bg-black/30 pointer-events-auto transition-all duration-200 ease-out origin-top-right',
@@ -513,8 +565,10 @@ const ThumbnailComponent = ({
 };
 
 const ListItemComponent = ({
+  autoStack,
   isActive,
   isSelected,
+  onAutoStackToggle,
   onContextMenu,
   onImageClick,
   onImageDoubleClick,
@@ -728,6 +782,7 @@ const ListItemComponent = ({
             VC
           </UiText>
         )}
+        {autoStack && <AutoStackBadge stack={autoStack} onToggle={onAutoStackToggle} />}
       </div>
 
       <div style={{ width: getW('date') }} className="flex items-center px-3 h-full overflow-hidden">
@@ -815,14 +870,15 @@ const RowComponent = ({
   columnWidths,
   queueThumbnailRequest,
   onToggleRecursiveFolder,
+  onToggleAutoStack,
 }: LibraryRowProps) => {
   const { t } = useTranslation();
   const row = rows[index];
 
   useEffect(() => {
     if (row && row.type === 'images') {
-      row.images.forEach((img: ImageFile) => {
-        queueThumbnailRequest(img.path);
+      row.images.forEach((item: LibraryAutoStackItem) => {
+        queueThumbnailRequest(item.image.path);
       });
     }
   }, [row, queueThumbnailRequest]);
@@ -903,7 +959,7 @@ const RowComponent = ({
         gap: gap,
       }}
     >
-      {row.images.map((imageFile: ImageFile) => (
+      {row.images.map(({ image: imageFile, stack }: LibraryAutoStackItem) => (
         <div
           key={imageFile.path}
           style={{
@@ -913,8 +969,10 @@ const RowComponent = ({
         >
           {isListView ? (
             <ListItem
+              autoStack={stack}
               isActive={activePath === imageFile.path}
               isSelected={multiSelectedSet.has(imageFile.path)}
+              onAutoStackToggle={onToggleAutoStack}
               onContextMenu={onContextMenu}
               onImageClick={onImageClick}
               onImageDoubleClick={onImageDoubleClick}
@@ -929,8 +987,10 @@ const RowComponent = ({
             />
           ) : (
             <Thumbnail
+              autoStack={stack}
               isActive={activePath === imageFile.path}
               isSelected={multiSelectedSet.has(imageFile.path)}
+              onAutoStackToggle={onToggleAutoStack}
               onContextMenu={onContextMenu}
               onImageClick={onImageClick}
               onImageDoubleClick={onImageDoubleClick}

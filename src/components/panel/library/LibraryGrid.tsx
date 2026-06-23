@@ -16,6 +16,7 @@ import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
+import { buildLibraryAutoStackItems } from '../../../utils/libraryAutoStacks';
 import { debounce } from '../../../utils/timing';
 import {
   ExifOverlay,
@@ -349,6 +350,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
   const [gridSize, setGridSize] = useState({ height: 0, width: 0 });
   const [listHandle, setListHandle] = useListCallbackRef();
   const [collapsedRecursiveFolders, setCollapsedRecursiveFolders] = useState<Set<string>>(new Set());
+  const [expandedAutoStackIds, setExpandedAutoStackIds] = useState<Set<string>>(new Set());
   const libraryContainerRef = useRef<HTMLDivElement>(null);
   const gridObserverRef = useRef<ResizeObserver | null>(null);
   const loadedThumbnailsRef = useRef(new Set<string>());
@@ -453,6 +455,18 @@ export default function LibraryGrid(props: LibraryGridProps) {
     });
   }, []);
 
+  const handleToggleAutoStack = useCallback((stackId: string) => {
+    setExpandedAutoStackIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(stackId)) {
+        next.delete(stackId);
+      } else {
+        next.add(stackId);
+      }
+      return next;
+    });
+  }, []);
+
   const handleImageLoad = useCallback((path: string) => {
     loadedThumbnailsRef.current.add(path);
   }, []);
@@ -487,20 +501,22 @@ export default function LibraryGrid(props: LibraryGridProps) {
         rows.push({ type: 'header', path: group.path, count: groupImages.length, isExpanded });
 
         if (isExpanded) {
-          for (let i = 0; i < groupImages.length; i += columnCount) {
+          const stackItems = buildLibraryAutoStackItems(groupImages, expandedAutoStackIds);
+          for (let i = 0; i < stackItems.length; i += columnCount) {
             rows.push({
               type: 'images',
-              images: groupImages.slice(i, i + columnCount),
+              images: stackItems.slice(i, i + columnCount),
               startIndex: i,
             });
           }
         }
       });
     } else {
-      for (let i = 0; i < imageList.length; i += columnCount) {
+      const stackItems = buildLibraryAutoStackItems(imageList, expandedAutoStackIds);
+      for (let i = 0; i < stackItems.length; i += columnCount) {
         rows.push({
           type: 'images',
-          images: imageList.slice(i, i + columnCount),
+          images: stackItems.slice(i, i + columnCount),
           startIndex: i,
         });
       }
@@ -524,6 +540,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
     imageList,
     libraryViewMode,
     collapsedRecursiveFolders,
+    expandedAutoStackIds,
     thumbnailSize,
     listColumnWidths.thumbnail,
     currentFolderPath,
@@ -566,7 +583,8 @@ export default function LibraryGrid(props: LibraryGridProps) {
 
         targetTop += headerHeight;
 
-        const imageIndex = groupImages.findIndex((img) => img.path === activePath);
+        const stackItems = buildLibraryAutoStackItems(groupImages, expandedAutoStackIds);
+        const imageIndex = stackItems.findIndex((item) => item.image.path === activePath);
         if (imageIndex !== -1) {
           const rowIndex = Math.floor(imageIndex / columnCount);
           targetTop += rowIndex * rowHeight;
@@ -574,11 +592,12 @@ export default function LibraryGrid(props: LibraryGridProps) {
           break;
         }
 
-        const rowsInGroup = Math.ceil(groupImages.length / columnCount);
+        const rowsInGroup = Math.ceil(stackItems.length / columnCount);
         targetTop += rowsInGroup * rowHeight;
       }
     } else {
-      const index = imageList.findIndex((img) => img.path === activePath);
+      const stackItems = buildLibraryAutoStackItems(imageList, expandedAutoStackIds);
+      const index = stackItems.findIndex((item) => item.image.path === activePath);
       if (index !== -1) {
         const rowIndex = Math.floor(index / columnCount);
         targetTop = rowIndex * rowHeight;
@@ -604,7 +623,16 @@ export default function LibraryGrid(props: LibraryGridProps) {
         });
       }
     }
-  }, [activePath, gridData, multiSelectedPaths.length, listHandle, currentFolderPath, imageList, libraryViewMode]);
+  }, [
+    activePath,
+    gridData,
+    multiSelectedPaths.length,
+    listHandle,
+    currentFolderPath,
+    imageList,
+    libraryViewMode,
+    expandedAutoStackIds,
+  ]);
 
   const memoizedRowProps = useMemo<RowRendererProps>(() => {
     return {
@@ -626,6 +654,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
       columnWidths: listColumnWidths,
       queueThumbnailRequest,
       onToggleRecursiveFolder: handleToggleRecursiveFolder,
+      onToggleAutoStack: handleToggleAutoStack,
     };
   }, [
     gridData,
@@ -641,6 +670,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
     listColumnWidths,
     queueThumbnailRequest,
     handleToggleRecursiveFolder,
+    handleToggleAutoStack,
   ]);
 
   if (!gridData) {

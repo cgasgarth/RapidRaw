@@ -1486,6 +1486,16 @@
       "progress": "Importowanie... ({{current}}/{{total}})"
     },
     "items": {
+      "autoStackBurst": "Seria",
+      "autoStackCollapse_one": "Zwiń stos {{kind}} z {{count}} zdjęciem",
+      "autoStackCollapse_few": "Zwiń stos {{kind}} z {{count}} zdjęciami",
+      "autoStackCollapse_many": "Zwiń stos {{kind}} z {{count}} zdjęciami",
+      "autoStackCollapse_other": "Zwiń stos {{kind}} z {{count}} zdjęciami",
+      "autoStackExpand_one": "Rozwiń stos {{kind}} z {{count}} zdjęciem",
+      "autoStackExpand_few": "Rozwiń stos {{kind}} z {{count}} zdjęciami",
+      "autoStackExpand_many": "Rozwiń stos {{kind}} z {{count}} zdjęciami",
+      "autoStackExpand_other": "Rozwiń stos {{kind}} z {{count}} zdjęciami",
+      "autoStackHdr": "HDR",
       "collapseFolder": "Zwiń folder",
       "currentFolder": "Bieżący folder",
       "expandFolder": "Rozwiń folder",
