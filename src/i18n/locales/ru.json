@@ -758,7 +758,9 @@
         "undo": "Отменить (Ctrl+Z) или история (правый клик)"
       },
       "vc": "ВК",
-      "exportSoftProofDetails": "{{profile}} / {{intent}} preview"
+      "exportSoftProofActive": "Proofing",
+      "exportSoftProofDetails": "{{profile}} / {{intent}} preview",
+      "exportSoftProofUnavailable": "No export recipe available"
     },
     "tether": {
       "battery": "Battery",

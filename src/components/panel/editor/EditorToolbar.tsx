@@ -80,6 +80,15 @@ const EditorToolbar = memo(
       [appSettings?.exportPresets, selectedExportProofRecipeId],
     );
     const canSoftProof = exportProofRecipeOptions.length > 0;
+    const selectedExportProofProfile = selectedExportProofRecipe?.colorProfile ?? 'srgb';
+    const selectedExportProofIntent = selectedExportProofRecipe?.renderingIntent ?? 'relativeColorimetric';
+    const selectedExportProofName = selectedExportProofRecipe?.name ?? '';
+    const exportSoftProofSummary = selectedExportProofRecipe
+      ? t('editor.toolbar.exportSoftProofDetails', {
+          profile: selectedExportProofProfile,
+          intent: selectedExportProofIntent,
+        })
+      : t('editor.toolbar.exportSoftProofUnavailable');
 
     const showResolution = !isAndroid && selectedImage.width > 0 && selectedImage.height > 0;
     const [displayedResolution, setDisplayedResolution] = useState('');
@@ -753,15 +762,21 @@ const EditorToolbar = memo(
             className="hidden xl:flex items-center gap-2"
             data-export-soft-proof-enabled={String(isExportSoftProofEnabled)}
             data-export-soft-proof-recipe-id={selectedExportProofRecipeId ?? ''}
+            data-export-soft-proof-recipe-name={selectedExportProofName}
+            data-export-soft-proof-status={
+              isExportSoftProofEnabled ? 'active' : canSoftProof ? 'available' : 'unavailable'
+            }
             data-testid="export-soft-proof-toolbar"
           >
             <button
               className={cx(
-                'p-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
+                'relative p-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
                 isExportSoftProofEnabled
                   ? 'bg-accent text-button-text hover:bg-accent/90 hover:text-button-text'
                   : 'bg-surface hover:bg-card-active text-text-primary',
               )}
+              aria-label={t('editor.toolbar.tooltips.exportSoftProof')}
+              aria-pressed={isExportSoftProofEnabled}
               disabled={!canSoftProof}
               onClick={() => {
                 setEditor({
@@ -774,9 +789,15 @@ const EditorToolbar = memo(
               type="button"
             >
               <Palette size={20} />
+              {isExportSoftProofEnabled && (
+                <span
+                  className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border border-bg-primary bg-warning"
+                  data-testid="export-soft-proof-active-dot"
+                />
+              )}
             </button>
             {isExportSoftProofEnabled && (
-              <div className="w-56" data-testid="export-soft-proof-recipe-details">
+              <div className="w-64" data-testid="export-soft-proof-recipe-details">
                 <Dropdown
                   className="w-full"
                   disabled={!canSoftProof}
@@ -788,22 +809,20 @@ const EditorToolbar = memo(
                   triggerClassName="h-9 rounded-full bg-surface px-3 text-xs"
                 />
                 {selectedExportProofRecipe && (
-                  <UiText
-                    as="p"
-                    className="mt-1 truncate text-center"
-                    color={TextColors.secondary}
-                    data-export-soft-proof-color-profile={selectedExportProofRecipe.colorProfile ?? 'srgb'}
-                    data-export-soft-proof-rendering-intent={
-                      selectedExportProofRecipe.renderingIntent ?? 'relativeColorimetric'
-                    }
+                  <div
+                    className="mt-1 flex items-center justify-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-2 py-1"
+                    data-export-soft-proof-color-profile={selectedExportProofProfile}
+                    data-export-soft-proof-rendering-intent={selectedExportProofIntent}
                     data-export-soft-proof-status="export-transform-preview"
-                    variant={TextVariants.small}
+                    data-testid="export-soft-proof-active-badge"
                   >
-                    {t('editor.toolbar.exportSoftProofDetails', {
-                      profile: selectedExportProofRecipe.colorProfile ?? 'srgb',
-                      intent: selectedExportProofRecipe.renderingIntent ?? 'relativeColorimetric',
-                    })}
-                  </UiText>
+                    <UiText as="span" className="uppercase" color={TextColors.secondary} variant={TextVariants.small}>
+                      {t('editor.toolbar.exportSoftProofActive')}
+                    </UiText>
+                    <UiText as="span" className="truncate" color={TextColors.primary} variant={TextVariants.small}>
+                      {exportSoftProofSummary}
+                    </UiText>
+                  </div>
                 )}
               </div>
             )}

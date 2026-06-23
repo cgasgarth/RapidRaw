@@ -743,7 +743,9 @@
         "undo": "元に戻す (Ctrl+Z) または履歴 (右クリック)"
       },
       "vc": "仮想",
-      "exportSoftProofDetails": "{{profile}} / {{intent}} preview"
+      "exportSoftProofActive": "Proofing",
+      "exportSoftProofDetails": "{{profile}} / {{intent}} preview",
+      "exportSoftProofUnavailable": "No export recipe available"
     },
     "tether": {
       "battery": "Battery",
