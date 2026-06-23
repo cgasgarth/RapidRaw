@@ -7,7 +7,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use chrono::{SecondsFormat, Utc};
-use image::{DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, imageops};
+use image::{
+    DynamicImage, ExtendedColorType, GenericImageView, GrayImage, ImageBuffer, ImageEncoder,
+    ImageFormat, Luma, codecs::tiff::TiffEncoder, imageops,
+};
 use jxl_encoder::{LosslessConfig, LossyConfig, PixelLayout};
 use moxcms::{ColorProfile, Layout, TransformOptions};
 use mozjpeg_rs::{Encoder as MozJpegEncoder, Preset};
@@ -39,7 +42,9 @@ use crate::deblur_render::apply_deblur_stage;
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ExportReceiptOutput {
+    bit_depth: Option<u8>,
     byte_size: u64,
+    color_profile: Option<String>,
     format: String,
     output_path: String,
     source_path: String,
@@ -576,9 +581,7 @@ fn encode_image_to_bytes(
                 .map_err(|e| e.to_string())?;
         }
         "tiff" => {
-            DynamicImage::ImageRgb16(image.to_rgb16())
-                .write_to(&mut cursor, image::ImageFormat::Tiff)
-                .map_err(|e| e.to_string())?;
+            return encode_srgb_tiff16_to_bytes(image);
         }
         "avif" => {
             image
@@ -587,6 +590,30 @@ fn encode_image_to_bytes(
         }
         _ => return Err(format!("Unsupported file format: {}", output_format)),
     };
+    Ok(image_bytes)
+}
+
+fn encode_srgb_tiff16_to_bytes(image: &DynamicImage) -> Result<Vec<u8>, String> {
+    let rgb_image = image.to_rgb16();
+    let (width, height) = rgb_image.dimensions();
+    let pixels = rgb_image.into_raw();
+    let icc_profile = encode_icc_profile(&ColorProfile::new_srgb())?;
+    let mut image_bytes = Vec::new();
+    let mut cursor = Cursor::new(&mut image_bytes);
+    let mut encoder = TiffEncoder::new(&mut cursor);
+
+    encoder
+        .set_icc_profile(icc_profile)
+        .map_err(|e| format!("Failed to attach sRGB TIFF ICC profile: {}", e))?;
+    encoder
+        .write_image(
+            bytemuck::cast_slice(&pixels),
+            width,
+            height,
+            ExtendedColorType::Rgb16,
+        )
+        .map_err(|e| format!("Failed to encode 16-bit sRGB TIFF: {}", e))?;
+
     Ok(image_bytes)
 }
 
@@ -1019,7 +1046,12 @@ pub async fn export_images(
                         }
                         #[cfg(not(target_os = "android"))]
                         fs::write(&output_path, cube_bytes).map_err(|e| e.to_string())?;
-                        return export_receipt_output(&output_path, &source_path_str, &extension);
+                        return export_receipt_output(
+                            &output_path,
+                            &source_path_str,
+                            &extension,
+                            None,
+                        );
                     }
 
                     let base_image = if is_current_edit {
@@ -1111,7 +1143,12 @@ pub async fn export_images(
                         )?;
                     }
 
-                    export_receipt_output(&output_path, &source_path_str, &extension)
+                    export_receipt_output(
+                        &output_path,
+                        &source_path_str,
+                        &extension,
+                        Some(&export_settings),
+                    )
                 })();
 
                 let current_progress = progress_counter_clone.fetch_add(1, Ordering::SeqCst) + 1;
@@ -1191,17 +1228,53 @@ fn export_receipt_output(
     output_path: &Path,
     source_path: &str,
     format: &str,
+    export_settings: Option<&ExportSettings>,
 ) -> Result<ExportReceiptOutput, String> {
     let byte_size = fs::metadata(output_path)
         .map_err(|error| error.to_string())?
         .len();
+    let metadata = export_settings.and_then(|settings| export_receipt_metadata(format, settings));
 
     Ok(ExportReceiptOutput {
+        bit_depth: metadata.as_ref().map(|metadata| metadata.bit_depth),
         byte_size,
+        color_profile: metadata.map(|metadata| metadata.color_profile),
         format: format.to_string(),
         output_path: output_path.to_string_lossy().to_string(),
         source_path: source_path.to_string(),
     })
+}
+
+struct ExportReceiptMetadata {
+    bit_depth: u8,
+    color_profile: String,
+}
+
+fn export_receipt_metadata(
+    format: &str,
+    export_settings: &ExportSettings,
+) -> Option<ExportReceiptMetadata> {
+    match format {
+        "jpg" | "jpeg" => Some(ExportReceiptMetadata {
+            bit_depth: 8,
+            color_profile: export_color_profile_receipt_label(&export_settings.color_profile),
+        }),
+        "tif" | "tiff" => Some(ExportReceiptMetadata {
+            bit_depth: 16,
+            color_profile: "sRGB".to_string(),
+        }),
+        _ => None,
+    }
+}
+
+fn export_color_profile_receipt_label(color_profile: &ExportColorProfile) -> String {
+    match color_profile {
+        ExportColorProfile::DisplayP3 => "Display P3".to_string(),
+        ExportColorProfile::Srgb
+        | ExportColorProfile::AdobeRgb1998
+        | ExportColorProfile::ProPhotoRgb
+        | ExportColorProfile::SourceEmbedded => "sRGB".to_string(),
+    }
 }
 
 #[tauri::command]
@@ -1511,7 +1584,11 @@ mod tests {
         ExportColorProfile, ExportSettings, OutputSharpeningSettings, OutputSharpeningTarget,
         apply_export_resize_and_watermark, encode_image_to_bytes, export_rgb_pixels_and_profile,
     };
-    use image::{DynamicImage, ImageBuffer, Rgb};
+    use std::io::Cursor;
+
+    use image::{
+        ColorType, DynamicImage, ImageBuffer, ImageDecoder, Rgb, codecs::tiff::TiffDecoder,
+    };
 
     fn synthetic_export_edge() -> DynamicImage {
         let mut buffer = ImageBuffer::<Rgb<f32>, Vec<f32>>::new(11, 5);
@@ -1590,6 +1667,10 @@ mod tests {
         chunks[0]
     }
 
+    fn tiff_decoder(bytes: &[u8]) -> TiffDecoder<Cursor<&[u8]>> {
+        TiffDecoder::new(Cursor::new(bytes)).expect("TIFF decoder should open exported bytes")
+    }
+
     #[test]
     fn output_sharpening_increases_export_edge_contrast() {
         let before = synthetic_export_edge();
@@ -1633,6 +1714,35 @@ mod tests {
             .expect("JPEG encoding should include sRGB ICC profile");
 
         assert!(single_icc_payload(&bytes).len() > b"ICC_PROFILE\0\x01\x01".len());
+    }
+
+    #[test]
+    fn tiff_export_writes_rgb16_pixels() {
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(2, 2, Rgb([128, 64, 32])));
+        let bytes = encode_image_to_bytes(&image, "tiff", 90, &ExportColorProfile::Srgb)
+            .expect("TIFF encoding should succeed");
+        let decoder = tiff_decoder(&bytes);
+
+        assert_eq!(decoder.color_type(), ColorType::Rgb16);
+    }
+
+    #[test]
+    fn tiff_export_embeds_srgb_icc_profile() {
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(2, 2, Rgb([128, 64, 32])));
+        let bytes = encode_image_to_bytes(&image, "tiff", 90, &ExportColorProfile::Srgb)
+            .expect("TIFF encoding should include sRGB ICC profile");
+        let mut decoder = tiff_decoder(&bytes);
+        let icc_profile = decoder
+            .icc_profile()
+            .expect("TIFF ICC profile should be readable")
+            .expect("TIFF export should include an embedded ICC profile");
+
+        assert_eq!(
+            icc_profile,
+            encode_image_to_bytes(&image, "jpg", 90, &ExportColorProfile::Srgb)
+                .map(|jpeg| single_icc_payload(&jpeg)[b"ICC_PROFILE\0\x01\x01".len()..].to_vec())
+                .expect("reference sRGB JPEG should encode")
+        );
     }
 
     #[test]

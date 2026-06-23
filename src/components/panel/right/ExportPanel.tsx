@@ -323,6 +323,10 @@ export default function ExportPanel({
   );
   const firstReceiptOutput = lastReceipt?.outputs[0];
   const firstReceiptFileName = firstReceiptOutput?.outputPath.split(/[\\/]/).pop() ?? '';
+  const firstReceiptMetadataText =
+    firstReceiptOutput?.colorProfile && firstReceiptOutput.bitDepth
+      ? `${firstReceiptOutput.colorProfile} · ${firstReceiptOutput.bitDepth}-bit`
+      : null;
   const isExporting = status === Status.Exporting;
   const isLibraryContext = !!onClose;
 
@@ -1114,6 +1118,7 @@ export default function ExportPanel({
             <div className="mt-2 flex items-center justify-between gap-2">
               <UiText color={TextColors.secondary} variant={TextVariants.small}>
                 {formatBytes(firstReceiptOutput.byteSize, t)} · {firstReceiptOutput.format.toUpperCase()}
+                {firstReceiptMetadataText ? ` · ${firstReceiptMetadataText}` : ''}
               </UiText>
               <button
                 className="rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
