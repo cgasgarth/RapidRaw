@@ -8,6 +8,7 @@ import {
   type LibraryRelinkIdentity,
   type LibraryRelinkPlan,
 } from '../schemas/libraryRelinkSchemas';
+import { librarySessionSetSchema, type LibrarySession, type LibrarySessionSet } from '../schemas/librarySessionSchemas';
 
 interface ScoreRule {
   kind: LibraryRelinkEvidenceKind;
@@ -19,6 +20,12 @@ interface ScoreRule {
 interface PlanLibraryRelinkInput {
   candidateIdentities: LibraryRelinkIdentity[];
   missingIdentity: LibraryRelinkIdentity;
+}
+
+interface ApplyLibraryRelinkInput {
+  fromPath: string;
+  plan: LibraryRelinkPlan;
+  sessionSet: LibrarySessionSet;
 }
 
 const verifiedThreshold = 80;
@@ -88,6 +95,29 @@ export const scoreRelinkCandidate = (
   };
 };
 
+export const applyLibraryRelinkToSessionSet = ({
+  fromPath,
+  plan,
+  sessionSet,
+}: ApplyLibraryRelinkInput): LibrarySessionSet => {
+  const parsedSessionSet = librarySessionSetSchema.parse(sessionSet);
+  const parsedPlan = libraryRelinkPlanSchema.parse(plan);
+
+  if (parsedPlan.status !== 'matched' || parsedPlan.selectedCandidatePath === null) {
+    throw new Error('Library relink requires one verified matched candidate.');
+  }
+
+  const normalizedFromPath = normalizePathForRewrite(fromPath);
+  const normalizedToPath = normalizePathForRewrite(parsedPlan.selectedCandidatePath);
+
+  return librarySessionSetSchema.parse({
+    ...parsedSessionSet,
+    sessions: parsedSessionSet.sessions.map((session) =>
+      applyRelinkToSession(session, normalizedFromPath, normalizedToPath),
+    ),
+  });
+};
+
 const compareEvidence = (
   rule: ScoreRule,
   missingIdentity: LibraryRelinkIdentity,
@@ -116,3 +146,30 @@ const normalizeIdentityValue = (value: string | number | null | undefined): stri
 };
 
 const fileNameFromPath = (path: string): string => path.split(/[\\/]/u).pop() ?? path;
+
+const applyRelinkToSession = (session: LibrarySession, fromPath: string, toPath: string): LibrarySession => ({
+  ...session,
+  activeAssetPath: rewriteNullablePath(session.activeAssetPath, fromPath, toPath),
+  activeFolderPath: rewriteNullablePath(session.activeFolderPath, fromPath, toPath),
+  recentAssetPaths: rewritePathList(session.recentAssetPaths, fromPath, toPath),
+  rootPaths: rewritePathList(session.rootPaths, fromPath, toPath),
+  selectedAssetPaths: rewritePathList(session.selectedAssetPaths, fromPath, toPath),
+});
+
+const rewritePathList = (paths: readonly string[], fromPath: string, toPath: string): string[] =>
+  paths.map((path) => rewritePath(path, fromPath, toPath));
+
+const rewriteNullablePath = (path: string | null, fromPath: string, toPath: string): string | null =>
+  path === null ? null : rewritePath(path, fromPath, toPath);
+
+const rewritePath = (path: string, fromPath: string, toPath: string): string => {
+  const normalizedPath = normalizePathForRewrite(path);
+  if (normalizedPath === fromPath) return toPath;
+  if (isPathInside(normalizedPath, fromPath)) return `${toPath}${normalizedPath.slice(fromPath.length)}`;
+  return path;
+};
+
+const isPathInside = (path: string, parentPath: string): boolean =>
+  path.startsWith(`${parentPath}/`) || path.startsWith(`${parentPath}\\`);
+
+const normalizePathForRewrite = (path: string): string => path.trim().replace(/[\\/]+$/u, '');
