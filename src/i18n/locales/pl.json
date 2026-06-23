@@ -1863,6 +1863,13 @@
         "low": "Low confidence",
         "medium": "Medium confidence"
       },
+      "focusConfidenceInputs": {
+        "center": "",
+        "exposure": "",
+        "eye": "",
+        "face": ""
+      },
+      "focusConfidenceInputsTitle": "",
       "focusConfidenceValue": "Confidence {{confidence}}%",
       "focusRankingsTab": "Focus Ranking",
       "focusRankValue": "#{{rank}} focus pick",
