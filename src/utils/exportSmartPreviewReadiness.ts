@@ -6,4 +6,5 @@ export const isStaleOrOfflineSmartPreview = (smartPreview: ThumbnailSmartPreview
 export const hasStaleOrOfflineSmartPreview = (
   paths: ReadonlyArray<string>,
   smartPreviews: Readonly<Record<string, ThumbnailSmartPreviewState | undefined>>,
-): boolean => paths.some((path) => isStaleOrOfflineSmartPreview(smartPreviews[path]));
+  reconnectedPaths: ReadonlySet<string> = new Set(),
+): boolean => paths.some((path) => !reconnectedPaths.has(path) && isStaleOrOfflineSmartPreview(smartPreviews[path]));

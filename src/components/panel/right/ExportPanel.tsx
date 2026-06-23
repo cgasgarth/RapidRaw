@@ -346,11 +346,60 @@ export default function ExportPanel({
   );
   const numImages = pathsToExport.length;
   const isOfflineSmartPreviewExport = !isLibraryContext && selectedImage?.isOfflineSmartPreview === true;
-  const isLibrarySmartPreviewExport = useMemo(
-    () => isLibraryContext && hasStaleOrOfflineSmartPreview(pathsToExport, thumbnailSmartPreviews),
+  const staleSmartPreviewPaths = useMemo(
+    () =>
+      isLibraryContext
+        ? pathsToExport.filter((path) => hasStaleOrOfflineSmartPreview([path], thumbnailSmartPreviews))
+        : [],
     [isLibraryContext, pathsToExport, thumbnailSmartPreviews],
   );
+  const staleSmartPreviewKey = useMemo(() => staleSmartPreviewPaths.join('\n'), [staleSmartPreviewPaths]);
+  const [reconnectedSmartPreviewState, setReconnectedSmartPreviewState] = useState<{
+    key: string;
+    paths: ReadonlySet<string>;
+  }>(() => ({ key: '', paths: new Set() }));
+  const reconnectedSmartPreviewPaths = useMemo(
+    () =>
+      reconnectedSmartPreviewState.key === staleSmartPreviewKey
+        ? reconnectedSmartPreviewState.paths
+        : new Set<string>(),
+    [reconnectedSmartPreviewState, staleSmartPreviewKey],
+  );
+  const isLibrarySmartPreviewExport = useMemo(
+    () =>
+      isLibraryContext &&
+      hasStaleOrOfflineSmartPreview(pathsToExport, thumbnailSmartPreviews, reconnectedSmartPreviewPaths),
+    [isLibraryContext, pathsToExport, reconnectedSmartPreviewPaths, thumbnailSmartPreviews],
+  );
   const isSmartPreviewExportBlocked = isOfflineSmartPreviewExport || isLibrarySmartPreviewExport;
+
+  useEffect(() => {
+    if (staleSmartPreviewPaths.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    void Promise.all(
+      staleSmartPreviewPaths.map(async (path): Promise<string | null> => {
+        try {
+          const dims = await invokeWithSchema(Invokes.GetImageDimensions, { path }, imageDimensionsSchema);
+          return dims.width > 0 && dims.height > 0 ? path : null;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((results) => {
+      if (cancelled) return;
+      setReconnectedSmartPreviewState({
+        key: staleSmartPreviewKey,
+        paths: new Set(results.filter((path): path is string => path !== null)),
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [staleSmartPreviewKey, staleSmartPreviewPaths]);
 
   useEffect(() => {
     const fetchDims = async () => {

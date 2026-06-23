@@ -40,3 +40,16 @@ test('blocks library export when any selected path is stale or offline', () => {
     }),
   ).toBe(true);
 });
+
+test('allows library export when stale smart preview path is proven reconnected', () => {
+  expect(
+    hasStaleOrOfflineSmartPreview(
+      ['/photos/a.CR3', '/photos/b.CR3'],
+      {
+        '/photos/a.CR3': smartPreviewState(),
+        '/photos/b.CR3': smartPreviewState({ source: 'smartPreview', sourceAvailable: false, stale: true }),
+      },
+      new Set(['/photos/b.CR3']),
+    ),
+  ).toBe(false);
+});
