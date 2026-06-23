@@ -758,7 +758,9 @@
         "undo": "Deshacer (Ctrl+Z) o Historial (Clic derecho)"
       },
       "vc": "CV",
-      "exportSoftProofDetails": "{{profile}} / {{intent}} preview"
+      "exportSoftProofActive": "Proofing",
+      "exportSoftProofDetails": "{{profile}} / {{intent}} preview",
+      "exportSoftProofUnavailable": "No export recipe available"
     },
     "tether": {
       "battery": "Battery",

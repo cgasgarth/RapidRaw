@@ -1193,7 +1193,9 @@
       "unknown": "Unknown"
     },
     "toolbar": {
+      "exportSoftProofActive": "Proofing",
       "exportSoftProofDetails": "{{profile}} / {{intent}} preview",
+      "exportSoftProofUnavailable": "No export recipe available",
       "historyDepth": "{{current}}/{{total}}",
       "tooltips": {
         "aperture": "Aperture",

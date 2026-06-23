@@ -758,7 +758,9 @@
         "undo": "Annulla (Ctrl+Z) o Cronologia (Tasto destro)"
       },
       "vc": "CV",
-      "exportSoftProofDetails": "{{profile}} / {{intent}} preview"
+      "exportSoftProofActive": "Proofing",
+      "exportSoftProofDetails": "{{profile}} / {{intent}} preview",
+      "exportSoftProofUnavailable": "No export recipe available"
     },
     "tether": {
       "battery": "Battery",
