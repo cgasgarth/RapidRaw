@@ -34,16 +34,16 @@ const toDetectionSource = (
   const exif = source.exif ?? {};
 
   return {
-    aperture: parseNumber(exif['FNumber']),
+    aperture: parsePositiveNumber(exif['FNumber']),
     cameraMake: cleanString(exif['Make']),
     cameraModel: cleanString(exif['Model']),
     declaredExposureEv: parseFilenameExposureEv(source.path),
     exposureCompensationEv: parseExposureCompensation(exif['ExposureBiasValue']),
     exposureTimeSeconds: parseExposureTime(exif['ExposureTime']),
-    focalLengthMm: parseNumber(exif['FocalLengthIn35mmFilm'] ?? exif['FocalLength']),
+    focalLengthMm: parsePositiveNumber(exif['FocalLengthIn35mmFilm'] ?? exif['FocalLength']),
     height: 1,
     imagePath: source.path,
-    iso: parseNumber(exif['ISO'] ?? exif['PhotographicSensitivity']),
+    iso: parsePositiveNumber(exif['ISO'] ?? exif['PhotographicSensitivity']),
     lensModel: cleanString(exif['LensModel']),
     rawBlackLevelKnown: false,
     rawWhiteLevelKnown: false,
@@ -76,6 +76,11 @@ const parseNumber = (value: string | undefined): number | undefined => {
 };
 
 const parseExposureTime = (value: string | undefined): number | undefined => {
+  const parsed = parseNumber(value);
+  return parsed !== undefined && parsed > 0 ? parsed : undefined;
+};
+
+const parsePositiveNumber = (value: string | undefined): number | undefined => {
   const parsed = parseNumber(value);
   return parsed !== undefined && parsed > 0 ? parsed : undefined;
 };
