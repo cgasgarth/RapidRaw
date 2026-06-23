@@ -345,6 +345,12 @@ const fixture = {
     },
     rollback: {
       label: 'Rollback virtual copy',
+      restoreAction: {
+        buttonLabel: 'Restore pre-agent edit graph',
+        commandId: 'command_agent_expert_edit_demo_rollback_2844',
+        restoredLabel: 'Restored graph_rev_agent_expert_edit_demo_initial_2844 from the handoff rollback target.',
+        toolName: 'edit_graph.rollback',
+      },
       status: 'available',
       summary: 'Rollback restores graph_rev_agent_expert_edit_demo_initial_2844 without modifying the source RAW.',
       targetRevision: 'graph_rev_agent_expert_edit_demo_initial_2844',

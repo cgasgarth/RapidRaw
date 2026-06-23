@@ -245,6 +245,14 @@ export const agentReviewHandoffSchema = z
     rollback: z
       .object({
         label: z.string().min(1),
+        restoreAction: z
+          .object({
+            buttonLabel: z.string().min(1),
+            commandId: z.string().min(1),
+            restoredLabel: z.string().min(1),
+            toolName: z.string().min(1),
+          })
+          .strict(),
         status: agentReviewHandoffRollbackStatusSchema,
         summary: z.string().min(1),
         targetRevision: z.string().min(1),
