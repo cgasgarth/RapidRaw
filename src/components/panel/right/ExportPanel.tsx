@@ -57,6 +57,7 @@ interface ExportPanelProps {
   rootPaths: string[];
   isVisible?: boolean;
   onClose?: () => void;
+  onLinkedVariantImported?: (path: string) => Promise<void> | void;
 }
 
 interface SectionProps {
@@ -219,6 +220,7 @@ export default function ExportPanel({
   rootPaths,
   isVisible = true,
   onClose,
+  onLinkedVariantImported,
 }: ExportPanelProps) {
   const { t } = useTranslation();
 
@@ -361,29 +363,33 @@ export default function ExportPanel({
   const currentExternalVariantImportedPath = isCurrentExternalVariantStatus ? externalVariantStatus.importedPath : null;
   const isImportingCurrentExternalVariant = isCurrentExternalVariantStatus && externalVariantStatus.importing;
 
-  const handleImportExternalVariant = useCallback(async (sourceVirtualPath: string, outputPath: string) => {
-    setExternalVariantStatus({ error: null, importedPath: null, importing: true, receiptOutputPath: outputPath });
-    try {
-      const receipt = await invokeWithSchema(
-        Invokes.ImportExternalEditorVariant,
-        { outputPath, sourceVirtualPath },
-        externalEditorVariantReceiptSchema,
-      );
-      setExternalVariantStatus({
-        error: null,
-        importedPath: receipt.outputPath,
-        importing: false,
-        receiptOutputPath: outputPath,
-      });
-    } catch (error) {
-      setExternalVariantStatus({
-        error: formatUnknownError(error),
-        importedPath: null,
-        importing: false,
-        receiptOutputPath: outputPath,
-      });
-    }
-  }, []);
+  const handleImportExternalVariant = useCallback(
+    async (sourceVirtualPath: string, outputPath: string) => {
+      setExternalVariantStatus({ error: null, importedPath: null, importing: true, receiptOutputPath: outputPath });
+      try {
+        const receipt = await invokeWithSchema(
+          Invokes.ImportExternalEditorVariant,
+          { outputPath, sourceVirtualPath },
+          externalEditorVariantReceiptSchema,
+        );
+        await onLinkedVariantImported?.(receipt.outputPath);
+        setExternalVariantStatus({
+          error: null,
+          importedPath: receipt.outputPath,
+          importing: false,
+          receiptOutputPath: outputPath,
+        });
+      } catch (error) {
+        setExternalVariantStatus({
+          error: formatUnknownError(error),
+          importedPath: null,
+          importing: false,
+          receiptOutputPath: outputPath,
+        });
+      }
+    },
+    [onLinkedVariantImported],
+  );
 
   const pathsToExport = useMemo(
     () =>
