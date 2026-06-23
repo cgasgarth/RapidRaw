@@ -1,7 +1,7 @@
 use crate::gpu_processing::WgpuDisplay;
 use bytemuck::{Pod, Zeroable};
 use glam::{Mat3, Vec2, Vec3};
-use image::{DynamicImage, GenericImageView, Rgb32FImage, Rgba};
+use image::{DynamicImage, GenericImageView, ImageFormat, Rgb32FImage, Rgba, RgbaImage};
 use imageproc::geometric_transformations::{Border, Interpolation, rotate_about_center};
 use nalgebra::{Matrix3 as NaMatrix3, Vector3 as NaVector3};
 use rawler::decoders::Orientation;
@@ -11,6 +11,7 @@ use serde_json::Value;
 use serde_json::json;
 use std::borrow::Cow;
 use std::f32::consts::PI;
+use std::io::Cursor;
 use std::sync::Arc;
 
 pub use crate::gpu_processing::{
@@ -3051,6 +3052,76 @@ pub fn calculate_histogram_from_image(image: &DynamicImage) -> Result<HistogramD
     })
 }
 
+#[derive(Serialize, Clone)]
+pub struct GamutWarningOverlayData {
+    coverage_ratio: f32,
+    height: u32,
+    mask_data_url: String,
+    max_channel_value: u8,
+    min_channel_value: u8,
+    pixel_count: u64,
+    warning_pixel_count: u64,
+    width: u32,
+}
+
+pub fn calculate_gamut_warning_overlay_from_image(
+    image: &DynamicImage,
+) -> Result<GamutWarningOverlayData, String> {
+    const MAX_OVERLAY_DIMENSION: u32 = 512;
+    const HIGH_CLIP_THRESHOLD: u8 = 252;
+    const LOW_CLIP_THRESHOLD: u8 = 3;
+
+    let rgba = image.to_rgba8();
+    let (source_width, source_height) = rgba.dimensions();
+    let max_dimension = source_width.max(source_height).max(1);
+    let scale = (MAX_OVERLAY_DIMENSION as f32 / max_dimension as f32).min(1.0);
+    let width = ((source_width as f32 * scale).round() as u32).max(1);
+    let height = ((source_height as f32 * scale).round() as u32).max(1);
+    let mut mask = RgbaImage::new(width, height);
+    let mut warning_pixel_count = 0u64;
+    let mut min_channel_value = u8::MAX;
+    let mut max_channel_value = u8::MIN;
+
+    for y in 0..height {
+        let source_y = ((y as f32 / scale).floor() as u32).min(source_height.saturating_sub(1));
+        for x in 0..width {
+            let source_x = ((x as f32 / scale).floor() as u32).min(source_width.saturating_sub(1));
+            let pixel = rgba.get_pixel(source_x, source_y);
+            let channels = [pixel[0], pixel[1], pixel[2]];
+            let pixel_min = channels.iter().copied().min().unwrap_or(0);
+            let pixel_max = channels.iter().copied().max().unwrap_or(0);
+            min_channel_value = min_channel_value.min(pixel_min);
+            max_channel_value = max_channel_value.max(pixel_max);
+            let warns = pixel_min <= LOW_CLIP_THRESHOLD || pixel_max >= HIGH_CLIP_THRESHOLD;
+
+            if warns {
+                warning_pixel_count += 1;
+                mask.put_pixel(x, y, Rgba([255, 45, 149, 122]));
+            } else {
+                mask.put_pixel(x, y, Rgba([0, 0, 0, 0]));
+            }
+        }
+    }
+
+    let pixel_count = u64::from(width) * u64::from(height);
+    let coverage_ratio = warning_pixel_count as f32 / pixel_count.max(1) as f32;
+    let mut png = Cursor::new(Vec::new());
+    DynamicImage::ImageRgba8(mask)
+        .write_to(&mut png, ImageFormat::Png)
+        .map_err(|error| format!("Failed to encode gamut warning overlay: {}", error))?;
+
+    Ok(GamutWarningOverlayData {
+        coverage_ratio,
+        height,
+        mask_data_url: format!("data:image/png;base64,{}", BASE64.encode(png.get_ref())),
+        max_channel_value,
+        min_channel_value,
+        pixel_count,
+        warning_pixel_count,
+        width,
+    })
+}
+
 fn apply_gaussian_smoothing(histogram: &mut [f32], sigma: f32) {
     if sigma <= 0.0 {
         return;
@@ -3676,9 +3747,10 @@ pub fn calculate_auto_adjustments(
 mod tests {
     use super::{
         CapturePreSharpeningSettings, ImageMetadata, RawEngineArtifacts, WaveletDetailSettings,
-        apply_wavelet_detail_by_scale, remove_raw_artifacts_and_enhance_with_settings,
+        apply_wavelet_detail_by_scale, calculate_gamut_warning_overlay_from_image,
+        remove_raw_artifacts_and_enhance_with_settings,
     };
-    use image::{DynamicImage, ImageBuffer, Rgb, Rgb32FImage};
+    use image::{DynamicImage, ImageBuffer, Rgb, Rgb32FImage, Rgba, RgbaImage};
     use serde_json::json;
 
     fn synthetic_edge_image() -> DynamicImage {
@@ -3694,6 +3766,30 @@ mod tests {
 
     fn red_channel(image: &DynamicImage, x: u32, y: u32) -> f32 {
         image.to_rgb32f().get_pixel(x, y).0[0]
+    }
+
+    #[test]
+    fn gamut_warning_overlay_reports_output_referred_clip_coverage() {
+        let mut image = RgbaImage::new(4, 2);
+        for y in 0..2 {
+            for x in 0..4 {
+                image.put_pixel(x, y, Rgba([64, 96, 128, 255]));
+            }
+        }
+        image.put_pixel(0, 0, Rgba([255, 96, 128, 255]));
+        image.put_pixel(1, 0, Rgba([64, 0, 128, 255]));
+
+        let overlay = calculate_gamut_warning_overlay_from_image(&DynamicImage::ImageRgba8(image))
+            .expect("synthetic overlay should encode");
+
+        assert_eq!(overlay.width, 4);
+        assert_eq!(overlay.height, 2);
+        assert_eq!(overlay.warning_pixel_count, 2);
+        assert_eq!(overlay.pixel_count, 8);
+        assert_eq!(overlay.min_channel_value, 0);
+        assert_eq!(overlay.max_channel_value, 255);
+        assert!((overlay.coverage_ratio - 0.25).abs() < f32::EPSILON);
+        assert!(overlay.mask_data_url.starts_with("data:image/png;base64,"));
     }
 
     fn synthetic_texture_image() -> DynamicImage {

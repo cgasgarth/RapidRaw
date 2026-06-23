@@ -78,6 +78,21 @@ export const base64PayloadSchema = z
   })
   .loose();
 
+export const gamutWarningOverlayPayloadSchema = z
+  .object({
+    coverage_ratio: z.number().min(0).max(1),
+    height: z.number().int().positive(),
+    mask_data_url: z.string().startsWith('data:image/png;base64,'),
+    max_channel_value: z.number().int().min(0).max(255),
+    min_channel_value: z.number().int().min(0).max(255),
+    pixel_count: z.number().int().nonnegative(),
+    warning_pixel_count: z.number().int().nonnegative(),
+    width: z.number().int().positive(),
+  })
+  .strict();
+
+export type GamutWarningOverlayPayload = z.infer<typeof gamutWarningOverlayPayloadSchema>;
+
 export const panoramaCompletePayloadSchema = z
   .object({
     base64: z.string(),
@@ -169,6 +184,7 @@ export const parsePathProgressPayload = (value: unknown) => pathProgressPayloadS
 export const parseDenoiseCompletePayload = (value: unknown) => denoiseCompletePayloadSchema.parse(value);
 export const parseRenderPathPayload = (value: unknown) => renderPathPayloadSchema.parse(value);
 export const parseBase64Payload = (value: unknown) => base64PayloadSchema.parse(value);
+export const parseGamutWarningOverlayPayload = (value: unknown) => gamutWarningOverlayPayloadSchema.parse(value);
 export const parsePanoramaCompletePayload = (value: unknown) => panoramaCompletePayloadSchema.parse(value);
 export const parseAiConnectorStatusPayload = (value: unknown) => aiConnectorStatusPayloadSchema.parse(value);
 export const parseExportReceiptPayload = (value: unknown) => exportReceiptPayloadSchema.parse(value);

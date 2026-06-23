@@ -399,6 +399,7 @@ function BrushMaskCanvasVisualSmoke() {
                 crop={null}
                 cursorStyle="crosshair"
                 finalPreviewUrl={brushMaskCanvasImageDataUrl}
+                gamutWarningOverlay={null}
                 handleCropComplete={() => {}}
                 hasRenderedFirstFrame
                 imageRenderSize={{
@@ -414,6 +415,7 @@ function BrushMaskCanvasVisualSmoke() {
                 isMasking
                 isMaxZoom={false}
                 isRotationActive={false}
+                isGamutWarningOverlayVisible={false}
                 isSliderDragging={false}
                 isStraightenActive={false}
                 maskOverlayUrl={buildBrushMaskCanvasOverlayUrl(activeSubMask)}

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import AdjustmentSlider from './AdjustmentSlider';
+import { useEditorStore } from '../../store/useEditorStore';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import {
   type Adjustments,
@@ -15,6 +16,7 @@ import {
   INITIAL_ADJUSTMENTS,
 } from '../../utils/adjustments';
 import { COLOR_GRADING_PRESETS } from '../../utils/colorGradingPresets';
+import { formatGamutWarningCoverage } from '../../utils/gamutWarningDisplay';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../utils/profileTonePresets';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../utils/selectiveColorRanges';
 import {
@@ -834,8 +836,12 @@ export default function ColorPanel({
   const [activeColorBalanceRange, setActiveColorBalanceRange] = useState<ColorBalanceRgbRange>('midtones');
   const [activeChannelMixerOutput, setActiveChannelMixerOutput] = useState<ChannelMixerOutput>('red');
   const [selectiveColorPreviewMode, setSelectiveColorPreviewMode] = useState<SelectiveColorPreviewMode>('adjusted');
+  const gamutWarningOverlay = useEditorStore((state) => state.gamutWarningOverlay);
+  const isGamutWarningOverlayVisible = useEditorStore((state) => state.isGamutWarningOverlayVisible);
+  const setEditor = useEditorStore((state) => state.setEditor);
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
   const isWgpuEnabled = appSettings?.useWgpuRenderer !== false;
+  const gamutWarningCoverage = formatGamutWarningCoverage(gamutWarningOverlay);
 
   const HSL_COLORS = useMemo<Array<ColorProps>>(
     () =>
@@ -1320,6 +1326,40 @@ export default function ColorPanel({
     <div className="space-y-4">
       {!isForMask && <ColorRuntimeStatusRail />}
       {!isForMask && <ColorWorkflowReadinessRail />}
+      {!isForMask && (
+        <div
+          className="rounded-md border border-border bg-bg-tertiary p-2"
+          data-coverage-ratio={(gamutWarningOverlay?.coverage_ratio ?? 0).toFixed(6)}
+          data-testid="gamut-warning-controls"
+          data-visible={String(isGamutWarningOverlayVisible)}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <UiText variant={TextVariants.heading}>{t('adjustments.color.gamutWarning.title')}</UiText>
+              <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+                {t('adjustments.color.gamutWarning.coverage', { value: gamutWarningCoverage })}
+              </UiText>
+            </div>
+            <button
+              aria-pressed={isGamutWarningOverlayVisible}
+              className={`shrink-0 rounded px-2 py-1 text-xs transition-colors ${
+                isGamutWarningOverlayVisible
+                  ? 'bg-accent text-button-text'
+                  : 'bg-bg-secondary text-text-secondary hover:bg-surface'
+              }`}
+              data-testid="gamut-warning-toggle"
+              onClick={() => {
+                setEditor({ isGamutWarningOverlayVisible: !isGamutWarningOverlayVisible });
+              }}
+              type="button"
+            >
+              {isGamutWarningOverlayVisible
+                ? t('adjustments.color.gamutWarning.on')
+                : t('adjustments.color.gamutWarning.off')}
+            </button>
+          </div>
+        </div>
+      )}
       {!isForMask && (
         <div
           className="rounded-md border border-border bg-bg-tertiary p-2"

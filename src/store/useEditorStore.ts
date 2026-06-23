@@ -9,6 +9,7 @@ import type { OverlayMode } from '../components/panel/right/CropPanel';
 import type { SelectedImage, WaveformData, BrushSettings } from '../components/ui/AppProperties';
 import type { BaseRenderSize, ImageDimensions } from '../hooks/useImageRenderSize';
 import type { MaskOverlaySettings } from '../schemas/maskOverlaySchemas';
+import type { GamutWarningOverlayPayload } from '../schemas/tauriEventSchemas';
 import type { BasicToneCommandEnvelope } from '../utils/basicToneCommandBridge';
 
 export interface InteractivePatch {
@@ -44,6 +45,8 @@ interface EditorState {
   // Analytics
   histogram: ChannelConfig | null;
   waveform: WaveformData | null;
+  gamutWarningOverlay: GamutWarningOverlayPayload | null;
+  isGamutWarningOverlayVisible: boolean;
   isWaveformVisible: boolean;
   activeWaveformChannel: DisplayMode;
   waveformHeight: number;
@@ -104,6 +107,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   showOriginal: false,
   histogram: null,
   waveform: null,
+  gamutWarningOverlay: null,
+  isGamutWarningOverlayVisible: true,
   isWaveformVisible: false,
   activeWaveformChannel: DisplayMode.Luma,
   waveformHeight: 220,

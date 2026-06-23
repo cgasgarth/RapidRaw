@@ -78,6 +78,12 @@
       "colorGrading": "颜色分级",
       "colorMixer": "颜色混合器",
       "falloffSmoothness": "过渡",
+      "gamutWarning": {
+        "coverage": "",
+        "off": "",
+        "on": "",
+        "title": ""
+      },
       "grading": {
         "applyPreset": "应用 {{name}} 颜色分级预设。类别 {{category}}，混合 {{blending}}，平衡 {{balance}}。",
         "balance": "平衡",
@@ -691,6 +697,8 @@
     },
     "canvas": {
       "cropPreviewAlt": "裁剪预览",
+      "gamutWarningCoverage": "",
+      "gamutWarningOverlay": "",
       "maskOverlayAlt": "蒙版叠加",
       "originalAlt": "原始图像"
     },

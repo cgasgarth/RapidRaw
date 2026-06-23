@@ -706,6 +706,15 @@ fn start_analytics_worker(app_handle: tauri::AppHandle) {
                 );
             }
 
+            if let Ok(gamut_warning_data) =
+                image_processing::calculate_gamut_warning_overlay_from_image(&job.image)
+            {
+                let _ = app_handle.emit(
+                    "gamut-warning-update",
+                    serde_json::json!({ "path": job.path, "data": gamut_warning_data }),
+                );
+            }
+
             if job.compute_waveform
                 && let Ok(waveform_data) = image_processing::calculate_waveform_from_image(
                     &job.image,
