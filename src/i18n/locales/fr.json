@@ -834,7 +834,7 @@
       "importLinkedVariant": "Importer la variante liée",
       "importingLinkedVariant": "Importation…",
       "linkedVariantImportFailed": "Échec de l'importation : {{error}}",
-      "linkedVariantImported": "Variante liée importée : {{filename}}",
+      "linkedVariantImported": "Linked variant imported: {{filename}}. Original left untouched.",
       "openInEditor": "Ouvrir dans l'éditeur",
       "showInFinder": "Afficher dans le Finder",
       "success": "Exportation réussie !",
