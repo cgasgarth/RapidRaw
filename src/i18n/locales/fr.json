@@ -668,6 +668,21 @@
         "tags": "Étiquettes",
         "title": "Organisation"
       },
+      "xmpConflicts": {
+        "apply": "Appliquer les choix",
+        "checking": "Vérification du sidecar XMP...",
+        "choices": {
+          "external": "Utiliser XMP",
+          "local": "Garder local",
+          "merge": "Fusionner"
+        },
+        "description": "Ce sidecar a changé hors de RawEngine. Choisissez quoi conserver avant la synchronisation.",
+        "external": "XMP",
+        "local": "Local",
+        "merge": "Fusionner",
+        "resolving": "Application...",
+        "title": "Conflit XMP"
+      },
       "title": "Métadonnées"
     },
     "presets": {

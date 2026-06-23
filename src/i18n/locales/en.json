@@ -1043,7 +1043,22 @@
         "selectionCount_one": "{{count}} selected",
         "selectionCount_other": "{{count}} selected"
       },
-      "title": "Metadata"
+      "title": "Metadata",
+      "xmpConflicts": {
+        "apply": "Apply choices",
+        "checking": "Checking XMP sidecar...",
+        "choices": {
+          "external": "Use XMP",
+          "local": "Keep local",
+          "merge": "Merge"
+        },
+        "description": "This sidecar changed outside RawEngine. Choose what to keep before syncing.",
+        "external": "XMP",
+        "local": "Local",
+        "merge": "Merge",
+        "resolving": "Applying...",
+        "title": "XMP conflict"
+      }
     },
     "presets": {
       "applyPresetLabel": "Apply preset {{name}}",
