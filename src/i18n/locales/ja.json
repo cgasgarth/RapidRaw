@@ -764,7 +764,13 @@
       "transport": "Transport",
       "unknown": "Unknown",
       "captureUnavailable": "Capture not implemented",
-      "discoveryOnly": "Discovery only"
+      "discoveryOnly": "Discovery only",
+      "closeSession": "Close session",
+      "openSession": "Open session",
+      "sessionClosed": "Session closed",
+      "sessionClosedDescription": "Open a discovery session before capture controls are enabled.",
+      "sessionOpen": "Session open",
+      "sessionOpenDescription": "{{camera}} is reserved for this tether session."
     }
   },
   "export": {

@@ -62,7 +62,7 @@ import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformit
 import type { FocusStackOutputReviewWorkflow } from '../../schemas/focusStackOutputReviewSchemas';
 import type { MaskOverlaySettings } from '../../schemas/maskOverlaySchemas';
 import type { SuperResolutionOutputReviewWorkflow } from '../../schemas/superResolutionOutputReviewSchemas';
-import type { TetherDiscoveryResponse } from '../../schemas/tetheringSchemas';
+import type { TetherDiscoveryResponse, TetherSessionResponse } from '../../schemas/tetheringSchemas';
 import type { SuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
 
 interface VisualSmokeAppProps {
@@ -274,6 +274,22 @@ const tetherDiscoveryMockResponse: TetherDiscoveryResponse = {
     macosProviderBoundary: 'visual_smoke_provider_not_hardware_capture',
     manualHardwareRequired: true,
   },
+};
+const tetherSessionMockResponse: TetherSessionResponse = {
+  session: {
+    cameraDisplayName: 'Sony ILCE-7M4',
+    cameraId: 'validation-camera-sony-a7iv',
+    destinationRoot: null,
+    openedAt: '2026-06-23T00:00:00.000Z',
+    providerMode: 'fake',
+    sessionId: 'tether-session-visual-smoke',
+    status: 'open',
+  },
+  status: 'open',
+};
+const tetherClosedSessionMockResponse: TetherSessionResponse = {
+  session: null,
+  status: 'closed',
 };
 
 const brushMaskCanvasImageWidth = 640;
@@ -596,7 +612,11 @@ function TetherDiscoveryVisualSmoke() {
 
         <aside className="overflow-y-auto border-l border-white/10 bg-[#171a1f]">
           <div className="border-b border-white/10 px-4 py-3 text-sm font-semibold">{tetherDiscoverySmokeTitle}</div>
-          <TetherPanel discoverCameras={() => Promise.resolve(tetherDiscoveryMockResponse)} />
+          <TetherPanel
+            closeSession={() => Promise.resolve(tetherClosedSessionMockResponse)}
+            discoverCameras={() => Promise.resolve(tetherDiscoveryMockResponse)}
+            openSession={() => Promise.resolve(tetherSessionMockResponse)}
+          />
         </aside>
       </div>
     </main>

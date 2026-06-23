@@ -17,6 +17,7 @@ use crate::image_processing::GpuContext;
 use crate::lens_correction::LensDatabase;
 use crate::lut_processing::Lut;
 use crate::panorama_stitching::PendingPanoramaResult;
+use crate::tethering::TetherSessionSnapshot;
 
 #[derive(Serialize, Deserialize)]
 pub struct WindowState {
@@ -156,6 +157,7 @@ pub struct AppState {
     pub full_transformed_cache: Mutex<Option<TransformedImageCache>>,
     pub decoded_image_cache: Mutex<DecodedImageCache>,
     pub thumbnail_manager: Arc<ThumbnailManager>,
+    pub tether_session: Mutex<Option<TetherSessionSnapshot>>,
 }
 
 impl AppState {
@@ -196,6 +198,7 @@ impl AppState {
             full_transformed_cache: Mutex::new(None),
             decoded_image_cache: Mutex::new(DecodedImageCache::new(5)),
             thumbnail_manager: ThumbnailManager::new(),
+            tether_session: Mutex::new(None),
         }
     }
 }

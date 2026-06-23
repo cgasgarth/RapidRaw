@@ -199,6 +199,7 @@
     "check:command-palette-culling-ui": "bun tests/integration/checks/check-command-palette-culling-ui.ts",
     "check:tether-discovery-ui": "bun tests/integration/checks/check-tether-discovery-ui.ts",
     "check:tether-discovery-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario tether-discovery-ui",
+    "check:tether-session-ui": "bun run check:tether-discovery-ui && bun run check:tether-discovery-ui-smoke",
     "check:command-palette-lens-ui": "bun tests/integration/checks/check-command-palette-lens-ui.ts",
     "check:command-palette-merge-sources-ui": "bun tests/integration/checks/check-command-palette-merge-sources-ui.ts",
     "check:command-palette-negative-lab-ui": "bun tests/integration/checks/check-command-palette-negative-lab-ui.ts",

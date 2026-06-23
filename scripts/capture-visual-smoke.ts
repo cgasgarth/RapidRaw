@@ -1141,6 +1141,14 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('tether-capture-disabled').getByText('Capture not implemented', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    await page.getByTestId('tether-open-session').click();
+    await page.getByTestId('tether-session-status').getByText('Session open', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('tether-close-session').click();
+    await page.getByTestId('tether-session-status').getByText('Session closed', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
     return;
   }
 
