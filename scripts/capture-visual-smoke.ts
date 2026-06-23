@@ -606,6 +606,8 @@ const srPrivateRunReportSchema = z
                   .regex(/^sha256:[a-f0-9]{64}$/u),
                 outputArtifactPath: z.string().trim().min(1),
                 outputPixelCount: z.number().int().positive(),
+                registrationResidualPx: z.number().min(0),
+                sourceCount: z.number().int().min(2),
                 sourceCoverageRatio: z.number().min(0).max(1),
               })
               .strict(),
@@ -667,6 +669,7 @@ async function loadSrPrivateRawProof(): Promise<SrPrivateRawBrowserProof> {
   const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT ?? '/tmp/rawengine-private-root';
   const artifactRoot = `${privateRoot}/private-artifacts/validation/computational-merge`;
   const privateRunReportPath = `${artifactRoot}/sr-subpixel-private-run-report.json`;
+  await ensureSrPrivateQualityReadout(privateRoot, privateRunReportPath);
   const privateRunReport = srPrivateRunReportSchema.parse(JSON.parse(await readFile(privateRunReportPath, 'utf8')));
   const report = privateRunReport.reports[0];
   if (report === undefined) throw new Error('SR private run report did not include a report.');
@@ -757,6 +760,37 @@ async function loadSrPrivateRawProof(): Promise<SrPrivateRawBrowserProof> {
     sourcePaths: sourcePaths.join(','),
     sourceWidths: decodeReport.decodedSources.map((source) => String(source.width)).join(','),
   };
+}
+
+async function ensureSrPrivateQualityReadout(privateRoot: string, privateRunReportPath: string): Promise<void> {
+  const privateRunReport = JSON.parse(await readFile(privateRunReportPath, 'utf8'));
+  if (privateRunReport?.reports?.[0]?.superResolutionQualityReadout !== undefined) return;
+
+  await new Promise<void>((resolveProof, rejectProof) => {
+    const child = spawn('bun', ['run', 'check:sr-real-raw-private-app-server-proof'], {
+      env: { ...process.env, RAWENGINE_PRIVATE_RAW_ROOT: privateRoot },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let output = '';
+    const captureOutput = (chunk: Buffer) => {
+      output = `${output}${chunk.toString()}`.slice(-2_000);
+    };
+    child.stdout.on('data', captureOutput);
+    child.stderr.on('data', captureOutput);
+    child.once('error', rejectProof);
+    child.once('exit', (code) => {
+      if (code === 0) {
+        resolveProof();
+        return;
+      }
+
+      rejectProof(
+        new Error(
+          `SR private app-server proof could not upgrade ${privateRunReportPath}: ${output.trim() || `exit ${code}`}`,
+        ),
+      );
+    });
+  });
 }
 
 async function loadFocusPrivateRawProof(): Promise<FocusPrivateRawBrowserProof> {

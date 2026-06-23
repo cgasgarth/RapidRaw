@@ -69,6 +69,31 @@ const runtimeSampleSchema = z
 
 type RuntimeSample = z.infer<typeof runtimeSampleSchema>;
 
+const legacySrQualityMetricSchema = z.object({ name: z.string(), value: z.number() }).passthrough();
+const legacySrRunArtifactSchema = z
+  .object({ hash: z.string(), kind: z.string(), path: z.string(), publicRepoAllowed: z.boolean() })
+  .passthrough();
+const legacySrPrivateRunReportCollectionSchema = z
+  .object({
+    reports: z
+      .array(
+        z
+          .object({
+            acceptanceStatus: z.string(),
+            artifacts: z.array(legacySrRunArtifactSchema),
+            featureFamily: z.string(),
+            fixtureId: z.string(),
+            qualityMetrics: z.array(legacySrQualityMetricSchema),
+            superResolutionQualityReadout: z.unknown().optional(),
+          })
+          .passthrough(),
+      )
+      .min(1),
+  })
+  .passthrough();
+
+type LegacySrPrivateRunReport = z.infer<typeof legacySrPrivateRunReportCollectionSchema>['reports'][number];
+
 const rootValue = valueAfter('--root') ?? process.env.RAWENGINE_PRIVATE_RAW_ROOT;
 if (rootValue === undefined || rootValue.trim().length === 0) {
   await runSelfTest();
@@ -127,7 +152,9 @@ async function runProof(rootPath: string): Promise<void> {
   await writeFile(join(rootPath, PROOF_PATH), `${JSON.stringify(proof, null, 2)}\n`);
 
   const reportPath = join(rootPath, REPORT_PATH);
-  const collection = parseComputationalMergePrivateRunReportCollection(JSON.parse(await readFile(reportPath, 'utf8')));
+  const collection = parseComputationalMergePrivateRunReportCollection(
+    upgradeLegacySrQualityReadout(JSON.parse(await readFile(reportPath, 'utf8'))),
+  );
   const upgraded = await upgradeReport(rootPath, collection, {
     applyCommandId: applyCommand.commandId,
     applyRuntimeId: applied.apply.mutationResult.derivedAssetId,
@@ -136,6 +163,51 @@ async function runProof(rootPath: string): Promise<void> {
     proofHash: await sha256File(join(rootPath, PROOF_PATH)),
   });
   await writeFile(reportPath, `${JSON.stringify(upgraded, null, 2)}\n`);
+}
+
+function upgradeLegacySrQualityReadout(rawReportCollection: unknown): unknown {
+  const collection = legacySrPrivateRunReportCollectionSchema.parse(rawReportCollection);
+
+  return {
+    ...collection,
+    reports: collection.reports.map((report) => {
+      if (
+        report.fixtureId !== FIXTURE_ID ||
+        report.featureFamily !== 'super_resolution' ||
+        report.acceptanceStatus !== 'runtime_apply_capable' ||
+        report.superResolutionQualityReadout !== undefined
+      ) {
+        return report;
+      }
+
+      const outputArtifact = report.artifacts.find((artifact) => artifact.kind === 'merge_output_private');
+      if (outputArtifact === undefined) {
+        throw new Error('Legacy SR runtime report requires merge output artifact for quality readout migration.');
+      }
+
+      return {
+        ...report,
+        superResolutionQualityReadout: {
+          artifactScore: legacyMetricValue(report, 'superResolutionArtifactScore'),
+          detailGainRatio: legacyMetricValue(report, 'superResolutionDetailGainRatio'),
+          outputArtifactHash: outputArtifact.hash,
+          outputArtifactPath: outputArtifact.path,
+          outputPixelCount: legacyMetricValue(report, 'superResolutionOutputPixelCount'),
+          registrationResidualPx: legacyMetricValue(report, 'superResolutionRegistrationResidualPx'),
+          sourceCount: legacyMetricValue(report, 'decodedSourceCount'),
+          sourceCoverageRatio: legacyMetricValue(report, 'superResolutionSourceCoverageRatio'),
+        },
+      };
+    }),
+  };
+}
+
+function legacyMetricValue(report: LegacySrPrivateRunReport, name: string): number {
+  const metric = report.qualityMetrics.find((candidate) => candidate.name === name);
+  if (metric === undefined) {
+    throw new Error(`Legacy SR runtime report missing quality metric ${name}.`);
+  }
+  return metric.value;
 }
 
 function buildControls(sample: RuntimeSample) {
