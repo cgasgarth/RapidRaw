@@ -1298,7 +1298,7 @@
       "failed": "Export failed",
       "importingLinkedVariant": "Importing…",
       "importLinkedVariant": "Import Linked Variant",
-      "linkedVariantImported": "Linked variant imported: {{filename}}",
+      "linkedVariantImported": "Linked variant imported: {{filename}}. Original left untouched.",
       "linkedVariantImportFailed": "Import failed: {{error}}",
       "noImageSelected": "No image selected for export.",
       "noImagesSelected": "No images selected.",

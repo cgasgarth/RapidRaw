@@ -832,7 +832,7 @@
       "importLinkedVariant": "Importa variante collegata",
       "importingLinkedVariant": "Importazione…",
       "linkedVariantImportFailed": "Importazione non riuscita: {{error}}",
-      "linkedVariantImported": "Variante collegata importata: {{filename}}",
+      "linkedVariantImported": "Linked variant imported: {{filename}}. Original left untouched.",
       "openInEditor": "Apri nell'Editor",
       "success": "Esportazione completata con successo!",
       "chooseExternalEditor": "Scegli editor...",

@@ -3399,6 +3399,7 @@ fn write_external_editor_variant_sidecar(
         "operationVersion": 1,
         "output": {
             "format": "tiff",
+            "noOverwritePolicy": "never_overwrite_original",
             "path": output_path_string,
             "storage": "linked_file",
         },
@@ -4183,6 +4184,10 @@ mod tests {
         assert_eq!(
             artifact["output"]["path"].as_str(),
             Some(output_path.to_string_lossy().as_ref())
+        );
+        assert_eq!(
+            artifact["output"]["noOverwritePolicy"].as_str(),
+            Some("never_overwrite_original")
         );
         assert_eq!(
             artifact["provenance"]["sourceImagePath"].as_str(),

@@ -832,7 +832,7 @@
       "importLinkedVariant": "Импортировать связанную версию",
       "importingLinkedVariant": "Импорт…",
       "linkedVariantImportFailed": "Не удалось импортировать: {{error}}",
-      "linkedVariantImported": "Связанная версия импортирована: {{filename}}",
+      "linkedVariantImported": "Linked variant imported: {{filename}}. Original left untouched.",
       "openInEditor": "Открыть в редакторе",
       "success": "Экспорт успешно завершен!",
       "chooseExternalEditor": "Выбрать редактор...",

@@ -817,7 +817,7 @@
       "importLinkedVariant": "リンクされたバリアントを読み込む",
       "importingLinkedVariant": "読み込み中…",
       "linkedVariantImportFailed": "読み込みに失敗しました: {{error}}",
-      "linkedVariantImported": "リンクされたバリアントを読み込みました: {{filename}}",
+      "linkedVariantImported": "Linked variant imported: {{filename}}. Original left untouched.",
       "openInEditor": "エディタで開く",
       "success": "書き出しが成功しました！",
       "chooseExternalEditor": "エディタを選択...",
