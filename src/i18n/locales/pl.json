@@ -1240,6 +1240,7 @@
       "tooltips": {
         "aperture": "Przysłona",
         "backToLibrary": "Wróć do biblioteki",
+        "exportSoftProof": "",
         "fileType": "",
         "focalLength": "Ogniskowa",
         "fullscreen": "Przełącz pełny ekran (F)",

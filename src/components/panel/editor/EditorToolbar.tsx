@@ -1,11 +1,14 @@
 import cx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, ArrowLeft, Maximize, Loader2, Undo, Redo } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, Maximize, Loader2, Undo, Redo, Palette } from 'lucide-react';
 import { memo, useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { IconAperture, IconCalendar, IconClock, IconFocalLength, IconIso, IconShutter } from './ExifIcons';
+import { useEditorStore } from '../../../store/useEditorStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import Dropdown from '../../ui/Dropdown';
 import UiText from '../../ui/Text';
 
 import type { Adjustments, AiPatch, MaskContainer } from '../../../utils/adjustments';
@@ -60,6 +63,19 @@ const EditorToolbar = memo(
     const [isHistoryVisible, setIsHistoryVisible] = useState(false);
     const historyContainerRef = useRef<HTMLDivElement>(null);
     const historyButtonRef = useRef<HTMLDivElement>(null);
+    const appSettings = useSettingsStore((state) => state.appSettings);
+    const isExportSoftProofEnabled = useEditorStore((state) => state.isExportSoftProofEnabled);
+    const exportSoftProofRecipeId = useEditorStore((state) => state.exportSoftProofRecipeId);
+    const setEditor = useEditorStore((state) => state.setEditor);
+    const exportProofRecipeOptions = useMemo(
+      () =>
+        (appSettings?.exportPresets ?? [])
+          .filter((preset) => preset.fileFormat !== 'cube')
+          .map((preset) => ({ label: preset.name, value: preset.id })),
+      [appSettings?.exportPresets],
+    );
+    const selectedExportProofRecipeId = exportSoftProofRecipeId ?? exportProofRecipeOptions[0]?.value ?? null;
+    const canSoftProof = exportProofRecipeOptions.length > 0;
 
     const showResolution = !isAndroid && selectedImage.width > 0 && selectedImage.height > 0;
     const [displayedResolution, setDisplayedResolution] = useState('');
@@ -120,6 +136,28 @@ const EditorToolbar = memo(
         setDisplayedResolution(` - ${selectedImage.width} × ${selectedImage.height}`);
       }
     }, [showResolution, selectedImage.width, selectedImage.height]);
+
+    useEffect(() => {
+      if (exportProofRecipeOptions.length === 0) {
+        if (isExportSoftProofEnabled || exportSoftProofRecipeId !== null) {
+          setEditor({ isExportSoftProofEnabled: false, exportSoftProofRecipeId: null });
+        }
+        return;
+      }
+
+      if (
+        selectedExportProofRecipeId !== null &&
+        !exportProofRecipeOptions.some((option) => option.value === selectedExportProofRecipeId)
+      ) {
+        setEditor({ exportSoftProofRecipeId: exportProofRecipeOptions[0]?.value ?? null });
+      }
+    }, [
+      exportProofRecipeOptions,
+      exportSoftProofRecipeId,
+      isExportSoftProofEnabled,
+      selectedExportProofRecipeId,
+      setEditor,
+    ]);
 
     useEffect(() => {
       const wasLoadingResolution = prevIsLoadingRef.current && !isLoading;
@@ -705,6 +743,48 @@ const EditorToolbar = memo(
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
+
+          <div
+            className="hidden xl:flex items-center gap-2"
+            data-export-soft-proof-enabled={String(isExportSoftProofEnabled)}
+            data-export-soft-proof-recipe-id={selectedExportProofRecipeId ?? ''}
+            data-testid="export-soft-proof-toolbar"
+          >
+            <button
+              className={cx(
+                'p-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
+                isExportSoftProofEnabled
+                  ? 'bg-accent text-button-text hover:bg-accent/90 hover:text-button-text'
+                  : 'bg-surface hover:bg-card-active text-text-primary',
+              )}
+              disabled={!canSoftProof}
+              onClick={() => {
+                setEditor({
+                  isExportSoftProofEnabled: !isExportSoftProofEnabled,
+                  exportSoftProofRecipeId: selectedExportProofRecipeId,
+                });
+              }}
+              onKeyDown={handleButtonKeyDown}
+              data-tooltip={t('editor.toolbar.tooltips.exportSoftProof')}
+              type="button"
+            >
+              <Palette size={20} />
+            </button>
+            {isExportSoftProofEnabled && (
+              <div className="w-44">
+                <Dropdown
+                  className="w-full"
+                  disabled={!canSoftProof}
+                  options={exportProofRecipeOptions}
+                  value={selectedExportProofRecipeId}
+                  onChange={(value) => {
+                    setEditor({ exportSoftProofRecipeId: value });
+                  }}
+                  triggerClassName="h-9 rounded-full bg-surface px-3 text-xs"
+                />
+              </div>
+            )}
           </div>
 
           <button

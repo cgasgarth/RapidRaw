@@ -47,6 +47,8 @@ interface EditorState {
   waveform: WaveformData | null;
   gamutWarningOverlay: GamutWarningOverlayPayload | null;
   isGamutWarningOverlayVisible: boolean;
+  isExportSoftProofEnabled: boolean;
+  exportSoftProofRecipeId: string | null;
   isWaveformVisible: boolean;
   activeWaveformChannel: DisplayMode;
   waveformHeight: number;
@@ -109,6 +111,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   waveform: null,
   gamutWarningOverlay: null,
   isGamutWarningOverlayVisible: true,
+  isExportSoftProofEnabled: false,
+  exportSoftProofRecipeId: null,
   isWaveformVisible: false,
   activeWaveformChannel: DisplayMode.Luma,
   waveformHeight: 220,

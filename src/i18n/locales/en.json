@@ -1162,6 +1162,7 @@
       "tooltips": {
         "aperture": "Aperture",
         "backToLibrary": "Back to Library",
+        "exportSoftProof": "Soft proof selected export recipe",
         "fileType": "File Type",
         "focalLength": "Focal Length",
         "fullscreen": "Toggle Fullscreen (F)",
