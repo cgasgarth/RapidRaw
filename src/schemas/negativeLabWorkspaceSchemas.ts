@@ -14,14 +14,45 @@ export const negativeLabDustScratchSeveritySchema = z.enum(['clear', 'review', '
 export const negativeLabDustScratchFindingCodeSchema = z.enum([
   'acquisition_review_required',
   'base_fog_only_review',
+  'candidate_dust_spot',
+  'candidate_emulsion_scratch',
   'edge_dust_check',
   'emulsion_scratch_check',
   'excluded_not_reviewed',
   'preview_required',
 ]);
 
+export const negativeLabDustScratchCandidateSchema = z
+  .object({
+    candidateId: z.string().trim().min(1),
+    confidence: z.number().min(0).max(1),
+    geometry: z
+      .object({
+        coordinateSpace: z.literal('normalized_frame'),
+        height: z.number().positive().max(1),
+        kind: z.literal('rect'),
+        width: z.number().positive().max(1),
+        x: z.number().min(0).max(1),
+        y: z.number().min(0).max(1),
+      })
+      .strict(),
+    kind: z.enum(['dust_spot', 'emulsion_scratch']),
+    status: z.enum(['acknowledged', 'ignored', 'pending']),
+  })
+  .strict()
+  .superRefine((candidate, context) => {
+    if (candidate.geometry.x + candidate.geometry.width > 1 || candidate.geometry.y + candidate.geometry.height > 1) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab defect candidate geometry must fit within the normalized frame.',
+        path: ['geometry'],
+      });
+    }
+  });
+
 export const negativeLabDustScratchReviewFrameSchema = z
   .object({
+    candidates: z.array(negativeLabDustScratchCandidateSchema),
     findingCodes: z.array(negativeLabDustScratchFindingCodeSchema).min(1),
     frameId: z.string().trim().min(1),
     included: z.boolean(),
@@ -43,6 +74,14 @@ export const negativeLabDustScratchReviewFrameSchema = z
       context.addIssue({
         code: 'custom',
         message: 'Frames that still need preview cannot be marked clear.',
+        path: ['severity'],
+      });
+    }
+
+    if (frame.candidates.some((candidate) => candidate.status === 'pending') && frame.severity === 'clear') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Frames with pending defect candidates must stay in review.',
         path: ['severity'],
       });
     }
@@ -70,6 +109,7 @@ export const negativeLabDustScratchReviewReportSchema = z
 
 export const negativeLabQcProofRowSchema = z
   .object({
+    candidates: z.array(negativeLabDustScratchCandidateSchema),
     contactSheetSlot: z.number().int().positive(),
     exportBlockedReason: z.string().trim().min(1).max(120).nullable(),
     findingCodes: z.array(negativeLabDustScratchFindingCodeSchema).min(1),

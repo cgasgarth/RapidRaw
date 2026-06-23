@@ -38,7 +38,13 @@ export interface NegativeLabQcContactSheetArtifact {
     };
     label: string;
     overlayId: string;
-    overlayKind: 'base_sample' | 'density_sample' | 'frame_boundary' | 'warning_badge';
+    overlayKind:
+      | 'base_sample'
+      | 'density_sample'
+      | 'dust_candidate'
+      | 'frame_boundary'
+      | 'scratch_candidate'
+      | 'warning_badge';
     severity: 'info' | 'warning';
     warningCodes: Array<'contact_sheet_requires_split'>;
   }>;
@@ -213,6 +219,17 @@ export const buildNegativeLabQcContactSheetArtifact = ({
           overlayKind: 'warning_badge' as const,
           severity: 'warning' as const,
           warningCodes: ['contact_sheet_requires_split' as const],
+        });
+      }
+      for (const candidate of frame.candidates) {
+        overlays.push({
+          frameId: frame.frameId,
+          geometry: candidate.geometry,
+          label: `${candidate.kind === 'dust_spot' ? 'Dust candidate' : 'Scratch candidate'}: ${frame.scanLabel}`,
+          overlayId: `overlay_negative_lab_qc_${candidate.kind}_${frame.contactSheetSlot}_${candidate.candidateId}`,
+          overlayKind: candidate.kind === 'dust_spot' ? ('dust_candidate' as const) : ('scratch_candidate' as const),
+          severity: candidate.status === 'ignored' ? ('info' as const) : ('warning' as const),
+          warningCodes: candidate.status === 'ignored' ? [] : ['contact_sheet_requires_split' as const],
         });
       }
       return overlays;

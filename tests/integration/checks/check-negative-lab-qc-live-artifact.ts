@@ -61,6 +61,8 @@ if (artifact.warnings.length !== 1 || artifact.warnings[0]?.frameIds?.[0] !== 'n
 if (
   !artifact.overlays.some((overlay) => overlay.overlayKind === 'frame_boundary') ||
   !artifact.overlays.some((overlay) => overlay.overlayKind === 'density_sample') ||
+  !artifact.overlays.some((overlay) => overlay.overlayKind === 'dust_candidate') ||
+  !artifact.overlays.some((overlay) => overlay.overlayKind === 'scratch_candidate') ||
   !artifact.overlays.some((overlay) => overlay.overlayId === 'overlay_negative_lab_qc_rejected_2')
 ) {
   throw new Error('Negative Lab live QC artifact did not reflect enabled review overlays.');
@@ -80,6 +82,7 @@ for (const marker of [
   'negative-lab-qc-proof-artifact',
   'negative-lab-qc-overlay-controls',
   'data-overlay-count={qcProofArtifact.overlays.length}',
+  'data-defect-candidate-count={frame.candidates.length}',
   'data-contact-sheet-hash={qcProofArtifact.contactSheet.artifact.contentHash}',
   'modals.negativeConversion.qcProofArtifactHash',
 ]) {
