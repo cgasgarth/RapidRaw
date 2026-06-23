@@ -1,6 +1,6 @@
 import cx from 'clsx';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useEditorStore } from '../../store/useEditorStore';
@@ -78,6 +78,7 @@ interface EditorViewProps {
   handleZoomChange: (zoom: number) => void;
   handleRightPanelSelect: (panelId: Panel) => void;
   requestThumbnails: (paths: string[]) => void;
+  refreshImageList: () => Promise<void>;
 }
 
 export default function EditorView({
@@ -101,6 +102,7 @@ export default function EditorView({
   handleZoomChange,
   handleRightPanelSelect,
   requestThumbnails,
+  refreshImageList,
 }: EditorViewProps) {
   const { selectedImage } = useEditorStore(
     useShallow((state) => ({
@@ -148,6 +150,17 @@ export default function EditorView({
       isPasted: state.isPasted,
       setExportState: state.setExportState,
     })),
+  );
+
+  const handleLinkedVariantImported = useCallback(
+    async (path: string) => {
+      await refreshImageList();
+      const { imageList, setLibrary } = useLibraryStore.getState();
+      if (!imageList.some((image) => image.path === path)) return;
+      setLibrary({ libraryActivePath: path, multiSelectedPaths: [path], selectionAnchorPath: path });
+      requestThumbnails([path]);
+    },
+    [refreshImageList, requestThumbnails],
   );
 
   const { appSettings, handleSettingsChange } = useSettingsStore(
@@ -251,6 +264,7 @@ export default function EditorView({
                       void handleSettingsChange(settings);
                     }}
                     rootPaths={rootPaths}
+                    onLinkedVariantImported={handleLinkedVariantImported}
                   />
                 ),
                 [Panel.Masks]: <MasksPanel />,

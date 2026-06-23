@@ -367,6 +367,17 @@ function App() {
     }
   }, [currentFolderPath, handleSelectSubfolder, handleSelectAlbum]);
 
+  const handleLinkedVariantImported = useCallback(
+    async (path: string) => {
+      await handleLibraryRefresh();
+      const { imageList, setLibrary } = useLibraryStore.getState();
+      if (!imageList.some((image) => image.path === path)) return;
+      setLibrary({ libraryActivePath: path, multiSelectedPaths: [path], selectionAnchorPath: path });
+      requestThumbnails([path]);
+    },
+    [handleLibraryRefresh, requestThumbnails],
+  );
+
   const {
     executeDelete,
     handleDeleteSelected,
@@ -785,6 +796,7 @@ function App() {
                   handleZoomChange={handleZoomChange}
                   handleRightPanelSelect={handleRightPanelSelect}
                   requestThumbnails={requestThumbnails}
+                  refreshImageList={handleLibraryRefresh}
                 />
               ) : (
                 <LibraryView
@@ -833,6 +845,7 @@ function App() {
                 onSettingsChange={handleSettingsChangeVoid}
                 rootPaths={rootPaths}
                 isVisible={isLibraryExportPanelVisible}
+                onLinkedVariantImported={handleLinkedVariantImported}
                 onClose={() => {
                   setUI({ isLibraryExportPanelVisible: false });
                 }}
