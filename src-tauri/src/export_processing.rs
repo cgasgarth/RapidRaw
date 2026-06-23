@@ -581,7 +581,7 @@ fn encode_image_to_bytes(
                 .map_err(|e| e.to_string())?;
         }
         "tiff" => {
-            return encode_srgb_tiff16_to_bytes(image);
+            return encode_tiff16_to_bytes(image, color_profile);
         }
         "avif" => {
             image
@@ -593,18 +593,20 @@ fn encode_image_to_bytes(
     Ok(image_bytes)
 }
 
-fn encode_srgb_tiff16_to_bytes(image: &DynamicImage) -> Result<Vec<u8>, String> {
-    let rgb_image = image.to_rgb16();
-    let (width, height) = rgb_image.dimensions();
-    let pixels = rgb_image.into_raw();
-    let icc_profile = encode_icc_profile(&ColorProfile::new_srgb())?;
+fn encode_tiff16_to_bytes(
+    image: &DynamicImage,
+    color_profile: &ExportColorProfile,
+) -> Result<Vec<u8>, String> {
+    let (pixels, width, height, output_profile) =
+        export_rgb16_pixels_and_profile(image, color_profile)?;
+    let icc_profile = encode_icc_profile(&output_profile)?;
     let mut image_bytes = Vec::new();
     let mut cursor = Cursor::new(&mut image_bytes);
     let mut encoder = TiffEncoder::new(&mut cursor);
 
     encoder
         .set_icc_profile(icc_profile)
-        .map_err(|e| format!("Failed to attach sRGB TIFF ICC profile: {}", e))?;
+        .map_err(|e| format!("Failed to attach TIFF ICC profile: {}", e))?;
     encoder
         .write_image(
             bytemuck::cast_slice(&pixels),
@@ -612,9 +614,48 @@ fn encode_srgb_tiff16_to_bytes(image: &DynamicImage) -> Result<Vec<u8>, String> 
             height,
             ExtendedColorType::Rgb16,
         )
-        .map_err(|e| format!("Failed to encode 16-bit sRGB TIFF: {}", e))?;
+        .map_err(|e| format!("Failed to encode 16-bit TIFF: {}", e))?;
 
     Ok(image_bytes)
+}
+
+fn export_rgb16_pixels_and_profile(
+    image: &DynamicImage,
+    color_profile: &ExportColorProfile,
+) -> Result<(Vec<u16>, u32, u32, ColorProfile), String> {
+    let rgb_image = image.to_rgb16();
+    let (width, height) = rgb_image.dimensions();
+    let pixels = rgb_image.into_raw();
+    let output_profile = output_color_profile(color_profile);
+
+    if matches!(color_profile, ExportColorProfile::DisplayP3) {
+        let src_profile = ColorProfile::new_srgb();
+        let transform = src_profile
+            .create_transform_16bit(
+                Layout::Rgb,
+                &output_profile,
+                Layout::Rgb,
+                TransformOptions::default(),
+            )
+            .map_err(|e| format!("Failed to build Display P3 TIFF export transform: {}", e))?;
+        let row_len = (width as usize)
+            .checked_mul(3)
+            .ok_or_else(|| "TIFF export row is too wide".to_string())?;
+        let mut transformed = vec![0u16; pixels.len()];
+
+        for (src_row, dst_row) in pixels
+            .chunks_exact(row_len)
+            .zip(transformed.chunks_exact_mut(row_len))
+        {
+            transform
+                .transform(src_row, dst_row)
+                .map_err(|e| format!("Failed to convert TIFF export to Display P3: {}", e))?;
+        }
+
+        Ok((transformed, width, height, output_profile))
+    } else {
+        Ok((pixels, width, height, output_profile))
+    }
 }
 
 fn encode_jpeg_to_bytes(
@@ -1261,7 +1302,7 @@ fn export_receipt_metadata(
         }),
         "tif" | "tiff" => Some(ExportReceiptMetadata {
             bit_depth: 16,
-            color_profile: "sRGB".to_string(),
+            color_profile: export_color_profile_receipt_label(&export_settings.color_profile),
         }),
         _ => None,
     }
@@ -1583,6 +1624,7 @@ mod tests {
     use super::{
         ExportColorProfile, ExportSettings, OutputSharpeningSettings, OutputSharpeningTarget,
         apply_export_resize_and_watermark, encode_image_to_bytes, export_rgb_pixels_and_profile,
+        export_rgb16_pixels_and_profile,
     };
     use std::io::Cursor;
 
@@ -1742,6 +1784,43 @@ mod tests {
             encode_image_to_bytes(&image, "jpg", 90, &ExportColorProfile::Srgb)
                 .map(|jpeg| single_icc_payload(&jpeg)[b"ICC_PROFILE\0\x01\x01".len()..].to_vec())
                 .expect("reference sRGB JPEG should encode")
+        );
+    }
+
+    #[test]
+    fn tiff_export_embeds_display_p3_icc_profile() {
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(2, 2, Rgb([128, 64, 32])));
+        let srgb = encode_image_to_bytes(&image, "tiff", 90, &ExportColorProfile::Srgb)
+            .expect("sRGB TIFF encoding should succeed");
+        let display_p3 = encode_image_to_bytes(&image, "tiff", 90, &ExportColorProfile::DisplayP3)
+            .expect("Display P3 TIFF encoding should succeed");
+        let mut srgb_decoder = tiff_decoder(&srgb);
+        let mut display_p3_decoder = tiff_decoder(&display_p3);
+
+        assert_ne!(
+            display_p3_decoder
+                .icc_profile()
+                .expect("Display P3 TIFF ICC should decode"),
+            srgb_decoder
+                .icc_profile()
+                .expect("sRGB TIFF ICC should decode"),
+            "Display P3 TIFF export should embed a distinct ICC profile"
+        );
+    }
+
+    #[test]
+    fn display_p3_tiff_export_transforms_rgb16_pixels() {
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(1, 1, Rgb([255, 0, 0])));
+        let (srgb_pixels, _, _, _) =
+            export_rgb16_pixels_and_profile(&image, &ExportColorProfile::Srgb)
+                .expect("sRGB TIFF export recipe should succeed");
+        let (display_p3_pixels, _, _, _) =
+            export_rgb16_pixels_and_profile(&image, &ExportColorProfile::DisplayP3)
+                .expect("Display P3 TIFF export recipe should succeed");
+
+        assert_ne!(
+            display_p3_pixels, srgb_pixels,
+            "Display P3 TIFF export should transform 16-bit pixels before tagging them"
         );
     }
 
