@@ -210,6 +210,25 @@ const fixture = {
       'Original RAW is never overwritten; apply targets a virtual copy.',
     ],
   },
+  failureRecovery: {
+    editAction: {
+      id: 'edit-failed-ai-plan',
+      label: 'Edit preserved plan',
+      state: 'available',
+    },
+    failedToolCallId: 'tool-4',
+    id: 'agent-failure-recovery-missing-provider',
+    preservedPlanId: 'plan_ai_enhancement_missing_provider_2844',
+    reason:
+      'The requested local connector was unavailable, so the agent preserved the plan and offered a local retry path.',
+    recoveredToolCallId: 'tool-3',
+    retryAction: {
+      id: 'retry-local-tone-color',
+      label: 'Retry with local tone/color tools',
+      state: 'available',
+    },
+    title: 'Recover failed tool call',
+  },
   id: 'agent-chat-demo-expert-edit-runtime-v1',
   livePromptWalkthrough: {
     approval: {
