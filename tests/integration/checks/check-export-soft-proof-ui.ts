@@ -6,11 +6,13 @@ const read = (path: string) => readFileSync(path, 'utf8');
 const failures: string[] = [];
 
 const toolbarSource = read('src/components/panel/editor/EditorToolbar.tsx');
+const exportPanelSource = read('src/components/panel/right/ExportPanel.tsx');
 const hookSource = read('src/hooks/useImageProcessing.ts');
 const storeSource = read('src/store/useEditorStore.ts');
 const appPropertiesSource = read('src/components/ui/AppProperties.tsx');
 const rustLibSource = read('src-tauri/src/lib.rs');
 const rustExportSource = read('src-tauri/src/export_processing.rs');
+const tauriEventSchemasSource = read('src/schemas/tauriEventSchemas.ts');
 const locale = JSON.parse(read('src/i18n/locales/en.json'));
 
 for (const marker of [
@@ -48,9 +50,21 @@ if (!rustLibSource.includes('export_processing::export_soft_proof_rgb_pixels_and
 
 if (
   !rustExportSource.includes('pub(crate) fn export_soft_proof_rgb_pixels_and_profile') ||
-  !rustExportSource.includes('export_rgb_pixels_and_profile(image, color_profile, rendering_intent)')
+  !rustExportSource.includes('export_rgb_pixels_and_profile(image, color_profile, rendering_intent)') ||
+  !rustExportSource.includes('color_managed_transform: "export_rgb_pixels_and_profile".to_string()')
 ) {
-  failures.push('export_rgb_pixels_and_profile is not available to the soft-proof command.');
+  failures.push('export_rgb_pixels_and_profile is not available to the soft-proof command and receipt.');
+}
+
+for (const marker of [
+  'colorManagedTransform',
+  'data-export-receipt-color-managed-transform',
+  'data-testid="export-success-color-managed-transform"',
+  'export.status.colorManagedTransform',
+]) {
+  if (!exportPanelSource.includes(marker) && !tauriEventSchemasSource.includes(marker)) {
+    failures.push(`Export receipt missing ${marker}`);
+  }
 }
 
 if (
@@ -66,6 +80,10 @@ if (typeof locale.editor?.toolbar?.tooltips?.exportSoftProof !== 'string') {
 
 if (typeof locale.editor?.toolbar?.exportSoftProofDetails !== 'string') {
   failures.push('Missing export soft-proof details locale.');
+}
+
+if (typeof locale.export?.status?.colorManagedTransform !== 'string') {
+  failures.push('Missing export receipt color-managed transform locale.');
 }
 
 if (failures.length > 0) {

@@ -1270,6 +1270,7 @@
       "cancelled": "导出已取消",
       "chooseExternalEditor": "选择编辑器...",
       "chooseExternalEditorTitle": "选择外部编辑器",
+      "colorManagedTransform": "",
       "estimatedAverageSize": "（平均 {{size}}）",
       "estimatedSize": "预计文件大小：约 {{size}}",
       "estimatedTotalSize": "预计总大小：约 {{size}}",

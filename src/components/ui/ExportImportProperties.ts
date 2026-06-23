@@ -105,6 +105,7 @@ export interface ExportReceipt {
 export interface ExportReceiptOutput {
   bitDepth?: number | null | undefined;
   byteSize: number;
+  colorManagedTransform?: string | null | undefined;
   colorProfile?: string | null | undefined;
   format: string;
   outputPath: string;
