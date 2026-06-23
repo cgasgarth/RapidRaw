@@ -10,7 +10,7 @@ export default defineConfig(async ({ command }) => ({
   plugins: [tailwindcss(), react()],
   define: {
     __RAWENGINE_BROWSER_TAURI_HARNESS__: JSON.stringify(
-      command === 'serve' && process.env.VITE_RAWENGINE_BROWSER_TAURI_HARNESS === '1',
+      command === 'serve' || process.env.VITE_RAWENGINE_BROWSER_TAURI_HARNESS === '1',
     ),
   },
 

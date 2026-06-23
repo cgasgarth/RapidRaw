@@ -38,7 +38,7 @@ async function stopServer(server: ReturnType<typeof spawn>): Promise<void> {
 }
 
 const server = spawn('bun', ['run', 'dev', '--', '--host', host], {
-  env: { ...process.env, VITE_RAWENGINE_BROWSER_TAURI_HARNESS: '1' },
+  env: { ...process.env },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let serverOutput = '';
