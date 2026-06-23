@@ -3,9 +3,11 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
+  tetherCaptureResponseSchema,
   tetherDiscoveryResponseSchema,
   tetherSessionResponseSchema,
   type TetherCapability,
+  type TetherCaptureResponse,
   type TetherDiscoveryResponse,
   type TetherSessionResponse,
 } from '../../../schemas/tetheringSchemas';
@@ -16,6 +18,7 @@ import Button from '../../ui/Button';
 import UiText from '../../ui/Text';
 
 interface TetherPanelProps {
+  captureFrame?: () => Promise<TetherCaptureResponse>;
   closeSession?: () => Promise<TetherSessionResponse>;
   discoverCameras?: () => Promise<TetherDiscoveryResponse>;
   openSession?: (cameraId: string) => Promise<TetherSessionResponse>;
@@ -44,7 +47,11 @@ const defaultOpenSession = (cameraId: string): Promise<TetherSessionResponse> =>
 const defaultCloseSession = (): Promise<TetherSessionResponse> =>
   invokeWithSchema(Invokes.CloseTetherSession, {}, tetherSessionResponseSchema);
 
+const defaultCaptureFrame = (): Promise<TetherCaptureResponse> =>
+  invokeWithSchema(Invokes.TriggerTetherCapture, { request: {} }, tetherCaptureResponseSchema);
+
 export function TetherPanel({
+  captureFrame = defaultCaptureFrame,
   closeSession = defaultCloseSession,
   discoverCameras = defaultDiscoverCameras,
   openSession = defaultOpenSession,
@@ -52,7 +59,9 @@ export function TetherPanel({
   const { t } = useTranslation();
   const [discovery, setDiscovery] = useState<TetherDiscoveryResponse | null>(null);
   const [session, setSession] = useState<TetherSessionResponse['session']>(null);
+  const [capture, setCapture] = useState<TetherCaptureResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isCaptureBusy, setIsCaptureBusy] = useState(false);
   const [isSessionBusy, setIsSessionBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const camera = discovery?.cameras[0] ?? null;
@@ -93,12 +102,26 @@ export function TetherPanel({
     try {
       const response = await closeSession();
       setSession(response.session);
+      setCapture(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsSessionBusy(false);
     }
   }, [closeSession]);
+
+  const triggerCapture = useCallback(async () => {
+    setIsCaptureBusy(true);
+    setError(null);
+    try {
+      const response = await captureFrame();
+      setCapture(response);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsCaptureBusy(false);
+    }
+  }, [captureFrame]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -157,10 +180,35 @@ export function TetherPanel({
         </UiText>
       </section>
 
-      <Button disabled={true} onClick={() => undefined} size="sm" data-testid="tether-capture-disabled">
+      <Button
+        disabled={!isSessionOpen || isCaptureBusy}
+        onClick={() => {
+          void triggerCapture();
+        }}
+        size="sm"
+        data-testid="tether-trigger-capture"
+      >
         <Camera size={14} />
-        {t('editor.tether.captureUnavailable')}
+        {isCaptureBusy ? t('editor.tether.captureBusy') : t('editor.tether.capture')}
       </Button>
+
+      {capture !== null && (
+        <section
+          className="rounded-md border border-green-500/40 bg-green-500/10 p-3"
+          data-capture-checksum={capture.checksum}
+          data-capture-imported-path={capture.importedPath}
+          data-capture-status={capture.status}
+          data-testid="tether-capture-result"
+        >
+          <UiText variant={TextVariants.label}>{t('editor.tether.captureComplete')}</UiText>
+          <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block truncate">
+            {capture.importedPath}
+          </UiText>
+          <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+            {t('editor.tether.captureVerified', { bytes: capture.bytes })}
+          </UiText>
+        </section>
+      )}
 
       <section
         className="rounded-md border border-border-color bg-bg-secondary p-3"
