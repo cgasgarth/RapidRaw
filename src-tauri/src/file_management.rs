@@ -304,6 +304,14 @@ pub struct ExternalEditorVariantReceipt {
     source_revision: String,
 }
 
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FileWatchSnapshot {
+    byte_size: u64,
+    modified_ms: u128,
+    path: String,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryRelinkIdentity {
@@ -3443,6 +3451,38 @@ pub fn import_external_editor_variant(
 }
 
 #[tauri::command]
+pub fn get_external_editor_file_watch_snapshot(
+    output_path: String,
+) -> Result<FileWatchSnapshot, String> {
+    let output_path = PathBuf::from(output_path);
+    let metadata = fs::metadata(&output_path)
+        .map_err(|err| format!("Failed to read {}: {}", output_path.display(), err))?;
+    let modified = metadata.modified().map_err(|err| {
+        format!(
+            "Failed to read modified time for {}: {}",
+            output_path.display(),
+            err
+        )
+    })?;
+    let modified_ms = modified
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|err| {
+            format!(
+                "Invalid modified time for {}: {}",
+                output_path.display(),
+                err
+            )
+        })?
+        .as_millis();
+
+    Ok(FileWatchSnapshot {
+        byte_size: metadata.len(),
+        modified_ms,
+        path: output_path.to_string_lossy().to_string(),
+    })
+}
+
+#[tauri::command]
 pub fn launch_external_editor(
     output_path: String,
     editor_path: Option<String>,
@@ -4197,6 +4237,21 @@ mod tests {
             artifact["provenance"]["sourceRevision"],
             receipt.source_revision
         );
+    }
+
+    #[test]
+    fn external_editor_file_watch_snapshot_tracks_size_and_modified_time() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let output_path = temp_dir.path().join("image-edit.tiff");
+        fs::write(&output_path, b"edited tiff").expect("edited output");
+
+        let snapshot =
+            get_external_editor_file_watch_snapshot(output_path.to_string_lossy().into_owned())
+                .expect("file watch snapshot");
+
+        assert_eq!(snapshot.path, output_path.to_string_lossy());
+        assert_eq!(snapshot.byte_size, b"edited tiff".len() as u64);
+        assert!(snapshot.modified_ms > 0);
     }
 
     #[test]

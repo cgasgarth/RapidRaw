@@ -1285,6 +1285,8 @@
       "externalEditorConfigured": "外部编辑器：{{editor}}",
       "externalEditorDefault": "外部编辑器：系统默认",
       "externalEditorFailed": "无法打开外部编辑器：{{error}}",
+      "externalEditorSaveDetected": "",
+      "externalEditorWatching": "",
       "failed": "导出失败",
       "importingLinkedVariant": "正在导入…",
       "importLinkedVariant": "导入关联变体",

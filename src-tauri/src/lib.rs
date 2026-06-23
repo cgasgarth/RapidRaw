@@ -2669,6 +2669,7 @@ pub fn run() {
             file_management::delete_files_with_associated,
             file_management::save_metadata_and_update_thumbnail,
             file_management::import_external_editor_variant,
+            file_management::get_external_editor_file_watch_snapshot,
             file_management::launch_external_editor,
             file_management::apply_adjustments_to_paths,
             file_management::load_metadata,

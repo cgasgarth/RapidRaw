@@ -82,6 +82,13 @@ const externalEditorVariantReceiptSchema = z
     sourceRevision: z.string().trim().min(1),
   })
   .strict();
+const externalEditorFileWatchSnapshotSchema = z
+  .object({
+    byteSize: z.number().int().nonnegative(),
+    modifiedMs: z.number().int().nonnegative(),
+    path: z.string().trim().min(1),
+  })
+  .strict();
 
 function Section({ title, children }: SectionProps) {
   return (
@@ -337,6 +344,13 @@ export default function ExportPanel({
     receiptOutputPath: string | null;
   }>({ error: null, importedPath: null, importing: false, receiptOutputPath: null });
   const [externalEditorError, setExternalEditorError] = useState<string | null>(null);
+  const [externalEditorWatch, setExternalEditorWatch] = useState<{
+    baselineByteSize: number;
+    baselineModifiedMs: number;
+    detected: boolean;
+    outputPath: string;
+    polling: boolean;
+  } | null>(null);
   const [watermarkImageAspectRatio, setWatermarkImageAspectRatio] = useState(1);
   const [imageAspectRatio, setImageAspectRatio] = useState(16 / 9);
   const filenameInputRef = useRef<HTMLInputElement>(null);
@@ -375,6 +389,8 @@ export default function ExportPanel({
   const currentExternalVariantError = isCurrentExternalVariantStatus ? externalVariantStatus.error : null;
   const currentExternalVariantImportedPath = isCurrentExternalVariantStatus ? externalVariantStatus.importedPath : null;
   const isImportingCurrentExternalVariant = isCurrentExternalVariantStatus && externalVariantStatus.importing;
+  const isCurrentExternalEditorWatch = externalEditorWatch?.outputPath === firstReceiptOutput?.outputPath;
+  const currentExternalEditorWatch = isCurrentExternalEditorWatch ? externalEditorWatch : null;
 
   const handleImportExternalVariant = useCallback(
     async (sourceVirtualPath: string, outputPath: string) => {
@@ -424,17 +440,56 @@ export default function ExportPanel({
     async (outputPath: string) => {
       setExternalEditorError(null);
       try {
+        const baseline = await invokeWithSchema(
+          Invokes.GetExternalEditorFileWatchSnapshot,
+          { outputPath },
+          externalEditorFileWatchSnapshotSchema,
+        );
         await invokeWithSchema(
           Invokes.LaunchExternalEditor,
           { editorPath: configuredExternalEditorPath || null, outputPath },
           emptyTauriResponseSchema,
         );
+        setExternalEditorWatch({
+          baselineByteSize: baseline.byteSize,
+          baselineModifiedMs: baseline.modifiedMs,
+          detected: false,
+          outputPath,
+          polling: true,
+        });
       } catch (error) {
         setExternalEditorError(formatUnknownError(error));
       }
     },
     [configuredExternalEditorPath],
   );
+
+  useEffect(() => {
+    if (!externalEditorWatch || externalEditorWatch.detected || !externalEditorWatch.polling) return;
+    const interval = window.setInterval(() => {
+      void (async () => {
+        try {
+          const snapshot = await invokeWithSchema(
+            Invokes.GetExternalEditorFileWatchSnapshot,
+            { outputPath: externalEditorWatch.outputPath },
+            externalEditorFileWatchSnapshotSchema,
+          );
+          if (
+            snapshot.modifiedMs !== externalEditorWatch.baselineModifiedMs ||
+            snapshot.byteSize !== externalEditorWatch.baselineByteSize
+          ) {
+            setExternalEditorWatch({ ...externalEditorWatch, detected: true, polling: false });
+          }
+        } catch (error) {
+          setExternalEditorError(formatUnknownError(error));
+          setExternalEditorWatch({ ...externalEditorWatch, polling: false });
+        }
+      })();
+    }, 2000);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [externalEditorWatch]);
 
   const pathsToExport = useMemo(
     () =>
@@ -1369,6 +1424,19 @@ export default function ExportPanel({
                     {configuredExternalEditorPath
                       ? t('export.status.externalEditorConfigured', { editor: externalEditorName })
                       : t('export.status.externalEditorDefault')}
+                  </UiText>
+                )}
+                {currentExternalEditorWatch && (
+                  <UiText
+                    className="truncate"
+                    color={currentExternalEditorWatch.detected ? TextColors.primary : TextColors.secondary}
+                    data-external-editor-save-detected={String(currentExternalEditorWatch.detected)}
+                    data-testid="export-success-external-editor-watch"
+                    variant={TextVariants.small}
+                  >
+                    {currentExternalEditorWatch.detected
+                      ? t('export.status.externalEditorSaveDetected')
+                      : t('export.status.externalEditorWatching')}
                   </UiText>
                 )}
               </div>
