@@ -149,12 +149,13 @@ export default function SuperResolutionModal({
   const reconstructionReadinessLabel = isSourceCountValid
     ? t('modals.superResolution.preflight.ready')
     : t('modals.superResolution.preflight.blocked');
+  const fallbackOutputReviewSourceCount = Math.max(2, sourceCount);
   const outputReview =
     runtimeOutputReview ??
     buildSuperResolutionOutputReviewWorkflow({
       artifactPath: reviewArtifactPath,
       settings,
-      sourceCount,
+      sourceCount: fallbackOutputReviewSourceCount,
     });
   const hasRuntimeOutputReview = runtimeOutputReview !== null && runtimeOutputReview !== undefined;
   const outputReviewDecisionLabel = t(`modals.superResolution.review.decision.${outputReview.decision}`);

@@ -46,6 +46,8 @@ for (const marker of [
   'data-preview-source-count={sourceCount}',
   'modals.focusStack.preflight.workload',
   'modals.focusStack.previewWorkloadValue',
+  'fallbackOutputReviewSourceCount = Math.max(2, sourceCount)',
+  'sourceCount: fallbackOutputReviewSourceCount',
   'focus-halo-suppression-controls',
   'data-halo-suppression-strength-percent={settings.haloSuppressionStrengthPercent}',
   'data-halo-risk-cell-ratio={outputReview.haloRiskCellRatio}',
