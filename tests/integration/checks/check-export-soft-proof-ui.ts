@@ -23,7 +23,11 @@ for (const marker of [
   'data-export-soft-proof-color-profile',
   'data-export-soft-proof-rendering-intent',
   'data-export-soft-proof-status="export-transform-preview"',
+  'data-testid="export-soft-proof-active-dot"',
+  'data-testid="export-soft-proof-active-badge"',
+  'aria-pressed={isExportSoftProofEnabled}',
   'editor.toolbar.exportSoftProofDetails',
+  'editor.toolbar.exportSoftProofActive',
   'editor.toolbar.tooltips.exportSoftProof',
 ]) {
   if (!toolbarSource.includes(marker)) failures.push(`EditorToolbar missing ${marker}`);
@@ -80,6 +84,10 @@ if (typeof locale.editor?.toolbar?.tooltips?.exportSoftProof !== 'string') {
 
 if (typeof locale.editor?.toolbar?.exportSoftProofDetails !== 'string') {
   failures.push('Missing export soft-proof details locale.');
+}
+
+if (typeof locale.editor?.toolbar?.exportSoftProofActive !== 'string') {
+  failures.push('Missing export soft-proof active locale.');
 }
 
 if (typeof locale.export?.status?.colorManagedTransform !== 'string') {
