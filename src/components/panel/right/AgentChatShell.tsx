@@ -12,6 +12,7 @@ import type {
   AgentChatMessage,
   AgentChatToolCall,
   AgentChatTranscript,
+  AgentFailureRecovery,
   AgentPrivateRawArtifacts,
   AgentReviewHandoff,
   AgentSelectedFrameScope,
@@ -878,6 +879,53 @@ function LivePromptWalkthroughPanel({ walkthrough }: { walkthrough: AgentLivePro
   );
 }
 
+function FailureRecoveryPanel({ recovery }: { recovery: AgentFailureRecovery }) {
+  const [retryState, setRetryState] = useState<'available' | 'completed'>(recovery.retryAction.state);
+
+  return (
+    <div
+      className="space-y-3 rounded-md border border-amber-500/20 bg-amber-500/5 p-3"
+      data-failed-tool-call-id={recovery.failedToolCallId}
+      data-preserved-plan-id={recovery.preservedPlanId}
+      data-recovered-tool-call-id={recovery.recoveredToolCallId}
+      data-retry-state={retryState}
+      data-testid="agent-failure-recovery"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-text-primary">{recovery.title}</div>
+          <p className="mt-1 text-[11px] leading-4 text-text-secondary">{recovery.reason}</p>
+        </div>
+        <span className="shrink-0 rounded border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-100">
+          {recovery.failedToolCallId}
+        </span>
+      </div>
+
+      <div className="grid gap-2 text-[11px] md:grid-cols-2">
+        <button
+          className="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-2 text-left text-emerald-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          data-testid="agent-failure-recovery-retry"
+          disabled={retryState === 'completed'}
+          onClick={() => {
+            setRetryState('completed');
+          }}
+          type="button"
+        >
+          <span className="block font-semibold text-text-primary">{recovery.retryAction.label}</span>
+          <span className="mt-1 block font-mono">{recovery.recoveredToolCallId}</span>
+        </button>
+        <div
+          className="rounded-md border border-white/10 bg-black/15 px-2 py-2"
+          data-testid="agent-failure-recovery-edit"
+        >
+          <span className="block font-semibold text-text-primary">{recovery.editAction.label}</span>
+          <span className="mt-1 block font-mono text-text-secondary">{recovery.preservedPlanId}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AgentChatShell({ transcript }: AgentChatShellProps) {
   const { t } = useTranslation();
   const runtimeBadge = agentRuntimeBadge[transcript.runtimeStatus];
@@ -914,6 +962,8 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
       {transcript.livePromptWalkthrough ? (
         <LivePromptWalkthroughPanel walkthrough={transcript.livePromptWalkthrough} />
       ) : null}
+
+      {transcript.failureRecovery ? <FailureRecoveryPanel recovery={transcript.failureRecovery} /> : null}
 
       <div className="space-y-2" data-testid="agent-tool-transcript">
         <div className="flex items-center justify-between text-xs">

@@ -1017,6 +1017,15 @@ async function prepareScenario(page, mode) {
     await handoff
       .getByText('Restored graph_rev_agent_expert_edit_demo_initial_2844', { exact: false })
       .waitFor({ timeout: 10_000 });
+    const recovery = page.getByTestId('agent-failure-recovery');
+    await recovery.getByText('Recover failed tool call', { exact: true }).waitFor({ timeout: 10_000 });
+    await recovery.getByTestId('agent-failure-recovery-retry').click();
+    await page.waitForFunction(
+      () =>
+        document.querySelector('[data-testid="agent-failure-recovery"]')?.getAttribute('data-retry-state') ===
+        'completed',
+      { timeout: 10_000 },
+    );
     await scope.getByText('Selected-frame scope', { exact: true }).waitFor({ timeout: 10_000 });
     await page.getByTestId('agent-selected-frame-assets').getByText('DSC_2844.NEF', { exact: true }).waitFor({
       timeout: 10_000,
