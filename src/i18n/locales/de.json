@@ -1281,6 +1281,7 @@
       "cancelled": "Export abgebrochen",
       "chooseExternalEditor": "Editor wählen...",
       "chooseExternalEditorTitle": "Externen Editor wählen",
+      "colorManagedTransform": "",
       "estimatedAverageSize": " ({{size}} Ø)",
       "estimatedSize": "Geschätzte Dateigröße: ~{{size}}",
       "estimatedTotalSize": "Geschätzte Gesamtgröße: ~{{size}}",

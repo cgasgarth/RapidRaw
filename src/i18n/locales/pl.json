@@ -1363,6 +1363,7 @@
       "cancelled": "Eksport anulowany",
       "chooseExternalEditor": "Wybierz edytor...",
       "chooseExternalEditorTitle": "Wybierz edytor zewnętrzny",
+      "colorManagedTransform": "",
       "estimatedAverageSize": " (śr. {{size}})",
       "estimatedSize": "Szacowany rozmiar pliku: ~{{size}}",
       "estimatedTotalSize": "Szacowany rozmiar całkowity: ~{{size}}",
