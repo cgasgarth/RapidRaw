@@ -90,12 +90,13 @@ export default function FocusStackModal({
   const stackReadinessLabel = isSourceCountValid
     ? t('modals.focusStack.preflight.ready')
     : t('modals.focusStack.preflight.blocked');
+  const fallbackOutputReviewSourceCount = Math.max(2, sourceCount);
   const outputReview =
     runtimeOutputReview ??
     buildFocusStackOutputReviewWorkflow({
       artifactPath: outputReviewArtifactPath,
       settings,
-      sourceCount,
+      sourceCount: fallbackOutputReviewSourceCount,
     });
   const hasRuntimeOutputReview = runtimeOutputReview !== null && runtimeOutputReview !== undefined;
   const outputReviewDecisionLabel = t(`modals.focusStack.review.decision.${outputReview.decision}`);

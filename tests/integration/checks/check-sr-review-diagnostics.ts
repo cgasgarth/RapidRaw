@@ -18,6 +18,8 @@ for (const marker of [
   'outputPixelMultiplier',
   'sourceReadinessLabel',
   'reconstructionReadinessLabel',
+  'fallbackOutputReviewSourceCount = Math.max(2, sourceCount)',
+  'sourceCount: fallbackOutputReviewSourceCount',
   'sections={[',
   'modals.superResolution.preflight.sources',
   'modals.superResolution.preflight.ready',
