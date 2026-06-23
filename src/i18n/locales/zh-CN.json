@@ -1287,7 +1287,7 @@
       "failed": "导出失败",
       "importingLinkedVariant": "正在导入…",
       "importLinkedVariant": "导入关联变体",
-      "linkedVariantImported": "已导入关联变体：{{filename}}",
+      "linkedVariantImported": "Linked variant imported: {{filename}}. Original left untouched.",
       "linkedVariantImportFailed": "导入失败：{{error}}",
       "noImageSelected": "未选择要导出的图像。",
       "noImagesSelected": "未选择图像。",

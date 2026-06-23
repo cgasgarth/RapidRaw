@@ -1382,7 +1382,7 @@
       "failed": "Eksport nie powiódł się",
       "importingLinkedVariant": "Importowanie…",
       "importLinkedVariant": "Importuj połączony wariant",
-      "linkedVariantImported": "Zaimportowano połączony wariant: {{filename}}",
+      "linkedVariantImported": "Linked variant imported: {{filename}}. Original left untouched.",
       "linkedVariantImportFailed": "Import nie powiódł się: {{error}}",
       "noImageSelected": "Brak wybranego obrazu do eksportu.",
       "noImagesSelected": "Nie wybrano obrazów.",

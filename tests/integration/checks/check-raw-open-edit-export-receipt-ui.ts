@@ -61,6 +61,10 @@ const failures = [
   ['Rust linked variant command', rustFileSource.includes('import_external_editor_variant')],
   ['Rust configured editor launcher', rustFileSource.includes('launch_external_editor')],
   ['Rust linked variant artifact', rustFileSource.includes('external_editor.import_linked_variant')],
+  [
+    'Rust linked variant no-overwrite policy',
+    rustFileSource.includes('"noOverwritePolicy": "never_overwrite_original"'),
+  ],
   ['Rust receipt payload', rustExportSource.includes('struct ExportReceipt')],
   ['Rust output byte size', rustExportSource.includes('fs::metadata(output_path)')],
   ['Rust emits export complete payload', rustExportSource.includes('ExportReceipt {')],
@@ -70,7 +74,8 @@ const failures = [
       enLocale.includes('"showInFinder"') &&
       enLocale.includes('"openInEditor"') &&
       enLocale.includes('"chooseExternalEditor"') &&
-      enLocale.includes('"importLinkedVariant"'),
+      enLocale.includes('"importLinkedVariant"') &&
+      enLocale.includes('Original left untouched'),
   ],
   [
     'French receipt locale',
