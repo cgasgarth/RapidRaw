@@ -21,6 +21,7 @@ use crate::image_processing::{
 };
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportProofRequest {
@@ -35,6 +36,7 @@ pub struct RawOpenEditExportProofRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportCommand {
@@ -53,6 +55,7 @@ pub struct RawOpenEditExportCommand {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportBasicToneApproval {
@@ -117,6 +120,8 @@ pub struct RawOpenEditExportSourceMetadata {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportBasicToneParameters {
+    pub accepted_dry_run_plan_hash: String,
+    pub accepted_dry_run_plan_id: String,
     pub black_point: f64,
     pub clarity: f64,
     pub contrast: f64,
@@ -565,6 +570,14 @@ fn basic_tone_adjustments(parameters: &Value) -> Result<Value, String> {
     let parameters: RawOpenEditExportBasicToneParameters =
         serde_json::from_value(parameters.clone()).map_err(|error| error.to_string())?;
 
+    if parameters.accepted_dry_run_plan_hash.trim().is_empty()
+        || parameters.accepted_dry_run_plan_id.trim().is_empty()
+    {
+        return Err(
+            "editCommand.parameters accepted dry-run plan identity is required.".to_string(),
+        );
+    }
+
     Ok(json!({
         "blacks": parameters.black_point,
         "clarity": parameters.clarity,
@@ -979,6 +992,8 @@ mod tests {
             expected_graph_revision: "graph-rev.open-edit-export.edge-ringing.v1".to_string(),
             idempotency_key: Some("idem.raw-open-edit-export.edge-ringing.v1".to_string()),
             parameters: json!({
+                "acceptedDryRunPlanHash": "sha256:raw-open-edit-export-basic-tone-accepted-plan-v1",
+                "acceptedDryRunPlanId": "dryrun_raw_open_edit_export_basic_tone_v1",
                 "blackPoint": -2.0,
                 "clarity": 4.0,
                 "contrast": 8.0,

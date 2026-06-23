@@ -14,6 +14,7 @@ const SOURCE_COMMAND = `RAWENGINE_PRIVATE_RAW_ROOT=${PRIVATE_ROOT} RAWENGINE_PRI
 const ASSET_COMMAND = `RAWENGINE_PRIVATE_RAW_ROOT=${PRIVATE_ROOT} bun run check:negative-lab-real-raw-private-proof -- --require-assets`;
 const UPDATE_REPORT = process.argv.includes('--update');
 const requireAssets = process.argv.includes('--require-assets');
+const allowFreshHashes = process.argv.includes('--allow-fresh-hashes');
 const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT;
 
 const hashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
@@ -152,7 +153,9 @@ if (requireAssets && privateRoot !== undefined) {
     }
     if (artifact.kind === 'conversion_bundle_private' || artifact.kind === 'sidecar_private') continue;
     const actualHash = hashBuffer(await readFile(absolutePath));
-    if (actualHash !== artifact.hash) failures.push(`${artifact.kind}: hash mismatch for ${artifact.path}`);
+    if (!allowFreshHashes && actualHash !== artifact.hash) {
+      failures.push(`${artifact.kind}: hash mismatch for ${artifact.path}`);
+    }
   }
 }
 

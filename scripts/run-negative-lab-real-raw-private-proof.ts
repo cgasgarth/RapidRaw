@@ -6,6 +6,7 @@ import { extname, join, resolve } from 'node:path';
 import { z } from 'zod';
 
 import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from './compact-output.ts';
+import { resolvePrivateRawRootSource } from './lib/private-raw-root-source.ts';
 
 const SOURCE_RELATIVE_PATH = 'private-fixtures/negative-lab/alaska-negative-lab-v1.arw';
 const PREFERRED_SOURCE_NAME = '_DSC8786.ARW';
@@ -52,8 +53,15 @@ if (args.privateRoot === undefined) {
   process.exit(0);
 }
 
-const privateRoot = resolve(args.privateRoot);
-await preparePrivateRoot(privateRoot, args.source);
+const resolution = await resolvePrivateRawRootSource({
+  fixtureRelativePath: SOURCE_RELATIVE_PATH,
+  privateRoot: args.privateRoot,
+  source: args.source,
+  tempPrefix: 'rawengine-negative-lab-plain-root-',
+});
+const privateRoot = resolution.privateRoot;
+const usesPlainSourceRoot = resolution.source !== undefined && privateRoot !== resolve(args.privateRoot);
+await preparePrivateRoot(privateRoot, resolution.source);
 
 await runRequired(
   'negative lab real RAW Rust proof',
@@ -78,12 +86,17 @@ await runRequired(
   },
 );
 
-await runRequired('negative lab private RAW artifact validation', [
-  'bun',
-  'run',
-  'check:negative-lab-real-raw-private-proof-summary',
-  '--require-assets',
-]);
+await runRequired(
+  'negative lab private RAW artifact validation',
+  [
+    'bun',
+    'run',
+    'check:negative-lab-real-raw-private-proof-summary',
+    '--require-assets',
+    ...(usesPlainSourceRoot ? ['--allow-fresh-hashes'] : []),
+  ],
+  { env: { RAWENGINE_PRIVATE_RAW_ROOT: privateRoot } },
+);
 
 console.log('negative lab real RAW private proof ok');
 

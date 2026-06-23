@@ -2,19 +2,22 @@
 
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 
 import { z } from 'zod';
 
 import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from './compact-output.ts';
+import { resolvePrivateRawRootSource } from './lib/private-raw-root-source.ts';
 
 const FIXTURE_ID = 'validation.raw-open-edit-export.professional-color.v1';
 const REQUEST_PATH = 'fixtures/validation/professional-color-workflow-proof-request.json';
+const SOURCE_RELATIVE_PATH = 'private-fixtures/color/professional-workflow-v1/alaska-dsc7853.arw';
 
 const argsSchema = z
   .object({
     privateRoot: z.string().trim().min(1).optional(),
     requireAssets: z.boolean(),
+    source: z.string().trim().min(1).optional(),
   })
   .strict();
 
@@ -33,6 +36,7 @@ interface RunResult {
 const args = argsSchema.parse({
   privateRoot: valueAfter('--root') ?? process.env.RAWENGINE_PRIVATE_RAW_ROOT,
   requireAssets: process.argv.includes('--require-assets'),
+  source: valueAfter('--source') ?? process.env.RAWENGINE_PRIVATE_RAW_SOURCE,
 });
 
 await runRequired('professional color committed proof summary', [
@@ -50,7 +54,13 @@ if (args.privateRoot === undefined) {
   process.exit(0);
 }
 
-const privateRoot = resolve(args.privateRoot);
+const resolution = await resolvePrivateRawRootSource({
+  fixtureRelativePath: SOURCE_RELATIVE_PATH,
+  privateRoot: args.privateRoot,
+  source: args.source,
+  tempPrefix: 'rawengine-professional-color-plain-root-',
+});
+const privateRoot = resolution.privateRoot;
 
 await runRequired('professional color private root prep', [
   'bun',
@@ -59,6 +69,7 @@ await runRequired('professional color private root prep', [
   privateRoot,
   '--request',
   REQUEST_PATH,
+  ...(resolution.source === undefined ? [] : ['--source', resolution.source]),
   ...(args.requireAssets ? ['--require-assets'] : []),
 ]);
 
