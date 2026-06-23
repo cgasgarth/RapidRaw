@@ -61,14 +61,58 @@ struct RawDefectCorrectionReport {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct RawDefectCorrectionContext {
+struct RawDefectImageBounds {
     active_bounds: (usize, usize, usize, usize),
-    black_level: f32,
     cfa_height: usize,
     cfa_width: usize,
     height: usize,
-    white_level: f32,
     width: usize,
+}
+
+#[derive(Debug, Clone)]
+struct RawDefectCorrectionContext {
+    bounds: RawDefectImageBounds,
+    black_cpp: usize,
+    black_height: usize,
+    black_levels: Vec<f32>,
+    black_width: usize,
+    cfa_colors: Vec<usize>,
+    white_levels: Vec<f32>,
+}
+
+impl RawDefectCorrectionContext {
+    fn black_level_at(&self, x: usize, y: usize) -> f32 {
+        if self.black_levels.is_empty() || self.black_width == 0 || self.black_height == 0 {
+            return 0.0;
+        }
+
+        let cpp = self.black_cpp.max(1);
+        let index = ((y % self.black_height) * self.black_width + (x % self.black_width)) * cpp;
+        self.black_levels
+            .get(index)
+            .copied()
+            .or_else(|| self.black_levels.first().copied())
+            .unwrap_or(0.0)
+    }
+
+    fn white_level_at(&self, x: usize, y: usize) -> f32 {
+        if self.white_levels.is_empty() {
+            return u16::MAX as f32;
+        }
+
+        if self.white_levels.len() == 1 || self.cfa_colors.is_empty() {
+            return self.white_levels[0];
+        }
+
+        let cfa_index =
+            (y % self.bounds.cfa_height) * self.bounds.cfa_width + (x % self.bounds.cfa_width);
+        let color_index = self.cfa_colors.get(cfa_index).copied().unwrap_or(0);
+        self.white_levels
+            .get(color_index)
+            .copied()
+            .or_else(|| self.white_levels.first().copied())
+            .unwrap_or(u16::MAX as f32)
+    }
 }
 
 fn active_bounds(raw_image: &RawImage) -> (usize, usize, usize, usize) {
@@ -159,15 +203,13 @@ fn repair_integer_cfa_defects(
     pixels: &mut [u16],
     context: RawDefectCorrectionContext,
 ) -> RawDefectCorrectionReport {
-    let RawDefectCorrectionContext {
+    let RawDefectImageBounds {
         active_bounds,
-        black_level,
         cfa_height,
         cfa_width,
         height,
-        white_level,
         width,
-    } = context;
+    } = context.bounds;
 
     if width == 0
         || height == 0
@@ -187,15 +229,6 @@ fn repair_integer_cfa_defects(
         return RawDefectCorrectionReport::default();
     }
 
-    let black = black_level.clamp(0.0, u16::MAX as f32);
-    let white = white_level.clamp(black + 1.0, u16::MAX as f32);
-    let range = (white - black).max(1.0);
-    let outlier_delta = (range * 0.18).max(1024.0);
-    let hot_floor = black + range * 0.70;
-    let dead_ceiling = black + range * 0.06;
-    let useful_signal_floor = black + range * 0.12;
-    let highlight_structure_floor = (black + range * 0.55).clamp(0.0, u16::MAX as f32) as u16;
-
     let original = pixels.to_vec();
     let mut replacements = Vec::new();
     let mut report = RawDefectCorrectionReport::default();
@@ -209,6 +242,18 @@ fn repair_integer_cfa_defects(
             if neighbors.len() < 4 {
                 continue;
             }
+
+            let black = context.black_level_at(x, y).clamp(0.0, u16::MAX as f32);
+            let white = context
+                .white_level_at(x, y)
+                .clamp(black + 1.0, u16::MAX as f32);
+            let range = (white - black).max(1.0);
+            let outlier_delta = (range * 0.18).max(1024.0);
+            let hot_floor = black + range * 0.70;
+            let dead_ceiling = black + range * 0.06;
+            let useful_signal_floor = black + range * 0.12;
+            let highlight_structure_floor =
+                (black + range * 0.55).clamp(0.0, u16::MAX as f32) as u16;
 
             let median = median_u16(&mut neighbors) as f32;
             let hot_isolated = value >= hot_floor
@@ -249,8 +294,8 @@ fn repair_integer_cfa_defects(
 
 fn repair_raw_sensor_defects(
     raw_image: &mut RawImage,
-    original_black_level: f32,
-    original_white_level: f32,
+    _original_black_level: f32,
+    _original_white_level: f32,
 ) -> RawDefectCorrectionReport {
     let RawPhotometricInterpretation::Cfa(config) = &raw_image.photometric else {
         return RawDefectCorrectionReport::default();
@@ -265,18 +310,39 @@ fn repair_raw_sensor_defects(
     let active = active_bounds(raw_image);
     let cfa_width = config.cfa.width;
     let cfa_height = config.cfa.height;
+    let cfa_colors = (0..cfa_height)
+        .flat_map(|row| (0..cfa_width).map(move |col| config.cfa.color_at(row, col)))
+        .collect();
+    let black_levels = raw_image
+        .blacklevel
+        .levels
+        .iter()
+        .map(|level| level.as_f32())
+        .collect();
+    let white_levels = raw_image
+        .whitelevel
+        .0
+        .iter()
+        .map(|level| *level as f32)
+        .collect();
 
     match &mut raw_image.data {
         RawImageData::Integer(pixels) => repair_integer_cfa_defects(
             pixels,
             RawDefectCorrectionContext {
-                active_bounds: active,
-                black_level: original_black_level,
-                cfa_height,
-                cfa_width,
-                height,
-                white_level: original_white_level,
-                width,
+                bounds: RawDefectImageBounds {
+                    active_bounds: active,
+                    cfa_height,
+                    cfa_width,
+                    height,
+                    width,
+                },
+                black_cpp: raw_image.blacklevel.cpp,
+                black_height: raw_image.blacklevel.height,
+                black_levels,
+                black_width: raw_image.blacklevel.width,
+                cfa_colors,
+                white_levels,
             },
         ),
         RawImageData::Float(_) => RawDefectCorrectionReport::default(),
@@ -561,13 +627,32 @@ mod tests {
         active_bounds: (usize, usize, usize, usize),
     ) -> RawDefectCorrectionContext {
         RawDefectCorrectionContext {
-            active_bounds,
-            black_level: 512.0,
-            cfa_height: 2,
-            cfa_width: 2,
-            height,
-            white_level: 65_535.0,
-            width,
+            bounds: RawDefectImageBounds {
+                active_bounds,
+                cfa_height: 2,
+                cfa_width: 2,
+                height,
+                width,
+            },
+            black_cpp: 1,
+            black_height: 1,
+            black_levels: vec![512.0],
+            black_width: 1,
+            cfa_colors: vec![0, 1, 1, 2],
+            white_levels: vec![65_535.0],
+        }
+    }
+
+    fn bayer_context_with_levels(
+        width: usize,
+        height: usize,
+        black_levels: Vec<f32>,
+        white_levels: Vec<f32>,
+    ) -> RawDefectCorrectionContext {
+        RawDefectCorrectionContext {
+            black_levels,
+            white_levels,
+            ..bayer_context(width, height, (0, 0, width, height))
         }
     }
 
@@ -636,6 +721,27 @@ mod tests {
 
         assert_eq!(report.hot_pixels, 1);
         assert_eq!(pixels[2 * width + 2], u16::MAX);
+        assert_eq!(pixels[6 * width + 6], 8_000);
+    }
+
+    #[test]
+    fn raw_defect_correction_uses_phase_specific_white_levels() {
+        let width = 12;
+        let height = 12;
+        let mut pixels = bayer_pixels(width, height, 8_000);
+        pixels[6 * width + 6] = 30_000;
+
+        let report = repair_integer_cfa_defects(
+            &mut pixels,
+            bayer_context_with_levels(
+                width,
+                height,
+                vec![512.0],
+                vec![32_000.0, 65_535.0, 65_535.0],
+            ),
+        );
+
+        assert_eq!(report.hot_pixels, 1);
         assert_eq!(pixels[6 * width + 6], 8_000);
     }
 
