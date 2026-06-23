@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
+import { open as openShellPath } from '@tauri-apps/plugin-shell';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileInput, CheckCircle, XCircle, Loader, Ban, ChevronDown, ChevronRight, Settings, X } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, useCallback, type ReactNode } from 'react';
@@ -329,6 +330,7 @@ export default function ExportPanel({
   );
   const firstReceiptOutput = lastReceipt?.outputs[0];
   const firstReceiptFileName = firstReceiptOutput?.outputPath.split(/[\\/]/).pop() ?? '';
+  const canOpenReceiptInEditor = firstReceiptOutput?.format.toLowerCase() === 'tiff';
   const firstReceiptMetadataText =
     firstReceiptOutput?.colorProfile && firstReceiptOutput.bitDepth
       ? [firstReceiptOutput.colorProfile, `${firstReceiptOutput.bitDepth}-bit`, firstReceiptOutput.renderingIntent]
@@ -1218,16 +1220,30 @@ export default function ExportPanel({
                 {formatBytes(firstReceiptOutput.byteSize, t)} · {firstReceiptOutput.format.toUpperCase()}
                 {firstReceiptMetadataText ? ` · ${firstReceiptMetadataText}` : ''}
               </UiText>
-              <button
-                className="rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
-                data-testid="export-success-show-in-finder"
-                onClick={() => {
-                  void invoke(Invokes.ShowInFinder, { path: firstReceiptOutput.outputPath });
-                }}
-                type="button"
-              >
-                {t('export.status.showInFinder')}
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                {canOpenReceiptInEditor && (
+                  <button
+                    className="rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
+                    data-testid="export-success-open-in-editor"
+                    onClick={() => {
+                      void openShellPath(firstReceiptOutput.outputPath);
+                    }}
+                    type="button"
+                  >
+                    {t('export.status.openInEditor')}
+                  </button>
+                )}
+                <button
+                  className="rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
+                  data-testid="export-success-show-in-finder"
+                  onClick={() => {
+                    void invoke(Invokes.ShowInFinder, { path: firstReceiptOutput.outputPath });
+                  }}
+                  type="button"
+                >
+                  {t('export.status.showInFinder')}
+                </button>
+              </div>
             </div>
           </div>
         )}

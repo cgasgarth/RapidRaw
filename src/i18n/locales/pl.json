@@ -1377,6 +1377,7 @@
       "noImageSelected": "Brak wybranego obrazu do eksportu.",
       "noImagesSelected": "Nie wybrano obrazów.",
       "offlineSmartPreviewBlocked": "Podłącz ponownie oryginalny plik przed eksportem w pełnej rozdzielczości. Nadal możesz edytować inteligentny podgląd.",
+      "openInEditor": "Otwórz w edytorze",
       "showInFinder": "Pokaż w Finderze",
       "success": "Eksport zakończony sukcesem!"
     },

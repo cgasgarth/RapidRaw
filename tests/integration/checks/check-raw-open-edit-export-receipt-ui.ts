@@ -31,13 +31,25 @@ const failures = [
   ['listener parses export receipt', listenerSource.includes('parseExportReceiptPayload(event.payload)')],
   ['receipt UI test id', exportPanelSource.includes('data-testid="export-success-receipt"')],
   ['show in Finder action', exportPanelSource.includes('data-testid="export-success-show-in-finder"')],
+  ['open in editor action', exportPanelSource.includes('data-testid="export-success-open-in-editor"')],
+  ['open in editor uses shell opener', exportPanelSource.includes('openShellPath(firstReceiptOutput.outputPath)')],
+  ['open in editor TIFF gate', exportPanelSource.includes("firstReceiptOutput?.format.toLowerCase() === 'tiff'")],
   ['clears stale receipt on new export', exportPanelSource.includes('lastReceipt: undefined')],
   ['Rust receipt payload', rustExportSource.includes('struct ExportReceipt')],
   ['Rust output byte size', rustExportSource.includes('fs::metadata(output_path)')],
   ['Rust emits export complete payload', rustExportSource.includes('ExportReceipt {')],
-  ['English receipt locale', enLocale.includes('"exportedFile"') && enLocale.includes('"showInFinder"')],
-  ['French receipt locale', frLocale.includes('"exportedFile"') && frLocale.includes('"showInFinder"')],
-  ['Spanish receipt locale', esLocale.includes('"exportedFile"') && esLocale.includes('"showInFinder"')],
+  [
+    'English receipt locale',
+    enLocale.includes('"exportedFile"') && enLocale.includes('"showInFinder"') && enLocale.includes('"openInEditor"'),
+  ],
+  [
+    'French receipt locale',
+    frLocale.includes('"exportedFile"') && frLocale.includes('"showInFinder"') && frLocale.includes('"openInEditor"'),
+  ],
+  [
+    'Spanish receipt locale',
+    esLocale.includes('"exportedFile"') && esLocale.includes('"showInFinder"') && esLocale.includes('"openInEditor"'),
+  ],
   ['package script', packageJson.includes('"check:raw-open-edit-export-receipt-ui"')],
 ]
   .filter(([, passed]) => !passed)

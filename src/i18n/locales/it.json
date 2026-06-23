@@ -829,6 +829,7 @@
       "failed": "Esportazione fallita",
       "noImageSelected": "Nessuna immagine selezionata per l'esportazione.",
       "noImagesSelected": "Nessuna immagine selezionata.",
+      "openInEditor": "Apri nell'Editor",
       "success": "Esportazione completata con successo!"
     },
     "title": "Esporta",

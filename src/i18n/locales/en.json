@@ -1294,6 +1294,7 @@
       "noImageSelected": "No image selected for export.",
       "noImagesSelected": "No images selected.",
       "offlineSmartPreviewBlocked": "Reconnect the original file before full-resolution export. You can keep editing the smart preview.",
+      "openInEditor": "Open in Editor",
       "showInFinder": "Show in Finder",
       "success": "Export successful!"
     },
