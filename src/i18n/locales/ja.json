@@ -272,6 +272,7 @@
       "removeFromAlbum_other": "{{count}} 枚の画像をアルバムから削除",
       "renameImage_one": "画像名を変更",
       "renameImage_other": "{{count}} 枚の画像名を変更",
+      "relinkOriginal": "Relink Original...",
       "resetAdjustments_one": "補正設定をリセット",
       "resetAdjustments_other": "{{count}} 枚の画像の補正設定をリセット",
       "showExplorer": "エクスプローラーで表示",
@@ -291,7 +292,10 @@
       "failedMove": "ファイルの移動に失敗しました: {{err}}",
       "failedMoveError": "移動に失敗しました: {{err}}",
       "failedMoveInvalid": "移動に失敗しました: 対象グループが見つからないか無効です。",
-      "failedRemoveImages": "画像の削除に失敗しました: {{err}}"
+      "failedRemoveImages": "画像の削除に失敗しました: {{err}}",
+      "failedRelinkOriginal": "Could not verify that file as the missing original.",
+      "failedRelinkOriginalWithError": "Could not relink original: {{err}}",
+      "relinkedOriginal": "Original relinked"
     }
   },
   "editor": {

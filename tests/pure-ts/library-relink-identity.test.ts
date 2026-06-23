@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 
 import {
+  applyLibraryRelinkToRuntimeState,
   applyLibraryRelinkToSessionSet,
   planLibraryRelink,
   scoreRelinkCandidate,
@@ -108,6 +109,61 @@ test('applies a verified file relink to active, recent, and selected session pat
     '/Volumes/archive/Alaska/DSC00001.ARW',
     '/Volumes/card/DCIM/100MSDCF/DSC00002.ARW',
   ]);
+});
+
+test('applies a verified file relink to runtime state and virtual copy paths', () => {
+  const plan = planLibraryRelink({
+    missingIdentity: missingRaw,
+    candidateIdentities: [{ ...missingRaw, path: '/Volumes/archive/Alaska/DSC00001.ARW' }],
+  });
+
+  const updated = applyLibraryRelinkToRuntimeState(
+    {
+      currentFolderPath: '/Volumes/card/DCIM/100MSDCF',
+      imageList: [
+        {
+          exif: null,
+          is_edited: true,
+          is_virtual_copy: false,
+          modified: 1,
+          path: '/Volumes/card/DCIM/100MSDCF/DSC00001.ARW',
+          rating: 5,
+          tags: ['select'],
+        },
+        {
+          exif: null,
+          is_edited: true,
+          is_virtual_copy: true,
+          modified: 1,
+          path: '/Volumes/card/DCIM/100MSDCF/DSC00001.ARW?vc=abc123',
+          rating: 4,
+          tags: ['copy'],
+        },
+      ],
+      imageRatings: {
+        '/Volumes/card/DCIM/100MSDCF/DSC00001.ARW': 5,
+        '/Volumes/card/DCIM/100MSDCF/DSC00001.ARW?vc=abc123': 4,
+      },
+      libraryActivePath: '/Volumes/card/DCIM/100MSDCF/DSC00001.ARW',
+      multiSelectedPaths: ['/Volumes/card/DCIM/100MSDCF/DSC00001.ARW?vc=abc123'],
+      rootPaths: ['/Volumes/card/DCIM'],
+      selectionAnchorPath: '/Volumes/card/DCIM/100MSDCF/DSC00001.ARW',
+    },
+    missingRaw.path,
+    plan,
+  );
+
+  expect(updated.imageList.map((image) => image.path)).toEqual([
+    '/Volumes/archive/Alaska/DSC00001.ARW',
+    '/Volumes/archive/Alaska/DSC00001.ARW?vc=abc123',
+  ]);
+  expect(updated.imageRatings).toEqual({
+    '/Volumes/archive/Alaska/DSC00001.ARW': 5,
+    '/Volumes/archive/Alaska/DSC00001.ARW?vc=abc123': 4,
+  });
+  expect(updated.libraryActivePath).toBe('/Volumes/archive/Alaska/DSC00001.ARW');
+  expect(updated.multiSelectedPaths).toEqual(['/Volumes/archive/Alaska/DSC00001.ARW?vc=abc123']);
+  expect(updated.selectionAnchorPath).toBe('/Volumes/archive/Alaska/DSC00001.ARW');
 });
 
 test('applies a verified folder relink to roots and nested session paths', () => {

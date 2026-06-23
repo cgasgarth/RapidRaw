@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-dialog';
 import {
   Aperture,
   Check,
@@ -66,6 +67,7 @@ import {
 import { useContextMenu } from '../context/ContextMenuContext';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../schemas/focusStackUiSchemas';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../schemas/hdrMergeUiSchemas';
+import { libraryRelinkIdentitySchema } from '../schemas/libraryRelinkSchemas';
 import { DEFAULT_PANORAMA_UI_SETTINGS } from '../schemas/panoramaUiSchemas';
 import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../schemas/superResolutionUiSchemas';
 import { useEditorStore } from '../store/useEditorStore';
@@ -75,7 +77,9 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { globalImageCache } from '../utils/ImageLRUCache';
+import { applyLibraryRelinkToRuntimeState, planLibraryRelink } from '../utils/libraryRelinkIdentity';
 import { createSuperResolutionSourcePreflightMetadata } from '../utils/superResolutionSourcePreflight';
+import { invokeWithSchema } from '../utils/tauriSchemaInvoke';
 
 export interface UseAppContextMenusProps {
   handleImageSelect: (path: string) => void;
@@ -452,6 +456,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       const resetLabel = t('contextMenus.thumbnail.resetAdjustments', { count: selectionCount });
       const copyLabel = t('contextMenus.thumbnail.copyImage', { count: selectionCount });
       const autoAdjustLabel = t('contextMenus.thumbnail.autoAdjust', { count: selectionCount });
+      const relinkLabel = t('contextMenus.thumbnail.relinkOriginal');
       const renameLabel = t('contextMenus.thumbnail.renameImage', { count: selectionCount });
       const cullLabel = t('contextMenus.thumbnail.cullImage', { count: selectionCount });
       const collageLabel = t('contextMenus.thumbnail.collage', { count: selectionCount });
@@ -765,6 +770,69 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           label: renameLabel,
           onClick: () => {
             props.handleRenameFiles(finalSelection);
+          },
+        },
+        {
+          disabled: !isSingleSelection || firstSelectedPath === undefined || firstSelectedPath.includes('?vc='),
+          icon: FileInput,
+          label: relinkLabel,
+          onClick: async () => {
+            const fromPath = finalSelection[0];
+            if (!fromPath) return;
+
+            const selected = await open({
+              directory: false,
+              multiple: false,
+              title: relinkLabel,
+            });
+            if (typeof selected !== 'string') return;
+
+            try {
+              const [missingIdentity, candidateIdentity] = await Promise.all([
+                invokeWithSchema(
+                  Invokes.ReadLibraryRelinkIdentity,
+                  { path: fromPath },
+                  libraryRelinkIdentitySchema,
+                  Invokes.ReadLibraryRelinkIdentity,
+                ),
+                invokeWithSchema(
+                  Invokes.ReadLibraryRelinkIdentity,
+                  { path: selected },
+                  libraryRelinkIdentitySchema,
+                  Invokes.ReadLibraryRelinkIdentity,
+                ),
+              ]);
+              const plan = planLibraryRelink({ candidateIdentities: [candidateIdentity], missingIdentity });
+
+              if (plan.status !== 'matched') {
+                toast.error(t('contextMenus.toasts.failedRelinkOriginal'));
+                return;
+              }
+
+              setLibrary((state) =>
+                applyLibraryRelinkToRuntimeState(
+                  {
+                    currentFolderPath: state.currentFolderPath,
+                    imageList: state.imageList,
+                    imageRatings: state.imageRatings,
+                    libraryActivePath: state.libraryActivePath,
+                    multiSelectedPaths: state.multiSelectedPaths,
+                    rootPaths: state.rootPaths,
+                    selectionAnchorPath: state.selectionAnchorPath,
+                  },
+                  fromPath,
+                  plan,
+                ),
+              );
+              setEditor((state) =>
+                state.selectedImage?.path === fromPath && plan.selectedCandidatePath !== null
+                  ? { selectedImage: { ...state.selectedImage, path: plan.selectedCandidatePath } }
+                  : {},
+              );
+              toast.success(t('contextMenus.toasts.relinkedOriginal'));
+            } catch (err) {
+              toast.error(t('contextMenus.toasts.failedRelinkOriginalWithError', { err }));
+            }
           },
         },
         { type: OPTION_SEPARATOR },

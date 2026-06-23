@@ -483,6 +483,7 @@
       "pasteAdjustments_many": "Wklej ustawienia do {{count}} obrazów",
       "pasteAdjustments_other": "Wklej ustawienia do {{count}} obrazów",
       "physicalCopy": "Kopia fizyczna",
+      "relinkOriginal": "Relink Original...",
       "removeFromAlbum_one": "Usuń z albumu",
       "removeFromAlbum_few": "Usuń {{count}} obrazy z albumu",
       "removeFromAlbum_many": "Usuń {{count}} obrazów z albumu",
@@ -512,7 +513,10 @@
       "failedMove": "Nie udało się przenieść plików: {{err}}",
       "failedMoveError": "Nie udało się przenieść: {{err}}",
       "failedMoveInvalid": "Nie udało się przenieść: Grupa docelowa nie znaleziona lub nieprawidłowa.",
-      "failedRemoveImages": "Nie udało się usunąć obrazów: {{err}}"
+      "failedRelinkOriginal": "Could not verify that file as the missing original.",
+      "failedRelinkOriginalWithError": "Could not relink original: {{err}}",
+      "failedRemoveImages": "Nie udało się usunąć obrazów: {{err}}",
+      "relinkedOriginal": "Original relinked"
     }
   },
   "editor": {
