@@ -407,6 +407,7 @@
       "paste": "Paste",
       "pin": "Pin Folder",
       "refresh": "Refresh Folders",
+      "relinkFolder": "Relink Folder...",
       "removeRoot": "Remove Root Folder",
       "renameFolder": "Rename Folder",
       "showExplorer": "Show in File Explorer",
@@ -475,9 +476,14 @@
       "failedMove": "Failed to move files: {{err}}",
       "failedMoveError": "Failed to move: {{err}}",
       "failedMoveInvalid": "Failed to move: Target group not found or invalid.",
+      "failedRelinkFolderNoImages": "No loaded images in that folder can be verified for relink.",
+      "failedRelinkFolderReview": "Folder relink needs review: {{matched}}/{{total}} matched, {{rejected}} need attention.",
+      "failedRelinkFolderWithError": "Could not relink folder: {{err}}",
       "failedRelinkOriginal": "Could not verify that file as the missing original.",
       "failedRelinkOriginalWithError": "Could not relink original: {{err}}",
       "failedRemoveImages": "Failed to remove images: {{err}}",
+      "relinkedFolder_one": "Relinked folder with 1 verified image.",
+      "relinkedFolder_other": "Relinked folder with {{count}} verified images.",
       "relinkedOriginal": "Original relinked"
     }
   },

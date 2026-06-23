@@ -24,6 +24,13 @@ interface PlanLibraryRelinkInput {
   missingIdentity: LibraryRelinkIdentity;
 }
 
+interface PlanLibraryFolderRelinkInput {
+  candidateIdentities: LibraryRelinkIdentity[];
+  fromRootPath: string;
+  missingIdentities: LibraryRelinkIdentity[];
+  toRootPath: string;
+}
+
 interface ApplyLibraryRelinkInput {
   fromPath: string;
   plan: LibraryRelinkPlan;
@@ -38,6 +45,15 @@ export interface LibraryRelinkRuntimeState {
   multiSelectedPaths: string[];
   rootPaths: string[];
   selectionAnchorPath: string | null;
+}
+
+export interface LibraryFolderRelinkPlan {
+  ambiguousCount: number;
+  matchedCount: number;
+  rejectedCount: number;
+  relinkPlan: LibraryRelinkPlan | null;
+  status: 'matched' | 'ambiguous' | 'rejected';
+  totalCount: number;
 }
 
 const verifiedThreshold = 80;
@@ -104,6 +120,66 @@ export const scoreRelinkCandidate = (
     decision,
     evidence,
     score,
+  };
+};
+
+export const planLibraryFolderRelink = (input: PlanLibraryFolderRelinkInput): LibraryFolderRelinkPlan => {
+  const normalizedFromRoot = normalizePathForRewrite(input.fromRootPath);
+  const normalizedToRoot = normalizePathForRewrite(input.toRootPath);
+  const missingIdentities = input.missingIdentities.map((identity) => libraryRelinkIdentitySchema.parse(identity));
+  const candidateByPath = new Map(
+    input.candidateIdentities.map((identity) => {
+      const parsed = libraryRelinkIdentitySchema.parse(identity);
+      return [normalizePathForRewrite(parsed.path), parsed] as const;
+    }),
+  );
+
+  const candidateResults: LibraryRelinkCandidateResult[] = [];
+  let matchedCount = 0;
+  let ambiguousCount = 0;
+  let rejectedCount = 0;
+
+  for (const missingIdentity of missingIdentities) {
+    const candidatePath = rewritePath(missingIdentity.path, normalizedFromRoot, normalizedToRoot);
+    const candidateIdentity = candidateByPath.get(normalizePathForRewrite(candidatePath));
+
+    if (!candidateIdentity) {
+      rejectedCount += 1;
+      candidateResults.push(missingCandidateResult(candidatePath));
+      continue;
+    }
+
+    const itemPlan = planLibraryRelink({ candidateIdentities: [candidateIdentity], missingIdentity });
+    candidateResults.push(...itemPlan.candidates);
+
+    if (itemPlan.status === 'matched') {
+      matchedCount += 1;
+    } else if (itemPlan.status === 'ambiguous') {
+      ambiguousCount += 1;
+    } else {
+      rejectedCount += 1;
+    }
+  }
+
+  const status =
+    missingIdentities.length === 0 || rejectedCount > 0 ? 'rejected' : ambiguousCount > 0 ? 'ambiguous' : 'matched';
+
+  const relinkPlan =
+    status === 'matched'
+      ? libraryRelinkPlanSchema.parse({
+          candidates: candidateResults,
+          selectedCandidatePath: normalizedToRoot,
+          status: 'matched',
+        })
+      : null;
+
+  return {
+    ambiguousCount,
+    matchedCount,
+    rejectedCount,
+    relinkPlan,
+    status,
+    totalCount: missingIdentities.length,
   };
 };
 
@@ -210,6 +286,16 @@ const rewritePath = (path: string, fromPath: string, toPath: string): string => 
   if (isPathInside(normalizedPath, fromPath)) return `${toPath}${normalizedPath.slice(fromPath.length)}`;
   return path;
 };
+
+export const rewriteLibraryRelinkPath = (path: string, fromPath: string, toPath: string): string =>
+  rewritePath(path, normalizePathForRewrite(fromPath), normalizePathForRewrite(toPath));
+
+const missingCandidateResult = (candidatePath: string): LibraryRelinkCandidateResult => ({
+  candidatePath,
+  decision: 'rejected',
+  evidence: [{ kind: 'filename', status: 'missing', weight: 0 }],
+  score: 0,
+});
 
 const rewriteRecordKeys = <TValue>(
   record: Record<string, TValue>,

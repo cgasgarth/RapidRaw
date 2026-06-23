@@ -77,7 +77,12 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { globalImageCache } from '../utils/ImageLRUCache';
-import { applyLibraryRelinkToRuntimeState, planLibraryRelink } from '../utils/libraryRelinkIdentity';
+import {
+  applyLibraryRelinkToRuntimeState,
+  planLibraryFolderRelink,
+  planLibraryRelink,
+  rewriteLibraryRelinkPath,
+} from '../utils/libraryRelinkIdentity';
 import { createSuperResolutionSourcePreflightMetadata } from '../utils/superResolutionSourcePreflight';
 import { invokeWithSchema } from '../utils/tauriSchemaInvoke';
 
@@ -106,6 +111,27 @@ interface FolderTreeRoot {
 }
 
 type ContextMenuEvent = MouseEvent<HTMLElement>;
+
+const normalizeRelinkPath = (path: string): string => path.trim().replace(/[\\/]+$/u, '');
+
+const isRelinkPathInside = (path: string, parentPath: string): boolean => {
+  const normalizedPath = normalizeRelinkPath(path);
+  const normalizedParent = normalizeRelinkPath(parentPath);
+  return (
+    normalizedPath === normalizedParent ||
+    normalizedPath.startsWith(`${normalizedParent}/`) ||
+    normalizedPath.startsWith(`${normalizedParent}\\`)
+  );
+};
+
+const collectFolderRelinkSourcePaths = (imageList: ImageFile[], folderPath: string): string[] =>
+  Array.from(
+    new Set(
+      imageList
+        .map((image) => image.path.split('?vc=')[0] ?? image.path)
+        .filter((imagePath) => isRelinkPathInside(imagePath, folderPath)),
+    ),
+  ).sort((left, right) => left.localeCompare(right));
 
 const findAlbumById = (items: AlbumItem[], albumId: string): Album | null => {
   for (const item of items) {
@@ -945,6 +971,119 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       const numCopied = copiedFilePaths.length;
       const copyPastedLabel = t('contextMenus.folders.copyHere', { count: numCopied });
       const movePastedLabel = t('contextMenus.folders.moveHere', { count: numCopied });
+      const relinkFolderLabel = t('contextMenus.folders.relinkFolder');
+
+      const handleRelinkFolder = async () => {
+        const selected = await open({
+          directory: true,
+          multiple: false,
+          title: relinkFolderLabel,
+        });
+        if (typeof selected !== 'string') return;
+
+        const { imageList, setLibrary } = useLibraryStore.getState();
+        const sourcePaths = collectFolderRelinkSourcePaths(imageList, targetPath);
+        if (sourcePaths.length === 0) {
+          toast.error(t('contextMenus.toasts.failedRelinkFolderNoImages'));
+          return;
+        }
+
+        const candidatePaths = sourcePaths.map((sourcePath) =>
+          rewriteLibraryRelinkPath(sourcePath, targetPath, selected),
+        );
+
+        try {
+          const [missingIdentities, candidateIdentities] = await Promise.all([
+            Promise.all(
+              sourcePaths.map((sourcePath) =>
+                invokeWithSchema(
+                  Invokes.ReadLibraryRelinkIdentity,
+                  { path: sourcePath },
+                  libraryRelinkIdentitySchema,
+                  Invokes.ReadLibraryRelinkIdentity,
+                ),
+              ),
+            ),
+            Promise.all(
+              candidatePaths.map((candidatePath) =>
+                invokeWithSchema(
+                  Invokes.ReadLibraryRelinkIdentity,
+                  { path: candidatePath },
+                  libraryRelinkIdentitySchema,
+                  Invokes.ReadLibraryRelinkIdentity,
+                ),
+              ),
+            ),
+          ]);
+
+          const folderPlan = planLibraryFolderRelink({
+            candidateIdentities,
+            fromRootPath: targetPath,
+            missingIdentities,
+            toRootPath: selected,
+          });
+
+          if (folderPlan.status !== 'matched' || folderPlan.relinkPlan === null) {
+            toast.error(
+              t('contextMenus.toasts.failedRelinkFolderReview', {
+                matched: folderPlan.matchedCount,
+                rejected: folderPlan.rejectedCount + folderPlan.ambiguousCount,
+                total: folderPlan.totalCount,
+              }),
+            );
+            return;
+          }
+          const relinkPlan = folderPlan.relinkPlan;
+
+          setLibrary((state) =>
+            applyLibraryRelinkToRuntimeState(
+              {
+                currentFolderPath: state.currentFolderPath,
+                imageList: state.imageList,
+                imageRatings: state.imageRatings,
+                libraryActivePath: state.libraryActivePath,
+                multiSelectedPaths: state.multiSelectedPaths,
+                rootPaths: state.rootPaths,
+                selectionAnchorPath: state.selectionAnchorPath,
+              },
+              targetPath,
+              relinkPlan,
+            ),
+          );
+
+          const { selectedImage, setEditor } = useEditorStore.getState();
+          if (selectedImage && isRelinkPathInside(selectedImage.path, targetPath)) {
+            setEditor({
+              selectedImage: {
+                ...selectedImage,
+                path: rewriteLibraryRelinkPath(selectedImage.path, targetPath, selected),
+              },
+            });
+          }
+
+          const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+          if (appSettings) {
+            await handleSettingsChange({
+              ...appSettings,
+              lastRootPath:
+                appSettings.lastRootPath && isRelinkPathInside(appSettings.lastRootPath, targetPath)
+                  ? rewriteLibraryRelinkPath(appSettings.lastRootPath, targetPath, selected)
+                  : appSettings.lastRootPath,
+              rootFolders: (appSettings.rootFolders ?? []).map((rootPath) =>
+                isRelinkPathInside(rootPath, targetPath)
+                  ? rewriteLibraryRelinkPath(rootPath, targetPath, selected)
+                  : rootPath,
+              ),
+            });
+          }
+
+          await props.refreshAllFolderTrees();
+          await props.refreshImageList();
+          toast.success(t('contextMenus.toasts.relinkedFolder', { count: folderPlan.matchedCount }));
+        } catch (err) {
+          toast.error(t('contextMenus.toasts.failedRelinkFolderWithError', { err }));
+        }
+      };
 
       const pinOption = isCurrentlyPinned
         ? {
@@ -1088,6 +1227,13 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           label: t('contextMenus.folders.importImages'),
           onClick: () => {
             props.handleImportClick(targetPath);
+          },
+        },
+        {
+          icon: ScanSearch,
+          label: relinkFolderLabel,
+          onClick: () => {
+            void handleRelinkFolder();
           },
         },
         { type: OPTION_SEPARATOR },
