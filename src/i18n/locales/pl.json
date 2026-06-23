@@ -604,6 +604,11 @@
           "runtime": "",
           "summary": ""
         },
+        "progress": {
+          "durationMs": "",
+          "local": "",
+          "stagesComplete": ""
+        },
         "readiness": {
           "applies": "",
           "appServer": "",

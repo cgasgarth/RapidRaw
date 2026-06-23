@@ -566,6 +566,11 @@
           "runtime": "Runtime",
           "summary": "Agent apply proof is linked to a private RAW output lane; private files stay outside the public repo."
         },
+        "progress": {
+          "durationMs": "{{duration}} ms",
+          "local": "local",
+          "stagesComplete": "{{completed}}/{{total}} stages complete"
+        },
         "readiness": {
           "applies": "Applies",
           "appServer": "App-server",
