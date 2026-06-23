@@ -93,6 +93,7 @@ export enum Invokes {
   HandleImportLegacyPresetsFromFile = 'handle_import_legacy_presets_from_file',
   ImportFiles = 'import_files',
   ImportExternalEditorVariant = 'import_external_editor_variant',
+  LaunchExternalEditor = 'launch_external_editor',
   InvokeGenerativeReplaseWithMaskDef = 'invoke_generative_replace_with_mask_def',
   IsImageCached = 'is_image_cached',
   ListImagesInDir = 'list_images_in_dir',
@@ -245,6 +246,7 @@ export interface AppSettings {
   defaultNonRawTonemapper?: string;
   copyPasteSettings?: CopyPasteSettings;
   enableFocusMode?: boolean;
+  externalEditorPath?: string;
   openTreeSections?: string[];
   folderIcons?: Record<string, string>;
   exifOverlay?: ExifOverlay;

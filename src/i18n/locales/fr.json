@@ -836,7 +836,12 @@
       "linkedVariantImported": "Variante liée importée : {{filename}}",
       "openInEditor": "Ouvrir dans l'éditeur",
       "showInFinder": "Afficher dans le Finder",
-      "success": "Exportation réussie !"
+      "success": "Exportation réussie !",
+      "chooseExternalEditor": "Choisir l’éditeur...",
+      "chooseExternalEditorTitle": "Choisir l’éditeur externe",
+      "externalEditorConfigured": "Éditeur externe : {{editor}}",
+      "externalEditorDefault": "Éditeur externe : valeur système par défaut",
+      "externalEditorFailed": "Impossible d’ouvrir l’éditeur externe : {{error}}"
     },
     "title": "Exporter",
     "watermark": {

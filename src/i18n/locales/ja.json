@@ -819,7 +819,12 @@
       "linkedVariantImportFailed": "読み込みに失敗しました: {{error}}",
       "linkedVariantImported": "リンクされたバリアントを読み込みました: {{filename}}",
       "openInEditor": "エディタで開く",
-      "success": "書き出しが成功しました！"
+      "success": "書き出しが成功しました！",
+      "chooseExternalEditor": "エディタを選択...",
+      "chooseExternalEditorTitle": "外部エディタを選択",
+      "externalEditorConfigured": "外部エディタ: {{editor}}",
+      "externalEditorDefault": "外部エディタ: システム既定",
+      "externalEditorFailed": "外部エディタを開けませんでした: {{error}}"
     },
     "watermark": {
       "addWatermark": "ウォーターマークを追加",

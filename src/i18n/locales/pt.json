@@ -834,7 +834,12 @@
       "linkedVariantImportFailed": "Falha na importação: {{error}}",
       "linkedVariantImported": "Variante vinculada importada: {{filename}}",
       "openInEditor": "Abrir no Editor",
-      "success": "Exportação concluída com sucesso!"
+      "success": "Exportação concluída com sucesso!",
+      "chooseExternalEditor": "Escolher editor...",
+      "chooseExternalEditorTitle": "Escolher editor externo",
+      "externalEditorConfigured": "Editor externo: {{editor}}",
+      "externalEditorDefault": "Editor externo: padrão do sistema",
+      "externalEditorFailed": "Não foi possível abrir o editor externo: {{error}}"
     },
     "title": "Exportar",
     "watermark": {

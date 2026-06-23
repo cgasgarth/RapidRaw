@@ -38,7 +38,13 @@ const failures = [
   ['receipt UI test id', exportPanelSource.includes('data-testid="export-success-receipt"')],
   ['show in Finder action', exportPanelSource.includes('data-testid="export-success-show-in-finder"')],
   ['open in editor action', exportPanelSource.includes('data-testid="export-success-open-in-editor"')],
-  ['open in editor uses shell opener', exportPanelSource.includes('openShellPath(firstReceiptOutput.outputPath)')],
+  ['choose external editor action', exportPanelSource.includes('data-testid="export-success-choose-external-editor"')],
+  ['external editor persisted setting', exportPanelSource.includes('externalEditorPath: selectedPath')],
+  [
+    'external editor configured label',
+    exportPanelSource.includes('data-testid="export-success-external-editor-config"'),
+  ],
+  ['open in editor uses configured launcher', exportPanelSource.includes('Invokes.LaunchExternalEditor')],
   ['open in editor TIFF gate', exportPanelSource.includes("firstReceiptOutput?.format.toLowerCase() === 'tiff'")],
   ['linked variant import action', exportPanelSource.includes('data-testid="export-success-import-linked-variant"')],
   ['linked variant import invoke', exportPanelSource.includes('Invokes.ImportExternalEditorVariant')],
@@ -53,6 +59,7 @@ const failures = [
   ['linked variant imported state', exportPanelSource.includes('data-testid="export-success-linked-variant-imported"')],
   ['clears stale receipt on new export', exportPanelSource.includes('lastReceipt: undefined')],
   ['Rust linked variant command', rustFileSource.includes('import_external_editor_variant')],
+  ['Rust configured editor launcher', rustFileSource.includes('launch_external_editor')],
   ['Rust linked variant artifact', rustFileSource.includes('external_editor.import_linked_variant')],
   ['Rust receipt payload', rustExportSource.includes('struct ExportReceipt')],
   ['Rust output byte size', rustExportSource.includes('fs::metadata(output_path)')],
@@ -62,15 +69,22 @@ const failures = [
     enLocale.includes('"exportedFile"') &&
       enLocale.includes('"showInFinder"') &&
       enLocale.includes('"openInEditor"') &&
+      enLocale.includes('"chooseExternalEditor"') &&
       enLocale.includes('"importLinkedVariant"'),
   ],
   [
     'French receipt locale',
-    frLocale.includes('"exportedFile"') && frLocale.includes('"showInFinder"') && frLocale.includes('"openInEditor"'),
+    frLocale.includes('"exportedFile"') &&
+      frLocale.includes('"showInFinder"') &&
+      frLocale.includes('"openInEditor"') &&
+      frLocale.includes('"chooseExternalEditor"'),
   ],
   [
     'Spanish receipt locale',
-    esLocale.includes('"exportedFile"') && esLocale.includes('"showInFinder"') && esLocale.includes('"openInEditor"'),
+    esLocale.includes('"exportedFile"') &&
+      esLocale.includes('"showInFinder"') &&
+      esLocale.includes('"openInEditor"') &&
+      esLocale.includes('"chooseExternalEditor"'),
   ],
   ['package script', packageJson.includes('"check:raw-open-edit-export-receipt-ui"')],
 ]

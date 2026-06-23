@@ -834,7 +834,12 @@
       "linkedVariantImportFailed": "Importazione non riuscita: {{error}}",
       "linkedVariantImported": "Variante collegata importata: {{filename}}",
       "openInEditor": "Apri nell'Editor",
-      "success": "Esportazione completata con successo!"
+      "success": "Esportazione completata con successo!",
+      "chooseExternalEditor": "Scegli editor...",
+      "chooseExternalEditorTitle": "Scegli editor esterno",
+      "externalEditorConfigured": "Editor esterno: {{editor}}",
+      "externalEditorDefault": "Editor esterno: predefinito di sistema",
+      "externalEditorFailed": "Impossibile aprire l’editor esterno: {{error}}"
     },
     "title": "Esporta",
     "watermark": {

@@ -3442,6 +3442,74 @@ pub fn import_external_editor_variant(
 }
 
 #[tauri::command]
+pub fn launch_external_editor(
+    output_path: String,
+    editor_path: Option<String>,
+) -> Result<(), String> {
+    let output_path = PathBuf::from(output_path);
+    if !output_path.exists() {
+        return Err(format!(
+            "Exported file does not exist: {}",
+            output_path.display()
+        ));
+    }
+
+    let output_path_str = output_path.to_string_lossy().to_string();
+    let configured_editor = editor_path.and_then(|value| {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    });
+
+    #[cfg(target_os = "macos")]
+    {
+        let mut command = Command::new("open");
+        if let Some(editor) = configured_editor {
+            command.args(["-a", &editor, &output_path_str]);
+        } else {
+            command.arg(&output_path_str);
+        }
+        command.spawn().map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(editor) = configured_editor {
+            Command::new(editor)
+                .arg(&output_path_str)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        } else {
+            Command::new("cmd")
+                .args(["/C", "start", "", &output_path_str])
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(editor) = configured_editor {
+            Command::new(editor)
+                .arg(&output_path_str)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        } else {
+            Command::new("xdg-open")
+                .arg(&output_path_str)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+}
+
+#[tauri::command]
 pub fn create_virtual_copy(
     source_virtual_path: String,
     target_album_id: Option<String>,
