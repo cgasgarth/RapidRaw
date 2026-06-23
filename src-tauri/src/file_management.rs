@@ -37,9 +37,9 @@ use crate::gpu_processing;
 use crate::image_loader;
 use crate::image_processing::GpuContext;
 use crate::image_processing::{
-    Crop, ImageMetadata, apply_coarse_rotation, apply_cpu_default_raw_processing, apply_crop,
-    apply_flip, apply_geometry_warp, apply_rotation, auto_results_to_json,
-    get_all_adjustments_from_json, perform_auto_analysis,
+    Crop, ImageMetadata, RawEngineArtifacts, apply_coarse_rotation,
+    apply_cpu_default_raw_processing, apply_crop, apply_flip, apply_geometry_warp, apply_rotation,
+    auto_results_to_json, get_all_adjustments_from_json, perform_auto_analysis,
 };
 use crate::mask_generation::MaskDefinition;
 use crate::tagging::{COLOR_TAG_PREFIX, USER_TAG_PREFIX};
@@ -291,6 +291,17 @@ pub struct ImageFile {
     tags: Option<Vec<String>>,
     exif: Option<HashMap<String, String>>,
     is_virtual_copy: bool,
+}
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ExternalEditorVariantReceipt {
+    artifact_id: String,
+    content_hash: String,
+    output_path: String,
+    sidecar_path: String,
+    source_path: String,
+    source_revision: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -3309,6 +3320,127 @@ fn rollback_renames(journal: &[(PathBuf, PathBuf)]) {
     }
 }
 
+fn hash_file_sha256(path: &Path) -> Result<String, String> {
+    let mut file = fs::File::open(path)
+        .map_err(|err| format!("Failed to open {}: {}", path.display(), err))?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 8192];
+
+    loop {
+        let read = file
+            .read(&mut buffer)
+            .map_err(|err| format!("Failed to read {}: {}", path.display(), err))?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+
+    Ok(format!("sha256:{}", hex::encode(hasher.finalize())))
+}
+
+fn is_tiff_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| matches!(extension.to_ascii_lowercase().as_str(), "tif" | "tiff"))
+        .unwrap_or(false)
+}
+
+fn write_external_editor_variant_sidecar(
+    source_virtual_path: &str,
+    output_path: &Path,
+    sidecar_path: &Path,
+) -> Result<ExternalEditorVariantReceipt, String> {
+    let (source_path, source_sidecar_path) = parse_virtual_path(source_virtual_path);
+    if !source_path.exists() {
+        return Err(format!(
+            "Source image does not exist: {}",
+            source_path.display()
+        ));
+    }
+    if !output_path.exists() {
+        return Err(format!(
+            "Edited TIFF does not exist: {}",
+            output_path.display()
+        ));
+    }
+    if !output_path.is_file() {
+        return Err(format!(
+            "Edited TIFF is not a file: {}",
+            output_path.display()
+        ));
+    }
+    if !is_tiff_path(output_path) {
+        return Err(format!(
+            "External editor variants must be TIFF files: {}",
+            output_path.display()
+        ));
+    }
+
+    let mut sidecar = crate::exif_processing::load_sidecar(&source_sidecar_path);
+    let source_adjustments =
+        serde_json::to_vec(&sidecar.adjustments).map_err(|err| err.to_string())?;
+    let source_revision = compute_source_revision(source_virtual_path, &source_adjustments);
+    let content_hash = hash_file_sha256(output_path)?;
+    let artifact_id = format!("artifact_external_editor_{}", Uuid::new_v4().simple());
+    let output_path_string = output_path.to_string_lossy().to_string();
+    let source_path_string = source_path.to_string_lossy().to_string();
+    let source_virtual_path_string = source_virtual_path.to_string();
+
+    let artifacts = sidecar
+        .raw_engine_artifacts
+        .get_or_insert_with(RawEngineArtifacts::new_v1);
+    artifacts.schema_version = 1;
+    artifacts.external_editor_artifacts.push(serde_json::json!({
+        "artifactId": artifact_id,
+        "contentHash": content_hash,
+        "createdAt": Utc::now().to_rfc3339(),
+        "operationId": "external_editor.import_linked_variant",
+        "operationVersion": 1,
+        "output": {
+            "format": "tiff",
+            "path": output_path_string,
+            "storage": "linked_file",
+        },
+        "provenance": {
+            "runtimeStatus": "imported",
+            "sourceImagePath": source_path_string,
+            "sourceRevision": source_revision,
+            "sourceVirtualPath": source_virtual_path_string,
+        },
+        "schemaVersion": 1,
+    }));
+
+    let json = serde_json::to_string_pretty(&sidecar)
+        .map_err(|err| format!("Failed to serialize external editor sidecar: {}", err))?;
+    fs::write(sidecar_path, json).map_err(|err| {
+        format!(
+            "Failed to write external editor sidecar {}: {}",
+            sidecar_path.display(),
+            err
+        )
+    })?;
+
+    Ok(ExternalEditorVariantReceipt {
+        artifact_id,
+        content_hash,
+        output_path: output_path_string,
+        sidecar_path: sidecar_path.to_string_lossy().to_string(),
+        source_path: source_path.to_string_lossy().to_string(),
+        source_revision,
+    })
+}
+
+#[tauri::command]
+pub fn import_external_editor_variant(
+    source_virtual_path: String,
+    output_path: String,
+) -> Result<ExternalEditorVariantReceipt, String> {
+    let output_path = PathBuf::from(output_path);
+    let sidecar_path = rrdata_sidecar_path(&output_path, None);
+    write_external_editor_variant_sidecar(&source_virtual_path, &output_path, &sidecar_path)
+}
+
 #[tauri::command]
 pub fn create_virtual_copy(
     source_virtual_path: String,
@@ -3930,6 +4062,68 @@ mod tests {
 
         assert!(!first_copy.exists());
         assert!(!second_copy.exists());
+    }
+
+    #[test]
+    fn external_editor_variant_sidecar_records_linked_tiff_provenance() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let source_path = temp_dir.path().join("image.raf");
+        let output_path = temp_dir.path().join("image-edit.tiff");
+        let sidecar_path = rrdata_sidecar_path(&output_path, None);
+        fs::write(&source_path, b"raw").expect("source image");
+        fs::write(&output_path, b"edited tiff").expect("edited output");
+
+        let source_sidecar_path = crate::exif_processing::get_primary_sidecar_path(&source_path);
+        let source_metadata = ImageMetadata {
+            adjustments: serde_json::json!({ "exposure": 0.4 }),
+            rating: 4,
+            ..ImageMetadata::default()
+        };
+        fs::write(
+            &source_sidecar_path,
+            serde_json::to_string_pretty(&source_metadata).expect("source metadata json"),
+        )
+        .expect("source sidecar");
+
+        let receipt = write_external_editor_variant_sidecar(
+            &source_path.to_string_lossy(),
+            &output_path,
+            &sidecar_path,
+        )
+        .expect("import linked variant");
+
+        assert_eq!(receipt.output_path, output_path.to_string_lossy());
+        assert_eq!(receipt.source_path, source_path.to_string_lossy());
+        assert!(receipt.content_hash.starts_with("sha256:"));
+        assert!(sidecar_path.exists());
+
+        let imported = crate::exif_processing::load_sidecar(&sidecar_path);
+        assert_eq!(imported.rating, 4);
+        let artifact = imported
+            .raw_engine_artifacts
+            .expect("rawEngineArtifacts")
+            .external_editor_artifacts
+            .pop()
+            .expect("external editor artifact");
+
+        assert_eq!(artifact["artifactId"], receipt.artifact_id);
+        assert_eq!(artifact["contentHash"], receipt.content_hash);
+        assert_eq!(
+            artifact["operationId"],
+            "external_editor.import_linked_variant"
+        );
+        assert_eq!(
+            artifact["output"]["path"].as_str(),
+            Some(output_path.to_string_lossy().as_ref())
+        );
+        assert_eq!(
+            artifact["provenance"]["sourceImagePath"].as_str(),
+            Some(source_path.to_string_lossy().as_ref())
+        );
+        assert_eq!(
+            artifact["provenance"]["sourceRevision"],
+            receipt.source_revision
+        );
     }
 
     #[test]
