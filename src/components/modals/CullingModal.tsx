@@ -34,6 +34,7 @@ interface CullingModalProps {
 type CullAction = 'reject' | 'rate_zero' | 'delete';
 type CullingStage = 'settings' | 'progress' | 'results';
 type CullingResultsTab = 'similar' | 'blurry' | 'focus';
+type FocusConfidenceBand = 'high' | 'medium' | 'low';
 
 const RAW_SOURCE_EXTENSIONS = new Set(['arw', 'cr2', 'cr3', 'dng', 'nef', 'orf', 'pef', 'raf', 'rw2', 'srw']);
 const SETUP_PREVIEW_LIMIT = 6;
@@ -45,6 +46,23 @@ interface CompareViewport {
   panX: number;
   panY: number;
   zoomPercent: number;
+}
+
+function getFocusConfidenceBand(confidence: number): FocusConfidenceBand {
+  if (confidence >= 0.7) return 'high';
+  if (confidence >= 0.4) return 'medium';
+  return 'low';
+}
+
+function getFocusConfidenceBandClass(band: FocusConfidenceBand): string {
+  switch (band) {
+    case 'high':
+      return 'border-green-500/40 bg-green-500/15 text-green-300';
+    case 'medium':
+      return 'border-yellow-500/40 bg-yellow-500/15 text-yellow-200';
+    case 'low':
+      return 'border-red-500/40 bg-red-500/15 text-red-300';
+  }
 }
 
 interface ImageThumbnailProps {
@@ -906,42 +924,59 @@ export default function CullingModal({
               )}
               {activeResultsTab === 'focus' && (
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-                  {suggestions.focusRankings.map((img, index) => (
-                    <div
-                      className="rounded-md border border-border-color bg-bg-secondary p-2"
-                      data-focus-confidence={img.focusConfidence.toFixed(2)}
-                      data-focus-eye-sharpness={img.eyeSharpnessMetric.toFixed(2)}
-                      data-focus-face-sharpness={img.faceSharpnessMetric.toFixed(2)}
-                      data-focus-rank={index + 1}
-                      data-focus-region={img.focusRegion}
-                      data-focus-score={img.focusScore.toFixed(2)}
-                      data-testid="culling-focus-ranking-card"
-                      key={img.path}
-                    >
-                      <ImageThumbnail path={img.path} thumbnails={thumbnails} isSelected={false}>
-                        {t('modals.culling.focusRankValue', { rank: index + 1 })}
-                      </ImageThumbnail>
-                      <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
-                        <UiText variant={TextVariants.small}>
-                          {t('modals.culling.focusScoreValue', { score: Math.round(img.focusScore * 100) })}
-                        </UiText>
-                        <UiText variant={TextVariants.small}>
-                          {t('modals.culling.focusConfidenceValue', {
-                            confidence: Math.round(img.focusConfidence * 100),
-                          })}
-                        </UiText>
-                        <UiText variant={TextVariants.small}>
-                          {t('modals.culling.eyeSharpnessValue', { sharpness: img.eyeSharpnessMetric.toFixed(0) })}
-                        </UiText>
-                        <UiText variant={TextVariants.small}>
-                          {t('modals.culling.faceSharpnessValue', { sharpness: img.faceSharpnessMetric.toFixed(0) })}
-                        </UiText>
-                        <UiText variant={TextVariants.small} color={TextColors.secondary} className="col-span-2">
-                          {getFocusRegionLabel(img.focusRegion)}
-                        </UiText>
+                  {suggestions.focusRankings.map((img, index) => {
+                    const confidenceBand = getFocusConfidenceBand(img.focusConfidence);
+                    return (
+                      <div
+                        className="rounded-md border border-border-color bg-bg-secondary p-2"
+                        data-focus-confidence={img.focusConfidence.toFixed(2)}
+                        data-focus-confidence-band={confidenceBand}
+                        data-focus-eye-sharpness={img.eyeSharpnessMetric.toFixed(2)}
+                        data-focus-face-sharpness={img.faceSharpnessMetric.toFixed(2)}
+                        data-focus-rank={index + 1}
+                        data-focus-region={img.focusRegion}
+                        data-focus-score={img.focusScore.toFixed(2)}
+                        data-testid="culling-focus-ranking-card"
+                        key={img.path}
+                      >
+                        <ImageThumbnail path={img.path} thumbnails={thumbnails} isSelected={false}>
+                          {t('modals.culling.focusRankValue', { rank: index + 1 })}
+                        </ImageThumbnail>
+                        <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
+                          <UiText variant={TextVariants.small}>
+                            {t('modals.culling.focusScoreValue', { score: Math.round(img.focusScore * 100) })}
+                          </UiText>
+                          <span
+                            className={`rounded border px-1.5 py-0.5 text-[11px] ${getFocusConfidenceBandClass(confidenceBand)}`}
+                            data-testid="culling-focus-confidence-band"
+                          >
+                            {confidenceBand === 'high'
+                              ? t('modals.culling.focusConfidenceBand.high')
+                              : confidenceBand === 'medium'
+                                ? t('modals.culling.focusConfidenceBand.medium')
+                                : t('modals.culling.focusConfidenceBand.low')}
+                          </span>
+                          <UiText variant={TextVariants.small}>
+                            {t('modals.culling.focusConfidenceValue', {
+                              confidence: Math.round(img.focusConfidence * 100),
+                            })}
+                          </UiText>
+                          <UiText variant={TextVariants.small}>
+                            {t('modals.culling.eyeSharpnessValue', { sharpness: img.eyeSharpnessMetric.toFixed(0) })}
+                          </UiText>
+                          <UiText variant={TextVariants.small}>
+                            {t('modals.culling.faceSharpnessValue', { sharpness: img.faceSharpnessMetric.toFixed(0) })}
+                          </UiText>
+                          <UiText variant={TextVariants.small} color={TextColors.secondary} className="col-span-2">
+                            {getFocusRegionLabel(img.focusRegion)}
+                          </UiText>
+                          <UiText variant={TextVariants.small} color={TextColors.secondary} className="col-span-2">
+                            {t('modals.culling.focusReviewOnlyHint')}
+                          </UiText>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </motion.div>
