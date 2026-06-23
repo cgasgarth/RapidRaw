@@ -750,56 +750,119 @@ mod tests {
     }
 
     #[test]
-    fn private_raw_processing_modes_generate_distinct_outputs_when_enabled() {
+    fn private_raw_processing_modes_generate_distinct_exports_when_enabled() {
         if std::env::var("RAWENGINE_RUN_PRIVATE_RAW_PROCESSING_MODE_PROOF").ok()
             != Some("1".to_string())
         {
             return;
         }
 
-        let source_path = std::env::var("RAWENGINE_RAW_PROCESSING_MODE_SOURCE")
-            .expect("RAWENGINE_RAW_PROCESSING_MODE_SOURCE must point to a private RAW");
-        let source_bytes = fs::read(&source_path).expect("read private RAW");
-        let mut hashes = Vec::new();
+        let bayer_source = std::env::var("RAWENGINE_RAW_PROCESSING_MODE_BAYER_SOURCE")
+            .or_else(|_| std::env::var("RAWENGINE_RAW_PROCESSING_MODE_SOURCE"))
+            .expect("RAWENGINE_RAW_PROCESSING_MODE_BAYER_SOURCE must point to a private Bayer RAW");
+        let xtrans_source = std::env::var("RAWENGINE_RAW_PROCESSING_MODE_XTRANS_SOURCE").expect(
+            "RAWENGINE_RAW_PROCESSING_MODE_XTRANS_SOURCE must point to a private X-Trans RAW",
+        );
+        let report_dir = std::env::var("RAWENGINE_RAW_PROCESSING_MODE_REPORT_DIR")
+            .unwrap_or_else(|_| "target/raw-processing-mode-proof".to_string());
+        let report_dir = Path::new(&report_dir);
+        fs::create_dir_all(report_dir).expect("create report dir");
 
-        for mode in ["fast", "balanced", "maximum"] {
-            let recipe = raw_processing_mode_recipe(Some(mode));
-            let mut settings = AppSettings {
-                raw_processing_mode: Some(mode.to_string()),
-                raw_highlight_compression: Some(recipe.raw_highlight_compression),
-                raw_preprocessing_color_nr: Some(recipe.raw_preprocessing_color_nr),
-                raw_preprocessing_sharpening: Some(recipe.raw_preprocessing_sharpening),
-                raw_preprocessing_sharpening_detail: Some(
-                    recipe.raw_preprocessing_sharpening_detail,
-                ),
-                raw_preprocessing_sharpening_edge_masking: Some(
-                    recipe.raw_preprocessing_sharpening_edge_masking,
-                ),
-                raw_preprocessing_sharpening_radius: Some(
-                    recipe.raw_preprocessing_sharpening_radius,
-                ),
-                ..AppSettings::default()
-            };
-            settings.apply_preprocessing_to_non_raws = Some(false);
+        let mut source_reports = Vec::new();
 
-            let started = Instant::now();
-            let image =
-                load_base_image_from_bytes(&source_bytes, &source_path, false, &settings, None)
-                    .expect("decode private RAW with processing mode");
-            let rgba = image.to_rgba8();
-            let hash = blake3::hash(rgba.as_raw()).to_hex().to_string();
-            println!(
-                "raw_processing_mode_proof mode={} dimensions={}x{} elapsed_ms={} hash={}",
-                mode,
-                image.width(),
-                image.height(),
-                started.elapsed().as_millis(),
-                hash
-            );
-            hashes.push(hash);
+        for (source_class, source_path) in [("bayer", bayer_source), ("xtrans", xtrans_source)] {
+            let source_bytes = fs::read(&source_path).expect("read private RAW");
+            let mut mode_reports = Vec::new();
+            let mut image_hashes = Vec::new();
+            let mut export_hashes = Vec::new();
+
+            for mode in ["fast", "balanced", "maximum"] {
+                let recipe = raw_processing_mode_recipe(Some(mode));
+                let settings = AppSettings {
+                    raw_processing_mode: Some(mode.to_string()),
+                    raw_highlight_compression: Some(recipe.raw_highlight_compression),
+                    raw_preprocessing_color_nr: Some(recipe.raw_preprocessing_color_nr),
+                    raw_preprocessing_sharpening: Some(recipe.raw_preprocessing_sharpening),
+                    raw_preprocessing_sharpening_detail: Some(
+                        recipe.raw_preprocessing_sharpening_detail,
+                    ),
+                    raw_preprocessing_sharpening_edge_masking: Some(
+                        recipe.raw_preprocessing_sharpening_edge_masking,
+                    ),
+                    raw_preprocessing_sharpening_radius: Some(
+                        recipe.raw_preprocessing_sharpening_radius,
+                    ),
+                    apply_preprocessing_to_non_raws: Some(false),
+                    ..AppSettings::default()
+                };
+
+                let started = Instant::now();
+                let image =
+                    load_base_image_from_bytes(&source_bytes, &source_path, false, &settings, None)
+                        .expect("decode private RAW with processing mode");
+                let decode_elapsed_ms = started.elapsed().as_millis();
+                let rgba = image.to_rgba8();
+                let image_hash = blake3::hash(rgba.as_raw()).to_hex().to_string();
+                let export_path = report_dir.join(format!("{}-{}.tiff", source_class, mode));
+                image
+                    .save_with_format(&export_path, image::ImageFormat::Tiff)
+                    .expect("write processing mode TIFF export");
+                let export_bytes = fs::read(&export_path).expect("read TIFF export");
+                let export_hash = blake3::hash(&export_bytes).to_hex().to_string();
+                let export_size_bytes = export_bytes.len();
+
+                println!(
+                    "raw_processing_mode_export source={} mode={} dimensions={}x{} elapsed_ms={} image_hash={} export_hash={} export_bytes={}",
+                    source_class,
+                    mode,
+                    image.width(),
+                    image.height(),
+                    decode_elapsed_ms,
+                    image_hash,
+                    export_hash,
+                    export_size_bytes
+                );
+
+                image_hashes.push(image_hash.clone());
+                export_hashes.push(export_hash.clone());
+                mode_reports.push(serde_json::json!({
+                    "decodeElapsedMs": decode_elapsed_ms,
+                    "dimensions": {
+                        "height": image.height(),
+                        "width": image.width(),
+                    },
+                    "exportHash": export_hash,
+                    "exportPath": export_path.to_string_lossy(),
+                    "exportSizeBytes": export_size_bytes,
+                    "imageHash": image_hash,
+                    "mode": mode,
+                    "provenance": recipe.provenance,
+                }));
+            }
+
+            assert_eq!(image_hashes.len(), 3);
+            assert_eq!(export_hashes.len(), 3);
+            assert_ne!(image_hashes[0], image_hashes[1]);
+            assert_ne!(image_hashes[1], image_hashes[2]);
+            assert_ne!(export_hashes[0], export_hashes[1]);
+            assert_ne!(export_hashes[1], export_hashes[2]);
+
+            source_reports.push(serde_json::json!({
+                "sourceClass": source_class,
+                "sourcePath": source_path,
+                "modes": mode_reports,
+            }));
         }
 
-        assert_ne!(hashes[0], hashes[1]);
-        assert_ne!(hashes[1], hashes[2]);
+        let report = serde_json::json!({
+            "issue": 3293,
+            "proofBoundary": "private_raw_processing_mode_export_runtime",
+            "sources": source_reports,
+        });
+        fs::write(
+            report_dir.join("raw-processing-mode-export-proof.json"),
+            serde_json::to_vec_pretty(&report).expect("serialize report"),
+        )
+        .expect("write processing mode proof report");
     }
 }
