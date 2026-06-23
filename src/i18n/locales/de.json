@@ -1278,6 +1278,8 @@
     "status": {
       "cancelExport": "Export abbrechen",
       "cancelled": "Export abgebrochen",
+      "chooseExternalEditor": "Editor wählen...",
+      "chooseExternalEditorTitle": "Externen Editor wählen",
       "estimatedAverageSize": " ({{size}} Ø)",
       "estimatedSize": "Geschätzte Dateigröße: ~{{size}}",
       "estimatedTotalSize": "Geschätzte Gesamtgröße: ~{{size}}",
@@ -1289,6 +1291,9 @@
       "exportMultiple_one": "Exportiere {{count}} {{label}}",
       "exportMultiple_other": "Exportiere {{count}} {{label}}",
       "exportSingle": "{{label}} exportieren",
+      "externalEditorConfigured": "Externer Editor: {{editor}}",
+      "externalEditorDefault": "Externer Editor: Systemstandard",
+      "externalEditorFailed": "Externer Editor konnte nicht geöffnet werden: {{error}}",
       "failed": "Export fehlgeschlagen",
       "importingLinkedVariant": "Wird importiert…",
       "importLinkedVariant": "Verknüpfte Variante importieren",

@@ -834,7 +834,12 @@
       "linkedVariantImportFailed": "Не удалось импортировать: {{error}}",
       "linkedVariantImported": "Связанная версия импортирована: {{filename}}",
       "openInEditor": "Открыть в редакторе",
-      "success": "Экспорт успешно завершен!"
+      "success": "Экспорт успешно завершен!",
+      "chooseExternalEditor": "Выбрать редактор...",
+      "chooseExternalEditorTitle": "Выбрать внешний редактор",
+      "externalEditorConfigured": "Внешний редактор: {{editor}}",
+      "externalEditorDefault": "Внешний редактор: системный по умолчанию",
+      "externalEditorFailed": "Не удалось открыть внешний редактор: {{error}}"
     },
     "watermark": {
       "addWatermark": "Добавить водяной знак",

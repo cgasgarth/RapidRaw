@@ -1,6 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { open as openShellPath } from '@tauri-apps/plugin-shell';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileInput, CheckCircle, XCircle, Loader, Ban, ChevronDown, ChevronRight, Settings, X } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, useCallback, type ReactNode } from 'react';
@@ -12,6 +11,7 @@ import { useExportSettings } from '../../../hooks/useExportSettings';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../../schemas/exportRecipeIds';
 import { outputSharpeningSettingsSchema } from '../../../schemas/outputSharpeningSchemas';
+import { emptyTauriResponseSchema } from '../../../schemas/tauriResponseSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
@@ -336,6 +336,7 @@ export default function ExportPanel({
     importing: boolean;
     receiptOutputPath: string | null;
   }>({ error: null, importedPath: null, importing: false, receiptOutputPath: null });
+  const [externalEditorError, setExternalEditorError] = useState<string | null>(null);
   const [watermarkImageAspectRatio, setWatermarkImageAspectRatio] = useState(1);
   const [imageAspectRatio, setImageAspectRatio] = useState(16 / 9);
   const filenameInputRef = useRef<HTMLInputElement>(null);
@@ -350,6 +351,18 @@ export default function ExportPanel({
   const firstReceiptOutput = lastReceipt?.outputs[0];
   const firstReceiptFileName = firstReceiptOutput?.outputPath.split(/[\\/]/).pop() ?? '';
   const canOpenReceiptInEditor = firstReceiptOutput?.format.toLowerCase() === 'tiff';
+  const configuredExternalEditorPath = useMemo(
+    () => appSettings?.externalEditorPath?.trim() ?? '',
+    [appSettings?.externalEditorPath],
+  );
+  const externalEditorName = useMemo(
+    () =>
+      configuredExternalEditorPath
+        .split(/[\\/]/)
+        .pop()
+        ?.replace(/\.app$/i, '') ?? '',
+    [configuredExternalEditorPath],
+  );
   const firstReceiptMetadataText =
     firstReceiptOutput?.colorProfile && firstReceiptOutput.bitDepth
       ? [firstReceiptOutput.colorProfile, `${firstReceiptOutput.bitDepth}-bit`, firstReceiptOutput.renderingIntent]
@@ -389,6 +402,38 @@ export default function ExportPanel({
       }
     },
     [onLinkedVariantImported],
+  );
+
+  const handleChooseExternalEditor = useCallback(async () => {
+    if (!appSettings) return;
+    setExternalEditorError(null);
+    try {
+      const selectedPath = await open({
+        directory: osPlatform === 'macos',
+        multiple: false,
+        title: t('export.status.chooseExternalEditorTitle'),
+      });
+      if (typeof selectedPath !== 'string') return;
+      onSettingsChange({ ...appSettings, externalEditorPath: selectedPath });
+    } catch (error) {
+      setExternalEditorError(formatUnknownError(error));
+    }
+  }, [appSettings, onSettingsChange, osPlatform, t]);
+
+  const handleOpenInExternalEditor = useCallback(
+    async (outputPath: string) => {
+      setExternalEditorError(null);
+      try {
+        await invokeWithSchema(
+          Invokes.LaunchExternalEditor,
+          { editorPath: configuredExternalEditorPath || null, outputPath },
+          emptyTauriResponseSchema,
+        );
+      } catch (error) {
+        setExternalEditorError(formatUnknownError(error));
+      }
+    },
+    [configuredExternalEditorPath],
   );
 
   const pathsToExport = useMemo(
@@ -1287,14 +1332,49 @@ export default function ExportPanel({
                 {t('export.status.linkedVariantImportFailed', { error: currentExternalVariantError })}
               </UiText>
             )}
-            <div className="mt-2 flex items-center justify-between gap-2">
-              <UiText color={TextColors.secondary} variant={TextVariants.small}>
-                {formatBytes(firstReceiptOutput.byteSize, t)} · {firstReceiptOutput.format.toUpperCase()}
-                {firstReceiptMetadataText ? ` · ${firstReceiptMetadataText}` : ''}
+            {externalEditorError && (
+              <UiText
+                as="p"
+                className="mt-1 break-all text-red-400"
+                data-testid="export-success-external-editor-error"
+                variant={TextVariants.small}
+              >
+                {t('export.status.externalEditorFailed', { error: externalEditorError })}
               </UiText>
+            )}
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <UiText color={TextColors.secondary} variant={TextVariants.small}>
+                  {formatBytes(firstReceiptOutput.byteSize, t)} · {firstReceiptOutput.format.toUpperCase()}
+                  {firstReceiptMetadataText ? ` · ${firstReceiptMetadataText}` : ''}
+                </UiText>
+                {canOpenReceiptInEditor && (
+                  <UiText
+                    className="truncate"
+                    color={TextColors.secondary}
+                    data-external-editor-path={configuredExternalEditorPath}
+                    data-testid="export-success-external-editor-config"
+                    variant={TextVariants.small}
+                  >
+                    {configuredExternalEditorPath
+                      ? t('export.status.externalEditorConfigured', { editor: externalEditorName })
+                      : t('export.status.externalEditorDefault')}
+                  </UiText>
+                )}
+              </div>
               <div className="flex shrink-0 items-center gap-1">
                 {canOpenReceiptInEditor && (
                   <>
+                    <button
+                      className="rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
+                      data-testid="export-success-choose-external-editor"
+                      onClick={() => {
+                        void handleChooseExternalEditor();
+                      }}
+                      type="button"
+                    >
+                      {t('export.status.chooseExternalEditor')}
+                    </button>
                     <button
                       className="rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
                       data-testid="export-success-import-linked-variant"
@@ -1312,7 +1392,7 @@ export default function ExportPanel({
                       className="rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
                       data-testid="export-success-open-in-editor"
                       onClick={() => {
-                        void openShellPath(firstReceiptOutput.outputPath);
+                        void handleOpenInExternalEditor(firstReceiptOutput.outputPath);
                       }}
                       type="button"
                     >

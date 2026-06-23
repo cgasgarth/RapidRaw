@@ -439,6 +439,8 @@ pub struct AppSettings {
     #[serde(default)]
     pub enable_focus_mode: Option<bool>,
     #[serde(default)]
+    pub external_editor_path: Option<String>,
+    #[serde(default)]
     pub folder_icons: Option<HashMap<String, String>>,
     #[serde(default)]
     pub raw_preprocessing_color_nr: Option<f32>,
@@ -537,6 +539,7 @@ impl Default for AppSettings {
             default_raw_tonemapper: Some("agx".to_string()),
             default_non_raw_tonemapper: Some("basic".to_string()),
             enable_focus_mode: Some(false),
+            external_editor_path: None,
             folder_icons: Some(HashMap::new()),
             raw_preprocessing_color_nr: Some(0.5),
             raw_preprocessing_sharpening: Some(0.35),
