@@ -81,6 +81,17 @@ const scenarios = VISUAL_SMOKE_SCENARIOS.map((scenario) => ({
   ...scenario,
   outputPath: resolve(outputDir, scenario.outputFile),
 }));
+
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  printUsage();
+  process.exit(0);
+}
+
+if (process.argv.includes('--list-scenarios')) {
+  printScenarioList();
+  process.exit(0);
+}
+
 const highDpiTargets = [
   { deviceScaleFactor: 1, name: 'empty-library-1x.png' },
   { deviceScaleFactor: 2, name: 'empty-library-2x.png' },
@@ -117,6 +128,18 @@ const requiresNegativeLabRealRawPrivateProof = selectedScenarios.some(
 
 if (selectedScenarios.length === 0) {
   throw new Error(`Unknown visual smoke scenario: ${requestedScenario ?? '<missing>'}`);
+}
+
+function printUsage(): void {
+  console.log(`Usage: bun scripts/capture-visual-smoke.ts [--scenario <id>] [--list-scenarios]\n`);
+  console.log('Runs browser visual smoke capture for RawEngine UI scenarios.');
+  console.log('Use --list-scenarios to print valid scenario IDs without launching a browser.');
+}
+
+function printScenarioList(): void {
+  for (const scenario of scenarios) {
+    console.log(`${scenario.mode}\t${scenario.marker}`);
+  }
 }
 
 const sleep = (milliseconds) => new Promise((resolveSleep) => setTimeout(resolveSleep, milliseconds));

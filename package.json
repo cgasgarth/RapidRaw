@@ -514,6 +514,7 @@
     "check:unused-deps": "bun scripts/run-compact-command.ts --label unused-deps -- knip --config knip.jsonc --dependencies --reporter compact",
     "check:performance-smoke": "bun tests/integration/checks/check-performance-smoke.ts",
     "check:visual-smoke": "bun scripts/capture-visual-smoke.ts",
+    "check:visual-smoke-help": "bun tests/integration/checks/check-visual-smoke-help.ts",
     "check:visual-smoke:pr": "bun scripts/capture-visual-smoke.ts --scenario empty-library",
     "bundle:diff": "bun scripts/diff-vite-bundle-reports.ts",
     "bundle:report": "bun scripts/generate-vite-bundle-report.ts",
