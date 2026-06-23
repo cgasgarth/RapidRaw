@@ -272,6 +272,7 @@
       "removeFromAlbum_other": "Удалить {{count}} изображений из альбома",
       "renameImage_one": "Переименовать изображение",
       "renameImage_other": "Переименовать {{count}} изображений",
+      "relinkOriginal": "Relink Original...",
       "resetAdjustments_one": "Сбросить настройки",
       "resetAdjustments_other": "Сбросить настройки для {{count}} изображений",
       "showExplorer": "Показать в проводнике",
@@ -291,7 +292,10 @@
       "failedMove": "Не удалось переместить файлы: {{err}}",
       "failedMoveError": "Не удалось переместить: {{err}}",
       "failedMoveInvalid": "Не удалось переместить: целевая группа не найдена или недействительна.",
-      "failedRemoveImages": "Не удалось удалить изображения: {{err}}"
+      "failedRemoveImages": "Не удалось удалить изображения: {{err}}",
+      "failedRelinkOriginal": "Could not verify that file as the missing original.",
+      "failedRelinkOriginalWithError": "Could not relink original: {{err}}",
+      "relinkedOriginal": "Original relinked"
     }
   },
   "editor": {

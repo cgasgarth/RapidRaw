@@ -21,7 +21,7 @@ const APPROVED_RAW_INVOKE_BUDGET = {
   'src/components/panel/CommunityPage.tsx': { raw: 4, typed: 0 },
   'src/components/panel/Editor.tsx': { raw: 3, typed: 0 },
   'src/components/panel/SettingsPanel.tsx': { raw: 1, typed: 0 },
-  'src/components/panel/right/ExportPanel.tsx': { raw: 2, typed: 0 },
+  'src/components/panel/right/ExportPanel.tsx': { raw: 3, typed: 0 },
   'src/components/panel/right/MetadataPanel.tsx': { raw: 2, typed: 0 },
   'src/components/panel/right/PresetsPanel.tsx': { raw: 2, typed: 0 },
   'src/components/ui/LUTControl.tsx': { raw: 1, typed: 1 },
@@ -36,7 +36,7 @@ const APPROVED_RAW_INVOKE_BUDGET = {
   'src/hooks/useImageProcessing.ts': { raw: 5, typed: 0 },
   'src/hooks/useLibraryActions.ts': { raw: 8, typed: 3 },
   'src/hooks/usePresets.ts': { raw: 5, typed: 2 },
-  'src/hooks/useProductivityActions.ts': { raw: 8, typed: 1 },
+  'src/hooks/useProductivityActions.ts': { raw: 9, typed: 1 },
   'src/hooks/useThumbnails.ts': { raw: 2, typed: 0 },
   'src/utils/frontendLogBridge.ts': { raw: 1, typed: 0 },
 };

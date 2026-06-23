@@ -450,6 +450,7 @@
       "pasteAdjustments_one": "粘贴调整",
       "pasteAdjustments_other": "粘贴调整到 {{count}} 张图像",
       "physicalCopy": "物理副本",
+      "relinkOriginal": "Relink Original...",
       "removeFromAlbum_one": "从相册中移除",
       "removeFromAlbum_other": "从相册中移除 {{count}} 张图像",
       "renameImage_one": "重命名图像",
@@ -473,7 +474,10 @@
       "failedMove": "移动文件失败：{{err}}",
       "failedMoveError": "移动失败：{{err}}",
       "failedMoveInvalid": "移动失败：未找到目标组或目标组无效。",
-      "failedRemoveImages": "移除图像失败：{{err}}"
+      "failedRelinkOriginal": "Could not verify that file as the missing original.",
+      "failedRelinkOriginalWithError": "Could not relink original: {{err}}",
+      "failedRemoveImages": "移除图像失败：{{err}}",
+      "relinkedOriginal": "Original relinked"
     }
   },
   "editor": {

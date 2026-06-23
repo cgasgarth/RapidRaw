@@ -272,6 +272,7 @@
       "removeFromAlbum_other": "Retirer {{count}} images de l'album",
       "renameImage_one": "Renommer l'image",
       "renameImage_other": "Renommer {{count}} images",
+      "relinkOriginal": "Relink Original...",
       "resetAdjustments_one": "Réinitialiser les ajustements",
       "resetAdjustments_other": "Réinitialiser les ajustements sur {{count}} images",
       "showExplorer": "Afficher dans l'explorateur",
@@ -291,7 +292,10 @@
       "failedMove": "Échec du déplacement des fichiers : {{err}}",
       "failedMoveError": "Échec du déplacement : {{err}}",
       "failedMoveInvalid": "Échec du déplacement : Groupe cible introuvable ou invalide.",
-      "failedRemoveImages": "Échec de la suppression des images : {{err}}"
+      "failedRemoveImages": "Échec de la suppression des images : {{err}}",
+      "failedRelinkOriginal": "Could not verify that file as the missing original.",
+      "failedRelinkOriginalWithError": "Could not relink original: {{err}}",
+      "relinkedOriginal": "Original relinked"
     }
   },
   "editor": {

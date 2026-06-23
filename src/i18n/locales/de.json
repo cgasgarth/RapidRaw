@@ -451,6 +451,7 @@
       "pasteAdjustments_one": "Einstellungen einfügen",
       "pasteAdjustments_other": "Einstellungen in {{count}} Bilder einfügen",
       "physicalCopy": "Physische Kopie",
+      "relinkOriginal": "Relink Original...",
       "removeFromAlbum_one": "Aus Album entfernen",
       "removeFromAlbum_other": "{{count}} Bilder aus Album entfernen",
       "renameImage_one": "Bild umbenennen",
@@ -474,7 +475,10 @@
       "failedMove": "Dateien verschieben fehlgeschlagen: {{err}}",
       "failedMoveError": "Verschieben fehlgeschlagen: {{err}}",
       "failedMoveInvalid": "Verschieben fehlgeschlagen: Zielgruppe nicht gefunden oder ungültig.",
-      "failedRemoveImages": "Bilder entfernen fehlgeschlagen: {{err}}"
+      "failedRelinkOriginal": "Could not verify that file as the missing original.",
+      "failedRelinkOriginalWithError": "Could not relink original: {{err}}",
+      "failedRemoveImages": "Bilder entfernen fehlgeschlagen: {{err}}",
+      "relinkedOriginal": "Original relinked"
     }
   },
   "editor": {

@@ -105,6 +105,7 @@ export enum Invokes {
   PreviewGeometryTransform = 'preview_geometry_transform',
   PreviewNegativeConversion = 'preview_negative_conversion',
   ReadExifForPaths = 'read_exif_for_paths',
+  ReadLibraryRelinkIdentity = 'read_library_relink_identity',
   RemoveTagForPaths = 'remove_tag_for_paths',
   RenameFiles = 'rename_files',
   RenameFolder = 'rename_folder',

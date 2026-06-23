@@ -10,6 +10,8 @@ import {
 } from '../schemas/libraryRelinkSchemas';
 import { librarySessionSetSchema, type LibrarySession, type LibrarySessionSet } from '../schemas/librarySessionSchemas';
 
+import type { ImageFile } from '../components/ui/AppProperties';
+
 interface ScoreRule {
   kind: LibraryRelinkEvidenceKind;
   matchWeight: number;
@@ -26,6 +28,16 @@ interface ApplyLibraryRelinkInput {
   fromPath: string;
   plan: LibraryRelinkPlan;
   sessionSet: LibrarySessionSet;
+}
+
+export interface LibraryRelinkRuntimeState {
+  currentFolderPath: string | null;
+  imageList: ImageFile[];
+  imageRatings: Record<string, number>;
+  libraryActivePath: string | null;
+  multiSelectedPaths: string[];
+  rootPaths: string[];
+  selectionAnchorPath: string | null;
 }
 
 const verifiedThreshold = 80;
@@ -118,6 +130,35 @@ export const applyLibraryRelinkToSessionSet = ({
   });
 };
 
+export const applyLibraryRelinkToRuntimeState = (
+  state: LibraryRelinkRuntimeState,
+  fromPath: string,
+  plan: LibraryRelinkPlan,
+): LibraryRelinkRuntimeState => {
+  const parsedPlan = libraryRelinkPlanSchema.parse(plan);
+
+  if (parsedPlan.status !== 'matched' || parsedPlan.selectedCandidatePath === null) {
+    throw new Error('Library relink requires one verified matched candidate.');
+  }
+
+  const normalizedFromPath = normalizePathForRewrite(fromPath);
+  const normalizedToPath = normalizePathForRewrite(parsedPlan.selectedCandidatePath);
+
+  return {
+    ...state,
+    currentFolderPath: rewriteNullablePath(state.currentFolderPath, normalizedFromPath, normalizedToPath),
+    imageList: state.imageList.map((image) => ({
+      ...image,
+      path: rewritePath(image.path, normalizedFromPath, normalizedToPath),
+    })),
+    imageRatings: rewriteRecordKeys(state.imageRatings, normalizedFromPath, normalizedToPath),
+    libraryActivePath: rewriteNullablePath(state.libraryActivePath, normalizedFromPath, normalizedToPath),
+    multiSelectedPaths: rewritePathList(state.multiSelectedPaths, normalizedFromPath, normalizedToPath),
+    rootPaths: rewritePathList(state.rootPaths, normalizedFromPath, normalizedToPath),
+    selectionAnchorPath: rewriteNullablePath(state.selectionAnchorPath, normalizedFromPath, normalizedToPath),
+  };
+};
+
 const compareEvidence = (
   rule: ScoreRule,
   missingIdentity: LibraryRelinkIdentity,
@@ -165,9 +206,17 @@ const rewriteNullablePath = (path: string | null, fromPath: string, toPath: stri
 const rewritePath = (path: string, fromPath: string, toPath: string): string => {
   const normalizedPath = normalizePathForRewrite(path);
   if (normalizedPath === fromPath) return toPath;
+  if (normalizedPath.startsWith(`${fromPath}?vc=`)) return `${toPath}${normalizedPath.slice(fromPath.length)}`;
   if (isPathInside(normalizedPath, fromPath)) return `${toPath}${normalizedPath.slice(fromPath.length)}`;
   return path;
 };
+
+const rewriteRecordKeys = <TValue>(
+  record: Record<string, TValue>,
+  fromPath: string,
+  toPath: string,
+): Record<string, TValue> =>
+  Object.fromEntries(Object.entries(record).map(([path, value]) => [rewritePath(path, fromPath, toPath), value]));
 
 const isPathInside = (path: string, parentPath: string): boolean =>
   path.startsWith(`${parentPath}/`) || path.startsWith(`${parentPath}\\`);

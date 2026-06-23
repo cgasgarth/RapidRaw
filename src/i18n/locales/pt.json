@@ -272,6 +272,7 @@
       "removeFromAlbum_other": "Remover {{count}} Imagens do Álbum",
       "renameImage_one": "Renomear Imagem",
       "renameImage_other": "Renomear {{count}} Imagens",
+      "relinkOriginal": "Relink Original...",
       "resetAdjustments_one": "Redefinir Ajustes",
       "resetAdjustments_other": "Redefinir Ajustes em {{count}} Imagens",
       "showExplorer": "Mostrar no Explorador de Arquivos",
@@ -291,7 +292,10 @@
       "failedMove": "Falha ao mover arquivos: {{err}}",
       "failedMoveError": "Falha ao mover: {{err}}",
       "failedMoveInvalid": "Falha ao mover: Grupo de destino não encontrado ou inválido.",
-      "failedRemoveImages": "Falha ao remover imagens: {{err}}"
+      "failedRemoveImages": "Falha ao remover imagens: {{err}}",
+      "failedRelinkOriginal": "Could not verify that file as the missing original.",
+      "failedRelinkOriginalWithError": "Could not relink original: {{err}}",
+      "relinkedOriginal": "Original relinked"
     }
   },
   "editor": {
