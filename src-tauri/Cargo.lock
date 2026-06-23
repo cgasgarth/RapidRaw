@@ -34,6 +34,7 @@ dependencies = [
  "log",
  "memmap2",
  "mimalloc",
+ "moxcms",
  "mozjpeg-rs",
  "nalgebra",
  "ndarray 0.17.2",

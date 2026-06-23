@@ -7,9 +7,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use chrono::{SecondsFormat, Utc};
-use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, imageops};
 use jxl_encoder::{LosslessConfig, LossyConfig, PixelLayout};
+use moxcms::{ColorProfile, Layout, TransformOptions};
+use mozjpeg_rs::{Encoder as MozJpegEncoder, Preset};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::Emitter;
@@ -425,7 +426,12 @@ fn save_image_with_metadata(
         .unwrap_or("")
         .to_lowercase();
 
-    let mut image_bytes = encode_image_to_bytes(image, &extension, export_settings.jpeg_quality)?;
+    let mut image_bytes = encode_image_to_bytes(
+        image,
+        &extension,
+        export_settings.jpeg_quality,
+        &export_settings.color_profile,
+    )?;
 
     exif_processing::write_image_with_metadata(
         &mut image_bytes,
@@ -508,6 +514,7 @@ fn encode_image_to_bytes(
     image: &DynamicImage,
     output_format: &str,
     jpeg_quality: u8,
+    color_profile: &ExportColorProfile,
 ) -> Result<Vec<u8>, String> {
     let mut image_bytes = Vec::new();
     let mut cursor = Cursor::new(&mut image_bytes);
@@ -555,11 +562,7 @@ fn encode_image_to_bytes(
             return Ok(webp_mem.to_vec());
         }
         "jpg" | "jpeg" => {
-            let rgb_image = image.to_rgb8();
-            let encoder = JpegEncoder::new_with_quality(&mut cursor, jpeg_quality);
-            rgb_image
-                .write_with_encoder(encoder)
-                .map_err(|e| e.to_string())?;
+            return encode_jpeg_to_bytes(image, jpeg_quality, color_profile);
         }
         "png" => {
             let image_to_encode = if image.as_rgb32f().is_some() {
@@ -585,6 +588,77 @@ fn encode_image_to_bytes(
         _ => return Err(format!("Unsupported file format: {}", output_format)),
     };
     Ok(image_bytes)
+}
+
+fn encode_jpeg_to_bytes(
+    image: &DynamicImage,
+    jpeg_quality: u8,
+    color_profile: &ExportColorProfile,
+) -> Result<Vec<u8>, String> {
+    let (rgb_pixels, width, height, output_profile) =
+        export_rgb_pixels_and_profile(image, color_profile)?;
+    let icc_profile = encode_icc_profile(&output_profile)?;
+
+    MozJpegEncoder::new(Preset::BaselineBalanced)
+        .quality(jpeg_quality.clamp(1, 100))
+        .icc_profile(icc_profile)
+        .encode_rgb(&rgb_pixels, width, height)
+        .map_err(|e| format!("Failed to encode JPEG: {}", e))
+}
+
+fn export_rgb_pixels_and_profile(
+    image: &DynamicImage,
+    color_profile: &ExportColorProfile,
+) -> Result<(Vec<u8>, u32, u32, ColorProfile), String> {
+    let rgb_image = image.to_rgb8();
+    let (width, height) = rgb_image.dimensions();
+    let pixels = rgb_image.into_raw();
+    let output_profile = output_color_profile(color_profile);
+
+    if matches!(color_profile, ExportColorProfile::DisplayP3) {
+        let src_profile = ColorProfile::new_srgb();
+        let transform = src_profile
+            .create_transform_8bit(
+                Layout::Rgb,
+                &output_profile,
+                Layout::Rgb,
+                TransformOptions::default(),
+            )
+            .map_err(|e| format!("Failed to build Display P3 export transform: {}", e))?;
+        let row_len = (width as usize)
+            .checked_mul(3)
+            .ok_or_else(|| "JPEG export row is too wide".to_string())?;
+        let mut transformed = vec![0u8; pixels.len()];
+
+        for (src_row, dst_row) in pixels
+            .chunks_exact(row_len)
+            .zip(transformed.chunks_exact_mut(row_len))
+        {
+            transform
+                .transform(src_row, dst_row)
+                .map_err(|e| format!("Failed to convert JPEG export to Display P3: {}", e))?;
+        }
+
+        Ok((transformed, width, height, output_profile))
+    } else {
+        Ok((pixels, width, height, output_profile))
+    }
+}
+
+fn output_color_profile(color_profile: &ExportColorProfile) -> ColorProfile {
+    match color_profile {
+        ExportColorProfile::DisplayP3 => ColorProfile::new_display_p3(),
+        ExportColorProfile::Srgb
+        | ExportColorProfile::AdobeRgb1998
+        | ExportColorProfile::ProPhotoRgb
+        | ExportColorProfile::SourceEmbedded => ColorProfile::new_srgb(),
+    }
+}
+
+fn encode_icc_profile(profile: &ColorProfile) -> Result<Vec<u8>, String> {
+    profile
+        .encode()
+        .map_err(|e| format!("Failed to encode export ICC profile: {}", e))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1265,6 +1339,7 @@ pub async fn estimate_export_sizes(
             &processed_preview,
             &output_format,
             export_settings.jpeg_quality,
+            &export_settings.color_profile,
         )?;
         let preview_byte_size = preview_bytes.len();
 
@@ -1403,6 +1478,7 @@ pub async fn estimate_export_sizes(
             &processed_preview,
             &output_format,
             export_settings.jpeg_quality,
+            &export_settings.color_profile,
         )?;
         let single_image_estimated_size = preview_bytes.len();
 
@@ -1432,8 +1508,8 @@ pub async fn estimate_export_sizes(
 #[cfg(test)]
 mod tests {
     use super::{
-        ExportSettings, OutputSharpeningSettings, OutputSharpeningTarget,
-        apply_export_resize_and_watermark,
+        ExportColorProfile, ExportSettings, OutputSharpeningSettings, OutputSharpeningTarget,
+        apply_export_resize_and_watermark, encode_image_to_bytes, export_rgb_pixels_and_profile,
     };
     use image::{DynamicImage, ImageBuffer, Rgb};
 
@@ -1466,6 +1542,52 @@ mod tests {
 
     fn red_channel(image: &DynamicImage, x: u32, y: u32) -> f32 {
         image.to_rgb32f().get_pixel(x, y).0[0]
+    }
+
+    fn jpeg_icc_chunks(bytes: &[u8]) -> Vec<&[u8]> {
+        let mut chunks = Vec::new();
+        let mut index = 2usize;
+
+        assert_eq!(&bytes[0..2], &[0xff, 0xd8], "expected JPEG SOI marker");
+
+        while index + 4 <= bytes.len() {
+            if bytes[index] != 0xff {
+                break;
+            }
+
+            let marker = bytes[index + 1];
+            index += 2;
+
+            if marker == 0xda || marker == 0xd9 {
+                break;
+            }
+
+            let length = u16::from_be_bytes([bytes[index], bytes[index + 1]]) as usize;
+            let payload_start = index + 2;
+            let payload_end = index + length;
+            assert!(
+                payload_end <= bytes.len(),
+                "JPEG marker length exceeded buffer"
+            );
+
+            if marker == 0xe2 {
+                let payload = &bytes[payload_start..payload_end];
+                if payload.starts_with(b"ICC_PROFILE\0") {
+                    chunks.push(payload);
+                }
+            }
+
+            index = payload_end;
+        }
+
+        chunks
+    }
+
+    fn single_icc_payload(bytes: &[u8]) -> &[u8] {
+        let chunks = jpeg_icc_chunks(bytes);
+        assert_eq!(chunks.len(), 1, "expected one embedded ICC marker chunk");
+
+        chunks[0]
     }
 
     #[test]
@@ -1502,5 +1624,45 @@ mod tests {
                 assert_eq!(red_channel(&after, x, y), red_channel(&before, x, y));
             }
         }
+    }
+
+    #[test]
+    fn jpeg_export_embeds_srgb_icc_profile() {
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(2, 2, Rgb([128, 64, 32])));
+        let bytes = encode_image_to_bytes(&image, "jpg", 90, &ExportColorProfile::Srgb)
+            .expect("JPEG encoding should include sRGB ICC profile");
+
+        assert!(single_icc_payload(&bytes).len() > b"ICC_PROFILE\0\x01\x01".len());
+    }
+
+    #[test]
+    fn jpeg_export_embeds_display_p3_icc_profile() {
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(2, 2, Rgb([128, 64, 32])));
+        let srgb = encode_image_to_bytes(&image, "jpg", 90, &ExportColorProfile::Srgb)
+            .expect("sRGB JPEG encoding should succeed");
+        let display_p3 = encode_image_to_bytes(&image, "jpg", 90, &ExportColorProfile::DisplayP3)
+            .expect("Display P3 JPEG encoding should succeed");
+
+        assert_ne!(
+            single_icc_payload(&display_p3),
+            single_icc_payload(&srgb),
+            "Display P3 export should embed a distinct ICC profile"
+        );
+    }
+
+    #[test]
+    fn display_p3_jpeg_export_transforms_rgb_pixels() {
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(1, 1, Rgb([255, 0, 0])));
+        let (srgb_pixels, _, _, _) =
+            export_rgb_pixels_and_profile(&image, &ExportColorProfile::Srgb)
+                .expect("sRGB export recipe should succeed");
+        let (display_p3_pixels, _, _, _) =
+            export_rgb_pixels_and_profile(&image, &ExportColorProfile::DisplayP3)
+                .expect("Display P3 export recipe should succeed");
+
+        assert_ne!(
+            display_p3_pixels, srgb_pixels,
+            "Display P3 export should transform pixels before tagging them"
+        );
     }
 }
