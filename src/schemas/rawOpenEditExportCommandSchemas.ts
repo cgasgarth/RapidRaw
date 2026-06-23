@@ -181,6 +181,8 @@ export const rawOpenEditExportBasicToneCommandSchema = z
     idempotencyKey: z.string().trim().min(1).optional(),
     parameters: z
       .object({
+        acceptedDryRunPlanHash: z.string().trim().min(1),
+        acceptedDryRunPlanId: z.string().trim().min(1),
         blackPoint: z.number().min(-100).max(100),
         clarity: z.number().min(-100).max(100),
         contrast: z.number().min(-100).max(100),

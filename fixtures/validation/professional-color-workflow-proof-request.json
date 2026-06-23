@@ -45,6 +45,8 @@
     "expectedGraphRevision": "graph-rev.raw-open-edit-export.professional-color.v1",
     "idempotencyKey": "idem.raw-open-edit-export.professional-color.v1",
     "parameters": {
+      "acceptedDryRunPlanHash": "sha256:professional-color-workflow-basic-tone-accepted-plan-v1",
+      "acceptedDryRunPlanId": "dryrun_professional_color_workflow_basic_tone_v1",
       "blackPoint": -3,
       "clarity": 6,
       "contrast": 10,

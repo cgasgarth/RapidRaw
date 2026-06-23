@@ -45,6 +45,8 @@
     "expectedGraphRevision": "graph-rev.raw-open-edit-export.high-iso-skin-shadow.v1",
     "idempotencyKey": "idem.raw-open-edit-export.high-iso-skin-shadow.v1",
     "parameters": {
+      "acceptedDryRunPlanHash": "sha256:raw-open-edit-export-basic-tone-accepted-plan-v1",
+      "acceptedDryRunPlanId": "dryrun_raw_open_edit_export_basic_tone_v1",
       "blackPoint": -2,
       "clarity": 4,
       "contrast": 8,
