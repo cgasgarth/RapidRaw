@@ -91,9 +91,6 @@ const importXTypeScript = {
 
 module.exports = [
   {
-    linterOptions: {
-      reportUnusedDisableDirectives: 'error',
-    },
     ignores: [
       'dist/**',
       'node_modules/**',
@@ -102,6 +99,11 @@ module.exports = [
       'src-tauri/rawler/**',
       'data/**',
     ],
+  },
+  {
+    linterOptions: {
+      reportUnusedDisableDirectives: 'error',
+    },
   },
   jsRecommendedForTs,
   ...tsStrictTypeChecked,
