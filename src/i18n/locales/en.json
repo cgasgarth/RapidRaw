@@ -1742,6 +1742,8 @@
       "duplicatesHeader_other": "Duplicates ({{count}})",
       "emptyAnalysisModes": "Enable similar grouping, blur filtering, focus ranking, or a combination before starting culling.",
       "emptyBatch": "Select one or more images before starting culling.",
+      "eyeFaceBalanceValue": "Eye/face balance {{balance}}%",
+      "eyeSharpnessReviewWarning": "Review eyes manually - face detail is sharper than the eye band.",
       "eyeSharpnessValue": "Eye sharpness {{sharpness}}",
       "faceSharpnessValue": "Face sharpness {{sharpness}}",
       "filterBlurry": "Filter Blurry Images",

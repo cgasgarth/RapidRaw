@@ -65,6 +65,15 @@ function getFocusConfidenceBandClass(band: FocusConfidenceBand): string {
   }
 }
 
+function getEyeFaceBalancePercent(analysis: ImageAnalysisResult): number {
+  if (analysis.faceSharpnessMetric <= 0) return 100;
+  return Math.round((analysis.eyeSharpnessMetric / analysis.faceSharpnessMetric) * 100);
+}
+
+function needsEyeSharpnessReview(analysis: ImageAnalysisResult): boolean {
+  return analysis.focusConfidence >= 0.4 && getEyeFaceBalancePercent(analysis) < 75;
+}
+
 interface ImageThumbnailProps {
   children?: ReactNode;
   isSelected: boolean;
@@ -926,12 +935,16 @@ export default function CullingModal({
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
                   {suggestions.focusRankings.map((img, index) => {
                     const confidenceBand = getFocusConfidenceBand(img.focusConfidence);
+                    const eyeFaceBalancePercent = getEyeFaceBalancePercent(img);
+                    const showEyeSharpnessReview = needsEyeSharpnessReview(img);
                     return (
                       <div
                         className="rounded-md border border-border-color bg-bg-secondary p-2"
                         data-focus-confidence={img.focusConfidence.toFixed(2)}
                         data-focus-confidence-band={confidenceBand}
                         data-focus-eye-sharpness={img.eyeSharpnessMetric.toFixed(2)}
+                        data-focus-eye-face-balance-percent={eyeFaceBalancePercent}
+                        data-focus-eye-review={String(showEyeSharpnessReview)}
                         data-focus-face-sharpness={img.faceSharpnessMetric.toFixed(2)}
                         data-focus-rank={index + 1}
                         data-focus-region={img.focusRegion}
@@ -967,6 +980,18 @@ export default function CullingModal({
                           <UiText variant={TextVariants.small}>
                             {t('modals.culling.faceSharpnessValue', { sharpness: img.faceSharpnessMetric.toFixed(0) })}
                           </UiText>
+                          <UiText variant={TextVariants.small} className="col-span-2">
+                            {t('modals.culling.eyeFaceBalanceValue', { balance: eyeFaceBalancePercent })}
+                          </UiText>
+                          {showEyeSharpnessReview && (
+                            <UiText
+                              variant={TextVariants.small}
+                              className="col-span-2 rounded border border-yellow-500/40 bg-yellow-500/10 px-2 py-1 text-yellow-200"
+                              data-testid="culling-focus-eye-sharpness-review"
+                            >
+                              {t('modals.culling.eyeSharpnessReviewWarning')}
+                            </UiText>
+                          )}
                           <UiText variant={TextVariants.small} color={TextColors.secondary} className="col-span-2">
                             {getFocusRegionLabel(img.focusRegion)}
                           </UiText>
