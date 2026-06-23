@@ -3665,8 +3665,7 @@ pub fn resolve_xmp_metadata_conflicts(
         .push(serde_json::json!(&receipt));
 
     let json_string = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
-    crate::exif_processing::write_text_file_atomic(&sidecar_path, &json_string)
-        .map_err(|e| e.to_string())?;
+    crate::exif_processing::write_text_file_atomic(&sidecar_path, &json_string)?;
 
     let settings = load_settings_or_default(&app_handle);
     sync_metadata_to_xmp(
