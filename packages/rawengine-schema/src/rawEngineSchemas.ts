@@ -3042,8 +3042,32 @@ export const computationalMergeCommandEnvelopeV1Schema = z
             boundaryMode: panoramaBoundaryModeSchema,
             exposureNormalization: z.enum(['none', 'auto']),
             lensCorrectionPolicy: z.enum(['unchanged', 'required_before_stitch', 'applied_before_stitch']),
+            manualCropInsetsPercent: z
+              .object({
+                bottom: z.number().min(0).max(40),
+                left: z.number().min(0).max(40),
+                right: z.number().min(0).max(40),
+                top: z.number().min(0).max(40),
+              })
+              .strict()
+              .superRefine((insets, context) => {
+                if (insets.left + insets.right > 80) {
+                  context.addIssue({
+                    code: 'custom',
+                    message: 'Horizontal panorama crop insets cannot exceed 80%.',
+                  });
+                }
+                if (insets.top + insets.bottom > 80) {
+                  context.addIssue({
+                    code: 'custom',
+                    message: 'Vertical panorama crop insets cannot exceed 80%.',
+                  });
+                }
+              })
+              .optional(),
             maxPreviewDimensionPx: z.number().int().positive().max(8192),
             memoryBudgetBytes: z.number().int().positive().optional(),
+            overlapFeatherPx: z.number().int().min(0).max(512).optional(),
             outputName: z.string().trim().min(1),
             projection: panoramaProjectionSchema,
             qualityPreference: computationalMergeQualityPreferenceV1Schema,

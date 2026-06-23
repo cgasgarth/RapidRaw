@@ -7,12 +7,31 @@ export const panoramaUiExposureModeSchema = z.enum(['gain_compensation', 'none']
 export const panoramaUiQualityPreferenceSchema = z.enum(['preview', 'balanced', 'best']);
 export const panoramaRuntimePlanStatusSchema = z.enum(['accepted', 'warning', 'blocked_plan_only']);
 
+const panoramaManualCropInsetsSchema = z
+  .object({
+    bottom: z.number().min(0).max(40),
+    left: z.number().min(0).max(40),
+    right: z.number().min(0).max(40),
+    top: z.number().min(0).max(40),
+  })
+  .strict()
+  .superRefine((insets, context) => {
+    if (insets.left + insets.right > 80) {
+      context.addIssue({ code: 'custom', message: 'Horizontal crop insets cannot remove more than 80%.' });
+    }
+    if (insets.top + insets.bottom > 80) {
+      context.addIssue({ code: 'custom', message: 'Vertical crop insets cannot remove more than 80%.' });
+    }
+  });
+
 export const panoramaUiSettingsSchema = z
   .object({
     blendMode: panoramaUiBlendModeSchema,
     boundaryMode: panoramaUiBoundaryModeSchema,
     exposureMode: panoramaUiExposureModeSchema,
+    manualCropInsetsPercent: panoramaManualCropInsetsSchema,
     maxPreviewDimensionPx: z.number().int().positive().max(8192),
+    overlapFeatherPx: z.number().int().min(0).max(512),
     projection: panoramaUiProjectionSchema,
     qualityPreference: panoramaUiQualityPreferenceSchema,
     seamExposureCompensationPercent: z.number().int().min(0).max(100),
@@ -193,7 +212,14 @@ export const DEFAULT_PANORAMA_UI_SETTINGS = panoramaUiSettingsSchema.parse({
   blendMode: 'multi_band',
   boundaryMode: 'auto_crop',
   exposureMode: 'gain_compensation',
+  manualCropInsetsPercent: {
+    bottom: 0,
+    left: 0,
+    right: 0,
+    top: 0,
+  },
   maxPreviewDimensionPx: 4096,
+  overlapFeatherPx: 64,
   projection: 'rectilinear',
   qualityPreference: 'best',
   seamExposureCompensationPercent: 100,

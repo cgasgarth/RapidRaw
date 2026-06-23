@@ -2508,13 +2508,14 @@
         "transparent": "Transparent edge"
       },
       "boundaryLabel": "Boundary handling",
+      "boundaryRefinementLabel": "Boundary refinement",
       "cancel": "Cancel",
       "close": "Close",
       "descCount": "Combine {{count}} overlapping images into a seamless panorama.",
       "descCount_one": "Combine {{count}} overlapping image into a seamless panorama.",
       "descCount_other": "Combine {{count}} overlapping images into a seamless panorama.",
       "descGeneric": "Combine your overlapping images into a seamless panorama.",
-      "engineCapabilityBlocked": "Current engine can render rectilinear panoramas with auto-crop. Other projection and boundary modes stay disabled until their runtime paths are proven.",
+      "engineCapabilityBlocked": "Current engine can render rectilinear panoramas with auto-crop or manual crop. Transparent boundaries and spherical projection stay disabled until their runtime paths are proven.",
       "engineSupported": "Runtime supported",
       "engineUnsupported": "Runtime pending",
       "exposure": {
@@ -2524,7 +2525,19 @@
       "exposureLabel": "Exposure normalization",
       "failed": "Panorama Failed",
       "initializing": "Initializing...",
+      "manualCrop": {
+        "bottom": "Bottom",
+        "label": "Manual crop",
+        "left": "Left",
+        "right": "Right",
+        "top": "Top",
+        "value": "T {{top}}% / R {{right}}% / B {{bottom}}% / L {{left}}%"
+      },
       "openInEditor": "Open in Editor",
+      "overlapFeather": {
+        "label": "Overlap feather",
+        "value": "{{value}} px"
+      },
       "previewBudgetLabel": "Preview budget",
       "previewMemory": "{{value}} MB estimated",
       "previewPixels": "{{value}} px",
@@ -2599,8 +2612,8 @@
       "summarySources": "Sources",
       "summaryWorkload": "Workload",
       "title": "Stitch Panorama",
-      "uiOnlyNotice": "Rectilinear projection and auto-crop are runtime-backed for this engine. Other projection and boundary modes stay disabled until their render, save, and reopen paths are proven.",
-      "workflowStatus": "Projection, blend, boundary, and preview controls are recorded for the panorama request.",
+      "uiOnlyNotice": "Rectilinear projection, auto-crop, manual crop, and overlap feather metadata are runtime-backed for this engine. Other projection and boundary modes stay disabled until their render, save, and reopen paths are proven.",
+      "workflowStatus": "Projection, blend, boundary, crop, overlap, and preview controls are recorded for the panorama request.",
       "workflowTitle": "Panorama setup"
     },
     "renameAlbum": {

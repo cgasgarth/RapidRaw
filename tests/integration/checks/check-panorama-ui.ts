@@ -14,6 +14,7 @@ const requiredLocaleKeys = [
   'boundary.autoCrop',
   'boundary.manualCrop',
   'boundary.transparent',
+  'boundaryRefinementLabel',
   'boundaryLabel',
   'engineCapabilityBlocked',
   'engineSupported',
@@ -21,6 +22,14 @@ const requiredLocaleKeys = [
   'exposure.gainCompensation',
   'exposure.none',
   'exposureLabel',
+  'manualCrop.bottom',
+  'manualCrop.label',
+  'manualCrop.left',
+  'manualCrop.right',
+  'manualCrop.top',
+  'manualCrop.value',
+  'overlapFeather.label',
+  'overlapFeather.value',
   'previewBudgetLabel',
   'previewMemory',
   'previewPixels',
@@ -92,6 +101,20 @@ if (invalid.success) {
   process.exit(1);
 }
 
+const invalidManualCrop = panoramaUiSettingsSchema.safeParse({
+  ...DEFAULT_PANORAMA_UI_SETTINGS,
+  manualCropInsetsPercent: {
+    bottom: 0,
+    left: 41,
+    right: 40,
+    top: 0,
+  },
+});
+if (invalidManualCrop.success) {
+  console.error('Panorama UI schema accepted oversized manual crop insets.');
+  process.exit(1);
+}
+
 const source = readFileSync('src/components/modals/PanoramaModal.tsx', 'utf8');
 for (const marker of [
   'panorama-setup-summary',
@@ -111,6 +134,13 @@ for (const marker of [
   'panorama-seam-line',
   'panorama-source-contribution-chip',
   'panorama-quality-diagnostics',
+  'panorama-boundary-refinement',
+  'panorama-manual-crop-controls',
+  'panorama-manual-crop-${control.key}',
+  'panorama-overlap-feather-control',
+  'panorama-overlap-feather-slider',
+  'data-manual-crop-insets=',
+  'data-overlap-feather-px=',
   'data-inlier-edge-count={inlierEdgeCount}',
   'data-seam-max-p95-error-px={seamMaxP95ErrorPx}',
   "data-crop-coverage-percent={cropCoveragePercent ?? ''}",
