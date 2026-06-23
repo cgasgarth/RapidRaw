@@ -1109,7 +1109,22 @@
         "selectionCount_many": "{{count}} selected",
         "selectionCount_other": "{{count}} selected"
       },
-      "title": "Metadane"
+      "title": "Metadane",
+      "xmpConflicts": {
+        "apply": "Zastosuj wybory",
+        "checking": "Sprawdzanie sidecara XMP...",
+        "choices": {
+          "external": "Użyj XMP",
+          "local": "Zachowaj lokalne",
+          "merge": "Scal"
+        },
+        "description": "Ten sidecar został zmieniony poza RawEngine. Wybierz, co zachować przed synchronizacją.",
+        "external": "XMP",
+        "local": "Lokalne",
+        "merge": "Scal",
+        "resolving": "Stosowanie...",
+        "title": "Konflikt XMP"
+      }
     },
     "presets": {
       "applyPresetLabel": "Zastosuj preset {{name}}",

@@ -668,6 +668,21 @@
         "tags": "Теги",
         "title": "Организация"
       },
+      "xmpConflicts": {
+        "apply": "Применить выбор",
+        "checking": "Проверка XMP sidecar...",
+        "choices": {
+          "external": "Использовать XMP",
+          "local": "Оставить локальное",
+          "merge": "Объединить"
+        },
+        "description": "Этот sidecar изменен вне RawEngine. Выберите, что сохранить перед синхронизацией.",
+        "external": "XMP",
+        "local": "Локально",
+        "merge": "Объединить",
+        "resolving": "Применение...",
+        "title": "Конфликт XMP"
+      },
       "title": "Метаданные"
     },
     "presets": {

@@ -1,12 +1,18 @@
 import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ChevronDown, ChevronRight, Plus, Star, Tag, X, User } from 'lucide-react';
-import { useState, useMemo, useRef } from 'react';
+import { AlertTriangle, Check, ChevronDown, ChevronRight, GitMerge, Plus, Star, Tag, X, User } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { useManagedFocus } from '../../../hooks/useManagedFocus';
+import {
+  type XmpMetadataConflictChoice,
+  type XmpMetadataConflictDecision,
+  type XmpMetadataConflictReport,
+  xmpMetadataConflictReportSchema,
+} from '../../../schemas/xmpMetadataConflictSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useProcessStore } from '../../../store/useProcessStore';
@@ -16,6 +22,8 @@ import { COLOR_LABELS, type Color } from '../../../utils/adjustments';
 import { Invokes } from '../../ui/AppProperties';
 import UiText from '../../ui/Text';
 import { IconAperture, IconShutter, IconIso, IconFocalLength, IconLens } from '../editor/ExifIcons';
+
+import type { TFunction } from 'i18next';
 
 interface CameraSetting {
   format?(value: MetadataValue): string | number;
@@ -29,6 +37,7 @@ type CameraSettings = Record<CameraSettingKey, CameraSetting>;
 type MetadataValue = string | number | null | undefined;
 
 type ExifData = Record<string, MetadataValue>;
+type ConflictDecisions = Partial<Record<XmpMetadataConflictDecision['field'], XmpMetadataConflictChoice>>;
 
 interface GPSData {
   altitude: string | number | null;
@@ -139,6 +148,21 @@ function MetadataItem({ label, value }: MetaDataItemProps) {
       </button>
     </div>
   );
+}
+
+function formatConflictValue(value: unknown) {
+  if (value === null || value === undefined) return 'None';
+  if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : 'None';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return value.toString();
+  if (typeof value === 'object') return JSON.stringify(value);
+  return 'Unsupported value';
+}
+
+function xmpChoiceLabel(choice: XmpMetadataConflictChoice, t: TFunction) {
+  if (choice === 'local') return t('editor.metadata.xmpConflicts.choices.local');
+  if (choice === 'external') return t('editor.metadata.xmpConflicts.choices.external');
+  return t('editor.metadata.xmpConflicts.choices.merge');
 }
 
 interface EditableMetadataItemProps {
@@ -266,8 +290,13 @@ export default function MetadataPanel() {
   const imageRatings = useLibraryStore((s) => s.imageRatings);
   const appSettings = useSettingsStore((s) => s.appSettings);
   const thumbnails = useProcessStore((s) => s.thumbnails);
+  const setLibrary = useLibraryStore((s) => s.setLibrary);
 
   const { handleRate, handleSetColorLabel, handleTagsChanged, handleUpdateExif } = useLibraryActions();
+  const [xmpConflictReport, setXmpConflictReport] = useState<XmpMetadataConflictReport | null>(null);
+  const [xmpConflictDecisions, setXmpConflictDecisions] = useState<ConflictDecisions>({});
+  const [isCheckingXmpConflicts, setIsCheckingXmpConflicts] = useState(false);
+  const [isResolvingXmpConflicts, setIsResolvingXmpConflicts] = useState(false);
 
   const rating = selectedImage ? imageRatings[selectedImage.path] || 0 : 0;
   const tags = useMemo(
@@ -369,6 +398,115 @@ export default function MetadataPanel() {
   const megapixels = selectedImage ? ((selectedImage.width * selectedImage.height) / 1000000).toFixed(1) : null;
   const populatedCameraFieldCount = cameraGridSettings.filter((setting) => setting.value !== '-').length;
   const editableMetadataFieldCount = EDITABLE_FIELDS.length;
+
+  useEffect(() => {
+    let isActive = true;
+
+    const checkConflicts = async () => {
+      if (!selectedImage?.path || targetPaths.length !== 1) {
+        setXmpConflictReport(null);
+        setXmpConflictDecisions({});
+        return;
+      }
+
+      setIsCheckingXmpConflicts(true);
+      try {
+        const payload = await invoke<unknown>(Invokes.CheckXmpMetadataConflicts, { path: selectedImage.path });
+        const result = xmpMetadataConflictReportSchema.nullable().safeParse(payload);
+        if (!isActive) return;
+
+        if (!result.success || result.data === null) {
+          setXmpConflictReport(null);
+          setXmpConflictDecisions({});
+          return;
+        }
+
+        setXmpConflictReport(result.data);
+        setXmpConflictDecisions(
+          Object.fromEntries(
+            result.data.fields.map((field) => [field.field, field.field === 'keywords' ? 'merge' : 'external']),
+          ),
+        );
+      } catch (err) {
+        if (isActive) {
+          console.error('Failed to check XMP conflicts:', err);
+          setXmpConflictReport(null);
+          setXmpConflictDecisions({});
+        }
+      } finally {
+        if (isActive) setIsCheckingXmpConflicts(false);
+      }
+    };
+
+    void checkConflicts();
+
+    return () => {
+      isActive = false;
+    };
+  }, [selectedImage?.path, targetPaths.length]);
+
+  const handleResolveXmpConflicts = async () => {
+    if (!selectedImage?.path || xmpConflictReport === null) return;
+
+    const decisions: XmpMetadataConflictDecision[] = xmpConflictReport.fields.map((field) => ({
+      field: field.field,
+      choice: xmpConflictDecisions[field.field] ?? (field.field === 'keywords' ? 'merge' : 'external'),
+    }));
+
+    setIsResolvingXmpConflicts(true);
+    try {
+      await invoke(Invokes.ResolveXmpMetadataConflicts, { path: selectedImage.path, decisions });
+
+      setLibrary((state) => {
+        const nextRatings = { ...state.imageRatings };
+        const nextImageList = state.imageList.map((image) => {
+          if (image.path !== selectedImage.path) return image;
+
+          let nextRating = nextRatings[image.path] ?? image.rating;
+          let nextTags = [...(image.tags ?? [])];
+
+          for (const decision of decisions) {
+            const field = xmpConflictReport.fields.find((candidate) => candidate.field === decision.field);
+            if (!field) continue;
+            const value =
+              decision.choice === 'local'
+                ? field.local
+                : decision.choice === 'merge'
+                  ? (field.merged ?? field.external)
+                  : field.external;
+
+            if (field.field === 'rating' && typeof value === 'number') {
+              nextRating = value;
+              nextRatings[image.path] = value;
+            }
+
+            if (field.field === 'colorLabel') {
+              nextTags = nextTags.filter((tag) => !tag.startsWith('color:'));
+              if (typeof value === 'string' && value.length > 0) nextTags.push(`color:${value}`);
+            }
+
+            if (field.field === 'keywords' && Array.isArray(value)) {
+              const colorTags = nextTags.filter((tag) => tag.startsWith('color:'));
+              const keywordTags = value
+                .filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0)
+                .map((tag) => `user:${tag.trim()}`);
+              nextTags = [...colorTags, ...keywordTags];
+            }
+          }
+
+          return { ...image, rating: nextRating, tags: nextTags.length > 0 ? nextTags : null };
+        });
+
+        return { imageList: nextImageList, imageRatings: nextRatings };
+      });
+      setXmpConflictReport(null);
+      setXmpConflictDecisions({});
+    } catch (err) {
+      console.error('Failed to resolve XMP conflicts:', err);
+    } finally {
+      setIsResolvingXmpConflicts(false);
+    }
+  };
 
   const handleAddTag = async (tagToAdd: string) => {
     const newTagValue = tagToAdd.trim().toLowerCase();
@@ -657,6 +795,107 @@ export default function MetadataPanel() {
                       className="overflow-hidden"
                     >
                       <div className="px-4 pb-4 pt-2 border-t border-surface/50 flex flex-col gap-4">
+                        {(xmpConflictReport || isCheckingXmpConflicts) && (
+                          <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3">
+                            <div className="mb-2 flex items-start justify-between gap-3">
+                              <UiText
+                                as="span"
+                                variant={TextVariants.small}
+                                color={TextColors.primary}
+                                weight={TextWeights.semibold}
+                                className="flex items-center gap-2"
+                              >
+                                <AlertTriangle size={15} className="text-yellow-400" />
+                                {t('editor.metadata.xmpConflicts.title')}
+                              </UiText>
+                              {xmpConflictReport && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    void handleResolveXmpConflicts();
+                                  }}
+                                  disabled={isResolvingXmpConflicts}
+                                  className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-xs font-semibold text-bg-primary transition-opacity disabled:opacity-50"
+                                >
+                                  <GitMerge size={13} />
+                                  {isResolvingXmpConflicts
+                                    ? t('editor.metadata.xmpConflicts.resolving')
+                                    : t('editor.metadata.xmpConflicts.apply')}
+                                </button>
+                              )}
+                            </div>
+                            {isCheckingXmpConflicts && !xmpConflictReport ? (
+                              <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                                {t('editor.metadata.xmpConflicts.checking')}
+                              </UiText>
+                            ) : (
+                              <div className="flex flex-col gap-2">
+                                <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                                  {t('editor.metadata.xmpConflicts.description')}
+                                </UiText>
+                                {xmpConflictReport?.fields.map((field) => {
+                                  const selectedChoice =
+                                    xmpConflictDecisions[field.field] ??
+                                    (field.field === 'keywords' ? 'merge' : 'external');
+                                  const choices: XmpMetadataConflictChoice[] =
+                                    field.merged === undefined ? ['local', 'external'] : ['local', 'external', 'merge'];
+
+                                  return (
+                                    <div
+                                      key={field.field}
+                                      className="rounded-md border border-surface bg-bg-primary/80 p-2"
+                                      data-xmp-conflict-field={field.field}
+                                    >
+                                      <div className="mb-2 grid grid-cols-[80px_1fr] gap-2 text-xs">
+                                        <UiText variant={TextVariants.small} color={TextColors.primary}>
+                                          {field.label}
+                                        </UiText>
+                                        <div className="min-w-0 space-y-1 text-text-secondary">
+                                          <div className="truncate">
+                                            {t('editor.metadata.xmpConflicts.local')}:{' '}
+                                            {formatConflictValue(field.local)}
+                                          </div>
+                                          <div className="truncate">
+                                            {t('editor.metadata.xmpConflicts.external')}:{' '}
+                                            {formatConflictValue(field.external)}
+                                          </div>
+                                          {field.merged !== undefined && (
+                                            <div className="truncate">
+                                              {t('editor.metadata.xmpConflicts.merge')}:{' '}
+                                              {formatConflictValue(field.merged)}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="flex flex-wrap gap-1">
+                                        {choices.map((choice) => (
+                                          <button
+                                            key={choice}
+                                            type="button"
+                                            onClick={() => {
+                                              setXmpConflictDecisions((current) => ({
+                                                ...current,
+                                                [field.field]: choice,
+                                              }));
+                                            }}
+                                            className={cx(
+                                              'rounded px-2 py-1 text-xs font-medium transition-colors',
+                                              selectedChoice === choice
+                                                ? 'bg-accent text-bg-primary'
+                                                : 'bg-bg-secondary text-text-secondary hover:text-text-primary',
+                                            )}
+                                          >
+                                            {xmpChoiceLabel(choice, t)}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <div>
                           <UiText
                             variant={TextVariants.small}

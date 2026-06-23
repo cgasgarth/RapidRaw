@@ -42,7 +42,7 @@ use crate::image_processing::{
     get_all_adjustments_from_json, perform_auto_analysis,
 };
 use crate::mask_generation::MaskDefinition;
-use crate::tagging::COLOR_TAG_PREFIX;
+use crate::tagging::{COLOR_TAG_PREFIX, USER_TAG_PREFIX};
 
 fn resolve_thumbnail_cache_dir(app_handle: &AppHandle) -> std::result::Result<PathBuf, String> {
     let cache_dir = app_handle
@@ -3386,16 +3386,300 @@ pub fn extract_xmp_tags(content: &str) -> Vec<String> {
     tags
 }
 
-pub fn sync_metadata_from_xmp(source_path: &Path, metadata: &mut ImageMetadata) -> bool {
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct XmpMetadataConflictField {
+    pub field: String,
+    pub label: String,
+    pub local: Value,
+    pub external: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub merged: Option<Value>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct XmpMetadataConflictReport {
+    pub path: String,
+    pub xmp_path: String,
+    pub fields: Vec<XmpMetadataConflictField>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct XmpMetadataConflictDecision {
+    pub field: String,
+    pub choice: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct XmpConflictReceipt {
+    pub id: String,
+    pub resolved_at: String,
+    pub xmp_path: String,
+    pub decisions: Vec<XmpMetadataConflictDecision>,
+}
+
+fn find_xmp_path(source_path: &Path) -> Option<PathBuf> {
     let xmp_path = source_path.with_extension("xmp");
     let xmp_path_upper = source_path.with_extension("XMP");
-    let actual_xmp = if xmp_path.exists() {
+
+    if xmp_path.exists() {
         Some(xmp_path)
     } else if xmp_path_upper.exists() {
         Some(xmp_path_upper)
     } else {
         None
+    }
+}
+
+fn sorted_unique_values(values: impl IntoIterator<Item = String>) -> Vec<String> {
+    let mut values = values
+        .into_iter()
+        .filter_map(|value| {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        })
+        .collect::<Vec<_>>();
+    values.sort_by_key(|value| value.to_lowercase());
+    values.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+    values
+}
+
+fn metadata_color_label(metadata: &ImageMetadata) -> Option<String> {
+    metadata.tags.as_ref().and_then(|tags| {
+        tags.iter()
+            .find_map(|tag| tag.strip_prefix(COLOR_TAG_PREFIX).map(str::to_string))
+    })
+}
+
+fn metadata_keywords(metadata: &ImageMetadata) -> Vec<String> {
+    sorted_unique_values(
+        metadata
+            .tags
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|tag| {
+                if tag.starts_with(COLOR_TAG_PREFIX) {
+                    None
+                } else if let Some(user_tag) = tag.strip_prefix(USER_TAG_PREFIX) {
+                    Some(user_tag.to_string())
+                } else {
+                    Some(tag)
+                }
+            }),
+    )
+}
+
+fn replace_metadata_color_label(metadata: &mut ImageMetadata, color_label: Option<String>) {
+    let mut tags = metadata.tags.clone().unwrap_or_default();
+    tags.retain(|tag| !tag.starts_with(COLOR_TAG_PREFIX));
+
+    if let Some(label) = color_label.filter(|label| !label.trim().is_empty()) {
+        tags.push(format!(
+            "{}{}",
+            COLOR_TAG_PREFIX,
+            label.trim().to_lowercase()
+        ));
+    }
+
+    metadata.tags = if tags.is_empty() { None } else { Some(tags) };
+}
+
+fn replace_metadata_keywords(metadata: &mut ImageMetadata, keywords: Vec<String>) {
+    let mut tags = metadata
+        .tags
+        .clone()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|tag| tag.starts_with(COLOR_TAG_PREFIX))
+        .collect::<Vec<_>>();
+
+    tags.extend(
+        sorted_unique_values(keywords)
+            .into_iter()
+            .map(|tag| format!("{}{}", USER_TAG_PREFIX, tag)),
+    );
+
+    metadata.tags = if tags.is_empty() { None } else { Some(tags) };
+}
+
+fn xmp_external_keywords(content: &str) -> Vec<String> {
+    sorted_unique_values(extract_xmp_tags(content))
+}
+
+fn xmp_conflict_value(
+    report: &XmpMetadataConflictReport,
+    field: &str,
+    choice: &str,
+) -> Option<Value> {
+    let conflict = report
+        .fields
+        .iter()
+        .find(|conflict| conflict.field == field)?;
+    match choice {
+        "local" => Some(conflict.local.clone()),
+        "external" => Some(conflict.external.clone()),
+        "merge" => conflict
+            .merged
+            .clone()
+            .or_else(|| Some(conflict.external.clone())),
+        _ => None,
+    }
+}
+
+fn build_xmp_metadata_conflict_report(
+    path: &str,
+    source_path: &Path,
+    metadata: &ImageMetadata,
+) -> Result<Option<XmpMetadataConflictReport>, String> {
+    let Some(xmp_path) = find_xmp_path(source_path) else {
+        return Ok(None);
     };
+    let content = fs::read_to_string(&xmp_path).map_err(|e| e.to_string())?;
+    let mut fields = Vec::new();
+
+    let local_rating = serde_json::json!(metadata.rating);
+    let external_rating =
+        extract_xmp_rating(&content).map_or(Value::Null, |rating| serde_json::json!(rating));
+    if local_rating != external_rating {
+        fields.push(XmpMetadataConflictField {
+            field: "rating".to_string(),
+            label: "Rating".to_string(),
+            local: local_rating,
+            external: external_rating,
+            merged: None,
+        });
+    }
+
+    let local_color =
+        metadata_color_label(metadata).map_or(Value::Null, |label| serde_json::json!(label));
+    let external_color = extract_xmp_label(&content)
+        .map(|label| label.to_lowercase())
+        .map_or(Value::Null, |label| serde_json::json!(label));
+    if local_color != external_color {
+        fields.push(XmpMetadataConflictField {
+            field: "colorLabel".to_string(),
+            label: "Color label".to_string(),
+            local: local_color,
+            external: external_color,
+            merged: None,
+        });
+    }
+
+    let local_keywords = metadata_keywords(metadata);
+    let external_keywords = xmp_external_keywords(&content);
+    if local_keywords != external_keywords {
+        let merged_keywords = sorted_unique_values(
+            local_keywords
+                .iter()
+                .cloned()
+                .chain(external_keywords.iter().cloned()),
+        );
+        fields.push(XmpMetadataConflictField {
+            field: "keywords".to_string(),
+            label: "Keywords".to_string(),
+            local: serde_json::json!(local_keywords),
+            external: serde_json::json!(external_keywords),
+            merged: Some(serde_json::json!(merged_keywords)),
+        });
+    }
+
+    if fields.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(XmpMetadataConflictReport {
+            path: path.to_string(),
+            xmp_path: xmp_path.to_string_lossy().into_owned(),
+            fields,
+        }))
+    }
+}
+
+#[tauri::command]
+pub fn check_xmp_metadata_conflicts(
+    path: String,
+) -> Result<Option<XmpMetadataConflictReport>, String> {
+    let (source_path, sidecar_path) = parse_virtual_path(&path);
+    let metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+    build_xmp_metadata_conflict_report(&path, &source_path, &metadata)
+}
+
+#[tauri::command]
+pub fn resolve_xmp_metadata_conflicts(
+    path: String,
+    decisions: Vec<XmpMetadataConflictDecision>,
+    app_handle: AppHandle,
+) -> Result<Option<XmpConflictReceipt>, String> {
+    let (source_path, sidecar_path) = parse_virtual_path(&path);
+    let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+    let Some(report) = build_xmp_metadata_conflict_report(&path, &source_path, &metadata)? else {
+        return Ok(None);
+    };
+
+    for decision in &decisions {
+        let Some(value) = xmp_conflict_value(&report, &decision.field, &decision.choice) else {
+            continue;
+        };
+
+        match decision.field.as_str() {
+            "rating" => {
+                metadata.rating = value.as_u64().unwrap_or_default().min(5) as u8;
+            }
+            "colorLabel" => {
+                replace_metadata_color_label(&mut metadata, value.as_str().map(str::to_string));
+            }
+            "keywords" => {
+                let keywords = value
+                    .as_array()
+                    .map(|values| {
+                        values
+                            .iter()
+                            .filter_map(|value| value.as_str().map(str::to_string))
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+                replace_metadata_keywords(&mut metadata, keywords);
+            }
+            _ => {}
+        }
+    }
+
+    let receipt = XmpConflictReceipt {
+        id: Uuid::new_v4().to_string(),
+        resolved_at: Utc::now().to_rfc3339(),
+        xmp_path: report.xmp_path,
+        decisions,
+    };
+
+    metadata
+        .raw_engine_artifacts
+        .get_or_insert_with(crate::image_processing::RawEngineArtifacts::new_v1)
+        .xmp_conflict_receipts
+        .push(serde_json::json!(&receipt));
+
+    let json_string = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
+    crate::exif_processing::write_text_file_atomic(&sidecar_path, &json_string)
+        .map_err(|e| e.to_string())?;
+
+    let settings = load_settings_or_default(&app_handle);
+    sync_metadata_to_xmp(
+        &source_path,
+        &metadata,
+        settings.create_xmp_if_missing.unwrap_or(false),
+    );
+
+    Ok(Some(receipt))
+}
+
+pub fn sync_metadata_from_xmp(source_path: &Path, metadata: &mut ImageMetadata) -> bool {
+    let actual_xmp = find_xmp_path(source_path);
 
     let mut changed = false;
 
@@ -3508,6 +3792,8 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
                     Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
                 };
                 label = Some(cap_color);
+            } else if let Some(user_tag) = t.strip_prefix(USER_TAG_PREFIX) {
+                normal_tags.push(user_tag.to_string());
             } else {
                 normal_tags.push(t);
             }
@@ -3699,5 +3985,57 @@ mod tests {
         assert!(read_payload.stale);
         assert!(!read_payload.source_available);
         assert_eq!(read_payload.source, "smartPreview");
+    }
+
+    #[test]
+    fn xmp_conflict_report_detects_rating_label_and_keyword_divergence() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let image_path = temp_dir.path().join("image.raf");
+        fs::write(&image_path, b"raw").expect("source image");
+        fs::write(
+            image_path.with_extension("xmp"),
+            r#"<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about="" xmlns:xmp="http://ns.adobe.com/xap/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+   <xmp:Rating>5</xmp:Rating>
+   <xmp:Label>Green</xmp:Label>
+   <dc:subject><rdf:Bag><rdf:li>alaska</rdf:li><rdf:li>mountain</rdf:li></rdf:Bag></dc:subject>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>"#,
+        )
+        .expect("xmp");
+
+        let metadata = ImageMetadata {
+            rating: 2,
+            tags: Some(vec![
+                "color:red".to_string(),
+                "user:alaska".to_string(),
+                "user:sunset".to_string(),
+            ]),
+            ..ImageMetadata::default()
+        };
+
+        let report = build_xmp_metadata_conflict_report("image.raf", &image_path, &metadata)
+            .expect("report result");
+        let report = report.expect("conflicts");
+
+        assert_eq!(report.fields.len(), 3);
+        assert!(report.fields.iter().any(|field| field.field == "rating"));
+        assert!(
+            report
+                .fields
+                .iter()
+                .any(|field| field.field == "colorLabel")
+        );
+        let keywords = report
+            .fields
+            .iter()
+            .find(|field| field.field == "keywords")
+            .expect("keywords");
+        assert_eq!(
+            keywords.merged.as_ref().expect("merged keywords"),
+            &serde_json::json!(["alaska", "mountain", "sunset"])
+        );
     }
 }

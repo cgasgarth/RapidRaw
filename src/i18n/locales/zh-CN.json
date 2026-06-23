@@ -1039,7 +1039,22 @@
         "selectionCount_one": "{{count}} selected",
         "selectionCount_other": "{{count}} selected"
       },
-      "title": "元数据"
+      "title": "元数据",
+      "xmpConflicts": {
+        "apply": "应用选择",
+        "checking": "正在检查 XMP sidecar...",
+        "choices": {
+          "external": "使用 XMP",
+          "local": "保留本地",
+          "merge": "合并"
+        },
+        "description": "此 sidecar 已在 RawEngine 外部更改。同步前请选择要保留的内容。",
+        "external": "XMP",
+        "local": "本地",
+        "merge": "合并",
+        "resolving": "正在应用...",
+        "title": "XMP 冲突"
+      }
     },
     "presets": {
       "applyPresetLabel": "应用预设 {{name}}",
