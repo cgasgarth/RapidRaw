@@ -999,6 +999,9 @@ async function prepareScenario(page, mode) {
       .waitFor({
         timeout: 10_000,
       });
+    await page.getByTestId('agent-replay-gallery').getByText('Rollback target', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
     await handoff
       .getByTestId('agent-review-handoff-artifacts')
       .getByText('artifact_agent_expert_edit_demo_before_raw_2844', { exact: true })
