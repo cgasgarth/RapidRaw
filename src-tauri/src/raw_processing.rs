@@ -1,9 +1,11 @@
 use crate::image_processing::apply_orientation;
 use anyhow::{Result, anyhow};
 use image::{DynamicImage, ImageBuffer, Rgba};
+use rawler::imgop::xyz::Illuminant;
 use rawler::{
     decoders::{Orientation, RawDecodeParams},
     imgop::develop::{DemosaicAlgorithm, Intermediate, ProcessingStep, RawDevelop},
+    pixarray::Color2D,
     rawimage::{RawImage, RawImageData, RawPhotometricInterpretation},
     rawsource::RawSource,
 };
@@ -12,9 +14,27 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RawProcessingProfile {
+    Fast,
+    Balanced,
+    Maximum,
+}
+
+impl RawProcessingProfile {
+    pub fn from_mode(mode: &str) -> Self {
+        match mode {
+            "fast" => Self::Fast,
+            "maximum" => Self::Maximum,
+            _ => Self::Balanced,
+        }
+    }
+}
+
 pub fn develop_raw_image(
     file_bytes: &[u8],
     fast_demosaic: bool,
+    profile: RawProcessingProfile,
     highlight_compression: f32,
     linear_mode: String,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
@@ -22,6 +42,7 @@ pub fn develop_raw_image(
     let (developed_image, orientation) = develop_internal_with_options(
         file_bytes,
         fast_demosaic,
+        profile,
         highlight_compression,
         linear_mode,
         cancel_token,
@@ -51,6 +72,16 @@ fn is_linear_raw_format(raw_image: &RawImage) -> bool {
     matches!(
         raw_image.photometric,
         RawPhotometricInterpretation::LinearRaw
+    )
+}
+
+fn is_rgb_bayer_raw(raw_image: &RawImage) -> bool {
+    matches!(
+        &raw_image.photometric,
+        RawPhotometricInterpretation::Cfa(config)
+            if raw_image.cpp == 1
+                && config.cfa.is_rgb()
+                && !(config.cfa.width == 6 && config.cfa.height == 6)
     )
 }
 
@@ -349,6 +380,199 @@ fn repair_raw_sensor_defects(
     }
 }
 
+fn multiply_4x3_3x3(a: &[[f32; 3]; 4], b: &[[f32; 3]; 3]) -> [[f32; 3]; 4] {
+    let mut result = [[0.0; 3]; 4];
+    for i in 0..4 {
+        for j in 0..3 {
+            for (k, row) in b.iter().enumerate().take(3) {
+                result[i][j] += a[i][k] * row[j];
+            }
+        }
+    }
+    result
+}
+
+fn normalize_4x3(matrix: [[f32; 3]; 4]) -> [[f32; 3]; 4] {
+    let mut result = [[0.0; 3]; 4];
+    for row in 0..4 {
+        let sum: f32 = matrix[row].iter().sum();
+        if sum.abs() > f32::EPSILON {
+            for col in 0..3 {
+                result[row][col] = matrix[row][col] / sum;
+            }
+        }
+    }
+    result
+}
+
+fn pseudo_inverse_4x3(matrix: [[f32; 3]; 4]) -> [[f32; 4]; 3] {
+    let mut tmp: [[f32; 3]; 4] = [[0.0; 3]; 4];
+    let mut result: [[f32; 4]; 3] = [[0.0; 4]; 3];
+    let mut work: [[f32; 6]; 3] = [[0.0; 6]; 3];
+
+    for i in 0..3 {
+        for (j, value) in work[i].iter_mut().enumerate() {
+            *value = if j == i + 3 { 1.0 } else { 0.0 };
+        }
+        for j in 0..3 {
+            for row in &matrix {
+                work[i][j] += row[i] * row[j];
+            }
+        }
+    }
+
+    for i in 0..3 {
+        let pivot = work[i][i];
+        if pivot.abs() <= f32::EPSILON {
+            continue;
+        }
+        for value in &mut work[i] {
+            *value /= pivot;
+        }
+        let pivot_row = work[i];
+        for (k, row) in work.iter_mut().enumerate() {
+            if k == i {
+                continue;
+            }
+            let factor = row[i];
+            for (value, pivot_value) in row.iter_mut().zip(pivot_row.iter()) {
+                *value -= pivot_value * factor;
+            }
+        }
+    }
+
+    for i in 0..4 {
+        for j in 0..3 {
+            tmp[i][j] = (0..3).map(|k| work[j][k + 3] * matrix[i][k]).sum();
+        }
+    }
+    for i in 0..3 {
+        for j in 0..4 {
+            result[i][j] = tmp[j][i];
+        }
+    }
+
+    result
+}
+
+fn clip_euclidean_norm_avg(pix: [f32; 3]) -> [f32; 3] {
+    let pix = pix.map(|p| p.max(0.0));
+    let max_val = pix.iter().copied().reduce(f32::max).unwrap_or(0.0);
+    if max_val <= 1.0 {
+        return pix;
+    }
+
+    let color = pix.map(|p| p / max_val);
+    let euclidean = pix.iter().map(|p| p.powi(2)).sum::<f32>().sqrt() / 3.0_f32.sqrt();
+    color.map(|p| (p + euclidean) * 0.5)
+}
+
+fn calibrate_three_color(raw_image: &RawImage, pixels: Color2D<f32, 3>) -> Color2D<f32, 3> {
+    let Some((_illuminant, color_matrix)) = raw_image
+        .color_matrix
+        .iter()
+        .find(|(illuminant, _)| **illuminant == Illuminant::D65)
+        .or_else(|| raw_image.color_matrix.iter().next())
+    else {
+        return pixels;
+    };
+
+    if color_matrix.len() % 3 != 0 {
+        return pixels;
+    }
+
+    let mut xyz_to_cam = [[0.0; 3]; 4];
+    let components = (color_matrix.len() / 3).min(4);
+    for i in 0..components {
+        for j in 0..3 {
+            xyz_to_cam[i][j] = color_matrix[i * 3 + j];
+        }
+    }
+
+    let wb = if raw_image.wb_coeffs[0].is_nan() {
+        [1.0, 1.0, 1.0, 1.0]
+    } else {
+        raw_image.wb_coeffs
+    };
+    let srgb_to_xyz_d65 = [
+        [0.412_456_4, 0.357_576_1, 0.180_437_5],
+        [0.212_672_9, 0.715_152_2, 0.072_175],
+        [0.019_333_9, 0.119_192, 0.950_304_1],
+    ];
+    let rgb_to_cam = normalize_4x3(multiply_4x3_3x3(&xyz_to_cam, &srgb_to_xyz_d65));
+    let cam_to_rgb = pseudo_inverse_4x3(rgb_to_cam);
+
+    let data = pixels
+        .data
+        .iter()
+        .map(|pixel| {
+            let r = pixel[0] * wb[0];
+            let g = pixel[1] * wb[1];
+            let b = pixel[2] * wb[2];
+            clip_euclidean_norm_avg([
+                cam_to_rgb[0][0] * r + cam_to_rgb[0][1] * g + cam_to_rgb[0][2] * b,
+                cam_to_rgb[1][0] * r + cam_to_rgb[1][1] * g + cam_to_rgb[1][2] * b,
+                cam_to_rgb[2][0] * r + cam_to_rgb[2][1] * g + cam_to_rgb[2][2] * b,
+            ])
+        })
+        .collect();
+
+    Color2D::new_with(data, pixels.width, pixels.height)
+}
+
+fn apply_default_crop(raw_image: &RawImage, intermediate: Intermediate) -> Intermediate {
+    let Some(mut crop) = raw_image.crop_area else {
+        return intermediate;
+    };
+    if let Some(active_area) = raw_image.active_area {
+        crop = crop.intersection(&active_area).adapt(&active_area);
+    }
+
+    let original_width = raw_image
+        .active_area
+        .map(|area| area.d.w)
+        .unwrap_or(raw_image.width);
+    let width = intermediate.dim().w;
+    if original_width > 0 {
+        let scale_factor = width as f32 / original_width as f32;
+        if (scale_factor - 1.0).abs() > 1e-6 {
+            crop.scale(scale_factor);
+        }
+    }
+
+    if crop.is_empty() || crop.d == intermediate.dim() {
+        return intermediate;
+    }
+
+    match intermediate {
+        Intermediate::Monochrome(pixels) => Intermediate::Monochrome(pixels.crop(crop)),
+        Intermediate::ThreeColor(pixels) => Intermediate::ThreeColor(pixels.crop(crop)),
+        Intermediate::FourColor(pixels) => Intermediate::FourColor(pixels.crop(crop)),
+    }
+}
+
+fn develop_bayer_hq_intermediate(raw_image: &RawImage) -> Result<Intermediate> {
+    let mut scaled = raw_image.clone();
+    scaled.apply_scaling()?;
+    let RawPhotometricInterpretation::Cfa(config) = &scaled.photometric else {
+        return Err(anyhow!("Bayer HQ requires CFA RAW input"));
+    };
+
+    let pixels = rawler::pixarray::PixF32::new_with(
+        scaled.data.as_f32().into_owned(),
+        scaled.width,
+        scaled.height,
+    );
+    let roi = scaled.active_area.unwrap_or(pixels.rect());
+    let demosaiced = crate::bayer_hq::demosaic_bayer_hq(&pixels, &config.cfa, roi);
+    let calibrated = calibrate_three_color(&scaled, demosaiced);
+
+    Ok(apply_default_crop(
+        &scaled,
+        Intermediate::ThreeColor(calibrated),
+    ))
+}
+
 #[cfg(test)]
 fn inject_raw_defect_proof_pixels(
     raw_image: &mut RawImage,
@@ -389,6 +613,7 @@ fn srgb_to_linear(value: f32) -> f32 {
 fn develop_internal_with_options(
     file_bytes: &[u8],
     fast_demosaic: bool,
+    profile: RawProcessingProfile,
     highlight_compression: f32,
     linear_mode: String,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
@@ -462,6 +687,11 @@ fn develop_internal_with_options(
     }
 
     let mut developer = RawDevelop::default();
+    let use_bayer_hq = profile == RawProcessingProfile::Maximum
+        && !fast_demosaic
+        && !is_linear_format
+        && is_rgb_bayer_raw(&raw_image)
+        && apply_calibration;
 
     if is_linear_format {
         developer.steps.retain(|&step| {
@@ -477,7 +707,11 @@ fn develop_internal_with_options(
     }
 
     check_cancel()?;
-    let mut developed_intermediate = developer.develop_intermediate(&raw_image)?;
+    let mut developed_intermediate = if use_bayer_hq {
+        develop_bayer_hq_intermediate(&raw_image)?
+    } else {
+        developer.develop_intermediate(&raw_image)?
+    };
 
     drop(raw_image);
 
@@ -766,6 +1000,7 @@ mod tests {
         let (uncorrected, uncorrected_orientation) = develop_internal_with_options(
             &file_bytes,
             false,
+            RawProcessingProfile::Balanced,
             2.5,
             "default".to_string(),
             None,
@@ -777,6 +1012,7 @@ mod tests {
         let (corrected, corrected_orientation) = develop_internal_with_options(
             &file_bytes,
             false,
+            RawProcessingProfile::Balanced,
             2.5,
             "default".to_string(),
             None,
@@ -829,5 +1065,120 @@ mod tests {
             serde_json::to_vec_pretty(&report).expect("serialize proof report"),
         )
         .expect("write proof report");
+    }
+
+    #[test]
+    fn private_bayer_hq_generates_distinct_maximum_output_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_BAYER_HQ_PROOF").ok() != Some("1".to_string()) {
+            return;
+        }
+
+        let source_path = std::env::var("RAWENGINE_PRIVATE_RAW_SOURCE")
+            .or_else(|_| std::env::var("RAWENGINE_BAYER_HQ_SOURCE"))
+            .expect("RAWENGINE_PRIVATE_RAW_SOURCE or RAWENGINE_BAYER_HQ_SOURCE must point to a Bayer RAW");
+        let report_dir = std::env::var("RAWENGINE_BAYER_HQ_REPORT_DIR")
+            .unwrap_or_else(|_| "target/bayer-hq-proof".to_string());
+        let report_dir = Path::new(&report_dir);
+        fs::create_dir_all(report_dir).expect("create report dir");
+
+        let file_bytes = fs::read(&source_path).expect("read private Bayer RAW");
+        let (balanced, balanced_orientation) = develop_internal_with_options(
+            &file_bytes,
+            false,
+            RawProcessingProfile::Balanced,
+            2.5,
+            "default".to_string(),
+            None,
+            RawDefectDevelopmentOptions::default(),
+        )
+        .expect("develop balanced private RAW");
+        let balanced = apply_orientation(balanced, balanced_orientation);
+
+        let started = std::time::Instant::now();
+        let (maximum, maximum_orientation) = develop_internal_with_options(
+            &file_bytes,
+            false,
+            RawProcessingProfile::Maximum,
+            4.0,
+            "default".to_string(),
+            None,
+            RawDefectDevelopmentOptions::default(),
+        )
+        .expect("develop Bayer HQ private RAW");
+        let maximum_elapsed_ms = started.elapsed().as_millis();
+        let maximum = apply_orientation(maximum, maximum_orientation);
+
+        assert_eq!(balanced.width(), maximum.width());
+        assert_eq!(balanced.height(), maximum.height());
+
+        let balanced_rgba = balanced.to_rgba8();
+        let maximum_rgba = maximum.to_rgba8();
+        let balanced_hash = blake3::hash(balanced_rgba.as_raw()).to_hex().to_string();
+        let maximum_hash = blake3::hash(maximum_rgba.as_raw()).to_hex().to_string();
+        assert_ne!(balanced_hash, maximum_hash);
+        let mut changed_pixels = 0usize;
+        let mut absolute_delta_sum = 0u64;
+        for (balanced_pixel, maximum_pixel) in balanced_rgba
+            .as_raw()
+            .chunks_exact(4)
+            .zip(maximum_rgba.as_raw().chunks_exact(4))
+        {
+            if balanced_pixel != maximum_pixel {
+                changed_pixels += 1;
+            }
+            absolute_delta_sum += balanced_pixel
+                .iter()
+                .zip(maximum_pixel.iter())
+                .take(3)
+                .map(|(balanced_value, maximum_value)| {
+                    balanced_value.abs_diff(*maximum_value) as u64
+                })
+                .sum::<u64>();
+        }
+        let pixel_count = (balanced_rgba.width() as usize) * (balanced_rgba.height() as usize);
+        let changed_pixel_ratio = changed_pixels as f64 / pixel_count.max(1) as f64;
+        let mean_absolute_byte_delta = absolute_delta_sum as f64 / (pixel_count.max(1) * 3) as f64;
+        assert!(changed_pixel_ratio > 0.001);
+        assert!(mean_absolute_byte_delta > 0.01);
+
+        let balanced_path = report_dir.join("bayer-balanced-ppg.tiff");
+        let maximum_path = report_dir.join("bayer-maximum-hq.tiff");
+        balanced
+            .save_with_format(&balanced_path, image::ImageFormat::Tiff)
+            .expect("write balanced TIFF");
+        maximum
+            .save_with_format(&maximum_path, image::ImageFormat::Tiff)
+            .expect("write Bayer HQ TIFF");
+
+        let report = serde_json::json!({
+            "issue": 3239,
+            "proofBoundary": "private_bayer_hq_runtime_output",
+            "sourcePath": source_path,
+            "dimensions": {
+                "width": maximum.width(),
+                "height": maximum.height(),
+            },
+            "balanced": {
+                "algorithm": "rawler_ppg_quality",
+                "imageHash": balanced_hash,
+                "tiffPath": balanced_path.to_string_lossy(),
+            },
+            "maximum": {
+                "algorithm": "rawengine_adaptive_bayer_hq_v1",
+                "elapsedMs": maximum_elapsed_ms,
+                "imageHash": maximum_hash,
+                "tiffPath": maximum_path.to_string_lossy(),
+            },
+            "outputDiff": {
+                "changedPixelRatio": changed_pixel_ratio,
+                "meanAbsoluteByteDelta": mean_absolute_byte_delta,
+            },
+            "privateAssetsCommitted": false,
+        });
+        fs::write(
+            report_dir.join("bayer-hq-private-proof.json"),
+            serde_json::to_vec_pretty(&report).expect("serialize Bayer HQ proof report"),
+        )
+        .expect("write Bayer HQ proof report");
     }
 }

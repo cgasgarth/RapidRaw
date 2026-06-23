@@ -13,6 +13,7 @@ mod album_management;
 mod android_integration;
 mod app_settings;
 mod app_state;
+mod bayer_hq;
 mod cache_utils;
 #[cfg(feature = "validation-harness")]
 mod color_gpu_readback_probe;
