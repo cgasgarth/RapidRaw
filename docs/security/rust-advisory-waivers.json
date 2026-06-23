@@ -13,19 +13,6 @@
       "reviewDate": "2026-09-15",
       "expiryDate": "2026-12-15",
       "issue": 262
-    },
-    {
-      "advisoryId": "RUSTSEC-2026-0185",
-      "ghsaId": "GHSA-4w2j-m93h-cj5j",
-      "crate": "quinn-proto",
-      "currentVersion": "0.11.14",
-      "patchedVersion": ">=0.11.15",
-      "reason": "Dependency upgrades are paused; remediation is tracked separately and this network stack is not part of the current Negative Lab feature slice.",
-      "owner": "@cgasgarth",
-      "introducedDate": "2026-06-22",
-      "reviewDate": "2026-07-06",
-      "expiryDate": "2026-07-22",
-      "issue": 3165
     }
   ]
 }
