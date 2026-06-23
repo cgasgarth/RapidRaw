@@ -756,7 +756,8 @@
         "shutterSpeed": "Velocidad de obturación",
         "undo": "Deshacer (Ctrl+Z) o Historial (Clic derecho)"
       },
-      "vc": "CV"
+      "vc": "CV",
+      "exportSoftProofDetails": "{{profile}} / {{intent}} preview"
     }
   },
   "export": {

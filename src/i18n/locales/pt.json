@@ -756,7 +756,8 @@
         "shutterSpeed": "Velocidade do Obturador",
         "undo": "Desfazer (Ctrl+Z) ou Histórico (Botão Direito)"
       },
-      "vc": "CV"
+      "vc": "CV",
+      "exportSoftProofDetails": "{{profile}} / {{intent}} preview"
     }
   },
   "export": {
