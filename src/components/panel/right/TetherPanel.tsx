@@ -1,4 +1,4 @@
-import { Battery, Camera, CheckCircle2, HardDrive, RefreshCcw, Usb, AlertTriangle } from 'lucide-react';
+import { Battery, Camera, CheckCircle2, HardDrive, Images, RefreshCcw, Usb, AlertTriangle } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -23,6 +23,8 @@ interface TetherPanelProps {
   discoverCameras?: () => Promise<TetherDiscoveryResponse>;
   openSession?: (cameraId: string) => Promise<TetherSessionResponse>;
 }
+
+type TetherReviewMode = 'holdCurrent' | 'newest';
 
 const capabilityTone: Record<TetherCapability['status'], string> = {
   not_checked: 'border-yellow-500/40 bg-yellow-500/10 text-yellow-200',
@@ -60,6 +62,8 @@ export function TetherPanel({
   const [discovery, setDiscovery] = useState<TetherDiscoveryResponse | null>(null);
   const [session, setSession] = useState<TetherSessionResponse['session']>(null);
   const [capture, setCapture] = useState<TetherCaptureResponse | null>(null);
+  const [captures, setCaptures] = useState<Array<TetherCaptureResponse>>([]);
+  const [reviewMode, setReviewMode] = useState<TetherReviewMode>('newest');
   const [isLoading, setIsLoading] = useState(false);
   const [isCaptureBusy, setIsCaptureBusy] = useState(false);
   const [isSessionBusy, setIsSessionBusy] = useState(false);
@@ -103,6 +107,7 @@ export function TetherPanel({
       const response = await closeSession();
       setSession(response.session);
       setCapture(null);
+      setCaptures([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -115,13 +120,16 @@ export function TetherPanel({
     setError(null);
     try {
       const response = await captureFrame();
-      setCapture(response);
+      setCaptures((current) => [response, ...current].slice(0, 8));
+      setCapture((current) => (reviewMode === 'newest' || current === null ? response : current));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsCaptureBusy(false);
     }
-  }, [captureFrame]);
+  }, [captureFrame, reviewMode]);
+
+  const selectedCaptureKey = capture === null ? null : captureKey(capture);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -207,6 +215,77 @@ export function TetherPanel({
           <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
             {t('editor.tether.captureVerified', { bytes: capture.bytes })}
           </UiText>
+        </section>
+      )}
+
+      {captures.length > 0 && (
+        <section
+          className="rounded-md border border-border-color bg-bg-secondary p-3"
+          data-review-mode={reviewMode}
+          data-selected-capture-key={selectedCaptureKey ?? ''}
+          data-testid="tether-incoming-capture-strip"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Images size={16} className="text-accent" />
+              <UiText variant={TextVariants.label}>{t('editor.tether.incomingCaptures')}</UiText>
+            </div>
+            <div className="flex gap-1" data-testid="tether-review-mode-control">
+              {(['newest', 'holdCurrent'] as const).map((mode) => (
+                <button
+                  className={`rounded border px-2 py-1 text-xs transition-colors ${
+                    reviewMode === mode
+                      ? 'border-accent bg-accent text-button-text'
+                      : 'border-border-color bg-bg-primary text-text-secondary hover:text-text-primary'
+                  }`}
+                  data-review-mode-option={mode}
+                  data-selected={String(reviewMode === mode)}
+                  key={mode}
+                  onClick={() => {
+                    setReviewMode(mode);
+                    if (mode === 'newest') setCapture(captures[0] ?? null);
+                  }}
+                  type="button"
+                >
+                  {mode === 'newest' ? t('editor.tether.reviewNewest') : t('editor.tether.reviewHoldCurrent')}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1" data-testid="tether-incoming-capture-items">
+            {captures.map((incomingCapture) => {
+              const key = captureKey(incomingCapture);
+              const isSelected = key === selectedCaptureKey;
+              return (
+                <button
+                  className={`min-w-48 rounded-md border p-2 text-left transition-colors ${
+                    isSelected
+                      ? 'border-accent bg-accent/10'
+                      : 'border-border-color bg-bg-primary hover:border-accent/60'
+                  }`}
+                  data-capture-imported-path={incomingCapture.importedPath}
+                  data-capture-key={key}
+                  data-selected={String(isSelected)}
+                  data-testid="tether-incoming-capture-item"
+                  key={key}
+                  onClick={() => {
+                    setCapture(incomingCapture);
+                  }}
+                  type="button"
+                >
+                  <UiText variant={TextVariants.label} className="block truncate">
+                    {captureFileName(incomingCapture.importedPath)}
+                  </UiText>
+                  <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+                    {t('editor.tether.captureVerified', { bytes: incomingCapture.bytes })}
+                  </UiText>
+                  <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block truncate">
+                    {incomingCapture.capturedAt}
+                  </UiText>
+                </button>
+              );
+            })}
+          </div>
         </section>
       )}
 
@@ -340,4 +419,12 @@ function Metric({ icon, label, value }: { icon: ReactNode; label: string; value:
       </UiText>
     </div>
   );
+}
+
+function captureKey(capture: TetherCaptureResponse): string {
+  return `${capture.sessionId}:${capture.capturedAt}:${capture.checksum}`;
+}
+
+function captureFileName(path: string): string {
+  return path.split(/[\\/]/u).pop() ?? path;
 }
