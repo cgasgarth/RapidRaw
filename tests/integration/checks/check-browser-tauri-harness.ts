@@ -61,6 +61,16 @@ try {
   page.on('pageerror', (error) => {
     consoleErrors.push(error.message);
   });
+  await page.route('https://api.github.com/repos/CyberTimon/RapidRAW/releases/latest', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      json: {
+        html_url: 'https://github.com/CyberTimon/RapidRAW/releases/latest',
+        tag_name: 'v0.0.0-browser-harness',
+      },
+      status: 200,
+    });
+  });
 
   await page.goto(baseUrl, { waitUntil: 'networkidle' });
   await page.getByRole('heading', { name: 'RapidRAW' }).waitFor({ timeout: 10_000 });
