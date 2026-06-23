@@ -33,6 +33,7 @@ interface CullingModalProps {
 
 type CullAction = 'reject' | 'rate_zero' | 'delete';
 type CullingStage = 'settings' | 'progress' | 'results';
+type CullingResultsTab = 'similar' | 'blurry' | 'focus';
 
 const RAW_SOURCE_EXTENSIONS = new Set(['arw', 'cr2', 'cr3', 'dng', 'nef', 'orf', 'pef', 'raf', 'rw2', 'srw']);
 const SETUP_PREVIEW_LIMIT = 6;
@@ -49,31 +50,34 @@ interface CompareViewport {
 interface ImageThumbnailProps {
   children?: ReactNode;
   isSelected: boolean;
-  onToggle: () => void;
+  onToggle?: () => void;
   path: string;
   thumbnails: Record<string, string>;
 }
 
 function ImageThumbnail({ path, thumbnails, isSelected, onToggle, children }: ImageThumbnailProps) {
   const thumbnailUrl = thumbnails[path];
-  return (
-    <button
-      type="button"
-      className={`relative group rounded-md overflow-hidden border-2 transition-colors cursor-pointer text-left ${
-        isSelected ? 'border-accent' : 'border-transparent hover:border-surface'
+  const interactiveClasses = onToggle ? 'cursor-pointer hover:border-surface' : 'cursor-default';
+  const content = (
+    <div
+      className={`relative group rounded-md overflow-hidden border-2 transition-colors text-left ${
+        isSelected ? 'border-accent' : `border-transparent ${interactiveClasses}`
       }`}
-      onClick={onToggle}
     >
       <img
         src={thumbnailUrl}
         alt={path}
-        className={`w-full h-full object-cover transition-opacity ${isSelected ? 'opacity-100' : 'opacity-75 group-hover:opacity-100'}`}
-      />
-      <div
-        className={`absolute inset-0 bg-black/50 transition-opacity ${
-          isSelected ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
+        className={`w-full h-full object-cover transition-opacity ${
+          isSelected || !onToggle ? 'opacity-100' : 'opacity-75 group-hover:opacity-100'
         }`}
       />
+      {onToggle && (
+        <div
+          className={`absolute inset-0 bg-black/50 transition-opacity ${
+            isSelected ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
+          }`}
+        />
+      )}
       <div className="absolute top-2 right-2">{isSelected && <CheckCircle size={16} className="text-accent" />}</div>
       {children && (
         <UiText
@@ -85,6 +89,16 @@ function ImageThumbnail({ path, thumbnails, isSelected, onToggle, children }: Im
           {children}
         </UiText>
       )}
+    </div>
+  );
+
+  if (!onToggle) {
+    return <div className="block w-full">{content}</div>;
+  }
+
+  return (
+    <button type="button" className="block w-full text-left" onClick={onToggle}>
+      {content}
     </button>
   );
 }
@@ -113,6 +127,8 @@ interface CompareFrameProps {
   metadataLabels: {
     dimensions: (width: number, height: number) => string;
     focus: string;
+    focusConfidence: string;
+    focusScore: string;
     score: string;
     sharpness: string;
   };
@@ -167,6 +183,12 @@ function CompareFrame({
           {metadataLabels.focus}: {analysis.centerFocusMetric.toFixed(0)}
         </span>
         <span>
+          {metadataLabels.focusScore}: {(analysis.focusScore * 100).toFixed(0)}
+        </span>
+        <span>
+          {metadataLabels.focusConfidence}: {(analysis.focusConfidence * 100).toFixed(0)}%
+        </span>
+        <span>
           {metadataLabels.sharpness}: {analysis.sharpnessMetric.toFixed(0)}
         </span>
         <span>
@@ -206,11 +228,12 @@ export default function CullingModal({
     similarityThreshold: 28,
     filterBlurry: true,
     blurThreshold: 100.0,
+    rankFocus: true,
   });
 
   const [selectedRejects, setSelectedRejects] = useState<Set<string>>(new Set());
   const [action, setAction] = useState<CullAction>('reject');
-  const [activeTab, setActiveTab] = useState<'similar' | 'blurry'>('similar');
+  const [activeTab, setActiveTab] = useState<CullingResultsTab>('similar');
   const [compareViewport, setCompareViewport] = useState<CompareViewport>({
     linked: true,
     panX: 0,
@@ -307,16 +330,28 @@ export default function CullingModal({
 
   const numSimilar = suggestions?.similarGroups.reduce((acc, group) => acc + group.duplicates.length, 0) || 0;
   const numBlurry = suggestions?.blurryImages.length || 0;
+  const numFocusRankings = suggestions?.focusRankings.length || 0;
   const setupPreviewPaths = imagePaths.slice(0, SETUP_PREVIEW_LIMIT);
   const setupPreviewOverflowCount = Math.max(0, imagePaths.length - setupPreviewPaths.length);
-  const hasCullingAnalysisMode = settings.groupSimilar || settings.filterBlurry;
-  const cullingAnalysisModeCount = Number(settings.groupSimilar) + Number(settings.filterBlurry);
+  const hasCullingAnalysisMode = settings.groupSimilar || settings.filterBlurry || settings.rankFocus;
+  const cullingAnalysisModeCount =
+    Number(settings.groupSimilar) + Number(settings.filterBlurry) + Number(settings.rankFocus);
   const canStartCulling = imagePaths.length > 0 && hasCullingAnalysisMode;
+  const fallbackResultsTab: CullingResultsTab =
+    numSimilar > 0 ? 'similar' : numBlurry > 0 ? 'blurry' : numFocusRankings > 0 ? 'focus' : activeTab;
+  const activeResultsTab =
+    (activeTab === 'similar' && numSimilar > 0) ||
+    (activeTab === 'blurry' && numBlurry > 0) ||
+    (activeTab === 'focus' && numFocusRankings > 0)
+      ? activeTab
+      : fallbackResultsTab;
 
   const compareMetadataLabels = useMemo(
     () => ({
       dimensions: (width: number, height: number) => t('modals.culling.compareDimensions', { height, width }),
       focus: t('modals.culling.compareFocus'),
+      focusConfidence: t('modals.culling.focusConfidence'),
+      focusScore: t('modals.culling.focusScore'),
       score: t('modals.culling.compareScore'),
       sharpness: t('modals.culling.compareSharpness'),
     }),
@@ -343,6 +378,16 @@ export default function CullingModal({
     setCompareViewport((viewport) => ({ ...viewport, linked: !viewport.linked }));
   }, []);
 
+  const getFocusRegionLabel = useCallback(
+    (region: string) => {
+      if (region === 'center_fallback') {
+        return t('modals.culling.focusRegion.center_fallback');
+      }
+      return t('modals.culling.focusRegion.unknown');
+    },
+    [t],
+  );
+
   const renderSettings = () => (
     <>
       <div className="flex items-center justify-center mb-4">
@@ -356,6 +401,7 @@ export default function CullingModal({
         data-blur-filter-enabled={String(settings.filterBlurry)}
         data-blur-threshold={settings.blurThreshold}
         data-culling-analysis-mode-count={cullingAnalysisModeCount}
+        data-focus-ranking-enabled={String(settings.rankFocus)}
         data-group-similar-enabled={String(settings.groupSimilar)}
         data-image-count={imagePaths.length}
         data-raster-source-count={sourceMix.raster}
@@ -387,6 +433,10 @@ export default function CullingModal({
             value: settings.filterBlurry
               ? t('modals.culling.summaryEnabledThreshold', { threshold: settings.blurThreshold })
               : t('modals.culling.summaryDisabled'),
+          },
+          {
+            label: t('modals.culling.summaryFocusRanking'),
+            value: settings.rankFocus ? t('modals.culling.summaryEnabled') : t('modals.culling.summaryDisabled'),
           },
           {
             label: t('modals.culling.summaryWorkload'),
@@ -519,6 +569,20 @@ export default function CullingModal({
             </div>
           )}
         </div>
+        <div>
+          <Switch
+            label={t('modals.culling.rankFocus')}
+            checked={settings.rankFocus}
+            onChange={(v) => {
+              setSettings((s) => ({ ...s, rankFocus: v }));
+            }}
+          />
+          {settings.rankFocus && (
+            <UiText variant={TextVariants.small} className="mt-1 block pl-4">
+              {t('modals.culling.rankFocusDesc')}
+            </UiText>
+          )}
+        </div>
       </div>
       <div className="flex justify-end gap-3 mt-8">
         <button
@@ -582,7 +646,7 @@ export default function CullingModal({
 
     if (!suggestions) return null;
 
-    const totalSuggestions = numSimilar + numBlurry;
+    const totalSuggestions = numSimilar + numBlurry + numFocusRankings;
     if (totalSuggestions === 0) {
       return (
         <div className="flex flex-col items-center justify-center h-48">
@@ -611,7 +675,7 @@ export default function CullingModal({
                   setActiveTab('similar');
                 }}
                 className={`${
-                  activeTab === 'similar'
+                  activeResultsTab === 'similar'
                     ? 'border-accent text-accent'
                     : 'border-transparent text-text-secondary hover:text-text-primary hover:border-gray-300'
                 } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm`}
@@ -626,7 +690,7 @@ export default function CullingModal({
                   setActiveTab('blurry');
                 }}
                 className={`${
-                  activeTab === 'blurry'
+                  activeResultsTab === 'blurry'
                     ? 'border-accent text-accent'
                     : 'border-transparent text-text-secondary hover:text-text-primary hover:border-gray-300'
                 } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm`}
@@ -635,19 +699,36 @@ export default function CullingModal({
                 <span className="bg-surface text-text-secondary rounded-full px-2 py-0.5 text-xs">{numBlurry}</span>
               </button>
             )}
+            {numFocusRankings > 0 && (
+              <button
+                onClick={() => {
+                  setActiveTab('focus');
+                }}
+                className={`${
+                  activeResultsTab === 'focus'
+                    ? 'border-accent text-accent'
+                    : 'border-transparent text-text-secondary hover:text-text-primary hover:border-gray-300'
+                } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm`}
+              >
+                {t('modals.culling.focusRankingsTab')}{' '}
+                <span className="bg-surface text-text-secondary rounded-full px-2 py-0.5 text-xs">
+                  {numFocusRankings}
+                </span>
+              </button>
+            )}
           </nav>
         </div>
 
         <div className="bg-bg-primary rounded-lg p-2 h-[50vh] overflow-y-auto">
           <AnimatePresence mode="wait">
             <motion.div
-              key={activeTab}
+              key={activeResultsTab}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
             >
-              {activeTab === 'similar' && (
+              {activeResultsTab === 'similar' && (
                 <div className="space-y-4">
                   <section
                     className="rounded-md border border-border-color bg-bg-secondary p-3"
@@ -803,7 +884,7 @@ export default function CullingModal({
                   ))}
                 </div>
               )}
-              {activeTab === 'blurry' && (
+              {activeResultsTab === 'blurry' && (
                 <div className="grid grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
                   {suggestions.blurryImages.map((img) => (
                     <ImageThumbnail
@@ -817,6 +898,38 @@ export default function CullingModal({
                     >
                       {t('modals.culling.sharpness', { sharpness: img.sharpnessMetric.toFixed(0) })}
                     </ImageThumbnail>
+                  ))}
+                </div>
+              )}
+              {activeResultsTab === 'focus' && (
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+                  {suggestions.focusRankings.map((img, index) => (
+                    <div
+                      className="rounded-md border border-border-color bg-bg-secondary p-2"
+                      data-focus-confidence={img.focusConfidence.toFixed(2)}
+                      data-focus-rank={index + 1}
+                      data-focus-region={img.focusRegion}
+                      data-focus-score={img.focusScore.toFixed(2)}
+                      data-testid="culling-focus-ranking-card"
+                      key={img.path}
+                    >
+                      <ImageThumbnail path={img.path} thumbnails={thumbnails} isSelected={false}>
+                        {t('modals.culling.focusRankValue', { rank: index + 1 })}
+                      </ImageThumbnail>
+                      <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
+                        <UiText variant={TextVariants.small}>
+                          {t('modals.culling.focusScoreValue', { score: Math.round(img.focusScore * 100) })}
+                        </UiText>
+                        <UiText variant={TextVariants.small}>
+                          {t('modals.culling.focusConfidenceValue', {
+                            confidence: Math.round(img.focusConfidence * 100),
+                          })}
+                        </UiText>
+                        <UiText variant={TextVariants.small} color={TextColors.secondary} className="col-span-2">
+                          {getFocusRegionLabel(img.focusRegion)}
+                        </UiText>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}

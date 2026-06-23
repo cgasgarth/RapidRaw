@@ -17,6 +17,8 @@ pub struct CullingSettings {
     pub blur_threshold: f64,
     pub group_similar: bool,
     pub filter_blurry: bool,
+    #[serde(default)]
+    pub rank_focus: bool,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -27,6 +29,9 @@ pub struct ImageAnalysisResult {
     pub sharpness_metric: f64,
     pub center_focus_metric: f64,
     pub exposure_metric: f64,
+    pub focus_score: f64,
+    pub focus_confidence: f64,
+    pub focus_region: String,
     pub width: u32,
     pub height: u32,
 }
@@ -43,6 +48,7 @@ pub struct CullGroup {
 pub struct CullingSuggestions {
     pub similar_groups: Vec<CullGroup>,
     pub blurry_images: Vec<ImageAnalysisResult>,
+    pub focus_rankings: Vec<ImageAnalysisResult>,
     pub failed_paths: Vec<String>,
 }
 
@@ -61,6 +67,15 @@ struct ImageAnalysisData {
 const WEIGHT_SHARPNESS: f64 = 0.40;
 const WEIGHT_CENTER_FOCUS: f64 = 0.35;
 const WEIGHT_EXPOSURE: f64 = 0.25;
+const FOCUS_REGION_CENTER_FALLBACK: &str = "center_fallback";
+
+fn clamp_unit(value: f64) -> f64 {
+    value.clamp(0.0, 1.0)
+}
+
+fn normalize_focus_metric(metric: f64) -> f64 {
+    clamp_unit((metric + 1.0).log10() / 3.5)
+}
 
 fn calculate_laplacian_variance(image: &GrayImage) -> f64 {
     let (width, height) = image.dimensions();
@@ -150,12 +165,15 @@ fn analyze_image(
     .to_image();
     let center_focus_metric = calculate_laplacian_variance(&center_crop);
 
-    let normalized_sharpness = ((sharpness_metric + 1.0).log10() / 3.5).min(1.0);
-    let normalized_center_focus = ((center_focus_metric + 1.0).log10() / 3.5).min(1.0);
+    let normalized_sharpness = normalize_focus_metric(sharpness_metric);
+    let normalized_center_focus = normalize_focus_metric(center_focus_metric);
 
     let quality_score = (normalized_sharpness * WEIGHT_SHARPNESS)
         + (normalized_center_focus * WEIGHT_CENTER_FOCUS)
         + (exposure_metric * WEIGHT_EXPOSURE);
+    let focus_score =
+        (normalized_center_focus * 0.65) + (normalized_sharpness * 0.25) + (exposure_metric * 0.10);
+    let focus_confidence = clamp_unit((normalized_center_focus * 0.85) + (exposure_metric * 0.15));
 
     let hash = hasher.hash_image(&thumbnail);
 
@@ -167,6 +185,9 @@ fn analyze_image(
             sharpness_metric,
             center_focus_metric,
             exposure_metric,
+            focus_score,
+            focus_confidence,
+            focus_region: FOCUS_REGION_CENTER_FALLBACK.to_string(),
             width,
             height,
         },
@@ -307,6 +328,74 @@ pub async fn cull_images(
         });
     }
 
+    if settings.rank_focus {
+        suggestions.focus_rankings = successful_analyses
+            .iter()
+            .map(|item| item.result.clone())
+            .collect();
+        suggestions.focus_rankings.sort_by(|a, b| {
+            b.focus_score
+                .partial_cmp(&a.focus_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+    }
+
     let _ = app_handle.emit(crate::events::CULLING_COMPLETE, &suggestions);
     Ok(suggestions)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::{Rgb, RgbImage};
+
+    fn write_focus_fixture(path: &std::path::Path, focused_center: bool) {
+        let mut image = RgbImage::from_pixel(128, 128, Rgb([128, 128, 128]));
+        for y in 32..96 {
+            for x in 32..96 {
+                let value = if focused_center {
+                    if ((x / 4) + (y / 4)) % 2 == 0 {
+                        235
+                    } else {
+                        25
+                    }
+                } else {
+                    128 + (((x + y) % 8) as u8)
+                };
+                image.put_pixel(x, y, Rgb([value, value, value]));
+            }
+        }
+        image.save(path).expect("write focus fixture");
+    }
+
+    #[test]
+    fn focus_ranking_metrics_prefer_center_detail_without_rejection() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let focused_path = temp_dir.path().join("focused.png");
+        let soft_path = temp_dir.path().join("soft.png");
+        write_focus_fixture(&focused_path, true);
+        write_focus_fixture(&soft_path, false);
+
+        let hasher = HasherConfig::new()
+            .hash_alg(HashAlg::DoubleGradient)
+            .hash_size(16, 16)
+            .to_hasher();
+        let settings = crate::app_settings::AppSettings::default();
+        let focused = analyze_image(
+            focused_path.to_str().expect("focused path"),
+            &hasher,
+            &settings,
+        )
+        .expect("focused analysis")
+        .result;
+        let soft = analyze_image(soft_path.to_str().expect("soft path"), &hasher, &settings)
+            .expect("soft analysis")
+            .result;
+
+        assert_eq!(focused.focus_region, FOCUS_REGION_CENTER_FALLBACK);
+        assert!(focused.focus_score > soft.focus_score);
+        assert!(focused.focus_confidence > soft.focus_confidence);
+        assert!((0.0..=1.0).contains(&focused.focus_score));
+        assert!((0.0..=1.0).contains(&focused.focus_confidence));
+    }
 }
