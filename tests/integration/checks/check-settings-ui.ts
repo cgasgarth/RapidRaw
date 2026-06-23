@@ -1,0 +1,126 @@
+#!/usr/bin/env bun
+
+import { chromium } from '@playwright/test';
+import { spawn } from 'node:child_process';
+
+const host = '127.0.0.1';
+const port = 1420;
+const baseUrl = `http://${host}:${port}`;
+
+async function waitForDevServer(): Promise<void> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 45_000) {
+    try {
+      const response = await fetch(baseUrl);
+      if (response.ok) return;
+    } catch {
+      // Vite is still starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(`Timed out waiting for Vite at ${baseUrl}`);
+}
+
+async function stopServer(server: ReturnType<typeof spawn>): Promise<void> {
+  if (server.exitCode !== null || server.signalCode !== null) return;
+  server.kill('SIGTERM');
+  await Promise.race([
+    new Promise((resolve) => {
+      server.once('exit', resolve);
+    }),
+    new Promise((resolve) =>
+      setTimeout(() => {
+        server.kill('SIGKILL');
+        resolve(undefined);
+      }, 5_000),
+    ),
+  ]);
+}
+
+const server = spawn('bun', ['run', 'dev', '--', '--host', host], {
+  env: { ...process.env, VITE_RAWENGINE_BROWSER_TAURI_HARNESS: '1' },
+  stdio: ['ignore', 'pipe', 'pipe'],
+});
+let serverOutput = '';
+const captureServerOutput = (chunk: Buffer) => {
+  serverOutput = `${serverOutput}${chunk.toString()}`.slice(-4_000);
+};
+server.stdout.on('data', captureServerOutput);
+server.stderr.on('data', captureServerOutput);
+
+let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+
+try {
+  await waitForDevServer();
+  browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({ viewport: { height: 900, width: 1440 } });
+  await page.route('https://api.github.com/repos/CyberTimon/RapidRAW/releases/latest', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      json: {
+        html_url: 'https://github.com/CyberTimon/RapidRAW/releases/latest',
+        tag_name: 'v0.0.0-browser-harness',
+      },
+      status: 200,
+    });
+  });
+
+  await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { name: 'RapidRAW' }).waitFor({ timeout: 10_000 });
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByTestId('settings-panel').waitFor({ timeout: 10_000 });
+  await page.getByTestId('settings-category-processing').click();
+  await page.locator('label[for="switch-enable-live-previews"]').click();
+  await page.waitForFunction(() =>
+    (window.__RAWENGINE_BROWSER_TAURI_HARNESS__ ?? { calls: [] }).calls.some(
+      (call) =>
+        call.command === 'save_settings' &&
+        call.args?.settings !== null &&
+        typeof call.args?.settings === 'object' &&
+        'enableLivePreviews' in call.args.settings &&
+        call.args.settings.enableLivePreviews === false,
+    ),
+  );
+  const savedSettings = await page.evaluate(() => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    return calls
+      .filter((call) => call.command === 'save_settings')
+      .map((call) => call.args?.settings)
+      .at(-1);
+  });
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { name: 'RapidRAW' }).waitFor({ timeout: 10_000 });
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByTestId('settings-category-processing').click();
+  const reloadProof = await page.evaluate(() => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    const loaded = calls.filter((call) => call.command === 'load_settings').map((call) => call.args).length;
+    return { loaded };
+  });
+  const livePreviewCheckedAfterReload = await page.getByLabel('Enable live previews').isChecked();
+
+  if (reloadProof.loaded < 1) {
+    throw new Error('Settings UI did not load settings through the Tauri boundary.');
+  }
+  if (
+    savedSettings === null ||
+    typeof savedSettings !== 'object' ||
+    !('enableLivePreviews' in savedSettings) ||
+    savedSettings.enableLivePreviews !== false
+  ) {
+    throw new Error('Settings UI did not persist the live preview preference through save_settings.');
+  }
+  if (livePreviewCheckedAfterReload) {
+    throw new Error('Settings UI did not reload the saved live preview preference.');
+  }
+
+  console.log('settings UI ok');
+} catch (error) {
+  console.error('settings UI failed');
+  if (serverOutput.trim()) console.error(serverOutput.trim());
+  throw error;
+} finally {
+  if (browser !== undefined) await browser.close();
+  await stopServer(server);
+}

@@ -1209,7 +1209,11 @@ export function SettingsPanel({
   return (
     <>
       <ConfirmModal {...confirmModalState} onClose={closeConfirmModal} />
-      <div className="flex flex-col h-full w-full text-text-primary">
+      <div
+        className="flex flex-col h-full w-full text-text-primary"
+        data-active-category={activeCategory}
+        data-testid="settings-panel"
+      >
         <header className="shrink-0 flex flex-wrap items-center justify-between gap-y-4 mb-8 pt-4">
           <div className="flex items-center shrink-0">
             <Button
@@ -1229,6 +1233,7 @@ export function SettingsPanel({
           <div className="relative flex w-full min-[1200px]:w-112.5 p-2 bg-surface rounded-md">
             {settingCategories.map((category) => (
               <button
+                data-testid={`settings-category-${category.id}`}
                 key={category.id}
                 onClick={() => {
                   setActiveCategory(category.id);

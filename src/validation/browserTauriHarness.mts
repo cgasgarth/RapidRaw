@@ -41,12 +41,15 @@ const harnessEnabled =
     ? __RAWENGINE_BROWSER_TAURI_HARNESS__
     : import.meta.env.VITE_RAWENGINE_BROWSER_TAURI_HARNESS === '1';
 const browserHarnessRoot = '/tmp/rawengine-browser-harness';
+const browserHarnessSettingsStorageKey = 'rawengine-browser-tauri-harness-settings-v1';
 const commandNames: Record<
   | 'cancelThumbnailGeneration'
   | 'checkAiConnectorStatus'
   | 'clearSessionCaches'
   | 'frontendReady'
   | 'applyAdjustments'
+  | 'getLensfunMakers'
+  | 'getLogFilePath'
   | 'getAlbumImages'
   | 'getFolderTree'
   | 'getPinnedFolderTrees'
@@ -69,6 +72,8 @@ const commandNames: Record<
   checkAiConnectorStatus: Invokes.CheckAIConnectorStatus,
   clearSessionCaches: Invokes.ClearSessionCaches,
   frontendReady: Invokes.FrontendReady,
+  getLensfunMakers: 'get_lensfun_makers',
+  getLogFilePath: 'get_log_file_path',
   getAlbumImages: Invokes.GetAlbumImages,
   getFolderTree: Invokes.GetFolderTree,
   getPinnedFolderTrees: Invokes.GetPinnedFolderTrees,
@@ -86,7 +91,7 @@ const commandNames: Record<
   updateThumbnailQueue: Invokes.UpdateThumbnailQueue,
 };
 
-const harnessSettings: AppSettings = {
+let harnessSettings: AppSettings = {
   lastRootPath: null,
   editorPreviewResolution: 1024,
   libraryViewMode: LibraryViewMode.Flat,
@@ -131,8 +136,12 @@ export const installBrowserTauriHarness = (): void => {
 const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unknown>): Promise<unknown> => {
   switch (command) {
     case commandNames.loadSettings:
+      harnessSettings = readPersistedHarnessSettings();
       return Promise.resolve(harnessSettings);
     case commandNames.saveSettings:
+      harnessSettings = normalizeHarnessSettings(args?.['settings']);
+      window.localStorage.setItem(browserHarnessSettingsStorageKey, JSON.stringify(harnessSettings));
+      return Promise.resolve(null);
     case commandNames.frontendReady:
     case commandNames.startBackgroundIndexing:
     case commandNames.updateThumbnailQueue:
@@ -167,6 +176,10 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       });
     case commandNames.getPinnedFolderTrees:
       return Promise.resolve([]);
+    case commandNames.getLensfunMakers:
+      return Promise.resolve([]);
+    case commandNames.getLogFilePath:
+      return Promise.resolve('/tmp/rawengine-browser-harness/RapidRAW.log');
     case commandNames.listImagesInDir:
     case commandNames.listImagesRecursive:
       return Promise.resolve([
@@ -203,6 +216,25 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       return Promise.resolve('/Users/browser-harness');
     default:
       return Promise.reject(new Error(`Unhandled browser Tauri harness command: ${command}`));
+  }
+};
+
+const normalizeHarnessSettings = (value: unknown): AppSettings => {
+  if (value !== null && typeof value === 'object') {
+    return { ...harnessSettings, ...(value as Partial<AppSettings>) };
+  }
+
+  return harnessSettings;
+};
+
+const readPersistedHarnessSettings = (): AppSettings => {
+  const raw = window.localStorage.getItem(browserHarnessSettingsStorageKey);
+  if (raw === null) return harnessSettings;
+
+  try {
+    return normalizeHarnessSettings(JSON.parse(raw));
+  } catch {
+    return harnessSettings;
   }
 };
 
