@@ -824,11 +824,12 @@ fn generate_export_soft_proof_preview(
     let preview_dim = target_resolution.unwrap_or(1920).clamp(512, 8192);
     let (preview_image, _, _) =
         generate_transformed_preview(&state, &loaded_image, &adjustments_clone, preview_dim)?;
-    let (proof_pixels, width, height, _) = export_processing::export_rgb_pixels_and_profile(
-        &preview_image,
-        &color_profile,
-        &rendering_intent,
-    )?;
+    let (proof_pixels, width, height, _) =
+        export_processing::export_soft_proof_rgb_pixels_and_profile(
+            &preview_image,
+            &color_profile,
+            &rendering_intent,
+        )?;
 
     Encoder::new(Preset::BaselineFastest)
         .quality(86)

@@ -683,7 +683,7 @@ fn encode_jpeg_to_bytes(
     rendering_intent: &ExportRenderingIntent,
 ) -> Result<Vec<u8>, String> {
     let (rgb_pixels, width, height, output_profile) =
-        export_rgb_pixels_and_profile(image, color_profile, rendering_intent)?;
+        export_jpeg_rgb_pixels_and_profile(image, color_profile, rendering_intent)?;
     let icc_profile = encode_icc_profile(&output_profile)?;
 
     MozJpegEncoder::new(Preset::BaselineBalanced)
@@ -693,7 +693,23 @@ fn encode_jpeg_to_bytes(
         .map_err(|e| format!("Failed to encode JPEG: {}", e))
 }
 
-pub(crate) fn export_rgb_pixels_and_profile(
+pub(crate) fn export_jpeg_rgb_pixels_and_profile(
+    image: &DynamicImage,
+    color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
+) -> Result<(Vec<u8>, u32, u32, ColorProfile), String> {
+    export_rgb_pixels_and_profile(image, color_profile, rendering_intent)
+}
+
+pub(crate) fn export_soft_proof_rgb_pixels_and_profile(
+    image: &DynamicImage,
+    color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
+) -> Result<(Vec<u8>, u32, u32, ColorProfile), String> {
+    export_rgb_pixels_and_profile(image, color_profile, rendering_intent)
+}
+
+fn export_rgb_pixels_and_profile(
     image: &DynamicImage,
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
@@ -1690,7 +1706,8 @@ mod tests {
     use super::{
         ExportColorProfile, ExportRenderingIntent, ExportSettings, OutputSharpeningSettings,
         OutputSharpeningTarget, apply_export_resize_and_watermark, encode_image_to_bytes,
-        export_receipt_metadata, export_rgb_pixels_and_profile, export_rgb16_pixels_and_profile,
+        export_jpeg_rgb_pixels_and_profile, export_receipt_metadata, export_rgb_pixels_and_profile,
+        export_rgb16_pixels_and_profile, export_soft_proof_rgb_pixels_and_profile,
         export_transform_options, mox_rendering_intent,
     };
     use std::io::Cursor;
@@ -2006,6 +2023,54 @@ mod tests {
         assert_ne!(
             display_p3_pixels, srgb_pixels,
             "Display P3 export should transform pixels before tagging them"
+        );
+    }
+
+    #[test]
+    fn display_p3_soft_proof_matches_jpeg_export_rgb8_transform() {
+        let pixels = [
+            Rgb([255, 0, 0]),
+            Rgb([32, 192, 64]),
+            Rgb([8, 48, 224]),
+            Rgb([240, 220, 32]),
+            Rgb([16, 16, 16]),
+            Rgb([250, 250, 250]),
+        ];
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_fn(3, 2, |x, y| {
+            pixels[(y * 3 + x) as usize]
+        }));
+
+        let (soft_proof_pixels, soft_proof_width, soft_proof_height, _) =
+            export_soft_proof_rgb_pixels_and_profile(
+                &image,
+                &ExportColorProfile::DisplayP3,
+                &ExportRenderingIntent::RelativeColorimetric,
+            )
+            .expect("Display P3 soft-proof RGB8 transform should succeed");
+        let (jpeg_pixels, jpeg_width, jpeg_height, _) = export_jpeg_rgb_pixels_and_profile(
+            &image,
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("Display P3 JPEG export RGB8 transform should succeed");
+        let (srgb_pixels, _, _, _) = export_jpeg_rgb_pixels_and_profile(
+            &image,
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("sRGB JPEG export RGB8 transform should succeed");
+
+        assert_eq!(
+            (soft_proof_width, soft_proof_height),
+            (jpeg_width, jpeg_height)
+        );
+        assert_eq!(
+            soft_proof_pixels, jpeg_pixels,
+            "soft proof must feed the same Display P3 RGB8 transform output as JPEG export"
+        );
+        assert_ne!(
+            soft_proof_pixels, srgb_pixels,
+            "fixture must exercise the Display P3 transform, not only dimension/identity plumbing"
         );
     }
 }
