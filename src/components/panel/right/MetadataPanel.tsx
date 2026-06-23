@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, Check, ChevronDown, ChevronRight, GitMerge, Plus, Star, Tag, X, User } from 'lucide-react';
@@ -7,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { useManagedFocus } from '../../../hooks/useManagedFocus';
+import { emptyTauriResponseSchema } from '../../../schemas/tauriResponseSchemas';
 import {
   type XmpMetadataConflictChoice,
   type XmpMetadataConflictDecision,
@@ -19,6 +19,7 @@ import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { COLOR_LABELS, type Color } from '../../../utils/adjustments';
+import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import { Invokes } from '../../ui/AppProperties';
 import UiText from '../../ui/Text';
 import { IconAperture, IconShutter, IconIso, IconFocalLength, IconLens } from '../editor/ExifIcons';
@@ -411,20 +412,23 @@ export default function MetadataPanel() {
 
       setIsCheckingXmpConflicts(true);
       try {
-        const payload = await invoke<unknown>(Invokes.CheckXmpMetadataConflicts, { path: selectedImage.path });
-        const result = xmpMetadataConflictReportSchema.nullable().safeParse(payload);
+        const result = await invokeWithSchema(
+          Invokes.CheckXmpMetadataConflicts,
+          { path: selectedImage.path },
+          xmpMetadataConflictReportSchema.nullable(),
+        );
         if (!isActive) return;
 
-        if (!result.success || result.data === null) {
+        if (result === null) {
           setXmpConflictReport(null);
           setXmpConflictDecisions({});
           return;
         }
 
-        setXmpConflictReport(result.data);
+        setXmpConflictReport(result);
         setXmpConflictDecisions(
           Object.fromEntries(
-            result.data.fields.map((field) => [field.field, field.field === 'keywords' ? 'merge' : 'external']),
+            result.fields.map((field) => [field.field, field.field === 'keywords' ? 'merge' : 'external']),
           ),
         );
       } catch (err) {
@@ -455,7 +459,11 @@ export default function MetadataPanel() {
 
     setIsResolvingXmpConflicts(true);
     try {
-      await invoke(Invokes.ResolveXmpMetadataConflicts, { path: selectedImage.path, decisions });
+      await invokeWithSchema(
+        Invokes.ResolveXmpMetadataConflicts,
+        { path: selectedImage.path, decisions },
+        emptyTauriResponseSchema,
+      );
 
       setLibrary((state) => {
         const nextRatings = { ...state.imageRatings };
@@ -513,7 +521,11 @@ export default function MetadataPanel() {
     if (newTagValue && !currentTags.some((t) => t.tag === newTagValue)) {
       try {
         const prefixedTag = `${USER_TAG_PREFIX}${newTagValue}`;
-        await invoke(Invokes.AddTagForPaths, { paths: targetPaths, tag: prefixedTag });
+        await invokeWithSchema(
+          Invokes.AddTagForPaths,
+          { paths: targetPaths, tag: prefixedTag },
+          emptyTauriResponseSchema,
+        );
 
         const newTags = [...currentTags, { tag: newTagValue, isUser: true }];
         handleTagsChanged(targetPaths, newTags);
@@ -527,7 +539,11 @@ export default function MetadataPanel() {
   const handleRemoveTag = async (tagToRemove: { tag: string; isUser: boolean }) => {
     try {
       const prefixedTag = tagToRemove.isUser ? `${USER_TAG_PREFIX}${tagToRemove.tag}` : tagToRemove.tag;
-      await invoke(Invokes.RemoveTagForPaths, { paths: targetPaths, tag: prefixedTag });
+      await invokeWithSchema(
+        Invokes.RemoveTagForPaths,
+        { paths: targetPaths, tag: prefixedTag },
+        emptyTauriResponseSchema,
+      );
 
       const newTags = currentTags.filter((t) => t.tag !== tagToRemove.tag);
       handleTagsChanged(targetPaths, newTags);
