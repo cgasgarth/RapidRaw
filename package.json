@@ -68,7 +68,7 @@
     "check:color-balance-command-proof": "bun tests/integration/checks/check-color-balance-command-proof.ts",
     "check:color-balance-command-proof:update": "bun tests/integration/checks/check-color-balance-command-proof.ts --update",
     "check:channel-mixer": "bun tests/integration/checks/check-channel-mixer.ts",
-    "check:levels-runtime": "bun tests/integration/checks/check-levels-runtime.ts",
+    "check:levels-runtime": "bun scripts/run-compact-command.ts --label levels-runtime -- bun test --reporter=dot tests/pure-ts/levels-runtime.test.ts",
     "check:color-grading-presets": "bun tests/integration/checks/check-color-grading-presets.ts",
     "check:profile-tone": "bun tests/integration/checks/check-profile-tone.ts",
     "check:camera-profile-lookup": "bun tests/integration/checks/check-camera-profile-lookup-fixtures.ts",
