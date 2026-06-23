@@ -296,6 +296,7 @@ function TreeNode({
   isInstantTransition,
   folderIcons,
 }: TreeNodeProps) {
+  const { t } = useTranslation();
   const hasChildren = node.hasSubdirs || node.children.length > 0;
   const isSelected = node.path === selectedPath;
   const isPinned = pinnedFolders.includes(node.path);
@@ -364,6 +365,7 @@ function TreeNode({
       >
         <button
           type="button"
+          aria-label={isExpanded ? t('library.items.collapseFolder') : t('library.items.expandFolder')}
           className={cx(
             'relative w-5 h-5 flex items-center justify-center p-0.5 rounded-sm transition-colors shrink-0 bg-transparent',
             {

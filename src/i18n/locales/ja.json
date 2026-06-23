@@ -40,7 +40,9 @@
         "global": "グローバル",
         "highlights": "ハイライト",
         "midtones": "中間調",
-        "shadows": "シャドウ"
+        "shadows": "シャドウ",
+        "threeWayTab": "Three-way color grading",
+        "globalTab": "Global color grading"
       },
       "hue": "色相",
       "luminance": "輝度",
@@ -890,7 +892,8 @@
       "adobeRgb1998": "Adobe RGB (1998)",
       "proPhotoRgb": "ProPhoto RGB",
       "sourceEmbedded": "埋め込み元プロファイル"
-    }
+    },
+    "closePanel": "Close export panel"
   },
   "library": {
     "community": {

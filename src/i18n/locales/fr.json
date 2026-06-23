@@ -40,7 +40,9 @@
         "global": "Global",
         "highlights": "Hautes lumières",
         "midtones": "Tons moyens",
-        "shadows": "Ombres"
+        "shadows": "Ombres",
+        "threeWayTab": "Three-way color grading",
+        "globalTab": "Global color grading"
       },
       "hue": "Teinte",
       "luminance": "Luminance",
@@ -908,7 +910,8 @@
       "adobeRgb1998": "Adobe RGB (1998)",
       "proPhotoRgb": "ProPhoto RGB",
       "sourceEmbedded": "Profil source intégré"
-    }
+    },
+    "closePanel": "Close export panel"
   },
   "library": {
     "community": {

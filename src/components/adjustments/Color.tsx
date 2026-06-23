@@ -516,6 +516,11 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
           return (
             <button
               key={tab.id}
+              aria-label={
+                tab.id === '3way'
+                  ? t('adjustments.color.grading.threeWayTab')
+                  : t('adjustments.color.grading.globalTab')
+              }
               onClick={() => {
                 setActiveTab(tab.id as '3way' | 'global');
               }}

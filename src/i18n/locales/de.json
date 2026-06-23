@@ -91,6 +91,7 @@
         "blending": "Mischen",
         "blendingValue": "Mix {{value}}",
         "global": "Global",
+        "globalTab": "Global color grading",
         "highlights": "Lichter",
         "midtones": "Mitteltöne",
         "presetCategories": {
@@ -99,7 +100,8 @@
           "neutral": "Neutral",
           "portrait": "Porträt"
         },
-        "shadows": "Tiefen"
+        "shadows": "Tiefen",
+        "threeWayTab": "Three-way color grading"
       },
       "hue": "Farbton",
       "levels": {
@@ -1232,6 +1234,7 @@
       "mb": "MB",
       "tb": "TB"
     },
+    "closePanel": "Close export panel",
     "colorProfiles": {
       "adobeRgb1998": "Adobe RGB (1998)",
       "displayP3": "Display P3",
