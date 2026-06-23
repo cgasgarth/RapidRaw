@@ -591,6 +591,9 @@
         "duration": {
           "pending": ""
         },
+        "e2e": {
+          "verified": ""
+        },
         "mode": {
           "apply": "",
           "dryRun": "",

@@ -12,6 +12,7 @@ import type {
   AgentChatMessage,
   AgentChatToolCall,
   AgentChatTranscript,
+  AgentE2eClosure,
   AgentFailureRecovery,
   AgentLongEditProgress,
   AgentPrivateRawArtifacts,
@@ -954,6 +955,49 @@ function FailureRecoveryPanel({ recovery }: { recovery: AgentFailureRecovery }) 
   );
 }
 
+function E2eClosurePanel({ closure }: { closure: AgentE2eClosure }) {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      className="space-y-3 rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3"
+      data-step-count={closure.steps.length}
+      data-testid="agent-e2e-closure"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-text-primary">{closure.title}</div>
+          <a className="mt-1 block truncate text-[11px] text-sky-100 hover:underline" href={closure.proofHref}>
+            {closure.proofLabel}
+          </a>
+        </div>
+        <span className="shrink-0 rounded border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-100">
+          {t('editor.ai.agent.e2e.verified')}
+        </span>
+      </div>
+
+      <div className="grid gap-2 text-[11px]" data-testid="agent-e2e-closure-steps">
+        {closure.steps.map((step) => (
+          <div
+            className="rounded border border-white/10 bg-black/15 p-2"
+            data-closure-status={step.status}
+            data-testid={`agent-e2e-closure-step-${step.id}`}
+            key={step.id}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-text-primary">{step.label}</span>
+              <span className="rounded border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-100">
+                {step.status}
+              </span>
+            </div>
+            <p className="mt-1 leading-4 text-text-secondary">{step.summary}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LongEditProgressPanel({ progress }: { progress: AgentLongEditProgress }) {
   const { t } = useTranslation();
   const completedPercent = Math.round((progress.completedStageCount / progress.stages.length) * 100);
@@ -1048,6 +1092,8 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
       {transcript.livePromptWalkthrough ? (
         <LivePromptWalkthroughPanel walkthrough={transcript.livePromptWalkthrough} />
       ) : null}
+
+      {transcript.e2eClosure ? <E2eClosurePanel closure={transcript.e2eClosure} /> : null}
 
       {transcript.failureRecovery ? <FailureRecoveryPanel recovery={transcript.failureRecovery} /> : null}
 

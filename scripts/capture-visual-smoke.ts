@@ -1032,6 +1032,9 @@ async function prepareScenario(page, mode) {
     const progress = page.getByTestId('agent-long-edit-progress');
     await progress.getByText('Long edit progress', { exact: true }).waitFor({ timeout: 10_000 });
     await progress.getByText('Audit save', { exact: true }).waitFor({ timeout: 10_000 });
+    await page.getByTestId('agent-e2e-closure').getByText('Private RAW proved', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
     await scope.getByText('Selected-frame scope', { exact: true }).waitFor({ timeout: 10_000 });
     await page.getByTestId('agent-selected-frame-assets').getByText('DSC_2844.NEF', { exact: true }).waitFor({
       timeout: 10_000,
