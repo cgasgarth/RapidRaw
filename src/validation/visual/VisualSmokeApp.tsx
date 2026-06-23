@@ -2018,6 +2018,10 @@ const panoramaRenderedReviewFixture: PanoramaRenderedReview = {
   },
   warningCodes: ['geometry_estimate_low_confidence', 'legacy_full_frame_render'],
 };
+const panoramaSavedReviewSmokeSettings: PanoramaUiSettings = {
+  ...DEFAULT_PANORAMA_UI_SETTINGS,
+  projection: panoramaRenderedReviewFixture.projection.effective,
+};
 const hdrPreviewSvg = encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640">
   <defs>
@@ -3405,7 +3409,7 @@ function PanoramaSavedReviewVisualSmoke() {
         progressMessage={null}
         renderedReview={panoramaRenderedReviewFixture}
         runtimePlan={panoramaRuntimePlanFixture}
-        settings={DEFAULT_PANORAMA_UI_SETTINGS}
+        settings={panoramaSavedReviewSmokeSettings}
       />
     </main>
   );
