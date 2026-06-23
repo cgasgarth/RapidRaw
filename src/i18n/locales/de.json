@@ -1158,6 +1158,7 @@
       }
     },
     "toolbar": {
+      "exportSoftProofDetails": "{{profile}} / {{intent}} preview",
       "historyDepth": "",
       "tooltips": {
         "aperture": "Blende",

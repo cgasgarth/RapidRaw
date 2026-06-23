@@ -756,7 +756,8 @@
         "shutterSpeed": "Tempo di Esposizione",
         "undo": "Annulla (Ctrl+Z) o Cronologia (Tasto destro)"
       },
-      "vc": "CV"
+      "vc": "CV",
+      "exportSoftProofDetails": "{{profile}} / {{intent}} preview"
     }
   },
   "export": {

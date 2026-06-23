@@ -17,6 +17,11 @@ for (const marker of [
   'isExportSoftProofEnabled',
   'exportSoftProofRecipeId',
   'data-testid="export-soft-proof-toolbar"',
+  'data-testid="export-soft-proof-recipe-details"',
+  'data-export-soft-proof-color-profile',
+  'data-export-soft-proof-rendering-intent',
+  'data-export-soft-proof-status="export-transform-preview"',
+  'editor.toolbar.exportSoftProofDetails',
   'editor.toolbar.tooltips.exportSoftProof',
 ]) {
   if (!toolbarSource.includes(marker)) failures.push(`EditorToolbar missing ${marker}`);
@@ -37,11 +42,14 @@ for (const marker of ['GenerateExportSoftProofPreview', 'generate_export_soft_pr
   }
 }
 
-if (!rustLibSource.includes('export_processing::export_rgb_pixels_and_profile')) {
+if (!rustLibSource.includes('export_processing::export_soft_proof_rgb_pixels_and_profile')) {
   failures.push('Rust soft-proof command does not reuse export color transform.');
 }
 
-if (!rustExportSource.includes('pub(crate) fn export_rgb_pixels_and_profile')) {
+if (
+  !rustExportSource.includes('pub(crate) fn export_soft_proof_rgb_pixels_and_profile') ||
+  !rustExportSource.includes('export_rgb_pixels_and_profile(image, color_profile, rendering_intent)')
+) {
   failures.push('export_rgb_pixels_and_profile is not available to the soft-proof command.');
 }
 
@@ -54,6 +62,10 @@ if (
 
 if (typeof locale.editor?.toolbar?.tooltips?.exportSoftProof !== 'string') {
   failures.push('Missing export soft-proof tooltip locale.');
+}
+
+if (typeof locale.editor?.toolbar?.exportSoftProofDetails !== 'string') {
+  failures.push('Missing export soft-proof details locale.');
 }
 
 if (failures.length > 0) {

@@ -756,7 +756,8 @@
         "shutterSpeed": "Vitesse d'obturation",
         "undo": "Annuler (Ctrl+Z) ou Historique (Clic-droit)"
       },
-      "vc": "CV"
+      "vc": "CV",
+      "exportSoftProofDetails": "{{profile}} / {{intent}} preview"
     }
   },
   "export": {
