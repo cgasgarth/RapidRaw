@@ -354,6 +354,7 @@ export interface SelectedImage {
   exif: ExifData | null;
   height: number;
   isRaw: boolean;
+  isOfflineSmartPreview?: boolean;
   isReady: boolean;
   metadata?: unknown;
   original_base64?: string;

@@ -1060,6 +1060,9 @@
         "title": "XMP conflict"
       }
     },
+    "offlineSmartPreview": {
+      "warning": "Original file is disconnected. Edits are preview-only until the original is reconnected; full-resolution export is unavailable."
+    },
     "presets": {
       "applyPresetLabel": "Apply preset {{name}}",
       "colorStyles": {
@@ -1265,6 +1268,7 @@
       "failed": "Export failed",
       "noImageSelected": "No image selected for export.",
       "noImagesSelected": "No images selected.",
+      "offlineSmartPreviewBlocked": "Reconnect the original file before full-resolution export. You can keep editing the smart preview.",
       "showInFinder": "Show in Finder",
       "success": "Export successful!"
     },
