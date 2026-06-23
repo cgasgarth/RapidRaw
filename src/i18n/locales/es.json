@@ -1222,7 +1222,9 @@
         "low": "Low confidence",
         "medium": "Medium confidence"
       },
-      "focusReviewOnlyHint": "Review aid only - RawEngine will not auto-reject from focus confidence."
+      "focusReviewOnlyHint": "Review aid only - RawEngine will not auto-reject from focus confidence.",
+      "eyeFaceBalanceValue": "Eye/face balance {{balance}}%",
+      "eyeSharpnessReviewWarning": "Review eyes manually - face detail is sharper than the eye band."
     },
     "denoise": {
       "batchProgressText": "Reduciendo ruido de {{current}} de {{total}}...",
