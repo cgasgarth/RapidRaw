@@ -30,6 +30,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   SrPrivateRawModalReview: 'sr-private-raw-modal-review',
   SrPrivateRawUi: 'sr-private-raw-ui',
   SrUi: 'sr-ui',
+  TetherDiscoveryUi: 'tether-discovery-ui',
   WorkflowRail: 'workflow-rail',
 } as const;
 
@@ -68,6 +69,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Culling compare sync',
     mode: VISUAL_SMOKE_SCENARIO_IDS.CullingCompareSync,
     outputFile: 'culling-compare-sync.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Tethered camera discovery',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.TetherDiscoveryUi,
+    outputFile: 'tether-discovery-ui.png',
     sectionMinimum: 1,
   },
   {

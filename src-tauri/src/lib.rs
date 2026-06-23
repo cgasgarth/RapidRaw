@@ -66,6 +66,7 @@ mod raw_processing;
 mod sr_real_raw_proof;
 mod tagging;
 mod tagging_utils;
+mod tethering;
 mod wavelet_render;
 mod window_customizer;
 
@@ -2703,6 +2704,7 @@ pub fn run() {
             tagging::add_tag_for_paths,
             tagging::remove_tag_for_paths,
             culling::cull_images,
+            tethering::discover_tethered_cameras,
             deblur_api::dry_run_deblur_controls,
             lens_correction::get_lensfun_makers,
             lens_correction::get_lensfun_lenses_for_maker,

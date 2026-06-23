@@ -17,6 +17,7 @@ import AgentChatShell from '../../components/panel/right/AgentChatShell';
 import { MaskOverlayReviewControls } from '../../components/panel/right/MaskOverlayReviewControls';
 import { Mask, SubMaskMode, ToolType, type SubMask } from '../../components/panel/right/Masks';
 import RightPanelSwitcher from '../../components/panel/right/RightPanelSwitcher';
+import { TetherPanel } from '../../components/panel/right/TetherPanel';
 import {
   Panel,
   type BrushSettings,
@@ -61,6 +62,7 @@ import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformit
 import type { FocusStackOutputReviewWorkflow } from '../../schemas/focusStackOutputReviewSchemas';
 import type { MaskOverlaySettings } from '../../schemas/maskOverlaySchemas';
 import type { SuperResolutionOutputReviewWorkflow } from '../../schemas/superResolutionOutputReviewSchemas';
+import type { TetherDiscoveryResponse } from '../../schemas/tetheringSchemas';
 import type { SuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
 
 interface VisualSmokeAppProps {
@@ -221,6 +223,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawModalReview]: SuperResolutionPrivateRawModalReviewSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi]: SuperResolutionPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrUi]: SuperResolutionVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.TetherDiscoveryUi]: TetherDiscoveryVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.WorkflowRail]: WorkflowRailVisualSmoke,
 } satisfies Partial<Record<VisualSmokeMode, () => ReactElement>>;
 type VisualSmokeComponentMode = keyof typeof visualSmokeComponents;
@@ -234,6 +237,44 @@ const workflowRailRuntime = 'UI polish';
 const workflowRailTargetProof = 'Fixed 36px icon targets keep the rail compact without changing panel order.';
 const workflowRailActivePanelLabel = 'Active panel';
 const workflowRailNoPanelLabel = 'none';
+const tetherDiscoverySmokeTitle = 'Tethered camera discovery';
+const tetherDiscoveryMockResponse: TetherDiscoveryResponse = {
+  cameras: [
+    {
+      batteryPercent: 87,
+      capabilities: [
+        { id: 'discovery', label: 'Discovery', status: 'ready' },
+        { id: 'battery_status', label: 'Battery reported', status: 'ready' },
+        { id: 'storage_status', label: 'Storage reported', status: 'ready' },
+        { id: 'remote_capture', label: 'Remote capture not implemented', status: 'not_checked' },
+      ],
+      connection: {
+        transport: 'USB-C PTP',
+        trusted: true,
+      },
+      displayName: 'Sony ILCE-7M4',
+      id: 'validation-camera-sony-a7iv',
+      make: 'Sony',
+      model: 'ILCE-7M4',
+      storage: {
+        freeGb: 118.4,
+        label: 'Slot 1',
+        state: 'ready',
+      },
+    },
+  ],
+  provider: {
+    adapter: 'visual_smoke_tether_provider',
+    message: 'Visual smoke provider proves the discovery panel without requiring a physical camera.',
+    mode: 'fake',
+    status: 'ready',
+  },
+  proof: {
+    fakeProviderAvailable: true,
+    macosProviderBoundary: 'visual_smoke_provider_not_hardware_capture',
+    manualHardwareRequired: true,
+  },
+};
 
 const brushMaskCanvasImageWidth = 640;
 const brushMaskCanvasImageHeight = 360;
@@ -535,6 +576,27 @@ function WorkflowRailVisualSmoke() {
               />
             </div>
           </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function TetherDiscoveryVisualSmoke() {
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.TetherDiscoveryUi}
+    >
+      <div className="grid h-screen grid-cols-[1fr_420px] bg-[#0f1114]" data-visual-smoke-section="tether-discovery">
+        <section className="flex min-w-0 items-center justify-center border-r border-white/10 bg-[#121518] p-10">
+          <div className="aspect-[4/3] w-full max-w-4xl rounded-md border border-white/10 bg-gradient-to-br from-[#22313a] via-[#6a715f] to-[#d6aa71] shadow-2xl" />
+        </section>
+
+        <aside className="overflow-y-auto border-l border-white/10 bg-[#171a1f]">
+          <div className="border-b border-white/10 px-4 py-3 text-sm font-semibold">{tetherDiscoverySmokeTitle}</div>
+          <TetherPanel discoverCameras={() => Promise.resolve(tetherDiscoveryMockResponse)} />
         </aside>
       </div>
     </main>

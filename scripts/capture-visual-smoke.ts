@@ -1122,6 +1122,28 @@ async function prepareScenario(page, mode) {
     return;
   }
 
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.TetherDiscoveryUi) {
+    const panel = page.getByTestId('tether-panel');
+    await panel.waitFor({ timeout: 10_000 });
+    await page.getByTestId('tether-camera-card').getByRole('heading', { name: 'Sony ILCE-7M4' }).waitFor({
+      timeout: 10_000,
+    });
+    await page
+      .getByTestId('tether-provider-status')
+      .getByText('visual_smoke_tether_provider', { exact: true })
+      .waitFor({
+        timeout: 10_000,
+      });
+    const readyBadgeCount = await page.locator('[data-capability-status="ready"]').count();
+    if (readyBadgeCount !== 3) {
+      throw new Error(`Expected 3 ready tether capabilities, found ${readyBadgeCount}.`);
+    }
+    await page.getByTestId('tether-capture-disabled').getByText('Capture not implemented', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    return;
+  }
+
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.BrushMaskCanvasUi) {
     await page.getByRole('button', { name: 'Size 96' }).click();
     await page.getByRole('button', { name: 'Feather 64' }).click();

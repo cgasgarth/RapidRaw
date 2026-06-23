@@ -131,6 +131,7 @@ export enum Invokes {
   StitchPanorama = 'stitch_panorama',
   MergeHdr = 'merge_hdr',
   TestAIConnectorConnection = 'test_ai_connector_connection',
+  DiscoverTetheredCameras = 'discover_tethered_cameras',
   UpdateWgpuTransform = 'update_wgpu_transform',
   UpdateThumbnailQueue = 'update_thumbnail_queue',
   UpdateExifFields = 'update_exif_fields',
@@ -158,6 +159,7 @@ export enum Panel {
   Masks = 'masks',
   Metadata = 'metadata',
   Presets = 'presets',
+  Tether = 'tether',
 }
 
 export enum RawStatus {
