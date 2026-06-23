@@ -183,6 +183,27 @@ function ArtifactReviewPanel({ review }: { review: AgentArtifactReview }) {
         ))}
       </div>
 
+      <div className="grid gap-2 text-[11px] md:grid-cols-2" data-testid="agent-replay-gallery">
+        {review.replayGallery.map((entry) => (
+          <a
+            className="rounded border border-white/10 bg-black/15 p-2 hover:border-primary/50"
+            data-artifact-id={entry.artifactId}
+            data-gallery-role={entry.role}
+            data-tool-call-id={entry.toolCallId}
+            href={entry.href}
+            key={entry.id}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-text-primary">{entry.label}</span>
+              <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 uppercase text-text-secondary">
+                {entry.role}
+              </span>
+            </div>
+            <div className="mt-1 truncate font-mono text-text-secondary">{entry.artifactId}</div>
+          </a>
+        ))}
+      </div>
+
       <div className="space-y-1" data-testid="agent-audit-entries">
         {review.auditEntries.map((entry) => (
           <a

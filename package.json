@@ -556,6 +556,7 @@
     "check:agent-handoff-rollback-restore": "bun tests/integration/checks/check-agent-handoff-rollback-restore.ts",
     "check:agent-failure-recovery": "bun tests/integration/checks/check-agent-failure-recovery.ts",
     "check:agent-long-edit-progress": "bun tests/integration/checks/check-agent-long-edit-progress.ts",
+    "check:agent-replay-gallery": "bun tests/integration/checks/check-agent-replay-gallery.ts",
     "check:layer-workflow-smoke": "bun scripts/capture-visual-smoke.ts --scenario layer-stack-workflow",
     "check:rawengine-app-server-host": "bun tests/integration/checks/check-rawengine-app-server-host.ts",
     "check:rawengine-local-app-server-bridge": "bun tests/integration/checks/check-rawengine-local-app-server-bridge.ts",

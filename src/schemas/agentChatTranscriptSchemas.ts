@@ -215,6 +215,20 @@ export const agentArtifactReviewSchema = z
           .strict(),
       )
       .min(1),
+    replayGallery: z
+      .array(
+        z
+          .object({
+            artifactId: z.string().min(1),
+            href: z.string().min(1),
+            id: z.string().min(1),
+            label: z.string().min(1),
+            role: z.enum(['source', 'dry_run', 'output', 'rollback']),
+            toolCallId: z.string().min(1),
+          })
+          .strict(),
+      )
+      .min(4),
   })
   .strict();
 
