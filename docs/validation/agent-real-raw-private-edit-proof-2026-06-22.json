@@ -1,0 +1,14 @@
+{
+  "appliedGraphRevision": "history_0:apply:basic_tone_agent_private_raw_3126_0:apply:selective_color_agent_private_raw_3126_1",
+  "changedPixelCount": 4,
+  "fixtureId": "agent.private-raw.local-alaska-edit.v1",
+  "outputHash": "8daf8e2a",
+  "prompt": "Make this private Alaska RAW warmer with cleaner shadows and a polished contrast pop.",
+  "recipeKind": "warm_portrait_pop",
+  "schemaVersion": 1,
+  "selectedRawBasename": "_DSC8786.ARW",
+  "sourceHashAfter": "sha256:b26b15620ea2c5c7c1db19f1f1c59b06806cf78ea398aa220ee27035d504cb3d",
+  "sourceHashBefore": "sha256:b26b15620ea2c5c7c1db19f1f1c59b06806cf78ea398aa220ee27035d504cb3d",
+  "sourceHashUnchanged": true,
+  "validationMode": "agent_real_raw_private_runtime_apply"
+}
