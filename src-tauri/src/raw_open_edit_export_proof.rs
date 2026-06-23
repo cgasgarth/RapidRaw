@@ -2,14 +2,18 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 
 use chrono::{SecondsFormat, Utc};
-use image::{DynamicImage, ImageFormat};
+use image::{DynamicImage, ImageFormat, RgbImage};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::app_settings::{AppSettings, load_settings_or_default};
 use crate::app_state::AppState;
-use crate::export_processing::process_image_for_export_pipeline_with_tonemapper_override;
+use crate::export_processing::{
+    ExportColorProfile, ExportRenderingIntent, export_jpeg_rgb_pixels_and_profile,
+    export_soft_proof_rgb_pixels_and_profile,
+    process_image_for_export_pipeline_with_tonemapper_override,
+};
 use crate::formats::is_raw_file;
 use crate::image_loader::load_base_image_from_bytes;
 use crate::image_processing::{
@@ -247,6 +251,8 @@ pub struct RawOpenEditExportRuntimeEnvironment {
 pub struct RawOpenEditExportRenderPathProof {
     pub export_after_format: String,
     pub export_after_writer_id: String,
+    pub soft_proof_after_format: String,
+    pub soft_proof_after_writer_id: String,
     pub preview_after_format: String,
     pub preview_after_writer_id: String,
     pub preview_before_writer_id: String,
@@ -342,6 +348,28 @@ fn run_raw_open_edit_export_proof_with_context(
         tm_override,
         &[],
     )?;
+    let export_color_profile =
+        export_color_profile_for_proof(&request.edit_command.color_pipeline.render_target)?;
+    let export_rendering_intent =
+        export_rendering_intent_for_proof(&request.edit_command.color_pipeline.render_target)?;
+    let (soft_proof_after_pixels, soft_proof_after_width, soft_proof_after_height, _) =
+        export_soft_proof_rgb_pixels_and_profile(
+            &preview_after,
+            &export_color_profile,
+            &export_rendering_intent,
+        )?;
+    let (export_rgb8_pixels, export_rgb8_width, export_rgb8_height, _) =
+        export_jpeg_rgb_pixels_and_profile(
+            &preview_after,
+            &export_color_profile,
+            &export_rendering_intent,
+        )?;
+    if (soft_proof_after_width, soft_proof_after_height) != (export_rgb8_width, export_rgb8_height)
+    {
+        return Err("soft proof and export transform dimensions diverged.".to_string());
+    }
+    let soft_proof_export_rgb8_mean_abs_delta =
+        mean_abs_delta_rgb8(&soft_proof_after_pixels, &export_rgb8_pixels)?;
 
     let slug = slug_from_fixture_id(&request.fixture_id);
     let preview_before_relative = format!(
@@ -354,6 +382,10 @@ fn run_raw_open_edit_export_proof_with_context(
     );
     let export_after_relative = format!(
         "{}/{}-export-after.tiff",
+        request.artifact_dir_relative, slug
+    );
+    let soft_proof_after_relative = format!(
+        "{}/{}-soft-proof-after.png",
         request.artifact_dir_relative, slug
     );
     let sidecar_after_relative = format!("{}/{}-after.rrdata", request.artifact_dir_relative, slug);
@@ -379,6 +411,14 @@ fn run_raw_open_edit_export_proof_with_context(
         &export_after_relative,
         &export_after,
         ImageFormat::Tiff,
+    )?;
+    write_rgb8_image(
+        &private_root,
+        &soft_proof_after_relative,
+        soft_proof_after_pixels,
+        soft_proof_after_width,
+        soft_proof_after_height,
+        ImageFormat::Png,
     )?;
 
     let sidecar_path = resolve_private_relative(&private_root, &sidecar_after_relative)?;
@@ -415,6 +455,11 @@ fn run_raw_open_edit_export_proof_with_context(
             "export_after_private",
             &export_after_relative,
         )?,
+        hashed_artifact(
+            &private_root,
+            "soft_proof_after_private",
+            &soft_proof_after_relative,
+        )?,
         artifact("sidecar_after_private", &sidecar_after_path),
     ];
 
@@ -440,6 +485,12 @@ fn run_raw_open_edit_export_proof_with_context(
                 preview_export_mean_abs_delta <= 0.015,
             ),
             metric(
+                "softProofExportRgb8MeanAbsDelta",
+                soft_proof_export_rgb8_mean_abs_delta,
+                0.0,
+                soft_proof_export_rgb8_mean_abs_delta == 0.0,
+            ),
+            metric(
                 "sidecarReloadRevisionMatch",
                 if sidecar_reload_revision_match {
                     1.0
@@ -461,6 +512,8 @@ fn run_raw_open_edit_export_proof_with_context(
         render_paths: RawOpenEditExportRenderPathProof {
             export_after_format: "tiff".to_string(),
             export_after_writer_id: "raw_open_edit_export_export_after".to_string(),
+            soft_proof_after_format: "png".to_string(),
+            soft_proof_after_writer_id: "raw_open_edit_export_soft_proof_after".to_string(),
             preview_after_format: "png".to_string(),
             preview_after_writer_id: "raw_open_edit_export_preview_after".to_string(),
             preview_before_writer_id: "raw_open_edit_export_preview_before".to_string(),
@@ -685,6 +738,37 @@ fn tonemapper_override_for_proof(pipeline: &RawOpenEditExportColorPipeline) -> O
     }
 }
 
+fn export_color_profile_for_proof(
+    render_target: &RawOpenEditExportRenderTarget,
+) -> Result<ExportColorProfile, String> {
+    match render_target.output_profile.as_str() {
+        "adobe_rgb_1998" => Ok(ExportColorProfile::AdobeRgb1998),
+        "display_p3" => Ok(ExportColorProfile::DisplayP3),
+        "prophoto_rgb" => Ok(ExportColorProfile::ProPhotoRgb),
+        "source_embedded" => Ok(ExportColorProfile::SourceEmbedded),
+        "srgb" => Ok(ExportColorProfile::Srgb),
+        _ => Err(format!(
+            "Unsupported soft-proof output profile {}.",
+            render_target.output_profile
+        )),
+    }
+}
+
+fn export_rendering_intent_for_proof(
+    render_target: &RawOpenEditExportRenderTarget,
+) -> Result<ExportRenderingIntent, String> {
+    match render_target.intent.as_str() {
+        "absolute_colorimetric" => Ok(ExportRenderingIntent::AbsoluteColorimetric),
+        "perceptual" => Ok(ExportRenderingIntent::Perceptual),
+        "relative_colorimetric" => Ok(ExportRenderingIntent::RelativeColorimetric),
+        "saturation" => Ok(ExportRenderingIntent::Saturation),
+        _ => Err(format!(
+            "Unsupported soft-proof rendering intent {}.",
+            render_target.intent
+        )),
+    }
+}
+
 fn write_image(
     private_root: &Path,
     relative_path: &str,
@@ -698,6 +782,20 @@ fn write_image(
     image
         .save_with_format(path, format)
         .map_err(|error| error.to_string())
+}
+
+fn write_rgb8_image(
+    private_root: &Path,
+    relative_path: &str,
+    pixels: Vec<u8>,
+    width: u32,
+    height: u32,
+    format: ImageFormat,
+) -> Result<(), String> {
+    let image = RgbImage::from_raw(width, height, pixels)
+        .map(DynamicImage::ImageRgb8)
+        .ok_or_else(|| "soft-proof RGB8 buffer dimensions are invalid.".to_string())?;
+    write_image(private_root, relative_path, &image, format)
 }
 
 fn resolve_private_relative(private_root: &Path, relative_path: &str) -> Result<PathBuf, String> {
@@ -808,6 +906,23 @@ fn mean_abs_delta(first: &DynamicImage, second: &DynamicImage) -> f64 {
         }
     }
     total / f64::from(width * height * 4)
+}
+
+fn mean_abs_delta_rgb8(first: &[u8], second: &[u8]) -> Result<f64, String> {
+    if first.len() != second.len() {
+        return Err("soft proof and export transform byte lengths diverged.".to_string());
+    }
+    if first.is_empty() {
+        return Ok(0.0);
+    }
+
+    let total = first
+        .iter()
+        .zip(second.iter())
+        .map(|(first_byte, second_byte)| f64::from(first_byte.abs_diff(*second_byte)) / 255.0)
+        .sum::<f64>();
+
+    Ok(total / first.len() as f64)
 }
 
 fn slug_from_fixture_id(fixture_id: &str) -> String {
@@ -1139,6 +1254,8 @@ mod tests {
                 preview_after_format: "png".to_string(),
                 preview_after_writer_id: "raw_open_edit_export_preview_after".to_string(),
                 preview_before_writer_id: "raw_open_edit_export_preview_before".to_string(),
+                soft_proof_after_format: "png".to_string(),
+                soft_proof_after_writer_id: "raw_open_edit_export_soft_proof_after".to_string(),
             },
             report_id: "raw-open-edit-export-run.sample.v1".to_string(),
             sidecar_after: asset.clone(),
@@ -1294,6 +1411,20 @@ mod tests {
                 .metrics
                 .iter()
                 .any(|metric| metric.name == "previewExportMeanAbsDelta" && metric.passed)
+        );
+        assert!(
+            report
+                .artifacts
+                .iter()
+                .any(|artifact| artifact.kind == "soft_proof_after_private")
+        );
+        assert!(
+            report
+                .metrics
+                .iter()
+                .any(|metric| metric.name == "softProofExportRgb8MeanAbsDelta"
+                    && metric.passed
+                    && metric.value == 0.0)
         );
     }
 
