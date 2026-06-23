@@ -2137,12 +2137,20 @@ async function prepareScenario(page, mode) {
 
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.NegativeLabBatchColorWorkspace) {
     await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabWorkspace).waitFor({ timeout: 10_000 });
-    await page.getByTestId('negative-lab-acquisition-health').waitFor({ timeout: 10_000 });
-    await page
-      .getByTestId('negative-lab-acquisition-severity')
-      .getByText('Ready', { exact: true })
-      .waitFor({ timeout: 10_000 });
+    const acquisitionHealth = page.getByTestId('negative-lab-acquisition-health');
+    await acquisitionHealth.waitFor({ timeout: 10_000 });
+    const acquisitionSeverity = await acquisitionHealth.getAttribute('data-acquisition-severity');
+    if (acquisitionSeverity !== 'review') {
+      throw new Error(
+        `Negative Lab batch-color acquisition severity expected review, received ${acquisitionSeverity}.`,
+      );
+    }
+    await page.getByTestId('negative-lab-acquisition-severity').waitFor({ timeout: 10_000 });
     await page.getByTestId('negative-lab-acquisition-source-tiff_scan').waitFor({ timeout: 10_000 });
+    await page.getByTestId('negative-lab-acquisition-source-jpeg_lossy').waitFor({ timeout: 10_000 });
+    await page.getByTestId('negative-lab-acquisition-warning-lab_processed_input_for_negative_lab').waitFor({
+      timeout: 10_000,
+    });
     await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabBatchReadiness).waitFor({ timeout: 10_000 });
     await page
       .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabQueuedCount)
