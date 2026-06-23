@@ -17,7 +17,7 @@
     "icc_colorimetric_accuracy"
   ],
   "fixtureId": "validation.color.professional-workflow.local-cc-raw.v1",
-  "generatedAt": "2026-06-21T00:41:03.440Z",
+  "generatedAt": "2026-06-23T14:30:18.378Z",
   "e2eIssue": 2309,
   "issue": 2309,
   "proofBoundary": "private_raw_runtime_plus_visual_smoke_not_full_macos_manual_e2e",
@@ -27,8 +27,9 @@
     "command": "RAWENGINE_RUN_PRIVATE_RAW_PROFESSIONAL_COLOR_PROOF=1 RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root cargo +1.95.0 test --manifest-path src-tauri/Cargo.toml --locked --no-default-features --features required-ci,validation-harness,tauri-test raw_open_edit_export_proof::tests::private_runtime_smoke_generates_professional_color_report_when_enabled -- --nocapture",
     "editCommandId": "command.raw-open-edit-export.professional-color.v1",
     "metrics": {
-      "changedPixelRatio": 0.9598651666666667,
+      "changedPixelRatio": 0.9646880416666667,
       "previewExportMeanAbsDelta": 0,
+      "softProofExportRgb8MeanAbsDelta": 0,
       "sourceHashUnchanged": 1
     },
     "rawRuntimeFixtureId": "validation.raw-open-edit-export.professional-color.v1",
@@ -37,7 +38,9 @@
       "exportAfterWriterId": "raw_open_edit_export_export_after",
       "previewAfterFormat": "png",
       "previewAfterWriterId": "raw_open_edit_export_preview_after",
-      "previewBeforeWriterId": "raw_open_edit_export_preview_before"
+      "previewBeforeWriterId": "raw_open_edit_export_preview_before",
+      "softProofAfterFormat": "png",
+      "softProofAfterWriterId": "raw_open_edit_export_soft_proof_after"
     },
     "status": "passed",
     "workflowReportPath": "private-artifacts/validation/open-edit-export/professional-color-v1-workflow-report.json"
@@ -63,21 +66,27 @@
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:b7c68dd85b6e638a17ec1a38651e344b61d51618ac9614f74c7da990bd980dc1",
+      "hash": "sha256:6fb2638513c73787e9103718ec5859496a4e170943e72274c06b43f6c4205539",
       "kind": "preview_before_private",
       "path": "private-artifacts/validation/open-edit-export/professional-color-v1-preview-before.png",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:b16532fd7387855696deba488503977f5889dcb7b81d4ecff35668e26f3ac220",
+      "hash": "sha256:b7a3a87b8eef39496d2d408ee783af61420a0541e782d685675d505137921ca5",
       "kind": "preview_after_private",
       "path": "private-artifacts/validation/open-edit-export/professional-color-v1-preview-after.png",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:42e4b344219ca2747ed175c43918360db869e1f374ecc25e8c817f63541e19dc",
+      "hash": "sha256:dc23738420230044f20ba44324e656410f560284632f853a71dcfc619401a9a3",
       "kind": "export_after_private",
       "path": "private-artifacts/validation/open-edit-export/professional-color-v1-export-after.tiff",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:98420f4f30444f000d0de1dbefb2bac4880a3d2ab7d2d4e76b7795058e150eee",
+      "kind": "soft_proof_after_private",
+      "path": "private-artifacts/validation/open-edit-export/professional-color-v1-soft-proof-after.png",
       "publicRepoAllowed": false
     },
     {
@@ -87,7 +96,7 @@
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:5f3a8cc38da23e79888293830e9795899dd9b8c7b3691b0e47b61f4f973a4e07",
+      "hash": "sha256:f5fe207e67daf7f9f5ae1cacceb3b9bef4067ea1789c542a33078f131b1acd93",
       "kind": "visual_smoke_screenshot",
       "path": "artifacts/visual-smoke/color-workflow.png",
       "publicRepoAllowed": false

@@ -19,6 +19,7 @@ const proofArtifactSchema = z
       'preview_before_private',
       'preview_after_private',
       'export_after_private',
+      'soft_proof_after_private',
       'sidecar_after_private',
       'workflow_report_private',
     ]),
@@ -29,7 +30,12 @@ const proofArtifactSchema = z
 
 const proofMetricSchema = z
   .object({
-    name: z.enum(['previewExportMeanAbsDelta', 'sidecarReloadRevisionMatch', 'sourceHashUnchanged']),
+    name: z.enum([
+      'previewExportMeanAbsDelta',
+      'softProofExportRgb8MeanAbsDelta',
+      'sidecarReloadRevisionMatch',
+      'sourceHashUnchanged',
+    ]),
     required: z.literal(true),
     threshold: z.number().min(0),
   })

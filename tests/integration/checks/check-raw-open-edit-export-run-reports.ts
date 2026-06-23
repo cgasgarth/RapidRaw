@@ -104,6 +104,9 @@ for (const report of reports) {
     if (report.renderPaths.exportAfterFormat !== 'tiff') {
       failures.push(`${report.fixtureId}: exportAfterFormat must be tiff.`);
     }
+    if (report.renderPaths.softProofAfterFormat !== 'png') {
+      failures.push(`${report.fixtureId}: softProofAfterFormat must be png.`);
+    }
   }
 
   const reportMetrics = new Map(report.metrics.map((metric) => [metric.name, metric]));

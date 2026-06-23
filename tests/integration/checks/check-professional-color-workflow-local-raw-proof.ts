@@ -32,6 +32,7 @@ const artifactSchema = z
       'preview_before_private',
       'preview_after_private',
       'export_after_private',
+      'soft_proof_after_private',
       'sidecar_after_private',
       'visual_smoke_screenshot',
     ]),
@@ -44,6 +45,7 @@ const metricSchema = z
   .object({
     changedPixelRatio: z.number().gt(0),
     previewExportMeanAbsDelta: z.number().min(0).max(0.015),
+    softProofExportRgb8MeanAbsDelta: z.literal(0),
     sourceHashUnchanged: z.literal(1),
   })
   .strict();
@@ -55,6 +57,8 @@ const renderPathsSchema = z
     previewAfterFormat: z.literal('png'),
     previewAfterWriterId: z.string().trim().min(1),
     previewBeforeWriterId: z.string().trim().min(1),
+    softProofAfterFormat: z.literal('png'),
+    softProofAfterWriterId: z.string().trim().min(1),
   })
   .strict();
 
@@ -117,7 +121,7 @@ const reportSchema = z
       .array(z.enum([PROFESSIONAL_SOURCE_FOLDER_PROOF_COMMAND, PROFESSIONAL_ASSET_PROOF_COMMAND]))
       .length(2),
     validationMode: z.literal('local_cc_raw_runtime_plus_visual_smoke'),
-    workflowArtifacts: z.array(artifactSchema).length(6),
+    workflowArtifacts: z.array(artifactSchema).length(7),
   })
   .strict()
   .superRefine((report, context) => {
@@ -140,6 +144,7 @@ const workflowMetricSchema = z
     name: z.enum([
       'changedPixelRatio',
       'previewExportMeanAbsDelta',
+      'softProofExportRgb8MeanAbsDelta',
       'sidecarReloadRevisionMatch',
       'sourceHashUnchanged',
     ]),
@@ -155,9 +160,9 @@ const workflowReportSchema = z
           .omit({ kind: true })
           .extend({ kind: artifactSchema.shape.kind.exclude(['visual_smoke_screenshot']) }),
       )
-      .length(5),
+      .length(6),
     fixtureId: z.literal(request.fixtureId),
-    metrics: z.array(workflowMetricSchema).length(4),
+    metrics: z.array(workflowMetricSchema).length(5),
     renderPaths: renderPathsSchema,
     sourceRaw: z.object({ hash: hashSchema, path: z.string(), publicRepoAllowed: z.literal(false) }).strict(),
   })
@@ -277,6 +282,7 @@ function metricMap(metrics: ReadonlyArray<z.infer<typeof workflowMetricSchema>>)
   return {
     changedPixelRatio: requiredMetric(byName, 'changedPixelRatio'),
     previewExportMeanAbsDelta: requiredMetric(byName, 'previewExportMeanAbsDelta'),
+    softProofExportRgb8MeanAbsDelta: requiredMetric(byName, 'softProofExportRgb8MeanAbsDelta'),
     sourceHashUnchanged: requiredMetric(byName, 'sourceHashUnchanged'),
   };
 }
