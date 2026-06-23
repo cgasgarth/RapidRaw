@@ -186,6 +186,7 @@
     "check:dust-spot-visualization-smoke": "bun scripts/capture-visual-smoke.ts --scenario detail-dust-spot",
     "check:denoise-cpu-reference": "bun tests/integration/checks/check-denoise-cpu-reference.ts",
     "check:export-recipes": "bun tests/integration/checks/check-export-recipe-fixtures.ts",
+    "check:export-rendering-intent": "bun tests/integration/checks/check-export-rendering-intent.ts",
     "check:export-batch-proof": "bun tests/integration/checks/check-export-batch-proof.ts",
     "check:export-batch-proof:update": "bun tests/integration/checks/check-export-batch-proof.ts --update",
     "check:export-readiness-ui": "bun tests/integration/checks/check-export-readiness-ui.ts",

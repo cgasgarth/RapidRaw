@@ -22,6 +22,7 @@ import Button from '../../ui/Button';
 import Dropdown from '../../ui/Dropdown';
 import {
   ExportColorProfile,
+  ExportRenderingIntent,
   type ExportPreset,
   type ExportSettings,
   type FileFormat,
@@ -270,6 +271,8 @@ export default function ExportPanel({
     setPreserveFolders,
     colorProfile,
     setColorProfile,
+    renderingIntent,
+    setRenderingIntent,
     handleApplyPreset,
     currentSettingsObject,
   } = useExportSettings();
@@ -328,7 +331,9 @@ export default function ExportPanel({
   const firstReceiptFileName = firstReceiptOutput?.outputPath.split(/[\\/]/).pop() ?? '';
   const firstReceiptMetadataText =
     firstReceiptOutput?.colorProfile && firstReceiptOutput.bitDepth
-      ? `${firstReceiptOutput.colorProfile} · ${firstReceiptOutput.bitDepth}-bit`
+      ? [firstReceiptOutput.colorProfile, `${firstReceiptOutput.bitDepth}-bit`, firstReceiptOutput.renderingIntent]
+          .filter(Boolean)
+          .join(' · ')
       : null;
   const isExporting = status === Status.Exporting;
   const isLibraryContext = !!onClose;
@@ -467,6 +472,15 @@ export default function ExportPanel({
     ],
     [t],
   );
+  const renderingIntentOptions = useMemo(
+    () => [
+      { label: t('export.renderingIntents.relativeColorimetric'), value: ExportRenderingIntent.RelativeColorimetric },
+      { label: t('export.renderingIntents.perceptual'), value: ExportRenderingIntent.Perceptual },
+      { label: t('export.renderingIntents.saturation'), value: ExportRenderingIntent.Saturation },
+      { label: t('export.renderingIntents.absoluteColorimetric'), value: ExportRenderingIntent.AbsoluteColorimetric },
+    ],
+    [t],
+  );
 
   const debouncedEstimateSize = useMemo(
     () =>
@@ -519,6 +533,7 @@ export default function ExportPanel({
       stripGps,
       exportMasks: !isLibraryContext ? exportMasks : undefined,
       outputSharpening: parsedOutputSharpening,
+      renderingIntent,
       watermark:
         enableWatermark && watermarkPath
           ? {
@@ -541,6 +556,7 @@ export default function ExportPanel({
     selectedImage?.path,
     fileFormat,
     colorProfile,
+    renderingIntent,
     jpegQuality,
     enableResize,
     resizeMode,
@@ -601,6 +617,7 @@ export default function ExportPanel({
       stripGps,
       exportMasks: !isLibraryContext ? exportMasks : undefined,
       outputSharpening: parsedOutputSharpening,
+      renderingIntent,
       watermark:
         enableWatermark && watermarkPath
           ? {
@@ -706,6 +723,9 @@ export default function ExportPanel({
   const selectedFileFormat = FILE_FORMATS.find((format) => format.id === fileFormat);
   const selectedColorProfileLabel =
     colorProfileOptions.find((option) => option.value === colorProfile)?.label ?? t('export.colorProfiles.srgb');
+  const selectedRenderingIntentLabel =
+    renderingIntentOptions.find((option) => option.value === renderingIntent)?.label ??
+    t('export.renderingIntents.relativeColorimetric');
   const selectedResizeModeLabel =
     resizeModeOptions.find((option) => option.value === resizeMode)?.label ?? t('export.resize.modes.longEdge');
   const exportReadinessItems = [
@@ -716,6 +736,9 @@ export default function ExportPanel({
     fileFormat === FileFormats.Cube
       ? t('export.readiness.lutProfile')
       : t('export.readiness.colorProfile', { profile: selectedColorProfileLabel }),
+    fileFormat === FileFormats.Cube
+      ? t('export.readiness.renderingIntentUnavailable')
+      : t('export.readiness.renderingIntent', { intent: selectedRenderingIntentLabel }),
     enableResize
       ? t('export.readiness.resizeEnabled', { mode: selectedResizeModeLabel, value: resizeValue })
       : t('export.readiness.resizeOff'),
@@ -1107,6 +1130,19 @@ export default function ExportPanel({
                                 disabled={isExporting}
                                 className="w-full"
                               />
+                            </div>
+                            <div className="space-y-1">
+                              <UiText variant={TextVariants.label}>{t('export.advanced.renderingIntent')}</UiText>
+                              <Dropdown
+                                options={renderingIntentOptions}
+                                value={renderingIntent}
+                                onChange={setRenderingIntent}
+                                disabled={isExporting}
+                                className="w-full"
+                              />
+                              <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                                {t('export.advanced.blackPointCompensationUnavailable')}
+                              </UiText>
                             </div>
                           </>
                         )}
