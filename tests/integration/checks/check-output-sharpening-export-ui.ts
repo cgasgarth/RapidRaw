@@ -27,6 +27,7 @@ for (const marker of [
 for (const marker of [
   'outputSharpeningSettingsSchema.parse(outputSharpening)',
   'outputSharpening: parsedOutputSharpening',
+  'renderingIntent',
   'export.sections.outputSharpening',
   'export.outputSharpening.enable',
   'export.readiness.outputSharpeningOn',
@@ -61,6 +62,7 @@ exportRecipeSchema.parse({
   keepMetadata: true,
   name: 'Output sharpen UI',
   outputSharpening: parsedSettings,
+  renderingIntent: 'relativeColorimetric',
   resizeMode: 'longEdge',
   resizeValue: 2048,
   stripGps: true,

@@ -1178,10 +1178,12 @@
   },
   "export": {
     "advanced": {
+      "blackPointCompensationUnavailable": "Black-point compensation is not available with the current color engine.",
       "colorProfile": "Color Profile",
       "exportMasks": "Export masks as separate files",
       "preserveFolders": "Preserve Folder Structure",
       "preserveTimestamps": "Set File Timestamps from EXIF Capture Date",
+      "renderingIntent": "Rendering Intent",
       "title": "Export Settings"
     },
     "bytes": {
@@ -1240,10 +1242,18 @@
       "metadataWithoutGps": "GPS removed",
       "outputSharpeningOff": "No output sharpening",
       "outputSharpeningOn": "Output sharpen {{target}}",
+      "renderingIntent": "{{intent}} intent",
+      "renderingIntentUnavailable": "No color intent",
       "resizeEnabled": "{{mode}} {{value}}px",
       "resizeOff": "Full size",
       "watermarkOff": "No watermark",
       "watermarkOn": "Watermark"
+    },
+    "renderingIntents": {
+      "absoluteColorimetric": "Absolute colorimetric",
+      "perceptual": "Perceptual",
+      "relativeColorimetric": "Relative colorimetric",
+      "saturation": "Saturation"
     },
     "resize": {
       "dontEnlarge": "Don't Enlarge",

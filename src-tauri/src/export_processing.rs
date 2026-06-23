@@ -12,7 +12,7 @@ use image::{
     ImageFormat, Luma, codecs::tiff::TiffEncoder, imageops,
 };
 use jxl_encoder::{LosslessConfig, LossyConfig, PixelLayout};
-use moxcms::{ColorProfile, Layout, TransformOptions};
+use moxcms::{ColorProfile, Layout, RenderingIntent as MoxRenderingIntent, TransformOptions};
 use mozjpeg_rs::{Encoder as MozJpegEncoder, Preset};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -48,6 +48,7 @@ struct ExportReceiptOutput {
     color_profile: Option<String>,
     format: String,
     output_path: String,
+    rendering_intent: Option<String>,
     source_path: String,
 }
 
@@ -88,6 +89,8 @@ pub struct ResizeOptions {
 pub struct ExportSettings {
     #[serde(default)]
     pub color_profile: ExportColorProfile,
+    #[serde(default)]
+    pub rendering_intent: ExportRenderingIntent,
     pub jpeg_quality: u8,
     pub resize: Option<ResizeOptions>,
     pub keep_metadata: bool,
@@ -112,6 +115,16 @@ pub enum ExportColorProfile {
     AdobeRgb1998,
     ProPhotoRgb,
     SourceEmbedded,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportRenderingIntent {
+    AbsoluteColorimetric,
+    Perceptual,
+    #[default]
+    RelativeColorimetric,
+    Saturation,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -437,6 +450,7 @@ fn save_image_with_metadata(
         &extension,
         export_settings.jpeg_quality,
         &export_settings.color_profile,
+        &export_settings.rendering_intent,
     )?;
 
     exif_processing::write_image_with_metadata(
@@ -521,6 +535,7 @@ fn encode_image_to_bytes(
     output_format: &str,
     jpeg_quality: u8,
     color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
 ) -> Result<Vec<u8>, String> {
     let mut image_bytes = Vec::new();
     let mut cursor = Cursor::new(&mut image_bytes);
@@ -568,7 +583,7 @@ fn encode_image_to_bytes(
             return Ok(webp_mem.to_vec());
         }
         "jpg" | "jpeg" => {
-            return encode_jpeg_to_bytes(image, jpeg_quality, color_profile);
+            return encode_jpeg_to_bytes(image, jpeg_quality, color_profile, rendering_intent);
         }
         "png" => {
             let image_to_encode = if image.as_rgb32f().is_some() {
@@ -582,7 +597,7 @@ fn encode_image_to_bytes(
                 .map_err(|e| e.to_string())?;
         }
         "tiff" => {
-            return encode_tiff16_to_bytes(image, color_profile);
+            return encode_tiff16_to_bytes(image, color_profile, rendering_intent);
         }
         "avif" => {
             image
@@ -597,9 +612,10 @@ fn encode_image_to_bytes(
 fn encode_tiff16_to_bytes(
     image: &DynamicImage,
     color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
 ) -> Result<Vec<u8>, String> {
     let (pixels, width, height, output_profile) =
-        export_rgb16_pixels_and_profile(image, color_profile)?;
+        export_rgb16_pixels_and_profile(image, color_profile, rendering_intent)?;
     let icc_profile = encode_icc_profile(&output_profile)?;
     let mut image_bytes = Vec::new();
     let mut cursor = Cursor::new(&mut image_bytes);
@@ -623,6 +639,7 @@ fn encode_tiff16_to_bytes(
 fn export_rgb16_pixels_and_profile(
     image: &DynamicImage,
     color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
 ) -> Result<(Vec<u16>, u32, u32, ColorProfile), String> {
     let rgb_image = image.to_rgb16();
     let (width, height) = rgb_image.dimensions();
@@ -636,7 +653,7 @@ fn export_rgb16_pixels_and_profile(
                 Layout::Rgb,
                 &output_profile,
                 Layout::Rgb,
-                TransformOptions::default(),
+                export_transform_options(rendering_intent),
             )
             .map_err(|e| format!("Failed to build Display P3 TIFF export transform: {}", e))?;
         let row_len = (width as usize)
@@ -663,9 +680,10 @@ fn encode_jpeg_to_bytes(
     image: &DynamicImage,
     jpeg_quality: u8,
     color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
 ) -> Result<Vec<u8>, String> {
     let (rgb_pixels, width, height, output_profile) =
-        export_rgb_pixels_and_profile(image, color_profile)?;
+        export_rgb_pixels_and_profile(image, color_profile, rendering_intent)?;
     let icc_profile = encode_icc_profile(&output_profile)?;
 
     MozJpegEncoder::new(Preset::BaselineBalanced)
@@ -678,6 +696,7 @@ fn encode_jpeg_to_bytes(
 fn export_rgb_pixels_and_profile(
     image: &DynamicImage,
     color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
 ) -> Result<(Vec<u8>, u32, u32, ColorProfile), String> {
     let rgb_image = image.to_rgb8();
     let (width, height) = rgb_image.dimensions();
@@ -691,7 +710,7 @@ fn export_rgb_pixels_and_profile(
                 Layout::Rgb,
                 &output_profile,
                 Layout::Rgb,
-                TransformOptions::default(),
+                export_transform_options(rendering_intent),
             )
             .map_err(|e| format!("Failed to build Display P3 export transform: {}", e))?;
         let row_len = (width as usize)
@@ -721,6 +740,22 @@ fn output_color_profile(color_profile: &ExportColorProfile) -> ColorProfile {
         | ExportColorProfile::AdobeRgb1998
         | ExportColorProfile::ProPhotoRgb
         | ExportColorProfile::SourceEmbedded => ColorProfile::new_srgb(),
+    }
+}
+
+fn export_transform_options(rendering_intent: &ExportRenderingIntent) -> TransformOptions {
+    TransformOptions {
+        rendering_intent: mox_rendering_intent(rendering_intent),
+        ..TransformOptions::default()
+    }
+}
+
+fn mox_rendering_intent(rendering_intent: &ExportRenderingIntent) -> MoxRenderingIntent {
+    match rendering_intent {
+        ExportRenderingIntent::AbsoluteColorimetric => MoxRenderingIntent::AbsoluteColorimetric,
+        ExportRenderingIntent::Perceptual => MoxRenderingIntent::Perceptual,
+        ExportRenderingIntent::RelativeColorimetric => MoxRenderingIntent::RelativeColorimetric,
+        ExportRenderingIntent::Saturation => MoxRenderingIntent::Saturation,
     }
 }
 
@@ -1282,9 +1317,12 @@ fn export_receipt_output(
     Ok(ExportReceiptOutput {
         bit_depth: metadata.as_ref().map(|metadata| metadata.bit_depth),
         byte_size,
-        color_profile: metadata.map(|metadata| metadata.color_profile),
+        color_profile: metadata
+            .as_ref()
+            .map(|metadata| metadata.color_profile.clone()),
         format: format.to_string(),
         output_path: output_path.to_string_lossy().to_string(),
+        rendering_intent: metadata.map(|metadata| metadata.rendering_intent),
         source_path: source_path.to_string(),
     })
 }
@@ -1292,6 +1330,7 @@ fn export_receipt_output(
 struct ExportReceiptMetadata {
     bit_depth: u8,
     color_profile: String,
+    rendering_intent: String,
 }
 
 fn export_receipt_metadata(
@@ -1302,12 +1341,27 @@ fn export_receipt_metadata(
         "jpg" | "jpeg" => Some(ExportReceiptMetadata {
             bit_depth: 8,
             color_profile: export_color_profile_receipt_label(&export_settings.color_profile),
+            rendering_intent: export_rendering_intent_receipt_label(
+                &export_settings.rendering_intent,
+            ),
         }),
         "tif" | "tiff" => Some(ExportReceiptMetadata {
             bit_depth: 16,
             color_profile: export_color_profile_receipt_label(&export_settings.color_profile),
+            rendering_intent: export_rendering_intent_receipt_label(
+                &export_settings.rendering_intent,
+            ),
         }),
         _ => None,
+    }
+}
+
+fn export_rendering_intent_receipt_label(rendering_intent: &ExportRenderingIntent) -> String {
+    match rendering_intent {
+        ExportRenderingIntent::AbsoluteColorimetric => "Absolute colorimetric".to_string(),
+        ExportRenderingIntent::Perceptual => "Perceptual".to_string(),
+        ExportRenderingIntent::RelativeColorimetric => "Relative colorimetric".to_string(),
+        ExportRenderingIntent::Saturation => "Saturation".to_string(),
     }
 }
 
@@ -1457,6 +1511,7 @@ pub async fn estimate_export_sizes(
             &output_format,
             export_settings.jpeg_quality,
             &export_settings.color_profile,
+            &export_settings.rendering_intent,
         )?;
         let preview_byte_size = preview_bytes.len();
 
@@ -1603,6 +1658,7 @@ pub async fn estimate_export_sizes(
             &output_format,
             export_settings.jpeg_quality,
             &export_settings.color_profile,
+            &export_settings.rendering_intent,
         )?;
         let single_image_estimated_size = preview_bytes.len();
 
@@ -1632,9 +1688,10 @@ pub async fn estimate_export_sizes(
 #[cfg(test)]
 mod tests {
     use super::{
-        ExportColorProfile, ExportSettings, OutputSharpeningSettings, OutputSharpeningTarget,
-        apply_export_resize_and_watermark, encode_image_to_bytes, export_rgb_pixels_and_profile,
-        export_rgb16_pixels_and_profile,
+        ExportColorProfile, ExportRenderingIntent, ExportSettings, OutputSharpeningSettings,
+        OutputSharpeningTarget, apply_export_resize_and_watermark, encode_image_to_bytes,
+        export_receipt_metadata, export_rgb_pixels_and_profile, export_rgb16_pixels_and_profile,
+        export_transform_options, mox_rendering_intent,
     };
     use std::io::Cursor;
 
@@ -1656,6 +1713,7 @@ mod tests {
     fn base_export_settings(output_sharpening: Option<OutputSharpeningSettings>) -> ExportSettings {
         ExportSettings {
             color_profile: Default::default(),
+            rendering_intent: Default::default(),
             jpeg_quality: 90,
             resize: None,
             keep_metadata: false,
@@ -1760,10 +1818,42 @@ mod tests {
     }
 
     #[test]
+    fn export_transform_options_use_requested_rendering_intent() {
+        assert_eq!(
+            export_transform_options(&ExportRenderingIntent::Perceptual).rendering_intent,
+            mox_rendering_intent(&ExportRenderingIntent::Perceptual)
+        );
+        assert_eq!(
+            export_transform_options(&ExportRenderingIntent::Saturation).rendering_intent,
+            mox_rendering_intent(&ExportRenderingIntent::Saturation)
+        );
+        assert_eq!(
+            export_transform_options(&ExportRenderingIntent::AbsoluteColorimetric).rendering_intent,
+            mox_rendering_intent(&ExportRenderingIntent::AbsoluteColorimetric)
+        );
+    }
+
+    #[test]
+    fn export_receipt_reports_rendering_intent() {
+        let mut settings = base_export_settings(None);
+        settings.rendering_intent = ExportRenderingIntent::Perceptual;
+        let metadata = export_receipt_metadata("tiff", &settings)
+            .expect("TIFF receipt metadata should be available");
+
+        assert_eq!(metadata.rendering_intent, "Perceptual");
+    }
+
+    #[test]
     fn jpeg_export_embeds_srgb_icc_profile() {
         let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(2, 2, Rgb([128, 64, 32])));
-        let bytes = encode_image_to_bytes(&image, "jpg", 90, &ExportColorProfile::Srgb)
-            .expect("JPEG encoding should include sRGB ICC profile");
+        let bytes = encode_image_to_bytes(
+            &image,
+            "jpg",
+            90,
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("JPEG encoding should include sRGB ICC profile");
 
         assert!(single_icc_payload(&bytes).len() > b"ICC_PROFILE\0\x01\x01".len());
     }
@@ -1771,8 +1861,14 @@ mod tests {
     #[test]
     fn tiff_export_writes_rgb16_pixels() {
         let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(2, 2, Rgb([128, 64, 32])));
-        let bytes = encode_image_to_bytes(&image, "tiff", 90, &ExportColorProfile::Srgb)
-            .expect("TIFF encoding should succeed");
+        let bytes = encode_image_to_bytes(
+            &image,
+            "tiff",
+            90,
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("TIFF encoding should succeed");
         let decoder = tiff_decoder(&bytes);
 
         assert_eq!(decoder.color_type(), ColorType::Rgb16);
@@ -1781,8 +1877,14 @@ mod tests {
     #[test]
     fn tiff_export_embeds_srgb_icc_profile() {
         let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(2, 2, Rgb([128, 64, 32])));
-        let bytes = encode_image_to_bytes(&image, "tiff", 90, &ExportColorProfile::Srgb)
-            .expect("TIFF encoding should include sRGB ICC profile");
+        let bytes = encode_image_to_bytes(
+            &image,
+            "tiff",
+            90,
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("TIFF encoding should include sRGB ICC profile");
         let mut decoder = tiff_decoder(&bytes);
         let icc_profile = decoder
             .icc_profile()
@@ -1791,19 +1893,37 @@ mod tests {
 
         assert_eq!(
             icc_profile,
-            encode_image_to_bytes(&image, "jpg", 90, &ExportColorProfile::Srgb)
-                .map(|jpeg| single_icc_payload(&jpeg)[b"ICC_PROFILE\0\x01\x01".len()..].to_vec())
-                .expect("reference sRGB JPEG should encode")
+            encode_image_to_bytes(
+                &image,
+                "jpg",
+                90,
+                &ExportColorProfile::Srgb,
+                &ExportRenderingIntent::RelativeColorimetric
+            )
+            .map(|jpeg| single_icc_payload(&jpeg)[b"ICC_PROFILE\0\x01\x01".len()..].to_vec())
+            .expect("reference sRGB JPEG should encode")
         );
     }
 
     #[test]
     fn tiff_export_embeds_display_p3_icc_profile() {
         let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(2, 2, Rgb([128, 64, 32])));
-        let srgb = encode_image_to_bytes(&image, "tiff", 90, &ExportColorProfile::Srgb)
-            .expect("sRGB TIFF encoding should succeed");
-        let display_p3 = encode_image_to_bytes(&image, "tiff", 90, &ExportColorProfile::DisplayP3)
-            .expect("Display P3 TIFF encoding should succeed");
+        let srgb = encode_image_to_bytes(
+            &image,
+            "tiff",
+            90,
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("sRGB TIFF encoding should succeed");
+        let display_p3 = encode_image_to_bytes(
+            &image,
+            "tiff",
+            90,
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("Display P3 TIFF encoding should succeed");
         let mut srgb_decoder = tiff_decoder(&srgb);
         let mut display_p3_decoder = tiff_decoder(&display_p3);
 
@@ -1821,12 +1941,18 @@ mod tests {
     #[test]
     fn display_p3_tiff_export_transforms_rgb16_pixels() {
         let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(1, 1, Rgb([255, 0, 0])));
-        let (srgb_pixels, _, _, _) =
-            export_rgb16_pixels_and_profile(&image, &ExportColorProfile::Srgb)
-                .expect("sRGB TIFF export recipe should succeed");
-        let (display_p3_pixels, _, _, _) =
-            export_rgb16_pixels_and_profile(&image, &ExportColorProfile::DisplayP3)
-                .expect("Display P3 TIFF export recipe should succeed");
+        let (srgb_pixels, _, _, _) = export_rgb16_pixels_and_profile(
+            &image,
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("sRGB TIFF export recipe should succeed");
+        let (display_p3_pixels, _, _, _) = export_rgb16_pixels_and_profile(
+            &image,
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("Display P3 TIFF export recipe should succeed");
 
         assert_ne!(
             display_p3_pixels, srgb_pixels,
@@ -1837,10 +1963,22 @@ mod tests {
     #[test]
     fn jpeg_export_embeds_display_p3_icc_profile() {
         let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(2, 2, Rgb([128, 64, 32])));
-        let srgb = encode_image_to_bytes(&image, "jpg", 90, &ExportColorProfile::Srgb)
-            .expect("sRGB JPEG encoding should succeed");
-        let display_p3 = encode_image_to_bytes(&image, "jpg", 90, &ExportColorProfile::DisplayP3)
-            .expect("Display P3 JPEG encoding should succeed");
+        let srgb = encode_image_to_bytes(
+            &image,
+            "jpg",
+            90,
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("sRGB JPEG encoding should succeed");
+        let display_p3 = encode_image_to_bytes(
+            &image,
+            "jpg",
+            90,
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("Display P3 JPEG encoding should succeed");
 
         assert_ne!(
             single_icc_payload(&display_p3),
@@ -1852,12 +1990,18 @@ mod tests {
     #[test]
     fn display_p3_jpeg_export_transforms_rgb_pixels() {
         let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(1, 1, Rgb([255, 0, 0])));
-        let (srgb_pixels, _, _, _) =
-            export_rgb_pixels_and_profile(&image, &ExportColorProfile::Srgb)
-                .expect("sRGB export recipe should succeed");
-        let (display_p3_pixels, _, _, _) =
-            export_rgb_pixels_and_profile(&image, &ExportColorProfile::DisplayP3)
-                .expect("Display P3 export recipe should succeed");
+        let (srgb_pixels, _, _, _) = export_rgb_pixels_and_profile(
+            &image,
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("sRGB export recipe should succeed");
+        let (display_p3_pixels, _, _, _) = export_rgb_pixels_and_profile(
+            &image,
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("Display P3 export recipe should succeed");
 
         assert_ne!(
             display_p3_pixels, srgb_pixels,

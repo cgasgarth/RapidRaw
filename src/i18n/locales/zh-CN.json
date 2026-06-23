@@ -1168,10 +1168,12 @@
   },
   "export": {
     "advanced": {
+      "blackPointCompensationUnavailable": "",
       "colorProfile": "色彩配置文件",
       "exportMasks": "将蒙版导出为单独文件",
       "preserveFolders": "保留文件夹结构",
       "preserveTimestamps": "将文件时间戳设为 EXIF 拍摄日期",
+      "renderingIntent": "",
       "title": "导出设置"
     },
     "bytes": {
@@ -1228,10 +1230,18 @@
       "metadataWithoutGps": "",
       "outputSharpeningOff": "",
       "outputSharpeningOn": "",
+      "renderingIntent": "",
+      "renderingIntentUnavailable": "",
       "resizeEnabled": "",
       "resizeOff": "",
       "watermarkOff": "",
       "watermarkOn": ""
+    },
+    "renderingIntents": {
+      "absoluteColorimetric": "",
+      "perceptual": "",
+      "relativeColorimetric": "",
+      "saturation": ""
     },
     "resize": {
       "dontEnlarge": "不放大",

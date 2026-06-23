@@ -5,6 +5,12 @@ import { EXPORT_RECIPE_FILE_FORMAT_IDS, ExportFileFormatId } from '../utils/expo
 
 export const exportFileFormatSchema = z.enum(EXPORT_RECIPE_FILE_FORMAT_IDS);
 export const exportColorProfileSchema = z.enum(['srgb', 'displayP3', 'adobeRgb1998', 'proPhotoRgb', 'sourceEmbedded']);
+export const exportRenderingIntentSchema = z.enum([
+  'absoluteColorimetric',
+  'perceptual',
+  'relativeColorimetric',
+  'saturation',
+]);
 export const exportResizeModeSchema = z.enum(['longEdge', 'shortEdge', 'width', 'height']);
 export const watermarkAnchorSchema = z.enum([
   'topLeft',
@@ -35,6 +41,7 @@ export const exportRecipeSchema = z
     outputSharpening: outputSharpeningSettingsSchema.nullable().default(null),
     preserveFolders: z.boolean().default(false),
     preserveTimestamps: z.boolean().default(false),
+    renderingIntent: exportRenderingIntentSchema.default('relativeColorimetric'),
     resizeMode: exportResizeModeSchema,
     resizeValue: z.number().int().min(1).max(100_000),
     stripGps: z.boolean(),

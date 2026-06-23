@@ -117,6 +117,7 @@ export const exportReceiptPayloadSchema = z
           colorProfile: z.string().trim().min(1).optional().nullable(),
           format: z.string().trim().min(1),
           outputPath: z.string().trim().min(1),
+          renderingIntent: z.string().trim().min(1).optional().nullable(),
           sourcePath: z.string().trim().min(1),
         })
         .strict(),

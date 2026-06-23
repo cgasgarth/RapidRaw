@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 
 import {
   ExportColorProfile,
+  ExportRenderingIntent,
   type ExportPreset,
   FILE_FORMATS,
   FileFormats,
@@ -23,6 +24,9 @@ const isWatermarkAnchor = (value: string): value is WatermarkAnchor => WATERMARK
 
 export function useExportSettings() {
   const [colorProfile, setColorProfile] = useState<ExportColorProfile>(ExportColorProfile.Srgb);
+  const [renderingIntent, setRenderingIntent] = useState<ExportRenderingIntent>(
+    ExportRenderingIntent.RelativeColorimetric,
+  );
   const [fileFormat, setFileFormat] = useState<FileFormats>(FileFormats.Jpeg);
   const [jpegQuality, setJpegQuality] = useState(90);
   const [enableResize, setEnableResize] = useState(false);
@@ -45,6 +49,7 @@ export function useExportSettings() {
 
   const handleApplyPreset = useCallback((preset: ExportPreset) => {
     setColorProfile(preset.colorProfile ?? ExportColorProfile.Srgb);
+    setRenderingIntent(preset.renderingIntent ?? ExportRenderingIntent.RelativeColorimetric);
     setFileFormat(isFileFormat(preset.fileFormat) ? preset.fileFormat : FileFormats.Jpeg);
     setJpegQuality(preset.jpegQuality);
     setEnableResize(preset.enableResize);
@@ -71,6 +76,7 @@ export function useExportSettings() {
   const currentSettingsObject = useMemo(
     () => ({
       colorProfile,
+      renderingIntent,
       fileFormat,
       jpegQuality,
       enableResize,
@@ -93,6 +99,7 @@ export function useExportSettings() {
     }),
     [
       colorProfile,
+      renderingIntent,
       fileFormat,
       jpegQuality,
       enableResize,
@@ -126,6 +133,8 @@ export function useExportSettings() {
   return {
     colorProfile,
     setColorProfile,
+    renderingIntent,
+    setRenderingIntent,
     fileFormat,
     setFileFormat,
     jpegQuality,

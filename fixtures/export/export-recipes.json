@@ -20,7 +20,8 @@
     "watermarkPath": null,
     "watermarkScale": 10,
     "watermarkSpacing": 5,
-    "colorProfile": "srgb"
+    "colorProfile": "srgb",
+    "renderingIntent": "relativeColorimetric"
   },
   {
     "dontEnlarge": true,
@@ -43,7 +44,8 @@
     "watermarkPath": null,
     "watermarkScale": 10,
     "watermarkSpacing": 5,
-    "colorProfile": "srgb"
+    "colorProfile": "srgb",
+    "renderingIntent": "relativeColorimetric"
   },
   {
     "dontEnlarge": true,
@@ -66,7 +68,8 @@
     "watermarkPath": null,
     "watermarkScale": 10,
     "watermarkSpacing": 5,
-    "colorProfile": "displayP3"
+    "colorProfile": "displayP3",
+    "renderingIntent": "relativeColorimetric"
   },
   {
     "dontEnlarge": true,
@@ -89,6 +92,7 @@
     "watermarkPath": "/fixtures/watermark/logo.png",
     "watermarkScale": 12,
     "watermarkSpacing": 4,
-    "colorProfile": "proPhotoRgb"
+    "colorProfile": "proPhotoRgb",
+    "renderingIntent": "relativeColorimetric"
   }
 ]

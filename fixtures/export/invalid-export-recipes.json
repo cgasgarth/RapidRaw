@@ -19,7 +19,8 @@
       "watermarkPath": null,
       "watermarkScale": 10,
       "watermarkSpacing": 5,
-      "colorProfile": "srgb"
+      "colorProfile": "srgb",
+      "renderingIntent": "relativeColorimetric"
     }
   },
   {
@@ -42,7 +43,8 @@
       "watermarkPath": null,
       "watermarkScale": 10,
       "watermarkSpacing": 5,
-      "colorProfile": "srgb"
+      "colorProfile": "srgb",
+      "renderingIntent": "relativeColorimetric"
     }
   },
   {
@@ -65,7 +67,8 @@
       "watermarkPath": null,
       "watermarkScale": 10,
       "watermarkSpacing": 5,
-      "colorProfile": "srgb"
+      "colorProfile": "srgb",
+      "renderingIntent": "relativeColorimetric"
     }
   },
   {
@@ -88,7 +91,8 @@
       "watermarkOpacity": 75,
       "watermarkPath": null,
       "watermarkScale": 10,
-      "watermarkSpacing": 5
+      "watermarkSpacing": 5,
+      "renderingIntent": "relativeColorimetric"
     }
   }
 ]

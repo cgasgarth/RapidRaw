@@ -44,6 +44,7 @@ export interface ExportSettings {
   exportMasks?: boolean | undefined;
   outputSharpening?: OutputSharpeningSettings | null | undefined;
   preserveFolders?: boolean | undefined;
+  renderingIntent?: ExportRenderingIntent | undefined;
 }
 
 export enum ExportColorProfile {
@@ -52,6 +53,13 @@ export enum ExportColorProfile {
   AdobeRgb1998 = 'adobeRgb1998',
   ProPhotoRgb = 'proPhotoRgb',
   SourceEmbedded = 'sourceEmbedded',
+}
+
+export enum ExportRenderingIntent {
+  AbsoluteColorimetric = 'absoluteColorimetric',
+  Perceptual = 'perceptual',
+  RelativeColorimetric = 'relativeColorimetric',
+  Saturation = 'saturation',
 }
 
 export interface OutputSharpeningSettings {
@@ -100,6 +108,7 @@ export interface ExportReceiptOutput {
   colorProfile?: string | null | undefined;
   format: string;
   outputPath: string;
+  renderingIntent?: string | null | undefined;
   sourcePath: string;
 }
 
@@ -149,4 +158,5 @@ export interface ExportPreset {
   watermarkOpacity: number;
   lastExportPath?: string;
   outputSharpening?: OutputSharpeningSettings | null;
+  renderingIntent?: ExportRenderingIntent;
 }

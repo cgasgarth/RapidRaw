@@ -1178,10 +1178,12 @@
   },
   "export": {
     "advanced": {
+      "blackPointCompensationUnavailable": "",
       "colorProfile": "Farbprofil",
       "exportMasks": "Masken als separate Dateien exportieren",
       "preserveFolders": "Ordnerstruktur beibehalten",
       "preserveTimestamps": "Dateizeitstempel aus EXIF-Aufnahmedatum setzen",
+      "renderingIntent": "",
       "title": "Exporteinstellungen"
     },
     "bytes": {
@@ -1239,10 +1241,18 @@
       "metadataWithoutGps": "",
       "outputSharpeningOff": "",
       "outputSharpeningOn": "",
+      "renderingIntent": "",
+      "renderingIntentUnavailable": "",
       "resizeEnabled": "",
       "resizeOff": "",
       "watermarkOff": "",
       "watermarkOn": ""
+    },
+    "renderingIntents": {
+      "absoluteColorimetric": "",
+      "perceptual": "",
+      "relativeColorimetric": "",
+      "saturation": ""
     },
     "resize": {
       "dontEnlarge": "Nicht vergrößern",

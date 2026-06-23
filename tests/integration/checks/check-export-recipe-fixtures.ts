@@ -29,6 +29,12 @@ for (const [index, recipe] of validRecipes.entries()) {
   if (!rawRecipe || typeof rawRecipe.colorProfile !== 'string') {
     failures.push(`${recipe.id} fixture must explicitly declare colorProfile`);
   }
+  if (!recipe.renderingIntent) {
+    failures.push(`${recipe.id} must declare renderingIntent`);
+  }
+  if (!rawRecipe || typeof rawRecipe.renderingIntent !== 'string') {
+    failures.push(`${recipe.id} fixture must explicitly declare renderingIntent`);
+  }
 
   if (ids.has(recipe.id)) {
     failures.push(`Duplicate export recipe id: ${recipe.id}`);
@@ -58,6 +64,7 @@ const upsertRecipe = {
   fileFormat: 'jpeg',
   id: 'client-proof-jpeg-v2',
   name: 'Client Proof JPEG v2',
+  renderingIntent: 'perceptual',
   resizeMode: 'longEdge',
   resizeValue: 3600,
 };
@@ -85,6 +92,9 @@ if (persistedRecipe?.resizeValue !== 3600) failures.push('Export recipe apply mu
 if (persistedRecipe?.fileFormat !== 'jpeg') failures.push('Export recipe apply must persist file format.');
 if (persistedRecipe?.colorProfile !== 'adobeRgb1998') {
   failures.push('Export recipe apply must persist color profile.');
+}
+if (persistedRecipe?.renderingIntent !== 'perceptual') {
+  failures.push('Export recipe apply must persist rendering intent.');
 }
 
 if (failures.length > 0) {

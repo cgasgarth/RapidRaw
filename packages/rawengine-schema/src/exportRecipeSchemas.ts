@@ -8,6 +8,12 @@ export const exportRecipeColorProfileV1Schema = z.enum([
   'proPhotoRgb',
   'sourceEmbedded',
 ]);
+export const exportRecipeRenderingIntentV1Schema = z.enum([
+  'absoluteColorimetric',
+  'perceptual',
+  'relativeColorimetric',
+  'saturation',
+]);
 export const exportRecipeResizeModeV1Schema = z.enum(['longEdge', 'shortEdge', 'width', 'height']);
 export const exportRecipeWatermarkAnchorV1Schema = z.enum([
   'topLeft',
@@ -37,6 +43,7 @@ export const exportRecipeV1Schema = z
     name: z.string().trim().min(1),
     preserveFolders: z.boolean().default(false),
     preserveTimestamps: z.boolean().default(false),
+    renderingIntent: exportRecipeRenderingIntentV1Schema.default('relativeColorimetric'),
     resizeMode: exportRecipeResizeModeV1Schema,
     resizeValue: z.number().int().min(1).max(100_000),
     stripGps: z.boolean(),

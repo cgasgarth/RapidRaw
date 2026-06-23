@@ -1256,10 +1256,12 @@
   },
   "export": {
     "advanced": {
+      "blackPointCompensationUnavailable": "",
       "colorProfile": "Profil kolorów",
       "exportMasks": "Eksportuj maski jako osobne pliki",
       "preserveFolders": "Zachowaj strukturę folderów",
       "preserveTimestamps": "Ustaw datę modyfikacji pliku na podstawie daty wykonania (EXIF)",
+      "renderingIntent": "",
       "title": "Ustawienia eksportu"
     },
     "bytes": {
@@ -1321,10 +1323,18 @@
       "metadataWithoutGps": "",
       "outputSharpeningOff": "",
       "outputSharpeningOn": "",
+      "renderingIntent": "",
+      "renderingIntentUnavailable": "",
       "resizeEnabled": "",
       "resizeOff": "",
       "watermarkOff": "",
       "watermarkOn": ""
+    },
+    "renderingIntents": {
+      "absoluteColorimetric": "",
+      "perceptual": "",
+      "relativeColorimetric": "",
+      "saturation": ""
     },
     "resize": {
       "dontEnlarge": "Nie powiększaj",
