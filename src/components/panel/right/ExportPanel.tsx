@@ -75,8 +75,11 @@ const exportSizeEstimateSchema = z.number().nonnegative();
 const externalEditorVariantReceiptSchema = z
   .object({
     artifactId: z.string().trim().min(1),
+    bitDepth: z.number().int().positive().optional().nullable(),
+    colorProfile: z.string().trim().min(1).optional().nullable(),
     contentHash: z.string().trim().min(1),
     outputPath: z.string().trim().min(1),
+    renderingIntent: z.string().trim().min(1).optional().nullable(),
     sidecarPath: z.string().trim().min(1),
     sourcePath: z.string().trim().min(1),
     sourceRevision: z.string().trim().min(1),
@@ -393,12 +396,19 @@ export default function ExportPanel({
   const currentExternalEditorWatch = isCurrentExternalEditorWatch ? externalEditorWatch : null;
 
   const handleImportExternalVariant = useCallback(
-    async (sourceVirtualPath: string, outputPath: string) => {
+    async (sourceVirtualPath: string, output: NonNullable<typeof firstReceiptOutput>) => {
+      const outputPath = output.outputPath;
       setExternalVariantStatus({ error: null, importedPath: null, importing: true, receiptOutputPath: outputPath });
       try {
         const receipt = await invokeWithSchema(
           Invokes.ImportExternalEditorVariant,
-          { outputPath, sourceVirtualPath },
+          {
+            bitDepth: output.bitDepth ?? null,
+            colorProfile: output.colorProfile ?? null,
+            outputPath,
+            renderingIntent: output.renderingIntent ?? null,
+            sourceVirtualPath,
+          },
           externalEditorVariantReceiptSchema,
         );
         await onLinkedVariantImported?.(receipt.outputPath);
@@ -1458,7 +1468,7 @@ export default function ExportPanel({
                       data-testid="export-success-import-linked-variant"
                       disabled={isImportingCurrentExternalVariant}
                       onClick={() => {
-                        void handleImportExternalVariant(firstReceiptOutput.sourcePath, firstReceiptOutput.outputPath);
+                        void handleImportExternalVariant(firstReceiptOutput.sourcePath, firstReceiptOutput);
                       }}
                       type="button"
                     >

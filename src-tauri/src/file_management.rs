@@ -297,8 +297,11 @@ pub struct ImageFile {
 #[serde(rename_all = "camelCase")]
 pub struct ExternalEditorVariantReceipt {
     artifact_id: String,
+    bit_depth: Option<u8>,
+    color_profile: Option<String>,
     content_hash: String,
     output_path: String,
+    rendering_intent: Option<String>,
     sidecar_path: String,
     source_path: String,
     source_revision: String,
@@ -3358,6 +3361,9 @@ fn write_external_editor_variant_sidecar(
     source_virtual_path: &str,
     output_path: &Path,
     sidecar_path: &Path,
+    bit_depth: Option<u8>,
+    color_profile: Option<String>,
+    rendering_intent: Option<String>,
 ) -> Result<ExternalEditorVariantReceipt, String> {
     let (source_path, source_sidecar_path) = parse_virtual_path(source_virtual_path);
     if !source_path.exists() {
@@ -3406,9 +3412,15 @@ fn write_external_editor_variant_sidecar(
         "operationId": "external_editor.import_linked_variant",
         "operationVersion": 1,
         "output": {
+            "bitDepth": bit_depth,
+            "bitDepthProvenance": "export_receipt",
+            "colorProfile": color_profile,
+            "colorProfileProvenance": "export_receipt",
             "format": "tiff",
             "noOverwritePolicy": "never_overwrite_original",
             "path": output_path_string,
+            "renderingIntent": rendering_intent,
+            "renderingIntentProvenance": "export_receipt",
             "storage": "linked_file",
         },
         "provenance": {
@@ -3432,8 +3444,11 @@ fn write_external_editor_variant_sidecar(
 
     Ok(ExternalEditorVariantReceipt {
         artifact_id,
+        bit_depth,
+        color_profile,
         content_hash,
         output_path: output_path_string,
+        rendering_intent,
         sidecar_path: sidecar_path.to_string_lossy().to_string(),
         source_path: source_path.to_string_lossy().to_string(),
         source_revision,
@@ -3444,10 +3459,20 @@ fn write_external_editor_variant_sidecar(
 pub fn import_external_editor_variant(
     source_virtual_path: String,
     output_path: String,
+    bit_depth: Option<u8>,
+    color_profile: Option<String>,
+    rendering_intent: Option<String>,
 ) -> Result<ExternalEditorVariantReceipt, String> {
     let output_path = PathBuf::from(output_path);
     let sidecar_path = rrdata_sidecar_path(&output_path, None);
-    write_external_editor_variant_sidecar(&source_virtual_path, &output_path, &sidecar_path)
+    write_external_editor_variant_sidecar(
+        &source_virtual_path,
+        &output_path,
+        &sidecar_path,
+        bit_depth,
+        color_profile,
+        rendering_intent,
+    )
 }
 
 #[tauri::command]
@@ -4198,9 +4223,18 @@ mod tests {
             &source_path.to_string_lossy(),
             &output_path,
             &sidecar_path,
+            Some(16),
+            Some("Display P3".to_string()),
+            Some("Relative colorimetric".to_string()),
         )
         .expect("import linked variant");
 
+        assert_eq!(receipt.bit_depth, Some(16));
+        assert_eq!(receipt.color_profile.as_deref(), Some("Display P3"));
+        assert_eq!(
+            receipt.rendering_intent.as_deref(),
+            Some("Relative colorimetric")
+        );
         assert_eq!(receipt.output_path, output_path.to_string_lossy());
         assert_eq!(receipt.source_path, source_path.to_string_lossy());
         assert!(receipt.content_hash.starts_with("sha256:"));
@@ -4228,6 +4262,27 @@ mod tests {
         assert_eq!(
             artifact["output"]["noOverwritePolicy"].as_str(),
             Some("never_overwrite_original")
+        );
+        assert_eq!(artifact["output"]["bitDepth"].as_u64(), Some(16));
+        assert_eq!(
+            artifact["output"]["bitDepthProvenance"].as_str(),
+            Some("export_receipt")
+        );
+        assert_eq!(
+            artifact["output"]["colorProfile"].as_str(),
+            Some("Display P3")
+        );
+        assert_eq!(
+            artifact["output"]["colorProfileProvenance"].as_str(),
+            Some("export_receipt")
+        );
+        assert_eq!(
+            artifact["output"]["renderingIntent"].as_str(),
+            Some("Relative colorimetric")
+        );
+        assert_eq!(
+            artifact["output"]["renderingIntentProvenance"].as_str(),
+            Some("export_receipt")
         );
         assert_eq!(
             artifact["provenance"]["sourceImagePath"].as_str(),
