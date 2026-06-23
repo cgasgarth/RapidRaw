@@ -48,6 +48,9 @@ const requiredSnippets = [
   [rustSource, 'fake_provider_opens_and_closes_session'],
   [rustSource, 'fake_provider_captures_verified_raw_copy'],
   [rustSource, 'hardware_adapter_pending'],
+  [panelSource, 'data-testid="tether-incoming-capture-strip"'],
+  [panelSource, 'data-testid="tether-review-mode-control"'],
+  [panelSource, 'data-review-mode-option={mode}'],
 ] as const;
 
 const failures = requiredSnippets

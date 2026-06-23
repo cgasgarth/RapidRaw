@@ -1158,14 +1158,27 @@ async function prepareScenario(page, mode) {
         timeout: 10_000,
       });
     const readyBadgeCount = await page.locator('[data-capability-status="ready"]').count();
-    if (readyBadgeCount !== 3) {
-      throw new Error(`Expected 3 ready tether capabilities, found ${readyBadgeCount}.`);
+    if (readyBadgeCount !== 4) {
+      throw new Error(`Expected 4 ready tether capabilities, found ${readyBadgeCount}.`);
     }
-    await page.getByTestId('tether-capture-disabled').getByText('Capture not implemented', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
     await page.getByTestId('tether-open-session').click();
     await page.getByTestId('tether-session-status').getByText('Session open', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('tether-trigger-capture').click();
+    await page.getByTestId('tether-capture-result').getByText('Capture imported', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('tether-incoming-capture-strip').waitFor({ timeout: 10_000 });
+    await page.getByTestId('tether-incoming-capture-item').getByText('alaska-dsc7853.ARW', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.locator('[data-review-mode-option="holdCurrent"]').click();
+    await page.locator('[data-review-mode-option="holdCurrent"][data-selected="true"]').waitFor({
+      timeout: 10_000,
+    });
+    await page.locator('[data-review-mode-option="newest"]').click();
+    await page.locator('[data-review-mode-option="newest"][data-selected="true"]').waitFor({
       timeout: 10_000,
     });
     await page.getByTestId('tether-close-session').click();

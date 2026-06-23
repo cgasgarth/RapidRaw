@@ -246,7 +246,7 @@ const tetherDiscoveryMockResponse: TetherDiscoveryResponse = {
         { id: 'discovery', label: 'Discovery', status: 'ready' },
         { id: 'battery_status', label: 'Battery reported', status: 'ready' },
         { id: 'storage_status', label: 'Storage reported', status: 'ready' },
-        { id: 'remote_capture', label: 'Remote capture not implemented', status: 'not_checked' },
+        { id: 'remote_capture', label: 'Remote capture ready', status: 'ready' },
       ],
       connection: {
         transport: 'USB-C PTP',
@@ -291,6 +291,17 @@ const tetherClosedSessionMockResponse: TetherSessionResponse = {
   session: null,
   status: 'closed',
 };
+const tetherCaptureMockResponse = {
+  bytes: 25565952,
+  cameraDisplayName: 'Sony ILCE-7M4',
+  capturedAt: '2026-06-23T00:00:02.000Z',
+  checksum: 'sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b',
+  importedPath: '/tmp/rawengine-tether-captures/alaska-dsc7853.ARW',
+  providerMode: 'fake',
+  sessionId: 'tether-session-visual-smoke',
+  sourcePath: '/Users/cgas/Pictures/Capture One/Alaska/_DSC7853.ARW',
+  status: 'captured',
+} as const;
 
 const brushMaskCanvasImageWidth = 640;
 const brushMaskCanvasImageHeight = 360;
@@ -613,6 +624,7 @@ function TetherDiscoveryVisualSmoke() {
         <aside className="overflow-y-auto border-l border-white/10 bg-[#171a1f]">
           <div className="border-b border-white/10 px-4 py-3 text-sm font-semibold">{tetherDiscoverySmokeTitle}</div>
           <TetherPanel
+            captureFrame={() => Promise.resolve(tetherCaptureMockResponse)}
             closeSession={() => Promise.resolve(tetherClosedSessionMockResponse)}
             discoverCameras={() => Promise.resolve(tetherDiscoveryMockResponse)}
             openSession={() => Promise.resolve(tetherSessionMockResponse)}
