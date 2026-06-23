@@ -1198,7 +1198,13 @@
         "eye_band_heuristic": "Upper-face eye-band heuristic - no detector available",
         "unknown": "Unknown focus region"
       },
-      "emptyAnalysisModes": "Enable similar grouping, blur filtering, focus ranking, or a combination before starting culling."
+      "emptyAnalysisModes": "Enable similar grouping, blur filtering, focus ranking, or a combination before starting culling.",
+      "focusConfidenceBand": {
+        "high": "High confidence",
+        "low": "Low confidence",
+        "medium": "Medium confidence"
+      },
+      "focusReviewOnlyHint": "Review aid only - RawEngine will not auto-reject from focus confidence."
     },
     "denoise": {
       "batchProgressText": "ノイズ低減を実行中 ({{current}}/{{total}})...",

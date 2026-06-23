@@ -1729,6 +1729,11 @@
       "faceSharpnessValue": "Face sharpness {{sharpness}}",
       "filterBlurry": "过滤模糊图像",
       "focusConfidence": "Confidence",
+      "focusConfidenceBand": {
+        "high": "High confidence",
+        "low": "Low confidence",
+        "medium": "Medium confidence"
+      },
       "focusConfidenceValue": "Confidence {{confidence}}%",
       "focusRankingsTab": "Focus Ranking",
       "focusRankValue": "#{{rank}} focus pick",
@@ -1737,6 +1742,7 @@
         "eye_band_heuristic": "Upper-face eye-band heuristic - no detector available",
         "unknown": "Unknown focus region"
       },
+      "focusReviewOnlyHint": "Review aid only - RawEngine will not auto-reject from focus confidence.",
       "focusScore": "Focus score",
       "focusScoreValue": "Score {{score}}",
       "groupHeader": "第 {{index}} 组",

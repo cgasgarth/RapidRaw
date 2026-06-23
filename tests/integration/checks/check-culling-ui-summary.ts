@@ -13,9 +13,13 @@ const requiredLocaleKeys = [
   'eyeSharpnessValue',
   'faceSharpnessValue',
   'focusConfidence',
+  'focusConfidenceBand.high',
+  'focusConfidenceBand.low',
+  'focusConfidenceBand.medium',
   'focusConfidenceValue',
   'focusRankingsTab',
   'focusRankValue',
+  'focusReviewOnlyHint',
   'focusScore',
   'focusScoreValue',
   'compareLinked',
@@ -54,7 +58,13 @@ const requiredLocaleKeys = [
   'summaryWorkloadValue_other',
 ];
 
-const missingKeys = requiredLocaleKeys.filter((key) => typeof cullingLocale?.[key] !== 'string');
+const getLocaleValue = (path: string): unknown =>
+  path.split('.').reduce<unknown>((value, key) => {
+    if (typeof value !== 'object' || value === null || !(key in value)) return undefined;
+    return (value as Record<string, unknown>)[key];
+  }, cullingLocale);
+
+const missingKeys = requiredLocaleKeys.filter((key) => typeof getLocaleValue(key) !== 'string');
 if (missingKeys.length > 0) {
   console.error(`Missing culling summary locale keys: ${missingKeys.join(', ')}`);
   process.exit(1);
@@ -90,9 +100,16 @@ for (const marker of [
   'data-focus-ranking-enabled={String(settings.rankFocus)}',
   'data-culling-analysis-mode-count={cullingAnalysisModeCount}',
   'data-testid="culling-focus-ranking-card"',
+  'data-testid="culling-focus-confidence-band"',
+  'data-focus-confidence-band={confidenceBand}',
   'data-focus-eye-sharpness={img.eyeSharpnessMetric.toFixed(2)}',
   'data-focus-face-sharpness={img.faceSharpnessMetric.toFixed(2)}',
+  'getFocusConfidenceBand(img.focusConfidence)',
+  'modals.culling.focusConfidenceBand.high',
+  'modals.culling.focusConfidenceBand.medium',
+  'modals.culling.focusConfidenceBand.low',
   'modals.culling.focusRankingsTab',
+  'modals.culling.focusReviewOnlyHint',
   'modals.culling.rankFocus',
   'modals.culling.rankFocusDesc',
   'modals.culling.eyeSharpnessValue',
