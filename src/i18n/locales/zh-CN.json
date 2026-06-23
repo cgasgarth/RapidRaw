@@ -2200,6 +2200,15 @@
       "densitometerStatusBalanced": "Balanced",
       "densitometerStatusMinorCast": "Minor cast",
       "densitometerStatusStrongCast": "Strong cast",
+      "dustCandidate": {
+        "dustSpot": "灰尘候选",
+        "emulsionScratch": "划痕候选"
+      },
+      "dustCandidateStatus": {
+        "acknowledged": "已确认",
+        "ignored": "已忽略",
+        "pending": "待处理"
+      },
       "dustRetouchCount": "",
       "dustReviewCount": "",
       "dustScratchReview": "",

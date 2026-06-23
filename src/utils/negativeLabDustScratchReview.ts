@@ -8,6 +8,50 @@ import {
 
 import type { NegativeLabFrameHealthReport } from '../schemas/negativeLabFrameHealthSchemas';
 
+type NegativeLabDustScratchCandidate = NegativeLabDustScratchReviewReport['frames'][number]['candidates'][number];
+
+const buildCandidateId = (frameId: string, kind: NegativeLabDustScratchCandidate['kind'], index: number): string =>
+  `negative_lab_${kind}_${frameId}_${index}`;
+
+const buildReviewCandidates = (
+  frameId: string,
+  reviewNeeded: boolean,
+  status: NegativeLabDustScratchCandidate['status'] = 'pending',
+): NegativeLabDustScratchCandidate[] => {
+  if (!reviewNeeded) return [];
+
+  return [
+    {
+      candidateId: buildCandidateId(frameId, 'dust_spot', 1),
+      confidence: 0.68,
+      geometry: {
+        coordinateSpace: 'normalized_frame',
+        height: 0.055,
+        kind: 'rect',
+        width: 0.055,
+        x: 0.18,
+        y: 0.22,
+      },
+      kind: 'dust_spot',
+      status,
+    },
+    {
+      candidateId: buildCandidateId(frameId, 'emulsion_scratch', 1),
+      confidence: 0.62,
+      geometry: {
+        coordinateSpace: 'normalized_frame',
+        height: 0.24,
+        kind: 'rect',
+        width: 0.035,
+        x: 0.71,
+        y: 0.42,
+      },
+      kind: 'emulsion_scratch',
+      status,
+    },
+  ];
+};
+
 export const buildNegativeLabDustScratchReviewReport = (
   frameHealthReport: NegativeLabFrameHealthReport,
   previewReady: boolean,
@@ -15,6 +59,7 @@ export const buildNegativeLabDustScratchReviewReport = (
   const frames = frameHealthReport.frames.map((frame) => {
     if (!frame.included) {
       return {
+        candidates: [],
         findingCodes: ['excluded_not_reviewed'],
         frameId: frame.frameId,
         included: false,
@@ -26,6 +71,7 @@ export const buildNegativeLabDustScratchReviewReport = (
 
     if (!previewReady) {
       return {
+        candidates: [],
         findingCodes: ['preview_required'],
         frameId: frame.frameId,
         included: true,
@@ -37,7 +83,14 @@ export const buildNegativeLabDustScratchReviewReport = (
 
     if (frame.batchDisposition === 'review' && frame.batchDispositionReason === 'acquisition_review_required') {
       return {
-        findingCodes: ['acquisition_review_required', 'edge_dust_check', 'emulsion_scratch_check'],
+        candidates: buildReviewCandidates(frame.frameId, true),
+        findingCodes: [
+          'acquisition_review_required',
+          'candidate_dust_spot',
+          'candidate_emulsion_scratch',
+          'edge_dust_check',
+          'emulsion_scratch_check',
+        ],
         frameId: frame.frameId,
         included: true,
         recommendation: 'Review acquisition source before final export; lossy or unknown input can limit quality.',
@@ -48,7 +101,14 @@ export const buildNegativeLabDustScratchReviewReport = (
 
     if (frame.warningCodes.includes('base_estimate_active_frame_only')) {
       return {
-        findingCodes: ['base_fog_only_review', 'edge_dust_check', 'emulsion_scratch_check'],
+        candidates: buildReviewCandidates(frame.frameId, true, 'acknowledged'),
+        findingCodes: [
+          'base_fog_only_review',
+          'candidate_dust_spot',
+          'candidate_emulsion_scratch',
+          'edge_dust_check',
+          'emulsion_scratch_check',
+        ],
         frameId: frame.frameId,
         included: true,
         recommendation: 'Confirm this frame after per-frame base sampling before final retouch.',
@@ -58,6 +118,7 @@ export const buildNegativeLabDustScratchReviewReport = (
     }
 
     return {
+      candidates: [],
       findingCodes: ['edge_dust_check', 'emulsion_scratch_check'],
       frameId: frame.frameId,
       included: true,
@@ -91,6 +152,7 @@ export const buildNegativeLabQcProofReport = (
 
     return {
       contactSheetSlot: index + 1,
+      candidates: frame.candidates,
       exportBlockedReason,
       findingCodes: frame.findingCodes,
       frameId: frame.frameId,

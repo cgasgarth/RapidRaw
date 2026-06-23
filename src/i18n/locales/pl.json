@@ -2338,6 +2338,15 @@
       "densitometerStatusBalanced": "Balanced",
       "densitometerStatusMinorCast": "Minor cast",
       "densitometerStatusStrongCast": "Strong cast",
+      "dustCandidate": {
+        "dustSpot": "Kandydat kurzu",
+        "emulsionScratch": "Kandydat rysy"
+      },
+      "dustCandidateStatus": {
+        "acknowledged": "Potwierdzone",
+        "ignored": "Zignorowane",
+        "pending": "Oczekuje"
+      },
       "dustRetouchCount": "",
       "dustReviewCount": "",
       "dustScratchReview": "",

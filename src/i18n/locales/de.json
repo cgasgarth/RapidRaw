@@ -2214,6 +2214,15 @@
       "densitometerStatusBalanced": "Balanced",
       "densitometerStatusMinorCast": "Minor cast",
       "densitometerStatusStrongCast": "Strong cast",
+      "dustCandidate": {
+        "dustSpot": "Staubkandidat",
+        "emulsionScratch": "Kratzerkandidat"
+      },
+      "dustCandidateStatus": {
+        "acknowledged": "Bestaetigt",
+        "ignored": "Ignoriert",
+        "pending": "Ausstehend"
+      },
       "dustRetouchCount": "",
       "dustReviewCount": "",
       "dustScratchReview": "",

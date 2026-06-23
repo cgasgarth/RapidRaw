@@ -7071,7 +7071,9 @@ export const negativeLabQcOverlayKindSchema = z.enum([
   'base_sample',
   'clipping',
   'density_sample',
+  'dust_candidate',
   'warning_badge',
+  'scratch_candidate',
   'roll_consistency_delta',
 ]);
 

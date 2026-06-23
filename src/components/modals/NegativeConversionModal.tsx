@@ -418,6 +418,15 @@ const DUST_SCRATCH_SEVERITY_LABEL_KEYS = {
   retouch: 'modals.negativeConversion.dustSeverity.retouch',
   review: 'modals.negativeConversion.dustSeverity.review',
 } as const;
+const DUST_SCRATCH_CANDIDATE_KIND_LABEL_KEYS = {
+  dust_spot: 'modals.negativeConversion.dustCandidate.dustSpot',
+  emulsion_scratch: 'modals.negativeConversion.dustCandidate.emulsionScratch',
+} as const;
+const DUST_SCRATCH_CANDIDATE_STATUS_LABEL_KEYS = {
+  acknowledged: 'modals.negativeConversion.dustCandidateStatus.acknowledged',
+  ignored: 'modals.negativeConversion.dustCandidateStatus.ignored',
+  pending: 'modals.negativeConversion.dustCandidateStatus.pending',
+} as const;
 type NegativeLabFrameHealthFilter = 'all' | NegativeLabFrameWarningSeverity;
 type NegativeLabFrameHealthSort = 'roll_order' | 'warning_severity';
 const NEGATIVE_LAB_FRAME_HEALTH_FILTERS = ['all', 'review', 'info', 'ok'] satisfies Array<NegativeLabFrameHealthFilter>;
@@ -2916,6 +2925,28 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               {t(DUST_SCRATCH_SEVERITY_LABEL_KEYS[frame.severity])}
             </span>
             <span className="col-span-2 text-[11px] text-text-tertiary">{frame.recommendation}</span>
+            {frame.candidates.length > 0 && (
+              <div
+                className="col-span-2 grid gap-1"
+                data-candidate-count={frame.candidates.length}
+                data-testid={`negative-lab-dust-candidate-list-${index}`}
+              >
+                {frame.candidates.map((candidate) => (
+                  <span
+                    className="rounded border border-yellow-300/30 bg-yellow-300/10 px-1.5 py-0.5 text-[11px] text-yellow-100"
+                    data-candidate-confidence={candidate.confidence.toFixed(2)}
+                    data-candidate-kind={candidate.kind}
+                    data-candidate-status={candidate.status}
+                    data-testid={`negative-lab-dust-candidate-${candidate.candidateId}`}
+                    key={candidate.candidateId}
+                  >
+                    {t(DUST_SCRATCH_CANDIDATE_KIND_LABEL_KEYS[candidate.kind])}
+                    {' / '}
+                    {t(DUST_SCRATCH_CANDIDATE_STATUS_LABEL_KEYS[candidate.status])}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -3017,6 +3048,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 ? 'visible'
                 : 'hidden'
             }
+            data-defect-candidate-count={frame.candidates.length}
             data-testid={`negative-lab-qc-proof-row-${frame.contactSheetSlot - 1}`}
             key={frame.frameId}
           >

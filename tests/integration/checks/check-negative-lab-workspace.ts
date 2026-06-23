@@ -79,7 +79,17 @@ if (!proof.reviewReport.frames.some((frame) => frame.findingCodes.includes('base
 }
 
 if (proof.reviewReport.retouchCount !== 0) {
-  throw new Error('Negative Lab workspace review must not claim pixel retouch findings from heuristic proof.');
+  throw new Error('Negative Lab workspace review should keep candidate findings in review until acknowledged.');
+}
+
+if (
+  !proof.reviewReport.frames.some((frame) => frame.candidates.some((candidate) => candidate.status === 'acknowledged'))
+) {
+  throw new Error('Negative Lab workspace review did not persist acknowledged dust/scratch candidate state.');
+}
+
+if (!mixedReviewReport.frames.some((frame) => frame.candidates.some((candidate) => candidate.status === 'pending'))) {
+  throw new Error('Negative Lab workspace review did not expose pending dust/scratch candidate overlays.');
 }
 
 if (
@@ -129,6 +139,8 @@ for (const marker of [
   'scanInputGuidancePreferred',
   'scanInputGuidanceAvoidPositive',
   'scanInputGuidanceAvoidProofs',
+  'negative-lab-dust-candidate-list-',
+  'negative-lab-dust-candidate-${candidate.candidateId}',
   'negative-lab-qc-proof-artifact',
   'negative-lab-qc-overlay-controls',
   'data-overlay-count={qcProofArtifact.overlays.length}',
@@ -227,4 +239,4 @@ for (const marker of [
   }
 }
 
-console.log(`negative lab workspace ok (${proof.targetCount} frames, heuristic inspection + QC proof only)`);
+console.log(`negative lab workspace ok (${proof.targetCount} frames, defect candidates + QC proof)`);
