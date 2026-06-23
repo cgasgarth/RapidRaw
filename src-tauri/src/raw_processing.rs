@@ -91,6 +91,18 @@ struct RawDefectCorrectionReport {
     dead_pixels: usize,
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct HighlightReconstructionReport {
+    candidate_pixels: usize,
+    reconstructed_channels: usize,
+    reconstructed_pixels: usize,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct BayerHqDevelopmentReport {
+    artifact_suppression: crate::bayer_hq::ArtifactSuppressionReport,
+}
+
 #[derive(Debug, Clone, Copy)]
 struct RawDefectImageBounds {
     active_bounds: (usize, usize, usize, usize),
@@ -380,6 +392,195 @@ fn repair_raw_sensor_defects(
     }
 }
 
+fn saturation_threshold(context: &RawDefectCorrectionContext, x: usize, y: usize) -> f32 {
+    let black = context.black_level_at(x, y).clamp(0.0, u16::MAX as f32);
+    let white = context
+        .white_level_at(x, y)
+        .clamp(black + 1.0, u16::MAX as f32);
+    let range = (white - black).max(1.0);
+    white - 2.0_f32.max(range * 0.005)
+}
+
+fn same_cfa_unclipped_neighbor_signals(
+    pixels: &[u16],
+    context: &RawDefectCorrectionContext,
+    x: usize,
+    y: usize,
+    radius: isize,
+) -> Vec<u16> {
+    let RawDefectImageBounds {
+        cfa_height,
+        cfa_width,
+        height,
+        width,
+        ..
+    } = context.bounds;
+    let mut values = Vec::with_capacity(((radius * 2 + 1).pow(2) - 1).max(0) as usize);
+    let x = x as isize;
+    let y = y as isize;
+    let cfa_width = cfa_width.max(1) as isize;
+    let cfa_height = cfa_height.max(1) as isize;
+
+    for row in -radius..=radius {
+        for col in -radius..=radius {
+            if row == 0 && col == 0 {
+                continue;
+            }
+
+            let nx = x + col * cfa_width;
+            let ny = y + row * cfa_height;
+            if nx < 0 || ny < 0 || nx as usize >= width || ny as usize >= height {
+                continue;
+            }
+
+            let nx = nx as usize;
+            let ny = ny as usize;
+            let value = pixels[ny * width + nx];
+            if (value as f32) < saturation_threshold(context, nx, ny) {
+                values.push(value);
+            }
+        }
+    }
+
+    values
+}
+
+fn reconstruct_integer_cfa_highlights(
+    pixels: &mut [u16],
+    context: RawDefectCorrectionContext,
+) -> HighlightReconstructionReport {
+    let RawDefectImageBounds {
+        active_bounds,
+        cfa_height,
+        cfa_width,
+        height,
+        width,
+    } = context.bounds;
+
+    if width == 0
+        || height == 0
+        || pixels.len() != width * height
+        || cfa_width == 0
+        || cfa_height == 0
+        || context.white_levels.is_empty()
+    {
+        return HighlightReconstructionReport::default();
+    }
+
+    let (left, top, right, bottom) = active_bounds;
+    let left = left.saturating_add(cfa_width * 2);
+    let top = top.saturating_add(cfa_height * 2);
+    let right = right.saturating_sub(cfa_width * 2).min(width);
+    let bottom = bottom.saturating_sub(cfa_height * 2).min(height);
+    if left >= right || top >= bottom {
+        return HighlightReconstructionReport::default();
+    }
+
+    let original = pixels.to_vec();
+    let mut replacements = Vec::new();
+    let mut report = HighlightReconstructionReport::default();
+
+    for y in top..bottom {
+        for x in left..right {
+            let index = y * width + x;
+            let value = original[index] as f32;
+            let black = context.black_level_at(x, y).clamp(0.0, u16::MAX as f32);
+            let white = context
+                .white_level_at(x, y)
+                .clamp(black + 1.0, u16::MAX as f32);
+            let range = (white - black).max(1.0);
+            if value < saturation_threshold(&context, x, y) {
+                continue;
+            }
+
+            report.candidate_pixels += 1;
+            let mut samples = same_cfa_unclipped_neighbor_signals(&original, &context, x, y, 2);
+            if samples.len() < 4 {
+                samples = same_cfa_unclipped_neighbor_signals(&original, &context, x, y, 4);
+            }
+            if samples.len() < 6 {
+                continue;
+            }
+
+            let median = median_u16(&mut samples) as f32;
+            let median_signal = (median - black).max(0.0);
+            if median_signal < range * 0.65 {
+                continue;
+            }
+
+            let headroom = (white - median).max(range * 0.02);
+            let estimate = (white + headroom * 0.25).clamp(white + 1.0, black + range * 1.15);
+            if estimate.is_finite() && estimate > value && estimate <= u16::MAX as f32 {
+                replacements.push((index, estimate.round() as u16));
+            }
+        }
+    }
+
+    for (index, replacement) in replacements {
+        pixels[index] = replacement;
+        report.reconstructed_pixels += 1;
+        report.reconstructed_channels += 1;
+    }
+
+    report
+}
+
+fn reconstruct_raw_sensor_highlights(raw_image: &mut RawImage) -> HighlightReconstructionReport {
+    let RawPhotometricInterpretation::Cfa(config) = &raw_image.photometric else {
+        return HighlightReconstructionReport::default();
+    };
+
+    if raw_image.cpp != 1
+        || !config.cfa.is_rgb()
+        || (config.cfa.width == 6 && config.cfa.height == 6)
+    {
+        return HighlightReconstructionReport::default();
+    }
+
+    let width = raw_image.width;
+    let height = raw_image.height;
+    let active = active_bounds(raw_image);
+    let cfa_width = config.cfa.width;
+    let cfa_height = config.cfa.height;
+    let cfa_colors = (0..cfa_height)
+        .flat_map(|row| (0..cfa_width).map(move |col| config.cfa.color_at(row, col)))
+        .collect();
+    let black_levels = raw_image
+        .blacklevel
+        .levels
+        .iter()
+        .map(|level| level.as_f32())
+        .collect();
+    let white_levels = raw_image
+        .whitelevel
+        .0
+        .iter()
+        .map(|level| *level as f32)
+        .collect();
+
+    match &mut raw_image.data {
+        RawImageData::Integer(pixels) => reconstruct_integer_cfa_highlights(
+            pixels,
+            RawDefectCorrectionContext {
+                bounds: RawDefectImageBounds {
+                    active_bounds: active,
+                    cfa_height,
+                    cfa_width,
+                    height,
+                    width,
+                },
+                black_cpp: raw_image.blacklevel.cpp,
+                black_height: raw_image.blacklevel.height,
+                black_levels,
+                black_width: raw_image.blacklevel.width,
+                cfa_colors,
+                white_levels,
+            },
+        ),
+        RawImageData::Float(_) => HighlightReconstructionReport::default(),
+    }
+}
+
 fn multiply_4x3_3x3(a: &[[f32; 3]; 4], b: &[[f32; 3]; 3]) -> [[f32; 3]; 4] {
     let mut result = [[0.0; 3]; 4];
     for i in 0..4 {
@@ -553,7 +754,7 @@ fn apply_default_crop(raw_image: &RawImage, intermediate: Intermediate) -> Inter
 
 fn develop_bayer_hq_intermediate(
     raw_image: &RawImage,
-) -> Result<(Intermediate, crate::bayer_hq::ArtifactSuppressionReport)> {
+) -> Result<(Intermediate, BayerHqDevelopmentReport)> {
     let mut scaled = raw_image.clone();
     scaled.apply_scaling()?;
     let RawPhotometricInterpretation::Cfa(config) = &scaled.photometric else {
@@ -572,7 +773,9 @@ fn develop_bayer_hq_intermediate(
 
     Ok((
         apply_default_crop(&scaled, Intermediate::ThreeColor(calibrated)),
-        suppression_report,
+        BayerHqDevelopmentReport {
+            artifact_suppression: suppression_report,
+        },
     ))
 }
 
@@ -683,6 +886,21 @@ fn develop_internal_with_options(
                 defect_report.dead_pixels
             );
         }
+    }
+
+    let highlight_reconstruction_report =
+        if profile != RawProcessingProfile::Fast && apply_calibration {
+            reconstruct_raw_sensor_highlights(&mut raw_image)
+        } else {
+            HighlightReconstructionReport::default()
+        };
+    if highlight_reconstruction_report.reconstructed_pixels > 0 {
+        log::debug!(
+            "Reconstructed RAW sensor highlights before demosaic: candidates={}, pixels={}, channels={}",
+            highlight_reconstruction_report.candidate_pixels,
+            highlight_reconstruction_report.reconstructed_pixels,
+            highlight_reconstruction_report.reconstructed_channels
+        );
     }
 
     for level in raw_image.whitelevel.0.iter_mut() {
@@ -983,6 +1201,57 @@ mod tests {
     }
 
     #[test]
+    fn highlight_reconstruction_extends_single_clipped_channel_from_local_ratio() {
+        let width = 16;
+        let height = 16;
+        let mut pixels = bayer_pixels(width, height, 8_000);
+        for y in (0..height).step_by(2) {
+            for x in (0..width).step_by(2) {
+                pixels[y * width + x] = 14_800;
+            }
+        }
+        pixels[8 * width + 8] = 16_000;
+
+        let report = reconstruct_integer_cfa_highlights(
+            &mut pixels,
+            bayer_context_with_levels(
+                width,
+                height,
+                vec![512.0],
+                vec![16_000.0, 16_000.0, 16_000.0],
+            ),
+        );
+
+        assert_eq!(report.candidate_pixels, 1);
+        assert_eq!(report.reconstructed_pixels, 1);
+        assert_eq!(report.reconstructed_channels, 1);
+        assert!(pixels[8 * width + 8] > 16_000);
+        assert!(pixels[8 * width + 8] <= 18_323);
+    }
+
+    #[test]
+    fn highlight_reconstruction_rejects_all_channel_clip() {
+        let width = 16;
+        let height = 16;
+        let mut pixels = bayer_pixels(width, height, 8_000);
+        pixels[8 * width + 8] = 16_000;
+
+        let report = reconstruct_integer_cfa_highlights(
+            &mut pixels,
+            bayer_context_with_levels(
+                width,
+                height,
+                vec![512.0],
+                vec![16_000.0, 16_000.0, 16_000.0],
+            ),
+        );
+
+        assert_eq!(report.candidate_pixels, 1);
+        assert_eq!(report.reconstructed_pixels, 0);
+        assert_eq!(pixels[8 * width + 8], 16_000);
+    }
+
+    #[test]
     fn private_raw_defect_correction_changes_injected_sensor_defects_when_enabled() {
         if std::env::var("RAWENGINE_RUN_PRIVATE_RAW_DEFECT_PROOF").ok() != Some("1".to_string()) {
             return;
@@ -1114,11 +1383,13 @@ mod tests {
         let source = RawSource::new_from_slice(&file_bytes);
         let decoder =
             rawler::get_decoder(&source).expect("create RAW decoder for suppression proof");
-        let raw_image = decoder
+        let mut raw_image = decoder
             .raw_image(&source, &RawDecodeParams::default(), false)
             .expect("decode private Bayer RAW for suppression proof");
-        let (_, suppression_report) =
+        let highlight_reconstruction_report = reconstruct_raw_sensor_highlights(&mut raw_image);
+        let (_, bayer_hq_report) =
             develop_bayer_hq_intermediate(&raw_image).expect("run Bayer HQ suppression proof path");
+        let suppression_report = bayer_hq_report.artifact_suppression;
         assert!(suppression_report.evaluated_pixels > 0);
         assert!(suppression_report.adjusted_pixels > 0);
         let suppression_adjusted_ratio = suppression_report.adjusted_pixels as f64
@@ -1167,7 +1438,7 @@ mod tests {
             .expect("write Bayer HQ TIFF");
 
         let report = serde_json::json!({
-            "issues": [3239, 3241],
+            "issues": [3239, 3241, 3242],
             "proofBoundary": "private_bayer_hq_runtime_output",
             "sourcePath": source_path,
             "dimensions": {
@@ -1189,6 +1460,13 @@ mod tests {
                     "evaluatedPixels": suppression_report.evaluated_pixels,
                     "adjustedPixels": suppression_report.adjusted_pixels,
                     "adjustedPixelRatio": suppression_adjusted_ratio,
+                },
+                "highlightReconstruction": {
+                    "algorithm": "sensor_linear_same_phase_headroom_v1",
+                    "stage": "pre_demosaic_integer_cfa",
+                    "candidatePixels": highlight_reconstruction_report.candidate_pixels,
+                    "reconstructedPixels": highlight_reconstruction_report.reconstructed_pixels,
+                    "reconstructedChannels": highlight_reconstruction_report.reconstructed_channels,
                 },
             },
             "outputDiff": {
