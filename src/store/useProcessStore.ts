@@ -4,12 +4,23 @@ import { type ExportState, type ImportState, Status } from '../components/ui/Exp
 
 import type { Progress } from '../components/ui/AppProperties';
 
+export interface ThumbnailSmartPreviewState {
+  colorProfile: string;
+  height: number;
+  source: string;
+  sourceAvailable: boolean;
+  sourceRevision: string;
+  stale: boolean;
+  width: number;
+}
+
 interface ProcessState {
   exportState: ExportState;
   importState: ImportState;
   isIndexing: boolean;
   indexingProgress: Progress;
   thumbnails: Record<string, string>;
+  thumbnailSmartPreviews: Record<string, ThumbnailSmartPreviewState>;
   thumbnailProgress: Progress;
   aiModelDownloadStatus: string | null;
   copiedFilePaths: Array<string>;
@@ -33,6 +44,7 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
   isIndexing: false,
   indexingProgress: { current: 0, total: 0 },
   thumbnails: {},
+  thumbnailSmartPreviews: {},
   thumbnailProgress: { current: 0, total: 0 },
   aiModelDownloadStatus: null,
   copiedFilePaths: [],

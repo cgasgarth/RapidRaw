@@ -81,6 +81,186 @@ fn compute_thumbnail_cache_hash(path_str: &str, adjustments_bytes: &[u8]) -> Opt
     Some(hasher.finalize().to_hex().to_string())
 }
 
+const SMART_PREVIEW_SCHEMA_VERSION: u8 = 1;
+const SMART_PREVIEW_COLOR_PROFILE: &str = "srgb";
+const SMART_PREVIEW_TARGET_WIDTH: u32 = 2560;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SmartPreviewManifest {
+    schema_version: u8,
+    path: String,
+    width: u32,
+    height: u32,
+    byte_size: u64,
+    color_profile: String,
+    source_revision: String,
+    source_available: bool,
+    stale: bool,
+    created_at: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ThumbnailSmartPreviewPayload {
+    color_profile: String,
+    height: u32,
+    source: String,
+    source_available: bool,
+    source_revision: String,
+    stale: bool,
+    width: u32,
+}
+
+#[derive(Debug, Clone)]
+struct ThumbnailResult {
+    data_url: String,
+    is_edited: bool,
+    rating: u8,
+    smart_preview: Option<ThumbnailSmartPreviewPayload>,
+}
+
+fn compute_smart_preview_id(path_str: &str) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(path_str.as_bytes());
+    hasher.finalize().to_hex().to_string()
+}
+
+fn compute_source_revision(path_str: &str, adjustments_bytes: &[u8]) -> String {
+    let (source_path, _) = parse_virtual_path(path_str);
+    let metadata = fs::metadata(&source_path).ok();
+    let modified_secs = metadata
+        .as_ref()
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let byte_len = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
+
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(path_str.as_bytes());
+    hasher.update(&modified_secs.to_le_bytes());
+    hasher.update(&byte_len.to_le_bytes());
+    hasher.update(adjustments_bytes);
+    hasher.finalize().to_hex().to_string()
+}
+
+fn resolve_smart_preview_cache_dir(app_handle: &AppHandle) -> std::result::Result<PathBuf, String> {
+    let cache_dir = app_handle
+        .path()
+        .app_cache_dir()
+        .map_err(|e| e.to_string())?;
+    let smart_preview_dir = cache_dir.join("smart-previews");
+    if !smart_preview_dir.exists() {
+        fs::create_dir_all(&smart_preview_dir).map_err(|e| e.to_string())?;
+    }
+    Ok(smart_preview_dir)
+}
+
+fn smart_preview_paths(smart_preview_dir: &Path, path_str: &str) -> (PathBuf, PathBuf) {
+    let preview_id = compute_smart_preview_id(path_str);
+    (
+        smart_preview_dir.join(format!("{}.jpg", preview_id)),
+        smart_preview_dir.join(format!("{}.json", preview_id)),
+    )
+}
+
+fn thumbnail_smart_preview_payload(
+    manifest: &SmartPreviewManifest,
+    source: &str,
+) -> ThumbnailSmartPreviewPayload {
+    ThumbnailSmartPreviewPayload {
+        color_profile: manifest.color_profile.clone(),
+        height: manifest.height,
+        source: source.to_string(),
+        source_available: manifest.source_available,
+        source_revision: manifest.source_revision.clone(),
+        stale: manifest.stale,
+        width: manifest.width,
+    }
+}
+
+fn write_smart_preview_artifact(
+    smart_preview_dir: &Path,
+    path_str: &str,
+    thumb_data: &[u8],
+    width: u32,
+    height: u32,
+    adjustments_bytes: &[u8],
+) -> Option<ThumbnailSmartPreviewPayload> {
+    let (source_path, _) = parse_virtual_path(path_str);
+    let source_available = source_path.exists();
+    let (preview_path, manifest_path) = smart_preview_paths(smart_preview_dir, path_str);
+    let manifest = SmartPreviewManifest {
+        schema_version: SMART_PREVIEW_SCHEMA_VERSION,
+        path: path_str.to_string(),
+        width,
+        height,
+        byte_size: thumb_data.len() as u64,
+        color_profile: SMART_PREVIEW_COLOR_PROFILE.to_string(),
+        source_revision: compute_source_revision(path_str, adjustments_bytes),
+        source_available,
+        stale: !source_available,
+        created_at: Utc::now().to_rfc3339(),
+    };
+
+    if fs::write(&preview_path, thumb_data).is_err() {
+        return None;
+    }
+    if let Ok(manifest_bytes) = serde_json::to_vec_pretty(&manifest) {
+        let _ = fs::write(manifest_path, manifest_bytes);
+    }
+
+    Some(thumbnail_smart_preview_payload(&manifest, "rendered"))
+}
+
+fn read_smart_preview_artifact(
+    smart_preview_dir: &Path,
+    path_str: &str,
+) -> Option<(String, ThumbnailSmartPreviewPayload)> {
+    let (preview_path, manifest_path) = smart_preview_paths(smart_preview_dir, path_str);
+    let data = fs::read(preview_path).ok()?;
+    let mut manifest: SmartPreviewManifest =
+        serde_json::from_slice(&fs::read(manifest_path).ok()?).ok()?;
+    let (source_path, _) = parse_virtual_path(path_str);
+    manifest.source_available = source_path.exists();
+    manifest.stale = !manifest.source_available;
+
+    let base64_str = general_purpose::STANDARD.encode(&data);
+    Some((
+        jpeg_data_url(base64_str),
+        thumbnail_smart_preview_payload(&manifest, "smartPreview"),
+    ))
+}
+
+fn generate_and_write_smart_preview_artifact(
+    smart_preview_dir: &Path,
+    path_str: &str,
+    gpu_context: Option<&GpuContext>,
+    preloaded_image: Option<&DynamicImage>,
+    app_handle: &AppHandle,
+    adjustments_bytes: &[u8],
+) -> Option<ThumbnailSmartPreviewPayload> {
+    let smart_image = generate_thumbnail_data_with_target(
+        path_str,
+        gpu_context,
+        preloaded_image,
+        app_handle,
+        Some(SMART_PREVIEW_TARGET_WIDTH),
+    )
+    .ok()?;
+    let (smart_data, width, height) =
+        encode_thumbnail(&smart_image, SMART_PREVIEW_TARGET_WIDTH).ok()?;
+    write_smart_preview_artifact(
+        smart_preview_dir,
+        path_str,
+        &smart_data,
+        width,
+        height,
+        adjustments_bytes,
+    )
+}
+
 #[derive(Debug)]
 pub enum ReadFileError {
     Io(std::io::Error),
@@ -871,6 +1051,16 @@ pub fn generate_thumbnail_data(
     preloaded_image: Option<&DynamicImage>,
     app_handle: &AppHandle,
 ) -> anyhow::Result<DynamicImage> {
+    generate_thumbnail_data_with_target(path_str, gpu_context, preloaded_image, app_handle, None)
+}
+
+fn generate_thumbnail_data_with_target(
+    path_str: &str,
+    gpu_context: Option<&GpuContext>,
+    preloaded_image: Option<&DynamicImage>,
+    app_handle: &AppHandle,
+    target_resolution: Option<u32>,
+) -> anyhow::Result<DynamicImage> {
     let (source_path, sidecar_path) = parse_virtual_path(path_str);
     let source_path_str = source_path.to_string_lossy().to_string();
     let is_raw = is_raw_file(&source_path_str);
@@ -888,7 +1078,8 @@ pub fn generate_thumbnail_data(
     {
         let state = app_handle.state::<AppState>();
         let settings = load_settings_or_default(app_handle);
-        let target_res = settings.thumbnail_resolution.unwrap_or(720);
+        let target_res =
+            target_resolution.unwrap_or_else(|| settings.thumbnail_resolution.unwrap_or(720));
 
         let geometry_hash = calculate_geometry_hash(&meta.adjustments);
 
@@ -1164,12 +1355,13 @@ pub fn generate_thumbnail_data(
     Ok(apply_coarse_rotation(Cow::Owned(final_image), fallback_orientation_steps).into_owned())
 }
 
-fn encode_thumbnail(image: &DynamicImage, target_width: u32) -> Result<Vec<u8>> {
+fn encode_thumbnail(image: &DynamicImage, target_width: u32) -> Result<(Vec<u8>, u32, u32)> {
     let thumbnail = crate::image_processing::downscale_f32_image(image, target_width, target_width);
+    let (width, height) = thumbnail.dimensions();
     let mut buf = Cursor::new(Vec::new());
     let mut encoder = JpegEncoder::new_with_quality(&mut buf, 75);
     encoder.encode_image(&thumbnail.to_rgb8())?;
-    Ok(buf.into_inner())
+    Ok((buf.into_inner(), width, height))
 }
 
 fn generate_single_thumbnail_and_cache(
@@ -1180,7 +1372,7 @@ fn generate_single_thumbnail_and_cache(
     force_regenerate: bool,
     app_handle: &AppHandle,
     settings: &AppSettings,
-) -> Option<(String, u8, bool)> {
+) -> Option<ThumbnailResult> {
     let (_, sidecar_path) = parse_virtual_path(path_str);
 
     let (rating, is_edited, adjustments_bytes) =
@@ -1201,7 +1393,24 @@ fn generate_single_thumbnail_and_cache(
             (0, false, Vec::new())
         };
 
-    let cache_hash = compute_thumbnail_cache_hash(path_str, &adjustments_bytes)?;
+    let smart_preview_dir = resolve_smart_preview_cache_dir(app_handle).ok();
+    let cache_hash = compute_thumbnail_cache_hash(path_str, &adjustments_bytes);
+
+    if !force_regenerate
+        && cache_hash.is_none()
+        && let Some(smart_preview_dir) = smart_preview_dir.as_deref()
+        && let Some((data_url, smart_preview)) =
+            read_smart_preview_artifact(smart_preview_dir, path_str)
+    {
+        return Some(ThumbnailResult {
+            data_url,
+            rating,
+            is_edited,
+            smart_preview: Some(smart_preview),
+        });
+    }
+
+    let cache_hash = cache_hash?;
 
     let cache_filename = format!("{}.jpg", cache_hash);
     let cache_path = thumb_cache_dir.join(cache_filename);
@@ -1210,21 +1419,82 @@ fn generate_single_thumbnail_and_cache(
         && cache_path.exists()
         && let Ok(data) = fs::read(&cache_path)
     {
+        let smart_preview = smart_preview_dir.as_deref().and_then(|dir| {
+            if let Some((_, existing)) = read_smart_preview_artifact(dir, path_str) {
+                Some(existing)
+            } else {
+                generate_and_write_smart_preview_artifact(
+                    dir,
+                    path_str,
+                    gpu_context,
+                    preloaded_image,
+                    app_handle,
+                    &adjustments_bytes,
+                )
+            }
+        });
         let base64_str = general_purpose::STANDARD.encode(&data);
-        return Some((jpeg_data_url(base64_str), rating, is_edited));
+        return Some(ThumbnailResult {
+            data_url: jpeg_data_url(base64_str),
+            rating,
+            is_edited,
+            smart_preview,
+        });
     }
 
     let target_width = settings.thumbnail_resolution.unwrap_or(720);
 
     if let Ok(thumb_image) =
         generate_thumbnail_data(path_str, gpu_context, preloaded_image, app_handle)
-        && let Ok(thumb_data) = encode_thumbnail(&thumb_image, target_width)
+        && let Ok((thumb_data, width, height)) = encode_thumbnail(&thumb_image, target_width)
     {
         let _ = fs::write(&cache_path, &thumb_data);
+        let smart_preview = smart_preview_dir
+            .as_deref()
+            .and_then(|dir| {
+                generate_and_write_smart_preview_artifact(
+                    dir,
+                    path_str,
+                    gpu_context,
+                    preloaded_image,
+                    app_handle,
+                    &adjustments_bytes,
+                )
+            })
+            .or_else(|| {
+                smart_preview_dir.as_deref().and_then(|dir| {
+                    write_smart_preview_artifact(
+                        dir,
+                        path_str,
+                        &thumb_data,
+                        width,
+                        height,
+                        &adjustments_bytes,
+                    )
+                })
+            });
         let base64_str = general_purpose::STANDARD.encode(&thumb_data);
-        return Some((jpeg_data_url(base64_str), rating, is_edited));
+        return Some(ThumbnailResult {
+            data_url: jpeg_data_url(base64_str),
+            rating,
+            is_edited,
+            smart_preview,
+        });
     }
     None
+}
+
+fn emit_thumbnail_result(app_handle: &AppHandle, path: &str, thumbnail: ThumbnailResult) {
+    let _ = app_handle.emit(
+        "thumbnail-generated",
+        serde_json::json!({
+            "path": path,
+            "data": thumbnail.data_url,
+            "rating": thumbnail.rating,
+            "is_edited": thumbnail.is_edited,
+            "smartPreview": thumbnail.smart_preview
+        }),
+    );
 }
 
 pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
@@ -1272,16 +1542,8 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
                         &worker_settings,
                     );
 
-                    if let Some((thumbnail_data, rating, is_edited)) = result {
-                        let _ = app_clone.emit(
-                            "thumbnail-generated",
-                            serde_json::json!({
-                                "path": path_to_process,
-                                "data": thumbnail_data,
-                                "rating": rating,
-                                "is_edited": is_edited
-                            }),
-                        );
+                    if let Some(thumbnail) = result {
+                        emit_thumbnail_result(&app_clone, &path_to_process, thumbnail);
                     }
                     increment_thumbnail_progress(&state, &app_clone);
                 }
@@ -1950,11 +2212,8 @@ pub fn save_metadata_and_update_thumbnail(
             &settings,
         );
 
-        if let Some((thumbnail_data, rating, is_edited)) = result {
-            let _ = app_handle_clone.emit(
-                "thumbnail-generated",
-                serde_json::json!({ "path": path_clone, "data": thumbnail_data, "rating": rating, "is_edited": is_edited }),
-            );
+        if let Some(thumbnail) = result {
+            emit_thumbnail_result(&app_handle_clone, &path_clone, thumbnail);
         }
 
         increment_thumbnail_progress(&state, &app_handle_clone);
@@ -2048,11 +2307,8 @@ pub async fn apply_adjustments_to_paths(
                 &settings,
             );
 
-            if let Some((thumbnail_data, rating, is_edited)) = result {
-                let _ = app_handle.emit(
-                    "thumbnail-generated",
-                    serde_json::json!({ "path": path_str, "data": thumbnail_data, "rating": rating, "is_edited": is_edited  }),
-                );
+            if let Some(thumbnail) = result {
+                emit_thumbnail_result(&app_handle, path_str, thumbnail);
             }
 
             increment_thumbnail_progress(&state, &app_handle);
@@ -2120,11 +2376,8 @@ pub async fn reset_adjustments_for_paths(
                 &settings,
             );
 
-            if let Some((thumbnail_data, rating, is_edited)) = result {
-                let _ = app_handle.emit(
-                    "thumbnail-generated",
-                    serde_json::json!({ "path": path_str, "data": thumbnail_data, "rating": rating, "is_edited": is_edited }),
-                );
+            if let Some(thumbnail) = result {
+                emit_thumbnail_result(&app_handle, path_str, thumbnail);
             }
 
             increment_thumbnail_progress(&state, &app_handle);
@@ -2233,11 +2486,8 @@ pub async fn apply_auto_adjustments_to_paths(
                 &settings,
             );
 
-            if let Some((thumbnail_data, rating, is_edited)) = result {
-                let _ = app_handle.emit(
-                    "thumbnail-generated",
-                    serde_json::json!({ "path": path, "data": thumbnail_data, "rating": rating, "is_edited": is_edited  }),
-                );
+            if let Some(thumbnail) = result {
+                emit_thumbnail_result(&app_handle, path, thumbnail);
             }
 
             increment_thumbnail_progress(&state, &app_handle);
@@ -2674,7 +2924,7 @@ pub fn get_cached_or_generate_thumbnail_image(
         }
 
         let thumb_image = generate_thumbnail_data(path_str, gpu_context, None, app_handle)?;
-        let thumb_data = encode_thumbnail(&thumb_image, target_width)?;
+        let (thumb_data, _, _) = encode_thumbnail(&thumb_image, target_width)?;
         fs::write(&cache_path, &thumb_data)?;
 
         Ok(thumb_image)
@@ -3395,5 +3645,59 @@ mod tests {
 
         assert!(!first_copy.exists());
         assert!(!second_copy.exists());
+    }
+
+    #[test]
+    fn smart_preview_id_stays_stable_when_source_changes() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let image_path = temp_dir.path().join("image.raf");
+        fs::write(&image_path, b"first").expect("source image");
+        let path = image_path.to_string_lossy().into_owned();
+
+        let preview_id = compute_smart_preview_id(&path);
+
+        fs::write(&image_path, b"second").expect("updated source image");
+
+        assert_eq!(preview_id, compute_smart_preview_id(&path));
+    }
+
+    #[test]
+    fn smart_preview_source_revision_tracks_source_and_adjustment_changes() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let image_path = temp_dir.path().join("image.raf");
+        fs::write(&image_path, b"first").expect("source image");
+        let path = image_path.to_string_lossy().into_owned();
+
+        let original_revision = compute_source_revision(&path, br#"{"exposure":0}"#);
+        let adjustment_revision = compute_source_revision(&path, br#"{"exposure":1}"#);
+        fs::write(&image_path, b"second payload").expect("updated source image");
+        let source_revision = compute_source_revision(&path, br#"{"exposure":0}"#);
+
+        assert_ne!(original_revision, adjustment_revision);
+        assert_ne!(original_revision, source_revision);
+    }
+
+    #[test]
+    fn smart_preview_artifact_reports_stale_when_source_disappears() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let image_path = temp_dir.path().join("image.raf");
+        fs::write(&image_path, b"raw").expect("source image");
+        let path = image_path.to_string_lossy().into_owned();
+        let preview_dir = temp_dir.path().join("smart-previews");
+        fs::create_dir_all(&preview_dir).expect("preview dir");
+
+        let write_payload =
+            write_smart_preview_artifact(&preview_dir, &path, b"jpeg", 2560, 1707, b"{}")
+                .expect("smart preview write");
+        assert!(!write_payload.stale);
+
+        fs::remove_file(&image_path).expect("source removed");
+        let (data_url, read_payload) =
+            read_smart_preview_artifact(&preview_dir, &path).expect("smart preview read");
+
+        assert!(data_url.starts_with("data:image/jpeg;base64,"));
+        assert!(read_payload.stale);
+        assert!(!read_payload.source_available);
+        assert_eq!(read_payload.source, "smartPreview");
     }
 }

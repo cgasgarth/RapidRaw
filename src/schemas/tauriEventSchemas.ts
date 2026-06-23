@@ -20,12 +20,25 @@ export const progressPayloadSchema = z
   })
   .loose();
 
+export const thumbnailSmartPreviewPayloadSchema = z
+  .object({
+    colorProfile: z.string(),
+    height: nonnegativeNumberSchema,
+    source: z.string(),
+    sourceAvailable: z.boolean(),
+    sourceRevision: z.string(),
+    stale: z.boolean(),
+    width: nonnegativeNumberSchema,
+  })
+  .strict();
+
 export const thumbnailGeneratedPayloadSchema = z
   .object({
     data: z.string().nullable().optional(),
     is_edited: z.boolean().optional(),
     path: z.string(),
     rating: z.number().optional(),
+    smartPreview: thumbnailSmartPreviewPayloadSchema.optional().nullable(),
   })
   .loose();
 

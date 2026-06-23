@@ -1420,6 +1420,7 @@
       "tooltipFocalLength": "Focal Length",
       "tooltipIso": "ISO",
       "tooltipShutterSpeed": "Shutter Speed",
+      "tooltipSmartPreview": "Using offline smart preview",
       "tooltipVirtualCopy": "Virtual Copy"
     },
     "search": {

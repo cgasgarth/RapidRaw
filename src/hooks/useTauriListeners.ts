@@ -60,6 +60,7 @@ import {
 
 import type { ChannelConfig } from '../components/adjustments/Curves';
 import type { ImageFile, WaveformData } from '../components/ui/AppProperties';
+import type { ThumbnailSmartPreviewState } from '../store/useProcessStore';
 
 interface TauriListenerProps {
   refreshAllFolderTrees: () => void;
@@ -91,6 +92,7 @@ export function useTauriListeners({
   });
 
   const thumbnailBuffer = useRef<Record<string, string>>({});
+  const smartPreviewBuffer = useRef<Record<string, ThumbnailSmartPreviewState>>({});
   const ratingBuffer = useRef<Record<string, number>>({});
   const editStatusBuffer = useRef<Record<string, boolean>>({});
   const flushHandle = useRef<number | null>(null);
@@ -103,16 +105,24 @@ export function useTauriListeners({
       if (!isEffectActive) return;
 
       const pendingThumbs = thumbnailBuffer.current;
+      const pendingSmartPreviews = smartPreviewBuffer.current;
       const pendingRatings = ratingBuffer.current;
       const pendingEdits = editStatusBuffer.current;
 
       thumbnailBuffer.current = {};
+      smartPreviewBuffer.current = {};
       ratingBuffer.current = {};
       editStatusBuffer.current = {};
 
       if (Object.keys(pendingThumbs).length > 0) {
         useProcessStore.getState().setProcess((state) => ({
           thumbnails: { ...state.thumbnails, ...pendingThumbs },
+        }));
+      }
+
+      if (Object.keys(pendingSmartPreviews).length > 0) {
+        useProcessStore.getState().setProcess((state) => ({
+          thumbnailSmartPreviews: { ...state.thumbnailSmartPreviews, ...pendingSmartPreviews },
         }));
       }
 
@@ -165,11 +175,14 @@ export function useTauriListeners({
       }),
       listen<unknown>(THUMBNAIL_GENERATED_EVENT, (event) => {
         if (!isEffectActive) return;
-        const { path, data, rating, is_edited } = parseThumbnailGeneratedPayload(event.payload);
+        const { path, data, rating, is_edited, smartPreview } = parseThumbnailGeneratedPayload(event.payload);
 
         if (data) {
           thumbnailBuffer.current[path] = data;
           refs.current.markGenerated(path);
+        }
+        if (smartPreview) {
+          smartPreviewBuffer.current[path] = smartPreview;
         }
         if (rating !== undefined) {
           ratingBuffer.current[path] = rating;
@@ -177,7 +190,7 @@ export function useTauriListeners({
         if (is_edited !== undefined) {
           editStatusBuffer.current[path] = is_edited;
         }
-        if (data || rating !== undefined || is_edited !== undefined) {
+        if (data || rating !== undefined || is_edited !== undefined || smartPreview) {
           scheduleFlush();
         }
       }),
@@ -424,6 +437,7 @@ export function useTauriListeners({
         flushHandle.current = null;
       }
       thumbnailBuffer.current = {};
+      smartPreviewBuffer.current = {};
       ratingBuffer.current = {};
       listeners.forEach((p) => {
         void p.then((unlisten) => {

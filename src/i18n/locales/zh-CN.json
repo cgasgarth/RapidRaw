@@ -1405,6 +1405,7 @@
       "tooltipFocalLength": "焦距",
       "tooltipIso": "ISO",
       "tooltipShutterSpeed": "快门速度",
+      "tooltipSmartPreview": "正在使用离线智能预览",
       "tooltipVirtualCopy": "虚拟副本"
     },
     "search": {
