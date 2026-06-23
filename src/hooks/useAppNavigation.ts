@@ -151,6 +151,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       uncroppedAdjustedPreviewUrl: null,
       histogram: null,
       waveform: null,
+      gamutWarningOverlay: null,
       activeMaskId: null,
       activeMaskContainerId: null,
       activeAiPatchContainerId: null,
@@ -305,6 +306,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         previewSize: { width: 0, height: 0 },
         histogram: null,
         waveform: null,
+        gamutWarningOverlay: null,
         uncroppedAdjustedPreviewUrl: null,
       });
 
@@ -405,7 +407,13 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         if (!preserveEditor && selectedImage) {
           debouncedSave.flush();
           debouncedSetHistory.cancel();
-          setEditor({ selectedImage: null, finalPreviewUrl: null, uncroppedAdjustedPreviewUrl: null, histogram: null });
+          setEditor({
+            finalPreviewUrl: null,
+            gamutWarningOverlay: null,
+            histogram: null,
+            selectedImage: null,
+            uncroppedAdjustedPreviewUrl: null,
+          });
           setEditor({ adjustments: INITIAL_ADJUSTMENTS });
           resetHistory(INITIAL_ADJUSTMENTS);
         }

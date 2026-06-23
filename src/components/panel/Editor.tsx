@@ -139,6 +139,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const uncroppedAdjustedPreviewUrl = useEditorStore((s) => s.uncroppedAdjustedPreviewUrl);
   const transformedOriginalUrl = useEditorStore((s) => s.transformedOriginalUrl);
   const interactivePatch = useEditorStore((s) => s.interactivePatch);
+  const gamutWarningOverlay = useEditorStore((s) => s.gamutWarningOverlay);
+  const isGamutWarningOverlayVisible = useEditorStore((s) => s.isGamutWarningOverlayVisible);
   const showOriginal = useEditorStore((s) => s.showOriginal);
   const isSliderDragging = useEditorStore((s) => s.isSliderDragging);
   const targetZoom = useEditorStore((s) => s.zoom);
@@ -2151,6 +2153,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
             brushSettings={brushSettings}
             crop={crop}
             finalPreviewUrl={finalPreviewUrl}
+            gamutWarningOverlay={gamutWarningOverlay}
             handleCropComplete={handleCropComplete}
             imageRenderSize={imageRenderSize}
             interactivePatch={interactivePatch}
@@ -2161,6 +2164,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
             isStraightenActive={isStraightenActive}
             isRotationActive={isRotationActive}
             isSliderDragging={isSliderDragging}
+            isGamutWarningOverlayVisible={isGamutWarningOverlayVisible}
             maskOverlayUrl={maskOverlayUrl}
             onGenerateAiMask={(id, start, end) => {
               if (!id) return;

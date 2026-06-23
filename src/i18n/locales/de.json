@@ -78,6 +78,12 @@
       "colorGrading": "Color Grading",
       "colorMixer": "Farbmischer",
       "falloffSmoothness": "Falloff",
+      "gamutWarning": {
+        "coverage": "",
+        "off": "",
+        "on": "",
+        "title": ""
+      },
       "grading": {
         "applyPreset": "Color-Grading-Vorgabe {{name}} anwenden. Kategorie {{category}}, Mischen {{blending}}, Abgleich {{balance}}.",
         "balance": "Abgleich",
@@ -693,6 +699,8 @@
     },
     "canvas": {
       "cropPreviewAlt": "Zuschnittvorschau",
+      "gamutWarningCoverage": "",
+      "gamutWarningOverlay": "",
       "maskOverlayAlt": "Maskenuberlagerung",
       "originalAlt": "Original"
     },

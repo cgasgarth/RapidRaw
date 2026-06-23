@@ -78,6 +78,12 @@
       "colorGrading": "Gradacja kolorów",
       "colorMixer": "Mikser kolorów",
       "falloffSmoothness": "Falloff",
+      "gamutWarning": {
+        "coverage": "",
+        "off": "",
+        "on": "",
+        "title": ""
+      },
       "grading": {
         "applyPreset": "Zastosuj preset gradacji {{name}}. Kategoria {{category}}, mieszanie {{blending}}, balans {{balance}}.",
         "balance": "Balans",
@@ -737,6 +743,8 @@
     },
     "canvas": {
       "cropPreviewAlt": "Podglad kadrowania",
+      "gamutWarningCoverage": "",
+      "gamutWarningOverlay": "",
       "maskOverlayAlt": "Nakladka maski",
       "originalAlt": "Oryginal"
     },

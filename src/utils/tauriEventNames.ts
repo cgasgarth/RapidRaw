@@ -14,6 +14,7 @@ export const EXPORT_ERROR_EVENT = 'export-error';
 export const HDR_COMPLETE_EVENT = 'hdr-complete';
 export const HDR_ERROR_EVENT = 'hdr-error';
 export const HDR_PROGRESS_EVENT = 'hdr-progress';
+export const GAMUT_WARNING_UPDATE_EVENT = 'gamut-warning-update';
 export const HISTOGRAM_UPDATE_EVENT = 'histogram-update';
 export const IMPORT_COMPLETE_EVENT = 'import-complete';
 export const IMPORT_ERROR_EVENT = 'import-error';

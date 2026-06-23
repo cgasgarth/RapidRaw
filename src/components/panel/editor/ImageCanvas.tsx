@@ -9,10 +9,12 @@ import {
   BRUSH_MASK_COMMAND_COORDINATE_SPACE,
   buildBrushMaskCommandFromParameters,
 } from '../../../utils/brushMaskCommandBridge';
+import { formatGamutWarningCoverage } from '../../../utils/gamutWarningDisplay';
 import { calculateWhiteBalancePickerAdjustment } from '../../../utils/whiteBalancePicker';
 import { Mask, type SubMask, SubMaskMode, ToolType } from '../right/Masks';
 
 import type { RenderSize } from '../../../hooks/useImageRenderSize';
+import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
 import type { Adjustments, AiPatch, Coord, MaskContainer } from '../../../utils/adjustments';
 import type { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
 import type { OverlayMode } from '../right/CropPanel';
@@ -120,6 +122,7 @@ interface ImageCanvasProps {
   brushSettings: BrushSettings | null;
   crop: Crop | null;
   finalPreviewUrl: string | null;
+  gamutWarningOverlay: GamutWarningOverlayPayload | null;
   handleCropComplete: (c: Crop, cp: PercentCrop) => void;
   imageRenderSize: RenderSize;
   isAiEditing: boolean;
@@ -127,6 +130,7 @@ interface ImageCanvasProps {
   isMaskControlHovered: boolean;
   isMasking: boolean;
   isSliderDragging: boolean;
+  isGamutWarningOverlayVisible: boolean;
   isStraightenActive: boolean;
   isRotationActive?: boolean;
   maskOverlayUrl: string | null;
@@ -1072,6 +1076,7 @@ const ImageCanvas = memo(
     brushSettings,
     crop,
     finalPreviewUrl,
+    gamutWarningOverlay,
     handleCropComplete,
     imageRenderSize,
     interactivePatch,
@@ -1080,6 +1085,7 @@ const ImageCanvas = memo(
     isMaskControlHovered,
     isMasking,
     isSliderDragging,
+    isGamutWarningOverlayVisible,
     isStraightenActive,
     isRotationActive,
     maskOverlayUrl,
@@ -1140,7 +1146,6 @@ const ImageCanvas = memo(
     const retainedPatchRef = useRef<typeof interactivePatch>(null);
 
     const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage.isReady && hasRenderedFirstFrame;
-
     const paddingX = imageRenderSize.width * 0.5;
     const paddingY = imageRenderSize.height * 0.5;
 
@@ -2277,6 +2282,12 @@ const ImageCanvas = memo(
     const cropPreviewUrl = uncroppedAdjustedPreviewUrl || selectedImage.thumbnailUrl;
     const originalSrc = transformedOriginalUrl;
     const isShowingOriginal = showOriginal && !!originalSrc;
+    const gamutCoverage = formatGamutWarningCoverage(gamutWarningOverlay);
+    const showGamutWarningOverlay =
+      isGamutWarningOverlayVisible &&
+      !isShowingOriginal &&
+      !isCropping &&
+      (gamutWarningOverlay?.warning_pixel_count ?? 0) > 0;
 
     useEffect(() => {
       if (!originalSrc) {
@@ -2521,6 +2532,36 @@ const ImageCanvas = memo(
                     zIndex: 3,
                   }}
                 />
+              )}
+              {showGamutWarningOverlay && gamutWarningOverlay && (
+                <div
+                  aria-label={t('editor.canvas.gamutWarningOverlay')}
+                  className="pointer-events-none absolute"
+                  data-coverage-ratio={gamutWarningOverlay.coverage_ratio.toFixed(6)}
+                  data-mask-height={gamutWarningOverlay.height}
+                  data-mask-width={gamutWarningOverlay.width}
+                  data-testid="gamut-warning-overlay"
+                  data-warning-pixel-count={gamutWarningOverlay.warning_pixel_count}
+                  style={{
+                    height: cssPx(imageRenderSize.height),
+                    left: cssPx(imageRenderSize.offsetX),
+                    top: cssPx(imageRenderSize.offsetY),
+                    width: cssPx(imageRenderSize.width),
+                    zIndex: 4,
+                  }}
+                >
+                  <img
+                    alt=""
+                    className="h-full w-full object-fill"
+                    src={gamutWarningOverlay.mask_data_url}
+                    style={{
+                      imageRendering: isMaxZoom ? 'pixelated' : 'auto',
+                    }}
+                  />
+                  <div className="absolute bottom-3 right-3 rounded-md border border-fuchsia-300/30 bg-black/70 px-3 py-2 text-xs font-medium text-fuchsia-100 shadow-lg">
+                    {t('editor.canvas.gamutWarningCoverage', { value: gamutCoverage })}
+                  </div>
+                </div>
               )}
             </div>
           </div>

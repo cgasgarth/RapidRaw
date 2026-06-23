@@ -9,6 +9,7 @@ import {
   parseCullingSuggestionsPayload,
   parseDenoiseCompletePayload,
   parseExportReceiptPayload,
+  parseGamutWarningOverlayPayload,
   parseImportProgressPayload,
   parseImportStartPayload,
   parsePanoramaCompletePayload,
@@ -35,6 +36,7 @@ import {
   EXPORT_CANCELLED_EVENT,
   EXPORT_COMPLETE_EVENT,
   EXPORT_ERROR_EVENT,
+  GAMUT_WARNING_UPDATE_EVENT,
   HDR_COMPLETE_EVENT,
   HDR_ERROR_EVENT,
   HDR_PROGRESS_EVENT,
@@ -152,6 +154,13 @@ export function useTauriListeners({
       listen<ImageAnalyticsPayload<ChannelConfig>>(HISTOGRAM_UPDATE_EVENT, (event) => {
         if (isEffectActive && event.payload.path === useEditorStore.getState().selectedImage?.path) {
           useEditorStore.getState().setEditor({ histogram: event.payload.data });
+        }
+      }),
+      listen<ImageAnalyticsPayload<unknown>>(GAMUT_WARNING_UPDATE_EVENT, (event) => {
+        if (isEffectActive && event.payload.path === useEditorStore.getState().selectedImage?.path) {
+          useEditorStore
+            .getState()
+            .setEditor({ gamutWarningOverlay: parseGamutWarningOverlayPayload(event.payload.data) });
         }
       }),
       listen<unknown>(OPEN_WITH_FILE_EVENT, (event) => {
