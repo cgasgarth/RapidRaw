@@ -135,6 +135,9 @@ jobs:
       - name: Capture PR visual smoke
         run: bun run check:visual-smoke:pr
 
+      - name: Check browser Tauri harness
+        run: bun run check:browser-tauri-harness
+
       - name: Upload visual smoke screenshots
         if: ${{ failure() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

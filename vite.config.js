@@ -6,8 +6,13 @@ import { getViteChunkSizeWarningLimitKb } from './scripts/lib/vite-bundle-policy
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig(async ({ command }) => ({
   plugins: [tailwindcss(), react()],
+  define: {
+    __RAWENGINE_BROWSER_TAURI_HARNESS__: JSON.stringify(
+      command === 'serve' && process.env.VITE_RAWENGINE_BROWSER_TAURI_HARNESS === '1',
+    ),
+  },
 
   clearScreen: false,
   server: {
