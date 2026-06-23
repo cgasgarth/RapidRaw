@@ -402,6 +402,14 @@ pub async fn cull_images(
 mod tests {
     use super::*;
     use image::Luma;
+    use serde::Serialize;
+    use sha2::{Digest, Sha256};
+    use std::fs;
+    use std::path::{Path, PathBuf};
+
+    const PRIVATE_CULLING_ARTIFACT_DIR: &str = "private-artifacts/validation/culling-focus-ranking";
+    const PRIVATE_CULLING_REPORT_NAME: &str = "culling-focus-ranking-report.json";
+    const PRIVATE_CULLING_SOURCE_LIMIT: usize = 24;
 
     fn build_focus_fixture(focused_eye_band: bool) -> GrayImage {
         let mut image = GrayImage::from_pixel(128, 128, Luma([128]));
@@ -471,5 +479,273 @@ mod tests {
         assert_eq!(metrics.center, 0.0);
         assert_eq!(metrics.face, 0.0);
         assert_eq!(metrics.eye, 0.0);
+    }
+
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PrivateCullingFocusReport {
+        artifact_path: String,
+        failed_paths: Vec<String>,
+        issue: u32,
+        metrics: Vec<PrivateCullingMetric>,
+        proof_claims: PrivateCullingProofClaims,
+        rankings: Vec<PrivateCullingRanking>,
+        source_count: usize,
+        validation_mode: String,
+    }
+
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PrivateCullingMetric {
+        name: String,
+        passed: bool,
+        threshold: f64,
+        value: f64,
+    }
+
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PrivateCullingProofClaims {
+        does_not_prove: Vec<String>,
+        proves: Vec<String>,
+    }
+
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PrivateCullingRanking {
+        center_focus_metric: f64,
+        exposure_metric: f64,
+        face_sharpness_metric: f64,
+        focus_confidence: f64,
+        focus_region: String,
+        focus_score: f64,
+        path: String,
+        rank: usize,
+        source_hash_after: String,
+        source_hash_before: String,
+        source_is_raw: bool,
+    }
+
+    #[test]
+    fn private_runtime_smoke_generates_culling_focus_raw_report_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_CULLING_FOCUS_RAW_PROOF")
+            .ok()
+            .as_deref()
+            != Some("1")
+        {
+            eprintln!("skipping private culling focus RAW proof smoke");
+            return;
+        }
+
+        let private_root = PathBuf::from(
+            std::env::var("RAWENGINE_PRIVATE_RAW_ROOT")
+                .unwrap_or_else(|_| "/tmp/rawengine-private-root".to_string()),
+        );
+        run_private_culling_focus_raw_proof(&private_root)
+            .expect("private culling focus RAW proof runs");
+    }
+
+    fn run_private_culling_focus_raw_proof(private_root: &Path) -> Result<(), String> {
+        let source_paths = collect_raw_paths(private_root, PRIVATE_CULLING_SOURCE_LIMIT)?;
+        if source_paths.len() < 2 {
+            return Err(format!(
+                "expected at least 2 RAW files under {}, found {}",
+                private_root.display(),
+                source_paths.len()
+            ));
+        }
+
+        let hasher = HasherConfig::new()
+            .hash_alg(HashAlg::DoubleGradient)
+            .hash_size(16, 16)
+            .to_hasher();
+        let settings = crate::app_settings::AppSettings::default();
+        let mut rankings = Vec::new();
+        let mut failed_paths = Vec::new();
+        for path in source_paths {
+            let source_hash_before = sha256_file(&path)?;
+            let path_string = path.to_string_lossy().to_string();
+            let result = match analyze_image(&path_string, &hasher, &settings) {
+                Ok(analysis) => analysis.result,
+                Err(error) => {
+                    failed_paths.push(format!(
+                        "{}: {error}",
+                        relative_private_path(private_root, &path)
+                    ));
+                    continue;
+                }
+            };
+            let source_hash_after = sha256_file(&path)?;
+            rankings.push(PrivateCullingRanking {
+                center_focus_metric: result.center_focus_metric,
+                exposure_metric: result.exposure_metric,
+                face_sharpness_metric: result.face_sharpness_metric,
+                focus_confidence: result.focus_confidence,
+                focus_region: result.focus_region,
+                focus_score: result.focus_score,
+                path: relative_private_path(private_root, &path),
+                rank: 0,
+                source_hash_after,
+                source_hash_before,
+                source_is_raw: crate::formats::is_raw_file(&path_string),
+            });
+        }
+        if rankings.len() < 2 {
+            return Err(format!(
+                "expected at least 2 decodable RAW files under {}, decoded {}, failures: {}",
+                private_root.display(),
+                rankings.len(),
+                failed_paths.join("; ")
+            ));
+        }
+
+        rankings.sort_by(|left, right| {
+            right
+                .focus_score
+                .partial_cmp(&left.focus_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        for (index, ranking) in rankings.iter_mut().enumerate() {
+            ranking.rank = index + 1;
+        }
+
+        let sorted_descending = rankings
+            .windows(2)
+            .all(|window| window[0].focus_score >= window[1].focus_score);
+        let bounded_scores = rankings.iter().all(|ranking| {
+            (0.0..=1.0).contains(&ranking.focus_score)
+                && (0.0..=1.0).contains(&ranking.focus_confidence)
+        });
+        let raw_sources = rankings.iter().all(|ranking| ranking.source_is_raw);
+        let source_hashes_unchanged = rankings
+            .iter()
+            .all(|ranking| ranking.source_hash_before == ranking.source_hash_after);
+        let heuristic_regions = rankings
+            .iter()
+            .all(|ranking| ranking.focus_region == FOCUS_REGION_EYE_BAND_HEURISTIC);
+
+        let metrics = vec![
+            private_metric(
+                "sourceCount",
+                rankings.len() as f64,
+                2.0,
+                rankings.len() >= 2,
+            ),
+            private_metric(
+                "focusScoreSortedDescending",
+                if sorted_descending { 1.0 } else { 0.0 },
+                1.0,
+                sorted_descending,
+            ),
+            private_metric(
+                "focusScoresBounded",
+                if bounded_scores { 1.0 } else { 0.0 },
+                1.0,
+                bounded_scores,
+            ),
+            private_metric(
+                "sourceHashesUnchanged",
+                if source_hashes_unchanged { 1.0 } else { 0.0 },
+                1.0,
+                source_hashes_unchanged,
+            ),
+            private_metric(
+                "allSourcesAreRaw",
+                if raw_sources { 1.0 } else { 0.0 },
+                1.0,
+                raw_sources,
+            ),
+            private_metric(
+                "heuristicFocusRegionDeclared",
+                if heuristic_regions { 1.0 } else { 0.0 },
+                1.0,
+                heuristic_regions,
+            ),
+        ];
+
+        let artifact_dir = private_root.join(PRIVATE_CULLING_ARTIFACT_DIR);
+        fs::create_dir_all(&artifact_dir).map_err(|error| error.to_string())?;
+        let artifact_path = artifact_dir.join(PRIVATE_CULLING_REPORT_NAME);
+        let report = PrivateCullingFocusReport {
+            artifact_path: format!("{PRIVATE_CULLING_ARTIFACT_DIR}/{PRIVATE_CULLING_REPORT_NAME}"),
+            failed_paths,
+            issue: 3267,
+            metrics,
+            proof_claims: PrivateCullingProofClaims {
+                does_not_prove: vec![
+                    "trained_face_or_eye_detection".to_string(),
+                    "automatic_rejection_decisions".to_string(),
+                    "macos_app_ui_e2e_session".to_string(),
+                    "portrait_dataset_accuracy".to_string(),
+                ],
+                proves: vec![
+                    "real_private_raw_decode_for_culling_focus_ranking".to_string(),
+                    "focus_rankings_are_sorted_by_runtime_focus_score".to_string(),
+                    "focus_score_and_confidence_are_bounded".to_string(),
+                    "source_raw_files_are_not_mutated".to_string(),
+                    "focus_region_is_declared_as_heuristic".to_string(),
+                ],
+            },
+            source_count: rankings.len(),
+            rankings,
+            validation_mode: "private_raw_culling_focus_ranking_runtime".to_string(),
+        };
+        fs::write(
+            &artifact_path,
+            serde_json::to_vec_pretty(&report).map_err(|error| error.to_string())?,
+        )
+        .map_err(|error| error.to_string())?;
+
+        assert!(report.metrics.iter().all(|metric| metric.passed));
+        Ok(())
+    }
+
+    fn collect_raw_paths(root: &Path, limit: usize) -> Result<Vec<PathBuf>, String> {
+        let mut paths = Vec::new();
+        collect_raw_paths_into(root, &mut paths)?;
+        paths.sort();
+        paths.truncate(limit);
+        Ok(paths)
+    }
+
+    fn collect_raw_paths_into(root: &Path, paths: &mut Vec<PathBuf>) -> Result<(), String> {
+        for entry in fs::read_dir(root).map_err(|error| error.to_string())? {
+            let entry = entry.map_err(|error| error.to_string())?;
+            let path = entry.path();
+            if path.is_dir() {
+                collect_raw_paths_into(&path, paths)?;
+            } else if crate::formats::is_raw_file(&path) {
+                paths.push(path);
+            }
+        }
+        Ok(())
+    }
+
+    fn relative_private_path(root: &Path, path: &Path) -> String {
+        path.strip_prefix(root)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .to_string()
+    }
+
+    fn sha256_file(path: &Path) -> Result<String, String> {
+        let bytes = fs::read(path).map_err(|error| error.to_string())?;
+        let mut hasher = Sha256::new();
+        hasher.update(bytes);
+        Ok(format!("sha256:{}", hex::encode(hasher.finalize())))
+    }
+
+    fn private_metric(
+        name: &str,
+        value: f64,
+        threshold: f64,
+        passed: bool,
+    ) -> PrivateCullingMetric {
+        PrivateCullingMetric {
+            name: name.to_string(),
+            passed,
+            threshold,
+            value,
+        }
     }
 }
