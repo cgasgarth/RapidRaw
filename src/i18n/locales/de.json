@@ -1162,6 +1162,7 @@
       "tooltips": {
         "aperture": "Blende",
         "backToLibrary": "Zurück zur Bibliothek",
+        "exportSoftProof": "",
         "fileType": "",
         "focalLength": "Brennweite",
         "fullscreen": "Vollbild umschalten (F)",

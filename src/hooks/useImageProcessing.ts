@@ -51,12 +51,21 @@ export function useImageProcessing(
   const originalSize = useEditorStore((state) => state.originalSize);
   const showOriginal = useEditorStore((state) => state.showOriginal);
   const isSliderDragging = useEditorStore((state) => state.isSliderDragging);
+  const isExportSoftProofEnabled = useEditorStore((state) => state.isExportSoftProofEnabled);
+  const exportSoftProofRecipeId = useEditorStore((state) => state.exportSoftProofRecipeId);
   const transformedOriginalUrl = useEditorStore((state) => state.transformedOriginalUrl);
   const setEditor = useEditorStore((state) => state.setEditor);
 
   const activeRightPanel = useUIStore((state) => state.activeRightPanel);
   const appSettings = useSettingsStore((state) => state.appSettings);
   const multiSelectedPaths = useLibraryStore((state) => state.multiSelectedPaths);
+  const selectedProofRecipe = useMemo(
+    () =>
+      isExportSoftProofEnabled
+        ? (appSettings?.exportPresets ?? []).find((preset) => preset.id === exportSoftProofRecipeId)
+        : undefined,
+    [appSettings?.exportPresets, exportSoftProofRecipeId, isExportSoftProofEnabled],
+  );
 
   const inFlightCountRef = useRef(0);
   const pendingApplyRef = useRef<{ adjustments: Adjustments; targetRes?: number | undefined } | null>(null);
@@ -144,14 +153,22 @@ export function useImageProcessing(
       const roi = calculateROI();
 
       try {
-        const buffer: ArrayBuffer = await invoke(Invokes.ApplyAdjustments, {
-          jsAdjustments: payload,
-          isInteractive: dragging,
-          targetResolution: targetRes || null,
-          roi: roi || null,
-          computeWaveform: isWaveformVisible,
-          activeWaveformChannel: activeWaveformChannelRef.current,
-        });
+        const buffer: ArrayBuffer =
+          !dragging && selectedProofRecipe
+            ? await invoke(Invokes.GenerateExportSoftProofPreview, {
+                jsAdjustments: payload,
+                colorProfile: selectedProofRecipe.colorProfile ?? 'srgb',
+                renderingIntent: selectedProofRecipe.renderingIntent ?? 'relativeColorimetric',
+                targetResolution: targetRes || null,
+              })
+            : await invoke(Invokes.ApplyAdjustments, {
+                jsAdjustments: payload,
+                isInteractive: dragging,
+                targetResolution: targetRes || null,
+                roi: roi || null,
+                computeWaveform: isWaveformVisible,
+                activeWaveformChannel: activeWaveformChannelRef.current,
+              });
 
         if (newlySentPatchIds.size > 0) {
           newlySentPatchIds.forEach((id) => patchesSentToBackend.add(id));
@@ -245,7 +262,15 @@ export function useImageProcessing(
         }
       }
     },
-    [selectedImage?.path, calculateROI, isWaveformVisible, setEditor, previewJobIdRef, latestRenderedJobIdRef],
+    [
+      selectedImage?.path,
+      calculateROI,
+      isWaveformVisible,
+      selectedProofRecipe,
+      setEditor,
+      previewJobIdRef,
+      latestRenderedJobIdRef,
+    ],
   );
 
   const flushPipeline = useCallback(

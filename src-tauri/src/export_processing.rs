@@ -693,7 +693,7 @@ fn encode_jpeg_to_bytes(
         .map_err(|e| format!("Failed to encode JPEG: {}", e))
 }
 
-fn export_rgb_pixels_and_profile(
+pub(crate) fn export_rgb_pixels_and_profile(
     image: &DynamicImage,
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
