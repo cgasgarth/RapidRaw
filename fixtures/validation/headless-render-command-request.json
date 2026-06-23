@@ -50,6 +50,8 @@
     "dryRun": false,
     "expectedGraphRevision": "graph-rev.headless-render.basic-tone.v1",
     "parameters": {
+      "acceptedDryRunPlanHash": "sha256:headless-render-basic-tone-accepted-plan-v1",
+      "acceptedDryRunPlanId": "dryrun_headless_render_basic_tone_v1",
       "blackPoint": -6,
       "clarity": 10,
       "contrast": 18,

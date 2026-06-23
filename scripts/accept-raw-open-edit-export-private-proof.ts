@@ -98,6 +98,7 @@ function sampleManifest(): unknown {
         evidenceId: 'raw-evidence.detail.sample.v1',
         expectedMetrics: [
           { name: 'previewExportMeanAbsDelta', required: true, threshold: 0.015 },
+          { name: 'softProofExportRgb8MeanAbsDelta', required: true, threshold: 0 },
           { name: 'sidecarReloadRevisionMatch', required: true, threshold: 1 },
           { name: 'sourceHashUnchanged', required: true, threshold: 1 },
         ],
@@ -144,6 +145,13 @@ function sampleReports(): unknown {
             source: 'private_raw_report',
             threshold: 0.015,
             value: 0.01,
+          },
+          {
+            name: 'softProofExportRgb8MeanAbsDelta',
+            passed: true,
+            source: 'private_raw_report',
+            threshold: 0,
+            value: 0,
           },
           { name: 'sidecarReloadRevisionMatch', passed: true, source: 'private_raw_report', threshold: 1, value: 1 },
           { name: 'sourceHashUnchanged', passed: true, source: 'private_raw_report', threshold: 1, value: 1 },

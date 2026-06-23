@@ -161,6 +161,7 @@ function sampleReport(): Record<string, unknown> {
     metrics: [
       { name: 'changedPixelRatio', passed: true, source: 'private_raw_report', threshold: 0, value: 0.1 },
       { name: 'previewExportMeanAbsDelta', passed: true, source: 'private_raw_report', threshold: 0.015, value: 0.01 },
+      { name: 'softProofExportRgb8MeanAbsDelta', passed: true, source: 'private_raw_report', threshold: 0, value: 0 },
       { name: 'sidecarReloadRevisionMatch', passed: true, source: 'private_raw_report', threshold: 1, value: 1 },
       { name: 'sourceHashUnchanged', passed: true, source: 'private_raw_report', threshold: 1, value: 1 },
     ],

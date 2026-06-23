@@ -70,6 +70,8 @@
     "dryRun": false,
     "expectedGraphRevision": "graph-rev.color-runtime.white-balance-tone.v1",
     "parameters": {
+      "acceptedDryRunPlanHash": "sha256:white-balance-tone-runtime-accepted-plan-v1",
+      "acceptedDryRunPlanId": "dryrun_white_balance_tone_runtime_v1",
       "blackPoint": -5,
       "clarity": 8,
       "contrast": 14,
