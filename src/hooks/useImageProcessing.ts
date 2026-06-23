@@ -1,15 +1,17 @@
-import { invoke } from '@tauri-apps/api/core';
 import { useCallback, useEffect, useRef, useMemo } from 'react';
+import { z } from 'zod';
 
 import { debouncedSave } from './useEditorActions';
 import { Invokes, Panel } from '../components/ui/AppProperties';
 import { prepareAdjustmentPayloadForBackend } from '../schemas/adjustmentPayloadSchemas';
+import { emptyTauriResponseSchema } from '../schemas/tauriResponseSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 import { type Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../utils/adjustments';
 import { globalImageCache } from '../utils/ImageLRUCache';
+import { invokeWithSchema } from '../utils/tauriSchemaInvoke';
 import { debounce } from '../utils/timing';
 
 import type React from 'react';
@@ -30,6 +32,9 @@ interface TransformWrapperRefValue {
     transformState?: TransformState | null;
   };
 }
+
+const previewBufferResponseSchema = z.instanceof(ArrayBuffer);
+const previewDataUrlResponseSchema = z.string();
 
 export function useImageProcessing(
   transformWrapperRef: React.RefObject<TransformWrapperRefValue | null>,
@@ -155,20 +160,28 @@ export function useImageProcessing(
       try {
         const buffer: ArrayBuffer =
           !dragging && selectedProofRecipe
-            ? await invoke(Invokes.GenerateExportSoftProofPreview, {
-                jsAdjustments: payload,
-                colorProfile: selectedProofRecipe.colorProfile ?? 'srgb',
-                renderingIntent: selectedProofRecipe.renderingIntent ?? 'relativeColorimetric',
-                targetResolution: targetRes || null,
-              })
-            : await invoke(Invokes.ApplyAdjustments, {
-                jsAdjustments: payload,
-                isInteractive: dragging,
-                targetResolution: targetRes || null,
-                roi: roi || null,
-                computeWaveform: isWaveformVisible,
-                activeWaveformChannel: activeWaveformChannelRef.current,
-              });
+            ? await invokeWithSchema(
+                Invokes.GenerateExportSoftProofPreview,
+                {
+                  jsAdjustments: payload,
+                  colorProfile: selectedProofRecipe.colorProfile ?? 'srgb',
+                  renderingIntent: selectedProofRecipe.renderingIntent ?? 'relativeColorimetric',
+                  targetResolution: targetRes || null,
+                },
+                previewBufferResponseSchema,
+              )
+            : await invokeWithSchema(
+                Invokes.ApplyAdjustments,
+                {
+                  jsAdjustments: payload,
+                  isInteractive: dragging,
+                  targetResolution: targetRes || null,
+                  roi: roi || null,
+                  computeWaveform: isWaveformVisible,
+                  activeWaveformChannel: activeWaveformChannelRef.current,
+                },
+                previewBufferResponseSchema,
+              );
 
         if (newlySentPatchIds.size > 0) {
           newlySentPatchIds.forEach((id) => patchesSentToBackend.add(id));
@@ -313,7 +326,11 @@ export function useImageProcessing(
   const generateUncroppedPreview = useCallback(
     (currentAdjustments: Adjustments) => {
       if (!selectedImage?.isReady) return;
-      invoke(Invokes.GenerateUncroppedPreview, { jsAdjustments: currentAdjustments }).catch((err: unknown) => {
+      invokeWithSchema(
+        Invokes.GenerateUncroppedPreview,
+        { jsAdjustments: currentAdjustments },
+        emptyTauriResponseSchema,
+      ).catch((err: unknown) => {
         console.error('Failed to generate uncropped preview:', err);
       });
     },
@@ -373,10 +390,14 @@ export function useImageProcessing(
       debounce(async (currentAdjustments: Adjustments, targetRes: number) => {
         if (targetRes > currentOriginalResRef.current) {
           try {
-            const base64Data: string = await invoke(Invokes.GenerateOriginalTransformedPreview, {
-              jsAdjustments: currentAdjustments,
-              targetResolution: targetRes,
-            });
+            const base64Data = await invokeWithSchema(
+              Invokes.GenerateOriginalTransformedPreview,
+              {
+                jsAdjustments: currentAdjustments,
+                targetResolution: targetRes,
+              },
+              previewDataUrlResponseSchema,
+            );
             currentOriginalResRef.current = targetRes;
             setEditor({ transformedOriginalUrl: base64Data });
           } catch (e) {
@@ -458,11 +479,13 @@ export function useImageProcessing(
               otherPaths.forEach((p) => {
                 globalImageCache.delete(p);
               });
-              invoke(Invokes.ApplyAdjustmentsToPaths, { paths: otherPaths, adjustments: delta }).catch(
-                (err: unknown) => {
-                  console.error('Failed to apply adjustments to multi-selection:', err);
-                },
-              );
+              invokeWithSchema(
+                Invokes.ApplyAdjustmentsToPaths,
+                { paths: otherPaths, adjustments: delta },
+                emptyTauriResponseSchema,
+              ).catch((err: unknown) => {
+                console.error('Failed to apply adjustments to multi-selection:', err);
+              });
             }
           }
         }
@@ -520,10 +543,14 @@ export function useImageProcessing(
       if (showOriginal && selectedImage?.path && !transformedOriginalUrl) {
         try {
           const targetRes = calculateTargetRes();
-          const base64Data: string = await invoke(Invokes.GenerateOriginalTransformedPreview, {
-            jsAdjustments: adjustments,
-            targetResolution: targetRes,
-          });
+          const base64Data = await invokeWithSchema(
+            Invokes.GenerateOriginalTransformedPreview,
+            {
+              jsAdjustments: adjustments,
+              targetResolution: targetRes,
+            },
+            previewDataUrlResponseSchema,
+          );
           if (isEffectActive) {
             currentOriginalResRef.current = targetRes;
             setEditor({ transformedOriginalUrl: base64Data });
