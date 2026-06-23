@@ -627,6 +627,7 @@ export default function CropPanel() {
                   label={
                     <div className="flex items-center gap-2">
                       <button
+                        aria-label={t('editor.crop.tooltips.straighten')}
                         onClick={() => {
                           setEditor((state) => {
                             const willBeActive = !state.isStraightenActive;
@@ -648,6 +649,7 @@ export default function CropPanel() {
                         <Ruler size={14} />
                       </button>
                       <button
+                        aria-label={t('editor.crop.tooltips.resetFineRotation')}
                         className="p-1.5 rounded-md text-text-secondary transition-colors cursor-pointer hover:bg-card-active hover:text-text-primary"
                         onClick={resetFineRotation}
                         data-tooltip={t('editor.crop.tooltips.resetFineRotation')}

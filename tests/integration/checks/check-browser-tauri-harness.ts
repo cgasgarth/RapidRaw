@@ -85,6 +85,11 @@ try {
     .dblclick();
   await page.getByRole('heading', { name: 'Adjustments' }).waitFor({ timeout: 10_000 });
   await page.getByText(/1024 × 768/u).waitFor({ timeout: 10_000 });
+  await page.keyboard.press('Control+K');
+  await page.getByRole('dialog', { name: /Command Palette/u }).waitFor({ timeout: 10_000 });
+  await page.getByRole('button', { name: /Show crop tools/u }).click();
+  await page.getByRole('heading', { name: 'Crop' }).waitFor({ timeout: 10_000 });
+  await page.getByRole('button', { name: /Straighten Tool/u }).waitFor({ timeout: 10_000 });
   const unlabeledIconButtons = await page.locator('button').evaluateAll((buttons) =>
     buttons
       .map((button, index) => {
