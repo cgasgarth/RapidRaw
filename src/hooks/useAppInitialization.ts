@@ -1,12 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
-import { useCallback, useEffect, useRef, type RefObject } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 
 import {
   type AppSettings,
   type FilterCriteria,
-  type ImageFile,
   Invokes,
   LibraryViewMode,
   EditedStatus,
@@ -24,13 +23,6 @@ import { THEMES, DEFAULT_THEME_ID, type ThemeProps } from '../utils/themes';
 
 import type { FolderTree } from '../components/panel/FolderTree';
 import type { i18n as I18n } from 'i18next';
-
-interface PreloadedInitializationData {
-  currentPath?: string;
-  images?: Promise<ImageFile[]> | undefined;
-  rootPaths?: string[];
-  trees?: Promise<FolderTree[]> | undefined;
-}
 
 interface PersistedFolderState {
   activeAlbumId?: string | null;
@@ -52,7 +44,6 @@ interface NavigatorWithUserLanguage extends Navigator {
 }
 
 interface UseAppInitializationProps {
-  preloadedDataRef: RefObject<PreloadedInitializationData>;
   thumbnailSize: ThumbnailSize;
   setThumbnailSize: (size: ThumbnailSize) => void;
   thumbnailAspectRatio: ThumbnailAspectRatio;
@@ -82,7 +73,6 @@ const getDefaultLanguage = (i18nInstance: I18n): string => {
 };
 
 export const useAppInitialization = ({
-  preloadedDataRef,
   thumbnailSize,
   setThumbnailSize,
   thumbnailAspectRatio,
@@ -238,33 +228,6 @@ export const useAppInitialization = ({
           }
         }
 
-        const rootFolders = settings.rootFolders?.length
-          ? settings.rootFolders
-          : settings.lastRootPath
-            ? [settings.lastRootPath]
-            : [];
-
-        if (!isAndroid && rootFolders.length > 0) {
-          const currentPath = settings.lastFolderState?.currentFolderPath ?? rootFolders[0];
-          if (!currentPath) return;
-          const isAlbum = currentPath.startsWith('Album: ');
-          const command =
-            settings.libraryViewMode === LibraryViewMode.Recursive
-              ? Invokes.ListImagesRecursive
-              : Invokes.ListImagesInDir;
-
-          preloadedDataRef.current = {
-            rootPaths: rootFolders,
-            currentPath: currentPath,
-            trees: invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
-              paths: rootFolders,
-              expandedFolders: settings.lastFolderState?.expandedFolders ?? rootFolders,
-              showImageCounts: settings.enableFolderImageCounts ?? false,
-            }),
-            images: isAlbum ? undefined : invoke<ImageFile[]>(command, { path: currentPath }),
-          };
-        }
-
         if (settings.lastFolderState) {
           setLibrary({
             expandedFolders: new Set(settings.lastFolderState.expandedFolders || []),
@@ -299,7 +262,6 @@ export const useAppInitialization = ({
     setFilterCriteria,
     setEditor,
     setLibrary,
-    preloadedDataRef,
     setLibraryViewMode,
     setThumbnailSize,
     setThumbnailAspectRatio,

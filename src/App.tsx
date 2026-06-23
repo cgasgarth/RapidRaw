@@ -234,7 +234,6 @@ function App() {
   const preloadedDataRef = useRef<PreloadedAppData>({});
 
   useAppInitialization({
-    preloadedDataRef,
     thumbnailSize,
     setThumbnailSize,
     thumbnailAspectRatio,
