@@ -1246,6 +1246,7 @@
       "closeSession": "Close session",
       "connected": "Connected",
       "discoveryOnly": "Discovery only",
+      "incomingCaptures": "Incoming captures",
       "noCameraDescription": "Connect a supported camera and refresh to verify macOS tether discovery.",
       "noCameraTitle": "No camera reported",
       "openSession": "Open session",
@@ -1256,6 +1257,8 @@
         "fake": "Fake CI"
       },
       "refresh": "Refresh",
+      "reviewHoldCurrent": "Hold current",
+      "reviewNewest": "Newest",
       "sessionClosed": "Session closed",
       "sessionClosedDescription": "Open a discovery session before capture controls are enabled.",
       "sessionOpen": "Session open",
