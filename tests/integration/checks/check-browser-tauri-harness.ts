@@ -69,6 +69,12 @@ try {
     .getByRole('button', { name: /browser-harness\.ARW/u })
     .first()
     .waitFor({ timeout: 10_000 });
+  await page
+    .getByRole('button', { name: /browser-harness\.ARW/u })
+    .first()
+    .dblclick();
+  await page.getByRole('heading', { name: 'Adjustments' }).waitFor({ timeout: 10_000 });
+  await page.getByText(/1024 × 768/u).waitFor({ timeout: 10_000 });
 
   const harnessProof = await page.evaluate(() => ({
     calls: window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.map((call) => call.command) ?? [],
@@ -83,6 +89,9 @@ try {
     'get_supported_file_types',
     'plugin:dialog|open',
     'get_folder_tree',
+    'load_metadata',
+    'load_image',
+    'apply_adjustments',
   ]) {
     if (!harnessProof.calls.includes(requiredCommand)) {
       throw new Error(`Browser Tauri harness did not record ${requiredCommand}.`);

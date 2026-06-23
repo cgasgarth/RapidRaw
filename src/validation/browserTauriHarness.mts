@@ -33,48 +33,64 @@ const browserHarnessRoot = '/tmp/rawengine-browser-harness';
 const commandNames: Record<
   | 'cancelThumbnailGeneration'
   | 'checkAiConnectorStatus'
+  | 'clearSessionCaches'
   | 'frontendReady'
+  | 'applyAdjustments'
   | 'getAlbumImages'
   | 'getFolderTree'
   | 'getPinnedFolderTrees'
   | 'getSupportedFileTypes'
+  | 'isImageCached'
   | 'listImagesInDir'
   | 'listImagesRecursive'
+  | 'loadImage'
+  | 'loadMetadata'
   | 'loadSettings'
   | 'readExifForPaths'
   | 'saveSettings'
+  | 'saveMetadataAndUpdateThumbnail'
   | 'startBackgroundIndexing'
   | 'updateThumbnailQueue',
   string
 > = {
+  applyAdjustments: Invokes.ApplyAdjustments,
   cancelThumbnailGeneration: Invokes.CancelThumbnailGeneration,
   checkAiConnectorStatus: Invokes.CheckAIConnectorStatus,
+  clearSessionCaches: Invokes.ClearSessionCaches,
   frontendReady: Invokes.FrontendReady,
   getAlbumImages: Invokes.GetAlbumImages,
   getFolderTree: Invokes.GetFolderTree,
   getPinnedFolderTrees: Invokes.GetPinnedFolderTrees,
   getSupportedFileTypes: Invokes.GetSupportedFileTypes,
+  isImageCached: Invokes.IsImageCached,
   listImagesInDir: Invokes.ListImagesInDir,
   listImagesRecursive: Invokes.ListImagesRecursive,
+  loadImage: Invokes.LoadImage,
+  loadMetadata: Invokes.LoadMetadata,
   loadSettings: Invokes.LoadSettings,
   readExifForPaths: Invokes.ReadExifForPaths,
   saveSettings: Invokes.SaveSettings,
+  saveMetadataAndUpdateThumbnail: Invokes.SaveMetadataAndUpdateThumbnail,
   startBackgroundIndexing: Invokes.StartBackgroundIndexing,
   updateThumbnailQueue: Invokes.UpdateThumbnailQueue,
 };
 
 const harnessSettings: AppSettings = {
   lastRootPath: null,
+  editorPreviewResolution: 1024,
   libraryViewMode: LibraryViewMode.Flat,
   rootFolders: [],
   theme: Theme.Dark,
   thumbnailSize: ThumbnailSize.Medium,
+  useWgpuRenderer: false,
 };
 
 const harnessSupportedTypes = {
   nonRaw: ['jpg', 'jpeg', 'png', 'tif', 'tiff'],
   raw: ['arw', 'cr2', 'cr3', 'dng', 'nef', 'raf'],
 };
+const harnessPreviewJpegBase64 =
+  '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAAEAAQDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAH/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAEFAqf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/ASP/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/ASP/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAY/Al//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/IV//2gAMAwEAAgADAAAAEP/EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQMBAT8QH//EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQIBAT8QH//EABQQAQAAAAAAAAAAAAAAAAAAABD/2gAIAQEAAT8QH//Z';
 
 let callbackId = 0;
 
@@ -110,7 +126,23 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.startBackgroundIndexing:
     case commandNames.updateThumbnailQueue:
     case commandNames.cancelThumbnailGeneration:
+    case commandNames.clearSessionCaches:
+    case commandNames.saveMetadataAndUpdateThumbnail:
       return Promise.resolve(null);
+    case commandNames.isImageCached:
+      return Promise.resolve(false);
+    case commandNames.loadMetadata:
+      return Promise.resolve({ adjustments: null });
+    case commandNames.loadImage:
+      return Promise.resolve({
+        exif: { Make: 'RawEngine Harness', Model: 'Browser Tauri API' },
+        height: 768,
+        is_raw: true,
+        metadata: { harness: true },
+        width: 1024,
+      });
+    case commandNames.applyAdjustments:
+      return Promise.resolve(decodeBase64ToArrayBuffer(harnessPreviewJpegBase64));
     case commandNames.checkAiConnectorStatus:
       return Promise.resolve({ connected: false });
     case commandNames.getSupportedFileTypes:
@@ -166,4 +198,13 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
 const getStringArg = (args: Record<string, unknown> | undefined, key: string): string | undefined => {
   const value = args?.[key];
   return typeof value === 'string' ? value : undefined;
+};
+
+const decodeBase64ToArrayBuffer = (base64: string): ArrayBuffer => {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes.buffer;
 };
