@@ -6,6 +6,15 @@ export const compareSurveyModeSchema = z.enum(['compare', 'survey']);
 export const compareSurveySortKeySchema = z.enum(['selection_order', 'rating', 'capture_time', 'file_name']);
 export const compareSurveySortOrderSchema = z.enum(['asc', 'desc']);
 
+export const compareSurveyViewportSchema = z
+  .object({
+    linked: z.boolean(),
+    panX: z.number().min(-100).max(100),
+    panY: z.number().min(-100).max(100),
+    zoomPercent: z.number().int().min(25).max(400),
+  })
+  .strict();
+
 export const compareSurveyCandidateSchema = z
   .object({
     capturedAt: z.iso.datetime().nullable(),
@@ -39,6 +48,7 @@ export const compareSurveySessionSchema = z
       .strict(),
     updatedAt: z.iso.datetime(),
     version: z.literal(1),
+    viewport: compareSurveyViewportSchema,
     zoomLinked: z.boolean(),
   })
   .strict()
@@ -79,6 +89,7 @@ export const compareSurveySessionSchema = z
 
 export type CompareSurveyCandidate = z.infer<typeof compareSurveyCandidateSchema>;
 export type CompareSurveySession = z.infer<typeof compareSurveySessionSchema>;
+export type CompareSurveyViewport = z.infer<typeof compareSurveyViewportSchema>;
 
 export const compareSurveyPickExportHandoffSchema = z
   .object({

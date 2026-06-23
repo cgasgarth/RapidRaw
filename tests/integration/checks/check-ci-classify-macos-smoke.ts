@@ -328,6 +328,7 @@ function isSafeFixturePath(path) {
     (path.startsWith('fixtures/negative-lab/public/') && hasExtension(path, new Set(['.jpg', '.jpeg', '.png']))) ||
     (path.startsWith('fixtures/panorama/') && path.endsWith('.json')) ||
     path.startsWith('fixtures/sidecar-roundtrip/') ||
+    (path.startsWith('fixtures/ui/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/validation/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/workflow/') && path.endsWith('.json'))
   );
@@ -930,6 +931,11 @@ function runSelfTest() {
   assertClassification(
     'sidecar roundtrip fixture outputs can skip smoke',
     ['fixtures/sidecar-roundtrip/IMG_0001.CR3.rrdata'],
+    SMOKE_MODES.NONE,
+  );
+  assertClassification(
+    'UI fixture outputs can skip smoke',
+    ['fixtures/ui/compare-survey-session.json'],
     SMOKE_MODES.NONE,
   );
   assertChangeClassification(

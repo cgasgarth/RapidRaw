@@ -32,6 +32,7 @@
       "sort": { "key": "selection_order", "order": "asc" },
       "updatedAt": "2026-06-14T11:30:00.000Z",
       "version": 1,
+      "viewport": { "linked": true, "panX": 0, "panY": 0, "zoomPercent": 100 },
       "zoomLinked": true
     }
   },
@@ -68,6 +69,7 @@
       "sort": { "key": "selection_order", "order": "asc" },
       "updatedAt": "2026-06-14T11:30:00.000Z",
       "version": 1,
+      "viewport": { "linked": true, "panX": 0, "panY": 0, "zoomPercent": 100 },
       "zoomLinked": true
     }
   },
@@ -104,6 +106,44 @@
       "sort": { "key": "selection_order", "order": "asc" },
       "updatedAt": "2026-06-14T11:30:00.000Z",
       "version": 1,
+      "viewport": { "linked": true, "panX": 0, "panY": 0, "zoomPercent": 100 },
+      "zoomLinked": true
+    }
+  },
+  {
+    "case": "rejects out of bounds linked viewport",
+    "session": {
+      "activePath": "/tmp/a.raw",
+      "candidatePaths": ["/tmp/a.raw", "/tmp/b.raw"],
+      "candidates": [
+        {
+          "capturedAt": null,
+          "colorLabel": null,
+          "edited": false,
+          "path": "/tmp/a.raw",
+          "rating": 0,
+          "rejected": false,
+          "virtualCopyId": null
+        },
+        {
+          "capturedAt": null,
+          "colorLabel": null,
+          "edited": false,
+          "path": "/tmp/b.raw",
+          "rating": 0,
+          "rejected": false,
+          "virtualCopyId": null
+        }
+      ],
+      "compareReferencePath": "/tmp/a.raw",
+      "createdAt": "2026-06-14T11:30:00.000Z",
+      "id": "bad-viewport",
+      "mode": "compare",
+      "showMetadataOverlays": true,
+      "sort": { "key": "selection_order", "order": "asc" },
+      "updatedAt": "2026-06-14T11:30:00.000Z",
+      "version": 1,
+      "viewport": { "linked": true, "panX": 120, "panY": 0, "zoomPercent": 100 },
       "zoomLinked": true
     }
   }
