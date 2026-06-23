@@ -2708,6 +2708,7 @@ pub fn run() {
             tethering::open_tether_session,
             tethering::get_tether_session,
             tethering::close_tether_session,
+            tethering::trigger_tether_capture,
             deblur_api::dry_run_deblur_controls,
             lens_correction::get_lensfun_makers,
             lens_correction::get_lensfun_lenses_for_maker,
