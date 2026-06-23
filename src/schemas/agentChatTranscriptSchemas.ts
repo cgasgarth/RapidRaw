@@ -22,6 +22,7 @@ export const agentChatRuntimeStatusSchema = z.enum(['ui_only_demo', 'runtime_app
 export const agentLivePromptWalkthroughStageStateSchema = z.enum(['completed', 'current', 'pending']);
 export const agentFailureRecoveryActionStateSchema = z.enum(['available', 'completed']);
 export const agentLongEditProgressStageStateSchema = z.enum(['completed', 'current', 'pending']);
+export const agentE2eClosureStepStatusSchema = z.enum(['verified']);
 
 export const agentChatMessageSchema = z
   .object({
@@ -172,6 +173,27 @@ export const agentLongEditProgressSchema = z
           .strict(),
       )
       .min(5),
+    title: z.string().min(1),
+  })
+  .strict();
+
+export const agentE2eClosureSchema = z
+  .object({
+    id: z.string().min(1),
+    proofHref: z.string().min(1),
+    proofLabel: z.string().min(1),
+    steps: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1),
+            label: z.string().min(1),
+            status: agentE2eClosureStepStatusSchema,
+            summary: z.string().min(1),
+          })
+          .strict(),
+      )
+      .min(7),
     title: z.string().min(1),
   })
   .strict();
@@ -402,6 +424,7 @@ export const agentChatTranscriptSchema = z
     artifactReview: agentArtifactReviewSchema.optional(),
     auditTranscript: agentAuditTranscriptSchema.optional(),
     dryRunReview: agentChatDryRunReviewSchema.optional(),
+    e2eClosure: agentE2eClosureSchema.optional(),
     failureRecovery: agentFailureRecoverySchema.optional(),
     id: z.string().min(1),
     livePromptWalkthrough: agentLivePromptWalkthroughSchema.optional(),
@@ -421,6 +444,7 @@ export type AgentArtifactReview = z.infer<typeof agentArtifactReviewSchema>;
 export type AgentAuditTranscript = z.infer<typeof agentAuditTranscriptSchema>;
 export type AgentChatToolCall = z.infer<typeof agentChatToolCallSchema>;
 export type AgentChatDryRunReview = z.infer<typeof agentChatDryRunReviewSchema>;
+export type AgentE2eClosure = z.infer<typeof agentE2eClosureSchema>;
 export type AgentFailureRecovery = z.infer<typeof agentFailureRecoverySchema>;
 export type AgentLivePromptWalkthrough = z.infer<typeof agentLivePromptWalkthroughSchema>;
 export type AgentLongEditProgress = z.infer<typeof agentLongEditProgressSchema>;

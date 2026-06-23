@@ -244,6 +244,56 @@ const fixture = {
       'Original RAW is never overwritten; apply targets a virtual copy.',
     ],
   },
+  e2eClosure: {
+    id: 'agent-e2e-closure-runtime-2844',
+    proofHref: 'docs/validation/agent-real-raw-private-edit-proof-2026-06-22.json',
+    proofLabel: 'Private RAW runtime proof',
+    steps: [
+      {
+        id: 'prompt',
+        label: 'Prompt captured',
+        status: 'verified',
+        summary: 'The selected RAW edit request is preserved in the live prompt walkthrough.',
+      },
+      {
+        id: 'plan',
+        label: 'Plan generated',
+        status: 'verified',
+        summary: 'Typed recipe planning maps the prompt to tone and selective color commands.',
+      },
+      {
+        id: 'approval',
+        label: 'Approval gated',
+        status: 'verified',
+        summary: 'Apply remains tied to an accepted dry-run identity and approval state.',
+      },
+      {
+        id: 'apply',
+        label: 'Edit applied',
+        status: 'verified',
+        summary: 'The app-server command bundle mutates the virtual-copy edit graph.',
+      },
+      {
+        id: 'private-raw',
+        label: 'Private RAW proved',
+        status: 'verified',
+        summary: 'The private RAW proof records output hash and unchanged source hash.',
+      },
+      {
+        id: 'replay',
+        label: 'Replay linked',
+        status: 'verified',
+        summary: 'The replay gallery links source, dry-run, output, and rollback artifacts.',
+      },
+      {
+        id: 'rollback',
+        label: 'Rollback available',
+        status: 'verified',
+        summary: 'The handoff exposes the pre-agent graph revision and restore action.',
+      },
+    ],
+    title: 'E2E agent closure',
+  },
   failureRecovery: {
     editAction: {
       id: 'edit-failed-ai-plan',
