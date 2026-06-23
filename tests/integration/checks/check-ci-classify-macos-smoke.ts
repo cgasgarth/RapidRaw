@@ -59,6 +59,7 @@ const SAFE_FRONTEND_EXTENSIONS = new Set([
   '.less',
   '.module.css',
   '.module.scss',
+  '.mts',
   '.sass',
   '.scss',
   '.ts',
@@ -112,6 +113,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     new Set(['bun tests/integration/checks/check-camera-profile-input-transform-proof.ts']),
   ],
   ['check:brush-mask-command', new Set(['bun tests/integration/checks/check-brush-mask-command.ts'])],
+  ['check:browser-tauri-harness', new Set(['bun tests/integration/checks/check-browser-tauri-harness.ts'])],
   ['check:capture-sharpening', new Set(['bun tests/integration/checks/check-capture-sharpening-fixtures.ts'])],
   ['check:compare-survey', new Set(['bun tests/integration/checks/check-compare-survey-fixtures.ts'])],
   ['check:defringe', new Set(['bun tests/integration/checks/check-defringe-fixtures.ts'])],
@@ -949,6 +951,22 @@ function runSelfTest() {
   assertClassification(
     'validation scripts can skip smoke',
     ['tests/integration/checks/check-eslint-escape-hatches.ts'],
+    SMOKE_MODES.NONE,
+  );
+  assertClassification(
+    'browser harness frontend ESM can skip smoke',
+    ['src/validation/browserTauriHarness.mts'],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'browser harness package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -60,6 +60,7 @@\n+    "check:browser-tauri-harness": "bun tests/integration/checks/check-browser-tauri-harness.ts",',
+      },
+    ],
     SMOKE_MODES.NONE,
   );
   assertChangeClassification(
