@@ -84,7 +84,9 @@ export const exportReceiptPayloadSchema = z
     outputs: z.array(
       z
         .object({
+          bitDepth: z.number().int().positive().optional().nullable(),
           byteSize: z.number().int().nonnegative(),
+          colorProfile: z.string().trim().min(1).optional().nullable(),
           format: z.string().trim().min(1),
           outputPath: z.string().trim().min(1),
           sourcePath: z.string().trim().min(1),
