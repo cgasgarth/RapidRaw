@@ -79,6 +79,47 @@ if (reducedSeamExposureDryRun.dryRun.provenance.exposureNormalizationResult.comp
   throw new Error('Panorama seam exposure compensation strength was not preserved in provenance.');
 }
 
+const manualCropCommand = buildPanoramaUiDryRunCommandV1(
+  {
+    ...controls,
+    boundaryMode: 'manual_crop',
+    manualCropInsetsPercent: {
+      bottom: 10,
+      left: 8,
+      right: 12,
+      top: 6,
+    },
+    overlapFeatherPx: 128,
+  },
+  {
+    commandId: 'command_panorama_ui_runtime_manual_crop',
+    correlationId: 'corr_panorama_ui_runtime_manual_crop',
+    expectedGraphRevision: 'graph_rev_panorama_ui_runtime',
+    targetId: 'project_panorama_ui_runtime',
+  },
+);
+const manualCropDryRun = bus.execute({
+  request: buildRequest(manualCropCommand),
+  toolName: panoramaRoutePair.dryRunToolName,
+});
+if (manualCropDryRun.kind !== 'dry_run') {
+  throw new Error('Expected manual crop panorama dry-run result.');
+}
+const manualCropOutput = manualCropDryRun.dryRun.dryRunResult.mergePlan.outputDimensions;
+const baseOutput = dryRun.dryRun.dryRunResult.mergePlan.outputDimensions;
+if (manualCropOutput.width >= baseOutput.width || manualCropOutput.height >= baseOutput.height) {
+  throw new Error('Panorama manual crop did not reduce rendered output dimensions.');
+}
+if (manualCropDryRun.dryRun.provenance.crop.mode !== 'manual') {
+  throw new Error('Panorama manual crop was not preserved in provenance.');
+}
+if (manualCropDryRun.dryRun.provenance.seamBlend.overlapFeatherPx !== 128) {
+  throw new Error('Panorama overlap feather was not preserved in provenance.');
+}
+if (hashPixels(manualCropDryRun.dryRun.outputPixels) === fullCompensationHash) {
+  throw new Error('Panorama manual crop did not change rendered output pixels.');
+}
+
 const applyCommand = buildPanoramaUiApplyCommandV1(controls, {
   acceptedDryRunPlanHash: dryRun.acceptedDryRunPlanHash,
   acceptedDryRunPlanId: dryRun.dryRun.dryRunResult.mergePlan.planId,
@@ -126,6 +167,7 @@ expectThrows('mismatched accepted panorama UI runtime plan', () =>
 const result = {
   fixture: 'synthetic_panorama_ui_runtime_bridge_v1',
   fullCompensationHash,
+  manualCropOutput,
   output: dryRun.dryRun.dryRunResult.mergePlan.outputDimensions,
   outputSha256: hashPixels(applied.apply.outputPixels),
   planId: dryRun.dryRun.dryRunResult.mergePlan.planId,

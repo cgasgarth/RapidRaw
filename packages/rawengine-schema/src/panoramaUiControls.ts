@@ -22,6 +22,23 @@ const panoramaUiSourceV1Schema = z
   })
   .strict();
 
+const panoramaManualCropInsetsPercentV1Schema = z
+  .object({
+    bottom: z.number().min(0).max(40).default(0),
+    left: z.number().min(0).max(40).default(0),
+    right: z.number().min(0).max(40).default(0),
+    top: z.number().min(0).max(40).default(0),
+  })
+  .strict()
+  .superRefine((insets, context) => {
+    if (insets.left + insets.right > 80) {
+      context.addIssue({ code: 'custom', message: 'Horizontal panorama crop insets cannot exceed 80%.' });
+    }
+    if (insets.top + insets.bottom > 80) {
+      context.addIssue({ code: 'custom', message: 'Vertical panorama crop insets cannot exceed 80%.' });
+    }
+  });
+
 export const panoramaUiControlsV1Schema = z
   .object({
     blendMode: z.enum(['feather', 'multi_band']).default('multi_band'),
@@ -30,8 +47,15 @@ export const panoramaUiControlsV1Schema = z
     lensCorrectionPolicy: z
       .enum(['unchanged', 'required_before_stitch', 'applied_before_stitch'])
       .default('required_before_stitch'),
+    manualCropInsetsPercent: panoramaManualCropInsetsPercentV1Schema.default({
+      bottom: 0,
+      left: 0,
+      right: 0,
+      top: 0,
+    }),
     maxPreviewDimensionPx: z.number().int().positive().max(8192).default(4096),
     memoryBudgetBytes: z.number().int().positive().optional(),
+    overlapFeatherPx: z.number().int().min(0).max(512).default(64),
     outputName: z.string().trim().min(1),
     projection: panoramaProjectionSchema.exclude(['planar']),
     qualityPreference: computationalMergeQualityPreferenceV1Schema.default('best'),
@@ -87,8 +111,10 @@ export const buildPanoramaUiDryRunCommandV1 = (
       boundaryMode: controls.boundaryMode,
       exposureNormalization: controls.exposureMode === 'gain_compensation' ? 'auto' : 'none',
       lensCorrectionPolicy: controls.lensCorrectionPolicy,
+      manualCropInsetsPercent: controls.manualCropInsetsPercent,
       maxPreviewDimensionPx: controls.maxPreviewDimensionPx,
       memoryBudgetBytes: controls.memoryBudgetBytes,
+      overlapFeatherPx: controls.overlapFeatherPx,
       outputName: controls.outputName,
       projection: controls.projection,
       qualityPreference: controls.qualityPreference,
@@ -136,8 +162,10 @@ export const buildPanoramaUiApplyCommandV1 = (
       boundaryMode: controls.boundaryMode,
       exposureNormalization: controls.exposureMode === 'gain_compensation' ? 'auto' : 'none',
       lensCorrectionPolicy: controls.lensCorrectionPolicy,
+      manualCropInsetsPercent: controls.manualCropInsetsPercent,
       maxPreviewDimensionPx: controls.maxPreviewDimensionPx,
       memoryBudgetBytes: controls.memoryBudgetBytes,
+      overlapFeatherPx: controls.overlapFeatherPx,
       outputName: controls.outputName,
       projection: controls.projection,
       qualityPreference: controls.qualityPreference,

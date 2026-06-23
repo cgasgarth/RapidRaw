@@ -81,7 +81,7 @@ export default function PanoramaModal({
     { label: t('modals.panorama.boundary.manualCrop'), value: 'manual_crop' },
   ];
   const supportedProjection = settings.projection === 'rectilinear' || settings.projection === 'cylindrical';
-  const supportedBoundary = settings.boundaryMode === 'auto_crop';
+  const supportedBoundary = settings.boundaryMode === 'auto_crop' || settings.boundaryMode === 'manual_crop';
   const isEngineApplyReady = isSourceCountValid && supportedProjection && supportedBoundary;
   const exposureOptions: Array<OptionItem<PanoramaUiExposureMode>> = [
     { label: t('modals.panorama.exposure.gainCompensation'), value: 'gain_compensation' },
@@ -92,6 +92,18 @@ export default function PanoramaModal({
   const selectedProjectionLabel = projectionOptions.find((option) => option.value === settings.projection)?.label ?? '';
   const selectedQualityLabel =
     qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '';
+  const manualCropInsetControls = [
+    { key: 'top', label: t('modals.panorama.manualCrop.top') },
+    { key: 'right', label: t('modals.panorama.manualCrop.right') },
+    { key: 'bottom', label: t('modals.panorama.manualCrop.bottom') },
+    { key: 'left', label: t('modals.panorama.manualCrop.left') },
+  ] as const;
+  const manualCropLabel = t('modals.panorama.manualCrop.value', {
+    bottom: settings.manualCropInsetsPercent.bottom,
+    left: settings.manualCropInsetsPercent.left,
+    right: settings.manualCropInsetsPercent.right,
+    top: settings.manualCropInsetsPercent.top,
+  });
   const estimatedPreviewMegapixels = Math.round(((imageCount ?? 0) * settings.maxPreviewDimensionPx ** 2) / 1_000_000);
   const estimatedPreviewMemoryMb = Math.max(
     0,
@@ -231,8 +243,10 @@ export default function PanoramaModal({
               data-boundary-mode={savedReviewSummary.boundaryMode}
               data-capability-level={savedReviewSummary.capabilityLevel}
               data-crop-rectangle={`${savedReviewSummary.crop.x},${savedReviewSummary.crop.y},${savedReviewSummary.crop.width},${savedReviewSummary.crop.height}`}
+              data-manual-crop-insets={`${settings.manualCropInsetsPercent.top},${settings.manualCropInsetsPercent.right},${settings.manualCropInsetsPercent.bottom},${settings.manualCropInsetsPercent.left}`}
               data-output-dimensions={`${savedReviewSummary.outputDimensions.width} x ${savedReviewSummary.outputDimensions.height}`}
               data-output-path={savedReviewSummary.outputPath}
+              data-overlap-feather-px={settings.overlapFeatherPx}
               data-projection={savedReviewSummary.projection}
               data-seam-max-p95-error-px={
                 savedReviewSummary.seamReview.seams.length === 0
@@ -412,6 +426,14 @@ export default function PanoramaModal({
                 value: selectedBoundaryLabel,
               },
               {
+                label: t('modals.panorama.manualCrop.label'),
+                value: manualCropLabel,
+              },
+              {
+                label: t('modals.panorama.overlapFeather.label'),
+                value: t('modals.panorama.overlapFeather.value', { value: settings.overlapFeatherPx }),
+              },
+              {
                 label: t('modals.panorama.summaryExposure'),
                 value: selectedExposureLabel,
               },
@@ -450,6 +472,8 @@ export default function PanoramaModal({
             className="mb-5 grid grid-cols-4 gap-2 rounded-md border border-border-color bg-bg-secondary/70 p-2 text-xs"
             data-boundary-mode={settings.boundaryMode}
             data-exposure-mode={settings.exposureMode}
+            data-manual-crop-insets={`${settings.manualCropInsetsPercent.top},${settings.manualCropInsetsPercent.right},${settings.manualCropInsetsPercent.bottom},${settings.manualCropInsetsPercent.left}`}
+            data-overlap-feather-px={settings.overlapFeatherPx}
             data-projection={settings.projection}
             data-seam-exposure-compensation-percent={settings.seamExposureCompensationPercent}
             data-source-count={imageCount ?? 0}
@@ -688,7 +712,7 @@ export default function PanoramaModal({
               </UiText>
               <div className="grid gap-2" data-testid="panorama-boundary-options">
                 {boundaryOptions.map((option) => {
-                  const isSupported = option.value === 'auto_crop';
+                  const isSupported = option.value === 'auto_crop' || option.value === 'manual_crop';
                   const isSelected = settings.boundaryMode === option.value;
                   return (
                     <button
@@ -756,6 +780,75 @@ export default function PanoramaModal({
                   value={settings.seamExposureCompensationPercent}
                 />
               </div>
+            </div>
+          </section>
+
+          <section
+            className="mt-5 rounded-md border border-border-color bg-surface p-3"
+            data-manual-crop-insets={`${settings.manualCropInsetsPercent.top},${settings.manualCropInsetsPercent.right},${settings.manualCropInsetsPercent.bottom},${settings.manualCropInsetsPercent.left}`}
+            data-overlap-feather-px={settings.overlapFeatherPx}
+            data-testid="panorama-boundary-refinement"
+          >
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <UiText variant={TextVariants.heading}>{t('modals.panorama.boundaryRefinementLabel')}</UiText>
+              <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                {manualCropLabel}
+              </UiText>
+            </div>
+            <div className="grid grid-cols-2 gap-3" data-testid="panorama-manual-crop-controls">
+              {manualCropInsetControls.map((control) => (
+                <div className="block" key={control.key}>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <UiText as="span" variant={TextVariants.small} color={TextColors.secondary}>
+                      {control.label}
+                    </UiText>
+                    <UiText as="span" variant={TextVariants.small} color={TextColors.secondary}>
+                      {settings.manualCropInsetsPercent[control.key]}%
+                    </UiText>
+                  </div>
+                  <input
+                    aria-label={control.label}
+                    className="w-full accent-accent"
+                    data-testid={`panorama-manual-crop-${control.key}`}
+                    max={40}
+                    min={0}
+                    onChange={(event) => {
+                      setSetting({
+                        boundaryMode: 'manual_crop',
+                        manualCropInsetsPercent: {
+                          ...settings.manualCropInsetsPercent,
+                          [control.key]: Number(event.target.value),
+                        },
+                      });
+                    }}
+                    step={1}
+                    type="range"
+                    value={settings.manualCropInsetsPercent[control.key]}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="mt-3" data-testid="panorama-overlap-feather-control">
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <UiText as="span" variant={TextVariants.small} color={TextColors.secondary}>
+                  {t('modals.panorama.overlapFeather.label')}
+                </UiText>
+                <UiText as="span" variant={TextVariants.small} color={TextColors.secondary}>
+                  {t('modals.panorama.overlapFeather.value', { value: settings.overlapFeatherPx })}
+                </UiText>
+              </div>
+              <input
+                className="w-full accent-accent"
+                data-testid="panorama-overlap-feather-slider"
+                max={512}
+                min={0}
+                onChange={(event) => {
+                  setSetting({ overlapFeatherPx: Number(event.target.value) });
+                }}
+                step={8}
+                type="range"
+                value={settings.overlapFeatherPx}
+              />
             </div>
           </section>
 

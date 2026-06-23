@@ -201,6 +201,7 @@ export const panoramaRuntimeProvenanceV1Schema = z
     seamBlend: z
       .object({
         blendMode: z.enum(['feather', 'multi_band']),
+        overlapFeatherPx: z.number().int().min(0).max(512),
         seamMethod: z.enum(['adaptive_feather']),
       })
       .strict(),
@@ -279,7 +280,13 @@ export const buildPanoramaRuntimeDryRunV1 = (requestValue: unknown): PanoramaRun
   const runtime = renderPanoramaRuntime(request);
   const planId = `panorama_plan_${request.command.commandId}`;
   const planHash = `sha256:${stablePanoramaRuntimeHash(
-    `${planId}:${runtime.provenance.resolvedProjection}:${request.command.parameters.seamExposureCompensationPercent}`,
+    [
+      planId,
+      runtime.provenance.resolvedProjection,
+      request.command.parameters.seamExposureCompensationPercent,
+      request.command.parameters.overlapFeatherPx ?? 64,
+      JSON.stringify(runtime.provenance.crop),
+    ].join(':'),
   )}`;
   const renderedContentHash = hashPanoramaRuntimePixels(runtime.outputPixels);
   const previewArtifacts = [
@@ -456,7 +463,7 @@ export const buildPanoramaRuntimeArtifactV1 = ({
     },
     schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     seamPolicy: {
-      featherWidthPx: 100,
+      featherWidthPx: provenance.seamBlend.overlapFeatherPx,
       lowDetailFeatherMultiplier: 5,
       mode: 'adaptive_dp_feather_v1',
     },
@@ -523,26 +530,23 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
   if (stitched.outputPixels === null) {
     throw new Error('Panorama runtime plan expected renderable synthetic output pixels.');
   }
-  const seamReview = buildPanoramaSeamReview(
-    request,
-    alignment,
-    sourceGeometry,
+  const crop = buildPanoramaRuntimeCrop(
+    request.command.parameters.boundaryMode,
     stitched.output.width,
     stitched.output.height,
+    request.command.parameters.manualCropInsetsPercent,
   );
+  const croppedOutput = cropPanoramaRuntimePixels(stitched.outputPixels, stitched.output.width, crop);
+  const seamReview = buildPanoramaSeamReview(request, alignment, sourceGeometry, crop.width, crop.height);
   const warnings = [...new Set([...stitched.warningCodes, ...seamReview.warnings])].sort();
 
   return {
-    height: stitched.output.height,
-    outputPixels: stitched.outputPixels,
+    height: crop.height,
+    outputPixels: croppedOutput,
     provenance: panoramaRuntimeProvenanceV1Schema.parse({
       alignment,
       boundaryMode: request.command.parameters.boundaryMode,
-      crop: buildPanoramaRuntimeCrop(
-        request.command.parameters.boundaryMode,
-        stitched.output.width,
-        stitched.output.height,
-      ),
+      crop,
       engineId: PANORAMA_RUNTIME_ENGINE_ID,
       engineVersion: PANORAMA_RUNTIME_ENGINE_VERSION,
       exposureNormalization: request.command.parameters.exposureNormalization,
@@ -567,6 +571,7 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
       runtimeStatus: 'dry_run_rendered',
       seamBlend: {
         blendMode: request.command.parameters.blendMode ?? 'feather',
+        overlapFeatherPx: request.command.parameters.overlapFeatherPx ?? 64,
         seamMethod: 'adaptive_feather',
       },
       seamReview,
@@ -579,7 +584,7 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
       stitchedSourceCount: stitched.stitchedSourceCount,
     }),
     warnings,
-    width: stitched.output.width,
+    width: crop.width,
   };
 };
 
@@ -666,18 +671,49 @@ const buildPanoramaRuntimeCrop = (
   boundaryMode: PanoramaRuntimeCommandV1['parameters']['boundaryMode'],
   width: number,
   height: number,
-) => ({
-  height,
-  mode:
+  manualCropInsetsPercent?: PanoramaRuntimeCommandV1['parameters']['manualCropInsetsPercent'],
+) => {
+  const mode: PanoramaRuntimeProvenanceV1['crop']['mode'] =
     boundaryMode === 'transparent' || boundaryMode === 'deferred_fill'
       ? 'none'
       : boundaryMode === 'manual_crop'
         ? 'manual'
-        : 'auto',
-  width,
-  x: 0,
-  y: 0,
-});
+        : 'auto';
+  if (mode !== 'manual') {
+    return { height, mode, width, x: 0, y: 0 };
+  }
+
+  const insets = manualCropInsetsPercent ?? { bottom: 0, left: 0, right: 0, top: 0 };
+  const x = Math.min(width - 1, Math.round((width * insets.left) / 100));
+  const y = Math.min(height - 1, Math.round((height * insets.top) / 100));
+  const right = Math.min(width - x - 1, Math.round((width * insets.right) / 100));
+  const bottom = Math.min(height - y - 1, Math.round((height * insets.bottom) / 100));
+  return {
+    height: Math.max(1, height - y - bottom),
+    mode,
+    width: Math.max(1, width - x - right),
+    x,
+    y,
+  };
+};
+
+const cropPanoramaRuntimePixels = (
+  pixels: Uint8Array,
+  sourceWidth: number,
+  crop: PanoramaRuntimeProvenanceV1['crop'],
+) => {
+  if (crop.x === 0 && crop.y === 0 && crop.width === sourceWidth && crop.height * crop.width * 3 === pixels.length) {
+    return pixels;
+  }
+
+  const cropped = new Uint8Array(crop.width * crop.height * 3);
+  for (let row = 0; row < crop.height; row += 1) {
+    const sourceStart = ((crop.y + row) * sourceWidth + crop.x) * 3;
+    const sourceEnd = sourceStart + crop.width * 3;
+    cropped.set(pixels.subarray(sourceStart, sourceEnd), row * crop.width * 3);
+  }
+  return cropped;
+};
 
 const buildPanoramaRuntimeAlignment = (
   sourceFrames: PanoramaRuntimeSourceFrameV1[],
@@ -1007,7 +1043,12 @@ const buildPanoramaRuntimeQualityMetrics = (
 ): PanoramaRuntimeProvenanceV1['qualityMetrics'] => {
   const sourcePixelCount = request.sourceFrames.reduce((total, frame) => total + frame.width * frame.height, 0);
   const overlapAreaTotal = alignment.pairwiseMatches.reduce((total, match) => total + match.overlapAreaPx, 0);
-  const crop = buildPanoramaRuntimeCrop(request.command.parameters.boundaryMode, outputWidth, outputHeight);
+  const crop = buildPanoramaRuntimeCrop(
+    request.command.parameters.boundaryMode,
+    outputWidth,
+    outputHeight,
+    request.command.parameters.manualCropInsetsPercent,
+  );
   const outputPixelCount = outputWidth * outputHeight;
   return {
     cropCoverageRatio: roundPanoramaRuntimeMetric((crop.width * crop.height) / Math.max(1, outputPixelCount)),
