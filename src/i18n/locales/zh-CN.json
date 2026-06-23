@@ -3146,6 +3146,26 @@
         "high": "高质量",
         "performance": "性能优先"
       },
+      "rawMode": {
+        "description": "应用带版本的 RAW 显影配方，让速度、默认质量和最高细节都清晰且可重复。",
+        "label": "RAW 处理模式",
+        "provenance": "配方来源",
+        "title": "RAW 质量模式"
+      },
+      "rawModes": {
+        "balanced": {
+          "description": "默认质量去马赛克、高光恢复、色度清理和轻量捕获锐化。",
+          "label": "平衡"
+        },
+        "fast": {
+          "description": "快速去马赛克并关闭捕获预处理，适合快速筛选和编辑。",
+          "label": "快速"
+        },
+        "maximum": {
+          "description": "全质量去马赛克，提供更强高光余量、色度清理和保护细节的捕获锐化。",
+          "label": "最高"
+        }
+      },
       "renderScale": "渲染分辨率缩放",
       "renderScaleDesc": "相对于显示器缩放渲染分辨率。较低的值可在高分辨率屏幕上提高性能，但会牺牲一些清晰度。",
       "restartRequired": "处理引擎的更改需要重启应用程序才能生效。",

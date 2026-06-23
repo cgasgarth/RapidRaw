@@ -45,6 +45,52 @@ struct SmartPreviewManifest {
     stale: bool,
 }
 
+struct RawProcessingModeRecipe {
+    force_fast_demosaic: bool,
+    provenance: &'static str,
+    raw_highlight_compression: f32,
+    raw_preprocessing_color_nr: f32,
+    raw_preprocessing_sharpening: f32,
+    raw_preprocessing_sharpening_detail: f32,
+    raw_preprocessing_sharpening_edge_masking: f32,
+    raw_preprocessing_sharpening_radius: f32,
+}
+
+fn raw_processing_mode_recipe(mode: Option<&str>) -> RawProcessingModeRecipe {
+    match mode.unwrap_or("balanced") {
+        "fast" => RawProcessingModeRecipe {
+            force_fast_demosaic: true,
+            provenance: "speed_demosaic_no_capture_preprocessing_v1",
+            raw_highlight_compression: 1.5,
+            raw_preprocessing_color_nr: 0.0,
+            raw_preprocessing_sharpening: 0.0,
+            raw_preprocessing_sharpening_detail: 0.0,
+            raw_preprocessing_sharpening_edge_masking: 0.0,
+            raw_preprocessing_sharpening_radius: 1.0,
+        },
+        "maximum" => RawProcessingModeRecipe {
+            force_fast_demosaic: false,
+            provenance: "maximum_detail_capture_preprocessing_v1",
+            raw_highlight_compression: 4.0,
+            raw_preprocessing_color_nr: 0.65,
+            raw_preprocessing_sharpening: 0.42,
+            raw_preprocessing_sharpening_detail: 0.55,
+            raw_preprocessing_sharpening_edge_masking: 0.45,
+            raw_preprocessing_sharpening_radius: 2.2,
+        },
+        _ => RawProcessingModeRecipe {
+            force_fast_demosaic: false,
+            provenance: "default_quality_capture_preprocessing_v1",
+            raw_highlight_compression: 2.5,
+            raw_preprocessing_color_nr: 0.5,
+            raw_preprocessing_sharpening: 0.35,
+            raw_preprocessing_sharpening_detail: 0.45,
+            raw_preprocessing_sharpening_edge_masking: 0.3,
+            raw_preprocessing_sharpening_radius: 2.0,
+        },
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PatchMaskInfo {
@@ -76,9 +122,16 @@ pub fn load_base_image_from_bytes(
     settings: &AppSettings,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<DynamicImage> {
-    let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
+    let raw_processing_mode = settings.raw_processing_mode.as_deref();
+    let recipe = raw_processing_mode_recipe(raw_processing_mode);
+    let use_fast_raw_dev = use_fast_raw_dev || recipe.force_fast_demosaic;
+    let highlight_compression = settings
+        .raw_highlight_compression
+        .unwrap_or(recipe.raw_highlight_compression);
     let linear_mode = settings.linear_raw_mode.clone();
-    let color_nr_setting = settings.raw_preprocessing_color_nr.unwrap_or(0.5);
+    let color_nr_setting = settings
+        .raw_preprocessing_color_nr
+        .unwrap_or(recipe.raw_preprocessing_color_nr);
     let color_nr_amount = if color_nr_setting <= 0.0 {
         0.0
     } else {
@@ -86,12 +139,18 @@ pub fn load_base_image_from_bytes(
         (12.0 / x - 10.0).max(0.1)
     };
     let sharpening_settings = crate::image_processing::CapturePreSharpeningSettings {
-        amount: settings.raw_preprocessing_sharpening.unwrap_or(0.35),
-        detail: settings.raw_preprocessing_sharpening_detail.unwrap_or(0.45),
+        amount: settings
+            .raw_preprocessing_sharpening
+            .unwrap_or(recipe.raw_preprocessing_sharpening),
+        detail: settings
+            .raw_preprocessing_sharpening_detail
+            .unwrap_or(recipe.raw_preprocessing_sharpening_detail),
         edge_masking: settings
             .raw_preprocessing_sharpening_edge_masking
-            .unwrap_or(0.3),
-        radius_px: settings.raw_preprocessing_sharpening_radius.unwrap_or(2.0),
+            .unwrap_or(recipe.raw_preprocessing_sharpening_edge_masking),
+        radius_px: settings
+            .raw_preprocessing_sharpening_radius
+            .unwrap_or(recipe.raw_preprocessing_sharpening_radius),
     };
     let apply_to_non_raws = settings.apply_preprocessing_to_non_raws.unwrap_or(false);
 
@@ -503,7 +562,20 @@ pub async fn load_image(
                             cancel_token.clone(),
                         )
                         .map_err(|e| e.to_string())?;
-                        let exif = exif_processing::read_exif_data(&path_clone, &mmap);
+                        let mut exif = exif_processing::read_exif_data(&path_clone, &mmap);
+                        exif.insert(
+                            "RawEngineRawProcessingMode".to_string(),
+                            settings
+                                .raw_processing_mode
+                                .clone()
+                                .unwrap_or_else(|| "balanced".to_string()),
+                        );
+                        exif.insert(
+                            "RawEngineRawProcessingProvenance".to_string(),
+                            raw_processing_mode_recipe(settings.raw_processing_mode.as_deref())
+                                .provenance
+                                .to_string(),
+                        );
                         Ok((img, exif))
                     }
                     Err(e) => {
@@ -528,7 +600,20 @@ pub async fn load_image(
                             cancel_token.clone(),
                         )
                         .map_err(|e| e.to_string())?;
-                        let exif = exif_processing::read_exif_data(&path_clone, &bytes);
+                        let mut exif = exif_processing::read_exif_data(&path_clone, &bytes);
+                        exif.insert(
+                            "RawEngineRawProcessingMode".to_string(),
+                            settings
+                                .raw_processing_mode
+                                .clone()
+                                .unwrap_or_else(|| "balanced".to_string()),
+                        );
+                        exif.insert(
+                            "RawEngineRawProcessingProvenance".to_string(),
+                            raw_processing_mode_recipe(settings.raw_processing_mode.as_deref())
+                                .provenance
+                                .to_string(),
+                        );
                         Ok((img, exif))
                     }
                 })();
@@ -632,5 +717,89 @@ mod tests {
             load_offline_smart_preview_from_cache(temp_dir.path(), &original.to_string_lossy());
 
         assert!(loaded.is_none());
+    }
+
+    #[test]
+    fn raw_processing_mode_recipes_are_distinct() {
+        let fast = raw_processing_mode_recipe(Some("fast"));
+        let balanced = raw_processing_mode_recipe(Some("balanced"));
+        let maximum = raw_processing_mode_recipe(Some("maximum"));
+
+        assert!(fast.force_fast_demosaic);
+        assert!(!balanced.force_fast_demosaic);
+        assert!(!maximum.force_fast_demosaic);
+        assert_eq!(fast.raw_preprocessing_sharpening, 0.0);
+        assert!(maximum.raw_highlight_compression > balanced.raw_highlight_compression);
+        assert!(maximum.raw_preprocessing_sharpening > balanced.raw_preprocessing_sharpening);
+        assert_eq!(
+            balanced.provenance,
+            "default_quality_capture_preprocessing_v1"
+        );
+    }
+
+    #[test]
+    fn unknown_raw_processing_mode_uses_balanced_recipe() {
+        let unknown = raw_processing_mode_recipe(Some("experimental"));
+        let balanced = raw_processing_mode_recipe(Some("balanced"));
+
+        assert_eq!(unknown.provenance, balanced.provenance);
+        assert_eq!(
+            unknown.raw_preprocessing_color_nr,
+            balanced.raw_preprocessing_color_nr
+        );
+    }
+
+    #[test]
+    fn private_raw_processing_modes_generate_distinct_outputs_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_RAW_PROCESSING_MODE_PROOF").ok()
+            != Some("1".to_string())
+        {
+            return;
+        }
+
+        let source_path = std::env::var("RAWENGINE_RAW_PROCESSING_MODE_SOURCE")
+            .expect("RAWENGINE_RAW_PROCESSING_MODE_SOURCE must point to a private RAW");
+        let source_bytes = fs::read(&source_path).expect("read private RAW");
+        let mut hashes = Vec::new();
+
+        for mode in ["fast", "balanced", "maximum"] {
+            let recipe = raw_processing_mode_recipe(Some(mode));
+            let mut settings = AppSettings {
+                raw_processing_mode: Some(mode.to_string()),
+                raw_highlight_compression: Some(recipe.raw_highlight_compression),
+                raw_preprocessing_color_nr: Some(recipe.raw_preprocessing_color_nr),
+                raw_preprocessing_sharpening: Some(recipe.raw_preprocessing_sharpening),
+                raw_preprocessing_sharpening_detail: Some(
+                    recipe.raw_preprocessing_sharpening_detail,
+                ),
+                raw_preprocessing_sharpening_edge_masking: Some(
+                    recipe.raw_preprocessing_sharpening_edge_masking,
+                ),
+                raw_preprocessing_sharpening_radius: Some(
+                    recipe.raw_preprocessing_sharpening_radius,
+                ),
+                ..AppSettings::default()
+            };
+            settings.apply_preprocessing_to_non_raws = Some(false);
+
+            let started = Instant::now();
+            let image =
+                load_base_image_from_bytes(&source_bytes, &source_path, false, &settings, None)
+                    .expect("decode private RAW with processing mode");
+            let rgba = image.to_rgba8();
+            let hash = blake3::hash(rgba.as_raw()).to_hex().to_string();
+            println!(
+                "raw_processing_mode_proof mode={} dimensions={}x{} elapsed_ms={} hash={}",
+                mode,
+                image.width(),
+                image.height(),
+                started.elapsed().as_millis(),
+                hash
+            );
+            hashes.push(hash);
+        }
+
+        assert_ne!(hashes[0], hashes[1]);
+        assert_ne!(hashes[1], hashes[2]);
     }
 }

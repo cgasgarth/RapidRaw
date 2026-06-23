@@ -3175,6 +3175,26 @@
         "high": "Hohe Qualität",
         "performance": "Leistung"
       },
+      "rawMode": {
+        "description": "Wendet ein versioniertes RAW-Entwicklungsrezept an, damit Geschwindigkeit, Standardqualität und maximale Details verständlich und wiederholbar sind.",
+        "label": "RAW-Verarbeitungsmodus",
+        "provenance": "Rezept-Herkunft",
+        "title": "RAW-Qualitätsmodus"
+      },
+      "rawModes": {
+        "balanced": {
+          "description": "Demosaicing in Standardqualität, Spitzlichter-Wiederherstellung, Chroma-Bereinigung und sanfte Capture-Schärfung.",
+          "label": "Ausgewogen"
+        },
+        "fast": {
+          "description": "Schnelles Demosaicing ohne Capture-Vorverarbeitung für reaktionsschnelle Auswahl und schnelle Bearbeitung.",
+          "label": "Schnell"
+        },
+        "maximum": {
+          "description": "Demosaicing in voller Qualität mit stärkerem Spitzlichter-Spielraum, Chroma-Bereinigung und detailschonender Capture-Schärfung.",
+          "label": "Maximum"
+        }
+      },
       "renderScale": "Render-Auflösungsskalierung",
       "renderScaleDesc": "Skaliert die Renderauflösung relativ zu Ihrem Display. Niedrigere Werte verbessern die Leistung auf hochauflösenden Bildschirmen.",
       "restartRequired": "Änderungen an der Verarbeitungs-Engine erfordern einen Neustart der Anwendung.",
