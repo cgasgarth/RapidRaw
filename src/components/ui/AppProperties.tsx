@@ -420,6 +420,8 @@ export interface ImageAnalysisResult {
   qualityScore: number;
   sharpnessMetric: number;
   centerFocusMetric: number;
+  faceSharpnessMetric: number;
+  eyeSharpnessMetric: number;
   exposureMetric: number;
   focusScore: number;
   focusConfidence: number;

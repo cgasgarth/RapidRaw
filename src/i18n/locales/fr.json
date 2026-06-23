@@ -1196,6 +1196,8 @@
       "title": "Trier les images",
       "focusConfidence": "Confidence",
       "focusConfidenceValue": "Confidence {{confidence}}%",
+      "eyeSharpnessValue": "Eye sharpness {{sharpness}}",
+      "faceSharpnessValue": "Face sharpness {{sharpness}}",
       "focusRankingsTab": "Focus Ranking",
       "focusRankValue": "#{{rank}} focus pick",
       "focusScore": "Focus score",
@@ -1206,6 +1208,7 @@
       "summaryFocusRanking": "Focus ranking",
       "focusRegion": {
         "center_fallback": "Center fallback - no face or eye detector available",
+        "eye_band_heuristic": "Upper-face eye-band heuristic - no detector available",
         "unknown": "Unknown focus region"
       },
       "emptyAnalysisModes": "Enable similar grouping, blur filtering, focus ranking, or a combination before starting culling."

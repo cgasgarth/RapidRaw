@@ -383,6 +383,9 @@ export default function CullingModal({
       if (region === 'center_fallback') {
         return t('modals.culling.focusRegion.center_fallback');
       }
+      if (region === 'eye_band_heuristic') {
+        return t('modals.culling.focusRegion.eye_band_heuristic');
+      }
       return t('modals.culling.focusRegion.unknown');
     },
     [t],
@@ -907,6 +910,8 @@ export default function CullingModal({
                     <div
                       className="rounded-md border border-border-color bg-bg-secondary p-2"
                       data-focus-confidence={img.focusConfidence.toFixed(2)}
+                      data-focus-eye-sharpness={img.eyeSharpnessMetric.toFixed(2)}
+                      data-focus-face-sharpness={img.faceSharpnessMetric.toFixed(2)}
                       data-focus-rank={index + 1}
                       data-focus-region={img.focusRegion}
                       data-focus-score={img.focusScore.toFixed(2)}
@@ -924,6 +929,12 @@ export default function CullingModal({
                           {t('modals.culling.focusConfidenceValue', {
                             confidence: Math.round(img.focusConfidence * 100),
                           })}
+                        </UiText>
+                        <UiText variant={TextVariants.small}>
+                          {t('modals.culling.eyeSharpnessValue', { sharpness: img.eyeSharpnessMetric.toFixed(0) })}
+                        </UiText>
+                        <UiText variant={TextVariants.small}>
+                          {t('modals.culling.faceSharpnessValue', { sharpness: img.faceSharpnessMetric.toFixed(0) })}
                         </UiText>
                         <UiText variant={TextVariants.small} color={TextColors.secondary} className="col-span-2">
                           {getFocusRegionLabel(img.focusRegion)}
