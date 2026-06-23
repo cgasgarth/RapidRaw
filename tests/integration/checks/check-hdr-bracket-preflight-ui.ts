@@ -35,4 +35,16 @@ if (blocked?.accepted || !blocked?.blockCodes.includes('missing_required_exposur
   throw new Error('Expected missing exposure metadata to block HDR bracket preflight.');
 }
 
+const zeroApertureMetadata = buildHdrBracketPreflight([
+  { exif: { ExposureTime: '1/250', FNumber: '0', ISO: '100' }, path: '/hdr/zero-aperture-1.nef' },
+  { exif: { ExposureTime: '1/60', FNumber: '0', ISO: '100' }, path: '/hdr/zero-aperture-2.nef' },
+  { exif: { ExposureTime: '1/15', FNumber: '0', ISO: '100' }, path: '/hdr/zero-aperture-3.nef' },
+]);
+if (
+  zeroApertureMetadata?.accepted ||
+  !zeroApertureMetadata?.blockCodes.includes('missing_required_exposure_metadata')
+) {
+  throw new Error('Expected zero aperture metadata to be treated as missing, not accepted or thrown.');
+}
+
 console.log('hdr bracket preflight UI ok');
