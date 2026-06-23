@@ -1151,10 +1151,12 @@
     "tether": {
       "battery": "Battery",
       "captureUnavailable": "Capture not implemented",
+      "closeSession": "Close session",
       "connected": "Connected",
       "discoveryOnly": "Discovery only",
       "noCameraDescription": "Connect a supported camera and refresh to verify macOS tether discovery.",
       "noCameraTitle": "No camera reported",
+      "openSession": "Open session",
       "pendingAdapter": "macOS hardware adapter",
       "pendingMessage": "Discovery is waiting for the native camera provider.",
       "providerMode": {
@@ -1162,6 +1164,10 @@
         "fake": "Fake CI"
       },
       "refresh": "Refresh",
+      "sessionClosed": "Session closed",
+      "sessionClosedDescription": "Open a discovery session before capture controls are enabled.",
+      "sessionOpen": "Session open",
+      "sessionOpenDescription": "{{camera}} is reserved for this tether session.",
       "storage": "Storage",
       "storageValue": "{{label}} · {{freeGb}} GB free",
       "subtitle": "Discover one connected camera before capture controls are enabled.",

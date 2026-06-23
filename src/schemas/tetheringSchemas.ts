@@ -39,6 +39,23 @@ export const tetherDiscoveryResponseSchema = z.object({
   }),
 });
 
+export const tetherSessionSnapshotSchema = z.object({
+  cameraDisplayName: z.string().trim().min(1),
+  cameraId: z.string().trim().min(1),
+  destinationRoot: z.string().trim().min(1).nullable(),
+  openedAt: z.string().trim().min(1),
+  providerMode: z.enum(['auto', 'fake']),
+  sessionId: z.string().trim().min(1),
+  status: z.literal('open'),
+});
+
+export const tetherSessionResponseSchema = z.object({
+  session: tetherSessionSnapshotSchema.nullable(),
+  status: z.enum(['open', 'closed']),
+});
+
 export type TetherCapability = z.infer<typeof tetherCapabilitySchema>;
 export type TetherDiscoveryResponse = z.infer<typeof tetherDiscoveryResponseSchema>;
+export type TetherSessionResponse = z.infer<typeof tetherSessionResponseSchema>;
+export type TetherSessionSnapshot = z.infer<typeof tetherSessionSnapshotSchema>;
 export type TetheredCamera = z.infer<typeof tetheredCameraSchema>;
