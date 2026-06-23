@@ -756,7 +756,8 @@
         "shutterSpeed": "Выдержка",
         "undo": "Отменить (Ctrl+Z) или история (правый клик)"
       },
-      "vc": "ВК"
+      "vc": "ВК",
+      "exportSoftProofDetails": "{{profile}} / {{intent}} preview"
     }
   },
   "export": {

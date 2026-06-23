@@ -1148,6 +1148,7 @@
       }
     },
     "toolbar": {
+      "exportSoftProofDetails": "{{profile}} / {{intent}} preview",
       "historyDepth": "",
       "tooltips": {
         "aperture": "光圈",

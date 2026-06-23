@@ -75,6 +75,10 @@ const EditorToolbar = memo(
       [appSettings?.exportPresets],
     );
     const selectedExportProofRecipeId = exportSoftProofRecipeId ?? exportProofRecipeOptions[0]?.value ?? null;
+    const selectedExportProofRecipe = useMemo(
+      () => (appSettings?.exportPresets ?? []).find((preset) => preset.id === selectedExportProofRecipeId),
+      [appSettings?.exportPresets, selectedExportProofRecipeId],
+    );
     const canSoftProof = exportProofRecipeOptions.length > 0;
 
     const showResolution = !isAndroid && selectedImage.width > 0 && selectedImage.height > 0;
@@ -772,7 +776,7 @@ const EditorToolbar = memo(
               <Palette size={20} />
             </button>
             {isExportSoftProofEnabled && (
-              <div className="w-44">
+              <div className="w-56" data-testid="export-soft-proof-recipe-details">
                 <Dropdown
                   className="w-full"
                   disabled={!canSoftProof}
@@ -783,6 +787,24 @@ const EditorToolbar = memo(
                   }}
                   triggerClassName="h-9 rounded-full bg-surface px-3 text-xs"
                 />
+                {selectedExportProofRecipe && (
+                  <UiText
+                    as="p"
+                    className="mt-1 truncate text-center"
+                    color={TextColors.secondary}
+                    data-export-soft-proof-color-profile={selectedExportProofRecipe.colorProfile ?? 'srgb'}
+                    data-export-soft-proof-rendering-intent={
+                      selectedExportProofRecipe.renderingIntent ?? 'relativeColorimetric'
+                    }
+                    data-export-soft-proof-status="export-transform-preview"
+                    variant={TextVariants.small}
+                  >
+                    {t('editor.toolbar.exportSoftProofDetails', {
+                      profile: selectedExportProofRecipe.colorProfile ?? 'srgb',
+                      intent: selectedExportProofRecipe.renderingIntent ?? 'relativeColorimetric',
+                    })}
+                  </UiText>
+                )}
               </div>
             )}
           </div>
