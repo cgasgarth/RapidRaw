@@ -1056,6 +1056,9 @@
         "title": "XMP 冲突"
       }
     },
+    "offlineSmartPreview": {
+      "warning": "原始文件已断开连接。在重新连接原始文件之前，编辑仅适用于预览；无法进行全分辨率导出。"
+    },
     "presets": {
       "applyPresetLabel": "应用预设 {{name}}",
       "colorStyles": {
@@ -1253,6 +1256,7 @@
       "failed": "导出失败",
       "noImageSelected": "未选择要导出的图像。",
       "noImagesSelected": "未选择图像。",
+      "offlineSmartPreviewBlocked": "请先重新连接原始文件，再进行全分辨率导出。你仍可继续编辑智能预览。",
       "showInFinder": "在 Finder 中显示",
       "success": "导出成功！"
     },

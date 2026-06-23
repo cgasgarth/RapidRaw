@@ -96,6 +96,7 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
                   ...state.selectedImage,
                   exif: loadImageResult.exif ?? null,
                   height: loadImageResult.height,
+                  isOfflineSmartPreview: loadImageResult.is_offline_smart_preview === true,
                   isRaw: loadImageResult.is_raw,
                   isReady: true,
                   metadata: loadImageResult.metadata,

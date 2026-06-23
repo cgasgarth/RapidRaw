@@ -342,6 +342,7 @@ export default function ExportPanel({
     [isLibraryContext, multiSelectedPaths, selectedImage],
   );
   const numImages = pathsToExport.length;
+  const isOfflineSmartPreviewExport = !isLibraryContext && selectedImage?.isOfflineSmartPreview === true;
 
   useEffect(() => {
     const fetchDims = async () => {
@@ -520,7 +521,7 @@ export default function ExportPanel({
   };
 
   const handleExport = async () => {
-    if (numImages === 0 || isExporting) return;
+    if (numImages === 0 || isExporting || isOfflineSmartPreviewExport) return;
 
     let finalFilenameTemplate = filenameTemplate;
     if (
@@ -641,7 +642,7 @@ export default function ExportPanel({
     }
   };
 
-  const canExport = numImages > 0;
+  const canExport = numImages > 0 && !isOfflineSmartPreviewExport;
   const isLut = fileFormat === FileFormats.Cube;
   const itemLabel = isLut ? t('export.labels.lut') : t('export.labels.image');
   const itemLabelPlural = isLut ? t('export.labels.lut_plural') : t('export.labels.image_plural');
@@ -1066,7 +1067,11 @@ export default function ExportPanel({
             weight={TextWeights.normal}
             className="text-center mt-4"
           >
-            {isLibraryContext ? t('export.status.noImagesSelected') : t('export.status.noImageSelected')}
+            {isOfflineSmartPreviewExport
+              ? t('export.status.offlineSmartPreviewBlocked')
+              : isLibraryContext
+                ? t('export.status.noImagesSelected')
+                : t('export.status.noImageSelected')}
           </UiText>
         )}
       </div>

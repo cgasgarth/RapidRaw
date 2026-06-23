@@ -1126,6 +1126,9 @@
         "title": "Konflikt XMP"
       }
     },
+    "offlineSmartPreview": {
+      "warning": "Oryginalny plik jest odłączony. Edycje działają tylko na podglądzie do czasu ponownego podłączenia oryginału; eksport w pełnej rozdzielczości jest niedostępny."
+    },
     "presets": {
       "applyPresetLabel": "Zastosuj preset {{name}}",
       "colorStyles": {
@@ -1348,6 +1351,7 @@
       "failed": "Eksport nie powiódł się",
       "noImageSelected": "Brak wybranego obrazu do eksportu.",
       "noImagesSelected": "Nie wybrano obrazów.",
+      "offlineSmartPreviewBlocked": "Podłącz ponownie oryginalny plik przed eksportem w pełnej rozdzielczości. Nadal możesz edytować inteligentny podgląd.",
       "showInFinder": "Pokaż w Finderze",
       "success": "Eksport zakończony sukcesem!"
     },

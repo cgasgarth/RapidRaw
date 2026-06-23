@@ -24,6 +24,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 use std::time::Instant;
+use tauri::Manager;
 
 #[derive(serde::Serialize)]
 pub struct LoadImageResult {
@@ -32,6 +33,16 @@ pub struct LoadImageResult {
     pub metadata: ImageMetadata,
     pub exif: HashMap<String, String>,
     pub is_raw: bool,
+    pub is_offline_smart_preview: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SmartPreviewManifest {
+    width: u32,
+    height: u32,
+    source_available: bool,
+    stale: bool,
 }
 
 #[derive(Deserialize)]
@@ -354,6 +365,48 @@ pub fn is_image_cached(path: String, state: tauri::State<'_, AppState>) -> bool 
         .is_some()
 }
 
+fn compute_smart_preview_id(path_str: &str) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(path_str.as_bytes());
+    hasher.finalize().to_hex().to_string()
+}
+
+fn load_offline_smart_preview(
+    app_handle: &tauri::AppHandle,
+    source_path_str: &str,
+) -> Option<(DynamicImage, SmartPreviewManifest)> {
+    let cache_dir = app_handle.path().app_cache_dir().ok()?;
+    load_offline_smart_preview_from_cache(&cache_dir, source_path_str)
+}
+
+fn load_offline_smart_preview_from_cache(
+    cache_dir: &Path,
+    source_path_str: &str,
+) -> Option<(DynamicImage, SmartPreviewManifest)> {
+    let source_path = Path::new(source_path_str);
+    if source_path.exists() {
+        return None;
+    }
+
+    let preview_id = compute_smart_preview_id(source_path_str);
+    let preview_path = cache_dir
+        .join("smart-previews")
+        .join(format!("{}.jpg", preview_id));
+    let manifest_path = cache_dir
+        .join("smart-previews")
+        .join(format!("{}.json", preview_id));
+
+    let manifest = fs::read_to_string(manifest_path)
+        .ok()
+        .and_then(|content| serde_json::from_str::<SmartPreviewManifest>(&content).ok())?;
+    if manifest.source_available || !manifest.stale {
+        return None;
+    }
+
+    let image = ImageReader::open(preview_path).ok()?.decode().ok()?;
+    Some((image, manifest))
+}
+
 #[tauri::command]
 pub async fn load_image(
     path: String,
@@ -402,8 +455,33 @@ pub async fn load_image(
         .unwrap()
         .get(&source_path_str);
 
+    let mut is_offline_smart_preview = false;
+
     let (pristine_arc, exif_data) = if let Some((cached_img, cached_exif)) = cached_data {
         (cached_img, cached_exif)
+    } else if let Some((smart_preview, manifest)) =
+        load_offline_smart_preview(&app_handle, &source_path_str)
+    {
+        is_offline_smart_preview = true;
+        let (preview_width, preview_height) = smart_preview.dimensions();
+        let mut exif_data_loaded = metadata.exif.clone().unwrap_or_default();
+        exif_data_loaded.insert(
+            "RawEngineOfflineSmartPreview".to_string(),
+            "true".to_string(),
+        );
+        exif_data_loaded.insert(
+            "RawEngineOfflineSmartPreviewSource".to_string(),
+            "missing-original".to_string(),
+        );
+        exif_data_loaded.insert(
+            "RawEngineOfflineSmartPreviewManifestSize".to_string(),
+            format!("{}x{}", manifest.width, manifest.height),
+        );
+        exif_data_loaded.insert(
+            "RawEngineOfflineSmartPreviewRenderSize".to_string(),
+            format!("{}x{}", preview_width, preview_height),
+        );
+        (Arc::new(smart_preview), exif_data_loaded)
     } else {
         let (pristine_img, exif_data_loaded) = tokio::task::spawn_blocking(move || {
             if generation_tracker.load(Ordering::SeqCst) != my_generation {
@@ -475,6 +553,7 @@ pub async fn load_image(
     }
 
     let is_raw = is_raw_file(&source_path_str);
+    let loaded_is_raw = is_raw && !is_offline_smart_preview;
 
     if state.load_image_generation.load(Ordering::SeqCst) != my_generation {
         return Err("Load cancelled".to_string());
@@ -485,7 +564,7 @@ pub async fn load_image(
     *state.original_image.lock().unwrap() = Some(LoadedImage {
         path,
         image: pristine_arc,
-        is_raw,
+        is_raw: loaded_is_raw,
     });
 
     Ok(LoadImageResult {
@@ -493,6 +572,65 @@ pub async fn load_image(
         height: orig_height,
         metadata,
         exif: exif_data,
-        is_raw,
+        is_raw: loaded_is_raw,
+        is_offline_smart_preview,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn loads_offline_smart_preview_when_original_is_missing() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let smart_preview_dir = temp_dir.path().join("smart-previews");
+        fs::create_dir_all(&smart_preview_dir).expect("smart preview dir");
+
+        let missing_original = temp_dir.path().join("missing-original.dng");
+        let missing_original_str = missing_original.to_string_lossy().to_string();
+        let preview_id = compute_smart_preview_id(&missing_original_str);
+        let preview_path = smart_preview_dir.join(format!("{}.jpg", preview_id));
+        let manifest_path = smart_preview_dir.join(format!("{}.json", preview_id));
+
+        let preview = DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
+            24,
+            16,
+            image::Rgb([32, 64, 96]),
+        ));
+        preview.save(&preview_path).expect("save smart preview");
+        fs::write(
+            manifest_path,
+            serde_json::json!({
+                "width": 24,
+                "height": 16,
+                "sourceAvailable": false,
+                "stale": true,
+            })
+            .to_string(),
+        )
+        .expect("write manifest");
+
+        let (loaded, manifest) =
+            load_offline_smart_preview_from_cache(temp_dir.path(), &missing_original_str)
+                .expect("offline smart preview");
+
+        assert_eq!(loaded.dimensions(), (24, 16));
+        assert_eq!(manifest.width, 24);
+        assert_eq!(manifest.height, 16);
+        assert!(!manifest.source_available);
+        assert!(manifest.stale);
+    }
+
+    #[test]
+    fn ignores_smart_preview_when_original_exists() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let original = temp_dir.path().join("connected.dng");
+        fs::write(&original, b"connected").expect("original");
+
+        let loaded =
+            load_offline_smart_preview_from_cache(temp_dir.path(), &original.to_string_lossy());
+
+        assert!(loaded.is_none());
+    }
 }

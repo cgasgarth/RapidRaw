@@ -12,6 +12,7 @@ import {
   type MouseEvent,
   type RefObject,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
@@ -122,6 +123,7 @@ interface EditorProps {
 }
 
 export default function Editor({ onBackToLibrary, onContextMenu, transformWrapperRef }: EditorProps) {
+  const { t } = useTranslation();
   const appSettings = useSettingsStore((s) => s.appSettings);
   const osPlatform = useSettingsStore((s) => s.osPlatform);
   const isFullScreen = useUIStore((s) => s.isFullScreen);
@@ -2094,6 +2096,14 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           adjustmentsHistoryIndex={adjustmentsHistoryIndex}
           goToAdjustmentsHistoryIndex={goToHistoryIndex}
         />
+        {selectedImage.isOfflineSmartPreview === true && (
+          <div
+            className="mx-1 mb-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-100"
+            data-testid="offline-smart-preview-editor-warning"
+          >
+            {t('editor.offlineSmartPreview.warning')}
+          </div>
+        )}
       </div>
 
       <div

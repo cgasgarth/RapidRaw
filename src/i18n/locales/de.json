@@ -1060,6 +1060,9 @@
         "title": "XMP-Konflikt"
       }
     },
+    "offlineSmartPreview": {
+      "warning": "Die Originaldatei ist getrennt. Bearbeitungen sind nur Vorschau-Bearbeitungen, bis das Original wieder verbunden ist; Export in voller Auflösung ist nicht verfügbar."
+    },
     "presets": {
       "applyPresetLabel": "Vorgabe {{name}} anwenden",
       "colorStyles": {
@@ -1264,6 +1267,7 @@
       "failed": "Export fehlgeschlagen",
       "noImageSelected": "Kein Bild zum Exportieren ausgewählt.",
       "noImagesSelected": "Keine Bilder ausgewählt.",
+      "offlineSmartPreviewBlocked": "Verbinde die Originaldatei erneut, bevor du in voller Auflösung exportierst. Du kannst die Smart-Vorschau weiter bearbeiten.",
       "showInFinder": "Im Finder anzeigen",
       "success": "Export erfolgreich!"
     },

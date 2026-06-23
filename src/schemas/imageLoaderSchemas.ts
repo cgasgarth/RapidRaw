@@ -25,6 +25,7 @@ export const loadImageResultSchema = z
   .object({
     exif: exifSchema.optional(),
     height: z.number().nonnegative(),
+    is_offline_smart_preview: z.boolean().optional(),
     is_raw: z.boolean(),
     metadata: z.unknown().optional(),
     width: z.number().nonnegative(),
