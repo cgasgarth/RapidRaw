@@ -466,6 +466,7 @@ export default function MainLibrary(props: MainLibraryProps) {
                               : t('library.splash.openFolder')}
                         </Button>
                         <Button
+                          aria-label={t('settings.title')}
                           className="px-3 bg-surface text-text-primary shadow-md h-11"
                           onClick={() => {
                             setShowSettings(true);
