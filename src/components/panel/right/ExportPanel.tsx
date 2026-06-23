@@ -922,6 +922,7 @@ export default function ExportPanel({
         <UiText variant={TextVariants.title}>{t('export.title')}</UiText>
         {onClose && (
           <button
+            aria-label={t('export.closePanel')}
             onClick={onClose}
             className="p-1 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary"
           >

@@ -39,6 +39,7 @@ import { useProductivityActions } from './hooks/useProductivityActions';
 import { useSortedLibrary } from './hooks/useSortedLibrary';
 import { useTauriListeners } from './hooks/useTauriListeners';
 import { useThumbnails } from './hooks/useThumbnails';
+import { useTooltipAccessibility } from './hooks/useTooltipAccessibility';
 import './i18n';
 import { folderTreeListSchema } from './schemas/folderTreeSchemas';
 import { parseAiConnectorStatusPayload } from './schemas/tauriEventSchemas';
@@ -120,6 +121,7 @@ const insertChildrenIntoTree = (
 
 function App() {
   const COMPACT_EDITOR_MAX_WIDTH = 900;
+  useTooltipAccessibility();
 
   const { appSettings, theme, osPlatform, handleSettingsChange } = useSettingsStore(
     useShallow((state) => ({

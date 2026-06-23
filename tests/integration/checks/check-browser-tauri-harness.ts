@@ -75,6 +75,30 @@ try {
     .dblclick();
   await page.getByRole('heading', { name: 'Adjustments' }).waitFor({ timeout: 10_000 });
   await page.getByText(/1024 × 768/u).waitFor({ timeout: 10_000 });
+  const unlabeledIconButtons = await page.locator('button').evaluateAll((buttons) =>
+    buttons
+      .map((button, index) => {
+        const rect = button.getBoundingClientRect();
+        const label =
+          button.getAttribute('aria-label')?.trim() ||
+          button.getAttribute('title')?.trim() ||
+          button.textContent?.trim() ||
+          '';
+        const isDecorativeDisabledIndicator =
+          button.disabled && button.classList.contains('cursor-default') && button.classList.contains('bg-transparent');
+        return {
+          index,
+          isDecorativeDisabledIndicator,
+          label,
+          visible: rect.width > 0 && rect.height > 0,
+        };
+      })
+      .filter((button) => button.visible && button.label.length === 0 && !button.isDecorativeDisabledIndicator)
+      .map((button) => button.index),
+  );
+  if (unlabeledIconButtons.length > 0) {
+    throw new Error(`Visible icon buttons missing accessible names: ${unlabeledIconButtons.join(', ')}`);
+  }
 
   const harnessProof = await page.evaluate(() => ({
     calls: window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.map((call) => call.command) ?? [],

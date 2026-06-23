@@ -40,7 +40,9 @@
         "global": "Глобально",
         "highlights": "Света",
         "midtones": "Средние тона",
-        "shadows": "Тени"
+        "shadows": "Тени",
+        "threeWayTab": "Three-way color grading",
+        "globalTab": "Global color grading"
       },
       "hue": "Цветовой тон",
       "luminance": "Светимость",
@@ -905,7 +907,8 @@
       "adobeRgb1998": "Adobe RGB (1998)",
       "proPhotoRgb": "ProPhoto RGB",
       "sourceEmbedded": "Встроенный исходный профиль"
-    }
+    },
+    "closePanel": "Close export panel"
   },
   "library": {
     "community": {

@@ -91,6 +91,7 @@
         "blending": "混合",
         "blendingValue": "混合 {{value}}",
         "global": "全局",
+        "globalTab": "Global color grading",
         "highlights": "高光",
         "midtones": "中间调",
         "presetCategories": {
@@ -99,7 +100,8 @@
           "neutral": "中性",
           "portrait": "人像"
         },
-        "shadows": "阴影"
+        "shadows": "阴影",
+        "threeWayTab": "Three-way color grading"
       },
       "hue": "色相",
       "levels": {
@@ -1222,6 +1224,7 @@
       "mb": "MB",
       "tb": "TB"
     },
+    "closePanel": "Close export panel",
     "colorProfiles": {
       "adobeRgb1998": "Adobe RGB (1998)",
       "displayP3": "Display P3",
