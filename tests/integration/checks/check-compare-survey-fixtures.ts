@@ -45,6 +45,15 @@ const pickExportHandoff = parseCompareSurveyPickExportHandoff({
 if (pickExportHandoff.editorOpenedPath !== session.activePath) {
   failures.push('Compare/survey handoff did not preserve active pick path.');
 }
+if (
+  session.viewport.zoomPercent !== 100 ||
+  session.viewport.panX !== 12 ||
+  session.viewport.panY !== -8 ||
+  !session.viewport.linked ||
+  !session.zoomLinked
+) {
+  failures.push('Compare/survey viewport did not preserve linked 100% alignment state.');
+}
 
 for (const invalidHandoff of [
   { ...pickExportHandoff, editorOpenedPath: '/Users/example/Pictures/Selects/DSC_9999.NEF' },

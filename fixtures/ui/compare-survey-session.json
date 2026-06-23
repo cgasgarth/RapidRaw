@@ -42,5 +42,6 @@
   "sort": { "key": "selection_order", "order": "asc" },
   "updatedAt": "2026-06-14T11:35:00.000Z",
   "version": 1,
+  "viewport": { "linked": true, "panX": 12, "panY": -8, "zoomPercent": 100 },
   "zoomLinked": true
 }

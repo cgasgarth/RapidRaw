@@ -1,12 +1,18 @@
 import { invoke } from '@tauri-apps/api/core';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CheckCircle, XCircle, Loader2, Users, Trash2, Star, Tag } from 'lucide-react';
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { CheckCircle, XCircle, Loader2, Users, Trash2, Star, Tag, Move, Link2, Unlink } from 'lucide-react';
+import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { TextColors, TextVariants } from '../../types/typography';
-import { type CullingSettings, type CullingSuggestions, Invokes, type Progress } from '../ui/AppProperties';
+import {
+  type CullingSettings,
+  type CullingSuggestions,
+  type ImageAnalysisResult,
+  Invokes,
+  type Progress,
+} from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
 import Slider from '../ui/Slider';
@@ -30,6 +36,15 @@ type CullingStage = 'settings' | 'progress' | 'results';
 
 const RAW_SOURCE_EXTENSIONS = new Set(['arw', 'cr2', 'cr3', 'dng', 'nef', 'orf', 'pef', 'raf', 'rw2', 'srw']);
 const SETUP_PREVIEW_LIMIT = 6;
+const COMPARE_PAN_STEP = 10;
+const COMPARE_ZOOM_STEPS = [50, 100, 200] as const;
+
+interface CompareViewport {
+  linked: boolean;
+  panX: number;
+  panY: number;
+  zoomPercent: number;
+}
 
 interface ImageThumbnailProps {
   children?: ReactNode;
@@ -80,6 +95,98 @@ function getFileExtension(path: string): string {
   return dotIndex > -1 ? fileName.slice(dotIndex + 1).toLowerCase() : '';
 }
 
+function clampPan(value: number): number {
+  return Math.max(-100, Math.min(100, value));
+}
+
+function getCompareViewportStyle(viewport: CompareViewport): CSSProperties {
+  return {
+    transform: `translate(${viewport.panX}%, ${viewport.panY}%) scale(${viewport.zoomPercent / 100})`,
+    transformOrigin: 'center',
+  };
+}
+
+interface CompareFrameProps {
+  analysis: ImageAnalysisResult;
+  isReference?: boolean;
+  isSelected?: boolean;
+  metadataLabels: {
+    dimensions: (width: number, height: number) => string;
+    focus: string;
+    score: string;
+    sharpness: string;
+  };
+  onToggle?: () => void;
+  thumbnails: Record<string, string>;
+  viewport: CompareViewport;
+}
+
+function CompareFrame({
+  analysis,
+  isReference = false,
+  isSelected = false,
+  metadataLabels,
+  onToggle,
+  thumbnails,
+  viewport,
+}: CompareFrameProps) {
+  const thumbnailUrl = thumbnails[analysis.path];
+  const frame = (
+    <div
+      className={`relative aspect-[4/3] overflow-hidden rounded-md border-2 bg-bg-secondary ${
+        isReference ? 'border-green-500' : isSelected ? 'border-accent' : 'border-transparent hover:border-surface'
+      }`}
+      data-center-focus={analysis.centerFocusMetric.toFixed(2)}
+      data-height={analysis.height}
+      data-path={analysis.path}
+      data-quality-score={analysis.qualityScore.toFixed(2)}
+      data-sharpness={analysis.sharpnessMetric.toFixed(2)}
+      data-viewport-linked={String(viewport.linked)}
+      data-viewport-pan-x={viewport.panX}
+      data-viewport-pan-y={viewport.panY}
+      data-viewport-zoom={viewport.zoomPercent}
+      data-width={analysis.width}
+    >
+      <img
+        src={thumbnailUrl}
+        alt={analysis.path}
+        className="h-full w-full object-cover transition-transform duration-150"
+        style={getCompareViewportStyle(viewport)}
+      />
+      {!isReference && (
+        <div className="absolute top-2 right-2">{isSelected && <CheckCircle size={16} className="text-accent" />}</div>
+      )}
+      <UiText
+        as="div"
+        variant={TextVariants.small}
+        color={TextColors.white}
+        className="absolute bottom-0 left-0 right-0 grid grid-cols-2 gap-x-2 bg-black/65 p-1"
+      >
+        <span>{metadataLabels.dimensions(analysis.width, analysis.height)}</span>
+        <span>
+          {metadataLabels.focus}: {analysis.centerFocusMetric.toFixed(0)}
+        </span>
+        <span>
+          {metadataLabels.sharpness}: {analysis.sharpnessMetric.toFixed(0)}
+        </span>
+        <span>
+          {metadataLabels.score}: {analysis.qualityScore.toFixed(2)}
+        </span>
+      </UiText>
+    </div>
+  );
+
+  if (onToggle === undefined) {
+    return frame;
+  }
+
+  return (
+    <button type="button" className="block w-full text-left" onClick={onToggle}>
+      {frame}
+    </button>
+  );
+}
+
 export default function CullingModal({
   isOpen,
   onClose,
@@ -104,6 +211,12 @@ export default function CullingModal({
   const [selectedRejects, setSelectedRejects] = useState<Set<string>>(new Set());
   const [action, setAction] = useState<CullAction>('reject');
   const [activeTab, setActiveTab] = useState<'similar' | 'blurry'>('similar');
+  const [compareViewport, setCompareViewport] = useState<CompareViewport>({
+    linked: true,
+    panX: 0,
+    panY: 0,
+    zoomPercent: 100,
+  });
 
   const CULL_ACTIONS = useMemo(
     () => [
@@ -199,6 +312,36 @@ export default function CullingModal({
   const hasCullingAnalysisMode = settings.groupSimilar || settings.filterBlurry;
   const cullingAnalysisModeCount = Number(settings.groupSimilar) + Number(settings.filterBlurry);
   const canStartCulling = imagePaths.length > 0 && hasCullingAnalysisMode;
+
+  const compareMetadataLabels = useMemo(
+    () => ({
+      dimensions: (width: number, height: number) => t('modals.culling.compareDimensions', { height, width }),
+      focus: t('modals.culling.compareFocus'),
+      score: t('modals.culling.compareScore'),
+      sharpness: t('modals.culling.compareSharpness'),
+    }),
+    [t],
+  );
+
+  const setCompareZoom = useCallback((zoomPercent: number) => {
+    setCompareViewport((viewport) => ({ ...viewport, zoomPercent }));
+  }, []);
+
+  const nudgeCompareViewport = useCallback((panXDelta: number, panYDelta: number) => {
+    setCompareViewport((viewport) => ({
+      ...viewport,
+      panX: clampPan(viewport.panX + panXDelta),
+      panY: clampPan(viewport.panY + panYDelta),
+    }));
+  }, []);
+
+  const resetCompareViewport = useCallback(() => {
+    setCompareViewport((viewport) => ({ ...viewport, panX: 0, panY: 0, zoomPercent: 100 }));
+  }, []);
+
+  const toggleLinkedCompareViewport = useCallback(() => {
+    setCompareViewport((viewport) => ({ ...viewport, linked: !viewport.linked }));
+  }, []);
 
   const renderSettings = () => (
     <>
@@ -506,6 +649,113 @@ export default function CullingModal({
             >
               {activeTab === 'similar' && (
                 <div className="space-y-4">
+                  <section
+                    className="rounded-md border border-border-color bg-bg-secondary p-3"
+                    data-pan-x={compareViewport.panX}
+                    data-pan-y={compareViewport.panY}
+                    data-testid="culling-compare-sync-controls"
+                    data-viewport-linked={String(compareViewport.linked)}
+                    data-zoom-percent={compareViewport.zoomPercent}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <Move size={16} className="text-accent" />
+                        <UiText variant={TextVariants.label}>{t('modals.culling.compareViewport')}</UiText>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          aria-pressed={compareViewport.linked}
+                          className="inline-flex items-center gap-1 rounded border border-border-color px-2 py-1 text-xs text-text-primary hover:bg-surface"
+                          data-testid="culling-compare-link-toggle"
+                          onClick={toggleLinkedCompareViewport}
+                        >
+                          {compareViewport.linked ? <Link2 size={14} /> : <Unlink size={14} />}
+                          {compareViewport.linked
+                            ? t('modals.culling.compareLinked')
+                            : t('modals.culling.compareUnlinked')}
+                        </button>
+                        {COMPARE_ZOOM_STEPS.map((zoomPercent) => (
+                          <button
+                            type="button"
+                            aria-pressed={compareViewport.zoomPercent === zoomPercent}
+                            className={`rounded border px-2 py-1 text-xs ${
+                              compareViewport.zoomPercent === zoomPercent
+                                ? 'border-accent text-accent'
+                                : 'border-border-color text-text-primary hover:bg-surface'
+                            }`}
+                            data-testid={`culling-compare-zoom-${zoomPercent}`}
+                            key={zoomPercent}
+                            onClick={() => {
+                              setCompareZoom(zoomPercent);
+                            }}
+                          >
+                            {zoomPercent}%
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          className="rounded border border-border-color px-2 py-1 text-xs text-text-primary hover:bg-surface"
+                          data-testid="culling-compare-reset"
+                          onClick={resetCompareViewport}
+                        >
+                          {t('modals.culling.compareReset')}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 sm:inline-grid sm:grid-cols-5">
+                      <button
+                        type="button"
+                        className="rounded border border-border-color px-2 py-1 text-xs text-text-primary hover:bg-surface sm:col-start-2"
+                        data-testid="culling-compare-pan-up"
+                        onClick={() => {
+                          nudgeCompareViewport(0, -COMPARE_PAN_STEP);
+                        }}
+                      >
+                        {t('modals.culling.comparePanUp')}
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded border border-border-color px-2 py-1 text-xs text-text-primary hover:bg-surface sm:col-start-1 sm:row-start-2"
+                        data-testid="culling-compare-pan-left"
+                        onClick={() => {
+                          nudgeCompareViewport(-COMPARE_PAN_STEP, 0);
+                        }}
+                      >
+                        {t('modals.culling.comparePanLeft')}
+                      </button>
+                      <UiText
+                        variant={TextVariants.small}
+                        color={TextColors.secondary}
+                        className="flex items-center justify-center rounded border border-border-color px-2 py-1 text-center sm:col-start-2 sm:row-start-2"
+                      >
+                        {t('modals.culling.comparePanReadout', {
+                          x: compareViewport.panX,
+                          y: compareViewport.panY,
+                        })}
+                      </UiText>
+                      <button
+                        type="button"
+                        className="rounded border border-border-color px-2 py-1 text-xs text-text-primary hover:bg-surface sm:col-start-3 sm:row-start-2"
+                        data-testid="culling-compare-pan-right"
+                        onClick={() => {
+                          nudgeCompareViewport(COMPARE_PAN_STEP, 0);
+                        }}
+                      >
+                        {t('modals.culling.comparePanRight')}
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded border border-border-color px-2 py-1 text-xs text-text-primary hover:bg-surface sm:col-start-2 sm:row-start-3"
+                        data-testid="culling-compare-pan-down"
+                        onClick={() => {
+                          nudgeCompareViewport(0, COMPARE_PAN_STEP);
+                        }}
+                      >
+                        {t('modals.culling.comparePanDown')}
+                      </button>
+                    </div>
+                  </section>
                   {suggestions.similarGroups.map((group, index) => (
                     <div key={index} className="bg-surface rounded-lg p-3">
                       <UiText variant={TextVariants.heading} className="mb-2">
@@ -516,39 +766,35 @@ export default function CullingModal({
                           <UiText variant={TextVariants.label} className="mb-1">
                             {t('modals.culling.bestImage')}
                           </UiText>
-                          <div className="relative rounded-md overflow-hidden border-2 border-green-500">
-                            <img
-                              src={thumbnails[group.representative.path]}
-                              alt={t('modals.culling.representative')}
-                              className="w-full h-full object-cover"
-                            />
-                            <UiText
-                              as="div"
-                              variant={TextVariants.small}
-                              color={TextColors.white}
-                              className="absolute bottom-0 left-0 right-0 p-1 bg-black/60"
-                            >
-                              {t('modals.culling.score', { score: group.representative.qualityScore.toFixed(2) })}
-                            </UiText>
-                          </div>
+                          <CompareFrame
+                            analysis={group.representative}
+                            isReference
+                            metadataLabels={compareMetadataLabels}
+                            thumbnails={thumbnails}
+                            viewport={compareViewport}
+                          />
                         </div>
                         <div>
                           <UiText variant={TextVariants.label} className="mb-1">
                             {t('modals.culling.duplicatesHeader', { count: group.duplicates.length })}
                           </UiText>
-                          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                          <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
                             {group.duplicates.map((dup) => (
-                              <ImageThumbnail
-                                key={dup.path}
-                                path={dup.path}
-                                thumbnails={thumbnails}
+                              <CompareFrame
+                                analysis={dup}
                                 isSelected={selectedRejects.has(dup.path)}
+                                key={dup.path}
+                                metadataLabels={compareMetadataLabels}
                                 onToggle={() => {
                                   handleToggleReject(dup.path);
                                 }}
-                              >
-                                {t('modals.culling.score', { score: dup.qualityScore.toFixed(2) })}
-                              </ImageThumbnail>
+                                thumbnails={thumbnails}
+                                viewport={
+                                  compareViewport.linked
+                                    ? compareViewport
+                                    : { linked: false, panX: 0, panY: 0, zoomPercent: 100 }
+                                }
+                              />
                             ))}
                           </div>
                         </div>
@@ -642,7 +888,7 @@ export default function CullingModal({
     >
       <div
         aria-modal="true"
-        className={`bg-surface rounded-lg shadow-xl p-6 w-full max-w-3xl transform transition-all duration-300 ease-out ${
+        className={`bg-surface rounded-lg shadow-xl p-6 w-full max-w-5xl transform transition-all duration-300 ease-out ${
           show ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 -translate-y-4'
         }`}
         role="dialog"

@@ -6,6 +6,7 @@ import ColorPanel from '../../components/adjustments/Color';
 import DetailsPanel from '../../components/adjustments/Details';
 import EffectsPanel from '../../components/adjustments/Effects';
 import CommandPaletteModal from '../../components/modals/CommandPaletteModal';
+import CullingModal from '../../components/modals/CullingModal';
 import FocusStackModal from '../../components/modals/FocusStackModal';
 import HdrModal from '../../components/modals/HdrModal';
 import { NegativeConversionModal } from '../../components/modals/NegativeConversionModal';
@@ -16,7 +17,12 @@ import AgentChatShell from '../../components/panel/right/AgentChatShell';
 import { MaskOverlayReviewControls } from '../../components/panel/right/MaskOverlayReviewControls';
 import { Mask, SubMaskMode, ToolType, type SubMask } from '../../components/panel/right/Masks';
 import RightPanelSwitcher from '../../components/panel/right/RightPanelSwitcher';
-import { Panel, type BrushSettings, type SelectedImage } from '../../components/ui/AppProperties';
+import {
+  Panel,
+  type BrushSettings,
+  type CullingSuggestions,
+  type SelectedImage,
+} from '../../components/ui/AppProperties';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../../schemas/focusStackUiSchemas';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS, type HdrMergeUiSettings } from '../../schemas/hdrMergeUiSchemas';
 import {
@@ -190,6 +196,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.BrushMaskCanvasUi]: BrushMaskCanvasVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ColorWorkflow]: ColorWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.CommandPaletteWorkflows]: CommandPaletteWorkflowSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.CullingCompareSync]: CullingCompareSyncVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.DetailDustSpot]: DetailDustSpotVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.DetailWorkspace]: DetailWorkspaceVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FilmLookBrowser]: FilmLookVisualSmoke,
@@ -844,6 +851,7 @@ const copy = {
   strokeCount: (count: number) => `${count} strokes`,
   toolOrder: 'Tool order',
   commandPaletteSmoke: 'Command Palette Workflows',
+  cullingCompareSync: 'Culling compare sync',
   filmLook: 'Film look',
   filmPreset: 'Neutral 400',
   focusStackSmoke: 'Focus Stack Smoke',
@@ -2050,6 +2058,91 @@ function CommandPaletteWorkflowSmoke() {
           onClose={() => {
             setIsOpen(false);
           }}
+        />
+      </div>
+    </main>
+  );
+}
+
+const cullingComparePaths = [
+  '/Users/example/Pictures/Burst/DSC_2401.NEF',
+  '/Users/example/Pictures/Burst/DSC_2402.NEF',
+  '/Users/example/Pictures/Burst/DSC_2403.NEF',
+] as const;
+
+function buildCullingThumbnail(label: string, baseColor: string, detailColor: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480"><rect width="640" height="480" fill="${baseColor}"/><path d="M0 354 C116 268 192 306 284 198 C380 94 476 156 640 58 L640 480 L0 480 Z" fill="${detailColor}" opacity="0.82"/><circle cx="332" cy="206" r="92" fill="#f8f0d7" opacity="0.32"/><path d="M32 80 H608 M32 160 H608 M32 240 H608 M32 320 H608 M128 32 V448 M256 32 V448 M384 32 V448 M512 32 V448" stroke="#ffffff" stroke-opacity="0.12" stroke-width="4"/><text x="36" y="430" fill="#f4f1e8" font-family="Arial, sans-serif" font-size="34">${label}</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+const cullingCompareThumbnails: Record<string, string> = {
+  [cullingComparePaths[0]]: buildCullingThumbnail('reference', '#28313d', '#7fc6ff'),
+  [cullingComparePaths[1]]: buildCullingThumbnail('candidate A', '#2f3136', '#87d49b'),
+  [cullingComparePaths[2]]: buildCullingThumbnail('candidate B', '#352f3c', '#f0b56c'),
+};
+
+const cullingCompareSuggestions: CullingSuggestions = {
+  blurryImages: [],
+  failedPaths: [],
+  similarGroups: [
+    {
+      duplicates: [
+        {
+          centerFocusMetric: 88,
+          exposureMetric: 0.04,
+          height: 4024,
+          path: cullingComparePaths[1],
+          qualityScore: 0.91,
+          sharpnessMetric: 184,
+          width: 6048,
+        },
+        {
+          centerFocusMetric: 72,
+          exposureMetric: -0.08,
+          height: 4024,
+          path: cullingComparePaths[2],
+          qualityScore: 0.76,
+          sharpnessMetric: 143,
+          width: 6048,
+        },
+      ],
+      representative: {
+        centerFocusMetric: 94,
+        exposureMetric: 0.02,
+        height: 4024,
+        path: cullingComparePaths[0],
+        qualityScore: 0.97,
+        sharpnessMetric: 221,
+        width: 6048,
+      },
+    },
+  ],
+};
+
+function CullingCompareSyncVisualSmoke() {
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.CullingCompareSync}
+    >
+      <div className="h-screen bg-[#0f1114]" data-visual-smoke-section="culling-compare-sync">
+        <div className="flex h-11 items-center justify-between border-b border-white/10 bg-[#181b1f] px-4">
+          <span className="text-sm font-semibold tracking-normal">{copy.brand}</span>
+          <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">
+            {copy.cullingCompareSync}
+          </span>
+        </div>
+        <CullingModal
+          error={null}
+          imagePaths={[...cullingComparePaths]}
+          isOpen
+          onApply={() => {}}
+          onClose={() => {}}
+          onError={() => {}}
+          progress={null}
+          suggestions={cullingCompareSuggestions}
+          thumbnails={cullingCompareThumbnails}
         />
       </div>
     </main>

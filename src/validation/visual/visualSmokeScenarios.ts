@@ -3,6 +3,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   BrushMaskCanvasUi: 'brush-mask-canvas-ui',
   ColorWorkflow: 'color-workflow',
   CommandPaletteWorkflows: 'command-palette-workflows',
+  CullingCompareSync: 'culling-compare-sync',
   DetailDustSpot: 'detail-dust-spot',
   DetailWorkspace: 'detail-workspace',
   EmptyLibrary: 'empty-library',
@@ -61,6 +62,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Command Palette Workflows',
     mode: VISUAL_SMOKE_SCENARIO_IDS.CommandPaletteWorkflows,
     outputFile: 'command-palette-workflows.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Culling compare sync',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.CullingCompareSync,
+    outputFile: 'culling-compare-sync.png',
     sectionMinimum: 1,
   },
   {
