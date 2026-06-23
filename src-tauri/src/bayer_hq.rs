@@ -4,6 +4,24 @@ use rawler::{
     pixarray::{Color2D, PixF32},
 };
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct ArtifactSuppressionReport {
+    pub adjusted_pixels: usize,
+    pub evaluated_pixels: usize,
+}
+
+fn luma(pixel: [f32; 3]) -> f32 {
+    pixel[0] * 0.2126 + pixel[1] * 0.7152 + pixel[2] * 0.0722
+}
+
+fn chroma(pixel: [f32; 3]) -> (f32, f32) {
+    (pixel[0] - pixel[1], pixel[2] - pixel[1])
+}
+
+fn pixel_index(width: usize, row: usize, col: usize) -> usize {
+    row * width + col
+}
+
 fn sample_same_color(
     pixels: &PixF32,
     cfa: &CFA,
@@ -139,6 +157,61 @@ pub fn demosaic_bayer_hq(pixels: &PixF32, cfa: &CFA, roi: Rect) -> Color2D<f32, 
     Color2D::new_with(output, roi.d.w, roi.d.h)
 }
 
+pub fn suppress_false_color_and_zipper(image: &mut Color2D<f32, 3>) -> ArtifactSuppressionReport {
+    const CHROMA_DELTA_THRESHOLD: f32 = 0.055;
+    const CHROMA_BLEND: f32 = 0.58;
+
+    if image.width < 3 || image.height < 3 {
+        return ArtifactSuppressionReport::default();
+    }
+
+    let original = image.data.clone();
+    let mut report = ArtifactSuppressionReport::default();
+
+    for row in 1..image.height - 1 {
+        for col in 1..image.width - 1 {
+            let center_index = pixel_index(image.width, row, col);
+            let center = original[center_index];
+            let west = original[pixel_index(image.width, row, col - 1)];
+            let east = original[pixel_index(image.width, row, col + 1)];
+            let north = original[pixel_index(image.width, row - 1, col)];
+            let south = original[pixel_index(image.width, row + 1, col)];
+            let horizontal_gradient = (luma(west) - luma(east)).abs();
+            let vertical_gradient = (luma(north) - luma(south)).abs();
+            let (center_rg, center_bg) = chroma(center);
+            let (first, second, gradient) = if horizontal_gradient <= vertical_gradient {
+                (west, east, horizontal_gradient)
+            } else {
+                (north, south, vertical_gradient)
+            };
+            let (first_rg, first_bg) = chroma(first);
+            let (second_rg, second_bg) = chroma(second);
+            let target_rg = (first_rg + second_rg) * 0.5;
+            let target_bg = (first_bg + second_bg) * 0.5;
+            let delta = (center_rg - target_rg)
+                .abs()
+                .max((center_bg - target_bg).abs());
+            let threshold = CHROMA_DELTA_THRESHOLD + gradient * 0.35;
+
+            report.evaluated_pixels += 1;
+            if delta <= threshold {
+                continue;
+            }
+
+            let next_rg = center_rg + (target_rg - center_rg) * CHROMA_BLEND;
+            let next_bg = center_bg + (target_bg - center_bg) * CHROMA_BLEND;
+            image.data[center_index] = [
+                (center[1] + next_rg).max(0.0),
+                center[1].max(0.0),
+                (center[1] + next_bg).max(0.0),
+            ];
+            report.adjusted_pixels += 1;
+        }
+    }
+
+    report
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -157,5 +230,19 @@ mod tests {
         assert_eq!(demosaiced.width, 8);
         assert_eq!(demosaiced.height, 8);
         assert_eq!(demosaiced.data[0][0], 0.2);
+    }
+
+    #[test]
+    fn false_color_suppression_reduces_flat_luma_chroma_outliers() {
+        let mut image = Color2D::new_with(vec![[0.4, 0.4, 0.4]; 25], 5, 5);
+        image.data[pixel_index(5, 2, 2)] = [0.9, 0.4, 0.0];
+
+        let before = chroma(image.data[pixel_index(5, 2, 2)]).0.abs();
+        let report = suppress_false_color_and_zipper(&mut image);
+        let after = chroma(image.data[pixel_index(5, 2, 2)]).0.abs();
+
+        assert_eq!(report.evaluated_pixels, 9);
+        assert_eq!(report.adjusted_pixels, 1);
+        assert!(after < before * 0.5);
     }
 }

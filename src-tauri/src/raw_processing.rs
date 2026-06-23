@@ -551,7 +551,9 @@ fn apply_default_crop(raw_image: &RawImage, intermediate: Intermediate) -> Inter
     }
 }
 
-fn develop_bayer_hq_intermediate(raw_image: &RawImage) -> Result<Intermediate> {
+fn develop_bayer_hq_intermediate(
+    raw_image: &RawImage,
+) -> Result<(Intermediate, crate::bayer_hq::ArtifactSuppressionReport)> {
     let mut scaled = raw_image.clone();
     scaled.apply_scaling()?;
     let RawPhotometricInterpretation::Cfa(config) = &scaled.photometric else {
@@ -564,12 +566,13 @@ fn develop_bayer_hq_intermediate(raw_image: &RawImage) -> Result<Intermediate> {
         scaled.height,
     );
     let roi = scaled.active_area.unwrap_or(pixels.rect());
-    let demosaiced = crate::bayer_hq::demosaic_bayer_hq(&pixels, &config.cfa, roi);
+    let mut demosaiced = crate::bayer_hq::demosaic_bayer_hq(&pixels, &config.cfa, roi);
+    let suppression_report = crate::bayer_hq::suppress_false_color_and_zipper(&mut demosaiced);
     let calibrated = calibrate_three_color(&scaled, demosaiced);
 
-    Ok(apply_default_crop(
-        &scaled,
-        Intermediate::ThreeColor(calibrated),
+    Ok((
+        apply_default_crop(&scaled, Intermediate::ThreeColor(calibrated)),
+        suppression_report,
     ))
 }
 
@@ -708,7 +711,7 @@ fn develop_internal_with_options(
 
     check_cancel()?;
     let mut developed_intermediate = if use_bayer_hq {
-        develop_bayer_hq_intermediate(&raw_image)?
+        develop_bayer_hq_intermediate(&raw_image)?.0
     } else {
         developer.develop_intermediate(&raw_image)?
     };
@@ -1108,6 +1111,19 @@ mod tests {
         let maximum_elapsed_ms = started.elapsed().as_millis();
         let maximum = apply_orientation(maximum, maximum_orientation);
 
+        let source = RawSource::new_from_slice(&file_bytes);
+        let decoder =
+            rawler::get_decoder(&source).expect("create RAW decoder for suppression proof");
+        let raw_image = decoder
+            .raw_image(&source, &RawDecodeParams::default(), false)
+            .expect("decode private Bayer RAW for suppression proof");
+        let (_, suppression_report) =
+            develop_bayer_hq_intermediate(&raw_image).expect("run Bayer HQ suppression proof path");
+        assert!(suppression_report.evaluated_pixels > 0);
+        assert!(suppression_report.adjusted_pixels > 0);
+        let suppression_adjusted_ratio = suppression_report.adjusted_pixels as f64
+            / suppression_report.evaluated_pixels.max(1) as f64;
+
         assert_eq!(balanced.width(), maximum.width());
         assert_eq!(balanced.height(), maximum.height());
 
@@ -1151,7 +1167,7 @@ mod tests {
             .expect("write Bayer HQ TIFF");
 
         let report = serde_json::json!({
-            "issue": 3239,
+            "issues": [3239, 3241],
             "proofBoundary": "private_bayer_hq_runtime_output",
             "sourcePath": source_path,
             "dimensions": {
@@ -1168,6 +1184,12 @@ mod tests {
                 "elapsedMs": maximum_elapsed_ms,
                 "imageHash": maximum_hash,
                 "tiffPath": maximum_path.to_string_lossy(),
+                "falseColorSuppression": {
+                    "algorithm": "suppress_false_color_and_zipper",
+                    "evaluatedPixels": suppression_report.evaluated_pixels,
+                    "adjustedPixels": suppression_report.adjusted_pixels,
+                    "adjustedPixelRatio": suppression_adjusted_ratio,
+                },
             },
             "outputDiff": {
                 "changedPixelRatio": changed_pixel_ratio,
