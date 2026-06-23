@@ -44,6 +44,12 @@ const failures = [
     'external editor configured label',
     exportPanelSource.includes('data-testid="export-success-external-editor-config"'),
   ],
+  ['external editor watch invoke', exportPanelSource.includes('Invokes.GetExternalEditorFileWatchSnapshot')],
+  ['external editor watch status', exportPanelSource.includes('data-testid="export-success-external-editor-watch"')],
+  [
+    'external editor save detection marker',
+    exportPanelSource.includes('data-external-editor-save-detected={String(currentExternalEditorWatch.detected)}'),
+  ],
   ['open in editor uses configured launcher', exportPanelSource.includes('Invokes.LaunchExternalEditor')],
   ['open in editor TIFF gate', exportPanelSource.includes("firstReceiptOutput?.format.toLowerCase() === 'tiff'")],
   ['linked variant import action', exportPanelSource.includes('data-testid="export-success-import-linked-variant"')],
@@ -60,6 +66,7 @@ const failures = [
   ['clears stale receipt on new export', exportPanelSource.includes('lastReceipt: undefined')],
   ['Rust linked variant command', rustFileSource.includes('import_external_editor_variant')],
   ['Rust configured editor launcher', rustFileSource.includes('launch_external_editor')],
+  ['Rust external editor watch snapshot command', rustFileSource.includes('get_external_editor_file_watch_snapshot')],
   ['Rust linked variant artifact', rustFileSource.includes('external_editor.import_linked_variant')],
   [
     'Rust linked variant no-overwrite policy',
@@ -74,6 +81,8 @@ const failures = [
       enLocale.includes('"showInFinder"') &&
       enLocale.includes('"openInEditor"') &&
       enLocale.includes('"chooseExternalEditor"') &&
+      enLocale.includes('"externalEditorSaveDetected"') &&
+      enLocale.includes('"externalEditorWatching"') &&
       enLocale.includes('"importLinkedVariant"') &&
       enLocale.includes('Original left untouched'),
   ],

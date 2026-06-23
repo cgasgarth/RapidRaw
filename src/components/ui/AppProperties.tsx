@@ -81,6 +81,7 @@ export enum Invokes {
   GetImageDimensions = 'get_image_dimensions',
   GetFolderTree = 'get_folder_tree',
   GetFolderChildren = 'get_folder_children',
+  GetExternalEditorFileWatchSnapshot = 'get_external_editor_file_watch_snapshot',
   GetLogFilePath = 'get_log_file_path',
   GetLensDistortionParams = 'get_lens_distortion_params',
   GetOrCreateInternalLibraryRoot = 'get_or_create_internal_library_root',

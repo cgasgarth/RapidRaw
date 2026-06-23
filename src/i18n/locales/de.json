@@ -1295,6 +1295,8 @@
       "externalEditorConfigured": "Externer Editor: {{editor}}",
       "externalEditorDefault": "Externer Editor: Systemstandard",
       "externalEditorFailed": "Externer Editor konnte nicht geöffnet werden: {{error}}",
+      "externalEditorSaveDetected": "",
+      "externalEditorWatching": "",
       "failed": "Export fehlgeschlagen",
       "importingLinkedVariant": "Wird importiert…",
       "importLinkedVariant": "Verknüpfte Variante importieren",

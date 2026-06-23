@@ -304,6 +304,14 @@ pub struct ExternalEditorVariantReceipt {
     source_revision: String,
 }
 
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FileWatchSnapshot {
+    byte_size: u64,
+    modified_ms: u128,
+    path: String,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryRelinkIdentity {
@@ -3440,6 +3448,38 @@ pub fn import_external_editor_variant(
     let output_path = PathBuf::from(output_path);
     let sidecar_path = rrdata_sidecar_path(&output_path, None);
     write_external_editor_variant_sidecar(&source_virtual_path, &output_path, &sidecar_path)
+}
+
+#[tauri::command]
+pub fn get_external_editor_file_watch_snapshot(
+    output_path: String,
+) -> Result<FileWatchSnapshot, String> {
+    let output_path = PathBuf::from(output_path);
+    let metadata = fs::metadata(&output_path)
+        .map_err(|err| format!("Failed to read {}: {}", output_path.display(), err))?;
+    let modified = metadata.modified().map_err(|err| {
+        format!(
+            "Failed to read modified time for {}: {}",
+            output_path.display(),
+            err
+        )
+    })?;
+    let modified_ms = modified
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|err| {
+            format!(
+                "Invalid modified time for {}: {}",
+                output_path.display(),
+                err
+            )
+        })?
+        .as_millis();
+
+    Ok(FileWatchSnapshot {
+        byte_size: metadata.len(),
+        modified_ms,
+        path: output_path.to_string_lossy().to_string(),
+    })
 }
 
 #[tauri::command]

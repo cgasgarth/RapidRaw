@@ -1379,6 +1379,8 @@
       "externalEditorConfigured": "Edytor zewnętrzny: {{editor}}",
       "externalEditorDefault": "Edytor zewnętrzny: domyślny systemowy",
       "externalEditorFailed": "Nie można otworzyć edytora zewnętrznego: {{error}}",
+      "externalEditorSaveDetected": "",
+      "externalEditorWatching": "",
       "failed": "Eksport nie powiódł się",
       "importingLinkedVariant": "Importowanie…",
       "importLinkedVariant": "Importuj połączony wariant",

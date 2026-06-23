@@ -1296,6 +1296,8 @@
       "externalEditorConfigured": "External editor: {{editor}}",
       "externalEditorDefault": "External editor: system default",
       "externalEditorFailed": "Could not open external editor: {{error}}",
+      "externalEditorSaveDetected": "Saved changes detected. Import the linked variant when ready.",
+      "externalEditorWatching": "Watching exported TIFF for external saves...",
       "failed": "Export failed",
       "importingLinkedVariant": "Importing…",
       "importLinkedVariant": "Import Linked Variant",
