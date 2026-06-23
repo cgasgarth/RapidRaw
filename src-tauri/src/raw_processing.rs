@@ -31,15 +31,28 @@ impl RawProcessingProfile {
     }
 }
 
-pub fn develop_raw_image(
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RawDemosaicPath {
+    BayerHq,
+    Fast,
+    LinearBypass,
+    Standard,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RawDevelopmentReport {
+    pub demosaic_path: RawDemosaicPath,
+}
+
+pub(crate) fn develop_raw_image_with_report(
     file_bytes: &[u8],
     fast_demosaic: bool,
     profile: RawProcessingProfile,
     highlight_compression: f32,
     linear_mode: String,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
-) -> Result<DynamicImage> {
-    let (developed_image, orientation) = develop_internal_with_options(
+) -> Result<(DynamicImage, RawDevelopmentReport)> {
+    let (developed_image, orientation, report) = develop_internal_with_options(
         file_bytes,
         fast_demosaic,
         profile,
@@ -48,7 +61,7 @@ pub fn develop_raw_image(
         cancel_token,
         RawDefectDevelopmentOptions::default(),
     )?;
-    Ok(apply_orientation(developed_image, orientation))
+    Ok((apply_orientation(developed_image, orientation), report))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -824,7 +837,7 @@ fn develop_internal_with_options(
     linear_mode: String,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
     defect_options: RawDefectDevelopmentOptions,
-) -> Result<(DynamicImage, Orientation)> {
+) -> Result<(DynamicImage, Orientation, RawDevelopmentReport)> {
     let check_cancel = || -> Result<()> {
         if let Some((tracker, generation)) = &cancel_token
             && tracker.load(Ordering::SeqCst) != *generation
@@ -913,6 +926,15 @@ fn develop_internal_with_options(
         && !is_linear_format
         && is_rgb_bayer_raw(&raw_image)
         && apply_calibration;
+    let demosaic_path = if use_bayer_hq {
+        RawDemosaicPath::BayerHq
+    } else if is_linear_format {
+        RawDemosaicPath::LinearBypass
+    } else if fast_demosaic {
+        RawDemosaicPath::Fast
+    } else {
+        RawDemosaicPath::Standard
+    };
 
     if is_linear_format {
         developer.steps.retain(|&step| {
@@ -1041,7 +1063,11 @@ fn develop_internal_with_options(
         }
     };
 
-    Ok((dynamic_image, orientation))
+    Ok((
+        dynamic_image,
+        orientation,
+        RawDevelopmentReport { demosaic_path },
+    ))
 }
 
 pub fn get_fast_demosaic_scale_factor(
@@ -1269,7 +1295,7 @@ mod tests {
             inject_test_defects: true,
             repair_sensor_defects: false,
         };
-        let (uncorrected, uncorrected_orientation) = develop_internal_with_options(
+        let (uncorrected, uncorrected_orientation, _) = develop_internal_with_options(
             &file_bytes,
             false,
             RawProcessingProfile::Balanced,
@@ -1281,7 +1307,7 @@ mod tests {
         .expect("develop private RAW with injected defects");
         let uncorrected = apply_orientation(uncorrected, uncorrected_orientation);
 
-        let (corrected, corrected_orientation) = develop_internal_with_options(
+        let (corrected, corrected_orientation, _) = develop_internal_with_options(
             &file_bytes,
             false,
             RawProcessingProfile::Balanced,
@@ -1354,7 +1380,7 @@ mod tests {
         fs::create_dir_all(report_dir).expect("create report dir");
 
         let file_bytes = fs::read(&source_path).expect("read private Bayer RAW");
-        let (balanced, balanced_orientation) = develop_internal_with_options(
+        let (balanced, balanced_orientation, balanced_report) = develop_internal_with_options(
             &file_bytes,
             false,
             RawProcessingProfile::Balanced,
@@ -1367,7 +1393,7 @@ mod tests {
         let balanced = apply_orientation(balanced, balanced_orientation);
 
         let started = std::time::Instant::now();
-        let (maximum, maximum_orientation) = develop_internal_with_options(
+        let (maximum, maximum_orientation, maximum_report) = develop_internal_with_options(
             &file_bytes,
             false,
             RawProcessingProfile::Maximum,
@@ -1379,6 +1405,8 @@ mod tests {
         .expect("develop Bayer HQ private RAW");
         let maximum_elapsed_ms = started.elapsed().as_millis();
         let maximum = apply_orientation(maximum, maximum_orientation);
+        assert_eq!(balanced_report.demosaic_path, RawDemosaicPath::Standard);
+        assert_eq!(maximum_report.demosaic_path, RawDemosaicPath::BayerHq);
 
         let source = RawSource::new_from_slice(&file_bytes);
         let decoder =

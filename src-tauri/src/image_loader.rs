@@ -6,7 +6,7 @@ use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
 use crate::image_processing::{ImageMetadata, apply_orientation};
 use crate::mask_generation::{MaskDefinition, SubMask, generate_mask_bitmap};
-use crate::raw_processing::{RawProcessingProfile, develop_raw_image};
+use crate::raw_processing::{RawDemosaicPath, RawProcessingProfile, develop_raw_image_with_report};
 use anyhow::{Context, Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
 use exif::{Reader as ExifReader, Tag};
@@ -54,6 +54,13 @@ struct RawProcessingModeRecipe {
     raw_preprocessing_sharpening_detail: f32,
     raw_preprocessing_sharpening_edge_masking: f32,
     raw_preprocessing_sharpening_radius: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DemosaicSharpeningPath {
+    Fast,
+    Standard,
+    BayerHq,
 }
 
 fn normalize_raw_processing_mode(mode: Option<&str>) -> &'static str {
@@ -111,6 +118,88 @@ fn raw_processing_mode_recipe(mode: Option<&str>) -> RawProcessingModeRecipe {
             raw_preprocessing_sharpening_radius: 2.0,
         },
     }
+}
+
+fn is_recipe_value(value: Option<f32>, recipe_value: f32) -> bool {
+    value.is_none_or(|value| (value - recipe_value).abs() <= 0.000_1)
+}
+
+fn uses_recipe_capture_sharpening(
+    settings: &AppSettings,
+    recipe: &RawProcessingModeRecipe,
+) -> bool {
+    is_recipe_value(
+        settings.raw_preprocessing_sharpening,
+        recipe.raw_preprocessing_sharpening,
+    ) && is_recipe_value(
+        settings.raw_preprocessing_sharpening_detail,
+        recipe.raw_preprocessing_sharpening_detail,
+    ) && is_recipe_value(
+        settings.raw_preprocessing_sharpening_edge_masking,
+        recipe.raw_preprocessing_sharpening_edge_masking,
+    ) && is_recipe_value(
+        settings.raw_preprocessing_sharpening_radius,
+        recipe.raw_preprocessing_sharpening_radius,
+    )
+}
+
+fn demosaic_sharpening_path(demosaic_path: RawDemosaicPath) -> DemosaicSharpeningPath {
+    match demosaic_path {
+        RawDemosaicPath::BayerHq => DemosaicSharpeningPath::BayerHq,
+        RawDemosaicPath::Fast | RawDemosaicPath::LinearBypass => DemosaicSharpeningPath::Fast,
+        RawDemosaicPath::Standard => DemosaicSharpeningPath::Standard,
+    }
+}
+
+fn resolve_capture_pre_sharpening_settings(
+    settings: &AppSettings,
+    recipe: &RawProcessingModeRecipe,
+    path: DemosaicSharpeningPath,
+    dimensions: (u32, u32),
+) -> crate::image_processing::CapturePreSharpeningSettings {
+    let base = crate::image_processing::CapturePreSharpeningSettings {
+        amount: settings
+            .raw_preprocessing_sharpening
+            .unwrap_or(recipe.raw_preprocessing_sharpening),
+        detail: settings
+            .raw_preprocessing_sharpening_detail
+            .unwrap_or(recipe.raw_preprocessing_sharpening_detail),
+        edge_masking: settings
+            .raw_preprocessing_sharpening_edge_masking
+            .unwrap_or(recipe.raw_preprocessing_sharpening_edge_masking),
+        radius_px: settings
+            .raw_preprocessing_sharpening_radius
+            .unwrap_or(recipe.raw_preprocessing_sharpening_radius),
+    };
+
+    if !base.is_enabled() || !uses_recipe_capture_sharpening(settings, recipe) {
+        return base.normalized();
+    }
+
+    let long_edge = dimensions.0.max(dimensions.1);
+    let high_resolution_radius_offset = if long_edge >= 7000 { 0.15 } else { 0.0 };
+
+    match path {
+        DemosaicSharpeningPath::Fast => crate::image_processing::CapturePreSharpeningSettings {
+            amount: 0.0,
+            detail: 0.0,
+            edge_masking: 0.0,
+            radius_px: 1.0,
+        },
+        DemosaicSharpeningPath::Standard => crate::image_processing::CapturePreSharpeningSettings {
+            amount: (base.amount * 0.95).min(0.38),
+            detail: (base.detail * 0.9).min(0.45),
+            edge_masking: base.edge_masking.max(0.36),
+            radius_px: (base.radius_px + high_resolution_radius_offset).min(2.2),
+        },
+        DemosaicSharpeningPath::BayerHq => crate::image_processing::CapturePreSharpeningSettings {
+            amount: (base.amount * 1.05).min(0.48),
+            detail: (base.detail * 1.08).min(0.62),
+            edge_masking: base.edge_masking.max(0.46),
+            radius_px: (base.radius_px + 0.15 + high_resolution_radius_offset).min(2.5),
+        },
+    }
+    .normalized()
 }
 
 pub(crate) fn raw_processing_settings_for_adjustments(
@@ -191,7 +280,7 @@ pub fn load_base_image_from_bytes(
         let x = color_nr_setting.clamp(0.01, 1.0);
         (12.0 / x - 10.0).max(0.1)
     };
-    let sharpening_settings = crate::image_processing::CapturePreSharpeningSettings {
+    let base_sharpening_settings = crate::image_processing::CapturePreSharpeningSettings {
         amount: settings
             .raw_preprocessing_sharpening
             .unwrap_or(recipe.raw_preprocessing_sharpening),
@@ -216,7 +305,7 @@ pub fn load_base_image_from_bytes(
     if is_raw_file(path_for_ext_check) {
         let profile = RawProcessingProfile::from_mode(raw_processing_mode.unwrap_or("balanced"));
         match panic::catch_unwind(move || {
-            develop_raw_image(
+            develop_raw_image_with_report(
                 bytes,
                 use_fast_raw_dev,
                 profile,
@@ -225,7 +314,13 @@ pub fn load_base_image_from_bytes(
                 cancel_token,
             )
         }) {
-            Ok(Ok(mut image)) => {
+            Ok(Ok((mut image, report))) => {
+                let sharpening_settings = resolve_capture_pre_sharpening_settings(
+                    settings,
+                    &recipe,
+                    demosaic_sharpening_path(report.demosaic_path),
+                    image.dimensions(),
+                );
                 if !use_fast_raw_dev && (color_nr_amount > 0.0 || sharpening_settings.is_enabled())
                 {
                     let start = Instant::now();
@@ -265,13 +360,13 @@ pub fn load_base_image_from_bytes(
 
         if apply_to_non_raws
             && !use_fast_raw_dev
-            && (color_nr_amount > 0.0 || sharpening_settings.is_enabled())
+            && (color_nr_amount > 0.0 || base_sharpening_settings.is_enabled())
         {
             let start = Instant::now();
             crate::image_processing::remove_raw_artifacts_and_enhance_with_settings(
                 &mut image,
                 color_nr_amount,
-                sharpening_settings,
+                base_sharpening_settings,
             );
             let duration = start.elapsed();
             log::info!(
@@ -801,6 +896,70 @@ mod tests {
     }
 
     #[test]
+    fn demosaic_aware_capture_sharpening_preserves_manual_overrides() {
+        let recipe = raw_processing_mode_recipe(Some("balanced"));
+        let manual = AppSettings {
+            raw_preprocessing_sharpening: Some(0.62),
+            raw_preprocessing_sharpening_detail: Some(0.7),
+            raw_preprocessing_sharpening_edge_masking: Some(0.2),
+            raw_preprocessing_sharpening_radius: Some(1.4),
+            ..AppSettings::default()
+        };
+
+        let resolved = resolve_capture_pre_sharpening_settings(
+            &manual,
+            &recipe,
+            DemosaicSharpeningPath::BayerHq,
+            (8000, 6000),
+        );
+
+        assert_eq!(resolved.amount, 0.62);
+        assert_eq!(resolved.detail, 0.7);
+        assert_eq!(resolved.edge_masking, 0.2);
+        assert_eq!(resolved.radius_px, 1.4);
+    }
+
+    #[test]
+    fn demosaic_aware_capture_sharpening_tunes_recipe_defaults() {
+        let balanced_recipe = raw_processing_mode_recipe(Some("balanced"));
+        let maximum_recipe = raw_processing_mode_recipe(Some("maximum"));
+        let balanced_settings = AppSettings::default();
+        let maximum_settings = AppSettings {
+            raw_processing_mode: Some("maximum".to_string()),
+            raw_preprocessing_color_nr: Some(maximum_recipe.raw_preprocessing_color_nr),
+            raw_preprocessing_sharpening: Some(maximum_recipe.raw_preprocessing_sharpening),
+            raw_preprocessing_sharpening_detail: Some(
+                maximum_recipe.raw_preprocessing_sharpening_detail,
+            ),
+            raw_preprocessing_sharpening_edge_masking: Some(
+                maximum_recipe.raw_preprocessing_sharpening_edge_masking,
+            ),
+            raw_preprocessing_sharpening_radius: Some(
+                maximum_recipe.raw_preprocessing_sharpening_radius,
+            ),
+            ..AppSettings::default()
+        };
+
+        let balanced = resolve_capture_pre_sharpening_settings(
+            &balanced_settings,
+            &balanced_recipe,
+            DemosaicSharpeningPath::Standard,
+            (6000, 4000),
+        );
+        let maximum = resolve_capture_pre_sharpening_settings(
+            &maximum_settings,
+            &maximum_recipe,
+            DemosaicSharpeningPath::BayerHq,
+            (8000, 6000),
+        );
+
+        assert!(maximum.amount > balanced.amount);
+        assert!(maximum.detail > balanced.detail);
+        assert!(maximum.edge_masking > balanced.edge_masking);
+        assert!(maximum.radius_px > balanced.radius_px);
+    }
+
+    #[test]
     fn unknown_raw_processing_mode_uses_balanced_recipe() {
         let unknown = raw_processing_mode_recipe(Some("experimental"));
         let balanced = raw_processing_mode_recipe(Some("balanced"));
@@ -893,6 +1052,22 @@ mod tests {
                     load_base_image_from_bytes(&source_bytes, &source_path, false, &settings, None)
                         .expect("decode private RAW with processing mode");
                 let decode_elapsed_ms = started.elapsed().as_millis();
+                let profile = RawProcessingProfile::from_mode(mode);
+                let (_, development_report) = develop_raw_image_with_report(
+                    &source_bytes,
+                    recipe.force_fast_demosaic,
+                    profile,
+                    recipe.raw_highlight_compression,
+                    "default".to_string(),
+                    None,
+                )
+                .expect("develop private RAW report for processing mode");
+                let effective_sharpening = resolve_capture_pre_sharpening_settings(
+                    &settings,
+                    &recipe,
+                    demosaic_sharpening_path(development_report.demosaic_path),
+                    image.dimensions(),
+                );
                 let rgba = image.to_rgba8();
                 let image_hash = blake3::hash(rgba.as_raw()).to_hex().to_string();
                 let export_path = report_dir.join(format!("{}-{}.tiff", source_class, mode));
@@ -929,6 +1104,12 @@ mod tests {
                     "imageHash": image_hash,
                     "mode": mode,
                     "provenance": recipe.provenance,
+                    "effectiveCaptureSharpening": {
+                        "amount": effective_sharpening.amount,
+                        "detail": effective_sharpening.detail,
+                        "edgeMasking": effective_sharpening.edge_masking,
+                        "radiusPx": effective_sharpening.radius_px,
+                    },
                 }));
             }
 
@@ -1052,5 +1233,122 @@ mod tests {
             serde_json::to_vec_pretty(&report).expect("serialize override report"),
         )
         .expect("write override proof report");
+    }
+
+    #[test]
+    fn private_demosaic_aware_capture_sharpening_generates_output_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_CAPTURE_SHARPENING_PROOF").ok()
+            != Some("1".to_string())
+        {
+            return;
+        }
+
+        let source_path = std::env::var("RAWENGINE_CAPTURE_SHARPENING_SOURCE")
+            .expect("RAWENGINE_CAPTURE_SHARPENING_SOURCE must point to a private Bayer RAW");
+        let report_dir = std::env::var("RAWENGINE_CAPTURE_SHARPENING_REPORT_DIR")
+            .unwrap_or_else(|_| "target/capture-sharpening-proof".to_string());
+        let report_dir = Path::new(&report_dir);
+        fs::create_dir_all(report_dir).expect("create report dir");
+        let source_bytes = fs::read(&source_path).expect("read private RAW");
+        let recipe = raw_processing_mode_recipe(Some("maximum"));
+
+        let enabled_settings = AppSettings {
+            raw_processing_mode: Some("maximum".to_string()),
+            raw_preprocessing_color_nr: Some(recipe.raw_preprocessing_color_nr),
+            raw_preprocessing_sharpening: Some(recipe.raw_preprocessing_sharpening),
+            raw_preprocessing_sharpening_detail: Some(recipe.raw_preprocessing_sharpening_detail),
+            raw_preprocessing_sharpening_edge_masking: Some(
+                recipe.raw_preprocessing_sharpening_edge_masking,
+            ),
+            raw_preprocessing_sharpening_radius: Some(recipe.raw_preprocessing_sharpening_radius),
+            apply_preprocessing_to_non_raws: Some(false),
+            ..AppSettings::default()
+        };
+        let disabled_settings = AppSettings {
+            raw_preprocessing_sharpening: Some(0.0),
+            raw_preprocessing_sharpening_detail: Some(0.0),
+            raw_preprocessing_sharpening_edge_masking: Some(0.0),
+            raw_preprocessing_sharpening_radius: Some(1.0),
+            ..enabled_settings.clone()
+        };
+        let (_, development_report) = develop_raw_image_with_report(
+            &source_bytes,
+            recipe.force_fast_demosaic,
+            RawProcessingProfile::Maximum,
+            recipe.raw_highlight_compression,
+            "default".to_string(),
+            None,
+        )
+        .expect("develop private RAW report for capture sharpening proof");
+        assert_eq!(development_report.demosaic_path, RawDemosaicPath::BayerHq);
+        let sharpening_path = demosaic_sharpening_path(development_report.demosaic_path);
+
+        let mut reports = Vec::new();
+        let mut hashes = Vec::new();
+        for (case, settings) in [
+            ("demosaic-aware", enabled_settings),
+            ("disabled", disabled_settings),
+        ] {
+            let started = Instant::now();
+            let image =
+                load_base_image_from_bytes(&source_bytes, &source_path, false, &settings, None)
+                    .expect("decode private RAW for capture sharpening proof");
+            let elapsed_ms = started.elapsed().as_millis();
+            let effective_sharpening = resolve_capture_pre_sharpening_settings(
+                &settings,
+                &recipe,
+                sharpening_path,
+                image.dimensions(),
+            );
+            let rgba = image.to_rgba8();
+            let hash = blake3::hash(rgba.as_raw()).to_hex().to_string();
+            let export_path = report_dir.join(format!("{}.tiff", case));
+            image
+                .save_with_format(&export_path, image::ImageFormat::Tiff)
+                .expect("write capture sharpening TIFF export");
+
+            println!(
+                "capture_sharpening_proof case={} dimensions={}x{} elapsed_ms={} image_hash={}",
+                case,
+                image.width(),
+                image.height(),
+                elapsed_ms,
+                hash
+            );
+
+            hashes.push(hash.clone());
+            reports.push(serde_json::json!({
+                "case": case,
+                "dimensions": {
+                    "height": image.height(),
+                    "width": image.width(),
+                },
+                "elapsedMs": elapsed_ms,
+                "exportPath": export_path.to_string_lossy(),
+                "imageHash": hash,
+                "rawDemosaicPath": format!("{:?}", development_report.demosaic_path),
+                "effectiveCaptureSharpening": {
+                    "amount": effective_sharpening.amount,
+                    "detail": effective_sharpening.detail,
+                    "edgeMasking": effective_sharpening.edge_masking,
+                    "radiusPx": effective_sharpening.radius_px,
+                },
+            }));
+        }
+
+        assert_eq!(hashes.len(), 2);
+        assert_ne!(hashes[0], hashes[1]);
+
+        let report = serde_json::json!({
+            "issue": 3245,
+            "proofBoundary": "private_bayer_raw_capture_sharpening_runtime",
+            "sourcePath": source_path,
+            "cases": reports,
+        });
+        fs::write(
+            report_dir.join("capture-sharpening-proof.json"),
+            serde_json::to_vec_pretty(&report).expect("serialize report"),
+        )
+        .expect("write capture sharpening proof report");
     }
 }
