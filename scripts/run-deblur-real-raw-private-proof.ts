@@ -6,6 +6,7 @@ import { extname, join, resolve } from 'node:path';
 import { z } from 'zod';
 
 import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from './compact-output.ts';
+import { resolvePrivateRawRootSource } from './lib/private-raw-root-source.ts';
 
 const SOURCE_RELATIVE_PATH = 'private-fixtures/detail/alaska-deblur-v1.arw';
 const RAW_EXTENSIONS = new Set(['.arw', '.cr2', '.cr3', '.dng', '.nef', '.raf', '.rw2']);
@@ -47,8 +48,15 @@ if (args.privateRoot === undefined) {
   process.exit(0);
 }
 
-const privateRoot = resolve(args.privateRoot);
-await preparePrivateRoot(privateRoot, args.source);
+const resolution = await resolvePrivateRawRootSource({
+  fixtureRelativePath: SOURCE_RELATIVE_PATH,
+  privateRoot: args.privateRoot,
+  source: args.source,
+  tempPrefix: 'rawengine-deblur-plain-root-',
+});
+const privateRoot = resolution.privateRoot;
+const usesPlainSourceRoot = resolution.source !== undefined && privateRoot !== resolve(args.privateRoot);
+await preparePrivateRoot(privateRoot, resolution.source);
 
 await runRequired(
   'deblur real RAW Rust proof',
@@ -73,12 +81,17 @@ await runRequired(
   },
 );
 
-await runRequired('deblur private proof asset validation', [
-  'bun',
-  'run',
-  'check:deblur-real-raw-private-proof-summary',
-  '--require-assets',
-]);
+await runRequired(
+  'deblur private proof asset validation',
+  [
+    'bun',
+    'run',
+    'check:deblur-real-raw-private-proof-summary',
+    '--require-assets',
+    ...(usesPlainSourceRoot ? ['--allow-fresh-hashes'] : []),
+  ],
+  { env: { RAWENGINE_PRIVATE_RAW_ROOT: privateRoot } },
+);
 
 console.log('deblur real RAW private proof ok');
 
