@@ -830,6 +830,10 @@
       "failed": "Exportación fallida",
       "noImageSelected": "No se seleccionó ninguna imagen para exportar.",
       "noImagesSelected": "No se seleccionaron imágenes.",
+      "importLinkedVariant": "Importar variante vinculada",
+      "importingLinkedVariant": "Importando…",
+      "linkedVariantImportFailed": "Error al importar: {{error}}",
+      "linkedVariantImported": "Variante vinculada importada: {{filename}}",
       "openInEditor": "Abrir en el editor",
       "showInFinder": "Mostrar en Finder",
       "success": "¡Exportación exitosa!"

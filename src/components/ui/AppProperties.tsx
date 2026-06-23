@@ -92,6 +92,7 @@ export enum Invokes {
   HandleImportPresetsFromFile = 'handle_import_presets_from_file',
   HandleImportLegacyPresetsFromFile = 'handle_import_legacy_presets_from_file',
   ImportFiles = 'import_files',
+  ImportExternalEditorVariant = 'import_external_editor_variant',
   InvokeGenerativeReplaseWithMaskDef = 'invoke_generative_replace_with_mask_def',
   IsImageCached = 'is_image_cached',
   ListImagesInDir = 'list_images_in_dir',

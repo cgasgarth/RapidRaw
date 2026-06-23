@@ -829,6 +829,10 @@
       "failed": "A exportação falhou",
       "noImageSelected": "Nenhuma imagem selecionada para exportação.",
       "noImagesSelected": "Nenhuma imagem selecionada.",
+      "importLinkedVariant": "Importar variante vinculada",
+      "importingLinkedVariant": "Importando…",
+      "linkedVariantImportFailed": "Falha na importação: {{error}}",
+      "linkedVariantImported": "Variante vinculada importada: {{filename}}",
       "openInEditor": "Abrir no Editor",
       "success": "Exportação concluída com sucesso!"
     },

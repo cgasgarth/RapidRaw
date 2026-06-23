@@ -814,6 +814,10 @@
       "failed": "書き出しに失敗しました",
       "noImageSelected": "書き出す画像が選択されていません。",
       "noImagesSelected": "画像が選択されていません。",
+      "importLinkedVariant": "リンクされたバリアントを読み込む",
+      "importingLinkedVariant": "読み込み中…",
+      "linkedVariantImportFailed": "読み込みに失敗しました: {{error}}",
+      "linkedVariantImported": "リンクされたバリアントを読み込みました: {{filename}}",
       "openInEditor": "エディタで開く",
       "success": "書き出しが成功しました！"
     },

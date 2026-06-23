@@ -8,6 +8,7 @@ const [
   listenerSource,
   exportPanelSource,
   rustExportSource,
+  rustFileSource,
   enLocale,
   frLocale,
   esLocale,
@@ -18,6 +19,7 @@ const [
   readFile('src/hooks/useTauriListeners.ts', 'utf8'),
   readFile('src/components/panel/right/ExportPanel.tsx', 'utf8'),
   readFile('src-tauri/src/export_processing.rs', 'utf8'),
+  readFile('src-tauri/src/file_management.rs', 'utf8'),
   readFile('src/i18n/locales/en.json', 'utf8'),
   readFile('src/i18n/locales/fr.json', 'utf8'),
   readFile('src/i18n/locales/es.json', 'utf8'),
@@ -34,13 +36,21 @@ const failures = [
   ['open in editor action', exportPanelSource.includes('data-testid="export-success-open-in-editor"')],
   ['open in editor uses shell opener', exportPanelSource.includes('openShellPath(firstReceiptOutput.outputPath)')],
   ['open in editor TIFF gate', exportPanelSource.includes("firstReceiptOutput?.format.toLowerCase() === 'tiff'")],
+  ['linked variant import action', exportPanelSource.includes('data-testid="export-success-import-linked-variant"')],
+  ['linked variant import invoke', exportPanelSource.includes('Invokes.ImportExternalEditorVariant')],
+  ['linked variant imported state', exportPanelSource.includes('data-testid="export-success-linked-variant-imported"')],
   ['clears stale receipt on new export', exportPanelSource.includes('lastReceipt: undefined')],
+  ['Rust linked variant command', rustFileSource.includes('import_external_editor_variant')],
+  ['Rust linked variant artifact', rustFileSource.includes('external_editor.import_linked_variant')],
   ['Rust receipt payload', rustExportSource.includes('struct ExportReceipt')],
   ['Rust output byte size', rustExportSource.includes('fs::metadata(output_path)')],
   ['Rust emits export complete payload', rustExportSource.includes('ExportReceipt {')],
   [
     'English receipt locale',
-    enLocale.includes('"exportedFile"') && enLocale.includes('"showInFinder"') && enLocale.includes('"openInEditor"'),
+    enLocale.includes('"exportedFile"') &&
+      enLocale.includes('"showInFinder"') &&
+      enLocale.includes('"openInEditor"') &&
+      enLocale.includes('"importLinkedVariant"'),
   ],
   [
     'French receipt locale',

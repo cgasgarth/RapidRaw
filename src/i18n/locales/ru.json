@@ -829,6 +829,10 @@
       "failed": "Экспорт не удался",
       "noImageSelected": "Не выбрано изображение для экспорта.",
       "noImagesSelected": "Изображения не выбраны.",
+      "importLinkedVariant": "Импортировать связанную версию",
+      "importingLinkedVariant": "Импорт…",
+      "linkedVariantImportFailed": "Не удалось импортировать: {{error}}",
+      "linkedVariantImported": "Связанная версия импортирована: {{filename}}",
       "openInEditor": "Открыть в редакторе",
       "success": "Экспорт успешно завершен!"
     },

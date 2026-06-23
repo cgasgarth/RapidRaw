@@ -15,6 +15,7 @@ import { outputSharpeningSettingsSchema } from '../../../schemas/outputSharpenin
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { formatUnknownError } from '../../../utils/errorFormatting';
 import { hasStaleOrOfflineSmartPreview } from '../../../utils/exportSmartPreviewReadiness';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import { debounce } from '../../../utils/timing';
@@ -70,6 +71,16 @@ interface ImageDimensions {
 
 const imageDimensionsSchema = z.object({ height: z.number(), width: z.number() }).strict();
 const exportSizeEstimateSchema = z.number().nonnegative();
+const externalEditorVariantReceiptSchema = z
+  .object({
+    artifactId: z.string().trim().min(1),
+    contentHash: z.string().trim().min(1),
+    outputPath: z.string().trim().min(1),
+    sidecarPath: z.string().trim().min(1),
+    sourcePath: z.string().trim().min(1),
+    sourceRevision: z.string().trim().min(1),
+  })
+  .strict();
 
 function Section({ title, children }: SectionProps) {
   return (
@@ -317,6 +328,12 @@ export default function ExportPanel({
 
   const [estimatedSize, setEstimatedSize] = useState<number | null>(null);
   const [isEstimating, setIsEstimating] = useState<boolean>(false);
+  const [externalVariantStatus, setExternalVariantStatus] = useState<{
+    error: string | null;
+    importedPath: string | null;
+    importing: boolean;
+    receiptOutputPath: string | null;
+  }>({ error: null, importedPath: null, importing: false, receiptOutputPath: null });
   const [watermarkImageAspectRatio, setWatermarkImageAspectRatio] = useState(1);
   const [imageAspectRatio, setImageAspectRatio] = useState(16 / 9);
   const filenameInputRef = useRef<HTMLInputElement>(null);
@@ -339,6 +356,34 @@ export default function ExportPanel({
       : null;
   const isExporting = status === Status.Exporting;
   const isLibraryContext = !!onClose;
+  const isCurrentExternalVariantStatus = externalVariantStatus.receiptOutputPath === firstReceiptOutput?.outputPath;
+  const currentExternalVariantError = isCurrentExternalVariantStatus ? externalVariantStatus.error : null;
+  const currentExternalVariantImportedPath = isCurrentExternalVariantStatus ? externalVariantStatus.importedPath : null;
+  const isImportingCurrentExternalVariant = isCurrentExternalVariantStatus && externalVariantStatus.importing;
+
+  const handleImportExternalVariant = useCallback(async (sourceVirtualPath: string, outputPath: string) => {
+    setExternalVariantStatus({ error: null, importedPath: null, importing: true, receiptOutputPath: outputPath });
+    try {
+      const receipt = await invokeWithSchema(
+        Invokes.ImportExternalEditorVariant,
+        { outputPath, sourceVirtualPath },
+        externalEditorVariantReceiptSchema,
+      );
+      setExternalVariantStatus({
+        error: null,
+        importedPath: receipt.outputPath,
+        importing: false,
+        receiptOutputPath: outputPath,
+      });
+    } catch (error) {
+      setExternalVariantStatus({
+        error: formatUnknownError(error),
+        importedPath: null,
+        importing: false,
+        receiptOutputPath: outputPath,
+      });
+    }
+  }, []);
 
   const pathsToExport = useMemo(
     () =>
@@ -1215,6 +1260,27 @@ export default function ExportPanel({
             <UiText as="p" className="break-all" color={TextColors.secondary} variant={TextVariants.small}>
               {firstReceiptOutput.outputPath}
             </UiText>
+            {currentExternalVariantImportedPath && (
+              <UiText
+                as="p"
+                className="mt-1 break-all"
+                color={TextColors.secondary}
+                data-testid="export-success-linked-variant-imported"
+                variant={TextVariants.small}
+              >
+                {t('export.status.linkedVariantImported', { filename: firstReceiptFileName })}
+              </UiText>
+            )}
+            {currentExternalVariantError && (
+              <UiText
+                as="p"
+                className="mt-1 break-all text-red-400"
+                data-testid="export-success-linked-variant-error"
+                variant={TextVariants.small}
+              >
+                {t('export.status.linkedVariantImportFailed', { error: currentExternalVariantError })}
+              </UiText>
+            )}
             <div className="mt-2 flex items-center justify-between gap-2">
               <UiText color={TextColors.secondary} variant={TextVariants.small}>
                 {formatBytes(firstReceiptOutput.byteSize, t)} · {firstReceiptOutput.format.toUpperCase()}
@@ -1222,16 +1288,31 @@ export default function ExportPanel({
               </UiText>
               <div className="flex shrink-0 items-center gap-1">
                 {canOpenReceiptInEditor && (
-                  <button
-                    className="rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
-                    data-testid="export-success-open-in-editor"
-                    onClick={() => {
-                      void openShellPath(firstReceiptOutput.outputPath);
-                    }}
-                    type="button"
-                  >
-                    {t('export.status.openInEditor')}
-                  </button>
+                  <>
+                    <button
+                      className="rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
+                      data-testid="export-success-import-linked-variant"
+                      disabled={isImportingCurrentExternalVariant}
+                      onClick={() => {
+                        void handleImportExternalVariant(firstReceiptOutput.sourcePath, firstReceiptOutput.outputPath);
+                      }}
+                      type="button"
+                    >
+                      {isImportingCurrentExternalVariant
+                        ? t('export.status.importingLinkedVariant')
+                        : t('export.status.importLinkedVariant')}
+                    </button>
+                    <button
+                      className="rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
+                      data-testid="export-success-open-in-editor"
+                      onClick={() => {
+                        void openShellPath(firstReceiptOutput.outputPath);
+                      }}
+                      type="button"
+                    >
+                      {t('export.status.openInEditor')}
+                    </button>
+                  </>
                 )}
                 <button
                   className="rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
