@@ -6,7 +6,7 @@ use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
 use crate::image_processing::{ImageMetadata, apply_orientation};
 use crate::mask_generation::{MaskDefinition, SubMask, generate_mask_bitmap};
-use crate::raw_processing::develop_raw_image;
+use crate::raw_processing::{RawProcessingProfile, develop_raw_image};
 use anyhow::{Context, Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
 use exif::{Reader as ExifReader, Tag};
@@ -214,10 +214,12 @@ pub fn load_base_image_from_bytes(
     );
 
     if is_raw_file(path_for_ext_check) {
+        let profile = RawProcessingProfile::from_mode(raw_processing_mode.unwrap_or("balanced"));
         match panic::catch_unwind(move || {
             develop_raw_image(
                 bytes,
                 use_fast_raw_dev,
+                profile,
                 highlight_compression,
                 linear_mode,
                 cancel_token,
