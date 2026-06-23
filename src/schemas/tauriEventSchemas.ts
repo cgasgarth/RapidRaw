@@ -135,7 +135,9 @@ export const cullingProgressPayloadSchema = progressPayloadSchema
 const imageAnalysisResultSchema = z
   .object({
     centerFocusMetric: z.number(),
+    eyeSharpnessMetric: z.number(),
     exposureMetric: z.number(),
+    faceSharpnessMetric: z.number(),
     focusConfidence: z.number().min(0).max(1),
     focusRegion: z.string(),
     focusScore: z.number().min(0).max(1),
