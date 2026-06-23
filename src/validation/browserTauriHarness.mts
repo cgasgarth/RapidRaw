@@ -47,6 +47,7 @@ const commandNames: Record<
   | 'checkAiConnectorStatus'
   | 'clearSessionCaches'
   | 'frontendReady'
+  | 'generateUncroppedPreview'
   | 'applyAdjustments'
   | 'getLensfunMakers'
   | 'getLogFilePath'
@@ -72,6 +73,7 @@ const commandNames: Record<
   checkAiConnectorStatus: Invokes.CheckAIConnectorStatus,
   clearSessionCaches: Invokes.ClearSessionCaches,
   frontendReady: Invokes.FrontendReady,
+  generateUncroppedPreview: Invokes.GenerateUncroppedPreview,
   getLensfunMakers: 'get_lensfun_makers',
   getLogFilePath: 'get_log_file_path',
   getAlbumImages: Invokes.GetAlbumImages,
@@ -163,6 +165,8 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       });
     case commandNames.applyAdjustments:
       return Promise.resolve(decodeBase64ToArrayBuffer(harnessPreviewJpegBase64));
+    case commandNames.generateUncroppedPreview:
+      return Promise.resolve(null);
     case commandNames.checkAiConnectorStatus:
       return Promise.resolve({ connected: false });
     case commandNames.getSupportedFileTypes:

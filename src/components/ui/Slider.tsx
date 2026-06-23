@@ -491,50 +491,50 @@ const Slider = ({
 
   const numericValue = Number.isNaN(value) ? 0 : value;
   const canResetFromLabel = typeof label === 'string' && !disabled;
+  const labelContent = (
+    <>
+      <span
+        aria-hidden={isLabelHovered && typeof label === 'string'}
+        className={`col-start-1 row-start-1 text-sm font-medium text-text-secondary select-none transition-opacity duration-200 ease-in-out ${
+          isLabelHovered && typeof label === 'string' ? 'opacity-0' : 'opacity-100'
+        }`}
+      >
+        {label}
+      </span>
+      {typeof label === 'string' && (
+        <span
+          aria-hidden={!isLabelHovered}
+          className={`col-start-1 row-start-1 text-sm font-medium text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none ${
+            isLabelHovered ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          {t('ui.slider.reset')}
+        </span>
+      )}
+    </>
+  );
 
   return (
     <div className="mb-2 group" ref={containerRef}>
       <div className="flex justify-between items-center mb-1">
-        <button
-          className={`grid border-0 bg-transparent p-0 text-left ${canResetFromLabel ? 'cursor-pointer' : 'cursor-default'}`}
-          disabled={!canResetFromLabel}
-          onClick={canResetFromLabel ? handleReset : undefined}
-          onDoubleClick={canResetFromLabel ? handleReset : undefined}
-          onMouseEnter={
-            typeof label === 'string'
-              ? () => {
-                  setIsLabelHovered(true);
-                }
-              : undefined
-          }
-          onMouseLeave={
-            typeof label === 'string'
-              ? () => {
-                  setIsLabelHovered(false);
-                }
-              : undefined
-          }
-          type="button"
-        >
-          <span
-            aria-hidden={isLabelHovered && typeof label === 'string'}
-            className={`col-start-1 row-start-1 text-sm font-medium text-text-secondary select-none transition-opacity duration-200 ease-in-out ${
-              isLabelHovered && typeof label === 'string' ? 'opacity-0' : 'opacity-100'
-            }`}
+        {canResetFromLabel ? (
+          <button
+            className="grid border-0 bg-transparent p-0 text-left cursor-pointer"
+            onClick={handleReset}
+            onDoubleClick={handleReset}
+            onMouseEnter={() => {
+              setIsLabelHovered(true);
+            }}
+            onMouseLeave={() => {
+              setIsLabelHovered(false);
+            }}
+            type="button"
           >
-            {label}
-          </span>
-          {typeof label === 'string' && (
-            <span
-              aria-hidden={!isLabelHovered}
-              className={`col-start-1 row-start-1 text-sm font-medium text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none ${
-                isLabelHovered ? 'opacity-100' : 'opacity-0'
-              }`}
-            >
-              {t('ui.slider.reset')}
-            </span>
-          )}
-        </button>
+            {labelContent}
+          </button>
+        ) : (
+          <div className="grid border-0 bg-transparent p-0 text-left cursor-default">{labelContent}</div>
+        )}
         <div className="w-12 text-right">
           {isEditing ? (
             <input
