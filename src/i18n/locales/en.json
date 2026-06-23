@@ -1282,6 +1282,7 @@
       "cancelled": "Export cancelled",
       "chooseExternalEditor": "Choose Editor...",
       "chooseExternalEditorTitle": "Choose External Editor",
+      "colorManagedTransform": "Color transform: {{transform}}",
       "estimatedAverageSize": " ({{size}} avg)",
       "estimatedSize": "Estimated file size: ~{{size}}",
       "estimatedTotalSize": "Estimated total size: ~{{size}}",

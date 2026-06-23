@@ -45,6 +45,7 @@ use crate::deblur_render::apply_deblur_stage;
 struct ExportReceiptOutput {
     bit_depth: Option<u8>,
     byte_size: u64,
+    color_managed_transform: Option<String>,
     color_profile: Option<String>,
     format: String,
     output_path: String,
@@ -1333,6 +1334,9 @@ fn export_receipt_output(
     Ok(ExportReceiptOutput {
         bit_depth: metadata.as_ref().map(|metadata| metadata.bit_depth),
         byte_size,
+        color_managed_transform: metadata
+            .as_ref()
+            .map(|metadata| metadata.color_managed_transform.clone()),
         color_profile: metadata
             .as_ref()
             .map(|metadata| metadata.color_profile.clone()),
@@ -1345,6 +1349,7 @@ fn export_receipt_output(
 
 struct ExportReceiptMetadata {
     bit_depth: u8,
+    color_managed_transform: String,
     color_profile: String,
     rendering_intent: String,
 }
@@ -1356,6 +1361,7 @@ fn export_receipt_metadata(
     match format {
         "jpg" | "jpeg" => Some(ExportReceiptMetadata {
             bit_depth: 8,
+            color_managed_transform: "export_rgb_pixels_and_profile".to_string(),
             color_profile: export_color_profile_receipt_label(&export_settings.color_profile),
             rendering_intent: export_rendering_intent_receipt_label(
                 &export_settings.rendering_intent,
@@ -1363,6 +1369,7 @@ fn export_receipt_metadata(
         }),
         "tif" | "tiff" => Some(ExportReceiptMetadata {
             bit_depth: 16,
+            color_managed_transform: "export_rgb_pixels_and_profile".to_string(),
             color_profile: export_color_profile_receipt_label(&export_settings.color_profile),
             rendering_intent: export_rendering_intent_receipt_label(
                 &export_settings.rendering_intent,
@@ -1858,6 +1865,10 @@ mod tests {
             .expect("TIFF receipt metadata should be available");
 
         assert_eq!(metadata.rendering_intent, "Perceptual");
+        assert_eq!(
+            metadata.color_managed_transform,
+            "export_rgb_pixels_and_profile"
+        );
     }
 
     #[test]

@@ -1300,6 +1300,7 @@ export default function ExportPanel({
         {firstReceiptOutput && (
           <div
             className="rounded-md border border-surface bg-surface/60 p-2"
+            data-export-receipt-color-managed-transform={firstReceiptOutput.colorManagedTransform ?? ''}
             data-export-receipt-format={firstReceiptOutput.format}
             data-export-receipt-output-path={firstReceiptOutput.outputPath}
             data-export-receipt-total={lastReceipt.total}
@@ -1348,6 +1349,15 @@ export default function ExportPanel({
                   {formatBytes(firstReceiptOutput.byteSize, t)} · {firstReceiptOutput.format.toUpperCase()}
                   {firstReceiptMetadataText ? ` · ${firstReceiptMetadataText}` : ''}
                 </UiText>
+                {firstReceiptOutput.colorManagedTransform && (
+                  <UiText
+                    color={TextColors.secondary}
+                    data-testid="export-success-color-managed-transform"
+                    variant={TextVariants.small}
+                  >
+                    {t('export.status.colorManagedTransform', { transform: firstReceiptOutput.colorManagedTransform })}
+                  </UiText>
+                )}
                 {canOpenReceiptInEditor && (
                   <UiText
                     className="truncate"
