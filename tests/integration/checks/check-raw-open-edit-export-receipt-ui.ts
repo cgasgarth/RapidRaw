@@ -54,6 +54,12 @@ const failures = [
   ['open in editor TIFF gate', exportPanelSource.includes("firstReceiptOutput?.format.toLowerCase() === 'tiff'")],
   ['linked variant import action', exportPanelSource.includes('data-testid="export-success-import-linked-variant"')],
   ['linked variant import invoke', exportPanelSource.includes('Invokes.ImportExternalEditorVariant')],
+  ['linked variant bit-depth handoff', exportPanelSource.includes('bitDepth: output.bitDepth ?? null')],
+  ['linked variant color-profile handoff', exportPanelSource.includes('colorProfile: output.colorProfile ?? null')],
+  [
+    'linked variant rendering-intent handoff',
+    exportPanelSource.includes('renderingIntent: output.renderingIntent ?? null'),
+  ],
   ['linked variant import callback prop', exportPanelSource.includes('onLinkedVariantImported?.(receipt.outputPath)')],
   ['library export reveal callback', appSource.includes('onLinkedVariantImported={handleLinkedVariantImported}')],
   ['editor export reveal callback', editorViewSource.includes('onLinkedVariantImported={handleLinkedVariantImported}')],
@@ -71,6 +77,12 @@ const failures = [
   [
     'Rust linked variant no-overwrite policy',
     rustFileSource.includes('"noOverwritePolicy": "never_overwrite_original"'),
+  ],
+  ['Rust linked variant bit-depth lineage', rustFileSource.includes('"bitDepthProvenance": "export_receipt"')],
+  ['Rust linked variant color-profile lineage', rustFileSource.includes('"colorProfileProvenance": "export_receipt"')],
+  [
+    'Rust linked variant rendering-intent lineage',
+    rustFileSource.includes('"renderingIntentProvenance": "export_receipt"'),
   ],
   ['Rust receipt payload', rustExportSource.includes('struct ExportReceipt')],
   ['Rust output byte size', rustExportSource.includes('fs::metadata(output_path)')],
