@@ -1,4 +1,4 @@
-import { Crop, FileInput, Info, Layers, Paintbrush, SlidersHorizontal, SwatchBook } from 'lucide-react';
+import { Camera, Crop, FileInput, Info, Layers, Paintbrush, SlidersHorizontal, SwatchBook } from 'lucide-react';
 
 import { Panel } from '../../ui/AppProperties';
 
@@ -26,6 +26,7 @@ export const RIGHT_PANEL_GROUPS = [
   ],
   [
     { fallbackLabel: 'Presets', icon: SwatchBook, id: Panel.Presets, tooltipKey: 'editor.switcher.tooltips.presets' },
+    { fallbackLabel: 'Tether', icon: Camera, id: Panel.Tether, tooltipKey: 'editor.switcher.tooltips.tether' },
     { fallbackLabel: 'Export', icon: FileInput, id: Panel.Export, tooltipKey: 'editor.switcher.tooltips.export' },
   ],
 ] as const satisfies ReadonlyArray<ReadonlyArray<RightPanelRegistryEntry>>;

@@ -32,6 +32,9 @@ const MasksPanel = lazy(() =>
 const PresetsPanel = lazy(() =>
   import('../panel/right/PresetsPanel.js').then((module) => ({ default: module.PresetsPanel })),
 );
+const TetherPanel = lazy(() =>
+  import('../panel/right/TetherPanel.js').then((module) => ({ default: module.TetherPanel })),
+);
 
 const panelVariants: Variants = {
   animate: (direction: number) => ({
@@ -277,6 +280,7 @@ export default function EditorView({
                     }}
                   />
                 ),
+                [Panel.Tether]: <TetherPanel />,
               }[renderedRightPanel]}
           </Suspense>
         </motion.div>

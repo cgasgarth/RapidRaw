@@ -1144,8 +1144,30 @@
         "info": "信息",
         "inpaint": "修复",
         "masks": "蒙版",
-        "presets": "预设"
+        "presets": "预设",
+        "tether": "Tether"
       }
+    },
+    "tether": {
+      "battery": "Battery",
+      "captureUnavailable": "Capture not implemented",
+      "connected": "Connected",
+      "discoveryOnly": "Discovery only",
+      "noCameraDescription": "Connect a supported camera and refresh to verify macOS tether discovery.",
+      "noCameraTitle": "No camera reported",
+      "pendingAdapter": "macOS hardware adapter",
+      "pendingMessage": "Discovery is waiting for the native camera provider.",
+      "providerMode": {
+        "auto": "macOS",
+        "fake": "Fake CI"
+      },
+      "refresh": "Refresh",
+      "storage": "Storage",
+      "storageValue": "{{label}} · {{freeGb}} GB free",
+      "subtitle": "Discover one connected camera before capture controls are enabled.",
+      "title": "Tether",
+      "transport": "Transport",
+      "unknown": "Unknown"
     },
     "toolbar": {
       "exportSoftProofDetails": "{{profile}} / {{intent}} preview",
