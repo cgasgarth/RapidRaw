@@ -182,8 +182,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   feature issues.
 - When using consult for repo-aware decisions, prefer the RapidRaw ChatGPT
   project with the GitHub repo attached when available.
-- For new consult chats, start with the concrete milestone or topic context;
-  do not add generic labels like "new topic" to the prompt.
+- For fresh consult chats, start directly with the concrete milestone, feature,
+  bug, PR, or decision context. Do not announce that the prompt is a fresh
+  thread or add meta labels before the actual request.
 - Treat consult output as advice. Verify it against current repo state before
   implementing.
 
