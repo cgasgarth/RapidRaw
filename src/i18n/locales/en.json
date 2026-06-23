@@ -1401,6 +1401,12 @@
       "progress": "Importing... ({{current}}/{{total}})"
     },
     "items": {
+      "autoStackBurst": "Burst",
+      "autoStackCollapse_one": "Collapse {{kind}} stack with {{count}} image",
+      "autoStackCollapse_other": "Collapse {{kind}} stack with {{count}} images",
+      "autoStackExpand_one": "Expand {{kind}} stack with {{count}} image",
+      "autoStackExpand_other": "Expand {{kind}} stack with {{count}} images",
+      "autoStackHdr": "HDR",
       "collapseFolder": "Collapse Folder",
       "currentFolder": "Current Folder",
       "expandFolder": "Expand Folder",
