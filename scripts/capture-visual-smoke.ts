@@ -929,16 +929,29 @@ async function assertSectionCount(page, minimum) {
 
 async function prepareScenario(page, mode) {
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.CommandPaletteWorkflows) {
-    const runCommand = async (query, name) => {
+    const runCommand = async (query, name, options = { reopen: true }) => {
       await page.getByLabel('Search commands').fill(query);
       await page.getByRole('button', { name }).click();
-      await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.CommandPaletteOpen).click();
+      if (options.reopen) {
+        await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.CommandPaletteOpen).click();
+      }
     };
 
     await runCommand('focus', /Open focus stacking/u);
     await runCommand('super', /Open super resolution/u);
     await runCommand('panorama', /Open panorama stitching/u);
-    await runCommand('hdr', /Open HDR merge/u);
+    await runCommand('hdr', /Open HDR merge/u, { reopen: false });
+    await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.CommandPaletteOpen).click();
+    await page.getByLabel('Search commands').fill('negative');
+    const negativeDisabledReason = await page
+      .getByRole('button', { name: /Open negative lab/u })
+      .getAttribute('data-command-palette-disabled-reason');
+    if (negativeDisabledReason !== 'modals.commandPalette.unavailable.selectSource') {
+      throw new Error(`Expected disabled Negative Lab select-source reason, found ${negativeDisabledReason ?? 'none'}`);
+    }
+    await page.keyboard.press('Escape');
+    await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.CommandPaletteSelectSource).click();
+    await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.CommandPaletteOpen).click();
     await runCommand('negative', /Open negative lab/u);
     commandPaletteWorkflowProofSchema.parse(
       await page

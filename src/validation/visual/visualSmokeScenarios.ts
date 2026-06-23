@@ -36,6 +36,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
 
 export const VISUAL_SMOKE_PROOF_TEST_IDS = {
   CommandPaletteOpen: 'command-palette-open',
+  CommandPaletteSelectSource: 'command-palette-select-source',
   CommandPaletteWorkflowProof: 'command-palette-workflow-proof',
   NegativeLabAcceptBatchPlan: 'negative-lab-accept-batch-plan',
   NegativeLabAgentActivity: 'negative-lab-agent-activity',

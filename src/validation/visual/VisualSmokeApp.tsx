@@ -36,6 +36,7 @@ import {
   DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
   type SuperResolutionUiSettings,
 } from '../../schemas/superResolutionUiSchemas';
+import { useLibraryStore } from '../../store/useLibraryStore';
 import { useUIStore } from '../../store/useUIStore';
 import {
   INITIAL_ADJUSTMENTS,
@@ -947,6 +948,7 @@ const copy = {
   strokeCount: (count: number) => `${count} strokes`,
   toolOrder: 'Tool order',
   commandPaletteSmoke: 'Command Palette Workflows',
+  commandPaletteSelectSource: 'Select source',
   cullingCompareSync: 'Culling compare sync',
   filmLook: 'Film look',
   filmPreset: 'Neutral 400',
@@ -2136,6 +2138,7 @@ const skinToneProof = applySkinToneUniformityToRgbPixel(
   },
 );
 const skinToneOutputRed = skinToneProof.outputRgb.red.toFixed(3);
+const commandPaletteWorkflowSourcePath = '/Users/example/Pictures/CommandPalette/DSC_7853.ARW';
 
 function CommandPaletteWorkflowSmoke() {
   const [isOpen, setIsOpen] = useState(true);
@@ -2144,6 +2147,8 @@ function CommandPaletteWorkflowSmoke() {
   const negativeOpen = useUIStore((state) => state.negativeModalState.isOpen);
   const panoramaOpen = useUIStore((state) => state.panoramaModalState.isOpen);
   const srOpen = useUIStore((state) => state.superResolutionModalState.isOpen);
+  const selectedSourceCount = useLibraryStore((state) => state.multiSelectedPaths.length);
+  const setLibrary = useLibraryStore((state) => state.setLibrary);
 
   return (
     <main
@@ -2161,6 +2166,7 @@ function CommandPaletteWorkflowSmoke() {
           data-hdr-open={hdrOpen}
           data-negative-open={negativeOpen}
           data-panorama-open={panoramaOpen}
+          data-selected-source-count={selectedSourceCount}
           data-sr-open={srOpen}
           data-testid={VISUAL_SMOKE_PROOF_TEST_IDS.CommandPaletteWorkflowProof}
         />
@@ -2179,6 +2185,19 @@ function CommandPaletteWorkflowSmoke() {
           type="button"
         >
           {copy.harness}
+        </button>
+        <button
+          className="m-6 ml-0 rounded border border-white/10 bg-white/5 px-3 py-2 text-sm"
+          data-testid={VISUAL_SMOKE_PROOF_TEST_IDS.CommandPaletteSelectSource}
+          onClick={() => {
+            setLibrary({
+              libraryActivePath: commandPaletteWorkflowSourcePath,
+              multiSelectedPaths: [commandPaletteWorkflowSourcePath],
+            });
+          }}
+          type="button"
+        >
+          {copy.commandPaletteSelectSource}
         </button>
         <CommandPaletteModal
           isOpen={isOpen}
