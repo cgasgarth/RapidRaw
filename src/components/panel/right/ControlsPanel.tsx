@@ -1,13 +1,15 @@
 import cx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCcw, Copy, ClipboardPaste, Aperture, ChartArea } from 'lucide-react';
-import { useCallback, type MouseEvent, type ReactNode } from 'react';
+import { useCallback, useMemo, type MouseEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'react-toastify';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useWaveformControls } from '../../../hooks/useWaveformControls';
+import { emptyTauriResponseSchema } from '../../../schemas/tauriResponseSchemas';
 import { type CopiedSectionAdjustments, useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { type CollapsibleSectionsState, useUIStore } from '../../../store/useUIStore';
@@ -18,19 +20,29 @@ import {
   ADJUSTMENT_SECTIONS,
   pickAdjustmentValues,
 } from '../../../utils/adjustments';
+import { formatUnknownError } from '../../../utils/errorFormatting';
+import {
+  RAW_PROCESSING_MODE_RECIPES,
+  RAW_PROCESSING_MODES,
+  normalizeRawProcessingMode,
+  type RawProcessingMode,
+} from '../../../utils/rawProcessingModes';
+import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import BasicAdjustments from '../../adjustments/Basic';
 import ColorPanel from '../../adjustments/Color';
 import CurveGraph from '../../adjustments/Curves';
 import DetailsPanel from '../../adjustments/Details';
 import EffectsPanel from '../../adjustments/Effects';
-import { OPTION_SEPARATOR, Orientation, type Option } from '../../ui/AppProperties';
+import { Invokes, OPTION_SEPARATOR, Orientation, type Option } from '../../ui/AppProperties';
 import CollapsibleSection from '../../ui/CollapsibleSection';
+import Dropdown, { type OptionItem } from '../../ui/Dropdown';
 import Resizer from '../../ui/Resizer';
 import UiText from '../../ui/Text';
 import Waveform from '../editor/Waveform';
 
 const ADJUSTMENT_SECTION_NAMES = ['basic', 'curves', 'color', 'details', 'effects'] as const;
 type AdjustmentSectionName = (typeof ADJUSTMENT_SECTION_NAMES)[number];
+type RawProcessingModeOverrideOption = RawProcessingMode | 'inherit';
 type CollapsibleSectionsUpdater =
   | CollapsibleSectionsState
   | ((prev: CollapsibleSectionsState) => CollapsibleSectionsState);
@@ -55,6 +67,22 @@ export default function Controls() {
       appSettings: state.appSettings,
       theme: state.theme,
     })),
+  );
+
+  const rawProcessingModeOverrideOptions = useMemo<Array<OptionItem<RawProcessingModeOverrideOption>>>(
+    () => [
+      {
+        label: t('editor.adjustments.rawProcessingModeOverride.inherit', {
+          mode: t(`settings.processing.rawModes.${normalizeRawProcessingMode(appSettings?.rawProcessingMode)}.label`),
+        }),
+        value: 'inherit',
+      },
+      ...RAW_PROCESSING_MODES.map((mode) => ({
+        label: t(`settings.processing.rawModes.${mode}.label`),
+        value: mode,
+      })),
+    ],
+    [appSettings?.rawProcessingMode, t],
   );
 
   const { collapsibleSectionsState, setUI } = useUIStore(
@@ -129,6 +157,33 @@ export default function Controls() {
       };
     });
   };
+
+  const handleRawProcessingModeOverrideChange = useCallback(
+    async (mode: RawProcessingModeOverrideOption) => {
+      if (!selectedImage?.path) return;
+
+      const rawProcessingModeOverride = mode === 'inherit' ? null : mode;
+      const nextAdjustments = { ...adjustments, rawProcessingModeOverride };
+      setAdjustments(nextAdjustments);
+
+      try {
+        await invokeWithSchema(
+          Invokes.SaveMetadataAndUpdateThumbnail,
+          { adjustments: nextAdjustments, path: selectedImage.path },
+          emptyTauriResponseSchema,
+        );
+        await invokeWithSchema(Invokes.ClearImageCaches, {}, emptyTauriResponseSchema);
+        setEditor((state) =>
+          state.selectedImage?.path === selectedImage.path
+            ? { selectedImage: { ...state.selectedImage, isReady: false } }
+            : {},
+        );
+      } catch (error) {
+        toast.error(t('editor.adjustments.rawProcessingModeOverride.error', { error: formatUnknownError(error) }));
+      }
+    },
+    [adjustments, selectedImage, setAdjustments, setEditor, t],
+  );
 
   const handleResetAdjustments = () => {
     const resetValues = pickAdjustmentValues(
@@ -318,6 +373,39 @@ export default function Controls() {
           </button>
         </div>
       </div>
+
+      {selectedImage?.isRaw && (
+        <div
+          className="shrink-0 border-b border-surface px-4 py-3 space-y-2"
+          data-testid="raw-processing-mode-override-control"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <UiText as="div" variant={TextVariants.small} className="font-medium">
+                {t('editor.adjustments.rawProcessingModeOverride.label')}
+              </UiText>
+              <UiText as="div" variant={TextVariants.small} className="text-text-secondary">
+                {t('editor.adjustments.rawProcessingModeOverride.description')}
+              </UiText>
+            </div>
+            <Dropdown
+              className="w-44 shrink-0"
+              onChange={(mode) => {
+                void handleRawProcessingModeOverrideChange(mode);
+              }}
+              options={rawProcessingModeOverrideOptions}
+              value={adjustments.rawProcessingModeOverride ?? 'inherit'}
+            />
+          </div>
+          <UiText as="div" variant={TextVariants.small} className="font-mono text-text-secondary">
+            {
+              RAW_PROCESSING_MODE_RECIPES[
+                adjustments.rawProcessingModeOverride ?? normalizeRawProcessingMode(appSettings?.rawProcessingMode)
+              ].provenance
+            }
+          </UiText>
+        </div>
+      )}
 
       <AnimatePresence initial={false}>
         {isWaveformVisible && (

@@ -6,6 +6,7 @@ import {
 } from './selectiveColorRanges';
 import { Mask, type SubMask, SubMaskMode } from '../components/panel/right/Masks';
 
+import type { RawProcessingModeOverride } from './rawProcessingModes';
 import type { LevelsSettings } from '../schemas/levelsSchemas';
 import type { Crop } from 'react-image-crop';
 
@@ -194,6 +195,7 @@ export interface Adjustments {
   pointCurves?: Curves;
   parametricCurve?: ParametricCurve;
   curveMode?: 'point' | 'parametric';
+  rawProcessingModeOverride: RawProcessingModeOverride;
   crop: Crop | null;
   deblurEnabled: boolean;
   deblurSigmaPx: number;
@@ -658,6 +660,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   pointCurves: getDefaultCurves(),
   parametricCurve: getDefaultParametricCurve(),
   curveMode: 'point',
+  rawProcessingModeOverride: null,
   deblurEnabled: false,
   deblurSigmaPx: 0.8,
   deblurStrength: 0,

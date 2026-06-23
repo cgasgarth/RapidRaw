@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test';
 import {
   buildRawProcessingModePatch,
   normalizeRawProcessingMode,
+  normalizeRawProcessingModeOverride,
   RAW_PROCESSING_MODE_RECIPES,
 } from '../../src/utils/rawProcessingModes';
 
@@ -26,4 +27,10 @@ test('RAW processing mode normalization falls back to balanced', () => {
   expect(normalizeRawProcessingMode('unknown')).toBe('balanced');
   expect(normalizeRawProcessingMode(undefined)).toBe('balanced');
   expect(RAW_PROCESSING_MODE_RECIPES.balanced.provenance).toBe('default_quality_capture_preprocessing_v1');
+});
+
+test('RAW processing mode override normalization keeps inherit separate from invalid values', () => {
+  expect(normalizeRawProcessingModeOverride('maximum')).toBe('maximum');
+  expect(normalizeRawProcessingModeOverride('inherit')).toBeNull();
+  expect(normalizeRawProcessingModeOverride(undefined)).toBeNull();
 });
