@@ -1,6 +1,7 @@
 export const RAW_PROCESSING_MODES = ['fast', 'balanced', 'maximum'] as const;
 
 export type RawProcessingMode = (typeof RAW_PROCESSING_MODES)[number];
+export type RawProcessingModeOverride = RawProcessingMode | null;
 
 export interface RawProcessingModeRecipe {
   applyPreprocessingToNonRaws: boolean;
@@ -52,6 +53,11 @@ export const RAW_PROCESSING_MODE_RECIPES: Record<RawProcessingMode, RawProcessin
 
 export const normalizeRawProcessingMode = (mode: string | null | undefined): RawProcessingMode =>
   RAW_PROCESSING_MODES.includes(mode as RawProcessingMode) ? (mode as RawProcessingMode) : 'balanced';
+
+export const normalizeRawProcessingModeOverride = (mode: unknown): RawProcessingModeOverride =>
+  typeof mode === 'string' && RAW_PROCESSING_MODES.includes(mode as RawProcessingMode)
+    ? (mode as RawProcessingMode)
+    : null;
 
 export const buildRawProcessingModePatch = (mode: RawProcessingMode): RawProcessingModeRecipe => ({
   ...RAW_PROCESSING_MODE_RECIPES[mode],

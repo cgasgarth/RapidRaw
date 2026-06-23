@@ -535,6 +535,12 @@
         "pasteSettings": "Wklej ustawienia",
         "resetSectionSettings": "Resetuj ustawienia sekcji {{section}}"
       },
+      "rawProcessingModeOverride": {
+        "description": "Nadpisz globalny tryb jakosci RAW dla tego obrazu.",
+        "error": "Nie udalo sie zastosowac nadpisania trybu RAW: {{error}}",
+        "inherit": "Dziedzicz ({{mode}})",
+        "label": "Jakosc RAW"
+      },
       "sections": {
         "basic": "Podstawowe",
         "color": "Kolor",

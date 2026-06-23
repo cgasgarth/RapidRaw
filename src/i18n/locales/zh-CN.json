@@ -493,6 +493,12 @@
         "pasteSettings": "粘贴设置",
         "resetSectionSettings": "重置 {{section}} 设置"
       },
+      "rawProcessingModeOverride": {
+        "description": "为此图像覆盖全局 RAW 质量模式。",
+        "error": "应用 RAW 模式覆盖失败：{{error}}",
+        "inherit": "继承（{{mode}}）",
+        "label": "RAW 质量"
+      },
       "sections": {
         "basic": "基础",
         "color": "颜色",

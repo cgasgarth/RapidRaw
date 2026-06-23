@@ -56,8 +56,30 @@ struct RawProcessingModeRecipe {
     raw_preprocessing_sharpening_radius: f32,
 }
 
+fn normalize_raw_processing_mode(mode: Option<&str>) -> &'static str {
+    match mode {
+        Some("fast") => "fast",
+        Some("maximum") => "maximum",
+        _ => "balanced",
+    }
+}
+
+pub(crate) fn raw_processing_mode_override_from_adjustments(
+    adjustments: &Value,
+) -> Option<&'static str> {
+    adjustments
+        .get("rawProcessingModeOverride")
+        .and_then(Value::as_str)
+        .and_then(|mode| match mode {
+            "fast" => Some("fast"),
+            "balanced" => Some("balanced"),
+            "maximum" => Some("maximum"),
+            _ => None,
+        })
+}
+
 fn raw_processing_mode_recipe(mode: Option<&str>) -> RawProcessingModeRecipe {
-    match mode.unwrap_or("balanced") {
+    match normalize_raw_processing_mode(mode) {
         "fast" => RawProcessingModeRecipe {
             force_fast_demosaic: true,
             provenance: "speed_demosaic_no_capture_preprocessing_v1",
@@ -89,6 +111,37 @@ fn raw_processing_mode_recipe(mode: Option<&str>) -> RawProcessingModeRecipe {
             raw_preprocessing_sharpening_radius: 2.0,
         },
     }
+}
+
+pub(crate) fn raw_processing_settings_for_adjustments(
+    settings: &AppSettings,
+    adjustments: &Value,
+) -> AppSettings {
+    let Some(mode) = raw_processing_mode_override_from_adjustments(adjustments) else {
+        return settings.clone();
+    };
+    let recipe = raw_processing_mode_recipe(Some(mode));
+    AppSettings {
+        raw_processing_mode: Some(mode.to_string()),
+        raw_highlight_compression: Some(recipe.raw_highlight_compression),
+        raw_preprocessing_color_nr: Some(recipe.raw_preprocessing_color_nr),
+        raw_preprocessing_sharpening: Some(recipe.raw_preprocessing_sharpening),
+        raw_preprocessing_sharpening_detail: Some(recipe.raw_preprocessing_sharpening_detail),
+        raw_preprocessing_sharpening_edge_masking: Some(
+            recipe.raw_preprocessing_sharpening_edge_masking,
+        ),
+        raw_preprocessing_sharpening_radius: Some(recipe.raw_preprocessing_sharpening_radius),
+        apply_preprocessing_to_non_raws: Some(false),
+        ..settings.clone()
+    }
+}
+
+pub(crate) fn raw_processing_mode_cache_key(source_path: &str, settings: &AppSettings) -> String {
+    format!(
+        "{}::raw-processing-mode={}",
+        source_path,
+        normalize_raw_processing_mode(settings.raw_processing_mode.as_deref())
+    )
 }
 
 #[derive(Deserialize)]
@@ -505,6 +558,10 @@ pub async fn load_image(
     }
 
     let settings = load_settings_or_default(&app_handle);
+    let effective_settings =
+        raw_processing_settings_for_adjustments(&settings, &metadata.adjustments);
+    let raw_processing_cache_key =
+        raw_processing_mode_cache_key(&source_path_str, &effective_settings);
 
     let path_clone = source_path_str.clone();
 
@@ -512,7 +569,7 @@ pub async fn load_image(
         .decoded_image_cache
         .lock()
         .unwrap()
-        .get(&source_path_str);
+        .get(&raw_processing_cache_key);
 
     let mut is_offline_smart_preview = false;
 
@@ -558,23 +615,25 @@ pub async fn load_image(
                             &mmap,
                             &path_clone,
                             false,
-                            &settings,
+                            &effective_settings,
                             cancel_token.clone(),
                         )
                         .map_err(|e| e.to_string())?;
                         let mut exif = exif_processing::read_exif_data(&path_clone, &mmap);
                         exif.insert(
                             "RawEngineRawProcessingMode".to_string(),
-                            settings
+                            effective_settings
                                 .raw_processing_mode
                                 .clone()
                                 .unwrap_or_else(|| "balanced".to_string()),
                         );
                         exif.insert(
                             "RawEngineRawProcessingProvenance".to_string(),
-                            raw_processing_mode_recipe(settings.raw_processing_mode.as_deref())
-                                .provenance
-                                .to_string(),
+                            raw_processing_mode_recipe(
+                                effective_settings.raw_processing_mode.as_deref(),
+                            )
+                            .provenance
+                            .to_string(),
                         );
                         Ok((img, exif))
                     }
@@ -596,23 +655,25 @@ pub async fn load_image(
                             &bytes,
                             &path_clone,
                             false,
-                            &settings,
+                            &effective_settings,
                             cancel_token.clone(),
                         )
                         .map_err(|e| e.to_string())?;
                         let mut exif = exif_processing::read_exif_data(&path_clone, &bytes);
                         exif.insert(
                             "RawEngineRawProcessingMode".to_string(),
-                            settings
+                            effective_settings
                                 .raw_processing_mode
                                 .clone()
                                 .unwrap_or_else(|| "balanced".to_string()),
                         );
                         exif.insert(
                             "RawEngineRawProcessingProvenance".to_string(),
-                            raw_processing_mode_recipe(settings.raw_processing_mode.as_deref())
-                                .provenance
-                                .to_string(),
+                            raw_processing_mode_recipe(
+                                effective_settings.raw_processing_mode.as_deref(),
+                            )
+                            .provenance
+                            .to_string(),
                         );
                         Ok((img, exif))
                     }
@@ -625,7 +686,7 @@ pub async fn load_image(
         let arc_img = Arc::new(pristine_img);
 
         state.decoded_image_cache.lock().unwrap().insert(
-            source_path_str.clone(),
+            raw_processing_cache_key,
             arc_img.clone(),
             exif_data_loaded.clone(),
         );
@@ -750,6 +811,35 @@ mod tests {
     }
 
     #[test]
+    fn raw_processing_mode_override_updates_settings_and_cache_key() {
+        let base_settings = AppSettings {
+            raw_processing_mode: Some("fast".to_string()),
+            raw_preprocessing_sharpening: Some(0.0),
+            ..AppSettings::default()
+        };
+        let adjustments = serde_json::json!({
+            "rawProcessingModeOverride": "maximum",
+        });
+
+        let resolved = raw_processing_settings_for_adjustments(&base_settings, &adjustments);
+        assert_eq!(resolved.raw_processing_mode.as_deref(), Some("maximum"));
+        assert_eq!(resolved.raw_preprocessing_color_nr, Some(0.65));
+        assert_eq!(resolved.raw_preprocessing_sharpening, Some(0.42));
+        assert_eq!(
+            raw_processing_mode_cache_key("/tmp/image.arw", &resolved),
+            "/tmp/image.arw::raw-processing-mode=maximum"
+        );
+
+        let inherited =
+            raw_processing_settings_for_adjustments(&base_settings, &serde_json::json!({}));
+        assert_eq!(inherited.raw_processing_mode.as_deref(), Some("fast"));
+        assert_eq!(
+            raw_processing_mode_cache_key("/tmp/image.arw", &inherited),
+            "/tmp/image.arw::raw-processing-mode=fast"
+        );
+    }
+
+    #[test]
     fn private_raw_processing_modes_generate_distinct_exports_when_enabled() {
         if std::env::var("RAWENGINE_RUN_PRIVATE_RAW_PROCESSING_MODE_PROOF").ok()
             != Some("1".to_string())
@@ -864,5 +954,101 @@ mod tests {
             serde_json::to_vec_pretty(&report).expect("serialize report"),
         )
         .expect("write processing mode proof report");
+    }
+
+    #[test]
+    fn private_raw_processing_mode_override_roundtrips_sidecar_and_output_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_RAW_PROCESSING_MODE_OVERRIDE_PROOF").ok()
+            != Some("1".to_string())
+        {
+            return;
+        }
+
+        let source_path = std::env::var("RAWENGINE_RAW_PROCESSING_MODE_SOURCE")
+            .expect("RAWENGINE_RAW_PROCESSING_MODE_SOURCE must point to a private RAW");
+        let report_dir = std::env::var("RAWENGINE_RAW_PROCESSING_MODE_REPORT_DIR")
+            .unwrap_or_else(|_| "target/raw-processing-mode-override-proof".to_string());
+        let report_dir = Path::new(&report_dir);
+        fs::create_dir_all(report_dir).expect("create report dir");
+        let source_bytes = fs::read(&source_path).expect("read private RAW");
+        let base_settings = AppSettings {
+            raw_processing_mode: Some("balanced".to_string()),
+            ..AppSettings::default()
+        };
+        let mut reports = Vec::new();
+        let mut image_hashes = Vec::new();
+        let mut export_hashes = Vec::new();
+
+        for mode in ["fast", "maximum"] {
+            let adjustments = serde_json::json!({
+                "rawProcessingModeOverride": mode,
+            });
+            let sidecar_path = report_dir.join(format!("override-{}.rrdata", mode));
+            let sidecar = ImageMetadata {
+                adjustments: adjustments.clone(),
+                ..ImageMetadata::default()
+            };
+            crate::exif_processing::save_sidecar_metadata_atomic(&sidecar_path, &sidecar)
+                .expect("write override sidecar");
+            let reloaded = crate::exif_processing::load_sidecar(&sidecar_path);
+            assert_eq!(
+                raw_processing_mode_override_from_adjustments(&reloaded.adjustments),
+                Some(mode)
+            );
+
+            let settings =
+                raw_processing_settings_for_adjustments(&base_settings, &reloaded.adjustments);
+            let image =
+                load_base_image_from_bytes(&source_bytes, &source_path, false, &settings, None)
+                    .expect("decode private RAW with sidecar override");
+            let rgba = image.to_rgba8();
+            let image_hash = blake3::hash(rgba.as_raw()).to_hex().to_string();
+            let export_path = report_dir.join(format!("override-{}.tiff", mode));
+            image
+                .save_with_format(&export_path, image::ImageFormat::Tiff)
+                .expect("write override TIFF export");
+            let export_bytes = fs::read(&export_path).expect("read override TIFF export");
+            let export_hash = blake3::hash(&export_bytes).to_hex().to_string();
+
+            println!(
+                "raw_processing_mode_override_proof mode={} dimensions={}x{} image_hash={} export_hash={} sidecar={}",
+                mode,
+                image.width(),
+                image.height(),
+                image_hash,
+                export_hash,
+                sidecar_path.display()
+            );
+
+            image_hashes.push(image_hash.clone());
+            export_hashes.push(export_hash.clone());
+            reports.push(serde_json::json!({
+                "dimensions": {
+                    "height": image.height(),
+                    "width": image.width(),
+                },
+                "exportHash": export_hash,
+                "exportPath": export_path.to_string_lossy(),
+                "imageHash": image_hash,
+                "mode": mode,
+                "sidecarPath": sidecar_path.to_string_lossy(),
+            }));
+        }
+
+        assert_eq!(image_hashes.len(), 2);
+        assert_eq!(export_hashes.len(), 2);
+        assert_ne!(image_hashes[0], image_hashes[1]);
+        assert_ne!(export_hashes[0], export_hashes[1]);
+
+        let report = serde_json::json!({
+            "issue": 3294,
+            "proofBoundary": "private_raw_sidecar_override_export_runtime",
+            "outputs": reports,
+        });
+        fs::write(
+            report_dir.join("raw-processing-mode-override-proof.json"),
+            serde_json::to_vec_pretty(&report).expect("serialize override report"),
+        )
+        .expect("write override proof report");
     }
 }

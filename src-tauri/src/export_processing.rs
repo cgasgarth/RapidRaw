@@ -27,6 +27,7 @@ use crate::file_management::{
 use crate::formats::is_raw_file;
 use crate::image_loader::{
     composite_patches_on_image, load_and_composite, load_base_image_from_bytes,
+    raw_processing_settings_for_adjustments,
 };
 use crate::image_processing::{
     AllAdjustments, Crop, GpuContext, RenderRequest, downscale_f32_image,
@@ -1001,6 +1002,8 @@ pub async fn export_images(
                 };
 
                 hydrate_adjustments(&state, &mut js_adjustments);
+                let effective_settings =
+                    raw_processing_settings_for_adjustments(&settings, &js_adjustments);
                 let is_raw = is_raw_file(&source_path_str);
                 let original_path = std::path::Path::new(&source_path_str);
                 let file_date = exif_processing::get_creation_date_from_path(original_path);
@@ -1109,7 +1112,7 @@ pub async fn export_images(
                                     &source_path_str,
                                     &js_adjustments,
                                     false,
-                                    &settings,
+                                    &effective_settings,
                                     None,
                                 )
                                 .map_err(|e| format!("Failed to load fallback image: {}", e))?
@@ -1122,7 +1125,7 @@ pub async fn export_images(
                                 &source_path_str,
                                 &js_adjustments,
                                 false,
-                                &settings,
+                                &effective_settings,
                                 None,
                             )
                             .map_err(|e| format!("Failed to load from mmap: {}", e))?,
@@ -1134,7 +1137,7 @@ pub async fn export_images(
                                     &source_path_str,
                                     &js_adjustments,
                                     false,
-                                    &settings,
+                                    &effective_settings,
                                     None,
                                 )
                                 .map_err(|e| format!("Failed to load from bytes: {}", e))?
@@ -1495,9 +1498,16 @@ pub async fn estimate_export_sizes(
             }
         };
 
-        let original_image =
-            load_base_image_from_bytes(file_data, &source_path_str, true, &settings, None)
-                .map_err(|e| e.to_string())?;
+        let effective_settings =
+            raw_processing_settings_for_adjustments(&settings, &js_adjustments);
+        let original_image = load_base_image_from_bytes(
+            file_data,
+            &source_path_str,
+            true,
+            &effective_settings,
+            None,
+        )
+        .map_err(|e| e.to_string())?;
 
         let raw_scale_factor = if is_raw {
             crate::raw_processing::get_fast_demosaic_scale_factor(
