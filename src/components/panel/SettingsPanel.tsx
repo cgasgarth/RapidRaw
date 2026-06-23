@@ -58,6 +58,13 @@ import {
   KEYBIND_SECTIONS,
   normalizeCombo,
 } from '../../utils/keyboardUtils';
+import {
+  buildRawProcessingModePatch,
+  normalizeRawProcessingMode,
+  RAW_PROCESSING_MODES,
+  RAW_PROCESSING_MODE_RECIPES,
+  type RawProcessingMode,
+} from '../../utils/rawProcessingModes';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { type ThemeProps, THEMES } from '../../utils/themes';
 import ConfirmModal from '../modals/ConfirmModal';
@@ -151,6 +158,7 @@ interface ProcessingSettings {
   imageCacheSize: number;
   linuxGpuOptimization: boolean;
   processingBackend: string;
+  rawProcessingMode: RawProcessingMode;
   rawHighlightCompression: number;
   rawPreprocessingColorNr: number;
   rawPreprocessingSharpening: number;
@@ -177,6 +185,7 @@ const buildProcessingSettings = (appSettings: AppSettings, osPlatform: string): 
   imageCacheSize: appSettings.imageCacheSize ?? 5,
   linuxGpuOptimization: appSettings.linuxGpuOptimization ?? false,
   processingBackend: appSettings.processingBackend || 'auto',
+  rawProcessingMode: normalizeRawProcessingMode(appSettings.rawProcessingMode),
   rawHighlightCompression: appSettings.rawHighlightCompression ?? 2.5,
   rawPreprocessingColorNr: appSettings.rawPreprocessingColorNr ?? 0.5,
   rawPreprocessingSharpening: appSettings.rawPreprocessingSharpening ?? 0.35,
@@ -720,6 +729,15 @@ export function SettingsPanel({
     });
   }, [t, osPlatform]);
 
+  const rawProcessingModeOptions = useMemo<OptionItem<RawProcessingMode>[]>(
+    () =>
+      RAW_PROCESSING_MODES.map((mode) => ({
+        value: mode,
+        label: t(`settings.processing.rawModes.${mode}.label`),
+      })),
+    [t],
+  );
+
   const linearRawOptions = useMemo<OptionItem<string>[]>(
     () => [
       { value: 'auto', label: t('settings.processing.preprocessing.linearOptions.auto') },
@@ -862,6 +880,27 @@ export function SettingsPanel({
 
   const handleCaptureSharpeningPresetChangeVoid = (presetId: string) => {
     void handleCaptureSharpeningPresetChange(presetId);
+  };
+
+  const handleRawProcessingModeChange = async (mode: RawProcessingMode) => {
+    const patch = buildRawProcessingModePatch(mode);
+    const settingsPatch = {
+      applyPreprocessingToNonRaws: patch.applyPreprocessingToNonRaws,
+      rawHighlightCompression: patch.rawHighlightCompression,
+      rawPreprocessingColorNr: patch.rawPreprocessingColorNr,
+      rawPreprocessingSharpening: patch.rawPreprocessingSharpening,
+      rawPreprocessingSharpeningDetail: patch.rawPreprocessingSharpeningDetail,
+      rawPreprocessingSharpeningEdgeMasking: patch.rawPreprocessingSharpeningEdgeMasking,
+      rawPreprocessingSharpeningRadius: patch.rawPreprocessingSharpeningRadius,
+    };
+    const nextSettings = { ...appSettings, ...settingsPatch, rawProcessingMode: mode };
+    setProcessingSettings((prev) => ({ ...prev, ...settingsPatch, rawProcessingMode: mode }));
+    await onSettingsChange(nextSettings);
+    await invokeWithSchema(Invokes.ClearImageCaches, {}, emptyResponseSchema);
+  };
+
+  const handleRawProcessingModeChangeVoid = (mode: RawProcessingMode) => {
+    void handleRawProcessingModeChange(mode);
   };
 
   const handleSaveAndRelaunch = async () => {
@@ -2134,6 +2173,32 @@ export function SettingsPanel({
                         </div>
                       </>
                     )}
+                  </div>
+                </div>
+
+                <div className="p-6 bg-surface rounded-xl shadow-md">
+                  <UiText variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                    {t('settings.processing.rawMode.title')}
+                  </UiText>
+                  <div className="space-y-5" data-testid="raw-processing-mode-control">
+                    <DropdownSetting
+                      label={t('settings.processing.rawMode.label')}
+                      description={t('settings.processing.rawMode.description')}
+                      onChange={handleRawProcessingModeChangeVoid}
+                      options={rawProcessingModeOptions}
+                      value={processingSettings.rawProcessingMode}
+                    />
+                    <div className="rounded-lg border border-surface bg-bg-primary/40 p-3">
+                      <UiText as="div" color={TextColors.secondary} className="text-xs uppercase tracking-wide">
+                        {t('settings.processing.rawMode.provenance')}
+                      </UiText>
+                      <UiText as="div" color={TextColors.primary} className="mt-1 font-mono text-xs">
+                        {RAW_PROCESSING_MODE_RECIPES[processingSettings.rawProcessingMode].provenance}
+                      </UiText>
+                      <UiText as="div" color={TextColors.secondary} className="mt-2 text-sm">
+                        {t(`settings.processing.rawModes.${processingSettings.rawProcessingMode}.description`)}
+                      </UiText>
+                    </div>
                   </div>
                 </div>
 

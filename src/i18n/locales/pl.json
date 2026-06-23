@@ -3341,6 +3341,26 @@
         "high": "Wysoka jakość",
         "performance": "Wydajność"
       },
+      "rawMode": {
+        "description": "Stosuje wersjonowaną recepturę wywoływania RAW, aby szybkość, jakość domyślna i maksymalna szczegółowość były zrozumiałe i powtarzalne.",
+        "label": "Tryb przetwarzania RAW",
+        "provenance": "Pochodzenie receptury",
+        "title": "Tryb jakości RAW"
+      },
+      "rawModes": {
+        "balanced": {
+          "description": "Domyślnej jakości demozaikowanie, odzyskiwanie świateł, czyszczenie chromy i delikatne wyostrzanie wejściowe.",
+          "label": "Zrównoważony"
+        },
+        "fast": {
+          "description": "Szybkie demozaikowanie z wyłączoną obróbką wejściową dla sprawnej selekcji i szybkich edycji.",
+          "label": "Szybki"
+        },
+        "maximum": {
+          "description": "Pełnej jakości demozaikowanie z większym zapasem świateł, czyszczeniem chromy i bezpiecznym dla detali wyostrzaniem wejściowym.",
+          "label": "Maksymalny"
+        }
+      },
       "renderScale": "Skala rozdzielczości renderowania",
       "renderScaleDesc": "Skaluje rozdzielczość względem twojego ekranu. Niższe wartości poprawiają wydajność na ekranach o wysokiej rozdzielczości kosztem ostrości.",
       "restartRequired": "Zmiany w silniku przetwarzania wymagają ponownego uruchomienia aplikacji, aby odniosły skutek.",

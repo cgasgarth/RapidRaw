@@ -3273,6 +3273,26 @@
         "high": "High Quality",
         "performance": "Performance"
       },
+      "rawMode": {
+        "description": "Applies a versioned RAW development recipe so speed, default quality, and maximum detail are understandable and repeatable.",
+        "label": "RAW Processing Mode",
+        "provenance": "Recipe provenance",
+        "title": "RAW Quality Mode"
+      },
+      "rawModes": {
+        "balanced": {
+          "description": "Default-quality demosaic, highlight recovery, chroma cleanup, and gentle capture sharpening.",
+          "label": "Balanced"
+        },
+        "fast": {
+          "description": "Speed demosaic with capture preprocessing disabled for responsive culling and quick edits.",
+          "label": "Fast"
+        },
+        "maximum": {
+          "description": "Full-quality demosaic with stronger highlight headroom, chroma cleanup, and detail-safe capture sharpening.",
+          "label": "Maximum"
+        }
+      },
       "renderScale": "Render Resolution Scale",
       "renderScaleDesc": "Scales the render resolution relative to your display. Lower values improve performance on high-resolution screens at the cost of some sharpness.",
       "restartRequired": "Changes to the processing engine require an application restart to take effect.",

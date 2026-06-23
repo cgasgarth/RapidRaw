@@ -451,6 +451,8 @@ pub struct AppSettings {
     #[serde(default)]
     pub raw_preprocessing_sharpening_radius: Option<f32>,
     #[serde(default)]
+    pub raw_processing_mode: Option<String>,
+    #[serde(default)]
     pub apply_preprocessing_to_non_raws: Option<bool>,
     #[serde(default)]
     pub exif_overlay: Option<String>,
@@ -541,6 +543,7 @@ impl Default for AppSettings {
             raw_preprocessing_sharpening_detail: Some(0.45),
             raw_preprocessing_sharpening_edge_masking: Some(0.3),
             raw_preprocessing_sharpening_radius: Some(2.0),
+            raw_processing_mode: Some("balanced".to_string()),
             apply_preprocessing_to_non_raws: Some(false),
             exif_overlay: Some("off".to_string()),
             language: Some("en".to_string()),
