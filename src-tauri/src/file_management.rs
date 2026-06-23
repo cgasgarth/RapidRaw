@@ -4240,6 +4240,21 @@ mod tests {
     }
 
     #[test]
+    fn external_editor_file_watch_snapshot_tracks_size_and_modified_time() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let output_path = temp_dir.path().join("image-edit.tiff");
+        fs::write(&output_path, b"edited tiff").expect("edited output");
+
+        let snapshot =
+            get_external_editor_file_watch_snapshot(output_path.to_string_lossy().into_owned())
+                .expect("file watch snapshot");
+
+        assert_eq!(snapshot.path, output_path.to_string_lossy());
+        assert_eq!(snapshot.byte_size, b"edited tiff".len() as u64);
+        assert!(snapshot.modified_ms > 0);
+    }
+
+    #[test]
     fn smart_preview_id_stays_stable_when_source_changes() {
         let temp_dir = tempfile::tempdir().expect("tempdir");
         let image_path = temp_dir.path().join("image.raf");
