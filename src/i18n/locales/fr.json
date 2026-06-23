@@ -1193,7 +1193,22 @@
       "similarityThresholdDesc": "Une valeur plus basse est plus stricte (doublons exacts). Une valeur plus élevée est plus souple (quasi-doublons). Une valeur de 24 à 32 est recommandée.",
       "startCulling": "Démarrer le tri",
       "starting": "Démarrage...",
-      "title": "Trier les images"
+      "title": "Trier les images",
+      "focusConfidence": "Confidence",
+      "focusConfidenceValue": "Confidence {{confidence}}%",
+      "focusRankingsTab": "Focus Ranking",
+      "focusRankValue": "#{{rank}} focus pick",
+      "focusScore": "Focus score",
+      "focusScoreValue": "Score {{score}}",
+      "rankFocus": "Rank Focus Picks",
+      "rankFocusDesc": "Sort the batch by center-weighted sharpness and confidence without selecting images for rejection.",
+      "summaryEnabled": "Enabled",
+      "summaryFocusRanking": "Focus ranking",
+      "focusRegion": {
+        "center_fallback": "Center fallback - no face or eye detector available",
+        "unknown": "Unknown focus region"
+      },
+      "emptyAnalysisModes": "Enable similar grouping, blur filtering, focus ranking, or a combination before starting culling."
     },
     "denoise": {
       "batchProgressText": "Débruitage {{current}} sur {{total}}...",

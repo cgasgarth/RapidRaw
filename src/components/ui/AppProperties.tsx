@@ -411,6 +411,7 @@ export interface CullingSettings {
   blurThreshold: number;
   groupSimilar: boolean;
   filterBlurry: boolean;
+  rankFocus: boolean;
 }
 
 export interface ImageAnalysisResult {
@@ -419,6 +420,9 @@ export interface ImageAnalysisResult {
   sharpnessMetric: number;
   centerFocusMetric: number;
   exposureMetric: number;
+  focusScore: number;
+  focusConfidence: number;
+  focusRegion: string;
   width: number;
   height: number;
 }
@@ -431,6 +435,7 @@ export interface CullGroup {
 export interface CullingSuggestions {
   similarGroups: CullGroup[];
   blurryImages: ImageAnalysisResult[];
+  focusRankings: ImageAnalysisResult[];
   failedPaths: string[];
 }
 

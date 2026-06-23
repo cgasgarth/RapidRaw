@@ -1175,7 +1175,22 @@
       "similarityThresholdDesc": "低いほど厳密（完全な重複）になります。高いほど緩やか（類似画像）になります。24-32の値を推奨します。",
       "startCulling": "選別を開始",
       "starting": "開始中...",
-      "title": "画像を選別"
+      "title": "画像を選別",
+      "focusConfidence": "Confidence",
+      "focusConfidenceValue": "Confidence {{confidence}}%",
+      "focusRankingsTab": "Focus Ranking",
+      "focusRankValue": "#{{rank}} focus pick",
+      "focusScore": "Focus score",
+      "focusScoreValue": "Score {{score}}",
+      "rankFocus": "Rank Focus Picks",
+      "rankFocusDesc": "Sort the batch by center-weighted sharpness and confidence without selecting images for rejection.",
+      "summaryEnabled": "Enabled",
+      "summaryFocusRanking": "Focus ranking",
+      "focusRegion": {
+        "center_fallback": "Center fallback - no face or eye detector available",
+        "unknown": "Unknown focus region"
+      },
+      "emptyAnalysisModes": "Enable similar grouping, blur filtering, focus ranking, or a combination before starting culling."
     },
     "denoise": {
       "batchProgressText": "ノイズ低減を実行中 ({{current}}/{{total}})...",

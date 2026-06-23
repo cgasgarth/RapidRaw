@@ -135,6 +135,9 @@ const imageAnalysisResultSchema = z
   .object({
     centerFocusMetric: z.number(),
     exposureMetric: z.number(),
+    focusConfidence: z.number().min(0).max(1),
+    focusRegion: z.string(),
+    focusScore: z.number().min(0).max(1),
     height: nonnegativeNumberSchema,
     path: z.string(),
     qualityScore: z.number(),
@@ -154,6 +157,7 @@ export const cullingSuggestionsPayloadSchema = z
   .object({
     blurryImages: z.array(imageAnalysisResultSchema),
     failedPaths: z.array(z.string()),
+    focusRankings: z.array(imageAnalysisResultSchema).default([]),
     similarGroups: z.array(cullGroupSchema),
   })
   .loose();
