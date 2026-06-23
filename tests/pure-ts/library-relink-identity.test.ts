@@ -3,7 +3,9 @@ import { expect, test } from 'bun:test';
 import {
   applyLibraryRelinkToRuntimeState,
   applyLibraryRelinkToSessionSet,
+  planLibraryFolderRelink,
   planLibraryRelink,
+  rewriteLibraryRelinkPath,
   scoreRelinkCandidate,
 } from '../../src/utils/libraryRelinkIdentity.ts';
 
@@ -185,6 +187,51 @@ test('applies a verified folder relink to roots and nested session paths', () =>
     '/Volumes/archive/Alaska/DCIM/100MSDCF/DSC00001.ARW',
     '/Volumes/archive/Alaska/DCIM/100MSDCF/DSC00002.ARW',
   ]);
+});
+
+test('plans a same-structure folder relink when all child identities verify', () => {
+  const secondMissing = {
+    ...missingRaw,
+    contentHash: hash('b'),
+    path: '/Volumes/card/DCIM/100MSDCF/DSC00002.ARW',
+  };
+
+  const plan = planLibraryFolderRelink({
+    fromRootPath: '/Volumes/card/DCIM',
+    toRootPath: '/Volumes/archive/Alaska/DCIM',
+    missingIdentities: [missingRaw, secondMissing],
+    candidateIdentities: [
+      { ...missingRaw, path: '/Volumes/archive/Alaska/DCIM/100MSDCF/DSC00001.ARW' },
+      { ...secondMissing, path: '/Volumes/archive/Alaska/DCIM/100MSDCF/DSC00002.ARW' },
+    ],
+  });
+
+  expect(plan.status).toBe('matched');
+  expect(plan.matchedCount).toBe(2);
+  expect(plan.relinkPlan?.selectedCandidatePath).toBe('/Volumes/archive/Alaska/DCIM');
+});
+
+test('rejects a folder relink when any expected child is missing or mismatched', () => {
+  const plan = planLibraryFolderRelink({
+    fromRootPath: '/Volumes/card/DCIM',
+    toRootPath: '/Volumes/archive/Alaska/DCIM',
+    missingIdentities: [missingRaw],
+    candidateIdentities: [],
+  });
+
+  expect(plan.status).toBe('rejected');
+  expect(plan.rejectedCount).toBe(1);
+  expect(plan.relinkPlan).toBeNull();
+});
+
+test('rewrites nested folder paths and virtual copy suffixes', () => {
+  expect(
+    rewriteLibraryRelinkPath(
+      '/Volumes/card/DCIM/100MSDCF/DSC00001.ARW?vc=abc123',
+      '/Volumes/card/DCIM',
+      '/Volumes/archive/Alaska/DCIM',
+    ),
+  ).toBe('/Volumes/archive/Alaska/DCIM/100MSDCF/DSC00001.ARW?vc=abc123');
 });
 
 test('does not apply ambiguous relink plans to sessions', () => {

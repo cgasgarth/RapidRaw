@@ -407,6 +407,7 @@
       "paste": "Einfügen",
       "pin": "Ordner anheften",
       "refresh": "Ordner aktualisieren",
+      "relinkFolder": "Ordner neu verknupfen...",
       "removeRoot": "Stammordner entfernen",
       "renameFolder": "Ordner umbenennen",
       "showExplorer": "Im Explorer anzeigen",
@@ -475,9 +476,14 @@
       "failedMove": "Dateien verschieben fehlgeschlagen: {{err}}",
       "failedMoveError": "Verschieben fehlgeschlagen: {{err}}",
       "failedMoveInvalid": "Verschieben fehlgeschlagen: Zielgruppe nicht gefunden oder ungültig.",
+      "failedRelinkFolderNoImages": "Keine geladenen Bilder in diesem Ordner konnen zum Neuverknupfen gepruft werden.",
+      "failedRelinkFolderReview": "Ordner-Neuverknupfung braucht Prufung: {{matched}}/{{total}} passen, {{rejected}} brauchen Aufmerksamkeit.",
+      "failedRelinkFolderWithError": "Ordner konnte nicht neu verknupft werden: {{err}}",
       "failedRelinkOriginal": "Could not verify that file as the missing original.",
       "failedRelinkOriginalWithError": "Could not relink original: {{err}}",
       "failedRemoveImages": "Bilder entfernen fehlgeschlagen: {{err}}",
+      "relinkedFolder_one": "Ordner mit 1 gepruftem Bild neu verknupft.",
+      "relinkedFolder_other": "Ordner mit {{count}} gepruften Bildern neu verknupft.",
       "relinkedOriginal": "Original relinked"
     }
   },

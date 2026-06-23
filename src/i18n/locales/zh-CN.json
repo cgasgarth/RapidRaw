@@ -406,6 +406,7 @@
       "paste": "粘贴",
       "pin": "固定文件夹",
       "refresh": "刷新文件夹",
+      "relinkFolder": "重新链接文件夹...",
       "removeRoot": "移除根文件夹",
       "renameFolder": "重命名文件夹",
       "showExplorer": "在文件资源管理器中显示",
@@ -474,9 +475,13 @@
       "failedMove": "移动文件失败：{{err}}",
       "failedMoveError": "移动失败：{{err}}",
       "failedMoveInvalid": "移动失败：未找到目标组或目标组无效。",
+      "failedRelinkFolderNoImages": "该文件夹中没有可用于重新链接验证的已加载图像。",
+      "failedRelinkFolderReview": "文件夹重新链接需要复核：{{matched}}/{{total}} 已匹配，{{rejected}} 需要处理。",
+      "failedRelinkFolderWithError": "无法重新链接文件夹：{{err}}",
       "failedRelinkOriginal": "Could not verify that file as the missing original.",
       "failedRelinkOriginalWithError": "Could not relink original: {{err}}",
       "failedRemoveImages": "移除图像失败：{{err}}",
+      "relinkedFolder_other": "已用 {{count}} 张已验证图像重新链接文件夹。",
       "relinkedOriginal": "Original relinked"
     }
   },
