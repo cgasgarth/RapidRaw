@@ -1293,6 +1293,7 @@
       "noImageSelected": "Kein Bild zum Exportieren ausgewählt.",
       "noImagesSelected": "Keine Bilder ausgewählt.",
       "offlineSmartPreviewBlocked": "Verbinde die Originaldatei erneut, bevor du in voller Auflösung exportierst. Du kannst die Smart-Vorschau weiter bearbeiten.",
+      "openInEditor": "Im Editor öffnen",
       "showInFinder": "Im Finder anzeigen",
       "success": "Export erfolgreich!"
     },

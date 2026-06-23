@@ -830,6 +830,7 @@
       "failed": "Échec de l'exportation",
       "noImageSelected": "Aucune image sélectionnée pour l'exportation.",
       "noImagesSelected": "Aucune image sélectionnée.",
+      "openInEditor": "Ouvrir dans l'éditeur",
       "showInFinder": "Afficher dans le Finder",
       "success": "Exportation réussie !"
     },
