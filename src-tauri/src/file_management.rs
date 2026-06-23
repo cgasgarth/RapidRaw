@@ -1640,12 +1640,17 @@ pub fn move_files(
         ));
     }
 
-    let unique_source_images: HashSet<PathBuf> = source_paths
-        .iter()
-        .map(|p| parse_virtual_path(p).0)
-        .collect();
+    let mut seen_source_images = HashSet::new();
+    let mut unique_source_images = Vec::new();
+    for source_path in &source_paths {
+        let source_image_path = parse_virtual_path(source_path).0;
+        if seen_source_images.insert(source_image_path.clone()) {
+            unique_source_images.push(source_image_path);
+        }
+    }
 
-    let mut all_files_to_trash = Vec::new();
+    let mut destination_paths = HashSet::new();
+    let mut move_plan: Vec<Vec<PathBuf>> = Vec::with_capacity(unique_source_images.len());
     let mut renames = HashMap::new();
 
     for source_image_path in unique_source_images {
@@ -1661,6 +1666,12 @@ pub fn move_files(
         for file_to_move in &files_to_move {
             if let Some(file_name) = file_to_move.file_name() {
                 let dest_file_path = dest_path.join(file_name);
+                if !destination_paths.insert(dest_file_path.clone()) {
+                    return Err(format!(
+                        "Multiple files would be moved to {}.",
+                        dest_file_path.display()
+                    ));
+                }
                 if dest_file_path.exists() {
                     return Err(format!(
                         "File already exists at destination: {}",
@@ -1670,20 +1681,36 @@ pub fn move_files(
             }
         }
 
-        for file_to_move in &files_to_move {
-            if let Some(file_name) = file_to_move.file_name() {
-                let dest_file_path = dest_path.join(file_name);
-                fs::copy(file_to_move, &dest_file_path).map_err(|e| e.to_string())?;
-            }
-        }
-
         let dest_image_path = dest_path.join(source_image_path.file_name().unwrap());
         renames.insert(
             source_image_path.to_string_lossy().into_owned(),
             dest_image_path.to_string_lossy().into_owned(),
         );
 
-        all_files_to_trash.extend(files_to_move);
+        move_plan.push(files_to_move);
+    }
+
+    let mut copied_destinations = Vec::new();
+    let mut all_files_to_trash = Vec::new();
+
+    for files_to_move in &move_plan {
+        for file_to_move in files_to_move {
+            if let Some(file_name) = file_to_move.file_name() {
+                let dest_file_path = dest_path.join(file_name);
+                if let Err(err) = fs::copy(file_to_move, &dest_file_path) {
+                    rollback_copied_files(&copied_destinations);
+                    return Err(format!(
+                        "Failed to copy {} to {}: {}. Completed copies were rolled back.",
+                        file_to_move.display(),
+                        dest_file_path.display(),
+                        err
+                    ));
+                }
+                copied_destinations.push(dest_file_path);
+            }
+        }
+
+        all_files_to_trash.extend(files_to_move.iter().cloned());
     }
 
     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
@@ -1695,25 +1722,50 @@ pub fn move_files(
             trash_error
         );
         for path in all_files_to_trash {
-            if path.is_file() {
-                fs::remove_file(&path).map_err(|e| {
-                    format!("Failed to delete source file {}: {}", path.display(), e)
-                })?;
+            if path.is_file()
+                && let Err(err) = fs::remove_file(&path)
+            {
+                rollback_copied_files(&copied_destinations);
+                return Err(format!(
+                    "Failed to delete source file {}: {}. Completed copies were rolled back.",
+                    path.display(),
+                    err
+                ));
             }
         }
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     for path in all_files_to_trash {
-        if path.is_file() {
-            fs::remove_file(&path)
-                .map_err(|e| format!("Failed to delete source file {}: {}", path.display(), e))?;
+        if path.is_file()
+            && let Err(err) = fs::remove_file(&path)
+        {
+            rollback_copied_files(&copied_destinations);
+            return Err(format!(
+                "Failed to delete source file {}: {}. Completed copies were rolled back.",
+                path.display(),
+                err
+            ));
         }
     }
 
     sync_album_path_changes(&app_handle, Some(&renames), None, None);
 
     Ok(())
+}
+
+fn rollback_copied_files(paths: &[PathBuf]) {
+    for path in paths.iter().rev() {
+        if let Err(err) = fs::remove_file(path)
+            && path.exists()
+        {
+            log::error!(
+                "Failed to roll back copied file {}: {}",
+                path.display(),
+                err
+            );
+        }
+    }
 }
 
 #[tauri::command]
@@ -2747,14 +2799,22 @@ pub fn rename_files(
         return Ok(Vec::new());
     }
 
-    let mut operations: HashMap<PathBuf, PathBuf> = HashMap::new();
+    let mut primary_operations: Vec<(PathBuf, PathBuf)> = Vec::with_capacity(paths.len());
     let mut final_new_paths = Vec::with_capacity(paths.len());
     let mut renames = HashMap::new();
+    let mut source_paths = HashSet::new();
+    let mut destination_paths = HashSet::new();
 
     for (i, path_str) in paths.iter().enumerate() {
         let (original_path, _) = parse_virtual_path(path_str);
         if !original_path.exists() {
             return Err(format!("File not found: {}", path_str));
+        }
+        if !source_paths.insert(original_path.clone()) {
+            return Err(format!(
+                "Duplicate source file in rename request: {}",
+                original_path.display()
+            ));
         }
 
         let parent = original_path
@@ -2777,6 +2837,13 @@ pub fn rename_files(
         let new_filename = format!("{}.{}", new_stem, extension);
         let new_path = parent.join(new_filename);
 
+        if !destination_paths.insert(new_path.clone()) {
+            return Err(format!(
+                "Multiple files would be renamed to {}.",
+                new_path.display()
+            ));
+        }
+
         if new_path.exists() && new_path != original_path {
             return Err(format!(
                 "A file with the name {} already exists.",
@@ -2784,11 +2851,13 @@ pub fn rename_files(
             ));
         }
 
-        operations.insert(original_path, new_path);
+        final_new_paths.push(new_path.to_string_lossy().into_owned());
+        primary_operations.push((original_path, new_path));
     }
 
-    let mut sidecar_operations: HashMap<PathBuf, PathBuf> = HashMap::new();
-    for (original_path, new_path) in &operations {
+    let mut operations = primary_operations.clone();
+    let mut sidecar_operations: Vec<(PathBuf, PathBuf)> = Vec::new();
+    for (original_path, new_path) in &primary_operations {
         let parent = original_path
             .parent()
             .ok_or("Could not get parent directory")?;
@@ -2804,10 +2873,20 @@ pub fn rename_files(
                     split_rrdata_sidecar_filename(&entry_filename)
                     && source_filename == original_filename_str
                 {
-                    sidecar_operations.insert(
-                        entry_path,
-                        rrdata_sidecar_path(new_path, copy_id.as_deref()),
-                    );
+                    let destination = rrdata_sidecar_path(new_path, copy_id.as_deref());
+                    if destination.exists() && destination != entry_path {
+                        return Err(format!(
+                            "A sidecar with the name {} already exists.",
+                            destination.display()
+                        ));
+                    }
+                    if !destination_paths.insert(destination.clone()) {
+                        return Err(format!(
+                            "Multiple files would be renamed to {}.",
+                            destination.display()
+                        ));
+                    }
+                    sidecar_operations.push((entry_path, destination));
                 }
             }
         }
@@ -2815,34 +2894,65 @@ pub fn rename_files(
         let old_rrexif = rrexif_sidecar_path(original_path);
 
         if old_rrexif.exists() {
-            sidecar_operations.insert(old_rrexif, rrexif_sidecar_path(new_path));
+            let new_rrexif = rrexif_sidecar_path(new_path);
+            if new_rrexif.exists() && new_rrexif != old_rrexif {
+                return Err(format!(
+                    "A metadata sidecar with the name {} already exists.",
+                    new_rrexif.display()
+                ));
+            }
+            if !destination_paths.insert(new_rrexif.clone()) {
+                return Err(format!(
+                    "Multiple files would be renamed to {}.",
+                    new_rrexif.display()
+                ));
+            }
+            sidecar_operations.push((old_rrexif, new_rrexif));
         }
     }
     operations.extend(sidecar_operations);
 
-    for (old_path, new_path) in operations {
-        fs::rename(&old_path, &new_path).map_err(|e| {
-            format!(
-                "Failed to rename {} to {}: {}",
+    let mut journal: Vec<(PathBuf, PathBuf)> = Vec::with_capacity(operations.len());
+
+    for (old_path, new_path) in &operations {
+        if old_path == new_path {
+            continue;
+        }
+
+        if let Err(err) = fs::rename(old_path, new_path) {
+            rollback_renames(&journal);
+            return Err(format!(
+                "Failed to rename {} to {}: {}. Completed renames were rolled back.",
                 old_path.display(),
                 new_path.display(),
-                e
-            )
-        })?;
+                err
+            ));
+        }
+
+        journal.push((new_path.clone(), old_path.clone()));
 
         let old_str = old_path.to_string_lossy().into_owned();
         let new_str = new_path.to_string_lossy().into_owned();
 
         renames.insert(old_str, new_str.clone());
-
-        if is_supported_image_file(&new_path) {
-            final_new_paths.push(new_str);
-        }
     }
 
     sync_album_path_changes(&app_handle, Some(&renames), None, None);
 
     Ok(final_new_paths)
+}
+
+fn rollback_renames(journal: &[(PathBuf, PathBuf)]) {
+    for (new_path, old_path) in journal.iter().rev() {
+        if let Err(err) = fs::rename(new_path, old_path) {
+            log::error!(
+                "Failed to roll back rename {} to {}: {}",
+                new_path.display(),
+                old_path.display(),
+                err
+            );
+        }
+    }
 }
 
 #[tauri::command]
@@ -3139,5 +3249,47 @@ mod tests {
 
         assert!(err.contains("bad.raf"));
         assert!(!crate::exif_processing::get_primary_sidecar_path(&missing_parent_path).exists());
+    }
+
+    #[test]
+    fn rollback_renames_restores_completed_file_moves_in_reverse_order() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let first_original = temp_dir.path().join("first.raf");
+        let second_original = temp_dir.path().join("second.raf");
+        let first_new = temp_dir.path().join("renamed-first.raf");
+        let second_new = temp_dir.path().join("renamed-second.raf");
+
+        fs::write(&first_original, b"first").expect("first source");
+        fs::write(&second_original, b"second").expect("second source");
+        fs::rename(&first_original, &first_new).expect("first rename");
+        fs::rename(&second_original, &second_new).expect("second rename");
+
+        rollback_renames(&[
+            (first_new.clone(), first_original.clone()),
+            (second_new.clone(), second_original.clone()),
+        ]);
+
+        assert_eq!(fs::read(&first_original).expect("first restored"), b"first");
+        assert_eq!(
+            fs::read(&second_original).expect("second restored"),
+            b"second"
+        );
+        assert!(!first_new.exists());
+        assert!(!second_new.exists());
+    }
+
+    #[test]
+    fn rollback_copied_files_removes_completed_destinations() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let first_copy = temp_dir.path().join("first-copy.raf");
+        let second_copy = temp_dir.path().join("second-copy.raf");
+
+        fs::write(&first_copy, b"first").expect("first copy");
+        fs::write(&second_copy, b"second").expect("second copy");
+
+        rollback_copied_files(&[first_copy.clone(), second_copy.clone()]);
+
+        assert!(!first_copy.exists());
+        assert!(!second_copy.exists());
     }
 }
