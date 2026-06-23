@@ -1511,6 +1511,7 @@
       "tooltipFocalLength": "Ogniskowa",
       "tooltipIso": "ISO",
       "tooltipShutterSpeed": "Czas otwarcia migawki",
+      "tooltipSmartPreview": "Uzywanie inteligentnego podgladu offline",
       "tooltipVirtualCopy": "Kopia wirtualna"
     },
     "search": {

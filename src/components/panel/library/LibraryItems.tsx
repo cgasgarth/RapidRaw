@@ -1,5 +1,13 @@
 import cx from 'clsx';
-import { Image as ImageIcon, Folder, FolderOpen, Star as StarIcon, SlidersHorizontal, Images } from 'lucide-react';
+import {
+  Image as ImageIcon,
+  Folder,
+  FolderOpen,
+  Star as StarIcon,
+  SlidersHorizontal,
+  Images,
+  CloudOff,
+} from 'lucide-react';
 import {
   memo,
   useState,
@@ -179,9 +187,11 @@ const ThumbnailComponent = ({
 }: ThumbnailComponentProps) => {
   const { t } = useTranslation();
   const data = useProcessStore((s) => s.thumbnails[path]);
+  const smartPreview = useProcessStore((s) => s.thumbnailSmartPreviews[path]);
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
   const displayEditIcon = useSettingsStore((s) => s.appSettings?.displayEditIcon ?? true);
   const showEditIcon = isEdited && displayEditIcon;
+  const showSmartPreviewBadge = smartPreview?.stale || smartPreview?.source === 'smartPreview';
 
   const [showPlaceholder, setShowPlaceholder] = useState(false);
   const [layers, setLayers] = useState<ImageLayer[]>([]);
@@ -345,6 +355,15 @@ const ThumbnailComponent = ({
         {layers.length === 0 && showPlaceholder && (
           <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-surface">
             <ImageIcon className="text-text-secondary animate-pulse" />
+          </div>
+        )}
+
+        {showSmartPreviewBadge && (
+          <div
+            className="absolute left-1.5 top-1.5 z-20 rounded-full bg-black/45 p-1 text-white shadow-md"
+            data-tooltip={t('library.items.tooltipSmartPreview')}
+          >
+            <CloudOff size={12} />
           </div>
         )}
       </div>
@@ -583,7 +602,9 @@ const ListItemComponent = ({
 }: ListItemComponentProps) => {
   const { t } = useTranslation();
   const data = useProcessStore((s) => s.thumbnails[path]);
+  const smartPreview = useProcessStore((s) => s.thumbnailSmartPreviews[path]);
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
+  const showSmartPreviewBadge = smartPreview?.stale || smartPreview?.source === 'smartPreview';
 
   const [showPlaceholder, setShowPlaceholder] = useState(false);
   const [layers, setLayers] = useState<ImageLayer[]>([]);
@@ -783,6 +804,14 @@ const ListItemComponent = ({
           </UiText>
         )}
         {autoStack && <AutoStackBadge stack={autoStack} onToggle={onAutoStackToggle} />}
+        {showSmartPreviewBadge && (
+          <CloudOff
+            aria-hidden="true"
+            className="shrink-0 text-text-secondary"
+            data-tooltip={t('library.items.tooltipSmartPreview')}
+            size={13}
+          />
+        )}
       </div>
 
       <div style={{ width: getW('date') }} className="flex items-center px-3 h-full overflow-hidden">

@@ -1419,6 +1419,7 @@
       "tooltipFocalLength": "Brennweite",
       "tooltipIso": "ISO",
       "tooltipShutterSpeed": "Verschlusszeit",
+      "tooltipSmartPreview": "Offline-Smart-Vorschau wird verwendet",
       "tooltipVirtualCopy": "Virtuelle Kopie"
     },
     "search": {
