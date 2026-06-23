@@ -494,7 +494,7 @@
     "check:security": "bun run check:security:js && bun run check:security:rust",
     "check:security:js": "bun scripts/run-compact-command.ts --label security:js -- bun audit --audit-level moderate",
     "check:rust-advisory-waivers": "bun tests/integration/checks/check-rust-advisory-waivers.ts",
-    "check:security:rust": "bun run check:rust-advisory-waivers && bun scripts/run-compact-command.ts --label security:rust --cwd src-tauri -- cargo audit --ignore RUSTSEC-2024-0429 --ignore RUSTSEC-2026-0185",
+    "check:security:rust": "bun run check:rust-advisory-waivers && bun scripts/run-compact-command.ts --label security:rust --cwd src-tauri -- cargo audit --ignore RUSTSEC-2024-0429",
     "check:licenses": "bun run check:licenses:js && bun run check:licenses:rust",
     "check:licenses:js": "bun tests/integration/checks/check-js-dependency-licenses.ts",
     "check:licenses:rust": "bun scripts/run-compact-command.ts --label licenses:rust --cwd src-tauri -- cargo deny check licenses",
