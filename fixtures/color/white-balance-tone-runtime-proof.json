@@ -55,7 +55,7 @@
       "inputDomain": "camera_linear_rgb",
       "operationDomain": "acescg_linear_v1",
       "renderTarget": {
-        "bitDepth": 8,
+        "bitDepth": 16,
         "embedIcc": true,
         "intent": "relative_colorimetric",
         "outputProfile": "display_p3",
