@@ -83,21 +83,27 @@
           "publicRepoAllowed": false
         },
         {
-          "hash": "sha256:b7c68dd85b6e638a17ec1a38651e344b61d51618ac9614f74c7da990bd980dc1",
+          "hash": "sha256:6fb2638513c73787e9103718ec5859496a4e170943e72274c06b43f6c4205539",
           "kind": "preview_before_private",
           "path": "private-artifacts/validation/open-edit-export/professional-color-v1-preview-before.png",
           "publicRepoAllowed": false
         },
         {
-          "hash": "sha256:b16532fd7387855696deba488503977f5889dcb7b81d4ecff35668e26f3ac220",
+          "hash": "sha256:b7a3a87b8eef39496d2d408ee783af61420a0541e782d685675d505137921ca5",
           "kind": "preview_after_private",
           "path": "private-artifacts/validation/open-edit-export/professional-color-v1-preview-after.png",
           "publicRepoAllowed": false
         },
         {
-          "hash": "sha256:42e4b344219ca2747ed175c43918360db869e1f374ecc25e8c817f63541e19dc",
+          "hash": "sha256:dc23738420230044f20ba44324e656410f560284632f853a71dcfc619401a9a3",
           "kind": "export_after_private",
           "path": "private-artifacts/validation/open-edit-export/professional-color-v1-export-after.tiff",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": "sha256:98420f4f30444f000d0de1dbefb2bac4880a3d2ab7d2d4e76b7795058e150eee",
+          "kind": "soft_proof_after_private",
+          "path": "private-artifacts/validation/open-edit-export/professional-color-v1-soft-proof-after.png",
           "publicRepoAllowed": false
         },
         {
@@ -107,7 +113,7 @@
           "publicRepoAllowed": false
         },
         {
-          "hash": "sha256:58cd942f1d04c75e89d9b0bfa7f587c51011f20bf772cb742621f50afe5f92df",
+          "hash": "sha256:719cfeb3ce97302726d8e736933aa186233572bca8426053ed4ac44e9632bc3f",
           "kind": "workflow_report_private",
           "path": "private-artifacts/validation/open-edit-export/professional-color-v1-workflow-report.json",
           "publicRepoAllowed": false
@@ -120,6 +126,11 @@
           "name": "previewExportMeanAbsDelta",
           "required": true,
           "threshold": 0.015
+        },
+        {
+          "name": "softProofExportRgb8MeanAbsDelta",
+          "required": true,
+          "threshold": 0
         },
         {
           "name": "sidecarReloadRevisionMatch",

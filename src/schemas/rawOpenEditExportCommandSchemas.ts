@@ -306,6 +306,7 @@ export const rawOpenEditExportProofReportSchema = z
           name: z.enum([
             'changedPixelRatio',
             'previewExportMeanAbsDelta',
+            'softProofExportRgb8MeanAbsDelta',
             'sidecarReloadRevisionMatch',
             'sourceHashUnchanged',
           ]),

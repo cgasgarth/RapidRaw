@@ -20,6 +20,7 @@ const artifactKindSchema = z.enum([
   'preview_before_private',
   'preview_after_private',
   'export_after_private',
+  'soft_proof_after_private',
   'sidecar_after_private',
   'workflow_report_private',
 ]);
@@ -27,6 +28,7 @@ const artifactKindSchema = z.enum([
 const metricNameSchema = z.enum([
   'changedPixelRatio',
   'previewExportMeanAbsDelta',
+  'softProofExportRgb8MeanAbsDelta',
   'sidecarReloadRevisionMatch',
   'sourceHashUnchanged',
 ]);
@@ -184,6 +186,8 @@ const renderPathsSchema = z
     previewAfterFormat: z.literal('png'),
     previewAfterWriterId: z.string().trim().min(1),
     previewBeforeWriterId: z.string().trim().min(1),
+    softProofAfterFormat: z.literal('png'),
+    softProofAfterWriterId: z.string().trim().min(1),
   })
   .strict();
 
