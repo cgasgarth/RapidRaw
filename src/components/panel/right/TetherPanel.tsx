@@ -1,4 +1,4 @@
-import { Battery, Camera, CheckCircle2, HardDrive, Images, RefreshCcw, Usb, AlertTriangle } from 'lucide-react';
+import { Battery, Camera, CheckCircle2, HardDrive, Images, Pin, RefreshCcw, Usb, AlertTriangle } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -21,16 +21,19 @@ interface TetherPanelProps {
   captureFrame?: () => Promise<TetherCaptureResponse>;
   closeSession?: () => Promise<TetherSessionResponse>;
   discoverCameras?: () => Promise<TetherDiscoveryResponse>;
+  onOpenCapture?: (path: string) => void;
   openSession?: (cameraId: string) => Promise<TetherSessionResponse>;
 }
 
-type TetherReviewMode = 'holdCurrent' | 'newest';
+type TetherReviewMode = 'holdCurrent' | 'newest' | 'pinned';
 
 const capabilityTone: Record<TetherCapability['status'], string> = {
   not_checked: 'border-yellow-500/40 bg-yellow-500/10 text-yellow-200',
   ready: 'border-green-500/40 bg-green-500/10 text-green-300',
   unavailable: 'border-red-500/40 bg-red-500/10 text-red-300',
 };
+
+const reviewModes: Array<TetherReviewMode> = ['newest', 'pinned', 'holdCurrent'];
 
 const defaultDiscoverCameras = (): Promise<TetherDiscoveryResponse> =>
   invokeWithSchema(
@@ -56,6 +59,7 @@ export function TetherPanel({
   captureFrame = defaultCaptureFrame,
   closeSession = defaultCloseSession,
   discoverCameras = defaultDiscoverCameras,
+  onOpenCapture,
   openSession = defaultOpenSession,
 }: TetherPanelProps = {}) {
   const { t } = useTranslation();
@@ -63,6 +67,7 @@ export function TetherPanel({
   const [session, setSession] = useState<TetherSessionResponse['session']>(null);
   const [capture, setCapture] = useState<TetherCaptureResponse | null>(null);
   const [captures, setCaptures] = useState<Array<TetherCaptureResponse>>([]);
+  const [pinnedCaptureKey, setPinnedCaptureKey] = useState<string | null>(null);
   const [reviewMode, setReviewMode] = useState<TetherReviewMode>('newest');
   const [isLoading, setIsLoading] = useState(false);
   const [isCaptureBusy, setIsCaptureBusy] = useState(false);
@@ -121,15 +126,51 @@ export function TetherPanel({
     try {
       const response = await captureFrame();
       setCaptures((current) => [response, ...current].slice(0, 8));
-      setCapture((current) => (reviewMode === 'newest' || current === null ? response : current));
+      setCapture((current) => {
+        if (reviewMode === 'newest' || current === null) return response;
+        if (reviewMode === 'pinned' && pinnedCaptureKey !== null) return current;
+        return current;
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsCaptureBusy(false);
     }
-  }, [captureFrame, reviewMode]);
+  }, [captureFrame, pinnedCaptureKey, reviewMode]);
 
   const selectedCaptureKey = capture === null ? null : captureKey(capture);
+
+  const setMode = useCallback(
+    (mode: TetherReviewMode) => {
+      setReviewMode(mode);
+      if (mode === 'newest') {
+        setPinnedCaptureKey(null);
+        setCapture(captures[0] ?? null);
+        return;
+      }
+      if (mode === 'holdCurrent') {
+        setPinnedCaptureKey(null);
+        return;
+      }
+      if (capture !== null) setPinnedCaptureKey(captureKey(capture));
+    },
+    [capture, captures],
+  );
+
+  const selectCapture = useCallback(
+    (nextCapture: TetherCaptureResponse) => {
+      setCapture(nextCapture);
+      if (reviewMode === 'pinned') setPinnedCaptureKey(captureKey(nextCapture));
+    },
+    [reviewMode],
+  );
+
+  const openCapture = useCallback(
+    (path: string) => {
+      onOpenCapture?.(path);
+    },
+    [onOpenCapture],
+  );
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -215,6 +256,18 @@ export function TetherPanel({
           <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
             {t('editor.tether.captureVerified', { bytes: capture.bytes })}
           </UiText>
+          {onOpenCapture && (
+            <Button
+              onClick={() => {
+                openCapture(capture.importedPath);
+              }}
+              size="sm"
+              className="mt-3"
+              data-testid="tether-open-selected-capture"
+            >
+              {t('editor.tether.openSelectedCapture')}
+            </Button>
+          )}
         </section>
       )}
 
@@ -231,7 +284,7 @@ export function TetherPanel({
               <UiText variant={TextVariants.label}>{t('editor.tether.incomingCaptures')}</UiText>
             </div>
             <div className="flex gap-1" data-testid="tether-review-mode-control">
-              {(['newest', 'holdCurrent'] as const).map((mode) => (
+              {reviewModes.map((mode) => (
                 <button
                   className={`rounded border px-2 py-1 text-xs transition-colors ${
                     reviewMode === mode
@@ -242,12 +295,11 @@ export function TetherPanel({
                   data-selected={String(reviewMode === mode)}
                   key={mode}
                   onClick={() => {
-                    setReviewMode(mode);
-                    if (mode === 'newest') setCapture(captures[0] ?? null);
+                    setMode(mode);
                   }}
                   type="button"
                 >
-                  {mode === 'newest' ? t('editor.tether.reviewNewest') : t('editor.tether.reviewHoldCurrent')}
+                  {t(reviewModeLocaleKey(mode))}
                 </button>
               ))}
             </div>
@@ -256,8 +308,9 @@ export function TetherPanel({
             {captures.map((incomingCapture) => {
               const key = captureKey(incomingCapture);
               const isSelected = key === selectedCaptureKey;
+              const isPinned = key === pinnedCaptureKey;
               return (
-                <button
+                <div
                   className={`min-w-48 rounded-md border p-2 text-left transition-colors ${
                     isSelected
                       ? 'border-accent bg-accent/10'
@@ -265,24 +318,61 @@ export function TetherPanel({
                   }`}
                   data-capture-imported-path={incomingCapture.importedPath}
                   data-capture-key={key}
+                  data-pinned={String(isPinned)}
                   data-selected={String(isSelected)}
                   data-testid="tether-incoming-capture-item"
                   key={key}
-                  onClick={() => {
-                    setCapture(incomingCapture);
-                  }}
-                  type="button"
                 >
-                  <UiText variant={TextVariants.label} className="block truncate">
-                    {captureFileName(incomingCapture.importedPath)}
-                  </UiText>
-                  <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
-                    {t('editor.tether.captureVerified', { bytes: incomingCapture.bytes })}
-                  </UiText>
-                  <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block truncate">
-                    {incomingCapture.capturedAt}
-                  </UiText>
-                </button>
+                  <button
+                    className="block w-full text-left"
+                    onClick={() => {
+                      selectCapture(incomingCapture);
+                    }}
+                    type="button"
+                  >
+                    <UiText variant={TextVariants.label} className="block truncate">
+                      {captureFileName(incomingCapture.importedPath)}
+                    </UiText>
+                    <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+                      {t('editor.tether.captureVerified', { bytes: incomingCapture.bytes })}
+                    </UiText>
+                    <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block truncate">
+                      {incomingCapture.capturedAt}
+                    </UiText>
+                  </button>
+                  <div className="mt-2 flex gap-1">
+                    <button
+                      className={`rounded border px-2 py-1 text-xs ${
+                        isPinned
+                          ? 'border-accent bg-accent text-button-text'
+                          : 'border-border-color bg-bg-secondary text-text-secondary hover:text-text-primary'
+                      }`}
+                      data-pinned={String(isPinned)}
+                      data-testid="tether-pin-capture"
+                      onClick={() => {
+                        setReviewMode('pinned');
+                        setPinnedCaptureKey(key);
+                        setCapture(incomingCapture);
+                      }}
+                      type="button"
+                    >
+                      <Pin size={12} className="mr-1 inline" />
+                      {t('editor.tether.pinCapture')}
+                    </button>
+                    {onOpenCapture && (
+                      <button
+                        className="rounded border border-border-color bg-bg-secondary px-2 py-1 text-xs text-text-secondary hover:text-text-primary"
+                        data-testid="tether-open-capture"
+                        onClick={() => {
+                          openCapture(incomingCapture.importedPath);
+                        }}
+                        type="button"
+                      >
+                        {t('editor.tether.openCapture')}
+                      </button>
+                    )}
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -427,4 +517,12 @@ function captureKey(capture: TetherCaptureResponse): string {
 
 function captureFileName(path: string): string {
   return path.split(/[\\/]/u).pop() ?? path;
+}
+
+function reviewModeLocaleKey(
+  mode: TetherReviewMode,
+): 'editor.tether.reviewHoldCurrent' | 'editor.tether.reviewNewest' | 'editor.tether.reviewPinned' {
+  if (mode === 'newest') return 'editor.tether.reviewNewest';
+  if (mode === 'pinned') return 'editor.tether.reviewPinned';
+  return 'editor.tether.reviewHoldCurrent';
 }

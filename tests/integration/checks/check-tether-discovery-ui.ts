@@ -3,9 +3,12 @@
 import { readFileSync } from 'node:fs';
 
 const panelSource = readFileSync('src/components/panel/right/TetherPanel.tsx', 'utf8');
+const editorViewSource = readFileSync('src/components/views/EditorView.tsx', 'utf8');
 const schemaSource = readFileSync('src/schemas/tetheringSchemas.ts', 'utf8');
 const registrySource = readFileSync('src/components/panel/right/rightPanelRegistry.ts', 'utf8');
 const appPropertiesSource = readFileSync('src/components/ui/AppProperties.tsx', 'utf8');
+const visualSmokeSource = readFileSync('src/validation/visual/VisualSmokeApp.tsx', 'utf8');
+const visualSmokeScriptSource = readFileSync('scripts/capture-visual-smoke.ts', 'utf8');
 const libSource = readFileSync('src-tauri/src/lib.rs', 'utf8');
 const rustSource = readFileSync('src-tauri/src/tethering.rs', 'utf8');
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8')) as {
@@ -24,9 +27,15 @@ const requiredSnippets = [
   [panelSource, 'data-testid="tether-incoming-capture-strip"'],
   [panelSource, 'data-testid="tether-review-mode-control"'],
   [panelSource, 'data-testid="tether-incoming-capture-item"'],
-  [panelSource, "type TetherReviewMode = 'holdCurrent' | 'newest'"],
+  [panelSource, "type TetherReviewMode = 'holdCurrent' | 'newest' | 'pinned'"],
   [panelSource, 'setCaptures((current) => [response, ...current].slice(0, 8))'],
   [panelSource, "reviewMode === 'newest'"],
+  [panelSource, 'data-testid="tether-pin-capture"'],
+  [panelSource, 'data-testid="tether-open-capture"'],
+  [panelSource, 'data-testid="tether-open-selected-capture"'],
+  [panelSource, 'data-pinned={String(isPinned)}'],
+  [panelSource, "setReviewMode('pinned')"],
+  [panelSource, 'onOpenCapture?.(path)'],
   [panelSource, 'Invokes.DiscoverTetheredCameras'],
   [panelSource, 'Invokes.OpenTetherSession'],
   [panelSource, 'Invokes.CloseTetherSession'],
@@ -51,6 +60,13 @@ const requiredSnippets = [
   [panelSource, 'data-testid="tether-incoming-capture-strip"'],
   [panelSource, 'data-testid="tether-review-mode-control"'],
   [panelSource, 'data-review-mode-option={mode}'],
+  [editorViewSource, 'handleTetherCaptureOpen'],
+  [editorViewSource, 'handleImageSelect(path)'],
+  [editorViewSource, 'onOpenCapture={(path) =>'],
+  [visualSmokeSource, "data-opened-capture-path={openedCapturePath ?? ''}"],
+  [visualSmokeScriptSource, '[data-review-mode-option="pinned"]'],
+  [visualSmokeScriptSource, '[data-testid="tether-incoming-capture-item"][data-pinned="true"]'],
+  [visualSmokeScriptSource, 'data-opened-capture-path="/tmp/rawengine-tether-captures/alaska-dsc7853.ARW"'],
 ] as const;
 
 const failures = requiredSnippets
@@ -69,6 +85,10 @@ for (const key of [
   'incomingCaptures',
   'reviewHoldCurrent',
   'reviewNewest',
+  'reviewPinned',
+  'pinCapture',
+  'openCapture',
+  'openSelectedCapture',
   'providerMode',
   'openSession',
   'closeSession',
