@@ -64,6 +64,7 @@
     "check:browser-tauri-harness": "bun tests/integration/checks/check-browser-tauri-harness.ts",
     "check:session-restore-gated": "bun tests/integration/checks/check-session-restore-gated.ts",
     "check:export-single-panel-editor": "bun tests/integration/checks/check-export-single-panel-editor.ts",
+    "check:export-built-in-preset-readiness": "bun tests/integration/checks/check-export-built-in-preset-readiness.ts",
     "check:settings-ui": "bun tests/integration/checks/check-settings-ui.ts",
     "check:color-abi": "bun tests/integration/checks/check-color-adjustment-abi-parity.ts",
     "check:color-pipeline-audit": "bun tests/integration/checks/check-color-pipeline-audit.ts",
