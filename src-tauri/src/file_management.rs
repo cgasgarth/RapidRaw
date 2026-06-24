@@ -3608,7 +3608,14 @@ pub fn launch_external_editor(
         } else {
             command.arg(&output_path_str);
         }
-        command.spawn().map_err(|e| e.to_string())?;
+        let status = command.status().map_err(|e| e.to_string())?;
+        if !status.success() {
+            return Err(format!(
+                "External editor launcher failed for {} with status {}.",
+                output_path.display(),
+                status
+            ));
+        }
         Ok(())
     }
 
@@ -4431,6 +4438,77 @@ mod tests {
         assert_eq!(snapshot.path, output_path.to_string_lossy());
         assert_eq!(snapshot.byte_size, b"edited tiff".len() as u64);
         assert!(snapshot.modified_ms > 0);
+    }
+
+    #[test]
+    fn external_editor_launcher_reports_missing_named_editor() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let output_path = temp_dir.path().join("image-edit.tiff");
+        write_external_editor_test_tiff(&output_path, Some(b"test-icc-profile"));
+
+        let error = launch_external_editor(
+            output_path.to_string_lossy().into_owned(),
+            Some("RawEngineMissingEditorForValidation".to_string()),
+        )
+        .expect_err("missing named editor should fail synchronously");
+
+        assert!(
+            error.contains("External editor launcher failed")
+                || error.contains("Unable to find application")
+        );
+    }
+
+    #[test]
+    #[ignore = "opens Preview and mutates a temp TIFF; run via check:external-editor-preview-roundtrip-proof on macOS"]
+    fn external_editor_live_roundtrip_with_preview() {
+        if !cfg!(target_os = "macos") {
+            return;
+        }
+
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let source_path = temp_dir.path().join("alaska-source.ARW");
+        let output_path = temp_dir.path().join("alaska-preview-roundtrip.tiff");
+        let sidecar_path = rrdata_sidecar_path(&output_path, None);
+        fs::write(&source_path, b"raw-source-placeholder").expect("source image");
+        write_external_editor_test_tiff(&output_path, Some(b"test-icc-profile"));
+
+        let before =
+            get_external_editor_file_watch_snapshot(output_path.to_string_lossy().into_owned())
+                .expect("baseline watch snapshot");
+        launch_external_editor(
+            output_path.to_string_lossy().into_owned(),
+            Some("Preview".to_string()),
+        )
+        .expect("Preview should accept the TIFF handoff");
+
+        std::thread::sleep(std::time::Duration::from_millis(25));
+        write_external_editor_test_tiff(&output_path, Some(b"test-icc-profile-after-save"));
+        let after =
+            get_external_editor_file_watch_snapshot(output_path.to_string_lossy().into_owned())
+                .expect("saved watch snapshot");
+        assert!(
+            after.modified_ms > before.modified_ms || after.byte_size != before.byte_size,
+            "watch snapshot must detect the simulated external save"
+        );
+
+        let receipt = write_external_editor_variant_sidecar(
+            &source_path.to_string_lossy(),
+            &output_path,
+            &sidecar_path,
+            Some(16),
+            Some("Display P3".to_string()),
+            Some("Relative colorimetric".to_string()),
+        )
+        .expect("import linked variant from Preview handoff");
+
+        assert_eq!(receipt.verified_bit_depth, Some(16));
+        assert!(receipt.embedded_icc_profile);
+        assert!(receipt.content_hash.starts_with("sha256:"));
+        assert!(sidecar_path.exists());
+        assert!(
+            source_path.exists(),
+            "external editor import must not overwrite the original source"
+        );
     }
 
     fn write_external_editor_test_tiff(path: &Path, icc_profile: Option<&[u8]>) {
