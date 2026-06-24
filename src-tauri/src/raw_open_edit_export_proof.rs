@@ -1,8 +1,12 @@
 use std::fs;
+use std::io::Cursor;
 use std::path::{Component, Path, PathBuf};
 
 use chrono::{SecondsFormat, Utc};
-use image::{DynamicImage, ImageFormat, RgbImage};
+use image::{
+    ColorType, DynamicImage, ImageDecoder, ImageFormat, RgbImage, codecs::tiff::TiffDecoder,
+};
+use moxcms::ColorProfile;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -10,9 +14,9 @@ use sha2::{Digest, Sha256};
 use crate::app_settings::{AppSettings, load_settings_or_default};
 use crate::app_state::AppState;
 use crate::export_processing::{
-    ExportColorProfile, ExportRenderingIntent, export_jpeg_rgb_pixels_and_profile,
+    ExportColorProfile, ExportRenderingIntent, ExportSettings, export_jpeg_rgb_pixels_and_profile,
     export_soft_proof_rgb_pixels_and_profile,
-    process_image_for_export_pipeline_with_tonemapper_override,
+    process_image_for_export_pipeline_with_tonemapper_override, save_image_with_metadata,
 };
 use crate::formats::is_raw_file;
 use crate::image_loader::load_base_image_from_bytes;
@@ -263,6 +267,20 @@ pub struct RawOpenEditExportRenderPathProof {
     pub preview_before_writer_id: String,
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RawOpenEditExportFinalFileProof {
+    pub bit_depth: u32,
+    pub embedded_icc_profile_hash: String,
+    pub expected_output_profile_hash: String,
+    pub final_file_format: String,
+    pub output_profile: String,
+    pub pixel_max_abs_delta: f64,
+    pub pixel_mean_abs_delta: f64,
+    pub reopened_dimensions: RawOpenEditExportDimensions,
+    pub writer_id: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportProofReport {
@@ -271,6 +289,7 @@ pub struct RawOpenEditExportProofReport {
     pub edit_command_id: String,
     pub edit_graph_revision: String,
     pub fixture_id: String,
+    pub final_file: RawOpenEditExportFinalFileProof,
     pub generated_at: String,
     pub metrics: Vec<RawOpenEditExportProofMetric>,
     pub preview_after: RawOpenEditExportProofHashedPath,
@@ -411,16 +430,31 @@ fn run_raw_open_edit_export_proof_with_context(
         &preview_after,
         ImageFormat::Png,
     )?;
-    write_image(
-        &private_root,
-        &export_after_relative,
+    let export_settings = ExportSettings {
+        color_profile: export_color_profile.clone(),
+        rendering_intent: export_rendering_intent.clone(),
+        jpeg_quality: 95,
+        resize: None,
+        keep_metadata: false,
+        preserve_timestamps: false,
+        strip_gps: true,
+        filename_template: None,
+        watermark: None,
+        export_masks: false,
+        output_sharpening: None,
+        preserve_folders: false,
+    };
+    let export_after_path = resolve_private_relative(&private_root, &export_after_relative)?;
+    save_image_with_metadata(
         &export_after,
-        ImageFormat::Tiff,
+        &export_after_path,
+        &source_path_string,
+        &export_settings,
     )?;
     write_rgb8_image(
         &private_root,
         &soft_proof_after_relative,
-        soft_proof_after_pixels,
+        soft_proof_after_pixels.clone(),
         soft_proof_after_width,
         soft_proof_after_height,
         ImageFormat::Png,
@@ -437,6 +471,13 @@ fn run_raw_open_edit_export_proof_with_context(
 
     let changed_pixel_ratio = changed_pixel_ratio(&preview_before, &preview_after);
     let preview_export_mean_abs_delta = mean_abs_delta(&preview_after, &export_after);
+    let final_file = inspect_final_tiff_export(
+        &export_after_path,
+        &export_color_profile,
+        &soft_proof_after_pixels,
+        soft_proof_after_width,
+        soft_proof_after_height,
+    )?;
     let reloaded_sidecar = fs::read_to_string(&sidecar_path).map_err(|error| error.to_string())?;
     let reloaded_sidecar_json: Value =
         serde_json::from_str(&reloaded_sidecar).map_err(|error| error.to_string())?;
@@ -475,6 +516,7 @@ fn run_raw_open_edit_export_proof_with_context(
         edit_command_id: request.edit_command.command_id,
         edit_graph_revision: request.edit_command.expected_graph_revision,
         fixture_id: request.fixture_id,
+        final_file: final_file.clone(),
         generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         metrics: vec![
             metric(
@@ -494,6 +536,26 @@ fn run_raw_open_edit_export_proof_with_context(
                 soft_proof_export_rgb8_mean_abs_delta,
                 0.0,
                 soft_proof_export_rgb8_mean_abs_delta == 0.0,
+            ),
+            metric("finalFileReopenSucceeded", 1.0, 1.0, true),
+            metric(
+                "finalFileBitDepth",
+                final_file.bit_depth as f64,
+                16.0,
+                final_file.bit_depth == 16,
+            ),
+            metric("finalFileIccProfileEmbedded", 1.0, 1.0, true),
+            metric(
+                "finalFileSoftProofRgb8MeanAbsDelta",
+                final_file.pixel_mean_abs_delta,
+                0.0,
+                final_file.pixel_mean_abs_delta == 0.0,
+            ),
+            metric(
+                "finalFileSoftProofRgb8MaxAbsDelta",
+                final_file.pixel_max_abs_delta,
+                0.0,
+                final_file.pixel_max_abs_delta == 0.0,
             ),
             metric(
                 "sidecarReloadRevisionMatch",
@@ -516,7 +578,7 @@ fn run_raw_open_edit_export_proof_with_context(
         preview_before: preview_before_path,
         render_paths: RawOpenEditExportRenderPathProof {
             export_after_format: "tiff".to_string(),
-            export_after_writer_id: "raw_open_edit_export_export_after".to_string(),
+            export_after_writer_id: "export_processing::save_image_with_metadata".to_string(),
             soft_proof_after_format: "png".to_string(),
             soft_proof_after_writer_id: "raw_open_edit_export_soft_proof_after".to_string(),
             preview_after_format: "png".to_string(),
@@ -544,6 +606,77 @@ fn run_raw_open_edit_export_proof_with_context(
     report.artifacts = artifacts;
 
     Ok(report)
+}
+
+fn inspect_final_tiff_export(
+    output_path: &Path,
+    color_profile: &ExportColorProfile,
+    expected_rgb8: &[u8],
+    expected_width: u32,
+    expected_height: u32,
+) -> Result<RawOpenEditExportFinalFileProof, String> {
+    let bytes = fs::read(output_path).map_err(|error| error.to_string())?;
+    let mut decoder =
+        TiffDecoder::new(Cursor::new(bytes.as_slice())).map_err(|error| error.to_string())?;
+    let bit_depth = match decoder.color_type() {
+        ColorType::Rgb16 => 16,
+        other => return Err(format!("final TIFF must reopen as RGB16, got {other:?}")),
+    };
+    let embedded_icc = decoder
+        .icc_profile()
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| "final TIFF export must embed an ICC profile".to_string())?;
+    let expected_icc = expected_output_profile_bytes(color_profile)?;
+    let reopened = image::load_from_memory_with_format(&bytes, ImageFormat::Tiff)
+        .map_err(|error| error.to_string())?
+        .to_rgb16();
+    let (width, height) = reopened.dimensions();
+    if (width, height) != (expected_width, expected_height) {
+        return Err(format!(
+            "final TIFF dimensions {width}x{height} diverged from soft proof {expected_width}x{expected_height}"
+        ));
+    }
+    let reopened_rgb8 = quantize_rgb16_to_rgb8(reopened.as_raw());
+    let pixel_mean_abs_delta = mean_abs_delta_rgb8(&reopened_rgb8, expected_rgb8)?;
+    let pixel_max_abs_delta = max_abs_delta_rgb8(&reopened_rgb8, expected_rgb8)?;
+
+    Ok(RawOpenEditExportFinalFileProof {
+        bit_depth,
+        embedded_icc_profile_hash: sha256_bytes(&embedded_icc),
+        expected_output_profile_hash: sha256_bytes(&expected_icc),
+        final_file_format: "tiff".to_string(),
+        output_profile: export_color_profile_label(color_profile).to_string(),
+        pixel_max_abs_delta,
+        pixel_mean_abs_delta,
+        reopened_dimensions: RawOpenEditExportDimensions { height, width },
+        writer_id: "export_processing::save_image_with_metadata".to_string(),
+    })
+}
+
+fn expected_output_profile_bytes(color_profile: &ExportColorProfile) -> Result<Vec<u8>, String> {
+    let profile = match color_profile {
+        ExportColorProfile::DisplayP3 => ColorProfile::new_display_p3(),
+        ExportColorProfile::Srgb => ColorProfile::new_srgb(),
+        ExportColorProfile::AdobeRgb1998
+        | ExportColorProfile::ProPhotoRgb
+        | ExportColorProfile::SourceEmbedded => {
+            return Err("unsupported profile cannot be used for final-file proof".to_string());
+        }
+    };
+
+    profile
+        .encode()
+        .map_err(|error| format!("failed to encode expected output ICC profile: {error}"))
+}
+
+fn export_color_profile_label(color_profile: &ExportColorProfile) -> &'static str {
+    match color_profile {
+        ExportColorProfile::DisplayP3 => "display_p3",
+        ExportColorProfile::Srgb => "srgb",
+        ExportColorProfile::AdobeRgb1998 => "adobe_rgb_1998",
+        ExportColorProfile::ProPhotoRgb => "prophoto_rgb",
+        ExportColorProfile::SourceEmbedded => "source_embedded",
+    }
 }
 
 fn edit_command_adjustments(command: &RawOpenEditExportCommand) -> Result<Value, String> {
@@ -675,7 +808,7 @@ fn color_management_proof(
 ) -> RawOpenEditExportColorManagementProof {
     let pipeline = &request.edit_command.color_pipeline;
     RawOpenEditExportColorManagementProof {
-        conformance: "mismatch".to_string(),
+        conformance: "partial".to_string(),
         decoder_trace: RawOpenEditExportDecoderTrace {
             camera_calibration: trace_status_not_surfaced(),
             camera_make: request.source_metadata.camera_make.clone(),
@@ -692,29 +825,27 @@ fn color_management_proof(
         does_not_prove: vec![
             "acescg_working_space".to_string(),
             "bradford_chromatic_adaptation".to_string(),
+            "black_point_compensation".to_string(),
             "camera_profile_quality".to_string(),
             "capture_one_class_quality".to_string(),
             "display_device_visual_match".to_string(),
-            "display_p3_export".to_string(),
             "gpu_color_parity".to_string(),
-            "icc_embedding".to_string(),
             "icc_colorimetric_accuracy".to_string(),
-            "sixteen_bit_export".to_string(),
         ],
         observed_color_pipeline: RawOpenEditExportObservedColorPipeline {
-            bit_depth: 8,
-            cmm_used: false,
+            bit_depth: 16,
+            cmm_used: true,
             display_profile_correctness: "not_proven".to_string(),
-            export_color_encoding: "current_srgb_pipe_rgba8".to_string(),
+            export_color_encoding: "display_p3_rgb16_tiff".to_string(),
             export_format: "tiff".to_string(),
             gamut_mapping: "not_proven".to_string(),
-            icc_profile_embedded: false,
+            icc_profile_embedded: true,
             input_domain: "decoder_camera_rgb_observed".to_string(),
             operation_domain: "linear_srgb_d65_observed".to_string(),
-            output_profile: "untagged_srgb_pipe".to_string(),
-            rendering_intent_applied: false,
+            output_profile: "display_p3".to_string(),
+            rendering_intent_applied: true,
             scene_to_display_transform: pipeline.scene_to_display_transform.clone(),
-            transfer_status: "current_srgb_pipe_rgba8_export".to_string(),
+            transfer_status: "moxcms_rgb16_display_p3_final_file".to_string(),
             view_transform: pipeline.render_target.view_transform.clone(),
             working_buffer: "linear_srgb_d65_observed".to_string(),
         },
@@ -726,7 +857,8 @@ fn color_management_proof(
         },
         tracking_issue: 2308,
         warnings: vec![
-            "Requested ACEScg/Display-P3/16-bit/ICC fields are request intent only; observed runtime remains the current RGBA8 sRGB-pipe export.".to_string(),
+            "Final TIFF proof verifies Display P3 ICC embedding and RGB16 file reopen, but not full chart-based colorimetric accuracy.".to_string(),
+            "Black-point compensation remains unsupported by the active CMM path and is not claimed.".to_string(),
             "Decoder calibration and white-balance metadata are not surfaced by this proof trace yet.".to_string(),
             "WGPU adapter/backend are not surfaced by this proof trace yet.".to_string(),
         ],
@@ -827,7 +959,11 @@ fn resolve_private_relative(private_root: &Path, relative_path: &str) -> Result<
 
 fn sha256_file(path: &Path) -> Result<String, String> {
     let bytes = fs::read(path).map_err(|error| error.to_string())?;
-    Ok(format!("sha256:{}", hex::encode(Sha256::digest(bytes))))
+    Ok(sha256_bytes(&bytes))
+}
+
+fn sha256_bytes(bytes: &[u8]) -> String {
+    format!("sha256:{}", hex::encode(Sha256::digest(bytes)))
 }
 
 fn hashed_artifact(
@@ -936,6 +1072,25 @@ fn mean_abs_delta_rgb8(first: &[u8], second: &[u8]) -> Result<f64, String> {
         .sum::<f64>();
 
     Ok(total / first.len() as f64)
+}
+
+fn max_abs_delta_rgb8(first: &[u8], second: &[u8]) -> Result<f64, String> {
+    if first.len() != second.len() {
+        return Err("soft proof and final export byte lengths diverged.".to_string());
+    }
+
+    Ok(first
+        .iter()
+        .zip(second.iter())
+        .map(|(first_byte, second_byte)| f64::from(first_byte.abs_diff(*second_byte)) / 255.0)
+        .fold(0.0, f64::max))
+}
+
+fn quantize_rgb16_to_rgb8(pixels: &[u16]) -> Vec<u8> {
+    pixels
+        .iter()
+        .map(|value| (((*value as u32) + 128) / 257) as u8)
+        .collect()
 }
 
 fn slug_from_fixture_id(fixture_id: &str) -> String {
@@ -1184,8 +1339,63 @@ mod tests {
         );
         assert_eq!(
             sidecar["rawOpenEditExportProof"]["colorManagement"]["observedColorPipeline"]["bitDepth"],
-            json!(8)
+            json!(16)
         );
+    }
+
+    #[test]
+    fn final_tiff_inspection_verifies_icc_bit_depth_and_soft_proof_pixels() {
+        let directory = tempfile::tempdir().expect("tempdir");
+        let output_path = directory.path().join("final.tiff");
+        let image = DynamicImage::ImageRgb8(image::ImageBuffer::from_pixel(
+            2,
+            2,
+            image::Rgb([128, 64, 32]),
+        ));
+        let settings = ExportSettings {
+            color_profile: ExportColorProfile::DisplayP3,
+            rendering_intent: ExportRenderingIntent::RelativeColorimetric,
+            jpeg_quality: 95,
+            resize: None,
+            keep_metadata: false,
+            preserve_timestamps: false,
+            strip_gps: true,
+            filename_template: None,
+            watermark: None,
+            export_masks: false,
+            output_sharpening: None,
+            preserve_folders: false,
+        };
+        save_image_with_metadata(
+            &image,
+            &output_path,
+            "private-fixtures/detail/sample.cr3",
+            &settings,
+        )
+        .expect("final TIFF export writes through production encoder");
+        let (soft_proof, width, height, _) = export_soft_proof_rgb_pixels_and_profile(
+            &image,
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("soft proof pixels");
+
+        let proof = inspect_final_tiff_export(
+            &output_path,
+            &ExportColorProfile::DisplayP3,
+            &soft_proof,
+            width,
+            height,
+        )
+        .expect("final TIFF proof");
+
+        assert_eq!(proof.bit_depth, 16);
+        assert_eq!(
+            proof.embedded_icc_profile_hash,
+            proof.expected_output_profile_hash
+        );
+        assert_eq!(proof.pixel_mean_abs_delta, 0.0);
+        assert_eq!(proof.pixel_max_abs_delta, 0.0);
     }
 
     #[test]
@@ -1259,13 +1469,31 @@ mod tests {
             edit_command_id: "command.raw-open-edit-export.basic-tone.v1".to_string(),
             edit_graph_revision: "graph-rev.raw-open-edit-export.sample.v1".to_string(),
             fixture_id: "validation.raw-open-edit-export.sample.v1".to_string(),
+            final_file: RawOpenEditExportFinalFileProof {
+                bit_depth: 16,
+                embedded_icc_profile_hash:
+                    "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+                        .to_string(),
+                expected_output_profile_hash:
+                    "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+                        .to_string(),
+                final_file_format: "tiff".to_string(),
+                output_profile: "display_p3".to_string(),
+                pixel_max_abs_delta: 0.0,
+                pixel_mean_abs_delta: 0.0,
+                reopened_dimensions: RawOpenEditExportDimensions {
+                    height: 2,
+                    width: 2,
+                },
+                writer_id: "export_processing::save_image_with_metadata".to_string(),
+            },
             generated_at: "2026-06-17T00:00:00Z".to_string(),
             metrics: Vec::new(),
             preview_after: asset.clone(),
             preview_before: asset.clone(),
             render_paths: RawOpenEditExportRenderPathProof {
                 export_after_format: "tiff".to_string(),
-                export_after_writer_id: "raw_open_edit_export_export_after".to_string(),
+                export_after_writer_id: "export_processing::save_image_with_metadata".to_string(),
                 preview_after_format: "png".to_string(),
                 preview_after_writer_id: "raw_open_edit_export_preview_after".to_string(),
                 preview_before_writer_id: "raw_open_edit_export_preview_before".to_string(),
@@ -1284,6 +1512,7 @@ mod tests {
         assert!(value.get("previewBefore").is_some());
         assert!(value.get("sidecarAfter").is_some());
         assert!(value.get("sourceRaw").is_some());
+        assert!(value.get("finalFile").is_some());
         assert!(value.get("sourceHashUnchanged").is_none());
         assert!(
             value["colorManagement"]

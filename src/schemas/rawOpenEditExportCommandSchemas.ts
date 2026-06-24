@@ -93,32 +93,30 @@ const colorManagementProofSchema = z
         z.enum([
           'acescg_working_space',
           'bradford_chromatic_adaptation',
+          'black_point_compensation',
           'camera_profile_quality',
           'capture_one_class_quality',
           'display_device_visual_match',
-          'display_p3_export',
           'gpu_color_parity',
-          'icc_embedding',
           'icc_colorimetric_accuracy',
-          'sixteen_bit_export',
         ]),
       )
-      .min(9),
+      .min(7),
     observedColorPipeline: z
       .object({
-        bitDepth: z.literal(8),
-        cmmUsed: z.literal(false),
+        bitDepth: z.literal(16),
+        cmmUsed: z.literal(true),
         displayProfileCorrectness: z.literal('not_proven'),
-        exportColorEncoding: z.literal('current_srgb_pipe_rgba8'),
+        exportColorEncoding: z.literal('display_p3_rgb16_tiff'),
         exportFormat: z.literal('tiff'),
         gamutMapping: z.literal('not_proven'),
-        iccProfileEmbedded: z.literal(false),
+        iccProfileEmbedded: z.literal(true),
         inputDomain: z.literal('decoder_camera_rgb_observed'),
         operationDomain: z.literal('linear_srgb_d65_observed'),
-        outputProfile: z.literal('untagged_srgb_pipe'),
-        renderingIntentApplied: z.literal(false),
+        outputProfile: z.literal('display_p3'),
+        renderingIntentApplied: z.literal(true),
         sceneToDisplayTransform: z.literal('rawengine_agx_v1'),
-        transferStatus: z.literal('current_srgb_pipe_rgba8_export'),
+        transferStatus: z.literal('moxcms_rgb16_display_p3_final_file'),
         viewTransform: z.literal('rawengine_agx_v1'),
         workingBuffer: z.literal('linear_srgb_d65_observed'),
       })
@@ -140,14 +138,12 @@ const colorManagementProofSchema = z
     for (const nonClaim of [
       'acescg_working_space',
       'bradford_chromatic_adaptation',
+      'black_point_compensation',
       'camera_profile_quality',
       'capture_one_class_quality',
       'display_device_visual_match',
-      'display_p3_export',
       'gpu_color_parity',
-      'icc_embedding',
       'icc_colorimetric_accuracy',
-      'sixteen_bit_export',
     ] as const) {
       if (!doesNotProve.has(nonClaim)) {
         context.addIssue({
