@@ -805,7 +805,11 @@ function tetherIngestPresetLocaleKey(
 
 function tetherMetadataTemplateLocaleKey(
   templateId: TetherCaptureRequest['metadataTemplateId'],
-): 'editor.tether.metadataTemplateNone' | 'editor.tether.metadataTemplateStudioSession' {
+):
+  | 'editor.tether.metadataTemplateNone'
+  | 'editor.tether.metadataTemplateReviewSelect'
+  | 'editor.tether.metadataTemplateStudioSession' {
+  if (templateId === 'reviewSelect') return 'editor.tether.metadataTemplateReviewSelect';
   if (templateId === 'studioSession') return 'editor.tether.metadataTemplateStudioSession';
   return 'editor.tether.metadataTemplateNone';
 }

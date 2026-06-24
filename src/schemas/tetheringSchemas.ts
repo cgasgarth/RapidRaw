@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const tetherIngestPresetIdSchema = z.enum(['cameraSequence', 'sourceSequence', 'timestampCamera']);
-export const tetherMetadataTemplateIdSchema = z.enum(['none', 'studioSession']);
+export const tetherMetadataTemplateIdSchema = z.enum(['none', 'studioSession', 'reviewSelect']);
 export const tetherCameraControlIdSchema = z.enum(['iso', 'shutterSpeed', 'aperture']);
 export const tetherCameraControlStatusSchema = z.enum(['ready', 'read_only', 'unsupported']);
 

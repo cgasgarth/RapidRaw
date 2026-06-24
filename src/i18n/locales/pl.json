@@ -1321,6 +1321,7 @@
       "metadataSkipped": "No metadata template applied",
       "metadataTemplate": "Metadata template",
       "metadataTemplateNone": "None",
+      "metadataTemplateReviewSelect": "",
       "metadataTemplateStudioSession": "Studio session",
       "noCameraDescription": "Connect a supported camera and refresh to verify macOS tether discovery.",
       "noCameraTitle": "No camera reported",

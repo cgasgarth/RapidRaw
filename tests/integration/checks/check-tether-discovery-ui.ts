@@ -155,6 +155,7 @@ for (const key of [
   'metadataSkipped',
   'metadataTemplate',
   'metadataTemplateNone',
+  'metadataTemplateReviewSelect',
   'metadataTemplateStudioSession',
   'incomingCaptures',
   'reviewHoldCurrent',
