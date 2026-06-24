@@ -1349,6 +1349,7 @@
       "cancelled": "Export abgebrochen",
       "chooseExternalEditor": "Editor wählen...",
       "chooseExternalEditorTitle": "Externen Editor wählen",
+      "cmm": "",
       "colorManagedTransform": "",
       "estimatedAverageSize": " ({{size}} Ø)",
       "estimatedSize": "Geschätzte Dateigröße: ~{{size}}",
@@ -1367,6 +1368,8 @@
       "externalEditorSaveDetected": "",
       "externalEditorWatching": "",
       "failed": "Export fehlgeschlagen",
+      "iccEmbedded": "",
+      "identityTransform": "",
       "importingLinkedVariant": "Wird importiert…",
       "importLinkedVariant": "Verknüpfte Variante importieren",
       "linkedVariantImported": "Linked variant imported: {{filename}}. Original left untouched.",
@@ -1376,7 +1379,8 @@
       "offlineSmartPreviewBlocked": "Verbinde die Originaldatei erneut, bevor du in voller Auflösung exportierst. Du kannst die Smart-Vorschau weiter bearbeiten.",
       "openInEditor": "Im Editor öffnen",
       "showInFinder": "Im Finder anzeigen",
-      "success": "Export erfolgreich!"
+      "success": "Export erfolgreich!",
+      "transformApplied": ""
     },
     "title": "Export",
     "watermark": {

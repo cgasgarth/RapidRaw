@@ -394,6 +394,20 @@ export default function ExportPanel({
           .filter(Boolean)
           .join(' · ')
       : null;
+  const firstReceiptPolicyText = firstReceiptOutput
+    ? [
+        firstReceiptOutput.transformApplied === true
+          ? t('export.status.transformApplied')
+          : firstReceiptOutput.transformApplied === false
+            ? t('export.status.identityTransform')
+            : null,
+        firstReceiptOutput.iccEmbedded === true ? t('export.status.iccEmbedded') : null,
+        firstReceiptOutput.cmm ? t('export.status.cmm', { cmm: firstReceiptOutput.cmm }) : null,
+        firstReceiptOutput.policyVersion,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : null;
   const isExporting = status === Status.Exporting;
   const isLibraryContext = !!onClose;
   const isCurrentExternalVariantStatus = externalVariantStatus.receiptOutputPath === firstReceiptOutput?.outputPath;
@@ -1387,10 +1401,17 @@ export default function ExportPanel({
         {firstReceiptOutput && (
           <div
             className="rounded-md border border-surface bg-surface/60 p-2"
+            data-export-receipt-black-point-compensation={firstReceiptOutput.blackPointCompensation ?? ''}
             data-export-receipt-color-managed-transform={firstReceiptOutput.colorManagedTransform ?? ''}
+            data-export-receipt-cmm={firstReceiptOutput.cmm ?? ''}
+            data-export-receipt-effective-color-profile={firstReceiptOutput.effectiveColorProfile ?? ''}
             data-export-receipt-format={firstReceiptOutput.format}
+            data-export-receipt-icc-embedded={String(firstReceiptOutput.iccEmbedded ?? '')}
             data-export-receipt-output-path={firstReceiptOutput.outputPath}
+            data-export-receipt-policy-version={firstReceiptOutput.policyVersion ?? ''}
+            data-export-receipt-requested-color-profile={firstReceiptOutput.requestedColorProfile ?? ''}
             data-export-receipt-total={lastReceipt.total}
+            data-export-receipt-transform-applied={String(firstReceiptOutput.transformApplied ?? '')}
             data-testid="export-success-receipt"
           >
             <UiText as="p" color={TextColors.primary} variant={TextVariants.small} weight={TextWeights.semibold}>
@@ -1443,6 +1464,15 @@ export default function ExportPanel({
                     variant={TextVariants.small}
                   >
                     {t('export.status.colorManagedTransform', { transform: firstReceiptOutput.colorManagedTransform })}
+                  </UiText>
+                )}
+                {firstReceiptPolicyText && (
+                  <UiText
+                    color={TextColors.secondary}
+                    data-testid="export-success-color-policy"
+                    variant={TextVariants.small}
+                  >
+                    {firstReceiptPolicyText}
                   </UiText>
                 )}
                 {canOpenReceiptInEditor && (
