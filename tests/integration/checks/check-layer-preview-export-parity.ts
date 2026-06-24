@@ -32,7 +32,27 @@ const layerSchema = z
     maskAlpha: z.array(z.number().min(0).max(1)).optional(),
     name: z.string().trim().min(1),
     opacity: z.number().min(0).max(1),
-    pixels: z.array(pixelSchema).min(1),
+    pixels: z.array(pixelSchema).min(1).optional(),
+    retouchCloneSource: z
+      .object({
+        alignmentErrorPx: z.number().min(0).optional(),
+        rotationDegrees: z.number().min(-180).max(180),
+        scale: z.number().min(0.1).max(10),
+        sourcePoint: z
+          .object({
+            x: z.number().min(0).max(1),
+            y: z.number().min(0).max(1),
+          })
+          .strict(),
+        targetPoint: z
+          .object({
+            x: z.number().min(0).max(1),
+            y: z.number().min(0).max(1),
+          })
+          .strict(),
+      })
+      .strict()
+      .optional(),
     visible: z.boolean(),
   })
   .strict();
@@ -43,6 +63,26 @@ const sidecarLayerSchema = z
     id: z.string().trim().min(1),
     maskPersisted: z.boolean(),
     opacity: z.number().min(0).max(1),
+    retouchCloneSource: z
+      .object({
+        alignmentErrorPx: z.number().min(0).optional(),
+        rotationDegrees: z.number().min(-180).max(180),
+        scale: z.number().min(0.1).max(10),
+        sourcePoint: z
+          .object({
+            x: z.number().min(0).max(1),
+            y: z.number().min(0).max(1),
+          })
+          .strict(),
+        targetPoint: z
+          .object({
+            x: z.number().min(0).max(1),
+            y: z.number().min(0).max(1),
+          })
+          .strict(),
+      })
+      .strict()
+      .optional(),
     visible: z.boolean(),
   })
   .strict();
@@ -85,7 +125,10 @@ const caseSchema = z
     }
 
     for (const [index, layer] of fixture.layers.entries()) {
-      if (layer.pixels.length !== pixelCount) {
+      if (layer.retouchCloneSource === undefined && layer.pixels?.length !== pixelCount) {
+        context.addIssue({ code: 'custom', message: 'layer pixels must match dimensions.', path: ['layers', index] });
+      }
+      if (layer.retouchCloneSource !== undefined && layer.pixels !== undefined && layer.pixels.length !== pixelCount) {
         context.addIssue({ code: 'custom', message: 'layer pixels must match dimensions.', path: ['layers', index] });
       }
       if (layer.maskAlpha !== undefined && layer.maskAlpha.length !== pixelCount) {
@@ -140,6 +183,9 @@ for (const fixture of manifest.cases) {
   if (!fixture.layers.some((layer) => layer.opacity > 0 && layer.opacity < 1))
     fail(`${fixture.id}: missing partial opacity`);
   if (!fixture.layers.some((layer) => layer.maskAlpha !== undefined)) fail(`${fixture.id}: missing mask interaction`);
+  const cloneLayer = fixture.layers.find((layer) => layer.retouchCloneSource !== undefined);
+  if (cloneLayer === undefined) fail(`${fixture.id}: missing retouch clone source layer`);
+  if (cloneLayer.pixels !== undefined) fail(`${fixture.id}: clone source layer should sample from source pixels`);
 
   const sidecarLayerIds = fixture.sidecarLayerStack.layers.map((layer) => layer.id);
   const fixtureLayerIds = fixture.layers.map((layer) => layer.id);
@@ -174,6 +220,24 @@ for (const fixture of manifest.cases) {
 
   const sidecarRoundtrip = sidecarLayerStackSchema.parse(JSON.parse(JSON.stringify(fixture.sidecarLayerStack)));
   if (sidecarRoundtrip.storage !== 'sidecar_artifact') fail(`${fixture.id}: sidecar storage mismatch`);
+  if (!sidecarRoundtrip.layers.some((layer) => layer.retouchCloneSource?.sourcePoint.x === 0)) {
+    fail(`${fixture.id}: sidecar clone source linkage missing`);
+  }
+
+  const transformedCloneLayer = {
+    ...cloneLayer,
+    retouchCloneSource: {
+      ...cloneLayer.retouchCloneSource,
+      rotationDegrees: 2,
+    },
+  };
+  let rejectedTransformedClone = false;
+  try {
+    renderLayerPreviewStack({ ...fixture, layers: [transformedCloneLayer] });
+  } catch (error) {
+    rejectedTransformedClone = error instanceof Error && error.message.includes('exact translated sampling only');
+  }
+  if (!rejectedTransformedClone) fail(`${fixture.id}: transformed clone rendering should be gated`);
 
   await writePpm(resolve(OUTPUT_DIR, `${fixture.id}.preview.ppm`), fixture.width, fixture.height, preview.pixels);
   await writePpm(resolve(OUTPUT_DIR, `${fixture.id}.export.ppm`), fixture.width, fixture.height, exported.pixels);
