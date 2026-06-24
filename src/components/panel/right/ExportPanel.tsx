@@ -78,11 +78,13 @@ const externalEditorVariantReceiptSchema = z
     bitDepth: z.number().int().positive().optional().nullable(),
     colorProfile: z.string().trim().min(1).optional().nullable(),
     contentHash: z.string().trim().min(1),
+    embeddedIccProfile: z.boolean(),
     outputPath: z.string().trim().min(1),
     renderingIntent: z.string().trim().min(1).optional().nullable(),
     sidecarPath: z.string().trim().min(1),
     sourcePath: z.string().trim().min(1),
     sourceRevision: z.string().trim().min(1),
+    verifiedBitDepth: z.number().int().positive().optional().nullable(),
   })
   .strict();
 const externalEditorFileWatchSnapshotSchema = z
@@ -349,11 +351,20 @@ export default function ExportPanel({
   const [estimatedSize, setEstimatedSize] = useState<number | null>(null);
   const [isEstimating, setIsEstimating] = useState<boolean>(false);
   const [externalVariantStatus, setExternalVariantStatus] = useState<{
+    embeddedIccProfile: boolean | null;
     error: string | null;
     importedPath: string | null;
     importing: boolean;
     receiptOutputPath: string | null;
-  }>({ error: null, importedPath: null, importing: false, receiptOutputPath: null });
+    verifiedBitDepth: number | null;
+  }>({
+    embeddedIccProfile: null,
+    error: null,
+    importedPath: null,
+    importing: false,
+    receiptOutputPath: null,
+    verifiedBitDepth: null,
+  });
   const [externalEditorError, setExternalEditorError] = useState<string | null>(null);
   const [externalEditorWatch, setExternalEditorWatch] = useState<{
     baselineByteSize: number;
@@ -413,6 +424,12 @@ export default function ExportPanel({
   const isCurrentExternalVariantStatus = externalVariantStatus.receiptOutputPath === firstReceiptOutput?.outputPath;
   const currentExternalVariantError = isCurrentExternalVariantStatus ? externalVariantStatus.error : null;
   const currentExternalVariantImportedPath = isCurrentExternalVariantStatus ? externalVariantStatus.importedPath : null;
+  const currentExternalVariantEmbeddedIccProfile = isCurrentExternalVariantStatus
+    ? externalVariantStatus.embeddedIccProfile
+    : null;
+  const currentExternalVariantVerifiedBitDepth = isCurrentExternalVariantStatus
+    ? externalVariantStatus.verifiedBitDepth
+    : null;
   const isImportingCurrentExternalVariant = isCurrentExternalVariantStatus && externalVariantStatus.importing;
   const isCurrentExternalEditorWatch = externalEditorWatch?.outputPath === firstReceiptOutput?.outputPath;
   const currentExternalEditorWatch = isCurrentExternalEditorWatch ? externalEditorWatch : null;
@@ -420,7 +437,14 @@ export default function ExportPanel({
   const handleImportExternalVariant = useCallback(
     async (sourceVirtualPath: string, output: NonNullable<typeof firstReceiptOutput>) => {
       const outputPath = output.outputPath;
-      setExternalVariantStatus({ error: null, importedPath: null, importing: true, receiptOutputPath: outputPath });
+      setExternalVariantStatus({
+        embeddedIccProfile: null,
+        error: null,
+        importedPath: null,
+        importing: true,
+        receiptOutputPath: outputPath,
+        verifiedBitDepth: null,
+      });
       try {
         const receipt = await invokeWithSchema(
           Invokes.ImportExternalEditorVariant,
@@ -435,17 +459,21 @@ export default function ExportPanel({
         );
         await onLinkedVariantImported?.(receipt.outputPath);
         setExternalVariantStatus({
+          embeddedIccProfile: receipt.embeddedIccProfile,
           error: null,
           importedPath: receipt.outputPath,
           importing: false,
           receiptOutputPath: outputPath,
+          verifiedBitDepth: receipt.verifiedBitDepth ?? null,
         });
       } catch (error) {
         setExternalVariantStatus({
+          embeddedIccProfile: null,
           error: formatUnknownError(error),
           importedPath: null,
           importing: false,
           receiptOutputPath: outputPath,
+          verifiedBitDepth: null,
         });
       }
     },
@@ -1425,7 +1453,9 @@ export default function ExportPanel({
                 as="p"
                 className="mt-1 break-all"
                 color={TextColors.secondary}
+                data-external-editor-embedded-icc-profile={String(currentExternalVariantEmbeddedIccProfile)}
                 data-testid="export-success-linked-variant-imported"
+                data-external-editor-verified-bit-depth={currentExternalVariantVerifiedBitDepth ?? ''}
                 variant={TextVariants.small}
               >
                 {t('export.status.linkedVariantImported', { filename: firstReceiptFileName })}
