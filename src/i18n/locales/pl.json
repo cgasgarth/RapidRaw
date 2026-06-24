@@ -1432,6 +1432,7 @@
       "cancelled": "Eksport anulowany",
       "chooseExternalEditor": "Wybierz edytor...",
       "chooseExternalEditorTitle": "Wybierz edytor zewnętrzny",
+      "cmm": "",
       "colorManagedTransform": "",
       "estimatedAverageSize": " (śr. {{size}})",
       "estimatedSize": "Szacowany rozmiar pliku: ~{{size}}",
@@ -1452,6 +1453,8 @@
       "externalEditorSaveDetected": "",
       "externalEditorWatching": "",
       "failed": "Eksport nie powiódł się",
+      "iccEmbedded": "",
+      "identityTransform": "",
       "importingLinkedVariant": "Importowanie…",
       "importLinkedVariant": "Importuj połączony wariant",
       "linkedVariantImported": "Linked variant imported: {{filename}}. Original left untouched.",
@@ -1461,7 +1464,8 @@
       "offlineSmartPreviewBlocked": "Podłącz ponownie oryginalny plik przed eksportem w pełnej rozdzielczości. Nadal możesz edytować inteligentny podgląd.",
       "openInEditor": "Otwórz w edytorze",
       "showInFinder": "Pokaż w Finderze",
-      "success": "Eksport zakończony sukcesem!"
+      "success": "Eksport zakończony sukcesem!",
+      "transformApplied": ""
     },
     "title": "Eksport",
     "watermark": {

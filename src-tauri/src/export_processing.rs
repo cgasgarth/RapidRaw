@@ -44,13 +44,20 @@ use crate::deblur_render::apply_deblur_stage;
 #[serde(rename_all = "camelCase")]
 struct ExportReceiptOutput {
     bit_depth: Option<u8>,
+    black_point_compensation: Option<String>,
     byte_size: u64,
+    cmm: Option<String>,
     color_managed_transform: Option<String>,
     color_profile: Option<String>,
+    effective_color_profile: Option<String>,
     format: String,
+    icc_embedded: Option<bool>,
     output_path: String,
+    policy_version: Option<String>,
     rendering_intent: Option<String>,
+    requested_color_profile: Option<String>,
     source_path: String,
+    transform_applied: Option<bool>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1369,49 +1376,91 @@ fn export_receipt_output(
 
     Ok(ExportReceiptOutput {
         bit_depth: metadata.as_ref().map(|metadata| metadata.bit_depth),
+        black_point_compensation: metadata
+            .as_ref()
+            .map(|metadata| metadata.black_point_compensation.clone()),
         byte_size,
+        cmm: metadata.as_ref().map(|metadata| metadata.cmm.clone()),
         color_managed_transform: metadata
             .as_ref()
             .map(|metadata| metadata.color_managed_transform.clone()),
         color_profile: metadata
             .as_ref()
             .map(|metadata| metadata.color_profile.clone()),
+        effective_color_profile: metadata
+            .as_ref()
+            .map(|metadata| metadata.effective_color_profile.clone()),
         format: format.to_string(),
+        icc_embedded: metadata.as_ref().map(|metadata| metadata.icc_embedded),
         output_path: output_path.to_string_lossy().to_string(),
-        rendering_intent: metadata.map(|metadata| metadata.rendering_intent),
+        policy_version: metadata
+            .as_ref()
+            .map(|metadata| metadata.policy_version.clone()),
+        rendering_intent: metadata
+            .as_ref()
+            .map(|metadata| metadata.rendering_intent.clone()),
+        requested_color_profile: metadata
+            .as_ref()
+            .map(|metadata| metadata.requested_color_profile.clone()),
         source_path: source_path.to_string(),
+        transform_applied: metadata.map(|metadata| metadata.transform_applied),
     })
 }
 
 struct ExportReceiptMetadata {
     bit_depth: u8,
+    black_point_compensation: String,
+    cmm: String,
     color_managed_transform: String,
     color_profile: String,
+    effective_color_profile: String,
+    icc_embedded: bool,
+    policy_version: String,
     rendering_intent: String,
+    requested_color_profile: String,
+    transform_applied: bool,
 }
 
 fn export_receipt_metadata(
     format: &str,
     export_settings: &ExportSettings,
 ) -> Option<ExportReceiptMetadata> {
-    match format {
-        "jpg" | "jpeg" => Some(ExportReceiptMetadata {
-            bit_depth: 8,
-            color_managed_transform: "export_rgb_pixels_and_profile".to_string(),
-            color_profile: export_color_profile_receipt_label(&export_settings.color_profile),
-            rendering_intent: export_rendering_intent_receipt_label(
-                &export_settings.rendering_intent,
-            ),
-        }),
-        "tif" | "tiff" => Some(ExportReceiptMetadata {
-            bit_depth: 16,
-            color_managed_transform: "export_rgb_pixels_and_profile".to_string(),
-            color_profile: export_color_profile_receipt_label(&export_settings.color_profile),
-            rendering_intent: export_rendering_intent_receipt_label(
-                &export_settings.rendering_intent,
-            ),
-        }),
-        _ => None,
+    if !supports_color_managed_receipt_metadata(format) {
+        return None;
+    }
+
+    let transform_applied = matches!(export_settings.color_profile, ExportColorProfile::DisplayP3);
+    let bit_depth = if matches!(format, "tif" | "tiff") {
+        16
+    } else {
+        8
+    };
+    let color_profile = export_color_profile_receipt_label(&export_settings.color_profile);
+
+    Some(ExportReceiptMetadata {
+        bit_depth,
+        black_point_compensation: "Unavailable until CMM support is implemented".to_string(),
+        cmm: "moxcms".to_string(),
+        color_managed_transform: export_color_transform_receipt_label(transform_applied),
+        color_profile: color_profile.clone(),
+        effective_color_profile: color_profile,
+        icc_embedded: true,
+        policy_version: "rawengine-export-color-policy-v1".to_string(),
+        rendering_intent: export_rendering_intent_receipt_label(&export_settings.rendering_intent),
+        requested_color_profile: export_color_profile_receipt_label(&export_settings.color_profile),
+        transform_applied,
+    })
+}
+
+fn supports_color_managed_receipt_metadata(format: &str) -> bool {
+    matches!(format, "jpg" | "jpeg" | "tif" | "tiff")
+}
+
+fn export_color_transform_receipt_label(transform_applied: bool) -> String {
+    if transform_applied {
+        "sRGB to Display P3 conversion applied".to_string()
+    } else {
+        "sRGB identity output; ICC embedded".to_string()
     }
 }
 
@@ -1427,10 +1476,10 @@ fn export_rendering_intent_receipt_label(rendering_intent: &ExportRenderingInten
 fn export_color_profile_receipt_label(color_profile: &ExportColorProfile) -> String {
     match color_profile {
         ExportColorProfile::DisplayP3 => "Display P3".to_string(),
-        ExportColorProfile::Srgb
-        | ExportColorProfile::AdobeRgb1998
-        | ExportColorProfile::ProPhotoRgb
-        | ExportColorProfile::SourceEmbedded => "sRGB".to_string(),
+        ExportColorProfile::Srgb => "sRGB".to_string(),
+        ExportColorProfile::AdobeRgb1998 => "Adobe RGB (1998)".to_string(),
+        ExportColorProfile::ProPhotoRgb => "ProPhoto RGB".to_string(),
+        ExportColorProfile::SourceEmbedded => "Source embedded".to_string(),
     }
 }
 
@@ -1894,17 +1943,45 @@ mod tests {
     }
 
     #[test]
-    fn export_receipt_reports_rendering_intent() {
+    fn export_receipt_reports_semantic_applied_policy() {
         let mut settings = base_export_settings(None);
         settings.rendering_intent = ExportRenderingIntent::Perceptual;
         let metadata = export_receipt_metadata("tiff", &settings)
             .expect("TIFF receipt metadata should be available");
 
         assert_eq!(metadata.rendering_intent, "Perceptual");
+        assert_eq!(metadata.bit_depth, 16);
+        assert_eq!(metadata.cmm, "moxcms");
         assert_eq!(
             metadata.color_managed_transform,
-            "export_rgb_pixels_and_profile"
+            "sRGB identity output; ICC embedded"
         );
+        assert_eq!(metadata.effective_color_profile, "sRGB");
+        assert!(metadata.icc_embedded);
+        assert_eq!(metadata.policy_version, "rawengine-export-color-policy-v1");
+        assert_eq!(metadata.requested_color_profile, "sRGB");
+        assert!(!metadata.transform_applied);
+        assert_eq!(
+            metadata.black_point_compensation,
+            "Unavailable until CMM support is implemented"
+        );
+    }
+
+    #[test]
+    fn display_p3_export_receipt_reports_transform_applied() {
+        let mut settings = base_export_settings(None);
+        settings.color_profile = ExportColorProfile::DisplayP3;
+        let metadata = export_receipt_metadata("jpg", &settings)
+            .expect("JPEG receipt metadata should be available");
+
+        assert_eq!(
+            metadata.color_managed_transform,
+            "sRGB to Display P3 conversion applied"
+        );
+        assert_eq!(metadata.bit_depth, 8);
+        assert_eq!(metadata.effective_color_profile, "Display P3");
+        assert_eq!(metadata.requested_color_profile, "Display P3");
+        assert!(metadata.transform_applied);
     }
 
     #[test]
