@@ -102,6 +102,15 @@ const findAlbumById = (nodes: AlbumItem[], albumId: string): Album | null => {
   return null;
 };
 
+const folderTreeContainsPath = (nodes: FolderTree[], path: string): boolean =>
+  nodes.some((node) => node.path === path || folderTreeContainsPath(node.children, path));
+
+const resolveRestoredFolderPath = (trees: FolderTree[], preferredPath: string | null, fallbackPath: string): string => {
+  if (preferredPath?.startsWith('Album: ')) return preferredPath;
+  if (preferredPath && folderTreeContainsPath(trees, preferredPath)) return preferredPath;
+  return folderTreeContainsPath(trees, fallbackPath) ? fallbackPath : (trees[0]?.path ?? fallbackPath);
+};
+
 export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationProps) {
   const {
     transformWrapperRef,
@@ -601,9 +610,11 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
           : [];
 
       if (rootFolders.length === 0) return;
+      const fallbackRootFolder = rootFolders[0];
+      if (!fallbackRootFolder) return;
 
       const folderState = appSettings?.lastFolderState;
-      const pathToSelect = folderState?.currentFolderPath ?? rootFolders[0] ?? null;
+      let pathToSelect = folderState?.currentFolderPath ?? fallbackRootFolder;
 
       setLibrary({ rootPaths: rootFolders });
 
@@ -631,6 +642,12 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
           });
         }
         setLibrary({ folderTrees: treesData });
+
+        const resolvedPathToSelect = resolveRestoredFolderPath(treesData, pathToSelect, fallbackRootFolder);
+        if (pathToSelect !== resolvedPathToSelect) {
+          toast.warn('The previous folder could not be found. Restored the root folder instead.');
+          pathToSelect = resolvedPathToSelect;
+        }
       } catch (err) {
         console.error('Failed to restore folder trees:', err);
       } finally {
