@@ -7,6 +7,7 @@ import { prepareAdjustmentPayloadForBackend } from '../schemas/adjustmentPayload
 import { emptyTauriResponseSchema } from '../schemas/tauriResponseSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
+import { useProcessStore } from '../store/useProcessStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 import { type Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../utils/adjustments';
@@ -459,6 +460,7 @@ export function useImageProcessing(
 
         applyAdjustments(adjustments, false, targetRes);
         debouncedSave(selectedImage.path, adjustments);
+        useProcessStore.getState().invalidateThumbnails([selectedImage.path]);
 
         const otherPaths = multiSelectedPaths.filter((p) => p !== selectedImage.path);
         if (otherPaths.length > 0) {
@@ -479,6 +481,7 @@ export function useImageProcessing(
               otherPaths.forEach((p) => {
                 globalImageCache.delete(p);
               });
+              useProcessStore.getState().invalidateThumbnails(otherPaths);
               invokeWithSchema(
                 Invokes.ApplyAdjustmentsToPaths,
                 { paths: otherPaths, adjustments: delta },
