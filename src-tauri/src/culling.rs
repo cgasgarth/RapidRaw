@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Instant;
 use tauri::{AppHandle, Emitter};
 
 use crate::image_loader;
@@ -52,6 +53,19 @@ pub struct CullingSuggestions {
     pub blurry_images: Vec<ImageAnalysisResult>,
     pub focus_rankings: Vec<ImageAnalysisResult>,
     pub failed_paths: Vec<String>,
+    pub latency_report: Option<CullingLatencyReport>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CullingLatencyReport {
+    pub analysis_mode_count: usize,
+    pub average_analysis_ms: f64,
+    pub failed_count: usize,
+    pub max_analysis_ms: u128,
+    pub source_count: usize,
+    pub successful_count: usize,
+    pub total_elapsed_ms: u128,
 }
 
 #[derive(Serialize, Clone)]
@@ -62,6 +76,7 @@ struct CullingProgress {
 }
 
 struct ImageAnalysisData {
+    analysis_duration_ms: u128,
     hash: image_hasher::ImageHash,
     result: ImageAnalysisResult,
 }
@@ -230,6 +245,7 @@ fn analyze_image(
     let hash = hasher.hash_image(&thumbnail);
 
     Ok(ImageAnalysisData {
+        analysis_duration_ms: 0,
         hash,
         result: ImageAnalysisResult {
             path: path.to_string(),
@@ -254,6 +270,7 @@ pub async fn cull_images(
     settings: CullingSettings,
     app_handle: AppHandle,
 ) -> Result<CullingSuggestions, String> {
+    let started_at = Instant::now();
     if paths.is_empty() {
         return Ok(CullingSuggestions::default());
     }
@@ -282,7 +299,13 @@ pub async fn cull_images(
                 },
             );
 
-            analyze_image(path, &hasher, &app_settings).map_err(|e| (path.to_string(), e))
+            let image_started_at = Instant::now();
+            analyze_image(path, &hasher, &app_settings)
+                .map(|mut data| {
+                    data.analysis_duration_ms = image_started_at.elapsed().as_millis();
+                    data
+                })
+                .map_err(|e| (path.to_string(), e))
         })
         .collect();
 
@@ -394,6 +417,33 @@ pub async fn cull_images(
         });
     }
 
+    let successful_count = successful_analyses.len();
+    let total_analysis_ms: u128 = successful_analyses
+        .iter()
+        .map(|item| item.analysis_duration_ms)
+        .sum();
+    let max_analysis_ms = successful_analyses
+        .iter()
+        .map(|item| item.analysis_duration_ms)
+        .max()
+        .unwrap_or(0);
+    let average_analysis_ms = if successful_count == 0 {
+        0.0
+    } else {
+        total_analysis_ms as f64 / successful_count as f64
+    };
+    suggestions.latency_report = Some(CullingLatencyReport {
+        analysis_mode_count: (settings.group_similar as usize)
+            + (settings.filter_blurry as usize)
+            + (settings.rank_focus as usize),
+        average_analysis_ms,
+        failed_count: suggestions.failed_paths.len(),
+        max_analysis_ms,
+        source_count: total_count,
+        successful_count,
+        total_elapsed_ms: started_at.elapsed().as_millis(),
+    });
+
     let _ = app_handle.emit(crate::events::CULLING_COMPLETE, &suggestions);
     Ok(suggestions)
 }
@@ -487,6 +537,7 @@ mod tests {
         artifact_path: String,
         failed_paths: Vec<String>,
         issue: u32,
+        latency_report: CullingLatencyReport,
         metrics: Vec<PrivateCullingMetric>,
         proof_claims: PrivateCullingProofClaims,
         rankings: Vec<PrivateCullingRanking>,
@@ -519,6 +570,7 @@ mod tests {
         focus_confidence: f64,
         focus_region: String,
         focus_score: f64,
+        analysis_duration_ms: u128,
         path: String,
         rank: usize,
         source_hash_after: String,
@@ -546,7 +598,9 @@ mod tests {
     }
 
     fn run_private_culling_focus_raw_proof(private_root: &Path) -> Result<(), String> {
+        let report_started_at = Instant::now();
         let source_paths = collect_raw_paths(private_root, PRIVATE_CULLING_SOURCE_LIMIT)?;
+        let source_count = source_paths.len();
         if source_paths.len() < 2 {
             return Err(format!(
                 "expected at least 2 RAW files under {}, found {}",
@@ -565,6 +619,7 @@ mod tests {
         for path in source_paths {
             let source_hash_before = sha256_file(&path)?;
             let path_string = path.to_string_lossy().to_string();
+            let analysis_started_at = Instant::now();
             let result = match analyze_image(&path_string, &hasher, &settings) {
                 Ok(analysis) => analysis.result,
                 Err(error) => {
@@ -575,8 +630,10 @@ mod tests {
                     continue;
                 }
             };
+            let analysis_duration_ms = analysis_started_at.elapsed().as_millis();
             let source_hash_after = sha256_file(&path)?;
             rankings.push(PrivateCullingRanking {
+                analysis_duration_ms,
                 center_focus_metric: result.center_focus_metric,
                 exposure_metric: result.exposure_metric,
                 face_sharpness_metric: result.face_sharpness_metric,
@@ -623,6 +680,29 @@ mod tests {
         let heuristic_regions = rankings
             .iter()
             .all(|ranking| ranking.focus_region == FOCUS_REGION_EYE_BAND_HEURISTIC);
+        let total_analysis_ms: u128 = rankings
+            .iter()
+            .map(|ranking| ranking.analysis_duration_ms)
+            .sum();
+        let max_analysis_ms = rankings
+            .iter()
+            .map(|ranking| ranking.analysis_duration_ms)
+            .max()
+            .unwrap_or(0);
+        let average_analysis_ms = if rankings.is_empty() {
+            0.0
+        } else {
+            total_analysis_ms as f64 / rankings.len() as f64
+        };
+        let latency_report = CullingLatencyReport {
+            analysis_mode_count: 1,
+            average_analysis_ms,
+            failed_count: failed_paths.len(),
+            max_analysis_ms,
+            source_count,
+            successful_count: rankings.len(),
+            total_elapsed_ms: report_started_at.elapsed().as_millis(),
+        };
 
         let metrics = vec![
             private_metric(
@@ -661,6 +741,18 @@ mod tests {
                 1.0,
                 heuristic_regions,
             ),
+            private_metric(
+                "latencyReportIncludesAllSources",
+                latency_report.source_count as f64,
+                source_count as f64,
+                latency_report.source_count == source_count,
+            ),
+            private_metric(
+                "latencyReportHasSuccessfulSamples",
+                latency_report.successful_count as f64,
+                2.0,
+                latency_report.successful_count >= 2,
+            ),
         ];
 
         let artifact_dir = private_root.join(PRIVATE_CULLING_ARTIFACT_DIR);
@@ -669,7 +761,8 @@ mod tests {
         let report = PrivateCullingFocusReport {
             artifact_path: format!("{PRIVATE_CULLING_ARTIFACT_DIR}/{PRIVATE_CULLING_REPORT_NAME}"),
             failed_paths,
-            issue: 3267,
+            issue: 3400,
+            latency_report,
             metrics,
             proof_claims: PrivateCullingProofClaims {
                 does_not_prove: vec![
@@ -684,6 +777,7 @@ mod tests {
                     "focus_score_and_confidence_are_bounded".to_string(),
                     "source_raw_files_are_not_mutated".to_string(),
                     "focus_region_is_declared_as_heuristic".to_string(),
+                    "runtime_latency_report_is_emitted".to_string(),
                 ],
             },
             source_count: rankings.len(),

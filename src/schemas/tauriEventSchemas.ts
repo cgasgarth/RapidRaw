@@ -157,11 +157,24 @@ const cullGroupSchema = z
   })
   .loose();
 
+const cullingLatencyReportSchema = z
+  .object({
+    analysisModeCount: nonnegativeNumberSchema,
+    averageAnalysisMs: nonnegativeNumberSchema,
+    failedCount: nonnegativeNumberSchema,
+    maxAnalysisMs: nonnegativeNumberSchema,
+    sourceCount: nonnegativeNumberSchema,
+    successfulCount: nonnegativeNumberSchema,
+    totalElapsedMs: nonnegativeNumberSchema,
+  })
+  .loose();
+
 export const cullingSuggestionsPayloadSchema = z
   .object({
     blurryImages: z.array(imageAnalysisResultSchema),
     failedPaths: z.array(z.string()),
     focusRankings: z.array(imageAnalysisResultSchema).default([]),
+    latencyReport: cullingLatencyReportSchema.nullable().default(null),
     similarGroups: z.array(cullGroupSchema),
   })
   .loose();

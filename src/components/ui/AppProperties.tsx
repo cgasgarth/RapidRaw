@@ -450,6 +450,17 @@ export interface CullingSuggestions {
   blurryImages: ImageAnalysisResult[];
   focusRankings: ImageAnalysisResult[];
   failedPaths: string[];
+  latencyReport: CullingLatencyReport | null;
+}
+
+export interface CullingLatencyReport {
+  analysisModeCount: number;
+  averageAnalysisMs: number;
+  failedCount: number;
+  maxAnalysisMs: number;
+  sourceCount: number;
+  successfulCount: number;
+  totalElapsedMs: number;
 }
 
 export interface KeybindHandler {
