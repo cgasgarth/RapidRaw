@@ -12,6 +12,7 @@
     "build": "bun run build:frontend",
     "tauri": "tauri",
     "start": "tauri dev",
+    "start:native-qa": "bun scripts/start-native-qa-app.ts",
     "typecheck": "bun scripts/run-compact-command.ts --label typecheck -- tsc --noEmit --pretty false",
     "lint": "bun scripts/run-compact-command.ts --label lint -- eslint . --max-warnings 0",
     "lint:fix": "bun scripts/run-compact-command.ts --label lint:fix -- eslint . --fix",

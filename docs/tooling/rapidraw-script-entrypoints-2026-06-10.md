@@ -27,20 +27,21 @@ Tauri build behavior changes.
 
 ## `package.json` Scripts
 
-| Script         | Command                              | Current role                                       | Baseline status |
-| -------------- | ------------------------------------ | -------------------------------------------------- | --------------- |
-| `dev`          | `vite`                               | Vite dev server used by Tauri `beforeDevCommand`.  | Serves on 1420. |
-| `build`        | `vite build`                         | Frontend production build and Tauri `beforeBuild`. | Passing.        |
-| `tauri`        | `tauri`                              | Generic Tauri CLI passthrough.                     | Not gated.      |
-| `start`        | `tauri dev`                          | Local desktop dev app entrypoint.                  | Not gated.      |
-| `typecheck`    | `tsc --noEmit`                       | TypeScript validation.                             | Failing, #283.  |
-| `lint`         | `eslint .`                           | ESLint validation.                                 | Failing, #286.  |
-| `lint:fix`     | `eslint . --fix`                     | Local lint autofix.                                | Not gated.      |
-| `format`       | `prettier --write .`                 | Whole-repo formatting write.                       | Not gated.      |
-| `format:check` | `prettier --check .`                 | Prettier validation.                               | Failing, #289.  |
-| `i18n:extract` | `i18next-cli extract`                | Translation extraction write.                      | Not gated.      |
-| `i18n:check`   | `i18next-cli extract --ci --dry-run` | Translation extraction drift check.                | Passing.        |
-| `i18n:lint`    | `i18next-cli lint`                   | Hardcoded-string scan.                             | Failing, #285.  |
+| Script            | Command                              | Current role                                                                                | Baseline status |
+| ----------------- | ------------------------------------ | ------------------------------------------------------------------------------------------- | --------------- |
+| `dev`             | `vite`                               | Vite dev server used by Tauri `beforeDevCommand`.                                           | Serves on 1420. |
+| `build`           | `vite build`                         | Frontend production build and Tauri `beforeBuild`.                                          | Passing.        |
+| `tauri`           | `tauri`                              | Generic Tauri CLI passthrough.                                                              | Not gated.      |
+| `start`           | `tauri dev`                          | Local desktop dev app entrypoint.                                                           | Not gated.      |
+| `start:native-qa` | `bun scripts/start-native-qa-app.ts` | Builds and opens a debug `.app` bundle that Computer Use can attach to for native macOS QA. | Manual QA.      |
+| `typecheck`       | `tsc --noEmit`                       | TypeScript validation.                                                                      | Failing, #283.  |
+| `lint`            | `eslint .`                           | ESLint validation.                                                                          | Failing, #286.  |
+| `lint:fix`        | `eslint . --fix`                     | Local lint autofix.                                                                         | Not gated.      |
+| `format`          | `prettier --write .`                 | Whole-repo formatting write.                                                                | Not gated.      |
+| `format:check`    | `prettier --check .`                 | Prettier validation.                                                                        | Failing, #289.  |
+| `i18n:extract`    | `i18next-cli extract`                | Translation extraction write.                                                               | Not gated.      |
+| `i18n:check`      | `i18next-cli extract --ci --dry-run` | Translation extraction drift check.                                                         | Passing.        |
+| `i18n:lint`       | `i18next-cli lint`                   | Hardcoded-string scan.                                                                      | Failing, #285.  |
 
 `package.json` does not currently define a single `check`, `check:quick`, test,
 visual, fixture, or app-smoke command. Those should be added as explicit
