@@ -651,6 +651,14 @@ fn export_rgb16_pixels_and_profile(
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
 ) -> Result<(Vec<u16>, u32, u32, ColorProfile), String> {
+    export_rgb16_pixels_with_shared_conversion_core(image, color_profile, rendering_intent)
+}
+
+fn export_rgb16_pixels_with_shared_conversion_core(
+    image: &DynamicImage,
+    color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
+) -> Result<(Vec<u16>, u32, u32, ColorProfile), String> {
     let rgb_image = image.to_rgb16();
     let (width, height) = rgb_image.dimensions();
     let pixels = rgb_image.into_raw();
@@ -665,10 +673,10 @@ fn export_rgb16_pixels_and_profile(
                 Layout::Rgb,
                 export_transform_options(rendering_intent),
             )
-            .map_err(|e| format!("Failed to build Display P3 TIFF export transform: {}", e))?;
+            .map_err(|e| format!("Failed to build Display P3 export transform: {}", e))?;
         let row_len = (width as usize)
             .checked_mul(3)
-            .ok_or_else(|| "TIFF export row is too wide".to_string())?;
+            .ok_or_else(|| "Export row is too wide".to_string())?;
         let mut transformed = vec![0u16; pixels.len()];
 
         for (src_row, dst_row) in pixels
@@ -677,7 +685,7 @@ fn export_rgb16_pixels_and_profile(
         {
             transform
                 .transform(src_row, dst_row)
-                .map_err(|e| format!("Failed to convert TIFF export to Display P3: {}", e))?;
+                .map_err(|e| format!("Failed to convert export to Display P3: {}", e))?;
         }
 
         Ok((transformed, width, height, output_profile))
@@ -724,39 +732,21 @@ fn export_rgb_pixels_and_profile(
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
 ) -> Result<(Vec<u8>, u32, u32, ColorProfile), String> {
-    let rgb_image = image.to_rgb8();
-    let (width, height) = rgb_image.dimensions();
-    let pixels = rgb_image.into_raw();
-    let output_profile = output_color_profile(color_profile)?;
+    let (pixels, width, height, output_profile) =
+        export_rgb16_pixels_with_shared_conversion_core(image, color_profile, rendering_intent)?;
+    Ok((
+        quantize_rgb16_to_rgb8(&pixels),
+        width,
+        height,
+        output_profile,
+    ))
+}
 
-    if matches!(color_profile, ExportColorProfile::DisplayP3) {
-        let src_profile = ColorProfile::new_srgb();
-        let transform = src_profile
-            .create_transform_8bit(
-                Layout::Rgb,
-                &output_profile,
-                Layout::Rgb,
-                export_transform_options(rendering_intent),
-            )
-            .map_err(|e| format!("Failed to build Display P3 export transform: {}", e))?;
-        let row_len = (width as usize)
-            .checked_mul(3)
-            .ok_or_else(|| "JPEG export row is too wide".to_string())?;
-        let mut transformed = vec![0u8; pixels.len()];
-
-        for (src_row, dst_row) in pixels
-            .chunks_exact(row_len)
-            .zip(transformed.chunks_exact_mut(row_len))
-        {
-            transform
-                .transform(src_row, dst_row)
-                .map_err(|e| format!("Failed to convert JPEG export to Display P3: {}", e))?;
-        }
-
-        Ok((transformed, width, height, output_profile))
-    } else {
-        Ok((pixels, width, height, output_profile))
-    }
+fn quantize_rgb16_to_rgb8(pixels: &[u16]) -> Vec<u8> {
+    pixels
+        .iter()
+        .map(|value| (((*value as u32) + 128) / 257) as u8)
+        .collect()
 }
 
 fn output_color_profile(color_profile: &ExportColorProfile) -> Result<ColorProfile, String> {
@@ -1799,8 +1789,9 @@ mod tests {
         ExportColorProfile, ExportRenderingIntent, ExportSettings, OutputSharpeningSettings,
         OutputSharpeningTarget, apply_export_resize_and_watermark, encode_image_to_bytes,
         export_jpeg_rgb_pixels_and_profile, export_receipt_metadata, export_rgb_pixels_and_profile,
-        export_rgb16_pixels_and_profile, export_soft_proof_rgb_pixels_and_profile,
-        export_transform_options, mox_rendering_intent,
+        export_rgb16_pixels_and_profile, export_rgb16_pixels_with_shared_conversion_core,
+        export_soft_proof_rgb_pixels_and_profile, export_transform_options, mox_rendering_intent,
+        quantize_rgb16_to_rgb8,
     };
     use std::io::Cursor;
 
@@ -2148,6 +2139,45 @@ mod tests {
             display_p3_pixels, srgb_pixels,
             "Display P3 export should transform pixels before tagging them"
         );
+    }
+
+    #[test]
+    fn jpeg_and_soft_proof_quantize_shared_16bit_conversion_core() {
+        let pixels = [
+            Rgb([0, 8, 32]),
+            Rgb([64, 96, 128]),
+            Rgb([160, 192, 224]),
+            Rgb([255, 240, 208]),
+        ];
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_fn(2, 2, |x, y| {
+            pixels[(y * 2 + x) as usize]
+        }));
+
+        let (core_pixels, width, height, _) = export_rgb16_pixels_with_shared_conversion_core(
+            &image,
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("Display P3 shared conversion core should run");
+        let expected_rgb8 = quantize_rgb16_to_rgb8(&core_pixels);
+        let (jpeg_pixels, jpeg_width, jpeg_height, _) = export_jpeg_rgb_pixels_and_profile(
+            &image,
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("Display P3 JPEG export should run");
+        let (soft_proof_pixels, soft_proof_width, soft_proof_height, _) =
+            export_soft_proof_rgb_pixels_and_profile(
+                &image,
+                &ExportColorProfile::DisplayP3,
+                &ExportRenderingIntent::RelativeColorimetric,
+            )
+            .expect("Display P3 soft proof should run");
+
+        assert_eq!((jpeg_width, jpeg_height), (width, height));
+        assert_eq!((soft_proof_width, soft_proof_height), (width, height));
+        assert_eq!(jpeg_pixels, expected_rgb8);
+        assert_eq!(soft_proof_pixels, expected_rgb8);
     }
 
     #[test]

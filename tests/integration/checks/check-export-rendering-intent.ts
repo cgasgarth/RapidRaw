@@ -44,6 +44,8 @@ for (const marker of [
   'rawengine-export-color-policy-v1',
   'sRGB to Display P3 conversion applied',
   'Unavailable until CMM support is implemented',
+  'export_rgb16_pixels_with_shared_conversion_core',
+  'quantize_rgb16_to_rgb8',
 ]) {
   if (!rustExportSource.includes(marker)) failures.push(`Rust export capability matrix missing ${marker}`);
 }
