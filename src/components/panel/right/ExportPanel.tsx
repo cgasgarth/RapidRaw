@@ -220,6 +220,14 @@ const formatBytes = (bytes: number, t: TFunction, decimals = 2) => {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizeLabel}`;
 };
 
+const COLOR_MANAGED_OUTPUT_FORMATS: ReadonlySet<FileFormats> = new Set([FileFormats.Jpeg, FileFormats.Tiff]);
+
+const supportsColorManagedOutput = (fileFormat: FileFormats) => COLOR_MANAGED_OUTPUT_FORMATS.has(fileFormat);
+
+const isSupportedColorProfileForFormat = (fileFormat: FileFormats, colorProfile: ExportColorProfile) =>
+  colorProfile === ExportColorProfile.Srgb ||
+  (colorProfile === ExportColorProfile.DisplayP3 && supportsColorManagedOutput(fileFormat));
+
 export default function ExportPanel({
   exportState,
   multiSelectedPaths,
@@ -628,12 +636,11 @@ export default function ExportPanel({
   const colorProfileOptions = useMemo(
     () => [
       { label: t('export.colorProfiles.srgb'), value: ExportColorProfile.Srgb },
-      { label: t('export.colorProfiles.displayP3'), value: ExportColorProfile.DisplayP3 },
-      { label: t('export.colorProfiles.adobeRgb1998'), value: ExportColorProfile.AdobeRgb1998 },
-      { label: t('export.colorProfiles.proPhotoRgb'), value: ExportColorProfile.ProPhotoRgb },
-      { label: t('export.colorProfiles.sourceEmbedded'), value: ExportColorProfile.SourceEmbedded },
+      ...(supportsColorManagedOutput(fileFormat)
+        ? [{ label: t('export.colorProfiles.displayP3'), value: ExportColorProfile.DisplayP3 }]
+        : []),
     ],
-    [t],
+    [fileFormat, t],
   );
   const renderingIntentOptions = useMemo(
     () => [
@@ -644,6 +651,14 @@ export default function ExportPanel({
     ],
     [t],
   );
+  const hasColorManagedTransform =
+    supportsColorManagedOutput(fileFormat) && colorProfile === ExportColorProfile.DisplayP3;
+
+  useEffect(() => {
+    if (!isSupportedColorProfileForFormat(fileFormat, colorProfile)) {
+      setColorProfile(ExportColorProfile.Srgb);
+    }
+  }, [colorProfile, fileFormat, setColorProfile]);
 
   const debouncedEstimateSize = useMemo(
     () =>
@@ -899,7 +914,7 @@ export default function ExportPanel({
     fileFormat === FileFormats.Cube
       ? t('export.readiness.lutProfile')
       : t('export.readiness.colorProfile', { profile: selectedColorProfileLabel }),
-    fileFormat === FileFormats.Cube
+    fileFormat === FileFormats.Cube || !hasColorManagedTransform
       ? t('export.readiness.renderingIntentUnavailable')
       : t('export.readiness.renderingIntent', { intent: selectedRenderingIntentLabel }),
     enableResize
@@ -1295,19 +1310,25 @@ export default function ExportPanel({
                                 className="w-full"
                               />
                             </div>
-                            <div className="space-y-1">
-                              <UiText variant={TextVariants.label}>{t('export.advanced.renderingIntent')}</UiText>
-                              <Dropdown
-                                options={renderingIntentOptions}
-                                value={renderingIntent}
-                                onChange={setRenderingIntent}
-                                disabled={isExporting}
-                                className="w-full"
-                              />
+                            {hasColorManagedTransform ? (
+                              <div className="space-y-1">
+                                <UiText variant={TextVariants.label}>{t('export.advanced.renderingIntent')}</UiText>
+                                <Dropdown
+                                  options={renderingIntentOptions}
+                                  value={renderingIntent}
+                                  onChange={setRenderingIntent}
+                                  disabled={isExporting}
+                                  className="w-full"
+                                />
+                                <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                                  {t('export.advanced.blackPointCompensationUnavailable')}
+                                </UiText>
+                              </div>
+                            ) : (
                               <UiText variant={TextVariants.small} color={TextColors.secondary}>
-                                {t('export.advanced.blackPointCompensationUnavailable')}
+                                {t('export.readiness.renderingIntentUnavailable')}
                               </UiText>
-                            </div>
+                            )}
                           </>
                         )}
                       </div>

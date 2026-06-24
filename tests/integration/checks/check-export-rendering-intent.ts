@@ -23,6 +23,9 @@ for (const marker of [
 
 for (const marker of [
   'renderingIntentOptions',
+  'supportsColorManagedOutput(fileFormat)',
+  'isSupportedColorProfileForFormat(fileFormat, colorProfile)',
+  'hasColorManagedTransform',
   'export.advanced.renderingIntent',
   'export.advanced.blackPointCompensationUnavailable',
   'export.readiness.renderingIntent',
@@ -33,6 +36,13 @@ for (const marker of [
 
 for (const marker of ['export_transform_options(rendering_intent)', 'rendering_intent: mox_rendering_intent']) {
   if (!rustExportSource.includes(marker)) failures.push(`Rust export runtime missing ${marker}`);
+}
+for (const marker of [
+  'validate_export_color_policy(output_format, color_profile)',
+  'Adobe RGB export is not implemented yet.',
+  'Display P3 export is only supported for JPEG and TIFF',
+]) {
+  if (!rustExportSource.includes(marker)) failures.push(`Rust export capability matrix missing ${marker}`);
 }
 
 if (!exportTypesSource.includes('renderingIntent?: ExportRenderingIntent')) {
