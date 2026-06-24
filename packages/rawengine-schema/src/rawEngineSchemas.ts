@@ -266,6 +266,7 @@ export const rawEngineGamutMappingWarningCodeV1Schema = z.enum([
   'output_gamut_high_component_v1',
   'output_gamut_mapping_not_runtime_applied_v1',
   'output_gamut_negative_component_v1',
+  'output_gamut_perceptual_cpu_reference_v1',
   'output_gamut_perceptual_intent_unproven_v1',
 ]);
 

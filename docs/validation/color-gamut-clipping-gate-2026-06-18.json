@@ -9,6 +9,11 @@
       "inputMin": 0.18,
       "outOfGamutChannelCount": 0,
       "outOfGamutMagnitude": 0,
+      "perceptualDeltaL1": 0,
+      "perceptualHueAngleDriftDeg": 0,
+      "perceptualLinearRgb": [0.18, 0.18, 0.18],
+      "perceptualNeutralAxisDrift": 0,
+      "perceptualSaturationMonotonic": true,
       "runtimeClassification": "in_gamut",
       "warnings": []
     },
@@ -21,8 +26,13 @@
       "inputMin": 0.02,
       "outOfGamutChannelCount": 1,
       "outOfGamutMagnitude": 0.28,
+      "perceptualDeltaL1": 0.380121190789,
+      "perceptualHueAngleDriftDeg": 0.237383833414,
+      "perceptualLinearRgb": [1, 0.081744897656, 0.078376293132],
+      "perceptualNeutralAxisDrift": 0.921623706868,
+      "perceptualSaturationMonotonic": true,
       "runtimeClassification": "high_component",
-      "warnings": ["output_gamut_high_component_v1"]
+      "warnings": ["output_gamut_high_component_v1", "output_gamut_perceptual_cpu_reference_v1"]
     },
     {
       "clipDeltaL1": 0,
@@ -33,6 +43,11 @@
       "inputMin": 0.03,
       "outOfGamutChannelCount": 0,
       "outOfGamutMagnitude": 0,
+      "perceptualDeltaL1": 0,
+      "perceptualHueAngleDriftDeg": 0,
+      "perceptualLinearRgb": [0.98, 0.04, 0.03],
+      "perceptualNeutralAxisDrift": 0.95,
+      "perceptualSaturationMonotonic": true,
       "runtimeClassification": "in_gamut",
       "warnings": []
     },
@@ -45,8 +60,13 @@
       "inputMin": -0.08,
       "outOfGamutChannelCount": 1,
       "outOfGamutMagnitude": 0.08,
+      "perceptualDeltaL1": 0.098498589668,
+      "perceptualHueAngleDriftDeg": 0.883609220536,
+      "perceptualLinearRgb": [0, 0.407996877106, 0.343504533225],
+      "perceptualNeutralAxisDrift": 0.407996877106,
+      "perceptualSaturationMonotonic": true,
       "runtimeClassification": "negative_component",
-      "warnings": ["output_gamut_negative_component_v1"]
+      "warnings": ["output_gamut_negative_component_v1", "output_gamut_perceptual_cpu_reference_v1"]
     },
     {
       "clipDeltaL1": 1.55,
@@ -57,8 +77,13 @@
       "inputMin": 0.72,
       "outOfGamutChannelCount": 2,
       "outOfGamutMagnitude": 1.4,
+      "perceptualDeltaL1": 1.83,
+      "perceptualHueAngleDriftDeg": 0,
+      "perceptualLinearRgb": [1, 1, 1],
+      "perceptualNeutralAxisDrift": 0,
+      "perceptualSaturationMonotonic": true,
       "runtimeClassification": "high_component",
-      "warnings": ["output_gamut_high_component_v1"]
+      "warnings": ["output_gamut_high_component_v1", "output_gamut_perceptual_cpu_reference_v1"]
     },
     {
       "clipDeltaL1": 0.45,
@@ -69,8 +94,30 @@
       "inputMin": 0.22,
       "outOfGamutChannelCount": 2,
       "outOfGamutMagnitude": 0.31,
+      "perceptualDeltaL1": 0.539267670334,
+      "perceptualHueAngleDriftDeg": 3.649587939849,
+      "perceptualLinearRgb": [0.995520829945, 0.304788500279, 1],
+      "perceptualNeutralAxisDrift": 0.695211499721,
+      "perceptualSaturationMonotonic": true,
       "runtimeClassification": "high_component",
-      "warnings": ["output_gamut_high_component_v1"]
+      "warnings": ["output_gamut_high_component_v1", "output_gamut_perceptual_cpu_reference_v1"]
+    },
+    {
+      "clipDeltaL1": 0.28,
+      "clipDeltaMax": 0.28,
+      "clippedLinearRgb": [1, 0.02, 0.04],
+      "id": "gamut.srgb.perceptual-cpu-reference.v1",
+      "inputMax": 1.28,
+      "inputMin": 0.02,
+      "outOfGamutChannelCount": 1,
+      "outOfGamutMagnitude": 0.28,
+      "perceptualDeltaL1": 0.380121190789,
+      "perceptualHueAngleDriftDeg": 0.237383833414,
+      "perceptualLinearRgb": [1, 0.081744897656, 0.078376293132],
+      "perceptualNeutralAxisDrift": 0.921623706868,
+      "perceptualSaturationMonotonic": true,
+      "runtimeClassification": "high_component",
+      "warnings": ["output_gamut_high_component_v1", "output_gamut_perceptual_cpu_reference_v1"]
     },
     {
       "clipDeltaL1": 0.7,
@@ -81,14 +128,33 @@
       "inputMin": 0.12,
       "outOfGamutChannelCount": 1,
       "outOfGamutMagnitude": 0.7,
+      "perceptualDeltaL1": null,
+      "perceptualHueAngleDriftDeg": null,
+      "perceptualLinearRgb": null,
+      "perceptualNeutralAxisDrift": null,
+      "perceptualSaturationMonotonic": null,
       "runtimeClassification": "high_component",
       "warnings": ["output_gamut_high_component_v1"]
     }
   ],
   "fixturePath": "fixtures/color/gamut-mapping-fixtures.json",
   "generatedFromSnapshotDate": "2026-06-15",
-  "issue": 1931,
+  "issue": 3495,
+  "parentIssue": 3238,
+  "proofBoundary": "cpu_reference_only_no_preview_or_export_application",
   "schemaVersion": 1,
+  "summary": {
+    "clippingFractionMax": 0.666666666667,
+    "clippingFractionP50": 0.333333333333,
+    "clippingFractionP95": 0.666666666667,
+    "hueAngleDriftMaxDeg": 3.649587939849,
+    "hueAngleDriftP50Deg": 0.237383833414,
+    "hueAngleDriftP95Deg": 3.649587939849,
+    "perceptualDeltaL1Max": 1.83,
+    "perceptualDeltaL1P50": 0.380121190789,
+    "perceptualDeltaL1P95": 1.83,
+    "runtimeStatus": "cpu_reference_only"
+  },
   "thresholds": {
     "componentBoundaryEpsilon": 1e-12,
     "minOutOfGamutMagnitude": 0.000001
