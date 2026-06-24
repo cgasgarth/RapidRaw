@@ -135,6 +135,8 @@ pub struct TetherCaptureMetadataSummary {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TetherCaptureIngestSummary {
+    add_tags: Vec<String>,
+    apply_preset_ids: Vec<String>,
     collision_index: usize,
     file_name: String,
     naming_template: String,
@@ -517,7 +519,7 @@ fn trigger_tether_capture_for_state(
         .extension()
         .and_then(|extension| extension.to_str())
         .unwrap_or("raw");
-    let (imported_path, ingest) = resolve_imported_capture_path(
+    let (imported_path, mut ingest) = resolve_imported_capture_path(
         &destination_root,
         extension,
         &captured_at,
@@ -547,6 +549,7 @@ fn trigger_tether_capture_for_state(
         &ingest,
         &request.camera_control_values,
     )?;
+    apply_capture_import_preset(&imported_path, &mut ingest, &session, &captured_at)?;
     let backup = write_verified_backup_capture(
         request.backup_destination_root.as_deref(),
         &ingest.file_name,
@@ -758,6 +761,64 @@ fn metadata_template_values(
     }
 }
 
+fn apply_capture_import_preset(
+    imported_path: &Path,
+    ingest: &mut TetherCaptureIngestSummary,
+    session: &TetherSessionSnapshot,
+    captured_at: &chrono::DateTime<chrono::Utc>,
+) -> Result<(), String> {
+    if ingest.preset_id != "wedding-copy-ingest" {
+        return Ok(());
+    }
+
+    let add_tags = vec!["wedding".to_string(), "incoming".to_string()];
+    let apply_preset_ids = vec!["camera-standard-start".to_string()];
+    let sidecar_path = imported_path.with_file_name(format!(
+        "{}.rrdata",
+        imported_path
+            .file_name()
+            .and_then(|file_name| file_name.to_str())
+            .unwrap_or("capture")
+    ));
+    let mut sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
+    let mut tags = sidecar.tags.unwrap_or_default();
+    for tag in &add_tags {
+        if !tags.contains(tag) {
+            tags.push(tag.clone());
+        }
+    }
+    sidecar.tags = Some(tags);
+
+    let artifacts = sidecar
+        .raw_engine_artifacts
+        .get_or_insert_with(RawEngineArtifacts::new_v1);
+    artifacts.tether_capture_artifacts.retain(|artifact| {
+        artifact
+            .get("artifactType")
+            .and_then(|value| value.as_str())
+            != Some("tether_import_preset")
+    });
+    artifacts.tether_capture_artifacts.push(json!({
+        "artifactType": "tether_import_preset",
+        "appliedAt": captured_at.to_rfc3339(),
+        "captureSessionId": session.session_id,
+        "presetId": "wedding-copy-ingest",
+        "sourcePolicy": "copy",
+        "duplicatePolicy": "rename",
+        "sidecarPolicy": "copy_existing",
+        "rawOnly": true,
+        "metadataTemplateId": "copyright-client",
+        "addTags": add_tags,
+        "applyPresetIds": apply_preset_ids,
+        "pixelPresetStatus": "deferred"
+    }));
+
+    crate::exif_processing::save_sidecar_metadata_atomic(&sidecar_path, &sidecar)?;
+    ingest.add_tags = add_tags;
+    ingest.apply_preset_ids = apply_preset_ids;
+    Ok(())
+}
+
 fn write_verified_backup_capture(
     backup_destination_root: Option<&str>,
     file_name: &str,
@@ -946,7 +1007,7 @@ fn resolve_imported_capture_path(
         .filter(|preset_id| {
             matches!(
                 *preset_id,
-                "cameraSequence" | "sourceSequence" | "timestampCamera"
+                "cameraSequence" | "sourceSequence" | "timestampCamera" | "wedding-copy-ingest"
             )
         })
         .unwrap_or("timestampCamera");
@@ -967,6 +1028,8 @@ fn resolve_imported_capture_path(
             return (
                 candidate,
                 TetherCaptureIngestSummary {
+                    add_tags: Vec::new(),
+                    apply_preset_ids: Vec::new(),
                     collision_index,
                     file_name,
                     naming_template: naming_template.to_string(),
@@ -985,6 +1048,8 @@ fn resolve_imported_capture_path(
     (
         destination_root.join(&fallback_name),
         TetherCaptureIngestSummary {
+            add_tags: Vec::new(),
+            apply_preset_ids: Vec::new(),
             collision_index: 1001,
             file_name: fallback_name,
             naming_template: naming_template.to_string(),
@@ -997,6 +1062,7 @@ fn naming_template_for_preset(preset_id: &str) -> &'static str {
     match preset_id {
         "cameraSequence" => "{camera_id}_{counter:04}",
         "sourceSequence" => "{source_stem}_{counter:04}",
+        "wedding-copy-ingest" => "{counter:04}_{source_stem}",
         _ => "{capture_utc}_{camera_id}",
     }
 }
@@ -1031,7 +1097,7 @@ fn render_ingest_stem(
 }
 
 fn sanitize_file_stem(value: &str) -> String {
-    value
+    let sanitized = value
         .chars()
         .map(|character| {
             if character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.') {
@@ -1042,7 +1108,12 @@ fn sanitize_file_stem(value: &str) -> String {
         })
         .collect::<String>()
         .trim_matches('_')
-        .to_string()
+        .to_string();
+    let mut compacted = sanitized;
+    while compacted.contains("__") {
+        compacted = compacted.replace("__", "_");
+    }
+    compacted
 }
 
 fn sha256_file(path: &Path) -> Result<String, String> {
@@ -1396,7 +1467,7 @@ mod tests {
             "rawengine-tether-review-select-test-{}",
             uuid::Uuid::new_v4()
         ));
-        let source_path = root.join("source.ARW");
+        let source_path = root.join("_DSC7511.ARW");
         let destination_root = root.join("destination");
         fs::create_dir_all(&root).unwrap();
         fs::write(&source_path, b"fake raw bytes").unwrap();
@@ -1471,7 +1542,7 @@ mod tests {
             "rawengine-tether-copyright-client-delivery-test-{}",
             uuid::Uuid::new_v4()
         ));
-        let source_path = root.join("source.ARW");
+        let source_path = root.join("_DSC7511.ARW");
         let destination_root = root.join("destination");
         fs::create_dir_all(&root).unwrap();
         fs::write(&source_path, b"fake raw bytes").unwrap();
@@ -1535,6 +1606,76 @@ mod tests {
             tether_artifacts[0]["metadataTemplateId"].as_str(),
             Some("copyright-client-delivery")
         );
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn fake_provider_applies_wedding_copy_ingest_preset() {
+        let state = AppState::new();
+        let root = std::env::temp_dir().join(format!(
+            "rawengine-tether-wedding-copy-ingest-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let source_path = root.join("_DSC7511.ARW");
+        let destination_root = root.join("destination");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(&source_path, b"fake raw bytes").unwrap();
+
+        open_tether_session_for_state(
+            TetherSessionOpenRequest {
+                camera_id: "fake-sony-ilce-7m4-usb".to_string(),
+                destination_root: Some(destination_root.to_string_lossy().to_string()),
+                provider_mode: Some("fake".to_string()),
+            },
+            &state,
+        )
+        .unwrap();
+
+        let capture = trigger_tether_capture_for_state(
+            Some(TetherCaptureRequest {
+                backup_destination_root: None,
+                camera_control_values: BTreeMap::new(),
+                destination_root: None,
+                fake_source_path: Some(source_path.to_string_lossy().to_string()),
+                ingest_preset_id: Some("wedding-copy-ingest".to_string()),
+                metadata_template_id: None,
+            }),
+            &state,
+        )
+        .unwrap();
+
+        assert_eq!(capture.ingest.preset_id, "wedding-copy-ingest");
+        assert_eq!(capture.ingest.naming_template, "{counter:04}_{source_stem}");
+        assert_eq!(capture.ingest.file_name, "0001_DSC7511.ARW");
+        assert_eq!(
+            capture.ingest.add_tags,
+            vec!["wedding".to_string(), "incoming".to_string()]
+        );
+        assert_eq!(
+            capture.ingest.apply_preset_ids,
+            vec!["camera-standard-start".to_string()]
+        );
+
+        let sidecar_path = format!("{}.rrdata", capture.imported_path);
+        let sidecar = crate::exif_processing::load_sidecar(Path::new(&sidecar_path));
+        assert_eq!(
+            sidecar.tags.unwrap(),
+            vec!["wedding".to_string(), "incoming".to_string()]
+        );
+        let tether_artifacts = sidecar
+            .raw_engine_artifacts
+            .unwrap()
+            .tether_capture_artifacts;
+        assert!(tether_artifacts.iter().any(|artifact| {
+            artifact
+                .get("artifactType")
+                .and_then(|value| value.as_str())
+                == Some("tether_import_preset")
+                && artifact.get("presetId").and_then(|value| value.as_str())
+                    == Some("wedding-copy-ingest")
+                && artifact["applyPresetIds"][0] == "camera-standard-start"
+        }));
 
         let _ = fs::remove_dir_all(root);
     }

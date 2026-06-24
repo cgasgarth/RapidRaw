@@ -797,9 +797,11 @@ function tetherIngestPresetLocaleKey(
 ):
   | 'editor.tether.ingestPresetCameraSequence'
   | 'editor.tether.ingestPresetSourceSequence'
-  | 'editor.tether.ingestPresetTimestampCamera' {
+  | 'editor.tether.ingestPresetTimestampCamera'
+  | 'editor.tether.ingestPresetWeddingCopyIngest' {
   if (presetId === 'cameraSequence') return 'editor.tether.ingestPresetCameraSequence';
   if (presetId === 'sourceSequence') return 'editor.tether.ingestPresetSourceSequence';
+  if (presetId === 'wedding-copy-ingest') return 'editor.tether.ingestPresetWeddingCopyIngest';
   return 'editor.tether.ingestPresetTimestampCamera';
 }
 

@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
-export const tetherIngestPresetIdSchema = z.enum(['cameraSequence', 'sourceSequence', 'timestampCamera']);
+export const tetherIngestPresetIdSchema = z.enum([
+  'cameraSequence',
+  'sourceSequence',
+  'timestampCamera',
+  'wedding-copy-ingest',
+]);
 export const tetherMetadataTemplateIdSchema = z.enum([
   'none',
   'studioSession',
@@ -123,6 +128,8 @@ export const tetherCaptureBackupSchema = z.object({
 });
 
 export const tetherCaptureIngestSchema = z.object({
+  addTags: z.array(z.string().trim().min(1)).default([]),
+  applyPresetIds: z.array(z.string().trim().min(1)).default([]),
   collisionIndex: z.number().int().min(1),
   fileName: z.string().trim().min(1),
   namingTemplate: z.string().trim().min(1),

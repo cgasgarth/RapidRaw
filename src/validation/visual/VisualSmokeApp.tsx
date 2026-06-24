@@ -354,6 +354,8 @@ const tetherCaptureMockResponse = {
   capturedAt: '2026-06-23T00:00:02.000Z',
   checksum: 'sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b',
   ingest: {
+    addTags: [],
+    applyPresetIds: [],
     collisionIndex: 1,
     fileName: 'alaska-dsc7853_0001.ARW',
     namingTemplate: '{source_stem}_{counter:04}',
