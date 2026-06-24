@@ -469,6 +469,7 @@ for (const marker of [
   'includedPathSet',
   'pathsToConvert',
   'handleToggleIncludedPath',
+  'baseFogEstimate !== null',
   'renderBatchReadiness',
   'acceptedBatchPlanIdentity',
   'buildNegativeLabAcceptedPlanIdentity',
