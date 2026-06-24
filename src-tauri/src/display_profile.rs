@@ -91,31 +91,12 @@ pub fn build_srgb_to_active_display_lut_with_size(size: u32) -> DisplayLut {
     not(any(target_os = "android", target_os = "linux"))
 ))]
 fn try_build_srgb_to_active_display_lut(size: u32) -> Result<DisplayLut, String> {
-    use moxcms::{ColorProfile, Layout, TransformOptions};
+    use moxcms::ColorProfile;
 
     let display_profile_bytes = active_display_profile_bytes()?;
     let display_profile = ColorProfile::new_from_slice(&display_profile_bytes)
         .map_err(|error| format!("Failed to parse active display ICC profile: {error}"))?;
-    let transform = ColorProfile::new_srgb()
-        .create_transform_f32(
-            Layout::Rgb,
-            &display_profile,
-            Layout::Rgb,
-            TransformOptions::default(),
-        )
-        .map_err(|error| format!("Failed to create active display transform: {error}"))?;
-
-    let source = build_lut_source_rgb(size);
-    let mut transformed = vec![0.0_f32; source.len()];
-    transform
-        .transform(&source, &mut transformed)
-        .map_err(|error| format!("Failed to transform active display LUT: {error}"))?;
-
-    Ok(DisplayLut {
-        profile: active_display_profile()?,
-        rgba16f: rgb_to_rgba16f(&transformed),
-        size,
-    })
+    build_srgb_to_display_profile_lut_with_size(&display_profile, active_display_profile()?, size)
 }
 
 #[cfg(all(
@@ -158,6 +139,37 @@ fn build_lut_source_rgb(size: u32) -> Vec<f32> {
     }
 
     source
+}
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+fn build_srgb_to_display_profile_lut_with_size(
+    display_profile: &moxcms::ColorProfile,
+    profile: ActiveDisplayProfile,
+    size: u32,
+) -> Result<DisplayLut, String> {
+    use moxcms::{ColorProfile, Layout, TransformOptions};
+
+    let transform = ColorProfile::new_srgb()
+        .create_transform_f32(
+            Layout::Rgb,
+            display_profile,
+            Layout::Rgb,
+            TransformOptions::default(),
+        )
+        .map_err(|error| format!("Failed to create display transform: {error}"))?;
+
+    let size = size.max(2);
+    let source = build_lut_source_rgb(size);
+    let mut transformed = vec![0.0_f32; source.len()];
+    transform
+        .transform(&source, &mut transformed)
+        .map_err(|error| format!("Failed to transform display LUT: {error}"))?;
+
+    Ok(DisplayLut {
+        profile,
+        rgba16f: rgb_to_rgba16f(&transformed),
+        size,
+    })
 }
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
@@ -345,5 +357,35 @@ mod cross_platform_tests {
         assert_eq!(white[1].to_f32(), 1.0);
         assert_eq!(white[2].to_f32(), 1.0);
         assert_eq!(white[3].to_f32(), 1.0);
+    }
+
+    #[test]
+    fn controlled_display_p3_lut_builds_alternate_profile_transform() {
+        let profile = ActiveDisplayProfile {
+            cmm: "moxcms".to_string(),
+            display_id: None,
+            icc_sha256: None,
+            profile_byte_count: None,
+            source: "controlled_display_p3_test_profile".to_string(),
+            status: ActiveDisplayProfileStatus::ActiveProfileLoaded,
+        };
+        let lut = build_srgb_to_display_profile_lut_with_size(
+            &moxcms::ColorProfile::new_display_p3(),
+            profile,
+            3,
+        )
+        .expect("controlled Display P3 profile should build a LUT");
+
+        assert_eq!(lut.size, 3);
+        assert_eq!(lut.profile.source, "controlled_display_p3_test_profile");
+
+        let red_index = ((2 * 4) as usize)..((2 * 4 + 4) as usize);
+        let red = &lut.rgba16f[red_index];
+        assert!(
+            (red[0].to_f32() - 1.0).abs() > 0.0001
+                || red[1].to_f32() > 0.0001
+                || red[2].to_f32() > 0.0001
+        );
+        assert_eq!(red[3].to_f32(), 1.0);
     }
 }
