@@ -26,6 +26,8 @@ const requiredSnippets = [
   [panelSource, 'data-testid="tether-open-session"'],
   [panelSource, 'data-testid="tether-close-session"'],
   [panelSource, 'data-testid="tether-trigger-capture"'],
+  [panelSource, 'tetherDisabledControlClassName'],
+  [panelSource, 'disabled:bg-bg-secondary disabled:text-text-tertiary disabled:ring-1 disabled:ring-border-color'],
   [panelSource, 'data-testid="tether-exposure-controls"'],
   [panelSource, 'data-testid={`tether-exposure-control-${control.id}`}'],
   [panelSource, 'setCameraControl({'],

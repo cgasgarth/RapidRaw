@@ -44,6 +44,8 @@ const capabilityTone: Record<TetherCapability['status'], string> = {
 const reviewModes: Array<TetherReviewMode> = ['newest', 'pinned', 'holdCurrent'];
 const tetherIngestPresetIds = tetherIngestPresetIdSchema.options;
 const tetherMetadataTemplateIds = tetherMetadataTemplateIdSchema.options;
+const tetherDisabledControlClassName =
+  'disabled:bg-bg-secondary disabled:text-text-tertiary disabled:ring-1 disabled:ring-border-color';
 
 const defaultDiscoverCameras = (): Promise<TetherDiscoveryResponse> =>
   invokeWithSchema(
@@ -296,6 +298,7 @@ export function TetherPanel({
       </section>
 
       <Button
+        className={tetherDisabledControlClassName}
         disabled={!isSessionOpen || isCaptureBusy}
         onClick={() => {
           void triggerCapture();
@@ -647,6 +650,7 @@ export function TetherPanel({
         )}
         <div className="mt-3 flex gap-2">
           <Button
+            className={tetherDisabledControlClassName}
             disabled={camera === null || isSessionOpen || isSessionBusy}
             onClick={() => {
               void openCameraSession();
@@ -657,6 +661,7 @@ export function TetherPanel({
             {t('editor.tether.openSession')}
           </Button>
           <Button
+            className={tetherDisabledControlClassName}
             disabled={!isSessionOpen || isSessionBusy}
             onClick={() => {
               void closeCameraSession();
