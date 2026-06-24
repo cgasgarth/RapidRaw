@@ -5,10 +5,11 @@
       "id": "layers.synthetic.preview-export-parity.v1",
       "width": 3,
       "height": 2,
-      "expectedPreviewExportHash": "sha256:62b1a1a3b49900f19fe56696a457b5a35cdb1588bf0636af604b36d57745756e",
+      "expectedPreviewExportHash": "sha256:1e0db991f14f3c6162e809e8d1d57af56fd4f8fbaa1d94b54b78514cf912287a",
       "expectedCoverageByLayer": [
         { "id": "tone-normal", "opacity": 0.25, "touchedPixels": 6 },
         { "id": "shadow-multiply", "opacity": 0.55, "touchedPixels": 5 },
+        { "id": "retouch-clone-source", "opacity": 1, "touchedPixels": 2 },
         { "id": "highlight-screen", "opacity": 0.35, "touchedPixels": 5 },
         { "id": "contrast-overlay", "opacity": 0.4, "touchedPixels": 6 },
         { "id": "skin-soft-light", "opacity": 0.3, "touchedPixels": 6 }
@@ -52,6 +53,21 @@
             { "r": 96, "g": 104, "b": 112 },
             { "r": 88, "g": 96, "b": 104 }
           ]
+        },
+        {
+          "id": "retouch-clone-source",
+          "name": "Clone source sample",
+          "blendMode": "normal",
+          "opacity": 1,
+          "visible": true,
+          "maskAlpha": [0, 1, 1, 0, 0, 0],
+          "retouchCloneSource": {
+            "alignmentErrorPx": 0,
+            "rotationDegrees": 0,
+            "scale": 1,
+            "sourcePoint": { "x": 0, "y": 0 },
+            "targetPoint": { "x": 0.5, "y": 0 }
+          }
         },
         {
           "id": "highlight-screen",
@@ -108,6 +124,20 @@
         "layers": [
           { "id": "tone-normal", "blendMode": "normal", "opacity": 0.25, "visible": true, "maskPersisted": false },
           { "id": "shadow-multiply", "blendMode": "multiply", "opacity": 0.55, "visible": true, "maskPersisted": true },
+          {
+            "id": "retouch-clone-source",
+            "blendMode": "normal",
+            "opacity": 1,
+            "visible": true,
+            "maskPersisted": true,
+            "retouchCloneSource": {
+              "alignmentErrorPx": 0,
+              "rotationDegrees": 0,
+              "scale": 1,
+              "sourcePoint": { "x": 0, "y": 0 },
+              "targetPoint": { "x": 0.5, "y": 0 }
+            }
+          },
           { "id": "highlight-screen", "blendMode": "screen", "opacity": 0.35, "visible": true, "maskPersisted": true },
           { "id": "contrast-overlay", "blendMode": "overlay", "opacity": 0.4, "visible": true, "maskPersisted": false },
           {

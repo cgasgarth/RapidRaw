@@ -12,8 +12,17 @@ export interface LayerBlendStackLayer {
   maskAlpha?: ReadonlyArray<number>;
   name: string;
   opacity: number;
-  pixels: ReadonlyArray<LayerRgbPixel>;
+  pixels?: ReadonlyArray<LayerRgbPixel>;
+  retouchCloneSource?: LayerRetouchCloneSource;
   visible: boolean;
+}
+
+export interface LayerRetouchCloneSource {
+  alignmentErrorPx?: number;
+  rotationDegrees: number;
+  scale: number;
+  sourcePoint: { x: number; y: number };
+  targetPoint: { x: number; y: number };
 }
 
 export interface LayerBlendStackInput {
@@ -70,6 +79,35 @@ const blendPixel = (base: LayerRgbPixel, source: LayerRgbPixel, mode: LayerBlend
   };
 };
 
+const normalizedPointToPixel = (
+  point: { x: number; y: number },
+  width: number,
+  height: number,
+): { x: number; y: number } => ({
+  x: Math.round(clamp01(point.x) * (width - 1)),
+  y: Math.round(clamp01(point.y) * (height - 1)),
+});
+
+const cloneSampleIndex = (
+  targetIndex: number,
+  width: number,
+  height: number,
+  cloneSource: LayerRetouchCloneSource,
+): number | null => {
+  if (cloneSource.rotationDegrees !== 0 || cloneSource.scale !== 1) {
+    throw new Error('Retouch clone layer rendering supports exact translated sampling only.');
+  }
+
+  const sourcePoint = normalizedPointToPixel(cloneSource.sourcePoint, width, height);
+  const targetPoint = normalizedPointToPixel(cloneSource.targetPoint, width, height);
+  const targetX = targetIndex % width;
+  const targetY = Math.floor(targetIndex / width);
+  const sourceX = targetX + sourcePoint.x - targetPoint.x;
+  const sourceY = targetY + sourcePoint.y - targetPoint.y;
+  if (sourceX < 0 || sourceX >= width || sourceY < 0 || sourceY >= height) return null;
+  return sourceY * width + sourceX;
+};
+
 export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendStackRender {
   const pixelCount = input.width * input.height;
   if (input.basePixels.length !== pixelCount) {
@@ -86,7 +124,10 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
   for (const layer of input.layers) {
     const opacity = clamp01(layer.opacity);
     if (!layer.visible || opacity === 0) continue;
-    if (layer.pixels.length !== pixelCount) {
+    if (layer.retouchCloneSource === undefined && layer.pixels?.length !== pixelCount) {
+      throw new Error(`Layer ${layer.id} pixel count mismatch: ${layer.pixels?.length ?? 0} != ${pixelCount}.`);
+    }
+    if (layer.retouchCloneSource !== undefined && layer.pixels !== undefined && layer.pixels.length !== pixelCount) {
       throw new Error(`Layer ${layer.id} pixel count mismatch: ${layer.pixels.length} != ${pixelCount}.`);
     }
     if (layer.maskAlpha !== undefined && layer.maskAlpha.length !== pixelCount) {
@@ -95,7 +136,12 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
 
     let touchedPixels = 0;
     for (let index = 0; index < pixelCount; index += 1) {
-      const source = layer.pixels[index];
+      const cloneSourceIndex =
+        layer.retouchCloneSource === undefined
+          ? null
+          : cloneSampleIndex(index, input.width, input.height, layer.retouchCloneSource);
+      if (layer.retouchCloneSource !== undefined && cloneSourceIndex === null) continue;
+      const source = cloneSourceIndex === null ? layer.pixels?.[index] : pixels[cloneSourceIndex];
       const base = pixels[index];
       if (!source || !base) {
         throw new Error(`Layer ${layer.id} missing pixel ${index}.`);
