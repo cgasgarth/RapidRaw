@@ -9,6 +9,7 @@ use std::num::NonZero;
 use tauri::Manager;
 use wgpu::util::{DeviceExt, TextureDataOrder};
 
+use crate::display_profile::build_srgb_to_active_display_lut;
 use crate::image_processing::{AllAdjustments, GpuContext, MAX_MASKS};
 use crate::lut_processing::Lut;
 use crate::{AppState, GpuImageCache};
@@ -48,6 +49,8 @@ pub struct WgpuDisplay {
     pub pipeline: wgpu::RenderPipeline,
     pub bind_group_layout: wgpu::BindGroupLayout,
     pub sampler: wgpu::Sampler,
+    pub display_lut_texture: wgpu::Texture,
+    pub display_lut_view: wgpu::TextureView,
     pub transform_buffer: wgpu::Buffer,
     pub latest_transform: DisplayTransform,
     pub current_bind_group: Option<wgpu::BindGroup>,
@@ -320,6 +323,16 @@ pub fn get_or_init_gpu_context(
                     count: None,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                 },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    count: None,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D3,
+                        multisampled: false,
+                    },
+                },
             ],
         });
 
@@ -373,12 +386,58 @@ pub fn get_or_init_gpu_context(
             min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
+        let display_lut = build_srgb_to_active_display_lut();
+        let display_lut_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Active Display Profile LUT"),
+            size: wgpu::Extent3d {
+                width: display_lut.size,
+                height: display_lut.size,
+                depth_or_array_layers: display_lut.size,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D3,
+            format: wgpu::TextureFormat::Rgba16Float,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &display_lut_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            bytemuck::cast_slice(&display_lut.rgba16f),
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(display_lut.size * 4 * std::mem::size_of::<f16>() as u32),
+                rows_per_image: Some(display_lut.size),
+            },
+            wgpu::Extent3d {
+                width: display_lut.size,
+                height: display_lut.size,
+                depth_or_array_layers: display_lut.size,
+            },
+        );
+        log::info!(
+            "Loaded active display profile LUT via {} ({:?})",
+            display_lut.profile.source,
+            display_lut.profile.status
+        );
+        let display_lut_view = display_lut_texture.create_view(&wgpu::TextureViewDescriptor {
+            label: Some("Active Display Profile LUT View"),
+            dimension: Some(wgpu::TextureViewDimension::D3),
+            ..Default::default()
+        });
 
         Some(WgpuDisplay {
             surface,
             config,
             pipeline,
             bind_group_layout,
+            display_lut_texture,
+            display_lut_view,
             transform_buffer,
             latest_transform: DisplayTransform {
                 rect: [0.0, 0.0, 100.0, 100.0],
@@ -1774,6 +1833,10 @@ fn process_and_get_dynamic_image_inner(
                         binding: 2,
                         resource: wgpu::BindingResource::Sampler(&display.sampler),
                     },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: wgpu::BindingResource::TextureView(&display.display_lut_view),
+                    },
                 ],
                 label: Some("Migrated Display Bind Group"),
             });
@@ -2022,6 +2085,10 @@ fn process_and_get_dynamic_image_inner(
                 wgpu::BindGroupEntry {
                     binding: 2,
                     resource: wgpu::BindingResource::Sampler(&display.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(&display.display_lut_view),
                 },
             ],
             label: None,

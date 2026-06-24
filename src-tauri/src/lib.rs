@@ -29,6 +29,7 @@ pub mod denoise_cpu_reference;
 mod denoise_real_raw_proof;
 mod denoise_render;
 mod denoising;
+mod display_profile;
 mod events;
 mod exif_processing;
 mod export_processing;
@@ -2637,6 +2638,7 @@ pub fn run() {
             denoising::apply_denoising,
             denoising::batch_denoise_images,
             denoising::save_denoised_image,
+            display_profile::get_active_display_profile,
             image_loader::load_image,
             image_loader::is_image_cached,
             panorama_stitching::plan_panorama,

@@ -134,6 +134,7 @@ export enum Invokes {
   DiscoverTetheredCameras = 'discover_tethered_cameras',
   OpenTetherSession = 'open_tether_session',
   GetTetherSession = 'get_tether_session',
+  GetActiveDisplayProfile = 'get_active_display_profile',
   CloseTetherSession = 'close_tether_session',
   TriggerTetherCapture = 'trigger_tether_capture',
   UpdateWgpuTransform = 'update_wgpu_transform',
