@@ -2,8 +2,8 @@
 
 Issue: #94 `color(gamut): add gamut mapping plan`
 
-Runtime status: schema and fixture contract only. This PR does not modify live
-preview pixels, export pixels, WGSL, or Rust image processing.
+Runtime status: fixture contract plus CPU reference mapping. This work does not
+modify live preview pixels, export pixels, WGSL, or Rust image processing.
 
 ## Decision
 
@@ -56,9 +56,10 @@ Fixture classification is computed from `destinationLinearRgbBeforeMap`:
 
 ## Current Gate Thresholds
 
-The #1931 gate is deterministic and synthetic. It validates classification,
-warning policy, clip fallback bounds, and a committed review report, but it does
-not claim perceptual gamut mapping quality.
+The #3495 gate is deterministic and synthetic. It validates classification,
+warning policy, clip fallback bounds, a `colorjs.io` OKLCH chroma-reduction CPU
+reference, and a committed review report, but it does not claim live preview or
+export gamut mapping quality.
 
 - Component boundary epsilon: `1e-12`.
 - Minimum measurable out-of-gamut magnitude: `1e-6`.
@@ -80,7 +81,6 @@ not claim perceptual gamut mapping quality.
 
 ## Follow-Up Work
 
-- Add CPU reference gamut mapper for sRGB and Display P3.
 - Add preview/export parity fixtures using the same gamut policy.
 - Add soft-proof and gamut-warning UI overlays.
 - Add GPU readback parity once the runtime path exists.

@@ -5,8 +5,10 @@ import { resolve } from 'node:path';
 
 import { rawEngineGamutMappingFixtureManifestV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
+  applyPerceptualOklchChromaReduceReference,
   applyRelativeColorimetricClipFallback,
   classifyLinearRgbGamut,
+  type GamutMappingDestination,
   type GamutClassification,
 } from '../../../src/utils/gamutMappingRuntime.ts';
 
@@ -23,6 +25,7 @@ const REQUIRED_CASE_IDS = new Set([
   'gamut.srgb.negative-component-warning.v1',
   'gamut.srgb.hdr-component-warning.v1',
   'gamut.srgb.perceptual-intent-blocked.v1',
+  'gamut.srgb.perceptual-cpu-reference.v1',
   'gamut.scene-referred.no-output-map.v1',
 ]);
 
@@ -37,6 +40,11 @@ interface GamutClipReportCase {
   inputMin: number;
   outOfGamutChannelCount: number;
   outOfGamutMagnitude: number;
+  perceptualDeltaL1: number | null;
+  perceptualHueAngleDriftDeg: number | null;
+  perceptualLinearRgb: Array<number> | null;
+  perceptualNeutralAxisDrift: number | null;
+  perceptualSaturationMonotonic: boolean | null;
   runtimeClassification: GamutClassification;
   warnings: Array<string>;
 }
@@ -55,6 +63,10 @@ for (const requiredId of REQUIRED_CASE_IDS) {
 for (const testCase of manifest.cases) {
   const rgb = testCase.destinationLinearRgbBeforeMap;
   const runtime = applyRelativeColorimetricClipFallback(rgb);
+  const perceptualRuntime =
+    testCase.policy.destination === 'srgb' || testCase.policy.destination === 'display_p3'
+      ? applyPerceptualOklchChromaReduceReference(rgb, testCase.policy.destination as GamutMappingDestination)
+      : null;
   const actualClassification = classifyLinearRgbGamut(rgb);
   const minComponent = Math.min(...rgb);
   const maxComponent = Math.max(...rgb);
@@ -123,6 +135,23 @@ for (const testCase of manifest.cases) {
   }
 
   if (
+    testCase.policy.intent === 'perceptual' &&
+    perceptualRuntime !== null &&
+    actualClassification !== 'in_gamut' &&
+    !perceptualRuntime.warnings.includes('output_gamut_perceptual_cpu_reference_v1')
+  ) {
+    failures.push(`${testCase.id}: perceptual CPU reference must disclose reference-only mapping.`);
+  }
+
+  if (perceptualRuntime !== null && !perceptualRuntime.preservedInGamut) {
+    failures.push(`${testCase.id}: perceptual CPU reference changed an in-gamut fixture.`);
+  }
+
+  if (perceptualRuntime !== null && !perceptualRuntime.saturationMonotonic) {
+    failures.push(`${testCase.id}: perceptual CPU reference increased OKLCH chroma.`);
+  }
+
+  if (
     testCase.policy.status === 'schema_only' &&
     !hasWarning(testCase, 'output_gamut_mapping_not_runtime_applied_v1')
   ) {
@@ -148,8 +177,13 @@ for (const testCase of manifest.cases) {
     inputMin: roundMetric(minComponent),
     outOfGamutChannelCount,
     outOfGamutMagnitude: roundMetric(outOfGamutMagnitude),
+    perceptualDeltaL1: perceptualRuntime === null ? null : roundMetric(perceptualRuntime.perceptualDeltaL1),
+    perceptualHueAngleDriftDeg: perceptualRuntime === null ? null : roundMetric(perceptualRuntime.hueAngleDriftDeg),
+    perceptualLinearRgb: perceptualRuntime === null ? null : perceptualRuntime.perceptualLinearRgb.map(roundMetric),
+    perceptualNeutralAxisDrift: perceptualRuntime === null ? null : roundMetric(perceptualRuntime.neutralAxisDrift),
+    perceptualSaturationMonotonic: perceptualRuntime === null ? null : perceptualRuntime.saturationMonotonic,
     runtimeClassification: runtime.classification,
-    warnings: runtime.warnings,
+    warnings: perceptualRuntime?.warnings ?? runtime.warnings,
   });
 }
 
@@ -186,8 +220,11 @@ const report = {
   cases: reportCases,
   fixturePath: FIXTURE_PATH,
   generatedFromSnapshotDate: manifest.snapshotDate,
-  issue: 1931,
+  issue: 3495,
+  parentIssue: 3238,
+  proofBoundary: 'cpu_reference_only_no_preview_or_export_application',
   schemaVersion: 1,
+  summary: summarizeReportCases(reportCases),
   thresholds: {
     componentBoundaryEpsilon: COMPONENT_BOUNDARY_EPSILON,
     minOutOfGamutMagnitude: MIN_OUT_OF_GAMUT_MAGNITUDE,
@@ -215,4 +252,34 @@ console.log(`gamut clipping gate ok (${manifest.cases.length} cases, max clip ${
 
 function roundMetric(value: number): number {
   return Number(value.toFixed(12));
+}
+
+function percentile(values: Array<number>, p: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].toSorted((left, right) => left - right);
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * p) - 1));
+  return sorted[index] ?? 0;
+}
+
+function summarizeReportCases(cases: Array<GamutClipReportCase>) {
+  const perceptualDeltas = cases
+    .map((testCase) => testCase.perceptualDeltaL1)
+    .filter((value): value is number => value !== null);
+  const hueDrifts = cases
+    .map((testCase) => testCase.perceptualHueAngleDriftDeg)
+    .filter((value): value is number => value !== null);
+  const clippingFractions = cases.map((testCase) => testCase.outOfGamutChannelCount / 3);
+
+  return {
+    clippingFractionMax: roundMetric(Math.max(...clippingFractions)),
+    clippingFractionP50: roundMetric(percentile(clippingFractions, 0.5)),
+    clippingFractionP95: roundMetric(percentile(clippingFractions, 0.95)),
+    hueAngleDriftMaxDeg: roundMetric(Math.max(...hueDrifts)),
+    hueAngleDriftP50Deg: roundMetric(percentile(hueDrifts, 0.5)),
+    hueAngleDriftP95Deg: roundMetric(percentile(hueDrifts, 0.95)),
+    perceptualDeltaL1Max: roundMetric(Math.max(...perceptualDeltas)),
+    perceptualDeltaL1P50: roundMetric(percentile(perceptualDeltas, 0.5)),
+    perceptualDeltaL1P95: roundMetric(percentile(perceptualDeltas, 0.95)),
+    runtimeStatus: 'cpu_reference_only',
+  };
 }

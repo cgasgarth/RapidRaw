@@ -88,6 +88,24 @@
       "notes": "Perceptual mapping remains a planned policy until image-wide runtime behavior is proven."
     },
     {
+      "id": "gamut.srgb.perceptual-cpu-reference.v1",
+      "destinationLinearRgbBeforeMap": [1.28, 0.02, 0.04],
+      "expectedClassification": "high_component",
+      "policy": {
+        "destination": "srgb",
+        "intent": "perceptual",
+        "method": "perceptual_oklch_chroma_reduce_planned_v1",
+        "status": "cpu_reference_planned",
+        "warnings": [
+          "output_gamut_high_component_v1",
+          "output_gamut_mapping_not_runtime_applied_v1",
+          "output_gamut_perceptual_cpu_reference_v1",
+          "output_gamut_perceptual_intent_unproven_v1"
+        ]
+      },
+      "notes": "CPU reference maps saturated out-of-gamut sRGB with OKLCH chroma reduction, but preview/export runtime remains unproven."
+    },
+    {
       "id": "gamut.scene-referred.no-output-map.v1",
       "destinationLinearRgbBeforeMap": [1.7, 0.55, 0.12],
       "expectedClassification": "high_component",
