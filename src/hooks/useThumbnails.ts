@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useRef, useCallback, useEffect } from 'react';
 
 import { Invokes } from '../components/ui/AppProperties';
+import { useProcessStore } from '../store/useProcessStore';
 
 const shuffleThumbnailPaths = (paths: string[]) => {
   for (let i = paths.length - 1; i > 0; i--) {
@@ -12,6 +13,26 @@ const shuffleThumbnailPaths = (paths: string[]) => {
     paths[i] = swapPath;
     paths[j] = currentPath;
   }
+};
+
+export const shouldQueueThumbnailPath = (
+  path: string,
+  cachedThumbnails: Readonly<Record<string, string>>,
+  generatedPaths: Set<string>,
+  pendingPaths: ReadonlySet<string>,
+): boolean => {
+  if (cachedThumbnails[path]) {
+    generatedPaths.add(path);
+    return false;
+  }
+
+  if (pendingPaths.has(path)) return false;
+
+  if (generatedPaths.has(path)) {
+    generatedPaths.delete(path);
+  }
+
+  return true;
 };
 
 export function useThumbnails() {
@@ -62,9 +83,10 @@ export function useThumbnails() {
   const requestThumbnails = useCallback(
     (visiblePaths: string[]) => {
       const pathsToQueue: string[] = [];
+      const cachedThumbnails = useProcessStore.getState().thumbnails;
 
       visiblePaths.forEach((p) => {
-        if (!generatedRef.current.has(p) && !pendingQueueRef.current.has(p)) {
+        if (shouldQueueThumbnailPath(p, cachedThumbnails, generatedRef.current, pendingQueueRef.current)) {
           pathsToQueue.push(p);
         }
       });
