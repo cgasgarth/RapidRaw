@@ -4477,8 +4477,9 @@ mod tests {
         .expect_err("missing named editor should fail synchronously");
 
         assert!(
-            error.contains("External editor launcher failed")
-                || error.contains("Unable to find application")
+            error.contains(&output_path.to_string_lossy().to_string())
+                || error.contains("RawEngineMissingEditorForValidation"),
+            "missing-editor error should identify the failed launch target: {error}"
         );
     }
 

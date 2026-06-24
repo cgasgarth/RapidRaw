@@ -17,6 +17,7 @@ staged_files="$(git diff --cached --name-only --diff-filter=ACMR)"
 
 bun lint-staged --quiet --concurrent false
 bun run check:lint
+bun run check:external-editor-missing-launcher
 
 if printf '%s\n' "$staged_files" | grep -Eq '^(src-tauri/.*\.rs|src-tauri/Cargo\.(toml|lock)|\.cargo/.*|rust-toolchain\.toml)$'; then
   bun run check:rust:fmt

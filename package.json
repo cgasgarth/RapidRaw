@@ -292,6 +292,7 @@
     "check:raw-open-edit-export-private-proof-acceptance": "bun scripts/accept-raw-open-edit-export-private-proof.ts --self-test",
     "check:raw-open-edit-export-receipt-ui": "bun tests/integration/checks/check-raw-open-edit-export-receipt-ui.ts",
     "check:external-editor-preview-roundtrip-proof": "bun scripts/run-compact-command.ts --label external-editor-preview-roundtrip-proof --cwd src-tauri -- cargo test external_editor_live_roundtrip_with_preview --locked --no-default-features --features required-ci -- --ignored --nocapture",
+    "check:external-editor-missing-launcher": "bun scripts/run-compact-command.ts --label external-editor-missing-launcher --cwd src-tauri -- cargo test --quiet --locked --no-default-features --features required-ci external_editor_launcher_reports_missing_named_editor",
     "run:raw-color-management-private-proof": "bun scripts/run-raw-color-management-private-proof.ts",
     "check:computational-merge-e2e-proof-manifest": "bun tests/integration/checks/check-computational-merge-e2e-proof-manifest.ts",
     "check:computational-merge-private-report-collector": "bun scripts/collect-computational-merge-private-run-reports.ts --self-test",
