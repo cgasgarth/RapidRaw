@@ -15,3 +15,7 @@ export RAWENGINE_COMPACT_TAIL_LINES="${RAWENGINE_COMPACT_TAIL_LINES:-8}"
 
 bun lint-staged --quiet --concurrent false
 bun run check:lint
+
+if git diff --cached --name-only --diff-filter=ACMR | grep -Eq '^(src-tauri/.*\.rs|src-tauri/Cargo\.(toml|lock)|\.cargo/.*|rust-toolchain\.toml)$'; then
+  bun run check:rust:clippy
+fi

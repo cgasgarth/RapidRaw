@@ -9,6 +9,7 @@ use std::num::NonZero;
 use tauri::Manager;
 use wgpu::util::{DeviceExt, TextureDataOrder};
 
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
 use crate::display_profile::build_srgb_to_active_display_lut;
 use crate::image_processing::{AllAdjustments, GpuContext, MAX_MASKS};
 use crate::lut_processing::Lut;

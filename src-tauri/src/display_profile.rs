@@ -1,7 +1,5 @@
 use serde::Serialize;
 
-pub const DISPLAY_LUT_SIZE: u32 = 32;
-
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ActiveDisplayProfile {
@@ -11,12 +9,6 @@ pub struct ActiveDisplayProfile {
     pub profile_byte_count: Option<usize>,
     pub source: String,
     pub status: ActiveDisplayProfileStatus,
-}
-
-pub struct DisplayLut {
-    pub profile: ActiveDisplayProfile,
-    pub rgba16f: Vec<half::f16>,
-    pub size: u32,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -65,10 +57,22 @@ pub fn active_display_profile_bytes() -> Result<Vec<u8>, String> {
     macos::copy_display_profile_data(macos::main_display_id())
 }
 
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+pub const DISPLAY_LUT_SIZE: u32 = 32;
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+pub struct DisplayLut {
+    pub profile: ActiveDisplayProfile,
+    pub rgba16f: Vec<half::f16>,
+    pub size: u32,
+}
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
 pub fn build_srgb_to_active_display_lut() -> DisplayLut {
     build_srgb_to_active_display_lut_with_size(DISPLAY_LUT_SIZE)
 }
 
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
 pub fn build_srgb_to_active_display_lut_with_size(size: u32) -> DisplayLut {
     let size = size.max(2);
 
@@ -82,7 +86,10 @@ pub fn build_srgb_to_active_display_lut_with_size(size: u32) -> DisplayLut {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(
+    target_os = "macos",
+    not(any(target_os = "android", target_os = "linux"))
+))]
 fn try_build_srgb_to_active_display_lut(size: u32) -> Result<DisplayLut, String> {
     use moxcms::{ColorProfile, Layout, TransformOptions};
 
@@ -111,7 +118,10 @@ fn try_build_srgb_to_active_display_lut(size: u32) -> Result<DisplayLut, String>
     })
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(all(
+    not(target_os = "macos"),
+    not(any(target_os = "android", target_os = "linux"))
+))]
 fn try_build_srgb_to_active_display_lut(size: u32) -> Result<DisplayLut, String> {
     Ok(DisplayLut {
         profile: fallback_display_profile(),
@@ -120,6 +130,7 @@ fn try_build_srgb_to_active_display_lut(size: u32) -> Result<DisplayLut, String>
     })
 }
 
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
 fn fallback_display_profile() -> ActiveDisplayProfile {
     ActiveDisplayProfile {
         cmm: "identity".to_string(),
@@ -131,6 +142,7 @@ fn fallback_display_profile() -> ActiveDisplayProfile {
     }
 }
 
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
 fn build_lut_source_rgb(size: u32) -> Vec<f32> {
     let max_index = (size - 1) as f32;
     let mut source = Vec::with_capacity((size as usize).pow(3) * 3);
@@ -148,6 +160,7 @@ fn build_lut_source_rgb(size: u32) -> Vec<f32> {
     source
 }
 
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
 fn rgb_to_rgba16f(rgb: &[f32]) -> Vec<half::f16> {
     rgb.chunks_exact(3)
         .flat_map(|pixel| {
@@ -161,10 +174,12 @@ fn rgb_to_rgba16f(rgb: &[f32]) -> Vec<half::f16> {
         .collect()
 }
 
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
 fn build_identity_display_lut(size: u32) -> Vec<half::f16> {
     rgb_to_rgba16f(&build_lut_source_rgb(size))
 }
 
+#[cfg(target_os = "macos")]
 fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
 
@@ -312,7 +327,7 @@ mod tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(any(target_os = "android", target_os = "linux"))))]
 mod cross_platform_tests {
     use super::*;
 
