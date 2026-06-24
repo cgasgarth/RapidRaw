@@ -631,6 +631,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   } = usePreviewViewport({ maxZoom: 8, minZoom: 0.1, zoomStep: 0.25 });
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const previewImageRef = useRef<HTMLImageElement | null>(null);
+  const previewImageUrl = isCompareActive && originalUrl !== null ? originalUrl : previewUrl;
   const effectiveActivePathIndex = targetPaths[activePathIndex] === undefined ? 0 : activePathIndex;
   const selectedImagePath = targetPaths[effectiveActivePathIndex] ?? null;
   const hasMultipleScans = targetPaths.length > 1;
@@ -5349,7 +5350,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             </div>
           )}
 
-          {(previewUrl || originalUrl) && (
+          {previewImageUrl !== null && (
             <div
               className={cx(
                 'absolute inset-0 flex items-center justify-center',
@@ -5361,7 +5362,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 <div className="relative inline-block shadow-2xl">
                   <img
                     ref={previewImageRef}
-                    src={isCompareActive && originalUrl ? originalUrl : previewUrl || ''}
+                    src={previewImageUrl}
                     className="block object-contain"
                     data-testid="negative-lab-preview-image"
                     style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto' }}
@@ -5375,7 +5376,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                   {renderBaseFogSampleOverlay()}
                   {renderPatchProbeOverlay()}
                   {renderDraftPatchOverlay()}
-                  {isCompareActive && (
+                  {isCompareActive && originalUrl !== null && (
                     <UiText
                       as="div"
                       variant={TextVariants.small}
