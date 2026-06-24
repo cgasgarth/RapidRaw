@@ -13,9 +13,18 @@ export RAWENGINE_COMPACT_MAX_LINES="${RAWENGINE_COMPACT_MAX_LINES:-16}"
 export RAWENGINE_COMPACT_HEAD_LINES="${RAWENGINE_COMPACT_HEAD_LINES:-5}"
 export RAWENGINE_COMPACT_TAIL_LINES="${RAWENGINE_COMPACT_TAIL_LINES:-8}"
 
+staged_files="$(git diff --cached --name-only --diff-filter=ACMR)"
+
 bun lint-staged --quiet --concurrent false
 bun run check:lint
 
-if git diff --cached --name-only --diff-filter=ACMR | grep -Eq '^(src-tauri/.*\.rs|src-tauri/Cargo\.(toml|lock)|\.cargo/.*|rust-toolchain\.toml)$'; then
+if printf '%s\n' "$staged_files" | grep -Eq '^(src-tauri/.*\.rs|src-tauri/Cargo\.(toml|lock)|\.cargo/.*|rust-toolchain\.toml)$'; then
+  bun run check:rust:fmt
+  bun run check:rust:check
   bun run check:rust:clippy
+fi
+
+if printf '%s\n' "$staged_files" | grep -Eq '^\.github/workflows/.*\.ya?ml$'; then
+  bun run check:actions:lint
+  bun run check:workflow-policy
 fi
