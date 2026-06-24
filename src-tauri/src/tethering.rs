@@ -580,7 +580,7 @@ fn apply_capture_metadata_template(
     camera_control_values: &BTreeMap<String, String>,
 ) -> Result<TetherCaptureMetadataSummary, String> {
     let template_id = requested_template_id
-        .filter(|template_id| matches!(*template_id, "none" | "studioSession"))
+        .filter(|template_id| matches!(*template_id, "none" | "studioSession" | "reviewSelect"))
         .unwrap_or("none");
 
     if template_id == "none" {
@@ -600,29 +600,15 @@ fn apply_capture_metadata_template(
             .unwrap_or("capture")
     ));
     let mut sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
-    sidecar.rating = 1;
-    sidecar.tags = Some(vec![
-        "tethered-capture".to_string(),
-        "studio-session".to_string(),
-    ]);
+    let (rating, tags, exif_values, mut applied_fields) =
+        metadata_template_values(template_id, session, captured_at, ingest);
+    sidecar.rating = rating;
+    sidecar.tags = Some(tags);
 
     let mut exif = sidecar.exif.unwrap_or_default();
-    exif.insert("Artist".to_string(), "RawEngine tether session".to_string());
-    exif.insert(
-        "ImageDescription".to_string(),
-        format!(
-            "Tethered capture from {} at {}",
-            session.camera_display_name,
-            captured_at.to_rfc3339()
-        ),
-    );
-    exif.insert(
-        "UserComment".to_string(),
-        format!(
-            "RawEngine tether ingest preset {} wrote {}.",
-            ingest.preset_id, ingest.file_name
-        ),
-    );
+    for (key, value) in exif_values {
+        exif.insert(key, value);
+    }
     for (control_id, value) in camera_control_values {
         exif.insert(
             format!("RawEngineTetherControl_{control_id}"),
@@ -652,13 +638,6 @@ fn apply_capture_metadata_template(
 
     crate::exif_processing::save_sidecar_metadata_atomic(&sidecar_path, &sidecar)?;
 
-    let mut applied_fields = vec![
-        "rating".to_string(),
-        "tags".to_string(),
-        "Artist".to_string(),
-        "ImageDescription".to_string(),
-        "UserComment".to_string(),
-    ];
     applied_fields.extend(
         camera_control_values
             .keys()
@@ -671,6 +650,70 @@ fn apply_capture_metadata_template(
         sidecar_path: Some(sidecar_path.to_string_lossy().to_string()),
         template_id: template_id.to_string(),
     })
+}
+
+fn metadata_template_values(
+    template_id: &str,
+    session: &TetherSessionSnapshot,
+    captured_at: &chrono::DateTime<chrono::Utc>,
+    ingest: &TetherCaptureIngestSummary,
+) -> (u8, Vec<String>, BTreeMap<String, String>, Vec<String>) {
+    if template_id == "reviewSelect" {
+        return (
+            4,
+            vec![
+                "tethered-capture".to_string(),
+                "review-select".to_string(),
+                "color:green".to_string(),
+            ],
+            BTreeMap::from([
+                (
+                    "ImageDescription".to_string(),
+                    "Review select for client proofing.".to_string(),
+                ),
+                (
+                    "UserComment".to_string(),
+                    "Selected during first cull.".to_string(),
+                ),
+            ]),
+            vec![
+                "rating".to_string(),
+                "colorLabel".to_string(),
+                "ImageDescription".to_string(),
+                "UserComment".to_string(),
+            ],
+        );
+    }
+
+    (
+        1,
+        vec!["tethered-capture".to_string(), "studio-session".to_string()],
+        BTreeMap::from([
+            ("Artist".to_string(), "RawEngine tether session".to_string()),
+            (
+                "ImageDescription".to_string(),
+                format!(
+                    "Tethered capture from {} at {}",
+                    session.camera_display_name,
+                    captured_at.to_rfc3339()
+                ),
+            ),
+            (
+                "UserComment".to_string(),
+                format!(
+                    "RawEngine tether ingest preset {} wrote {}.",
+                    ingest.preset_id, ingest.file_name
+                ),
+            ),
+        ]),
+        vec![
+            "rating".to_string(),
+            "tags".to_string(),
+            "Artist".to_string(),
+            "ImageDescription".to_string(),
+            "UserComment".to_string(),
+        ],
+    )
 }
 
 fn write_verified_backup_capture(
@@ -1300,6 +1343,81 @@ mod tests {
             Some("studioSession")
         );
         assert_eq!(tether_artifacts[0]["cameraControlValues"]["iso"], "800");
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn fake_provider_applies_review_select_metadata_template() {
+        let state = AppState::new();
+        let root = std::env::temp_dir().join(format!(
+            "rawengine-tether-review-select-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let source_path = root.join("source.ARW");
+        let destination_root = root.join("destination");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(&source_path, b"fake raw bytes").unwrap();
+
+        open_tether_session_for_state(
+            TetherSessionOpenRequest {
+                camera_id: "fake-sony-ilce-7m4-usb".to_string(),
+                destination_root: Some(destination_root.to_string_lossy().to_string()),
+                provider_mode: Some("fake".to_string()),
+            },
+            &state,
+        )
+        .unwrap();
+
+        let capture = trigger_tether_capture_for_state(
+            Some(TetherCaptureRequest {
+                backup_destination_root: None,
+                camera_control_values: BTreeMap::new(),
+                destination_root: None,
+                fake_source_path: Some(source_path.to_string_lossy().to_string()),
+                ingest_preset_id: Some("timestampCamera".to_string()),
+                metadata_template_id: Some("reviewSelect".to_string()),
+            }),
+            &state,
+        )
+        .unwrap();
+
+        assert!(capture.metadata.applied);
+        assert_eq!(capture.metadata.template_id, "reviewSelect");
+        assert!(
+            capture
+                .metadata
+                .applied_fields
+                .contains(&"colorLabel".to_string())
+        );
+        let sidecar_path = capture.metadata.sidecar_path.as_ref().unwrap();
+        let sidecar = crate::exif_processing::load_sidecar(Path::new(sidecar_path));
+        assert_eq!(sidecar.rating, 4);
+        assert_eq!(
+            sidecar.tags.unwrap(),
+            vec![
+                "tethered-capture".to_string(),
+                "review-select".to_string(),
+                "color:green".to_string()
+            ]
+        );
+        let exif = sidecar.exif.unwrap();
+        assert_eq!(
+            exif.get("ImageDescription").map(String::as_str),
+            Some("Review select for client proofing.")
+        );
+        assert_eq!(
+            exif.get("UserComment").map(String::as_str),
+            Some("Selected during first cull.")
+        );
+        let tether_artifacts = sidecar
+            .raw_engine_artifacts
+            .unwrap()
+            .tether_capture_artifacts;
+        assert_eq!(
+            tether_artifacts[0]["metadataTemplateId"].as_str(),
+            Some("reviewSelect")
+        );
 
         let _ = fs::remove_dir_all(root);
     }
