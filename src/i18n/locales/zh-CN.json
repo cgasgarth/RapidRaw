@@ -1336,6 +1336,7 @@
       "cancelled": "导出已取消",
       "chooseExternalEditor": "选择编辑器...",
       "chooseExternalEditorTitle": "选择外部编辑器",
+      "cmm": "",
       "colorManagedTransform": "",
       "estimatedAverageSize": "（平均 {{size}}）",
       "estimatedSize": "预计文件大小：约 {{size}}",
@@ -1354,6 +1355,8 @@
       "externalEditorSaveDetected": "",
       "externalEditorWatching": "",
       "failed": "导出失败",
+      "iccEmbedded": "",
+      "identityTransform": "",
       "importingLinkedVariant": "正在导入…",
       "importLinkedVariant": "导入关联变体",
       "linkedVariantImported": "Linked variant imported: {{filename}}. Original left untouched.",
@@ -1363,7 +1366,8 @@
       "offlineSmartPreviewBlocked": "请先重新连接原始文件，再进行全分辨率导出。你仍可继续编辑智能预览。",
       "openInEditor": "在编辑器中打开",
       "showInFinder": "在 Finder 中显示",
-      "success": "导出成功！"
+      "success": "导出成功！",
+      "transformApplied": ""
     },
     "title": "导出",
     "watermark": {

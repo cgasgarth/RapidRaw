@@ -104,13 +104,20 @@ export interface ExportReceipt {
 
 export interface ExportReceiptOutput {
   bitDepth?: number | null | undefined;
+  blackPointCompensation?: string | null | undefined;
   byteSize: number;
+  cmm?: string | null | undefined;
   colorManagedTransform?: string | null | undefined;
   colorProfile?: string | null | undefined;
+  effectiveColorProfile?: string | null | undefined;
   format: string;
+  iccEmbedded?: boolean | null | undefined;
   outputPath: string;
+  policyVersion?: string | null | undefined;
   renderingIntent?: string | null | undefined;
+  requestedColorProfile?: string | null | undefined;
   sourcePath: string;
+  transformApplied?: boolean | null | undefined;
 }
 
 export interface FileFormat {
