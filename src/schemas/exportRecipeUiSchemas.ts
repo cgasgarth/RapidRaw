@@ -29,10 +29,30 @@ const recipeIdentitySchema = z
 
 const recipeObjectSchema = z.record(z.string(), z.unknown());
 
+const normalizeLegacyBuiltInRecipe = (value: Record<string, unknown>): Record<string, unknown> => {
+  const id = typeof value['id'] === 'string' ? value['id'] : '';
+  if (!BUILT_IN_RECIPE_IDS.has(id)) return value;
+
+  return {
+    colorProfile: 'srgb',
+    exportMasks: false,
+    outputSharpening: null,
+    preserveFolders: false,
+    preserveTimestamps: false,
+    renderingIntent: 'relativeColorimetric',
+    watermarkAnchor: 'bottomRight',
+    watermarkOpacity: 75,
+    watermarkPath: null,
+    watermarkScale: 10,
+    watermarkSpacing: 5,
+    ...value,
+  };
+};
+
 const asRecipeLike = (value: unknown): ExportRecipe | null => {
   const recipeObject = recipeObjectSchema.safeParse(value);
   const parsed = exportRecipeSchema.safeParse(
-    recipeObject.success ? { preserveTimestamps: false, ...recipeObject.data } : value,
+    recipeObject.success ? normalizeLegacyBuiltInRecipe(recipeObject.data) : value,
   );
   return parsed.success ? parsed.data : null;
 };
