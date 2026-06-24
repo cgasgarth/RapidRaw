@@ -33,7 +33,7 @@ const normalizeLegacyBuiltInRecipe = (value: Record<string, unknown>): Record<st
   const id = typeof value['id'] === 'string' ? value['id'] : '';
   if (!BUILT_IN_RECIPE_IDS.has(id)) return value;
 
-  return {
+  const normalized: Record<string, unknown> = {
     colorProfile: 'srgb',
     exportMasks: false,
     outputSharpening: null,
@@ -47,6 +47,13 @@ const normalizeLegacyBuiltInRecipe = (value: Record<string, unknown>): Record<st
     watermarkSpacing: 5,
     ...value,
   };
+
+  if (typeof normalized['exportMasks'] !== 'boolean') normalized['exportMasks'] = false;
+  if (typeof normalized['preserveFolders'] !== 'boolean') normalized['preserveFolders'] = false;
+  if (typeof normalized['preserveTimestamps'] !== 'boolean') normalized['preserveTimestamps'] = false;
+  if (normalized['lastExportPath'] === null) delete normalized['lastExportPath'];
+
+  return normalized;
 };
 
 const asRecipeLike = (value: unknown): ExportRecipe | null => {
