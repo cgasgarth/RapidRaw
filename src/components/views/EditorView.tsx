@@ -1,6 +1,7 @@
 import cx from 'clsx';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { lazy, Suspense, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useEditorStore } from '../../store/useEditorStore';
@@ -107,6 +108,7 @@ export default function EditorView({
   requestThumbnails,
   refreshImageList,
 }: EditorViewProps) {
+  const { t } = useTranslation();
   const { selectedImage } = useEditorStore(
     useShallow((state) => ({
       selectedImage: state.selectedImage,
@@ -289,17 +291,27 @@ export default function EditorView({
   );
 
   return (
-    <div className={cx('flex grow h-full min-h-0', isCompactPortrait ? 'flex-col gap-2' : 'flex-row')}>
-      <div className={cx('flex-1 flex flex-col min-w-0', isCompactPortrait && 'min-h-0')}>
+    <div
+      aria-label={t('editor.accessibility.workspace')}
+      className={cx('flex grow h-full min-h-0', isCompactPortrait ? 'flex-col gap-2' : 'flex-row')}
+      role="main"
+    >
+      <div
+        aria-label={t('editor.accessibility.previewRegion')}
+        className={cx('flex-1 flex flex-col min-w-0', isCompactPortrait && 'min-h-0')}
+        role="region"
+      >
         {editorNode}
         {!isCompactPortrait && editorBottomBarNode}
       </div>
       <div
+        aria-label={t('editor.accessibility.toolsPanel')}
         className={cx(
           'flex overflow-hidden shrink-0',
           isCompactPortrait ? 'flex-col bg-bg-secondary rounded-lg' : 'h-full bg-transparent',
           !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
         )}
+        role="complementary"
         style={
           isCompactPortrait
             ? {
@@ -331,7 +343,13 @@ export default function EditorView({
                 layout="horizontal"
               />
             </div>
-            <div className="shrink-0 border-t border-surface">{editorBottomBarComponent}</div>
+            <div
+              aria-label={t('editor.accessibility.filmstrip')}
+              className="shrink-0 border-t border-surface"
+              role="region"
+            >
+              {editorBottomBarComponent}
+            </div>
           </>
         ) : (
           <>

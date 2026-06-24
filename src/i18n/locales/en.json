@@ -496,6 +496,13 @@
     }
   },
   "editor": {
+    "accessibility": {
+      "filmstrip": "Editor filmstrip",
+      "imagePreview": "Image preview",
+      "previewRegion": "Editor preview",
+      "toolsPanel": "Editor tools",
+      "workspace": "Editor workspace"
+    },
     "adjustments": {
       "actions": {
         "copySectionSettings": "Copy {{section}} Settings",

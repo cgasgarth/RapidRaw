@@ -496,6 +496,13 @@
     }
   },
   "editor": {
+    "accessibility": {
+      "filmstrip": "",
+      "imagePreview": "",
+      "previewRegion": "",
+      "toolsPanel": "",
+      "workspace": ""
+    },
     "adjustments": {
       "actions": {
         "copySectionSettings": "{{section}}-Einstellungen kopieren",
