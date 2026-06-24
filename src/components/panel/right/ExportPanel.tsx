@@ -74,6 +74,7 @@ interface ImageDimensions {
 }
 
 const imageDimensionsSchema = z.object({ height: z.number(), width: z.number() }).strict();
+const originalFileAvailableSchema = z.boolean();
 const exportSizeEstimateSchema = z.number().nonnegative();
 const externalEditorVariantReceiptSchema = z
   .object({
@@ -614,8 +615,12 @@ export default function ExportPanel({
     void Promise.all(
       staleSmartPreviewPaths.map(async (path): Promise<string | null> => {
         try {
-          const dims = await invokeWithSchema(Invokes.GetImageDimensions, { path }, imageDimensionsSchema);
-          return dims.width > 0 && dims.height > 0 ? path : null;
+          const isAvailable = await invokeWithSchema(
+            Invokes.IsOriginalFileAvailable,
+            { path },
+            originalFileAvailableSchema,
+          );
+          return isAvailable ? path : null;
         } catch {
           return null;
         }
