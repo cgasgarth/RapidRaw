@@ -101,10 +101,14 @@ type LivePromptStatus = 'applied' | 'applying' | 'dry_run_ready' | 'failed' | 'i
 interface LivePromptResult {
   appliedGraphRevision?: string;
   changedPixelCount?: number;
+  changedPixelPercent?: number;
   error?: string;
+  maxChannelDelta?: number;
+  meanLuminanceDelta?: number;
   previewAfterHash?: string;
   previewBeforeHash?: string;
   recipeName?: string;
+  sampledPixelCount?: number;
   status: LivePromptStatus;
   summary?: string;
 }
@@ -241,6 +245,10 @@ function LivePromptComposer() {
         ...current,
         appliedGraphRevision: applyResult.appliedGraphRevision,
         changedPixelCount: applyResult.changedPixelCount,
+        changedPixelPercent: applyResult.changedPixelPercent,
+        maxChannelDelta: applyResult.maxChannelDelta,
+        meanLuminanceDelta: applyResult.meanLuminanceDelta,
+        sampledPixelCount: applyResult.sampledPixelCount,
         status: 'applied',
       }));
     } catch (error) {
@@ -354,9 +362,13 @@ function LivePromptComposer() {
         className="rounded border border-white/10 bg-black/15 p-2 text-[11px]"
         data-applied-graph-revision={result.appliedGraphRevision ?? ''}
         data-changed-pixel-count={result.changedPixelCount?.toString() ?? ''}
+        data-changed-pixel-percent={result.changedPixelPercent?.toString() ?? ''}
+        data-max-channel-delta={result.maxChannelDelta?.toString() ?? ''}
+        data-mean-luminance-delta={result.meanLuminanceDelta?.toString() ?? ''}
         data-preview-after-hash={result.previewAfterHash ?? ''}
         data-preview-before-hash={result.previewBeforeHash ?? ''}
         data-preview-refresh-policy="native-renderer-handoff"
+        data-sampled-pixel-count={result.sampledPixelCount?.toString() ?? ''}
         data-testid="agent-live-prompt-result"
       >
         <div className="flex items-center justify-between gap-2">
@@ -372,7 +384,13 @@ function LivePromptComposer() {
         {result.appliedGraphRevision ? (
           <div className="mt-1 font-mono text-[10px] text-emerald-100">
             {result.appliedGraphRevision} ·{' '}
-            {t('editor.ai.agent.composer.changedPixels', { count: result.changedPixelCount })}
+            {t('editor.ai.agent.composer.previewDelta', {
+              changed: result.changedPixelCount,
+              maxDelta: result.maxChannelDelta,
+              meanLuma: result.meanLuminanceDelta,
+              percent: result.changedPixelPercent,
+              sampled: result.sampledPixelCount,
+            })}
           </div>
         ) : null}
         {result.error ? <p className="mt-1 leading-4 text-red-100">{result.error}</p> : null}
