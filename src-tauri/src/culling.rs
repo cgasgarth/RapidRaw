@@ -92,6 +92,7 @@ const FOCUS_REGION_EYE_BAND_HEURISTIC: &str = "eye_band_heuristic";
 const FOCUS_REGION_LOCAL_FACE_EYE: &str = "local_face_eye_regions";
 const FOCUS_REGION_PROVIDER_HEURISTIC: &str = "heuristic";
 const FOCUS_REGION_PROVIDER_LOCAL_MANIFEST: &str = "local_manifest";
+const HEURISTIC_FOCUS_CONFIDENCE_SCALE: f64 = 0.75;
 const MIN_DETECTED_REGION_CONFIDENCE: f64 = 0.5;
 
 #[derive(Deserialize, Debug, Clone)]
@@ -379,13 +380,19 @@ fn analyze_image(
         + (exposure_metric * 0.05);
     let region_consistency =
         clamp_unit(1.0 - ((normalized_eye_sharpness - normalized_face_sharpness).abs() * 0.35));
-    let focus_confidence = clamp_unit(
+    let raw_focus_confidence = clamp_unit(
         ((normalized_eye_sharpness * 0.60)
             + (normalized_face_sharpness * 0.20)
             + (normalized_center_focus * 0.10)
             + (exposure_metric * 0.10))
             * region_consistency,
     );
+    let focus_confidence =
+        if focus_region_metrics.focus_region_provider == FOCUS_REGION_PROVIDER_HEURISTIC {
+            raw_focus_confidence * HEURISTIC_FOCUS_CONFIDENCE_SCALE
+        } else {
+            raw_focus_confidence
+        };
 
     let hash = hasher.hash_image(&thumbnail);
 
