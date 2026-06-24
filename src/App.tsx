@@ -828,31 +828,38 @@ function App() {
                 />
               )}
             </div>
-            {!selectedImage && isLibraryExportPanelVisible && (
-              <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
+            {!selectedImage && (
+              <>
+                {isLibraryExportPanelVisible && (
+                  <Resizer
+                    direction={Orientation.Vertical}
+                    onMouseDown={createResizeHandler('right', rightPanelWidth)}
+                  />
+                )}
+                <div
+                  className={cx(
+                    'shrink-0 overflow-hidden',
+                    !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+                  )}
+                  style={{ width: isLibraryExportPanelVisible && !isFullScreen ? `${rightPanelWidth}px` : '0px' }}
+                >
+                  <ExportPanel
+                    exportState={exportState}
+                    multiSelectedPaths={multiSelectedPaths}
+                    selectedImage={null}
+                    setExportState={setExportState}
+                    appSettings={appSettings}
+                    onSettingsChange={handleSettingsChangeVoid}
+                    rootPaths={rootPaths}
+                    isVisible={isLibraryExportPanelVisible}
+                    onLinkedVariantImported={handleLinkedVariantImported}
+                    onClose={() => {
+                      setUI({ isLibraryExportPanelVisible: false });
+                    }}
+                  />
+                </div>
+              </>
             )}
-            <div
-              className={cx(
-                'shrink-0 overflow-hidden',
-                !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
-              )}
-              style={{ width: isLibraryExportPanelVisible && !isFullScreen ? `${rightPanelWidth}px` : '0px' }}
-            >
-              <ExportPanel
-                exportState={exportState}
-                multiSelectedPaths={multiSelectedPaths}
-                selectedImage={null}
-                setExportState={setExportState}
-                appSettings={appSettings}
-                onSettingsChange={handleSettingsChangeVoid}
-                rootPaths={rootPaths}
-                isVisible={isLibraryExportPanelVisible}
-                onLinkedVariantImported={handleLinkedVariantImported}
-                onClose={() => {
-                  setUI({ isLibraryExportPanelVisible: false });
-                }}
-              />
-            </div>
           </div>
         </div>
         <AppModals
