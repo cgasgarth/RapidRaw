@@ -36,7 +36,7 @@ useLibraryStore.getState().setLibrary({
 
 useEditorStore.getState().setEditor({
   adjustments: INITIAL_ADJUSTMENTS,
-  finalPreviewUrl: 'rawengine-preview://history_0/recipe-before',
+  finalPreviewUrl: 'blob:rawengine-recipe-before',
   hasRenderedFirstFrame: true,
   history: [INITIAL_ADJUSTMENTS],
   historyIndex: 0,
@@ -69,8 +69,11 @@ const result = await runAgentCoreEditCommandBundle({
 });
 const state = useEditorStore.getState();
 
-if (result.changedPixelCount < 4 || !state.finalPreviewUrl?.includes(result.outputHash)) {
-  throw new Error('Recipe planner commands did not visibly affect output.');
+if (result.changedPixelCount < 4) {
+  throw new Error('Recipe planner commands did not prove changed output.');
+}
+if (state.finalPreviewUrl?.startsWith('rawengine-preview://')) {
+  throw new Error('Recipe planner commands must not publish synthetic preview URLs.');
 }
 if (state.adjustments.hsl.oranges.saturation !== 12 || state.adjustments.contrast !== 20) {
   throw new Error('Recipe planner did not apply typed tone/color commands.');

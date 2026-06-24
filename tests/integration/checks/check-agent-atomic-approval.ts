@@ -35,7 +35,7 @@ useLibraryStore.getState().setLibrary({
 
 useEditorStore.getState().setEditor({
   adjustments: INITIAL_ADJUSTMENTS,
-  finalPreviewUrl: 'rawengine-preview://history_0/atomic-before',
+  finalPreviewUrl: 'blob:rawengine-atomic-before',
   hasRenderedFirstFrame: true,
   history: [INITIAL_ADJUSTMENTS],
   historyIndex: 0,
@@ -108,7 +108,7 @@ if (rollbackRevision !== 'history_0') {
 if (rolledBackState.adjustments.exposure !== INITIAL_ADJUSTMENTS.exposure || rolledBackState.historyIndex !== 0) {
   throw new Error('Rollback did not restore original adjustments and history index.');
 }
-if (rolledBackState.finalPreviewUrl !== 'rawengine-preview://history_0/atomic-before') {
+if (rolledBackState.finalPreviewUrl !== 'blob:rawengine-atomic-before') {
   throw new Error('Rollback did not restore original preview identity.');
 }
 

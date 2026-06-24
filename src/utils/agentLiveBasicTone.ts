@@ -117,11 +117,10 @@ export const applyBasicToneToLiveEditor = async ({
     const history = pushEditHistoryEntry(state.history, state.historyIndex, adjustments);
     return {
       adjustments,
-      finalPreviewUrl: `rawengine-preview://${mutation.appliedGraphRevision}/${afterPreviewHash}`,
       history: history.history,
       historyIndex: history.historyIndex,
       lastBasicToneCommand: applyCommand,
-      uncroppedAdjustedPreviewUrl: `rawengine-preview://${mutation.appliedGraphRevision}/uncropped/${afterPreviewHash}`,
+      uncroppedAdjustedPreviewUrl: null,
     };
   });
 

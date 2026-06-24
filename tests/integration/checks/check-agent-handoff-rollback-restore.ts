@@ -48,7 +48,7 @@ useLibraryStore.getState().setLibrary({
 
 useEditorStore.getState().setEditor({
   adjustments: INITIAL_ADJUSTMENTS,
-  finalPreviewUrl: 'rawengine-preview://history_0/handoff-rollback-before',
+  finalPreviewUrl: 'blob:rawengine-handoff-rollback-before',
   hasRenderedFirstFrame: true,
   history: [INITIAL_ADJUSTMENTS],
   historyIndex: 0,
@@ -99,7 +99,7 @@ const restoredState = useEditorStore.getState();
 if (restoredRevision !== 'history_0' || restoredState.historyIndex !== 0) {
   failures.push('Rollback restore path must recover the pre-agent history revision.');
 }
-if (restoredState.finalPreviewUrl !== 'rawengine-preview://history_0/handoff-rollback-before') {
+if (restoredState.finalPreviewUrl !== 'blob:rawengine-handoff-rollback-before') {
   failures.push('Rollback restore path must recover the pre-agent preview identity.');
 }
 if (restoredState.adjustments.exposure !== INITIAL_ADJUSTMENTS.exposure) {

@@ -35,7 +35,7 @@ useLibraryStore.getState().setLibrary({
 
 useEditorStore.getState().setEditor({
   adjustments: INITIAL_ADJUSTMENTS,
-  finalPreviewUrl: 'rawengine-preview://history_0/core-before',
+  finalPreviewUrl: 'blob:rawengine-core-before',
   hasRenderedFirstFrame: true,
   history: [INITIAL_ADJUSTMENTS],
   historyIndex: 0,
@@ -99,8 +99,14 @@ if (state.adjustments.exposure !== 0.3 || state.adjustments.hsl.oranges.saturati
 if (state.historyIndex !== 1 || state.history.length !== 2) {
   throw new Error('Agent core command bundle did not commit one history entry.');
 }
-if (result.changedPixelCount < 4 || !state.finalPreviewUrl?.includes(result.outputHash)) {
-  throw new Error('Agent core command bundle did not visibly update preview output.');
+if (result.changedPixelCount < 4) {
+  throw new Error('Agent core command bundle did not prove changed preview output.');
+}
+if (state.finalPreviewUrl !== 'blob:rawengine-core-before') {
+  throw new Error('Agent core command bundle must preserve visible preview until native render completes.');
+}
+if (state.uncroppedAdjustedPreviewUrl !== null) {
+  throw new Error('Agent core command bundle must invalidate stale uncropped preview output.');
 }
 if (result.mutations.at(-1)?.commandType !== 'toneColor.adjustHsl') {
   throw new Error('Agent core command bundle final mutation must come from final HSL apply.');

@@ -28,7 +28,7 @@ useEditorStore.getState().setEditor({
     ],
   },
   brushSettings: { feather: 50, size: 64, tool: ToolType.Brush },
-  finalPreviewUrl: 'rawengine-preview://history_3/agent-context',
+  finalPreviewUrl: 'blob:rawengine-agent-context',
   hasRenderedFirstFrame: true,
   histogram: {
     [ActiveChannel.Blue]: { color: '#4D96FF', data: histogramBins.map((value) => value + 2) },
