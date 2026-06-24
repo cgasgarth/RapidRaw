@@ -1046,6 +1046,22 @@
       "clickToEdit": "Zum Bearbeiten klicken",
       "copied": "Kopiert",
       "copy": "Kopieren",
+      "displayProfile": {
+        "cmm": "CMM",
+        "displayId": "Display-ID",
+        "errorDescription": "Display-Profil konnte nicht gelesen werden: {{error}}",
+        "iccHash": "ICC-Hash",
+        "loading": "Laden",
+        "loadingDescription": "Aktives Display-Profil wird gelesen...",
+        "profileBytes": "Profil-Bytes",
+        "status": {
+          "active_profile_loaded": "ColorSync aktiv",
+          "error": "Nicht verfügbar",
+          "fallback_no_active_profile": "sRGB-Fallback",
+          "unsupported_platform": "Nicht unterstützt"
+        },
+        "title": "Display-Profil"
+      },
       "emptyClickToAdd": "Leer (Klicken zum Hinzufügen)",
       "extendedExif": {
         "title": "Erweiterte EXIF"

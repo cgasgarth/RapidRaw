@@ -19,7 +19,7 @@
   },
   "fixtureId": "validation.raw-open-edit-export.high-iso-skin-shadow.v1",
   "generatedAt": "2026-06-20T01:06:45.397Z",
-  "issue": 2327,
+  "issue": 3234,
   "outputTransform": {
     "bitDepth": 16,
     "embedIcc": true,

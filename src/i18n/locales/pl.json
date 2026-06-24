@@ -1110,6 +1110,22 @@
       "clickToEdit": "Kliknij, aby edytować",
       "copied": "Skopiowano",
       "copy": "Kopiuj",
+      "displayProfile": {
+        "cmm": "CMM",
+        "displayId": "ID monitora",
+        "errorDescription": "Nie udało się odczytać profilu monitora: {{error}}",
+        "iccHash": "Hash ICC",
+        "loading": "Wczytywanie",
+        "loadingDescription": "Odczytywanie aktywnego profilu monitora...",
+        "profileBytes": "Bajty profilu",
+        "status": {
+          "active_profile_loaded": "ColorSync aktywny",
+          "error": "Niedostępne",
+          "fallback_no_active_profile": "Fallback sRGB",
+          "unsupported_platform": "Nieobsługiwane"
+        },
+        "title": "Profil monitora"
+      },
       "emptyClickToAdd": "Puste (Kliknij, aby dodać)",
       "extendedExif": {
         "title": "Rozszerzony EXIF"

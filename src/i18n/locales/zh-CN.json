@@ -1040,6 +1040,22 @@
       "clickToEdit": "点击编辑",
       "copied": "已复制",
       "copy": "复制",
+      "displayProfile": {
+        "cmm": "CMM",
+        "displayId": "显示器 ID",
+        "errorDescription": "无法读取显示器配置文件：{{error}}",
+        "iccHash": "ICC 哈希",
+        "loading": "正在加载",
+        "loadingDescription": "正在读取活动显示器配置文件...",
+        "profileBytes": "配置文件字节数",
+        "status": {
+          "active_profile_loaded": "ColorSync 活动",
+          "error": "不可用",
+          "fallback_no_active_profile": "sRGB 回退",
+          "unsupported_platform": "不支持"
+        },
+        "title": "显示器配置文件"
+      },
       "emptyClickToAdd": "空（点击添加）",
       "extendedExif": {
         "title": "扩展 EXIF"
