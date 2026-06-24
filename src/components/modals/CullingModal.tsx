@@ -443,6 +443,9 @@ export default function CullingModal({
       if (region === 'eye_band_heuristic') {
         return t('modals.culling.focusRegion.eye_band_heuristic');
       }
+      if (region === 'local_face_eye_regions') {
+        return t('modals.culling.focusRegion.local_face_eye_regions');
+      }
       return t('modals.culling.focusRegion.unknown');
     },
     [t],
@@ -1035,12 +1038,15 @@ export default function CullingModal({
                           ?.valuePercent.toString()}
                         data-focus-confidence={img.focusConfidence.toFixed(2)}
                         data-focus-confidence-band={confidenceBand}
+                        data-focus-detected-eye-confidence={img.detectedEyeConfidence?.toFixed(2) ?? ''}
+                        data-focus-detected-face-confidence={img.detectedFaceConfidence?.toFixed(2) ?? ''}
                         data-focus-eye-sharpness={img.eyeSharpnessMetric.toFixed(2)}
                         data-focus-eye-face-balance-percent={eyeFaceBalancePercent}
                         data-focus-eye-review={String(showEyeSharpnessReview)}
                         data-focus-face-sharpness={img.faceSharpnessMetric.toFixed(2)}
                         data-focus-rank={index + 1}
                         data-focus-region={img.focusRegion}
+                        data-focus-region-provider={img.focusRegionProvider ?? ''}
                         data-focus-score={img.focusScore.toFixed(2)}
                         data-testid="culling-focus-ranking-card"
                         key={img.path}

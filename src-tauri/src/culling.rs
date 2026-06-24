@@ -4,6 +4,7 @@ use image_hasher::{HashAlg, HasherConfig};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
@@ -35,6 +36,9 @@ pub struct ImageAnalysisResult {
     pub focus_score: f64,
     pub focus_confidence: f64,
     pub focus_region: String,
+    pub focus_region_provider: String,
+    pub detected_eye_confidence: Option<f64>,
+    pub detected_face_confidence: Option<f64>,
     pub width: u32,
     pub height: u32,
 }
@@ -85,11 +89,37 @@ const WEIGHT_SHARPNESS: f64 = 0.40;
 const WEIGHT_CENTER_FOCUS: f64 = 0.35;
 const WEIGHT_EXPOSURE: f64 = 0.25;
 const FOCUS_REGION_EYE_BAND_HEURISTIC: &str = "eye_band_heuristic";
+const FOCUS_REGION_LOCAL_FACE_EYE: &str = "local_face_eye_regions";
+const FOCUS_REGION_PROVIDER_HEURISTIC: &str = "heuristic";
+const FOCUS_REGION_PROVIDER_LOCAL_MANIFEST: &str = "local_manifest";
+const MIN_DETECTED_REGION_CONFIDENCE: f64 = 0.5;
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+struct LocalFocusRegionManifest {
+    provider: Option<String>,
+    regions: Vec<LocalFocusRegion>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+struct LocalFocusRegion {
+    kind: String,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    confidence: f64,
+}
 
 struct FocusRegionMetrics {
     center: f64,
     face: f64,
     eye: f64,
+    focus_region: String,
+    focus_region_provider: String,
+    detected_eye_confidence: Option<f64>,
+    detected_face_confidence: Option<f64>,
 }
 
 fn clamp_unit(value: f64) -> f64 {
@@ -168,13 +198,88 @@ fn crop_laplacian_variance(image: &GrayImage, x: u32, y: u32, width: u32, height
     calculate_laplacian_variance(&crop)
 }
 
-fn calculate_focus_region_metrics(image: &GrayImage) -> FocusRegionMetrics {
+fn focus_region_sidecar_candidates(path: &str) -> Vec<PathBuf> {
+    let source_path = Path::new(path);
+    let mut candidates = vec![PathBuf::from(format!("{path}.focus-regions.json"))];
+    candidates.push(source_path.with_extension("focus-regions.json"));
+    candidates
+}
+
+fn load_local_focus_region_manifest(path: &str) -> Option<LocalFocusRegionManifest> {
+    focus_region_sidecar_candidates(path)
+        .into_iter()
+        .find(|candidate| candidate.is_file())
+        .and_then(|candidate| std::fs::read(candidate).ok())
+        .and_then(|bytes| serde_json::from_slice::<LocalFocusRegionManifest>(&bytes).ok())
+}
+
+fn best_detected_region<'a>(
+    manifest: &'a LocalFocusRegionManifest,
+    kind: &str,
+) -> Option<&'a LocalFocusRegion> {
+    manifest
+        .regions
+        .iter()
+        .filter(|region| {
+            region.kind.eq_ignore_ascii_case(kind)
+                && region.confidence >= MIN_DETECTED_REGION_CONFIDENCE
+                && region.width >= 3.0
+                && region.height >= 3.0
+        })
+        .max_by(|left, right| {
+            left.confidence
+                .partial_cmp(&right.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+}
+
+fn detected_region_laplacian_variance(
+    image: &GrayImage,
+    source_width: u32,
+    source_height: u32,
+    region: &LocalFocusRegion,
+) -> Option<f64> {
+    let (thumbnail_width, thumbnail_height) = image.dimensions();
+    if source_width == 0 || source_height == 0 || thumbnail_width < 3 || thumbnail_height < 3 {
+        return None;
+    }
+
+    let scale_x = thumbnail_width as f64 / source_width as f64;
+    let scale_y = thumbnail_height as f64 / source_height as f64;
+    let x = (region.x.max(0.0) * scale_x).floor() as u32;
+    let y = (region.y.max(0.0) * scale_y).floor() as u32;
+    let width = (region.width * scale_x).round().max(3.0) as u32;
+    let height = (region.height * scale_y).round().max(3.0) as u32;
+
+    if x >= thumbnail_width || y >= thumbnail_height {
+        return None;
+    }
+
+    let width = width.min(thumbnail_width - x);
+    let height = height.min(thumbnail_height - y);
+    if width < 3 || height < 3 {
+        return None;
+    }
+
+    Some(crop_laplacian_variance(image, x, y, width, height))
+}
+
+fn calculate_focus_region_metrics(
+    image: &GrayImage,
+    source_width: u32,
+    source_height: u32,
+    manifest: Option<&LocalFocusRegionManifest>,
+) -> FocusRegionMetrics {
     let (width, height) = image.dimensions();
     if width < 6 || height < 6 {
         return FocusRegionMetrics {
             center: 0.0,
             face: 0.0,
             eye: 0.0,
+            focus_region: FOCUS_REGION_EYE_BAND_HEURISTIC.to_string(),
+            focus_region_provider: FOCUS_REGION_PROVIDER_HEURISTIC.to_string(),
+            detected_eye_confidence: None,
+            detected_face_confidence: None,
         };
     }
 
@@ -192,9 +297,43 @@ fn calculate_focus_region_metrics(image: &GrayImage) -> FocusRegionMetrics {
     let eye_x = (width - eye_width) / 2;
     let eye_y = height * 3 / 10;
     let eye_y = eye_y.min(height.saturating_sub(eye_height));
-    let eye = crop_laplacian_variance(image, eye_x, eye_y, eye_width, eye_height);
+    let heuristic_eye = crop_laplacian_variance(image, eye_x, eye_y, eye_width, eye_height);
 
-    FocusRegionMetrics { center, face, eye }
+    let detected_face_region = manifest.and_then(|item| best_detected_region(item, "face"));
+    let detected_eye_region = manifest.and_then(|item| best_detected_region(item, "eye"));
+    let detected_face = detected_face_region.and_then(|region| {
+        detected_region_laplacian_variance(image, source_width, source_height, region)
+    });
+    let detected_eye = detected_eye_region.and_then(|region| {
+        detected_region_laplacian_variance(image, source_width, source_height, region)
+    });
+
+    let has_detected_region = detected_face.is_some() || detected_eye.is_some();
+    FocusRegionMetrics {
+        center,
+        face: detected_face.unwrap_or(face),
+        eye: detected_eye.unwrap_or(heuristic_eye),
+        focus_region: if has_detected_region {
+            FOCUS_REGION_LOCAL_FACE_EYE.to_string()
+        } else {
+            FOCUS_REGION_EYE_BAND_HEURISTIC.to_string()
+        },
+        focus_region_provider: if has_detected_region {
+            manifest
+                .and_then(|item| item.provider.clone())
+                .unwrap_or_else(|| FOCUS_REGION_PROVIDER_LOCAL_MANIFEST.to_string())
+        } else {
+            FOCUS_REGION_PROVIDER_HEURISTIC.to_string()
+        },
+        detected_eye_confidence: detected_eye
+            .is_some()
+            .then(|| detected_eye_region.map(|region| region.confidence))
+            .flatten(),
+        detected_face_confidence: detected_face
+            .is_some()
+            .then(|| detected_face_region.map(|region| region.confidence))
+            .flatten(),
+    }
 }
 
 fn analyze_image(
@@ -211,10 +350,16 @@ fn analyze_image(
     let (width, height) = img.dimensions();
     let thumbnail = img.thumbnail(ANALYSIS_DIM, ANALYSIS_DIM);
     let gray_thumbnail = thumbnail.to_luma8();
+    let local_focus_regions = load_local_focus_region_manifest(path);
 
     let sharpness_metric = calculate_laplacian_variance(&gray_thumbnail);
     let exposure_metric = calculate_exposure_metric(&gray_thumbnail);
-    let focus_region_metrics = calculate_focus_region_metrics(&gray_thumbnail);
+    let focus_region_metrics = calculate_focus_region_metrics(
+        &gray_thumbnail,
+        width,
+        height,
+        local_focus_regions.as_ref(),
+    );
     let center_focus_metric = focus_region_metrics.center;
     let face_sharpness_metric = focus_region_metrics.face;
     let eye_sharpness_metric = focus_region_metrics.eye;
@@ -257,7 +402,10 @@ fn analyze_image(
             exposure_metric,
             focus_score,
             focus_confidence,
-            focus_region: FOCUS_REGION_EYE_BAND_HEURISTIC.to_string(),
+            focus_region: focus_region_metrics.focus_region,
+            focus_region_provider: focus_region_metrics.focus_region_provider,
+            detected_eye_confidence: focus_region_metrics.detected_eye_confidence,
+            detected_face_confidence: focus_region_metrics.detected_face_confidence,
             width,
             height,
         },
@@ -482,6 +630,21 @@ mod tests {
         image
     }
 
+    fn build_detected_region_fixture() -> GrayImage {
+        let mut image = GrayImage::from_pixel(128, 128, Luma([128]));
+        for y in 90..116 {
+            for x in 8..48 {
+                let value = if ((x / 3) + (y / 3)) % 2 == 0 {
+                    245
+                } else {
+                    15
+                };
+                image.put_pixel(x, y, Luma([value]));
+            }
+        }
+        image
+    }
+
     fn write_focus_fixture(path: &std::path::Path, focused_eye_band: bool) {
         let image = build_focus_fixture(focused_eye_band);
         image.save(path).expect("write focus fixture");
@@ -495,8 +658,10 @@ mod tests {
         write_focus_fixture(&focused_path, true);
         write_focus_fixture(&soft_path, false);
 
-        let focused_metrics = calculate_focus_region_metrics(&build_focus_fixture(true));
-        let soft_metrics = calculate_focus_region_metrics(&build_focus_fixture(false));
+        let focused_metrics =
+            calculate_focus_region_metrics(&build_focus_fixture(true), 128, 128, None);
+        let soft_metrics =
+            calculate_focus_region_metrics(&build_focus_fixture(false), 128, 128, None);
         assert!(focused_metrics.eye > soft_metrics.eye);
         assert!(focused_metrics.face > soft_metrics.face);
 
@@ -517,6 +682,10 @@ mod tests {
             .result;
 
         assert_eq!(focused.focus_region, FOCUS_REGION_EYE_BAND_HEURISTIC);
+        assert_eq!(
+            focused.focus_region_provider,
+            FOCUS_REGION_PROVIDER_HEURISTIC
+        );
         assert!(focused.focus_score > soft.focus_score);
         assert!(focused.focus_confidence > soft.focus_confidence);
         assert!((0.0..=1.0).contains(&focused.focus_score));
@@ -524,13 +693,89 @@ mod tests {
     }
 
     #[test]
+    fn local_focus_region_manifest_overrides_eye_band_when_detected() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let image_path = temp_dir.path().join("detected.png");
+        build_detected_region_fixture()
+            .save(&image_path)
+            .expect("write detected fixture");
+        fs::write(
+            format!("{}.focus-regions.json", image_path.display()),
+            r#"{
+              "provider": "unit-test-detector",
+              "regions": [
+                {"kind": "eye", "x": 8, "y": 90, "width": 40, "height": 26, "confidence": 0.92},
+                {"kind": "face", "x": 4, "y": 84, "width": 54, "height": 38, "confidence": 0.81}
+              ]
+            }"#,
+        )
+        .expect("write focus sidecar");
+
+        let hasher = HasherConfig::new()
+            .hash_alg(HashAlg::DoubleGradient)
+            .hash_size(16, 16)
+            .to_hasher();
+        let settings = crate::app_settings::AppSettings::default();
+        let result = analyze_image(image_path.to_str().expect("image path"), &hasher, &settings)
+            .expect("detected analysis")
+            .result;
+
+        assert_eq!(result.focus_region, FOCUS_REGION_LOCAL_FACE_EYE);
+        assert_eq!(result.focus_region_provider, "unit-test-detector");
+        assert_eq!(result.detected_eye_confidence, Some(0.92));
+        assert_eq!(result.detected_face_confidence, Some(0.81));
+        let heuristic_metrics =
+            calculate_focus_region_metrics(&build_detected_region_fixture(), 128, 128, None);
+        assert!(result.eye_sharpness_metric > heuristic_metrics.eye);
+        assert!((0.0..=1.0).contains(&result.focus_score));
+        assert!((0.0..=1.0).contains(&result.focus_confidence));
+    }
+
+    #[test]
+    fn low_confidence_local_focus_regions_fall_back_to_heuristic() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let image_path = temp_dir.path().join("fallback.png");
+        build_detected_region_fixture()
+            .save(&image_path)
+            .expect("write fallback fixture");
+        fs::write(
+            format!("{}.focus-regions.json", image_path.display()),
+            r#"{
+              "provider": "unit-test-detector",
+              "regions": [
+                {"kind": "eye", "x": 8, "y": 90, "width": 40, "height": 26, "confidence": 0.20}
+              ]
+            }"#,
+        )
+        .expect("write low-confidence sidecar");
+
+        let hasher = HasherConfig::new()
+            .hash_alg(HashAlg::DoubleGradient)
+            .hash_size(16, 16)
+            .to_hasher();
+        let settings = crate::app_settings::AppSettings::default();
+        let result = analyze_image(image_path.to_str().expect("image path"), &hasher, &settings)
+            .expect("fallback analysis")
+            .result;
+
+        assert_eq!(result.focus_region, FOCUS_REGION_EYE_BAND_HEURISTIC);
+        assert_eq!(
+            result.focus_region_provider,
+            FOCUS_REGION_PROVIDER_HEURISTIC
+        );
+        assert_eq!(result.detected_eye_confidence, None);
+        assert_eq!(result.detected_face_confidence, None);
+    }
+
+    #[test]
     fn tiny_images_keep_focus_metrics_bounded() {
         let image = GrayImage::from_pixel(4, 4, image::Luma([128]));
-        let metrics = calculate_focus_region_metrics(&image);
+        let metrics = calculate_focus_region_metrics(&image, 4, 4, None);
 
         assert_eq!(metrics.center, 0.0);
         assert_eq!(metrics.face, 0.0);
         assert_eq!(metrics.eye, 0.0);
+        assert_eq!(metrics.focus_region, FOCUS_REGION_EYE_BAND_HEURISTIC);
     }
 
     #[derive(Serialize)]
@@ -626,10 +871,13 @@ mod tests {
     #[serde(rename_all = "camelCase")]
     struct PrivateCullingRanking {
         center_focus_metric: f64,
+        detected_eye_confidence: Option<f64>,
+        detected_face_confidence: Option<f64>,
         exposure_metric: f64,
         face_sharpness_metric: f64,
         focus_confidence: f64,
         focus_region: String,
+        focus_region_provider: String,
         focus_score: f64,
         analysis_duration_ms: u128,
         path: String,
@@ -696,10 +944,13 @@ mod tests {
             rankings.push(PrivateCullingRanking {
                 analysis_duration_ms,
                 center_focus_metric: result.center_focus_metric,
+                detected_eye_confidence: result.detected_eye_confidence,
+                detected_face_confidence: result.detected_face_confidence,
                 exposure_metric: result.exposure_metric,
                 face_sharpness_metric: result.face_sharpness_metric,
                 focus_confidence: result.focus_confidence,
                 focus_region: result.focus_region,
+                focus_region_provider: result.focus_region_provider,
                 focus_score: result.focus_score,
                 path: relative_private_path(private_root, &path),
                 rank: 0,
@@ -738,9 +989,14 @@ mod tests {
         let source_hashes_unchanged = rankings
             .iter()
             .all(|ranking| ranking.source_hash_before == ranking.source_hash_after);
-        let heuristic_regions = rankings
+        let known_focus_regions = rankings.iter().all(|ranking| {
+            ranking.focus_region == FOCUS_REGION_EYE_BAND_HEURISTIC
+                || ranking.focus_region == FOCUS_REGION_LOCAL_FACE_EYE
+        });
+        let detected_focus_region_count = rankings
             .iter()
-            .all(|ranking| ranking.focus_region == FOCUS_REGION_EYE_BAND_HEURISTIC);
+            .filter(|ranking| ranking.focus_region == FOCUS_REGION_LOCAL_FACE_EYE)
+            .count();
         let total_analysis_ms: u128 = rankings
             .iter()
             .map(|ranking| ranking.analysis_duration_ms)
@@ -798,10 +1054,16 @@ mod tests {
                 raw_sources,
             ),
             private_metric(
-                "heuristicFocusRegionDeclared",
-                if heuristic_regions { 1.0 } else { 0.0 },
+                "knownFocusRegionDeclared",
+                if known_focus_regions { 1.0 } else { 0.0 },
                 1.0,
-                heuristic_regions,
+                known_focus_regions,
+            ),
+            private_metric(
+                "detectedFocusRegionCount",
+                detected_focus_region_count as f64,
+                0.0,
+                true,
             ),
             private_metric(
                 "latencyReportIncludesAllSources",
@@ -883,7 +1145,7 @@ mod tests {
                     "focus_rankings_are_sorted_by_runtime_focus_score".to_string(),
                     "focus_score_and_confidence_are_bounded".to_string(),
                     "source_raw_files_are_not_mutated".to_string(),
-                    "focus_region_is_declared_as_heuristic".to_string(),
+                    "focus_region_provider_metadata_is_reported".to_string(),
                     "runtime_latency_report_is_emitted".to_string(),
                     "private_label_manifest_metrics_are_reported_when_present".to_string(),
                 ],

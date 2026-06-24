@@ -437,6 +437,9 @@ export interface ImageAnalysisResult {
   focusScore: number;
   focusConfidence: number;
   focusRegion: string;
+  focusRegionProvider?: string | null | undefined;
+  detectedEyeConfidence?: number | null | undefined;
+  detectedFaceConfidence?: number | null | undefined;
   width: number;
   height: number;
 }

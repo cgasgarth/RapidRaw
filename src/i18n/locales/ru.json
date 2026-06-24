@@ -1257,6 +1257,7 @@
       "focusRegion": {
         "center_fallback": "Center fallback - no face or eye detector available",
         "eye_band_heuristic": "Upper-face eye-band heuristic - no detector available",
+        "local_face_eye_regions": "Local face/eye detector regions",
         "unknown": "Unknown focus region"
       },
       "emptyAnalysisModes": "Enable similar grouping, blur filtering, focus ranking, or a combination before starting culling.",
