@@ -41,7 +41,11 @@ interface PreviousAdjustments {
 }
 
 interface LoadImageResult {
+  exif?: Record<string, string> | null;
   height: number;
+  is_offline_smart_preview?: boolean;
+  is_raw: boolean;
+  metadata?: unknown;
   width: number;
 }
 
@@ -253,7 +257,21 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
             if (selectedImagePathRef.current !== path) return;
             isBackendReadyRef.current = true;
             currentResRef.current = 0;
-            setEditor({ originalSize: { width: result.width, height: result.height } });
+            setEditor((state) => ({
+              originalSize: { width: result.width, height: result.height },
+              selectedImage:
+                state.selectedImage?.path === path
+                  ? {
+                      ...state.selectedImage,
+                      exif: result.exif ?? state.selectedImage.exif,
+                      height: result.height,
+                      isOfflineSmartPreview: result.is_offline_smart_preview === true,
+                      isRaw: result.is_raw,
+                      metadata: result.metadata ?? state.selectedImage.metadata,
+                      width: result.width,
+                    }
+                  : state.selectedImage,
+            }));
           })
           .catch((err: unknown) => {
             if (String(err).includes('cancelled')) return;
