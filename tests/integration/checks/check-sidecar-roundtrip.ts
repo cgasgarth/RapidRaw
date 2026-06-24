@@ -59,6 +59,7 @@ const RawEngineArtifactsSchema = z
     schemaVersion: z.literal(1),
     staleArtifactIds: z.array(z.string().trim().min(1)).default([]),
     superResolutionArtifacts: z.array(superResolutionArtifactV1Schema).default([]),
+    tetherCaptureArtifacts: z.array(JsonValueSchema).default([]),
   })
   .strict();
 

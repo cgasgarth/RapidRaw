@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const tetherIngestPresetIdSchema = z.enum(['cameraSequence', 'sourceSequence', 'timestampCamera']);
+export const tetherMetadataTemplateIdSchema = z.enum(['none', 'studioSession']);
 
 export const tetherCapabilitySchema = z.object({
   id: z.string().trim().min(1),
@@ -61,6 +62,7 @@ export const tetherCaptureRequestSchema = z.object({
   destinationRoot: z.string().trim().min(1).optional(),
   fakeSourcePath: z.string().trim().min(1).optional(),
   ingestPresetId: tetherIngestPresetIdSchema.default('timestampCamera'),
+  metadataTemplateId: tetherMetadataTemplateIdSchema.default('none'),
 });
 
 export const tetherCaptureIngestSchema = z.object({
@@ -68,6 +70,13 @@ export const tetherCaptureIngestSchema = z.object({
   fileName: z.string().trim().min(1),
   namingTemplate: z.string().trim().min(1),
   presetId: tetherIngestPresetIdSchema,
+});
+
+export const tetherCaptureMetadataSchema = z.object({
+  applied: z.boolean(),
+  appliedFields: z.array(z.string().trim().min(1)),
+  sidecarPath: z.string().trim().min(1).nullable(),
+  templateId: tetherMetadataTemplateIdSchema,
 });
 
 export const tetherCaptureResponseSchema = z.object({
@@ -80,6 +89,7 @@ export const tetherCaptureResponseSchema = z.object({
     .regex(/^sha256:[a-f0-9]{64}$/u),
   ingest: tetherCaptureIngestSchema,
   importedPath: z.string().trim().min(1),
+  metadata: tetherCaptureMetadataSchema,
   providerMode: z.enum(['auto', 'fake']),
   sessionId: z.string().trim().min(1),
   sourcePath: z.string().trim().min(1),

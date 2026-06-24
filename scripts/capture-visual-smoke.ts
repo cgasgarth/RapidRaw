@@ -1240,11 +1240,18 @@ async function prepareScenario(page, mode) {
     await page.locator('[data-selected-ingest-preset="sourceSequence"]').waitFor({
       timeout: 10_000,
     });
+    await page.getByTestId('tether-metadata-template-select').selectOption('studioSession');
+    await page.locator('[data-selected-metadata-template="studioSession"]').waitFor({
+      timeout: 10_000,
+    });
     await page.getByTestId('tether-trigger-capture').click();
     await page.getByTestId('tether-capture-result').getByText('Capture imported', { exact: true }).waitFor({
       timeout: 10_000,
     });
     await page.locator('[data-testid="tether-capture-result"][data-ingest-preset-id="sourceSequence"]').waitFor({
+      timeout: 10_000,
+    });
+    await page.locator('[data-testid="tether-capture-result"][data-metadata-template-id="studioSession"]').waitFor({
       timeout: 10_000,
     });
     await page.getByTestId('tether-incoming-capture-strip').waitFor({ timeout: 10_000 });
