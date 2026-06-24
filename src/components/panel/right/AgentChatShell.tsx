@@ -162,7 +162,11 @@ function MessageBubble({ message }: { message: AgentChatMessage }) {
   );
 }
 
-function LivePromptComposer() {
+interface LivePromptComposerProps {
+  onResultChange?: (result: LivePromptResult) => void;
+}
+
+function LivePromptComposer({ onResultChange }: LivePromptComposerProps) {
   const { t } = useTranslation();
   const promptInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [prompt, setPrompt] = useState('');
@@ -208,18 +212,22 @@ function LivePromptComposer() {
         sessionId: 'agent-chat-shell',
       });
       setAcceptedPrompt(requestedPrompt);
-      setResult({
+      const nextResult = {
         previewAfterHash: preview.dryRunAfterHash,
         previewBeforeHash: preview.dryRunBeforeHash,
         recipeName: plan.recipeName,
         status: 'dry_run_ready',
         summary: plan.summary,
-      });
+      } satisfies LivePromptResult;
+      setResult(nextResult);
+      onResultChange?.(nextResult);
     } catch (error) {
-      setResult({
+      const nextResult = {
         error: error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError'),
         status: 'failed',
-      });
+      } satisfies LivePromptResult;
+      setResult(nextResult);
+      onResultChange?.(nextResult);
     }
   };
 
@@ -228,7 +236,9 @@ function LivePromptComposer() {
 
     try {
       setRollbackSnapshot(createAgentRollbackSnapshot());
-      setResult((current) => ({ ...current, status: 'applying' }));
+      const applyingResult = { ...result, status: 'applying' } satisfies LivePromptResult;
+      setResult(applyingResult);
+      onResultChange?.(applyingResult);
       const plan = planAgentEditRecipe(acceptedPrompt);
       const basicToneStep = plan.steps.find((step) => step.kind === 'basic_tone');
       if (basicToneStep?.kind !== 'basic_tone') {
@@ -241,8 +251,8 @@ function LivePromptComposer() {
         sessionId: 'agent-chat-shell',
       });
 
-      setResult((current) => ({
-        ...current,
+      const nextResult = {
+        ...applyingResult,
         appliedGraphRevision: applyResult.appliedGraphRevision,
         changedPixelCount: applyResult.changedPixelCount,
         changedPixelPercent: applyResult.changedPixelPercent,
@@ -250,13 +260,17 @@ function LivePromptComposer() {
         meanLuminanceDelta: applyResult.meanLuminanceDelta,
         sampledPixelCount: applyResult.sampledPixelCount,
         status: 'applied',
-      }));
+      } satisfies LivePromptResult;
+      setResult(nextResult);
+      onResultChange?.(nextResult);
     } catch (error) {
-      setResult((current) => ({
-        ...current,
+      const nextResult = {
+        ...result,
         error: error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError'),
         status: 'failed',
-      }));
+      } satisfies LivePromptResult;
+      setResult(nextResult);
+      onResultChange?.(nextResult);
     }
   };
 
@@ -272,7 +286,9 @@ function LivePromptComposer() {
       uncroppedAdjustedPreviewUrl: rollbackSnapshot.uncroppedAdjustedPreviewUrl,
     });
     setRollbackSnapshot(null);
-    setResult((current) => ({ ...current, status: 'rolled_back' }));
+    const nextResult = { ...result, status: 'rolled_back' } satisfies LivePromptResult;
+    setResult(nextResult);
+    onResultChange?.(nextResult);
   };
 
   return (
@@ -1330,7 +1346,33 @@ function LongEditProgressPanel({ progress }: { progress: AgentLongEditProgress }
 
 export default function AgentChatShell({ transcript }: AgentChatShellProps) {
   const { t } = useTranslation();
+  const [livePromptResult, setLivePromptResult] = useState<LivePromptResult>({ status: 'idle' });
   const runtimeBadge = agentRuntimeBadge[transcript.runtimeStatus];
+  const hasLiveApplyProof = livePromptResult.status === 'applied';
+  const liveApplyToolCall =
+    hasLiveApplyProof && livePromptResult.appliedGraphRevision
+      ? ({
+          approvalState: 'not_required',
+          id: 'live-agent-basic-tone-apply',
+          mode: 'apply',
+          provenance: {
+            requestHash: `sha256:${(livePromptResult.previewAfterHash ?? 'liveapplyproof00').padEnd(16, '0')}`,
+            runtime: 'codex_app_server',
+            schema: 'rawengine.agent.live_basic_tone_apply.v1',
+          },
+          status: 'succeeded',
+          summary: `${livePromptResult.appliedGraphRevision} · ${t('editor.ai.agent.composer.previewDelta', {
+            changed: livePromptResult.changedPixelCount,
+            maxDelta: livePromptResult.maxChannelDelta,
+            meanLuma: livePromptResult.meanLuminanceDelta,
+            percent: livePromptResult.changedPixelPercent,
+            sampled: livePromptResult.sampledPixelCount,
+          })}`,
+          timestamp: 'SYSTEM NOW',
+          title: livePromptResult.recipeName ?? t('editor.ai.agent.composer.status.applied'),
+          toolName: 'rawengine.live_basic_tone.apply',
+        } satisfies AgentChatToolCall)
+      : null;
 
   return (
     <section
@@ -1353,7 +1395,7 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
         </span>
       </div>
 
-      <LivePromptComposer />
+      <LivePromptComposer onResultChange={setLivePromptResult} />
 
       <div className="space-y-2" data-testid="agent-chat-messages">
         {transcript.messages.map((message) => (
@@ -1377,11 +1419,12 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
         <div className="flex items-center justify-between text-xs">
           <span className="font-semibold text-text-primary">{t('editor.ai.agent.transcript')}</span>
           <span className="text-text-secondary">
-            {transcript.runtimeStatus === 'runtime_apply_demo'
+            {hasLiveApplyProof || transcript.runtimeStatus === 'runtime_apply_demo'
               ? t('editor.ai.agent.runtimeApplyProof')
               : t('editor.ai.agent.noAppliedEdits')}
           </span>
         </div>
+        {liveApplyToolCall ? <ToolCallRow toolCall={liveApplyToolCall} /> : null}
         {transcript.toolCalls.map((toolCall) => (
           <ToolCallRow key={toolCall.id} toolCall={toolCall} />
         ))}
