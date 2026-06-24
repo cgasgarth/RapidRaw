@@ -19,6 +19,8 @@ const requiredSourceSnippets = [
   'data-testid="export-readiness-summary"',
   'data-export-readiness-item={item}',
   'export.readiness.metadataWithoutGps',
+  'Invokes.IsOriginalFileAvailable',
+  'originalFileAvailableSchema',
 ];
 const requiredKeys = [
   'format',

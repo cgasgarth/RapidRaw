@@ -79,6 +79,7 @@ export enum Invokes {
   GeneratePresetPreview = 'generate_preset_preview',
   GenerateUncroppedPreview = 'generate_uncropped_preview',
   GetImageDimensions = 'get_image_dimensions',
+  IsOriginalFileAvailable = 'is_original_file_available',
   GetFolderTree = 'get_folder_tree',
   GetFolderChildren = 'get_folder_children',
   GetExternalEditorFileWatchSnapshot = 'get_external_editor_file_watch_snapshot',

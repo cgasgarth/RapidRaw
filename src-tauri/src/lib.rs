@@ -295,6 +295,12 @@ fn get_image_dimensions(path: String) -> Result<ImageDimensions, String> {
 }
 
 #[tauri::command]
+fn is_original_file_available(path: String) -> bool {
+    let (source_path, _) = parse_virtual_path(&path);
+    source_path.exists()
+}
+
+#[tauri::command]
 fn cancel_thumbnail_generation(
     state: tauri::State<AppState>,
     app_handle: tauri::AppHandle,
@@ -2618,6 +2624,7 @@ pub fn run() {
             generate_all_community_previews,
             save_temp_file,
             get_image_dimensions,
+            is_original_file_available,
             frontend_ready,
             cancel_thumbnail_generation,
             update_wgpu_transform,
