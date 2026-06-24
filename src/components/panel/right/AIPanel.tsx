@@ -80,7 +80,6 @@ import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { agentChatTranscriptFixture } from '../../../utils/agentChatTranscriptFixture';
 import {
   cloneMaskLikeContainerForPaste,
   cloneSubMaskForPaste,
@@ -101,6 +100,7 @@ import Slider from '../../ui/Slider';
 import Switch from '../../ui/Switch';
 import UiText from '../../ui/Text';
 
+import type { AgentChatTranscript } from '../../../schemas/agentChatTranscriptSchemas';
 import type { Adjustments, AiPatch } from '../../../utils/adjustments';
 
 interface DragData extends MaskLikeDragData {
@@ -136,6 +136,48 @@ interface AiPanelCollapsibleState {
 
 const DEFAULT_BRUSH_SETTINGS: BrushSettings = { size: 50, feather: 50, tool: ToolType.Brush };
 const getNumericEventValue = (event: NumericChangeEvent): number => Number(event.target.value);
+const getImageLabelFromPath = (path: string): string => {
+  const cleanPath = path.split('?')[0] ?? path;
+  return cleanPath.split(/[\\/]/u).pop() || cleanPath || 'selected RAW';
+};
+
+const buildLiveAgentTranscript = (selectedImagePath: string | undefined): AgentChatTranscript => {
+  const targetLabel = selectedImagePath ? getImageLabelFromPath(selectedImagePath) : 'No image selected';
+  const targetSummary = selectedImagePath
+    ? `Ready to plan a local app-server edit for ${targetLabel}.`
+    : 'Select an image before asking the agent to plan or apply edits.';
+
+  return {
+    id: selectedImagePath ? `live-agent-${targetLabel}` : 'live-agent-no-selection',
+    messages: [
+      {
+        body: targetSummary,
+        id: 'live-agent-current-context',
+        role: 'system',
+        timestamp: 'now',
+      },
+    ],
+    runtimeStatus: 'ui_only_demo',
+    sessionTitle: selectedImagePath ? `Current image: ${targetLabel}` : 'No image selected',
+    toolCalls: [
+      {
+        approvalState: 'not_required',
+        id: 'live-agent-current-context-readiness',
+        mode: 'read',
+        provenance: {
+          requestHash: 'sha256:0000000000000000',
+          runtime: 'codex_app_server',
+          schema: 'liveAgentCurrentContext.v1',
+        },
+        status: selectedImagePath ? 'succeeded' : 'blocked',
+        summary: targetSummary,
+        timestamp: 'now',
+        title: selectedImagePath ? 'Current image context' : 'Waiting for image selection',
+        toolName: 'rawengine.live_context',
+      },
+    ],
+  };
+};
 
 const PLACEHOLDER_PATCH: AiPatch = {
   id: 'placeholder',
@@ -1180,6 +1222,7 @@ export function AIPanel() {
                   collapsibleState={collapsibleState}
                   setCollapsibleState={setCollapsibleState}
                   isGenerativeAvailable={isGenerativeAvailable}
+                  selectedImagePath={selectedImage?.path}
                 />
               </motion.div>
             )}
@@ -1901,6 +1944,7 @@ interface AiSettingsPanelProps {
   isGenerativeAvailable: boolean;
   aiProvider: AiProviderIdType;
   onGenerativeReplace: (containerId: string, prompt: string, useFastInpaint: boolean) => void | Promise<void>;
+  selectedImagePath?: string | undefined;
   setBrushSettings: (updater: BrushSettingsUpdater) => void;
   setCollapsibleState: Dispatch<SetStateAction<AiPanelCollapsibleState>>;
   updateContainer: UpdatePatch;
@@ -1922,6 +1966,7 @@ function SettingsPanel({
   setCollapsibleState,
   isGenerativeAvailable,
   aiProvider,
+  selectedImagePath,
 }: AiSettingsPanelProps) {
   const { t } = useTranslation();
   const setUI = useUIStore((state) => state.setUI);
@@ -2013,7 +2058,7 @@ function SettingsPanel({
         e.stopPropagation();
       }}
     >
-      <AgentChatShell transcript={agentChatTranscriptFixture} />
+      <AgentChatShell transcript={buildLiveAgentTranscript(selectedImagePath)} />
 
       <CollapsibleSection
         title={t('editor.ai.settings.generativeReplaceTitle')}
