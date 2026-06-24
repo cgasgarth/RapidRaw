@@ -1235,6 +1235,7 @@
       "ingestPresetCameraSequence": "Camera sequence",
       "ingestPresetSourceSequence": "Source sequence",
       "ingestPresetTimestampCamera": "Timestamp + camera",
+      "ingestPresetWeddingCopyIngest": "",
       "metadataApplied": "{{template}} metadata applied · {{fields}} fields",
       "metadataSkipped": "No metadata template applied",
       "metadataTemplate": "Metadata template",
