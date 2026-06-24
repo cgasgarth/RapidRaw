@@ -59,10 +59,24 @@ export const tetherSessionResponseSchema = z.object({
 });
 
 export const tetherCaptureRequestSchema = z.object({
+  backupDestinationRoot: z.string().trim().min(1).optional(),
   destinationRoot: z.string().trim().min(1).optional(),
   fakeSourcePath: z.string().trim().min(1).optional(),
   ingestPresetId: tetherIngestPresetIdSchema.default('timestampCamera'),
   metadataTemplateId: tetherMetadataTemplateIdSchema.default('none'),
+});
+
+export const tetherCaptureBackupSchema = z.object({
+  bytes: z.number().int().nonnegative().nullable(),
+  checksum: z
+    .string()
+    .trim()
+    .regex(/^sha256:[a-f0-9]{64}$/u)
+    .nullable(),
+  destinationPath: z.string().trim().min(1).nullable(),
+  enabled: z.boolean(),
+  error: z.string().trim().min(1).nullable(),
+  status: z.enum(['disabled', 'failed', 'verified']),
 });
 
 export const tetherCaptureIngestSchema = z.object({
@@ -80,6 +94,7 @@ export const tetherCaptureMetadataSchema = z.object({
 });
 
 export const tetherCaptureResponseSchema = z.object({
+  backup: tetherCaptureBackupSchema,
   bytes: z.number().int().nonnegative(),
   cameraDisplayName: z.string().trim().min(1),
   capturedAt: z.string().trim().min(1),
