@@ -950,6 +950,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     [conversionScope, frameHealthReport.frames, qcDecisionByFrameId],
   );
   const rollWarningCount = frameHealthReport.warningCodes.length + batchDryRunSummary.acquisitionReviewFrameIds.length;
+  const batchApplyFrameCount = batchDryRunSummary.dispositionCounts.apply;
+  const batchReviewFrameCount = batchDryRunSummary.dispositionCounts.review;
+  const batchSkippedFrameCount = batchDryRunSummary.dispositionCounts.skip;
   const dustScratchReviewReport = useMemo(
     () => buildNegativeLabDustScratchReviewReport(frameHealthReport, previewUrl !== null),
     [frameHealthReport, previewUrl],
@@ -2480,17 +2483,17 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           <div className="grid grid-cols-3 gap-1 text-[11px] text-text-tertiary">
             <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-planned-apply-count">
               {t('modals.negativeConversion.batchPlanApplyCount', {
-                applyCount: batchDryRunSummary.plannedApplyCount,
+                applyCount: batchApplyFrameCount,
               })}
             </span>
             <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-skipped-frame-count">
               {t('modals.negativeConversion.batchPlanSkippedCount', {
-                skippedCount: batchDryRunSummary.skippedFrameIds.length,
+                skippedCount: batchSkippedFrameCount,
               })}
             </span>
             <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-review-frame-count">
               {t('modals.negativeConversion.batchPlanReviewCount', {
-                reviewCount: batchDryRunSummary.reviewFrameIds.length,
+                reviewCount: batchReviewFrameCount,
               })}
             </span>
             <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-qc-approved-count">
@@ -2505,9 +2508,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             </span>
             <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-batch-workload-summary">
               {t('modals.negativeConversion.batchWorkloadSummary', {
-                applyCount: batchDryRunSummary.plannedApplyCount,
-                reviewCount: dustScratchReviewReport.reviewCount,
-                skippedCount: batchDryRunSummary.skippedFrameIds.length,
+                applyCount: batchApplyFrameCount,
+                reviewCount: batchReviewFrameCount,
+                skippedCount: batchSkippedFrameCount,
               })}
             </span>
             <span
