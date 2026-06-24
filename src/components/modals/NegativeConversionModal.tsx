@@ -1044,6 +1044,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     !isSaving &&
     !isLoading &&
     previewUrl !== null &&
+    baseFogEstimate !== null &&
     pathsToConvert.length > 0 &&
     (!requiresAcceptedBatchPlan || isBatchPlanAccepted);
   const qcProofReport = useMemo(
