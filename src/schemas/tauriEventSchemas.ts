@@ -113,13 +113,20 @@ export const exportReceiptPayloadSchema = z
       z
         .object({
           bitDepth: z.number().int().positive().optional().nullable(),
+          blackPointCompensation: z.string().trim().min(1).optional().nullable(),
           byteSize: z.number().int().nonnegative(),
+          cmm: z.string().trim().min(1).optional().nullable(),
           colorManagedTransform: z.string().trim().min(1).optional().nullable(),
           colorProfile: z.string().trim().min(1).optional().nullable(),
+          effectiveColorProfile: z.string().trim().min(1).optional().nullable(),
           format: z.string().trim().min(1),
+          iccEmbedded: z.boolean().optional().nullable(),
           outputPath: z.string().trim().min(1),
+          policyVersion: z.string().trim().min(1).optional().nullable(),
           renderingIntent: z.string().trim().min(1).optional().nullable(),
+          requestedColorProfile: z.string().trim().min(1).optional().nullable(),
           sourcePath: z.string().trim().min(1),
+          transformApplied: z.boolean().optional().nullable(),
         })
         .strict(),
     ),

@@ -1350,6 +1350,7 @@
       "cancelled": "Export cancelled",
       "chooseExternalEditor": "Choose Editor...",
       "chooseExternalEditorTitle": "Choose External Editor",
+      "cmm": "CMM {{cmm}}",
       "colorManagedTransform": "Color transform: {{transform}}",
       "estimatedAverageSize": " ({{size}} avg)",
       "estimatedSize": "Estimated file size: ~{{size}}",
@@ -1368,6 +1369,8 @@
       "externalEditorSaveDetected": "Saved changes detected. Import the linked variant when ready.",
       "externalEditorWatching": "Watching exported TIFF for external saves...",
       "failed": "Export failed",
+      "iccEmbedded": "ICC embedded",
+      "identityTransform": "Identity output",
       "importingLinkedVariant": "Importing…",
       "importLinkedVariant": "Import Linked Variant",
       "linkedVariantImported": "Linked variant imported: {{filename}}. Original left untouched.",
@@ -1377,7 +1380,8 @@
       "offlineSmartPreviewBlocked": "Reconnect the original file before full-resolution export. You can keep editing the smart preview.",
       "openInEditor": "Open in Editor",
       "showInFinder": "Show in Finder",
-      "success": "Export successful!"
+      "success": "Export successful!",
+      "transformApplied": "Transform applied"
     },
     "title": "Export",
     "watermark": {

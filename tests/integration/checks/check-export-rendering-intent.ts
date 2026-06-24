@@ -41,6 +41,9 @@ for (const marker of [
   'validate_export_color_policy(output_format, color_profile)',
   'Adobe RGB export is not implemented yet.',
   'Display P3 export is only supported for JPEG and TIFF',
+  'rawengine-export-color-policy-v1',
+  'sRGB to Display P3 conversion applied',
+  'Unavailable until CMM support is implemented',
 ]) {
   if (!rustExportSource.includes(marker)) failures.push(`Rust export capability matrix missing ${marker}`);
 }

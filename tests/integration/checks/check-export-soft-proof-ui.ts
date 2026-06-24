@@ -55,15 +55,25 @@ if (!rustLibSource.includes('export_processing::export_soft_proof_rgb_pixels_and
 if (
   !rustExportSource.includes('pub(crate) fn export_soft_proof_rgb_pixels_and_profile') ||
   !rustExportSource.includes('export_rgb_pixels_and_profile(image, color_profile, rendering_intent)') ||
-  !rustExportSource.includes('color_managed_transform: "export_rgb_pixels_and_profile".to_string()')
+  !rustExportSource.includes('export_color_transform_receipt_label(transform_applied)')
 ) {
   failures.push('export_rgb_pixels_and_profile is not available to the soft-proof command and receipt.');
 }
 
 for (const marker of [
   'colorManagedTransform',
+  'effectiveColorProfile',
+  'iccEmbedded',
+  'policyVersion',
+  'requestedColorProfile',
+  'transformApplied',
   'data-export-receipt-color-managed-transform',
+  'data-export-receipt-effective-color-profile',
+  'data-export-receipt-icc-embedded',
+  'data-export-receipt-policy-version',
+  'data-export-receipt-transform-applied',
   'data-testid="export-success-color-managed-transform"',
+  'data-testid="export-success-color-policy"',
   'export.status.colorManagedTransform',
 ]) {
   if (!exportPanelSource.includes(marker) && !tauriEventSchemasSource.includes(marker)) {
@@ -92,6 +102,10 @@ if (typeof locale.editor?.toolbar?.exportSoftProofActive !== 'string') {
 
 if (typeof locale.export?.status?.colorManagedTransform !== 'string') {
   failures.push('Missing export receipt color-managed transform locale.');
+}
+
+for (const key of ['cmm', 'iccEmbedded', 'identityTransform', 'transformApplied']) {
+  if (typeof locale.export?.status?.[key] !== 'string') failures.push(`Missing export receipt ${key} locale.`);
 }
 
 if (failures.length > 0) {
