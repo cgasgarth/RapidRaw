@@ -117,6 +117,27 @@ if (deleted.command.commandType !== 'layerMask.deleteLayer') {
   throw new Error('Expected delete operation to dispatch typed layer delete command.');
 }
 
+const cloneLayer = {
+  ...toMask({ id: 'layer-clone', name: 'Clone texture', opacity: 100, visible: true }),
+  retouchCloneSource: {
+    alignmentErrorPx: 0.18,
+    rotationDegrees: 1,
+    scale: 1.1,
+    sourcePoint: { x: 0.25, y: 0.35 },
+    targetPoint: { x: 0.62, y: 0.58 },
+  },
+} satisfies MaskContainer;
+const clone = run('create_clone', { layer: cloneLayer, type: 'create' });
+if (
+  clone.command.commandType !== 'layerMask.createLayer' ||
+  clone.command.parameters.retouchCloneSource?.sourcePoint.x !== 0.25 ||
+  clone.sidecar.layers[0]?.retouchCloneSource?.targetPoint.y !== 0.58 ||
+  masks[0]?.retouchCloneSource?.alignmentErrorPx !== 0.18
+) {
+  throw new Error('Expected clone layer creation to preserve source linkage through command, sidecar, and UI masks.');
+}
+run('delete_clone', { layerId: 'layer-clone', type: 'delete' });
+
 const actualFinalLayers = layerSummarySchema.array().parse(summarize(masks));
 if (JSON.stringify(actualFinalLayers) !== JSON.stringify(expectedFinalLayers)) {
   console.error('Expected:', JSON.stringify(expectedFinalLayers));
@@ -124,7 +145,7 @@ if (JSON.stringify(actualFinalLayers) !== JSON.stringify(expectedFinalLayers)) {
   process.exit(1);
 }
 
-if (!context.graphRevision.includes('delete_temp')) {
+if (!context.graphRevision.includes('delete_clone')) {
   throw new Error('Expected graph revision to advance after bridge dispatch.');
 }
 

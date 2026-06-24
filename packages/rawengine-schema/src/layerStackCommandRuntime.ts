@@ -22,6 +22,26 @@ export const layerStackSidecarLayerV1Schema = z
     maskIds: z.array(z.string().trim().min(1)),
     name: z.string().trim().min(1),
     opacity: z.number().min(0).max(1),
+    retouchCloneSource: z
+      .object({
+        alignmentErrorPx: z.number().min(0).optional(),
+        rotationDegrees: z.number().min(-180).max(180),
+        scale: z.number().min(0.1).max(10),
+        sourcePoint: z
+          .object({
+            x: z.number().min(0).max(1),
+            y: z.number().min(0).max(1),
+          })
+          .strict(),
+        targetPoint: z
+          .object({
+            x: z.number().min(0).max(1),
+            y: z.number().min(0).max(1),
+          })
+          .strict(),
+      })
+      .strict()
+      .optional(),
     visible: z.boolean(),
   })
   .strict();
@@ -196,6 +216,7 @@ const applyCommandToLayers = (
           maskIds: [],
           name: command.parameters.layerName,
           opacity: command.parameters.opacity,
+          retouchCloneSource: command.parameters.retouchCloneSource,
           visible: command.parameters.visible,
         },
         command.parameters.position,

@@ -68,6 +68,7 @@ interface LayerRowModel {
   maskCount: number;
   name: string;
   opacity: number;
+  retouchCloneSourceLabel: string | null;
   visible: boolean;
   visibleState: 'hidden' | 'mixed' | 'visible';
 }
@@ -116,6 +117,7 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
         maskCount: groupSummary?.layerIds.length ?? 1,
         name: groupSummary?.name ?? tFallbackLayerGroupName(),
         opacity: groupSummary?.opacity ?? 100,
+        retouchCloneSourceLabel: null,
         visible: groupSummary?.visibleState !== 'hidden',
         visibleState: groupSummary?.visibleState ?? 'visible',
       });
@@ -141,6 +143,9 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
       maskCount: mask.subMasks.length,
       name: mask.name.trim() || `Layer ${String(index + 1)}`,
       opacity: mask.opacity,
+      retouchCloneSourceLabel: mask.retouchCloneSource
+        ? `${mask.retouchCloneSource.sourcePoint.x.toFixed(2)},${mask.retouchCloneSource.sourcePoint.y.toFixed(2)} -> ${mask.retouchCloneSource.targetPoint.x.toFixed(2)},${mask.retouchCloneSource.targetPoint.y.toFixed(2)}`
+        : null,
       visible: mask.visible,
       visibleState: mask.visible ? 'visible' : 'hidden',
     });
@@ -161,6 +166,7 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
       maskCount: 0,
       name: 'Base RAW',
       opacity: 100,
+      retouchCloneSourceLabel: null,
       visible: true,
       visibleState: 'visible',
     },
@@ -323,6 +329,27 @@ export default function LayerStackPanel({
     };
     applyLayerStackCommand({ layer, type: 'create' }, layerId);
   };
+  const createCloneLayer = () => {
+    const layerId = crypto.randomUUID();
+    const layer: MaskContainer = {
+      adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+      blendMode: DEFAULT_LAYER_BLEND_MODE,
+      id: layerId,
+      invert: false,
+      name: t('editor.layers.newCloneLayerName', { count: masks.length + 1 }),
+      opacity: 100,
+      retouchCloneSource: {
+        alignmentErrorPx: 0,
+        rotationDegrees: 0,
+        scale: 1,
+        sourcePoint: { x: 0.42, y: 0.42 },
+        targetPoint: { x: 0.58, y: 0.58 },
+      },
+      subMasks: [],
+      visible: true,
+    };
+    applyLayerStackCommand({ layer, type: 'create' }, layerId);
+  };
   const moveActiveLayer = (direction: 'down' | 'up') => {
     if (!activeRow || activeRow.isBase) return;
     if (activeRow.isGroupHeader && activeRow.groupId) {
@@ -431,6 +458,15 @@ export default function LayerStackPanel({
             type="button"
           >
             <Plus size={17} className="mx-auto" />
+          </button>
+          <button
+            className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+            data-tooltip={t('editor.layers.actions.createCloneLayer')}
+            data-testid="layer-create-clone-layer"
+            onClick={createCloneLayer}
+            type="button"
+          >
+            <Copy size={17} className="mx-auto" />
           </button>
         </div>
       </div>
@@ -562,6 +598,7 @@ export default function LayerStackPanel({
               data-group-visible-state={row.isGroupHeader ? row.visibleState : ''}
               data-grouped-layer={String(row.isGroupedLayer)}
               data-layer-row-id={row.id}
+              data-retouch-clone-source={row.retouchCloneSourceLabel ?? ''}
               data-testid={
                 row.isGroupHeader
                   ? `layer-stack-group-row-${row.groupId ?? 'unknown'}`
@@ -615,14 +652,28 @@ export default function LayerStackPanel({
                   {row.name}
                 </UiText>
                 <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="block truncate">
-                  {t('editor.layers.rowSummary', {
-                    blendMode:
-                      row.blendMode === null ? t('editor.layers.groupType') : t(getBlendModeLabelKey(row.blendMode)),
-                    maskCount: row.isGroupHeader
-                      ? t('editor.layers.groupCount', { count: row.groupLayerCount })
-                      : getMaskCountLabel(row.maskCount),
-                    opacity: row.opacity,
-                  })}
+                  {row.retouchCloneSourceLabel !== null
+                    ? t('editor.layers.cloneRowSummary', {
+                        blendMode:
+                          row.blendMode === null
+                            ? t('editor.layers.groupType')
+                            : t(getBlendModeLabelKey(row.blendMode)),
+                        maskCount: row.isGroupHeader
+                          ? t('editor.layers.groupCount', { count: row.groupLayerCount })
+                          : getMaskCountLabel(row.maskCount),
+                        opacity: row.opacity,
+                        source: row.retouchCloneSourceLabel,
+                      })
+                    : t('editor.layers.rowSummary', {
+                        blendMode:
+                          row.blendMode === null
+                            ? t('editor.layers.groupType')
+                            : t(getBlendModeLabelKey(row.blendMode)),
+                        maskCount: row.isGroupHeader
+                          ? t('editor.layers.groupCount', { count: row.groupLayerCount })
+                          : getMaskCountLabel(row.maskCount),
+                        opacity: row.opacity,
+                      })}
                 </UiText>
               </span>
               <span className="flex items-center gap-1">

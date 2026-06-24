@@ -845,6 +845,7 @@
       "actions": {
         "collapseGroup": "Collapse group",
         "createAdjustmentLayer": "Create adjustment layer",
+        "createCloneLayer": "",
         "delete": "Delete layer",
         "duplicate": "Duplicate layer",
         "expandGroup": "Expand group",
@@ -875,6 +876,7 @@
         "screen": "Screen",
         "softLight": "Soft Light"
       },
+      "cloneRowSummary": "",
       "copyName": "{{name}} Copy",
       "defaultGroupName": "Layer Group",
       "exportReadiness": {
@@ -903,6 +905,7 @@
       "name": "Name",
       "newAdjustmentLayerName": "Adjustment Layer {{count}}",
       "newAdjustmentLayerName_other": "Adjustment Layer {{count}}",
+      "newCloneLayerName_other": "",
       "opacityPreset": "Set opacity to {{opacity}}",
       "operationReadiness": {
         "groupBlocked": "Group blocked",

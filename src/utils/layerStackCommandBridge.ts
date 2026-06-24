@@ -84,18 +84,24 @@ const clampOpacityFraction = (opacity: number): number => {
   return Math.max(0, Math.min(1, opacity / 100));
 };
 
-const toSidecarLayer = (layer: MaskContainer): LayerStackSidecarLayerV1 => ({
-  adjustmentPreset: 'empty_adjustment_layer_v1',
-  adjustments: {
-    toneColor: toLayerScopedToneAdjustment(layer.adjustments),
-  },
-  blendMode: layer.blendMode ?? DEFAULT_LAYER_BLEND_MODE,
-  id: layer.id,
-  maskIds: layer.subMasks.map((subMask) => subMask.id),
-  name: layer.name,
-  opacity: clampOpacityFraction(layer.opacity),
-  visible: layer.visible,
-});
+const toSidecarLayer = (layer: MaskContainer): LayerStackSidecarLayerV1 => {
+  const sidecarLayer: LayerStackSidecarLayerV1 = {
+    adjustmentPreset: 'empty_adjustment_layer_v1',
+    adjustments: {
+      toneColor: toLayerScopedToneAdjustment(layer.adjustments),
+    },
+    blendMode: layer.blendMode ?? DEFAULT_LAYER_BLEND_MODE,
+    id: layer.id,
+    maskIds: layer.subMasks.map((subMask) => subMask.id),
+    name: layer.name,
+    opacity: clampOpacityFraction(layer.opacity),
+    visible: layer.visible,
+  };
+  if (layer.retouchCloneSource !== undefined) {
+    sidecarLayer.retouchCloneSource = layer.retouchCloneSource;
+  }
+  return sidecarLayer;
+};
 
 export function buildLayerStackSidecarFromMasks(
   masks: ReadonlyArray<MaskContainer>,
@@ -161,19 +167,24 @@ function buildLayerStackCommand(
   } as const;
 
   switch (operation.type) {
-    case 'create':
+    case 'create': {
+      const createLayerParameters = {
+        blendMode: operation.layer.blendMode ?? DEFAULT_LAYER_BLEND_MODE,
+        layerId: operation.layer.id,
+        layerName: operation.layer.name,
+        opacity: clampOpacityFraction(operation.layer.opacity),
+        position: 'top',
+        visible: operation.layer.visible,
+      };
       return layerMaskCommandEnvelopeV1Schema.parse({
         ...base,
         commandType: 'layerMask.createLayer',
-        parameters: {
-          blendMode: operation.layer.blendMode ?? DEFAULT_LAYER_BLEND_MODE,
-          layerId: operation.layer.id,
-          layerName: operation.layer.name,
-          opacity: clampOpacityFraction(operation.layer.opacity),
-          position: 'top',
-          visible: operation.layer.visible,
-        },
+        parameters:
+          operation.layer.retouchCloneSource === undefined
+            ? createLayerParameters
+            : { ...createLayerParameters, retouchCloneSource: operation.layer.retouchCloneSource },
       });
+    }
     case 'setOpacity':
       return layerMaskCommandEnvelopeV1Schema.parse({
         ...base,
@@ -266,7 +277,7 @@ function materializeMasksFromSidecar(
 
   return sidecarLayers.map((layer) => {
     const previous = previousById.get(layer.id) ?? cloneSourceForOperation(previousMasks, operation);
-    return {
+    const materializedMask: MaskContainer = {
       ...previous,
       adjustments: toMaskAdjustments(layer.adjustments?.toneColor, previous.adjustments),
       blendMode: layer.blendMode,
@@ -276,6 +287,10 @@ function materializeMasksFromSidecar(
       subMasks: previous.subMasks,
       visible: layer.visible,
     };
+    if (layer.retouchCloneSource !== undefined) {
+      materializedMask.retouchCloneSource = layer.retouchCloneSource;
+    }
+    return materializedMask;
   });
 }
 
