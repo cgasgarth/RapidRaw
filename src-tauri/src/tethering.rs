@@ -351,6 +351,33 @@ fn resolve_provider_mode_with_env(
         .to_string()
 }
 
+fn resolve_tether_destination_root(destination_root: Option<String>) -> Option<String> {
+    resolve_tether_destination_root_with_env(
+        destination_root.as_deref(),
+        std::env::var("RAWENGINE_TETHER_CAPTURE_DESTINATION_ROOT")
+            .ok()
+            .as_deref(),
+    )
+}
+
+fn resolve_tether_destination_root_with_env(
+    destination_root: Option<&str>,
+    env_destination_root: Option<&str>,
+) -> Option<String> {
+    destination_root
+        .and_then(normalize_optional_path)
+        .or_else(|| env_destination_root.and_then(normalize_optional_path))
+}
+
+fn normalize_optional_path(path: &str) -> Option<String> {
+    let path = path.trim();
+    if path.is_empty() {
+        None
+    } else {
+        Some(path.to_string())
+    }
+}
+
 fn discover_with_provider_mode(mode: &str) -> TetherDiscoveryResponse {
     if mode == "fake" {
         FakeTetherProvider.discover()
@@ -407,13 +434,14 @@ fn open_tether_session_for_state(
         .find(|camera| camera.id == request.camera_id)
         .ok_or_else(|| "Camera is not available for tether session.".to_string())?;
 
-    let recovery = recover_tether_destination(request.destination_root.as_deref());
+    let destination_root = resolve_tether_destination_root(request.destination_root);
+    let recovery = recover_tether_destination(destination_root.as_deref());
 
     let session = TetherSessionSnapshot {
         camera_display_name: camera.display_name.clone(),
         camera_id: camera.id.clone(),
         capture_counter: 0,
-        destination_root: request.destination_root,
+        destination_root,
         opened_at: chrono::Utc::now().to_rfc3339(),
         provider_mode: discovery.provider.mode,
         recovery,
@@ -478,7 +506,8 @@ fn trigger_tether_capture_for_state(
     let destination_root = request
         .destination_root
         .or(session.destination_root.clone())
-        .or_else(|| std::env::var("RAWENGINE_TETHER_CAPTURE_DESTINATION_ROOT").ok())
+        .and_then(|destination_root| resolve_tether_destination_root(Some(destination_root)))
+        .or_else(|| resolve_tether_destination_root(None))
         .map(PathBuf::from)
         .unwrap_or_else(|| std::env::temp_dir().join("rawengine-tether-captures"));
     fs::create_dir_all(&destination_root).map_err(|error| error.to_string())?;
@@ -1042,6 +1071,26 @@ mod tests {
         );
         assert_eq!(resolve_provider_mode_with_env(None, Some("fake")), "fake");
         assert_eq!(resolve_provider_mode_with_env(Some("auto"), None), "auto");
+    }
+
+    #[test]
+    fn tether_destination_root_uses_explicit_path_then_env() {
+        assert_eq!(
+            resolve_tether_destination_root_with_env(
+                Some("/explicit/captures"),
+                Some("/env/captures")
+            ),
+            Some("/explicit/captures".to_string())
+        );
+        assert_eq!(
+            resolve_tether_destination_root_with_env(None, Some("/env/captures")),
+            Some("/env/captures".to_string())
+        );
+        assert_eq!(
+            resolve_tether_destination_root_with_env(Some("  "), Some("/env/captures")),
+            Some("/env/captures".to_string())
+        );
+        assert_eq!(resolve_tether_destination_root_with_env(None, None), None);
     }
 
     #[test]
