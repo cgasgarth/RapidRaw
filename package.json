@@ -120,6 +120,7 @@
     "check:layer-adjustments": "bun tests/integration/checks/check-layer-adjustment-operations.ts",
     "check:layer-scoped-tone-output": "bun tests/integration/checks/check-layer-scoped-tone-output.ts",
     "check:layer-preview-export-parity": "bun tests/integration/checks/check-layer-preview-export-parity.ts",
+    "check:filmstrip-reset-thumbnail-refresh": "bun tests/integration/checks/check-filmstrip-reset-thumbnail-refresh.ts",
     "check:layer-mask-private-raw-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario layer-mask-private-raw-ui",
     "check:layer-mask-private-raw-ui-proof": "bun tests/integration/checks/check-layer-mask-private-raw-ui-proof.ts",
     "check:brush-mask": "bun tests/integration/checks/check-brush-mask-parameters.ts",

@@ -31,12 +31,16 @@ interface ProcessState {
   setProcess: (state: Partial<ProcessState> | ((state: ProcessState) => Partial<ProcessState>)) => void;
   setExportState: (updater: Partial<ExportState> | ((state: ExportState) => Partial<ExportState>)) => void;
   setImportState: (updater: Partial<ImportState> | ((state: ImportState) => Partial<ImportState>)) => void;
+  invalidateThumbnails: (paths: ReadonlyArray<string>) => void;
 }
 
 let exportTimeout: ReturnType<typeof setTimeout>;
 let importTimeout: ReturnType<typeof setTimeout>;
 let copyTimeout: ReturnType<typeof setTimeout>;
 let pasteTimeout: ReturnType<typeof setTimeout>;
+
+const omitPaths = <Value>(record: Record<string, Value>, paths: ReadonlySet<string>): Record<string, Value> =>
+  Object.fromEntries(Object.entries(record).filter(([path]) => !paths.has(path)));
 
 export const useProcessStore = create<ProcessState>((set, get) => ({
   exportState: { errorMessage: '', progress: { current: 0, total: 0 }, status: Status.Idle },
@@ -71,6 +75,18 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
         set({ isPasted: false });
       }, 1000);
     }
+  },
+
+  invalidateThumbnails: (paths) => {
+    const pathSet = new Set(paths);
+    if (pathSet.size === 0) return;
+
+    set((prev) => {
+      return {
+        thumbnailSmartPreviews: omitPaths(prev.thumbnailSmartPreviews, pathSet),
+        thumbnails: omitPaths(prev.thumbnails, pathSet),
+      };
+    });
   },
 
   setExportState: (updater) => {
