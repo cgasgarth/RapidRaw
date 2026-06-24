@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 
 import {
   hasStaleOrOfflineSmartPreview,
+  isResolvingStaleSmartPreviewExport,
   isStaleOrOfflineSmartPreview,
 } from '../../src/utils/exportSmartPreviewReadiness';
 import type { ThumbnailSmartPreviewState } from '../../src/store/useProcessStore';
@@ -52,4 +53,10 @@ test('allows library export when stale smart preview path is proven reconnected'
       new Set(['/photos/b.CR3']),
     ),
   ).toBe(false);
+});
+
+test('reports resolving state until stale smart preview reconnection probe settles', () => {
+  expect(isResolvingStaleSmartPreviewExport(['/photos/b.CR3'], '/photos/b.CR3', '')).toBe(true);
+  expect(isResolvingStaleSmartPreviewExport(['/photos/b.CR3'], '/photos/b.CR3', '/photos/b.CR3')).toBe(false);
+  expect(isResolvingStaleSmartPreviewExport([], '', '')).toBe(false);
 });

@@ -1470,6 +1470,7 @@
       "noImagesSelected": "Nie wybrano obrazów.",
       "offlineSmartPreviewBlocked": "Podłącz ponownie oryginalny plik przed eksportem w pełnej rozdzielczości. Nadal możesz edytować inteligentny podgląd.",
       "openInEditor": "Otwórz w edytorze",
+      "resolvingOriginalFile": "Sprawdzanie oryginalnego pliku przed eksportem w pełnej rozdzielczości…",
       "showInFinder": "Pokaż w Finderze",
       "success": "Eksport zakończony sukcesem!",
       "transformApplied": ""

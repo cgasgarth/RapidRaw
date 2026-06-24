@@ -16,7 +16,10 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { formatUnknownError } from '../../../utils/errorFormatting';
-import { hasStaleOrOfflineSmartPreview } from '../../../utils/exportSmartPreviewReadiness';
+import {
+  hasStaleOrOfflineSmartPreview,
+  isResolvingStaleSmartPreviewExport,
+} from '../../../utils/exportSmartPreviewReadiness';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import { debounce } from '../../../utils/timing';
 import { Invokes, type SelectedImage, type AppSettings } from '../../ui/AppProperties';
@@ -582,6 +585,11 @@ export default function ExportPanel({
         ? reconnectedSmartPreviewState.paths
         : new Set<string>(),
     [reconnectedSmartPreviewState, staleSmartPreviewKey],
+  );
+  const isLibrarySmartPreviewResolving = isResolvingStaleSmartPreviewExport(
+    staleSmartPreviewPaths,
+    staleSmartPreviewKey,
+    reconnectedSmartPreviewState.key,
   );
   const isLibrarySmartPreviewExport = useMemo(
     () =>
@@ -1387,11 +1395,13 @@ export default function ExportPanel({
             weight={TextWeights.normal}
             className="text-center mt-4"
           >
-            {isSmartPreviewExportBlocked
-              ? t('export.status.offlineSmartPreviewBlocked')
-              : isLibraryContext
-                ? t('export.status.noImagesSelected')
-                : t('export.status.noImageSelected')}
+            {isLibrarySmartPreviewResolving
+              ? t('export.status.resolvingOriginalFile')
+              : isSmartPreviewExportBlocked
+                ? t('export.status.offlineSmartPreviewBlocked')
+                : isLibraryContext
+                  ? t('export.status.noImagesSelected')
+                  : t('export.status.noImageSelected')}
           </UiText>
         )}
       </div>

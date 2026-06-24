@@ -1369,6 +1369,7 @@
       "noImagesSelected": "未选择图像。",
       "offlineSmartPreviewBlocked": "请先重新连接原始文件，再进行全分辨率导出。你仍可继续编辑智能预览。",
       "openInEditor": "在编辑器中打开",
+      "resolvingOriginalFile": "正在检查原始文件，然后再进行全分辨率导出…",
       "showInFinder": "在 Finder 中显示",
       "success": "导出成功！",
       "transformApplied": ""
