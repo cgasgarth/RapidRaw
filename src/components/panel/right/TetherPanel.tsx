@@ -459,7 +459,11 @@ export function TetherPanel({
           data-metadata-template-id={capture.metadata.templateId}
           data-testid="tether-capture-result"
         >
-          <UiText variant={TextVariants.label}>{t('editor.tether.captureComplete')}</UiText>
+          <UiText variant={TextVariants.label}>
+            {capture.status === 'duplicate'
+              ? t('editor.tether.captureDuplicateSuppressed')
+              : t('editor.tether.captureComplete')}
+          </UiText>
           <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block truncate">
             {capture.importedPath}
           </UiText>

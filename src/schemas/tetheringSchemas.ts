@@ -159,7 +159,7 @@ export const tetherCaptureResponseSchema = z.object({
   providerMode: z.enum(['auto', 'fake']),
   sessionId: z.string().trim().min(1),
   sourcePath: z.string().trim().min(1),
-  status: z.literal('captured'),
+  status: z.enum(['captured', 'duplicate']),
 });
 
 export type TetherCapability = z.infer<typeof tetherCapabilitySchema>;

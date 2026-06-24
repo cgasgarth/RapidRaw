@@ -59,12 +59,23 @@ pub struct TetherSessionSnapshot {
     camera_display_name: String,
     camera_id: String,
     capture_counter: usize,
+    #[serde(skip_serializing)]
+    captured_imports_by_checksum: BTreeMap<String, TetherCapturedImport>,
     destination_root: Option<String>,
     opened_at: String,
     provider_mode: String,
     recovery: TetherRecoverySummary,
     session_id: String,
     status: String,
+}
+
+#[derive(Clone, Debug)]
+struct TetherCapturedImport {
+    bytes: u64,
+    captured_at: String,
+    ingest: TetherCaptureIngestSummary,
+    imported_path: String,
+    metadata: TetherCaptureMetadataSummary,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -112,7 +123,7 @@ pub struct TetherCaptureResponse {
     status: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TetherCaptureBackupSummary {
     bytes: Option<u64>,
@@ -123,7 +134,7 @@ pub struct TetherCaptureBackupSummary {
     status: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TetherCaptureMetadataSummary {
     applied: bool,
@@ -132,7 +143,7 @@ pub struct TetherCaptureMetadataSummary {
     template_id: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TetherCaptureIngestSummary {
     add_tags: Vec<String>,
@@ -443,6 +454,7 @@ fn open_tether_session_for_state(
         camera_display_name: camera.display_name.clone(),
         camera_id: camera.id.clone(),
         capture_counter: 0,
+        captured_imports_by_checksum: BTreeMap::new(),
         destination_root,
         opened_at: chrono::Utc::now().to_rfc3339(),
         provider_mode: discovery.provider.mode,
@@ -504,6 +516,33 @@ fn trigger_tether_capture_for_state(
             source_path.display()
         ));
     }
+    let source_checksum = sha256_file(&source_path)?;
+    if let Some(previous_import) =
+        find_previous_tether_import(state, &session.session_id, &source_checksum)
+    {
+        return Ok(TetherCaptureResponse {
+            backup: TetherCaptureBackupSummary {
+                bytes: None,
+                checksum: None,
+                destination_path: None,
+                enabled: false,
+                error: None,
+                status: "disabled".to_string(),
+            },
+            bytes: previous_import.bytes,
+            camera_display_name: session.camera_display_name,
+            camera_control_values: request.camera_control_values,
+            checksum: source_checksum,
+            captured_at: previous_import.captured_at,
+            ingest: previous_import.ingest,
+            imported_path: previous_import.imported_path,
+            metadata: previous_import.metadata,
+            provider_mode: session.provider_mode,
+            session_id: session.session_id,
+            source_path: source_path.to_string_lossy().to_string(),
+            status: "duplicate".to_string(),
+        });
+    }
 
     let destination_root = request
         .destination_root
@@ -531,7 +570,6 @@ fn trigger_tether_capture_for_state(
     let temporary_path = imported_path.with_extension(format!("{extension}.part"));
 
     fs::copy(&source_path, &temporary_path).map_err(|error| error.to_string())?;
-    let source_checksum = sha256_file(&source_path)?;
     let output_checksum = sha256_file(&temporary_path)?;
     if source_checksum != output_checksum {
         let _ = fs::remove_file(&temporary_path);
@@ -557,7 +595,7 @@ fn trigger_tether_capture_for_state(
         &output_checksum,
     );
 
-    Ok(TetherCaptureResponse {
+    let response = TetherCaptureResponse {
         backup,
         bytes,
         camera_display_name: session.camera_display_name,
@@ -571,7 +609,42 @@ fn trigger_tether_capture_for_state(
         session_id: session.session_id,
         source_path: source_path.to_string_lossy().to_string(),
         status: "captured".to_string(),
-    })
+    };
+    record_tether_import(state, &response);
+    Ok(response)
+}
+
+fn find_previous_tether_import(
+    state: &AppState,
+    session_id: &str,
+    checksum: &str,
+) -> Option<TetherCapturedImport> {
+    let guard = state.tether_session.lock().unwrap();
+    let session = guard.as_ref()?;
+    if session.session_id != session_id {
+        return None;
+    }
+    session.captured_imports_by_checksum.get(checksum).cloned()
+}
+
+fn record_tether_import(state: &AppState, response: &TetherCaptureResponse) {
+    let mut guard = state.tether_session.lock().unwrap();
+    let Some(session) = guard.as_mut() else {
+        return;
+    };
+    if session.session_id != response.session_id {
+        return;
+    }
+    session.captured_imports_by_checksum.insert(
+        response.checksum.clone(),
+        TetherCapturedImport {
+            bytes: response.bytes,
+            captured_at: response.captured_at.clone(),
+            ingest: response.ingest.clone(),
+            imported_path: response.imported_path.clone(),
+            metadata: response.metadata.clone(),
+        },
+    );
 }
 
 fn apply_capture_metadata_template(
@@ -1731,6 +1804,76 @@ mod tests {
         assert_eq!(capture.backup.status, "disabled");
         assert!(!capture.metadata.applied);
         assert!(Path::new(&capture.imported_path).is_file());
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn fake_provider_suppresses_duplicate_imports_in_session() {
+        let state = AppState::new();
+        let root = std::env::temp_dir().join(format!(
+            "rawengine-tether-duplicate-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let source_path = root.join("duplicate-source.ARW");
+        let destination_root = root.join("destination");
+        fs::create_dir_all(&destination_root).unwrap();
+        fs::write(&source_path, b"fake raw bytes").unwrap();
+
+        open_tether_session_for_state(
+            TetherSessionOpenRequest {
+                camera_id: "fake-sony-ilce-7m4-usb".to_string(),
+                destination_root: Some(destination_root.to_string_lossy().to_string()),
+                provider_mode: Some("fake".to_string()),
+            },
+            &state,
+        )
+        .unwrap();
+
+        let first = trigger_tether_capture_for_state(
+            Some(TetherCaptureRequest {
+                backup_destination_root: None,
+                camera_control_values: BTreeMap::new(),
+                destination_root: None,
+                fake_source_path: Some(source_path.to_string_lossy().to_string()),
+                ingest_preset_id: Some("sourceSequence".to_string()),
+                metadata_template_id: None,
+            }),
+            &state,
+        )
+        .unwrap();
+        let duplicate = trigger_tether_capture_for_state(
+            Some(TetherCaptureRequest {
+                backup_destination_root: None,
+                camera_control_values: BTreeMap::new(),
+                destination_root: None,
+                fake_source_path: Some(source_path.to_string_lossy().to_string()),
+                ingest_preset_id: Some("sourceSequence".to_string()),
+                metadata_template_id: None,
+            }),
+            &state,
+        )
+        .unwrap();
+
+        assert_eq!(first.status, "captured");
+        assert_eq!(duplicate.status, "duplicate");
+        assert_eq!(duplicate.imported_path, first.imported_path);
+        assert_eq!(duplicate.checksum, first.checksum);
+        assert_eq!(duplicate.ingest.file_name, first.ingest.file_name);
+        assert_eq!(duplicate.backup.status, "disabled");
+        assert_eq!(duplicate.backup.destination_path, None);
+        let imported_files = fs::read_dir(&destination_root)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .path()
+                    .extension()
+                    .and_then(|extension| extension.to_str())
+                    == Some("ARW")
+            })
+            .count();
+        assert_eq!(imported_files, 1);
 
         let _ = fs::remove_dir_all(root);
     }
