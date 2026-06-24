@@ -164,7 +164,7 @@ function buildProof(): z.infer<typeof proofSchema> {
     displaySnapshot: buildDisplaySnapshot(),
     fixtureId: request.fixtureId,
     generatedAt: new Date().toISOString(),
-    issue: 2327,
+    issue: 3234,
     outputTransform: {
       bitDepth: renderTarget.bitDepth,
       embedIcc: renderTarget.embedIcc,

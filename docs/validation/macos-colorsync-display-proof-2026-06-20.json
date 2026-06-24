@@ -18,7 +18,7 @@
     "source": "system_profiler SPDisplaysDataType -json + ColorSync display profile directory"
   },
   "fixtureId": "validation.raw-open-edit-export.high-iso-skin-shadow.v1",
-  "generatedAt": "2026-06-20T01:06:45.397Z",
+  "generatedAt": "2026-06-24T14:29:05.688Z",
   "issue": 3234,
   "outputTransform": {
     "bitDepth": 16,
