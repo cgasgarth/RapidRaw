@@ -59,7 +59,17 @@ pub struct TetherSessionSnapshot {
     destination_root: Option<String>,
     opened_at: String,
     provider_mode: String,
+    recovery: TetherRecoverySummary,
     session_id: String,
+    status: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TetherRecoverySummary {
+    message: String,
+    partial_files_found: usize,
+    quarantined_files: Vec<String>,
     status: String,
 }
 
@@ -374,6 +384,8 @@ fn open_tether_session_for_state(
         .find(|camera| camera.id == request.camera_id)
         .ok_or_else(|| "Camera is not available for tether session.".to_string())?;
 
+    let recovery = recover_tether_destination(request.destination_root.as_deref());
+
     let session = TetherSessionSnapshot {
         camera_display_name: camera.display_name.clone(),
         camera_id: camera.id.clone(),
@@ -381,6 +393,7 @@ fn open_tether_session_for_state(
         destination_root: request.destination_root,
         opened_at: chrono::Utc::now().to_rfc3339(),
         provider_mode: discovery.provider.mode,
+        recovery,
         session_id: format!("tether-session-{}", uuid::Uuid::new_v4()),
         status: "open".to_string(),
     };
@@ -662,6 +675,109 @@ fn write_verified_backup_capture_result(
     })
 }
 
+fn recover_tether_destination(destination_root: Option<&str>) -> TetherRecoverySummary {
+    let Some(root) = destination_root.filter(|root| !root.trim().is_empty()) else {
+        return tether_recovery_summary(
+            "not_checked",
+            0,
+            Vec::new(),
+            "No tether destination configured.",
+        );
+    };
+    let root = Path::new(root);
+    if !root.exists() {
+        return tether_recovery_summary("clean", 0, Vec::new(), "Tether destination is new.");
+    }
+    let entries = match fs::read_dir(root) {
+        Ok(entries) => entries,
+        Err(error) => {
+            return tether_recovery_summary(
+                "failed",
+                0,
+                Vec::new(),
+                &format!("Could not scan tether destination: {error}"),
+            );
+        }
+    };
+
+    let mut partial_files = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_file()
+            && path
+                .file_name()
+                .and_then(|file_name| file_name.to_str())
+                .is_some_and(|file_name| file_name.ends_with(".part"))
+        {
+            partial_files.push(path);
+        }
+    }
+
+    if partial_files.is_empty() {
+        return tether_recovery_summary(
+            "clean",
+            0,
+            Vec::new(),
+            "No partial tether downloads found.",
+        );
+    }
+
+    let quarantine_root = root.join(".rawengine-tether-quarantine");
+    if let Err(error) = fs::create_dir_all(&quarantine_root) {
+        return tether_recovery_summary(
+            "failed",
+            partial_files.len(),
+            Vec::new(),
+            &format!("Could not create tether quarantine: {error}"),
+        );
+    }
+
+    let mut quarantined_files = Vec::new();
+    for partial_path in &partial_files {
+        let file_name = partial_path
+            .file_name()
+            .and_then(|file_name| file_name.to_str())
+            .unwrap_or("partial-capture.part");
+        let quarantined_path = quarantine_root.join(format!(
+            "{}-{}",
+            chrono::Utc::now().format("%Y%m%dT%H%M%SZ"),
+            file_name
+        ));
+        match fs::rename(partial_path, &quarantined_path) {
+            Ok(()) => quarantined_files.push(quarantined_path.to_string_lossy().to_string()),
+            Err(error) => {
+                return tether_recovery_summary(
+                    "failed",
+                    partial_files.len(),
+                    quarantined_files,
+                    &format!("Could not quarantine partial tether download: {error}"),
+                );
+            }
+        }
+    }
+
+    tether_recovery_summary(
+        "quarantined",
+        partial_files.len(),
+        quarantined_files,
+        "Partial tether downloads were quarantined before capture.",
+    )
+}
+
+fn tether_recovery_summary(
+    status: &str,
+    partial_files_found: usize,
+    quarantined_files: Vec<String>,
+    message: &str,
+) -> TetherRecoverySummary {
+    TetherRecoverySummary {
+        message: message.to_string(),
+        partial_files_found,
+        quarantined_files,
+        status: status.to_string(),
+    }
+}
+
 fn resolve_imported_capture_path(
     destination_root: &Path,
     extension: &str,
@@ -892,6 +1008,7 @@ mod tests {
             "Sony ILCE-7M4"
         );
         assert_eq!(session.session.as_ref().unwrap().capture_counter, 0);
+        assert_eq!(session.session.as_ref().unwrap().recovery.status, "clean");
         assert!(state.tether_session.lock().unwrap().is_some());
 
         let closed = close_tether_session_for_state(&state);
@@ -914,6 +1031,37 @@ mod tests {
 
         assert!(error.contains("not available"));
         assert!(state.tether_session.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn session_open_quarantines_partial_downloads() {
+        let state = AppState::new();
+        let root = std::env::temp_dir().join(format!(
+            "rawengine-tether-recovery-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let partial_path = root.join("interrupted.ARW.part");
+        fs::write(&partial_path, b"partial raw bytes").unwrap();
+
+        let session = open_tether_session_for_state(
+            TetherSessionOpenRequest {
+                camera_id: "fake-sony-ilce-7m4-usb".to_string(),
+                destination_root: Some(root.to_string_lossy().to_string()),
+                provider_mode: Some("fake".to_string()),
+            },
+            &state,
+        )
+        .unwrap();
+
+        let recovery = &session.session.as_ref().unwrap().recovery;
+        assert_eq!(recovery.status, "quarantined");
+        assert_eq!(recovery.partial_files_found, 1);
+        assert_eq!(recovery.quarantined_files.len(), 1);
+        assert!(!partial_path.exists());
+        assert!(Path::new(&recovery.quarantined_files[0]).is_file());
+
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]

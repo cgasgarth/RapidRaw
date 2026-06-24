@@ -625,6 +625,26 @@ export function TetherPanel({
             ? t('editor.tether.sessionOpenDescription', { camera: session.cameraDisplayName })
             : t('editor.tether.sessionClosedDescription')}
         </UiText>
+        {session?.recovery && session.recovery.status !== 'clean' && (
+          <div
+            className="mt-3 rounded border border-yellow-500/40 bg-yellow-500/10 p-2"
+            data-partial-files-found={session.recovery.partialFilesFound}
+            data-recovery-status={session.recovery.status}
+            data-testid="tether-recovery-status"
+          >
+            <UiText
+              variant={TextVariants.small}
+              color={session.recovery.status === 'failed' ? TextColors.error : TextColors.secondary}
+              className="block"
+            >
+              {session.recovery.status === 'quarantined'
+                ? t('editor.tether.recoveryQuarantined', { count: session.recovery.partialFilesFound })
+                : session.recovery.status === 'failed'
+                  ? t('editor.tether.recoveryFailed', { message: session.recovery.message })
+                  : session.recovery.message}
+            </UiText>
+          </div>
+        )}
         <div className="mt-3 flex gap-2">
           <Button
             disabled={camera === null || isSessionOpen || isSessionBusy}

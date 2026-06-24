@@ -785,7 +785,9 @@
       "sessionClosed": "Session closed",
       "sessionClosedDescription": "Open a discovery session before capture controls are enabled.",
       "sessionOpen": "Session open",
-      "sessionOpenDescription": "{{camera}} is reserved for this tether session."
+      "sessionOpenDescription": "{{camera}} is reserved for this tether session.",
+      "recoveryFailed": "Tether recovery failed: {{message}}",
+      "recoveryQuarantined": "Quarantined {{count}} partial tether download(s)."
     }
   },
   "export": {
