@@ -27,11 +27,68 @@ export interface AgentLiveBasicToneApplyResult {
   beforePreviewHash: string;
   afterPreviewHash: string;
   changedPixelCount: number;
+  changedPixelPercent: number;
   command: BasicToneCommandEnvelope;
+  maxChannelDelta: number;
+  meanLuminanceDelta: number;
   mutation: ToneColorMutationResultV1;
+  sampledPixelCount: number;
 }
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
+
+const previewLuminance = (pixel: AgentLiveBasicTonePixel): number =>
+  pixel[0] * 0.2126 + pixel[1] * 0.7152 + pixel[2] * 0.0722;
+
+const buildPreviewProofPixels = (): AgentLiveBasicTonePixel[] =>
+  Array.from({ length: 64 }, (_, index): AgentLiveBasicTonePixel => {
+    const x = index % 8;
+    const y = Math.floor(index / 8);
+    const base = 0.08 + x * 0.11;
+    const warmth = (y - 3.5) * 0.018;
+    const shadowBias = y < 3 ? -0.035 : 0.025;
+
+    return [
+      Number(clamp01(base + warmth + shadowBias).toFixed(6)),
+      Number(clamp01(base * 0.92 + y * 0.014).toFixed(6)),
+      Number(clamp01(base * 0.82 - warmth).toFixed(6)),
+    ];
+  });
+
+const measurePreviewDelta = (
+  beforePreviewPixels: readonly AgentLiveBasicTonePixel[],
+  afterPreviewPixels: readonly AgentLiveBasicTonePixel[],
+) => {
+  let changedPixelCount = 0;
+  let maxChannelDelta = 0;
+  let totalLuminanceDelta = 0;
+
+  for (const [index, afterPixel] of afterPreviewPixels.entries()) {
+    const beforePixel = beforePreviewPixels[index];
+    if (beforePixel === undefined) continue;
+
+    const channelDeltas = [
+      Math.abs(afterPixel[0] - beforePixel[0]),
+      Math.abs(afterPixel[1] - beforePixel[1]),
+      Math.abs(afterPixel[2] - beforePixel[2]),
+    ];
+    const pixelChanged = channelDeltas.some((channelDelta) => channelDelta > 0);
+    maxChannelDelta = Math.max(maxChannelDelta, ...channelDeltas);
+
+    if (pixelChanged) changedPixelCount += 1;
+    totalLuminanceDelta += Math.abs(previewLuminance(afterPixel) - previewLuminance(beforePixel));
+  }
+
+  const sampledPixelCount = beforePreviewPixels.length;
+
+  return {
+    changedPixelCount,
+    changedPixelPercent: Number(((changedPixelCount / sampledPixelCount) * 100).toFixed(1)),
+    maxChannelDelta: Number(maxChannelDelta.toFixed(4)),
+    meanLuminanceDelta: Number((totalLuminanceDelta / sampledPixelCount).toFixed(4)),
+    sampledPixelCount,
+  };
+};
 
 export const renderBasicTonePreviewPixels = (
   pixels: readonly AgentLiveBasicTonePixel[],
@@ -96,19 +153,12 @@ export const applyBasicToneToLiveEditor = async ({
   if (!apply.ok) throw new Error(`Agent basic-tone apply failed: ${apply.message}`);
   const mutation = toneColorMutationResultV1Schema.parse(apply.result);
 
-  const beforePreviewPixels: readonly AgentLiveBasicTonePixel[] = [
-    [0.12, 0.1, 0.08],
-    [0.36, 0.32, 0.28],
-    [0.72, 0.68, 0.6],
-    [0.9, 0.84, 0.76],
-  ];
+  const beforePreviewPixels = buildPreviewProofPixels();
   const afterPreviewPixels = renderBasicTonePreviewPixels(beforePreviewPixels, applyCommand);
   const beforePreviewHash = hashBasicTonePreviewPixels(beforePreviewPixels);
   const afterPreviewHash = hashBasicTonePreviewPixels(afterPreviewPixels);
-  const changedPixelCount = afterPreviewPixels.filter((pixel, index) =>
-    pixel.some((channel, channelIndex) => channel !== beforePreviewPixels[index]?.[channelIndex]),
-  ).length;
-  if (beforePreviewHash === afterPreviewHash || changedPixelCount === 0) {
+  const previewDelta = measurePreviewDelta(beforePreviewPixels, afterPreviewPixels);
+  if (beforePreviewHash === afterPreviewHash || previewDelta.changedPixelCount === 0) {
     throw new Error('Agent basic-tone apply did not change rendered preview pixels.');
   }
 
@@ -128,8 +178,8 @@ export const applyBasicToneToLiveEditor = async ({
     afterPreviewHash,
     appliedGraphRevision: mutation.appliedGraphRevision,
     beforePreviewHash,
-    changedPixelCount,
     command: applyCommand,
+    ...previewDelta,
     mutation,
   };
 };

@@ -96,8 +96,16 @@ if (state.finalPreviewUrl !== 'blob:rawengine-preview-before') {
 if (state.uncroppedAdjustedPreviewUrl !== null) {
   throw new Error('Agent basic-tone apply must invalidate stale uncropped preview output.');
 }
-if (result.beforePreviewHash === result.afterPreviewHash || result.changedPixelCount < 4) {
+if (result.beforePreviewHash === result.afterPreviewHash || result.changedPixelCount < 64) {
   throw new Error('Agent basic-tone renderer proof did not change expected output pixels.');
+}
+if (
+  result.sampledPixelCount !== 64 ||
+  result.changedPixelPercent !== 100 ||
+  result.meanLuminanceDelta <= 0 ||
+  result.maxChannelDelta <= 0
+) {
+  throw new Error('Agent basic-tone renderer proof must report meaningful preview delta metrics.');
 }
 if (result.mutation.appliedGraphRevision !== result.appliedGraphRevision) {
   throw new Error('Agent basic-tone result did not preserve mutation graph revision.');
