@@ -3625,12 +3625,24 @@ pub fn launch_external_editor(
             Command::new(editor)
                 .arg(&output_path_str)
                 .spawn()
-                .map_err(|e| e.to_string())?;
+                .map_err(|e| {
+                    format!(
+                        "External editor launcher failed for {}: {}",
+                        output_path.display(),
+                        e
+                    )
+                })?;
         } else {
             Command::new("cmd")
                 .args(["/C", "start", "", &output_path_str])
                 .spawn()
-                .map_err(|e| e.to_string())?;
+                .map_err(|e| {
+                    format!(
+                        "External editor launcher failed for {}: {}",
+                        output_path.display(),
+                        e
+                    )
+                })?;
         }
         Ok(())
     }
@@ -3641,12 +3653,24 @@ pub fn launch_external_editor(
             Command::new(editor)
                 .arg(&output_path_str)
                 .spawn()
-                .map_err(|e| e.to_string())?;
+                .map_err(|e| {
+                    format!(
+                        "External editor launcher failed for {}: {}",
+                        output_path.display(),
+                        e
+                    )
+                })?;
         } else {
             Command::new("xdg-open")
                 .arg(&output_path_str)
                 .spawn()
-                .map_err(|e| e.to_string())?;
+                .map_err(|e| {
+                    format!(
+                        "External editor launcher failed for {}: {}",
+                        output_path.display(),
+                        e
+                    )
+                })?;
         }
         Ok(())
     }
