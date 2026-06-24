@@ -90,6 +90,12 @@ try {
   await page.getByRole('button', { name: /Show crop tools/u }).click();
   await page.getByRole('heading', { name: 'Crop' }).waitFor({ timeout: 10_000 });
   await page.getByRole('button', { name: /Straighten Tool/u }).waitFor({ timeout: 10_000 });
+  await page.keyboard.press('Control+K');
+  await page.getByRole('dialog', { name: /Command Palette/u }).waitFor({ timeout: 10_000 });
+  await page.getByLabel(/Search commands/u).fill('negative');
+  await page.getByRole('button', { name: /Open negative lab/u }).click();
+  await page.getByRole('heading', { name: 'Negative Conversion' }).waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-preview-image').waitFor({ timeout: 10_000 });
   const unlabeledIconButtons = await page.locator('button').evaluateAll((buttons) =>
     buttons
       .map((button, index) => {

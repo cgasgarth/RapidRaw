@@ -48,6 +48,7 @@ const commandNames: Record<
   | 'clearSessionCaches'
   | 'frontendReady'
   | 'generateUncroppedPreview'
+  | 'generatePreviewForPath'
   | 'applyAdjustments'
   | 'getLensfunMakers'
   | 'getLogFilePath'
@@ -61,6 +62,7 @@ const commandNames: Record<
   | 'loadImage'
   | 'loadMetadata'
   | 'loadSettings'
+  | 'previewNegativeConversion'
   | 'readExifForPaths'
   | 'saveSettings'
   | 'saveMetadataAndUpdateThumbnail'
@@ -74,6 +76,7 @@ const commandNames: Record<
   clearSessionCaches: Invokes.ClearSessionCaches,
   frontendReady: Invokes.FrontendReady,
   generateUncroppedPreview: Invokes.GenerateUncroppedPreview,
+  generatePreviewForPath: Invokes.GeneratePreviewForPath,
   getLensfunMakers: 'get_lensfun_makers',
   getLogFilePath: 'get_log_file_path',
   getAlbumImages: Invokes.GetAlbumImages,
@@ -86,6 +89,7 @@ const commandNames: Record<
   loadImage: Invokes.LoadImage,
   loadMetadata: Invokes.LoadMetadata,
   loadSettings: Invokes.LoadSettings,
+  previewNegativeConversion: Invokes.PreviewNegativeConversion,
   readExifForPaths: Invokes.ReadExifForPaths,
   saveSettings: Invokes.SaveSettings,
   saveMetadataAndUpdateThumbnail: Invokes.SaveMetadataAndUpdateThumbnail,
@@ -167,6 +171,10 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       return Promise.resolve(decodeBase64ToArrayBuffer(harnessPreviewJpegBase64));
     case commandNames.generateUncroppedPreview:
       return Promise.resolve(null);
+    case commandNames.generatePreviewForPath:
+      return Promise.resolve(Array.from(new Uint8Array(decodeBase64ToArrayBuffer(harnessPreviewJpegBase64))));
+    case commandNames.previewNegativeConversion:
+      return Promise.resolve(`data:image/jpeg;base64,${harnessPreviewJpegBase64}`);
     case commandNames.checkAiConnectorStatus:
       return Promise.resolve({ connected: false });
     case commandNames.getSupportedFileTypes:
