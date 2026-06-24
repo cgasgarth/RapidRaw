@@ -1,6 +1,7 @@
 import { Invokes, LibraryViewMode, Theme, ThumbnailSize, type AppSettings } from '../components/ui/AppProperties.tsx';
 
 type BrowserTauriInvoke = (command: string, args?: Record<string, unknown>, options?: unknown) => Promise<unknown>;
+type BrowserTauriEventCallback = (event: unknown) => void;
 
 interface BrowserTauriInternals {
   convertFileSrc: (filePath: string, protocol?: string) => string;
@@ -46,6 +47,7 @@ const commandNames: Record<
   | 'cancelThumbnailGeneration'
   | 'checkAiConnectorStatus'
   | 'clearSessionCaches'
+  | 'exportImages'
   | 'frontendReady'
   | 'generateUncroppedPreview'
   | 'generatePreviewForPath'
@@ -74,6 +76,7 @@ const commandNames: Record<
   cancelThumbnailGeneration: Invokes.CancelThumbnailGeneration,
   checkAiConnectorStatus: Invokes.CheckAIConnectorStatus,
   clearSessionCaches: Invokes.ClearSessionCaches,
+  exportImages: Invokes.ExportImages,
   frontendReady: Invokes.FrontendReady,
   generateUncroppedPreview: Invokes.GenerateUncroppedPreview,
   generatePreviewForPath: Invokes.GeneratePreviewForPath,
@@ -115,6 +118,10 @@ const harnessPreviewJpegBase64 =
   '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAAEAAQDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAH/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAEFAqf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/ASP/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/ASP/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAY/Al//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/IV//2gAMAwEAAgADAAAAEP/EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQMBAT8QH//EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQIBAT8QH//EABQQAQAAAAAAAAAAAAAAAAAAABD/2gAIAQEAAT8QH//Z';
 
 let callbackId = 0;
+const callbacks = new Map<number, (event: unknown) => void>();
+const eventListeners = new Map<string, Set<number>>();
+
+const isBrowserTauriEventCallback = (value: unknown): value is BrowserTauriEventCallback => typeof value === 'function';
 
 export const installBrowserTauriHarness = (): void => {
   if (!harnessEnabled || window.__TAURI_INTERNALS__ !== undefined) return;
@@ -131,8 +138,13 @@ export const installBrowserTauriHarness = (): void => {
       calls.push({ args, command, options });
       return handleBrowserHarnessInvoke(command, args);
     },
-    transformCallback: () => {
+    transformCallback: (callback) => {
       callbackId += 1;
+      if (isBrowserTauriEventCallback(callback)) {
+        callbacks.set(callbackId, (event) => {
+          callback(event);
+        });
+      }
       return callbackId;
     },
     unregisterCallback: () => {},
@@ -154,6 +166,9 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.cancelThumbnailGeneration:
     case commandNames.clearSessionCaches:
     case commandNames.saveMetadataAndUpdateThumbnail:
+      return Promise.resolve(null);
+    case commandNames.exportImages:
+      dispatchBrowserHarnessEvent('export-complete', createHarnessExportReceipt(args));
       return Promise.resolve(null);
     case commandNames.isImageCached:
       return Promise.resolve(false);
@@ -219,7 +234,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case 'plugin:dialog|save':
       return Promise.resolve(`${browserHarnessRoot}/export.tif`);
     case 'plugin:event|listen':
-      return Promise.resolve(1);
+      return Promise.resolve(registerBrowserHarnessEventListener(args));
     case 'plugin:event|unlisten':
     case 'plugin:shell|open':
       return Promise.resolve(null);
@@ -249,6 +264,57 @@ const readPersistedHarnessSettings = (): AppSettings => {
   } catch {
     return harnessSettings;
   }
+};
+
+const registerBrowserHarnessEventListener = (args: Record<string, unknown> | undefined): number => {
+  const event = getStringArg(args, 'event');
+  const handler = args?.['handler'];
+  if (!event || typeof handler !== 'number') return 0;
+
+  const listeners = eventListeners.get(event) ?? new Set<number>();
+  listeners.add(handler);
+  eventListeners.set(event, listeners);
+  return handler;
+};
+
+const dispatchBrowserHarnessEvent = (event: string, payload: unknown): void => {
+  const listenerIds = eventListeners.get(event);
+  if (!listenerIds) return;
+
+  for (const listenerId of listenerIds) {
+    callbacks.get(listenerId)?.({ event, id: listenerId, payload });
+  }
+};
+
+const createHarnessExportReceipt = (args: Record<string, unknown> | undefined) => {
+  const paths = getStringArrayArg(args, 'paths');
+  const sourcePath = paths[0] ?? `${browserHarnessRoot}/browser-harness.ARW`;
+  const outputPath = getStringArg(args, 'outputFolderOrFile') ?? `${browserHarnessRoot}/export.tif`;
+  const outputFormat = getStringArg(args, 'outputFormat') ?? 'tif';
+
+  return {
+    completedAt: new Date('2026-06-24T00:00:00.000Z').toISOString(),
+    outputs: [
+      {
+        bitDepth: 16,
+        blackPointCompensation: 'enabled',
+        byteSize: 143_654_912,
+        cmm: 'lcms2',
+        colorManagedTransform: 'display-p3 -> srgb',
+        colorProfile: 'srgb',
+        effectiveColorProfile: 'srgb',
+        format: outputFormat,
+        iccEmbedded: true,
+        outputPath,
+        policyVersion: 'browser-harness-export-policy-v1',
+        renderingIntent: 'relativeColorimetric',
+        requestedColorProfile: 'srgb',
+        sourcePath,
+        transformApplied: true,
+      },
+    ],
+    total: 1,
+  };
 };
 
 const getStringArg = (args: Record<string, unknown> | undefined, key: string): string | undefined => {
