@@ -1253,6 +1253,7 @@
       "reviewPinned": "Pinned",
       "sessionClosed": "Session closed",
       "sessionClosedDescription": "Open a discovery session before capture controls are enabled.",
+      "sessionDestinationRoot": "",
       "sessionOpen": "Session open",
       "sessionOpenDescription": "{{camera}} is reserved for this tether session.",
       "storage": "Storage",
