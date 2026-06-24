@@ -283,6 +283,7 @@ const tetherSessionMockResponse: TetherSessionResponse = {
   session: {
     cameraDisplayName: 'Sony ILCE-7M4',
     cameraId: 'validation-camera-sony-a7iv',
+    captureCounter: 0,
     destinationRoot: null,
     openedAt: '2026-06-23T00:00:00.000Z',
     providerMode: 'fake',
@@ -300,6 +301,12 @@ const tetherCaptureMockResponse = {
   cameraDisplayName: 'Sony ILCE-7M4',
   capturedAt: '2026-06-23T00:00:02.000Z',
   checksum: 'sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b',
+  ingest: {
+    collisionIndex: 1,
+    fileName: 'alaska-dsc7853_0001.ARW',
+    namingTemplate: '{source_stem}_{counter:04}',
+    presetId: 'sourceSequence',
+  },
   importedPath: '/tmp/rawengine-tether-captures/alaska-dsc7853.ARW',
   providerMode: 'fake',
   sessionId: 'tether-session-visual-smoke',
