@@ -10,6 +10,7 @@ const requiredLivePanelMarkers = [
   'buildLiveAgentTranscript(selectedImagePath)',
   'getImageLabelFromPath',
   'Current image:',
+  "runtimeStatus: 'runtime_apply_demo'",
   'rawengine.live_context',
 ];
 

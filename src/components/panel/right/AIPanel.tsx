@@ -157,7 +157,7 @@ const buildLiveAgentTranscript = (selectedImagePath: string | undefined): AgentC
         timestamp: 'now',
       },
     ],
-    runtimeStatus: 'ui_only_demo',
+    runtimeStatus: 'runtime_apply_demo',
     sessionTitle: selectedImagePath ? `Current image: ${targetLabel}` : 'No image selected',
     toolCalls: [
       {
