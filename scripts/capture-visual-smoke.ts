@@ -2477,25 +2477,23 @@ async function prepareScenario(page, mode) {
     .getByTestId('negative-lab-frame-health-visible-count')
     .getByText('2/2 visible', { exact: true })
     .waitFor({ timeout: 10_000 });
-  await page.getByTestId('negative-lab-planned-apply-count').getByText('Apply 2', { exact: true }).waitFor({
+  await page.getByTestId('negative-lab-planned-apply-count').getByText('Apply 0', { exact: true }).waitFor({
     timeout: 10_000,
   });
   await page.getByTestId('negative-lab-skipped-frame-count').getByText('Skip 0', { exact: true }).waitFor({
     timeout: 10_000,
   });
-  await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAcceptBatchPlan).click();
   await page
-    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentDryRunState)
-    .getByText('Dry-run accepted', { exact: true })
+    .getByTestId('negative-lab-convert-save-blocked-reason')
+    .getByText('Base pending', { exact: true })
     .waitFor({ timeout: 10_000 });
-  await page
-    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentCommitState)
-    .getByText('Ready to commit', { exact: true })
-    .waitFor({ timeout: 10_000 });
-  await page
-    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentCommandSource)
-    .getByText(NegativeLabAppServerCommandName.AcceptBatchPlan, { exact: true })
-    .waitFor({ timeout: 10_000 });
+  z.object({
+    canSave: z.literal('false'),
+    saveBlockedReason: z.literal('modals.negativeConversion.basePending'),
+  }).parse(await page.getByTestId('negative-lab-convert-save-action').evaluate((element) => ({ ...element.dataset })));
+  if (!(await page.getByTestId('negative-lab-convert-save-action').isDisabled())) {
+    throw new Error('Negative Lab convert/save action should be disabled while base estimation is pending.');
+  }
   await page.getByTestId('negative-lab-frame-health-sort').selectOption('roll_order');
   await page.getByTestId('negative-lab-active-scan-1').click();
   await page.getByTestId('negative-lab-roll-frame-status-1').getByText('Active', { exact: true }).waitFor({
