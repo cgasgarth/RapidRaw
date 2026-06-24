@@ -29,6 +29,12 @@
           "publicRepoAllowed": false
         },
         {
+          "hash": "sha256:6eef5046b0e8d6c673a90f4c1bf946b7406672b0d9d3d8ce960553078fbab1f8",
+          "kind": "soft_proof_after_private",
+          "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-soft-proof-after.png",
+          "publicRepoAllowed": false
+        },
+        {
           "hash": "sha256:a82ff62320d4caa621a4192550445e50fb80c8f607f0fa2a0f455274bcd0498f",
           "kind": "sidecar_after_private",
           "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-after.rrdata",

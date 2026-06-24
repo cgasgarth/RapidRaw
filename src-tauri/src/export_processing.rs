@@ -446,20 +446,21 @@ pub(crate) fn save_image_with_metadata(
     output_path: &std::path::Path,
     source_path_str: &str,
     export_settings: &ExportSettings,
-) -> Result<(), String> {
+) -> Result<Option<ExportReceiptMetadata>, String> {
     let extension = output_path
         .extension()
         .and_then(|s| s.to_str())
         .unwrap_or("")
         .to_lowercase();
 
-    let mut image_bytes = encode_image_to_bytes(
+    let encoded_image = encode_image_with_applied_policy(
         image,
         &extension,
         export_settings.jpeg_quality,
         &export_settings.color_profile,
         &export_settings.rendering_intent,
     )?;
+    let mut image_bytes = encoded_image.bytes;
 
     exif_processing::write_image_with_metadata(
         &mut image_bytes,
@@ -485,7 +486,7 @@ pub(crate) fn save_image_with_metadata(
     #[cfg(not(target_os = "android"))]
     fs::write(output_path, image_bytes).map_err(|e| e.to_string())?;
 
-    Ok(())
+    Ok(encoded_image.color_policy)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -538,6 +539,11 @@ fn encode_grayscale_to_png(bitmap: &GrayImage) -> Result<Vec<u8>, String> {
     Ok(buf)
 }
 
+struct EncodedExportImage {
+    bytes: Vec<u8>,
+    color_policy: Option<ExportReceiptMetadata>,
+}
+
 fn encode_image_to_bytes(
     image: &DynamicImage,
     output_format: &str,
@@ -545,12 +551,30 @@ fn encode_image_to_bytes(
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
 ) -> Result<Vec<u8>, String> {
+    encode_image_with_applied_policy(
+        image,
+        output_format,
+        jpeg_quality,
+        color_profile,
+        rendering_intent,
+    )
+    .map(|encoded| encoded.bytes)
+}
+
+fn encode_image_with_applied_policy(
+    image: &DynamicImage,
+    output_format: &str,
+    jpeg_quality: u8,
+    color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
+) -> Result<EncodedExportImage, String> {
     validate_export_color_policy(output_format, color_profile)?;
+    let normalized_format = output_format.to_lowercase();
 
     let mut image_bytes = Vec::new();
     let mut cursor = Cursor::new(&mut image_bytes);
 
-    match output_format.to_lowercase().as_str() {
+    match normalized_format.as_str() {
         "jxl" => {
             let (width, height) = image.dimensions();
             let has_alpha = image.color().has_alpha();
@@ -584,16 +608,29 @@ fn encode_image_to_bytes(
                 }
             };
 
-            return Ok(jxl_data);
+            return Ok(EncodedExportImage {
+                bytes: jxl_data,
+                color_policy: None,
+            });
         }
         "webp" => {
             let encoder = webp::Encoder::from_image(image)
                 .map_err(|_| "Failed to create WebP encoder".to_string())?;
             let webp_mem = encoder.encode(jpeg_quality as f32);
-            return Ok(webp_mem.to_vec());
+            return Ok(EncodedExportImage {
+                bytes: webp_mem.to_vec(),
+                color_policy: None,
+            });
         }
         "jpg" | "jpeg" => {
-            return encode_jpeg_to_bytes(image, jpeg_quality, color_profile, rendering_intent);
+            return Ok(EncodedExportImage {
+                bytes: encode_jpeg_to_bytes(image, jpeg_quality, color_profile, rendering_intent)?,
+                color_policy: export_receipt_metadata(
+                    &normalized_format,
+                    color_profile,
+                    rendering_intent,
+                ),
+            });
         }
         "png" => {
             let image_to_encode = if image.as_rgb32f().is_some() {
@@ -607,7 +644,14 @@ fn encode_image_to_bytes(
                 .map_err(|e| e.to_string())?;
         }
         "tiff" => {
-            return encode_tiff16_to_bytes(image, color_profile, rendering_intent);
+            return Ok(EncodedExportImage {
+                bytes: encode_tiff16_to_bytes(image, color_profile, rendering_intent)?,
+                color_policy: export_receipt_metadata(
+                    &normalized_format,
+                    color_profile,
+                    rendering_intent,
+                ),
+            });
         }
         "avif" => {
             image
@@ -616,7 +660,10 @@ fn encode_image_to_bytes(
         }
         _ => return Err(format!("Unsupported file format: {}", output_format)),
     };
-    Ok(image_bytes)
+    Ok(EncodedExportImage {
+        bytes: image_bytes,
+        color_policy: None,
+    })
 }
 
 fn encode_tiff16_to_bytes(
@@ -1247,7 +1294,7 @@ pub async fn export_images(
                         is_raw,
                         &app_handle_clone,
                     )?;
-                    save_image_with_metadata(
+                    let export_color_policy = save_image_with_metadata(
                         &final_image,
                         &output_path,
                         &source_path_str,
@@ -1276,7 +1323,7 @@ pub async fn export_images(
                         &output_path,
                         &source_path_str,
                         &extension,
-                        Some(&export_settings),
+                        export_color_policy,
                     )
                 })();
 
@@ -1357,12 +1404,11 @@ fn export_receipt_output(
     output_path: &Path,
     source_path: &str,
     format: &str,
-    export_settings: Option<&ExportSettings>,
+    metadata: Option<ExportReceiptMetadata>,
 ) -> Result<ExportReceiptOutput, String> {
     let byte_size = fs::metadata(output_path)
         .map_err(|error| error.to_string())?
         .len();
-    let metadata = export_settings.and_then(|settings| export_receipt_metadata(format, settings));
 
     Ok(ExportReceiptOutput {
         bit_depth: metadata.as_ref().map(|metadata| metadata.bit_depth),
@@ -1397,7 +1443,7 @@ fn export_receipt_output(
     })
 }
 
-struct ExportReceiptMetadata {
+pub(crate) struct ExportReceiptMetadata {
     bit_depth: u8,
     black_point_compensation: String,
     cmm: String,
@@ -1413,31 +1459,32 @@ struct ExportReceiptMetadata {
 
 fn export_receipt_metadata(
     format: &str,
-    export_settings: &ExportSettings,
+    color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
 ) -> Option<ExportReceiptMetadata> {
     if !supports_color_managed_receipt_metadata(format) {
         return None;
     }
 
-    let transform_applied = matches!(export_settings.color_profile, ExportColorProfile::DisplayP3);
+    let transform_applied = matches!(color_profile, ExportColorProfile::DisplayP3);
     let bit_depth = if matches!(format, "tif" | "tiff") {
         16
     } else {
         8
     };
-    let color_profile = export_color_profile_receipt_label(&export_settings.color_profile);
+    let color_profile_label = export_color_profile_receipt_label(color_profile);
 
     Some(ExportReceiptMetadata {
         bit_depth,
         black_point_compensation: "Unavailable until CMM support is implemented".to_string(),
         cmm: "moxcms".to_string(),
         color_managed_transform: export_color_transform_receipt_label(transform_applied),
-        color_profile: color_profile.clone(),
-        effective_color_profile: color_profile,
+        color_profile: color_profile_label.clone(),
+        effective_color_profile: color_profile_label,
         icc_embedded: true,
         policy_version: "rawengine-export-color-policy-v1".to_string(),
-        rendering_intent: export_rendering_intent_receipt_label(&export_settings.rendering_intent),
-        requested_color_profile: export_color_profile_receipt_label(&export_settings.color_profile),
+        rendering_intent: export_rendering_intent_receipt_label(rendering_intent),
+        requested_color_profile: export_color_profile_receipt_label(color_profile),
         transform_applied,
     })
 }
@@ -1788,10 +1835,10 @@ mod tests {
     use super::{
         ExportColorProfile, ExportRenderingIntent, ExportSettings, OutputSharpeningSettings,
         OutputSharpeningTarget, apply_export_resize_and_watermark, encode_image_to_bytes,
-        export_jpeg_rgb_pixels_and_profile, export_receipt_metadata, export_rgb_pixels_and_profile,
-        export_rgb16_pixels_and_profile, export_rgb16_pixels_with_shared_conversion_core,
-        export_soft_proof_rgb_pixels_and_profile, export_transform_options, mox_rendering_intent,
-        quantize_rgb16_to_rgb8,
+        encode_image_with_applied_policy, export_jpeg_rgb_pixels_and_profile,
+        export_receipt_metadata, export_rgb_pixels_and_profile, export_rgb16_pixels_and_profile,
+        export_rgb16_pixels_with_shared_conversion_core, export_soft_proof_rgb_pixels_and_profile,
+        export_transform_options, mox_rendering_intent, quantize_rgb16_to_rgb8,
     };
     use std::io::Cursor;
 
@@ -1937,8 +1984,9 @@ mod tests {
     fn export_receipt_reports_semantic_applied_policy() {
         let mut settings = base_export_settings(None);
         settings.rendering_intent = ExportRenderingIntent::Perceptual;
-        let metadata = export_receipt_metadata("tiff", &settings)
-            .expect("TIFF receipt metadata should be available");
+        let metadata =
+            export_receipt_metadata("tiff", &settings.color_profile, &settings.rendering_intent)
+                .expect("TIFF receipt metadata should be available");
 
         assert_eq!(metadata.rendering_intent, "Perceptual");
         assert_eq!(metadata.bit_depth, 16);
@@ -1962,8 +2010,9 @@ mod tests {
     fn display_p3_export_receipt_reports_transform_applied() {
         let mut settings = base_export_settings(None);
         settings.color_profile = ExportColorProfile::DisplayP3;
-        let metadata = export_receipt_metadata("jpg", &settings)
-            .expect("JPEG receipt metadata should be available");
+        let metadata =
+            export_receipt_metadata("jpg", &settings.color_profile, &settings.rendering_intent)
+                .expect("JPEG receipt metadata should be available");
 
         assert_eq!(
             metadata.color_managed_transform,
@@ -1973,6 +2022,39 @@ mod tests {
         assert_eq!(metadata.effective_color_profile, "Display P3");
         assert_eq!(metadata.requested_color_profile, "Display P3");
         assert!(metadata.transform_applied);
+    }
+
+    #[test]
+    fn encoded_export_image_carries_applied_color_policy_only_for_managed_outputs() {
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(2, 2, Rgb([128, 64, 32])));
+        let display_p3 = encode_image_with_applied_policy(
+            &image,
+            "jpg",
+            90,
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("Display P3 JPEG export should encode");
+        let metadata = display_p3
+            .color_policy
+            .expect("managed JPEG export should carry applied color policy");
+
+        assert!(display_p3.bytes.len() > b"ICC_PROFILE\0\x01\x01".len());
+        assert_eq!(metadata.effective_color_profile, "Display P3");
+        assert_eq!(metadata.requested_color_profile, "Display P3");
+        assert_eq!(metadata.rendering_intent, "Relative colorimetric");
+        assert!(metadata.transform_applied);
+
+        let png = encode_image_with_applied_policy(
+            &image,
+            "png",
+            90,
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("PNG export should encode");
+
+        assert!(png.color_policy.is_none());
     }
 
     #[test]

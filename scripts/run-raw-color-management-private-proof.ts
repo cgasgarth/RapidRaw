@@ -131,6 +131,8 @@ try {
       'tests/integration/checks/check-raw-open-edit-export-run-reports.ts',
       '--input',
       reportOutputPath,
+      '--fixture-id',
+      FIXTURE_ID,
       '--allow-fresh-hashes',
       '--require-assets',
     ],
