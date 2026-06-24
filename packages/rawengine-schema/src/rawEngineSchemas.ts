@@ -1621,6 +1621,16 @@ export const layerMaskRefinementParametersV1Schema = z
   })
   .strict();
 
+export const layerMaskCloneSourceV1Schema = z
+  .object({
+    alignmentErrorPx: z.number().min(0).optional(),
+    rotationDegrees: z.number().min(-180).max(180),
+    scale: z.number().min(0.1).max(10),
+    sourcePoint: layerMaskPointV1Schema,
+    targetPoint: layerMaskPointV1Schema,
+  })
+  .strict();
+
 const layerMaskCommandBaseV1Schema = z.object({
   actor: rawEngineActorSchema,
   approval: approvalRequirementSchema,
@@ -1646,6 +1656,7 @@ export const layerMaskCommandEnvelopeV1Schema = z
             opacity: z.number().min(0).max(1),
             position: z.enum(['top', 'bottom', 'above_layer', 'below_layer']),
             referenceLayerId: z.string().trim().min(1).optional(),
+            retouchCloneSource: layerMaskCloneSourceV1Schema.optional(),
             visible: z.boolean(),
           })
           .strict()

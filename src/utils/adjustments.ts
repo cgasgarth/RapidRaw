@@ -452,8 +452,23 @@ export interface MaskContainer {
   layerGroupName?: string;
   name: string;
   opacity: number;
+  retouchCloneSource?: RetouchCloneSource;
   subMasks: Array<SubMask>;
   visible: boolean;
+}
+
+export interface RetouchCloneSource {
+  alignmentErrorPx?: number | undefined;
+  rotationDegrees: number;
+  scale: number;
+  sourcePoint: {
+    x: number;
+    y: number;
+  };
+  targetPoint: {
+    x: number;
+    y: number;
+  };
 }
 
 export interface Sections {

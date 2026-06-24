@@ -32,6 +32,7 @@ const requiredOperationReadinessLocaleKeys = [
 ];
 const requiredActionLocaleKeys = ['showAllHidden', 'soloActive'];
 const requiredActiveRenderStateKeys = ['hidden', 'summary', 'title', 'visible'];
+const requiredCloneKeys = ['cloneRowSummary', 'newCloneLayerName'];
 
 const missingKeys = requiredLocaleKeys.filter((key) => typeof layerLocale?.[key] !== 'string');
 if (missingKeys.length > 0) {
@@ -42,6 +43,15 @@ if (missingKeys.length > 0) {
 const missingActionKeys = requiredActionLocaleKeys.filter((key) => typeof layerLocale?.actions?.[key] !== 'string');
 if (missingActionKeys.length > 0) {
   console.error(`Missing layer stack panel action locale keys: ${missingActionKeys.join(', ')}`);
+  process.exit(1);
+}
+if (typeof layerLocale?.actions?.createCloneLayer !== 'string') {
+  console.error('Missing layer stack clone action locale key: editor.layers.actions.createCloneLayer');
+  process.exit(1);
+}
+const missingCloneKeys = requiredCloneKeys.filter((key) => typeof layerLocale?.[key] !== 'string');
+if (missingCloneKeys.length > 0) {
+  console.error(`Missing layer stack clone locale keys: ${missingCloneKeys.join(', ')}`);
   process.exit(1);
 }
 
@@ -100,7 +110,9 @@ for (const marker of [
   'data-layer-stack-graph-revision={layerGraphRevision}',
   'data-layer-stack-last-command-type={lastCommandType}',
   'data-layer-stack-last-changed-layer-count={lastChangedLayerCount}',
+  'data-retouch-clone-source={row.retouchCloneSourceLabel ??',
   'applyLayerStackCommandBridgeOperation',
+  'data-testid="layer-create-clone-layer"',
   'data-testid="layer-operation-move-ready"',
   'data-testid="layer-operation-group-ready"',
   'data-testid="layer-operation-ungroup-ready"',
@@ -123,7 +135,10 @@ for (const marker of [
   'editor.layers.groupSummaryCount',
   'editor.layers.actions.soloActive',
   'editor.layers.actions.showAllHidden',
+  'editor.layers.actions.createCloneLayer',
   'editor.layers.activeRenderState.title',
+  'editor.layers.cloneRowSummary',
+  'editor.layers.newCloneLayerName',
   'editor.layers.activeRenderState.summary',
   'editor.layers.activeRenderState.visible',
   'editor.layers.activeRenderState.hidden',
