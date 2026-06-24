@@ -1248,8 +1248,8 @@ async function prepareScenario(page, mode) {
       .waitFor({
         timeout: 10_000,
       });
-    await page.getByTestId('tether-ingest-preset-select').selectOption('sourceSequence');
-    await page.locator('[data-selected-ingest-preset="sourceSequence"]').waitFor({
+    await page.getByTestId('tether-ingest-preset-select').selectOption('wedding-copy-ingest');
+    await page.locator('[data-selected-ingest-preset="wedding-copy-ingest"]').waitFor({
       timeout: 10_000,
     });
     await page.getByTestId('tether-metadata-template-select').selectOption('studioSession');

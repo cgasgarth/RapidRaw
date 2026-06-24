@@ -1219,6 +1219,7 @@
       "capture": "Capture RAW",
       "captureBusy": "Capturing...",
       "captureComplete": "Capture imported",
+      "captureDuplicateSuppressed": "",
       "captureUnavailable": "Capture unavailable",
       "captureVerified": "{{bytes}} bytes copied and checksum verified",
       "closeSession": "Close session",
