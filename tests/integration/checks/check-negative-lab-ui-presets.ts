@@ -515,6 +515,7 @@ for (const marker of [
   'negative-lab-recipe-summary',
   'negative-lab-active-scan-',
   'negative-lab-include-toggle-',
+  'data-included={String(isIncludedScan)}',
   'negative-lab-included-status',
   'negative-lab-preview-status',
   'negative-lab-base-status',
