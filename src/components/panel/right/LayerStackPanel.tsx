@@ -472,7 +472,7 @@ export default function LayerStackPanel({
       </div>
 
       <div
-        className="mx-3 mb-3 grid grid-cols-3 gap-2 rounded-md border border-surface bg-bg-secondary/70 p-2"
+        className="mx-3 mb-3 grid grid-cols-1 gap-1.5 rounded-md border border-surface bg-bg-secondary/70 p-2"
         data-collapsed-group-count={groupWorkflowProof.collapsedGroupCount}
         data-collapsed-group-ids={groupWorkflowProof.collapsedGroupIds.join(',')}
         data-group-count={groupCount}
@@ -544,7 +544,7 @@ export default function LayerStackPanel({
         <UiText
           variant={TextVariants.small}
           weight={TextWeights.medium}
-          className="truncate rounded bg-bg-primary px-2 py-1 text-center text-text-secondary"
+          className="rounded bg-bg-primary px-2 py-1 text-left leading-4 text-text-secondary"
           data-testid="layer-operation-move-ready"
         >
           {canMoveActiveLayerUp || canMoveActiveLayerDown
@@ -554,7 +554,7 @@ export default function LayerStackPanel({
         <UiText
           variant={TextVariants.small}
           weight={TextWeights.medium}
-          className="truncate rounded bg-bg-primary px-2 py-1 text-center text-text-secondary"
+          className="rounded bg-bg-primary px-2 py-1 text-left leading-4 text-text-secondary"
           data-testid="layer-operation-group-ready"
         >
           {canGroupActiveLayer
@@ -564,7 +564,7 @@ export default function LayerStackPanel({
         <UiText
           variant={TextVariants.small}
           weight={TextWeights.medium}
-          className="truncate rounded bg-bg-primary px-2 py-1 text-center text-text-secondary"
+          className="rounded bg-bg-primary px-2 py-1 text-left leading-4 text-text-secondary"
           data-testid="layer-operation-ungroup-ready"
         >
           {canUngroupActiveLayer
