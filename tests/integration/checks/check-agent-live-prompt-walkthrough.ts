@@ -35,7 +35,12 @@ for (const marker of [
   'data-testid="agent-live-prompt-walkthrough"',
   'data-testid="agent-live-prompt-walkthrough-stages"',
   'data-testid="agent-live-prompt-walkthrough-summary"',
+  'data-changed-pixel-percent',
+  'data-mean-luminance-delta',
+  'data-max-channel-delta',
+  'data-sampled-pixel-count',
   'applyBasicToneToLiveEditor',
+  'editor.ai.agent.composer.previewDelta',
   'runAgentBoundedEditPlannerLoop',
   'editor.ai.agent.walkthrough.title',
 ]) {
@@ -51,6 +56,7 @@ const localeSchema = z
             apply: z.string().min(1),
             dryRun: z.string().min(1),
             label: z.string().min(1),
+            previewDelta: z.string().min(1),
             rollback: z.string().min(1),
             status: z.object({
               applied: z.string().min(1),
