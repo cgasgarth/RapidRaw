@@ -563,6 +563,7 @@
     "check:agent-proof-gallery": "bun scripts/generate-agent-proof-gallery.ts",
     "check:agent-chat-ui": "bun scripts/capture-visual-smoke.ts --scenario agent-chat-ui",
     "check:agent-tool-readiness-ui": "bun tests/integration/checks/check-agent-tool-readiness-ui.ts",
+    "check:agent-live-panel-current-context": "bun tests/integration/checks/check-agent-live-panel-current-context.ts",
     "check:agent-live-editor-state": "bun tests/integration/checks/check-agent-live-editor-state.ts",
     "check:agent-live-prompt-walkthrough": "bun tests/integration/checks/check-agent-live-prompt-walkthrough.ts",
     "check:agent-handoff-audit-trail": "bun tests/integration/checks/check-agent-handoff-audit-trail.ts",
