@@ -27,10 +27,12 @@ const recipeIdentitySchema = z
   })
   .loose();
 
+const recipeObjectSchema = z.record(z.string(), z.unknown());
+
 const asRecipeLike = (value: unknown): ExportRecipe | null => {
-  const identity = recipeIdentitySchema.safeParse(value);
+  const recipeObject = recipeObjectSchema.safeParse(value);
   const parsed = exportRecipeSchema.safeParse(
-    identity.success ? { preserveTimestamps: false, ...identity.data } : value,
+    recipeObject.success ? { preserveTimestamps: false, ...recipeObject.data } : value,
   );
   return parsed.success ? parsed.data : null;
 };
