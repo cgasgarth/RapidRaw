@@ -77,6 +77,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { globalImageCache } from '../utils/ImageLRUCache';
+import { buildLibraryAutoStacks } from '../utils/libraryAutoStacks';
 import {
   applyLibraryRelinkToRuntimeState,
   planLibraryFolderRelink,
@@ -132,6 +133,16 @@ const collectFolderRelinkSourcePaths = (imageList: ImageFile[], folderPath: stri
         .filter((imagePath) => isRelinkPathInside(imagePath, folderPath)),
     ),
   ).sort((left, right) => left.localeCompare(right));
+
+const findHdrAutoStackPaths = (imageList: ImageFile[], path: string): string[] | null => {
+  const findInOrder = (images: ImageFile[]) =>
+    buildLibraryAutoStacks(images).find((stack) => stack.kind === 'bracket' && stack.paths.includes(path))?.paths ??
+    null;
+
+  return (
+    findInOrder(imageList) ?? findInOrder([...imageList].sort((left, right) => left.path.localeCompare(right.path)))
+  );
+};
 
 const findAlbumById = (items: AlbumItem[], albumId: string): Album | null => {
   for (const item of items) {
@@ -436,6 +447,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       const commonTags = getCommonTags(finalSelection);
 
       const selectionCount = finalSelection.length;
+      const hdrStackSelection =
+        selectionCount === 1 ? (findHdrAutoStackPaths(imageList, path) ?? finalSelection) : finalSelection;
+      const hdrSelectionCount = hdrStackSelection.length;
       const isSingleSelection = selectionCount === 1;
       const isEditingThisImage = selectedImage?.path === path;
       const deleteLabel = t('contextMenus.thumbnail.deleteImage', { count: selectionCount });
@@ -713,11 +727,11 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               },
             },
             {
-              disabled: selectionCount < 2 || selectionCount > 9,
+              disabled: hdrSelectionCount < 2 || hdrSelectionCount > 9,
               icon: Images,
               label: mergeLabel,
               onClick: () => {
-                const hdrSourceMetadata = finalSelection.map((path) => ({
+                const hdrSourceMetadata = hdrStackSelection.map((path) => ({
                   exif: imageList.find((image) => image.path === path)?.exif ?? null,
                   path,
                 }));
@@ -730,7 +744,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     progressMessage: null,
                     settings: DEFAULT_HDR_MERGE_UI_SETTINGS,
                     sourceMetadata: hdrSourceMetadata,
-                    stitchingSourcePaths: finalSelection,
+                    stitchingSourcePaths: hdrStackSelection,
                   },
                 });
               },

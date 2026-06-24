@@ -7,6 +7,9 @@ import { z } from 'zod';
 import { buildHdrMergeUiDryRunCommandV1 } from '../../../packages/rawengine-schema/src/hdrMergeUiControls.ts';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../../src/schemas/hdrMergeUiSchemas.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
+import { buildLibraryAutoStacks } from '../../../src/utils/libraryAutoStacks.ts';
+
+import type { ImageFile } from '../../../src/components/ui/AppProperties.tsx';
 
 const actionMetadataSchema = z
   .object({
@@ -69,14 +72,104 @@ const actionMetadata = actionMetadataSchema.parse({
   dryRun: packageCommand.dryRun,
   sources: packageCommand.parameters.sources.length,
 });
-const productivityActionsSource = await readFile('src/hooks/useProductivityActions.ts', 'utf8');
+const [contextMenuSource, productivityActionsSource] = await Promise.all([
+  readFile('src/hooks/useAppContextMenus.ts', 'utf8'),
+  readFile('src/hooks/useProductivityActions.ts', 'utf8'),
+]);
 const failures: string[] = [];
+const syntheticCaptureTime = Date.parse('2026-01-01T00:00:00Z') / 1000;
+const syntheticHdrImages: ImageFile[] = [
+  {
+    is_edited: false,
+    is_virtual_copy: false,
+    modified: syntheticCaptureTime,
+    path: '/tmp/hdr-stack/_DSC7527.ARW',
+    rating: 0,
+    tags: null,
+    exif: {
+      DateTimeOriginal: '2026:01:01 00:00:00',
+      ExposureTime: '1/1000',
+      FNumber: '8',
+      FocalLength: '35',
+      ISO: '100',
+      LensModel: 'Test 35mm',
+      Make: 'Sony',
+      Model: 'ILCE-7M4',
+    },
+  },
+  {
+    is_edited: false,
+    is_virtual_copy: false,
+    modified: syntheticCaptureTime + 1,
+    path: '/tmp/hdr-stack/_DSC7528.ARW',
+    rating: 0,
+    tags: null,
+    exif: {
+      DateTimeOriginal: '2026:01:01 00:00:01',
+      ExposureTime: '1/250',
+      FNumber: '8',
+      FocalLength: '35',
+      ISO: '100',
+      LensModel: 'Test 35mm',
+      Make: 'Sony',
+      Model: 'ILCE-7M4',
+    },
+  },
+  {
+    is_edited: false,
+    is_virtual_copy: false,
+    modified: syntheticCaptureTime + 2,
+    path: '/tmp/hdr-stack/_DSC7529.ARW',
+    rating: 0,
+    tags: null,
+    exif: {
+      DateTimeOriginal: '2026:01:01 00:00:02',
+      ExposureTime: '1/60',
+      FNumber: '8',
+      FocalLength: '35',
+      ISO: '100',
+      LensModel: 'Test 35mm',
+      Make: 'Sony',
+      Model: 'ILCE-7M4',
+    },
+  },
+];
+const syntheticHdrStack = buildLibraryAutoStacks(syntheticHdrImages).find((stack) => stack.kind === 'bracket');
+const syntheticPathSortedHdrStack = buildLibraryAutoStacks(
+  [syntheticHdrImages[1], syntheticHdrImages[2], syntheticHdrImages[0]]
+    .filter((image): image is ImageFile => Boolean(image))
+    .toSorted((left, right) => left.path.localeCompare(right.path)),
+).find((stack) => stack.kind === 'bracket');
 
 if (!productivityActionsSource.includes("getComputationalMergeAppServerRoutePairSummary('hdr').dryRunToolName")) {
   failures.push('HDR start action must store the typed app-server dry-run route.');
 }
 if (!productivityActionsSource.includes('lastDryRunCommand: dryRunCommand')) {
   failures.push('HDR start action must persist dry-run command metadata.');
+}
+if (!contextMenuSource.includes('findHdrAutoStackPaths')) {
+  failures.push('Thumbnail context menu must inspect library auto-stacks for HDR source expansion.');
+}
+if (!contextMenuSource.includes('left.path.localeCompare(right.path)')) {
+  failures.push('Thumbnail context menu must fall back to path-sorted HDR stack detection.');
+}
+if (!contextMenuSource.includes('const hdrSelectionCount = hdrStackSelection.length')) {
+  failures.push('Thumbnail context menu must gate HDR availability on expanded HDR stack source count.');
+}
+if (!contextMenuSource.includes('sourceMetadata: hdrSourceMetadata')) {
+  failures.push('Thumbnail context menu must pass HDR stack source metadata into the modal.');
+}
+if (!contextMenuSource.includes('stitchingSourcePaths: hdrStackSelection')) {
+  failures.push('Thumbnail context menu must open HDR modal with the full HDR stack source set.');
+}
+if (syntheticHdrStack?.coverPath !== '/tmp/hdr-stack/_DSC7528.ARW' || syntheticHdrStack.paths.length !== 3) {
+  failures.push('Synthetic HDR auto-stack fixture should resolve to a three-frame bracket stack.');
+}
+if (!syntheticHdrStack?.paths.includes('/tmp/hdr-stack/_DSC7529.ARW')) {
+  failures.push('Synthetic HDR auto-stack fixture should preserve all bracket member paths.');
+}
+if (syntheticPathSortedHdrStack?.paths.length !== 3) {
+  failures.push('Path-sorted HDR auto-stack fixture should recover bracket stacks from unsorted store order.');
 }
 if (actionMetadata.toolName !== routePair.dryRunToolName) {
   failures.push('HDR UI action command must use the typed app-server dry-run route.');
