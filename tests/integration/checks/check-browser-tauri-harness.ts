@@ -53,7 +53,7 @@ let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 try {
   await waitForDevServer();
   browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ viewport: { height: 900, width: 1440 } });
+  const page = await browser.newPage({ viewport: { height: 720, width: 1280 } });
   const consoleErrors: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
@@ -96,6 +96,21 @@ try {
   await page.getByRole('button', { name: /Open negative lab/u }).click();
   await page.getByRole('heading', { name: 'Negative Conversion' }).waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-preview-image').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-workspace').getByRole('button', { name: 'Cancel' }).click();
+  await page.getByTestId('negative-lab-workspace').waitFor({ state: 'detached', timeout: 10_000 });
+  await page.keyboard.press('Control+K');
+  const commandPaletteForCopyPaste = page.getByRole('dialog', { name: /Command Palette/u });
+  await commandPaletteForCopyPaste.waitFor({ timeout: 10_000 });
+  await commandPaletteForCopyPaste.getByLabel(/Search commands/u).fill('copy paste');
+  await commandPaletteForCopyPaste.getByRole('button', { name: /Copy and paste settings/u }).click();
+  const copyPasteDialog = page.getByRole('dialog', { name: /Copy & Paste Settings/u });
+  await copyPasteDialog.waitFor({ timeout: 10_000 });
+  const saveButton = copyPasteDialog.getByRole('button', { name: 'Save' });
+  await saveButton.waitFor({ timeout: 10_000 });
+  const saveBox = await saveButton.boundingBox();
+  if (saveBox === null || saveBox.y + saveBox.height > 720 || saveBox.y < 0) {
+    throw new Error('Copy & Paste Settings Save button is outside the constrained viewport.');
+  }
   const unlabeledIconButtons = await page.locator('button').evaluateAll((buttons) =>
     buttons
       .map((button, index) => {

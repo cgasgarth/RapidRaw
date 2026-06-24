@@ -194,15 +194,16 @@ export default function CopyPasteSettingsModal({ isOpen, onClose, onSave, settin
     >
       <div
         aria-modal="true"
-        className={`bg-surface rounded-lg shadow-xl p-6 w-full max-w-2xl flex flex-col transform transition-all duration-300 ease-out ${
+        aria-labelledby="copy-paste-settings-title"
+        className={`bg-surface rounded-lg shadow-xl w-[calc(100vw-2rem)] max-w-2xl max-h-[calc(100vh-2rem)] flex flex-col transform transition-all duration-300 ease-out ${
           show ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 -translate-y-4'
         }`}
         role="dialog"
       >
-        <UiText variant={TextVariants.title} className="mb-4">
+        <UiText id="copy-paste-settings-title" variant={TextVariants.title} className="px-6 pt-6 pb-4 shrink-0">
           {t('modals.copyPaste.title')}
         </UiText>
-        <div className="grow overflow-y-auto pr-2 -mr-2 space-y-6">
+        <div className="min-h-0 grow overflow-y-auto px-6 space-y-6">
           <div>
             <UiText variant={TextVariants.heading} className="block mb-2">
               {t('modals.copyPaste.pasteMode')}
@@ -270,7 +271,7 @@ export default function CopyPasteSettingsModal({ isOpen, onClose, onSave, settin
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-surface">
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-bg-primary shrink-0">
           <Button
             className="px-4 py-2 rounded-md text-text-secondary bg-surface hover:bg-surface transition-colors"
             onClick={onClose}
