@@ -229,9 +229,15 @@ const COLOR_MANAGED_OUTPUT_FORMATS: ReadonlySet<FileFormats> = new Set([FileForm
 
 const supportsColorManagedOutput = (fileFormat: FileFormats) => COLOR_MANAGED_OUTPUT_FORMATS.has(fileFormat);
 
+const WIDE_GAMUT_EXPORT_PROFILES: ReadonlySet<ExportColorProfile> = new Set([
+  ExportColorProfile.AdobeRgb1998,
+  ExportColorProfile.DisplayP3,
+  ExportColorProfile.ProPhotoRgb,
+]);
+
 const isSupportedColorProfileForFormat = (fileFormat: FileFormats, colorProfile: ExportColorProfile) =>
   colorProfile === ExportColorProfile.Srgb ||
-  (colorProfile === ExportColorProfile.DisplayP3 && supportsColorManagedOutput(fileFormat));
+  (WIDE_GAMUT_EXPORT_PROFILES.has(colorProfile) && supportsColorManagedOutput(fileFormat));
 
 export default function ExportPanel({
   exportState,
@@ -687,7 +693,11 @@ export default function ExportPanel({
     () => [
       { label: t('export.colorProfiles.srgb'), value: ExportColorProfile.Srgb },
       ...(supportsColorManagedOutput(fileFormat)
-        ? [{ label: t('export.colorProfiles.displayP3'), value: ExportColorProfile.DisplayP3 }]
+        ? [
+            { label: t('export.colorProfiles.displayP3'), value: ExportColorProfile.DisplayP3 },
+            { label: t('export.colorProfiles.adobeRgb1998'), value: ExportColorProfile.AdobeRgb1998 },
+            { label: t('export.colorProfiles.proPhotoRgb'), value: ExportColorProfile.ProPhotoRgb },
+          ]
         : []),
     ],
     [fileFormat, t],
@@ -702,7 +712,7 @@ export default function ExportPanel({
     [t],
   );
   const hasColorManagedTransform =
-    supportsColorManagedOutput(fileFormat) && colorProfile === ExportColorProfile.DisplayP3;
+    supportsColorManagedOutput(fileFormat) && WIDE_GAMUT_EXPORT_PROFILES.has(colorProfile);
 
   useEffect(() => {
     if (!isSupportedColorProfileForFormat(fileFormat, colorProfile)) {

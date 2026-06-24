@@ -25,7 +25,9 @@ for (const marker of [
   'renderingIntentOptions',
   'supportsColorManagedOutput(fileFormat)',
   'isSupportedColorProfileForFormat(fileFormat, colorProfile)',
+  'ExportColorProfile.AdobeRgb1998',
   'hasColorManagedTransform',
+  'export.colorProfiles.proPhotoRgb',
   'export.advanced.renderingIntent',
   'export.advanced.blackPointCompensationUnavailable',
   'export.readiness.renderingIntent',
@@ -39,8 +41,9 @@ for (const marker of ['export_transform_options(rendering_intent)', 'rendering_i
 }
 for (const marker of [
   'validate_export_color_policy(output_format, color_profile)',
-  'Adobe RGB export is not implemented yet.',
-  'Display P3 export is only supported for JPEG and TIFF',
+  'ColorProfile::new_adobe_rgb()',
+  'ColorProfile::new_pro_photo_rgb()',
+  'only supported for JPEG and TIFF',
   'rawengine-export-color-policy-v1',
   'sRGB to Display P3 conversion applied',
   'Unavailable until CMM support is implemented',
@@ -79,6 +82,8 @@ exportRecipeSchema.parse({
 for (const key of [
   locale.export?.advanced?.renderingIntent,
   locale.export?.advanced?.blackPointCompensationUnavailable,
+  locale.export?.colorProfiles?.adobeRgb1998,
+  locale.export?.colorProfiles?.proPhotoRgb,
   locale.export?.renderingIntents?.relativeColorimetric,
   locale.export?.readiness?.renderingIntent,
 ]) {
