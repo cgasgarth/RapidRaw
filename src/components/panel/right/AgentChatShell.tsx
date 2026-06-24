@@ -271,6 +271,7 @@ function LivePromptComposer() {
     <form
       className="pointer-events-auto relative z-10 space-y-3 rounded-md border border-sky-500/20 bg-sky-500/5 p-3"
       data-live-prompt-status={result.status}
+      data-preview-refresh-policy="native-renderer-handoff"
       data-testid="agent-live-prompt-composer"
       onSubmit={(event) => {
         event.preventDefault();
@@ -347,6 +348,11 @@ function LivePromptComposer() {
 
       <div
         className="rounded border border-white/10 bg-black/15 p-2 text-[11px]"
+        data-applied-graph-revision={result.appliedGraphRevision ?? ''}
+        data-changed-pixel-count={result.changedPixelCount?.toString() ?? ''}
+        data-preview-after-hash={result.previewAfterHash ?? ''}
+        data-preview-before-hash={result.previewBeforeHash ?? ''}
+        data-preview-refresh-policy="native-renderer-handoff"
         data-testid="agent-live-prompt-result"
       >
         <div className="flex items-center justify-between gap-2">

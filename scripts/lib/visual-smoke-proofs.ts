@@ -724,6 +724,23 @@ export const cameraProfileInputTransformPreviewProofSchema = z
 export const agentChatProofDatasetSchema = z.object({
   agentRuntimeStatus: z.literal('runtime_apply_demo'),
 });
+export const agentLivePromptComposerProofDatasetSchema = z.object({
+  livePromptStatus: z.enum(['idle', 'dry_run_ready', 'applied']),
+  previewRefreshPolicy: z.literal('native-renderer-handoff'),
+});
+export const agentLivePromptResultProofDatasetSchema = z
+  .object({
+    appliedGraphRevision: z.string().startsWith('history_'),
+    changedPixelCount: z.coerce.number().min(1),
+    previewAfterHash: z.string().trim().min(1),
+    previewBeforeHash: z.string().trim().min(1),
+    previewRefreshPolicy: z.literal('native-renderer-handoff'),
+  })
+  .superRefine((proof, context) => {
+    if (proof.previewAfterHash === proof.previewBeforeHash) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Agent apply preview hash must change.' });
+    }
+  });
 export const agentArtifactReviewProofDatasetSchema = z.object({
   artifactCount: z.literal('3'),
   auditCount: z.literal('3'),

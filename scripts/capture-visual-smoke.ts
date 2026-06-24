@@ -29,6 +29,8 @@ import {
   agentAuditTranscriptViewerProofDatasetSchema,
   agentChatProofDatasetSchema,
   agentDryRunReviewProofDatasetSchema,
+  agentLivePromptComposerProofDatasetSchema,
+  agentLivePromptResultProofDatasetSchema,
   agentPrivateRawArtifactsProofDatasetSchema,
   agentReviewHandoffProofDatasetSchema,
   agentSelectedFrameScopeProofDatasetSchema,
@@ -143,6 +145,18 @@ function printScenarioList(): void {
 }
 
 const sleep = (milliseconds) => new Promise((resolveSleep) => setTimeout(resolveSleep, milliseconds));
+
+async function expectDatasetValue(locator: Locator, key: string, value: string): Promise<void> {
+  await locator.waitFor({ timeout: 10_000 });
+  await locator.page().waitForFunction(
+    ({ selector, key: datasetKey, value: expectedValue }) => {
+      const element = document.querySelector(selector);
+      return element instanceof HTMLElement && element.dataset[datasetKey] === expectedValue;
+    },
+    { key, selector: `[data-testid="${await locator.getAttribute('data-testid')}"]`, value },
+    { timeout: 10_000 },
+  );
+}
 
 interface SrPrivateRawBrowserProof {
   artifactRoot: string;
@@ -999,6 +1013,16 @@ async function prepareScenario(page, mode) {
     const shell = page.getByTestId('agent-chat-shell');
     await shell.waitFor({ timeout: 10_000 });
     agentChatProofDatasetSchema.parse(await shell.evaluate((element) => ({ ...element.dataset })));
+    const composer = page.getByTestId('agent-live-prompt-composer');
+    agentLivePromptComposerProofDatasetSchema.parse(await composer.evaluate((element) => ({ ...element.dataset })));
+    await page.getByTestId('agent-live-prompt-input').fill('Brighten this RAW and recover shadows naturally.');
+    await page.getByTestId('agent-live-prompt-run').click();
+    await expectDatasetValue(composer, 'livePromptStatus', 'dry_run_ready');
+    await page.getByTestId('agent-live-prompt-apply').click();
+    await expectDatasetValue(composer, 'livePromptStatus', 'applied');
+    agentLivePromptResultProofDatasetSchema.parse(
+      await page.getByTestId('agent-live-prompt-result').evaluate((element) => ({ ...element.dataset })),
+    );
     const auditViewer = page.getByTestId('agent-audit-transcript-viewer');
     agentAuditTranscriptViewerProofDatasetSchema.parse(
       await auditViewer.evaluate((element) => ({ ...element.dataset })),
