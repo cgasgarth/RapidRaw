@@ -60,7 +60,7 @@ const proofSchema = z
     displaySnapshot: displaySnapshotSchema,
     fixtureId: z.string().min(1),
     generatedAt: z.string().datetime(),
-    issue: z.literal(2327),
+    issue: z.literal(3234),
     outputTransform: z
       .object({
         bitDepth: z.literal(16),

@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { useManagedFocus } from '../../../hooks/useManagedFocus';
+import { type ActiveDisplayProfile, activeDisplayProfileSchema } from '../../../schemas/displayProfileSchemas';
 import { emptyTauriResponseSchema } from '../../../schemas/tauriResponseSchemas';
 import {
   type XmpMetadataConflictChoice,
@@ -39,6 +40,10 @@ type MetadataValue = string | number | null | undefined;
 
 type ExifData = Record<string, MetadataValue>;
 type ConflictDecisions = Partial<Record<XmpMetadataConflictDecision['field'], XmpMetadataConflictChoice>>;
+type DisplayProfileState =
+  | { error: string; loading: false; profile: null }
+  | { error: null; loading: true; profile: null }
+  | { error: null; loading: false; profile: ActiveDisplayProfile };
 
 interface GPSData {
   altitude: string | number | null;
@@ -58,6 +63,8 @@ interface MetaDataItemProps {
 }
 
 const USER_TAG_PREFIX = 'user:';
+
+const DISPLAY_PROFILE_HASH_PREFIX_LENGTH = 19;
 
 function formatExifTag(str: string) {
   if (!str) return '';
@@ -158,6 +165,15 @@ function formatConflictValue(value: unknown) {
   if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return value.toString();
   if (typeof value === 'object') return JSON.stringify(value);
   return 'Unsupported value';
+}
+
+function formatDisplayProfileHash(profile: ActiveDisplayProfile) {
+  return profile.iccSha256?.slice(0, DISPLAY_PROFILE_HASH_PREFIX_LENGTH) ?? '-';
+}
+
+function formatDisplayProfileByteCount(profile: ActiveDisplayProfile) {
+  if (profile.profileByteCount === null || profile.profileByteCount === undefined) return '-';
+  return profile.profileByteCount.toLocaleString();
 }
 
 function xmpChoiceLabel(choice: XmpMetadataConflictChoice, t: TFunction) {
@@ -298,6 +314,11 @@ export default function MetadataPanel() {
   const [xmpConflictDecisions, setXmpConflictDecisions] = useState<ConflictDecisions>({});
   const [isCheckingXmpConflicts, setIsCheckingXmpConflicts] = useState(false);
   const [isResolvingXmpConflicts, setIsResolvingXmpConflicts] = useState(false);
+  const [displayProfileState, setDisplayProfileState] = useState<DisplayProfileState>({
+    error: null,
+    loading: true,
+    profile: null,
+  });
 
   const rating = selectedImage ? imageRatings[selectedImage.path] || 0 : 0;
   const tags = useMemo(
@@ -399,6 +420,32 @@ export default function MetadataPanel() {
   const megapixels = selectedImage ? ((selectedImage.width * selectedImage.height) / 1000000).toFixed(1) : null;
   const populatedCameraFieldCount = cameraGridSettings.filter((setting) => setting.value !== '-').length;
   const editableMetadataFieldCount = EDITABLE_FIELDS.length;
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadDisplayProfile = async () => {
+      setDisplayProfileState({ error: null, loading: true, profile: null });
+      try {
+        const profile = await invokeWithSchema(Invokes.GetActiveDisplayProfile, {}, activeDisplayProfileSchema);
+        if (isActive) setDisplayProfileState({ error: null, loading: false, profile });
+      } catch (err) {
+        if (isActive) {
+          setDisplayProfileState({
+            error: err instanceof Error ? err.message : String(err),
+            loading: false,
+            profile: null,
+          });
+        }
+      }
+    };
+
+    void loadDisplayProfile();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -608,6 +655,72 @@ export default function MetadataPanel() {
               >
                 {t('editor.metadata.readiness.editableFields', { count: editableMetadataFieldCount })}
               </UiText>
+            </section>
+            <section
+              className="rounded-md border border-surface bg-bg-secondary/70 p-3 text-xs"
+              data-display-profile-status={
+                displayProfileState.profile?.status ?? (displayProfileState.loading ? 'loading' : 'error')
+              }
+              data-testid="metadata-display-profile-status"
+            >
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <UiText variant={TextVariants.heading}>{t('editor.metadata.displayProfile.title')}</UiText>
+                <UiText
+                  as="span"
+                  variant={TextVariants.small}
+                  className={cx(
+                    'rounded px-2 py-1 font-semibold',
+                    displayProfileState.profile?.status === 'active_profile_loaded'
+                      ? 'bg-green-500/10 text-green-300'
+                      : 'bg-yellow-500/10 text-yellow-200',
+                  )}
+                >
+                  {displayProfileState.loading
+                    ? t('editor.metadata.displayProfile.loading')
+                    : displayProfileState.profile
+                      ? t(`editor.metadata.displayProfile.status.${displayProfileState.profile.status}`)
+                      : t('editor.metadata.displayProfile.status.error')}
+                </UiText>
+              </div>
+              {displayProfileState.profile ? (
+                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                  <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                    {t('editor.metadata.displayProfile.cmm')}
+                  </UiText>
+                  <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right">
+                    {displayProfileState.profile.cmm}
+                  </UiText>
+                  <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                    {t('editor.metadata.displayProfile.displayId')}
+                  </UiText>
+                  <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right">
+                    {displayProfileState.profile.displayId ?? '-'}
+                  </UiText>
+                  <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                    {t('editor.metadata.displayProfile.iccHash')}
+                  </UiText>
+                  <UiText
+                    variant={TextVariants.small}
+                    color={TextColors.primary}
+                    className="truncate text-right"
+                    data-tooltip={displayProfileState.profile.iccSha256 ?? undefined}
+                  >
+                    {formatDisplayProfileHash(displayProfileState.profile)}
+                  </UiText>
+                  <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                    {t('editor.metadata.displayProfile.profileBytes')}
+                  </UiText>
+                  <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right">
+                    {formatDisplayProfileByteCount(displayProfileState.profile)}
+                  </UiText>
+                </div>
+              ) : (
+                <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                  {displayProfileState.loading
+                    ? t('editor.metadata.displayProfile.loadingDescription')
+                    : t('editor.metadata.displayProfile.errorDescription', { error: displayProfileState.error })}
+                </UiText>
+              )}
             </section>
             <div>
               <UiText variant={TextVariants.heading} className="mb-3">
