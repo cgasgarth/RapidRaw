@@ -1287,9 +1287,12 @@
       "incomingCaptures": "Incoming captures",
       "noCameraDescription": "Connect a supported camera and refresh to verify macOS tether discovery.",
       "noCameraTitle": "No camera reported",
+      "openCapture": "Open",
+      "openSelectedCapture": "Open selected capture",
       "openSession": "Open session",
       "pendingAdapter": "macOS hardware adapter",
       "pendingMessage": "Discovery is waiting for the native camera provider.",
+      "pinCapture": "Pin",
       "providerMode": {
         "auto": "macOS",
         "fake": "Fake CI"
@@ -1297,6 +1300,7 @@
       "refresh": "Refresh",
       "reviewHoldCurrent": "Hold current",
       "reviewNewest": "Newest",
+      "reviewPinned": "Pinned",
       "sessionClosed": "Session closed",
       "sessionClosedDescription": "Open a discovery session before capture controls are enabled.",
       "sessionOpen": "Session open",

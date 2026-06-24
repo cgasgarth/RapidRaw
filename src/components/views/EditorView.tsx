@@ -75,6 +75,7 @@ interface EditorViewProps {
   handleEditorContextMenu: (event: MouseEvent<HTMLElement>) => void;
   handleThumbnailContextMenu: (event: MouseEvent<HTMLElement>, path: string) => void;
   handleImageClick: (path: string, event: MouseEvent<HTMLElement> | ReactKeyboardEvent<HTMLElement>) => void;
+  handleImageSelect: (path: string) => void;
   handleClearSelection: () => void;
   handleCopyAdjustments: () => void;
   handlePasteAdjustments: () => void;
@@ -99,6 +100,7 @@ export default function EditorView({
   handleEditorContextMenu,
   handleThumbnailContextMenu,
   handleImageClick,
+  handleImageSelect,
   handleClearSelection,
   handleCopyAdjustments,
   handlePasteAdjustments,
@@ -166,6 +168,15 @@ export default function EditorView({
       requestThumbnails([path]);
     },
     [refreshImageList, requestThumbnails],
+  );
+
+  const handleTetherCaptureOpen = useCallback(
+    async (path: string) => {
+      await refreshImageList();
+      requestThumbnails([path]);
+      handleImageSelect(path);
+    },
+    [handleImageSelect, refreshImageList, requestThumbnails],
   );
 
   const { appSettings, handleSettingsChange } = useSettingsStore(
@@ -282,7 +293,13 @@ export default function EditorView({
                     }}
                   />
                 ),
-                [Panel.Tether]: <TetherPanel />,
+                [Panel.Tether]: (
+                  <TetherPanel
+                    onOpenCapture={(path) => {
+                      void handleTetherCaptureOpen(path);
+                    }}
+                  />
+                ),
               }[renderedRightPanel]}
           </Suspense>
         </motion.div>

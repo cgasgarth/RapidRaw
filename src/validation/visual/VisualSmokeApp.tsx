@@ -614,9 +614,12 @@ function WorkflowRailVisualSmoke() {
 }
 
 function TetherDiscoveryVisualSmoke() {
+  const [openedCapturePath, setOpenedCapturePath] = useState<string | null>(null);
+
   return (
     <main
       className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-opened-capture-path={openedCapturePath ?? ''}
       data-visual-smoke-ready="true"
       data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.TetherDiscoveryUi}
     >
@@ -631,6 +634,7 @@ function TetherDiscoveryVisualSmoke() {
             captureFrame={() => Promise.resolve(tetherCaptureMockResponse)}
             closeSession={() => Promise.resolve(tetherClosedSessionMockResponse)}
             discoverCameras={() => Promise.resolve(tetherDiscoveryMockResponse)}
+            onOpenCapture={setOpenedCapturePath}
             openSession={() => Promise.resolve(tetherSessionMockResponse)}
           />
         </aside>

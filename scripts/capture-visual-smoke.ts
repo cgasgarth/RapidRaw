@@ -1244,6 +1244,18 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('tether-incoming-capture-item').getByText('alaska-dsc7853.ARW', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    await page.locator('[data-review-mode-option="pinned"]').click();
+    await page.locator('[data-review-mode-option="pinned"][data-selected="true"]').waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('tether-pin-capture').click();
+    await page.locator('[data-testid="tether-incoming-capture-item"][data-pinned="true"]').waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('tether-open-capture').click();
+    await page.locator('[data-opened-capture-path="/tmp/rawengine-tether-captures/alaska-dsc7853.ARW"]').waitFor({
+      timeout: 10_000,
+    });
     await page.locator('[data-review-mode-option="holdCurrent"]').click();
     await page.locator('[data-review-mode-option="holdCurrent"][data-selected="true"]').waitFor({
       timeout: 10_000,
