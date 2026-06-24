@@ -807,8 +807,10 @@ function tetherMetadataTemplateLocaleKey(
   templateId: TetherCaptureRequest['metadataTemplateId'],
 ):
   | 'editor.tether.metadataTemplateNone'
+  | 'editor.tether.metadataTemplateCopyrightClientDelivery'
   | 'editor.tether.metadataTemplateReviewSelect'
   | 'editor.tether.metadataTemplateStudioSession' {
+  if (templateId === 'copyright-client-delivery') return 'editor.tether.metadataTemplateCopyrightClientDelivery';
   if (templateId === 'reviewSelect') return 'editor.tether.metadataTemplateReviewSelect';
   if (templateId === 'studioSession') return 'editor.tether.metadataTemplateStudioSession';
   return 'editor.tether.metadataTemplateNone';
