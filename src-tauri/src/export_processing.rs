@@ -441,7 +441,7 @@ fn set_timestamps_from_exif(src: &Path, dst: &Path) {
     }
 }
 
-fn save_image_with_metadata(
+pub(crate) fn save_image_with_metadata(
     image: &DynamicImage,
     output_path: &std::path::Path,
     source_path_str: &str,
