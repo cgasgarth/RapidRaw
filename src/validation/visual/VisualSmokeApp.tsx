@@ -317,7 +317,7 @@ const tetherSessionMockResponse: TetherSessionResponse = {
     cameraDisplayName: 'Sony ILCE-7M4',
     cameraId: 'validation-camera-sony-a7iv',
     captureCounter: 0,
-    destinationRoot: null,
+    destinationRoot: '/tmp/rawengine-tether-captures',
     openedAt: '2026-06-23T00:00:00.000Z',
     providerMode: 'fake',
     recovery: {

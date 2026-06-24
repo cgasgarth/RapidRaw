@@ -635,6 +635,17 @@ export function TetherPanel({
             ? t('editor.tether.sessionOpenDescription', { camera: session.cameraDisplayName })
             : t('editor.tether.sessionClosedDescription')}
         </UiText>
+        {session?.destinationRoot && (
+          <UiText
+            variant={TextVariants.small}
+            color={TextColors.secondary}
+            className="mt-2 block truncate"
+            data-testid="tether-session-destination-root"
+            title={session.destinationRoot}
+          >
+            {t('editor.tether.sessionDestinationRoot', { path: session.destinationRoot })}
+          </UiText>
+        )}
         {session?.recovery && session.recovery.status !== 'clean' && (
           <div
             className="mt-3 rounded border border-yellow-500/40 bg-yellow-500/10 p-2"
