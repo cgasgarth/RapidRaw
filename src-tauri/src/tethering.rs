@@ -29,6 +29,8 @@ pub struct TetherSessionOpenRequest {
 #[serde(rename_all = "camelCase")]
 pub struct TetherCaptureRequest {
     #[serde(default)]
+    backup_destination_root: Option<String>,
+    #[serde(default)]
     destination_root: Option<String>,
     #[serde(default)]
     fake_source_path: Option<String>,
@@ -61,6 +63,7 @@ pub struct TetherSessionResponse {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TetherCaptureResponse {
+    backup: TetherCaptureBackupSummary,
     bytes: u64,
     camera_display_name: String,
     checksum: String,
@@ -71,6 +74,17 @@ pub struct TetherCaptureResponse {
     provider_mode: String,
     session_id: String,
     source_path: String,
+    status: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TetherCaptureBackupSummary {
+    bytes: Option<u64>,
+    checksum: Option<String>,
+    destination_path: Option<String>,
+    enabled: bool,
+    error: Option<String>,
     status: String,
 }
 
@@ -313,6 +327,7 @@ fn trigger_tether_capture_for_state(
     state: &AppState,
 ) -> Result<TetherCaptureResponse, String> {
     let request = request.unwrap_or(TetherCaptureRequest {
+        backup_destination_root: None,
         destination_root: None,
         fake_source_path: None,
         ingest_preset_id: None,
@@ -387,8 +402,15 @@ fn trigger_tether_capture_for_state(
         &captured_at,
         &ingest,
     )?;
+    let backup = write_verified_backup_capture(
+        request.backup_destination_root.as_deref(),
+        &ingest.file_name,
+        &imported_path,
+        &output_checksum,
+    );
 
     Ok(TetherCaptureResponse {
+        backup,
         bytes,
         camera_display_name: session.camera_display_name,
         checksum: output_checksum,
@@ -487,6 +509,78 @@ fn apply_capture_metadata_template(
         ],
         sidecar_path: Some(sidecar_path.to_string_lossy().to_string()),
         template_id: template_id.to_string(),
+    })
+}
+
+fn write_verified_backup_capture(
+    backup_destination_root: Option<&str>,
+    file_name: &str,
+    imported_path: &Path,
+    expected_checksum: &str,
+) -> TetherCaptureBackupSummary {
+    let Some(root) = backup_destination_root.filter(|root| !root.trim().is_empty()) else {
+        return TetherCaptureBackupSummary {
+            bytes: None,
+            checksum: None,
+            destination_path: None,
+            enabled: false,
+            error: None,
+            status: "disabled".to_string(),
+        };
+    };
+
+    match write_verified_backup_capture_result(
+        Path::new(root),
+        file_name,
+        imported_path,
+        expected_checksum,
+    ) {
+        Ok(summary) => summary,
+        Err(error) => TetherCaptureBackupSummary {
+            bytes: None,
+            checksum: None,
+            destination_path: None,
+            enabled: true,
+            error: Some(error),
+            status: "failed".to_string(),
+        },
+    }
+}
+
+fn write_verified_backup_capture_result(
+    backup_destination_root: &Path,
+    file_name: &str,
+    imported_path: &Path,
+    expected_checksum: &str,
+) -> Result<TetherCaptureBackupSummary, String> {
+    fs::create_dir_all(backup_destination_root).map_err(|error| error.to_string())?;
+    let backup_path = backup_destination_root.join(file_name);
+    let temporary_path = backup_path.with_extension(format!(
+        "{}.part",
+        backup_path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .unwrap_or("raw")
+    ));
+
+    fs::copy(imported_path, &temporary_path).map_err(|error| error.to_string())?;
+    let checksum = sha256_file(&temporary_path)?;
+    if checksum != expected_checksum {
+        let _ = fs::remove_file(&temporary_path);
+        return Err("Backup checksum verification failed.".to_string());
+    }
+    fs::rename(&temporary_path, &backup_path).map_err(|error| error.to_string())?;
+    let bytes = fs::metadata(&backup_path)
+        .map_err(|error| error.to_string())?
+        .len();
+
+    Ok(TetherCaptureBackupSummary {
+        bytes: Some(bytes),
+        checksum: Some(checksum),
+        destination_path: Some(backup_path.to_string_lossy().to_string()),
+        enabled: true,
+        error: None,
+        status: "verified".to_string(),
     })
 }
 
@@ -727,6 +821,7 @@ mod tests {
 
         let capture = trigger_tether_capture_for_state(
             Some(TetherCaptureRequest {
+                backup_destination_root: Some(root.join("backup").to_string_lossy().to_string()),
                 destination_root: None,
                 fake_source_path: Some(source_path.to_string_lossy().to_string()),
                 ingest_preset_id: Some("sourceSequence".to_string()),
@@ -746,6 +841,10 @@ mod tests {
         assert!(Path::new(&capture.imported_path).is_file());
         assert!(capture.bytes > 0);
         assert_eq!(capture.checksum, sha256_file(&source_path).unwrap());
+        assert_eq!(capture.backup.status, "verified");
+        let backup_path = PathBuf::from(capture.backup.destination_path.as_ref().unwrap());
+        assert!(backup_path.is_file());
+        assert_eq!(capture.backup.checksum.as_ref().unwrap(), &capture.checksum);
         assert!(capture.metadata.applied);
         assert_eq!(capture.metadata.template_id, "studioSession");
         assert!(
@@ -809,6 +908,7 @@ mod tests {
 
         let capture = trigger_tether_capture_for_state(
             Some(TetherCaptureRequest {
+                backup_destination_root: None,
                 destination_root: None,
                 fake_source_path: Some(source_path.to_string_lossy().to_string()),
                 ingest_preset_id: Some("cameraSequence".to_string()),
@@ -821,8 +921,53 @@ mod tests {
         assert_eq!(capture.ingest.preset_id, "cameraSequence");
         assert_eq!(capture.ingest.collision_index, 2);
         assert!(capture.ingest.file_name.ends_with("_0002.ARW"));
+        assert_eq!(capture.backup.status, "disabled");
         assert!(!capture.metadata.applied);
         assert!(Path::new(&capture.imported_path).is_file());
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn fake_provider_reports_backup_failure_without_losing_primary_capture() {
+        let state = AppState::new();
+        let root = std::env::temp_dir().join(format!(
+            "rawengine-tether-backup-failure-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let source_path = root.join("source.ARW");
+        let destination_root = root.join("destination");
+        let backup_blocker = root.join("not-a-directory");
+        fs::create_dir_all(&destination_root).unwrap();
+        fs::write(&source_path, b"fake raw bytes").unwrap();
+        fs::write(&backup_blocker, b"file blocks backup directory").unwrap();
+
+        open_tether_session_for_state(
+            TetherSessionOpenRequest {
+                camera_id: "fake-sony-ilce-7m4-usb".to_string(),
+                destination_root: Some(destination_root.to_string_lossy().to_string()),
+                provider_mode: Some("fake".to_string()),
+            },
+            &state,
+        )
+        .unwrap();
+
+        let capture = trigger_tether_capture_for_state(
+            Some(TetherCaptureRequest {
+                backup_destination_root: Some(backup_blocker.to_string_lossy().to_string()),
+                destination_root: None,
+                fake_source_path: Some(source_path.to_string_lossy().to_string()),
+                ingest_preset_id: Some("timestampCamera".to_string()),
+                metadata_template_id: None,
+            }),
+            &state,
+        )
+        .unwrap();
+
+        assert_eq!(capture.status, "captured");
+        assert!(Path::new(&capture.imported_path).is_file());
+        assert_eq!(capture.backup.status, "failed");
+        assert!(capture.backup.error.is_some());
 
         let _ = fs::remove_dir_all(root);
     }

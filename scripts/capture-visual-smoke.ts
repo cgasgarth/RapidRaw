@@ -1244,6 +1244,11 @@ async function prepareScenario(page, mode) {
     await page.locator('[data-selected-metadata-template="studioSession"]').waitFor({
       timeout: 10_000,
     });
+    await page.getByTestId('tether-backup-copy-toggle').check();
+    await page.getByTestId('tether-backup-copy-path').fill('/tmp/rawengine-tether-backup');
+    await page.locator('[data-testid="tether-backup-copy"][data-backup-enabled="true"]').waitFor({
+      timeout: 10_000,
+    });
     await page.getByTestId('tether-trigger-capture').click();
     await page.getByTestId('tether-capture-result').getByText('Capture imported', { exact: true }).waitFor({
       timeout: 10_000,
@@ -1252,6 +1257,9 @@ async function prepareScenario(page, mode) {
       timeout: 10_000,
     });
     await page.locator('[data-testid="tether-capture-result"][data-metadata-template-id="studioSession"]').waitFor({
+      timeout: 10_000,
+    });
+    await page.locator('[data-testid="tether-capture-result"][data-backup-status="verified"]').waitFor({
       timeout: 10_000,
     });
     await page.getByTestId('tether-incoming-capture-strip').waitFor({ timeout: 10_000 });

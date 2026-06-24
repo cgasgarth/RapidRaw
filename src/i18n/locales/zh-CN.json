@@ -1181,6 +1181,12 @@
       }
     },
     "tether": {
+      "backupCopy": "Second copy",
+      "backupCopyDescription": "Write a verified backup copy after the primary import succeeds.",
+      "backupCopyPlaceholder": "/Volumes/Backup/Tether",
+      "backupDisabled": "Second copy disabled",
+      "backupFailed": "Second copy failed: {{error}}",
+      "backupVerified": "Second copy verified: {{path}}",
       "battery": "Battery",
       "capture": "Capture RAW",
       "captureBusy": "Capturing...",

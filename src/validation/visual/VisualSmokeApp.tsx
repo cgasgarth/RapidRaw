@@ -301,6 +301,14 @@ const tetherClosedSessionMockResponse: TetherSessionResponse = {
   status: 'closed',
 };
 const tetherCaptureMockResponse = {
+  backup: {
+    bytes: 25565952,
+    checksum: 'sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b',
+    destinationPath: '/tmp/rawengine-tether-backup/alaska-dsc7853_0001.ARW',
+    enabled: true,
+    error: null,
+    status: 'verified',
+  },
   bytes: 25565952,
   cameraDisplayName: 'Sony ILCE-7M4',
   capturedAt: '2026-06-23T00:00:02.000Z',

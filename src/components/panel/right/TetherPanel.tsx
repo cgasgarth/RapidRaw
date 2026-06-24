@@ -73,6 +73,8 @@ export function TetherPanel({
   const [capture, setCapture] = useState<TetherCaptureResponse | null>(null);
   const [captures, setCaptures] = useState<Array<TetherCaptureResponse>>([]);
   const [pinnedCaptureKey, setPinnedCaptureKey] = useState<string | null>(null);
+  const [backupDestinationRoot, setBackupDestinationRoot] = useState('');
+  const [isBackupEnabled, setIsBackupEnabled] = useState(false);
   const [ingestPresetId, setIngestPresetId] = useState<TetherCaptureRequest['ingestPresetId']>('timestampCamera');
   const [metadataTemplateId, setMetadataTemplateId] = useState<TetherCaptureRequest['metadataTemplateId']>('none');
   const [reviewMode, setReviewMode] = useState<TetherReviewMode>('newest');
@@ -131,7 +133,12 @@ export function TetherPanel({
     setIsCaptureBusy(true);
     setError(null);
     try {
-      const response = await captureFrame({ ingestPresetId, metadataTemplateId });
+      const response = await captureFrame({
+        backupDestinationRoot:
+          isBackupEnabled && backupDestinationRoot.trim() ? backupDestinationRoot.trim() : undefined,
+        ingestPresetId,
+        metadataTemplateId,
+      });
       setCaptures((current) => [response, ...current].slice(0, 8));
       setCapture((current) => {
         if (reviewMode === 'newest' || current === null) return response;
@@ -143,7 +150,15 @@ export function TetherPanel({
     } finally {
       setIsCaptureBusy(false);
     }
-  }, [captureFrame, ingestPresetId, metadataTemplateId, pinnedCaptureKey, reviewMode]);
+  }, [
+    backupDestinationRoot,
+    captureFrame,
+    ingestPresetId,
+    isBackupEnabled,
+    metadataTemplateId,
+    pinnedCaptureKey,
+    reviewMode,
+  ]);
 
   const selectedCaptureKey = capture === null ? null : captureKey(capture);
 
@@ -293,9 +308,42 @@ export function TetherPanel({
         </label>
       </section>
 
+      <section
+        className="rounded-md border border-border-color bg-bg-secondary p-3"
+        data-backup-enabled={String(isBackupEnabled)}
+        data-testid="tether-backup-copy"
+      >
+        <label className="flex items-center justify-between gap-3">
+          <UiText variant={TextVariants.label}>{t('editor.tether.backupCopy')}</UiText>
+          <input
+            checked={isBackupEnabled}
+            className="h-4 w-4"
+            data-testid="tether-backup-copy-toggle"
+            onChange={(event) => {
+              setIsBackupEnabled(event.target.checked);
+            }}
+            type="checkbox"
+          />
+        </label>
+        <input
+          className="mt-2 w-full rounded border border-border-color bg-bg-primary px-2 py-2 text-sm text-text-primary"
+          data-testid="tether-backup-copy-path"
+          disabled={!isBackupEnabled}
+          onChange={(event) => {
+            setBackupDestinationRoot(event.target.value);
+          }}
+          placeholder={t('editor.tether.backupCopyPlaceholder')}
+          value={backupDestinationRoot}
+        />
+        <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+          {t('editor.tether.backupCopyDescription')}
+        </UiText>
+      </section>
+
       {capture !== null && (
         <section
           className="rounded-md border border-green-500/40 bg-green-500/10 p-3"
+          data-backup-status={capture.backup.status}
           data-capture-checksum={capture.checksum}
           data-capture-imported-path={capture.importedPath}
           data-capture-status={capture.status}
@@ -323,6 +371,17 @@ export function TetherPanel({
                   template: t(tetherMetadataTemplateLocaleKey(capture.metadata.templateId)),
                 })
               : t('editor.tether.metadataSkipped')}
+          </UiText>
+          <UiText
+            variant={TextVariants.small}
+            color={capture.backup.status === 'failed' ? TextColors.error : TextColors.secondary}
+            className="mt-1 block truncate"
+          >
+            {capture.backup.status === 'verified' && capture.backup.destinationPath !== null
+              ? t('editor.tether.backupVerified', { path: capture.backup.destinationPath })
+              : capture.backup.status === 'failed'
+                ? t('editor.tether.backupFailed', { error: capture.backup.error ?? t('editor.tether.unknown') })
+                : t('editor.tether.backupDisabled')}
           </UiText>
           {onOpenCapture && (
             <Button
@@ -386,6 +445,7 @@ export function TetherPanel({
                   }`}
                   data-capture-imported-path={incomingCapture.importedPath}
                   data-capture-key={key}
+                  data-backup-status={incomingCapture.backup.status}
                   data-ingest-preset-id={incomingCapture.ingest.presetId}
                   data-metadata-template-id={incomingCapture.metadata.templateId}
                   data-pinned={String(isPinned)}
