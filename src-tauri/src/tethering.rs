@@ -323,9 +323,28 @@ pub fn set_tether_camera_control(
 }
 
 fn resolve_provider_mode(provider_mode: Option<String>) -> String {
-    provider_mode
-        .or_else(|| std::env::var("RAWENGINE_TETHER_PROVIDER_MODE").ok())
-        .unwrap_or_else(|| "auto".to_string())
+    resolve_provider_mode_with_env(
+        provider_mode.as_deref(),
+        std::env::var("RAWENGINE_TETHER_PROVIDER_MODE")
+            .ok()
+            .as_deref(),
+    )
+}
+
+fn resolve_provider_mode_with_env(
+    provider_mode: Option<&str>,
+    env_provider_mode: Option<&str>,
+) -> String {
+    let requested_mode = provider_mode.unwrap_or("auto").trim();
+    if requested_mode != "auto" {
+        return requested_mode.to_string();
+    }
+
+    env_provider_mode
+        .map(str::trim)
+        .filter(|mode| !mode.is_empty())
+        .unwrap_or(requested_mode)
+        .to_string()
 }
 
 fn discover_with_provider_mode(mode: &str) -> TetherDiscoveryResponse {
@@ -987,6 +1006,20 @@ mod tests {
             response.proof.macos_provider_boundary,
             "macos_tether_provider_boundary"
         );
+    }
+
+    #[test]
+    fn provider_mode_env_overrides_auto_for_runtime_proof() {
+        assert_eq!(
+            resolve_provider_mode_with_env(Some("auto"), Some("fake")),
+            "fake"
+        );
+        assert_eq!(
+            resolve_provider_mode_with_env(Some("fake"), Some("auto")),
+            "fake"
+        );
+        assert_eq!(resolve_provider_mode_with_env(None, Some("fake")), "fake");
+        assert_eq!(resolve_provider_mode_with_env(Some("auto"), None), "auto");
     }
 
     #[test]
