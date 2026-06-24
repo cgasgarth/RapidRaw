@@ -97,6 +97,7 @@ export const tetherCameraControlWriteResponseSchema = z.object({
 
 export const tetherCaptureRequestSchema = z.object({
   backupDestinationRoot: z.string().trim().min(1).optional(),
+  cameraControlValues: z.record(z.string().trim().min(1), z.string().trim().min(1)).default({}),
   destinationRoot: z.string().trim().min(1).optional(),
   fakeSourcePath: z.string().trim().min(1).optional(),
   ingestPresetId: tetherIngestPresetIdSchema.default('timestampCamera'),
@@ -134,6 +135,7 @@ export const tetherCaptureResponseSchema = z.object({
   backup: tetherCaptureBackupSchema,
   bytes: z.number().int().nonnegative(),
   cameraDisplayName: z.string().trim().min(1),
+  cameraControlValues: z.record(z.string().trim().min(1), z.string().trim().min(1)).default({}),
   capturedAt: z.string().trim().min(1),
   checksum: z
     .string()

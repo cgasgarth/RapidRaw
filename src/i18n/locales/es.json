@@ -774,6 +774,7 @@
     "tether": {
       "battery": "Battery",
       "connected": "Connected",
+      "controlsRecorded": "Camera controls recorded: {{controls}}",
       "controlVerified": "{{value}} verified on camera",
       "controlsReady": "Writable",
       "controlsRequireSession": "Open session first",
@@ -809,7 +810,8 @@
       "sessionOpen": "Session open",
       "sessionOpenDescription": "{{camera}} is reserved for this tether session.",
       "recoveryFailed": "Tether recovery failed: {{message}}",
-      "recoveryQuarantined": "Quarantined {{count}} partial tether download(s)."
+      "recoveryQuarantined": "Quarantined {{count}} partial tether download(s).",
+      "none": "None"
     }
   },
   "export": {
