@@ -587,6 +587,7 @@
           "label": "",
           "noApplyStep": "",
           "placeholder": "",
+          "previewDelta": "",
           "rollback": "",
           "status": {
             "applied": "",

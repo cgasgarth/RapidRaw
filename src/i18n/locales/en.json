@@ -591,6 +591,7 @@
           "label": "Ask the agent",
           "noApplyStep": "The agent plan did not include an apply-capable tone step.",
           "placeholder": "Example: brighten this RAW, recover shadows, and keep the color natural",
+          "previewDelta": "{{changed}}/{{sampled}} samples changed ({{percent}}%); mean luma delta {{meanLuma}}, max channel delta {{maxDelta}}",
           "rollback": "Rollback",
           "status": {
             "applied": "Applied through the local app-server bridge",
