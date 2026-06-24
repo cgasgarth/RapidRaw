@@ -8,6 +8,7 @@ const port = 1420;
 const baseUrl = `http://${host}:${port}`;
 const harnessSettingsStorageKey = 'rawengine-browser-tauri-harness-settings-v1';
 const restoredRootPath = '/Users/cgas/Pictures/Capture One/Alaska';
+const staleFolderPath = `${restoredRootPath}/missing-stale-folder`;
 const forbiddenStartupCommands = new Set(['get_pinned_folder_trees', 'list_images_in_dir', 'list_images_recursive']);
 
 async function waitForDevServer(): Promise<void> {
@@ -58,13 +59,13 @@ try {
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { height: 900, width: 1440 } });
   await page.addInitScript(
-    ({ key, rootPath }) => {
+    ({ key, rootPath, stalePath }) => {
       window.localStorage.setItem(
         key,
         JSON.stringify({
           editorPreviewResolution: 1024,
           lastFolderState: {
-            currentFolderPath: rootPath,
+            currentFolderPath: stalePath,
             expandedFolders: [rootPath],
           },
           lastRootPath: rootPath,
@@ -76,7 +77,7 @@ try {
         }),
       );
     },
-    { key: harnessSettingsStorageKey, rootPath: restoredRootPath },
+    { key: harnessSettingsStorageKey, rootPath: restoredRootPath, stalePath: staleFolderPath },
   );
   await page.route('https://api.github.com/repos/CyberTimon/RapidRAW/releases/latest', async (route) => {
     await route.fulfill({
@@ -104,6 +105,17 @@ try {
     const commands = (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).map((call) => call.command);
     return commands.includes('get_pinned_folder_trees') && commands.includes('list_images_in_dir');
   });
+
+  const imageListCalls = await page.evaluate(() =>
+    (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).filter((call) => call.command === 'list_images_in_dir'),
+  );
+  const listedPaths = imageListCalls.map((call) => call.args?.['path']);
+  if (listedPaths.includes(staleFolderPath)) {
+    throw new Error(`Session restore listed stale missing folder: ${staleFolderPath}`);
+  }
+  if (!listedPaths.includes(restoredRootPath)) {
+    throw new Error(`Session restore did not fall back to root folder: ${restoredRootPath}`);
+  }
 
   console.log('session restore gated ok');
 } catch (error) {

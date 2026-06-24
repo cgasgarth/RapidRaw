@@ -183,11 +183,12 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       return Promise.resolve({
         children: [],
         imageCount: 1,
+        isDir: true,
         name: browserHarnessRoot.split('/').at(-1) ?? browserHarnessRoot,
         path: browserHarnessRoot,
       });
     case commandNames.getPinnedFolderTrees:
-      return Promise.resolve([]);
+      return Promise.resolve(getStringArrayArg(args, 'paths').map(createHarnessFolderTree));
     case commandNames.getLensfunMakers:
       return Promise.resolve([]);
     case commandNames.getLogFilePath:
@@ -254,6 +255,19 @@ const getStringArg = (args: Record<string, unknown> | undefined, key: string): s
   const value = args?.[key];
   return typeof value === 'string' ? value : undefined;
 };
+
+const getStringArrayArg = (args: Record<string, unknown> | undefined, key: string): string[] => {
+  const value = args?.[key];
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+};
+
+const createHarnessFolderTree = (path: string) => ({
+  children: [],
+  imageCount: 1,
+  isDir: true,
+  name: path.split('/').at(-1) ?? path,
+  path,
+});
 
 const decodeBase64ToArrayBuffer = (base64: string): ArrayBuffer => {
   const binary = atob(base64);
