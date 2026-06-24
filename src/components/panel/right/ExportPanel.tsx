@@ -1367,6 +1367,7 @@ export default function ExportPanel({
                                 value={colorProfile}
                                 onChange={setColorProfile}
                                 disabled={isExporting}
+                                placement="top"
                                 className="w-full"
                               />
                             </div>

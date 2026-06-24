@@ -28,6 +28,7 @@ for (const marker of [
   'ExportColorProfile.AdobeRgb1998',
   'hasColorManagedTransform',
   'export.colorProfiles.proPhotoRgb',
+  'placement="top"',
   'export.advanced.renderingIntent',
   'export.advanced.blackPointCompensationUnavailable',
   'export.readiness.renderingIntent',

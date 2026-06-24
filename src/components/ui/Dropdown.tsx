@@ -17,6 +17,7 @@ interface DropdownProps<T extends React.Key> {
   className?: string;
   onChange: (value: T) => void;
   options: Array<OptionItem<T>>;
+  placement?: 'bottom' | 'top';
   placeholder?: string;
   searchPlaceholder?: string;
   value: T | null;
@@ -28,6 +29,7 @@ const Dropdown = <T extends React.Key>({
   className = '',
   onChange,
   options,
+  placement = 'bottom',
   placeholder = 'Select an option',
   searchPlaceholder = 'Filter options...',
   value,
@@ -140,7 +142,10 @@ const Dropdown = <T extends React.Key>({
         {isOpen && (
           <motion.div
             animate={{ opacity: 1, scale: 1 }}
-            className="absolute right-0 mt-2 w-full origin-top-right z-20"
+            className={cx(
+              'absolute right-0 w-full origin-top-right z-20',
+              placement === 'top' ? 'bottom-full mb-2' : 'mt-2',
+            )}
             exit={{ opacity: 0, scale: 0.95 }}
             initial={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.1, ease: 'easeOut' }}
