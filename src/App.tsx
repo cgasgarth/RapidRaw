@@ -828,20 +828,15 @@ function App() {
                 />
               )}
             </div>
-            {!selectedImage && (
+            {!selectedImage && isLibraryExportPanelVisible && (
               <>
-                {isLibraryExportPanelVisible && (
-                  <Resizer
-                    direction={Orientation.Vertical}
-                    onMouseDown={createResizeHandler('right', rightPanelWidth)}
-                  />
-                )}
+                <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
                 <div
                   className={cx(
                     'shrink-0 overflow-hidden',
                     !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
                   )}
-                  style={{ width: isLibraryExportPanelVisible && !isFullScreen ? `${rightPanelWidth}px` : '0px' }}
+                  style={{ width: isFullScreen ? '0px' : `${rightPanelWidth}px` }}
                 >
                   <ExportPanel
                     exportState={exportState}

@@ -69,15 +69,26 @@ for (const result of lintResults) {
   }
 }
 
+const appSource = await readFile('src/App.tsx', 'utf8');
+if (!appSource.includes('!selectedImage && isLibraryExportPanelVisible &&')) {
+  failures.push('src/App.tsx must unmount the library ExportPanel when it is not visible.');
+}
+
 for (const target of dialogTargets) {
   const source = await readFile(target.path, 'utf8');
-  if (!source.includes('role="dialog"')) {
+  const usesComputationalSetupShell = source.includes('ComputationalSetupModalShell');
+  const shellSource = usesComputationalSetupShell
+    ? await readFile('src/components/modals/ComputationalSetupModalShell.tsx', 'utf8')
+    : '';
+  const dialogSource = usesComputationalSetupShell ? shellSource : source;
+
+  if (!dialogSource.includes('role="dialog"')) {
     failures.push(`${target.path} must expose role="dialog".`);
   }
-  if (!source.includes('aria-modal="true"')) {
+  if (!dialogSource.includes('aria-modal="true"')) {
     failures.push(`${target.path} must expose aria-modal="true".`);
   }
-  if (!source.includes('aria-labelledby=')) {
+  if (!dialogSource.includes('aria-labelledby=')) {
     failures.push(`${target.path} must label the dialog with aria-labelledby.`);
   }
 }
