@@ -767,6 +767,10 @@
     "tether": {
       "battery": "Battery",
       "connected": "Connected",
+      "controlVerified": "{{value}} verified on camera",
+      "controlsReady": "Writable",
+      "controlsRequireSession": "Open session first",
+      "exposureControls": "Exposure controls",
       "noCameraDescription": "Connect a supported camera and refresh to verify macOS tether discovery.",
       "noCameraTitle": "No camera reported",
       "pendingAdapter": "macOS hardware adapter",

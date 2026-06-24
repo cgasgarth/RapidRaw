@@ -2,11 +2,23 @@ import { z } from 'zod';
 
 export const tetherIngestPresetIdSchema = z.enum(['cameraSequence', 'sourceSequence', 'timestampCamera']);
 export const tetherMetadataTemplateIdSchema = z.enum(['none', 'studioSession']);
+export const tetherCameraControlIdSchema = z.enum(['iso', 'shutterSpeed', 'aperture']);
+export const tetherCameraControlStatusSchema = z.enum(['ready', 'read_only', 'unsupported']);
 
 export const tetherCapabilitySchema = z.object({
   id: z.string().trim().min(1),
   label: z.string().trim().min(1),
   status: z.enum(['ready', 'not_checked', 'unavailable']),
+});
+
+export const tetherCameraControlSchema = z.object({
+  currentValue: z.string().trim().min(1),
+  id: tetherCameraControlIdSchema,
+  label: z.string().trim().min(1),
+  status: tetherCameraControlStatusSchema,
+  unit: z.string().trim().min(1).nullable(),
+  values: z.array(z.string().trim().min(1)).min(1),
+  writable: z.boolean(),
 });
 
 export const tetheredCameraSchema = z.object({
@@ -20,6 +32,7 @@ export const tetheredCameraSchema = z.object({
   id: z.string().trim().min(1),
   make: z.string().trim().min(1),
   model: z.string().trim().min(1),
+  controls: z.array(tetherCameraControlSchema).default([]),
   storage: z.object({
     freeGb: z.number().nonnegative().nullable(),
     label: z.string().trim().min(1),
@@ -56,6 +69,22 @@ export const tetherSessionSnapshotSchema = z.object({
 export const tetherSessionResponseSchema = z.object({
   session: tetherSessionSnapshotSchema.nullable(),
   status: z.enum(['open', 'closed']),
+});
+
+export const tetherCameraControlWriteRequestSchema = z.object({
+  cameraId: z.string().trim().min(1),
+  controlId: tetherCameraControlIdSchema,
+  providerMode: z.enum(['auto', 'fake']).default('auto'),
+  value: z.string().trim().min(1),
+});
+
+export const tetherCameraControlWriteResponseSchema = z.object({
+  appliedValue: z.string().trim().min(1),
+  cameraId: z.string().trim().min(1),
+  controlId: tetherCameraControlIdSchema,
+  requestedValue: z.string().trim().min(1),
+  status: z.literal('verified'),
+  verifiedAt: z.string().trim().min(1),
 });
 
 export const tetherCaptureRequestSchema = z.object({
@@ -112,6 +141,9 @@ export const tetherCaptureResponseSchema = z.object({
 });
 
 export type TetherCapability = z.infer<typeof tetherCapabilitySchema>;
+export type TetherCameraControl = z.infer<typeof tetherCameraControlSchema>;
+export type TetherCameraControlWriteRequest = z.infer<typeof tetherCameraControlWriteRequestSchema>;
+export type TetherCameraControlWriteResponse = z.infer<typeof tetherCameraControlWriteResponseSchema>;
 export type TetherCaptureRequest = z.infer<typeof tetherCaptureRequestSchema>;
 export type TetherCaptureResponse = z.infer<typeof tetherCaptureResponseSchema>;
 export type TetherDiscoveryResponse = z.infer<typeof tetherDiscoveryResponseSchema>;

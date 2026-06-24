@@ -3,12 +3,16 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
+  tetherCameraControlWriteResponseSchema,
   tetherCaptureResponseSchema,
   tetherDiscoveryResponseSchema,
   tetherIngestPresetIdSchema,
   tetherMetadataTemplateIdSchema,
   tetherSessionResponseSchema,
   type TetherCapability,
+  type TetherCameraControl,
+  type TetherCameraControlWriteRequest,
+  type TetherCameraControlWriteResponse,
   type TetherCaptureRequest,
   type TetherCaptureResponse,
   type TetherDiscoveryResponse,
@@ -26,6 +30,7 @@ interface TetherPanelProps {
   discoverCameras?: () => Promise<TetherDiscoveryResponse>;
   onOpenCapture?: (path: string) => void;
   openSession?: (cameraId: string) => Promise<TetherSessionResponse>;
+  setCameraControl?: (request: TetherCameraControlWriteRequest) => Promise<TetherCameraControlWriteResponse>;
 }
 
 type TetherReviewMode = 'holdCurrent' | 'newest' | 'pinned';
@@ -60,19 +65,26 @@ const defaultCloseSession = (): Promise<TetherSessionResponse> =>
 const defaultCaptureFrame = (request: TetherCaptureRequest): Promise<TetherCaptureResponse> =>
   invokeWithSchema(Invokes.TriggerTetherCapture, { request }, tetherCaptureResponseSchema);
 
+const defaultSetCameraControl = (request: TetherCameraControlWriteRequest): Promise<TetherCameraControlWriteResponse> =>
+  invokeWithSchema(Invokes.SetTetherCameraControl, { request }, tetherCameraControlWriteResponseSchema);
+
 export function TetherPanel({
   captureFrame = defaultCaptureFrame,
   closeSession = defaultCloseSession,
   discoverCameras = defaultDiscoverCameras,
   onOpenCapture,
   openSession = defaultOpenSession,
+  setCameraControl = defaultSetCameraControl,
 }: TetherPanelProps = {}) {
   const { t } = useTranslation();
   const [discovery, setDiscovery] = useState<TetherDiscoveryResponse | null>(null);
   const [session, setSession] = useState<TetherSessionResponse['session']>(null);
   const [capture, setCapture] = useState<TetherCaptureResponse | null>(null);
   const [captures, setCaptures] = useState<Array<TetherCaptureResponse>>([]);
+  const [cameraControls, setCameraControls] = useState<Array<TetherCameraControl>>([]);
   const [pinnedCaptureKey, setPinnedCaptureKey] = useState<string | null>(null);
+  const [controlStatus, setControlStatus] = useState<Record<string, string>>({});
+  const [busyControlId, setBusyControlId] = useState<string | null>(null);
   const [backupDestinationRoot, setBackupDestinationRoot] = useState('');
   const [isBackupEnabled, setIsBackupEnabled] = useState(false);
   const [ingestPresetId, setIngestPresetId] = useState<TetherCaptureRequest['ingestPresetId']>('timestampCamera');
@@ -92,6 +104,7 @@ export function TetherPanel({
     try {
       const response = await discoverCameras();
       setDiscovery(response);
+      setCameraControls(response.cameras[0]?.controls ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -159,6 +172,37 @@ export function TetherPanel({
     pinnedCaptureKey,
     reviewMode,
   ]);
+
+  const updateCameraControl = useCallback(
+    async (control: TetherCameraControl, value: string) => {
+      if (camera === null || value === control.currentValue) return;
+
+      setBusyControlId(control.id);
+      setError(null);
+      try {
+        const response = await setCameraControl({
+          cameraId: camera.id,
+          controlId: control.id,
+          providerMode: discovery?.provider.mode ?? 'auto',
+          value,
+        });
+        setCameraControls((current) =>
+          current.map((item) =>
+            item.id === response.controlId ? { ...item, currentValue: response.appliedValue } : item,
+          ),
+        );
+        setControlStatus((current) => ({
+          ...current,
+          [response.controlId]: t('editor.tether.controlVerified', { value: response.appliedValue }),
+        }));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBusyControlId(null);
+      }
+    },
+    [camera, discovery, setCameraControl, t],
+  );
 
   const selectedCaptureKey = capture === null ? null : captureKey(capture);
 
@@ -262,6 +306,65 @@ export function TetherPanel({
         <Camera size={14} />
         {isCaptureBusy ? t('editor.tether.captureBusy') : t('editor.tether.capture')}
       </Button>
+
+      <section
+        className="rounded-md border border-border-color bg-bg-secondary p-3"
+        data-control-count={cameraControls.length}
+        data-testid="tether-exposure-controls"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <UiText variant={TextVariants.label}>{t('editor.tether.exposureControls')}</UiText>
+          <UiText variant={TextVariants.small} color={TextColors.secondary}>
+            {isSessionOpen ? t('editor.tether.controlsReady') : t('editor.tether.controlsRequireSession')}
+          </UiText>
+        </div>
+        <div className="mt-3 grid gap-2">
+          {cameraControls.map((control) => {
+            const isWritable =
+              isSessionOpen && control.writable && control.status === 'ready' && busyControlId === null;
+            return (
+              <label
+                className="grid grid-cols-[86px_1fr] items-center gap-2 rounded border border-border-color bg-bg-primary p-2"
+                data-control-current-value={control.currentValue}
+                data-control-id={control.id}
+                data-control-status={control.status}
+                data-control-writable={String(control.writable)}
+                data-testid="tether-exposure-control"
+                key={control.id}
+              >
+                <span>
+                  <UiText variant={TextVariants.small}>{control.label}</UiText>
+                  {control.unit !== null && (
+                    <UiText variant={TextVariants.small} color={TextColors.secondary} className="block">
+                      {control.unit}
+                    </UiText>
+                  )}
+                </span>
+                <select
+                  className="min-w-0 rounded border border-border-color bg-bg-secondary px-2 py-1.5 text-sm text-text-primary disabled:opacity-60"
+                  data-testid={`tether-exposure-control-${control.id}`}
+                  disabled={!isWritable}
+                  onChange={(event) => {
+                    void updateCameraControl(control, event.target.value);
+                  }}
+                  value={control.currentValue}
+                >
+                  {control.values.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+                {controlStatus[control.id] && (
+                  <UiText variant={TextVariants.small} color={TextColors.secondary} className="col-span-2">
+                    {controlStatus[control.id]}
+                  </UiText>
+                )}
+              </label>
+            );
+          })}
+        </div>
+      </section>
 
       <section className="rounded-md border border-border-color bg-bg-secondary p-3" data-testid="tether-ingest-preset">
         <label className="block">

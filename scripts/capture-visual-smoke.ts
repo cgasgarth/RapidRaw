@@ -1236,6 +1236,15 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('tether-session-status').getByText('Session open', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    await page.locator('[data-testid="tether-exposure-controls"][data-control-count="3"]').waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('tether-exposure-control-iso').selectOption('800');
+    await page
+      .locator('[data-testid="tether-exposure-control"][data-control-id="iso"][data-control-current-value="800"]')
+      .waitFor({
+        timeout: 10_000,
+      });
     await page.getByTestId('tether-ingest-preset-select').selectOption('sourceSequence');
     await page.locator('[data-selected-ingest-preset="sourceSequence"]').waitFor({
       timeout: 10_000,
