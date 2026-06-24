@@ -452,12 +452,14 @@ pub async fn cull_images(
 mod tests {
     use super::*;
     use image::Luma;
-    use serde::Serialize;
+    use serde::{Deserialize, Serialize};
     use sha2::{Digest, Sha256};
+    use std::collections::{HashMap, HashSet};
     use std::fs;
     use std::path::{Path, PathBuf};
 
     const PRIVATE_CULLING_ARTIFACT_DIR: &str = "private-artifacts/validation/culling-focus-ranking";
+    const PRIVATE_CULLING_LABELS_NAME: &str = "culling-focus-labels.json";
     const PRIVATE_CULLING_REPORT_NAME: &str = "culling-focus-ranking-report.json";
     const PRIVATE_CULLING_SOURCE_LIMIT: usize = 24;
 
@@ -537,12 +539,71 @@ mod tests {
         artifact_path: String,
         failed_paths: Vec<String>,
         issue: u32,
+        labeled_evaluation: Option<PrivateCullingLabeledEvaluation>,
         latency_report: CullingLatencyReport,
         metrics: Vec<PrivateCullingMetric>,
         proof_claims: PrivateCullingProofClaims,
         rankings: Vec<PrivateCullingRanking>,
         source_count: usize,
         validation_mode: String,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PrivateCullingLabelManifest {
+        cases: Vec<PrivateCullingLabelCase>,
+        dataset_id: String,
+        label_source: String,
+        schema_version: u32,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PrivateCullingLabelCase {
+        #[serde(default)]
+        acceptable_best_paths: Vec<String>,
+        case_id: String,
+        expected_best_path: String,
+        #[serde(default)]
+        no_face_fallback_expected: bool,
+        paths: Vec<String>,
+        #[serde(default)]
+        ranked_paths: Vec<String>,
+    }
+
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PrivateCullingLabeledEvaluation {
+        case_results: Vec<PrivateCullingLabelCaseResult>,
+        dataset_id: String,
+        false_confidence_case_count: usize,
+        label_source: String,
+        labeled_case_count: usize,
+        manifest_path: String,
+        mean_reciprocal_rank: f64,
+        mean_spearman_rank_correlation: Option<f64>,
+        no_face_fallback_case_count: usize,
+        no_face_fallback_match_count: usize,
+        schema_version: u32,
+        top_choice_accuracy: f64,
+    }
+
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PrivateCullingLabelCaseResult {
+        acceptable_best_paths: Vec<String>,
+        case_id: String,
+        expected_best_path: String,
+        expected_best_rank: Option<usize>,
+        false_confidence: bool,
+        no_face_fallback_expected: bool,
+        no_face_fallback_matched: bool,
+        predicted_confidence: Option<f64>,
+        predicted_focus_region: Option<String>,
+        predicted_top_path: Option<String>,
+        reciprocal_rank: f64,
+        spearman_rank_correlation: Option<f64>,
+        top_choice_matched: bool,
     }
 
     #[derive(Serialize)]
@@ -703,8 +764,9 @@ mod tests {
             successful_count: rankings.len(),
             total_elapsed_ms: report_started_at.elapsed().as_millis(),
         };
+        let labeled_evaluation = evaluate_private_culling_labels(private_root, &rankings)?;
 
-        let metrics = vec![
+        let mut metrics = vec![
             private_metric(
                 "sourceCount",
                 rankings.len() as f64,
@@ -754,6 +816,49 @@ mod tests {
                 latency_report.successful_count >= 2,
             ),
         ];
+        if let Some(evaluation) = labeled_evaluation.as_ref() {
+            metrics.extend([
+                private_metric(
+                    "labeledCaseCount",
+                    evaluation.labeled_case_count as f64,
+                    1.0,
+                    evaluation.labeled_case_count >= 1,
+                ),
+                private_metric(
+                    "labeledTopChoiceAccuracy",
+                    evaluation.top_choice_accuracy,
+                    0.0,
+                    true,
+                ),
+                private_metric(
+                    "labeledMeanReciprocalRank",
+                    evaluation.mean_reciprocal_rank,
+                    0.0,
+                    true,
+                ),
+                private_metric(
+                    "labeledFalseConfidenceCases",
+                    evaluation.false_confidence_case_count as f64,
+                    0.0,
+                    true,
+                ),
+                private_metric(
+                    "noFaceFallbackMatches",
+                    evaluation.no_face_fallback_match_count as f64,
+                    evaluation.no_face_fallback_case_count as f64,
+                    evaluation.no_face_fallback_match_count
+                        == evaluation.no_face_fallback_case_count,
+                ),
+            ]);
+            if let Some(correlation) = evaluation.mean_spearman_rank_correlation {
+                metrics.push(private_metric(
+                    "labeledMeanSpearmanRankCorrelation",
+                    correlation,
+                    -1.0,
+                    true,
+                ));
+            }
+        }
 
         let artifact_dir = private_root.join(PRIVATE_CULLING_ARTIFACT_DIR);
         fs::create_dir_all(&artifact_dir).map_err(|error| error.to_string())?;
@@ -761,7 +866,8 @@ mod tests {
         let report = PrivateCullingFocusReport {
             artifact_path: format!("{PRIVATE_CULLING_ARTIFACT_DIR}/{PRIVATE_CULLING_REPORT_NAME}"),
             failed_paths,
-            issue: 3400,
+            issue: 3399,
+            labeled_evaluation,
             latency_report,
             metrics,
             proof_claims: PrivateCullingProofClaims {
@@ -769,7 +875,8 @@ mod tests {
                     "trained_face_or_eye_detection".to_string(),
                     "automatic_rejection_decisions".to_string(),
                     "macos_app_ui_e2e_session".to_string(),
-                    "portrait_dataset_accuracy".to_string(),
+                    "general_portrait_dataset_accuracy_without_a_private_label_manifest"
+                        .to_string(),
                 ],
                 proves: vec![
                     "real_private_raw_decode_for_culling_focus_ranking".to_string(),
@@ -778,6 +885,7 @@ mod tests {
                     "source_raw_files_are_not_mutated".to_string(),
                     "focus_region_is_declared_as_heuristic".to_string(),
                     "runtime_latency_report_is_emitted".to_string(),
+                    "private_label_manifest_metrics_are_reported_when_present".to_string(),
                 ],
             },
             source_count: rankings.len(),
@@ -792,6 +900,211 @@ mod tests {
 
         assert!(report.metrics.iter().all(|metric| metric.passed));
         Ok(())
+    }
+
+    fn evaluate_private_culling_labels(
+        private_root: &Path,
+        rankings: &[PrivateCullingRanking],
+    ) -> Result<Option<PrivateCullingLabeledEvaluation>, String> {
+        let manifest_path = private_root
+            .join(PRIVATE_CULLING_ARTIFACT_DIR)
+            .join(PRIVATE_CULLING_LABELS_NAME);
+        if !manifest_path.exists() {
+            return Ok(None);
+        }
+
+        let manifest: PrivateCullingLabelManifest =
+            serde_json::from_slice(&fs::read(&manifest_path).map_err(|error| error.to_string())?)
+                .map_err(|error| format!("invalid private culling label manifest: {error}"))?;
+        if manifest.schema_version != 1 {
+            return Err(format!(
+                "unsupported private culling label schema version {}",
+                manifest.schema_version
+            ));
+        }
+
+        let ranking_by_path: HashMap<&str, &PrivateCullingRanking> = rankings
+            .iter()
+            .map(|ranking| (ranking.path.as_str(), ranking))
+            .collect();
+        let mut case_results = Vec::new();
+        let mut top_choice_matches = 0usize;
+        let mut reciprocal_rank_sum = 0.0;
+        let mut spearman_sum = 0.0;
+        let mut spearman_count = 0usize;
+        let mut false_confidence_case_count = 0usize;
+        let mut no_face_fallback_case_count = 0usize;
+        let mut no_face_fallback_match_count = 0usize;
+
+        for case in &manifest.cases {
+            let mut case_rankings: Vec<&PrivateCullingRanking> = case
+                .paths
+                .iter()
+                .filter_map(|path| ranking_by_path.get(path.as_str()).copied())
+                .collect();
+            if case_rankings.is_empty() {
+                return Err(format!(
+                    "label case {} has no decoded ranked paths",
+                    case.case_id
+                ));
+            }
+
+            case_rankings.sort_by(|left, right| {
+                right
+                    .focus_score
+                    .partial_cmp(&left.focus_score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            let predicted_top = case_rankings.first().copied();
+            let acceptable_best_paths = acceptable_best_paths(case);
+            let expected_best_rank = case_rankings
+                .iter()
+                .position(|ranking| acceptable_best_paths.contains(ranking.path.as_str()))
+                .map(|index| index + 1);
+            let reciprocal_rank = expected_best_rank
+                .map(|rank| 1.0 / rank as f64)
+                .unwrap_or(0.0);
+            let top_choice_matched = predicted_top
+                .map(|ranking| acceptable_best_paths.contains(ranking.path.as_str()))
+                .unwrap_or(false);
+            if top_choice_matched {
+                top_choice_matches += 1;
+            }
+            reciprocal_rank_sum += reciprocal_rank;
+
+            let spearman_rank_correlation = if case.ranked_paths.len() >= 2 {
+                let correlation = spearman_correlation(&case.ranked_paths, &case_rankings);
+                if let Some(value) = correlation {
+                    spearman_sum += value;
+                    spearman_count += 1;
+                }
+                correlation
+            } else {
+                None
+            };
+
+            let no_face_fallback_matched = !case.no_face_fallback_expected
+                || predicted_top
+                    .map(|ranking| ranking.focus_region == FOCUS_REGION_EYE_BAND_HEURISTIC)
+                    .unwrap_or(false);
+            if case.no_face_fallback_expected {
+                no_face_fallback_case_count += 1;
+                if no_face_fallback_matched {
+                    no_face_fallback_match_count += 1;
+                }
+            }
+
+            let false_confidence = !top_choice_matched
+                && predicted_top
+                    .map(|ranking| ranking.focus_confidence >= 0.65)
+                    .unwrap_or(false);
+            if false_confidence {
+                false_confidence_case_count += 1;
+            }
+
+            case_results.push(PrivateCullingLabelCaseResult {
+                acceptable_best_paths: acceptable_best_paths
+                    .into_iter()
+                    .map(str::to_string)
+                    .collect(),
+                case_id: case.case_id.clone(),
+                expected_best_path: case.expected_best_path.clone(),
+                expected_best_rank,
+                false_confidence,
+                no_face_fallback_expected: case.no_face_fallback_expected,
+                no_face_fallback_matched,
+                predicted_confidence: predicted_top.map(|ranking| ranking.focus_confidence),
+                predicted_focus_region: predicted_top.map(|ranking| ranking.focus_region.clone()),
+                predicted_top_path: predicted_top.map(|ranking| ranking.path.clone()),
+                reciprocal_rank,
+                spearman_rank_correlation,
+                top_choice_matched,
+            });
+        }
+
+        let labeled_case_count = case_results.len();
+        if labeled_case_count == 0 {
+            return Err(
+                "private culling label manifest must include at least one case".to_string(),
+            );
+        }
+
+        Ok(Some(PrivateCullingLabeledEvaluation {
+            case_results,
+            dataset_id: manifest.dataset_id,
+            false_confidence_case_count,
+            label_source: manifest.label_source,
+            labeled_case_count,
+            manifest_path: format!("{PRIVATE_CULLING_ARTIFACT_DIR}/{PRIVATE_CULLING_LABELS_NAME}"),
+            mean_reciprocal_rank: reciprocal_rank_sum / labeled_case_count as f64,
+            mean_spearman_rank_correlation: if spearman_count == 0 {
+                None
+            } else {
+                Some(spearman_sum / spearman_count as f64)
+            },
+            no_face_fallback_case_count,
+            no_face_fallback_match_count,
+            schema_version: manifest.schema_version,
+            top_choice_accuracy: top_choice_matches as f64 / labeled_case_count as f64,
+        }))
+    }
+
+    fn acceptable_best_paths(case: &PrivateCullingLabelCase) -> HashSet<&str> {
+        let mut paths: HashSet<&str> = case
+            .acceptable_best_paths
+            .iter()
+            .map(String::as_str)
+            .collect();
+        paths.insert(case.expected_best_path.as_str());
+        paths
+    }
+
+    fn spearman_correlation(
+        expected_paths: &[String],
+        predicted_rankings: &[&PrivateCullingRanking],
+    ) -> Option<f64> {
+        let predicted_rank_by_path: HashMap<&str, usize> = predicted_rankings
+            .iter()
+            .enumerate()
+            .map(|(index, ranking)| (ranking.path.as_str(), index + 1))
+            .collect();
+        let pairs: Vec<(f64, f64)> = expected_paths
+            .iter()
+            .enumerate()
+            .filter_map(|(index, path)| {
+                predicted_rank_by_path
+                    .get(path.as_str())
+                    .map(|predicted_rank| ((index + 1) as f64, *predicted_rank as f64))
+            })
+            .collect();
+        if pairs.len() < 2 {
+            return None;
+        }
+
+        let expected_mean =
+            pairs.iter().map(|(expected, _)| expected).sum::<f64>() / pairs.len() as f64;
+        let predicted_mean =
+            pairs.iter().map(|(_, predicted)| predicted).sum::<f64>() / pairs.len() as f64;
+        let numerator = pairs
+            .iter()
+            .map(|(expected, predicted)| (expected - expected_mean) * (predicted - predicted_mean))
+            .sum::<f64>();
+        let expected_denominator = pairs
+            .iter()
+            .map(|(expected, _)| (expected - expected_mean).powi(2))
+            .sum::<f64>()
+            .sqrt();
+        let predicted_denominator = pairs
+            .iter()
+            .map(|(_, predicted)| (predicted - predicted_mean).powi(2))
+            .sum::<f64>()
+            .sqrt();
+        let denominator = expected_denominator * predicted_denominator;
+        if denominator <= f64::EPSILON {
+            None
+        } else {
+            Some(numerator / denominator)
+        }
     }
 
     fn collect_raw_paths(root: &Path, limit: usize) -> Result<Vec<PathBuf>, String> {
