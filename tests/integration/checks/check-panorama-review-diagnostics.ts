@@ -6,6 +6,7 @@ const failures: string[] = [];
 const modalSource = readFileSync('src/components/modals/PanoramaModal.tsx', 'utf8');
 const panelSource = readFileSync('src/components/modals/ComputationalMergeReviewPanel.tsx', 'utf8');
 const contractSource = readFileSync('src/utils/computationalMergeReviewPanels.ts', 'utf8');
+const mergeStatusSource = readFileSync('src/components/modals/MergeStatusViews.tsx', 'utf8');
 
 for (const marker of [
   'panorama-review-diagnostics',
@@ -28,7 +29,7 @@ for (const marker of [
   'modals.panorama.boundaryLabel',
   'modals.panorama.exposureLabel',
   'modals.panorama.previewBudgetLabel',
-  'modals.panorama.review.privateRawPending',
+  'modals.panorama.review.limitation',
   'modals.panorama.review.runtimeAutoCrop',
   'modals.panorama.review.engineCapabilityBlocked',
 ]) {
@@ -40,6 +41,16 @@ for (const marker of [
 for (const marker of ['ComputationalMergeReviewSection', 'sections?:', 'data-testid={testId}']) {
   if (!panelSource.includes(marker)) {
     failures.push(`Shared review panel missing ${marker}.`);
+  }
+}
+
+for (const marker of [
+  'data-testid="merge-start-action"',
+  'data-start-blocked={String(isStartBlocked)}',
+  'disabled:bg-bg-secondary disabled:text-text-tertiary disabled:ring-1 disabled:ring-border-color',
+]) {
+  if (!mergeStatusSource.includes(marker)) {
+    failures.push(`Shared merge footer missing blocked start marker: ${marker}.`);
   }
 }
 
