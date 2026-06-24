@@ -494,6 +494,13 @@
     }
   },
   "editor": {
+    "accessibility": {
+      "filmstrip": "",
+      "imagePreview": "",
+      "previewRegion": "",
+      "toolsPanel": "",
+      "workspace": ""
+    },
     "adjustments": {
       "actions": {
         "copySectionSettings": "复制 {{section}} 设置",

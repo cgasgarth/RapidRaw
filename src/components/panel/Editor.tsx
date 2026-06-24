@@ -2103,97 +2103,103 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       </div>
 
       <div
-        className={cx(
-          'flex-1 relative overflow-hidden touch-none',
-          isFullScreen ? 'rounded-none' : 'rounded-lg',
-          appSettings?.useWgpuRenderer !== false && !isFullScreen && 'ring-[9999px] ring-bg-secondary',
-          !isWgpuActive && 'bg-bg-secondary',
-        )}
-        style={{ cursor: cursorStyle }}
-        role="presentation"
-        onContextMenu={onContextMenu}
-        ref={imageContainerRef}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onClick={handleClick}
+        aria-label={t('editor.accessibility.imagePreview')}
+        className={cx('flex-1 min-h-0', isFullScreen ? 'rounded-none' : 'rounded-lg')}
+        role="region"
       >
-        {showSpinner && (
-          <div
-            className={cx(
-              'absolute inset-0 bg-bg-secondary/80 flex items-center justify-center z-50 transition-opacity duration-300',
-              isLoaderVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
-            )}
-          >
-            <Loader2 size={48} className="animate-spin text-accent" />
-          </div>
-        )}
-
         <div
-          ref={contentRef}
-          className="w-full h-full flex items-center justify-center origin-top-left"
-          style={{
-            transform: `translate(${transformState.positionX}px, ${transformState.positionY}px) scale(${transformState.scale})`,
-          }}
+          className={cx(
+            'relative h-full overflow-hidden touch-none',
+            isFullScreen ? 'rounded-none' : 'rounded-lg',
+            appSettings?.useWgpuRenderer !== false && !isFullScreen && 'ring-[9999px] ring-bg-secondary',
+            !isWgpuActive && 'bg-bg-secondary',
+          )}
+          style={{ cursor: cursorStyle }}
+          role="presentation"
+          onContextMenu={onContextMenu}
+          ref={imageContainerRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          onClick={handleClick}
         >
-          <ImageCanvas
-            appSettings={appSettings}
-            activeAiPatchContainerId={activeAiPatchContainerId}
-            activeAiSubMaskId={activeAiSubMaskId}
-            activeMaskContainerId={activeMaskContainerId}
-            activeMaskId={activeMaskId}
-            adjustments={adjustments}
-            brushSettings={brushSettings}
-            crop={crop}
-            finalPreviewUrl={finalPreviewUrl}
-            gamutWarningOverlay={gamutWarningOverlay}
-            handleCropComplete={handleCropComplete}
-            imageRenderSize={imageRenderSize}
-            interactivePatch={interactivePatch}
-            isAiEditing={isAiEditing}
-            isCropping={isCropping}
-            isMaskControlHovered={isMaskControlHovered}
-            isMasking={isMasking}
-            isStraightenActive={isStraightenActive}
-            isRotationActive={isRotationActive}
-            isSliderDragging={isSliderDragging}
-            isGamutWarningOverlayVisible={isGamutWarningOverlayVisible}
-            maskOverlayUrl={maskOverlayUrl}
-            onGenerateAiMask={(id, start, end) => {
-              if (!id) return;
-              void handleGenerateAiMask(id, start, end);
+          {showSpinner && (
+            <div
+              className={cx(
+                'absolute inset-0 bg-bg-secondary/80 flex items-center justify-center z-50 transition-opacity duration-300',
+                isLoaderVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
+              )}
+            >
+              <Loader2 size={48} className="animate-spin text-accent" />
+            </div>
+          )}
+
+          <div
+            ref={contentRef}
+            className="w-full h-full flex items-center justify-center origin-top-left"
+            style={{
+              transform: `translate(${transformState.positionX}px, ${transformState.positionY}px) scale(${transformState.scale})`,
             }}
-            onLiveMaskPreview={handleLiveMaskPreview}
-            onQuickErase={(id, start, end) => {
-              void handleQuickErase(id, start, end);
-            }}
-            onSelectAiSubMask={(id) => {
-              setEditor({ activeAiSubMaskId: id });
-            }}
-            onSelectMask={(id) => {
-              setEditor({ activeMaskId: id });
-            }}
-            onStraighten={handleStraighten}
-            selectedImage={selectedImage}
-            setCrop={handleCropChange}
-            setIsMaskHovered={setIsMaskHovered}
-            setIsMaskTouchInteracting={setIsMaskTouchInteracting}
-            showOriginal={showOriginal}
-            transformedOriginalUrl={transformedOriginalUrl}
-            uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
-            updateSubMask={updateSubMaskLocal}
-            isWbPickerActive={isWbPickerActive}
-            onWbPicked={handleWbPicked}
-            setAdjustments={setAdjustments}
-            overlayRotation={overlayRotation}
-            overlayMode={overlayMode}
-            cursorStyle={cursorStyle}
-            isMaxZoom={isMaxZoom}
-            liveRotation={liveRotation}
-            transformState={transformState}
-            hasRenderedFirstFrame={hasRenderedFirstFrame}
-          />
+          >
+            <ImageCanvas
+              appSettings={appSettings}
+              activeAiPatchContainerId={activeAiPatchContainerId}
+              activeAiSubMaskId={activeAiSubMaskId}
+              activeMaskContainerId={activeMaskContainerId}
+              activeMaskId={activeMaskId}
+              adjustments={adjustments}
+              brushSettings={brushSettings}
+              crop={crop}
+              finalPreviewUrl={finalPreviewUrl}
+              gamutWarningOverlay={gamutWarningOverlay}
+              handleCropComplete={handleCropComplete}
+              imageRenderSize={imageRenderSize}
+              interactivePatch={interactivePatch}
+              isAiEditing={isAiEditing}
+              isCropping={isCropping}
+              isMaskControlHovered={isMaskControlHovered}
+              isMasking={isMasking}
+              isStraightenActive={isStraightenActive}
+              isRotationActive={isRotationActive}
+              isSliderDragging={isSliderDragging}
+              isGamutWarningOverlayVisible={isGamutWarningOverlayVisible}
+              maskOverlayUrl={maskOverlayUrl}
+              onGenerateAiMask={(id, start, end) => {
+                if (!id) return;
+                void handleGenerateAiMask(id, start, end);
+              }}
+              onLiveMaskPreview={handleLiveMaskPreview}
+              onQuickErase={(id, start, end) => {
+                void handleQuickErase(id, start, end);
+              }}
+              onSelectAiSubMask={(id) => {
+                setEditor({ activeAiSubMaskId: id });
+              }}
+              onSelectMask={(id) => {
+                setEditor({ activeMaskId: id });
+              }}
+              onStraighten={handleStraighten}
+              selectedImage={selectedImage}
+              setCrop={handleCropChange}
+              setIsMaskHovered={setIsMaskHovered}
+              setIsMaskTouchInteracting={setIsMaskTouchInteracting}
+              showOriginal={showOriginal}
+              transformedOriginalUrl={transformedOriginalUrl}
+              uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
+              updateSubMask={updateSubMaskLocal}
+              isWbPickerActive={isWbPickerActive}
+              onWbPicked={handleWbPicked}
+              setAdjustments={setAdjustments}
+              overlayRotation={overlayRotation}
+              overlayMode={overlayMode}
+              cursorStyle={cursorStyle}
+              isMaxZoom={isMaxZoom}
+              liveRotation={liveRotation}
+              transformState={transformState}
+              hasRenderedFirstFrame={hasRenderedFirstFrame}
+            />
+          </div>
         </div>
       </div>
     </div>

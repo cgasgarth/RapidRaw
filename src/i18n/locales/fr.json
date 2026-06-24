@@ -301,6 +301,13 @@
     }
   },
   "editor": {
+    "accessibility": {
+      "filmstrip": "Film fixe de l'éditeur",
+      "imagePreview": "Aperçu de l'image",
+      "previewRegion": "Aperçu de l'éditeur",
+      "toolsPanel": "Outils de l'éditeur",
+      "workspace": "Espace de travail de l'éditeur"
+    },
     "adjustments": {
       "actions": {
         "copySectionSettings": "Copier les paramètres de la section {{section}}",

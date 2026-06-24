@@ -301,6 +301,13 @@
     }
   },
   "editor": {
+    "accessibility": {
+      "filmstrip": "Tira de imágenes del editor",
+      "imagePreview": "Vista previa de imagen",
+      "previewRegion": "Vista previa del editor",
+      "toolsPanel": "Herramientas del editor",
+      "workspace": "Espacio de trabajo del editor"
+    },
     "adjustments": {
       "actions": {
         "copySectionSettings": "Copiar ajustes de {{section}}",

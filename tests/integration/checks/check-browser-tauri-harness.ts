@@ -83,6 +83,10 @@ try {
     .getByRole('button', { name: /browser-harness\.ARW/u })
     .first()
     .dblclick();
+  await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ timeout: 10_000 });
+  await page.getByRole('region', { name: 'Editor preview' }).waitFor({ timeout: 10_000 });
+  await page.getByRole('region', { name: 'Image preview' }).waitFor({ timeout: 10_000 });
+  await page.getByRole('complementary', { name: 'Editor tools' }).waitFor({ timeout: 10_000 });
   await page.getByRole('heading', { name: 'Adjustments' }).waitFor({ timeout: 10_000 });
   await page.getByText(/1024 × 768/u).waitFor({ timeout: 10_000 });
   await page.keyboard.press('Control+K');
