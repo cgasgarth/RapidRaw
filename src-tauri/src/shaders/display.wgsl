@@ -13,6 +13,9 @@ struct Transform {
 @group(0) @binding(0) var<uniform> transform: Transform;
 @group(0) @binding(1) var tex: texture_2d<f32>;
 @group(0) @binding(2) var samp: sampler;
+@group(0) @binding(3) var display_lut: texture_3d<f32>;
+
+const DISPLAY_LUT_SIZE: f32 = 32.0;
 
 struct VertexOutput {
     @builtin(position) pos: vec4<f32>,
@@ -69,9 +72,13 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let nearest_uv = (texel_coords + vec2<f32>(0.5, 0.5)) / transform.texture_size;
 
         let clamped_nearest = clamp(nearest_uv, min_uv, max_uv);
-        return textureSample(tex, samp, clamped_nearest);
+        let color = textureSample(tex, samp, clamped_nearest);
+        let lut_uv = (clamp(color.rgb, vec3<f32>(0.0), vec3<f32>(1.0)) * (DISPLAY_LUT_SIZE - 1.0) + vec3<f32>(0.5)) / DISPLAY_LUT_SIZE;
+        return vec4<f32>(textureSampleLevel(display_lut, samp, lut_uv, 0.0).rgb, color.a);
     } else {
         let clamped_uv = clamp(adjusted_uv, min_uv, max_uv);
-        return textureSample(tex, samp, clamped_uv);
+        let color = textureSample(tex, samp, clamped_uv);
+        let lut_uv = (clamp(color.rgb, vec3<f32>(0.0), vec3<f32>(1.0)) * (DISPLAY_LUT_SIZE - 1.0) + vec3<f32>(0.5)) / DISPLAY_LUT_SIZE;
+        return vec4<f32>(textureSampleLevel(display_lut, samp, lut_uv, 0.0).rgb, color.a);
     }
 }
