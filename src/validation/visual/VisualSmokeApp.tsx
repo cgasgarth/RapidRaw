@@ -66,7 +66,11 @@ import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformit
 import type { FocusStackOutputReviewWorkflow } from '../../schemas/focusStackOutputReviewSchemas';
 import type { MaskOverlaySettings } from '../../schemas/maskOverlaySchemas';
 import type { SuperResolutionOutputReviewWorkflow } from '../../schemas/superResolutionOutputReviewSchemas';
-import type { TetherDiscoveryResponse, TetherSessionResponse } from '../../schemas/tetheringSchemas';
+import type {
+  TetherCaptureResponse,
+  TetherDiscoveryResponse,
+  TetherSessionResponse,
+} from '../../schemas/tetheringSchemas';
 import type { SuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
 
 interface VisualSmokeAppProps {
@@ -308,11 +312,17 @@ const tetherCaptureMockResponse = {
     presetId: 'sourceSequence',
   },
   importedPath: '/tmp/rawengine-tether-captures/alaska-dsc7853.ARW',
+  metadata: {
+    applied: true,
+    appliedFields: ['rating', 'tags', 'Artist', 'ImageDescription', 'UserComment'],
+    sidecarPath: '/tmp/rawengine-tether-captures/alaska-dsc7853.ARW.rrdata',
+    templateId: 'studioSession',
+  },
   providerMode: 'fake',
   sessionId: 'tether-session-visual-smoke',
   sourcePath: '/Users/cgas/Pictures/Capture One/Alaska/_DSC7853.ARW',
   status: 'captured',
-} as const;
+} satisfies TetherCaptureResponse;
 
 const brushMaskCanvasImageWidth = 640;
 const brushMaskCanvasImageHeight = 360;

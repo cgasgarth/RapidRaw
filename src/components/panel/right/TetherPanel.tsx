@@ -6,6 +6,7 @@ import {
   tetherCaptureResponseSchema,
   tetherDiscoveryResponseSchema,
   tetherIngestPresetIdSchema,
+  tetherMetadataTemplateIdSchema,
   tetherSessionResponseSchema,
   type TetherCapability,
   type TetherCaptureRequest,
@@ -37,6 +38,7 @@ const capabilityTone: Record<TetherCapability['status'], string> = {
 
 const reviewModes: Array<TetherReviewMode> = ['newest', 'pinned', 'holdCurrent'];
 const tetherIngestPresetIds = tetherIngestPresetIdSchema.options;
+const tetherMetadataTemplateIds = tetherMetadataTemplateIdSchema.options;
 
 const defaultDiscoverCameras = (): Promise<TetherDiscoveryResponse> =>
   invokeWithSchema(
@@ -72,6 +74,7 @@ export function TetherPanel({
   const [captures, setCaptures] = useState<Array<TetherCaptureResponse>>([]);
   const [pinnedCaptureKey, setPinnedCaptureKey] = useState<string | null>(null);
   const [ingestPresetId, setIngestPresetId] = useState<TetherCaptureRequest['ingestPresetId']>('timestampCamera');
+  const [metadataTemplateId, setMetadataTemplateId] = useState<TetherCaptureRequest['metadataTemplateId']>('none');
   const [reviewMode, setReviewMode] = useState<TetherReviewMode>('newest');
   const [isLoading, setIsLoading] = useState(false);
   const [isCaptureBusy, setIsCaptureBusy] = useState(false);
@@ -128,7 +131,7 @@ export function TetherPanel({
     setIsCaptureBusy(true);
     setError(null);
     try {
-      const response = await captureFrame({ ingestPresetId });
+      const response = await captureFrame({ ingestPresetId, metadataTemplateId });
       setCaptures((current) => [response, ...current].slice(0, 8));
       setCapture((current) => {
         if (reviewMode === 'newest' || current === null) return response;
@@ -140,7 +143,7 @@ export function TetherPanel({
     } finally {
       setIsCaptureBusy(false);
     }
-  }, [captureFrame, ingestPresetId, pinnedCaptureKey, reviewMode]);
+  }, [captureFrame, ingestPresetId, metadataTemplateId, pinnedCaptureKey, reviewMode]);
 
   const selectedCaptureKey = capture === null ? null : captureKey(capture);
 
@@ -266,6 +269,30 @@ export function TetherPanel({
         </label>
       </section>
 
+      <section
+        className="rounded-md border border-border-color bg-bg-secondary p-3"
+        data-testid="tether-metadata-template"
+      >
+        <label className="block">
+          <UiText variant={TextVariants.label}>{t('editor.tether.metadataTemplate')}</UiText>
+          <select
+            className="mt-2 w-full rounded border border-border-color bg-bg-primary px-2 py-2 text-sm text-text-primary"
+            data-selected-metadata-template={metadataTemplateId}
+            data-testid="tether-metadata-template-select"
+            onChange={(event) => {
+              setMetadataTemplateId(tetherMetadataTemplateIdSchema.parse(event.target.value));
+            }}
+            value={metadataTemplateId}
+          >
+            {tetherMetadataTemplateIds.map((templateId) => (
+              <option key={templateId} value={templateId}>
+                {t(tetherMetadataTemplateLocaleKey(templateId))}
+              </option>
+            ))}
+          </select>
+        </label>
+      </section>
+
       {capture !== null && (
         <section
           className="rounded-md border border-green-500/40 bg-green-500/10 p-3"
@@ -273,6 +300,7 @@ export function TetherPanel({
           data-capture-imported-path={capture.importedPath}
           data-capture-status={capture.status}
           data-ingest-preset-id={capture.ingest.presetId}
+          data-metadata-template-id={capture.metadata.templateId}
           data-testid="tether-capture-result"
         >
           <UiText variant={TextVariants.label}>{t('editor.tether.captureComplete')}</UiText>
@@ -287,6 +315,14 @@ export function TetherPanel({
               collisionIndex: capture.ingest.collisionIndex,
               preset: t(tetherIngestPresetLocaleKey(capture.ingest.presetId)),
             })}
+          </UiText>
+          <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+            {capture.metadata.applied
+              ? t('editor.tether.metadataApplied', {
+                  fields: capture.metadata.appliedFields.length,
+                  template: t(tetherMetadataTemplateLocaleKey(capture.metadata.templateId)),
+                })
+              : t('editor.tether.metadataSkipped')}
           </UiText>
           {onOpenCapture && (
             <Button
@@ -351,6 +387,7 @@ export function TetherPanel({
                   data-capture-imported-path={incomingCapture.importedPath}
                   data-capture-key={key}
                   data-ingest-preset-id={incomingCapture.ingest.presetId}
+                  data-metadata-template-id={incomingCapture.metadata.templateId}
                   data-pinned={String(isPinned)}
                   data-selected={String(isSelected)}
                   data-testid="tether-incoming-capture-item"
@@ -569,4 +606,11 @@ function tetherIngestPresetLocaleKey(
   if (presetId === 'cameraSequence') return 'editor.tether.ingestPresetCameraSequence';
   if (presetId === 'sourceSequence') return 'editor.tether.ingestPresetSourceSequence';
   return 'editor.tether.ingestPresetTimestampCamera';
+}
+
+function tetherMetadataTemplateLocaleKey(
+  templateId: TetherCaptureRequest['metadataTemplateId'],
+): 'editor.tether.metadataTemplateNone' | 'editor.tether.metadataTemplateStudioSession' {
+  if (templateId === 'studioSession') return 'editor.tether.metadataTemplateStudioSession';
+  return 'editor.tether.metadataTemplateNone';
 }

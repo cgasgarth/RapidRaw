@@ -66,6 +66,8 @@ pub struct RawEngineArtifacts {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub panorama_artifacts: Vec<Value>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tether_capture_artifacts: Vec<Value>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub stale_artifact_ids: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub xmp_conflict_receipts: Vec<Value>,
@@ -81,6 +83,7 @@ impl RawEngineArtifacts {
             layer_stack_sidecars: Vec::new(),
             external_editor_artifacts: Vec::new(),
             panorama_artifacts: Vec::new(),
+            tether_capture_artifacts: Vec::new(),
             stale_artifact_ids: Vec::new(),
             xmp_conflict_receipts: Vec::new(),
         }

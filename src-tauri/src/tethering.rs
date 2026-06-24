@@ -2,9 +2,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sha2::{Digest, Sha256};
 
 use crate::app_state::AppState;
+use crate::image_processing::RawEngineArtifacts;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,6 +34,8 @@ pub struct TetherCaptureRequest {
     fake_source_path: Option<String>,
     #[serde(default)]
     ingest_preset_id: Option<String>,
+    #[serde(default)]
+    metadata_template_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -63,10 +67,20 @@ pub struct TetherCaptureResponse {
     captured_at: String,
     ingest: TetherCaptureIngestSummary,
     imported_path: String,
+    metadata: TetherCaptureMetadataSummary,
     provider_mode: String,
     session_id: String,
     source_path: String,
     status: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TetherCaptureMetadataSummary {
+    applied: bool,
+    applied_fields: Vec<String>,
+    sidecar_path: Option<String>,
+    template_id: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -302,6 +316,7 @@ fn trigger_tether_capture_for_state(
         destination_root: None,
         fake_source_path: None,
         ingest_preset_id: None,
+        metadata_template_id: None,
     });
     let (session, capture_counter) = {
         let mut guard = state.tether_session.lock().unwrap();
@@ -365,6 +380,13 @@ fn trigger_tether_capture_for_state(
     let bytes = fs::metadata(&imported_path)
         .map_err(|error| error.to_string())?
         .len();
+    let metadata = apply_capture_metadata_template(
+        &imported_path,
+        request.metadata_template_id.as_deref(),
+        &session,
+        &captured_at,
+        &ingest,
+    )?;
 
     Ok(TetherCaptureResponse {
         bytes,
@@ -373,10 +395,98 @@ fn trigger_tether_capture_for_state(
         captured_at: captured_at.to_rfc3339(),
         ingest,
         imported_path: imported_path.to_string_lossy().to_string(),
+        metadata,
         provider_mode: session.provider_mode,
         session_id: session.session_id,
         source_path: source_path.to_string_lossy().to_string(),
         status: "captured".to_string(),
+    })
+}
+
+fn apply_capture_metadata_template(
+    imported_path: &Path,
+    requested_template_id: Option<&str>,
+    session: &TetherSessionSnapshot,
+    captured_at: &chrono::DateTime<chrono::Utc>,
+    ingest: &TetherCaptureIngestSummary,
+) -> Result<TetherCaptureMetadataSummary, String> {
+    let template_id = requested_template_id
+        .filter(|template_id| matches!(*template_id, "none" | "studioSession"))
+        .unwrap_or("none");
+
+    if template_id == "none" {
+        return Ok(TetherCaptureMetadataSummary {
+            applied: false,
+            applied_fields: Vec::new(),
+            sidecar_path: None,
+            template_id: template_id.to_string(),
+        });
+    }
+
+    let sidecar_path = imported_path.with_file_name(format!(
+        "{}.rrdata",
+        imported_path
+            .file_name()
+            .and_then(|file_name| file_name.to_str())
+            .unwrap_or("capture")
+    ));
+    let mut sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
+    sidecar.rating = 1;
+    sidecar.tags = Some(vec![
+        "tethered-capture".to_string(),
+        "studio-session".to_string(),
+    ]);
+
+    let mut exif = sidecar.exif.unwrap_or_default();
+    exif.insert("Artist".to_string(), "RawEngine tether session".to_string());
+    exif.insert(
+        "ImageDescription".to_string(),
+        format!(
+            "Tethered capture from {} at {}",
+            session.camera_display_name,
+            captured_at.to_rfc3339()
+        ),
+    );
+    exif.insert(
+        "UserComment".to_string(),
+        format!(
+            "RawEngine tether ingest preset {} wrote {}.",
+            ingest.preset_id, ingest.file_name
+        ),
+    );
+    sidecar.exif = Some(exif);
+
+    let artifacts = sidecar
+        .raw_engine_artifacts
+        .get_or_insert_with(RawEngineArtifacts::new_v1);
+    artifacts.tether_capture_artifacts.retain(|artifact| {
+        artifact
+            .get("artifactType")
+            .and_then(|value| value.as_str())
+            != Some("tether_metadata_template")
+    });
+    artifacts.tether_capture_artifacts.push(json!({
+        "artifactType": "tether_metadata_template",
+        "appliedAt": captured_at.to_rfc3339(),
+        "captureSessionId": session.session_id,
+        "ingestPresetId": ingest.preset_id,
+        "metadataTemplateId": template_id,
+        "sidecarStorage": "sidecar_artifact"
+    }));
+
+    crate::exif_processing::save_sidecar_metadata_atomic(&sidecar_path, &sidecar)?;
+
+    Ok(TetherCaptureMetadataSummary {
+        applied: true,
+        applied_fields: vec![
+            "rating".to_string(),
+            "tags".to_string(),
+            "Artist".to_string(),
+            "ImageDescription".to_string(),
+            "UserComment".to_string(),
+        ],
+        sidecar_path: Some(sidecar_path.to_string_lossy().to_string()),
+        template_id: template_id.to_string(),
     })
 }
 
@@ -620,6 +730,7 @@ mod tests {
                 destination_root: None,
                 fake_source_path: Some(source_path.to_string_lossy().to_string()),
                 ingest_preset_id: Some("sourceSequence".to_string()),
+                metadata_template_id: Some("studioSession".to_string()),
             }),
             &state,
         )
@@ -635,6 +746,35 @@ mod tests {
         assert!(Path::new(&capture.imported_path).is_file());
         assert!(capture.bytes > 0);
         assert_eq!(capture.checksum, sha256_file(&source_path).unwrap());
+        assert!(capture.metadata.applied);
+        assert_eq!(capture.metadata.template_id, "studioSession");
+        assert!(
+            capture
+                .metadata
+                .applied_fields
+                .contains(&"rating".to_string())
+        );
+        let sidecar_path = capture.metadata.sidecar_path.as_ref().unwrap();
+        let sidecar = crate::exif_processing::load_sidecar(Path::new(sidecar_path));
+        assert_eq!(sidecar.rating, 1);
+        assert_eq!(
+            sidecar.tags.unwrap(),
+            vec!["tethered-capture".to_string(), "studio-session".to_string()]
+        );
+        let exif = sidecar.exif.unwrap();
+        assert_eq!(
+            exif.get("Artist").map(String::as_str),
+            Some("RawEngine tether session")
+        );
+        let tether_artifacts = sidecar
+            .raw_engine_artifacts
+            .unwrap()
+            .tether_capture_artifacts;
+        assert_eq!(tether_artifacts.len(), 1);
+        assert_eq!(
+            tether_artifacts[0]["metadataTemplateId"].as_str(),
+            Some("studioSession")
+        );
 
         let _ = fs::remove_dir_all(root);
     }
@@ -672,6 +812,7 @@ mod tests {
                 destination_root: None,
                 fake_source_path: Some(source_path.to_string_lossy().to_string()),
                 ingest_preset_id: Some("cameraSequence".to_string()),
+                metadata_template_id: None,
             }),
             &state,
         )
@@ -680,6 +821,7 @@ mod tests {
         assert_eq!(capture.ingest.preset_id, "cameraSequence");
         assert_eq!(capture.ingest.collision_index, 2);
         assert!(capture.ingest.file_name.ends_with("_0002.ARW"));
+        assert!(!capture.metadata.applied);
         assert!(Path::new(&capture.imported_path).is_file());
 
         let _ = fs::remove_dir_all(root);
