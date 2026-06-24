@@ -55,6 +55,23 @@ const failures = [
   ['linked variant import action', exportPanelSource.includes('data-testid="export-success-import-linked-variant"')],
   ['linked variant import invoke', exportPanelSource.includes('Invokes.ImportExternalEditorVariant')],
   ['linked variant bit-depth handoff', exportPanelSource.includes('bitDepth: output.bitDepth ?? null')],
+  [
+    'linked variant verified bit depth schema',
+    exportPanelSource.includes('verifiedBitDepth: z.number().int().positive()'),
+  ],
+  ['linked variant embedded ICC schema', exportPanelSource.includes('embeddedIccProfile: z.boolean()')],
+  [
+    'linked variant verified bit depth marker',
+    exportPanelSource.includes(
+      "data-external-editor-verified-bit-depth={currentExternalVariantVerifiedBitDepth ?? ''}",
+    ),
+  ],
+  [
+    'linked variant embedded ICC marker',
+    exportPanelSource.includes(
+      'data-external-editor-embedded-icc-profile={String(currentExternalVariantEmbeddedIccProfile)}',
+    ),
+  ],
   ['linked variant color-profile handoff', exportPanelSource.includes('colorProfile: output.colorProfile ?? null')],
   [
     'linked variant rendering-intent handoff',
@@ -78,8 +95,15 @@ const failures = [
     'Rust linked variant no-overwrite policy',
     rustFileSource.includes('"noOverwritePolicy": "never_overwrite_original"'),
   ],
-  ['Rust linked variant bit-depth lineage', rustFileSource.includes('"bitDepthProvenance": "export_receipt"')],
-  ['Rust linked variant color-profile lineage', rustFileSource.includes('"colorProfileProvenance": "export_receipt"')],
+  [
+    'Rust linked variant verified bit-depth lineage',
+    rustFileSource.includes('"bitDepthProvenance": "decoded_tiff_matches_export_receipt"'),
+  ],
+  [
+    'Rust linked variant embedded ICC verification',
+    rustFileSource.includes('"embeddedIccProfile": tiff_inspection.embedded_icc_profile'),
+  ],
+  ['Rust linked variant ICC profile lineage', rustFileSource.includes('"embedded_icc_profile_present"')],
   [
     'Rust linked variant rendering-intent lineage',
     rustFileSource.includes('"renderingIntentProvenance": "export_receipt"'),

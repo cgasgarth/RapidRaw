@@ -14,8 +14,8 @@ use std::thread;
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, NaiveDateTime, Utc};
-use image::codecs::jpeg::JpegEncoder;
-use image::{DynamicImage, GenericImageView, ImageBuffer, Luma};
+use image::codecs::{jpeg::JpegEncoder, tiff::TiffDecoder};
+use image::{ColorType, DynamicImage, GenericImageView, ImageBuffer, ImageDecoder, Luma};
 use rayon::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -300,11 +300,13 @@ pub struct ExternalEditorVariantReceipt {
     bit_depth: Option<u8>,
     color_profile: Option<String>,
     content_hash: String,
+    embedded_icc_profile: bool,
     output_path: String,
     rendering_intent: Option<String>,
     sidecar_path: String,
     source_path: String,
     source_revision: String,
+    verified_bit_depth: Option<u8>,
 }
 
 #[derive(Serialize, Debug)]
@@ -3357,6 +3359,68 @@ fn is_tiff_path(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
+struct ExternalEditorTiffInspection {
+    embedded_icc_profile: bool,
+    verified_bit_depth: Option<u8>,
+}
+
+fn tiff_bit_depth(color_type: ColorType) -> Option<u8> {
+    match color_type {
+        ColorType::L8 | ColorType::La8 | ColorType::Rgb8 | ColorType::Rgba8 => Some(8),
+        ColorType::L16 | ColorType::La16 | ColorType::Rgb16 | ColorType::Rgba16 => Some(16),
+        ColorType::Rgb32F | ColorType::Rgba32F => Some(32),
+        _ => None,
+    }
+}
+
+fn inspect_external_editor_tiff(
+    output_path: &Path,
+    expected_bit_depth: Option<u8>,
+    expected_color_profile: Option<&str>,
+) -> Result<ExternalEditorTiffInspection, String> {
+    let file = fs::File::open(output_path).map_err(|err| {
+        format!(
+            "Failed to open edited TIFF {}: {}",
+            output_path.display(),
+            err
+        )
+    })?;
+    let reader = std::io::BufReader::new(file);
+    let mut decoder = TiffDecoder::new(reader)
+        .map_err(|err| format!("Edited TIFF could not be decoded: {}", err))?;
+    let verified_bit_depth = tiff_bit_depth(decoder.color_type());
+    if let Some(expected) = expected_bit_depth
+        && verified_bit_depth != Some(expected)
+    {
+        return Err(format!(
+            "Edited TIFF bit depth mismatch: expected {}-bit from export receipt, decoded {}",
+            expected,
+            verified_bit_depth
+                .map(|bit_depth| format!("{bit_depth}-bit"))
+                .unwrap_or_else(|| "unsupported bit depth".to_string())
+        ));
+    }
+
+    let embedded_icc_profile = decoder
+        .icc_profile()
+        .map_err(|err| format!("Failed to read edited TIFF ICC profile: {}", err))?
+        .is_some_and(|profile| !profile.is_empty());
+    if expected_color_profile
+        .map(|profile| !profile.trim().is_empty())
+        .unwrap_or(false)
+        && !embedded_icc_profile
+    {
+        return Err(
+            "Edited TIFF is missing the ICC profile required by the export receipt".to_string(),
+        );
+    }
+
+    Ok(ExternalEditorTiffInspection {
+        embedded_icc_profile,
+        verified_bit_depth,
+    })
+}
+
 fn write_external_editor_variant_sidecar(
     source_virtual_path: &str,
     output_path: &Path,
@@ -3396,6 +3460,8 @@ fn write_external_editor_variant_sidecar(
         serde_json::to_vec(&sidecar.adjustments).map_err(|err| err.to_string())?;
     let source_revision = compute_source_revision(source_virtual_path, &source_adjustments);
     let content_hash = hash_file_sha256(output_path)?;
+    let tiff_inspection =
+        inspect_external_editor_tiff(output_path, bit_depth, color_profile.as_deref())?;
     let artifact_id = format!("artifact_external_editor_{}", Uuid::new_v4().simple());
     let output_path_string = output_path.to_string_lossy().to_string();
     let source_path_string = source_path.to_string_lossy().to_string();
@@ -3413,15 +3479,17 @@ fn write_external_editor_variant_sidecar(
         "operationVersion": 1,
         "output": {
             "bitDepth": bit_depth,
-            "bitDepthProvenance": "export_receipt",
+            "bitDepthProvenance": "decoded_tiff_matches_export_receipt",
             "colorProfile": color_profile,
-            "colorProfileProvenance": "export_receipt",
+            "colorProfileProvenance": if color_profile.is_some() { "embedded_icc_profile_present" } else { "not_requested" },
+            "embeddedIccProfile": tiff_inspection.embedded_icc_profile,
             "format": "tiff",
             "noOverwritePolicy": "never_overwrite_original",
             "path": output_path_string,
             "renderingIntent": rendering_intent,
             "renderingIntentProvenance": "export_receipt",
             "storage": "linked_file",
+            "verifiedBitDepth": tiff_inspection.verified_bit_depth,
         },
         "provenance": {
             "runtimeStatus": "imported",
@@ -3447,11 +3515,13 @@ fn write_external_editor_variant_sidecar(
         bit_depth,
         color_profile,
         content_hash,
+        embedded_icc_profile: tiff_inspection.embedded_icc_profile,
         output_path: output_path_string,
         rendering_intent,
         sidecar_path: sidecar_path.to_string_lossy().to_string(),
         source_path: source_path.to_string_lossy().to_string(),
         source_revision,
+        verified_bit_depth: tiff_inspection.verified_bit_depth,
     })
 }
 
@@ -4115,6 +4185,7 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image::{ImageEncoder, codecs::tiff::TiffEncoder};
 
     #[test]
     fn update_exif_fields_blocking_writes_primary_sidecar_atomically() {
@@ -4205,7 +4276,7 @@ mod tests {
         let output_path = temp_dir.path().join("image-edit.tiff");
         let sidecar_path = rrdata_sidecar_path(&output_path, None);
         fs::write(&source_path, b"raw").expect("source image");
-        fs::write(&output_path, b"edited tiff").expect("edited output");
+        write_external_editor_test_tiff(&output_path, Some(b"test-icc-profile"));
 
         let source_sidecar_path = crate::exif_processing::get_primary_sidecar_path(&source_path);
         let source_metadata = ImageMetadata {
@@ -4238,6 +4309,8 @@ mod tests {
         assert_eq!(receipt.output_path, output_path.to_string_lossy());
         assert_eq!(receipt.source_path, source_path.to_string_lossy());
         assert!(receipt.content_hash.starts_with("sha256:"));
+        assert!(receipt.embedded_icc_profile);
+        assert_eq!(receipt.verified_bit_depth, Some(16));
         assert!(sidecar_path.exists());
 
         let imported = crate::exif_processing::load_sidecar(&sidecar_path);
@@ -4266,7 +4339,7 @@ mod tests {
         assert_eq!(artifact["output"]["bitDepth"].as_u64(), Some(16));
         assert_eq!(
             artifact["output"]["bitDepthProvenance"].as_str(),
-            Some("export_receipt")
+            Some("decoded_tiff_matches_export_receipt")
         );
         assert_eq!(
             artifact["output"]["colorProfile"].as_str(),
@@ -4274,8 +4347,13 @@ mod tests {
         );
         assert_eq!(
             artifact["output"]["colorProfileProvenance"].as_str(),
-            Some("export_receipt")
+            Some("embedded_icc_profile_present")
         );
+        assert_eq!(
+            artifact["output"]["embeddedIccProfile"].as_bool(),
+            Some(true)
+        );
+        assert_eq!(artifact["output"]["verifiedBitDepth"].as_u64(), Some(16));
         assert_eq!(
             artifact["output"]["renderingIntent"].as_str(),
             Some("Relative colorimetric")
@@ -4295,6 +4373,52 @@ mod tests {
     }
 
     #[test]
+    fn external_editor_variant_rejects_tiff_with_mismatched_bit_depth() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let source_path = temp_dir.path().join("image.raf");
+        let output_path = temp_dir.path().join("image-edit.tiff");
+        let sidecar_path = rrdata_sidecar_path(&output_path, None);
+        fs::write(&source_path, b"raw").expect("source image");
+        write_external_editor_test_tiff(&output_path, Some(b"test-icc-profile"));
+
+        let error = write_external_editor_variant_sidecar(
+            &source_path.to_string_lossy(),
+            &output_path,
+            &sidecar_path,
+            Some(8),
+            Some("Display P3".to_string()),
+            Some("Relative colorimetric".to_string()),
+        )
+        .expect_err("mismatched receipt bit depth should fail");
+
+        assert!(error.contains("bit depth mismatch"));
+        assert!(!sidecar_path.exists());
+    }
+
+    #[test]
+    fn external_editor_variant_rejects_tiff_without_required_icc_profile() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let source_path = temp_dir.path().join("image.raf");
+        let output_path = temp_dir.path().join("image-edit.tiff");
+        let sidecar_path = rrdata_sidecar_path(&output_path, None);
+        fs::write(&source_path, b"raw").expect("source image");
+        write_external_editor_test_tiff(&output_path, None);
+
+        let error = write_external_editor_variant_sidecar(
+            &source_path.to_string_lossy(),
+            &output_path,
+            &sidecar_path,
+            Some(16),
+            Some("Display P3".to_string()),
+            Some("Relative colorimetric".to_string()),
+        )
+        .expect_err("missing ICC profile should fail");
+
+        assert!(error.contains("missing the ICC profile"));
+        assert!(!sidecar_path.exists());
+    }
+
+    #[test]
     fn external_editor_file_watch_snapshot_tracks_size_and_modified_time() {
         let temp_dir = tempfile::tempdir().expect("tempdir");
         let output_path = temp_dir.path().join("image-edit.tiff");
@@ -4307,6 +4431,24 @@ mod tests {
         assert_eq!(snapshot.path, output_path.to_string_lossy());
         assert_eq!(snapshot.byte_size, b"edited tiff".len() as u64);
         assert!(snapshot.modified_ms > 0);
+    }
+
+    fn write_external_editor_test_tiff(path: &Path, icc_profile: Option<&[u8]>) {
+        let image = [128_u16, 64, 32, 128, 64, 32, 128, 64, 32, 128, 64, 32];
+        let image_bytes: Vec<u8> = image
+            .iter()
+            .flat_map(|channel| channel.to_be_bytes())
+            .collect();
+        let file = fs::File::create(path).expect("create TIFF");
+        let mut encoder = TiffEncoder::new(file);
+        if let Some(profile) = icc_profile {
+            encoder
+                .set_icc_profile(profile.to_vec())
+                .expect("set TIFF ICC profile");
+        }
+        encoder
+            .write_image(&image_bytes, 2, 2, image::ExtendedColorType::Rgb16)
+            .expect("write TIFF");
     }
 
     #[test]
