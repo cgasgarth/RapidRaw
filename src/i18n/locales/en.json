@@ -1385,6 +1385,7 @@
       "noImagesSelected": "No images selected.",
       "offlineSmartPreviewBlocked": "Reconnect the original file before full-resolution export. You can keep editing the smart preview.",
       "openInEditor": "Open in Editor",
+      "resolvingOriginalFile": "Checking the original file before full-resolution export…",
       "showInFinder": "Show in Finder",
       "success": "Export successful!",
       "transformApplied": "Transform applied"

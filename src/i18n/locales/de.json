@@ -1382,6 +1382,7 @@
       "noImagesSelected": "Keine Bilder ausgewählt.",
       "offlineSmartPreviewBlocked": "Verbinde die Originaldatei erneut, bevor du in voller Auflösung exportierst. Du kannst die Smart-Vorschau weiter bearbeiten.",
       "openInEditor": "Im Editor öffnen",
+      "resolvingOriginalFile": "Originaldatei vor dem Export in voller Auflösung wird geprüft…",
       "showInFinder": "Im Finder anzeigen",
       "success": "Export erfolgreich!",
       "transformApplied": ""
