@@ -5,8 +5,10 @@ import { useTranslation } from 'react-i18next';
 import {
   tetherCaptureResponseSchema,
   tetherDiscoveryResponseSchema,
+  tetherIngestPresetIdSchema,
   tetherSessionResponseSchema,
   type TetherCapability,
+  type TetherCaptureRequest,
   type TetherCaptureResponse,
   type TetherDiscoveryResponse,
   type TetherSessionResponse,
@@ -18,7 +20,7 @@ import Button from '../../ui/Button';
 import UiText from '../../ui/Text';
 
 interface TetherPanelProps {
-  captureFrame?: () => Promise<TetherCaptureResponse>;
+  captureFrame?: (request: TetherCaptureRequest) => Promise<TetherCaptureResponse>;
   closeSession?: () => Promise<TetherSessionResponse>;
   discoverCameras?: () => Promise<TetherDiscoveryResponse>;
   onOpenCapture?: (path: string) => void;
@@ -34,6 +36,7 @@ const capabilityTone: Record<TetherCapability['status'], string> = {
 };
 
 const reviewModes: Array<TetherReviewMode> = ['newest', 'pinned', 'holdCurrent'];
+const tetherIngestPresetIds = tetherIngestPresetIdSchema.options;
 
 const defaultDiscoverCameras = (): Promise<TetherDiscoveryResponse> =>
   invokeWithSchema(
@@ -52,8 +55,8 @@ const defaultOpenSession = (cameraId: string): Promise<TetherSessionResponse> =>
 const defaultCloseSession = (): Promise<TetherSessionResponse> =>
   invokeWithSchema(Invokes.CloseTetherSession, {}, tetherSessionResponseSchema);
 
-const defaultCaptureFrame = (): Promise<TetherCaptureResponse> =>
-  invokeWithSchema(Invokes.TriggerTetherCapture, { request: {} }, tetherCaptureResponseSchema);
+const defaultCaptureFrame = (request: TetherCaptureRequest): Promise<TetherCaptureResponse> =>
+  invokeWithSchema(Invokes.TriggerTetherCapture, { request }, tetherCaptureResponseSchema);
 
 export function TetherPanel({
   captureFrame = defaultCaptureFrame,
@@ -68,6 +71,7 @@ export function TetherPanel({
   const [capture, setCapture] = useState<TetherCaptureResponse | null>(null);
   const [captures, setCaptures] = useState<Array<TetherCaptureResponse>>([]);
   const [pinnedCaptureKey, setPinnedCaptureKey] = useState<string | null>(null);
+  const [ingestPresetId, setIngestPresetId] = useState<TetherCaptureRequest['ingestPresetId']>('timestampCamera');
   const [reviewMode, setReviewMode] = useState<TetherReviewMode>('newest');
   const [isLoading, setIsLoading] = useState(false);
   const [isCaptureBusy, setIsCaptureBusy] = useState(false);
@@ -124,7 +128,7 @@ export function TetherPanel({
     setIsCaptureBusy(true);
     setError(null);
     try {
-      const response = await captureFrame();
+      const response = await captureFrame({ ingestPresetId });
       setCaptures((current) => [response, ...current].slice(0, 8));
       setCapture((current) => {
         if (reviewMode === 'newest' || current === null) return response;
@@ -136,7 +140,7 @@ export function TetherPanel({
     } finally {
       setIsCaptureBusy(false);
     }
-  }, [captureFrame, pinnedCaptureKey, reviewMode]);
+  }, [captureFrame, ingestPresetId, pinnedCaptureKey, reviewMode]);
 
   const selectedCaptureKey = capture === null ? null : captureKey(capture);
 
@@ -241,12 +245,34 @@ export function TetherPanel({
         {isCaptureBusy ? t('editor.tether.captureBusy') : t('editor.tether.capture')}
       </Button>
 
+      <section className="rounded-md border border-border-color bg-bg-secondary p-3" data-testid="tether-ingest-preset">
+        <label className="block">
+          <UiText variant={TextVariants.label}>{t('editor.tether.ingestPreset')}</UiText>
+          <select
+            className="mt-2 w-full rounded border border-border-color bg-bg-primary px-2 py-2 text-sm text-text-primary"
+            data-selected-ingest-preset={ingestPresetId}
+            data-testid="tether-ingest-preset-select"
+            onChange={(event) => {
+              setIngestPresetId(tetherIngestPresetIdSchema.parse(event.target.value));
+            }}
+            value={ingestPresetId}
+          >
+            {tetherIngestPresetIds.map((presetId) => (
+              <option key={presetId} value={presetId}>
+                {t(tetherIngestPresetLocaleKey(presetId))}
+              </option>
+            ))}
+          </select>
+        </label>
+      </section>
+
       {capture !== null && (
         <section
           className="rounded-md border border-green-500/40 bg-green-500/10 p-3"
           data-capture-checksum={capture.checksum}
           data-capture-imported-path={capture.importedPath}
           data-capture-status={capture.status}
+          data-ingest-preset-id={capture.ingest.presetId}
           data-testid="tether-capture-result"
         >
           <UiText variant={TextVariants.label}>{t('editor.tether.captureComplete')}</UiText>
@@ -255,6 +281,12 @@ export function TetherPanel({
           </UiText>
           <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
             {t('editor.tether.captureVerified', { bytes: capture.bytes })}
+          </UiText>
+          <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+            {t('editor.tether.ingestApplied', {
+              collisionIndex: capture.ingest.collisionIndex,
+              preset: t(tetherIngestPresetLocaleKey(capture.ingest.presetId)),
+            })}
           </UiText>
           {onOpenCapture && (
             <Button
@@ -318,6 +350,7 @@ export function TetherPanel({
                   }`}
                   data-capture-imported-path={incomingCapture.importedPath}
                   data-capture-key={key}
+                  data-ingest-preset-id={incomingCapture.ingest.presetId}
                   data-pinned={String(isPinned)}
                   data-selected={String(isSelected)}
                   data-testid="tether-incoming-capture-item"
@@ -525,4 +558,15 @@ function reviewModeLocaleKey(
   if (mode === 'newest') return 'editor.tether.reviewNewest';
   if (mode === 'pinned') return 'editor.tether.reviewPinned';
   return 'editor.tether.reviewHoldCurrent';
+}
+
+function tetherIngestPresetLocaleKey(
+  presetId: TetherCaptureRequest['ingestPresetId'],
+):
+  | 'editor.tether.ingestPresetCameraSequence'
+  | 'editor.tether.ingestPresetSourceSequence'
+  | 'editor.tether.ingestPresetTimestampCamera' {
+  if (presetId === 'cameraSequence') return 'editor.tether.ingestPresetCameraSequence';
+  if (presetId === 'sourceSequence') return 'editor.tether.ingestPresetSourceSequence';
+  return 'editor.tether.ingestPresetTimestampCamera';
 }

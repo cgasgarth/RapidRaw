@@ -30,6 +30,8 @@ pub struct TetherCaptureRequest {
     destination_root: Option<String>,
     #[serde(default)]
     fake_source_path: Option<String>,
+    #[serde(default)]
+    ingest_preset_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -37,6 +39,7 @@ pub struct TetherCaptureRequest {
 pub struct TetherSessionSnapshot {
     camera_display_name: String,
     camera_id: String,
+    capture_counter: usize,
     destination_root: Option<String>,
     opened_at: String,
     provider_mode: String,
@@ -58,11 +61,21 @@ pub struct TetherCaptureResponse {
     camera_display_name: String,
     checksum: String,
     captured_at: String,
+    ingest: TetherCaptureIngestSummary,
     imported_path: String,
     provider_mode: String,
     session_id: String,
     source_path: String,
     status: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TetherCaptureIngestSummary {
+    collision_index: usize,
+    file_name: String,
+    naming_template: String,
+    preset_id: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -258,6 +271,7 @@ fn open_tether_session_for_state(
     let session = TetherSessionSnapshot {
         camera_display_name: camera.display_name.clone(),
         camera_id: camera.id.clone(),
+        capture_counter: 0,
         destination_root: request.destination_root,
         opened_at: chrono::Utc::now().to_rfc3339(),
         provider_mode: discovery.provider.mode,
@@ -287,13 +301,16 @@ fn trigger_tether_capture_for_state(
     let request = request.unwrap_or(TetherCaptureRequest {
         destination_root: None,
         fake_source_path: None,
+        ingest_preset_id: None,
     });
-    let session = state
-        .tether_session
-        .lock()
-        .unwrap()
-        .clone()
-        .ok_or_else(|| "Open a tether session before capture.".to_string())?;
+    let (session, capture_counter) = {
+        let mut guard = state.tether_session.lock().unwrap();
+        let session = guard
+            .as_mut()
+            .ok_or_else(|| "Open a tether session before capture.".to_string())?;
+        session.capture_counter += 1;
+        (session.clone(), session.capture_counter)
+    };
 
     if session.provider_mode != "fake" {
         return Err("Native camera capture is not implemented yet.".to_string());
@@ -326,13 +343,15 @@ fn trigger_tether_capture_for_state(
         .extension()
         .and_then(|extension| extension.to_str())
         .unwrap_or("raw");
-    let file_name = format!(
-        "{}-{}.{}",
-        captured_at.format("%Y%m%dT%H%M%SZ"),
-        session.camera_id,
-        extension
+    let (imported_path, ingest) = resolve_imported_capture_path(
+        &destination_root,
+        extension,
+        &captured_at,
+        &session,
+        &source_path,
+        capture_counter,
+        request.ingest_preset_id.as_deref(),
     );
-    let imported_path = destination_root.join(file_name);
     let temporary_path = imported_path.with_extension(format!("{extension}.part"));
 
     fs::copy(&source_path, &temporary_path).map_err(|error| error.to_string())?;
@@ -352,12 +371,125 @@ fn trigger_tether_capture_for_state(
         camera_display_name: session.camera_display_name,
         checksum: output_checksum,
         captured_at: captured_at.to_rfc3339(),
+        ingest,
         imported_path: imported_path.to_string_lossy().to_string(),
         provider_mode: session.provider_mode,
         session_id: session.session_id,
         source_path: source_path.to_string_lossy().to_string(),
         status: "captured".to_string(),
     })
+}
+
+fn resolve_imported_capture_path(
+    destination_root: &Path,
+    extension: &str,
+    captured_at: &chrono::DateTime<chrono::Utc>,
+    session: &TetherSessionSnapshot,
+    source_path: &Path,
+    capture_counter: usize,
+    requested_preset_id: Option<&str>,
+) -> (PathBuf, TetherCaptureIngestSummary) {
+    let preset_id = requested_preset_id
+        .filter(|preset_id| {
+            matches!(
+                *preset_id,
+                "cameraSequence" | "sourceSequence" | "timestampCamera"
+            )
+        })
+        .unwrap_or("timestampCamera");
+    let naming_template = naming_template_for_preset(preset_id);
+    let template_has_counter = naming_template.contains("{counter");
+
+    for attempt in 0..1000 {
+        let collision_index = attempt + 1;
+        let counter = capture_counter + attempt;
+        let mut stem =
+            render_ingest_stem(naming_template, captured_at, session, source_path, counter);
+        if !template_has_counter && attempt > 0 {
+            stem = format!("{stem}-{collision_index:03}");
+        }
+        let file_name = format!("{stem}.{extension}");
+        let candidate = destination_root.join(&file_name);
+        if !candidate.exists() {
+            return (
+                candidate,
+                TetherCaptureIngestSummary {
+                    collision_index,
+                    file_name,
+                    naming_template: naming_template.to_string(),
+                    preset_id: preset_id.to_string(),
+                },
+            );
+        }
+    }
+
+    let fallback_name = format!(
+        "{}-{}.{}",
+        captured_at.format("%Y%m%dT%H%M%SZ"),
+        uuid::Uuid::new_v4(),
+        extension
+    );
+    (
+        destination_root.join(&fallback_name),
+        TetherCaptureIngestSummary {
+            collision_index: 1001,
+            file_name: fallback_name,
+            naming_template: naming_template.to_string(),
+            preset_id: preset_id.to_string(),
+        },
+    )
+}
+
+fn naming_template_for_preset(preset_id: &str) -> &'static str {
+    match preset_id {
+        "cameraSequence" => "{camera_id}_{counter:04}",
+        "sourceSequence" => "{source_stem}_{counter:04}",
+        _ => "{capture_utc}_{camera_id}",
+    }
+}
+
+fn render_ingest_stem(
+    template: &str,
+    captured_at: &chrono::DateTime<chrono::Utc>,
+    session: &TetherSessionSnapshot,
+    source_path: &Path,
+    counter: usize,
+) -> String {
+    let source_stem = source_path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or("capture");
+    let rendered = template
+        .replace(
+            "{capture_utc}",
+            &captured_at.format("%Y%m%dT%H%M%SZ").to_string(),
+        )
+        .replace("{camera_id}", &session.camera_id)
+        .replace("{camera_name}", &session.camera_display_name)
+        .replace("{source_stem}", source_stem)
+        .replace("{counter:04}", &format!("{counter:04}"))
+        .replace("{counter}", &counter.to_string());
+    let sanitized = sanitize_file_stem(&rendered);
+    if sanitized.is_empty() {
+        "capture".to_string()
+    } else {
+        sanitized
+    }
+}
+
+fn sanitize_file_stem(value: &str) -> String {
+    value
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.') {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>()
+        .trim_matches('_')
+        .to_string()
 }
 
 fn sha256_file(path: &Path) -> Result<String, String> {
@@ -430,6 +562,7 @@ mod tests {
             session.session.as_ref().unwrap().camera_display_name,
             "Sony ILCE-7M4"
         );
+        assert_eq!(session.session.as_ref().unwrap().capture_counter, 0);
         assert!(state.tether_session.lock().unwrap().is_some());
 
         let closed = close_tether_session_for_state(&state);
@@ -486,6 +619,7 @@ mod tests {
             Some(TetherCaptureRequest {
                 destination_root: None,
                 fake_source_path: Some(source_path.to_string_lossy().to_string()),
+                ingest_preset_id: Some("sourceSequence".to_string()),
             }),
             &state,
         )
@@ -494,9 +628,59 @@ mod tests {
         assert_eq!(capture.status, "captured");
         assert_eq!(capture.provider_mode, "fake");
         assert!(capture.imported_path.ends_with(".ARW"));
+        assert_eq!(capture.ingest.preset_id, "sourceSequence");
+        assert_eq!(capture.ingest.naming_template, "{source_stem}_{counter:04}");
+        assert_eq!(capture.ingest.collision_index, 1);
+        assert!(capture.ingest.file_name.ends_with("_0001.ARW"));
         assert!(Path::new(&capture.imported_path).is_file());
         assert!(capture.bytes > 0);
         assert_eq!(capture.checksum, sha256_file(&source_path).unwrap());
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn fake_provider_uses_collision_safe_ingest_counters() {
+        let state = AppState::new();
+        let root = std::env::temp_dir().join(format!(
+            "rawengine-tether-collision-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let source_path = root.join("source file.ARW");
+        let destination_root = root.join("destination");
+        fs::create_dir_all(&destination_root).unwrap();
+        fs::write(&source_path, b"fake raw bytes").unwrap();
+
+        open_tether_session_for_state(
+            TetherSessionOpenRequest {
+                camera_id: "fake-sony-ilce-7m4-usb".to_string(),
+                destination_root: Some(destination_root.to_string_lossy().to_string()),
+                provider_mode: Some("fake".to_string()),
+            },
+            &state,
+        )
+        .unwrap();
+
+        fs::write(
+            destination_root.join("fake-sony-ilce-7m4-usb_0001.ARW"),
+            b"existing",
+        )
+        .unwrap();
+
+        let capture = trigger_tether_capture_for_state(
+            Some(TetherCaptureRequest {
+                destination_root: None,
+                fake_source_path: Some(source_path.to_string_lossy().to_string()),
+                ingest_preset_id: Some("cameraSequence".to_string()),
+            }),
+            &state,
+        )
+        .unwrap();
+
+        assert_eq!(capture.ingest.preset_id, "cameraSequence");
+        assert_eq!(capture.ingest.collision_index, 2);
+        assert!(capture.ingest.file_name.ends_with("_0002.ARW"));
+        assert!(Path::new(&capture.imported_path).is_file());
 
         let _ = fs::remove_dir_all(root);
     }

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+export const tetherIngestPresetIdSchema = z.enum(['cameraSequence', 'sourceSequence', 'timestampCamera']);
+
 export const tetherCapabilitySchema = z.object({
   id: z.string().trim().min(1),
   label: z.string().trim().min(1),
@@ -42,6 +44,7 @@ export const tetherDiscoveryResponseSchema = z.object({
 export const tetherSessionSnapshotSchema = z.object({
   cameraDisplayName: z.string().trim().min(1),
   cameraId: z.string().trim().min(1),
+  captureCounter: z.number().int().nonnegative(),
   destinationRoot: z.string().trim().min(1).nullable(),
   openedAt: z.string().trim().min(1),
   providerMode: z.enum(['auto', 'fake']),
@@ -54,6 +57,19 @@ export const tetherSessionResponseSchema = z.object({
   status: z.enum(['open', 'closed']),
 });
 
+export const tetherCaptureRequestSchema = z.object({
+  destinationRoot: z.string().trim().min(1).optional(),
+  fakeSourcePath: z.string().trim().min(1).optional(),
+  ingestPresetId: tetherIngestPresetIdSchema.default('timestampCamera'),
+});
+
+export const tetherCaptureIngestSchema = z.object({
+  collisionIndex: z.number().int().min(1),
+  fileName: z.string().trim().min(1),
+  namingTemplate: z.string().trim().min(1),
+  presetId: tetherIngestPresetIdSchema,
+});
+
 export const tetherCaptureResponseSchema = z.object({
   bytes: z.number().int().nonnegative(),
   cameraDisplayName: z.string().trim().min(1),
@@ -62,6 +78,7 @@ export const tetherCaptureResponseSchema = z.object({
     .string()
     .trim()
     .regex(/^sha256:[a-f0-9]{64}$/u),
+  ingest: tetherCaptureIngestSchema,
   importedPath: z.string().trim().min(1),
   providerMode: z.enum(['auto', 'fake']),
   sessionId: z.string().trim().min(1),
@@ -70,6 +87,7 @@ export const tetherCaptureResponseSchema = z.object({
 });
 
 export type TetherCapability = z.infer<typeof tetherCapabilitySchema>;
+export type TetherCaptureRequest = z.infer<typeof tetherCaptureRequestSchema>;
 export type TetherCaptureResponse = z.infer<typeof tetherCaptureResponseSchema>;
 export type TetherDiscoveryResponse = z.infer<typeof tetherDiscoveryResponseSchema>;
 export type TetherSessionResponse = z.infer<typeof tetherSessionResponseSchema>;
