@@ -1050,6 +1050,18 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     baseFogEstimate !== null &&
     pathsToConvert.length > 0 &&
     (!requiresAcceptedBatchPlan || isBatchPlanAccepted);
+  const saveBlockedReasonKey =
+    canSave || isSaving
+      ? null
+      : isLoading || previewUrl === null
+        ? 'modals.negativeConversion.previewPending'
+        : baseFogEstimate === null
+          ? 'modals.negativeConversion.basePending'
+          : pathsToConvert.length === 0
+            ? 'modals.negativeConversion.workflowExportBlocked'
+            : requiresAcceptedBatchPlan && !isBatchPlanAccepted
+              ? 'modals.negativeConversion.agentDryRunBlocked'
+              : 'modals.negativeConversion.workflowExportBlocked';
   const qcProofReport = useMemo(
     () =>
       buildNegativeLabQcProofReport(
@@ -5483,7 +5495,18 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           >
             <div className="grow min-h-0 overflow-hidden">{renderContent()}</div>
 
-            <div className="shrink-0 p-4 flex justify-end gap-3 border-t border-surface bg-bg-secondary z-20">
+            <div className="shrink-0 p-4 flex items-center justify-end gap-3 border-t border-surface bg-bg-secondary z-20">
+              {saveBlockedReasonKey !== null && (
+                <UiText
+                  variant={TextVariants.small}
+                  color={TextColors.secondary}
+                  className="mr-auto rounded-sm border border-surface bg-surface/70 px-2 py-1"
+                  data-testid="negative-lab-convert-save-blocked-reason"
+                  id="negative-lab-convert-save-blocked-reason"
+                >
+                  {t(saveBlockedReasonKey)}
+                </UiText>
+              )}
               <button
                 disabled={isSaving}
                 onClick={onClose}
@@ -5495,6 +5518,16 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 onClick={() => {
                   void handleSave();
                 }}
+                aria-describedby={
+                  saveBlockedReasonKey !== null ? 'negative-lab-convert-save-blocked-reason' : undefined
+                }
+                className={cx(
+                  !canSave &&
+                    'border border-surface bg-surface text-text-tertiary shadow-none ring-1 ring-white/5 disabled:opacity-100',
+                )}
+                data-can-save={canSave ? 'true' : 'false'}
+                data-save-blocked-reason={saveBlockedReasonKey ?? ''}
+                data-testid="negative-lab-convert-save-action"
                 disabled={!canSave}
               >
                 {isSaving ? (

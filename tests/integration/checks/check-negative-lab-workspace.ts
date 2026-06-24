@@ -30,9 +30,18 @@ const mixedAcquisitionReport = buildNegativeLabFrameHealthReport({
   previewReady: true,
   targetPaths: ['/roll/001.CR3', '/roll/proof.jpg', '/roll/source.unknown'],
 });
+const basePendingReport = buildNegativeLabFrameHealthReport({
+  activePathIndex: 0,
+  baseFogConfidence: null,
+  includedPathSet: new Set(targetPaths),
+  previewReady: true,
+  targetPaths,
+});
 const reviewReport = buildNegativeLabDustScratchReviewReport(frameHealthReport, true);
 const mixedReviewReport = buildNegativeLabDustScratchReviewReport(mixedAcquisitionReport, true);
+const basePendingReviewReport = buildNegativeLabDustScratchReviewReport(basePendingReport, true);
 const qcProofReport = buildNegativeLabQcProofReport(reviewReport, true, true);
+const basePendingQcProofReport = buildNegativeLabQcProofReport(basePendingReviewReport, true, false);
 const proof = negativeLabWorkspaceProofSchema.parse({
   activeStage: 'inspection',
   exportReady: true,
@@ -101,6 +110,10 @@ if (
 
 if (qcProofReport.frames.some((frame) => frame.exportBlockedReason !== null)) {
   throw new Error('Negative Lab QC proof report blocked export-ready proof rows.');
+}
+
+if (basePendingQcProofReport.exportReady) {
+  throw new Error('Negative Lab QC proof report did not block base-pending export.');
 }
 
 for (const marker of [
@@ -247,6 +260,11 @@ for (const marker of [
   'data-runtime-status={selectedProfile.runtimeStatus}',
   'modals.negativeConversion.batchWorkloadSummary',
   'modals.negativeConversion.workflowExportBlocked',
+  'negative-lab-convert-save-action',
+  'negative-lab-convert-save-blocked-reason',
+  "data-save-blocked-reason={saveBlockedReasonKey ?? ''}",
+  "data-can-save={canSave ? 'true' : 'false'}",
+  'disabled:opacity-100',
 ]) {
   if (!modalSource.includes(marker)) {
     throw new Error(`Negative Lab workspace UI marker missing: ${marker}`);
