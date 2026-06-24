@@ -260,6 +260,35 @@ const tetherDiscoveryMockResponse: TetherDiscoveryResponse = {
         transport: 'USB-C PTP',
         trusted: true,
       },
+      controls: [
+        {
+          currentValue: '400',
+          id: 'iso',
+          label: 'ISO',
+          status: 'ready',
+          unit: null,
+          values: ['100', '200', '400', '800', '1600'],
+          writable: true,
+        },
+        {
+          currentValue: '1/125',
+          id: 'shutterSpeed',
+          label: 'Shutter',
+          status: 'ready',
+          unit: 's',
+          values: ['1/60', '1/125', '1/250'],
+          writable: true,
+        },
+        {
+          currentValue: 'f/5.6',
+          id: 'aperture',
+          label: 'Aperture',
+          status: 'ready',
+          unit: 'f-stop',
+          values: ['f/4', 'f/5.6', 'f/8'],
+          writable: true,
+        },
+      ],
       displayName: 'Sony ILCE-7M4',
       id: 'validation-camera-sony-a7iv',
       make: 'Sony',
@@ -661,6 +690,16 @@ function TetherDiscoveryVisualSmoke() {
             discoverCameras={() => Promise.resolve(tetherDiscoveryMockResponse)}
             onOpenCapture={setOpenedCapturePath}
             openSession={() => Promise.resolve(tetherSessionMockResponse)}
+            setCameraControl={(request) =>
+              Promise.resolve({
+                appliedValue: request.value,
+                cameraId: request.cameraId,
+                controlId: request.controlId,
+                requestedValue: request.value,
+                status: 'verified',
+                verifiedAt: '2026-06-23T00:00:01.000Z',
+              })
+            }
           />
         </aside>
       </div>

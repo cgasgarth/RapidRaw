@@ -40,6 +40,16 @@ pub struct TetherCaptureRequest {
     metadata_template_id: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TetherCameraControlWriteRequest {
+    camera_id: String,
+    control_id: String,
+    #[serde(default)]
+    provider_mode: Option<String>,
+    value: String,
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TetherSessionSnapshot {
@@ -51,6 +61,17 @@ pub struct TetherSessionSnapshot {
     provider_mode: String,
     session_id: String,
     status: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TetherCameraControlWriteResponse {
+    applied_value: String,
+    camera_id: String,
+    control_id: String,
+    requested_value: String,
+    status: String,
+    verified_at: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -137,6 +158,7 @@ struct TetheredCamera {
     battery_percent: Option<u8>,
     capabilities: Vec<TetherCapability>,
     connection: TetherConnectionStatus,
+    controls: Vec<TetherCameraControl>,
     display_name: String,
     id: String,
     make: String,
@@ -150,6 +172,18 @@ struct TetherCapability {
     id: String,
     label: String,
     status: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TetherCameraControl {
+    current_value: String,
+    id: String,
+    label: String,
+    status: String,
+    unit: Option<String>,
+    values: Vec<String>,
+    writable: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -193,6 +227,7 @@ impl TetherProvider for FakeTetherProvider {
                     transport: "USB-C PTP".to_string(),
                     trusted: true,
                 },
+                controls: fake_camera_controls(),
                 display_name: "Sony ILCE-7M4".to_string(),
                 id: "fake-sony-ilce-7m4-usb".to_string(),
                 make: "Sony".to_string(),
@@ -270,6 +305,13 @@ pub fn trigger_tether_capture(
     trigger_tether_capture_for_state(request, &state)
 }
 
+#[tauri::command]
+pub fn set_tether_camera_control(
+    request: TetherCameraControlWriteRequest,
+) -> Result<TetherCameraControlWriteResponse, String> {
+    set_tether_camera_control_for_provider(request)
+}
+
 fn resolve_provider_mode(provider_mode: Option<String>) -> String {
     provider_mode
         .or_else(|| std::env::var("RAWENGINE_TETHER_PROVIDER_MODE").ok())
@@ -282,6 +324,42 @@ fn discover_with_provider_mode(mode: &str) -> TetherDiscoveryResponse {
     } else {
         MacosTetherProvider.discover()
     }
+}
+
+fn set_tether_camera_control_for_provider(
+    request: TetherCameraControlWriteRequest,
+) -> Result<TetherCameraControlWriteResponse, String> {
+    let mode = resolve_provider_mode(request.provider_mode);
+    let discovery = discover_with_provider_mode(&mode);
+    let camera = discovery
+        .cameras
+        .iter()
+        .find(|camera| camera.id == request.camera_id)
+        .ok_or_else(|| "Camera is not available for tether control write.".to_string())?;
+    let control = camera
+        .controls
+        .iter()
+        .find(|control| control.id == request.control_id)
+        .ok_or_else(|| "Camera control is not supported by this provider.".to_string())?;
+
+    if !control.writable || control.status != "ready" {
+        return Err("Camera control is not writable.".to_string());
+    }
+    if !control.values.iter().any(|value| value == &request.value) {
+        return Err(format!(
+            "Unsupported value {} for {}.",
+            request.value, request.control_id
+        ));
+    }
+
+    Ok(TetherCameraControlWriteResponse {
+        applied_value: request.value.clone(),
+        camera_id: request.camera_id,
+        control_id: request.control_id,
+        requested_value: request.value,
+        status: "verified".to_string(),
+        verified_at: chrono::Utc::now().to_rfc3339(),
+    })
 }
 
 fn open_tether_session_for_state(
@@ -709,6 +787,50 @@ fn capability(id: &str, label: &str, status: &str) -> TetherCapability {
     }
 }
 
+fn fake_camera_controls() -> Vec<TetherCameraControl> {
+    vec![
+        camera_control(
+            "iso",
+            "ISO",
+            "400",
+            None,
+            &["100", "200", "400", "800", "1600"],
+        ),
+        camera_control(
+            "shutterSpeed",
+            "Shutter",
+            "1/125",
+            Some("s"),
+            &["1/30", "1/60", "1/125", "1/250", "1/500"],
+        ),
+        camera_control(
+            "aperture",
+            "Aperture",
+            "f/5.6",
+            Some("f-stop"),
+            &["f/2.8", "f/4", "f/5.6", "f/8", "f/11"],
+        ),
+    ]
+}
+
+fn camera_control(
+    id: &str,
+    label: &str,
+    current_value: &str,
+    unit: Option<&str>,
+    values: &[&str],
+) -> TetherCameraControl {
+    TetherCameraControl {
+        current_value: current_value.to_string(),
+        id: id.to_string(),
+        label: label.to_string(),
+        status: "ready".to_string(),
+        unit: unit.map(str::to_string),
+        values: values.iter().map(|value| value.to_string()).collect(),
+        writable: true,
+    }
+}
+
 fn proof(boundary: &str) -> TetherDiscoveryProof {
     TetherDiscoveryProof {
         fake_provider_available: true,
@@ -731,6 +853,9 @@ mod tests {
         assert_eq!(response.provider.status, "ready");
         assert_eq!(response.cameras[0].display_name, "Sony ILCE-7M4");
         assert!(response.cameras[0].connection.trusted);
+        assert_eq!(response.cameras[0].controls.len(), 3);
+        assert_eq!(response.cameras[0].controls[0].id, "iso");
+        assert_eq!(response.cameras[0].controls[0].current_value, "400");
         assert!(response.proof.fake_provider_available);
     }
 
@@ -789,6 +914,35 @@ mod tests {
 
         assert!(error.contains("not available"));
         assert!(state.tether_session.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn fake_provider_verifies_exposure_control_writes() {
+        let response = set_tether_camera_control_for_provider(TetherCameraControlWriteRequest {
+            camera_id: "fake-sony-ilce-7m4-usb".to_string(),
+            control_id: "iso".to_string(),
+            provider_mode: Some("fake".to_string()),
+            value: "800".to_string(),
+        })
+        .unwrap();
+
+        assert_eq!(response.status, "verified");
+        assert_eq!(response.control_id, "iso");
+        assert_eq!(response.requested_value, "800");
+        assert_eq!(response.applied_value, "800");
+    }
+
+    #[test]
+    fn fake_provider_rejects_unsupported_exposure_control_values() {
+        let error = set_tether_camera_control_for_provider(TetherCameraControlWriteRequest {
+            camera_id: "fake-sony-ilce-7m4-usb".to_string(),
+            control_id: "iso".to_string(),
+            provider_mode: Some("fake".to_string()),
+            value: "64000".to_string(),
+        })
+        .unwrap_err();
+
+        assert!(error.contains("Unsupported value"));
     }
 
     #[test]
