@@ -151,6 +151,7 @@ export function TetherPanel({
       const response = await captureFrame({
         backupDestinationRoot:
           isBackupEnabled && backupDestinationRoot.trim() ? backupDestinationRoot.trim() : undefined,
+        cameraControlValues: Object.fromEntries(cameraControls.map((control) => [control.id, control.currentValue])),
         ingestPresetId,
         metadataTemplateId,
       });
@@ -167,6 +168,7 @@ export function TetherPanel({
     }
   }, [
     backupDestinationRoot,
+    cameraControls,
     captureFrame,
     ingestPresetId,
     isBackupEnabled,
@@ -477,6 +479,11 @@ export function TetherPanel({
                   template: t(tetherMetadataTemplateLocaleKey(capture.metadata.templateId)),
                 })
               : t('editor.tether.metadataSkipped')}
+          </UiText>
+          <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+            {t('editor.tether.controlsRecorded', {
+              controls: formatTetherControlValues(capture.cameraControlValues, t('editor.tether.none')),
+            })}
           </UiText>
           <UiText
             variant={TextVariants.small}
@@ -801,4 +808,10 @@ function tetherMetadataTemplateLocaleKey(
 ): 'editor.tether.metadataTemplateNone' | 'editor.tether.metadataTemplateStudioSession' {
   if (templateId === 'studioSession') return 'editor.tether.metadataTemplateStudioSession';
   return 'editor.tether.metadataTemplateNone';
+}
+
+function formatTetherControlValues(values: Record<string, string>, emptyLabel: string): string {
+  const entries = Object.entries(values);
+  if (entries.length === 0) return emptyLabel;
+  return entries.map(([key, value]) => `${key}: ${value}`).join(', ');
 }

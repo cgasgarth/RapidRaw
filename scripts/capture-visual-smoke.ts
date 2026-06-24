@@ -1265,6 +1265,12 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('tether-capture-result').getByText('Capture imported', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    await page
+      .getByTestId('tether-capture-result')
+      .getByText('Camera controls recorded: aperture: f/5.6, iso: 800, shutterSpeed: 1/125', { exact: true })
+      .waitFor({
+        timeout: 10_000,
+      });
     await page.locator('[data-testid="tether-capture-result"][data-ingest-preset-id="sourceSequence"]').waitFor({
       timeout: 10_000,
     });

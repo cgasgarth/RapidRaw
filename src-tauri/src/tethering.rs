@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -30,6 +31,8 @@ pub struct TetherSessionOpenRequest {
 pub struct TetherCaptureRequest {
     #[serde(default)]
     backup_destination_root: Option<String>,
+    #[serde(default)]
+    camera_control_values: BTreeMap<String, String>,
     #[serde(default)]
     destination_root: Option<String>,
     #[serde(default)]
@@ -97,6 +100,7 @@ pub struct TetherCaptureResponse {
     backup: TetherCaptureBackupSummary,
     bytes: u64,
     camera_display_name: String,
+    camera_control_values: BTreeMap<String, String>,
     checksum: String,
     captured_at: String,
     ingest: TetherCaptureIngestSummary,
@@ -438,6 +442,7 @@ fn trigger_tether_capture_for_state(
 ) -> Result<TetherCaptureResponse, String> {
     let request = request.unwrap_or(TetherCaptureRequest {
         backup_destination_root: None,
+        camera_control_values: BTreeMap::new(),
         destination_root: None,
         fake_source_path: None,
         ingest_preset_id: None,
@@ -511,6 +516,7 @@ fn trigger_tether_capture_for_state(
         &session,
         &captured_at,
         &ingest,
+        &request.camera_control_values,
     )?;
     let backup = write_verified_backup_capture(
         request.backup_destination_root.as_deref(),
@@ -523,6 +529,7 @@ fn trigger_tether_capture_for_state(
         backup,
         bytes,
         camera_display_name: session.camera_display_name,
+        camera_control_values: request.camera_control_values,
         checksum: output_checksum,
         captured_at: captured_at.to_rfc3339(),
         ingest,
@@ -541,6 +548,7 @@ fn apply_capture_metadata_template(
     session: &TetherSessionSnapshot,
     captured_at: &chrono::DateTime<chrono::Utc>,
     ingest: &TetherCaptureIngestSummary,
+    camera_control_values: &BTreeMap<String, String>,
 ) -> Result<TetherCaptureMetadataSummary, String> {
     let template_id = requested_template_id
         .filter(|template_id| matches!(*template_id, "none" | "studioSession"))
@@ -586,6 +594,12 @@ fn apply_capture_metadata_template(
             ingest.preset_id, ingest.file_name
         ),
     );
+    for (control_id, value) in camera_control_values {
+        exif.insert(
+            format!("RawEngineTetherControl_{control_id}"),
+            value.clone(),
+        );
+    }
     sidecar.exif = Some(exif);
 
     let artifacts = sidecar
@@ -603,20 +617,28 @@ fn apply_capture_metadata_template(
         "captureSessionId": session.session_id,
         "ingestPresetId": ingest.preset_id,
         "metadataTemplateId": template_id,
+        "cameraControlValues": camera_control_values,
         "sidecarStorage": "sidecar_artifact"
     }));
 
     crate::exif_processing::save_sidecar_metadata_atomic(&sidecar_path, &sidecar)?;
 
+    let mut applied_fields = vec![
+        "rating".to_string(),
+        "tags".to_string(),
+        "Artist".to_string(),
+        "ImageDescription".to_string(),
+        "UserComment".to_string(),
+    ];
+    applied_fields.extend(
+        camera_control_values
+            .keys()
+            .map(|control_id| format!("RawEngineTetherControl_{control_id}")),
+    );
+
     Ok(TetherCaptureMetadataSummary {
         applied: true,
-        applied_fields: vec![
-            "rating".to_string(),
-            "tags".to_string(),
-            "Artist".to_string(),
-            "ImageDescription".to_string(),
-            "UserComment".to_string(),
-        ],
+        applied_fields,
         sidecar_path: Some(sidecar_path.to_string_lossy().to_string()),
         template_id: template_id.to_string(),
     })
@@ -1157,6 +1179,11 @@ mod tests {
         let capture = trigger_tether_capture_for_state(
             Some(TetherCaptureRequest {
                 backup_destination_root: Some(root.join("backup").to_string_lossy().to_string()),
+                camera_control_values: BTreeMap::from([
+                    ("aperture".to_string(), "f/5.6".to_string()),
+                    ("iso".to_string(), "800".to_string()),
+                    ("shutterSpeed".to_string(), "1/125".to_string()),
+                ]),
                 destination_root: None,
                 fake_source_path: Some(source_path.to_string_lossy().to_string()),
                 ingest_preset_id: Some("sourceSequence".to_string()),
@@ -1173,6 +1200,10 @@ mod tests {
         assert_eq!(capture.ingest.naming_template, "{source_stem}_{counter:04}");
         assert_eq!(capture.ingest.collision_index, 1);
         assert!(capture.ingest.file_name.ends_with("_0001.ARW"));
+        assert_eq!(
+            capture.camera_control_values.get("iso").map(String::as_str),
+            Some("800")
+        );
         assert!(Path::new(&capture.imported_path).is_file());
         assert!(capture.bytes > 0);
         assert_eq!(capture.checksum, sha256_file(&source_path).unwrap());
@@ -1188,6 +1219,12 @@ mod tests {
                 .applied_fields
                 .contains(&"rating".to_string())
         );
+        assert!(
+            capture
+                .metadata
+                .applied_fields
+                .contains(&"RawEngineTetherControl_iso".to_string())
+        );
         let sidecar_path = capture.metadata.sidecar_path.as_ref().unwrap();
         let sidecar = crate::exif_processing::load_sidecar(Path::new(sidecar_path));
         assert_eq!(sidecar.rating, 1);
@@ -1200,6 +1237,10 @@ mod tests {
             exif.get("Artist").map(String::as_str),
             Some("RawEngine tether session")
         );
+        assert_eq!(
+            exif.get("RawEngineTetherControl_iso").map(String::as_str),
+            Some("800")
+        );
         let tether_artifacts = sidecar
             .raw_engine_artifacts
             .unwrap()
@@ -1209,6 +1250,7 @@ mod tests {
             tether_artifacts[0]["metadataTemplateId"].as_str(),
             Some("studioSession")
         );
+        assert_eq!(tether_artifacts[0]["cameraControlValues"]["iso"], "800");
 
         let _ = fs::remove_dir_all(root);
     }
@@ -1244,6 +1286,7 @@ mod tests {
         let capture = trigger_tether_capture_for_state(
             Some(TetherCaptureRequest {
                 backup_destination_root: None,
+                camera_control_values: BTreeMap::new(),
                 destination_root: None,
                 fake_source_path: Some(source_path.to_string_lossy().to_string()),
                 ingest_preset_id: Some("cameraSequence".to_string()),
@@ -1290,6 +1333,7 @@ mod tests {
         let capture = trigger_tether_capture_for_state(
             Some(TetherCaptureRequest {
                 backup_destination_root: Some(backup_blocker.to_string_lossy().to_string()),
+                camera_control_values: BTreeMap::new(),
                 destination_root: None,
                 fake_source_path: Some(source_path.to_string_lossy().to_string()),
                 ingest_preset_id: Some("timestampCamera".to_string()),
