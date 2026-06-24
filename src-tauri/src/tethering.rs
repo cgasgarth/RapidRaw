@@ -807,7 +807,7 @@ fn apply_capture_import_preset(
         "duplicatePolicy": "rename",
         "sidecarPolicy": "copy_existing",
         "rawOnly": true,
-        "metadataTemplateId": "copyright-client",
+        "metadataTemplateId": "copyright-client-delivery",
         "addTags": add_tags,
         "applyPresetIds": apply_preset_ids,
         "pixelPresetStatus": "deferred"
@@ -1674,6 +1674,10 @@ mod tests {
                 == Some("tether_import_preset")
                 && artifact.get("presetId").and_then(|value| value.as_str())
                     == Some("wedding-copy-ingest")
+                && artifact
+                    .get("metadataTemplateId")
+                    .and_then(|value| value.as_str())
+                    == Some("copyright-client-delivery")
                 && artifact["applyPresetIds"][0] == "camera-standard-start"
         }));
 

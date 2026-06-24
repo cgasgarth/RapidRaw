@@ -472,6 +472,20 @@ export function TetherPanel({
               preset: t(tetherIngestPresetLocaleKey(capture.ingest.presetId)),
             })}
           </UiText>
+          {capture.ingest.addTags.length > 0 && (
+            <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+              {t('editor.tether.ingestTagsApplied', {
+                tags: formatTetherList(capture.ingest.addTags, t('editor.tether.none')),
+              })}
+            </UiText>
+          )}
+          {capture.ingest.applyPresetIds.length > 0 && (
+            <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+              {t('editor.tether.ingestDevelopPresetsApplied', {
+                presets: formatTetherList(capture.ingest.applyPresetIds, t('editor.tether.none')),
+              })}
+            </UiText>
+          )}
           <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
             {capture.metadata.applied
               ? t('editor.tether.metadataApplied', {
@@ -833,4 +847,9 @@ function formatTetherControlValues(values: Record<string, string>, emptyLabel: s
   const entries = Object.entries(values);
   if (entries.length === 0) return emptyLabel;
   return entries.map(([key, value]) => `${key}: ${value}`).join(', ');
+}
+
+function formatTetherList(values: Array<string>, emptyLabel: string): string {
+  if (values.length === 0) return emptyLabel;
+  return values.join(', ');
 }
