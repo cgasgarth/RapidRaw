@@ -107,6 +107,8 @@ for (const marker of [
   'data-active-layer-visible-state={activeRow.visibleState}',
   'data-testid="layer-export-readiness-summary"',
   'data-testid="layer-operation-readiness-summary"',
+  'grid grid-cols-1 gap-1.5 rounded-md border border-surface',
+  'text-left leading-4 text-text-secondary',
   'data-layer-stack-graph-revision={layerGraphRevision}',
   'data-layer-stack-last-command-type={lastCommandType}',
   'data-layer-stack-last-changed-layer-count={lastChangedLayerCount}',
