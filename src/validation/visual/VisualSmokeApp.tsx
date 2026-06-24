@@ -320,6 +320,12 @@ const tetherSessionMockResponse: TetherSessionResponse = {
     destinationRoot: null,
     openedAt: '2026-06-23T00:00:00.000Z',
     providerMode: 'fake',
+    recovery: {
+      message: 'Partial tether downloads were quarantined before capture.',
+      partialFilesFound: 1,
+      quarantinedFiles: ['/tmp/rawengine-tether-captures/.rawengine-tether-quarantine/interrupted.ARW.part'],
+      status: 'quarantined',
+    },
     sessionId: 'tether-session-visual-smoke',
     status: 'open',
   },

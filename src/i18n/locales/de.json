@@ -1235,6 +1235,10 @@
         "auto": "macOS",
         "fake": "Fake CI"
       },
+      "recoveryFailed": "Tether recovery failed: {{message}}",
+      "recoveryQuarantined": "Quarantined {{count}} partial tether download(s).",
+      "recoveryQuarantined_one": "",
+      "recoveryQuarantined_other": "",
       "refresh": "Refresh",
       "reviewHoldCurrent": "Hold current",
       "reviewNewest": "Newest",
