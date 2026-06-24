@@ -211,6 +211,8 @@ export function MergeFooterActions({
   }
 
   const disabled = isProcessing || isSaving;
+  const isStartBlocked = !finalImageBase64 && !isSourceCountValid;
+  const isStartDisabled = isProcessing || isStartBlocked;
 
   return (
     <div className={`w-full flex items-center justify-end gap-2 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -222,8 +224,11 @@ export function MergeFooterActions({
       </button>
 
       <Button
+        className="disabled:bg-bg-secondary disabled:text-text-tertiary disabled:ring-1 disabled:ring-border-color"
+        data-start-blocked={String(isStartBlocked)}
+        data-testid="merge-start-action"
         onClick={onRun}
-        disabled={isProcessing || (!finalImageBase64 && !isSourceCountValid)}
+        disabled={isStartDisabled}
         variant={finalImageBase64 ? 'secondary' : 'primary'}
       >
         {isProcessing ? (
