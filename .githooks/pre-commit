@@ -19,6 +19,20 @@ bun lint-staged --quiet --concurrent false
 bun run check:lint
 bun run check:external-editor-missing-launcher
 
+if [ -n "$staged_files" ]; then
+  macos_smoke_files="$(mktemp)"
+  macos_smoke_outputs="$(mktemp)"
+  printf '%s\n' "$staged_files" > "$macos_smoke_files"
+  bun tests/integration/checks/check-ci-classify-macos-smoke.ts --files "$macos_smoke_files" > "$macos_smoke_outputs"
+  if grep -q '^macos_smoke_decision=unclassified-fail-closed$' "$macos_smoke_outputs"; then
+    echo "Unclassified path requires explicit CI routing before merge." >&2
+    sed -n '/^macos_smoke_required_paths<<EOF_macos_smoke_required_paths$/,/^EOF_macos_smoke_required_paths$/p' "$macos_smoke_outputs" >&2
+    rm -f "$macos_smoke_files" "$macos_smoke_outputs"
+    exit 1
+  fi
+  rm -f "$macos_smoke_files" "$macos_smoke_outputs"
+fi
+
 if printf '%s\n' "$staged_files" | grep -Eq '(^|/)(package\.json|bun\.lock|tsconfig[^/]*\.json)$|\.tsx?$'; then
   bun run check:types
 fi

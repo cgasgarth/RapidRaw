@@ -37,6 +37,7 @@ const ALWAYS_REQUIRE_FILES = new Set([
   'index.html',
   'package.json',
   'pnpm-lock.yaml',
+  'rust-toolchain.toml',
   'tsconfig.json',
   'tsconfig.app.json',
   'tsconfig.node.json',
@@ -1019,6 +1020,7 @@ function runSelfTest() {
     ['README.md', 'src-tauri/Cargo.toml'],
     SMOKE_MODES.RELEASE,
   );
+  assertClassification('Rust toolchain changes require release smoke', ['rust-toolchain.toml'], SMOKE_MODES.RELEASE);
   console.log('check-ci-classify-macos-smoke self-test passed');
 }
 
