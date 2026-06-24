@@ -282,7 +282,7 @@ const ColorRuntimeStatusRail = () => {
   return (
     <div
       aria-label={t(runtimeStatusKey('ariaLabel'))}
-      className="grid grid-cols-3 gap-1 rounded-md border border-border bg-bg-tertiary p-1"
+      className="grid grid-cols-2 gap-1 rounded-md border border-border bg-bg-tertiary p-1"
       data-testid="color-runtime-status-rail"
     >
       {colorRuntimeStatusItems.map(([labelKey, stateKey]) => {
@@ -290,10 +290,10 @@ const ColorRuntimeStatusRail = () => {
 
         return (
           <div className="min-w-0 rounded bg-bg-secondary px-2 py-1" key={labelKey}>
-            <div className="truncate text-[10px] font-semibold uppercase tracking-normal text-text-secondary">
+            <div className="text-[10px] font-semibold uppercase leading-tight tracking-normal text-text-secondary">
               {t(runtimeStatusKey(labelKey))}
             </div>
-            <div className="truncate text-xs font-medium text-text-primary">{state}</div>
+            <div className="mt-0.5 text-xs font-medium leading-tight text-text-primary">{state}</div>
           </div>
         );
       })}
@@ -313,7 +313,7 @@ const ColorWorkflowReadinessRail = () => {
 
   return (
     <div
-      className="grid grid-cols-2 gap-1 rounded-md border border-border bg-bg-tertiary p-1"
+      className="grid gap-1 rounded-md border border-border bg-bg-tertiary p-1"
       data-channel-mixer-ready="true"
       data-color-balance-ready="true"
       data-grading-ready="true"
@@ -327,10 +327,12 @@ const ColorWorkflowReadinessRail = () => {
           data-testid="professional-color-readiness-item"
           key={item.key}
         >
-          <div className="truncate text-[10px] font-semibold uppercase tracking-normal text-text-secondary">
+          <div className="text-[10px] font-semibold uppercase leading-tight tracking-normal text-text-secondary">
             {item.label}
           </div>
-          <div className="truncate text-xs font-medium text-text-primary">{t(runtimeStatusKey('proofed'))}</div>
+          <div className="mt-0.5 text-xs font-medium leading-tight text-text-primary">
+            {t(runtimeStatusKey('proofed'))}
+          </div>
         </div>
       ))}
     </div>
@@ -1497,35 +1499,37 @@ export default function ColorPanel({
                   }}
                   type="button"
                 >
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="truncate font-semibold text-text-primary">{t(recipe.labelKey)}</span>
+                  <span className="flex flex-wrap items-start justify-between gap-1.5">
+                    <span className="min-w-0 flex-1 text-[13px] font-semibold leading-tight text-text-primary">
+                      {t(recipe.labelKey)}
+                    </span>
                     <span className="shrink-0 rounded bg-bg-tertiary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-normal text-text-secondary">
                       {t('adjustments.color.workflowRecipes.apply')}
                     </span>
                   </span>
-                  <span className="mt-1 block text-text-secondary">{t(recipe.descriptionKey)}</span>
+                  <span className="mt-1 block leading-snug text-text-secondary">{t(recipe.descriptionKey)}</span>
                   <span
                     aria-hidden="true"
-                    className="mt-2 grid grid-cols-2 gap-1 text-[10px] font-medium text-text-secondary"
+                    className="mt-2 grid gap-1 text-[10px] font-medium leading-tight text-text-secondary"
                     data-testid="professional-color-recipe-summary"
                   >
-                    <span className="rounded bg-bg-primary px-1.5 py-0.5">
+                    <span className="rounded bg-bg-primary px-1.5 py-1">
                       {t('adjustments.color.workflowRecipes.profileChip', {
                         value: t(`adjustments.color.profileTone.cameraProfiles.${recipe.cameraProfile}`),
                       })}
                     </span>
-                    <span className="rounded bg-bg-primary px-1.5 py-0.5">
+                    <span className="rounded bg-bg-primary px-1.5 py-1">
                       {t('adjustments.color.workflowRecipes.toneChip', {
                         value: t(`adjustments.color.profileTone.toneCurves.${recipe.toneCurve}`),
                       })}
                     </span>
-                    <span className="rounded bg-bg-primary px-1.5 py-0.5">
+                    <span className="rounded bg-bg-primary px-1.5 py-1">
                       {t('adjustments.color.workflowRecipes.whiteBalanceChip', {
                         temperature: formatSignedInteger(recipe.temperature),
                         tint: formatSignedInteger(recipe.tint),
                       })}
                     </span>
-                    <span className="rounded bg-bg-primary px-1.5 py-0.5">
+                    <span className="rounded bg-bg-primary px-1.5 py-1">
                       {t('adjustments.color.workflowRecipes.rangeChip', {
                         value: t(getSelectiveColorRange(recipe.activeColorRange).labelKey),
                       })}
