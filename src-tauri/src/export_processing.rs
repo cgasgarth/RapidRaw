@@ -538,6 +538,8 @@ fn encode_image_to_bytes(
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
 ) -> Result<Vec<u8>, String> {
+    validate_export_color_policy(output_format, color_profile)?;
+
     let mut image_bytes = Vec::new();
     let mut cursor = Cursor::new(&mut image_bytes);
 
@@ -645,7 +647,7 @@ fn export_rgb16_pixels_and_profile(
     let rgb_image = image.to_rgb16();
     let (width, height) = rgb_image.dimensions();
     let pixels = rgb_image.into_raw();
-    let output_profile = output_color_profile(color_profile);
+    let output_profile = output_color_profile(color_profile)?;
 
     if matches!(color_profile, ExportColorProfile::DisplayP3) {
         let src_profile = ColorProfile::new_srgb();
@@ -718,7 +720,7 @@ fn export_rgb_pixels_and_profile(
     let rgb_image = image.to_rgb8();
     let (width, height) = rgb_image.dimensions();
     let pixels = rgb_image.into_raw();
-    let output_profile = output_color_profile(color_profile);
+    let output_profile = output_color_profile(color_profile)?;
 
     if matches!(color_profile, ExportColorProfile::DisplayP3) {
         let src_profile = ColorProfile::new_srgb();
@@ -750,13 +752,47 @@ fn export_rgb_pixels_and_profile(
     }
 }
 
-fn output_color_profile(color_profile: &ExportColorProfile) -> ColorProfile {
+fn output_color_profile(color_profile: &ExportColorProfile) -> Result<ColorProfile, String> {
     match color_profile {
-        ExportColorProfile::DisplayP3 => ColorProfile::new_display_p3(),
-        ExportColorProfile::Srgb
-        | ExportColorProfile::AdobeRgb1998
-        | ExportColorProfile::ProPhotoRgb
-        | ExportColorProfile::SourceEmbedded => ColorProfile::new_srgb(),
+        ExportColorProfile::DisplayP3 => Ok(ColorProfile::new_display_p3()),
+        ExportColorProfile::Srgb => Ok(ColorProfile::new_srgb()),
+        ExportColorProfile::AdobeRgb1998 => {
+            Err("Adobe RGB export is not implemented yet.".to_string())
+        }
+        ExportColorProfile::ProPhotoRgb => {
+            Err("ProPhoto RGB export is not implemented yet.".to_string())
+        }
+        ExportColorProfile::SourceEmbedded => {
+            Err("Source embedded export profile is not implemented yet.".to_string())
+        }
+    }
+}
+
+fn validate_export_color_policy(
+    output_format: &str,
+    color_profile: &ExportColorProfile,
+) -> Result<(), String> {
+    let supports_display_p3 = matches!(
+        output_format.to_lowercase().as_str(),
+        "jpg" | "jpeg" | "tif" | "tiff"
+    );
+
+    match color_profile {
+        ExportColorProfile::Srgb => Ok(()),
+        ExportColorProfile::DisplayP3 if supports_display_p3 => Ok(()),
+        ExportColorProfile::DisplayP3 => Err(format!(
+            "Display P3 export is only supported for JPEG and TIFF, not {}.",
+            output_format
+        )),
+        ExportColorProfile::AdobeRgb1998 => {
+            Err("Adobe RGB export is not implemented yet.".to_string())
+        }
+        ExportColorProfile::ProPhotoRgb => {
+            Err("ProPhoto RGB export is not implemented yet.".to_string())
+        }
+        ExportColorProfile::SourceEmbedded => {
+            Err("Source embedded export profile is not implemented yet.".to_string())
+        }
     }
 }
 
@@ -2035,6 +2071,52 @@ mod tests {
             display_p3_pixels, srgb_pixels,
             "Display P3 export should transform pixels before tagging them"
         );
+    }
+
+    #[test]
+    fn unsupported_export_profiles_are_rejected_instead_of_falling_back_to_srgb() {
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(1, 1, Rgb([128, 64, 32])));
+
+        for profile in [
+            ExportColorProfile::AdobeRgb1998,
+            ExportColorProfile::ProPhotoRgb,
+            ExportColorProfile::SourceEmbedded,
+        ] {
+            let error = encode_image_to_bytes(
+                &image,
+                "jpg",
+                90,
+                &profile,
+                &ExportRenderingIntent::RelativeColorimetric,
+            )
+            .expect_err("unsupported profile should not silently export as sRGB");
+
+            assert!(
+                error.contains("not implemented yet"),
+                "unexpected unsupported-profile error: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn display_p3_is_rejected_for_formats_without_color_managed_output_path() {
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(1, 1, Rgb([128, 64, 32])));
+
+        for format in ["png", "webp", "jxl", "avif"] {
+            let error = encode_image_to_bytes(
+                &image,
+                format,
+                90,
+                &ExportColorProfile::DisplayP3,
+                &ExportRenderingIntent::RelativeColorimetric,
+            )
+            .expect_err("Display P3 should require the color-managed JPEG/TIFF path");
+
+            assert!(
+                error.contains("only supported for JPEG and TIFF"),
+                "unexpected Display P3 format error: {error}"
+            );
+        }
     }
 
     #[test]
