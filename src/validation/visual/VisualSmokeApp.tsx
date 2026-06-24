@@ -20,6 +20,8 @@ import RightPanelSwitcher from '../../components/panel/right/RightPanelSwitcher'
 import { TetherPanel } from '../../components/panel/right/TetherPanel';
 import {
   Panel,
+  RawStatus,
+  SortDirection,
   type BrushSettings,
   type CullingSuggestions,
   type SelectedImage,
@@ -36,6 +38,7 @@ import {
   DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
   type SuperResolutionUiSettings,
 } from '../../schemas/superResolutionUiSchemas';
+import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useUIStore } from '../../store/useUIStore';
 import {
@@ -637,6 +640,55 @@ function TetherDiscoveryVisualSmoke() {
 }
 
 function AgentChatVisualSmoke() {
+  useState(() => {
+    const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/_DSC7505.ARW';
+    useLibraryStore.getState().setLibrary({
+      activeAlbumId: 'album_agent_visual_smoke',
+      albumTree: [
+        { id: 'album_agent_visual_smoke', images: [selectedPath], name: 'Agent visual smoke', type: 'album' },
+      ],
+      currentFolderPath: '/Users/cgas/Pictures/Capture One/Alaska',
+      filterCriteria: { colors: [], editedStatus: 'all', rating: 0, rawStatus: RawStatus.RawOnly },
+      folderTrees: [],
+      imageList: [
+        {
+          exif: { ISO: '400', LensModel: 'FE 35mm F1.4 GM' },
+          is_edited: false,
+          is_virtual_copy: false,
+          modified: 1_781_928_505,
+          path: selectedPath,
+          rating: 4,
+          tags: ['agent-visual-smoke'],
+        },
+      ],
+      imageRatings: { [selectedPath]: 4 },
+      libraryActivePath: selectedPath,
+      multiSelectedPaths: [selectedPath],
+      pinnedFolderTrees: [],
+      rootPaths: ['/Users/cgas/Pictures/Capture One'],
+      sortCriteria: { key: 'rating', label: 'Rating', order: SortDirection.Descending },
+    });
+    useEditorStore.getState().setEditor({
+      adjustments: INITIAL_ADJUSTMENTS,
+      finalPreviewUrl: 'blob:rawengine-agent-visual-smoke-before',
+      hasRenderedFirstFrame: true,
+      history: [INITIAL_ADJUSTMENTS],
+      historyIndex: 0,
+      selectedImage: {
+        exif: { ISO: '400', LensModel: 'FE 35mm F1.4 GM' },
+        height: 4000,
+        isRaw: true,
+        isReady: true,
+        originalUrl: 'blob:rawengine-agent-visual-smoke-original',
+        path: selectedPath,
+        thumbnailUrl: 'blob:rawengine-agent-visual-smoke-thumb',
+        width: 6000,
+      },
+      uncroppedAdjustedPreviewUrl: null,
+    });
+    return true;
+  });
+
   return (
     <main
       className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
