@@ -36,6 +36,10 @@ if (!rows.some((row) => row.isBuiltIn && row.id === CLIENT_PROOF_TIFF_EXPORT_REC
   failures.push('Client proof TIFF built-in recipe must be visible.');
 }
 
+if (rows.filter((row) => row.isValidRecipe).length !== recipes.length) {
+  failures.push('All fixture export recipes must parse as valid UI recipes.');
+}
+
 if (!exportPresetLocale.success) {
   failures.push('Export recipe readiness locale keys must be present.');
 }
