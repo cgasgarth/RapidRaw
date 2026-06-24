@@ -17,7 +17,27 @@ export const layerBlendStackLayerSchema = z
     maskAlpha: z.array(z.number().min(0).max(1)).optional(),
     name: z.string().trim().min(1),
     opacity: z.number().min(0).max(1),
-    pixels: z.array(layerRgbPixelSchema).min(1),
+    pixels: z.array(layerRgbPixelSchema).min(1).optional(),
+    retouchCloneSource: z
+      .object({
+        alignmentErrorPx: z.number().min(0).optional(),
+        rotationDegrees: z.number().min(-180).max(180),
+        scale: z.number().min(0.1).max(10),
+        sourcePoint: z
+          .object({
+            x: z.number().min(0).max(1),
+            y: z.number().min(0).max(1),
+          })
+          .strict(),
+        targetPoint: z
+          .object({
+            x: z.number().min(0).max(1),
+            y: z.number().min(0).max(1),
+          })
+          .strict(),
+      })
+      .strict()
+      .optional(),
     visible: z.boolean(),
   })
   .strict();
@@ -37,7 +57,10 @@ export const layerBlendStackInputSchema = z
     }
 
     for (const [index, layer] of input.layers.entries()) {
-      if (layer.pixels.length !== pixelCount) {
+      if (layer.retouchCloneSource === undefined && layer.pixels?.length !== pixelCount) {
+        context.addIssue({ code: 'custom', message: 'layer pixels must match dimensions.', path: ['layers', index] });
+      }
+      if (layer.retouchCloneSource !== undefined && layer.pixels !== undefined && layer.pixels.length !== pixelCount) {
         context.addIssue({ code: 'custom', message: 'layer pixels must match dimensions.', path: ['layers', index] });
       }
       if (layer.maskAlpha !== undefined && layer.maskAlpha.length !== pixelCount) {
@@ -109,6 +132,35 @@ const blendPixel = (base: LayerRgbPixel, source: LayerRgbPixel, mode: LayerBlend
   };
 };
 
+const normalizedPointToPixel = (
+  point: { x: number; y: number },
+  width: number,
+  height: number,
+): { x: number; y: number } => ({
+  x: Math.round(clamp01(point.x) * (width - 1)),
+  y: Math.round(clamp01(point.y) * (height - 1)),
+});
+
+const cloneSampleIndex = (
+  targetIndex: number,
+  width: number,
+  height: number,
+  cloneSource: NonNullable<LayerBlendStackLayer['retouchCloneSource']>,
+): number | null => {
+  if (cloneSource.rotationDegrees !== 0 || cloneSource.scale !== 1) {
+    throw new Error('Retouch clone layer rendering supports exact translated sampling only.');
+  }
+
+  const sourcePoint = normalizedPointToPixel(cloneSource.sourcePoint, width, height);
+  const targetPoint = normalizedPointToPixel(cloneSource.targetPoint, width, height);
+  const targetX = targetIndex % width;
+  const targetY = Math.floor(targetIndex / width);
+  const sourceX = targetX + sourcePoint.x - targetPoint.x;
+  const sourceY = targetY + sourcePoint.y - targetPoint.y;
+  if (sourceX < 0 || sourceX >= width || sourceY < 0 || sourceY >= height) return null;
+  return sourceY * width + sourceX;
+};
+
 export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendStackRender {
   const parsedInput = layerBlendStackInputSchema.parse(input);
   const pixelCount = parsedInput.width * parsedInput.height;
@@ -125,7 +177,12 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
 
     let touchedPixels = 0;
     for (let index = 0; index < pixelCount; index += 1) {
-      const source = layer.pixels[index];
+      const cloneSourceIndex =
+        layer.retouchCloneSource === undefined
+          ? null
+          : cloneSampleIndex(index, parsedInput.width, parsedInput.height, layer.retouchCloneSource);
+      if (layer.retouchCloneSource !== undefined && cloneSourceIndex === null) continue;
+      const source = cloneSourceIndex === null ? layer.pixels?.[index] : pixels[cloneSourceIndex];
       const base = pixels[index];
       if (source === undefined || base === undefined) {
         throw new Error(`Layer ${layer.id} missing pixel ${index}.`);
