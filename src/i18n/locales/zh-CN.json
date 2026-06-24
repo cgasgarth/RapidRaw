@@ -1226,6 +1226,7 @@
       "metadataApplied": "{{template}} metadata applied · {{fields}} fields",
       "metadataSkipped": "No metadata template applied",
       "metadataTemplate": "Metadata template",
+      "metadataTemplateCopyrightClientDelivery": "",
       "metadataTemplateNone": "None",
       "metadataTemplateReviewSelect": "",
       "metadataTemplateStudioSession": "Studio session",
