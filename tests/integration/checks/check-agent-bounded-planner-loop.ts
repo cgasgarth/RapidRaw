@@ -36,7 +36,7 @@ useLibraryStore.getState().setLibrary({
 
 useEditorStore.getState().setEditor({
   adjustments: INITIAL_ADJUSTMENTS,
-  finalPreviewUrl: 'rawengine-preview://history_0/planner-before',
+  finalPreviewUrl: 'blob:rawengine-planner-before',
   hasRenderedFirstFrame: true,
   histogram: {
     [ActiveChannel.Blue]: { color: '#4D96FF', data: bins },

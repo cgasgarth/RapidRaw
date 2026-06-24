@@ -44,7 +44,7 @@ useLibraryStore.getState().setLibrary({
 
 useEditorStore.getState().setEditor({
   adjustments: INITIAL_ADJUSTMENTS,
-  finalPreviewUrl: 'rawengine-preview://history_0/before',
+  finalPreviewUrl: 'blob:rawengine-preview-before',
   hasRenderedFirstFrame: true,
   history: [INITIAL_ADJUSTMENTS],
   historyIndex: 0,
@@ -90,17 +90,11 @@ if (state.historyIndex !== 1 || state.history.length !== 2) {
 if (state.lastBasicToneCommand?.commandId !== result.command.commandId || state.lastBasicToneCommand.dryRun) {
   throw new Error('Agent basic-tone apply did not retain the applied command envelope.');
 }
-if (
-  state.finalPreviewUrl === 'rawengine-preview://history_0/before' ||
-  !state.finalPreviewUrl?.includes(result.afterPreviewHash)
-) {
-  throw new Error('Agent basic-tone apply did not update rendered preview identity.');
+if (state.finalPreviewUrl !== 'blob:rawengine-preview-before') {
+  throw new Error('Agent basic-tone apply must preserve the visible preview until the native renderer replaces it.');
 }
-if (
-  state.uncroppedAdjustedPreviewUrl === null ||
-  !state.uncroppedAdjustedPreviewUrl.includes(result.afterPreviewHash)
-) {
-  throw new Error('Agent basic-tone apply did not update uncropped rendered preview identity.');
+if (state.uncroppedAdjustedPreviewUrl !== null) {
+  throw new Error('Agent basic-tone apply must invalidate stale uncropped preview output.');
 }
 if (result.beforePreviewHash === result.afterPreviewHash || result.changedPixelCount < 4) {
   throw new Error('Agent basic-tone renderer proof did not change expected output pixels.');
@@ -109,4 +103,4 @@ if (result.mutation.appliedGraphRevision !== result.appliedGraphRevision) {
   throw new Error('Agent basic-tone result did not preserve mutation graph revision.');
 }
 
-console.log('agent basic tone live apply ok (store+history+render output)');
+console.log('agent basic tone live apply ok (store+history+renderer handoff)');

@@ -37,7 +37,7 @@ useLibraryStore.getState().setLibrary({
 
 useEditorStore.getState().setEditor({
   adjustments: INITIAL_ADJUSTMENTS,
-  finalPreviewUrl: 'rawengine-preview://history_0/before-dry-run',
+  finalPreviewUrl: 'blob:rawengine-before-dry-run',
   hasRenderedFirstFrame: true,
   history: [INITIAL_ADJUSTMENTS],
   historyIndex: 0,

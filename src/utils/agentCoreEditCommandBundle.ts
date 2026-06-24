@@ -158,10 +158,9 @@ export const runAgentCoreEditCommandBundle = async ({
     const history = pushEditHistoryEntry(state.history, state.historyIndex, nextAdjustments);
     return {
       adjustments: nextAdjustments,
-      finalPreviewUrl: `rawengine-preview://${currentGraphRevision}/${outputHash}`,
       history: history.history,
       historyIndex: history.historyIndex,
-      uncroppedAdjustedPreviewUrl: `rawengine-preview://${currentGraphRevision}/uncropped/${outputHash}`,
+      uncroppedAdjustedPreviewUrl: null,
     };
   });
 

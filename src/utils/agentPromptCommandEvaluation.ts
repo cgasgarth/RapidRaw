@@ -100,8 +100,10 @@ export const evaluateAgentPromptCommandFixture = async (
   }
 
   const state = useEditorStore.getState();
-  if (!state.finalPreviewUrl?.includes(result.outputHash)) {
-    throw new Error(`Prompt fixture ${fixture.id} did not publish the rendered output hash to the editor preview.`);
+  if (state.finalPreviewUrl?.startsWith('rawengine-preview://')) {
+    throw new Error(
+      `Prompt fixture ${fixture.id} published a synthetic preview URL instead of a native render handoff.`,
+    );
   }
 
   return agentPromptCommandEvaluationSchema.parse({

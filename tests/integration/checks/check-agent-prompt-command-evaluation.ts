@@ -39,7 +39,7 @@ const resetStores = (fixtureId: string): void => {
 
   useEditorStore.getState().setEditor({
     adjustments: INITIAL_ADJUSTMENTS,
-    finalPreviewUrl: `rawengine-preview://history_0/${fixtureId}-before`,
+    finalPreviewUrl: `blob:rawengine-${fixtureId}-before`,
     hasRenderedFirstFrame: true,
     history: [INITIAL_ADJUSTMENTS],
     historyIndex: 0,
