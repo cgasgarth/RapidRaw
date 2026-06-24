@@ -346,7 +346,21 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                 setUI({ collageModalState: { isOpen: true, sourceImages: [selectedImageFile] } });
               },
             },
-            { label: t('contextMenus.editor.cullImage'), icon: Users, disabled: true },
+            {
+              label: t('contextMenus.editor.cullImage'),
+              icon: Users,
+              onClick: () => {
+                setUI({
+                  cullingModalState: {
+                    error: null,
+                    isOpen: true,
+                    pathsToCull: [selectedImage.path],
+                    progress: null,
+                    suggestions: null,
+                  },
+                });
+              },
+            },
           ],
         },
         { type: OPTION_SEPARATOR },
@@ -744,7 +758,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                   },
                 });
               },
-              disabled: selectionCount < 2,
+              disabled: selectionCount === 0,
             },
           ],
         },
