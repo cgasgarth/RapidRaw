@@ -387,6 +387,7 @@ export default function CullingModal({
   const numSimilar = suggestions?.similarGroups.reduce((acc, group) => acc + group.duplicates.length, 0) || 0;
   const numBlurry = suggestions?.blurryImages.length || 0;
   const numFocusRankings = suggestions?.focusRankings.length || 0;
+  const latencyReport = suggestions?.latencyReport ?? null;
   const setupPreviewPaths = imagePaths.slice(0, SETUP_PREVIEW_LIMIT);
   const setupPreviewOverflowCount = Math.max(0, imagePaths.length - setupPreviewPaths.length);
   const hasCullingAnalysisMode = settings.groupSimilar || settings.filterBlurry || settings.rankFocus;
@@ -726,6 +727,56 @@ export default function CullingModal({
         <UiText variant={TextVariants.title} className="mb-4">
           {t('modals.culling.cullingSuggestions')}
         </UiText>
+        {latencyReport && (
+          <section
+            className="mb-4 grid grid-cols-2 gap-2 rounded-md border border-border-color bg-bg-secondary p-3 text-xs md:grid-cols-4"
+            data-analysis-mode-count={latencyReport.analysisModeCount}
+            data-average-analysis-ms={latencyReport.averageAnalysisMs.toFixed(1)}
+            data-failed-count={latencyReport.failedCount}
+            data-max-analysis-ms={latencyReport.maxAnalysisMs}
+            data-source-count={latencyReport.sourceCount}
+            data-successful-count={latencyReport.successfulCount}
+            data-testid="culling-latency-report"
+            data-total-elapsed-ms={latencyReport.totalElapsedMs}
+          >
+            <div>
+              <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                {t('modals.culling.latencyTotal')}
+              </UiText>
+              <UiText variant={TextVariants.small}>
+                {t('modals.culling.latencyMs', { value: latencyReport.totalElapsedMs })}
+              </UiText>
+            </div>
+            <div>
+              <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                {t('modals.culling.latencyAverage')}
+              </UiText>
+              <UiText variant={TextVariants.small}>
+                {t('modals.culling.latencyMs', { value: Math.round(latencyReport.averageAnalysisMs) })}
+              </UiText>
+            </div>
+            <div>
+              <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                {t('modals.culling.latencyMax')}
+              </UiText>
+              <UiText variant={TextVariants.small}>
+                {t('modals.culling.latencyMs', { value: latencyReport.maxAnalysisMs })}
+              </UiText>
+            </div>
+            <div>
+              <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                {t('modals.culling.latencyDecoded')}
+              </UiText>
+              <UiText variant={TextVariants.small}>
+                {t('modals.culling.latencyDecodedValue', {
+                  failed: latencyReport.failedCount,
+                  successful: latencyReport.successfulCount,
+                  total: latencyReport.sourceCount,
+                })}
+              </UiText>
+            </div>
+          </section>
+        )}
         <div className="border-b border-surface mb-4">
           <nav className="-mb-px flex space-x-4" aria-label={t('modals.culling.tabs')}>
             {numSimilar > 0 && (

@@ -2287,6 +2287,15 @@ const cullingCompareThumbnails: Record<string, string> = {
 const cullingCompareSuggestions: CullingSuggestions = {
   blurryImages: [],
   failedPaths: [],
+  latencyReport: {
+    analysisModeCount: 3,
+    averageAnalysisMs: 118,
+    failedCount: 0,
+    maxAnalysisMs: 176,
+    sourceCount: 3,
+    successfulCount: 3,
+    totalElapsedMs: 394,
+  },
   similarGroups: [
     {
       duplicates: [
