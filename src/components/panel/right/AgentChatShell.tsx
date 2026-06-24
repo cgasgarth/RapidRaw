@@ -165,7 +165,7 @@ function LivePromptComposer() {
   const [acceptedPrompt, setAcceptedPrompt] = useState('');
   const [result, setResult] = useState<LivePromptResult>({ status: 'idle' });
   const [rollbackSnapshot, setRollbackSnapshot] = useState<AgentRollbackSnapshot | null>(null);
-  const canRun = prompt.trim().length > 0 && result.status !== 'applying';
+  const canRun = result.status !== 'applying';
   const canApply = acceptedPrompt.length > 0 && result.status === 'dry_run_ready';
   const canRollback = rollbackSnapshot !== null && result.status === 'applied';
   let statusLabel;
@@ -289,6 +289,9 @@ function LivePromptComposer() {
           onChange={(event) => {
             setPrompt(event.target.value);
           }}
+          onInput={(event) => {
+            setPrompt(event.currentTarget.value);
+          }}
           onMouseDown={() => {
             promptInputRef.current?.focus();
           }}
@@ -302,6 +305,7 @@ function LivePromptComposer() {
         <button
           className="inline-flex items-center gap-2 rounded-md border border-primary/30 bg-primary/15 px-3 py-2 text-xs font-semibold text-text-primary disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
           data-testid="agent-live-prompt-run"
+          data-native-accessibility-input="reads-textarea-dom-value"
           disabled={!canRun}
           onMouseDown={(event) => {
             event.preventDefault();

@@ -29,6 +29,7 @@ for (const marker of [
   'data-testid="agent-live-prompt-composer"',
   'data-testid="agent-live-prompt-input"',
   'data-testid="agent-live-prompt-run"',
+  'data-native-accessibility-input="reads-textarea-dom-value"',
   'data-testid="agent-live-prompt-apply"',
   'data-testid="agent-live-prompt-rollback"',
   'data-testid="agent-live-prompt-walkthrough"',
