@@ -579,6 +579,25 @@
           "title": "",
           "uiOnly": ""
         },
+        "composer": {
+          "apply": "",
+          "applying": "",
+          "changedPixels_other": "",
+          "dryRun": "",
+          "label": "",
+          "noApplyStep": "",
+          "placeholder": "",
+          "rollback": "",
+          "status": {
+            "applied": "",
+            "applying": "",
+            "dry_run_ready": "",
+            "failed": "",
+            "idle": "",
+            "rolled_back": ""
+          },
+          "unknownError": ""
+        },
         "duration": {
           "pending": ""
         },

@@ -26,9 +26,16 @@ if (walkthrough === undefined) {
 
 const shellSource = readFileSync('src/components/panel/right/AgentChatShell.tsx', 'utf8');
 for (const marker of [
+  'data-testid="agent-live-prompt-composer"',
+  'data-testid="agent-live-prompt-input"',
+  'data-testid="agent-live-prompt-run"',
+  'data-testid="agent-live-prompt-apply"',
+  'data-testid="agent-live-prompt-rollback"',
   'data-testid="agent-live-prompt-walkthrough"',
   'data-testid="agent-live-prompt-walkthrough-stages"',
   'data-testid="agent-live-prompt-walkthrough-summary"',
+  'applyBasicToneToLiveEditor',
+  'runAgentBoundedEditPlannerLoop',
   'editor.ai.agent.walkthrough.title',
 ]) {
   if (!shellSource.includes(marker)) failures.push(`Agent chat shell missing marker: ${marker}`);
@@ -39,6 +46,17 @@ const localeSchema = z
     editor: z.object({
       ai: z.object({
         agent: z.object({
+          composer: z.object({
+            apply: z.string().min(1),
+            dryRun: z.string().min(1),
+            label: z.string().min(1),
+            rollback: z.string().min(1),
+            status: z.object({
+              applied: z.string().min(1),
+              dry_run_ready: z.string().min(1),
+              idle: z.string().min(1),
+            }),
+          }),
           walkthrough: z.object({
             plan: z.string().min(1),
             target: z.string().min(1),

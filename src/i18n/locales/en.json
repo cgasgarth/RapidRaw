@@ -581,6 +581,27 @@
           "title": "Audit transcript",
           "uiOnly": "Local HTML evidence only; no edits are applied."
         },
+        "composer": {
+          "apply": "Apply edit",
+          "applying": "Applying",
+          "changedPixels": "{{count}} preview pixels changed",
+          "changedPixels_one": "{{count}} preview pixel changed",
+          "changedPixels_other": "{{count}} preview pixels changed",
+          "dryRun": "Dry-run",
+          "label": "Ask the agent",
+          "noApplyStep": "The agent plan did not include an apply-capable tone step.",
+          "placeholder": "Example: brighten this RAW, recover shadows, and keep the color natural",
+          "rollback": "Rollback",
+          "status": {
+            "applied": "Applied through the local app-server bridge",
+            "applying": "Applying accepted dry-run",
+            "dry_run_ready": "Dry-run ready for review",
+            "failed": "Agent request failed",
+            "idle": "Waiting for a prompt",
+            "rolled_back": "Rolled back to the previous edit state"
+          },
+          "unknownError": "Unknown agent runtime error."
+        },
         "duration": {
           "pending": "Pending"
         },

@@ -1,8 +1,12 @@
-import { AlertTriangle, CheckCircle2, CircleDashed, Server, Sparkles } from 'lucide-react';
-import { useState } from 'react';
+import { AlertTriangle, CheckCircle2, CircleDashed, RotateCcw, Send, Server, Sparkles } from 'lucide-react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useEditorStore } from '../../../store/useEditorStore';
 import { buildAgentAppServerToolReadinessSummary } from '../../../utils/agentAppServerToolReadiness';
+import { runAgentBoundedEditPlannerLoop } from '../../../utils/agentBoundedEditPlannerLoop';
+import { planAgentEditRecipe } from '../../../utils/agentEditRecipePlanner';
+import { applyBasicToneToLiveEditor } from '../../../utils/agentLiveBasicTone';
 
 import type {
   AgentArtifactReview,
@@ -92,6 +96,33 @@ const longEditProgressStageStyles = {
 } satisfies Record<AgentLongEditProgress['stages'][number]['state'], string>;
 
 type LocalReviewDecision = 'approved' | 'pending' | 'rejected';
+type LivePromptStatus = 'applied' | 'applying' | 'dry_run_ready' | 'failed' | 'idle' | 'rolled_back';
+
+interface LivePromptResult {
+  appliedGraphRevision?: string;
+  changedPixelCount?: number;
+  error?: string;
+  previewAfterHash?: string;
+  previewBeforeHash?: string;
+  recipeName?: string;
+  status: LivePromptStatus;
+  summary?: string;
+}
+
+const createAgentRollbackSnapshot = () => {
+  const state = useEditorStore.getState();
+
+  return {
+    adjustments: state.adjustments,
+    finalPreviewUrl: state.finalPreviewUrl,
+    history: state.history,
+    historyIndex: state.historyIndex,
+    lastBasicToneCommand: state.lastBasicToneCommand,
+    uncroppedAdjustedPreviewUrl: state.uncroppedAdjustedPreviewUrl,
+  };
+};
+
+type AgentRollbackSnapshot = ReturnType<typeof createAgentRollbackSnapshot>;
 
 const formatRouteFamily = (family: string): string => family.replaceAll('_', ' ');
 
@@ -124,6 +155,219 @@ function MessageBubble({ message }: { message: AgentChatMessage }) {
         <p className="text-xs leading-5 text-text-primary">{message.body}</p>
       </div>
     </div>
+  );
+}
+
+function LivePromptComposer() {
+  const { t } = useTranslation();
+  const promptInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const [prompt, setPrompt] = useState('');
+  const [acceptedPrompt, setAcceptedPrompt] = useState('');
+  const [result, setResult] = useState<LivePromptResult>({ status: 'idle' });
+  const [rollbackSnapshot, setRollbackSnapshot] = useState<AgentRollbackSnapshot | null>(null);
+  const canRun = prompt.trim().length > 0 && result.status !== 'applying';
+  const canApply = acceptedPrompt.length > 0 && result.status === 'dry_run_ready';
+  const canRollback = rollbackSnapshot !== null && result.status === 'applied';
+  let statusLabel;
+
+  switch (result.status) {
+    case 'applied':
+      statusLabel = t('editor.ai.agent.composer.status.applied');
+      break;
+    case 'applying':
+      statusLabel = t('editor.ai.agent.composer.status.applying');
+      break;
+    case 'dry_run_ready':
+      statusLabel = t('editor.ai.agent.composer.status.dry_run_ready');
+      break;
+    case 'failed':
+      statusLabel = t('editor.ai.agent.composer.status.failed');
+      break;
+    case 'rolled_back':
+      statusLabel = t('editor.ai.agent.composer.status.rolled_back');
+      break;
+    case 'idle':
+      statusLabel = t('editor.ai.agent.composer.status.idle');
+      break;
+  }
+
+  const runDryRun = async () => {
+    const requestedPrompt = (promptInputRef.current?.value ?? prompt).trim();
+    if (requestedPrompt.length === 0) return;
+
+    try {
+      const plan = planAgentEditRecipe(requestedPrompt);
+      const preview = await runAgentBoundedEditPlannerLoop({
+        maxSteps: 5,
+        operationId: `agent_chat_${Date.now()}`,
+        prompt: requestedPrompt,
+        sessionId: 'agent-chat-shell',
+      });
+      setAcceptedPrompt(requestedPrompt);
+      setResult({
+        previewAfterHash: preview.dryRunAfterHash,
+        previewBeforeHash: preview.dryRunBeforeHash,
+        recipeName: plan.recipeName,
+        status: 'dry_run_ready',
+        summary: plan.summary,
+      });
+    } catch (error) {
+      setResult({
+        error: error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError'),
+        status: 'failed',
+      });
+    }
+  };
+
+  const applyDryRun = async () => {
+    if (!canApply) return;
+
+    try {
+      setRollbackSnapshot(createAgentRollbackSnapshot());
+      setResult((current) => ({ ...current, status: 'applying' }));
+      const plan = planAgentEditRecipe(acceptedPrompt);
+      const basicToneStep = plan.steps.find((step) => step.kind === 'basic_tone');
+      if (basicToneStep?.kind !== 'basic_tone') {
+        throw new Error(t('editor.ai.agent.composer.noApplyStep'));
+      }
+
+      const applyResult = await applyBasicToneToLiveEditor({
+        operationId: `agent_chat_apply_${Date.now()}`,
+        requestedAdjustments: basicToneStep.payload,
+        sessionId: 'agent-chat-shell',
+      });
+
+      setResult((current) => ({
+        ...current,
+        appliedGraphRevision: applyResult.appliedGraphRevision,
+        changedPixelCount: applyResult.changedPixelCount,
+        status: 'applied',
+      }));
+    } catch (error) {
+      setResult((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError'),
+        status: 'failed',
+      }));
+    }
+  };
+
+  const rollbackApply = () => {
+    if (rollbackSnapshot === null) return;
+
+    useEditorStore.setState({
+      adjustments: rollbackSnapshot.adjustments,
+      finalPreviewUrl: rollbackSnapshot.finalPreviewUrl,
+      history: rollbackSnapshot.history,
+      historyIndex: rollbackSnapshot.historyIndex,
+      lastBasicToneCommand: rollbackSnapshot.lastBasicToneCommand,
+      uncroppedAdjustedPreviewUrl: rollbackSnapshot.uncroppedAdjustedPreviewUrl,
+    });
+    setRollbackSnapshot(null);
+    setResult((current) => ({ ...current, status: 'rolled_back' }));
+  };
+
+  return (
+    <form
+      className="pointer-events-auto relative z-10 space-y-3 rounded-md border border-sky-500/20 bg-sky-500/5 p-3"
+      data-live-prompt-status={result.status}
+      data-testid="agent-live-prompt-composer"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void runDryRun();
+      }}
+    >
+      <div className="space-y-1">
+        <label className="text-xs font-semibold text-text-primary" htmlFor="agent-live-prompt-input">
+          {t('editor.ai.agent.composer.label')}
+        </label>
+        <textarea
+          className="min-h-20 w-full resize-y rounded-md border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-text-primary outline-none transition-colors placeholder:text-text-secondary focus:border-primary/60"
+          data-testid="agent-live-prompt-input"
+          id="agent-live-prompt-input"
+          onChange={(event) => {
+            setPrompt(event.target.value);
+          }}
+          onMouseDown={() => {
+            promptInputRef.current?.focus();
+          }}
+          placeholder={t('editor.ai.agent.composer.placeholder')}
+          ref={promptInputRef}
+          value={prompt}
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          className="inline-flex items-center gap-2 rounded-md border border-primary/30 bg-primary/15 px-3 py-2 text-xs font-semibold text-text-primary disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          data-testid="agent-live-prompt-run"
+          disabled={!canRun}
+          onMouseDown={(event) => {
+            event.preventDefault();
+            void runDryRun();
+          }}
+          onClick={() => {
+            void runDryRun();
+          }}
+          type="button"
+        >
+          <Send size={14} />
+          {t('editor.ai.agent.composer.dryRun')}
+        </button>
+        <button
+          className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          data-testid="agent-live-prompt-apply"
+          disabled={!canApply}
+          onMouseDown={(event) => {
+            event.preventDefault();
+            void applyDryRun();
+          }}
+          onClick={() => {
+            void applyDryRun();
+          }}
+          type="button"
+        >
+          {result.status === 'applying' ? t('editor.ai.agent.composer.applying') : t('editor.ai.agent.composer.apply')}
+        </button>
+        <button
+          className="inline-flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          data-testid="agent-live-prompt-rollback"
+          disabled={!canRollback}
+          onMouseDown={(event) => {
+            event.preventDefault();
+            rollbackApply();
+          }}
+          onClick={rollbackApply}
+          type="button"
+        >
+          <RotateCcw size={14} />
+          {t('editor.ai.agent.composer.rollback')}
+        </button>
+      </div>
+
+      <div
+        className="rounded border border-white/10 bg-black/15 p-2 text-[11px]"
+        data-testid="agent-live-prompt-result"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-semibold text-text-primary">{statusLabel}</span>
+          {result.recipeName ? <span className="font-mono text-text-secondary">{result.recipeName}</span> : null}
+        </div>
+        {result.summary ? <p className="mt-1 leading-4 text-text-secondary">{result.summary}</p> : null}
+        {result.previewAfterHash ? (
+          <div className="mt-1 font-mono text-[10px] text-text-secondary">
+            {result.previewBeforeHash} → {result.previewAfterHash}
+          </div>
+        ) : null}
+        {result.appliedGraphRevision ? (
+          <div className="mt-1 font-mono text-[10px] text-emerald-100">
+            {result.appliedGraphRevision} ·{' '}
+            {t('editor.ai.agent.composer.changedPixels', { count: result.changedPixelCount })}
+          </div>
+        ) : null}
+        {result.error ? <p className="mt-1 leading-4 text-red-100">{result.error}</p> : null}
+      </div>
+    </form>
   );
 }
 
@@ -1080,6 +1324,8 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
             : t('editor.ai.agent.uiOnly')}
         </span>
       </div>
+
+      <LivePromptComposer />
 
       <div className="space-y-2" data-testid="agent-chat-messages">
         {transcript.messages.map((message) => (
