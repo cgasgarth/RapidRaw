@@ -245,6 +245,10 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   Record those extra commands as PR evidence.
 - Do not wait for CI to discover basic formatting, lint, i18n, missing
   dependency, or bundle-budget failures.
+- When a GitHub Actions failure is caused by a deterministic repo issue, add or
+  update the cheapest appropriate precommit/local gate before treating the fix
+  as complete. Do not add precommit coverage for runner/network/service
+  infrastructure failures that cannot be reproduced locally.
 - Do not treat narrow checks as proof of broad behavior. Match validation scope
   to the requirement being claimed.
 - Treat plan-only, schema-only, API-only, dry-run-only, UI-only, and runtime
