@@ -1271,9 +1271,21 @@ async function prepareScenario(page, mode) {
       .waitFor({
         timeout: 10_000,
       });
-    await page.locator('[data-testid="tether-capture-result"][data-ingest-preset-id="sourceSequence"]').waitFor({
+    await page.locator('[data-testid="tether-capture-result"][data-ingest-preset-id="wedding-copy-ingest"]').waitFor({
       timeout: 10_000,
     });
+    await page
+      .getByTestId('tether-capture-result')
+      .getByText('Tags applied: wedding, incoming', { exact: true })
+      .waitFor({
+        timeout: 10_000,
+      });
+    await page
+      .getByTestId('tether-capture-result')
+      .getByText('Develop presets applied: camera-standard-start', { exact: true })
+      .waitFor({
+        timeout: 10_000,
+      });
     await page.locator('[data-testid="tether-capture-result"][data-metadata-template-id="studioSession"]').waitFor({
       timeout: 10_000,
     });
