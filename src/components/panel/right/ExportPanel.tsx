@@ -1491,14 +1491,15 @@ export default function ExportPanel({
                 {t('export.status.externalEditorFailed', { error: externalEditorError })}
               </UiText>
             )}
-            <div className="mt-2 flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <UiText color={TextColors.secondary} variant={TextVariants.small}>
+            <div className="mt-2 space-y-2">
+              <div className="min-w-0 space-y-0.5" data-testid="export-success-receipt-details">
+                <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
                   {formatBytes(firstReceiptOutput.byteSize, t)} · {firstReceiptOutput.format.toUpperCase()}
                   {firstReceiptMetadataText ? ` · ${firstReceiptMetadataText}` : ''}
                 </UiText>
                 {firstReceiptOutput.colorManagedTransform && (
                   <UiText
+                    className="truncate"
                     color={TextColors.secondary}
                     data-testid="export-success-color-managed-transform"
                     variant={TextVariants.small}
@@ -1508,6 +1509,7 @@ export default function ExportPanel({
                 )}
                 {firstReceiptPolicyText && (
                   <UiText
+                    className="truncate"
                     color={TextColors.secondary}
                     data-testid="export-success-color-policy"
                     variant={TextVariants.small}
@@ -1542,11 +1544,11 @@ export default function ExportPanel({
                   </UiText>
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-1" data-testid="export-success-receipt-actions">
                 {canOpenReceiptInEditor && (
                   <>
                     <button
-                      className="rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
+                      className="min-w-0 rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
                       data-testid="export-success-choose-external-editor"
                       onClick={() => {
                         void handleChooseExternalEditor();
@@ -1556,7 +1558,7 @@ export default function ExportPanel({
                       {t('export.status.chooseExternalEditor')}
                     </button>
                     <button
-                      className="rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
+                      className="min-w-0 rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
                       data-testid="export-success-import-linked-variant"
                       disabled={isImportingCurrentExternalVariant}
                       onClick={() => {
@@ -1569,7 +1571,7 @@ export default function ExportPanel({
                         : t('export.status.importLinkedVariant')}
                     </button>
                     <button
-                      className="rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
+                      className="min-w-0 rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
                       data-testid="export-success-open-in-editor"
                       onClick={() => {
                         void handleOpenInExternalEditor(firstReceiptOutput.outputPath);
@@ -1581,7 +1583,7 @@ export default function ExportPanel({
                   </>
                 )}
                 <button
-                  className="rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
+                  className="min-w-0 rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
                   data-testid="export-success-show-in-finder"
                   onClick={() => {
                     void invoke(Invokes.ShowInFinder, { path: firstReceiptOutput.outputPath });
