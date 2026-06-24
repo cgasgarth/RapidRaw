@@ -3348,13 +3348,18 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                       {isActiveScan && <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-accent" />}
                     </button>
                     <button
-                      aria-pressed={isIncludedScan}
+                      aria-label={t(
+                        isIncludedScan
+                          ? 'modals.negativeConversion.excludeScan'
+                          : 'modals.negativeConversion.includeScan',
+                      )}
                       className={cx(
                         'rounded px-2 py-1 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-50',
                         isIncludedScan
                           ? 'bg-accent/15 text-text-primary'
                           : 'bg-bg-primary text-text-secondary hover:bg-surface',
                       )}
+                      data-included={String(isIncludedScan)}
                       data-testid={`negative-lab-include-toggle-${index}`}
                       disabled={isSaving || isEstimatingBaseFog}
                       onClick={() => {
