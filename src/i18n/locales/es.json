@@ -1179,6 +1179,7 @@
         "colorMixer": "Mezclador de colores",
         "cropAspectRatio": "Recorte y relación de aspecto",
         "curves": "Curvas",
+        "dustSpotVisualization": "Visualización de manchas de polvo",
         "exposureToneMapper": "Exposición y Mapeador de tonos",
         "grain": "Grano",
         "halationGlow": "Halación y Resplandor",

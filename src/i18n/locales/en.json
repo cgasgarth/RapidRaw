@@ -1718,6 +1718,7 @@
         "cropAspectRatio": "Crop & Aspect Ratio",
         "curves": "Curves",
         "deblur": "Deblur",
+        "dustSpotVisualization": "Dust Spot Visualization",
         "exposureToneMapper": "Exposure & Tone Mapper",
         "grain": "Grain",
         "halationGlow": "Halation & Glow",

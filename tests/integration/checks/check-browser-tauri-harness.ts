@@ -105,6 +105,10 @@ try {
   await commandPaletteForCopyPaste.getByRole('button', { name: /Copy and paste settings/u }).click();
   const copyPasteDialog = page.getByRole('dialog', { name: /Copy & Paste Settings/u });
   await copyPasteDialog.waitFor({ timeout: 10_000 });
+  await copyPasteDialog.getByText('Dust Spot Visualization').waitFor({ timeout: 10_000 });
+  if ((await copyPasteDialog.getByText('DustSpotVisualization').count()) > 0) {
+    throw new Error('Copy & Paste Settings leaked the dust spot internal identifier.');
+  }
   const saveButton = copyPasteDialog.getByRole('button', { name: 'Save' });
   await saveButton.waitFor({ timeout: 10_000 });
   const saveBox = await saveButton.boundingBox();
