@@ -132,6 +132,18 @@ const setStageCursor = (stage: KonvaStage | null, cursor: string): void => {
 const cssPx = (value: number | undefined): string => `${String(value ?? 0)}px`;
 const cssPercent = (value: number): string => `${String(value)}%`;
 const svgNumber = (value: number): string => String(value);
+const getRemoveCanvasStatusColor = (status: RetouchRemoveSource['status']): string => {
+  switch (status) {
+    case 'ready':
+      return '#22c55e';
+    case 'fallback_unchanged':
+    case 'stale':
+      return '#f59e0b';
+    case 'needs_regeneration':
+    case undefined:
+      return '#f97316';
+  }
+};
 const clamp01 = (value: number): number => {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(1, value));
@@ -2947,6 +2959,7 @@ const ImageCanvas = memo(
                 imageRenderSize.scale;
               const removeStatus = activeRemoveSource.status ?? 'needs_regeneration';
               const removeStatusLabel = t(`editor.layers.removeSource.status.${removeStatus}`);
+              const removeStatusColor = getRemoveCanvasStatusColor(activeRemoveSource.status);
 
               return (
                 <div
@@ -2955,6 +2968,7 @@ const ImageCanvas = memo(
                   data-remove-handle-layer-id={activeRemoveLayer.id}
                   data-remove-handle-radius-px={activeRemoveSource.radiusPx ?? ''}
                   data-remove-handle-feather-radius-px={activeRemoveSource.featherRadiusPx ?? ''}
+                  data-remove-handle-status-color={removeStatusColor}
                   data-remove-handle-status={activeRemoveSource.status ?? 'needs_regeneration'}
                   data-remove-handle-status-label={removeStatusLabel}
                   data-remove-handle-target-x={targetX}
@@ -3008,7 +3022,7 @@ const ImageCanvas = memo(
                           <Circle
                             listening={false}
                             radius={removeRadius}
-                            stroke="#f97316"
+                            stroke={removeStatusColor}
                             strokeOpacity={0.8}
                             strokeScaleEnabled={false}
                             strokeWidth={strokeWidth}
@@ -3033,7 +3047,7 @@ const ImageCanvas = memo(
                           <Circle
                             dragBoundFunc={dragBoundRetouchHandle}
                             draggable
-                            fill="#f97316"
+                            fill={removeStatusColor}
                             onDragEnd={(event) => {
                               handleRemoveTargetDragEnd(activeRemoveLayer.id, activeRemoveSource, event);
                             }}
@@ -3065,7 +3079,7 @@ const ImageCanvas = memo(
                               cornerRadius={6}
                               fill="rgba(15, 23, 42, 0.88)"
                               lineJoin="round"
-                              stroke="#f97316"
+                              stroke={removeStatusColor}
                               strokeWidth={1}
                             />
                             <KonvaText
