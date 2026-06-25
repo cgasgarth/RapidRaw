@@ -896,6 +896,7 @@
         "createAdjustmentLayer": "Create adjustment layer",
         "createCloneLayer": "",
         "createHealLayer": "Create heal layer",
+        "createRemoveLayer": "Create remove layer",
         "delete": "Delete layer",
         "duplicate": "Duplicate layer",
         "expandGroup": "Expand group",
@@ -908,8 +909,7 @@
         "showAllHidden": "Show all hidden",
         "solo": "Solo layer",
         "soloActive": "Solo active",
-        "ungroup": "Ungroup layers",
-        "createRemoveLayer": "Create remove layer"
+        "ungroup": "Ungroup layers"
       },
       "activeRenderState": {
         "hidden": "Hidden",
@@ -979,6 +979,11 @@
       "newHealLayerName_few": "",
       "newHealLayerName_many": "",
       "newHealLayerName_other": "",
+      "newRemoveLayerName": "Remove Layer {{count}}",
+      "newRemoveLayerName_one": "Remove Layer {{count}}",
+      "newRemoveLayerName_few": "",
+      "newRemoveLayerName_many": "",
+      "newRemoveLayerName_other": "Remove Layers {{count}}",
       "opacityPreset": "Set opacity to {{opacity}}",
       "operationReadiness": {
         "groupBlocked": "Group blocked",
@@ -987,6 +992,26 @@
         "moveReady": "Move ready",
         "ungroupBlocked": "Ungroup blocked",
         "ungroupReady": "Ungroup ready"
+      },
+      "removeRowSummary": "{{blendMode}} - {{opacity}}% - remove {{source}} - {{maskCount}}",
+      "removeSource": {
+        "defaultMaskName": "Remove target",
+        "feather": "Feather",
+        "generators": {
+          "localPatchFill": "Built-in local fill"
+        },
+        "radius": "Radius",
+        "regenerate": "Regenerate",
+        "search": "Search",
+        "seed": "Seed",
+        "status": {
+          "fallback_unchanged": "Fallback unchanged",
+          "needs_regeneration": "Needs regeneration",
+          "ready": "Ready",
+          "stale": "Stale"
+        },
+        "summary": "{{generator}} - {{status}}",
+        "title": "Remove"
       },
       "retouchSource": {
         "feather": "",
@@ -1010,30 +1035,7 @@
       "visibleLayerCount_one": "{{count}} visible",
       "visibleLayerCount_few": "{{count}} visible",
       "visibleLayerCount_many": "{{count}} visible",
-      "visibleLayerCount_other": "{{count}} visible",
-      "newRemoveLayerName": "Remove Layer {{count}}",
-      "newRemoveLayerName_one": "Remove Layer {{count}}",
-      "newRemoveLayerName_other": "Remove Layers {{count}}",
-      "removeRowSummary": "{{blendMode}} - {{opacity}}% - remove {{source}} - {{maskCount}}",
-      "removeSource": {
-        "defaultMaskName": "Remove target",
-        "feather": "Feather",
-        "generators": {
-          "localPatchFill": "Built-in local fill"
-        },
-        "radius": "Radius",
-        "regenerate": "Regenerate",
-        "search": "Search",
-        "seed": "Seed",
-        "status": {
-          "fallback_unchanged": "Fallback unchanged",
-          "needs_regeneration": "Needs regeneration",
-          "ready": "Ready",
-          "stale": "Stale"
-        },
-        "summary": "{{generator}} - {{status}}",
-        "title": "Remove"
-      }
+      "visibleLayerCount_other": "{{count}} visible"
     },
     "masks": {
       "actions": {

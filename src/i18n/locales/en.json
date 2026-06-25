@@ -931,22 +931,6 @@
         "ungroupBlocked": "Ungroup blocked",
         "ungroupReady": "Ungroup ready"
       },
-      "retouchSource": {
-        "feather": "Feather",
-        "modes": {
-          "clone": "Clone",
-          "heal": "Heal"
-        },
-        "radius": "Radius",
-        "rotation": "Rotation",
-        "scale": "Scale",
-        "sourceX": "Source X",
-        "sourceY": "Source Y",
-        "summary": "{{mode}} source {{source}}",
-        "targetX": "Target X",
-        "targetY": "Target Y",
-        "title": "Retouch source"
-      },
       "removeRowSummary": "{{blendMode}} - {{opacity}}% - remove {{source}} - {{maskCount}}",
       "removeSource": {
         "defaultMaskName": "Remove target",
@@ -966,6 +950,22 @@
         },
         "summary": "{{generator}} - {{status}}",
         "title": "Remove"
+      },
+      "retouchSource": {
+        "feather": "Feather",
+        "modes": {
+          "clone": "Clone",
+          "heal": "Heal"
+        },
+        "radius": "Radius",
+        "rotation": "Rotation",
+        "scale": "Scale",
+        "sourceX": "Source X",
+        "sourceY": "Source Y",
+        "summary": "{{mode}} source {{source}}",
+        "targetX": "Target X",
+        "targetY": "Target Y",
+        "title": "Retouch source"
       },
       "rowSummary": "{{blendMode}} - {{opacity}}% - {{maskCount}}",
       "title": "Layers",

@@ -491,11 +491,13 @@ export interface RetouchRemoveSource {
   generator: 'local_patch_fill_v1';
   generatorVersion: 1;
   radiusPx?: number | undefined;
-  resolvedSourcePoint?: {
-    pressure?: number | undefined;
-    x: number;
-    y: number;
-  };
+  resolvedSourcePoint?:
+    | {
+        pressure?: number | undefined;
+        x: number;
+        y: number;
+      }
+    | undefined;
   searchRadiusMultiplier: number;
   seed: number;
   status?: 'fallback_unchanged' | 'needs_regeneration' | 'ready' | 'stale' | undefined;
