@@ -5,6 +5,7 @@ import type { MaskContainer } from './adjustments';
 
 export interface NegativeConversionEditorHandoff {
   acceptedDustHealLayers?: Array<MaskContainer>;
+  acceptedDustHealLayersBySavedPath?: Record<string, Array<MaskContainer>>;
   openInEditor: boolean;
 }
 
@@ -71,9 +72,11 @@ export async function handleNegativeConversionEditorHandoff({
   }
 
   if (handoff.openInEditor && firstSavedPath) {
+    const acceptedDustHealLayers =
+      handoff.acceptedDustHealLayersBySavedPath?.[firstSavedPath] ?? handoff.acceptedDustHealLayers;
     pendingAcceptedDustHealLayers =
-      handoff.acceptedDustHealLayers !== undefined && handoff.acceptedDustHealLayers.length > 0
-        ? { layers: handoff.acceptedDustHealLayers, path: firstSavedPath }
+      acceptedDustHealLayers !== undefined && acceptedDustHealLayers.length > 0
+        ? { layers: acceptedDustHealLayers, path: firstSavedPath }
         : null;
     await handleImageSelect(firstSavedPath);
   }
