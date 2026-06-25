@@ -1019,6 +1019,8 @@ export default function LayerStackPanel({
               data-retouch-candidate-id={row.retouchCloneSource?.candidateProvenance?.candidateId ?? ''}
               data-retouch-candidate-origin={row.retouchCloneSource?.candidateProvenance?.origin ?? ''}
               data-retouch-clone-source={row.retouchCloneSourceLabel ?? ''}
+              data-retouch-rotation-degrees={row.retouchCloneSource?.rotationDegrees ?? ''}
+              data-retouch-scale={row.retouchCloneSource?.scale ?? ''}
               data-retouch-remove-source={row.retouchRemoveSourceLabel ?? ''}
               data-testid={
                 row.isGroupHeader
@@ -1108,6 +1110,17 @@ export default function LayerStackPanel({
                           opacity: row.opacity,
                         })}
                 </UiText>
+                {row.retouchCloneSource !== null && (
+                  <UiText
+                    as="span"
+                    variant={TextVariants.small}
+                    color={TextColors.secondary}
+                    className="block truncate tabular-nums"
+                    data-testid="layer-retouch-transform-summary"
+                  >
+                    {`scale ${row.retouchCloneSource.scale.toFixed(2)} | rotate ${row.retouchCloneSource.rotationDegrees.toFixed(1)} deg`}
+                  </UiText>
+                )}
               </span>
               <span className="flex items-center gap-1">
                 <button
