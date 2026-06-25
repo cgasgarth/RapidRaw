@@ -240,6 +240,10 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   validation path: stage the intended files and try the commit. If precommit
   fails, fix the reported issue and retry the commit. Do not manually replay
   every check that precommit already covers unless debugging the failing hook.
+- Do not bypass the precommit hook for routine work. If the user has explicitly
+  paused local testing/checks/builds, `--no-verify` may be used only to respect
+  that pause; PR validation must then clearly say local hooks were skipped and
+  hosted CI is the validation source.
 - Run extra focused local validation only when it proves changed runtime,
   preview/export, UI, or image-output behavior that precommit cannot cover.
   Record those extra commands as PR evidence.
@@ -249,6 +253,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   update the cheapest appropriate precommit/local gate before treating the fix
   as complete. Do not add precommit coverage for runner/network/service
   infrastructure failures that cannot be reproduced locally.
+- If the failing GitHub Actions command is already covered by precommit, do not
+  add duplicate hook work. Record that the hook already covers the failure class
+  and fix the process miss that let the PR skip that local gate.
 - Do not treat narrow checks as proof of broad behavior. Match validation scope
   to the requirement being claimed.
 - Treat plan-only, schema-only, API-only, dry-run-only, UI-only, and runtime
