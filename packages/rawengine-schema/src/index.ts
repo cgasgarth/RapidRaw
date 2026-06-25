@@ -12,6 +12,7 @@ export * from './focusStackWeightedBlend.js';
 export * from './derivedArtifactInvalidation.js';
 export * from './editCommandBus.js';
 export * from './editGraphMigrations.js';
+export * from './exportColorCapabilities.js';
 export * from './exportRecipeSchemas.js';
 export * from './filmGrainProvenance.js';
 export * from './filmGrainRuntime.js';
