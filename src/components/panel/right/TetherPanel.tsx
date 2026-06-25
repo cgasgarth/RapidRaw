@@ -577,6 +577,8 @@ export function TetherPanel({
                   data-capture-imported-path={incomingCapture.importedPath}
                   data-capture-key={key}
                   data-backup-status={incomingCapture.backup.status}
+                  data-ingest-collision-index={incomingCapture.ingest.collisionIndex}
+                  data-ingest-file-name={incomingCapture.ingest.fileName}
                   data-ingest-preset-id={incomingCapture.ingest.presetId}
                   data-metadata-template-id={incomingCapture.metadata.templateId}
                   data-pinned={String(isPinned)}
@@ -599,6 +601,17 @@ export function TetherPanel({
                     </UiText>
                     <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block truncate">
                       {incomingCapture.capturedAt}
+                    </UiText>
+                    <UiText
+                      variant={TextVariants.small}
+                      color={TextColors.secondary}
+                      className="mt-1 block truncate"
+                      data-testid="tether-incoming-capture-ingest"
+                    >
+                      {t('editor.tether.ingestApplied', {
+                        collisionIndex: incomingCapture.ingest.collisionIndex,
+                        preset: t(tetherIngestPresetLocaleKey(incomingCapture.ingest.presetId)),
+                      })}
                     </UiText>
                   </button>
                   <div className="mt-2 flex gap-1">
