@@ -2501,6 +2501,9 @@
         "ignored": "已忽略",
         "pending": "待处理"
       },
+      "acceptDustCandidate": "Accept as heal",
+      "dustHealLayerCount": "Heal layers {{count}}",
+      "rejectDustCandidate": "Reject",
       "dustRetouchCount": "",
       "dustReviewCount": "",
       "dustScratchReview": "",

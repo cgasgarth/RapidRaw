@@ -2555,6 +2555,9 @@
         "ignored": "Ignored",
         "pending": "Pending"
       },
+      "acceptDustCandidate": "Accept as heal",
+      "dustHealLayerCount": "Heal layers {{count}}",
+      "rejectDustCandidate": "Reject",
       "dustRetouchCount": "Retouch {{retouchCount}}",
       "dustReviewCount": "Review {{reviewCount}}",
       "dustScratchReview": "Dust & scratch review",

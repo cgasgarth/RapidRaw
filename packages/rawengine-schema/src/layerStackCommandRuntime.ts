@@ -4,6 +4,7 @@ import { layerScopedAdjustmentStateV1Schema, layerScopedToneAdjustmentV1Schema }
 import {
   RAW_ENGINE_SCHEMA_VERSION,
   layerMaskBlendModeV1Schema,
+  layerMaskCloneSourceV1Schema,
   layerMaskCommandEnvelopeV1Schema,
   layerMaskDryRunResultV1Schema,
   layerMaskMutationResultV1Schema,
@@ -22,29 +23,7 @@ export const layerStackSidecarLayerV1Schema = z
     maskIds: z.array(z.string().trim().min(1)),
     name: z.string().trim().min(1),
     opacity: z.number().min(0).max(1),
-    retouchCloneSource: z
-      .object({
-        alignmentErrorPx: z.number().min(0).optional(),
-        featherRadiusPx: z.number().min(0).max(4096).optional(),
-        radiusPx: z.number().positive().max(4096).optional(),
-        retouchMode: z.enum(['clone', 'heal']).optional(),
-        rotationDegrees: z.number().min(-180).max(180),
-        scale: z.number().min(0.1).max(10),
-        sourcePoint: z
-          .object({
-            x: z.number().min(0).max(1),
-            y: z.number().min(0).max(1),
-          })
-          .strict(),
-        targetPoint: z
-          .object({
-            x: z.number().min(0).max(1),
-            y: z.number().min(0).max(1),
-          })
-          .strict(),
-      })
-      .strict()
-      .optional(),
+    retouchCloneSource: layerMaskCloneSourceV1Schema.optional(),
     visible: z.boolean(),
   })
   .strict();

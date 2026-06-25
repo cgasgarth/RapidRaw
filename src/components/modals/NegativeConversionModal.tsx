@@ -66,6 +66,7 @@ import {
   buildNegativeLabDustScratchReviewReport,
   buildNegativeLabQcProofReport,
 } from '../../utils/negativeLabDustScratchReview';
+import { buildDustCandidateHealLayer } from '../../utils/dustCandidateHealLayer';
 import {
   buildNegativeLabFrameExposureOverridePayload,
   getNegativeLabEffectiveFrameExposure,
@@ -427,6 +428,9 @@ const DUST_SCRATCH_CANDIDATE_STATUS_LABEL_KEYS = {
   ignored: 'modals.negativeConversion.dustCandidateStatus.ignored',
   pending: 'modals.negativeConversion.dustCandidateStatus.pending',
 } as const;
+type NegativeLabDustCandidateDecision = 'accepted' | 'rejected';
+type NegativeLabDustScratchFrame = ReturnType<typeof buildNegativeLabDustScratchReviewReport>['frames'][number];
+type NegativeLabDustScratchCandidate = NegativeLabDustScratchFrame['candidates'][number];
 type NegativeLabFrameHealthFilter = 'all' | NegativeLabFrameWarningSeverity;
 type NegativeLabFrameHealthSort = 'roll_order' | 'warning_severity';
 const NEGATIVE_LAB_FRAME_HEALTH_FILTERS = ['all', 'review', 'info', 'ok'] satisfies Array<NegativeLabFrameHealthFilter>;
@@ -610,6 +614,12 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     readNegativeLabQcOverlayVisibility,
   );
   const [qcDecisionByFrameId, setQcDecisionByFrameId] = useState<Record<string, NegativeLabQcDecision>>({});
+  const [dustCandidateDecisionById, setDustCandidateDecisionById] = useState<
+    Record<string, NegativeLabDustCandidateDecision>
+  >({});
+  const [dustHealLayerByCandidateId, setDustHealLayerByCandidateId] = useState<
+    Record<string, ReturnType<typeof buildDustCandidateHealLayer>>
+  >({});
   const [cropStatusByFrameId, setCropStatusByFrameId] = useState<Record<string, NegativeLabFrameCropStatus>>({});
   const [frameExposureOffsetByFrameId, setFrameExposureOffsetByFrameId] = useState<Record<string, number>>({});
   const [frameRgbBalanceOffsetByFrameId, setFrameRgbBalanceOffsetByFrameId] = useState<
@@ -957,6 +967,30 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     () => buildNegativeLabDustScratchReviewReport(frameHealthReport, previewUrl !== null),
     [frameHealthReport, previewUrl],
   );
+  const dustHealLayerCount = Object.keys(dustHealLayerByCandidateId).length;
+  const handleAcceptDustCandidate = (frame: NegativeLabDustScratchFrame, candidate: NegativeLabDustScratchCandidate) => {
+    if (candidate.kind !== 'dust_spot') {
+      setDustCandidateDecisionById((previous) => ({ ...previous, [candidate.candidateId]: 'rejected' }));
+      return;
+    }
+
+    const healLayer = buildDustCandidateHealLayer({
+      candidate,
+      frameId: frame.frameId,
+      imageHeight: 1000,
+      imageWidth: 1000,
+    });
+    setDustHealLayerByCandidateId((previous) => ({ ...previous, [candidate.candidateId]: healLayer }));
+    setDustCandidateDecisionById((previous) => ({ ...previous, [candidate.candidateId]: 'accepted' }));
+  };
+  const handleRejectDustCandidate = (candidate: NegativeLabDustScratchCandidate) => {
+    setDustHealLayerByCandidateId((previous) => {
+      const next = { ...previous };
+      delete next[candidate.candidateId];
+      return next;
+    });
+    setDustCandidateDecisionById((previous) => ({ ...previous, [candidate.candidateId]: 'rejected' }));
+  };
   const batchDryRunSummaryJson = useMemo(() => JSON.stringify(batchDryRunSummary), [batchDryRunSummary]);
   const batchDryRunPlanJson = useMemo(
     () =>
@@ -3037,6 +3071,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-retouch-count">
             {t('modals.negativeConversion.dustRetouchCount', { retouchCount: dustScratchReviewReport.retouchCount })}
           </span>
+          <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-dust-heal-layer-count">
+            {t('modals.negativeConversion.dustHealLayerCount', { count: dustHealLayerCount })}
+          </span>
         </div>
       </div>
       <UiText variant={TextVariants.small} className="text-text-tertiary">
@@ -3067,20 +3104,49 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 data-candidate-count={frame.candidates.length}
                 data-testid={`negative-lab-dust-candidate-list-${index}`}
               >
-                {frame.candidates.map((candidate) => (
-                  <span
-                    className="rounded border border-yellow-300/30 bg-yellow-300/10 px-1.5 py-0.5 text-[11px] text-yellow-100"
-                    data-candidate-confidence={candidate.confidence.toFixed(2)}
-                    data-candidate-kind={candidate.kind}
-                    data-candidate-status={candidate.status}
-                    data-testid={`negative-lab-dust-candidate-${candidate.candidateId}`}
-                    key={candidate.candidateId}
-                  >
-                    {t(DUST_SCRATCH_CANDIDATE_KIND_LABEL_KEYS[candidate.kind])}
-                    {' / '}
-                    {t(DUST_SCRATCH_CANDIDATE_STATUS_LABEL_KEYS[candidate.status])}
-                  </span>
-                ))}
+                {frame.candidates.map((candidate) => {
+                  const candidateDecision = dustCandidateDecisionById[candidate.candidateId] ?? candidate.status;
+                  const healLayer = dustHealLayerByCandidateId[candidate.candidateId];
+                  const canAccept = candidate.kind === 'dust_spot';
+
+                  return (
+                    <div
+                      className="grid grid-cols-[1fr_auto_auto] items-center gap-1 rounded border border-yellow-300/30 bg-yellow-300/10 px-1.5 py-1 text-[11px] text-yellow-100"
+                      data-candidate-confidence={candidate.confidence.toFixed(2)}
+                      data-candidate-kind={candidate.kind}
+                      data-candidate-review-decision={candidateDecision}
+                      data-candidate-status={candidate.status}
+                      data-generated-heal-confidence={healLayer?.retouchCloneSource?.candidateProvenance?.confidence ?? ''}
+                      data-generated-heal-layer-id={healLayer?.id ?? ''}
+                      data-testid={`negative-lab-dust-candidate-${candidate.candidateId}`}
+                      key={candidate.candidateId}
+                    >
+                      <span className="min-w-0 truncate">
+                        {t(DUST_SCRATCH_CANDIDATE_KIND_LABEL_KEYS[candidate.kind])}
+                        {' / '}
+                        {t(DUST_SCRATCH_CANDIDATE_STATUS_LABEL_KEYS[candidate.status])}
+                      </span>
+                      <button
+                        className="rounded bg-yellow-200 px-1.5 py-0.5 font-medium text-black disabled:cursor-not-allowed disabled:opacity-40"
+                        data-testid={`negative-lab-accept-dust-candidate-${candidate.candidateId}`}
+                        disabled={!canAccept || candidateDecision === 'accepted'}
+                        onClick={() => handleAcceptDustCandidate(frame, candidate)}
+                        type="button"
+                      >
+                        {t('modals.negativeConversion.acceptDustCandidate')}
+                      </button>
+                      <button
+                        className="rounded border border-yellow-200/40 px-1.5 py-0.5 text-yellow-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        data-testid={`negative-lab-reject-dust-candidate-${candidate.candidateId}`}
+                        disabled={candidateDecision === 'rejected'}
+                        onClick={() => handleRejectDustCandidate(candidate)}
+                        type="button"
+                      >
+                        {t('modals.negativeConversion.rejectDustCandidate')}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

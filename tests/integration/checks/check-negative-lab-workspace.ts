@@ -4,6 +4,7 @@ import {
   buildNegativeLabDustScratchReviewReport,
   buildNegativeLabQcProofReport,
 } from '../../../src/utils/negativeLabDustScratchReview.ts';
+import { buildDustCandidateHealLayer } from '../../../src/utils/dustCandidateHealLayer.ts';
 import { buildNegativeLabFrameHealthReport } from '../../../src/utils/negativeLabFrameHealth.ts';
 import {
   NEGATIVE_LAB_WORKSPACE_SCHEMA_VERSION,
@@ -52,6 +53,11 @@ const proof = negativeLabWorkspaceProofSchema.parse({
   targetCount: targetPaths.length,
 });
 const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
+const firstReviewFrame = mixedReviewReport.frames.find((frame) =>
+  frame.candidates.some((candidate) => candidate.kind === 'dust_spot'),
+);
+const firstDustCandidate = firstReviewFrame?.candidates.find((candidate) => candidate.kind === 'dust_spot');
+const firstScratchCandidate = firstReviewFrame?.candidates.find((candidate) => candidate.kind === 'emulsion_scratch');
 
 if (proof.reviewReport.frames.length !== targetPaths.length) {
   throw new Error('Negative Lab workspace review did not cover every frame.');
@@ -99,6 +105,46 @@ if (
 
 if (!mixedReviewReport.frames.some((frame) => frame.candidates.some((candidate) => candidate.status === 'pending'))) {
   throw new Error('Negative Lab workspace review did not expose pending dust/scratch candidate overlays.');
+}
+
+if (firstReviewFrame === undefined || firstDustCandidate === undefined || firstScratchCandidate === undefined) {
+  throw new Error('Negative Lab workspace review did not expose dust and scratch candidates for retouch handoff.');
+}
+
+const dustHealLayer = buildDustCandidateHealLayer({
+  candidate: firstDustCandidate,
+  frameId: firstReviewFrame.frameId,
+  imageHeight: 800,
+  imageWidth: 1000,
+  layerId: 'test_dust_heal_layer',
+  targetSubMaskId: 'test_dust_target',
+});
+const dustHealSource = dustHealLayer.retouchCloneSource;
+const dustHealProvenance = dustHealSource?.candidateProvenance;
+
+if (
+  dustHealSource?.retouchMode !== 'heal' ||
+  dustHealProvenance === undefined ||
+  dustHealProvenance.candidateId !== firstDustCandidate.candidateId ||
+  dustHealProvenance.confidence !== firstDustCandidate.confidence ||
+  dustHealSource.sourcePoint.x === dustHealSource.targetPoint.x ||
+  dustHealLayer.subMasks[0]?.type !== 'radial'
+) {
+  throw new Error('Negative Lab dust candidate did not become an editable heal layer handoff.');
+}
+
+try {
+  buildDustCandidateHealLayer({
+    candidate: firstScratchCandidate,
+    frameId: firstReviewFrame.frameId,
+    imageHeight: 800,
+    imageWidth: 1000,
+  });
+  throw new Error('Negative Lab scratch candidates should stay review-only in the dust heal handoff slice.');
+} catch (error) {
+  if (!(error instanceof Error) || !error.message.includes('dust spot candidates')) {
+    throw error;
+  }
 }
 
 if (
@@ -168,6 +214,14 @@ for (const marker of [
   'scanInputGuidanceAvoidProofs',
   'negative-lab-dust-candidate-list-',
   'negative-lab-dust-candidate-${candidate.candidateId}',
+  'negative-lab-dust-heal-layer-count',
+  'negative-lab-accept-dust-candidate-${candidate.candidateId}',
+  'negative-lab-reject-dust-candidate-${candidate.candidateId}',
+  'buildDustCandidateHealLayer',
+  'handleAcceptDustCandidate',
+  'handleRejectDustCandidate',
+  'data-candidate-review-decision={candidateDecision}',
+  'data-generated-heal-layer-id={healLayer?.id ??',
   'negative-lab-qc-proof-artifact',
   'negative-lab-qc-overlay-controls',
   'data-overlay-count={qcProofArtifact.overlays.length}',

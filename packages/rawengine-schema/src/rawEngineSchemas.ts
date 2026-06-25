@@ -1647,6 +1647,18 @@ export const layerMaskRefinementParametersV1Schema = z
 export const layerMaskCloneSourceV1Schema = z
   .object({
     alignmentErrorPx: z.number().min(0).optional(),
+    candidateProvenance: z
+      .object({
+        candidateId: z.string().trim().min(1),
+        candidateKind: z.enum(['dust_spot', 'emulsion_scratch']),
+        confidence: z.number().min(0).max(1),
+        confidenceSemantics: z.literal('ranking_score_v1'),
+        origin: z.literal('negative_lab_dust_candidate'),
+        sourceFrameId: z.string().trim().min(1),
+        statusAtAcceptance: z.enum(['acknowledged', 'ignored', 'pending']),
+      })
+      .strict()
+      .optional(),
     featherRadiusPx: z.number().min(0).max(4096).optional(),
     radiusPx: z.number().positive().max(4096).optional(),
     retouchMode: z.enum(['clone', 'heal']).optional(),
