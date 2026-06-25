@@ -133,6 +133,30 @@ if (
   throw new Error('Negative Lab dust candidate did not become an editable heal layer handoff.');
 }
 
+const edgeDustHealLayer = buildDustCandidateHealLayer({
+  candidate: {
+    ...firstDustCandidate,
+    candidateId: 'edge_dust_candidate',
+    geometry: {
+      height: 0.02,
+      width: 0.02,
+      x: 0.985,
+      y: firstDustCandidate.geometry.y,
+    },
+  },
+  frameId: firstReviewFrame.frameId,
+  imageHeight: 800,
+  imageWidth: 1000,
+});
+const edgeDustHealSource = edgeDustHealLayer.retouchCloneSource;
+if (
+  edgeDustHealSource === undefined ||
+  edgeDustHealSource.sourcePoint.x >= edgeDustHealSource.targetPoint.x ||
+  edgeDustHealSource.sourcePoint.x === edgeDustHealSource.targetPoint.x
+) {
+  throw new Error('Negative Lab edge dust candidate did not choose a distinct in-bounds heal source.');
+}
+
 try {
   buildDustCandidateHealLayer({
     candidate: firstScratchCandidate,
