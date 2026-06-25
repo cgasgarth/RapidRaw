@@ -117,6 +117,7 @@ export interface ExportReceiptOutput {
   renderingIntent?: string | null | undefined;
   requestedColorProfile?: string | null | undefined;
   sourcePath: string;
+  sourcePrecisionPath?: string | null | undefined;
   transformApplied?: boolean | null | undefined;
 }
 

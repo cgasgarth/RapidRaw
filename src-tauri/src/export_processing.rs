@@ -60,6 +60,7 @@ struct ExportReceiptOutput {
     rendering_intent: Option<String>,
     requested_color_profile: Option<String>,
     source_path: String,
+    source_precision_path: Option<String>,
     transform_applied: Option<bool>,
 }
 
@@ -632,6 +633,7 @@ fn encode_image_with_applied_policy(
                     &normalized_format,
                     color_profile,
                     rendering_intent,
+                    &export_source_precision_receipt_label(image),
                 ),
             });
         }
@@ -653,6 +655,7 @@ fn encode_image_with_applied_policy(
                     &normalized_format,
                     color_profile,
                     rendering_intent,
+                    &export_source_precision_receipt_label(image),
                 ),
             });
         }
@@ -1492,6 +1495,9 @@ fn export_receipt_output(
             .as_ref()
             .map(|metadata| metadata.requested_color_profile.clone()),
         source_path: source_path.to_string(),
+        source_precision_path: metadata
+            .as_ref()
+            .map(|metadata| metadata.source_precision_path.clone()),
         transform_applied: metadata.map(|metadata| metadata.transform_applied),
     })
 }
@@ -1507,6 +1513,7 @@ pub(crate) struct ExportReceiptMetadata {
     policy_version: String,
     rendering_intent: String,
     requested_color_profile: String,
+    source_precision_path: String,
     transform_applied: bool,
 }
 
@@ -1514,6 +1521,7 @@ fn export_receipt_metadata(
     format: &str,
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
+    source_precision_path: &str,
 ) -> Option<ExportReceiptMetadata> {
     if !supports_color_managed_receipt_metadata(format) {
         return None;
@@ -1542,8 +1550,31 @@ fn export_receipt_metadata(
         policy_version: "rawengine-export-color-policy-v1".to_string(),
         rendering_intent: export_rendering_intent_receipt_label(rendering_intent),
         requested_color_profile: export_color_profile_receipt_label(color_profile),
+        source_precision_path: source_precision_path.to_string(),
         transform_applied,
     })
+}
+
+fn export_source_precision_receipt_label(image: &DynamicImage) -> String {
+    match image {
+        DynamicImage::ImageRgb32F(_) => {
+            "rgb32f source; quantized only at color-managed encoder boundary".to_string()
+        }
+        DynamicImage::ImageRgba32F(_) => {
+            "rgba32f source; alpha dropped and quantized only at color-managed encoder boundary"
+                .to_string()
+        }
+        DynamicImage::ImageRgb16(_) => "rgb16 source; shared RGB16 export/proof core".to_string(),
+        DynamicImage::ImageRgba16(_) => {
+            "rgba16 source; alpha dropped for RGB color-managed export/proof".to_string()
+        }
+        DynamicImage::ImageRgb8(_) | DynamicImage::ImageRgba8(_) => {
+            "rgba8/rgb8 source; GPU readback-limited before color-managed export/proof".to_string()
+        }
+        _ => {
+            "image crate RGB16 conversion source; high-precision color path not proven".to_string()
+        }
+    }
 }
 
 fn supports_color_managed_receipt_metadata(format: &str) -> bool {
@@ -1905,8 +1936,9 @@ mod tests {
         encode_image_with_applied_policy, export_color_profile_receipt_label,
         export_jpeg_rgb_pixels_and_profile, export_receipt_metadata, export_rgb_pixels_and_profile,
         export_rgb16_pixels_and_profile, export_rgb16_pixels_with_shared_conversion_core,
-        export_soft_proof_rgb_pixels_and_profile, export_transform_options, mox_rendering_intent,
-        quantize_rgb16_to_rgb8, should_apply_srgb_perceptual_gamut_mapping,
+        export_soft_proof_rgb_pixels_and_profile, export_source_precision_receipt_label,
+        export_transform_options, mox_rendering_intent, quantize_rgb16_to_rgb8,
+        should_apply_srgb_perceptual_gamut_mapping,
     };
     use crate::gamut_mapping::SRGB_OKLAB_CHROMA_REDUCE_V1;
     use std::io::Cursor;
@@ -1945,6 +1977,10 @@ mod tests {
 
     fn red_channel(image: &DynamicImage, x: u32, y: u32) -> f32 {
         image.to_rgb32f().get_pixel(x, y).0[0]
+    }
+
+    fn synthetic_source_precision_path() -> String {
+        export_source_precision_receipt_label(&synthetic_export_edge())
     }
 
     fn jpeg_icc_chunks(bytes: &[u8]) -> Vec<&[u8]> {
@@ -2052,9 +2088,13 @@ mod tests {
     #[test]
     fn export_receipt_reports_semantic_applied_policy() {
         let settings = base_export_settings(None);
-        let metadata =
-            export_receipt_metadata("tiff", &settings.color_profile, &settings.rendering_intent)
-                .expect("TIFF receipt metadata should be available");
+        let metadata = export_receipt_metadata(
+            "tiff",
+            &settings.color_profile,
+            &settings.rendering_intent,
+            &synthetic_source_precision_path(),
+        )
+        .expect("TIFF receipt metadata should be available");
 
         assert_eq!(metadata.rendering_intent, "Relative colorimetric");
         assert_eq!(metadata.bit_depth, 16);
@@ -2072,6 +2112,10 @@ mod tests {
             metadata.black_point_compensation,
             "Unavailable until CMM support is implemented"
         );
+        assert_eq!(
+            metadata.source_precision_path,
+            "rgb32f source; quantized only at color-managed encoder boundary"
+        );
     }
 
     #[test]
@@ -2080,6 +2124,7 @@ mod tests {
             "tiff",
             &ExportColorProfile::Srgb,
             &ExportRenderingIntent::Perceptual,
+            &synthetic_source_precision_path(),
         )
         .expect("TIFF receipt metadata should be available");
 
@@ -2095,9 +2140,13 @@ mod tests {
     fn display_p3_export_receipt_reports_transform_applied() {
         let mut settings = base_export_settings(None);
         settings.color_profile = ExportColorProfile::DisplayP3;
-        let metadata =
-            export_receipt_metadata("jpg", &settings.color_profile, &settings.rendering_intent)
-                .expect("JPEG receipt metadata should be available");
+        let metadata = export_receipt_metadata(
+            "jpg",
+            &settings.color_profile,
+            &settings.rendering_intent,
+            &synthetic_source_precision_path(),
+        )
+        .expect("JPEG receipt metadata should be available");
 
         assert_eq!(
             metadata.color_managed_transform,
@@ -2434,6 +2483,7 @@ mod tests {
                 "tiff",
                 &profile,
                 &ExportRenderingIntent::RelativeColorimetric,
+                &export_source_precision_receipt_label(&image),
             )
             .expect("wide-gamut export should emit receipt metadata");
 

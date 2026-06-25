@@ -1464,6 +1464,7 @@ export default function ExportPanel({
             data-export-receipt-output-path={firstReceiptOutput.outputPath}
             data-export-receipt-policy-version={firstReceiptOutput.policyVersion ?? ''}
             data-export-receipt-requested-color-profile={firstReceiptOutput.requestedColorProfile ?? ''}
+            data-export-receipt-source-precision-path={firstReceiptOutput.sourcePrecisionPath ?? ''}
             data-export-receipt-total={lastReceipt.total}
             data-export-receipt-transform-applied={String(firstReceiptOutput.transformApplied ?? '')}
             data-testid="export-success-receipt"
