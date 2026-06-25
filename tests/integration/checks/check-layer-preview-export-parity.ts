@@ -392,14 +392,14 @@ const removeFixture = {
 const removePreview = renderLayerPreviewStack(removeFixture);
 const removeExport = renderLayerExportStack(removeFixture);
 const removePackage = renderPackageLayerPreviewStack(removeFixture);
-const expectedResolvedRemoveSource = [
+const expectedResolvedRemoveSource = z.array(resolvedRemoveSourceSchema).parse([
   {
     layerId: 'remove-local-fill',
     resolvedSourcePoint: { x: 0.25, y: 0.5 },
     status: 'ready',
     targetMaskId: 'remove-target',
   },
-] satisfies Array<z.infer<typeof resolvedRemoveSourceSchema>>;
+]);
 const removePreviewHash = hashPixels(removePreview.pixels);
 if (removePreviewHash !== hashPixels(removeExport.pixels) || removePreviewHash !== hashPixels(removePackage.pixels)) {
   fail('remove-local-fill: preview/export/package hash mismatch');
