@@ -958,6 +958,7 @@
           "heal": ""
         },
         "radius": "",
+        "resetTransform": "",
         "rotation": "",
         "scale": "",
         "sourceX": "",
