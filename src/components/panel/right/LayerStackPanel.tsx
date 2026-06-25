@@ -17,6 +17,7 @@ import {
 import { type KeyboardEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { Mask, SubMaskMode } from './Masks';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import {
   DEFAULT_LAYER_BLEND_MODE,
@@ -49,7 +50,6 @@ import {
   applyLayerStackCommandBridgeOperation,
   type LayerStackCommandBridgeOperation,
 } from '../../../utils/layerStackCommandBridge';
-import { Mask, SubMaskMode } from './Masks';
 import Slider, { type SliderChangeEvent } from '../../ui/Slider';
 import UiText from '../../ui/Text';
 
@@ -121,6 +121,20 @@ function isLayerBlendMode(value: string): value is LayerBlendMode {
 
 function getBlendModeLabelKey(value: LayerBlendMode): BlendModeLabelKey {
   return blendModes.find((blendMode) => blendMode.value === value)?.labelKey ?? 'editor.layers.blendModes.normal';
+}
+
+function getRemoveStatusLabelKey(status: RetouchRemoveSource['status']) {
+  switch (status) {
+    case 'fallback_unchanged':
+      return 'editor.layers.removeSource.status.fallback_unchanged';
+    case 'ready':
+      return 'editor.layers.removeSource.status.ready';
+    case 'stale':
+      return 'editor.layers.removeSource.status.stale';
+    case 'needs_regeneration':
+    case undefined:
+      return 'editor.layers.removeSource.status.needs_regeneration';
+  }
 }
 
 function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string>): Array<LayerRowModel> {
@@ -846,16 +860,16 @@ export default function LayerStackPanel({
                           opacity: row.opacity,
                           source: row.retouchRemoveSourceLabel,
                         })
-                    : t('editor.layers.rowSummary', {
-                        blendMode:
-                          row.blendMode === null
-                            ? t('editor.layers.groupType')
-                            : t(getBlendModeLabelKey(row.blendMode)),
-                        maskCount: row.isGroupHeader
-                          ? t('editor.layers.groupCount', { count: row.groupLayerCount })
-                          : getMaskCountLabel(row.maskCount),
-                        opacity: row.opacity,
-                      })}
+                      : t('editor.layers.rowSummary', {
+                          blendMode:
+                            row.blendMode === null
+                              ? t('editor.layers.groupType')
+                              : t(getBlendModeLabelKey(row.blendMode)),
+                          maskCount: row.isGroupHeader
+                            ? t('editor.layers.groupCount', { count: row.groupLayerCount })
+                            : getMaskCountLabel(row.maskCount),
+                          opacity: row.opacity,
+                        })}
                 </UiText>
               </span>
               <span className="flex items-center gap-1">
@@ -1137,12 +1151,7 @@ export default function LayerStackPanel({
                   <UiText variant={TextVariants.small} className="block text-text-tertiary">
                     {t('editor.layers.removeSource.summary', {
                       generator: t('editor.layers.removeSource.generators.localPatchFill'),
-                      status: t(
-                        [
-                          'editor.layers.removeSource.status',
-                          activeRow.retouchRemoveSource.status ?? 'needs_regeneration',
-                        ].join('.'),
-                      ),
+                      status: t(getRemoveStatusLabelKey(activeRow.retouchRemoveSource.status)),
                     })}
                   </UiText>
                 </span>

@@ -492,6 +492,7 @@ export interface RetouchRemoveSource {
   generatorVersion: 1;
   radiusPx?: number | undefined;
   resolvedSourcePoint?: {
+    pressure?: number | undefined;
     x: number;
     y: number;
   };

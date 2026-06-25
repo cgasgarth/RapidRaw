@@ -5,19 +5,20 @@ export interface RemoveRgbPixel {
 }
 
 export interface RemovePoint {
+  pressure?: number | undefined;
   x: number;
   y: number;
 }
 
 export interface RetouchRemoveSourceV1 {
-  featherRadiusPx?: number;
+  featherRadiusPx?: number | undefined;
   generator: 'local_patch_fill_v1';
   generatorVersion: 1;
-  radiusPx?: number;
-  resolvedSourcePoint?: RemovePoint;
+  radiusPx?: number | undefined;
+  resolvedSourcePoint?: RemovePoint | undefined;
   searchRadiusMultiplier: number;
   seed: number;
-  status?: 'fallback_unchanged' | 'needs_regeneration' | 'ready' | 'stale';
+  status?: 'fallback_unchanged' | 'needs_regeneration' | 'ready' | 'stale' | undefined;
   targetMaskId: string;
 }
 
@@ -148,16 +149,17 @@ export const resolveRemoveSamplingPlan = (input: {
       offset,
       score: scoreOffset(input.pixels, maskAlpha, indexes, input.width, input.height, offset),
     }))
-    .filter(
-      (candidate): candidate is { index: number; offset: RemovePoint; score: number } => candidate.score !== null,
-    )
+    .filter((candidate): candidate is { index: number; offset: RemovePoint; score: number } => candidate.score !== null)
     .toSorted(
       (a, b) =>
-        a.score - b.score || seededRank(input.removeSource.seed, a.index) - seededRank(input.removeSource.seed, b.index),
+        a.score - b.score ||
+        seededRank(input.removeSource.seed, a.index) - seededRank(input.removeSource.seed, b.index),
     );
 
   const selected =
-    scoredCandidates[Math.min(scoredCandidates.length - 1, input.removeSource.seed % Math.min(4, scoredCandidates.length))];
+    scoredCandidates[
+      Math.min(scoredCandidates.length - 1, input.removeSource.seed % Math.min(4, scoredCandidates.length))
+    ];
   if (selected === undefined) return null;
   return {
     sourcePoint: {
