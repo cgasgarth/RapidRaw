@@ -40,6 +40,7 @@ export * from './panoramaLocalOptimizationRansac.js';
 export * from './panoramaRuntimePlan.js';
 export * from './panoramaSyntheticStitch.js';
 export * from './rawEngineSchemas.js';
+export * from './retouchRemoveRuntime.js';
 export * from './superResolutionAlignmentDiagnostics.js';
 export * from './superResolutionAppServerRuntime.js';
 export * from './superResolutionReconstructionDiagnostics.js';

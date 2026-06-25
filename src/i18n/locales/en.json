@@ -851,6 +851,7 @@
         "createAdjustmentLayer": "Create adjustment layer",
         "createCloneLayer": "Create clone layer",
         "createHealLayer": "Create heal layer",
+        "createRemoveLayer": "Create remove layer",
         "delete": "Delete layer",
         "duplicate": "Duplicate layer",
         "expandGroup": "Expand group",
@@ -918,6 +919,9 @@
       "newHealLayerName": "Heal Layer {{count}}",
       "newHealLayerName_one": "",
       "newHealLayerName_other": "",
+      "newRemoveLayerName": "Remove Layer {{count}}",
+      "newRemoveLayerName_one": "Remove Layer {{count}}",
+      "newRemoveLayerName_other": "Remove Layers {{count}}",
       "opacityPreset": "Set opacity to {{opacity}}",
       "operationReadiness": {
         "groupBlocked": "Group blocked",
@@ -926,6 +930,26 @@
         "moveReady": "Move ready",
         "ungroupBlocked": "Ungroup blocked",
         "ungroupReady": "Ungroup ready"
+      },
+      "removeRowSummary": "{{blendMode}} - {{opacity}}% - remove {{source}} - {{maskCount}}",
+      "removeSource": {
+        "defaultMaskName": "Remove target",
+        "feather": "Feather",
+        "generators": {
+          "localPatchFill": "Built-in local fill"
+        },
+        "radius": "Radius",
+        "regenerate": "Regenerate",
+        "search": "Search",
+        "seed": "Seed",
+        "status": {
+          "fallback_unchanged": "Fallback unchanged",
+          "needs_regeneration": "Needs regeneration",
+          "ready": "Ready",
+          "stale": "Stale"
+        },
+        "summary": "{{generator}} - {{status}}",
+        "title": "Remove"
       },
       "retouchSource": {
         "feather": "Feather",

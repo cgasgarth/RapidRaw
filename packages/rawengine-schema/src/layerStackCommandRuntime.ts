@@ -5,6 +5,7 @@ import {
   RAW_ENGINE_SCHEMA_VERSION,
   layerMaskBlendModeV1Schema,
   layerMaskCloneSourceV1Schema,
+  layerMaskRemoveSourceV1Schema,
   layerMaskCommandEnvelopeV1Schema,
   layerMaskDryRunResultV1Schema,
   layerMaskMutationResultV1Schema,
@@ -24,9 +25,19 @@ export const layerStackSidecarLayerV1Schema = z
     name: z.string().trim().min(1),
     opacity: z.number().min(0).max(1),
     retouchCloneSource: layerMaskCloneSourceV1Schema.optional(),
+    retouchRemoveSource: layerMaskRemoveSourceV1Schema.optional(),
     visible: z.boolean(),
   })
-  .strict();
+  .strict()
+  .superRefine((layer, context) => {
+    if (layer.retouchCloneSource !== undefined && layer.retouchRemoveSource !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Layer cannot have both clone/heal and remove retouch sources.',
+        path: ['retouchRemoveSource'],
+      });
+    }
+  });
 
 export const layerStackSidecarV1Schema = z
   .object({
@@ -80,6 +91,7 @@ type LayerStackCommand = Extract<
       | 'layerMask.renameLayer'
       | 'layerMask.setLayerOpacity'
       | 'layerMask.setLayerVisibility'
+      | 'layerMask.updateRetouchRemoveSource'
       | 'layerMask.updateRetouchSource';
   }
 >;
@@ -101,6 +113,7 @@ const isLayerStackCommand = (command: LayerMaskCommandEnvelopeV1): command is La
     'layerMask.applyLayerAdjustment',
     'layerMask.deleteLayer',
     'layerMask.moveLayer',
+    'layerMask.updateRetouchRemoveSource',
     'layerMask.updateRetouchSource',
   ].includes(command.commandType);
 
@@ -201,6 +214,7 @@ const applyCommandToLayers = (
           name: command.parameters.layerName,
           opacity: command.parameters.opacity,
           retouchCloneSource: command.parameters.retouchCloneSource,
+          retouchRemoveSource: command.parameters.retouchRemoveSource,
           visible: command.parameters.visible,
         },
         command.parameters.position,
@@ -267,7 +281,14 @@ const applyCommandToLayers = (
       layerIndex(layers, command.parameters.layerId);
       return layers.map((layer) =>
         layer.id === command.parameters.layerId
-          ? { ...layer, retouchCloneSource: command.parameters.retouchCloneSource }
+          ? { ...layer, retouchCloneSource: command.parameters.retouchCloneSource, retouchRemoveSource: undefined }
+          : layer,
+      );
+    case 'layerMask.updateRetouchRemoveSource':
+      layerIndex(layers, command.parameters.layerId);
+      return layers.map((layer) =>
+        layer.id === command.parameters.layerId
+          ? { ...layer, retouchCloneSource: undefined, retouchRemoveSource: command.parameters.retouchRemoveSource }
           : layer,
       );
   }

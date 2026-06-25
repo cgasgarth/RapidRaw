@@ -34,6 +34,17 @@ const requiredActionLocaleKeys = ['showAllHidden', 'soloActive'];
 const requiredActiveRenderStateKeys = ['hidden', 'summary', 'title', 'visible'];
 const requiredCloneKeys = ['cloneRowSummary', 'newCloneLayerName'];
 const requiredHealKeys = ['healRowSummary', 'newHealLayerName'];
+const requiredRemoveKeys = ['newRemoveLayerName', 'removeRowSummary'];
+const requiredRemoveSourceKeys = [
+  'defaultMaskName',
+  'feather',
+  'radius',
+  'regenerate',
+  'search',
+  'seed',
+  'summary',
+  'title',
+];
 const requiredRetouchSourceKeys = [
   'feather',
   'radius',
@@ -66,6 +77,10 @@ if (typeof layerLocale?.actions?.createHealLayer !== 'string') {
   console.error('Missing layer stack heal action locale key: editor.layers.actions.createHealLayer');
   process.exit(1);
 }
+if (typeof layerLocale?.actions?.createRemoveLayer !== 'string') {
+  console.error('Missing layer stack remove action locale key: editor.layers.actions.createRemoveLayer');
+  process.exit(1);
+}
 const missingCloneKeys = requiredCloneKeys.filter((key) => typeof layerLocale?.[key] !== 'string');
 if (missingCloneKeys.length > 0) {
   console.error(`Missing layer stack clone locale keys: ${missingCloneKeys.join(', ')}`);
@@ -74,6 +89,23 @@ if (missingCloneKeys.length > 0) {
 const missingHealKeys = requiredHealKeys.filter((key) => typeof layerLocale?.[key] !== 'string');
 if (missingHealKeys.length > 0) {
   console.error(`Missing layer stack heal locale keys: ${missingHealKeys.join(', ')}`);
+  process.exit(1);
+}
+const missingRemoveKeys = requiredRemoveKeys.filter((key) => typeof layerLocale?.[key] !== 'string');
+if (missingRemoveKeys.length > 0) {
+  console.error(`Missing layer stack remove locale keys: ${missingRemoveKeys.join(', ')}`);
+  process.exit(1);
+}
+const missingRemoveSourceKeys = requiredRemoveSourceKeys.filter(
+  (key) => typeof layerLocale?.removeSource?.[key] !== 'string',
+);
+if (
+  missingRemoveSourceKeys.length > 0 ||
+  typeof layerLocale?.removeSource?.generators?.localPatchFill !== 'string' ||
+  typeof layerLocale?.removeSource?.status?.needs_regeneration !== 'string' ||
+  typeof layerLocale?.removeSource?.status?.ready !== 'string'
+) {
+  console.error(`Missing layer stack remove source locale keys: ${missingRemoveSourceKeys.join(', ')}`);
   process.exit(1);
 }
 const missingRetouchSourceKeys = requiredRetouchSourceKeys.filter(
@@ -146,9 +178,11 @@ for (const marker of [
   'data-layer-stack-last-command-type={lastCommandType}',
   'data-layer-stack-last-changed-layer-count={lastChangedLayerCount}',
   'data-retouch-clone-source={row.retouchCloneSourceLabel ??',
+  'data-retouch-remove-source={row.retouchRemoveSourceLabel ??',
   'applyLayerStackCommandBridgeOperation',
   'data-testid="layer-create-clone-layer"',
   'data-testid="layer-create-heal-layer"',
+  'data-testid="layer-create-remove-layer"',
   'data-testid="layer-operation-move-ready"',
   'data-testid="layer-operation-group-ready"',
   'data-testid="layer-operation-ungroup-ready"',
@@ -173,19 +207,27 @@ for (const marker of [
   'editor.layers.actions.showAllHidden',
   'editor.layers.actions.createCloneLayer',
   'editor.layers.actions.createHealLayer',
+  'editor.layers.actions.createRemoveLayer',
   'editor.layers.activeRenderState.title',
   'editor.layers.cloneRowSummary',
   'editor.layers.healRowSummary',
+  'editor.layers.removeRowSummary',
   'editor.layers.newCloneLayerName',
   'editor.layers.newHealLayerName',
+  'editor.layers.newRemoveLayerName',
   'data-testid="layer-retouch-source-editor"',
+  'data-testid="layer-retouch-remove-editor"',
+  'data-testid="layer-retouch-remove-regenerate"',
   'data-retouch-source-x={activeRow.retouchCloneSource.sourcePoint.x}',
   'data-retouch-target-y={activeRow.retouchCloneSource.targetPoint.y}',
   'data-testid={`layer-retouch-control-${control.field}`}',
   "type: 'updateRetouchSource'",
+  "type: 'updateRetouchRemoveSource'",
   'editor.layers.retouchSource.title',
   'editor.layers.retouchSource.sourceX',
   'editor.layers.retouchSource.targetX',
+  'editor.layers.removeSource.title',
+  'editor.layers.removeSource.search',
   'editor.layers.activeRenderState.summary',
   'editor.layers.activeRenderState.visible',
   'editor.layers.activeRenderState.hidden',

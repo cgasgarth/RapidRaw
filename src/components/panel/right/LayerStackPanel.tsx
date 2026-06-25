@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   Copy,
+  Eraser,
   Eye,
   EyeOff,
   GripVertical,
@@ -16,6 +17,7 @@ import {
 import { type KeyboardEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { Mask, SubMaskMode } from './Masks';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import {
   DEFAULT_LAYER_BLEND_MODE,
@@ -24,6 +26,7 @@ import {
   type LayerBlendMode,
   type MaskContainer,
   type RetouchCloneSource,
+  type RetouchRemoveSource,
 } from '../../../utils/adjustments';
 import {
   buildLayerGroupSummaries,
@@ -73,6 +76,8 @@ interface LayerRowModel {
   retouchCloneSource: RetouchCloneSource | null;
   retouchCloneSourceLabel: string | null;
   retouchMode: 'clone' | 'heal' | null;
+  retouchRemoveSource: RetouchRemoveSource | null;
+  retouchRemoveSourceLabel: string | null;
   visible: boolean;
   visibleState: 'hidden' | 'mixed' | 'visible';
 }
@@ -86,6 +91,8 @@ type RetouchControlField =
   | 'sourcePoint.y'
   | 'targetPoint.x'
   | 'targetPoint.y';
+
+type RetouchRemoveControlField = 'featherRadiusPx' | 'radiusPx' | 'searchRadiusMultiplier' | 'seed';
 
 const BASE_LAYER_ID = 'base-raw-layer';
 const LAYER_OPACITY_PRESETS = [0, 25, 50, 75, 100] as const;
@@ -116,6 +123,20 @@ function getBlendModeLabelKey(value: LayerBlendMode): BlendModeLabelKey {
   return blendModes.find((blendMode) => blendMode.value === value)?.labelKey ?? 'editor.layers.blendModes.normal';
 }
 
+function getRemoveStatusLabelKey(status: RetouchRemoveSource['status']) {
+  switch (status) {
+    case 'fallback_unchanged':
+      return 'editor.layers.removeSource.status.fallback_unchanged';
+    case 'ready':
+      return 'editor.layers.removeSource.status.ready';
+    case 'stale':
+      return 'editor.layers.removeSource.status.stale';
+    case 'needs_regeneration':
+    case undefined:
+      return 'editor.layers.removeSource.status.needs_regeneration';
+  }
+}
+
 function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string>): Array<LayerRowModel> {
   const groupSummaries = buildLayerGroupSummaries(masks);
   const rows: Array<LayerRowModel> = [];
@@ -141,6 +162,8 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
         retouchCloneSource: null,
         retouchCloneSourceLabel: null,
         retouchMode: null,
+        retouchRemoveSource: null,
+        retouchRemoveSourceLabel: null,
         visible: groupSummary?.visibleState !== 'hidden',
         visibleState: groupSummary?.visibleState ?? 'visible',
       });
@@ -167,10 +190,18 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
       name: mask.name.trim() || `Layer ${String(index + 1)}`,
       opacity: mask.opacity,
       retouchCloneSource: mask.retouchCloneSource ?? null,
-      retouchCloneSourceLabel: mask.retouchCloneSource
-        ? `${mask.retouchCloneSource.sourcePoint.x.toFixed(2)},${mask.retouchCloneSource.sourcePoint.y.toFixed(2)} -> ${mask.retouchCloneSource.targetPoint.x.toFixed(2)},${mask.retouchCloneSource.targetPoint.y.toFixed(2)}`
-        : null,
+      retouchCloneSourceLabel:
+        mask.retouchCloneSource === undefined
+          ? null
+          : [
+              `${mask.retouchCloneSource.sourcePoint.x.toFixed(2)},${mask.retouchCloneSource.sourcePoint.y.toFixed(2)}`,
+              `${mask.retouchCloneSource.targetPoint.x.toFixed(2)},${mask.retouchCloneSource.targetPoint.y.toFixed(2)}`,
+            ].join(' -> '),
       retouchMode: mask.retouchCloneSource?.retouchMode ?? (mask.retouchCloneSource ? 'clone' : null),
+      retouchRemoveSource: mask.retouchRemoveSource ?? null,
+      retouchRemoveSourceLabel: mask.retouchRemoveSource
+        ? `${mask.retouchRemoveSource.generator} / ${mask.retouchRemoveSource.status ?? 'needs_regeneration'}`
+        : null,
       visible: mask.visible,
       visibleState: mask.visible ? 'visible' : 'hidden',
     });
@@ -194,6 +225,8 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
       retouchCloneSource: null,
       retouchCloneSourceLabel: null,
       retouchMode: null,
+      retouchRemoveSource: null,
+      retouchRemoveSourceLabel: null,
       visible: true,
       visibleState: 'visible',
     },
@@ -324,6 +357,9 @@ export default function LayerStackPanel({
   const updateLayerRetouchSource = (layerId: string, retouchCloneSource: RetouchCloneSource) => {
     applyLayerStackCommand({ layerId, retouchCloneSource, type: 'updateRetouchSource' }, layerId);
   };
+  const updateLayerRetouchRemoveSource = (layerId: string, retouchRemoveSource: RetouchRemoveSource) => {
+    applyLayerStackCommand({ layerId, retouchRemoveSource, type: 'updateRetouchRemoveSource' }, layerId);
+  };
   const updateActiveRetouchNumber = (field: RetouchControlField, rawValue: number) => {
     if (!activeRow || activeRow.isBase || activeRow.isGroupHeader || activeRow.retouchCloneSource === null) return;
 
@@ -338,6 +374,29 @@ export default function LayerStackPanel({
     if (field === 'featherRadiusPx') nextSource.featherRadiusPx = roundRetouchNumber(clampNumber(rawValue, 0, 4096));
 
     updateLayerRetouchSource(activeRow.id, nextSource);
+  };
+  const updateActiveRetouchRemoveNumber = (field: RetouchRemoveControlField, rawValue: number) => {
+    if (!activeRow || activeRow.isBase || activeRow.isGroupHeader || activeRow.retouchRemoveSource === null) return;
+
+    const nextSource = structuredClone(activeRow.retouchRemoveSource);
+    if (field === 'radiusPx') nextSource.radiusPx = roundRetouchNumber(clampNumber(rawValue, 0.01, 4096));
+    if (field === 'featherRadiusPx') nextSource.featherRadiusPx = roundRetouchNumber(clampNumber(rawValue, 0, 4096));
+    if (field === 'searchRadiusMultiplier') {
+      nextSource.searchRadiusMultiplier = roundRetouchNumber(clampNumber(rawValue, 1, 12));
+    }
+    if (field === 'seed') nextSource.seed = Math.round(clampNumber(rawValue, 0, 0xffffffff));
+    nextSource.status = 'needs_regeneration';
+    delete nextSource.resolvedSourcePoint;
+
+    updateLayerRetouchRemoveSource(activeRow.id, nextSource);
+  };
+  const regenerateActiveRemoveLayer = () => {
+    if (!activeRow || activeRow.isBase || activeRow.isGroupHeader || activeRow.retouchRemoveSource === null) return;
+    const nextSource = structuredClone(activeRow.retouchRemoveSource);
+    nextSource.seed = (nextSource.seed + 1) % 0x100000000;
+    nextSource.status = 'needs_regeneration';
+    delete nextSource.resolvedSourcePoint;
+    updateLayerRetouchRemoveSource(activeRow.id, nextSource);
   };
   const updateGroupOpacity = (groupId: string, opacity: number) => {
     applyLayerStack(setLayerGroupOpacity(masks, groupId, opacity), `group:${groupId}`);
@@ -416,6 +475,42 @@ export default function LayerStackPanel({
         targetPoint: { x: 0.56, y: 0.56 },
       },
       subMasks: [],
+      visible: true,
+    };
+    applyLayerStackCommand({ layer, type: 'create' }, layerId);
+  };
+  const createRemoveLayer = () => {
+    const layerId = crypto.randomUUID();
+    const targetMaskId = `${layerId}_remove_region`;
+    const layer: MaskContainer = {
+      adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+      blendMode: DEFAULT_LAYER_BLEND_MODE,
+      id: layerId,
+      invert: false,
+      name: t('editor.layers.newRemoveLayerName', { count: masks.length + 1 }),
+      opacity: 100,
+      retouchRemoveSource: {
+        featherRadiusPx: 24,
+        generator: 'local_patch_fill_v1',
+        generatorVersion: 1,
+        radiusPx: 48,
+        searchRadiusMultiplier: 4,
+        seed: 0,
+        status: 'needs_regeneration',
+        targetMaskId,
+      },
+      subMasks: [
+        {
+          id: targetMaskId,
+          invert: false,
+          mode: SubMaskMode.Additive,
+          name: t('editor.layers.removeSource.defaultMaskName'),
+          opacity: 100,
+          parameters: { centerX: 0.5, centerY: 0.5, featherRadiusPx: 24, radiusPx: 48 },
+          type: Mask.Radial,
+          visible: true,
+        },
+      ],
       visible: true,
     };
     applyLayerStackCommand({ layer, type: 'create' }, layerId);
@@ -546,6 +641,15 @@ export default function LayerStackPanel({
             type="button"
           >
             <Sparkles size={17} className="mx-auto" />
+          </button>
+          <button
+            className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+            data-tooltip={t('editor.layers.actions.createRemoveLayer')}
+            data-testid="layer-create-remove-layer"
+            onClick={createRemoveLayer}
+            type="button"
+          >
+            <Eraser size={17} className="mx-auto" />
           </button>
         </div>
       </div>
@@ -678,6 +782,7 @@ export default function LayerStackPanel({
               data-grouped-layer={String(row.isGroupedLayer)}
               data-layer-row-id={row.id}
               data-retouch-clone-source={row.retouchCloneSourceLabel ?? ''}
+              data-retouch-remove-source={row.retouchRemoveSourceLabel ?? ''}
               data-testid={
                 row.isGroupHeader
                   ? `layer-stack-group-row-${row.groupId ?? 'unknown'}`
@@ -743,16 +848,28 @@ export default function LayerStackPanel({
                         opacity: row.opacity,
                         source: row.retouchCloneSourceLabel,
                       })
-                    : t('editor.layers.rowSummary', {
-                        blendMode:
-                          row.blendMode === null
-                            ? t('editor.layers.groupType')
-                            : t(getBlendModeLabelKey(row.blendMode)),
-                        maskCount: row.isGroupHeader
-                          ? t('editor.layers.groupCount', { count: row.groupLayerCount })
-                          : getMaskCountLabel(row.maskCount),
-                        opacity: row.opacity,
-                      })}
+                    : row.retouchRemoveSourceLabel !== null
+                      ? t('editor.layers.removeRowSummary', {
+                          blendMode:
+                            row.blendMode === null
+                              ? t('editor.layers.groupType')
+                              : t(getBlendModeLabelKey(row.blendMode)),
+                          maskCount: row.isGroupHeader
+                            ? t('editor.layers.groupCount', { count: row.groupLayerCount })
+                            : getMaskCountLabel(row.maskCount),
+                          opacity: row.opacity,
+                          source: row.retouchRemoveSourceLabel,
+                        })
+                      : t('editor.layers.rowSummary', {
+                          blendMode:
+                            row.blendMode === null
+                              ? t('editor.layers.groupType')
+                              : t(getBlendModeLabelKey(row.blendMode)),
+                          maskCount: row.isGroupHeader
+                            ? t('editor.layers.groupCount', { count: row.groupLayerCount })
+                            : getMaskCountLabel(row.maskCount),
+                          opacity: row.opacity,
+                        })}
                 </UiText>
               </span>
               <span className="flex items-center gap-1">
@@ -1012,6 +1129,109 @@ export default function LayerStackPanel({
                       />
                     </label>
                   ))}
+              </div>
+            </div>
+          )}
+          {activeRow.retouchRemoveSource !== null && (
+            <div
+              className="rounded-md border border-surface bg-bg-secondary p-2"
+              data-remove-generator={activeRow.retouchRemoveSource.generator}
+              data-remove-generator-version={activeRow.retouchRemoveSource.generatorVersion}
+              data-remove-search-radius-multiplier={activeRow.retouchRemoveSource.searchRadiusMultiplier}
+              data-remove-seed={activeRow.retouchRemoveSource.seed}
+              data-remove-status={activeRow.retouchRemoveSource.status ?? 'needs_regeneration'}
+              data-remove-target-mask-id={activeRow.retouchRemoveSource.targetMaskId}
+              data-testid="layer-retouch-remove-editor"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="min-w-0">
+                  <UiText variant={TextVariants.small} weight={TextWeights.medium} className="block text-text-primary">
+                    {t('editor.layers.removeSource.title')}
+                  </UiText>
+                  <UiText variant={TextVariants.small} className="block text-text-tertiary">
+                    {t('editor.layers.removeSource.summary', {
+                      generator: t('editor.layers.removeSource.generators.localPatchFill'),
+                      status: t(getRemoveStatusLabelKey(activeRow.retouchRemoveSource.status)),
+                    })}
+                  </UiText>
+                </span>
+                <button
+                  className={cx(
+                    'shrink-0 rounded-md border border-surface bg-surface px-2 py-1 text-xs text-text-secondary',
+                    'hover:bg-card-active hover:text-text-primary',
+                  )}
+                  data-testid="layer-retouch-remove-regenerate"
+                  onClick={regenerateActiveRemoveLayer}
+                  type="button"
+                >
+                  {t('editor.layers.removeSource.regenerate')}
+                </button>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {(
+                  [
+                    {
+                      field: 'radiusPx',
+                      label: t('editor.layers.removeSource.radius'),
+                      max: 4096,
+                      min: 0.01,
+                      step: 1,
+                      value: activeRow.retouchRemoveSource.radiusPx ?? 48,
+                    },
+                    {
+                      field: 'featherRadiusPx',
+                      label: t('editor.layers.removeSource.feather'),
+                      max: 4096,
+                      min: 0,
+                      step: 1,
+                      value: activeRow.retouchRemoveSource.featherRadiusPx ?? 24,
+                    },
+                    {
+                      field: 'searchRadiusMultiplier',
+                      label: t('editor.layers.removeSource.search'),
+                      max: 12,
+                      min: 1,
+                      step: 0.25,
+                      value: activeRow.retouchRemoveSource.searchRadiusMultiplier,
+                    },
+                    {
+                      field: 'seed',
+                      label: t('editor.layers.removeSource.seed'),
+                      max: 0xffffffff,
+                      min: 0,
+                      step: 1,
+                      value: activeRow.retouchRemoveSource.seed,
+                    },
+                  ] satisfies Array<{
+                    field: RetouchRemoveControlField;
+                    label: string;
+                    max: number;
+                    min: number;
+                    step: number;
+                    value: number;
+                  }>
+                ).map((control) => (
+                  <label className="min-w-0" key={control.field}>
+                    <UiText variant={TextVariants.small} className="block truncate text-text-tertiary">
+                      {control.label}
+                    </UiText>
+                    <input
+                      className="mt-1 h-8 w-full rounded-md bg-surface px-2 text-sm tabular-nums text-text-primary outline-none"
+                      data-testid={`layer-retouch-remove-control-${control.field}`}
+                      defaultValue={control.value}
+                      max={control.max}
+                      min={control.min}
+                      onBlur={(event) => {
+                        updateActiveRetouchRemoveNumber(control.field, Number(event.currentTarget.value));
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') event.currentTarget.blur();
+                      }}
+                      step={control.step}
+                      type="number"
+                    />
+                  </label>
+                ))}
               </div>
             </div>
           )}

@@ -453,6 +453,7 @@ export interface MaskContainer {
   name: string;
   opacity: number;
   retouchCloneSource?: RetouchCloneSource;
+  retouchRemoveSource?: RetouchRemoveSource;
   subMasks: Array<SubMask>;
   visible: boolean;
 }
@@ -483,6 +484,24 @@ export interface RetouchCloneSource {
     x: number;
     y: number;
   };
+}
+
+export interface RetouchRemoveSource {
+  featherRadiusPx?: number | undefined;
+  generator: 'local_patch_fill_v1';
+  generatorVersion: 1;
+  radiusPx?: number | undefined;
+  resolvedSourcePoint?:
+    | {
+        pressure?: number | undefined;
+        x: number;
+        y: number;
+      }
+    | undefined;
+  searchRadiusMultiplier: number;
+  seed: number;
+  status?: 'fallback_unchanged' | 'needs_regeneration' | 'ready' | 'stale' | undefined;
+  targetMaskId: string;
 }
 
 export interface Sections {
