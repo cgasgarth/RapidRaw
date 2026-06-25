@@ -2795,6 +2795,14 @@ const ImageCanvas = memo(
               const retouchFeatherRadius =
                 Math.max(0, (activeRetouchSource.radiusPx ?? 0) + (activeRetouchSource.featherRadiusPx ?? 0)) *
                 imageRenderSize.scale;
+              const retouchScale = Math.max(0.1, activeRetouchSource.scale);
+              const sourceFootprintRadius = retouchRadius / retouchScale;
+              const sourceFootprintAxisLength = Math.max(handleRadius * 1.5, sourceFootprintRadius);
+              const sourceFootprintRadians = (-activeRetouchSource.rotationDegrees * Math.PI) / 180;
+              const sourceFootprintAxisEnd = {
+                x: sourcePoint.x + sourceFootprintAxisLength * Math.cos(sourceFootprintRadians),
+                y: sourcePoint.y + sourceFootprintAxisLength * Math.sin(sourceFootprintRadians),
+              };
               const retouchMode = activeRetouchSource.retouchMode ?? 'clone';
               const retouchModeLabel = t(
                 retouchMode === 'heal'
@@ -2811,6 +2819,8 @@ const ImageCanvas = memo(
                   data-retouch-handle-mode-label={retouchModeLabel}
                   data-retouch-handle-radius-px={activeRetouchSource.radiusPx ?? ''}
                   data-retouch-handle-feather-radius-px={activeRetouchSource.featherRadiusPx ?? ''}
+                  data-retouch-handle-rotation-degrees={activeRetouchSource.rotationDegrees}
+                  data-retouch-handle-scale={activeRetouchSource.scale}
                   data-retouch-handle-source-x={activeRetouchSource.sourcePoint.x}
                   data-retouch-handle-source-y={activeRetouchSource.sourcePoint.y}
                   data-retouch-handle-target-x={activeRetouchSource.targetPoint.x}
@@ -2883,6 +2893,39 @@ const ImageCanvas = memo(
                               x={targetPoint.x}
                               y={targetPoint.y}
                             />
+                          )}
+                          {retouchRadius > 0 && (
+                            <>
+                              <Circle
+                                dash={[3, 3]}
+                                data-retouch-source-footprint-radius={sourceFootprintRadius}
+                                data-testid="image-canvas-retouch-source-footprint"
+                                listening={false}
+                                radius={sourceFootprintRadius}
+                                stroke="#0ea5e9"
+                                strokeOpacity={0.65}
+                                strokeScaleEnabled={false}
+                                strokeWidth={strokeWidth}
+                                x={sourcePoint.x}
+                                y={sourcePoint.y}
+                              />
+                              <Line
+                                data-retouch-source-footprint-rotation-degrees={activeRetouchSource.rotationDegrees}
+                                data-retouch-source-footprint-scale={activeRetouchSource.scale}
+                                data-testid="image-canvas-retouch-source-footprint-axis"
+                                listening={false}
+                                points={[
+                                  sourcePoint.x,
+                                  sourcePoint.y,
+                                  sourceFootprintAxisEnd.x,
+                                  sourceFootprintAxisEnd.y,
+                                ]}
+                                stroke="#0ea5e9"
+                                strokeOpacity={0.85}
+                                strokeScaleEnabled={false}
+                                strokeWidth={strokeWidth}
+                              />
+                            </>
                           )}
                           <Circle
                             dragBoundFunc={dragBoundRetouchHandle}
