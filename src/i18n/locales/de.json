@@ -946,6 +946,7 @@
         "regenerate": "Regenerate",
         "resetRegion": "Reset region",
         "revertOriginal": "Revert to original",
+        "rowStatus": "{{status}} - Search {{searchMultiplier}}x - Seed {{seedValue}}",
         "search": "Search",
         "seed": "Seed",
         "sourcePending": "Source pending",
