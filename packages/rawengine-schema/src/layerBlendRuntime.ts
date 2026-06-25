@@ -143,12 +143,12 @@ const roundPixelPoint = (point: { x: number; y: number }): { x: number; y: numbe
   y: Math.round(point.y),
 });
 
-const cloneSampleIndex = (
+const cloneSamplePoint = (
   targetIndex: number,
   width: number,
   height: number,
   cloneSource: NonNullable<LayerBlendStackLayer['retouchCloneSource']>,
-): number | null => {
+): { x: number; y: number } | null => {
   const sourcePoint = normalizedPointToPixel(cloneSource.sourcePoint, width, height);
   const targetPoint = normalizedPointToPixel(cloneSource.targetPoint, width, height);
   const targetX = targetIndex % width;
@@ -159,10 +159,52 @@ const cloneSampleIndex = (
   const sin = Math.sin(radians);
   const targetOffsetX = (targetX - targetPoint.x) / scale;
   const targetOffsetY = (targetY - targetPoint.y) / scale;
-  const sourceX = Math.round(sourcePoint.x + targetOffsetX * cos - targetOffsetY * sin);
-  const sourceY = Math.round(sourcePoint.y + targetOffsetX * sin + targetOffsetY * cos);
+  const sourceX = sourcePoint.x + targetOffsetX * cos - targetOffsetY * sin;
+  const sourceY = sourcePoint.y + targetOffsetX * sin + targetOffsetY * cos;
+  if (sourceX < 0 || sourceX >= width || sourceY < 0 || sourceY >= height) return null;
+  return { x: sourceX, y: sourceY };
+};
+
+const pixelIndexFromPoint = (point: { x: number; y: number }, width: number, height: number): number | null => {
+  const sourceX = Math.round(point.x);
+  const sourceY = Math.round(point.y);
   if (sourceX < 0 || sourceX >= width || sourceY < 0 || sourceY >= height) return null;
   return sourceY * width + sourceX;
+};
+
+const sampleBilinearPixel = (
+  pixels: LayerRgbPixel[],
+  width: number,
+  height: number,
+  point: { x: number; y: number },
+): LayerRgbPixel | undefined => {
+  if (point.x < 0 || point.x > width - 1 || point.y < 0 || point.y > height - 1) return undefined;
+
+  const x0 = Math.floor(point.x);
+  const y0 = Math.floor(point.y);
+  const x1 = Math.min(width - 1, x0 + 1);
+  const y1 = Math.min(height - 1, y0 + 1);
+  const tx = point.x - x0;
+  const ty = point.y - y0;
+  const topLeft = pixels[y0 * width + x0];
+  const topRight = pixels[y0 * width + x1];
+  const bottomLeft = pixels[y1 * width + x0];
+  const bottomRight = pixels[y1 * width + x1];
+  if (topLeft === undefined || topRight === undefined || bottomLeft === undefined || bottomRight === undefined) {
+    return undefined;
+  }
+
+  const channel = (key: keyof LayerRgbPixel) =>
+    topLeft[key] * (1 - tx) * (1 - ty) +
+    topRight[key] * tx * (1 - ty) +
+    bottomLeft[key] * (1 - tx) * ty +
+    bottomRight[key] * tx * ty;
+
+  return {
+    b: clampByte(channel('b')),
+    g: clampByte(channel('g')),
+    r: clampByte(channel('r')),
+  };
 };
 
 const translatedSampleIndex = (
@@ -269,21 +311,25 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
           removePlan.targetPoint,
         );
       } else if (layer.retouchCloneSource !== undefined) {
-        sourceAnchorIndex = cloneSampleIndex(
+        const sourceAnchorPoint = cloneSamplePoint(
           targetAnchorIndex,
           parsedInput.width,
           parsedInput.height,
           layer.retouchCloneSource,
         );
+        sourceAnchorIndex =
+          sourceAnchorPoint === null
+            ? null
+            : pixelIndexFromPoint(sourceAnchorPoint, parsedInput.width, parsedInput.height);
       }
     }
 
     for (let index = 0; index < pixelCount; index += 1) {
-      const cloneSourceIndex =
+      const cloneSourcePoint =
         layer.retouchCloneSource === undefined
           ? null
-          : cloneSampleIndex(index, parsedInput.width, parsedInput.height, layer.retouchCloneSource);
-      if (layer.retouchCloneSource !== undefined && cloneSourceIndex === null) continue;
+          : cloneSamplePoint(index, parsedInput.width, parsedInput.height, layer.retouchCloneSource);
+      if (layer.retouchCloneSource !== undefined && cloneSourcePoint === null) continue;
       const removeSourceIndex =
         removePlan === null
           ? null
@@ -298,9 +344,9 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
       const sampledSource =
         removeSourceIndex !== null
           ? (retouchBasePixels ?? pixels)[removeSourceIndex]
-          : cloneSourceIndex === null
+          : cloneSourcePoint === null
             ? layer.pixels?.[index]
-            : (retouchBasePixels ?? pixels)[cloneSourceIndex];
+            : sampleBilinearPixel(retouchBasePixels ?? pixels, parsedInput.width, parsedInput.height, cloneSourcePoint);
       const source =
         (layer.retouchCloneSource?.retouchMode === 'heal' || layer.retouchRemoveSource !== undefined) &&
         sampledSource !== undefined &&
