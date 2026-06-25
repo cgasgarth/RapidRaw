@@ -2557,6 +2557,8 @@
       },
       "acceptDustCandidate": "Accept as heal",
       "dustHealLayerCount": "Heal layers {{count}}",
+      "dustHealLayerCount_one": "{{count}} heal layer",
+      "dustHealLayerCount_other": "{{count}} heal layers",
       "rejectDustCandidate": "Reject",
       "dustRetouchCount": "Retouch {{retouchCount}}",
       "dustReviewCount": "Review {{reviewCount}}",

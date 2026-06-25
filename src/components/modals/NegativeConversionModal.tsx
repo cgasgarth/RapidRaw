@@ -49,6 +49,7 @@ import {
 } from '../../schemas/negativeLabShadowPatchBlackPointSuggestionSchemas';
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
+import { buildDustCandidateHealLayer } from '../../utils/dustCandidateHealLayer';
 import {
   DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID,
   NEGATIVE_LAB_ACQUISITION_PROFILES,
@@ -66,7 +67,6 @@ import {
   buildNegativeLabDustScratchReviewReport,
   buildNegativeLabQcProofReport,
 } from '../../utils/negativeLabDustScratchReview';
-import { buildDustCandidateHealLayer } from '../../utils/dustCandidateHealLayer';
 import {
   buildNegativeLabFrameExposureOverridePayload,
   getNegativeLabEffectiveFrameExposure,
@@ -985,8 +985,12 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   };
   const handleRejectDustCandidate = (candidate: NegativeLabDustScratchCandidate) => {
     setDustHealLayerByCandidateId((previous) => {
-      const next = { ...previous };
-      delete next[candidate.candidateId];
+      const next: typeof previous = {};
+      for (const [candidateId, healLayer] of Object.entries(previous)) {
+        if (candidateId !== candidate.candidateId) {
+          next[candidateId] = healLayer;
+        }
+      }
       return next;
     });
     setDustCandidateDecisionById((previous) => ({ ...previous, [candidate.candidateId]: 'rejected' }));
@@ -3130,7 +3134,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                         className="rounded bg-yellow-200 px-1.5 py-0.5 font-medium text-black disabled:cursor-not-allowed disabled:opacity-40"
                         data-testid={`negative-lab-accept-dust-candidate-${candidate.candidateId}`}
                         disabled={!canAccept || candidateDecision === 'accepted'}
-                        onClick={() => handleAcceptDustCandidate(frame, candidate)}
+                        onClick={() => {
+                          handleAcceptDustCandidate(frame, candidate);
+                        }}
                         type="button"
                       >
                         {t('modals.negativeConversion.acceptDustCandidate')}
@@ -3139,7 +3145,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                         className="rounded border border-yellow-200/40 px-1.5 py-0.5 text-yellow-100 disabled:cursor-not-allowed disabled:opacity-40"
                         data-testid={`negative-lab-reject-dust-candidate-${candidate.candidateId}`}
                         disabled={candidateDecision === 'rejected'}
-                        onClick={() => handleRejectDustCandidate(candidate)}
+                        onClick={() => {
+                          handleRejectDustCandidate(candidate);
+                        }}
                         type="button"
                       >
                         {t('modals.negativeConversion.rejectDustCandidate')}

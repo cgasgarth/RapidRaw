@@ -1,9 +1,9 @@
-import { Mask, SubMaskMode } from '../components/panel/right/Masks';
 import {
   DEFAULT_LAYER_BLEND_MODE,
   INITIAL_MASK_ADJUSTMENTS,
   type MaskContainer,
 } from './adjustments';
+import { Mask, SubMaskMode } from '../components/panel/right/Masks';
 
 import type { NegativeLabDustScratchReviewReport } from '../schemas/negativeLabWorkspaceSchemas';
 
