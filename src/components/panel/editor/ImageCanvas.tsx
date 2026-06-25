@@ -3125,6 +3125,32 @@ const ImageCanvas = memo(
                               y={resolvedSourcePoint.y}
                             />
                           )}
+                          {resolvedSourcePoint && (
+                            <Label
+                              data-remove-canvas-handle="resolvedSource"
+                              data-remove-canvas-source-label={removeStatusLabel}
+                              data-testid="image-canvas-remove-source-label"
+                              listening={false}
+                              x={resolvedSourcePoint.x + handleRadius + 8}
+                              y={resolvedSourcePoint.y - handleRadius - 28}
+                            >
+                              <Tag
+                                cornerRadius={6}
+                                fill="rgba(15, 23, 42, 0.88)"
+                                lineJoin="round"
+                                stroke="#0ea5e9"
+                                strokeWidth={1}
+                              />
+                              <KonvaText
+                                fill="#f8fafc"
+                                fontFamily="Inter, system-ui, sans-serif"
+                                fontSize={12}
+                                fontStyle="600"
+                                padding={6}
+                                text={t('editor.layers.removeSource.sourceResolved')}
+                              />
+                            </Label>
+                          )}
                           <Circle
                             dragBoundFunc={dragBoundRetouchHandle}
                             draggable
