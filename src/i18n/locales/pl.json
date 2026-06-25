@@ -1008,6 +1008,7 @@
         },
         "radius": "Radius",
         "regenerate": "Regenerate",
+        "revertOriginal": "Revert to original",
         "resetRegion": "Reset region",
         "search": "Search",
         "seed": "Seed",
