@@ -12,6 +12,15 @@ pub struct ActiveDisplayProfile {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DisplayPreviewLutStatus {
+    pub profile: ActiveDisplayProfile,
+    pub sample_count: usize,
+    pub size: u32,
+    pub status: DisplayPreviewLutTransformStatus,
+}
+
+#[derive(Clone, Copy, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 #[allow(dead_code)]
 pub enum ActiveDisplayProfileStatus {
@@ -20,9 +29,22 @@ pub enum ActiveDisplayProfileStatus {
     UnsupportedPlatform,
 }
 
+#[derive(Clone, Copy, Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DisplayPreviewLutTransformStatus {
+    ActiveDisplayTransform,
+    SrgbFallbackTransform,
+    UnsupportedPlatform,
+}
+
 #[tauri::command]
 pub fn get_active_display_profile() -> Result<ActiveDisplayProfile, String> {
     active_display_profile()
+}
+
+#[tauri::command]
+pub fn get_display_preview_lut_status() -> Result<DisplayPreviewLutStatus, String> {
+    display_preview_lut_status()
 }
 
 #[cfg(target_os = "macos")]
@@ -70,6 +92,44 @@ pub struct DisplayLut {
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
 pub fn build_srgb_to_active_display_lut() -> DisplayLut {
     build_srgb_to_active_display_lut_with_size(DISPLAY_LUT_SIZE)
+}
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+pub fn display_preview_lut_status() -> Result<DisplayPreviewLutStatus, String> {
+    let lut = build_srgb_to_active_display_lut();
+    Ok(DisplayPreviewLutStatus {
+        sample_count: lut.rgba16f.len() / 4,
+        size: lut.size,
+        status: display_lut_transform_status(&lut.profile),
+        profile: lut.profile,
+    })
+}
+
+#[cfg(any(target_os = "android", target_os = "linux"))]
+pub fn display_preview_lut_status() -> Result<DisplayPreviewLutStatus, String> {
+    Ok(DisplayPreviewLutStatus {
+        profile: active_display_profile()?,
+        sample_count: 0,
+        size: 0,
+        status: DisplayPreviewLutTransformStatus::UnsupportedPlatform,
+    })
+}
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+fn display_lut_transform_status(
+    profile: &ActiveDisplayProfile,
+) -> DisplayPreviewLutTransformStatus {
+    match profile.status {
+        ActiveDisplayProfileStatus::ActiveProfileLoaded => {
+            DisplayPreviewLutTransformStatus::ActiveDisplayTransform
+        }
+        ActiveDisplayProfileStatus::FallbackNoActiveProfile => {
+            DisplayPreviewLutTransformStatus::SrgbFallbackTransform
+        }
+        ActiveDisplayProfileStatus::UnsupportedPlatform => {
+            DisplayPreviewLutTransformStatus::UnsupportedPlatform
+        }
+    }
 }
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]

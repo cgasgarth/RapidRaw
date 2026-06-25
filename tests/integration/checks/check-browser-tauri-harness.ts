@@ -72,7 +72,7 @@ try {
     });
   });
 
-  await page.goto(baseUrl, { waitUntil: 'networkidle' });
+  await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: 'RapidRAW' }).waitFor({ timeout: 10_000 });
   await page.getByRole('button', { name: /Open Folder/u }).click();
   await page

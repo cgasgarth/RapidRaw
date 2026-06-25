@@ -37,6 +37,11 @@ if printf '%s\n' "$staged_files" | grep -Eq '(^|/)(package\.json|bun\.lock|tscon
   bun run check:types
 fi
 
+if printf '%s\n' "$staged_files" | grep -Eq '^(src/|tests/integration/checks/check-browser-tauri-harness\.ts$|scripts/capture-visual-smoke\.ts$|scripts/lib/visual-smoke-proofs\.ts$|index\.html$|vite\.config\.ts$|package\.json$|bun\.lock$)'; then
+  bun run check:visual-smoke:pr
+  bun run check:browser-tauri-harness
+fi
+
 if printf '%s\n' "$staged_files" | grep -Eq '^(src-tauri/.*\.rs|src-tauri/Cargo\.(toml|lock)|\.cargo/.*|rust-toolchain\.toml)$'; then
   bun run check:rust:fmt
   bun run check:rust:check
