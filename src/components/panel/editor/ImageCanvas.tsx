@@ -3247,6 +3247,8 @@ const ImageCanvas = memo(
                           />
                           <Label
                             data-remove-canvas-original-preserved={String(isOriginalPreserved)}
+                            data-remove-canvas-search-radius-multiplier={activeRemoveSource.searchRadiusMultiplier}
+                            data-remove-canvas-seed={activeRemoveSource.seed}
                             data-remove-canvas-status={removeStatus}
                             data-remove-canvas-source-resolved={String(resolvedSourcePoint !== null)}
                             data-testid="image-canvas-remove-status-label"
@@ -3267,7 +3269,11 @@ const ImageCanvas = memo(
                               fontSize={12}
                               fontStyle="600"
                               padding={6}
-                              text={`${t('editor.layers.removeSource.title')} - ${removeStatusLabel}`}
+                              text={t('editor.layers.removeSource.canvasStatus', {
+                                searchMultiplier: activeRemoveSource.searchRadiusMultiplier,
+                                seedValue: activeRemoveSource.seed,
+                                status: removeStatusLabel,
+                              })}
                             />
                           </Label>
                         </Group>
