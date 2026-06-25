@@ -1139,6 +1139,8 @@ export default function LayerStackPanel({
               data-remove-generator-version={activeRow.retouchRemoveSource.generatorVersion}
               data-remove-search-radius-multiplier={activeRow.retouchRemoveSource.searchRadiusMultiplier}
               data-remove-seed={activeRow.retouchRemoveSource.seed}
+              data-remove-resolved-source-x={activeRow.retouchRemoveSource.resolvedSourcePoint?.x ?? ''}
+              data-remove-resolved-source-y={activeRow.retouchRemoveSource.resolvedSourcePoint?.y ?? ''}
               data-remove-status={activeRow.retouchRemoveSource.status ?? 'needs_regeneration'}
               data-remove-target-mask-id={activeRow.retouchRemoveSource.targetMaskId}
               data-testid="layer-retouch-remove-editor"
@@ -1167,6 +1169,29 @@ export default function LayerStackPanel({
                   {t('editor.layers.removeSource.regenerate')}
                 </button>
               </div>
+              {activeRow.retouchRemoveSource.resolvedSourcePoint !== undefined && (
+                <div
+                  className="mt-2 grid grid-cols-2 gap-2 rounded-md border border-surface bg-surface/60 p-2"
+                  data-testid="layer-retouch-remove-resolved-source"
+                >
+                  <span className="min-w-0">
+                    <UiText variant={TextVariants.small} className="block truncate text-text-tertiary">
+                      {t('editor.layers.retouchSource.sourceX')}
+                    </UiText>
+                    <UiText variant={TextVariants.small} className="block tabular-nums text-text-primary">
+                      {activeRow.retouchRemoveSource.resolvedSourcePoint.x.toFixed(3)}
+                    </UiText>
+                  </span>
+                  <span className="min-w-0">
+                    <UiText variant={TextVariants.small} className="block truncate text-text-tertiary">
+                      {t('editor.layers.retouchSource.sourceY')}
+                    </UiText>
+                    <UiText variant={TextVariants.small} className="block tabular-nums text-text-primary">
+                      {activeRow.retouchRemoveSource.resolvedSourcePoint.y.toFixed(3)}
+                    </UiText>
+                  </span>
+                </div>
+              )}
               <div className="mt-2 grid grid-cols-2 gap-2">
                 {(
                   [
