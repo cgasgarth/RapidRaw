@@ -3172,6 +3172,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                       data-generated-heal-image-size-source={dustHealImageSize.source}
                       data-generated-heal-image-width={dustHealImageSize.imageWidth}
                       data-generated-heal-layer-id={healLayer?.id ?? ''}
+                      data-generated-heal-radius-px={healLayer?.retouchCloneSource?.radiusPx ?? ''}
+                      data-generated-heal-source-x={healLayer?.retouchCloneSource?.sourcePoint.x ?? ''}
+                      data-generated-heal-source-y={healLayer?.retouchCloneSource?.sourcePoint.y ?? ''}
+                      data-generated-heal-target-x={healLayer?.retouchCloneSource?.targetPoint.x ?? ''}
+                      data-generated-heal-target-y={healLayer?.retouchCloneSource?.targetPoint.y ?? ''}
                       data-testid={`negative-lab-dust-candidate-${candidate.candidateId}`}
                       key={candidate.candidateId}
                     >
@@ -3202,6 +3207,24 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                       >
                         {t('modals.negativeConversion.rejectDustCandidate')}
                       </button>
+                      {healLayer?.retouchCloneSource !== undefined && (
+                        <span
+                          className="col-span-3 truncate tabular-nums text-yellow-100/75"
+                          data-testid={`negative-lab-dust-candidate-heal-geometry-${candidate.candidateId}`}
+                        >
+                          {t('editor.layers.retouchSource.targetX')}/{t('editor.layers.retouchSource.targetY')}
+                          {': '}
+                          {healLayer.retouchCloneSource.targetPoint.x.toFixed(3)},{' '}
+                          {healLayer.retouchCloneSource.targetPoint.y.toFixed(3)}
+                          {' | '}
+                          {t('editor.layers.retouchSource.sourceX')}/{t('editor.layers.retouchSource.sourceY')}
+                          {': '}
+                          {healLayer.retouchCloneSource.sourcePoint.x.toFixed(3)},{' '}
+                          {healLayer.retouchCloneSource.sourcePoint.y.toFixed(3)}
+                          {' | '}
+                          {t('editor.layers.retouchSource.radius')} {healLayer.retouchCloneSource.radiusPx?.toFixed(1)}
+                        </span>
+                      )}
                     </div>
                   );
                 })}
