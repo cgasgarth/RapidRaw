@@ -257,8 +257,68 @@ const unchangedRemove = applyResolvedRemoveSourcesToLayerStack(
   ],
   { ...context, operationId: 'resolve_remove_source_again' },
 );
-if (unchangedRemove.appliedLayerIds.length !== 0 || unchangedRemove.graphRevision !== context.graphRevision) {
+if (
+  unchangedRemove.appliedLayerIds.length !== 0 ||
+  unchangedRemove.skippedLayerIds[0] !== 'layer-remove' ||
+  unchangedRemove.graphRevision !== context.graphRevision
+) {
   throw new Error('Expected unchanged resolved remove source metadata to be a no-op.');
+}
+const missingLayerRemove = applyResolvedRemoveSourcesToLayerStack(
+  masks,
+  [
+    {
+      layerId: 'layer-missing',
+      resolvedSourcePoint: { x: 0.22, y: 0.44 },
+      status: 'ready',
+      targetMaskId: 'layer-remove-target',
+    },
+  ],
+  { ...context, operationId: 'missing_remove_source_layer' },
+);
+if (
+  missingLayerRemove.appliedLayerIds.length !== 0 ||
+  missingLayerRemove.skippedLayerIds[0] !== 'layer-missing' ||
+  missingLayerRemove.graphRevision !== context.graphRevision
+) {
+  throw new Error('Expected missing resolved remove source layers to be reported as skipped.');
+}
+const mismatchedTargetRemove = applyResolvedRemoveSourcesToLayerStack(
+  masks,
+  [
+    {
+      layerId: 'layer-remove',
+      resolvedSourcePoint: { x: 0.22, y: 0.44 },
+      status: 'ready',
+      targetMaskId: 'layer-other-target',
+    },
+  ],
+  { ...context, operationId: 'mismatched_remove_source_target' },
+);
+if (
+  mismatchedTargetRemove.appliedLayerIds.length !== 0 ||
+  mismatchedTargetRemove.skippedLayerIds[0] !== 'layer-remove' ||
+  mismatchedTargetRemove.graphRevision !== context.graphRevision
+) {
+  throw new Error('Expected mismatched resolved remove source targets to be reported as skipped.');
+}
+const missingReadySourceRemove = applyResolvedRemoveSourcesToLayerStack(
+  masks,
+  [
+    {
+      layerId: 'layer-remove',
+      status: 'ready',
+      targetMaskId: 'layer-remove-target',
+    },
+  ],
+  { ...context, operationId: 'missing_ready_remove_source_point' },
+);
+if (
+  missingReadySourceRemove.appliedLayerIds.length !== 0 ||
+  missingReadySourceRemove.skippedLayerIds[0] !== 'layer-remove' ||
+  missingReadySourceRemove.graphRevision !== context.graphRevision
+) {
+  throw new Error('Expected ready remove source results without a source point to be reported as skipped.');
 }
 const fallbackRemove = applyResolvedRemoveSourcesToLayerStack(
   masks,

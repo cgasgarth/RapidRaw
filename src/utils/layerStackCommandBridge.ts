@@ -91,6 +91,7 @@ export interface LayerStackResolvedRemoveSourceApplication {
   appliedLayerIds: Array<string>;
   graphRevision: string;
   masks: Array<MaskContainer>;
+  skippedLayerIds: Array<string>;
   sidecar: LayerStackSidecarV1;
 }
 
@@ -172,23 +173,36 @@ export function applyResolvedRemoveSourcesToLayerStack(
   let currentContext = bridgeContextSchema.parse(context);
   let sidecar = buildLayerStackSidecarFromMasks(currentMasks, currentContext);
   const appliedLayerIds: Array<string> = [];
+  const skippedLayerIds: Array<string> = [];
 
   for (const resolvedSource of resolvedRemoveSources) {
     const currentLayer = currentMasks.find((mask) => mask.id === resolvedSource.layerId);
-    if (currentLayer?.retouchRemoveSource === undefined) continue;
-    if (currentLayer.retouchRemoveSource.targetMaskId !== resolvedSource.targetMaskId) continue;
+    if (currentLayer?.retouchRemoveSource === undefined) {
+      skippedLayerIds.push(resolvedSource.layerId);
+      continue;
+    }
+    if (currentLayer.retouchRemoveSource.targetMaskId !== resolvedSource.targetMaskId) {
+      skippedLayerIds.push(resolvedSource.layerId);
+      continue;
+    }
 
     const nextSource = {
       ...currentLayer.retouchRemoveSource,
       status: resolvedSource.status,
     } satisfies RetouchRemoveSource;
     if (resolvedSource.status === 'ready') {
-      if (resolvedSource.resolvedSourcePoint === undefined) continue;
+      if (resolvedSource.resolvedSourcePoint === undefined) {
+        skippedLayerIds.push(resolvedSource.layerId);
+        continue;
+      }
       nextSource.resolvedSourcePoint = resolvedSource.resolvedSourcePoint;
     } else {
       delete nextSource.resolvedSourcePoint;
     }
-    if (JSON.stringify(currentLayer.retouchRemoveSource) === JSON.stringify(nextSource)) continue;
+    if (JSON.stringify(currentLayer.retouchRemoveSource) === JSON.stringify(nextSource)) {
+      skippedLayerIds.push(resolvedSource.layerId);
+      continue;
+    }
 
     const result = applyLayerStackCommandBridgeOperation(
       currentMasks,
@@ -216,6 +230,7 @@ export function applyResolvedRemoveSourcesToLayerStack(
     appliedLayerIds,
     graphRevision: currentContext.graphRevision,
     masks: currentMasks,
+    skippedLayerIds,
     sidecar,
   };
 }
