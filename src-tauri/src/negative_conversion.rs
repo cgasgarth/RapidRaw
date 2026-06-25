@@ -9,6 +9,7 @@ use image::{DynamicImage, Rgb32FImage};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::hash::{Hash, Hasher};
@@ -82,6 +83,8 @@ pub struct NegativeConversionSaveOptions {
     pub frame_exposure_overrides: NegativeLabFrameExposureOverridePayload,
     #[serde(default)]
     pub frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload,
+    #[serde(default)]
+    pub accepted_dust_heal_layers_by_source_path: HashMap<String, Vec<serde_json::Value>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -319,6 +322,7 @@ impl Default for NegativeConversionSaveOptions {
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            accepted_dust_heal_layers_by_source_path: HashMap::new(),
         }
     }
 }
@@ -358,6 +362,23 @@ impl NegativeConversionSaveOptions {
                     && !override_entry.source_path.trim().is_empty()
             })
             .collect();
+        let accepted_dust_heal_layers_by_source_path = self
+            .accepted_dust_heal_layers_by_source_path
+            .into_iter()
+            .filter_map(|(source_path, layers)| {
+                let source_path = source_path.trim().to_string();
+                let layers: Vec<serde_json::Value> = layers
+                    .into_iter()
+                    .filter(|layer| {
+                        layer
+                            .get("id")
+                            .and_then(|value| value.as_str())
+                            .is_some_and(|id| !id.trim().is_empty())
+                    })
+                    .collect();
+                (!source_path.is_empty() && !layers.is_empty()).then_some((source_path, layers))
+            })
+            .collect();
 
         Self {
             output_format: self.output_format,
@@ -388,7 +409,15 @@ impl NegativeConversionSaveOptions {
                 overrides: frame_rgb_balance_overrides,
                 schema_version: 1,
             },
+            accepted_dust_heal_layers_by_source_path,
         }
+    }
+
+    fn accepted_dust_heal_layers_for_path(&self, source_path: &str) -> Vec<serde_json::Value> {
+        self.accepted_dust_heal_layers_by_source_path
+            .get(source_path)
+            .cloned()
+            .unwrap_or_default()
     }
 
     fn validate_accepted_batch_plan(&self, paths_len: usize) -> Result<(), String> {
@@ -1143,6 +1172,7 @@ fn write_negative_lab_output_sidecar(
     source_path: &Path,
     params: &NegativeConversionParams,
     save_options: &NegativeConversionSaveOptions,
+    accepted_dust_heal_layers: &[serde_json::Value],
     output_width: u32,
     output_height: u32,
 ) -> Result<(), String> {
@@ -1209,6 +1239,7 @@ fn write_negative_lab_output_sidecar(
         output_path,
         &positive_variant_id,
         &artifact_id,
+        accepted_dust_heal_layers,
     );
     artifacts.stale_artifact_ids.retain(|id| !id.is_empty());
 
@@ -1228,6 +1259,7 @@ fn upsert_negative_lab_layer_stack_sidecar(
     output_path: &Path,
     positive_variant_id: &str,
     artifact_id: &str,
+    layers: &[serde_json::Value],
 ) {
     let output_image_path = output_path.to_string_lossy().to_string();
     artifacts.layer_stack_sidecars.retain(|sidecar| {
@@ -1238,7 +1270,7 @@ fn upsert_negative_lab_layer_stack_sidecar(
     });
     artifacts.layer_stack_sidecars.push(serde_json::json!({
         "graphRevision": format!("graph_negative_lab_{}", positive_variant_id),
-        "layers": [],
+        "layers": layers,
         "lastCommandId": format!("command_seed_layer_stack_{}", artifact_id),
         "schemaVersion": 1,
         "sourceImagePath": output_image_path,
@@ -1907,6 +1939,7 @@ pub async fn convert_negatives(
                 Path::new(&real_path),
                 &effective_params,
                 &save_options,
+                &save_options.accepted_dust_heal_layers_for_path(&real_path),
                 processed.width(),
                 processed.height(),
             )?;
@@ -2320,6 +2353,7 @@ mod tests {
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            accepted_dust_heal_layers_by_source_path: HashMap::new(),
             suffix: " Proof / Final:01 ".to_string(),
         }
         .sanitized();
@@ -2349,6 +2383,7 @@ mod tests {
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            accepted_dust_heal_layers_by_source_path: HashMap::new(),
             suffix: "///".to_string(),
         }
         .sanitized();
@@ -2371,6 +2406,7 @@ mod tests {
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            accepted_dust_heal_layers_by_source_path: HashMap::new(),
             suffix: "Web Proof".to_string(),
         }
         .sanitized();
@@ -2386,6 +2422,7 @@ mod tests {
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            accepted_dust_heal_layers_by_source_path: HashMap::new(),
             suffix: "".to_string(),
         }
         .sanitized();
@@ -2427,6 +2464,7 @@ mod tests {
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            accepted_dust_heal_layers_by_source_path: HashMap::new(),
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
         assert!(accepted_plan.validate_accepted_batch_plan(2).is_ok());
@@ -2443,6 +2481,7 @@ mod tests {
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            accepted_dust_heal_layers_by_source_path: HashMap::new(),
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
         assert!(mismatched_plan.validate_accepted_batch_plan(2).is_err());
@@ -2624,6 +2663,34 @@ mod tests {
             black_point: 0.0,
             white_point: 1.0,
         };
+        let accepted_dust_heal_layers = vec![serde_json::json!({
+            "adjustmentPreset": "empty_adjustment_layer_v1",
+            "blendMode": "normal",
+            "id": "dust_candidate_001_heal_layer",
+            "maskIds": ["dust_candidate_001_target"],
+            "name": "Dust heal dust_candidate_001",
+            "opacity": 1.0,
+            "retouchCloneSource": {
+                "alignmentErrorPx": 0,
+                "candidateProvenance": {
+                    "candidateId": "dust_candidate_001",
+                    "candidateKind": "dust_spot",
+                    "confidence": 0.92,
+                    "confidenceSemantics": "ranking_score_v1",
+                    "origin": "negative_lab_dust_candidate",
+                    "sourceFrameId": "negative-lab-frame-001",
+                    "statusAtAcceptance": "acknowledged",
+                },
+                "featherRadiusPx": 3.5,
+                "radiusPx": 10.0,
+                "retouchMode": "heal",
+                "rotationDegrees": 0,
+                "scale": 1,
+                "sourcePoint": { "x": 0.42, "y": 0.38 },
+                "targetPoint": { "x": 0.36, "y": 0.38 },
+            },
+            "visible": true,
+        })];
         let save_options = NegativeConversionSaveOptions {
             accepted_dry_run_plan_hash: Some("fnv1a32:2f4a91bc".to_string()),
             accepted_dry_run_plan_id: Some("negative_lab_batch_plan_2f4a91bc".to_string()),
@@ -2655,6 +2722,10 @@ mod tests {
             }),
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            accepted_dust_heal_layers_by_source_path: HashMap::from([(
+                source_path.to_string_lossy().to_string(),
+                accepted_dust_heal_layers,
+            )]),
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
 
@@ -2663,6 +2734,7 @@ mod tests {
             &source_path,
             &params,
             &save_options,
+            &save_options.accepted_dust_heal_layers_for_path(&source_path.to_string_lossy()),
             12,
             8,
         )
@@ -2729,7 +2801,15 @@ mod tests {
             output_path.to_string_lossy().to_string()
         );
         assert_eq!(layer_stack["storage"], "sidecar_artifact");
-        assert_eq!(layer_stack["layers"].as_array().unwrap().len(), 0);
+        assert_eq!(layer_stack["layers"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            layer_stack["layers"][0]["id"],
+            "dust_candidate_001_heal_layer"
+        );
+        assert_eq!(
+            layer_stack["layers"][0]["retouchCloneSource"]["candidateProvenance"]["origin"],
+            "negative_lab_dust_candidate"
+        );
         assert!(
             layer_stack["graphRevision"]
                 .as_str()
@@ -2780,6 +2860,7 @@ mod tests {
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            accepted_dust_heal_layers_by_source_path: HashMap::new(),
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
         let bundle_path = negative_lab_conversion_bundle_path(&output_path);
@@ -3311,6 +3392,7 @@ mod tests {
             }),
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            accepted_dust_heal_layers_by_source_path: HashMap::new(),
             suffix: "Positive".to_string(),
         };
         write_negative_lab_output_sidecar(
@@ -3318,6 +3400,7 @@ mod tests {
             source_path,
             &params,
             &save_options,
+            &[],
             rendered.width(),
             rendered.height(),
         )
@@ -3609,6 +3692,7 @@ mod tests {
             }),
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            accepted_dust_heal_layers_by_source_path: HashMap::new(),
             suffix: "Positive".to_string(),
         };
         write_negative_lab_output_sidecar(
@@ -3616,6 +3700,7 @@ mod tests {
             &source_path,
             &params,
             &save_options,
+            &[],
             rendered.width(),
             rendered.height(),
         )
