@@ -971,6 +971,7 @@
         "sourceX": "Source X",
         "sourceY": "Source Y",
         "summary": "{{mode}} source {{source}}",
+        "swapSourceTarget": "Swap source and target",
         "targetX": "Target X",
         "targetY": "Target Y",
         "title": "Retouch source"
