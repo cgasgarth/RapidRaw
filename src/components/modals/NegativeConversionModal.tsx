@@ -48,6 +48,7 @@ import {
   type NegativeLabShadowPatchBlackPointSuggestion,
 } from '../../schemas/negativeLabShadowPatchBlackPointSuggestionSchemas';
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
+import { useEditorStore } from '../../store/useEditorStore';
 import { TextColors, TextVariants } from '../../types/typography';
 import { buildDustCandidateHealLayer } from '../../utils/dustCandidateHealLayer';
 import {
@@ -558,6 +559,7 @@ interface BaseFogSampleUndoEntry {
 
 export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }: NegativeConversionModalProps) {
   const { t } = useTranslation();
+  const selectedEditorImage = useEditorStore((state) => state.selectedImage);
   const [params, setParams] = useState<NegativeParams>(DEFAULT_PARAMS);
   const [selectedPresetId, setSelectedPresetId] = useState<string>(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -968,6 +970,23 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     [frameHealthReport, previewUrl],
   );
   const dustHealLayerCount = Object.keys(dustHealLayerByCandidateId).length;
+  const resolveDustHealImageSize = (frameId: string) => {
+    const sourcePath = frameHealthReport.frames.find((frame) => frame.frameId === frameId)?.sourcePath ?? null;
+    if (
+      sourcePath !== null &&
+      selectedEditorImage?.path === sourcePath &&
+      selectedEditorImage.width > 0 &&
+      selectedEditorImage.height > 0
+    ) {
+      return {
+        imageHeight: selectedEditorImage.height,
+        imageWidth: selectedEditorImage.width,
+        source: 'selected_editor_image',
+      } as const;
+    }
+
+    return { imageHeight: 1000, imageWidth: 1000, source: 'normalized_fallback' } as const;
+  };
   const handleAcceptDustCandidate = (
     frame: NegativeLabDustScratchFrame,
     candidate: NegativeLabDustScratchCandidate,
@@ -977,11 +996,12 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       return;
     }
 
+    const dustHealImageSize = resolveDustHealImageSize(frame.frameId);
     const healLayer = buildDustCandidateHealLayer({
       candidate,
       frameId: frame.frameId,
-      imageHeight: 1000,
-      imageWidth: 1000,
+      imageHeight: dustHealImageSize.imageHeight,
+      imageWidth: dustHealImageSize.imageWidth,
     });
     setDustHealLayerByCandidateId((previous) => ({ ...previous, [candidate.candidateId]: healLayer }));
     setDustCandidateDecisionById((previous) => ({ ...previous, [candidate.candidateId]: 'accepted' }));
@@ -3117,6 +3137,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 {frame.candidates.map((candidate) => {
                   const candidateDecision = dustCandidateDecisionById[candidate.candidateId] ?? candidate.status;
                   const healLayer = dustHealLayerByCandidateId[candidate.candidateId];
+                  const dustHealImageSize = resolveDustHealImageSize(frame.frameId);
                   const canAccept = candidate.kind === 'dust_spot';
 
                   return (
@@ -3129,6 +3150,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                       data-generated-heal-confidence={
                         healLayer?.retouchCloneSource?.candidateProvenance?.confidence ?? ''
                       }
+                      data-generated-heal-image-height={dustHealImageSize.imageHeight}
+                      data-generated-heal-image-size-source={dustHealImageSize.source}
+                      data-generated-heal-image-width={dustHealImageSize.imageWidth}
                       data-generated-heal-layer-id={healLayer?.id ?? ''}
                       data-testid={`negative-lab-dust-candidate-${candidate.candidateId}`}
                       key={candidate.candidateId}
