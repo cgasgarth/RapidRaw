@@ -31,7 +31,8 @@ export const buildDustCandidateHealLayer = ({
 
   const targetX = clamp01(candidate.geometry.x + candidate.geometry.width / 2);
   const targetY = clamp01(candidate.geometry.y + candidate.geometry.height / 2);
-  const sourceX = clamp01(targetX + Math.max(candidate.geometry.width * 2.5, 0.04));
+  const sourceOffsetX = Math.max(candidate.geometry.width * 2.5, 0.04);
+  const sourceX = clamp01(targetX + sourceOffsetX <= 1 ? targetX + sourceOffsetX : targetX - sourceOffsetX);
   const sourceY = targetY;
   const radiusPx = Math.max(
     2,
