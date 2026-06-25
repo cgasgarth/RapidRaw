@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
-import { DEFAULT_LAYER_BLEND_MODE, INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from './adjustments';
+import {
+  DEFAULT_LAYER_BLEND_MODE,
+  INITIAL_MASK_ADJUSTMENTS,
+  type MaskContainer,
+  type RetouchCloneSource,
+} from './adjustments';
 import {
   ActorKind,
   ApprovalClass,
@@ -49,6 +54,11 @@ export type LayerStackCommandBridgeOperation =
       layerId: string;
       toneColor: LayerScopedToneAdjustmentV1;
       type: 'applyToneAdjustment';
+    }
+  | {
+      layerId: string;
+      retouchCloneSource: RetouchCloneSource;
+      type: 'updateRetouchSource';
     }
   | {
       layerId: string;
@@ -239,6 +249,15 @@ function buildLayerStackCommand(
           layerId: operation.layerId,
         },
       });
+    case 'updateRetouchSource':
+      return layerMaskCommandEnvelopeV1Schema.parse({
+        ...base,
+        commandType: 'layerMask.updateRetouchSource',
+        parameters: {
+          layerId: operation.layerId,
+          retouchCloneSource: operation.retouchCloneSource,
+        },
+      });
     case 'delete':
       return layerMaskCommandEnvelopeV1Schema.parse({
         ...base,
@@ -289,6 +308,8 @@ function materializeMasksFromSidecar(
     };
     if (layer.retouchCloneSource !== undefined) {
       materializedMask.retouchCloneSource = layer.retouchCloneSource;
+    } else {
+      delete materializedMask.retouchCloneSource;
     }
     return materializedMask;
   });

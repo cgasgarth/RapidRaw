@@ -100,7 +100,8 @@ type LayerStackCommand = Extract<
       | 'layerMask.moveLayer'
       | 'layerMask.renameLayer'
       | 'layerMask.setLayerOpacity'
-      | 'layerMask.setLayerVisibility';
+      | 'layerMask.setLayerVisibility'
+      | 'layerMask.updateRetouchSource';
   }
 >;
 
@@ -121,6 +122,7 @@ const isLayerStackCommand = (command: LayerMaskCommandEnvelopeV1): command is La
     'layerMask.applyLayerAdjustment',
     'layerMask.deleteLayer',
     'layerMask.moveLayer',
+    'layerMask.updateRetouchSource',
   ].includes(command.commandType);
 
 const changedLayerIds = (
@@ -281,6 +283,13 @@ const applyCommandToLayers = (
         command.parameters.layerId,
         command.parameters.position,
         command.parameters.referenceLayerId,
+      );
+    case 'layerMask.updateRetouchSource':
+      layerIndex(layers, command.parameters.layerId);
+      return layers.map((layer) =>
+        layer.id === command.parameters.layerId
+          ? { ...layer, retouchCloneSource: command.parameters.retouchCloneSource }
+          : layer,
       );
   }
 };

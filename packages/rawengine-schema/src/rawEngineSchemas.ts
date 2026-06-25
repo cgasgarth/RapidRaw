@@ -1524,6 +1524,7 @@ export const layerMaskCommandTypeV1Schema = z.enum([
   'layerMask.duplicateLayer',
   'layerMask.deleteLayer',
   'layerMask.moveLayer',
+  'layerMask.updateRetouchSource',
   'layerMask.attachMask',
   'layerMask.applyLayerAdjustment',
   'layerMask.createBrushMask',
@@ -1778,6 +1779,17 @@ export const layerMaskCommandEnvelopeV1Schema = z
               });
             }
           }),
+      })
+      .strict(),
+    layerMaskCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('layerMask.updateRetouchSource'),
+        parameters: z
+          .object({
+            layerId: z.string().trim().min(1),
+            retouchCloneSource: layerMaskCloneSourceV1Schema,
+          })
+          .strict(),
       })
       .strict(),
     layerMaskCommandBaseV1Schema

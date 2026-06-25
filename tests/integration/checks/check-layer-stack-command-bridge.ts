@@ -137,6 +137,25 @@ if (
 ) {
   throw new Error('Expected clone layer creation to preserve source linkage through command, sidecar, and UI masks.');
 }
+const updatedClone = run('update_clone_source', {
+  layerId: 'layer-clone',
+  retouchCloneSource: {
+    alignmentErrorPx: 0.05,
+    retouchMode: 'clone',
+    rotationDegrees: 0,
+    scale: 1,
+    sourcePoint: { x: 0.12, y: 0.2 },
+    targetPoint: { x: 0.72, y: 0.8 },
+  },
+  type: 'updateRetouchSource',
+});
+if (
+  updatedClone.command.commandType !== 'layerMask.updateRetouchSource' ||
+  updatedClone.sidecar.layers[0]?.retouchCloneSource?.sourcePoint.x !== 0.12 ||
+  masks[0]?.retouchCloneSource?.targetPoint.y !== 0.8
+) {
+  throw new Error('Expected clone source edits to roundtrip through command, sidecar, and UI masks.');
+}
 run('delete_clone', { layerId: 'layer-clone', type: 'delete' });
 
 const healLayer = {
