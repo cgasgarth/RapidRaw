@@ -99,6 +99,7 @@ const requiredSnippets = [
   [rustSource, 'fake_provider_captures_verified_raw_copy'],
   [rustSource, 'fake_provider_reports_backup_failure_without_losing_primary_capture'],
   [rustSource, 'session_open_quarantines_partial_downloads'],
+  [rustSource, 'interrupted_primary_capture_is_quarantined_on_next_session_open'],
   [rustSource, 'recover_tether_destination'],
   [rustSource, 'fake_provider_verifies_exposure_control_writes'],
   [rustSource, 'fake_provider_rejects_unsupported_exposure_control_values'],
