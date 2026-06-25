@@ -143,6 +143,34 @@ const syncRetouchRemoveTargetMask = (
     };
   });
 
+const syncRetouchCloneTargetMask = (
+  masks: Array<MaskContainer>,
+  layerId: string,
+  retouchCloneSource: RetouchCloneSource,
+  imageDimensions: { height: number; width: number },
+): Array<MaskContainer> =>
+  masks.map((mask) => {
+    if (mask.id !== layerId) return mask;
+    let syncedTargetMask = false;
+    return {
+      ...mask,
+      subMasks: mask.subMasks.map((subMask) => {
+        if (subMask.type !== Mask.Radial || syncedTargetMask) return subMask;
+        syncedTargetMask = true;
+        return {
+          ...subMask,
+          parameters: {
+            ...(subMask.parameters ?? {}),
+            centerX: retouchCloneSource.targetPoint.x * imageDimensions.width,
+            centerY: retouchCloneSource.targetPoint.y * imageDimensions.height,
+            featherRadiusPx: retouchCloneSource.featherRadiusPx ?? 24,
+            radiusPx: retouchCloneSource.radiusPx ?? 48,
+          },
+        };
+      }),
+    };
+  });
+
 const blendModes = [
   { labelKey: 'editor.layers.blendModes.normal', value: 'normal' },
   { labelKey: 'editor.layers.blendModes.multiply', value: 'multiply' },
@@ -417,8 +445,18 @@ export default function LayerStackPanel({
   const updateLayerBlendMode = (layerId: string, blendMode: LayerBlendMode) => {
     applyLayerStack(setLayerBlendMode(masks, layerId, blendMode), layerId);
   };
-  const updateLayerRetouchSource = (layerId: string, retouchCloneSource: RetouchCloneSource) => {
-    applyLayerStackCommand({ layerId, retouchCloneSource, type: 'updateRetouchSource' }, layerId);
+  const updateLayerRetouchSource = (
+    layerId: string,
+    retouchCloneSource: RetouchCloneSource,
+    syncTargetMask = false,
+  ) => {
+    applyLayerStackCommand(
+      { layerId, retouchCloneSource, type: 'updateRetouchSource' },
+      layerId,
+      syncTargetMask
+        ? (nextMasks) => syncRetouchCloneTargetMask(nextMasks, layerId, retouchCloneSource, effectiveImageDimensions)
+        : undefined,
+    );
   };
   const updateLayerRetouchRemoveSource = (
     layerId: string,
@@ -447,7 +485,9 @@ export default function LayerStackPanel({
     if (field === 'radiusPx') nextSource.radiusPx = roundRetouchNumber(clampNumber(rawValue, 0.01, 4096));
     if (field === 'featherRadiusPx') nextSource.featherRadiusPx = roundRetouchNumber(clampNumber(rawValue, 0, 4096));
 
-    updateLayerRetouchSource(activeRow.id, nextSource);
+    const syncTargetMask =
+      field === 'targetPoint.x' || field === 'targetPoint.y' || field === 'radiusPx' || field === 'featherRadiusPx';
+    updateLayerRetouchSource(activeRow.id, nextSource, syncTargetMask);
   };
   const updateActiveRetouchRemoveNumber = (field: RetouchRemoveControlField, rawValue: number) => {
     if (!activeRow || activeRow.isBase || activeRow.isGroupHeader || activeRow.retouchRemoveSource === null) return;
