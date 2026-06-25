@@ -7,7 +7,12 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { useShallow } from 'zustand/react/shallow';
 
-import { getMoxcmsExportColorCapability } from '../../../../packages/rawengine-schema/src/exportColorCapabilities';
+import {
+  MOXCMS_EXPORT_COLOR_CAPABILITIES_V1,
+  exportColorCapabilityCatalogV1Schema,
+  type ExportColorCapabilityV1,
+  type ExportColorCapabilityCatalogV1,
+} from '../../../../packages/rawengine-schema/src/exportColorCapabilities';
 import { useExportSettings } from '../../../hooks/useExportSettings';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../../schemas/exportRecipeIds';
@@ -241,6 +246,11 @@ const isSupportedColorProfileForFormat = (fileFormat: FileFormats, colorProfile:
   colorProfile === ExportColorProfile.Srgb ||
   (WIDE_GAMUT_EXPORT_PROFILES.has(colorProfile) && supportsColorManagedOutput(fileFormat));
 
+const getExportColorCapability = (
+  catalog: ExportColorCapabilityCatalogV1,
+  colorProfile: ExportColorCapabilityV1['colorProfile'],
+) => catalog.capabilities.find((capability) => capability.colorProfile === colorProfile) ?? null;
+
 export default function ExportPanel({
   exportState,
   multiSelectedPaths,
@@ -386,6 +396,9 @@ export default function ExportPanel({
   } | null>(null);
   const [watermarkImageAspectRatio, setWatermarkImageAspectRatio] = useState(1);
   const [imageAspectRatio, setImageAspectRatio] = useState(16 / 9);
+  const [exportColorCapabilityCatalog, setExportColorCapabilityCatalog] = useState<ExportColorCapabilityCatalogV1>(
+    MOXCMS_EXPORT_COLOR_CAPABILITIES_V1,
+  );
   const filenameInputRef = useRef<HTMLInputElement>(null);
   const osPlatform = useOsPlatform();
   const isAndroid = osPlatform === 'android';
@@ -711,8 +724,8 @@ export default function ExportPanel({
   const hasColorManagedTransform =
     supportsColorManagedOutput(fileFormat) && WIDE_GAMUT_EXPORT_PROFILES.has(colorProfile);
   const exportColorCapability = useMemo(
-    () => (hasColorManagedTransform ? getMoxcmsExportColorCapability(colorProfile) : null),
-    [colorProfile, hasColorManagedTransform],
+    () => (hasColorManagedTransform ? getExportColorCapability(exportColorCapabilityCatalog, colorProfile) : null),
+    [colorProfile, exportColorCapabilityCatalog, hasColorManagedTransform],
   );
   const renderingIntentOptions = useMemo(() => {
     const supportedIntents = exportColorCapability?.renderingIntents ?? [];
@@ -724,6 +737,15 @@ export default function ExportPanel({
     ].filter((option) => supportedIntents.includes(option.value));
   }, [exportColorCapability, t]);
   const blackPointCompensationStatus = exportColorCapability?.blackPointCompensation ?? 'unsupported';
+
+  useEffect(() => {
+    if (!isVisible) return;
+    void invokeWithSchema(Invokes.GetExportColorCapabilities, {}, exportColorCapabilityCatalogV1Schema)
+      .then(setExportColorCapabilityCatalog)
+      .catch(() => {
+        setExportColorCapabilityCatalog(MOXCMS_EXPORT_COLOR_CAPABILITIES_V1);
+      });
+  }, [isVisible]);
 
   useEffect(() => {
     if (!isSupportedColorProfileForFormat(fileFormat, colorProfile)) {

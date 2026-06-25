@@ -28,7 +28,10 @@ for (const marker of [
 
 for (const marker of [
   'renderingIntentOptions',
-  'getMoxcmsExportColorCapability(colorProfile)',
+  'getExportColorCapability(exportColorCapabilityCatalog, colorProfile)',
+  'Invokes.GetExportColorCapabilities',
+  'exportColorCapabilityCatalogV1Schema',
+  'MOXCMS_EXPORT_COLOR_CAPABILITIES_V1',
   'data-black-point-compensation-status={blackPointCompensationStatus}',
   'data-color-engine={exportColorCapability?.engine',
   'data-rendering-intent-count={renderingIntentOptions.length}',
@@ -58,6 +61,14 @@ for (const marker of [
 
 for (const marker of ['export_transform_options(rendering_intent)', 'rendering_intent: mox_rendering_intent']) {
   if (!rustExportSource.includes(marker)) failures.push(`Rust export runtime missing ${marker}`);
+}
+for (const marker of [
+  'pub fn get_export_color_capabilities() -> ExportColorCapabilityCatalog',
+  'pub(crate) fn resolve_export_color_capabilities() -> ExportColorCapabilityCatalog',
+  'ExportBlackPointCompensationStatus::Unsupported',
+  'ExportColorEngineId::Moxcms',
+]) {
+  if (!rustExportSource.includes(marker)) failures.push(`Rust export runtime capability resolver missing ${marker}`);
 }
 for (const marker of [
   'validate_export_color_policy(output_format, color_profile)',

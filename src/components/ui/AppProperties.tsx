@@ -79,6 +79,7 @@ export enum Invokes {
   GenerateMaskOverlay = 'generate_mask_overlay',
   GeneratePresetPreview = 'generate_preset_preview',
   GenerateUncroppedPreview = 'generate_uncropped_preview',
+  GetExportColorCapabilities = 'get_export_color_capabilities',
   GetImageDimensions = 'get_image_dimensions',
   IsOriginalFileAvailable = 'is_original_file_available',
   GetFolderTree = 'get_folder_tree',
