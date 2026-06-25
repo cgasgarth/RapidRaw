@@ -664,6 +664,17 @@ export function TetherPanel({
             {t('editor.tether.sessionDestinationRoot', { path: session.destinationRoot })}
           </UiText>
         )}
+        {session && (
+          <UiText
+            variant={TextVariants.small}
+            color={TextColors.secondary}
+            className="mt-2 block"
+            data-session-capture-counter={session.captureCounter}
+            data-testid="tether-session-capture-counter"
+          >
+            {t('editor.tether.sessionCaptureCounter', { next: session.captureCounter })}
+          </UiText>
+        )}
         {session?.recovery && session.recovery.status !== 'clean' && (
           <div
             className="mt-3 rounded border border-yellow-500/40 bg-yellow-500/10 p-2"

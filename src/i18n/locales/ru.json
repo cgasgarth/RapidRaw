@@ -814,6 +814,7 @@
       "openSession": "Open session",
       "sessionClosed": "Session closed",
       "sessionClosedDescription": "Open a discovery session before capture controls are enabled.",
+      "sessionCaptureCounter": "Next capture: {{next}}",
       "sessionOpen": "Session open",
       "sessionOpenDescription": "{{camera}} is reserved for this tether session.",
       "recoveryFailed": "Tether recovery failed: {{message}}",
