@@ -4,7 +4,10 @@ import {
   buildNegativeLabDustScratchReviewReport,
   buildNegativeLabQcProofReport,
 } from '../../../src/utils/negativeLabDustScratchReview.ts';
-import { buildDustCandidateHealLayer } from '../../../src/utils/dustCandidateHealLayer.ts';
+import {
+  buildDustCandidateHealLayer,
+  buildDustHealCorrectionMetrics,
+} from '../../../src/utils/dustCandidateHealLayer.ts';
 import { buildNegativeLabFrameHealthReport } from '../../../src/utils/negativeLabFrameHealth.ts';
 import {
   NEGATIVE_LAB_WORKSPACE_SCHEMA_VERSION,
@@ -133,6 +136,28 @@ if (
   throw new Error('Negative Lab dust candidate did not become an editable heal layer handoff.');
 }
 
+const dustHealCorrectionMetrics = buildDustHealCorrectionMetrics({
+  decisionByCandidateId: {
+    [firstDustCandidate.candidateId]: 'accepted',
+    [firstScratchCandidate.candidateId]: 'rejected',
+  },
+  healLayerByCandidateId: {
+    [firstDustCandidate.candidateId]: dustHealLayer,
+  },
+  reviewReport: mixedReviewReport,
+});
+
+if (
+  dustHealCorrectionMetrics.acceptedCandidateCount !== 1 ||
+  dustHealCorrectionMetrics.rejectedCandidateCount !== 1 ||
+  dustHealCorrectionMetrics.generatedHealLayerCount !== 1 ||
+  dustHealCorrectionMetrics.editableHealLayerCount !== 1 ||
+  dustHealCorrectionMetrics.sourceReadyCount !== 1 ||
+  dustHealCorrectionMetrics.runtimeProofStatus !== 'needs_real_raw_output_proof'
+) {
+  throw new Error('Negative Lab dust heal correction metrics did not summarize accepted editable heal proof state.');
+}
+
 const edgeDustHealLayer = buildDustCandidateHealLayer({
   candidate: {
     ...firstDustCandidate,
@@ -256,6 +281,12 @@ for (const marker of [
   'data-candidate-filter-state={getDustCandidateFilterState(',
   'negative-lab-dust-candidate-filter-empty',
   'negative-lab-dust-heal-layer-count',
+  'negative-lab-dust-heal-correction-metrics',
+  'data-accepted-candidate-count={dustHealCorrectionMetrics.acceptedCandidateCount}',
+  'data-editable-heal-layer-count={dustHealCorrectionMetrics.editableHealLayerCount}',
+  'data-runtime-proof-status={dustHealCorrectionMetrics.runtimeProofStatus}',
+  'dustHealMetricsAccepted',
+  'dustHealRuntimeProofStatus',
   'negative-lab-accept-dust-candidate-${candidate.candidateId}',
   'negative-lab-accept-all-dust-candidates',
   'data-bulk-accept-count={bulkAcceptDustCandidateCount}',

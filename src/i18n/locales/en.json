@@ -2611,6 +2611,14 @@
       "dustHealLayerCount": "Heal layers {{count}}",
       "dustHealLayerCount_one": "{{count}} heal layer",
       "dustHealLayerCount_other": "{{count}} heal layers",
+      "dustHealMetricsAccepted": "Accepted {{acceptedCandidateCount}}",
+      "dustHealMetricsEditable": "Editable {{editableHealLayerCount}}/{{generatedHealLayerCount}}",
+      "dustHealMetricsRejected": "Rejected {{rejectedCandidateCount}}",
+      "dustHealMetricsSourceReady": "Sources {{sourceReadyCount}}/{{generatedHealLayerCount}}",
+      "dustHealRuntimeProofStatus": {
+        "needs_accepted_corrections": "Accept dust candidates to create editable heal layers.",
+        "needs_real_raw_output_proof": "Partial proof: validate preview/export pixels on real RAWs before closing."
+      },
       "dustRetouchCount": "Retouch {{retouchCount}}",
       "dustReviewCount": "Review {{reviewCount}}",
       "dustScratchReview": "Dust & scratch review",

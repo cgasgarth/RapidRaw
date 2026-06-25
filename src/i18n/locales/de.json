@@ -2578,6 +2578,14 @@
       "dustHealLayerCount": "Heal layers {{count}}",
       "dustHealLayerCount_one": "",
       "dustHealLayerCount_other": "",
+      "dustHealMetricsAccepted": "",
+      "dustHealMetricsEditable": "",
+      "dustHealMetricsRejected": "",
+      "dustHealMetricsSourceReady": "",
+      "dustHealRuntimeProofStatus": {
+        "needs_accepted_corrections": "",
+        "needs_real_raw_output_proof": ""
+      },
       "dustRetouchCount": "",
       "dustReviewCount": "",
       "dustScratchReview": "",
