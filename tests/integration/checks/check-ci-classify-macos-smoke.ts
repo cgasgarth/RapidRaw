@@ -344,6 +344,10 @@ function isSafeValidationScript(path) {
   );
 }
 
+function isSafeCodexConfig(path) {
+  return path.startsWith('.codex/environments/') && path.endsWith('.toml');
+}
+
 function isSafePackageJsonScriptPatch(patch) {
   if (!patch) return false;
 
@@ -406,6 +410,7 @@ function classifyPathChange(change) {
     SAFE_TOOLING_FILES.has(path) ||
     isMarkdown(path) ||
     path.startsWith('docs/') ||
+    isSafeCodexConfig(path) ||
     isSafeFixturePath(path) ||
     isSafePureTestPath(path) ||
     isSafeSchemaPackagePath(path) ||
@@ -1010,6 +1015,11 @@ function runSelfTest() {
   );
   assertClassification('script policy metadata can skip smoke', ['scripts/tsconfig.json'], SMOKE_MODES.NONE);
   assertClassification('docs can skip smoke', ['RAW_EDITOR_PLAN.md', 'docs/validation.md'], SMOKE_MODES.NONE);
+  assertClassification(
+    'Codex local environment config can skip smoke',
+    ['.codex/environments/environment.toml'],
+    SMOKE_MODES.NONE,
+  );
   assertClassification(
     'mixed safe and workflow paths require main smoke decision',
     ['README.md', '.github/workflows/lint.yml'],

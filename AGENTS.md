@@ -72,6 +72,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   availability, GitHub repo resolution, remotes, and current open PR count.
 - If preflight fails, fix that before feature work. Do not add or preserve repo
   scripts whose main purpose is managing agent workflow.
+- Use the checked-in Codex app local environment for Codex-managed worktrees. It
+  syncs the worktree to current `origin/main`, installs or links Bun
+  dependencies, fetches Cargo/git dependencies, and configures hooks.
 - Use `bun run worktree:create -- --branch codex/name` for every new Codex
   worktree. The helper fetches and fast-forwards `main`, creates the worktree
   from current `origin/main`, links verified Bun dependencies, configures Git
@@ -209,142 +212,34 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 ## Validation And Quality
 
-- Shift left as much as practical with checks that catch real product defects
-  before manual review.
-- Stop adding repo meta-tooling unless it clearly improves product quality or
-  prevents a recurring real failure.
-- Prefer vertical feature delivery over planning, schema-only, proof-only,
-  inventory-only, report-only, routing-only, or meta-tooling work.
-- Proof scripts should live inside the actual feature PR they validate. Do not
-  open PRs whose main value is only a probe, schema, inventory, plan, report, or
-  routing check. Include that work inside actual feature PRs when it is needed
-  to ship the product behavior.
-- Consult should return milestone-level plans and tradeoffs. The agent should
-  split that plan into PR-sized GitHub issues instead of prompting consult for
-  the smallest usable PR.
-- Delete stale or low-value meta checks when they do not validate product
-  behavior.
-- If a helper script primarily exists to manage agent workflow rather than
-  product quality, remove it or keep it out of the repo.
-- Remove validation inventory JSON from routine gates. Do not add or preserve
-  broad validation ledgers that are not directly required to prove changed
-  product behavior.
-- Use Bun for TypeScript/React package management, scripts, tests, and CI where
-  applicable.
-- Prefer Bun over inline Node commands when the task can be expressed as a repo
-  script or Bun script.
+- Favor vertical product slices. Planning, schema, probe, inventory, report,
+  routing, and meta-tooling work only counts when it directly supports changed
+  product behavior in the same PR.
+- Use Bun for TypeScript/React package management, scripts, tests, and CI.
 - Keep TypeScript and linting strict. Do not introduce `as any` or
   `as unknown as`.
 - Use Zod for TypeScript-facing runtime schemas and structured config validation.
-- Before push or PR creation, use the repo precommit hook as the default local
-  validation path: stage the intended files and try the commit. If precommit
-  fails, fix the reported issue and retry the commit. Do not manually replay
-  every check that precommit already covers unless debugging the failing hook.
-- Do not bypass the precommit hook for routine work. If the user has explicitly
-  paused local testing/checks/builds, `--no-verify` may be used only to respect
-  that pause; PR validation must then clearly say local hooks were skipped and
-  hosted CI is the validation source.
-- Run extra focused local validation only when it proves changed runtime,
-  preview/export, UI, or image-output behavior that precommit cannot cover.
-  Record those extra commands as PR evidence.
-- Do not wait for CI to discover basic formatting, lint, i18n, missing
-  dependency, or bundle-budget failures.
-- When a GitHub Actions failure is caused by a deterministic repo issue, add or
-  update the cheapest appropriate precommit/local gate before treating the fix
-  as complete. Do not add precommit coverage for runner/network/service
-  infrastructure failures that cannot be reproduced locally.
-- If the failing GitHub Actions command is already covered by precommit, do not
-  add duplicate hook work. Record that the hook already covers the failure class
-  and fix the process miss that let the PR skip that local gate.
-- Do not treat narrow checks as proof of broad behavior. Match validation scope
-  to the requirement being claimed.
-- Treat plan-only, schema-only, API-only, dry-run-only, UI-only, and runtime
-  apply-capable work as distinct completion states. Do not close or describe a
-  full feature as done until runtime behavior, preview/export behavior, E2E or
-  equivalent workflow coverage, screenshots or artifacts, and follow-up gaps are
-  all proven or explicitly tracked.
-- For image-editing features, completion validation must include actually
-  running the app/software with the new feature on RAW images and validating the
-  output image or generated artifacts. Schemas, dry-runs, synthetic fixtures, or
-  UI-only smoke checks are useful intermediate proof, but they are not enough to
-  close a feature as complete.
-- For private RAW/image-editing features, validation must prove real runtime
-  behavior on image output, not just schema acceptance.
+- Use the precommit hook as the default local validation path before push or PR.
+  Fix hook failures instead of bypassing them unless the user explicitly paused
+  local checks; then say hosted CI is the validation source.
+- Add focused checks only when they prove changed runtime, preview/export, UI,
+  or image-output behavior that the hook cannot cover. Match validation scope to
+  the claim.
+- Track completion states precisely: plan-only, schema-only, API-only,
+  dry-run-only, UI-only, runtime-capable, and end-to-end proven are distinct.
+  Do not call image-editing work complete until real runtime/output proof exists
+  or the follow-up gap is explicit.
 - The user has explicitly allowed project validation to use their own RAW files
   under `/Users/cgas/Pictures/Capture One/Alaska`. Use that folder for private
   local RAW proof when it fits the feature, but do not commit those RAW files or
   generated private image artifacts.
-- Keep private RAW validation standardized around one reusable private-root and
-  report pattern.
-- Private RAW reports may be generated locally as evidence, but should not be
-  committed unless they are deliberate human-review artifacts.
-- Do not count planning, schema, API, or UI-only work as a complete feature
-  unless end-to-end workflow proof exists in the same PR. If E2E proof is not
-  included, state the runtime status explicitly and keep or create a follow-up
-  issue for E2E validation.
-- Shift effort toward actual end-to-end feature slices with UI, runtime, and
-  output proof.
-- Keep frequently reused local checks and hooks token-efficient. On success,
-  prefer compact summaries over full command/file lists; on failure, preserve
-  actionable tool output.
-- Keep checks compact: success output should be short, and failure output should
-  show only actionable details.
+- Keep private RAW proof local by default. Commit generated reports only as
+  deliberate human-review artifacts.
 - Put new integration, validation, runtime-proof, fixture-proof, and E2E-style
   checks in `tests/integration/checks/`. Keep `scripts/` for reusable helpers,
   generators, CI classifiers, and command wrappers rather than adding new
   top-level `scripts/check-*.ts` files.
-- Avoid committed generated inventory/report JSON unless it is a human-review
-  artifact or required for a product validation gate.
-- Remove validation inventory JSON from routine gates. Do not maintain broad
-  validation inventory files as routine PR churn; prefer focused checks tied to
-  changed product behavior.
-- Do not keep committed generated validation reports just to prove scripts are
-  wired. Keep private RAW validation standardized around reusable private-root
-  setup plus per-feature run reports that prove real output behavior.
-- Prefer feature-specific runtime proofs that validate actual image output over
-  broad status ledgers.
-- Audit existing validation helpers when touching nearby code. Delete stale,
-  duplicate, or low-value meta checks instead of carrying them forward.
-- Do not edit existing tests solely to reduce token output. Compact the
-  commonly reused runner, package script, hook, or reporting layer instead.
-- Keep GitHub Actions current on supported major versions and maintain the
-  stable `PR CI / required` aggregate gate.
-- New `main` or PR workflow runs should not cancel older validation runs.
-
-## Dependency Freshness
-
-- Track latest stable major and minor versions for JavaScript/Bun packages, Rust
-  crates, GitHub Actions, Node, Bun, Tauri, Rust tooling, and validation CLIs.
-- Patch and minor refreshes may be grouped when they are compatible and pass the
-  full validation story.
-- Every discovered major package/tooling bump must have a dedicated GitHub issue
-  before implementation starts.
-- Treat Cargo `0.x` semver-incompatible minor or patch jumps as major-style
-  migration issues.
-- Do not hide major migrations inside broad lockfile refresh PRs.
-
-## Resource And Tooling Discipline
-
-- Keep searches repo-scoped by default.
-- Exclude `node_modules`, `dist`, `target`, `src-tauri/target`, plugin caches,
-  and `~/.codex` unless explicitly needed.
-- Prefer `rg -l`, `rg --count`, `jq` summaries, bounded `sed`/`head`/`tail`,
-  and compact scripts.
-- Use `ast-grep` (`sg`) for syntax-aware code searches and structural rewrites.
-  Prefer `rg` for plain text, filenames, and quick literal discovery; use
-  `sg --lang <language> -p '<pattern>'` when the query depends on code
-  structure.
-- Do not dump full CI logs, full JSON, broad file lists, or unchanged green
-  status.
-- Resource cleanup concerns are primarily about RAM pressure, not disk space.
-  Do not delete `node_modules`, build outputs, or target directories just for
-  disk cleanup.
-- Avoid leaving unnecessary local servers, browser sessions, or long-running
-  build processes alive after they are no longer needed.
-- Worktrees are allowed for parallel work when they reduce wait time without
-  confusing branch ownership.
-- Use `rg`/`rg --files` for repo search when available.
-- Use `apply_patch` for manual file edits.
-- Do not use AppleScript, `osascript`, System Events GUI scripting, JavaScript
-  from Apple Events, or Apple Events automation unless the user explicitly
-  permits that specific task.
+- Keep generated inventory/report JSON out of routine gates unless it is a
+  required product validation artifact.
+- When touching validation helpers, delete stale, duplicate, or low-value meta
+  checks instead of carrying them forward.
