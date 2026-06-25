@@ -50,7 +50,6 @@ import {
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { TextColors, TextVariants } from '../../types/typography';
-import { useEditorStore } from '../../store/useEditorStore';
 import { buildDustCandidateHealLayer } from '../../utils/dustCandidateHealLayer';
 import {
   DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID,
