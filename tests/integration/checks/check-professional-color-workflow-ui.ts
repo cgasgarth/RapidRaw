@@ -104,4 +104,14 @@ for (const marker of [
   }
 }
 
+for (const staleClass of [
+  'className="mt-2 grid grid-cols-2 gap-1 text-[10px] font-medium text-text-secondary"',
+  '<span className="truncate font-semibold text-text-primary">{t(recipe.labelKey)}</span>',
+]) {
+  if (source.includes(staleClass)) {
+    console.error(`Professional color workflow UI still uses cramped layout marker: ${staleClass}`);
+    process.exit(1);
+  }
+}
+
 console.log('professional color workflow UI ok');
