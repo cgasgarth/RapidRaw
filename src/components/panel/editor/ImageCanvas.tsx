@@ -2804,6 +2804,13 @@ const ImageCanvas = memo(
                 y: sourcePoint.y + sourceFootprintAxisLength * Math.sin(sourceFootprintRadians),
               };
               const retouchMode = activeRetouchSource.retouchMode ?? 'clone';
+              const activePlacementHandle: RetouchHandleKind = isAltPressed ? 'sourcePoint' : 'targetPoint';
+              const sourceHandleRadius =
+                activePlacementHandle === 'sourcePoint' ? handleRadius + Math.max(1, strokeWidth) : handleRadius;
+              const targetHandleRadius =
+                activePlacementHandle === 'targetPoint' ? handleRadius + Math.max(1, strokeWidth) : handleRadius;
+              const sourceHandleStrokeWidth = activePlacementHandle === 'sourcePoint' ? strokeWidth + 1 : strokeWidth;
+              const targetHandleStrokeWidth = activePlacementHandle === 'targetPoint' ? strokeWidth + 1 : strokeWidth;
               const retouchModeLabel = t(
                 retouchMode === 'heal'
                   ? 'editor.layers.retouchSource.modes.heal'
@@ -2825,6 +2832,8 @@ const ImageCanvas = memo(
                   data-retouch-handle-source-y={activeRetouchSource.sourcePoint.y}
                   data-retouch-handle-target-x={activeRetouchSource.targetPoint.x}
                   data-retouch-handle-target-y={activeRetouchSource.targetPoint.y}
+                  data-retouch-canvas-active-handle={activePlacementHandle}
+                  data-retouch-canvas-alt-pressed={String(isAltPressed)}
                   data-testid="image-canvas-retouch-handles"
                   style={{
                     height: stageHeight * maxSafeScale,
@@ -2846,8 +2855,10 @@ const ImageCanvas = memo(
                       <Group scaleX={maxSafeScale} scaleY={maxSafeScale}>
                         <Group x={groupOffsetX} y={groupOffsetY}>
                           <Rect
+                            cursor="crosshair"
                             data-retouch-canvas-click-target="source-or-target"
                             data-retouch-canvas-click-source-modifier="Alt"
+                            data-retouch-canvas-click-active-handle={activePlacementHandle}
                             data-testid="image-canvas-retouch-click-target"
                             fill="rgba(0, 0, 0, 0)"
                             height={effectiveImageDimensions.height * imageRenderSize.scale}
@@ -2943,15 +2954,15 @@ const ImageCanvas = memo(
                             onTouchStart={(event) => {
                               event.evt.stopPropagation();
                             }}
-                            radius={handleRadius}
                             shadowBlur={4}
                             shadowColor="black"
-                            shadowOpacity={0.5}
+                            shadowOpacity={activePlacementHandle === 'sourcePoint' ? 0.7 : 0.45}
                             stroke="#f8fafc"
                             strokeScaleEnabled={false}
-                            strokeWidth={strokeWidth}
+                            strokeWidth={sourceHandleStrokeWidth}
                             x={sourcePoint.x}
                             y={sourcePoint.y}
+                            radius={sourceHandleRadius}
                           />
                           <Label
                             data-retouch-canvas-handle="sourcePoint"
@@ -2993,15 +3004,15 @@ const ImageCanvas = memo(
                             onTouchStart={(event) => {
                               event.evt.stopPropagation();
                             }}
-                            radius={handleRadius}
                             shadowBlur={4}
                             shadowColor="black"
-                            shadowOpacity={0.5}
+                            shadowOpacity={activePlacementHandle === 'targetPoint' ? 0.7 : 0.45}
                             stroke="#f8fafc"
                             strokeScaleEnabled={false}
-                            strokeWidth={strokeWidth}
+                            strokeWidth={targetHandleStrokeWidth}
                             x={targetPoint.x}
                             y={targetPoint.y}
+                            radius={targetHandleRadius}
                           />
                           <Label
                             data-retouch-canvas-handle="targetPoint"
