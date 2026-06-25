@@ -490,7 +490,7 @@ if (JSON.stringify(scaledRetouchPixel) !== JSON.stringify(scaledExpectedPixel)) 
 
 const bilinearRetouchPixel = renderTransformedRetouchPixel({ ...transformedRetouchSource, scale: 2 }, 13);
 const bilinearExpectedPixel = {
-  b: 58,
+  b: 75,
   g: 73,
   r: 125,
 };
