@@ -2479,6 +2479,20 @@ const ImageCanvas = memo(
       },
       [canvasPointToRetouchPoint, updateRemoveTargetPoint],
     );
+    const handleRemoveCanvasClick = useCallback(
+      (layerId: string, removeSource: RetouchRemoveSource, event: CanvasKonvaEvent) => {
+        if (isNonPrimaryButton(event)) return;
+        event.evt.stopPropagation();
+        const pointer = event.target.getStage()?.getPointerPosition();
+        if (!pointer) return;
+        const point = canvasPointToRetouchPoint({
+          x: pointer.x / maxSafeScale - groupOffsetX,
+          y: pointer.y / maxSafeScale - groupOffsetY,
+        });
+        updateRemoveTargetPoint(layerId, removeSource, point);
+      },
+      [canvasPointToRetouchPoint, groupOffsetX, groupOffsetY, maxSafeScale, updateRemoveTargetPoint],
+    );
 
     const cropPreviewUrl = uncroppedAdjustedPreviewUrl || selectedImage.thumbnailUrl;
     const originalSrc = transformedOriginalUrl;
@@ -3048,6 +3062,21 @@ const ImageCanvas = memo(
                     <Layer>
                       <Group scaleX={maxSafeScale} scaleY={maxSafeScale}>
                         <Group x={groupOffsetX} y={groupOffsetY}>
+                          <Rect
+                            data-remove-canvas-click-target="target"
+                            data-testid="image-canvas-remove-click-target"
+                            fill="rgba(0, 0, 0, 0)"
+                            height={effectiveImageDimensions.height * imageRenderSize.scale}
+                            onClick={(event) => {
+                              handleRemoveCanvasClick(activeRemoveLayer.id, activeRemoveSource, event);
+                            }}
+                            onTap={(event) => {
+                              handleRemoveCanvasClick(activeRemoveLayer.id, activeRemoveSource, event);
+                            }}
+                            width={effectiveImageDimensions.width * imageRenderSize.scale}
+                            x={0}
+                            y={0}
+                          />
                           {resolvedSourcePoint && (
                             <Line
                               dash={[4, 4]}
