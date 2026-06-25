@@ -50,7 +50,7 @@ import {
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { TextColors, TextVariants } from '../../types/typography';
-import { buildDustCandidateHealLayer } from '../../utils/dustCandidateHealLayer';
+import { buildDustCandidateHealLayer, buildDustHealCorrectionMetrics } from '../../utils/dustCandidateHealLayer';
 import {
   DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID,
   NEGATIVE_LAB_ACQUISITION_PROFILES,
@@ -1016,6 +1016,15 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     [dustCandidateDecisionById, dustCandidateFilter, dustScratchReviewReport.frames],
   );
   const dustHealLayerCount = Object.keys(dustHealLayerByCandidateId).length;
+  const dustHealCorrectionMetrics = useMemo(
+    () =>
+      buildDustHealCorrectionMetrics({
+        decisionByCandidateId: dustCandidateDecisionById,
+        healLayerByCandidateId: dustHealLayerByCandidateId,
+        reviewReport: dustScratchReviewReport,
+      }),
+    [dustCandidateDecisionById, dustHealLayerByCandidateId, dustScratchReviewReport],
+  );
   const bulkAcceptDustCandidateCount = useMemo(
     () =>
       dustScratchReviewReport.frames.reduce(
@@ -3229,6 +3238,27 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       <UiText variant={TextVariants.small} className="text-text-tertiary">
         {t('modals.negativeConversion.dustScratchReviewHint')}
       </UiText>
+      <div
+        className="grid grid-cols-2 gap-1 rounded-sm border border-yellow-200/20 bg-bg-secondary px-2 py-1 text-[11px] text-yellow-100 sm:grid-cols-4"
+        data-accepted-candidate-count={dustHealCorrectionMetrics.acceptedCandidateCount}
+        data-editable-heal-layer-count={dustHealCorrectionMetrics.editableHealLayerCount}
+        data-generated-heal-layer-count={dustHealCorrectionMetrics.generatedHealLayerCount}
+        data-mean-accepted-confidence={dustHealCorrectionMetrics.meanAcceptedConfidence ?? ''}
+        data-pending-candidate-count={dustHealCorrectionMetrics.pendingCandidateCount}
+        data-rejected-candidate-count={dustHealCorrectionMetrics.rejectedCandidateCount}
+        data-runtime-proof-status={dustHealCorrectionMetrics.runtimeProofStatus}
+        data-source-ready-count={dustHealCorrectionMetrics.sourceReadyCount}
+        data-testid="negative-lab-dust-heal-correction-metrics"
+        data-unresolved-source-count={dustHealCorrectionMetrics.unresolvedSourceCount}
+      >
+        <span>{t('modals.negativeConversion.dustHealMetricsAccepted', dustHealCorrectionMetrics)}</span>
+        <span>{t('modals.negativeConversion.dustHealMetricsRejected', dustHealCorrectionMetrics)}</span>
+        <span>{t('modals.negativeConversion.dustHealMetricsEditable', dustHealCorrectionMetrics)}</span>
+        <span>{t('modals.negativeConversion.dustHealMetricsSourceReady', dustHealCorrectionMetrics)}</span>
+        <span className="col-span-2 text-yellow-100/70 sm:col-span-4">
+          {t(`modals.negativeConversion.dustHealRuntimeProofStatus.${dustHealCorrectionMetrics.runtimeProofStatus}`)}
+        </span>
+      </div>
       <div
         className="flex flex-wrap gap-1 text-[11px]"
         data-active-filter={dustCandidateFilter}

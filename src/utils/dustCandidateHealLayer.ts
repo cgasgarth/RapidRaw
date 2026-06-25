@@ -1,10 +1,13 @@
 import { DEFAULT_LAYER_BLEND_MODE, INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from './adjustments';
 import { Mask, SubMaskMode } from '../components/panel/right/Masks';
-
-import type { NegativeLabDustScratchReviewReport } from '../schemas/negativeLabWorkspaceSchemas';
+import {
+  parseNegativeLabDustHealCorrectionMetrics,
+  type NegativeLabDustHealCorrectionMetrics, type NegativeLabDustScratchReviewReport 
+} from '../schemas/negativeLabWorkspaceSchemas';
 
 type DustScratchFrame = NegativeLabDustScratchReviewReport['frames'][number];
 type DustScratchCandidate = DustScratchFrame['candidates'][number];
+type DustCandidateDecision = 'accepted' | 'pending' | 'rejected';
 
 interface DustCandidateHealLayerInput {
   candidate: DustScratchCandidate;
@@ -13,6 +16,12 @@ interface DustCandidateHealLayerInput {
   imageWidth: number;
   layerId?: string;
   targetSubMaskId?: string;
+}
+
+interface DustHealCorrectionMetricsInput {
+  decisionByCandidateId: Record<string, DustCandidateDecision | undefined>;
+  healLayerByCandidateId: Record<string, MaskContainer>;
+  reviewReport: NegativeLabDustScratchReviewReport;
 }
 
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
@@ -102,4 +111,51 @@ export const buildDustCandidateHealLayer = ({
     ],
     visible: true,
   };
+};
+
+export const buildDustHealCorrectionMetrics = ({
+  decisionByCandidateId,
+  healLayerByCandidateId,
+  reviewReport,
+}: DustHealCorrectionMetricsInput): NegativeLabDustHealCorrectionMetrics => {
+  let acceptedCandidateCount = 0;
+  let acceptedConfidenceTotal = 0;
+  let pendingCandidateCount = 0;
+  let rejectedCandidateCount = 0;
+
+  for (const frame of reviewReport.frames) {
+    for (const candidate of frame.candidates) {
+      const decision = decisionByCandidateId[candidate.candidateId] ?? 'pending';
+      if (decision === 'accepted') {
+        acceptedCandidateCount += 1;
+        acceptedConfidenceTotal += candidate.confidence;
+      } else if (decision === 'rejected') {
+        rejectedCandidateCount += 1;
+      } else {
+        pendingCandidateCount += 1;
+      }
+    }
+  }
+
+  const generatedHealLayers = Object.values(healLayerByCandidateId);
+  const editableHealLayerCount = generatedHealLayers.filter(
+    (layer) => layer.retouchCloneSource?.retouchMode === 'heal' && layer.subMasks.length > 0,
+  ).length;
+  const sourceReadyCount = generatedHealLayers.filter((layer) => {
+    const source = layer.retouchCloneSource;
+    return source !== undefined && isDistinctHealSource(source.sourcePoint, source.targetPoint);
+  }).length;
+
+  return parseNegativeLabDustHealCorrectionMetrics({
+    acceptedCandidateCount,
+    editableHealLayerCount,
+    generatedHealLayerCount: generatedHealLayers.length,
+    meanAcceptedConfidence:
+      acceptedCandidateCount === 0 ? null : Number((acceptedConfidenceTotal / acceptedCandidateCount).toFixed(4)),
+    pendingCandidateCount,
+    rejectedCandidateCount,
+    runtimeProofStatus: generatedHealLayers.length === 0 ? 'needs_accepted_corrections' : 'needs_real_raw_output_proof',
+    sourceReadyCount,
+    unresolvedSourceCount: generatedHealLayers.length - sourceReadyCount,
+  });
 };

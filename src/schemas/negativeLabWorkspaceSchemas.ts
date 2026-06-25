@@ -107,6 +107,53 @@ export const negativeLabDustScratchReviewReportSchema = z
     }
   });
 
+export const negativeLabDustHealCorrectionMetricsSchema = z
+  .object({
+    acceptedCandidateCount: z.number().int().nonnegative(),
+    editableHealLayerCount: z.number().int().nonnegative(),
+    generatedHealLayerCount: z.number().int().nonnegative(),
+    meanAcceptedConfidence: z.number().min(0).max(1).nullable(),
+    pendingCandidateCount: z.number().int().nonnegative(),
+    rejectedCandidateCount: z.number().int().nonnegative(),
+    runtimeProofStatus: z.enum(['needs_accepted_corrections', 'needs_real_raw_output_proof']),
+    sourceReadyCount: z.number().int().nonnegative(),
+    unresolvedSourceCount: z.number().int().nonnegative(),
+  })
+  .strict()
+  .superRefine((metrics, context) => {
+    if (metrics.editableHealLayerCount > metrics.generatedHealLayerCount) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Editable heal layer count cannot exceed generated heal layers.',
+        path: ['editableHealLayerCount'],
+      });
+    }
+
+    if (metrics.sourceReadyCount + metrics.unresolvedSourceCount !== metrics.generatedHealLayerCount) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Dust heal source readiness counts must cover every generated heal layer.',
+        path: ['sourceReadyCount'],
+      });
+    }
+
+    if (metrics.acceptedCandidateCount === 0 && metrics.meanAcceptedConfidence !== null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Accepted confidence summary requires accepted candidates.',
+        path: ['meanAcceptedConfidence'],
+      });
+    }
+
+    if (metrics.acceptedCandidateCount > 0 && metrics.meanAcceptedConfidence === null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Accepted dust candidates require a confidence summary.',
+        path: ['meanAcceptedConfidence'],
+      });
+    }
+  });
+
 export const negativeLabQcProofRowSchema = z
   .object({
     candidates: z.array(negativeLabDustScratchCandidateSchema),
@@ -204,12 +251,16 @@ export const negativeLabWorkspaceProofSchema = z
   });
 
 export type NegativeLabDustScratchReviewReport = z.infer<typeof negativeLabDustScratchReviewReportSchema>;
+export type NegativeLabDustHealCorrectionMetrics = z.infer<typeof negativeLabDustHealCorrectionMetricsSchema>;
 export type NegativeLabQcProofReport = z.infer<typeof negativeLabQcProofReportSchema>;
 export type NegativeLabWorkspaceProof = z.infer<typeof negativeLabWorkspaceProofSchema>;
 export type NegativeLabWorkspaceStageId = z.infer<typeof negativeLabWorkspaceStageIdSchema>;
 
 export const parseNegativeLabDustScratchReviewReport = (value: unknown): NegativeLabDustScratchReviewReport =>
   negativeLabDustScratchReviewReportSchema.parse(value);
+
+export const parseNegativeLabDustHealCorrectionMetrics = (value: unknown): NegativeLabDustHealCorrectionMetrics =>
+  negativeLabDustHealCorrectionMetricsSchema.parse(value);
 
 export const parseNegativeLabQcProofReport = (value: unknown): NegativeLabQcProofReport =>
   negativeLabQcProofReportSchema.parse(value);
