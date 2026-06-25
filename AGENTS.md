@@ -72,6 +72,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   availability, GitHub repo resolution, remotes, and current open PR count.
 - If preflight fails, fix that before feature work. Do not add or preserve repo
   scripts whose main purpose is managing agent workflow.
+- Use the checked-in Codex app local environment for Codex-managed worktrees
+  when available. It syncs the worktree to current `origin/main`, installs or
+  links Bun dependencies, fetches Cargo/git dependencies, and configures hooks.
 - Use `bun run worktree:create -- --branch codex/name` for every new Codex
   worktree. The helper fetches and fast-forwards `main`, creates the worktree
   from current `origin/main`, links verified Bun dependencies, configures Git
