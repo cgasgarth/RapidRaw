@@ -51,7 +51,7 @@ interface ImportSettings {
 }
 
 export interface AppModalsProps {
-  handleImageSelect: (path: string) => void;
+  handleImageSelect: (path: string) => Promise<void> | void;
   handleSavePanorama: () => Promise<string>;
   handleStartPanorama: (paths: string[]) => void;
   handleSaveHdr: () => Promise<string>;
@@ -211,7 +211,7 @@ export default function AppModals(props: AppModalsProps) {
           });
         }}
         onOpenFile={(path: string) => {
-          props.handleImageSelect(path);
+          void props.handleImageSelect(path);
         }}
         onSave={props.handleSavePanorama}
         onStitch={() => {
@@ -244,7 +244,7 @@ export default function AppModals(props: AppModalsProps) {
           });
         }}
         onOpenFile={(path: string) => {
-          props.handleImageSelect(path);
+          void props.handleImageSelect(path);
         }}
         onSave={props.handleSaveHdr}
         onMerge={() => {
@@ -376,7 +376,9 @@ export default function AppModals(props: AppModalsProps) {
         }}
         onBatchDenoise={props.handleBatchDenoise}
         onSave={props.handleSaveDenoisedImage}
-        onOpenFile={props.handleImageSelect}
+        onOpenFile={(path) => {
+          void props.handleImageSelect(path);
+        }}
         previewBase64={denoiseModalState.previewBase64}
         originalBase64={denoiseModalState.originalBase64 || null}
         isProcessing={denoiseModalState.isProcessing}

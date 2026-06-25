@@ -2108,7 +2108,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         },
         negativeConversionSavedPathsSchema,
       );
-      onSave(savedPaths, { openInEditor: openSavedPositiveInEditor });
+      onSave(savedPaths, {
+        acceptedDustHealLayers: Object.values(dustHealLayerByCandidateId),
+        openInEditor: openSavedPositiveInEditor,
+      });
       onClose();
     } catch (e) {
       console.error('Failed to batch save negatives', e);

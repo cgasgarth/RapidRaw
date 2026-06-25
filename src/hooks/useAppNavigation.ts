@@ -21,6 +21,7 @@ import { useUIStore } from '../store/useUIStore';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { formatUnknownError } from '../utils/errorFormatting';
 import { globalImageCache, type ImageCacheEntry } from '../utils/ImageLRUCache';
+import { consumePendingNegativeConversionDustHealLayers } from '../utils/negativeLabEditorHandoff';
 
 import type { FolderTree } from '../components/panel/FolderTree';
 import type { LoadImageResult } from '../schemas/imageLoaderSchemas';
@@ -300,9 +301,11 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
               prevAdjustmentsRef.current = { path, adjustments: freshAdjustments };
               globalImageCache.set(path, { ...cachedReadyEntry, adjustments: freshAdjustments });
             }
+            consumePendingNegativeConversionDustHealLayers(path);
           })
           .catch((err: unknown) => {
             console.error('Failed background metadata sync on cache hit:', err);
+            consumePendingNegativeConversionDustHealLayers(path);
           });
 
         return;

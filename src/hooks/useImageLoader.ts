@@ -9,6 +9,7 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { formatUnknownError } from '../utils/errorFormatting';
+import { consumePendingNegativeConversionDustHealLayers } from '../utils/negativeLabEditorHandoff';
 
 import type { ImageCacheEntry } from '../utils/ImageLRUCache';
 
@@ -117,6 +118,7 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
             }
             return state;
           });
+          consumePendingNegativeConversionDustHealLayers(selectedImagePath);
         } catch (err) {
           if (isEffectActive) {
             console.error('Failed to load image:', err);

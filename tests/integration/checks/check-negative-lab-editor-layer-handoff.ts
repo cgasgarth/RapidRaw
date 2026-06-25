@@ -13,8 +13,10 @@ import {
 } from '../../../packages/rawengine-schema/src';
 
 const appModalsSource = readFileSync('src/components/modals/AppModals.tsx', 'utf8');
+const appNavigationSource = readFileSync('src/hooks/useAppNavigation.ts', 'utf8');
 const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
 const handoffSource = readFileSync('src/utils/negativeLabEditorHandoff.ts', 'utf8');
+const imageLoaderSource = readFileSync('src/hooks/useImageLoader.ts', 'utf8');
 const visualSmokeSource = readFileSync('src/validation/visual/VisualSmokeApp.tsx', 'utf8');
 const visualSmokeCaptureSource = readFileSync('scripts/capture-visual-smoke.ts', 'utf8');
 
@@ -118,11 +120,21 @@ if (applied.sidecar.layers[0]?.id !== layer.id) {
 }
 
 for (const [label, source, marker] of [
-  ['modal save contract', modalSource, 'onSave(savedPaths, { openInEditor: openSavedPositiveInEditor });'],
+  ['modal save contract', modalSource, 'acceptedDustHealLayers: Object.values(dustHealLayerByCandidateId)'],
   ['modal handoff control', modalSource, 'negative-lab-positive-open-in-editor'],
   ['app handoff route', appModalsSource, 'handleNegativeConversionEditorHandoff({'],
   ['refresh best effort', handoffSource, 'onRefreshError?.(error);'],
-  ['handoff exact first path', handoffSource, 'handleImageSelect(firstSavedPath);'],
+  ['handoff exact first path', handoffSource, 'await handleImageSelect(firstSavedPath);'],
+  ['handoff dust heal layer contract', handoffSource, 'acceptedDustHealLayers?: Array<MaskContainer>;'],
+  ['handoff dust heal layer queue', handoffSource, 'pendingAcceptedDustHealLayers ='],
+  ['handoff dust heal layer consume', handoffSource, 'consumePendingNegativeConversionDustHealLayers'],
+  [
+    'handoff editor history append',
+    handoffSource,
+    'pushEditHistoryEntry(state.history, state.historyIndex, adjustments)',
+  ],
+  ['uncached handoff consume', imageLoaderSource, 'consumePendingNegativeConversionDustHealLayers(selectedImagePath);'],
+  ['cached handoff consume', appNavigationSource, 'consumePendingNegativeConversionDustHealLayers(path);'],
   ['visual smoke handoff state', visualSmokeSource, 'data-opened-positive-in-editor='],
   ['visual smoke shared helper', visualSmokeSource, 'handleNegativeConversionEditorHandoff({'],
   ['visual smoke opt out', visualSmokeSource, 'handoff: { openInEditor: false }'],
