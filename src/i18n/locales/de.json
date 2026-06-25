@@ -1388,7 +1388,7 @@
   "export": {
     "advanced": {
       "blackPointCompensation": "",
-      "blackPointCompensationTiffRelativeOnly": "",
+      "blackPointCompensationJpegTiffRelativeOnly": "",
       "blackPointCompensationUnavailable": "",
       "colorProfile": "Farbprofil",
       "exportMasks": "Masken als separate Dateien exportieren",

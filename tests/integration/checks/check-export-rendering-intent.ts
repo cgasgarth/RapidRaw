@@ -44,6 +44,7 @@ for (const marker of [
   'placement="top"',
   'export.advanced.renderingIntent',
   'export.advanced.blackPointCompensationUnavailable',
+  'export.advanced.blackPointCompensationJpegTiffRelativeOnly',
   'export.readiness.renderingIntent',
   'renderingIntent,',
 ]) {
@@ -55,7 +56,7 @@ for (const marker of [
   'exportColorCapabilityCatalogV1Schema',
   'MOXCMS_EXPORT_COLOR_CAPABILITIES_V1',
   "blackPointCompensation: colorProfile === 'srgb' ? 'unsupported' : 'supported'",
-  'LittleCMS enables black-point compensation for TIFF relative colorimetric wide-gamut exports.',
+  'LittleCMS enables black-point compensation for JPEG/TIFF relative colorimetric wide-gamut exports.',
 ]) {
   if (!capabilitySource.includes(marker)) failures.push(`Export color capability descriptor missing ${marker}`);
 }
@@ -82,6 +83,8 @@ for (const marker of [
   'sRGB to Display P3 conversion applied',
   'Unavailable for this export path',
   'Enabled via LittleCMS relative colorimetric transform',
+  'jpeg_relative_bpc_resolves_to_littlecms_policy',
+  'display_p3_jpeg_bpc_encodes_with_littlecms_receipt',
   'export_rgb16_pixels_with_shared_conversion_core',
   'quantize_rgb16_to_rgb8',
 ]) {
@@ -101,7 +104,7 @@ const displayP3Capability = capabilityCatalog.capabilities.find(
   (capability) => capability.colorProfile === 'displayP3',
 );
 if (displayP3Capability?.blackPointCompensation !== 'supported') {
-  failures.push('Display P3 TIFF relative colorimetric export must advertise BPC support.');
+  failures.push('Display P3 JPEG/TIFF relative colorimetric export must advertise BPC support.');
 }
 if (
   !capabilityCatalog.capabilities.every((capability) => capability.renderingIntents.includes('relativeColorimetric'))
@@ -136,7 +139,7 @@ for (const key of [
   locale.export?.advanced?.renderingIntent,
   locale.export?.advanced?.blackPointCompensationUnavailable,
   locale.export?.advanced?.blackPointCompensation,
-  locale.export?.advanced?.blackPointCompensationTiffRelativeOnly,
+  locale.export?.advanced?.blackPointCompensationJpegTiffRelativeOnly,
   locale.export?.colorProfiles?.adobeRgb1998,
   locale.export?.colorProfiles?.proPhotoRgb,
   locale.export?.renderingIntents?.relativeColorimetric,

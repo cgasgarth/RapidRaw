@@ -1390,7 +1390,7 @@
   "export": {
     "advanced": {
       "blackPointCompensation": "Black-point compensation",
-      "blackPointCompensationTiffRelativeOnly": "Available for 16-bit TIFF with relative colorimetric intent.",
+      "blackPointCompensationJpegTiffRelativeOnly": "Available for JPEG and 16-bit TIFF with relative colorimetric intent.",
       "blackPointCompensationUnavailable": "Black-point compensation is not available with the current color engine.",
       "colorProfile": "Color Profile",
       "exportMasks": "Export masks as separate files",

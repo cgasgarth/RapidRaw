@@ -740,7 +740,7 @@ export default function ExportPanel({
   }, [exportColorCapability, t]);
   const blackPointCompensationStatus = exportColorCapability?.blackPointCompensation ?? 'unsupported';
   const isBlackPointCompensationAvailable =
-    fileFormat === FileFormats.Tiff &&
+    (fileFormat === FileFormats.Jpeg || fileFormat === FileFormats.Tiff) &&
     renderingIntent === ExportRenderingIntent.RelativeColorimetric &&
     blackPointCompensationStatus === 'supported';
 
@@ -1456,7 +1456,7 @@ export default function ExportPanel({
                                 )}
                                 {blackPointCompensationStatus === 'supported' && !isBlackPointCompensationAvailable ? (
                                   <UiText variant={TextVariants.small} color={TextColors.secondary}>
-                                    {t('export.advanced.blackPointCompensationTiffRelativeOnly')}
+                                    {t('export.advanced.blackPointCompensationJpegTiffRelativeOnly')}
                                   </UiText>
                                 ) : null}
                               </div>

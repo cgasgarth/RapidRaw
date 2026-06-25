@@ -709,7 +709,13 @@ fn encode_image_with_applied_policy(
         }
         "jpg" | "jpeg" => {
             return Ok(EncodedExportImage {
-                bytes: encode_jpeg_to_bytes(image, jpeg_quality, color_profile, rendering_intent)?,
+                bytes: encode_jpeg_to_bytes(
+                    image,
+                    jpeg_quality,
+                    color_profile,
+                    rendering_intent,
+                    black_point_compensation,
+                )?,
                 color_policy: export_receipt_metadata(
                     &normalized_format,
                     color_profile,
@@ -818,7 +824,7 @@ fn export_rgb16_pixels_with_shared_conversion_core(
 
     if export_color_profile_requires_transform(color_profile) {
         if black_point_compensation
-            && is_lcms_tiff_relative_bpc_supported("tiff", color_profile, rendering_intent)
+            && is_lcms_relative_bpc_supported("tiff", color_profile, rendering_intent)
         {
             let transformed = transform_rgb16_with_lcms(
                 &pixels,
@@ -907,9 +913,14 @@ fn encode_jpeg_to_bytes(
     jpeg_quality: u8,
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
+    black_point_compensation: bool,
 ) -> Result<Vec<u8>, String> {
-    let (rgb_pixels, width, height, output_profile) =
-        export_jpeg_rgb_pixels_and_profile(image, color_profile, rendering_intent)?;
+    let (rgb_pixels, width, height, output_profile) = export_jpeg_rgb_pixels_and_profile(
+        image,
+        color_profile,
+        rendering_intent,
+        black_point_compensation,
+    )?;
     let icc_profile = encode_icc_profile(&output_profile)?;
 
     MozJpegEncoder::new(Preset::BaselineBalanced)
@@ -923,8 +934,14 @@ pub(crate) fn export_jpeg_rgb_pixels_and_profile(
     image: &DynamicImage,
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
+    black_point_compensation: bool,
 ) -> Result<(Vec<u8>, u32, u32, ColorProfile), String> {
-    export_rgb_pixels_and_profile(image, color_profile, rendering_intent)
+    export_rgb_pixels_and_profile(
+        image,
+        color_profile,
+        rendering_intent,
+        black_point_compensation,
+    )
 }
 
 pub(crate) fn export_soft_proof_rgb_pixels_and_profile(
@@ -932,19 +949,20 @@ pub(crate) fn export_soft_proof_rgb_pixels_and_profile(
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
 ) -> Result<(Vec<u8>, u32, u32, ColorProfile), String> {
-    export_rgb_pixels_and_profile(image, color_profile, rendering_intent)
+    export_rgb_pixels_and_profile(image, color_profile, rendering_intent, false)
 }
 
 fn export_rgb_pixels_and_profile(
     image: &DynamicImage,
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
+    black_point_compensation: bool,
 ) -> Result<(Vec<u8>, u32, u32, ColorProfile), String> {
     let (pixels, width, height, output_profile) = export_rgb16_pixels_with_shared_conversion_core(
         image,
         color_profile,
         rendering_intent,
-        false,
+        black_point_compensation,
     )?;
     Ok((
         quantize_rgb16_to_rgb8(&pixels),
@@ -1081,11 +1099,8 @@ fn resolve_export_color_transform_plan(
 
     let transform_applied = export_color_profile_requires_transform(color_profile)
         || should_apply_srgb_perceptual_gamut_mapping(color_profile, rendering_intent);
-    let supports_black_point_compensation = is_lcms_tiff_relative_bpc_supported(
-        &requested.output_format,
-        color_profile,
-        rendering_intent,
-    );
+    let supports_black_point_compensation =
+        is_lcms_relative_bpc_supported(&requested.output_format, color_profile, rendering_intent);
     let black_point_compensation_status = if supports_black_point_compensation {
         ExportBlackPointCompensationStatus::Supported
     } else {
@@ -1093,7 +1108,7 @@ fn resolve_export_color_transform_plan(
     };
     let disabled_reason = if black_point_compensation && !supports_black_point_compensation {
         Some(
-            "Black-point compensation is only available for TIFF wide-gamut relative colorimetric LittleCMS exports."
+            "Black-point compensation is only available for JPEG/TIFF wide-gamut relative colorimetric LittleCMS exports."
                 .to_string(),
         )
     } else {
@@ -1149,7 +1164,7 @@ fn applied_export_color_policy(
 pub(crate) fn resolve_export_color_capabilities() -> ExportColorCapabilityCatalog {
     let runtime_support_notes = vec![
         "Rendering intent is passed to moxcms transform options.".to_string(),
-        "LittleCMS enables black-point compensation for TIFF relative colorimetric wide-gamut exports."
+        "LittleCMS enables black-point compensation for JPEG/TIFF relative colorimetric wide-gamut exports."
             .to_string(),
     ];
     let capabilities = vec![
@@ -1209,12 +1224,12 @@ fn lcms_rendering_intent(rendering_intent: &ExportRenderingIntent) -> LcmsIntent
     }
 }
 
-fn is_lcms_tiff_relative_bpc_supported(
+fn is_lcms_relative_bpc_supported(
     output_format: &str,
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
 ) -> bool {
-    matches!(output_format, "tif" | "tiff")
+    matches!(output_format, "jpg" | "jpeg" | "tif" | "tiff")
         && export_color_profile_requires_transform(color_profile)
         && matches!(
             rendering_intent,
@@ -2296,7 +2311,8 @@ mod tests {
     use super::{
         ExportBlackPointCompensationStatus, ExportColorEngineId, ExportColorProfile,
         ExportRenderingIntent, ExportSettings, OutputSharpeningSettings, OutputSharpeningTarget,
-        apply_export_resize_and_watermark, encode_image_to_bytes, encode_image_with_applied_policy,
+        applied_export_color_policy, apply_export_resize_and_watermark, encode_icc_profile,
+        encode_image_to_bytes, encode_image_with_applied_policy,
         export_color_profile_receipt_label, export_jpeg_rgb_pixels_and_profile,
         export_receipt_metadata, export_rgb_pixels_and_profile, export_rgb16_pixels_and_profile,
         export_rgb16_pixels_with_shared_conversion_core, export_soft_proof_rgb_pixels_and_profile,
@@ -2629,6 +2645,24 @@ mod tests {
     }
 
     #[test]
+    fn jpeg_relative_bpc_resolves_to_littlecms_policy() {
+        let plan = resolve_export_color_transform_plan(
+            "jpg",
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+            true,
+        )
+        .expect("Display P3 JPEG BPC policy should resolve");
+
+        assert_eq!(plan.engine, ExportColorEngineId::Lcms2);
+        assert_eq!(
+            plan.black_point_compensation,
+            ExportBlackPointCompensationStatus::Supported
+        );
+        assert_eq!(applied_export_color_policy(plan, "synthetic").bit_depth, 8);
+    }
+
+    #[test]
     fn display_p3_tiff_bpc_encodes_with_littlecms_receipt() {
         let image = DynamicImage::ImageRgb16(ImageBuffer::from_fn(2, 1, |x, _| {
             if x == 0 {
@@ -2659,11 +2693,62 @@ mod tests {
     }
 
     #[test]
+    fn display_p3_jpeg_bpc_encodes_with_littlecms_receipt() {
+        let image = DynamicImage::ImageRgb16(ImageBuffer::from_fn(2, 1, |x, _| {
+            if x == 0 {
+                Rgb([1024, 2048, 4096])
+            } else {
+                Rgb([48_000, 36_000, 24_000])
+            }
+        }));
+        let encoded = encode_image_with_applied_policy(
+            &image,
+            "jpg",
+            92,
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+            true,
+        )
+        .expect("Display P3 JPEG BPC export should encode");
+        let metadata = encoded
+            .color_policy
+            .expect("managed JPEG export should carry applied color policy");
+        let (jpeg_pixels, _, _, jpeg_profile) = export_jpeg_rgb_pixels_and_profile(
+            &image,
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+            true,
+        )
+        .expect("Display P3 JPEG BPC RGB8 boundary should export");
+        let (core_pixels, _, _, _) = export_rgb16_pixels_and_profile(
+            &image,
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+            true,
+        )
+        .expect("Display P3 JPEG BPC shared RGB16 boundary should export");
+
+        assert_eq!(metadata.cmm, "lcms2");
+        assert_eq!(metadata.bit_depth, 8);
+        assert_eq!(
+            metadata.black_point_compensation,
+            "Enabled via LittleCMS relative colorimetric transform"
+        );
+        assert_eq!(jpeg_pixels, quantize_rgb16_to_rgb8(&core_pixels));
+        assert_eq!(
+            &single_icc_payload(&encoded.bytes)[b"ICC_PROFILE\0\x01\x01".len()..],
+            encode_icc_profile(&jpeg_profile)
+                .expect("Display P3 JPEG output ICC should encode")
+                .as_slice()
+        );
+    }
+
+    #[test]
     fn unsupported_bpc_request_is_reported_without_silent_enablement() {
         let metadata = export_receipt_metadata(
             "jpg",
             &ExportColorProfile::DisplayP3,
-            &ExportRenderingIntent::RelativeColorimetric,
+            &ExportRenderingIntent::Saturation,
             true,
             &synthetic_source_precision_path(),
         )
@@ -2677,7 +2762,7 @@ mod tests {
         assert_eq!(
             metadata.resolved_disabled_reason.as_deref(),
             Some(
-                "Black-point compensation is only available for TIFF wide-gamut relative colorimetric LittleCMS exports."
+                "Black-point compensation is only available for JPEG/TIFF wide-gamut relative colorimetric LittleCMS exports."
             )
         );
     }
@@ -2886,12 +2971,14 @@ mod tests {
             &image,
             &ExportColorProfile::Srgb,
             &ExportRenderingIntent::RelativeColorimetric,
+            false,
         )
         .expect("sRGB export recipe should succeed");
         let (display_p3_pixels, _, _, _) = export_rgb_pixels_and_profile(
             &image,
             &ExportColorProfile::DisplayP3,
             &ExportRenderingIntent::RelativeColorimetric,
+            false,
         )
         .expect("Display P3 export recipe should succeed");
 
@@ -2925,6 +3012,7 @@ mod tests {
             &image,
             &ExportColorProfile::DisplayP3,
             &ExportRenderingIntent::RelativeColorimetric,
+            false,
         )
         .expect("Display P3 JPEG export should run");
         let (soft_proof_pixels, soft_proof_width, soft_proof_height, _) =
@@ -3001,6 +3089,7 @@ mod tests {
             &image,
             &ExportColorProfile::Srgb,
             &ExportRenderingIntent::Perceptual,
+            false,
         )
         .expect("sRGB perceptual JPEG export should run");
 
@@ -3024,6 +3113,7 @@ mod tests {
                 &image,
                 &profile,
                 &ExportRenderingIntent::RelativeColorimetric,
+                false,
             )
             .expect("wide-gamut profile should export through CMM");
             let metadata = export_receipt_metadata(
@@ -3123,12 +3213,14 @@ mod tests {
             &image,
             &ExportColorProfile::DisplayP3,
             &ExportRenderingIntent::RelativeColorimetric,
+            false,
         )
         .expect("Display P3 JPEG export RGB8 transform should succeed");
         let (srgb_pixels, _, _, _) = export_jpeg_rgb_pixels_and_profile(
             &image,
             &ExportColorProfile::Srgb,
             &ExportRenderingIntent::RelativeColorimetric,
+            false,
         )
         .expect("sRGB JPEG export RGB8 transform should succeed");
 

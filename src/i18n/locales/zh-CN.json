@@ -1374,7 +1374,7 @@
   "export": {
     "advanced": {
       "blackPointCompensation": "",
-      "blackPointCompensationTiffRelativeOnly": "",
+      "blackPointCompensationJpegTiffRelativeOnly": "",
       "blackPointCompensationUnavailable": "",
       "colorProfile": "色彩配置文件",
       "exportMasks": "将蒙版导出为单独文件",
