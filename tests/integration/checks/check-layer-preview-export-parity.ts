@@ -386,9 +386,9 @@ if (removePreviewHash === hashPixels(removeFixture.basePixels)) {
 }
 
 const transformedRetouchBasePixels = Array.from({ length: 25 }, (_, index) => ({
-  b: index + 80,
-  g: index + 40,
-  r: index,
+  b: 20 + index * 3,
+  g: 10 + index * 5,
+  r: index * 10,
 }));
 const transformedRetouchBase = {
   basePixels: transformedRetouchBasePixels,
@@ -455,6 +455,19 @@ if (JSON.stringify(scaledRetouchPixel) !== JSON.stringify(scaledExpectedPixel)) 
   fail('retouch-transform: scale should sample canonical image-space source pixel', [
     `actual=${JSON.stringify(scaledRetouchPixel)}`,
     `expected=${JSON.stringify(scaledExpectedPixel)}`,
+  ]);
+}
+
+const bilinearRetouchPixel = renderTransformedRetouchPixel({ ...transformedRetouchSource, scale: 2 }, 13);
+const bilinearExpectedPixel = {
+  b: 58,
+  g: 73,
+  r: 125,
+};
+if (JSON.stringify(bilinearRetouchPixel) !== JSON.stringify(bilinearExpectedPixel)) {
+  fail('retouch-transform: scale should bilinearly sample subpixel source points', [
+    `actual=${JSON.stringify(bilinearRetouchPixel)}`,
+    `expected=${JSON.stringify(bilinearExpectedPixel)}`,
   ]);
 }
 
