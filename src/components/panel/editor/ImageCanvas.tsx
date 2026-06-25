@@ -15,7 +15,7 @@ import { Mask, type SubMask, SubMaskMode, ToolType } from '../right/Masks';
 
 import type { RenderSize } from '../../../hooks/useImageRenderSize';
 import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
-import type { Adjustments, AiPatch, Coord, MaskContainer } from '../../../utils/adjustments';
+import type { Adjustments, AiPatch, Coord, MaskContainer, RetouchCloneSource } from '../../../utils/adjustments';
 import type { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
 import type { OverlayMode } from '../right/CropPanel';
 import type { KonvaEventObject, Node as KonvaNode } from 'konva/lib/Node';
@@ -90,10 +90,12 @@ interface StraightenLine {
 
 type CanvasKonvaEvent = KonvaEventObject<MouseEvent | TouchEvent | PointerEvent>;
 type CanvasMoveEvent = CanvasKonvaEvent | MouseEvent | TouchEvent;
+type RetouchHandleDragEvent = KonvaEventObject<DragEvent>;
 type EditableKonvaEllipse = KonvaEllipse & {
   lastValidScaleX?: number;
   lastValidScaleY?: number;
 };
+type RetouchHandleKind = 'sourcePoint' | 'targetPoint';
 
 const toMaskParameters = (parameters: SubMask['parameters']): MaskParameters => parameters as MaskParameters;
 
@@ -111,6 +113,10 @@ const setStageCursor = (stage: KonvaStage | null, cursor: string): void => {
 const cssPx = (value: number | undefined): string => `${String(value ?? 0)}px`;
 const cssPercent = (value: number): string => `${String(value)}%`;
 const svgNumber = (value: number): string => String(value);
+const clamp01 = (value: number): number => {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(1, value));
+};
 
 interface ImageCanvasProps {
   appSettings: AppSettings | null;
@@ -1287,6 +1293,14 @@ const ImageCanvas = memo(
       isAiEditing,
     ]);
 
+    const activeRetouchLayer = useMemo(() => {
+      if (!activeMaskContainerId) return null;
+      const layer = adjustments.masks.find((mask: MaskContainer) => mask.id === activeMaskContainerId);
+      return layer?.retouchCloneSource === undefined ? null : layer;
+    }, [activeMaskContainerId, adjustments.masks]);
+
+    const activeRetouchSource = activeRetouchLayer?.retouchCloneSource ?? null;
+
     const activeSubMask = useMemo(() => {
       if (!activeContainer) {
         return null;
@@ -2279,6 +2293,58 @@ const ImageCanvas = memo(
       }
     };
 
+    const retouchPointToCanvas = useCallback(
+      (point: RetouchCloneSource['sourcePoint']): Coord => ({
+        x: clamp01(point.x) * effectiveImageDimensions.width * imageRenderSize.scale,
+        y: clamp01(point.y) * effectiveImageDimensions.height * imageRenderSize.scale,
+      }),
+      [effectiveImageDimensions.height, effectiveImageDimensions.width, imageRenderSize.scale],
+    );
+
+    const canvasPointToRetouchPoint = useCallback(
+      (point: Coord): RetouchCloneSource['sourcePoint'] => ({
+        x: clamp01(point.x / Math.max(1, effectiveImageDimensions.width * imageRenderSize.scale)),
+        y: clamp01(point.y / Math.max(1, effectiveImageDimensions.height * imageRenderSize.scale)),
+      }),
+      [effectiveImageDimensions.height, effectiveImageDimensions.width, imageRenderSize.scale],
+    );
+
+    const dragBoundRetouchHandle = useCallback(
+      (point: Vector2d): Vector2d => ({
+        x: Math.max(0, Math.min(effectiveImageDimensions.width * imageRenderSize.scale, point.x)),
+        y: Math.max(0, Math.min(effectiveImageDimensions.height * imageRenderSize.scale, point.y)),
+      }),
+      [effectiveImageDimensions.height, effectiveImageDimensions.width, imageRenderSize.scale],
+    );
+
+    const updateRetouchHandlePoint = useCallback(
+      (layerId: string, handle: RetouchHandleKind, point: RetouchCloneSource['sourcePoint']) => {
+        setAdjustments((prev: Adjustments) => ({
+          ...prev,
+          masks: prev.masks.map((mask: MaskContainer) => {
+            if (mask.id !== layerId || mask.retouchCloneSource === undefined) return mask;
+            return {
+              ...mask,
+              retouchCloneSource: {
+                ...mask.retouchCloneSource,
+                [handle]: point,
+              },
+            };
+          }),
+        }));
+      },
+      [setAdjustments],
+    );
+
+    const handleRetouchHandleDragEnd = useCallback(
+      (layerId: string, handle: RetouchHandleKind, event: RetouchHandleDragEvent) => {
+        event.evt.stopPropagation();
+        const point = canvasPointToRetouchPoint({ x: event.target.x(), y: event.target.y() });
+        updateRetouchHandlePoint(layerId, handle, point);
+      },
+      [canvasPointToRetouchPoint, updateRetouchHandlePoint],
+    );
+
     const cropPreviewUrl = uncroppedAdjustedPreviewUrl || selectedImage.thumbnailUrl;
     const originalSrc = transformedOriginalUrl;
     const isShowingOriginal = showOriginal && !!originalSrc;
@@ -2565,6 +2631,109 @@ const ImageCanvas = memo(
               )}
             </div>
           </div>
+
+          {activeRetouchLayer &&
+            activeRetouchSource &&
+            !isCropping &&
+            imageRenderSize.width > 0 &&
+            imageRenderSize.height > 0 &&
+            (() => {
+              const sourcePoint = retouchPointToCanvas(activeRetouchSource.sourcePoint);
+              const targetPoint = retouchPointToCanvas(activeRetouchSource.targetPoint);
+              const handleRadius = Math.max(6, Math.min(10, 7 / Math.max(0.75, transformState.scale)));
+              const strokeWidth = Math.max(1.5, 2 / Math.max(0.75, transformState.scale));
+
+              return (
+                <div
+                  aria-label={t('editor.layers.retouchSource.title')}
+                  className="absolute"
+                  data-retouch-handle-layer-id={activeRetouchLayer.id}
+                  data-retouch-handle-mode={activeRetouchSource.retouchMode ?? 'clone'}
+                  data-retouch-handle-source-x={activeRetouchSource.sourcePoint.x}
+                  data-retouch-handle-source-y={activeRetouchSource.sourcePoint.y}
+                  data-retouch-handle-target-x={activeRetouchSource.targetPoint.x}
+                  data-retouch-handle-target-y={activeRetouchSource.targetPoint.y}
+                  data-testid="image-canvas-retouch-handles"
+                  style={{
+                    height: stageHeight * maxSafeScale,
+                    left: stageLeft,
+                    opacity: isShowingOriginal ? 0 : 1,
+                    pointerEvents: isShowingOriginal ? 'none' : 'auto',
+                    top: stageTop,
+                    touchAction: 'none',
+                    transform: `scale(${svgNumber(1 / maxSafeScale)})`,
+                    transformOrigin: '0 0',
+                    transition: 'opacity 150ms ease-in-out',
+                    userSelect: 'none',
+                    width: stageWidth * maxSafeScale,
+                    zIndex: 5,
+                  }}
+                >
+                  <Stage height={stageHeight * maxSafeScale} width={stageWidth * maxSafeScale}>
+                    <Layer>
+                      <Group scaleX={maxSafeScale} scaleY={maxSafeScale}>
+                        <Group x={groupOffsetX} y={groupOffsetY}>
+                          <Line
+                            dash={[4, 4]}
+                            listening={false}
+                            points={[sourcePoint.x, sourcePoint.y, targetPoint.x, targetPoint.y]}
+                            stroke="#f8fafc"
+                            strokeScaleEnabled={false}
+                            strokeWidth={strokeWidth}
+                          />
+                          <Circle
+                            dragBoundFunc={dragBoundRetouchHandle}
+                            draggable
+                            fill="#0ea5e9"
+                            onDragEnd={(event) => {
+                              handleRetouchHandleDragEnd(activeRetouchLayer.id, 'sourcePoint', event);
+                            }}
+                            onMouseDown={(event) => {
+                              event.evt.stopPropagation();
+                            }}
+                            onTouchStart={(event) => {
+                              event.evt.stopPropagation();
+                            }}
+                            radius={handleRadius}
+                            shadowBlur={4}
+                            shadowColor="black"
+                            shadowOpacity={0.5}
+                            stroke="#f8fafc"
+                            strokeScaleEnabled={false}
+                            strokeWidth={strokeWidth}
+                            x={sourcePoint.x}
+                            y={sourcePoint.y}
+                          />
+                          <Circle
+                            dragBoundFunc={dragBoundRetouchHandle}
+                            draggable
+                            fill="#f97316"
+                            onDragEnd={(event) => {
+                              handleRetouchHandleDragEnd(activeRetouchLayer.id, 'targetPoint', event);
+                            }}
+                            onMouseDown={(event) => {
+                              event.evt.stopPropagation();
+                            }}
+                            onTouchStart={(event) => {
+                              event.evt.stopPropagation();
+                            }}
+                            radius={handleRadius}
+                            shadowBlur={4}
+                            shadowColor="black"
+                            shadowOpacity={0.5}
+                            stroke="#f8fafc"
+                            strokeScaleEnabled={false}
+                            strokeWidth={strokeWidth}
+                            x={targetPoint.x}
+                            y={targetPoint.y}
+                          />
+                        </Group>
+                      </Group>
+                    </Layer>
+                  </Stage>
+                </div>
+              );
+            })()}
 
           {(isMasking || isAiEditing || isWbPickerActive) && (
             <div
