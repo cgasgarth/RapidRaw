@@ -1055,6 +1055,12 @@
         "iccHash": "ICC hash",
         "loading": "Loading",
         "loadingDescription": "Reading the active display profile...",
+        "previewLut": "Preview LUT",
+        "previewLutStatus": {
+          "active": "Active display transform",
+          "fallback": "sRGB fallback transform",
+          "unsupported": "Not used on this platform"
+        },
         "profileBytes": "Profile bytes",
         "status": {
           "active_profile_loaded": "ColorSync active",

@@ -1047,6 +1047,12 @@
         "iccHash": "ICC 哈希",
         "loading": "正在加载",
         "loadingDescription": "正在读取活动显示器配置文件...",
+        "previewLut": "预览 LUT",
+        "previewLutStatus": {
+          "active": "活动显示器变换",
+          "fallback": "sRGB 回退变换",
+          "unsupported": "此平台未使用"
+        },
         "profileBytes": "配置文件字节数",
         "status": {
           "active_profile_loaded": "ColorSync 活动",
