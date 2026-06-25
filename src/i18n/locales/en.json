@@ -966,6 +966,7 @@
           "heal": "Heal"
         },
         "radius": "Radius",
+        "resetTransform": "Reset transform",
         "rotation": "Rotation",
         "scale": "Scale",
         "sourceX": "Source X",

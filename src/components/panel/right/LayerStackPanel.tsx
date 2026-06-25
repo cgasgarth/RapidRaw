@@ -524,6 +524,14 @@ export default function LayerStackPanel({
     nextSource.targetPoint = { ...activeRow.retouchCloneSource.sourcePoint };
     updateLayerRetouchSource(activeRow.id, nextSource, true);
   };
+  const resetActiveRetouchTransform = () => {
+    if (!activeRow || activeRow.isBase || activeRow.isGroupHeader || activeRow.retouchCloneSource === null) return;
+
+    const nextSource = structuredClone(activeRow.retouchCloneSource);
+    nextSource.rotationDegrees = 0;
+    nextSource.scale = 1;
+    updateLayerRetouchSource(activeRow.id, nextSource);
+  };
   const updateActiveRetouchRemoveNumber = (field: RetouchRemoveControlField, rawValue: number) => {
     if (!activeRow || activeRow.isBase || activeRow.isGroupHeader || activeRow.retouchRemoveSource === null) return;
 
@@ -1232,19 +1240,34 @@ export default function LayerStackPanel({
                   source: activeRow.retouchCloneSourceLabel,
                 })}
               </UiText>
-              <button
-                className={cx(
-                  'mt-2 rounded-md border border-surface bg-surface px-2 py-1 text-xs text-text-secondary',
-                  'hover:bg-card-active hover:text-text-primary',
-                )}
-                data-retouch-swap-source-x={activeRow.retouchCloneSource.sourcePoint.x}
-                data-retouch-swap-target-x={activeRow.retouchCloneSource.targetPoint.x}
-                data-testid="layer-retouch-swap-source-target"
-                onClick={swapActiveRetouchSourceTarget}
-                type="button"
-              >
-                {t('editor.layers.retouchSource.swapSourceTarget')}
-              </button>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <button
+                  className={cx(
+                    'rounded-md border border-surface bg-surface px-2 py-1 text-xs text-text-secondary',
+                    'hover:bg-card-active hover:text-text-primary',
+                  )}
+                  data-retouch-swap-source-x={activeRow.retouchCloneSource.sourcePoint.x}
+                  data-retouch-swap-target-x={activeRow.retouchCloneSource.targetPoint.x}
+                  data-testid="layer-retouch-swap-source-target"
+                  onClick={swapActiveRetouchSourceTarget}
+                  type="button"
+                >
+                  {t('editor.layers.retouchSource.swapSourceTarget')}
+                </button>
+                <button
+                  className={cx(
+                    'rounded-md border border-surface bg-surface px-2 py-1 text-xs text-text-secondary',
+                    'hover:bg-card-active hover:text-text-primary',
+                  )}
+                  data-retouch-reset-rotation-degrees={activeRow.retouchCloneSource.rotationDegrees}
+                  data-retouch-reset-scale={activeRow.retouchCloneSource.scale}
+                  data-testid="layer-retouch-reset-transform"
+                  onClick={resetActiveRetouchTransform}
+                  type="button"
+                >
+                  {t('editor.layers.retouchSource.resetTransform')}
+                </button>
+              </div>
               {activeRow.retouchCloneSource.candidateProvenance !== undefined && (
                 <div
                   data-retouch-candidate-source-label={`${activeRow.retouchCloneSource.sourcePoint.x.toFixed(3)},${activeRow.retouchCloneSource.sourcePoint.y.toFixed(3)}`}
