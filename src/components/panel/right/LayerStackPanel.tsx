@@ -650,6 +650,7 @@ export default function LayerStackPanel({
   const createRemoveLayer = () => {
     const layerId = crypto.randomUUID();
     const targetMaskId = `${layerId}_remove_region`;
+    const targetPoint = { x: 0.5, y: 0.5 };
     const layer: MaskContainer = {
       adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
       blendMode: DEFAULT_LAYER_BLEND_MODE,
@@ -674,7 +675,12 @@ export default function LayerStackPanel({
           mode: SubMaskMode.Additive,
           name: t('editor.layers.removeSource.defaultMaskName'),
           opacity: 100,
-          parameters: { centerX: 0.5, centerY: 0.5, featherRadiusPx: 24, radiusPx: 48 },
+          parameters: {
+            centerX: targetPoint.x * effectiveImageDimensions.width,
+            centerY: targetPoint.y * effectiveImageDimensions.height,
+            featherRadiusPx: 24,
+            radiusPx: 48,
+          },
           type: Mask.Radial,
           visible: true,
         },

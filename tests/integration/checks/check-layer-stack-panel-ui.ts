@@ -225,6 +225,8 @@ for (const marker of [
   'data-testid="layer-retouch-source-editor"',
   'data-testid="layer-retouch-remove-editor"',
   'data-testid="layer-retouch-remove-regenerate"',
+  'const targetMaskId = `${layerId}_remove_region`',
+  'const targetPoint = { x: 0.5, y: 0.5 }',
   'data-remove-resolved-source-x={activeRow.retouchRemoveSource.resolvedSourcePoint?.x ??',
   'data-remove-resolved-source-y={activeRow.retouchRemoveSource.resolvedSourcePoint?.y ??',
   'data-testid="layer-retouch-remove-resolved-source"',
