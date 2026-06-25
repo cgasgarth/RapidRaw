@@ -11,6 +11,7 @@ import {
   renderLayerHeadlessStack,
   renderLayerPreviewStack,
 } from '../../../src/utils/layerPreviewExportParity.ts';
+import { renderLayerPreviewStack as renderPackageLayerPreviewStack } from '../../../packages/rawengine-schema/src/layerBlendRuntime.ts';
 import { layerMaskBlendModeV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const FIXTURE_PATH = 'fixtures/layers/layer-preview-export-parity.json';
@@ -155,6 +156,28 @@ const writePpm = async (path, width, height, pixels) => {
   await writeFile(path, `${rows.join('\n')}\n`);
 };
 
+const withRetouchMode = (fixture, mode) => ({
+  ...fixture,
+  layers: fixture.layers.map((layer) =>
+    layer.retouchCloneSource === undefined
+      ? layer
+      : {
+          ...layer,
+          retouchCloneSource: {
+            ...layer.retouchCloneSource,
+            retouchMode: mode,
+          },
+        },
+  ),
+});
+
+const toRenderInput = (fixture) => ({
+  basePixels: fixture.basePixels,
+  height: fixture.height,
+  layers: fixture.layers,
+  width: fixture.width,
+});
+
 const fail = (message, details = []) => {
   console.error(message);
   for (const detail of details) console.error(`- ${detail}`);
@@ -187,14 +210,19 @@ for (const fixture of manifest.cases) {
   const preview = renderLayerPreviewStack(fixture);
   const exported = renderLayerExportStack(fixture);
   const headless = renderLayerHeadlessStack(fixture);
+  const packagePreview = renderPackageLayerPreviewStack(toRenderInput(fixture));
   const previewHash = hashPixels(preview.pixels);
   const exportHash = hashPixels(exported.pixels);
   const headlessHash = hashPixels(headless.pixels);
+  const packagePreviewHash = hashPixels(packagePreview.pixels);
   if (previewHash !== exportHash) {
     fail(`${fixture.id}: preview/export pixel hash mismatch`, [previewHash, exportHash]);
   }
   if (previewHash !== headlessHash) {
     fail(`${fixture.id}: preview/headless pixel hash mismatch`, [previewHash, headlessHash]);
+  }
+  if (previewHash !== packagePreviewHash) {
+    fail(`${fixture.id}: app/package pixel hash mismatch`, [previewHash, packagePreviewHash]);
   }
   if (previewHash !== fixture.expectedPreviewExportHash) {
     fail(`${fixture.id}: preview/export expected hash mismatch`, [previewHash, fixture.expectedPreviewExportHash]);
@@ -205,8 +233,39 @@ for (const fixture of manifest.cases) {
   if (JSON.stringify(preview.coverageByLayer) !== JSON.stringify(headless.coverageByLayer)) {
     fail(`${fixture.id}: preview/headless coverage mismatch`);
   }
+  if (JSON.stringify(preview.coverageByLayer) !== JSON.stringify(packagePreview.coverageByLayer)) {
+    fail(`${fixture.id}: app/package coverage mismatch`);
+  }
   if (JSON.stringify(preview.coverageByLayer) !== JSON.stringify(fixture.expectedCoverageByLayer)) {
     fail(`${fixture.id}: expected coverage mismatch`);
+  }
+
+  const clonePreviewHash = hashPixels(renderLayerPreviewStack(withRetouchMode(fixture, 'clone')).pixels);
+  if (clonePreviewHash === previewHash) {
+    fail(`${fixture.id}: heal retouch render should differ from clone render`);
+  }
+  const smallRadiusFixture = {
+    ...fixture,
+    layers: fixture.layers.map((layer) =>
+      layer.retouchCloneSource === undefined
+        ? layer
+        : {
+            ...layer,
+            retouchCloneSource: {
+              ...layer.retouchCloneSource,
+              featherRadiusPx: 0,
+              radiusPx: 0.75,
+            },
+          },
+    ),
+  };
+  const smallRadiusRetouchCoverage = renderLayerPreviewStack(smallRadiusFixture).coverageByLayer.find(
+    (layer) => layer.id === cloneLayer.id,
+  );
+  if (smallRadiusRetouchCoverage?.touchedPixels !== 1) {
+    fail(`${fixture.id}: heal radius should constrain retouch coverage`, [
+      `touchedPixels=${smallRadiusRetouchCoverage?.touchedPixels ?? 'missing'}`,
+    ]);
   }
 
   const sidecarRoundtrip = sidecarLayerStackSchema.parse(JSON.parse(JSON.stringify(fixture.sidecarLayerStack)));
