@@ -302,6 +302,7 @@
     "check:computational-merge-review-panels": "bun tests/integration/checks/check-computational-merge-review-panels.ts",
     "check:chromatic-adaptation": "bun tests/integration/checks/check-chromatic-adaptation-fixtures.ts",
     "check:gamut-mapping": "bun tests/integration/checks/check-gamut-mapping-fixtures.ts",
+    "check:gamut-mapping-export-runtime": "bun scripts/run-compact-command.ts --label gamut-mapping-export-runtime --cwd src-tauri -- cargo test --quiet --locked --no-default-features --features required-ci srgb_perceptual",
     "check:command-palette-workflows": "bun scripts/capture-visual-smoke.ts --scenario command-palette-workflows",
     "check:color-workflow-smoke": "bun scripts/capture-visual-smoke.ts --scenario color-workflow",
     "check:workflow-rail-smoke": "bun scripts/capture-visual-smoke.ts --scenario workflow-rail",

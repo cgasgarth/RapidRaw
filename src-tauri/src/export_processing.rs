@@ -25,6 +25,9 @@ use crate::file_management::{
     generate_filename_from_template, parse_virtual_path, read_file_mapped,
 };
 use crate::formats::is_raw_file;
+use crate::gamut_mapping::{
+    SRGB_OKLAB_CHROMA_REDUCE_V1, map_srgb_oklab_chroma_reduce_rgb16_pixels,
+};
 use crate::image_loader::{
     composite_patches_on_image, load_and_composite, load_base_image_from_bytes,
     raw_processing_settings_for_adjustments,
@@ -706,9 +709,8 @@ fn export_rgb16_pixels_with_shared_conversion_core(
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
 ) -> Result<(Vec<u16>, u32, u32, ColorProfile), String> {
-    let rgb_image = image.to_rgb16();
-    let (width, height) = rgb_image.dimensions();
-    let pixels = rgb_image.into_raw();
+    let (pixels, width, height) =
+        export_source_rgb16_pixels(image, color_profile, rendering_intent);
     let output_profile = output_color_profile(color_profile)?;
 
     if export_color_profile_requires_transform(color_profile) {
@@ -740,6 +742,48 @@ fn export_rgb16_pixels_with_shared_conversion_core(
     } else {
         Ok((pixels, width, height, output_profile))
     }
+}
+
+fn export_source_rgb16_pixels(
+    image: &DynamicImage,
+    color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
+) -> (Vec<u16>, u32, u32) {
+    if should_apply_srgb_perceptual_gamut_mapping(color_profile, rendering_intent) {
+        if let Some(rgb32f) = image.as_rgb32f() {
+            return (
+                map_srgb_oklab_chroma_reduce_rgb16_pixels(rgb32f.as_raw()),
+                rgb32f.width(),
+                rgb32f.height(),
+            );
+        }
+
+        if let Some(rgba32f) = image.as_rgba32f() {
+            let rgb: Vec<f32> = rgba32f
+                .as_raw()
+                .chunks_exact(4)
+                .flat_map(|pixel| [pixel[0], pixel[1], pixel[2]])
+                .collect();
+
+            return (
+                map_srgb_oklab_chroma_reduce_rgb16_pixels(&rgb),
+                rgba32f.width(),
+                rgba32f.height(),
+            );
+        }
+    }
+
+    let rgb_image = image.to_rgb16();
+    let (width, height) = rgb_image.dimensions();
+    (rgb_image.into_raw(), width, height)
+}
+
+fn should_apply_srgb_perceptual_gamut_mapping(
+    color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
+) -> bool {
+    matches!(color_profile, ExportColorProfile::Srgb)
+        && matches!(rendering_intent, ExportRenderingIntent::Perceptual)
 }
 
 fn encode_jpeg_to_bytes(
@@ -1475,7 +1519,8 @@ fn export_receipt_metadata(
         return None;
     }
 
-    let transform_applied = export_color_profile_requires_transform(color_profile);
+    let transform_applied = export_color_profile_requires_transform(color_profile)
+        || should_apply_srgb_perceptual_gamut_mapping(color_profile, rendering_intent);
     let bit_depth = if matches!(format, "tif" | "tiff") {
         16
     } else {
@@ -1489,7 +1534,7 @@ fn export_receipt_metadata(
         cmm: "moxcms".to_string(),
         color_managed_transform: export_color_transform_receipt_label(
             color_profile,
-            transform_applied,
+            rendering_intent,
         ),
         color_profile: color_profile_label.clone(),
         effective_color_profile: color_profile_label,
@@ -1507,9 +1552,13 @@ fn supports_color_managed_receipt_metadata(format: &str) -> bool {
 
 fn export_color_transform_receipt_label(
     color_profile: &ExportColorProfile,
-    transform_applied: bool,
+    rendering_intent: &ExportRenderingIntent,
 ) -> String {
-    if !transform_applied {
+    if should_apply_srgb_perceptual_gamut_mapping(color_profile, rendering_intent) {
+        return format!("{SRGB_OKLAB_CHROMA_REDUCE_V1}; ICC embedded");
+    }
+
+    if !export_color_profile_requires_transform(color_profile) {
         return "sRGB identity output; ICC embedded".to_string();
     }
 
@@ -1857,8 +1906,9 @@ mod tests {
         export_jpeg_rgb_pixels_and_profile, export_receipt_metadata, export_rgb_pixels_and_profile,
         export_rgb16_pixels_and_profile, export_rgb16_pixels_with_shared_conversion_core,
         export_soft_proof_rgb_pixels_and_profile, export_transform_options, mox_rendering_intent,
-        quantize_rgb16_to_rgb8,
+        quantize_rgb16_to_rgb8, should_apply_srgb_perceptual_gamut_mapping,
     };
+    use crate::gamut_mapping::SRGB_OKLAB_CHROMA_REDUCE_V1;
     use std::io::Cursor;
 
     use image::{
@@ -2001,13 +2051,12 @@ mod tests {
 
     #[test]
     fn export_receipt_reports_semantic_applied_policy() {
-        let mut settings = base_export_settings(None);
-        settings.rendering_intent = ExportRenderingIntent::Perceptual;
+        let settings = base_export_settings(None);
         let metadata =
             export_receipt_metadata("tiff", &settings.color_profile, &settings.rendering_intent)
                 .expect("TIFF receipt metadata should be available");
 
-        assert_eq!(metadata.rendering_intent, "Perceptual");
+        assert_eq!(metadata.rendering_intent, "Relative colorimetric");
         assert_eq!(metadata.bit_depth, 16);
         assert_eq!(metadata.cmm, "moxcms");
         assert_eq!(
@@ -2023,6 +2072,23 @@ mod tests {
             metadata.black_point_compensation,
             "Unavailable until CMM support is implemented"
         );
+    }
+
+    #[test]
+    fn srgb_perceptual_export_receipt_reports_gamut_mapper() {
+        let metadata = export_receipt_metadata(
+            "tiff",
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::Perceptual,
+        )
+        .expect("TIFF receipt metadata should be available");
+
+        assert_eq!(metadata.rendering_intent, "Perceptual");
+        assert_eq!(
+            metadata.color_managed_transform,
+            format!("{SRGB_OKLAB_CHROMA_REDUCE_V1}; ICC embedded")
+        );
+        assert!(metadata.transform_applied);
     }
 
     #[test]
@@ -2279,6 +2345,74 @@ mod tests {
         assert_eq!((soft_proof_width, soft_proof_height), (width, height));
         assert_eq!(jpeg_pixels, expected_rgb8);
         assert_eq!(soft_proof_pixels, expected_rgb8);
+    }
+
+    #[test]
+    fn srgb_perceptual_export_maps_out_of_gamut_float_pixels() {
+        let image = DynamicImage::ImageRgb32F(ImageBuffer::from_fn(2, 1, |x, _| {
+            if x == 0 {
+                Rgb([1.35, 0.05, 0.0])
+            } else {
+                Rgb([0.25, 0.5, 0.75])
+            }
+        }));
+        let (relative_pixels, _, _, _) = export_rgb16_pixels_and_profile(
+            &image,
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect("relative sRGB export should run");
+        let (perceptual_pixels, _, _, _) = export_rgb16_pixels_and_profile(
+            &image,
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::Perceptual,
+        )
+        .expect("perceptual sRGB export should run");
+
+        assert_ne!(
+            perceptual_pixels[0..3],
+            relative_pixels[0..3],
+            "out-of-gamut pixel should use the perceptual sRGB mapper"
+        );
+        assert_eq!(
+            perceptual_pixels[3..6],
+            relative_pixels[3..6],
+            "in-gamut pixel should remain identical"
+        );
+        assert!(should_apply_srgb_perceptual_gamut_mapping(
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::Perceptual
+        ));
+    }
+
+    #[test]
+    fn srgb_perceptual_soft_proof_matches_jpeg_export_rgb8_transform() {
+        let image = DynamicImage::ImageRgb32F(ImageBuffer::from_fn(2, 1, |x, _| {
+            if x == 0 {
+                Rgb([1.35, 0.05, 0.0])
+            } else {
+                Rgb([0.25, 0.5, 0.75])
+            }
+        }));
+        let (soft_proof_pixels, soft_proof_width, soft_proof_height, _) =
+            export_soft_proof_rgb_pixels_and_profile(
+                &image,
+                &ExportColorProfile::Srgb,
+                &ExportRenderingIntent::Perceptual,
+            )
+            .expect("sRGB perceptual soft proof should run");
+        let (jpeg_pixels, jpeg_width, jpeg_height, _) = export_jpeg_rgb_pixels_and_profile(
+            &image,
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::Perceptual,
+        )
+        .expect("sRGB perceptual JPEG export should run");
+
+        assert_eq!(
+            (soft_proof_width, soft_proof_height),
+            (jpeg_width, jpeg_height)
+        );
+        assert_eq!(soft_proof_pixels, jpeg_pixels);
     }
 
     #[test]

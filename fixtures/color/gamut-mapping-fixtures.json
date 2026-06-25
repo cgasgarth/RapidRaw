@@ -94,16 +94,15 @@
       "policy": {
         "destination": "srgb",
         "intent": "perceptual",
-        "method": "perceptual_oklch_chroma_reduce_planned_v1",
-        "status": "cpu_reference_planned",
+        "method": "perceptual_oklab_chroma_reduce_export_v1",
+        "status": "export_runtime_applied",
         "warnings": [
           "output_gamut_high_component_v1",
-          "output_gamut_mapping_not_runtime_applied_v1",
           "output_gamut_perceptual_cpu_reference_v1",
-          "output_gamut_perceptual_intent_unproven_v1"
+          "output_gamut_preview_not_runtime_applied_v1"
         ]
       },
-      "notes": "CPU reference maps saturated out-of-gamut sRGB with OKLCH chroma reduction, but preview/export runtime remains unproven."
+      "notes": "sRGB Perceptual export applies a versioned OKLab chroma-reduction mapper for final JPEG/TIFF/soft-proof output; live preview/display application remains unproven."
     },
     {
       "id": "gamut.scene-referred.no-output-map.v1",

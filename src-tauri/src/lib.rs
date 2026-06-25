@@ -37,6 +37,7 @@ mod file_management;
 #[cfg(all(test, feature = "tauri-test"))]
 mod focus_real_raw_proof;
 mod formats;
+mod gamut_mapping;
 mod gpu_processing;
 #[cfg(all(test, feature = "tauri-test"))]
 mod hdr_real_raw_proof;
