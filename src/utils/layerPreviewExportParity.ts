@@ -19,6 +19,15 @@ export interface LayerBlendStackLayer {
 
 export interface LayerRetouchCloneSource {
   alignmentErrorPx?: number;
+  candidateProvenance?: {
+    candidateId: string;
+    candidateKind: 'dust_spot' | 'emulsion_scratch';
+    confidence: number;
+    confidenceSemantics: 'ranking_score_v1';
+    origin: 'negative_lab_dust_candidate';
+    sourceFrameId: string;
+    statusAtAcceptance: 'acknowledged' | 'ignored' | 'pending';
+  };
   featherRadiusPx?: number;
   radiusPx?: number;
   retouchMode?: 'clone' | 'heal';

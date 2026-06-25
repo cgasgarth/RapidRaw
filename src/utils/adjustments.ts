@@ -457,8 +457,19 @@ export interface MaskContainer {
   visible: boolean;
 }
 
+export interface RetouchCandidateProvenance {
+  candidateId: string;
+  candidateKind: 'dust_spot' | 'emulsion_scratch';
+  confidence: number;
+  confidenceSemantics: 'ranking_score_v1';
+  origin: 'negative_lab_dust_candidate';
+  sourceFrameId: string;
+  statusAtAcceptance: 'acknowledged' | 'ignored' | 'pending';
+}
+
 export interface RetouchCloneSource {
   alignmentErrorPx?: number | undefined;
+  candidateProvenance?: RetouchCandidateProvenance | undefined;
   featherRadiusPx?: number | undefined;
   radiusPx?: number | undefined;
   retouchMode?: 'clone' | 'heal' | undefined;
