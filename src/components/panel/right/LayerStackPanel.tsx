@@ -18,6 +18,7 @@ import { type KeyboardEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Mask, SubMaskMode } from './Masks';
+import { useEditorStore } from '../../../store/useEditorStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import {
   DEFAULT_LAYER_BLEND_MODE,
@@ -293,6 +294,8 @@ export default function LayerStackPanel({
   onSetMaskContainers,
 }: LayerStackPanelProps) {
   const { t } = useTranslation();
+  const selectedImage = useEditorStore((state) => state.selectedImage);
+  const orientationSteps = useEditorStore((state) => state.adjustments.orientationSteps);
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
   const rows = useMemo(() => getLayerRows(masks, collapsedGroupIds), [collapsedGroupIds, masks]);
   const [localSelectedLayerId, setLocalSelectedLayerId] = useState<string>(BASE_LAYER_ID);
@@ -303,6 +306,11 @@ export default function LayerStackPanel({
   const visibleLayerCount = masks.filter((mask) => mask.visible).length;
   const hiddenLayerCount = masks.length - visibleLayerCount;
   const exportReadiness = useMemo(() => buildLayerExportReadinessSummary(masks), [masks]);
+  const effectiveImageDimensions = useMemo(() => {
+    const width = selectedImage?.width ?? 1;
+    const height = selectedImage?.height ?? 1;
+    return orientationSteps === 1 || orientationSteps === 3 ? { height: width, width: height } : { height, width };
+  }, [orientationSteps, selectedImage?.height, selectedImage?.width]);
   const groupWorkflowProof = useMemo(
     () => buildLayerGroupWorkflowProof(masks, collapsedGroupIds),
     [collapsedGroupIds, masks],
@@ -535,6 +543,10 @@ export default function LayerStackPanel({
   };
   const createHealLayer = () => {
     const layerId = crypto.randomUUID();
+    const targetMaskId = `${layerId}_heal_target`;
+    const targetPoint = { x: 0.56, y: 0.56 };
+    const radiusPx = 48;
+    const featherRadiusPx = 24;
     const layer: MaskContainer = {
       adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
       blendMode: DEFAULT_LAYER_BLEND_MODE,
@@ -544,15 +556,31 @@ export default function LayerStackPanel({
       opacity: 100,
       retouchCloneSource: {
         alignmentErrorPx: 0,
-        featherRadiusPx: 24,
-        radiusPx: 48,
+        featherRadiusPx,
+        radiusPx,
         retouchMode: 'heal',
         rotationDegrees: 0,
         scale: 1,
         sourcePoint: { x: 0.44, y: 0.44 },
-        targetPoint: { x: 0.56, y: 0.56 },
+        targetPoint,
       },
-      subMasks: [],
+      subMasks: [
+        {
+          id: targetMaskId,
+          invert: false,
+          mode: SubMaskMode.Additive,
+          name: t('editor.layers.newHealLayerName', { count: masks.length + 1 }),
+          opacity: 100,
+          parameters: {
+            centerX: targetPoint.x * effectiveImageDimensions.width,
+            centerY: targetPoint.y * effectiveImageDimensions.height,
+            featherRadiusPx,
+            radiusPx,
+          },
+          type: Mask.Radial,
+          visible: true,
+        },
+      ],
       visible: true,
     };
     applyLayerStackCommand({ layer, type: 'create' }, layerId);
