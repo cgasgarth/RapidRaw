@@ -23,6 +23,7 @@ import {
   LAYER_BLEND_MODES,
   type LayerBlendMode,
   type MaskContainer,
+  type RetouchCloneSource,
 } from '../../../utils/adjustments';
 import {
   buildLayerGroupSummaries,
@@ -69,14 +70,32 @@ interface LayerRowModel {
   maskCount: number;
   name: string;
   opacity: number;
+  retouchCloneSource: RetouchCloneSource | null;
   retouchCloneSourceLabel: string | null;
   retouchMode: 'clone' | 'heal' | null;
   visible: boolean;
   visibleState: 'hidden' | 'mixed' | 'visible';
 }
 
+type RetouchControlField =
+  | 'featherRadiusPx'
+  | 'radiusPx'
+  | 'rotationDegrees'
+  | 'scale'
+  | 'sourcePoint.x'
+  | 'sourcePoint.y'
+  | 'targetPoint.x'
+  | 'targetPoint.y';
+
 const BASE_LAYER_ID = 'base-raw-layer';
 const LAYER_OPACITY_PRESETS = [0, 25, 50, 75, 100] as const;
+
+const clampNumber = (value: number, min: number, max: number): number => {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, value));
+};
+
+const roundRetouchNumber = (value: number): number => Math.round(value * 1000) / 1000;
 
 const blendModes = [
   { labelKey: 'editor.layers.blendModes.normal', value: 'normal' },
@@ -119,6 +138,7 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
         maskCount: groupSummary?.layerIds.length ?? 1,
         name: groupSummary?.name ?? tFallbackLayerGroupName(),
         opacity: groupSummary?.opacity ?? 100,
+        retouchCloneSource: null,
         retouchCloneSourceLabel: null,
         retouchMode: null,
         visible: groupSummary?.visibleState !== 'hidden',
@@ -146,6 +166,7 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
       maskCount: mask.subMasks.length,
       name: mask.name.trim() || `Layer ${String(index + 1)}`,
       opacity: mask.opacity,
+      retouchCloneSource: mask.retouchCloneSource ?? null,
       retouchCloneSourceLabel: mask.retouchCloneSource
         ? `${mask.retouchCloneSource.sourcePoint.x.toFixed(2)},${mask.retouchCloneSource.sourcePoint.y.toFixed(2)} -> ${mask.retouchCloneSource.targetPoint.x.toFixed(2)},${mask.retouchCloneSource.targetPoint.y.toFixed(2)}`
         : null,
@@ -170,6 +191,7 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
       maskCount: 0,
       name: 'Base RAW',
       opacity: 100,
+      retouchCloneSource: null,
       retouchCloneSourceLabel: null,
       retouchMode: null,
       visible: true,
@@ -298,6 +320,24 @@ export default function LayerStackPanel({
   };
   const updateLayerBlendMode = (layerId: string, blendMode: LayerBlendMode) => {
     applyLayerStack(setLayerBlendMode(masks, layerId, blendMode), layerId);
+  };
+  const updateLayerRetouchSource = (layerId: string, retouchCloneSource: RetouchCloneSource) => {
+    applyLayerStackCommand({ layerId, retouchCloneSource, type: 'updateRetouchSource' }, layerId);
+  };
+  const updateActiveRetouchNumber = (field: RetouchControlField, rawValue: number) => {
+    if (!activeRow || activeRow.isBase || activeRow.isGroupHeader || activeRow.retouchCloneSource === null) return;
+
+    const nextSource = structuredClone(activeRow.retouchCloneSource);
+    if (field === 'sourcePoint.x') nextSource.sourcePoint.x = roundRetouchNumber(clampNumber(rawValue, 0, 1));
+    if (field === 'sourcePoint.y') nextSource.sourcePoint.y = roundRetouchNumber(clampNumber(rawValue, 0, 1));
+    if (field === 'targetPoint.x') nextSource.targetPoint.x = roundRetouchNumber(clampNumber(rawValue, 0, 1));
+    if (field === 'targetPoint.y') nextSource.targetPoint.y = roundRetouchNumber(clampNumber(rawValue, 0, 1));
+    if (field === 'scale') nextSource.scale = roundRetouchNumber(clampNumber(rawValue, 0.1, 10));
+    if (field === 'rotationDegrees') nextSource.rotationDegrees = roundRetouchNumber(clampNumber(rawValue, -180, 180));
+    if (field === 'radiusPx') nextSource.radiusPx = roundRetouchNumber(clampNumber(rawValue, 0.01, 4096));
+    if (field === 'featherRadiusPx') nextSource.featherRadiusPx = roundRetouchNumber(clampNumber(rawValue, 0, 4096));
+
+    updateLayerRetouchSource(activeRow.id, nextSource);
   };
   const updateGroupOpacity = (groupId: string, opacity: number) => {
     applyLayerStack(setLayerGroupOpacity(masks, groupId, opacity), `group:${groupId}`);
@@ -829,6 +869,152 @@ export default function LayerStackPanel({
               })}
             </UiText>
           </div>
+          {activeRow.retouchCloneSource !== null && (
+            <div
+              className="rounded-md border border-surface bg-bg-secondary p-2"
+              data-retouch-feather-radius-px={activeRow.retouchCloneSource.featherRadiusPx ?? ''}
+              data-retouch-mode={activeRow.retouchMode ?? 'clone'}
+              data-retouch-radius-px={activeRow.retouchCloneSource.radiusPx ?? ''}
+              data-retouch-rotation-degrees={activeRow.retouchCloneSource.rotationDegrees}
+              data-retouch-scale={activeRow.retouchCloneSource.scale}
+              data-retouch-source-x={activeRow.retouchCloneSource.sourcePoint.x}
+              data-retouch-source-y={activeRow.retouchCloneSource.sourcePoint.y}
+              data-retouch-target-x={activeRow.retouchCloneSource.targetPoint.x}
+              data-retouch-target-y={activeRow.retouchCloneSource.targetPoint.y}
+              data-testid="layer-retouch-source-editor"
+            >
+              <UiText variant={TextVariants.small} weight={TextWeights.medium} className="block text-text-primary">
+                {t('editor.layers.retouchSource.title')}
+              </UiText>
+              <UiText variant={TextVariants.small} className="block text-text-tertiary">
+                {t('editor.layers.retouchSource.summary', {
+                  mode: t(
+                    activeRow.retouchMode === 'heal'
+                      ? 'editor.layers.retouchSource.modes.heal'
+                      : 'editor.layers.retouchSource.modes.clone',
+                  ),
+                  source: activeRow.retouchCloneSourceLabel,
+                })}
+              </UiText>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {(
+                  [
+                    {
+                      field: 'sourcePoint.x',
+                      label: t('editor.layers.retouchSource.sourceX'),
+                      max: 1,
+                      min: 0,
+                      step: 0.01,
+                      value: activeRow.retouchCloneSource.sourcePoint.x,
+                    },
+                    {
+                      field: 'sourcePoint.y',
+                      label: t('editor.layers.retouchSource.sourceY'),
+                      max: 1,
+                      min: 0,
+                      step: 0.01,
+                      value: activeRow.retouchCloneSource.sourcePoint.y,
+                    },
+                    {
+                      field: 'targetPoint.x',
+                      label: t('editor.layers.retouchSource.targetX'),
+                      max: 1,
+                      min: 0,
+                      step: 0.01,
+                      value: activeRow.retouchCloneSource.targetPoint.x,
+                    },
+                    {
+                      field: 'targetPoint.y',
+                      label: t('editor.layers.retouchSource.targetY'),
+                      max: 1,
+                      min: 0,
+                      step: 0.01,
+                      value: activeRow.retouchCloneSource.targetPoint.y,
+                    },
+                    {
+                      field: 'scale',
+                      label: t('editor.layers.retouchSource.scale'),
+                      max: 10,
+                      min: 0.1,
+                      step: 0.01,
+                      value: activeRow.retouchCloneSource.scale,
+                    },
+                    {
+                      field: 'rotationDegrees',
+                      label: t('editor.layers.retouchSource.rotation'),
+                      max: 180,
+                      min: -180,
+                      step: 0.1,
+                      value: activeRow.retouchCloneSource.rotationDegrees,
+                    },
+                  ] satisfies Array<{
+                    field: RetouchControlField;
+                    label: string;
+                    max: number;
+                    min: number;
+                    step: number;
+                    value: number;
+                  }>
+                ).map((control) => (
+                  <label className="min-w-0" key={control.field}>
+                    <UiText variant={TextVariants.small} className="block truncate text-text-tertiary">
+                      {control.label}
+                    </UiText>
+                    <input
+                      className="mt-1 h-8 w-full rounded-md bg-surface px-2 text-sm tabular-nums text-text-primary outline-none"
+                      data-testid={`layer-retouch-control-${control.field}`}
+                      defaultValue={control.value}
+                      max={control.max}
+                      min={control.min}
+                      onBlur={(event) => {
+                        updateActiveRetouchNumber(control.field, Number(event.currentTarget.value));
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') event.currentTarget.blur();
+                      }}
+                      step={control.step}
+                      type="number"
+                    />
+                  </label>
+                ))}
+                {activeRow.retouchMode === 'heal' &&
+                  (
+                    [
+                      {
+                        field: 'radiusPx',
+                        label: t('editor.layers.retouchSource.radius'),
+                        value: activeRow.retouchCloneSource.radiusPx ?? 48,
+                      },
+                      {
+                        field: 'featherRadiusPx',
+                        label: t('editor.layers.retouchSource.feather'),
+                        value: activeRow.retouchCloneSource.featherRadiusPx ?? 24,
+                      },
+                    ] satisfies Array<{ field: RetouchControlField; label: string; value: number }>
+                  ).map((control) => (
+                    <label className="min-w-0" key={control.field}>
+                      <UiText variant={TextVariants.small} className="block truncate text-text-tertiary">
+                        {control.label}
+                      </UiText>
+                      <input
+                        className="mt-1 h-8 w-full rounded-md bg-surface px-2 text-sm tabular-nums text-text-primary outline-none"
+                        data-testid={`layer-retouch-control-${control.field}`}
+                        defaultValue={control.value}
+                        min={control.field === 'radiusPx' ? 0.01 : 0}
+                        onBlur={(event) => {
+                          updateActiveRetouchNumber(control.field, Number(event.currentTarget.value));
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') event.currentTarget.blur();
+                        }}
+                        step={1}
+                        type="number"
+                      />
+                    </label>
+                  ))}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-5 gap-1" data-testid="layer-opacity-presets">
             {LAYER_OPACITY_PRESETS.map((presetOpacity) => {
               const isActiveOpacity = activeRow.opacity === presetOpacity;

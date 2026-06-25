@@ -927,6 +927,22 @@
         "ungroupBlocked": "Ungroup blocked",
         "ungroupReady": "Ungroup ready"
       },
+      "retouchSource": {
+        "feather": "Feather",
+        "modes": {
+          "clone": "Clone",
+          "heal": "Heal"
+        },
+        "radius": "Radius",
+        "rotation": "Rotation",
+        "scale": "Scale",
+        "sourceX": "Source X",
+        "sourceY": "Source Y",
+        "summary": "{{mode}} source {{source}}",
+        "targetX": "Target X",
+        "targetY": "Target Y",
+        "title": "Retouch source"
+      },
       "rowSummary": "{{blendMode}} - {{opacity}}% - {{maskCount}}",
       "title": "Layers",
       "visibleLayerCount": "{{count}} visible",

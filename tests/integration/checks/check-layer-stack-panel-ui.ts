@@ -34,6 +34,18 @@ const requiredActionLocaleKeys = ['showAllHidden', 'soloActive'];
 const requiredActiveRenderStateKeys = ['hidden', 'summary', 'title', 'visible'];
 const requiredCloneKeys = ['cloneRowSummary', 'newCloneLayerName'];
 const requiredHealKeys = ['healRowSummary', 'newHealLayerName'];
+const requiredRetouchSourceKeys = [
+  'feather',
+  'radius',
+  'rotation',
+  'scale',
+  'sourceX',
+  'sourceY',
+  'summary',
+  'targetX',
+  'targetY',
+  'title',
+];
 
 const missingKeys = requiredLocaleKeys.filter((key) => typeof layerLocale?.[key] !== 'string');
 if (missingKeys.length > 0) {
@@ -62,6 +74,17 @@ if (missingCloneKeys.length > 0) {
 const missingHealKeys = requiredHealKeys.filter((key) => typeof layerLocale?.[key] !== 'string');
 if (missingHealKeys.length > 0) {
   console.error(`Missing layer stack heal locale keys: ${missingHealKeys.join(', ')}`);
+  process.exit(1);
+}
+const missingRetouchSourceKeys = requiredRetouchSourceKeys.filter(
+  (key) => typeof layerLocale?.retouchSource?.[key] !== 'string',
+);
+if (
+  missingRetouchSourceKeys.length > 0 ||
+  typeof layerLocale?.retouchSource?.modes?.clone !== 'string' ||
+  typeof layerLocale?.retouchSource?.modes?.heal !== 'string'
+) {
+  console.error(`Missing layer stack retouch source locale keys: ${missingRetouchSourceKeys.join(', ')}`);
   process.exit(1);
 }
 
@@ -155,6 +178,14 @@ for (const marker of [
   'editor.layers.healRowSummary',
   'editor.layers.newCloneLayerName',
   'editor.layers.newHealLayerName',
+  'data-testid="layer-retouch-source-editor"',
+  'data-retouch-source-x={activeRow.retouchCloneSource.sourcePoint.x}',
+  'data-retouch-target-y={activeRow.retouchCloneSource.targetPoint.y}',
+  'data-testid={`layer-retouch-control-${control.field}`}',
+  "type: 'updateRetouchSource'",
+  'editor.layers.retouchSource.title',
+  'editor.layers.retouchSource.sourceX',
+  'editor.layers.retouchSource.targetX',
   'editor.layers.activeRenderState.summary',
   'editor.layers.activeRenderState.visible',
   'editor.layers.activeRenderState.hidden',
