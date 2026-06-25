@@ -75,7 +75,7 @@ for (const marker of [
   'ColorProfile::new_adobe_rgb()',
   'ColorProfile::new_pro_photo_rgb()',
   'only supported for JPEG and TIFF',
-  'rawengine-export-color-policy-v1',
+  'rawengine-export-color-policy-v2',
   'sRGB to Display P3 conversion applied',
   'Unavailable until CMM support is implemented',
   'export_rgb16_pixels_with_shared_conversion_core',

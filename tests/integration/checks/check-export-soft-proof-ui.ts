@@ -55,7 +55,7 @@ if (!rustLibSource.includes('export_processing::export_soft_proof_rgb_pixels_and
 if (
   !rustExportSource.includes('pub(crate) fn export_soft_proof_rgb_pixels_and_profile') ||
   !rustExportSource.includes('export_rgb_pixels_and_profile(image, color_profile, rendering_intent)') ||
-  !rustExportSource.includes('export_color_transform_receipt_label(color_profile, rendering_intent)')
+  !rustExportSource.includes('resolve_export_color_transform_plan(format, color_profile, rendering_intent)')
 ) {
   failures.push('export_rgb_pixels_and_profile is not available to the soft-proof command and receipt.');
 }
@@ -65,13 +65,19 @@ for (const marker of [
   'effectiveColorProfile',
   'iccEmbedded',
   'policyVersion',
+  'policyStatus',
   'requestedColorProfile',
+  'requestedRenderingIntent',
+  'effectiveRenderingIntent',
   'sourcePrecisionPath',
   'transformApplied',
   'data-export-receipt-color-managed-transform',
   'data-export-receipt-effective-color-profile',
   'data-export-receipt-icc-embedded',
+  'data-export-receipt-policy-status',
   'data-export-receipt-policy-version',
+  'data-export-receipt-requested-rendering-intent',
+  'data-export-receipt-effective-rendering-intent',
   'data-export-receipt-source-precision-path',
   'data-export-receipt-transform-applied',
   'data-testid="export-success-color-managed-transform"',

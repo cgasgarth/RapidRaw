@@ -113,9 +113,13 @@ export interface ExportReceiptOutput {
   format: string;
   iccEmbedded?: boolean | null | undefined;
   outputPath: string;
+  policyStatus?: string | null | undefined;
   policyVersion?: string | null | undefined;
   renderingIntent?: string | null | undefined;
   requestedColorProfile?: string | null | undefined;
+  requestedRenderingIntent?: string | null | undefined;
+  resolvedDisabledReason?: string | null | undefined;
+  effectiveRenderingIntent?: string | null | undefined;
   sourcePath: string;
   sourcePrecisionPath?: string | null | undefined;
   transformApplied?: boolean | null | undefined;

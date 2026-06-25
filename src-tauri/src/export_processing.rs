@@ -57,8 +57,12 @@ struct ExportReceiptOutput {
     icc_embedded: Option<bool>,
     output_path: String,
     policy_version: Option<String>,
+    policy_status: Option<String>,
     rendering_intent: Option<String>,
     requested_color_profile: Option<String>,
+    requested_rendering_intent: Option<String>,
+    resolved_disabled_reason: Option<String>,
+    effective_rendering_intent: Option<String>,
     source_path: String,
     source_precision_path: Option<String>,
     transform_applied: Option<bool>,
@@ -118,7 +122,7 @@ pub struct ExportSettings {
     pub preserve_folders: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ExportColorProfile {
     #[default]
@@ -129,7 +133,7 @@ pub enum ExportColorProfile {
     SourceEmbedded,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ExportRenderingIntent {
     AbsoluteColorimetric,
@@ -139,16 +143,46 @@ pub enum ExportRenderingIntent {
     Saturation,
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ExportColorEngineId {
     Moxcms,
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ExportBlackPointCompensationStatus {
     Unsupported,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RequestedColorPolicy {
+    black_point_compensation_requested: bool,
+    color_profile: ExportColorProfile,
+    output_format: String,
+    rendering_intent: ExportRenderingIntent,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ResolvedColorTransformPlan {
+    black_point_compensation: ExportBlackPointCompensationStatus,
+    disabled_reason: Option<String>,
+    effective_color_profile: ExportColorProfile,
+    effective_rendering_intent: ExportRenderingIntent,
+    engine: ExportColorEngineId,
+    icc_embedded: bool,
+    requested: RequestedColorPolicy,
+    status: String,
+    transform_applied: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AppliedColorPolicy {
+    bit_depth: u8,
+    color_managed_transform: String,
+    plan: ResolvedColorTransformPlan,
+    policy_version: String,
+    source_precision_path: String,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -578,6 +612,7 @@ fn encode_grayscale_to_png(bitmap: &GrayImage) -> Result<Vec<u8>, String> {
     Ok(buf)
 }
 
+#[derive(Debug)]
 struct EncodedExportImage {
     bytes: Vec<u8>,
     color_policy: Option<ExportReceiptMetadata>,
@@ -895,31 +930,12 @@ fn validate_export_color_policy(
     output_format: &str,
     color_profile: &ExportColorProfile,
 ) -> Result<(), String> {
-    let supports_color_managed_profile = matches!(
-        output_format.to_lowercase().as_str(),
-        "jpg" | "jpeg" | "tif" | "tiff"
-    );
-
-    match color_profile {
-        ExportColorProfile::Srgb => Ok(()),
-        ExportColorProfile::AdobeRgb1998
-        | ExportColorProfile::DisplayP3
-        | ExportColorProfile::ProPhotoRgb
-            if supports_color_managed_profile =>
-        {
-            Ok(())
-        }
-        ExportColorProfile::AdobeRgb1998
-        | ExportColorProfile::DisplayP3
-        | ExportColorProfile::ProPhotoRgb => Err(format!(
-            "{} export is only supported for JPEG and TIFF, not {}.",
-            export_color_profile_receipt_label(color_profile),
-            output_format
-        )),
-        ExportColorProfile::SourceEmbedded => {
-            Err("Source embedded export profile is not implemented yet.".to_string())
-        }
-    }
+    resolve_export_color_transform_plan(
+        output_format,
+        color_profile,
+        &ExportRenderingIntent::RelativeColorimetric,
+    )
+    .map(|_| ())
 }
 
 fn export_color_profile_requires_transform(color_profile: &ExportColorProfile) -> bool {
@@ -938,6 +954,76 @@ fn moxcms_export_rendering_intents() -> Vec<ExportRenderingIntent> {
         ExportRenderingIntent::Saturation,
         ExportRenderingIntent::AbsoluteColorimetric,
     ]
+}
+
+fn resolve_export_color_transform_plan(
+    output_format: &str,
+    color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
+) -> Result<ResolvedColorTransformPlan, String> {
+    let requested = RequestedColorPolicy {
+        black_point_compensation_requested: false,
+        color_profile: color_profile.clone(),
+        output_format: output_format.to_lowercase(),
+        rendering_intent: rendering_intent.clone(),
+    };
+    let supports_color_managed_profile =
+        supports_color_managed_receipt_metadata(&requested.output_format);
+
+    if matches!(color_profile, ExportColorProfile::SourceEmbedded) {
+        return Err("Source embedded export profile is not implemented yet.".to_string());
+    }
+
+    if export_color_profile_requires_transform(color_profile) && !supports_color_managed_profile {
+        return Err(format!(
+            "{} export is only supported for JPEG and TIFF, not {}.",
+            export_color_profile_receipt_label(color_profile),
+            output_format
+        ));
+    }
+
+    let transform_applied = export_color_profile_requires_transform(color_profile)
+        || should_apply_srgb_perceptual_gamut_mapping(color_profile, rendering_intent);
+    let status = if supports_color_managed_profile {
+        "applied"
+    } else {
+        "not_applicable_unmanaged_srgb"
+    };
+
+    Ok(ResolvedColorTransformPlan {
+        black_point_compensation: ExportBlackPointCompensationStatus::Unsupported,
+        disabled_reason: None,
+        effective_color_profile: color_profile.clone(),
+        effective_rendering_intent: rendering_intent.clone(),
+        engine: ExportColorEngineId::Moxcms,
+        icc_embedded: supports_color_managed_profile,
+        requested,
+        status: status.to_string(),
+        transform_applied,
+    })
+}
+
+fn applied_export_color_policy(
+    plan: ResolvedColorTransformPlan,
+    source_precision_path: &str,
+) -> AppliedColorPolicy {
+    let bit_depth = if matches!(plan.requested.output_format.as_str(), "tif" | "tiff") {
+        16
+    } else {
+        8
+    };
+    let color_managed_transform = export_color_transform_receipt_label(
+        &plan.effective_color_profile,
+        &plan.effective_rendering_intent,
+    );
+
+    AppliedColorPolicy {
+        bit_depth,
+        color_managed_transform,
+        plan,
+        policy_version: "rawengine-export-color-policy-v2".to_string(),
+        source_precision_path: source_precision_path.to_string(),
+    }
 }
 
 pub(crate) fn resolve_export_color_capabilities() -> ExportColorCapabilityCatalog {
@@ -1566,12 +1652,24 @@ fn export_receipt_output(
         policy_version: metadata
             .as_ref()
             .map(|metadata| metadata.policy_version.clone()),
+        policy_status: metadata
+            .as_ref()
+            .map(|metadata| metadata.policy_status.clone()),
         rendering_intent: metadata
             .as_ref()
             .map(|metadata| metadata.rendering_intent.clone()),
         requested_color_profile: metadata
             .as_ref()
             .map(|metadata| metadata.requested_color_profile.clone()),
+        requested_rendering_intent: metadata
+            .as_ref()
+            .map(|metadata| metadata.requested_rendering_intent.clone()),
+        resolved_disabled_reason: metadata
+            .as_ref()
+            .and_then(|metadata| metadata.resolved_disabled_reason.clone()),
+        effective_rendering_intent: metadata
+            .as_ref()
+            .map(|metadata| metadata.effective_rendering_intent.clone()),
         source_path: source_path.to_string(),
         source_precision_path: metadata
             .as_ref()
@@ -1580,6 +1678,7 @@ fn export_receipt_output(
     })
 }
 
+#[derive(Debug)]
 pub(crate) struct ExportReceiptMetadata {
     bit_depth: u8,
     black_point_compensation: String,
@@ -1589,8 +1688,12 @@ pub(crate) struct ExportReceiptMetadata {
     effective_color_profile: String,
     icc_embedded: bool,
     policy_version: String,
+    policy_status: String,
     rendering_intent: String,
     requested_color_profile: String,
+    requested_rendering_intent: String,
+    resolved_disabled_reason: Option<String>,
+    effective_rendering_intent: String,
     source_precision_path: String,
     transform_applied: bool,
 }
@@ -1605,31 +1708,34 @@ fn export_receipt_metadata(
         return None;
     }
 
-    let transform_applied = export_color_profile_requires_transform(color_profile)
-        || should_apply_srgb_perceptual_gamut_mapping(color_profile, rendering_intent);
-    let bit_depth = if matches!(format, "tif" | "tiff") {
-        16
-    } else {
-        8
-    };
-    let color_profile_label = export_color_profile_receipt_label(color_profile);
+    let plan = resolve_export_color_transform_plan(format, color_profile, rendering_intent).ok()?;
+    let applied = applied_export_color_policy(plan, source_precision_path);
+    let color_profile_label =
+        export_color_profile_receipt_label(&applied.plan.effective_color_profile);
+    let rendering_intent_label =
+        export_rendering_intent_receipt_label(&applied.plan.effective_rendering_intent);
 
     Some(ExportReceiptMetadata {
-        bit_depth,
+        bit_depth: applied.bit_depth,
         black_point_compensation: "Unavailable until CMM support is implemented".to_string(),
-        cmm: "moxcms".to_string(),
-        color_managed_transform: export_color_transform_receipt_label(
-            color_profile,
-            rendering_intent,
-        ),
+        cmm: export_color_engine_receipt_label(&applied.plan.engine),
+        color_managed_transform: applied.color_managed_transform,
         color_profile: color_profile_label.clone(),
         effective_color_profile: color_profile_label,
-        icc_embedded: true,
-        policy_version: "rawengine-export-color-policy-v1".to_string(),
-        rendering_intent: export_rendering_intent_receipt_label(rendering_intent),
-        requested_color_profile: export_color_profile_receipt_label(color_profile),
-        source_precision_path: source_precision_path.to_string(),
-        transform_applied,
+        icc_embedded: applied.plan.icc_embedded,
+        policy_version: applied.policy_version,
+        policy_status: applied.plan.status,
+        rendering_intent: rendering_intent_label.clone(),
+        requested_color_profile: export_color_profile_receipt_label(
+            &applied.plan.requested.color_profile,
+        ),
+        requested_rendering_intent: export_rendering_intent_receipt_label(
+            &applied.plan.requested.rendering_intent,
+        ),
+        resolved_disabled_reason: applied.plan.disabled_reason,
+        effective_rendering_intent: rendering_intent_label,
+        source_precision_path: applied.source_precision_path,
+        transform_applied: applied.plan.transform_applied,
     })
 }
 
@@ -1683,6 +1789,12 @@ fn export_rendering_intent_receipt_label(rendering_intent: &ExportRenderingInten
         ExportRenderingIntent::Perceptual => "Perceptual".to_string(),
         ExportRenderingIntent::RelativeColorimetric => "Relative colorimetric".to_string(),
         ExportRenderingIntent::Saturation => "Saturation".to_string(),
+    }
+}
+
+fn export_color_engine_receipt_label(engine: &ExportColorEngineId) -> String {
+    match engine {
+        ExportColorEngineId::Moxcms => "moxcms".to_string(),
     }
 }
 
@@ -2017,7 +2129,7 @@ mod tests {
         export_rgb16_pixels_with_shared_conversion_core, export_soft_proof_rgb_pixels_and_profile,
         export_source_precision_receipt_label, export_transform_options, mox_rendering_intent,
         quantize_rgb16_to_rgb8, resolve_export_color_capabilities,
-        should_apply_srgb_perceptual_gamut_mapping,
+        resolve_export_color_transform_plan, should_apply_srgb_perceptual_gamut_mapping,
     };
     use crate::gamut_mapping::SRGB_OKLAB_CHROMA_REDUCE_V1;
     use std::io::Cursor;
@@ -2218,8 +2330,12 @@ mod tests {
         );
         assert_eq!(metadata.effective_color_profile, "sRGB");
         assert!(metadata.icc_embedded);
-        assert_eq!(metadata.policy_version, "rawengine-export-color-policy-v1");
+        assert_eq!(metadata.policy_version, "rawengine-export-color-policy-v2");
+        assert_eq!(metadata.policy_status, "applied");
         assert_eq!(metadata.requested_color_profile, "sRGB");
+        assert_eq!(metadata.requested_rendering_intent, "Relative colorimetric");
+        assert_eq!(metadata.effective_rendering_intent, "Relative colorimetric");
+        assert!(metadata.resolved_disabled_reason.is_none());
         assert!(!metadata.transform_applied);
         assert_eq!(
             metadata.black_point_compensation,
@@ -2268,7 +2384,54 @@ mod tests {
         assert_eq!(metadata.bit_depth, 8);
         assert_eq!(metadata.effective_color_profile, "Display P3");
         assert_eq!(metadata.requested_color_profile, "Display P3");
+        assert_eq!(metadata.requested_rendering_intent, "Relative colorimetric");
+        assert_eq!(metadata.effective_rendering_intent, "Relative colorimetric");
         assert!(metadata.transform_applied);
+    }
+
+    #[test]
+    fn export_color_transform_plan_resolves_requested_and_effective_policy() {
+        let plan = resolve_export_color_transform_plan(
+            "tiff",
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::Saturation,
+        )
+        .expect("Display P3 TIFF policy should resolve");
+
+        assert_eq!(plan.requested.color_profile, ExportColorProfile::DisplayP3);
+        assert_eq!(
+            plan.requested.rendering_intent,
+            ExportRenderingIntent::Saturation
+        );
+        assert_eq!(plan.effective_color_profile, ExportColorProfile::DisplayP3);
+        assert_eq!(
+            plan.effective_rendering_intent,
+            ExportRenderingIntent::Saturation
+        );
+        assert_eq!(plan.engine, ExportColorEngineId::Moxcms);
+        assert_eq!(
+            plan.black_point_compensation,
+            ExportBlackPointCompensationStatus::Unsupported
+        );
+        assert_eq!(plan.status, "applied");
+        assert!(plan.icc_embedded);
+        assert!(plan.transform_applied);
+        assert!(plan.disabled_reason.is_none());
+    }
+
+    #[test]
+    fn unsupported_color_policy_rejects_before_encoding_output() {
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(2, 2, Rgb([128, 64, 32])));
+        let error = encode_image_with_applied_policy(
+            &image,
+            "png",
+            90,
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+        )
+        .expect_err("wide-gamut PNG should fail before bytes are emitted");
+
+        assert!(error.contains("Display P3 export is only supported for JPEG and TIFF"));
     }
 
     #[test]
