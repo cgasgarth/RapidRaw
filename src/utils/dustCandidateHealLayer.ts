@@ -2,7 +2,8 @@ import { DEFAULT_LAYER_BLEND_MODE, INITIAL_MASK_ADJUSTMENTS, type MaskContainer 
 import { Mask, SubMaskMode } from '../components/panel/right/Masks';
 import {
   parseNegativeLabDustHealCorrectionMetrics,
-  type NegativeLabDustHealCorrectionMetrics, type NegativeLabDustScratchReviewReport 
+  type NegativeLabDustHealCorrectionMetrics,
+  type NegativeLabDustScratchReviewReport,
 } from '../schemas/negativeLabWorkspaceSchemas';
 
 type DustScratchFrame = NegativeLabDustScratchReviewReport['frames'][number];
