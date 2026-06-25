@@ -2,7 +2,19 @@ import { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import CropOverlay, { type PercentCrop, type Crop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
-import { Stage, Layer, Ellipse, Line, Transformer, Group, Circle, Rect } from 'react-konva';
+import {
+  Stage,
+  Layer,
+  Ellipse,
+  Line,
+  Transformer,
+  Group,
+  Circle,
+  Rect,
+  Label,
+  Tag,
+  Text as KonvaText,
+} from 'react-konva';
 
 import CompositionOverlays from './overlays/CompositionOverlays';
 import {
@@ -2878,6 +2890,8 @@ const ImageCanvas = memo(
               const removeFeatherRadius =
                 Math.max(0, (activeRemoveSource.radiusPx ?? 48) + (activeRemoveSource.featherRadiusPx ?? 24)) *
                 imageRenderSize.scale;
+              const removeStatus = activeRemoveSource.status ?? 'needs_regeneration';
+              const removeStatusLabel = t(`editor.layers.removeSource.status.${removeStatus}`);
 
               return (
                 <div
@@ -2887,10 +2901,12 @@ const ImageCanvas = memo(
                   data-remove-handle-radius-px={activeRemoveSource.radiusPx ?? ''}
                   data-remove-handle-feather-radius-px={activeRemoveSource.featherRadiusPx ?? ''}
                   data-remove-handle-status={activeRemoveSource.status ?? 'needs_regeneration'}
+                  data-remove-handle-status-label={removeStatusLabel}
                   data-remove-handle-target-x={targetX}
                   data-remove-handle-target-y={targetY}
                   data-remove-handle-resolved-source-x={activeRemoveSource.resolvedSourcePoint?.x ?? ''}
                   data-remove-handle-resolved-source-y={activeRemoveSource.resolvedSourcePoint?.y ?? ''}
+                  data-remove-handle-source-resolved={String(activeRemoveSource.resolvedSourcePoint !== undefined)}
                   data-testid="image-canvas-remove-handles"
                   style={{
                     height: stageHeight * maxSafeScale,
@@ -2982,6 +2998,30 @@ const ImageCanvas = memo(
                             x={targetPoint.x}
                             y={targetPoint.y}
                           />
+                          <Label
+                            data-remove-canvas-status={removeStatus}
+                            data-remove-canvas-source-resolved={String(resolvedSourcePoint !== null)}
+                            data-testid="image-canvas-remove-status-label"
+                            listening={false}
+                            x={targetPoint.x + handleRadius + 8}
+                            y={targetPoint.y - handleRadius - 28}
+                          >
+                            <Tag
+                              cornerRadius={6}
+                              fill="rgba(15, 23, 42, 0.88)"
+                              lineJoin="round"
+                              stroke="#f97316"
+                              strokeWidth={1}
+                            />
+                            <KonvaText
+                              fill="#f8fafc"
+                              fontFamily="Inter, system-ui, sans-serif"
+                              fontSize={12}
+                              fontStyle="600"
+                              padding={6}
+                              text={`${t('editor.layers.removeSource.title')} - ${removeStatusLabel}`}
+                            />
+                          </Label>
                         </Group>
                       </Group>
                     </Layer>
