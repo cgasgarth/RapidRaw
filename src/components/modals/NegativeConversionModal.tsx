@@ -3349,6 +3349,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
         data-base-scope={baseFogScope}
         data-export-ready={handoffReady ? 'true' : 'false'}
+        data-accepted-dust-heal-layer-count={dustHealLayerCount}
+        data-accepted-dust-heals-open-in-editor={dustHealLayerCount > 0 && openSavedPositiveInEditor ? 'true' : 'false'}
         data-output-format={saveOptions.outputFormat}
         data-open-saved-positive-in-editor={openSavedPositiveInEditor ? 'true' : 'false'}
         data-profile-id={selectedProfileId}
@@ -3406,6 +3408,18 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             title={provenanceLink}
           >
             {t('modals.negativeConversion.positiveHandoffProvenance', { proofId: provenanceLink })}
+          </span>
+          <span
+            className={cx(
+              'truncate rounded px-1.5 py-0.5',
+              dustHealLayerCount > 0 && openSavedPositiveInEditor
+                ? 'bg-yellow-300/10 text-yellow-100'
+                : 'bg-bg-secondary',
+            )}
+            data-open-in-editor={dustHealLayerCount > 0 && openSavedPositiveInEditor ? 'true' : 'false'}
+            data-testid="negative-lab-positive-dust-heal-handoff"
+          >
+            {t('modals.negativeConversion.dustHealLayerCount', { count: dustHealLayerCount })}
           </span>
           <label className="col-span-2 flex items-center justify-between gap-2 rounded bg-bg-secondary px-1.5 py-0.5">
             <span className="truncate">{t('modals.negativeConversion.positiveHandoffOpenInEditor')}</span>

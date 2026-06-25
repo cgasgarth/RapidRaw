@@ -122,6 +122,9 @@ if (applied.sidecar.layers[0]?.id !== layer.id) {
 for (const [label, source, marker] of [
   ['modal save contract', modalSource, 'acceptedDustHealLayers: Object.values(dustHealLayerByCandidateId)'],
   ['modal handoff control', modalSource, 'negative-lab-positive-open-in-editor'],
+  ['modal dust heal handoff count', modalSource, 'data-accepted-dust-heal-layer-count={dustHealLayerCount}'],
+  ['modal dust heal editor-ready state', modalSource, 'negative-lab-positive-dust-heal-handoff'],
+  ['modal dust heal open-in-editor state', modalSource, 'data-open-in-editor='],
   ['app handoff route', appModalsSource, 'handleNegativeConversionEditorHandoff({'],
   ['refresh best effort', handoffSource, 'onRefreshError?.(error);'],
   ['handoff exact first path', handoffSource, 'await handleImageSelect(firstSavedPath);'],
