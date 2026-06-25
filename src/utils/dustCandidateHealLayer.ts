@@ -16,6 +16,22 @@ interface DustCandidateHealLayerInput {
 }
 
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
+const isDistinctHealSource = (sourcePoint: { x: number; y: number }, targetPoint: { x: number; y: number }): boolean =>
+  Math.hypot(sourcePoint.x - targetPoint.x, sourcePoint.y - targetPoint.y) >= 0.01;
+
+const chooseDustHealSourcePoint = (
+  targetPoint: { x: number; y: number },
+  sourceOffset: number,
+): { x: number; y: number } => {
+  const candidates = [
+    { x: targetPoint.x + sourceOffset, y: targetPoint.y },
+    { x: targetPoint.x - sourceOffset, y: targetPoint.y },
+    { x: targetPoint.x, y: targetPoint.y + sourceOffset },
+    { x: targetPoint.x, y: targetPoint.y - sourceOffset },
+  ].map((point) => ({ x: clamp01(point.x), y: clamp01(point.y) }));
+
+  return candidates.find((point) => isDistinctHealSource(point, targetPoint)) ?? candidates[0] ?? targetPoint;
+};
 
 export const buildDustCandidateHealLayer = ({
   candidate,
@@ -32,8 +48,7 @@ export const buildDustCandidateHealLayer = ({
   const targetX = clamp01(candidate.geometry.x + candidate.geometry.width / 2);
   const targetY = clamp01(candidate.geometry.y + candidate.geometry.height / 2);
   const sourceOffsetX = Math.max(candidate.geometry.width * 2.5, 0.04);
-  const sourceX = clamp01(targetX + sourceOffsetX <= 1 ? targetX + sourceOffsetX : targetX - sourceOffsetX);
-  const sourceY = targetY;
+  const sourcePoint = chooseDustHealSourcePoint({ x: targetX, y: targetY }, sourceOffsetX);
   const radiusPx = Math.max(
     2,
     (Math.max(candidate.geometry.width * imageWidth, candidate.geometry.height * imageHeight) / 2) * 1.45,
@@ -63,7 +78,7 @@ export const buildDustCandidateHealLayer = ({
       retouchMode: 'heal',
       rotationDegrees: 0,
       scale: 1,
-      sourcePoint: { x: sourceX, y: sourceY },
+      sourcePoint,
       targetPoint: { x: targetX, y: targetY },
     },
     subMasks: [
