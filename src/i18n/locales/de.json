@@ -931,6 +931,7 @@
       },
       "removeRowSummary": "{{blendMode}} - {{opacity}}% - remove {{source}} - {{maskCount}}",
       "removeSource": {
+        "canvasStatus": "{{status}} - Search {{searchMultiplier}}x - Seed {{seedValue}}",
         "defaultMaskName": "Remove target",
         "feather": "Feather",
         "generators": {
