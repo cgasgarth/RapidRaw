@@ -3026,6 +3026,9 @@ const ImageCanvas = memo(
               const removeStatus = activeRemoveSource.status ?? 'needs_regeneration';
               const removeStatusLabel = t(`editor.layers.removeSource.status.${removeStatus}`);
               const removeStatusColor = getRemoveCanvasStatusColor(activeRemoveSource.status);
+              const isOriginalPreserved = removeStatus === 'fallback_unchanged' && resolvedSourcePoint === null;
+              const removeTargetStrokeOpacity = isOriginalPreserved ? 0.55 : 0.8;
+              const removeTargetDash = isOriginalPreserved ? [7, 5] : [];
 
               return (
                 <div
@@ -3037,6 +3040,7 @@ const ImageCanvas = memo(
                   data-remove-handle-status-color={removeStatusColor}
                   data-remove-handle-status={activeRemoveSource.status ?? 'needs_regeneration'}
                   data-remove-handle-status-label={removeStatusLabel}
+                  data-remove-handle-original-preserved={String(isOriginalPreserved)}
                   data-remove-handle-target-x={targetX}
                   data-remove-handle-target-y={targetY}
                   data-remove-handle-resolved-source-x={activeRemoveSource.resolvedSourcePoint?.x ?? ''}
@@ -3104,7 +3108,8 @@ const ImageCanvas = memo(
                             listening={false}
                             radius={removeRadius}
                             stroke={removeStatusColor}
-                            strokeOpacity={0.8}
+                            dash={removeTargetDash}
+                            strokeOpacity={removeTargetStrokeOpacity}
                             strokeScaleEnabled={false}
                             strokeWidth={strokeWidth}
                             x={targetPoint.x}
@@ -3178,6 +3183,7 @@ const ImageCanvas = memo(
                             y={targetPoint.y}
                           />
                           <Label
+                            data-remove-canvas-original-preserved={String(isOriginalPreserved)}
                             data-remove-canvas-status={removeStatus}
                             data-remove-canvas-source-resolved={String(resolvedSourcePoint !== null)}
                             data-testid="image-canvas-remove-status-label"
