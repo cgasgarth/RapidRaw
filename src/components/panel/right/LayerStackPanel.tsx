@@ -516,6 +516,14 @@ export default function LayerStackPanel({
       field === 'targetPoint.x' || field === 'targetPoint.y' || field === 'radiusPx' || field === 'featherRadiusPx';
     updateLayerRetouchSource(activeRow.id, nextSource, syncTargetMask);
   };
+  const swapActiveRetouchSourceTarget = () => {
+    if (!activeRow || activeRow.isBase || activeRow.isGroupHeader || activeRow.retouchCloneSource === null) return;
+
+    const nextSource = structuredClone(activeRow.retouchCloneSource);
+    nextSource.sourcePoint = { ...activeRow.retouchCloneSource.targetPoint };
+    nextSource.targetPoint = { ...activeRow.retouchCloneSource.sourcePoint };
+    updateLayerRetouchSource(activeRow.id, nextSource, true);
+  };
   const updateActiveRetouchRemoveNumber = (field: RetouchRemoveControlField, rawValue: number) => {
     if (!activeRow || activeRow.isBase || activeRow.isGroupHeader || activeRow.retouchRemoveSource === null) return;
 
@@ -1224,6 +1232,19 @@ export default function LayerStackPanel({
                   source: activeRow.retouchCloneSourceLabel,
                 })}
               </UiText>
+              <button
+                className={cx(
+                  'mt-2 rounded-md border border-surface bg-surface px-2 py-1 text-xs text-text-secondary',
+                  'hover:bg-card-active hover:text-text-primary',
+                )}
+                data-retouch-swap-source-x={activeRow.retouchCloneSource.sourcePoint.x}
+                data-retouch-swap-target-x={activeRow.retouchCloneSource.targetPoint.x}
+                data-testid="layer-retouch-swap-source-target"
+                onClick={swapActiveRetouchSourceTarget}
+                type="button"
+              >
+                {t('editor.layers.retouchSource.swapSourceTarget')}
+              </button>
               {activeRow.retouchCloneSource.candidateProvenance !== undefined && (
                 <div
                   data-retouch-candidate-source-label={`${activeRow.retouchCloneSource.sourcePoint.x.toFixed(3)},${activeRow.retouchCloneSource.sourcePoint.y.toFixed(3)}`}
