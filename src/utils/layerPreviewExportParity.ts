@@ -67,7 +67,9 @@ export interface LayerBlendStackRender {
   pixels: Array<LayerRgbPixel>;
   resolvedRemoveSources: Array<{
     layerId: string;
+    outputSampleHash?: string;
     resolvedSourcePoint?: { x: number; y: number };
+    sourceSampleHash?: string;
     status: 'fallback_unchanged' | 'ready';
     targetMaskId: string;
   }>;
@@ -81,6 +83,17 @@ const clamp01 = (value: number): number => {
 const clampByte = (value: number): number => {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(255, Math.round(value)));
+};
+
+const hashRemoveSample = (label: 'output' | 'source', index: number, pixel: LayerRgbPixel): string => {
+  let hash = 0x811c9dc5;
+  for (const value of [label === 'source' ? 1 : 2, index, pixel.r, pixel.g, pixel.b]) {
+    hash ^= value & 0xff;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+    hash ^= (value >>> 8) & 0xff;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `fnv1a32:${hash.toString(16).padStart(8, '0')}`;
 };
 
 const blendChannel = (base: number, source: number, mode: LayerBlendMode): number => {
@@ -291,16 +304,6 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
             removeSource: layer.retouchRemoveSource,
             width: input.width,
           });
-    if (layer.retouchRemoveSource !== undefined) {
-      resolvedRemoveSources.push({
-        layerId: layer.id,
-        ...(removePlan === null
-          ? {}
-          : { resolvedSourcePoint: removeSourcePointToNormalized(removePlan, input.width, input.height) }),
-        status: removePlan === null ? 'fallback_unchanged' : 'ready',
-        targetMaskId: layer.retouchRemoveSource.targetMaskId,
-      });
-    }
     const targetAnchorPoint =
       layer.retouchCloneSource === undefined
         ? removePlan === null
@@ -381,6 +384,28 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
       if (alpha === 0) continue;
       pixels[index] = blendPixel(base, source, layer.blendMode, alpha);
       touchedPixels += 1;
+    }
+
+    if (layer.retouchRemoveSource !== undefined) {
+      const sourceSample =
+        removePlan === null || sourceAnchorIndex === null || retouchBasePixels === null
+          ? undefined
+          : retouchBasePixels[sourceAnchorIndex];
+      const outputSample = removePlan === null || targetAnchorIndex === null ? undefined : pixels[targetAnchorIndex];
+      resolvedRemoveSources.push({
+        layerId: layer.id,
+        ...(removePlan === null
+          ? {}
+          : { resolvedSourcePoint: removeSourcePointToNormalized(removePlan, input.width, input.height) }),
+        ...(removePlan !== null && sourceAnchorIndex !== null && sourceSample !== undefined
+          ? { sourceSampleHash: hashRemoveSample('source', sourceAnchorIndex, sourceSample) }
+          : {}),
+        ...(removePlan !== null && targetAnchorIndex !== null && outputSample !== undefined
+          ? { outputSampleHash: hashRemoveSample('output', targetAnchorIndex, outputSample) }
+          : {}),
+        status: removePlan === null ? 'fallback_unchanged' : 'ready',
+        targetMaskId: layer.retouchRemoveSource.targetMaskId,
+      });
     }
 
     coverageByLayer.push({ id: layer.id, opacity, touchedPixels });

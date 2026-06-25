@@ -116,12 +116,20 @@ const coverageSchema = z
 const resolvedRemoveSourceSchema = z
   .object({
     layerId: z.string().trim().min(1),
+    outputSampleHash: z
+      .string()
+      .regex(/^fnv1a32:[0-9a-f]{8}$/u)
+      .optional(),
     resolvedSourcePoint: z
       .object({
         x: z.number().min(0).max(1),
         y: z.number().min(0).max(1),
       })
       .strict()
+      .optional(),
+    sourceSampleHash: z
+      .string()
+      .regex(/^fnv1a32:[0-9a-f]{8}$/u)
       .optional(),
     status: z.enum(['fallback_unchanged', 'ready']),
     targetMaskId: z.string().trim().min(1),
@@ -395,7 +403,9 @@ const removePackage = renderPackageLayerPreviewStack(removeFixture);
 const expectedResolvedRemoveSource = z.array(resolvedRemoveSourceSchema).parse([
   {
     layerId: 'remove-local-fill',
+    outputSampleHash: 'fnv1a32:6e9e394d',
     resolvedSourcePoint: { x: 0.25, y: 0.5 },
+    sourceSampleHash: 'fnv1a32:0724bd7a',
     status: 'ready',
     targetMaskId: 'remove-target',
   },
