@@ -2408,6 +2408,14 @@ const ImageCanvas = memo(
       },
       [canvasPointToRetouchPoint, updateRetouchHandlePoint],
     );
+    const handleRetouchHandleDragMove = useCallback(
+      (layerId: string, handle: RetouchHandleKind, event: RetouchHandleDragEvent) => {
+        event.evt.stopPropagation();
+        const point = canvasPointToRetouchPoint({ x: event.target.x(), y: event.target.y() });
+        updateRetouchHandlePoint(layerId, handle, point);
+      },
+      [canvasPointToRetouchPoint, updateRetouchHandlePoint],
+    );
 
     const updateRemoveTargetPoint = useCallback(
       (layerId: string, removeSource: RetouchRemoveSource, point: RetouchCloneSource['sourcePoint']) => {
@@ -2442,6 +2450,14 @@ const ImageCanvas = memo(
     );
 
     const handleRemoveTargetDragEnd = useCallback(
+      (layerId: string, removeSource: RetouchRemoveSource, event: RetouchHandleDragEvent) => {
+        event.evt.stopPropagation();
+        const point = canvasPointToRetouchPoint({ x: event.target.x(), y: event.target.y() });
+        updateRemoveTargetPoint(layerId, removeSource, point);
+      },
+      [canvasPointToRetouchPoint, updateRemoveTargetPoint],
+    );
+    const handleRemoveTargetDragMove = useCallback(
       (layerId: string, removeSource: RetouchRemoveSource, event: RetouchHandleDragEvent) => {
         event.evt.stopPropagation();
         const point = canvasPointToRetouchPoint({ x: event.target.x(), y: event.target.y() });
@@ -2831,6 +2847,9 @@ const ImageCanvas = memo(
                             onDragEnd={(event) => {
                               handleRetouchHandleDragEnd(activeRetouchLayer.id, 'sourcePoint', event);
                             }}
+                            onDragMove={(event) => {
+                              handleRetouchHandleDragMove(activeRetouchLayer.id, 'sourcePoint', event);
+                            }}
                             onMouseDown={(event) => {
                               event.evt.stopPropagation();
                             }}
@@ -2877,6 +2896,9 @@ const ImageCanvas = memo(
                             fill="#f97316"
                             onDragEnd={(event) => {
                               handleRetouchHandleDragEnd(activeRetouchLayer.id, 'targetPoint', event);
+                            }}
+                            onDragMove={(event) => {
+                              handleRetouchHandleDragMove(activeRetouchLayer.id, 'targetPoint', event);
                             }}
                             onMouseDown={(event) => {
                               event.evt.stopPropagation();
@@ -3050,6 +3072,9 @@ const ImageCanvas = memo(
                             fill={removeStatusColor}
                             onDragEnd={(event) => {
                               handleRemoveTargetDragEnd(activeRemoveLayer.id, activeRemoveSource, event);
+                            }}
+                            onDragMove={(event) => {
+                              handleRemoveTargetDragMove(activeRemoveLayer.id, activeRemoveSource, event);
                             }}
                             onMouseDown={(event) => {
                               event.evt.stopPropagation();
