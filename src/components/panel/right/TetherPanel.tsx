@@ -691,7 +691,9 @@ export function TetherPanel({
         {session?.recovery && session.recovery.status !== 'clean' && (
           <div
             className="mt-3 rounded border border-yellow-500/40 bg-yellow-500/10 p-2"
+            data-first-quarantined-file={session.recovery.quarantinedFiles[0] ?? ''}
             data-partial-files-found={session.recovery.partialFilesFound}
+            data-quarantined-file-count={session.recovery.quarantinedFiles.length}
             data-recovery-status={session.recovery.status}
             data-testid="tether-recovery-status"
           >
@@ -706,6 +708,17 @@ export function TetherPanel({
                   ? t('editor.tether.recoveryFailed', { message: session.recovery.message })
                   : session.recovery.message}
             </UiText>
+            {session.recovery.quarantinedFiles.length > 0 && (
+              <UiText
+                variant={TextVariants.small}
+                color={TextColors.secondary}
+                className="mt-1 block truncate"
+                data-testid="tether-recovery-quarantine-file"
+                title={session.recovery.quarantinedFiles[0]}
+              >
+                {session.recovery.quarantinedFiles[0]}
+              </UiText>
+            )}
           </div>
         )}
         <div className="mt-3 flex gap-2">
