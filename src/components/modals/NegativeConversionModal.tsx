@@ -51,6 +51,7 @@ import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { TextColors, TextVariants } from '../../types/typography';
 import { buildDustCandidateHealLayer, buildDustHealCorrectionMetrics } from '../../utils/dustCandidateHealLayer';
+import { buildLayerStackSidecarFromMasks } from '../../utils/layerStackCommandBridge';
 import {
   DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID,
   NEGATIVE_LAB_ACQUISITION_PROFILES,
@@ -118,6 +119,7 @@ import Button from '../ui/Button';
 import Slider from '../ui/Slider';
 import UiText from '../ui/Text';
 
+import type { LayerStackSidecarLayerV1 } from '../../../packages/rawengine-schema/src';
 import type { NegativeLabAcquisitionProfileId } from '../../schemas/negativeLabAcquisitionProfileSchemas';
 import type {
   NegativeLabAcquisitionHealthReport,
@@ -2194,6 +2196,27 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setIsSaving(true);
     setProgress(null);
     try {
+      const acceptedDustHealLayers = Object.values(dustHealLayerByCandidateId);
+      const frameIdBySourcePath = new Map(frameHealthReport.frames.map((frame) => [frame.sourcePath, frame.frameId]));
+      const acceptedDustHealLayersBySourcePath = Object.fromEntries(
+        pathsToConvert
+          .map((sourcePath) => {
+            const sourceFrameId = frameIdBySourcePath.get(sourcePath);
+            if (sourceFrameId === undefined) return null;
+            const sourceLayers = acceptedDustHealLayers.filter(
+              (layer) => layer.retouchCloneSource?.candidateProvenance?.sourceFrameId === sourceFrameId,
+            );
+            if (sourceLayers.length === 0) return null;
+            const sidecar = buildLayerStackSidecarFromMasks(sourceLayers, {
+              graphRevision: `graph_negative_lab_dust_heal_save_${sourceFrameId}`,
+              imagePath: sourcePath,
+              operationId: `negative_lab_dust_heal_save_${sourceFrameId}`,
+              sessionId: 'negative_lab_dust_heal_save_session',
+            });
+            return [sourcePath, sidecar.layers] as [string, Array<LayerStackSidecarLayerV1>];
+          })
+          .filter((entry): entry is [string, Array<LayerStackSidecarLayerV1>] => entry !== null),
+      );
       const savedPaths = await invokeWithSchema(
         Invokes.ConvertNegatives,
         {
@@ -2206,6 +2229,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             batchScope: conversionScope,
             frameExposureOverrides: frameExposureOverridePayload,
             frameRgbBalanceOverrides: frameRgbBalanceOverridePayload,
+            acceptedDustHealLayersBySourcePath,
             omittedDispositionFrameIds,
             qcApprovedFrameIds: approvedQcFrameIds,
             qcRejectedFrameIds: rejectedQcFrameIds,
@@ -2219,8 +2243,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         },
         negativeConversionSavedPathsSchema,
       );
-      const acceptedDustHealLayers = Object.values(dustHealLayerByCandidateId);
-      const frameIdBySourcePath = new Map(frameHealthReport.frames.map((frame) => [frame.sourcePath, frame.frameId]));
       const acceptedDustHealLayersBySavedPath = Object.fromEntries(
         savedPaths
           .map((savedPath, savedPathIndex) => {

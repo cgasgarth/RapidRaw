@@ -121,6 +121,13 @@ if (applied.sidecar.layers[0]?.id !== layer.id) {
 
 for (const [label, source, marker] of [
   ['modal save contract', modalSource, 'const acceptedDustHealLayers = Object.values(dustHealLayerByCandidateId);'],
+  [
+    'modal persisted heal sidecar contract',
+    modalSource,
+    'const acceptedDustHealLayersBySourcePath = Object.fromEntries(',
+  ],
+  ['modal persisted heal sidecar builder', modalSource, 'buildLayerStackSidecarFromMasks(sourceLayers, {'],
+  ['modal persisted heal save payload', modalSource, 'acceptedDustHealLayersBySourcePath,'],
   ['modal handoff control', modalSource, 'negative-lab-positive-open-in-editor'],
   ['modal dust heal handoff count', modalSource, 'data-accepted-dust-heal-layer-count={dustHealLayerCount}'],
   ['modal dust heal editor-ready state', modalSource, 'negative-lab-positive-dust-heal-handoff'],
