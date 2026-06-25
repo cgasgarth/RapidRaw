@@ -19,6 +19,9 @@ export interface LayerBlendStackLayer {
 
 export interface LayerRetouchCloneSource {
   alignmentErrorPx?: number;
+  featherRadiusPx?: number;
+  radiusPx?: number;
+  retouchMode?: 'clone' | 'heal';
   rotationDegrees: number;
   scale: number;
   sourcePoint: { x: number; y: number };

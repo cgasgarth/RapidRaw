@@ -459,6 +459,9 @@ export interface MaskContainer {
 
 export interface RetouchCloneSource {
   alignmentErrorPx?: number | undefined;
+  featherRadiusPx?: number | undefined;
+  radiusPx?: number | undefined;
+  retouchMode?: 'clone' | 'heal' | undefined;
   rotationDegrees: number;
   scale: number;
   sourcePoint: {

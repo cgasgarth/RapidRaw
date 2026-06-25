@@ -1646,6 +1646,9 @@ export const layerMaskRefinementParametersV1Schema = z
 export const layerMaskCloneSourceV1Schema = z
   .object({
     alignmentErrorPx: z.number().min(0).optional(),
+    featherRadiusPx: z.number().min(0).max(4096).optional(),
+    radiusPx: z.number().positive().max(4096).optional(),
+    retouchMode: z.enum(['clone', 'heal']).optional(),
     rotationDegrees: z.number().min(-180).max(180),
     scale: z.number().min(0.1).max(10),
     sourcePoint: layerMaskPointV1Schema,

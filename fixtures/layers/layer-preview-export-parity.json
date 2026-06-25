@@ -63,6 +63,9 @@
           "maskAlpha": [0, 1, 1, 0, 0, 0],
           "retouchCloneSource": {
             "alignmentErrorPx": 0,
+            "featherRadiusPx": 16,
+            "radiusPx": 32,
+            "retouchMode": "heal",
             "rotationDegrees": 0,
             "scale": 1,
             "sourcePoint": { "x": 0, "y": 0 },
@@ -132,6 +135,9 @@
             "maskPersisted": true,
             "retouchCloneSource": {
               "alignmentErrorPx": 0,
+              "featherRadiusPx": 16,
+              "radiusPx": 32,
+              "retouchMode": "heal",
               "rotationDegrees": 0,
               "scale": 1,
               "sourcePoint": { "x": 0, "y": 0 },

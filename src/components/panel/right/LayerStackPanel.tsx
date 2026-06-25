@@ -10,6 +10,7 @@ import {
   GripVertical,
   Layers3,
   Plus,
+  Sparkles,
   Trash2,
 } from 'lucide-react';
 import { type KeyboardEvent, useMemo, useState } from 'react';
@@ -69,6 +70,7 @@ interface LayerRowModel {
   name: string;
   opacity: number;
   retouchCloneSourceLabel: string | null;
+  retouchMode: 'clone' | 'heal' | null;
   visible: boolean;
   visibleState: 'hidden' | 'mixed' | 'visible';
 }
@@ -118,6 +120,7 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
         name: groupSummary?.name ?? tFallbackLayerGroupName(),
         opacity: groupSummary?.opacity ?? 100,
         retouchCloneSourceLabel: null,
+        retouchMode: null,
         visible: groupSummary?.visibleState !== 'hidden',
         visibleState: groupSummary?.visibleState ?? 'visible',
       });
@@ -146,6 +149,7 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
       retouchCloneSourceLabel: mask.retouchCloneSource
         ? `${mask.retouchCloneSource.sourcePoint.x.toFixed(2)},${mask.retouchCloneSource.sourcePoint.y.toFixed(2)} -> ${mask.retouchCloneSource.targetPoint.x.toFixed(2)},${mask.retouchCloneSource.targetPoint.y.toFixed(2)}`
         : null,
+      retouchMode: mask.retouchCloneSource?.retouchMode ?? (mask.retouchCloneSource ? 'clone' : null),
       visible: mask.visible,
       visibleState: mask.visible ? 'visible' : 'hidden',
     });
@@ -167,6 +171,7 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
       name: 'Base RAW',
       opacity: 100,
       retouchCloneSourceLabel: null,
+      retouchMode: null,
       visible: true,
       visibleState: 'visible',
     },
@@ -340,10 +345,35 @@ export default function LayerStackPanel({
       opacity: 100,
       retouchCloneSource: {
         alignmentErrorPx: 0,
+        retouchMode: 'clone',
         rotationDegrees: 0,
         scale: 1,
         sourcePoint: { x: 0.42, y: 0.42 },
         targetPoint: { x: 0.58, y: 0.58 },
+      },
+      subMasks: [],
+      visible: true,
+    };
+    applyLayerStackCommand({ layer, type: 'create' }, layerId);
+  };
+  const createHealLayer = () => {
+    const layerId = crypto.randomUUID();
+    const layer: MaskContainer = {
+      adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+      blendMode: DEFAULT_LAYER_BLEND_MODE,
+      id: layerId,
+      invert: false,
+      name: t('editor.layers.newHealLayerName', { count: masks.length + 1 }),
+      opacity: 100,
+      retouchCloneSource: {
+        alignmentErrorPx: 0,
+        featherRadiusPx: 24,
+        radiusPx: 48,
+        retouchMode: 'heal',
+        rotationDegrees: 0,
+        scale: 1,
+        sourcePoint: { x: 0.44, y: 0.44 },
+        targetPoint: { x: 0.56, y: 0.56 },
       },
       subMasks: [],
       visible: true,
@@ -467,6 +497,15 @@ export default function LayerStackPanel({
             type="button"
           >
             <Copy size={17} className="mx-auto" />
+          </button>
+          <button
+            className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+            data-tooltip={t('editor.layers.actions.createHealLayer')}
+            data-testid="layer-create-heal-layer"
+            onClick={createHealLayer}
+            type="button"
+          >
+            <Sparkles size={17} className="mx-auto" />
           </button>
         </div>
       </div>
@@ -653,7 +692,7 @@ export default function LayerStackPanel({
                 </UiText>
                 <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="block truncate">
                   {row.retouchCloneSourceLabel !== null
-                    ? t('editor.layers.cloneRowSummary', {
+                    ? t(row.retouchMode === 'heal' ? 'editor.layers.healRowSummary' : 'editor.layers.cloneRowSummary', {
                         blendMode:
                           row.blendMode === null
                             ? t('editor.layers.groupType')

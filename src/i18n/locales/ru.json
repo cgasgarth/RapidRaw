@@ -818,6 +818,13 @@
       "sessionOpenDescription": "{{camera}} is reserved for this tether session.",
       "recoveryFailed": "Tether recovery failed: {{message}}",
       "recoveryQuarantined": "Quarantined {{count}} partial tether download(s)."
+    },
+    "layers": {
+      "actions": {
+        "createHealLayer": "Create heal layer"
+      },
+      "healRowSummary": "{{blendMode}} - {{opacity}}% - heal {{source}} - {{maskCount}}",
+      "newHealLayerName": "Heal Layer {{count}}"
     }
   },
   "export": {
