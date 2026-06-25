@@ -570,13 +570,12 @@ fn trigger_tether_capture_for_state(
     );
     let temporary_path = imported_path.with_extension(format!("{extension}.part"));
 
-    fs::copy(&source_path, &temporary_path).map_err(|error| error.to_string())?;
-    let output_checksum = sha256_file(&temporary_path)?;
-    if source_checksum != output_checksum {
-        let _ = fs::remove_file(&temporary_path);
-        return Err("Fake capture checksum verification failed.".to_string());
-    }
-    fs::rename(&temporary_path, &imported_path).map_err(|error| error.to_string())?;
+    let output_checksum = write_verified_primary_capture(
+        &source_path,
+        &temporary_path,
+        &imported_path,
+        &source_checksum,
+    )?;
     let bytes = fs::metadata(&imported_path)
         .map_err(|error| error.to_string())?
         .len();
@@ -646,6 +645,43 @@ fn record_tether_import(state: &AppState, response: &TetherCaptureResponse) {
             metadata: response.metadata.clone(),
         },
     );
+}
+
+fn write_verified_primary_capture(
+    source_path: &Path,
+    temporary_path: &Path,
+    imported_path: &Path,
+    expected_checksum: &str,
+) -> Result<String, String> {
+    write_verified_primary_capture_result(
+        source_path,
+        temporary_path,
+        imported_path,
+        expected_checksum,
+        false,
+    )
+}
+
+fn write_verified_primary_capture_result(
+    source_path: &Path,
+    temporary_path: &Path,
+    imported_path: &Path,
+    expected_checksum: &str,
+    interrupt_after_copy: bool,
+) -> Result<String, String> {
+    fs::copy(source_path, temporary_path).map_err(|error| error.to_string())?;
+    if interrupt_after_copy {
+        return Err(
+            "Fake capture interrupted with partial download left for recovery.".to_string(),
+        );
+    }
+    let output_checksum = sha256_file(temporary_path)?;
+    if expected_checksum != output_checksum {
+        let _ = fs::remove_file(temporary_path);
+        return Err("Fake capture checksum verification failed.".to_string());
+    }
+    fs::rename(temporary_path, imported_path).map_err(|error| error.to_string())?;
+    Ok(output_checksum)
 }
 
 fn apply_capture_metadata_template(
@@ -1441,6 +1477,53 @@ mod tests {
         assert_eq!(recovery.partial_files_found, 1);
         assert_eq!(recovery.quarantined_files.len(), 1);
         assert!(!partial_path.exists());
+        assert!(Path::new(&recovery.quarantined_files[0]).is_file());
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn interrupted_primary_capture_is_quarantined_on_next_session_open() {
+        let state = AppState::new();
+        let root = std::env::temp_dir().join(format!(
+            "rawengine-tether-interrupted-capture-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let source_path = root.join("source.ARW");
+        let destination_root = root.join("destination");
+        fs::create_dir_all(&destination_root).unwrap();
+        fs::write(&source_path, b"fake raw bytes").unwrap();
+        let expected_checksum = sha256_file(&source_path).unwrap();
+        let imported_path = destination_root.join("source_0001.ARW");
+        let temporary_path = imported_path.with_extension("ARW.part");
+
+        let error = write_verified_primary_capture_result(
+            &source_path,
+            &temporary_path,
+            &imported_path,
+            &expected_checksum,
+            true,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("partial download"));
+        assert!(temporary_path.is_file());
+        assert!(!imported_path.exists());
+
+        let session = open_tether_session_for_state(
+            TetherSessionOpenRequest {
+                camera_id: "fake-sony-ilce-7m4-usb".to_string(),
+                destination_root: Some(destination_root.to_string_lossy().to_string()),
+                provider_mode: Some("fake".to_string()),
+            },
+            &state,
+        )
+        .unwrap();
+        let recovery = &session.session.as_ref().unwrap().recovery;
+
+        assert_eq!(recovery.status, "quarantined");
+        assert_eq!(recovery.partial_files_found, 1);
+        assert!(!temporary_path.exists());
         assert!(Path::new(&recovery.quarantined_files[0]).is_file());
 
         let _ = fs::remove_dir_all(root);
