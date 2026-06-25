@@ -2701,6 +2701,13 @@
         "dustSpot": "Kandydat kurzu",
         "emulsionScratch": "Kandydat rysy"
       },
+      "dustCandidateFilter": {
+        "accepted": "Accepted",
+        "all": "All",
+        "empty": "No dust candidates match this filter.",
+        "pending": "Pending",
+        "rejected": "Rejected"
+      },
       "dustCandidateStatus": {
         "acknowledged": "Potwierdzone",
         "ignored": "Zignorowane",

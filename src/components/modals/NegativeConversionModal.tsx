@@ -430,8 +430,25 @@ const DUST_SCRATCH_CANDIDATE_STATUS_LABEL_KEYS = {
   pending: 'modals.negativeConversion.dustCandidateStatus.pending',
 } as const;
 type NegativeLabDustCandidateDecision = 'accepted' | 'rejected';
+type NegativeLabDustCandidateFilter = 'accepted' | 'all' | 'pending' | 'rejected';
 type NegativeLabDustScratchFrame = ReturnType<typeof buildNegativeLabDustScratchReviewReport>['frames'][number];
 type NegativeLabDustScratchCandidate = NegativeLabDustScratchFrame['candidates'][number];
+const NEGATIVE_LAB_DUST_CANDIDATE_FILTERS = [
+  'all',
+  'pending',
+  'accepted',
+  'rejected',
+] satisfies Array<NegativeLabDustCandidateFilter>;
+const DUST_CANDIDATE_FILTER_LABEL_KEYS = {
+  accepted: 'modals.negativeConversion.dustCandidateFilter.accepted',
+  all: 'modals.negativeConversion.dustCandidateFilter.all',
+  pending: 'modals.negativeConversion.dustCandidateFilter.pending',
+  rejected: 'modals.negativeConversion.dustCandidateFilter.rejected',
+} as const satisfies Record<NegativeLabDustCandidateFilter, `modals.negativeConversion.${string}`>;
+const getDustCandidateFilterState = (
+  candidateId: string,
+  dustCandidateDecisionById: Record<string, NegativeLabDustCandidateDecision>,
+): Exclude<NegativeLabDustCandidateFilter, 'all'> => dustCandidateDecisionById[candidateId] ?? 'pending';
 type NegativeLabFrameHealthFilter = 'all' | NegativeLabFrameWarningSeverity;
 type NegativeLabFrameHealthSort = 'roll_order' | 'warning_severity';
 const NEGATIVE_LAB_FRAME_HEALTH_FILTERS = ['all', 'review', 'info', 'ok'] satisfies Array<NegativeLabFrameHealthFilter>;
@@ -619,6 +636,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [dustCandidateDecisionById, setDustCandidateDecisionById] = useState<
     Record<string, NegativeLabDustCandidateDecision>
   >({});
+  const [dustCandidateFilter, setDustCandidateFilter] = useState<NegativeLabDustCandidateFilter>('all');
   const [dustHealLayerByCandidateId, setDustHealLayerByCandidateId] = useState<
     Record<string, ReturnType<typeof buildDustCandidateHealLayer>>
   >({});
@@ -968,6 +986,34 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const dustScratchReviewReport = useMemo(
     () => buildNegativeLabDustScratchReviewReport(frameHealthReport, previewUrl !== null),
     [frameHealthReport, previewUrl],
+  );
+  const dustCandidateFilterCounts = useMemo(() => {
+    const counts: Record<NegativeLabDustCandidateFilter, number> = { accepted: 0, all: 0, pending: 0, rejected: 0 };
+    for (const frame of dustScratchReviewReport.frames) {
+      for (const candidate of frame.candidates) {
+        const filterState = getDustCandidateFilterState(candidate.candidateId, dustCandidateDecisionById);
+        counts.all += 1;
+        counts[filterState] += 1;
+      }
+    }
+    return counts;
+  }, [dustCandidateDecisionById, dustScratchReviewReport.frames]);
+  const visibleDustScratchReviewFrames = useMemo(
+    () =>
+      dustScratchReviewReport.frames
+        .map((frame) => ({
+          ...frame,
+          candidates:
+            dustCandidateFilter === 'all'
+              ? frame.candidates
+              : frame.candidates.filter(
+                  (candidate) =>
+                    getDustCandidateFilterState(candidate.candidateId, dustCandidateDecisionById) ===
+                    dustCandidateFilter,
+                ),
+        }))
+        .filter((frame) => dustCandidateFilter === 'all' || frame.candidates.length > 0),
+    [dustCandidateDecisionById, dustCandidateFilter, dustScratchReviewReport.frames],
   );
   const dustHealLayerCount = Object.keys(dustHealLayerByCandidateId).length;
   const bulkAcceptDustCandidateCount = useMemo(
@@ -3183,10 +3229,37 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       <UiText variant={TextVariants.small} className="text-text-tertiary">
         {t('modals.negativeConversion.dustScratchReviewHint')}
       </UiText>
+      <div
+        className="flex flex-wrap gap-1 text-[11px]"
+        data-active-filter={dustCandidateFilter}
+        data-testid="negative-lab-dust-candidate-filter"
+      >
+        {NEGATIVE_LAB_DUST_CANDIDATE_FILTERS.map((filter) => (
+          <button
+            className={cx(
+              'rounded border px-1.5 py-0.5 tabular-nums',
+              dustCandidateFilter === filter
+                ? 'border-yellow-200 bg-yellow-200 text-black'
+                : 'border-yellow-200/40 text-yellow-100',
+            )}
+            data-filter-count={dustCandidateFilterCounts[filter]}
+            data-filter-id={filter}
+            data-testid={`negative-lab-dust-candidate-filter-${filter}`}
+            key={filter}
+            onClick={() => {
+              setDustCandidateFilter(filter);
+            }}
+            type="button"
+          >
+            {t(DUST_CANDIDATE_FILTER_LABEL_KEYS[filter])} {dustCandidateFilterCounts[filter]}
+          </button>
+        ))}
+      </div>
       <div className="space-y-1">
-        {dustScratchReviewReport.frames.map((frame, index) => (
+        {visibleDustScratchReviewFrames.map((frame, index) => (
           <div
             className="grid grid-cols-[1fr_auto] gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
+            data-visible-candidate-count={frame.candidates.length}
             data-testid={`negative-lab-dust-review-row-${index}`}
             key={frame.frameId}
           >
@@ -3218,6 +3291,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                     <div
                       className="grid grid-cols-[1fr_auto_auto] items-center gap-1 rounded border border-yellow-300/30 bg-yellow-300/10 px-1.5 py-1 text-[11px] text-yellow-100"
                       data-candidate-confidence={candidate.confidence.toFixed(2)}
+                      data-candidate-filter-state={getDustCandidateFilterState(
+                        candidate.candidateId,
+                        dustCandidateDecisionById,
+                      )}
                       data-candidate-kind={candidate.kind}
                       data-candidate-review-decision={candidateDecision}
                       data-candidate-status={candidate.status}
@@ -3288,6 +3365,14 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             )}
           </div>
         ))}
+        {visibleDustScratchReviewFrames.length === 0 && (
+          <div
+            className="rounded-sm border border-yellow-200/20 bg-bg-secondary px-2 py-1 text-xs text-text-tertiary"
+            data-testid="negative-lab-dust-candidate-filter-empty"
+          >
+            {t('modals.negativeConversion.dustCandidateFilter.empty')}
+          </div>
+        )}
       </div>
     </div>
   );
