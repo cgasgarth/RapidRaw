@@ -151,8 +151,15 @@ const edgeDustHealLayer = buildDustCandidateHealLayer({
 const edgeDustHealSource = edgeDustHealLayer.retouchCloneSource;
 if (
   edgeDustHealSource === undefined ||
+  edgeDustHealSource.sourcePoint.x < 0 ||
+  edgeDustHealSource.sourcePoint.x > 1 ||
+  edgeDustHealSource.sourcePoint.y < 0 ||
+  edgeDustHealSource.sourcePoint.y > 1 ||
   edgeDustHealSource.sourcePoint.x >= edgeDustHealSource.targetPoint.x ||
-  edgeDustHealSource.sourcePoint.x === edgeDustHealSource.targetPoint.x
+  Math.hypot(
+    edgeDustHealSource.sourcePoint.x - edgeDustHealSource.targetPoint.x,
+    edgeDustHealSource.sourcePoint.y - edgeDustHealSource.targetPoint.y,
+  ) < 0.01
 ) {
   throw new Error('Negative Lab edge dust candidate did not choose a distinct in-bounds heal source.');
 }
