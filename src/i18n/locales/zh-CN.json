@@ -939,6 +939,7 @@
         "radius": "Radius",
         "regenerate": "Regenerate",
         "resetRegion": "Reset region",
+        "rowStatus": "{{status}} - Search {{searchMultiplier}}x - Seed {{seedValue}}",
         "revertOriginal": "Revert to original",
         "search": "Search",
         "seed": "Seed",

@@ -1132,10 +1132,11 @@ export default function LayerStackPanel({
                     data-remove-row-status={row.retouchRemoveSource.status ?? 'needs_regeneration'}
                     data-testid="layer-retouch-remove-row-status"
                   >
-                    {t(getRemoveStatusLabelKey(row.retouchRemoveSource.status))}
-                    {' | '}
-                    {t('editor.layers.removeSource.search')} {row.retouchRemoveSource.searchRadiusMultiplier}x{' | '}
-                    {t('editor.layers.removeSource.seed')} {row.retouchRemoveSource.seed}
+                    {t('editor.layers.removeSource.rowStatus', {
+                      searchMultiplier: row.retouchRemoveSource.searchRadiusMultiplier,
+                      seedValue: row.retouchRemoveSource.seed,
+                      status: t(getRemoveStatusLabelKey(row.retouchRemoveSource.status)),
+                    })}
                   </UiText>
                 )}
               </span>

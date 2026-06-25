@@ -42,6 +42,7 @@ const requiredRemoveSourceKeys = [
   'regenerate',
   'revertOriginal',
   'resetRegion',
+  'rowStatus',
   'search',
   'seed',
   'sourcePending',
