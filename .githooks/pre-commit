@@ -19,6 +19,18 @@ bun lint-staged --quiet --concurrent false
 bun run check:lint
 bun run check:external-editor-missing-launcher
 
+if printf '%s\n' "$staged_files" | grep -Eq '^(AGENTS\.md|docs/|.*\.md$)'; then
+  bun run docs:check
+fi
+
+if printf '%s\n' "$staged_files" | grep -Eq '^(src/|scripts/|tests/|eslint\.config\.js|package\.json|bun\.lock|tsconfig[^/]*\.json$)'; then
+  bun run check:lint-escapes
+fi
+
+if printf '%s\n' "$staged_files" | grep -Eq '^(src/|scripts/|tests/|knip\.jsonc|package\.json|bun\.lock|tsconfig[^/]*\.json$)'; then
+  bun run check:unused-deps
+fi
+
 if [ -n "$staged_files" ]; then
   macos_smoke_files="$(mktemp)"
   macos_smoke_outputs="$(mktemp)"
@@ -46,6 +58,8 @@ fi
 
 if printf '%s\n' "$staged_files" | grep -Eq '^(packages/rawengine-schema/|fixtures/|samples/)|(^|/)(package\.json|bun\.lock|tsconfig[^/]*\.json)$'; then
   bun run schema:check
+  bun run schema:command-bus
+  bun run schema:contract-gate
 fi
 
 if printf '%s\n' "$staged_files" | grep -Eq '^(src-tauri/.*\.rs|src-tauri/Cargo\.(toml|lock)|\.cargo/.*|rust-toolchain\.toml)$'; then
@@ -56,8 +70,7 @@ if printf '%s\n' "$staged_files" | grep -Eq '^(src-tauri/.*\.rs|src-tauri/Cargo\
   bun run check:rust:test
 fi
 
-if printf '%s\n' "$staged_files" | grep -Eq '^\.github/workflows/.*\.ya?ml$'; then
-  bun run check:actions:lint
-  bun run check:workflow-policy
+if printf '%s\n' "$staged_files" | grep -Eq '^(\.github/|tests/integration/checks/check-(actions|workflow|compact|rust-feature|schema-contract)|scripts/compact-output\.ts|scripts/run-compact-command\.ts|scripts/run-compact-checks\.ts)'; then
+  bun run check:actions
   bun run check:action-pins
 fi
