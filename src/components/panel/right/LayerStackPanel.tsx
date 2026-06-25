@@ -1226,6 +1226,8 @@ export default function LayerStackPanel({
               </UiText>
               {activeRow.retouchCloneSource.candidateProvenance !== undefined && (
                 <div
+                  data-retouch-candidate-source-label={`${activeRow.retouchCloneSource.sourcePoint.x.toFixed(3)},${activeRow.retouchCloneSource.sourcePoint.y.toFixed(3)}`}
+                  data-retouch-candidate-target-label={`${activeRow.retouchCloneSource.targetPoint.x.toFixed(3)},${activeRow.retouchCloneSource.targetPoint.y.toFixed(3)}`}
                   className="mt-2 rounded-md border border-surface bg-surface/60 px-2 py-1.5"
                   data-testid="layer-retouch-candidate-provenance"
                 >
@@ -1244,6 +1246,21 @@ export default function LayerStackPanel({
                     {Math.round(activeRow.retouchCloneSource.candidateProvenance.confidence * 100)}
                     {'% · '}
                     {activeRow.retouchCloneSource.candidateProvenance.sourceFrameId}
+                  </UiText>
+                  <UiText
+                    variant={TextVariants.small}
+                    className="block truncate tabular-nums text-text-tertiary"
+                    data-testid="layer-retouch-candidate-geometry"
+                  >
+                    {t('editor.layers.retouchSource.targetX')}/{t('editor.layers.retouchSource.targetY')}
+                    {': '}
+                    {activeRow.retouchCloneSource.targetPoint.x.toFixed(3)},{' '}
+                    {activeRow.retouchCloneSource.targetPoint.y.toFixed(3)}
+                    {' · '}
+                    {t('editor.layers.retouchSource.sourceX')}/{t('editor.layers.retouchSource.sourceY')}
+                    {': '}
+                    {activeRow.retouchCloneSource.sourcePoint.x.toFixed(3)},{' '}
+                    {activeRow.retouchCloneSource.sourcePoint.y.toFixed(3)}
                   </UiText>
                 </div>
               )}
