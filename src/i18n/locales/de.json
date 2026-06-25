@@ -2428,6 +2428,7 @@
       "zoomOutTooltip": "Verkleinern"
     },
     "negativeConversion": {
+      "acceptAllDustCandidates": "Accept all dust ({{candidateCount}})",
       "acceptBaseSample": "Accept sample",
       "acceptBatchPlan": "Accept batch plan",
       "acceptDetectedCrop": "Detected",

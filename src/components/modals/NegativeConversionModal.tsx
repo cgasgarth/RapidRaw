@@ -970,6 +970,20 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     [frameHealthReport, previewUrl],
   );
   const dustHealLayerCount = Object.keys(dustHealLayerByCandidateId).length;
+  const bulkAcceptDustCandidateCount = useMemo(
+    () =>
+      dustScratchReviewReport.frames.reduce(
+        (count, frame) =>
+          count +
+          frame.candidates.filter(
+            (candidate) =>
+              candidate.kind === 'dust_spot' &&
+              (dustCandidateDecisionById[candidate.candidateId] ?? candidate.status) !== 'accepted',
+          ).length,
+        0,
+      ),
+    [dustCandidateDecisionById, dustScratchReviewReport.frames],
+  );
   const resolveDustHealImageSize = (frameId: string) => {
     const sourcePath = frameHealthReport.frames.find((frame) => frame.frameId === frameId)?.sourcePath ?? null;
     if (
@@ -1005,6 +1019,16 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     });
     setDustHealLayerByCandidateId((previous) => ({ ...previous, [candidate.candidateId]: healLayer }));
     setDustCandidateDecisionById((previous) => ({ ...previous, [candidate.candidateId]: 'accepted' }));
+  };
+  const handleAcceptAllDustCandidates = () => {
+    for (const frame of dustScratchReviewReport.frames) {
+      for (const candidate of frame.candidates) {
+        const candidateDecision = dustCandidateDecisionById[candidate.candidateId] ?? candidate.status;
+        if (candidate.kind === 'dust_spot' && candidateDecision !== 'accepted') {
+          handleAcceptDustCandidate(frame, candidate);
+        }
+      }
+    }
   };
   const handleRejectDustCandidate = (candidate: NegativeLabDustScratchCandidate) => {
     setDustHealLayerByCandidateId((previous) => {
@@ -3122,6 +3146,16 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-dust-heal-layer-count">
             {t('modals.negativeConversion.dustHealLayerCount', { count: dustHealLayerCount })}
           </span>
+          <button
+            className="rounded border border-yellow-200/40 px-1.5 py-0.5 text-yellow-100 disabled:cursor-not-allowed disabled:opacity-40"
+            data-bulk-accept-count={bulkAcceptDustCandidateCount}
+            data-testid="negative-lab-accept-all-dust-candidates"
+            disabled={bulkAcceptDustCandidateCount === 0}
+            onClick={handleAcceptAllDustCandidates}
+            type="button"
+          >
+            {t('modals.negativeConversion.acceptAllDustCandidates', { candidateCount: bulkAcceptDustCandidateCount })}
+          </button>
         </div>
       </div>
       <UiText variant={TextVariants.small} className="text-text-tertiary">
