@@ -227,7 +227,7 @@ pub(crate) fn raw_processing_settings_for_adjustments(
 
 pub(crate) fn raw_processing_mode_cache_key(source_path: &str, settings: &AppSettings) -> String {
     format!(
-        "{}::raw-processing-mode={}",
+        "{}::raw-processing-mode={}::camera-profile-resolver=1",
         source_path,
         normalize_raw_processing_mode(settings.raw_processing_mode.as_deref())
     )
@@ -988,7 +988,7 @@ mod tests {
         assert_eq!(resolved.raw_preprocessing_sharpening, Some(0.42));
         assert_eq!(
             raw_processing_mode_cache_key("/tmp/image.arw", &resolved),
-            "/tmp/image.arw::raw-processing-mode=maximum"
+            "/tmp/image.arw::raw-processing-mode=maximum::camera-profile-resolver=1"
         );
 
         let inherited =
@@ -996,7 +996,7 @@ mod tests {
         assert_eq!(inherited.raw_processing_mode.as_deref(), Some("fast"));
         assert_eq!(
             raw_processing_mode_cache_key("/tmp/image.arw", &inherited),
-            "/tmp/image.arw::raw-processing-mode=fast"
+            "/tmp/image.arw::raw-processing-mode=fast::camera-profile-resolver=1"
         );
     }
 

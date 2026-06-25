@@ -9,9 +9,12 @@ use rawler::{
     rawimage::{RawImage, RawImageData, RawPhotometricInterpretation},
     rawsource::RawSource,
 };
-use std::sync::{
-    Arc,
-    atomic::{AtomicUsize, Ordering},
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -619,6 +622,128 @@ fn normalize_4x3(matrix: [[f32; 3]; 4]) -> [[f32; 3]; 4] {
     result
 }
 
+fn illuminant_cct_kelvin(illuminant: Illuminant) -> Option<f32> {
+    match illuminant {
+        Illuminant::A | Illuminant::Tungsten | Illuminant::IsoStudioTungsten => Some(2_856.0),
+        Illuminant::D50 => Some(5_003.0),
+        Illuminant::D55 => Some(5_503.0),
+        Illuminant::Daylight | Illuminant::FineWeather | Illuminant::Flash | Illuminant::D65 => {
+            Some(6_504.0)
+        }
+        Illuminant::CloudyWeather | Illuminant::D75 => Some(7_504.0),
+        Illuminant::Shade => Some(8_000.0),
+        _ => None,
+    }
+}
+
+fn valid_color_matrix(matrix: &[f32]) -> bool {
+    !matrix.is_empty()
+        && matrix.len().is_multiple_of(3)
+        && matrix.iter().all(|value| value.is_finite())
+}
+
+fn estimate_scene_cct_from_wb(wb: [f32; 4]) -> Option<f32> {
+    let [red, _green, blue, _extra] = wb;
+    if !red.is_finite() || !blue.is_finite() || red <= f32::EPSILON || blue <= f32::EPSILON {
+        return None;
+    }
+
+    let blue_to_red = (blue / red).clamp(0.44, 2.28);
+    Some((6_504.0 / blue_to_red).clamp(2_856.0, 8_000.0))
+}
+
+fn interpolation_weight_for_cct(target_cct: f32, warm_cct: f32, cool_cct: f32) -> f32 {
+    if (cool_cct - warm_cct).abs() <= f32::EPSILON {
+        return 0.0;
+    }
+
+    let inverse_target = 1.0 / target_cct;
+    let inverse_warm = 1.0 / warm_cct;
+    let inverse_cool = 1.0 / cool_cct;
+    ((inverse_target - inverse_warm) / (inverse_cool - inverse_warm)).clamp(0.0, 1.0)
+}
+
+fn interpolate_color_matrix(warm: &[f32], cool: &[f32], cool_weight: f32) -> Vec<f32> {
+    warm.iter()
+        .zip(cool.iter())
+        .map(|(warm_value, cool_value)| {
+            warm_value.mul_add(1.0 - cool_weight, cool_value * cool_weight)
+        })
+        .collect()
+}
+
+fn select_camera_color_matrix(
+    color_matrices: &HashMap<Illuminant, Vec<f32>>,
+    wb: [f32; 4],
+) -> Option<Vec<f32>> {
+    let d65 = color_matrices
+        .get(&Illuminant::D65)
+        .filter(|matrix| valid_color_matrix(matrix));
+
+    let mut candidates: Vec<(Illuminant, f32, &[f32])> = color_matrices
+        .iter()
+        .filter(|(_illuminant, matrix)| valid_color_matrix(matrix))
+        .filter_map(|(illuminant, matrix)| {
+            illuminant_cct_kelvin(*illuminant).map(|cct| (*illuminant, cct, matrix.as_slice()))
+        })
+        .collect();
+
+    candidates.sort_by(|left, right| {
+        left.1
+            .total_cmp(&right.1)
+            .then_with(|| left.0.cmp(&right.0))
+    });
+
+    let Some(target_cct) = estimate_scene_cct_from_wb(wb) else {
+        return d65.cloned().or_else(|| {
+            candidates
+                .first()
+                .map(|(_illuminant, _cct, matrix)| (*matrix).to_vec())
+        });
+    };
+
+    if candidates.len() >= 2 {
+        let warm = candidates
+            .iter()
+            .rev()
+            .find(|(_illuminant, cct, matrix)| {
+                *cct <= target_cct && matrix.len() == candidates[0].2.len()
+            })
+            .copied()
+            .unwrap_or(candidates[0]);
+        let cool = candidates
+            .iter()
+            .find(|(_illuminant, cct, matrix)| *cct >= target_cct && matrix.len() == warm.2.len())
+            .copied()
+            .unwrap_or(*candidates.last()?);
+
+        if warm.0 != cool.0 {
+            let cool_weight = interpolation_weight_for_cct(target_cct, warm.1, cool.1);
+            return Some(interpolate_color_matrix(warm.2, cool.2, cool_weight));
+        }
+
+        return Some(warm.2.to_vec());
+    }
+
+    d65.cloned().or_else(|| {
+        candidates
+            .first()
+            .map(|(_illuminant, _cct, matrix)| (*matrix).to_vec())
+    })
+}
+
+fn apply_dual_illuminant_camera_profile(raw_image: &mut RawImage) {
+    let wb = if raw_image.wb_coeffs[0].is_nan() {
+        [1.0, 1.0, 1.0, 1.0]
+    } else {
+        raw_image.wb_coeffs
+    };
+    if let Some(color_matrix) = select_camera_color_matrix(&raw_image.color_matrix, wb) {
+        raw_image.color_matrix.clear();
+        raw_image.color_matrix.insert(Illuminant::D65, color_matrix);
+    }
+}
+
 fn pseudo_inverse_4x3(matrix: [[f32; 3]; 4]) -> [[f32; 4]; 3] {
     let mut tmp: [[f32; 3]; 4] = [[0.0; 3]; 4];
     let mut result: [[f32; 4]; 3] = [[0.0; 4]; 3];
@@ -682,18 +807,14 @@ fn clip_euclidean_norm_avg(pix: [f32; 3]) -> [f32; 3] {
 }
 
 fn calibrate_three_color(raw_image: &RawImage, pixels: Color2D<f32, 3>) -> Color2D<f32, 3> {
-    let Some((_illuminant, color_matrix)) = raw_image
-        .color_matrix
-        .iter()
-        .find(|(illuminant, _)| **illuminant == Illuminant::D65)
-        .or_else(|| raw_image.color_matrix.iter().next())
-    else {
+    let wb = if raw_image.wb_coeffs[0].is_nan() {
+        [1.0, 1.0, 1.0, 1.0]
+    } else {
+        raw_image.wb_coeffs
+    };
+    let Some(color_matrix) = select_camera_color_matrix(&raw_image.color_matrix, wb) else {
         return pixels;
     };
-
-    if color_matrix.len() % 3 != 0 {
-        return pixels;
-    }
 
     let mut xyz_to_cam = [[0.0; 3]; 4];
     let components = (color_matrix.len() / 3).min(4);
@@ -702,12 +823,6 @@ fn calibrate_three_color(raw_image: &RawImage, pixels: Color2D<f32, 3>) -> Color
             xyz_to_cam[i][j] = color_matrix[i * 3 + j];
         }
     }
-
-    let wb = if raw_image.wb_coeffs[0].is_nan() {
-        [1.0, 1.0, 1.0, 1.0]
-    } else {
-        raw_image.wb_coeffs
-    };
     let srgb_to_xyz_d65 = [
         [0.412_456_4, 0.357_576_1, 0.180_437_5],
         [0.212_672_9, 0.715_152_2, 0.072_175],
@@ -914,6 +1029,10 @@ fn develop_internal_with_options(
             highlight_reconstruction_report.reconstructed_pixels,
             highlight_reconstruction_report.reconstructed_channels
         );
+    }
+
+    if apply_calibration {
+        apply_dual_illuminant_camera_profile(&mut raw_image);
     }
 
     for level in raw_image.whitelevel.0.iter_mut() {
@@ -1135,6 +1254,73 @@ mod tests {
             white_levels,
             ..bayer_context(width, height, (0, 0, width, height))
         }
+    }
+
+    #[test]
+    fn scene_cct_from_wb_tracks_blue_red_ratio() {
+        let daylight = estimate_scene_cct_from_wb([1.0, 1.0, 1.0, f32::NAN]).unwrap();
+        let tungsten = estimate_scene_cct_from_wb([1.0, 1.0, 2.28, f32::NAN]).unwrap();
+
+        assert!((daylight - 6_504.0).abs() < 0.1);
+        assert!((tungsten - 2_856.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn color_matrix_interpolation_uses_inverse_temperature() {
+        let cool_weight = interpolation_weight_for_cct(4_000.0, 2_856.0, 6_504.0);
+
+        assert!(cool_weight > 0.0);
+        assert!(cool_weight < 1.0);
+        assert!(
+            (cool_weight - 0.509_907_84).abs() < 0.000_001,
+            "unexpected cool weight {cool_weight}"
+        );
+    }
+
+    #[test]
+    fn interpolates_dual_illuminant_matrices_for_warm_white_balance() {
+        let warm = vec![0.80, -0.20, 0.10, -0.30, 1.20, 0.20, -0.04, 0.08, 0.66];
+        let cool = vec![0.60, -0.10, 0.04, -0.20, 1.05, 0.14, -0.02, 0.05, 0.52];
+        let target_cct = estimate_scene_cct_from_wb([1.0, 1.0, 1.5, f32::NAN]).unwrap();
+        let cool_weight = interpolation_weight_for_cct(target_cct, 2_856.0, 6_504.0);
+        let interpolated = interpolate_color_matrix(&warm, &cool, cool_weight);
+
+        assert_eq!(interpolated.len(), warm.len());
+        assert!(interpolated[0] < warm[0]);
+        assert!(interpolated[0] > cool[0]);
+        assert!(interpolated[4] < warm[4]);
+        assert!(interpolated[4] > cool[4]);
+    }
+
+    #[test]
+    fn camera_matrix_selection_interpolates_a_to_d65() {
+        let warm = vec![0.80, -0.20, 0.10, -0.30, 1.20, 0.20, -0.04, 0.08, 0.66];
+        let cool = vec![0.60, -0.10, 0.04, -0.20, 1.05, 0.14, -0.02, 0.05, 0.52];
+        let mut color_matrices = HashMap::new();
+        color_matrices.insert(Illuminant::A, warm.clone());
+        color_matrices.insert(Illuminant::D65, cool.clone());
+
+        let selected =
+            select_camera_color_matrix(&color_matrices, [1.0, 1.0, 1.5, f32::NAN]).unwrap();
+
+        assert_eq!(selected.len(), warm.len());
+        assert!(selected[0] < warm[0]);
+        assert!(selected[0] > cool[0]);
+        assert_ne!(selected, cool);
+    }
+
+    #[test]
+    fn camera_matrix_selection_keeps_d65_fallback_when_wb_is_invalid() {
+        let warm = vec![0.80, -0.20, 0.10, -0.30, 1.20, 0.20, -0.04, 0.08, 0.66];
+        let cool = vec![0.60, -0.10, 0.04, -0.20, 1.05, 0.14, -0.02, 0.05, 0.52];
+        let mut color_matrices = HashMap::new();
+        color_matrices.insert(Illuminant::A, warm);
+        color_matrices.insert(Illuminant::D65, cool.clone());
+
+        let selected =
+            select_camera_color_matrix(&color_matrices, [f32::NAN, 1.0, 1.0, f32::NAN]).unwrap();
+
+        assert_eq!(selected, cool);
     }
 
     #[test]
