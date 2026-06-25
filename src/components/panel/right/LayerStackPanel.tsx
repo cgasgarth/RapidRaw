@@ -567,6 +567,13 @@ export default function LayerStackPanel({
     delete nextSource.resolvedSourcePoint;
     updateLayerRetouchRemoveSource(activeRow.id, nextSource);
   };
+  const revertActiveRemoveLayerToOriginal = () => {
+    if (!activeRow || activeRow.isBase || activeRow.isGroupHeader || activeRow.retouchRemoveSource === null) return;
+    const nextSource = structuredClone(activeRow.retouchRemoveSource);
+    nextSource.status = 'fallback_unchanged';
+    delete nextSource.resolvedSourcePoint;
+    updateLayerRetouchRemoveSource(activeRow.id, nextSource);
+  };
   const resetActiveRemoveRegion = () => {
     if (!activeRow || activeRow.isBase || activeRow.isGroupHeader || activeRow.retouchRemoveSource === null) return;
     const nextSource = structuredClone(activeRow.retouchRemoveSource);
@@ -1479,6 +1486,20 @@ export default function LayerStackPanel({
                     type="button"
                   >
                     {t('editor.layers.removeSource.resetRegion')}
+                  </button>
+                  <button
+                    className={cx(
+                      'rounded-md border border-surface bg-surface px-2 py-1 text-xs text-text-secondary',
+                      'hover:bg-card-active hover:text-text-primary',
+                    )}
+                    data-remove-revert-radius-px={activeRow.retouchRemoveSource.radiusPx ?? 48}
+                    data-remove-revert-search-radius-multiplier={activeRow.retouchRemoveSource.searchRadiusMultiplier}
+                    data-remove-revert-seed={activeRow.retouchRemoveSource.seed}
+                    data-testid="layer-retouch-remove-revert-original"
+                    onClick={revertActiveRemoveLayerToOriginal}
+                    type="button"
+                  >
+                    {t('editor.layers.removeSource.revertOriginal')}
                   </button>
                   <button
                     className={cx(
