@@ -23,6 +23,10 @@ if printf '%s\n' "$staged_files" | grep -Eq '^(AGENTS\.md|docs/|.*\.md$)'; then
   bun run docs:check
 fi
 
+if printf '%s\n' "$staged_files" | grep -Eq '^(src/|i18next\.config\.ts$|package\.json$|bun\.lock$)'; then
+  bun run check:i18n
+fi
+
 if printf '%s\n' "$staged_files" | grep -Eq '^(src/|scripts/|tests/|eslint\.config\.js|package\.json|bun\.lock|tsconfig[^/]*\.json$)'; then
   bun run check:lint-escapes
 fi
