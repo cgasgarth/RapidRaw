@@ -567,6 +567,17 @@ export default function LayerStackPanel({
     delete nextSource.resolvedSourcePoint;
     updateLayerRetouchRemoveSource(activeRow.id, nextSource);
   };
+  const resetActiveRemoveRegion = () => {
+    if (!activeRow || activeRow.isBase || activeRow.isGroupHeader || activeRow.retouchRemoveSource === null) return;
+    const nextSource = structuredClone(activeRow.retouchRemoveSource);
+    nextSource.featherRadiusPx = 24;
+    nextSource.radiusPx = 48;
+    nextSource.searchRadiusMultiplier = 4;
+    nextSource.seed = 0;
+    nextSource.status = 'needs_regeneration';
+    delete nextSource.resolvedSourcePoint;
+    updateLayerRetouchRemoveSource(activeRow.id, nextSource, true, { x: 0.5, y: 0.5 });
+  };
   const updateGroupOpacity = (groupId: string, opacity: number) => {
     applyLayerStack(setLayerGroupOpacity(masks, groupId, opacity), `group:${groupId}`);
   };
@@ -1454,17 +1465,33 @@ export default function LayerStackPanel({
                     })}
                   </UiText>
                 </span>
-                <button
-                  className={cx(
-                    'shrink-0 rounded-md border border-surface bg-surface px-2 py-1 text-xs text-text-secondary',
-                    'hover:bg-card-active hover:text-text-primary',
-                  )}
-                  data-testid="layer-retouch-remove-regenerate"
-                  onClick={regenerateActiveRemoveLayer}
-                  type="button"
-                >
-                  {t('editor.layers.removeSource.regenerate')}
-                </button>
+                <span className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                  <button
+                    className={cx(
+                      'rounded-md border border-surface bg-surface px-2 py-1 text-xs text-text-secondary',
+                      'hover:bg-card-active hover:text-text-primary',
+                    )}
+                    data-remove-reset-radius-px={activeRow.retouchRemoveSource.radiusPx ?? 48}
+                    data-remove-reset-search-radius-multiplier={activeRow.retouchRemoveSource.searchRadiusMultiplier}
+                    data-remove-reset-seed={activeRow.retouchRemoveSource.seed}
+                    data-testid="layer-retouch-remove-reset-region"
+                    onClick={resetActiveRemoveRegion}
+                    type="button"
+                  >
+                    {t('editor.layers.removeSource.resetRegion')}
+                  </button>
+                  <button
+                    className={cx(
+                      'rounded-md border border-surface bg-surface px-2 py-1 text-xs text-text-secondary',
+                      'hover:bg-card-active hover:text-text-primary',
+                    )}
+                    data-testid="layer-retouch-remove-regenerate"
+                    onClick={regenerateActiveRemoveLayer}
+                    type="button"
+                  >
+                    {t('editor.layers.removeSource.regenerate')}
+                  </button>
+                </span>
               </div>
               <div
                 className="mt-2 grid grid-cols-1 gap-2 rounded-md border border-surface bg-surface/60 p-2"

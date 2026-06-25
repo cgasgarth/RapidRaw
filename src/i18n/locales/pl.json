@@ -1008,6 +1008,7 @@
         },
         "radius": "Radius",
         "regenerate": "Regenerate",
+        "resetRegion": "Reset region",
         "search": "Search",
         "seed": "Seed",
         "sourcePending": "Source pending",
