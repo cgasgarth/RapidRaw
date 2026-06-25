@@ -13,6 +13,7 @@ import {
   dispatchLayerStackCommand,
   layerMaskCommandEnvelopeV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
+  type LayerBlendResolvedRemoveSource,
   type LayerScopedToneAdjustmentV1,
   type LayerMaskCommandEnvelopeV1,
   type LayerMaskMutationResultV1,
@@ -86,6 +87,13 @@ export interface LayerStackCommandBridgeResult {
   sidecar: LayerStackSidecarV1;
 }
 
+export interface LayerStackResolvedRemoveSourceApplication {
+  appliedLayerIds: Array<string>;
+  graphRevision: string;
+  masks: Array<MaskContainer>;
+  sidecar: LayerStackSidecarV1;
+}
+
 const bridgeContextSchema = z
   .object({
     graphRevision: z.string().trim().min(1),
@@ -152,6 +160,63 @@ export function applyLayerStackCommandBridgeOperation(
     graphRevision: dispatched.sidecar.graphRevision,
     masks: materializeMasksFromSidecar(dispatched.sidecar.layers, masks, operation),
     sidecar: dispatched.sidecar,
+  };
+}
+
+export function applyResolvedRemoveSourcesToLayerStack(
+  masks: ReadonlyArray<MaskContainer>,
+  resolvedRemoveSources: ReadonlyArray<LayerBlendResolvedRemoveSource>,
+  context: LayerStackCommandBridgeContext,
+): LayerStackResolvedRemoveSourceApplication {
+  let currentMasks = [...masks];
+  let currentContext = bridgeContextSchema.parse(context);
+  let sidecar = buildLayerStackSidecarFromMasks(currentMasks, currentContext);
+  const appliedLayerIds: Array<string> = [];
+
+  for (const resolvedSource of resolvedRemoveSources) {
+    const currentLayer = currentMasks.find((mask) => mask.id === resolvedSource.layerId);
+    if (currentLayer?.retouchRemoveSource === undefined) continue;
+    if (currentLayer.retouchRemoveSource.targetMaskId !== resolvedSource.targetMaskId) continue;
+
+    const nextSource = {
+      ...currentLayer.retouchRemoveSource,
+      status: resolvedSource.status,
+    } satisfies RetouchRemoveSource;
+    if (resolvedSource.status === 'ready') {
+      if (resolvedSource.resolvedSourcePoint === undefined) continue;
+      nextSource.resolvedSourcePoint = resolvedSource.resolvedSourcePoint;
+    } else {
+      delete nextSource.resolvedSourcePoint;
+    }
+    if (JSON.stringify(currentLayer.retouchRemoveSource) === JSON.stringify(nextSource)) continue;
+
+    const result = applyLayerStackCommandBridgeOperation(
+      currentMasks,
+      {
+        layerId: resolvedSource.layerId,
+        retouchRemoveSource: nextSource,
+        type: 'updateRetouchRemoveSource',
+      },
+      {
+        ...currentContext,
+        operationId: `${currentContext.operationId}_resolve_${operationIdPart(resolvedSource.layerId)}`,
+      },
+    );
+    currentMasks = result.masks;
+    currentContext = {
+      ...currentContext,
+      graphRevision: result.graphRevision,
+      operationId: `${currentContext.operationId}_resolved`,
+    };
+    sidecar = result.sidecar;
+    appliedLayerIds.push(resolvedSource.layerId);
+  }
+
+  return {
+    appliedLayerIds,
+    graphRevision: currentContext.graphRevision,
+    masks: currentMasks,
+    sidecar,
   };
 }
 
@@ -290,6 +355,10 @@ function buildLayerStackCommand(
         },
       });
   }
+}
+
+function operationIdPart(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_]+/gu, '_').slice(0, 64) || 'layer';
 }
 
 function toMoveParameters(
