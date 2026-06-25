@@ -25,6 +25,7 @@ import {
   LAYER_BLEND_MODES,
   type LayerBlendMode,
   type MaskContainer,
+  type RetouchCandidateProvenance,
   type RetouchCloneSource,
   type RetouchRemoveSource,
 } from '../../../utils/adjustments';
@@ -171,6 +172,17 @@ function getRemoveStatusLabelKey(status: RetouchRemoveSource['status']) {
     case 'needs_regeneration':
     case undefined:
       return 'editor.layers.removeSource.status.needs_regeneration';
+  }
+}
+
+function getCandidateStatusLabelKey(status: RetouchCandidateProvenance['statusAtAcceptance']) {
+  switch (status) {
+    case 'acknowledged':
+      return 'modals.negativeConversion.dustCandidateStatus.acknowledged';
+    case 'ignored':
+      return 'modals.negativeConversion.dustCandidateStatus.ignored';
+    case 'pending':
+      return 'modals.negativeConversion.dustCandidateStatus.pending';
   }
 }
 
@@ -847,6 +859,8 @@ export default function LayerStackPanel({
               data-group-visible-state={row.isGroupHeader ? row.visibleState : ''}
               data-grouped-layer={String(row.isGroupedLayer)}
               data-layer-row-id={row.id}
+              data-retouch-candidate-id={row.retouchCloneSource?.candidateProvenance?.candidateId ?? ''}
+              data-retouch-candidate-origin={row.retouchCloneSource?.candidateProvenance?.origin ?? ''}
               data-retouch-clone-source={row.retouchCloneSourceLabel ?? ''}
               data-retouch-remove-source={row.retouchRemoveSourceLabel ?? ''}
               data-testid={
@@ -1055,6 +1069,14 @@ export default function LayerStackPanel({
           {activeRow.retouchCloneSource !== null && (
             <div
               className="rounded-md border border-surface bg-bg-secondary p-2"
+              data-retouch-candidate-confidence={activeRow.retouchCloneSource.candidateProvenance?.confidence ?? ''}
+              data-retouch-candidate-id={activeRow.retouchCloneSource.candidateProvenance?.candidateId ?? ''}
+              data-retouch-candidate-kind={activeRow.retouchCloneSource.candidateProvenance?.candidateKind ?? ''}
+              data-retouch-candidate-origin={activeRow.retouchCloneSource.candidateProvenance?.origin ?? ''}
+              data-retouch-candidate-source-frame-id={
+                activeRow.retouchCloneSource.candidateProvenance?.sourceFrameId ?? ''
+              }
+              data-retouch-candidate-status={activeRow.retouchCloneSource.candidateProvenance?.statusAtAcceptance ?? ''}
               data-retouch-feather-radius-px={activeRow.retouchCloneSource.featherRadiusPx ?? ''}
               data-retouch-mode={activeRow.retouchMode ?? 'clone'}
               data-retouch-radius-px={activeRow.retouchCloneSource.radiusPx ?? ''}
@@ -1079,6 +1101,29 @@ export default function LayerStackPanel({
                   source: activeRow.retouchCloneSourceLabel,
                 })}
               </UiText>
+              {activeRow.retouchCloneSource.candidateProvenance !== undefined && (
+                <div
+                  className="mt-2 rounded-md border border-surface bg-surface/60 px-2 py-1.5"
+                  data-testid="layer-retouch-candidate-provenance"
+                >
+                  <UiText variant={TextVariants.small} className="block truncate text-text-tertiary">
+                    {t(
+                      activeRow.retouchCloneSource.candidateProvenance.candidateKind === 'dust_spot'
+                        ? 'modals.negativeConversion.dustCandidate.dustSpot'
+                        : 'modals.negativeConversion.dustCandidate.emulsionScratch',
+                    )}
+                    {' · '}
+                    {t(getCandidateStatusLabelKey(activeRow.retouchCloneSource.candidateProvenance.statusAtAcceptance))}
+                  </UiText>
+                  <UiText variant={TextVariants.small} className="block truncate tabular-nums text-text-primary">
+                    {activeRow.retouchCloneSource.candidateProvenance.candidateId}
+                    {' · '}
+                    {Math.round(activeRow.retouchCloneSource.candidateProvenance.confidence * 100)}
+                    {'% · '}
+                    {activeRow.retouchCloneSource.candidateProvenance.sourceFrameId}
+                  </UiText>
+                </div>
+              )}
               <div className="mt-2 grid grid-cols-2 gap-2">
                 {(
                   [
