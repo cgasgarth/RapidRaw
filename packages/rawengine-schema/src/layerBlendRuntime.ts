@@ -5,7 +5,7 @@ import {
   layerMaskCloneSourceV1Schema,
   layerMaskRemoveSourceV1Schema,
 } from './rawEngineSchemas.js';
-import { resolveRemoveSamplingPlan } from './retouchRemoveRuntime.js';
+import { removeSourcePointToNormalized, resolveRemoveSamplingPlan } from './retouchRemoveRuntime.js';
 
 export const layerRgbPixelSchema = z
   .object({
@@ -74,10 +74,26 @@ export const layerBlendCoverageSchema = z
   })
   .strict();
 
+export const layerBlendResolvedRemoveSourceSchema = z
+  .object({
+    layerId: z.string().trim().min(1),
+    resolvedSourcePoint: z
+      .object({
+        x: z.number().min(0).max(1),
+        y: z.number().min(0).max(1),
+      })
+      .strict()
+      .optional(),
+    status: z.enum(['fallback_unchanged', 'ready']),
+    targetMaskId: z.string().trim().min(1),
+  })
+  .strict();
+
 export const layerBlendStackRenderSchema = z
   .object({
     coverageByLayer: z.array(layerBlendCoverageSchema),
     pixels: z.array(layerRgbPixelSchema).min(1),
+    resolvedRemoveSources: z.array(layerBlendResolvedRemoveSourceSchema),
   })
   .strict();
 
@@ -86,6 +102,7 @@ export type LayerBlendStackLayer = z.infer<typeof layerBlendStackLayerSchema>;
 export type LayerBlendStackInput = z.infer<typeof layerBlendStackInputSchema>;
 export type LayerBlendStackRender = z.infer<typeof layerBlendStackRenderSchema>;
 export type LayerBlendMode = LayerBlendStackLayer['blendMode'];
+export type LayerBlendResolvedRemoveSource = z.infer<typeof layerBlendResolvedRemoveSourceSchema>;
 
 const clamp01 = (value: number): number => {
   if (!Number.isFinite(value)) return 0;
@@ -274,6 +291,7 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
     r: clampByte(pixel.r),
   }));
   const coverageByLayer: LayerBlendStackRender['coverageByLayer'] = [];
+  const resolvedRemoveSources: LayerBlendStackRender['resolvedRemoveSources'] = [];
 
   for (const layer of parsedInput.layers) {
     const opacity = clamp01(layer.opacity);
@@ -292,6 +310,16 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
             removeSource: layer.retouchRemoveSource,
             width: parsedInput.width,
           });
+    if (layer.retouchRemoveSource !== undefined) {
+      resolvedRemoveSources.push({
+        layerId: layer.id,
+        ...(removePlan === null
+          ? {}
+          : { resolvedSourcePoint: removeSourcePointToNormalized(removePlan, parsedInput.width, parsedInput.height) }),
+        status: removePlan === null ? 'fallback_unchanged' : 'ready',
+        targetMaskId: layer.retouchRemoveSource.targetMaskId,
+      });
+    }
     const targetAnchorPoint =
       layer.retouchCloneSource === undefined
         ? removePlan === null
@@ -385,7 +413,7 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
     coverageByLayer.push({ id: layer.id, opacity, touchedPixels });
   }
 
-  return layerBlendStackRenderSchema.parse({ coverageByLayer, pixels });
+  return layerBlendStackRenderSchema.parse({ coverageByLayer, pixels, resolvedRemoveSources });
 }
 
 export const renderLayerPreviewStack = renderLayerBlendStack;
