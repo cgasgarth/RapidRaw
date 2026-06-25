@@ -2323,17 +2323,34 @@ const ImageCanvas = memo(
           ...prev,
           masks: prev.masks.map((mask: MaskContainer) => {
             if (mask.id !== layerId || mask.retouchCloneSource === undefined) return mask;
+            let syncedTargetMask = false;
+            const updatedSubMasks =
+              handle === 'targetPoint'
+                ? mask.subMasks.map((subMask: SubMask) => {
+                    if (subMask.type !== Mask.Radial || syncedTargetMask) return subMask;
+                    syncedTargetMask = true;
+                    return {
+                      ...subMask,
+                      parameters: {
+                        ...subMask.parameters,
+                        centerX: point.x * effectiveImageDimensions.width,
+                        centerY: point.y * effectiveImageDimensions.height,
+                      },
+                    };
+                  })
+                : mask.subMasks;
             return {
               ...mask,
               retouchCloneSource: {
                 ...mask.retouchCloneSource,
                 [handle]: point,
               },
+              subMasks: updatedSubMasks,
             };
           }),
         }));
       },
-      [setAdjustments],
+      [effectiveImageDimensions.height, effectiveImageDimensions.width, setAdjustments],
     );
 
     const handleRetouchHandleDragEnd = useCallback(
