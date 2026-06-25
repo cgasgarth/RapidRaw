@@ -65,6 +65,9 @@ mod private_decode_raw_proof;
 mod raw_open_edit_export_proof;
 mod raw_processing;
 #[cfg(all(test, feature = "tauri-test"))]
+mod retouch_clone_real_raw_proof;
+mod retouch_render;
+#[cfg(all(test, feature = "tauri-test"))]
 mod sr_real_raw_proof;
 mod tagging;
 mod tagging_utils;
@@ -564,6 +567,12 @@ fn process_preview_job(
         })
         .collect();
 
+    let retouched_processing_image = crate::retouch_render::apply_clone_retouch_layers(
+        processing_image_ref,
+        &adjustments_clone,
+        &mask_bitmaps,
+    );
+
     let is_raw = loaded_image.is_raw;
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
     let final_adjustments = get_all_adjustments_from_json(&adjustments_clone, is_raw, tm_override);
@@ -597,7 +606,7 @@ fn process_preview_job(
         crate::image_processing::process_and_get_dynamic_image_with_analytics(
             &context,
             &state,
-            processing_image_ref,
+            retouched_processing_image.as_ref(),
             render_input_hash,
             RenderRequest {
                 adjustments: final_adjustments,

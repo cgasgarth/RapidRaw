@@ -448,11 +448,16 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
     let denoised_image = apply_denoise_stage(transformed_image, js_adjustments);
     let deblurred_image = apply_deblur_stage(denoised_image.as_ref(), js_adjustments);
     let wavelet_image = apply_wavelet_detail_stage(deblurred_image.image.as_ref(), js_adjustments);
+    let retouched_image = crate::retouch_render::apply_clone_retouch_layers(
+        wavelet_image.as_ref(),
+        js_adjustments,
+        mask_bitmaps,
+    );
 
     process_and_get_dynamic_image(
         context,
         state,
-        wavelet_image.as_ref(),
+        retouched_image.as_ref(),
         unique_hash,
         RenderRequest {
             adjustments: all_adjustments,
