@@ -2659,6 +2659,10 @@ const ImageCanvas = memo(
               const targetPoint = retouchPointToCanvas(activeRetouchSource.targetPoint);
               const handleRadius = Math.max(6, Math.min(10, 7 / Math.max(0.75, transformState.scale)));
               const strokeWidth = Math.max(1.5, 2 / Math.max(0.75, transformState.scale));
+              const retouchRadius = (activeRetouchSource.radiusPx ?? 0) * imageRenderSize.scale;
+              const retouchFeatherRadius =
+                Math.max(0, (activeRetouchSource.radiusPx ?? 0) + (activeRetouchSource.featherRadiusPx ?? 0)) *
+                imageRenderSize.scale;
 
               return (
                 <div
@@ -2666,6 +2670,8 @@ const ImageCanvas = memo(
                   className="absolute"
                   data-retouch-handle-layer-id={activeRetouchLayer.id}
                   data-retouch-handle-mode={activeRetouchSource.retouchMode ?? 'clone'}
+                  data-retouch-handle-radius-px={activeRetouchSource.radiusPx ?? ''}
+                  data-retouch-handle-feather-radius-px={activeRetouchSource.featherRadiusPx ?? ''}
                   data-retouch-handle-source-x={activeRetouchSource.sourcePoint.x}
                   data-retouch-handle-source-y={activeRetouchSource.sourcePoint.y}
                   data-retouch-handle-target-x={activeRetouchSource.targetPoint.x}
@@ -2698,6 +2704,31 @@ const ImageCanvas = memo(
                             strokeScaleEnabled={false}
                             strokeWidth={strokeWidth}
                           />
+                          {retouchFeatherRadius > retouchRadius && (
+                            <Circle
+                              dash={[5, 5]}
+                              listening={false}
+                              radius={retouchFeatherRadius}
+                              stroke="#f8fafc"
+                              strokeOpacity={0.55}
+                              strokeScaleEnabled={false}
+                              strokeWidth={strokeWidth}
+                              x={targetPoint.x}
+                              y={targetPoint.y}
+                            />
+                          )}
+                          {retouchRadius > 0 && (
+                            <Circle
+                              listening={false}
+                              radius={retouchRadius}
+                              stroke="#f97316"
+                              strokeOpacity={0.8}
+                              strokeScaleEnabled={false}
+                              strokeWidth={strokeWidth}
+                              x={targetPoint.x}
+                              y={targetPoint.y}
+                            />
+                          )}
                           <Circle
                             dragBoundFunc={dragBoundRetouchHandle}
                             draggable
