@@ -44,6 +44,7 @@ fi
 
 if printf '%s\n' "$staged_files" | grep -Eq '^(src-tauri/.*\.rs|src-tauri/Cargo\.(toml|lock)|\.cargo/.*|rust-toolchain\.toml)$'; then
   bun run check:rust:fmt
+  bun run check:rust:platform-cfg-dead-code
   bun run check:rust:check
   bun run check:rust:clippy
   bun run check:rust:test

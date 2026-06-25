@@ -554,6 +554,7 @@
     "check:rust:fmt": "bun scripts/run-compact-command.ts --label rust:fmt --cwd src-tauri -- cargo fmt -p RapidRAW -- --check",
     "check:rust:check": "bun scripts/run-compact-command.ts --label rust:check --cwd src-tauri -- cargo check --locked --no-default-features --features required-ci",
     "check:rust:clippy": "bun scripts/run-compact-command.ts --label rust:clippy --cwd src-tauri -- cargo clippy --locked --all-targets --no-default-features --features required-ci -- -D warnings -W clippy::redundant_clone",
+    "check:rust:platform-cfg-dead-code": "bun tests/integration/checks/check-rust-platform-cfg-dead-code.ts",
     "schema:check": "bun scripts/run-compact-checks.ts --label schema:check schema:types schema:fixtures schema:samples schema:migrations check:schema-production-boundary",
     "schema:types": "bun scripts/run-compact-command.ts --label schema:types -- tsc -p packages/rawengine-schema/tsconfig.json --noEmit --pretty false",
     "schema:fixtures": "bun scripts/run-compact-command.ts --label schema:fixtures -- bun packages/rawengine-schema/scripts/check-samples.ts",
