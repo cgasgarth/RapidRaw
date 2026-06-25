@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { exportRecipeColorProfileV1Schema, exportRecipeRenderingIntentV1Schema } from './exportRecipeSchemas.js';
 
-export const exportColorEngineIdV1Schema = z.enum(['moxcms']);
+export const exportColorEngineIdV1Schema = z.enum(['lcms2', 'moxcms']);
 export const exportBlackPointCompensationStatusV1Schema = z.enum(['unsupported', 'supported']);
 
 export const exportColorCapabilityV1Schema = z
@@ -38,7 +38,7 @@ export const exportColorCapabilityCatalogV1Schema = z
 export type ExportColorCapabilityV1 = z.infer<typeof exportColorCapabilityV1Schema>;
 export type ExportColorCapabilityCatalogV1 = z.infer<typeof exportColorCapabilityCatalogV1Schema>;
 
-const MOXCMS_RENDERING_INTENTS: ExportColorCapabilityV1['renderingIntents'] = [
+const COLOR_MANAGED_RENDERING_INTENTS: ExportColorCapabilityV1['renderingIntents'] = [
   'relativeColorimetric',
   'perceptual',
   'saturation',
@@ -54,13 +54,13 @@ const MOXCMS_SUPPORTED_PROFILES: Array<ExportColorCapabilityV1['colorProfile']> 
 
 export const MOXCMS_EXPORT_COLOR_CAPABILITIES_V1 = exportColorCapabilityCatalogV1Schema.parse({
   capabilities: MOXCMS_SUPPORTED_PROFILES.map((colorProfile) => ({
-    blackPointCompensation: 'unsupported',
+    blackPointCompensation: colorProfile === 'srgb' ? 'unsupported' : 'supported',
     colorProfile,
     engine: 'moxcms',
-    renderingIntents: MOXCMS_RENDERING_INTENTS,
+    renderingIntents: COLOR_MANAGED_RENDERING_INTENTS,
     runtimeSupportNotes: [
       'Rendering intent is passed to moxcms transform options.',
-      'Black-point compensation remains disabled until the CMM exposes an applied BPC option.',
+      'LittleCMS enables black-point compensation for TIFF relative colorimetric wide-gamut exports.',
     ],
   })),
   engine: 'moxcms',

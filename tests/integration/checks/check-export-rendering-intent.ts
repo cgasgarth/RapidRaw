@@ -51,10 +51,11 @@ for (const marker of [
 }
 
 for (const marker of [
+  'blackPointCompensation',
   'exportColorCapabilityCatalogV1Schema',
   'MOXCMS_EXPORT_COLOR_CAPABILITIES_V1',
-  "blackPointCompensation: 'unsupported'",
-  'Black-point compensation remains disabled until the CMM exposes an applied BPC option.',
+  "blackPointCompensation: colorProfile === 'srgb' ? 'unsupported' : 'supported'",
+  'LittleCMS enables black-point compensation for TIFF relative colorimetric wide-gamut exports.',
 ]) {
   if (!capabilitySource.includes(marker)) failures.push(`Export color capability descriptor missing ${marker}`);
 }
@@ -66,6 +67,8 @@ for (const marker of [
   'pub fn get_export_color_capabilities() -> ExportColorCapabilityCatalog',
   'pub(crate) fn resolve_export_color_capabilities() -> ExportColorCapabilityCatalog',
   'ExportBlackPointCompensationStatus::Unsupported',
+  'ExportBlackPointCompensationStatus::Supported',
+  'ExportColorEngineId::Lcms2',
   'ExportColorEngineId::Moxcms',
 ]) {
   if (!rustExportSource.includes(marker)) failures.push(`Rust export runtime capability resolver missing ${marker}`);
@@ -77,7 +80,8 @@ for (const marker of [
   'only supported for JPEG and TIFF',
   'rawengine-export-color-policy-v2',
   'sRGB to Display P3 conversion applied',
-  'Unavailable until CMM support is implemented',
+  'Unavailable for this export path',
+  'Enabled via LittleCMS relative colorimetric transform',
   'export_rgb16_pixels_with_shared_conversion_core',
   'quantize_rgb16_to_rgb8',
 ]) {
@@ -93,8 +97,11 @@ if (capabilityCatalog.engine !== 'moxcms') failures.push('Export color capabilit
 if (!capabilityCatalog.capabilities.some((capability) => capability.colorProfile === 'displayP3')) {
   failures.push('Export color capability catalog must cover Display P3.');
 }
-if (capabilityCatalog.capabilities.some((capability) => capability.blackPointCompensation !== 'unsupported')) {
-  failures.push('moxcms export BPC must remain unsupported until runtime support exists.');
+const displayP3Capability = capabilityCatalog.capabilities.find(
+  (capability) => capability.colorProfile === 'displayP3',
+);
+if (displayP3Capability?.blackPointCompensation !== 'supported') {
+  failures.push('Display P3 TIFF relative colorimetric export must advertise BPC support.');
 }
 if (
   !capabilityCatalog.capabilities.every((capability) => capability.renderingIntents.includes('relativeColorimetric'))
@@ -104,6 +111,7 @@ if (
 
 exportRecipeSchema.parse({
   colorProfile: 'displayP3',
+  blackPointCompensation: true,
   dontEnlarge: true,
   enableResize: false,
   enableWatermark: false,
@@ -127,6 +135,8 @@ exportRecipeSchema.parse({
 for (const key of [
   locale.export?.advanced?.renderingIntent,
   locale.export?.advanced?.blackPointCompensationUnavailable,
+  locale.export?.advanced?.blackPointCompensation,
+  locale.export?.advanced?.blackPointCompensationTiffRelativeOnly,
   locale.export?.colorProfiles?.adobeRgb1998,
   locale.export?.colorProfiles?.proPhotoRgb,
   locale.export?.renderingIntents?.relativeColorimetric,

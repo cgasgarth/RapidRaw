@@ -1475,6 +1475,8 @@
   },
   "export": {
     "advanced": {
+      "blackPointCompensation": "",
+      "blackPointCompensationTiffRelativeOnly": "",
       "blackPointCompensationUnavailable": "",
       "colorProfile": "Profil kolorów",
       "exportMasks": "Eksportuj maski jako osobne pliki",

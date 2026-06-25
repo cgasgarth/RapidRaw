@@ -431,6 +431,7 @@ fn run_raw_open_edit_export_proof_with_context(
         ImageFormat::Png,
     )?;
     let export_settings = ExportSettings {
+        black_point_compensation: false,
         color_profile: export_color_profile.clone(),
         rendering_intent: export_rendering_intent.clone(),
         jpeg_quality: 95,
@@ -1353,6 +1354,7 @@ mod tests {
             image::Rgb([128, 64, 32]),
         ));
         let settings = ExportSettings {
+            black_point_compensation: false,
             color_profile: ExportColorProfile::DisplayP3,
             rendering_intent: ExportRenderingIntent::RelativeColorimetric,
             jpeg_quality: 95,

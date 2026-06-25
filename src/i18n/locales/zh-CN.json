@@ -1373,6 +1373,8 @@
   },
   "export": {
     "advanced": {
+      "blackPointCompensation": "",
+      "blackPointCompensationTiffRelativeOnly": "",
       "blackPointCompensationUnavailable": "",
       "colorProfile": "色彩配置文件",
       "exportMasks": "将蒙版导出为单独文件",
