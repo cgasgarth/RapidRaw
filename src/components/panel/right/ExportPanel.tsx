@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { useShallow } from 'zustand/react/shallow';
 
+import { getMoxcmsExportColorCapability } from '../../../../packages/rawengine-schema/src/exportColorCapabilities';
 import { useExportSettings } from '../../../hooks/useExportSettings';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../../schemas/exportRecipeIds';
@@ -707,23 +708,34 @@ export default function ExportPanel({
     ],
     [fileFormat, t],
   );
-  const renderingIntentOptions = useMemo(
-    () => [
+  const hasColorManagedTransform =
+    supportsColorManagedOutput(fileFormat) && WIDE_GAMUT_EXPORT_PROFILES.has(colorProfile);
+  const exportColorCapability = useMemo(
+    () => (hasColorManagedTransform ? getMoxcmsExportColorCapability(colorProfile) : null),
+    [colorProfile, hasColorManagedTransform],
+  );
+  const renderingIntentOptions = useMemo(() => {
+    const supportedIntents = exportColorCapability?.renderingIntents ?? [];
+    return [
       { label: t('export.renderingIntents.relativeColorimetric'), value: ExportRenderingIntent.RelativeColorimetric },
       { label: t('export.renderingIntents.perceptual'), value: ExportRenderingIntent.Perceptual },
       { label: t('export.renderingIntents.saturation'), value: ExportRenderingIntent.Saturation },
       { label: t('export.renderingIntents.absoluteColorimetric'), value: ExportRenderingIntent.AbsoluteColorimetric },
-    ],
-    [t],
-  );
-  const hasColorManagedTransform =
-    supportsColorManagedOutput(fileFormat) && WIDE_GAMUT_EXPORT_PROFILES.has(colorProfile);
+    ].filter((option) => supportedIntents.includes(option.value));
+  }, [exportColorCapability, t]);
+  const blackPointCompensationStatus = exportColorCapability?.blackPointCompensation ?? 'unsupported';
 
   useEffect(() => {
     if (!isSupportedColorProfileForFormat(fileFormat, colorProfile)) {
       setColorProfile(ExportColorProfile.Srgb);
     }
   }, [colorProfile, fileFormat, setColorProfile]);
+
+  useEffect(() => {
+    if (hasColorManagedTransform && !renderingIntentOptions.some((option) => option.value === renderingIntent)) {
+      setRenderingIntent(ExportRenderingIntent.RelativeColorimetric);
+    }
+  }, [hasColorManagedTransform, renderingIntent, renderingIntentOptions, setRenderingIntent]);
 
   const debouncedEstimateSize = useMemo(
     () =>
@@ -1377,7 +1389,13 @@ export default function ExportPanel({
                               />
                             </div>
                             {hasColorManagedTransform ? (
-                              <div className="space-y-1">
+                              <div
+                                className="space-y-1"
+                                data-black-point-compensation-status={blackPointCompensationStatus}
+                                data-color-engine={exportColorCapability?.engine ?? 'unavailable'}
+                                data-rendering-intent-count={renderingIntentOptions.length}
+                                data-testid="export-color-capability"
+                              >
                                 <UiText variant={TextVariants.label}>{t('export.advanced.renderingIntent')}</UiText>
                                 <Dropdown
                                   options={renderingIntentOptions}
