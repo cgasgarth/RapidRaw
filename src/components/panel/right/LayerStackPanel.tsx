@@ -92,7 +92,13 @@ type RetouchControlField =
   | 'targetPoint.x'
   | 'targetPoint.y';
 
-type RetouchRemoveControlField = 'featherRadiusPx' | 'radiusPx' | 'searchRadiusMultiplier' | 'seed';
+type RetouchRemoveControlField =
+  | 'featherRadiusPx'
+  | 'radiusPx'
+  | 'searchRadiusMultiplier'
+  | 'seed'
+  | 'targetCenterX'
+  | 'targetCenterY';
 
 const BASE_LAYER_ID = 'base-raw-layer';
 const LAYER_OPACITY_PRESETS = [0, 25, 50, 75, 100] as const;
@@ -104,10 +110,16 @@ const clampNumber = (value: number, min: number, max: number): number => {
 
 const roundRetouchNumber = (value: number): number => Math.round(value * 1000) / 1000;
 
+const numberParameter = (parameters: Record<string, unknown> | undefined, key: string, fallback: number): number => {
+  const value = parameters?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+};
+
 const syncRetouchRemoveTargetMask = (
   masks: Array<MaskContainer>,
   layerId: string,
   retouchRemoveSource: RetouchRemoveSource,
+  targetCenter?: { x?: number; y?: number },
 ): Array<MaskContainer> =>
   masks.map((mask) => {
     if (mask.id !== layerId) return mask;
@@ -119,6 +131,8 @@ const syncRetouchRemoveTargetMask = (
           ...subMask,
           parameters: {
             ...(subMask.parameters ?? {}),
+            ...(targetCenter?.x === undefined ? {} : { centerX: targetCenter.x }),
+            ...(targetCenter?.y === undefined ? {} : { centerY: targetCenter.y }),
             featherRadiusPx: retouchRemoveSource.featherRadiusPx ?? 24,
             radiusPx: retouchRemoveSource.radiusPx ?? 48,
           },
@@ -292,6 +306,11 @@ export default function LayerStackPanel({
   }, [masks]);
 
   const activeRow = rows.find((row) => row.id === selectedLayerId) ?? rows[0];
+  const activeMask = activeRow && !activeRow.isBase ? masks.find((mask) => mask.id === activeRow.id) : undefined;
+  const activeRemoveTargetSubMask =
+    activeRow?.retouchRemoveSource === null || activeRow?.retouchRemoveSource === undefined
+      ? undefined
+      : activeMask?.subMasks.find((subMask) => subMask.id === activeRow.retouchRemoveSource?.targetMaskId);
   const isBaseSelected = activeRow?.isBase ?? true;
   const isGroupHeaderSelected = activeRow?.isGroupHeader ?? false;
   const activeMaskIndex = activeRow && !activeRow.isBase ? masks.findIndex((mask) => mask.id === activeRow.id) : -1;
@@ -385,11 +404,14 @@ export default function LayerStackPanel({
     layerId: string,
     retouchRemoveSource: RetouchRemoveSource,
     syncTargetMask = false,
+    targetCenter?: { x?: number; y?: number },
   ) => {
     applyLayerStackCommand(
       { layerId, retouchRemoveSource, type: 'updateRetouchRemoveSource' },
       layerId,
-      syncTargetMask ? (nextMasks) => syncRetouchRemoveTargetMask(nextMasks, layerId, retouchRemoveSource) : undefined,
+      syncTargetMask
+        ? (nextMasks) => syncRetouchRemoveTargetMask(nextMasks, layerId, retouchRemoveSource, targetCenter)
+        : undefined,
     );
   };
   const updateActiveRetouchNumber = (field: RetouchControlField, rawValue: number) => {
@@ -413,6 +435,13 @@ export default function LayerStackPanel({
     const nextSource = structuredClone(activeRow.retouchRemoveSource);
     if (field === 'radiusPx') nextSource.radiusPx = roundRetouchNumber(clampNumber(rawValue, 0.01, 4096));
     if (field === 'featherRadiusPx') nextSource.featherRadiusPx = roundRetouchNumber(clampNumber(rawValue, 0, 4096));
+    let targetCenter: { x?: number; y?: number } | undefined;
+    if (field === 'targetCenterX') {
+      targetCenter = { x: roundRetouchNumber(clampNumber(rawValue, 0, 1)) };
+    }
+    if (field === 'targetCenterY') {
+      targetCenter = { y: roundRetouchNumber(clampNumber(rawValue, 0, 1)) };
+    }
     if (field === 'searchRadiusMultiplier') {
       nextSource.searchRadiusMultiplier = roundRetouchNumber(clampNumber(rawValue, 1, 12));
     }
@@ -420,7 +449,12 @@ export default function LayerStackPanel({
     nextSource.status = 'needs_regeneration';
     delete nextSource.resolvedSourcePoint;
 
-    updateLayerRetouchRemoveSource(activeRow.id, nextSource, field === 'radiusPx' || field === 'featherRadiusPx');
+    updateLayerRetouchRemoveSource(
+      activeRow.id,
+      nextSource,
+      field === 'radiusPx' || field === 'featherRadiusPx' || targetCenter !== undefined,
+      targetCenter,
+    );
   };
   const regenerateActiveRemoveLayer = () => {
     if (!activeRow || activeRow.isBase || activeRow.isGroupHeader || activeRow.retouchRemoveSource === null) return;
@@ -1227,6 +1261,22 @@ export default function LayerStackPanel({
               <div className="mt-2 grid grid-cols-2 gap-2">
                 {(
                   [
+                    {
+                      field: 'targetCenterX',
+                      label: t('editor.layers.retouchSource.targetX'),
+                      max: 1,
+                      min: 0,
+                      step: 0.001,
+                      value: numberParameter(activeRemoveTargetSubMask?.parameters, 'centerX', 0.5),
+                    },
+                    {
+                      field: 'targetCenterY',
+                      label: t('editor.layers.retouchSource.targetY'),
+                      max: 1,
+                      min: 0,
+                      step: 0.001,
+                      value: numberParameter(activeRemoveTargetSubMask?.parameters, 'centerY', 0.5),
+                    },
                     {
                       field: 'radiusPx',
                       label: t('editor.layers.removeSource.radius'),
