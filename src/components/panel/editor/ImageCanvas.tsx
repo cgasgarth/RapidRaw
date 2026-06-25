@@ -2416,6 +2416,20 @@ const ImageCanvas = memo(
       },
       [canvasPointToRetouchPoint, updateRetouchHandlePoint],
     );
+    const handleRetouchCanvasClick = useCallback(
+      (layerId: string, event: CanvasKonvaEvent) => {
+        if (isNonPrimaryButton(event)) return;
+        event.evt.stopPropagation();
+        const pointer = event.target.getStage()?.getPointerPosition();
+        if (!pointer) return;
+        const point = canvasPointToRetouchPoint({
+          x: pointer.x / maxSafeScale - groupOffsetX,
+          y: pointer.y / maxSafeScale - groupOffsetY,
+        });
+        updateRetouchHandlePoint(layerId, event.evt.altKey ? 'sourcePoint' : 'targetPoint', point);
+      },
+      [canvasPointToRetouchPoint, groupOffsetX, groupOffsetY, maxSafeScale, updateRetouchHandlePoint],
+    );
 
     const updateRemoveTargetPoint = useCallback(
       (layerId: string, removeSource: RetouchRemoveSource, point: RetouchCloneSource['sourcePoint']) => {
@@ -2807,6 +2821,22 @@ const ImageCanvas = memo(
                     <Layer>
                       <Group scaleX={maxSafeScale} scaleY={maxSafeScale}>
                         <Group x={groupOffsetX} y={groupOffsetY}>
+                          <Rect
+                            data-retouch-canvas-click-target="source-or-target"
+                            data-retouch-canvas-click-source-modifier="Alt"
+                            data-testid="image-canvas-retouch-click-target"
+                            fill="rgba(0, 0, 0, 0)"
+                            height={effectiveImageDimensions.height * imageRenderSize.scale}
+                            onClick={(event) => {
+                              handleRetouchCanvasClick(activeRetouchLayer.id, event);
+                            }}
+                            onTap={(event) => {
+                              handleRetouchCanvasClick(activeRetouchLayer.id, event);
+                            }}
+                            width={effectiveImageDimensions.width * imageRenderSize.scale}
+                            x={0}
+                            y={0}
+                          />
                           <Line
                             dash={[4, 4]}
                             listening={false}
