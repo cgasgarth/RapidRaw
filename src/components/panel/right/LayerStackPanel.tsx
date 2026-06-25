@@ -521,6 +521,10 @@ export default function LayerStackPanel({
   };
   const createCloneLayer = () => {
     const layerId = crypto.randomUUID();
+    const targetMaskId = `${layerId}_clone_target`;
+    const targetPoint = { x: 0.58, y: 0.58 };
+    const radiusPx = 48;
+    const featherRadiusPx = 24;
     const layer: MaskContainer = {
       adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
       blendMode: DEFAULT_LAYER_BLEND_MODE,
@@ -530,13 +534,31 @@ export default function LayerStackPanel({
       opacity: 100,
       retouchCloneSource: {
         alignmentErrorPx: 0,
+        featherRadiusPx,
+        radiusPx,
         retouchMode: 'clone',
         rotationDegrees: 0,
         scale: 1,
         sourcePoint: { x: 0.42, y: 0.42 },
-        targetPoint: { x: 0.58, y: 0.58 },
+        targetPoint,
       },
-      subMasks: [],
+      subMasks: [
+        {
+          id: targetMaskId,
+          invert: false,
+          mode: SubMaskMode.Additive,
+          name: t('editor.layers.newCloneLayerName', { count: masks.length + 1 }),
+          opacity: 100,
+          parameters: {
+            centerX: targetPoint.x * effectiveImageDimensions.width,
+            centerY: targetPoint.y * effectiveImageDimensions.height,
+            featherRadiusPx,
+            radiusPx,
+          },
+          type: Mask.Radial,
+          visible: true,
+        },
+      ],
       visible: true,
     };
     applyLayerStackCommand({ layer, type: 'create' }, layerId);

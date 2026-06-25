@@ -185,6 +185,7 @@ for (const marker of [
   'data-testid="layer-create-clone-layer"',
   'data-testid="layer-create-heal-layer"',
   'data-testid="layer-create-remove-layer"',
+  'const targetMaskId = `${layerId}_clone_target`',
   'const targetMaskId = `${layerId}_heal_target`',
   'centerX: targetPoint.x * effectiveImageDimensions.width',
   'centerY: targetPoint.y * effectiveImageDimensions.height',
