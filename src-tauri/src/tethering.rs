@@ -449,11 +449,12 @@ fn open_tether_session_for_state(
 
     let destination_root = resolve_tether_destination_root(request.destination_root);
     let recovery = recover_tether_destination(destination_root.as_deref());
+    let capture_counter = seed_tether_capture_counter(destination_root.as_deref());
 
     let session = TetherSessionSnapshot {
         camera_display_name: camera.display_name.clone(),
         camera_id: camera.id.clone(),
-        capture_counter: 0,
+        capture_counter,
         captured_imports_by_checksum: BTreeMap::new(),
         destination_root,
         opened_at: chrono::Utc::now().to_rfc3339(),
@@ -1101,6 +1102,54 @@ fn tether_recovery_summary(
         quarantined_files,
         status: status.to_string(),
     }
+}
+
+fn seed_tether_capture_counter(destination_root: Option<&str>) -> usize {
+    let Some(root) = destination_root.filter(|root| !root.trim().is_empty()) else {
+        return 0;
+    };
+    let root = Path::new(root);
+    let Ok(entries) = fs::read_dir(root) else {
+        return 0;
+    };
+
+    entries
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            if !path.is_file() {
+                return None;
+            }
+            let file_name = path.file_name()?.to_str()?;
+            if file_name.ends_with(".part") || file_name.ends_with(".rrdata") {
+                return None;
+            }
+            let stem = path.file_stem()?.to_str()?;
+            counter_from_ingest_stem(stem)
+        })
+        .max()
+        .unwrap_or(0)
+}
+
+fn counter_from_ingest_stem(stem: &str) -> Option<usize> {
+    let prefix = stem.split_once('_').and_then(|(prefix, _)| {
+        if prefix.len() >= 4 && prefix.chars().all(|character| character.is_ascii_digit()) {
+            prefix.parse::<usize>().ok()
+        } else {
+            None
+        }
+    });
+    if prefix.is_some() {
+        return prefix;
+    }
+
+    stem.rsplit_once('_').and_then(|(_, suffix)| {
+        if suffix.len() >= 4 && suffix.chars().all(|character| character.is_ascii_digit()) {
+            suffix.parse::<usize>().ok()
+        } else {
+            None
+        }
+    })
 }
 
 fn resolve_imported_capture_path(
@@ -1887,6 +1936,59 @@ mod tests {
         assert_eq!(capture.backup.status, "disabled");
         assert!(!capture.metadata.applied);
         assert!(Path::new(&capture.imported_path).is_file());
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn fake_provider_seeds_ingest_counter_from_destination() {
+        let state = AppState::new();
+        let root = std::env::temp_dir().join(format!(
+            "rawengine-tether-counter-seed-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let source_path = root.join("source.ARW");
+        let destination_root = root.join("destination");
+        fs::create_dir_all(&destination_root).unwrap();
+        fs::write(&source_path, b"fake raw bytes").unwrap();
+        fs::write(destination_root.join("0007_wedding.ARW"), b"existing").unwrap();
+        fs::write(destination_root.join("source_0011.ARW"), b"existing").unwrap();
+        fs::write(
+            destination_root.join("20260625T101112Z_fake.ARW"),
+            b"timestamp",
+        )
+        .unwrap();
+        fs::write(destination_root.join("capture_9999.ARW.part"), b"partial").unwrap();
+        fs::write(destination_root.join("source_0011.ARW.rrdata"), b"sidecar").unwrap();
+
+        let session = open_tether_session_for_state(
+            TetherSessionOpenRequest {
+                camera_id: "fake-sony-ilce-7m4-usb".to_string(),
+                destination_root: Some(destination_root.to_string_lossy().to_string()),
+                provider_mode: Some("fake".to_string()),
+            },
+            &state,
+        )
+        .unwrap()
+        .session
+        .unwrap();
+        assert_eq!(session.capture_counter, 11);
+
+        let capture = trigger_tether_capture_for_state(
+            Some(TetherCaptureRequest {
+                backup_destination_root: None,
+                camera_control_values: BTreeMap::new(),
+                destination_root: None,
+                fake_source_path: Some(source_path.to_string_lossy().to_string()),
+                ingest_preset_id: Some("sourceSequence".to_string()),
+                metadata_template_id: None,
+            }),
+            &state,
+        )
+        .unwrap();
+
+        assert_eq!(capture.ingest.collision_index, 1);
+        assert_eq!(capture.ingest.file_name, "source_0012.ARW");
 
         let _ = fs::remove_dir_all(root);
     }

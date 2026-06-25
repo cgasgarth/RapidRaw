@@ -105,6 +105,7 @@ const requiredSnippets = [
   [rustSource, 'fake_provider_rejects_unsupported_exposure_control_values'],
   [rustSource, 'fake_camera_controls'],
   [rustSource, 'fake_provider_uses_collision_safe_ingest_counters'],
+  [rustSource, 'fake_provider_seeds_ingest_counter_from_destination'],
   [rustSource, 'fake_provider_suppresses_duplicate_imports_in_session'],
   [rustSource, 'status: "duplicate".to_string()'],
   [panelSource, 'captureDuplicateSuppressed'],
