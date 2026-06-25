@@ -2653,6 +2653,7 @@ pub fn run() {
             panorama_stitching::plan_panorama,
             panorama_stitching::stitch_panorama,
             panorama_stitching::save_panorama,
+            export_processing::get_export_color_capabilities,
             export_processing::export_images,
             export_processing::cancel_export,
             export_processing::estimate_export_sizes,

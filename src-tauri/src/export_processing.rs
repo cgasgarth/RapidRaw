@@ -139,6 +139,36 @@ pub enum ExportRenderingIntent {
     Saturation,
 }
 
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportColorEngineId {
+    Moxcms,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportBlackPointCompensationStatus {
+    Unsupported,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportColorCapability {
+    pub black_point_compensation: ExportBlackPointCompensationStatus,
+    pub color_profile: ExportColorProfile,
+    pub engine: ExportColorEngineId,
+    pub rendering_intents: Vec<ExportRenderingIntent>,
+    pub runtime_support_notes: Vec<String>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportColorCapabilityCatalog {
+    pub capabilities: Vec<ExportColorCapability>,
+    pub engine: ExportColorEngineId,
+    pub schema_version: u8,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum OutputSharpeningTarget {
@@ -894,6 +924,49 @@ fn export_color_profile_requires_transform(color_profile: &ExportColorProfile) -
             | ExportColorProfile::DisplayP3
             | ExportColorProfile::ProPhotoRgb
     )
+}
+
+fn moxcms_export_rendering_intents() -> Vec<ExportRenderingIntent> {
+    vec![
+        ExportRenderingIntent::RelativeColorimetric,
+        ExportRenderingIntent::Perceptual,
+        ExportRenderingIntent::Saturation,
+        ExportRenderingIntent::AbsoluteColorimetric,
+    ]
+}
+
+pub(crate) fn resolve_export_color_capabilities() -> ExportColorCapabilityCatalog {
+    let runtime_support_notes = vec![
+        "Rendering intent is passed to moxcms transform options.".to_string(),
+        "Black-point compensation remains disabled until the CMM exposes an applied BPC option."
+            .to_string(),
+    ];
+    let capabilities = vec![
+        ExportColorProfile::Srgb,
+        ExportColorProfile::DisplayP3,
+        ExportColorProfile::AdobeRgb1998,
+        ExportColorProfile::ProPhotoRgb,
+    ]
+    .into_iter()
+    .map(|color_profile| ExportColorCapability {
+        black_point_compensation: ExportBlackPointCompensationStatus::Unsupported,
+        color_profile,
+        engine: ExportColorEngineId::Moxcms,
+        rendering_intents: moxcms_export_rendering_intents(),
+        runtime_support_notes: runtime_support_notes.clone(),
+    })
+    .collect();
+
+    ExportColorCapabilityCatalog {
+        capabilities,
+        engine: ExportColorEngineId::Moxcms,
+        schema_version: 1,
+    }
+}
+
+#[tauri::command]
+pub fn get_export_color_capabilities() -> ExportColorCapabilityCatalog {
+    resolve_export_color_capabilities()
 }
 
 fn export_transform_options(rendering_intent: &ExportRenderingIntent) -> TransformOptions {
@@ -1931,13 +2004,14 @@ pub async fn estimate_export_sizes(
 #[cfg(test)]
 mod tests {
     use super::{
-        ExportColorProfile, ExportRenderingIntent, ExportSettings, OutputSharpeningSettings,
-        OutputSharpeningTarget, apply_export_resize_and_watermark, encode_image_to_bytes,
-        encode_image_with_applied_policy, export_color_profile_receipt_label,
-        export_jpeg_rgb_pixels_and_profile, export_receipt_metadata, export_rgb_pixels_and_profile,
-        export_rgb16_pixels_and_profile, export_rgb16_pixels_with_shared_conversion_core,
-        export_soft_proof_rgb_pixels_and_profile, export_source_precision_receipt_label,
-        export_transform_options, mox_rendering_intent, quantize_rgb16_to_rgb8,
+        ExportBlackPointCompensationStatus, ExportColorEngineId, ExportColorProfile,
+        ExportRenderingIntent, ExportSettings, OutputSharpeningSettings, OutputSharpeningTarget,
+        apply_export_resize_and_watermark, encode_image_to_bytes, encode_image_with_applied_policy,
+        export_color_profile_receipt_label, export_jpeg_rgb_pixels_and_profile,
+        export_receipt_metadata, export_rgb_pixels_and_profile, export_rgb16_pixels_and_profile,
+        export_rgb16_pixels_with_shared_conversion_core, export_soft_proof_rgb_pixels_and_profile,
+        export_source_precision_receipt_label, export_transform_options, mox_rendering_intent,
+        quantize_rgb16_to_rgb8, resolve_export_color_capabilities,
         should_apply_srgb_perceptual_gamut_mapping,
     };
     use crate::gamut_mapping::SRGB_OKLAB_CHROMA_REDUCE_V1;
@@ -2082,6 +2156,40 @@ mod tests {
         assert_eq!(
             export_transform_options(&ExportRenderingIntent::AbsoluteColorimetric).rendering_intent,
             mox_rendering_intent(&ExportRenderingIntent::AbsoluteColorimetric)
+        );
+    }
+
+    #[test]
+    fn export_color_capability_resolver_reports_moxcms_limits() {
+        let catalog = resolve_export_color_capabilities();
+        assert_eq!(catalog.schema_version, 1);
+        assert_eq!(catalog.capabilities.len(), 4);
+
+        for capability in &catalog.capabilities {
+            assert!(matches!(capability.engine, ExportColorEngineId::Moxcms));
+            assert!(matches!(
+                capability.black_point_compensation,
+                ExportBlackPointCompensationStatus::Unsupported
+            ));
+            assert!(
+                capability
+                    .rendering_intents
+                    .iter()
+                    .any(|intent| matches!(intent, ExportRenderingIntent::RelativeColorimetric))
+            );
+            assert!(
+                capability
+                    .runtime_support_notes
+                    .iter()
+                    .any(|note| note.contains("Black-point compensation remains disabled"))
+            );
+        }
+
+        assert!(
+            catalog.capabilities.iter().any(|capability| matches!(
+                capability.color_profile,
+                ExportColorProfile::DisplayP3
+            ))
         );
     }
 
