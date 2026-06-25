@@ -54,6 +54,8 @@ for (const marker of [
   'text={`${retouchModeLabel} S`}',
   'text={`${retouchModeLabel} T`}',
   'data-testid="image-canvas-remove-handles"',
+  'getRemoveCanvasStatusColor(activeRemoveSource.status)',
+  'data-remove-handle-status-color={removeStatusColor}',
   'data-remove-handle-status={activeRemoveSource.status ??',
   'data-remove-handle-status-label={removeStatusLabel}',
   'data-remove-handle-source-resolved={String(activeRemoveSource.resolvedSourcePoint !== undefined)}',
