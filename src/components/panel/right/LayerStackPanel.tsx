@@ -104,6 +104,29 @@ const clampNumber = (value: number, min: number, max: number): number => {
 
 const roundRetouchNumber = (value: number): number => Math.round(value * 1000) / 1000;
 
+const syncRetouchRemoveTargetMask = (
+  masks: Array<MaskContainer>,
+  layerId: string,
+  retouchRemoveSource: RetouchRemoveSource,
+): Array<MaskContainer> =>
+  masks.map((mask) => {
+    if (mask.id !== layerId) return mask;
+    return {
+      ...mask,
+      subMasks: mask.subMasks.map((subMask) => {
+        if (subMask.id !== retouchRemoveSource.targetMaskId || subMask.type !== Mask.Radial) return subMask;
+        return {
+          ...subMask,
+          parameters: {
+            ...(subMask.parameters ?? {}),
+            featherRadiusPx: retouchRemoveSource.featherRadiusPx ?? 24,
+            radiusPx: retouchRemoveSource.radiusPx ?? 48,
+          },
+        };
+      }),
+    };
+  });
+
 const blendModes = [
   { labelKey: 'editor.layers.blendModes.normal', value: 'normal' },
   { labelKey: 'editor.layers.blendModes.multiply', value: 'multiply' },
@@ -329,6 +352,7 @@ export default function LayerStackPanel({
   const applyLayerStackCommand = (
     operation: LayerStackCommandBridgeOperation,
     nextSelectedLayerId = selectedLayerId,
+    materializeMasks: (nextMasks: Array<MaskContainer>) => Array<MaskContainer> = (nextMasks) => nextMasks,
   ) => {
     const result = applyLayerStackCommandBridgeOperation(masks, operation, {
       graphRevision: layerGraphRevision,
@@ -339,7 +363,7 @@ export default function LayerStackPanel({
     setLayerGraphRevision(result.graphRevision);
     setLastCommandType(result.command.commandType);
     setLastChangedLayerCount(result.commandResult.changedLayerIds.length);
-    applyLayerStack(result.masks, nextSelectedLayerId);
+    applyLayerStack(materializeMasks(result.masks), nextSelectedLayerId);
   };
   const updateLayerVisibility = (layerId: string, visible: boolean) => {
     applyLayerStackCommand({ layerId, type: 'setVisibility', visible }, layerId);
@@ -357,8 +381,16 @@ export default function LayerStackPanel({
   const updateLayerRetouchSource = (layerId: string, retouchCloneSource: RetouchCloneSource) => {
     applyLayerStackCommand({ layerId, retouchCloneSource, type: 'updateRetouchSource' }, layerId);
   };
-  const updateLayerRetouchRemoveSource = (layerId: string, retouchRemoveSource: RetouchRemoveSource) => {
-    applyLayerStackCommand({ layerId, retouchRemoveSource, type: 'updateRetouchRemoveSource' }, layerId);
+  const updateLayerRetouchRemoveSource = (
+    layerId: string,
+    retouchRemoveSource: RetouchRemoveSource,
+    syncTargetMask = false,
+  ) => {
+    applyLayerStackCommand(
+      { layerId, retouchRemoveSource, type: 'updateRetouchRemoveSource' },
+      layerId,
+      syncTargetMask ? (nextMasks) => syncRetouchRemoveTargetMask(nextMasks, layerId, retouchRemoveSource) : undefined,
+    );
   };
   const updateActiveRetouchNumber = (field: RetouchControlField, rawValue: number) => {
     if (!activeRow || activeRow.isBase || activeRow.isGroupHeader || activeRow.retouchCloneSource === null) return;
@@ -388,7 +420,7 @@ export default function LayerStackPanel({
     nextSource.status = 'needs_regeneration';
     delete nextSource.resolvedSourcePoint;
 
-    updateLayerRetouchRemoveSource(activeRow.id, nextSource);
+    updateLayerRetouchRemoveSource(activeRow.id, nextSource, field === 'radiusPx' || field === 'featherRadiusPx');
   };
   const regenerateActiveRemoveLayer = () => {
     if (!activeRow || activeRow.isBase || activeRow.isGroupHeader || activeRow.retouchRemoveSource === null) return;
