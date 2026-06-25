@@ -17,6 +17,8 @@ use std::{
     },
 };
 
+const CAMERA_PROFILE_RESOLVER_ALGORITHM_ID: &str = "dual_illuminant_mired_v1";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RawProcessingProfile {
     Fast,
@@ -34,7 +36,8 @@ impl RawProcessingProfile {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub(crate) enum RawDemosaicPath {
     BayerHq,
     Fast,
@@ -42,9 +45,43 @@ pub(crate) enum RawDemosaicPath {
     Standard,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RawCameraProfileReport {
+    pub algorithm_id: &'static str,
+    pub candidate_count: usize,
+    pub cool_illuminant: Option<String>,
+    pub cool_weight: Option<f32>,
+    pub estimated_cct_kelvin: Option<f32>,
+    pub fallback_reason: Option<&'static str>,
+    pub matrix_hash: Option<String>,
+    pub status: &'static str,
+    pub warm_illuminant: Option<String>,
+    pub warning_codes: Vec<&'static str>,
+}
+
+impl RawCameraProfileReport {
+    fn unavailable(reason: &'static str, candidate_count: usize) -> Self {
+        Self {
+            algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
+            candidate_count,
+            cool_illuminant: None,
+            cool_weight: None,
+            estimated_cct_kelvin: None,
+            fallback_reason: Some(reason),
+            matrix_hash: None,
+            status: "unavailable",
+            warm_illuminant: None,
+            warning_codes: vec![reason],
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct RawDevelopmentReport {
     pub demosaic_path: RawDemosaicPath,
+    pub camera_profile: RawCameraProfileReport,
 }
 
 pub(crate) fn develop_raw_image_with_report(
@@ -672,10 +709,27 @@ fn interpolate_color_matrix(warm: &[f32], cool: &[f32], cool_weight: f32) -> Vec
         .collect()
 }
 
-fn select_camera_color_matrix(
+fn camera_matrix_hash(matrix: &[f32]) -> String {
+    let mut hasher = blake3::Hasher::new();
+    for value in matrix {
+        hasher.update(&value.to_le_bytes());
+    }
+    format!("blake3:{}", hasher.finalize().to_hex())
+}
+
+fn illuminant_label(illuminant: Illuminant) -> String {
+    format!("{illuminant:?}")
+}
+
+struct CameraProfileResolution {
+    matrix: Option<Vec<f32>>,
+    report: RawCameraProfileReport,
+}
+
+fn resolve_camera_color_profile(
     color_matrices: &HashMap<Illuminant, Vec<f32>>,
     wb: [f32; 4],
-) -> Option<Vec<f32>> {
+) -> CameraProfileResolution {
     let d65 = color_matrices
         .get(&Illuminant::D65)
         .filter(|matrix| valid_color_matrix(matrix));
@@ -694,12 +748,38 @@ fn select_camera_color_matrix(
             .then_with(|| left.0.cmp(&right.0))
     });
 
+    let candidate_count = candidates.len();
+
     let Some(target_cct) = estimate_scene_cct_from_wb(wb) else {
-        return d65.cloned().or_else(|| {
+        let selected = d65.cloned().or_else(|| {
             candidates
                 .first()
                 .map(|(_illuminant, _cct, matrix)| (*matrix).to_vec())
         });
+        let fallback_reason = if selected.is_some() {
+            "invalid_white_balance"
+        } else {
+            "no_valid_camera_matrix"
+        };
+        return CameraProfileResolution {
+            matrix: selected.clone(),
+            report: RawCameraProfileReport {
+                algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
+                candidate_count,
+                cool_illuminant: None,
+                cool_weight: None,
+                estimated_cct_kelvin: None,
+                fallback_reason: Some(fallback_reason),
+                matrix_hash: selected.as_deref().map(camera_matrix_hash),
+                status: if selected.is_some() {
+                    "fallback"
+                } else {
+                    "unavailable"
+                },
+                warm_illuminant: None,
+                warning_codes: vec![fallback_reason],
+            },
+        };
     };
 
     if candidates.len() >= 2 {
@@ -715,33 +795,103 @@ fn select_camera_color_matrix(
             .iter()
             .find(|(_illuminant, cct, matrix)| *cct >= target_cct && matrix.len() == warm.2.len())
             .copied()
-            .unwrap_or(*candidates.last()?);
+            .unwrap_or(*candidates.last().expect("candidate count checked above"));
 
         if warm.0 != cool.0 {
             let cool_weight = interpolation_weight_for_cct(target_cct, warm.1, cool.1);
-            return Some(interpolate_color_matrix(warm.2, cool.2, cool_weight));
+            let matrix = interpolate_color_matrix(warm.2, cool.2, cool_weight);
+            return CameraProfileResolution {
+                report: RawCameraProfileReport {
+                    algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
+                    candidate_count,
+                    cool_illuminant: Some(illuminant_label(cool.0)),
+                    cool_weight: Some(cool_weight),
+                    estimated_cct_kelvin: Some(target_cct),
+                    fallback_reason: None,
+                    matrix_hash: Some(camera_matrix_hash(&matrix)),
+                    status: "interpolated",
+                    warm_illuminant: Some(illuminant_label(warm.0)),
+                    warning_codes: Vec::new(),
+                },
+                matrix: Some(matrix),
+            };
         }
 
-        return Some(warm.2.to_vec());
+        let matrix = warm.2.to_vec();
+        return CameraProfileResolution {
+            report: RawCameraProfileReport {
+                algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
+                candidate_count,
+                cool_illuminant: Some(illuminant_label(warm.0)),
+                cool_weight: Some(1.0),
+                estimated_cct_kelvin: Some(target_cct),
+                fallback_reason: None,
+                matrix_hash: Some(camera_matrix_hash(&matrix)),
+                status: "single_illuminant",
+                warm_illuminant: Some(illuminant_label(warm.0)),
+                warning_codes: Vec::new(),
+            },
+            matrix: Some(matrix),
+        };
     }
 
-    d65.cloned().or_else(|| {
+    let selected = d65.cloned().or_else(|| {
         candidates
             .first()
             .map(|(_illuminant, _cct, matrix)| (*matrix).to_vec())
-    })
+    });
+    CameraProfileResolution {
+        matrix: selected.clone(),
+        report: RawCameraProfileReport {
+            algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
+            candidate_count,
+            cool_illuminant: candidates
+                .first()
+                .map(|candidate| illuminant_label(candidate.0)),
+            cool_weight: Some(1.0),
+            estimated_cct_kelvin: Some(target_cct),
+            fallback_reason: if selected.is_some() {
+                Some("single_valid_camera_matrix")
+            } else {
+                Some("no_valid_camera_matrix")
+            },
+            matrix_hash: selected.as_deref().map(camera_matrix_hash),
+            status: if selected.is_some() {
+                "single_illuminant"
+            } else {
+                "unavailable"
+            },
+            warm_illuminant: candidates
+                .first()
+                .map(|candidate| illuminant_label(candidate.0)),
+            warning_codes: if selected.is_some() {
+                vec!["single_valid_camera_matrix"]
+            } else {
+                vec!["no_valid_camera_matrix"]
+            },
+        },
+    }
 }
 
-fn apply_dual_illuminant_camera_profile(raw_image: &mut RawImage) {
+fn select_camera_color_matrix(
+    color_matrices: &HashMap<Illuminant, Vec<f32>>,
+    wb: [f32; 4],
+) -> Option<Vec<f32>> {
+    resolve_camera_color_profile(color_matrices, wb).matrix
+}
+
+fn apply_dual_illuminant_camera_profile(raw_image: &mut RawImage) -> RawCameraProfileReport {
     let wb = if raw_image.wb_coeffs[0].is_nan() {
         [1.0, 1.0, 1.0, 1.0]
     } else {
         raw_image.wb_coeffs
     };
-    if let Some(color_matrix) = select_camera_color_matrix(&raw_image.color_matrix, wb) {
+    let resolution = resolve_camera_color_profile(&raw_image.color_matrix, wb);
+    if let Some(color_matrix) = resolution.matrix {
         raw_image.color_matrix.clear();
         raw_image.color_matrix.insert(Illuminant::D65, color_matrix);
     }
+    resolution.report
 }
 
 fn pseudo_inverse_4x3(matrix: [[f32; 3]; 4]) -> [[f32; 4]; 3] {
@@ -1031,9 +1181,11 @@ fn develop_internal_with_options(
         );
     }
 
-    if apply_calibration {
-        apply_dual_illuminant_camera_profile(&mut raw_image);
-    }
+    let camera_profile = if apply_calibration {
+        apply_dual_illuminant_camera_profile(&mut raw_image)
+    } else {
+        RawCameraProfileReport::unavailable("calibration_disabled", raw_image.color_matrix.len())
+    };
 
     for level in raw_image.whitelevel.0.iter_mut() {
         *level = u32::MAX;
@@ -1185,7 +1337,10 @@ fn develop_internal_with_options(
     Ok((
         dynamic_image,
         orientation,
-        RawDevelopmentReport { demosaic_path },
+        RawDevelopmentReport {
+            demosaic_path,
+            camera_profile,
+        },
     ))
 }
 
@@ -1300,13 +1455,27 @@ mod tests {
         color_matrices.insert(Illuminant::A, warm.clone());
         color_matrices.insert(Illuminant::D65, cool.clone());
 
-        let selected =
-            select_camera_color_matrix(&color_matrices, [1.0, 1.0, 1.5, f32::NAN]).unwrap();
+        let resolution = resolve_camera_color_profile(&color_matrices, [1.0, 1.0, 1.5, f32::NAN]);
+        let selected = resolution.matrix.unwrap();
 
         assert_eq!(selected.len(), warm.len());
         assert!(selected[0] < warm[0]);
         assert!(selected[0] > cool[0]);
         assert_ne!(selected, cool);
+        assert_eq!(resolution.report.status, "interpolated");
+        assert_eq!(
+            resolution.report.algorithm_id,
+            CAMERA_PROFILE_RESOLVER_ALGORITHM_ID
+        );
+        assert_eq!(resolution.report.candidate_count, 2);
+        assert!(resolution.report.cool_weight.unwrap() > 0.0);
+        assert!(
+            resolution
+                .report
+                .matrix_hash
+                .unwrap()
+                .starts_with("blake3:")
+        );
     }
 
     #[test]
@@ -1317,10 +1486,20 @@ mod tests {
         color_matrices.insert(Illuminant::A, warm);
         color_matrices.insert(Illuminant::D65, cool.clone());
 
-        let selected =
-            select_camera_color_matrix(&color_matrices, [f32::NAN, 1.0, 1.0, f32::NAN]).unwrap();
+        let resolution =
+            resolve_camera_color_profile(&color_matrices, [f32::NAN, 1.0, 1.0, f32::NAN]);
+        let selected = resolution.matrix.unwrap();
 
         assert_eq!(selected, cool);
+        assert_eq!(resolution.report.status, "fallback");
+        assert_eq!(
+            resolution.report.fallback_reason,
+            Some("invalid_white_balance")
+        );
+        assert_eq!(
+            resolution.report.warning_codes,
+            vec!["invalid_white_balance"]
+        );
     }
 
     #[test]

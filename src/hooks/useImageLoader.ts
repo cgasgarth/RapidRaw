@@ -101,6 +101,7 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
                   isReady: true,
                   metadata: loadImageResult.metadata,
                   originalUrl: null,
+                  rawDevelopmentReport: loadImageResult.raw_development_report ?? null,
                   width: loadImageResult.width,
                 },
               };

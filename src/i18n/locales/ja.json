@@ -670,7 +670,22 @@
         "tags": "タグ",
         "title": "整理"
       },
-      "title": "メタデータ"
+      "title": "メタデータ",
+      "cameraProfile": {
+        "algorithm": "Algorithm",
+        "coolWeight": "Cool weight",
+        "estimatedCct": "Estimated CCT",
+        "fallbackReason": "Fallback",
+        "illuminants": "Illuminants",
+        "matrixHash": "Matrix hash",
+        "status": {
+          "fallback": "Fallback",
+          "interpolated": "Interpolated",
+          "single_illuminant": "Single illuminant",
+          "unavailable": "Unavailable"
+        },
+        "title": "Camera Input Profile"
+      }
     },
     "presets": {
       "dialog": {

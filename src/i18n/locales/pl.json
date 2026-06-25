@@ -1107,6 +1107,21 @@
         "shutterSpeed": "Czas otwarcia migawki",
         "title": "Szczegóły aparatu"
       },
+      "cameraProfile": {
+        "algorithm": "Algorithm",
+        "coolWeight": "Cool weight",
+        "estimatedCct": "Estimated CCT",
+        "fallbackReason": "Fallback",
+        "illuminants": "Illuminants",
+        "matrixHash": "Matrix hash",
+        "status": {
+          "fallback": "Fallback",
+          "interpolated": "Interpolated",
+          "single_illuminant": "Single illuminant",
+          "unavailable": "Unavailable"
+        },
+        "title": "Camera Input Profile"
+      },
       "clickToEdit": "Kliknij, aby edytować",
       "copied": "Skopiowano",
       "copy": "Kopiuj",

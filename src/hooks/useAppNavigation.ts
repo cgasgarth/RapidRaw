@@ -23,6 +23,7 @@ import { formatUnknownError } from '../utils/errorFormatting';
 import { globalImageCache, type ImageCacheEntry } from '../utils/ImageLRUCache';
 
 import type { FolderTree } from '../components/panel/FolderTree';
+import type { LoadImageResult } from '../schemas/imageLoaderSchemas';
 
 interface TransformController {
   resetTransform(time?: number): void;
@@ -38,15 +39,6 @@ interface PreloadedNavigationData {
 interface PreviousAdjustments {
   adjustments: Adjustments;
   path: string;
-}
-
-interface LoadImageResult {
-  exif?: Record<string, string> | null;
-  height: number;
-  is_offline_smart_preview?: boolean;
-  is_raw: boolean;
-  metadata?: unknown;
-  width: number;
 }
 
 interface LoadedMetadata {
@@ -277,6 +269,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
                       isOfflineSmartPreview: result.is_offline_smart_preview === true,
                       isRaw: result.is_raw,
                       metadata: result.metadata ?? state.selectedImage.metadata,
+                      rawDevelopmentReport: result.raw_development_report ?? null,
                       width: result.width,
                     }
                   : state.selectedImage,
@@ -326,6 +319,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
           metadata: null,
           originalUrl: null,
           path,
+          rawDevelopmentReport: null,
           thumbnailUrl: useProcessStore.getState().thumbnails[path] ?? '',
           width: 0,
         },

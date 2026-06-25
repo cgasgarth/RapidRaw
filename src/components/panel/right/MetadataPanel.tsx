@@ -191,6 +191,23 @@ function previewLutStatus(lut: DisplayPreviewLutStatus) {
   return 'unsupported';
 }
 
+function formatCameraProfileEndpoint(warmIlluminant?: string | null, coolIlluminant?: string | null) {
+  if (warmIlluminant && coolIlluminant) return `${warmIlluminant} → ${coolIlluminant}`;
+  return warmIlluminant ?? coolIlluminant ?? '-';
+}
+
+function formatCameraProfilePercent(value?: number | null) {
+  return value === null || value === undefined ? '-' : `${Math.round(value * 100)}%`;
+}
+
+function formatCameraProfileCct(value?: number | null) {
+  return value === null || value === undefined ? '-' : `${Math.round(value)} K`;
+}
+
+function formatCameraProfileHash(value?: string | null) {
+  return value?.slice(0, 20) ?? '-';
+}
+
 function xmpChoiceLabel(choice: XmpMetadataConflictChoice, t: TFunction) {
   if (choice === 'local') return t('editor.metadata.xmpConflicts.choices.local');
   if (choice === 'external') return t('editor.metadata.xmpConflicts.choices.external');
@@ -438,6 +455,8 @@ export default function MetadataPanel() {
   const fileName = basePath.split(/[\\/]/).pop() || '';
   const fileExtension = fileName.split('.').pop()?.toUpperCase() || 'FILE';
   const megapixels = selectedImage ? ((selectedImage.width * selectedImage.height) / 1000000).toFixed(1) : null;
+  const rawDevelopmentReport = selectedImage?.rawDevelopmentReport ?? null;
+  const cameraProfileReport = rawDevelopmentReport?.cameraProfile ?? null;
   const populatedCameraFieldCount = cameraGridSettings.filter((setting) => setting.value !== '-').length;
   const editableMetadataFieldCount = EDITABLE_FIELDS.length;
 
@@ -779,6 +798,91 @@ export default function MetadataPanel() {
                 </UiText>
               )}
             </section>
+            {selectedImage.isRaw && cameraProfileReport !== null && (
+              <section
+                className="rounded-md border border-surface bg-bg-secondary/70 p-3 text-xs"
+                data-camera-profile-algorithm={cameraProfileReport.algorithmId}
+                data-camera-profile-candidate-count={cameraProfileReport.candidateCount}
+                data-camera-profile-matrix-hash={cameraProfileReport.matrixHash ?? ''}
+                data-camera-profile-status={cameraProfileReport.status}
+                data-demosaic-path={rawDevelopmentReport?.demosaicPath ?? ''}
+                data-testid="metadata-camera-profile-report"
+              >
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <UiText variant={TextVariants.heading}>{t('editor.metadata.cameraProfile.title')}</UiText>
+                  <UiText
+                    as="span"
+                    variant={TextVariants.small}
+                    className={cx(
+                      'rounded px-2 py-1 font-semibold',
+                      cameraProfileReport.status === 'interpolated'
+                        ? 'bg-green-500/10 text-green-300'
+                        : cameraProfileReport.status === 'single_illuminant'
+                          ? 'bg-sky-500/10 text-sky-200'
+                          : 'bg-yellow-500/10 text-yellow-200',
+                    )}
+                    data-testid="metadata-camera-profile-status-label"
+                  >
+                    {t(`editor.metadata.cameraProfile.status.${cameraProfileReport.status}`)}
+                  </UiText>
+                </div>
+                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                  <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                    {t('editor.metadata.cameraProfile.algorithm')}
+                  </UiText>
+                  <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right">
+                    {cameraProfileReport.algorithmId}
+                  </UiText>
+                  <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                    {t('editor.metadata.cameraProfile.illuminants')}
+                  </UiText>
+                  <UiText
+                    variant={TextVariants.small}
+                    color={TextColors.primary}
+                    className="truncate text-right"
+                    data-testid="metadata-camera-profile-endpoints"
+                  >
+                    {formatCameraProfileEndpoint(
+                      cameraProfileReport.warmIlluminant,
+                      cameraProfileReport.coolIlluminant,
+                    )}
+                  </UiText>
+                  <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                    {t('editor.metadata.cameraProfile.estimatedCct')}
+                  </UiText>
+                  <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right">
+                    {formatCameraProfileCct(cameraProfileReport.estimatedCctKelvin)}
+                  </UiText>
+                  <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                    {t('editor.metadata.cameraProfile.coolWeight')}
+                  </UiText>
+                  <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right">
+                    {formatCameraProfilePercent(cameraProfileReport.coolWeight)}
+                  </UiText>
+                  <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                    {t('editor.metadata.cameraProfile.matrixHash')}
+                  </UiText>
+                  <UiText
+                    variant={TextVariants.small}
+                    color={TextColors.primary}
+                    className="truncate text-right"
+                    data-tooltip={cameraProfileReport.matrixHash ?? undefined}
+                  >
+                    {formatCameraProfileHash(cameraProfileReport.matrixHash)}
+                  </UiText>
+                  {cameraProfileReport.fallbackReason && (
+                    <>
+                      <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                        {t('editor.metadata.cameraProfile.fallbackReason')}
+                      </UiText>
+                      <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right">
+                        {cameraProfileReport.fallbackReason}
+                      </UiText>
+                    </>
+                  )}
+                </div>
+              </section>
+            )}
             <div>
               <UiText variant={TextVariants.heading} className="mb-3">
                 {t('editor.metadata.fileInfo.title')}

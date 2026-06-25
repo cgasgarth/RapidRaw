@@ -6,7 +6,9 @@ use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
 use crate::image_processing::{ImageMetadata, apply_orientation};
 use crate::mask_generation::{MaskDefinition, SubMask, generate_mask_bitmap};
-use crate::raw_processing::{RawDemosaicPath, RawProcessingProfile, develop_raw_image_with_report};
+use crate::raw_processing::{
+    RawDemosaicPath, RawDevelopmentReport, RawProcessingProfile, develop_raw_image_with_report,
+};
 use anyhow::{Context, Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
 use exif::{Reader as ExifReader, Tag};
@@ -34,6 +36,7 @@ pub struct LoadImageResult {
     pub exif: HashMap<String, String>,
     pub is_raw: bool,
     pub is_offline_smart_preview: bool,
+    pub raw_development_report: Option<RawDevelopmentReport>,
 }
 
 #[derive(Deserialize)]
@@ -55,6 +58,12 @@ struct RawProcessingModeRecipe {
     raw_preprocessing_sharpening_edge_masking: f32,
     raw_preprocessing_sharpening_radius: f32,
 }
+
+type LoadedBaseImageWithExif = (
+    DynamicImage,
+    HashMap<String, String>,
+    Option<RawDevelopmentReport>,
+);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum DemosaicSharpeningPath {
@@ -264,6 +273,23 @@ pub fn load_base_image_from_bytes(
     settings: &AppSettings,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<DynamicImage> {
+    load_base_image_from_bytes_with_report(
+        bytes,
+        path_for_ext_check,
+        use_fast_raw_dev,
+        settings,
+        cancel_token,
+    )
+    .map(|(image, _)| image)
+}
+
+pub(crate) fn load_base_image_from_bytes_with_report(
+    bytes: &[u8],
+    path_for_ext_check: &str,
+    use_fast_raw_dev: bool,
+    settings: &AppSettings,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
     let raw_processing_mode = settings.raw_processing_mode.as_deref();
     let recipe = raw_processing_mode_recipe(raw_processing_mode);
     let use_fast_raw_dev = use_fast_raw_dev || recipe.force_fast_demosaic;
@@ -336,7 +362,7 @@ pub fn load_base_image_from_bytes(
                         duration
                     );
                 }
-                Ok(image)
+                Ok((image, Some(report)))
             }
             Ok(Err(e)) => {
                 let classified = classify_raw_develop_error(path_for_ext_check, e);
@@ -376,7 +402,68 @@ pub fn load_base_image_from_bytes(
             );
         }
 
-        Ok(image)
+        Ok((image, None))
+    }
+}
+
+fn add_raw_development_report_exif(
+    exif: &mut HashMap<String, String>,
+    report: &RawDevelopmentReport,
+) {
+    let profile = &report.camera_profile;
+    exif.insert(
+        "RawEngineCameraProfileAlgorithm".to_string(),
+        profile.algorithm_id.to_string(),
+    );
+    exif.insert(
+        "RawEngineCameraProfileCandidateCount".to_string(),
+        profile.candidate_count.to_string(),
+    );
+    exif.insert(
+        "RawEngineCameraProfileStatus".to_string(),
+        profile.status.to_string(),
+    );
+    if let Some(value) = profile.estimated_cct_kelvin {
+        exif.insert(
+            "RawEngineCameraProfileEstimatedCctKelvin".to_string(),
+            format!("{value:.0}"),
+        );
+    }
+    if let Some(value) = &profile.matrix_hash {
+        exif.insert(
+            "RawEngineCameraProfileMatrixHash".to_string(),
+            value.clone(),
+        );
+    }
+    if let Some(value) = &profile.warm_illuminant {
+        exif.insert(
+            "RawEngineCameraProfileWarmIlluminant".to_string(),
+            value.clone(),
+        );
+    }
+    if let Some(value) = &profile.cool_illuminant {
+        exif.insert(
+            "RawEngineCameraProfileCoolIlluminant".to_string(),
+            value.clone(),
+        );
+    }
+    if let Some(value) = profile.cool_weight {
+        exif.insert(
+            "RawEngineCameraProfileCoolWeight".to_string(),
+            format!("{value:.4}"),
+        );
+    }
+    if let Some(value) = &profile.fallback_reason {
+        exif.insert(
+            "RawEngineCameraProfileFallbackReason".to_string(),
+            value.to_string(),
+        );
+    }
+    if !profile.warning_codes.is_empty() {
+        exif.insert(
+            "RawEngineCameraProfileWarnings".to_string(),
+            profile.warning_codes.join(","),
+        );
     }
 }
 
@@ -670,45 +757,47 @@ pub async fn load_image(
 
     let mut is_offline_smart_preview = false;
 
-    let (pristine_arc, exif_data) = if let Some((cached_img, cached_exif)) = cached_data {
-        (cached_img, cached_exif)
-    } else if let Some((smart_preview, manifest)) =
-        load_offline_smart_preview(&app_handle, &source_path_str)
-    {
-        is_offline_smart_preview = true;
-        let (preview_width, preview_height) = smart_preview.dimensions();
-        let mut exif_data_loaded = metadata.exif.clone().unwrap_or_default();
-        exif_data_loaded.insert(
-            "RawEngineOfflineSmartPreview".to_string(),
-            "true".to_string(),
-        );
-        exif_data_loaded.insert(
-            "RawEngineOfflineSmartPreviewSource".to_string(),
-            "missing-original".to_string(),
-        );
-        exif_data_loaded.insert(
-            "RawEngineOfflineSmartPreviewManifestSize".to_string(),
-            format!("{}x{}", manifest.width, manifest.height),
-        );
-        exif_data_loaded.insert(
-            "RawEngineOfflineSmartPreviewRenderSize".to_string(),
-            format!("{}x{}", preview_width, preview_height),
-        );
-        (Arc::new(smart_preview), exif_data_loaded)
-    } else {
-        let (pristine_img, exif_data_loaded) = tokio::task::spawn_blocking(move || {
-            if generation_tracker.load(Ordering::SeqCst) != my_generation {
-                return Err("Load cancelled".to_string());
-            }
+    let (pristine_arc, exif_data, raw_development_report) =
+        if let Some((cached_img, cached_exif, cached_raw_development_report)) = cached_data {
+            (cached_img, cached_exif, cached_raw_development_report)
+        } else if let Some((smart_preview, manifest)) =
+            load_offline_smart_preview(&app_handle, &source_path_str)
+        {
+            is_offline_smart_preview = true;
+            let (preview_width, preview_height) = smart_preview.dimensions();
+            let mut exif_data_loaded = metadata.exif.clone().unwrap_or_default();
+            exif_data_loaded.insert(
+                "RawEngineOfflineSmartPreview".to_string(),
+                "true".to_string(),
+            );
+            exif_data_loaded.insert(
+                "RawEngineOfflineSmartPreviewSource".to_string(),
+                "missing-original".to_string(),
+            );
+            exif_data_loaded.insert(
+                "RawEngineOfflineSmartPreviewManifestSize".to_string(),
+                format!("{}x{}", manifest.width, manifest.height),
+            );
+            exif_data_loaded.insert(
+                "RawEngineOfflineSmartPreviewRenderSize".to_string(),
+                format!("{}x{}", preview_width, preview_height),
+            );
+            (Arc::new(smart_preview), exif_data_loaded, None)
+        } else {
+            let (pristine_img, exif_data_loaded, raw_development_report) =
+            tokio::task::spawn_blocking(move || {
+                if generation_tracker.load(Ordering::SeqCst) != my_generation {
+                    return Err("Load cancelled".to_string());
+                }
 
-            let result: Result<(DynamicImage, HashMap<String, String>), String> =
-                (|| match read_file_mapped(Path::new(&path_clone)) {
+                let result: Result<LoadedBaseImageWithExif, String> =
+                    (|| match read_file_mapped(Path::new(&path_clone)) {
                     Ok(mmap) => {
                         if generation_tracker.load(Ordering::SeqCst) != my_generation {
                             return Err("Load cancelled".to_string());
                         }
 
-                        let img = load_base_image_from_bytes(
+                        let (img, raw_development_report) = load_base_image_from_bytes_with_report(
                             &mmap,
                             &path_clone,
                             false,
@@ -732,7 +821,10 @@ pub async fn load_image(
                             .provenance
                             .to_string(),
                         );
-                        Ok((img, exif))
+                        if let Some(report) = &raw_development_report {
+                            add_raw_development_report_exif(&mut exif, report);
+                        }
+                        Ok((img, exif, raw_development_report))
                     }
                     Err(e) => {
                         log::warn!(
@@ -748,7 +840,7 @@ pub async fn load_image(
                             return Err("Load cancelled".to_string());
                         }
 
-                        let img = load_base_image_from_bytes(
+                        let (img, raw_development_report) = load_base_image_from_bytes_with_report(
                             &bytes,
                             &path_clone,
                             false,
@@ -772,24 +864,28 @@ pub async fn load_image(
                             .provenance
                             .to_string(),
                         );
-                        Ok((img, exif))
+                        if let Some(report) = &raw_development_report {
+                            add_raw_development_report_exif(&mut exif, report);
+                        }
+                        Ok((img, exif, raw_development_report))
                     }
                 })();
-            result
-        })
-        .await
-        .map_err(|e| e.to_string())??;
+                result
+            })
+            .await
+            .map_err(|e| e.to_string())??;
 
-        let arc_img = Arc::new(pristine_img);
+            let arc_img = Arc::new(pristine_img);
 
-        state.decoded_image_cache.lock().unwrap().insert(
-            raw_processing_cache_key,
-            arc_img.clone(),
-            exif_data_loaded.clone(),
-        );
+            state.decoded_image_cache.lock().unwrap().insert(
+                raw_processing_cache_key,
+                arc_img.clone(),
+                exif_data_loaded.clone(),
+                raw_development_report.clone(),
+            );
 
-        (arc_img, exif_data_loaded)
-    };
+            (arc_img, exif_data_loaded, raw_development_report)
+        };
 
     if state.load_image_generation.load(Ordering::SeqCst) != my_generation {
         return Err("Load cancelled".to_string());
@@ -817,6 +913,7 @@ pub async fn load_image(
         exif: exif_data,
         is_raw: loaded_is_raw,
         is_offline_smart_preview,
+        raw_development_report,
     })
 }
 
