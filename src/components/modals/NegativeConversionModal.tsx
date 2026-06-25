@@ -968,7 +968,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     [frameHealthReport, previewUrl],
   );
   const dustHealLayerCount = Object.keys(dustHealLayerByCandidateId).length;
-  const handleAcceptDustCandidate = (frame: NegativeLabDustScratchFrame, candidate: NegativeLabDustScratchCandidate) => {
+  const handleAcceptDustCandidate = (
+    frame: NegativeLabDustScratchFrame,
+    candidate: NegativeLabDustScratchCandidate,
+  ) => {
     if (candidate.kind !== 'dust_spot') {
       setDustCandidateDecisionById((previous) => ({ ...previous, [candidate.candidateId]: 'rejected' }));
       return;
@@ -3120,7 +3123,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                       data-candidate-kind={candidate.kind}
                       data-candidate-review-decision={candidateDecision}
                       data-candidate-status={candidate.status}
-                      data-generated-heal-confidence={healLayer?.retouchCloneSource?.candidateProvenance?.confidence ?? ''}
+                      data-generated-heal-confidence={
+                        healLayer?.retouchCloneSource?.candidateProvenance?.confidence ?? ''
+                      }
                       data-generated-heal-layer-id={healLayer?.id ?? ''}
                       data-testid={`negative-lab-dust-candidate-${candidate.candidateId}`}
                       key={candidate.candidateId}
