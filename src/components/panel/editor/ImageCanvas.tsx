@@ -15,7 +15,14 @@ import { Mask, type SubMask, SubMaskMode, ToolType } from '../right/Masks';
 
 import type { RenderSize } from '../../../hooks/useImageRenderSize';
 import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
-import type { Adjustments, AiPatch, Coord, MaskContainer, RetouchCloneSource } from '../../../utils/adjustments';
+import type {
+  Adjustments,
+  AiPatch,
+  Coord,
+  MaskContainer,
+  RetouchCloneSource,
+  RetouchRemoveSource,
+} from '../../../utils/adjustments';
 import type { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
 import type { OverlayMode } from '../right/CropPanel';
 import type { KonvaEventObject, Node as KonvaNode } from 'konva/lib/Node';
@@ -116,6 +123,10 @@ const svgNumber = (value: number): string => String(value);
 const clamp01 = (value: number): number => {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(1, value));
+};
+const numberParameter = (parameters: SubMask['parameters'], key: string, fallback: number): number => {
+  const value = parameters?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 };
 
 interface ImageCanvasProps {
@@ -1301,6 +1312,18 @@ const ImageCanvas = memo(
 
     const activeRetouchSource = activeRetouchLayer?.retouchCloneSource ?? null;
 
+    const activeRemoveLayer = useMemo(() => {
+      if (!activeMaskContainerId) return null;
+      const layer = adjustments.masks.find((mask: MaskContainer) => mask.id === activeMaskContainerId);
+      return layer?.retouchRemoveSource === undefined ? null : layer;
+    }, [activeMaskContainerId, adjustments.masks]);
+
+    const activeRemoveSource = activeRemoveLayer?.retouchRemoveSource ?? null;
+    const activeRemoveTargetSubMask = useMemo(() => {
+      if (!activeRemoveLayer || !activeRemoveSource) return null;
+      return activeRemoveLayer.subMasks.find((subMask) => subMask.id === activeRemoveSource.targetMaskId) ?? null;
+    }, [activeRemoveLayer, activeRemoveSource]);
+
     const activeSubMask = useMemo(() => {
       if (!activeContainer) {
         return null;
@@ -2362,6 +2385,47 @@ const ImageCanvas = memo(
       [canvasPointToRetouchPoint, updateRetouchHandlePoint],
     );
 
+    const updateRemoveTargetPoint = useCallback(
+      (layerId: string, removeSource: RetouchRemoveSource, point: RetouchCloneSource['sourcePoint']) => {
+        setAdjustments((prev: Adjustments) => ({
+          ...prev,
+          masks: prev.masks.map((mask: MaskContainer) => {
+            if (mask.id !== layerId || mask.retouchRemoveSource === undefined) return mask;
+            const retouchRemoveSource = { ...mask.retouchRemoveSource };
+            delete retouchRemoveSource.resolvedSourcePoint;
+            return {
+              ...mask,
+              retouchRemoveSource: {
+                ...retouchRemoveSource,
+                status: 'needs_regeneration',
+              },
+              subMasks: mask.subMasks.map((subMask: SubMask) => {
+                if (subMask.id !== removeSource.targetMaskId || subMask.type !== Mask.Radial) return subMask;
+                return {
+                  ...subMask,
+                  parameters: {
+                    ...subMask.parameters,
+                    centerX: point.x * effectiveImageDimensions.width,
+                    centerY: point.y * effectiveImageDimensions.height,
+                  },
+                };
+              }),
+            };
+          }),
+        }));
+      },
+      [effectiveImageDimensions.height, effectiveImageDimensions.width, setAdjustments],
+    );
+
+    const handleRemoveTargetDragEnd = useCallback(
+      (layerId: string, removeSource: RetouchRemoveSource, event: RetouchHandleDragEvent) => {
+        event.evt.stopPropagation();
+        const point = canvasPointToRetouchPoint({ x: event.target.x(), y: event.target.y() });
+        updateRemoveTargetPoint(layerId, removeSource, point);
+      },
+      [canvasPointToRetouchPoint, updateRemoveTargetPoint],
+    );
+
     const cropPreviewUrl = uncroppedAdjustedPreviewUrl || selectedImage.thumbnailUrl;
     const originalSrc = transformedOriginalUrl;
     const isShowingOriginal = showOriginal && !!originalSrc;
@@ -2758,6 +2822,149 @@ const ImageCanvas = memo(
                             fill="#f97316"
                             onDragEnd={(event) => {
                               handleRetouchHandleDragEnd(activeRetouchLayer.id, 'targetPoint', event);
+                            }}
+                            onMouseDown={(event) => {
+                              event.evt.stopPropagation();
+                            }}
+                            onTouchStart={(event) => {
+                              event.evt.stopPropagation();
+                            }}
+                            radius={handleRadius}
+                            shadowBlur={4}
+                            shadowColor="black"
+                            shadowOpacity={0.5}
+                            stroke="#f8fafc"
+                            strokeScaleEnabled={false}
+                            strokeWidth={strokeWidth}
+                            x={targetPoint.x}
+                            y={targetPoint.y}
+                          />
+                        </Group>
+                      </Group>
+                    </Layer>
+                  </Stage>
+                </div>
+              );
+            })()}
+
+          {activeRemoveLayer &&
+            activeRemoveSource &&
+            activeRemoveTargetSubMask &&
+            !isCropping &&
+            imageRenderSize.width > 0 &&
+            imageRenderSize.height > 0 &&
+            (() => {
+              const targetX = numberParameter(
+                activeRemoveTargetSubMask.parameters,
+                'centerX',
+                effectiveImageDimensions.width * 0.5,
+              );
+              const targetY = numberParameter(
+                activeRemoveTargetSubMask.parameters,
+                'centerY',
+                effectiveImageDimensions.height * 0.5,
+              );
+              const targetPoint = {
+                x: targetX * imageRenderSize.scale,
+                y: targetY * imageRenderSize.scale,
+              };
+              const resolvedSourcePoint =
+                activeRemoveSource.resolvedSourcePoint === undefined
+                  ? null
+                  : retouchPointToCanvas(activeRemoveSource.resolvedSourcePoint);
+              const handleRadius = Math.max(6, Math.min(10, 7 / Math.max(0.75, transformState.scale)));
+              const strokeWidth = Math.max(1.5, 2 / Math.max(0.75, transformState.scale));
+              const removeRadius = (activeRemoveSource.radiusPx ?? 48) * imageRenderSize.scale;
+              const removeFeatherRadius =
+                Math.max(0, (activeRemoveSource.radiusPx ?? 48) + (activeRemoveSource.featherRadiusPx ?? 24)) *
+                imageRenderSize.scale;
+
+              return (
+                <div
+                  aria-label={t('editor.layers.removeSource.title')}
+                  className="absolute"
+                  data-remove-handle-layer-id={activeRemoveLayer.id}
+                  data-remove-handle-radius-px={activeRemoveSource.radiusPx ?? ''}
+                  data-remove-handle-feather-radius-px={activeRemoveSource.featherRadiusPx ?? ''}
+                  data-remove-handle-status={activeRemoveSource.status ?? 'needs_regeneration'}
+                  data-remove-handle-target-x={targetX}
+                  data-remove-handle-target-y={targetY}
+                  data-remove-handle-resolved-source-x={activeRemoveSource.resolvedSourcePoint?.x ?? ''}
+                  data-remove-handle-resolved-source-y={activeRemoveSource.resolvedSourcePoint?.y ?? ''}
+                  data-testid="image-canvas-remove-handles"
+                  style={{
+                    height: stageHeight * maxSafeScale,
+                    left: stageLeft,
+                    opacity: isShowingOriginal ? 0 : 1,
+                    pointerEvents: isShowingOriginal ? 'none' : 'auto',
+                    top: stageTop,
+                    touchAction: 'none',
+                    transform: `scale(${svgNumber(1 / maxSafeScale)})`,
+                    transformOrigin: '0 0',
+                    transition: 'opacity 150ms ease-in-out',
+                    userSelect: 'none',
+                    width: stageWidth * maxSafeScale,
+                    zIndex: 5,
+                  }}
+                >
+                  <Stage height={stageHeight * maxSafeScale} width={stageWidth * maxSafeScale}>
+                    <Layer>
+                      <Group scaleX={maxSafeScale} scaleY={maxSafeScale}>
+                        <Group x={groupOffsetX} y={groupOffsetY}>
+                          {resolvedSourcePoint && (
+                            <Line
+                              dash={[4, 4]}
+                              listening={false}
+                              points={[resolvedSourcePoint.x, resolvedSourcePoint.y, targetPoint.x, targetPoint.y]}
+                              stroke="#f8fafc"
+                              strokeScaleEnabled={false}
+                              strokeWidth={strokeWidth}
+                            />
+                          )}
+                          {removeFeatherRadius > removeRadius && (
+                            <Circle
+                              dash={[5, 5]}
+                              listening={false}
+                              radius={removeFeatherRadius}
+                              stroke="#f8fafc"
+                              strokeOpacity={0.55}
+                              strokeScaleEnabled={false}
+                              strokeWidth={strokeWidth}
+                              x={targetPoint.x}
+                              y={targetPoint.y}
+                            />
+                          )}
+                          <Circle
+                            listening={false}
+                            radius={removeRadius}
+                            stroke="#f97316"
+                            strokeOpacity={0.8}
+                            strokeScaleEnabled={false}
+                            strokeWidth={strokeWidth}
+                            x={targetPoint.x}
+                            y={targetPoint.y}
+                          />
+                          {resolvedSourcePoint && (
+                            <Circle
+                              fill="#0ea5e9"
+                              listening={false}
+                              radius={handleRadius}
+                              shadowBlur={4}
+                              shadowColor="black"
+                              shadowOpacity={0.5}
+                              stroke="#f8fafc"
+                              strokeScaleEnabled={false}
+                              strokeWidth={strokeWidth}
+                              x={resolvedSourcePoint.x}
+                              y={resolvedSourcePoint.y}
+                            />
+                          )}
+                          <Circle
+                            dragBoundFunc={dragBoundRetouchHandle}
+                            draggable
+                            fill="#f97316"
+                            onDragEnd={(event) => {
+                              handleRemoveTargetDragEnd(activeRemoveLayer.id, activeRemoveSource, event);
                             }}
                             onMouseDown={(event) => {
                               event.evt.stopPropagation();
