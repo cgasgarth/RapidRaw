@@ -2594,6 +2594,13 @@
         "dustSpot": "Dust candidate",
         "emulsionScratch": "Scratch candidate"
       },
+      "dustCandidateFilter": {
+        "accepted": "Accepted",
+        "all": "All",
+        "empty": "No dust candidates match this filter.",
+        "pending": "Pending",
+        "rejected": "Rejected"
+      },
       "dustCandidateStatus": {
         "acknowledged": "Acknowledged",
         "ignored": "Ignored",

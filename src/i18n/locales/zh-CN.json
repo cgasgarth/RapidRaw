@@ -2540,6 +2540,13 @@
         "dustSpot": "灰尘候选",
         "emulsionScratch": "划痕候选"
       },
+      "dustCandidateFilter": {
+        "accepted": "Accepted",
+        "all": "All",
+        "empty": "No dust candidates match this filter.",
+        "pending": "Pending",
+        "rejected": "Rejected"
+      },
       "dustCandidateStatus": {
         "acknowledged": "已确认",
         "ignored": "已忽略",
