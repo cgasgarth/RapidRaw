@@ -2128,8 +2128,26 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         },
         negativeConversionSavedPathsSchema,
       );
+      const acceptedDustHealLayers = Object.values(dustHealLayerByCandidateId);
+      const frameIdBySourcePath = new Map(frameHealthReport.frames.map((frame) => [frame.sourcePath, frame.frameId]));
+      const acceptedDustHealLayersBySavedPath = Object.fromEntries(
+        savedPaths
+          .map((savedPath, savedPathIndex) => {
+            const sourcePath = pathsToConvert[savedPathIndex];
+            const sourceFrameId = sourcePath === undefined ? undefined : frameIdBySourcePath.get(sourcePath);
+            const sourceLayers =
+              sourceFrameId === undefined
+                ? []
+                : acceptedDustHealLayers.filter(
+                    (layer) => layer.retouchCloneSource?.candidateProvenance?.sourceFrameId === sourceFrameId,
+                  );
+            return sourceLayers.length > 0 ? [savedPath, sourceLayers] : null;
+          })
+          .filter((entry): entry is [string, typeof acceptedDustHealLayers] => entry !== null),
+      );
       onSave(savedPaths, {
-        acceptedDustHealLayers: Object.values(dustHealLayerByCandidateId),
+        acceptedDustHealLayers,
+        acceptedDustHealLayersBySavedPath,
         openInEditor: openSavedPositiveInEditor,
       });
       onClose();
