@@ -80,6 +80,7 @@
     "check:profile-tone": "bun tests/integration/checks/check-profile-tone.ts",
     "check:camera-profile-lookup": "bun tests/integration/checks/check-camera-profile-lookup-fixtures.ts",
     "check:camera-profile-input-transform": "bun tests/integration/checks/check-camera-profile-input-transform-proof.ts",
+    "check:camera-profile-provenance": "bun tests/integration/checks/check-camera-profile-provenance.ts",
     "check:colorchecker-fixtures": "bun tests/integration/checks/check-colorchecker-fixtures.ts",
     "check:colorchecker-render-gate": "bun tests/integration/checks/check-colorchecker-render-gate.ts",
     "check:colorchecker-render-gate:update": "bun tests/integration/checks/check-colorchecker-render-gate.ts --update",

@@ -1,4 +1,5 @@
 import type { ExportPreset } from './ExportImportProperties';
+import type { RawDevelopmentReport } from '../../schemas/imageLoaderSchemas';
 import type { Adjustments, CopyPasteSettings } from '../../utils/adjustments';
 import type { ToolType } from '../panel/right/Masks';
 import type { LucideIcon } from 'lucide-react';
@@ -376,6 +377,7 @@ export interface SelectedImage {
   original_base64?: string;
   originalUrl: string | null;
   path: string;
+  rawDevelopmentReport?: RawDevelopmentReport | null;
   thumbnailUrl: string;
   width: number;
 }

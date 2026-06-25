@@ -1,9 +1,22 @@
 use crate::AppState;
+use crate::raw_processing::RawDevelopmentReport;
 use image::DynamicImage;
 use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
+
+type DecodedImageCacheEntry = (
+    String,
+    Arc<DynamicImage>,
+    HashMap<String, String>,
+    Option<RawDevelopmentReport>,
+);
+type DecodedImageCacheValue = (
+    Arc<DynamicImage>,
+    HashMap<String, String>,
+    Option<RawDevelopmentReport>,
+);
 
 pub const GEOMETRY_KEYS: &[&str] = &[
     "transformDistortion",
@@ -158,7 +171,7 @@ pub fn calculate_full_job_hash(path: &str, adjustments: &serde_json::Value) -> u
 
 pub struct DecodedImageCache {
     capacity: usize,
-    items: Vec<(String, Arc<DynamicImage>, HashMap<String, String>)>,
+    items: Vec<DecodedImageCacheEntry>,
 }
 
 impl DecodedImageCache {
@@ -176,10 +189,10 @@ impl DecodedImageCache {
         }
     }
 
-    pub fn get(&mut self, path: &str) -> Option<(Arc<DynamicImage>, HashMap<String, String>)> {
-        if let Some(pos) = self.items.iter().position(|(p, _, _)| p == path) {
+    pub(crate) fn get(&mut self, path: &str) -> Option<DecodedImageCacheValue> {
+        if let Some(pos) = self.items.iter().position(|(p, _, _, _)| p == path) {
             let item = self.items.remove(pos);
-            let result = (item.1.clone(), item.2.clone());
+            let result = (item.1.clone(), item.2.clone(), item.3.clone());
             self.items.push(item);
             Some(result)
         } else {
@@ -191,18 +204,19 @@ impl DecodedImageCache {
         self.items.clear();
     }
 
-    pub fn insert(
+    pub(crate) fn insert(
         &mut self,
         path: String,
         image: Arc<DynamicImage>,
         exif: HashMap<String, String>,
+        raw_development_report: Option<RawDevelopmentReport>,
     ) {
-        if let Some(pos) = self.items.iter().position(|(p, _, _)| *p == path) {
+        if let Some(pos) = self.items.iter().position(|(p, _, _, _)| *p == path) {
             self.items.remove(pos);
         } else if self.items.len() >= self.capacity {
             self.items.remove(0);
         }
-        self.items.push((path, image, exif));
+        self.items.push((path, image, exif, raw_development_report));
     }
 }
 

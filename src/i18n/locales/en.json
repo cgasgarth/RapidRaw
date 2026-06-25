@@ -1045,6 +1045,21 @@
         "shutterSpeed": "Shutter Speed",
         "title": "Camera Details"
       },
+      "cameraProfile": {
+        "algorithm": "Algorithm",
+        "coolWeight": "Cool weight",
+        "estimatedCct": "Estimated CCT",
+        "fallbackReason": "Fallback",
+        "illuminants": "Illuminants",
+        "matrixHash": "Matrix hash",
+        "status": {
+          "fallback": "Fallback",
+          "interpolated": "Interpolated",
+          "single_illuminant": "Single illuminant",
+          "unavailable": "Unavailable"
+        },
+        "title": "Camera Input Profile"
+      },
       "clickToEdit": "Click to edit",
       "copied": "Copied",
       "copy": "Copy",

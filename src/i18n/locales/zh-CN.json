@@ -1037,6 +1037,21 @@
         "shutterSpeed": "快门速度",
         "title": "相机详情"
       },
+      "cameraProfile": {
+        "algorithm": "Algorithm",
+        "coolWeight": "Cool weight",
+        "estimatedCct": "Estimated CCT",
+        "fallbackReason": "Fallback",
+        "illuminants": "Illuminants",
+        "matrixHash": "Matrix hash",
+        "status": {
+          "fallback": "Fallback",
+          "interpolated": "Interpolated",
+          "single_illuminant": "Single illuminant",
+          "unavailable": "Unavailable"
+        },
+        "title": "Camera Input Profile"
+      },
       "clickToEdit": "点击编辑",
       "copied": "已复制",
       "copy": "复制",

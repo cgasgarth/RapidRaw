@@ -15,6 +15,36 @@ const nullAdjustmentSnapshotSchema = z
 
 const exifSchema = z.record(z.string(), z.string()).nullable();
 
+export const rawDemosaicPathSchema = z.enum(['bayer_hq', 'fast', 'linear_bypass', 'standard']);
+
+export const rawCameraProfileStatusSchema = z.enum(['fallback', 'interpolated', 'single_illuminant', 'unavailable']);
+
+export const rawCameraProfileReportSchema = z
+  .object({
+    algorithmId: z.string().trim().min(1),
+    candidateCount: z.number().int().nonnegative(),
+    coolIlluminant: z.string().trim().min(1).nullable().optional(),
+    coolWeight: z.number().min(0).max(1).nullable().optional(),
+    estimatedCctKelvin: z.number().positive().nullable().optional(),
+    fallbackReason: z.string().trim().min(1).nullable().optional(),
+    matrixHash: z
+      .string()
+      .regex(/^blake3:[0-9a-f]+$/u)
+      .nullable()
+      .optional(),
+    status: rawCameraProfileStatusSchema,
+    warmIlluminant: z.string().trim().min(1).nullable().optional(),
+    warningCodes: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
+export const rawDevelopmentReportSchema = z
+  .object({
+    cameraProfile: rawCameraProfileReportSchema,
+    demosaicPath: rawDemosaicPathSchema,
+  })
+  .strict();
+
 export const loadedMetadataSchema = z
   .object({
     adjustments: z.union([legacyAdjustmentSnapshotSchema, nullAdjustmentSnapshotSchema]).nullable().optional(),
@@ -28,12 +58,14 @@ export const loadImageResultSchema = z
     is_offline_smart_preview: z.boolean().optional(),
     is_raw: z.boolean(),
     metadata: z.unknown().optional(),
+    raw_development_report: rawDevelopmentReportSchema.nullable().optional(),
     width: z.number().nonnegative(),
   })
   .loose();
 
 export type LoadedMetadata = z.infer<typeof loadedMetadataSchema>;
 export type LoadImageResult = z.infer<typeof loadImageResultSchema>;
+export type RawDevelopmentReport = z.infer<typeof rawDevelopmentReportSchema>;
 
 export const isNullAdjustmentSnapshot = (
   value: LoadedMetadata['adjustments'],
