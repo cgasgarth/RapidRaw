@@ -3063,6 +3063,8 @@ const ImageCanvas = memo(
               const handleRadius = Math.max(6, Math.min(10, 7 / Math.max(0.75, transformState.scale)));
               const strokeWidth = Math.max(1.5, 2 / Math.max(0.75, transformState.scale));
               const removeRadius = (activeRemoveSource.radiusPx ?? 48) * imageRenderSize.scale;
+              const removeSearchRadius =
+                (activeRemoveSource.radiusPx ?? 48) * activeRemoveSource.searchRadiusMultiplier * imageRenderSize.scale;
               const removeFeatherRadius =
                 Math.max(0, (activeRemoveSource.radiusPx ?? 48) + (activeRemoveSource.featherRadiusPx ?? 24)) *
                 imageRenderSize.scale;
@@ -3080,6 +3082,8 @@ const ImageCanvas = memo(
                   data-remove-handle-layer-id={activeRemoveLayer.id}
                   data-remove-handle-radius-px={activeRemoveSource.radiusPx ?? ''}
                   data-remove-handle-feather-radius-px={activeRemoveSource.featherRadiusPx ?? ''}
+                  data-remove-handle-search-radius-multiplier={activeRemoveSource.searchRadiusMultiplier}
+                  data-remove-handle-search-radius-px={removeSearchRadius}
                   data-remove-handle-status-color={removeStatusColor}
                   data-remove-handle-status={activeRemoveSource.status ?? 'needs_regeneration'}
                   data-remove-handle-status-label={removeStatusLabel}
@@ -3132,6 +3136,22 @@ const ImageCanvas = memo(
                               stroke="#f8fafc"
                               strokeScaleEnabled={false}
                               strokeWidth={strokeWidth}
+                            />
+                          )}
+                          {removeSearchRadius > removeRadius && (
+                            <Circle
+                              dash={[10, 7]}
+                              data-remove-canvas-search-radius-multiplier={activeRemoveSource.searchRadiusMultiplier}
+                              data-remove-canvas-search-radius-px={removeSearchRadius}
+                              data-testid="image-canvas-remove-search-radius"
+                              listening={false}
+                              radius={removeSearchRadius}
+                              stroke="#facc15"
+                              strokeOpacity={0.45}
+                              strokeScaleEnabled={false}
+                              strokeWidth={strokeWidth}
+                              x={targetPoint.x}
+                              y={targetPoint.y}
                             />
                           )}
                           {removeFeatherRadius > removeRadius && (
