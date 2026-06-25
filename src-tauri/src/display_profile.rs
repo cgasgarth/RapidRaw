@@ -32,7 +32,9 @@ pub enum ActiveDisplayProfileStatus {
 #[derive(Clone, Copy, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DisplayPreviewLutTransformStatus {
+    #[cfg(not(any(target_os = "android", target_os = "linux")))]
     ActiveDisplayTransform,
+    #[cfg(not(any(target_os = "android", target_os = "linux")))]
     SrgbFallbackTransform,
     UnsupportedPlatform,
 }
