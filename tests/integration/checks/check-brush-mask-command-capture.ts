@@ -45,6 +45,11 @@ for (const marker of [
   'data-testid="image-canvas-brush-command-capture"',
   'data-brush-command-type={lastBrushCommandCapture?.commandType',
   'data-brush-command-coordinate-space={lastBrushCommandCapture?.coordinateSpace',
+  'data-testid="image-canvas-retouch-handles"',
+  'data-retouch-handle-source-x={activeRetouchSource.sourcePoint.x}',
+  "handleRetouchHandleDragEnd(activeRetouchLayer.id, 'sourcePoint', event)",
+  "handleRetouchHandleDragEnd(activeRetouchLayer.id, 'targetPoint', event)",
+  'updateRetouchHandlePoint(layerId, handle, point)',
   'recordBrushMaskCommandCapture(activeId, activeSubMask, nextParameters)',
   'buildBrushMaskCommandFromParameters(',
 ]) {
