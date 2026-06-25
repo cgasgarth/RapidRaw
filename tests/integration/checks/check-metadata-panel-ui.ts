@@ -56,6 +56,10 @@ for (const choice of ['external', 'local', 'merge']) {
 }
 
 const source = readFileSync('src/components/panel/right/MetadataPanel.tsx', 'utf8');
+const appPropertiesSource = readFileSync('src/components/ui/AppProperties.tsx', 'utf8');
+const rustSource = readFileSync('src-tauri/src/display_profile.rs', 'utf8');
+const libSource = readFileSync('src-tauri/src/lib.rs', 'utf8');
+const schemaSource = readFileSync('src/schemas/displayProfileSchemas.ts', 'utf8');
 for (const marker of [
   'data-testid="metadata-readiness-summary"',
   'data-selection-count={targetPaths.length}',
@@ -64,7 +68,10 @@ for (const marker of [
   'data-editable-field-count={editableMetadataFieldCount}',
   'editor.metadata.readiness.cameraFields',
   'editor.metadata.readiness.editableFields',
-  'data-display-preview-lut-status={previewLutStatus(displayProfileState.profile)}',
+  'displayPreviewLutStatusSchema',
+  'Invokes.GetDisplayPreviewLutStatus',
+  'data-display-preview-lut-samples={displayPreviewLutState.lut?.sampleCount ?? 0}',
+  'data-display-preview-lut-size={displayPreviewLutState.lut?.size ?? 0}',
   'data-testid="metadata-display-preview-lut-status"',
   'editor.metadata.displayProfile.previewLut',
   'editor.metadata.displayProfile.previewLutStatus',
@@ -76,6 +83,21 @@ for (const marker of [
 ]) {
   if (!source.includes(marker)) {
     console.error(`Metadata panel readiness marker missing: ${marker}`);
+    process.exit(1);
+  }
+}
+
+for (const [haystack, marker] of [
+  [schemaSource, 'displayPreviewLutStatusSchema'],
+  [schemaSource, 'displayPreviewLutTransformStatusSchema'],
+  [appPropertiesSource, "GetDisplayPreviewLutStatus = 'get_display_preview_lut_status'"],
+  [libSource, 'display_profile::get_display_preview_lut_status'],
+  [rustSource, 'pub fn get_display_preview_lut_status()'],
+  [rustSource, 'build_srgb_to_active_display_lut()'],
+  [rustSource, 'DisplayPreviewLutTransformStatus'],
+]) {
+  if (!haystack.includes(marker)) {
+    console.error(`Display preview LUT marker missing: ${marker}`);
     process.exit(1);
   }
 }

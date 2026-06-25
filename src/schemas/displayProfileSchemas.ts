@@ -22,3 +22,20 @@ export const activeDisplayProfileSchema = z
   .strict();
 
 export type ActiveDisplayProfile = z.infer<typeof activeDisplayProfileSchema>;
+
+export const displayPreviewLutTransformStatusSchema = z.enum([
+  'active_display_transform',
+  'srgb_fallback_transform',
+  'unsupported_platform',
+]);
+
+export const displayPreviewLutStatusSchema = z
+  .object({
+    profile: activeDisplayProfileSchema,
+    sampleCount: z.number().int().nonnegative(),
+    size: z.number().int().nonnegative(),
+    status: displayPreviewLutTransformStatusSchema,
+  })
+  .strict();
+
+export type DisplayPreviewLutStatus = z.infer<typeof displayPreviewLutStatusSchema>;

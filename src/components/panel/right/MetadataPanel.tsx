@@ -6,7 +6,12 @@ import { useTranslation } from 'react-i18next';
 
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { useManagedFocus } from '../../../hooks/useManagedFocus';
-import { type ActiveDisplayProfile, activeDisplayProfileSchema } from '../../../schemas/displayProfileSchemas';
+import {
+  type ActiveDisplayProfile,
+  type DisplayPreviewLutStatus,
+  activeDisplayProfileSchema,
+  displayPreviewLutStatusSchema,
+} from '../../../schemas/displayProfileSchemas';
 import { emptyTauriResponseSchema } from '../../../schemas/tauriResponseSchemas';
 import {
   type XmpMetadataConflictChoice,
@@ -44,6 +49,10 @@ type DisplayProfileState =
   | { error: string; loading: false; profile: null }
   | { error: null; loading: true; profile: null }
   | { error: null; loading: false; profile: ActiveDisplayProfile };
+type DisplayPreviewLutState =
+  | { error: string; loading: false; lut: null }
+  | { error: null; loading: true; lut: null }
+  | { error: null; loading: false; lut: DisplayPreviewLutStatus };
 
 interface GPSData {
   altitude: string | number | null;
@@ -176,9 +185,9 @@ function formatDisplayProfileByteCount(profile: ActiveDisplayProfile) {
   return profile.profileByteCount.toLocaleString();
 }
 
-function previewLutStatus(profile: ActiveDisplayProfile) {
-  if (profile.status === 'active_profile_loaded') return 'active';
-  if (profile.status === 'fallback_no_active_profile') return 'fallback';
+function previewLutStatus(lut: DisplayPreviewLutStatus) {
+  if (lut.status === 'active_display_transform') return 'active';
+  if (lut.status === 'srgb_fallback_transform') return 'fallback';
   return 'unsupported';
 }
 
@@ -325,6 +334,11 @@ export default function MetadataPanel() {
     loading: true,
     profile: null,
   });
+  const [displayPreviewLutState, setDisplayPreviewLutState] = useState<DisplayPreviewLutState>({
+    error: null,
+    loading: true,
+    lut: null,
+  });
 
   const rating = selectedImage ? imageRatings[selectedImage.path] || 0 : 0;
   const tags = useMemo(
@@ -432,15 +446,26 @@ export default function MetadataPanel() {
 
     const loadDisplayProfile = async () => {
       setDisplayProfileState({ error: null, loading: true, profile: null });
+      setDisplayPreviewLutState({ error: null, loading: true, lut: null });
       try {
-        const profile = await invokeWithSchema(Invokes.GetActiveDisplayProfile, {}, activeDisplayProfileSchema);
+        const [profile, lut] = await Promise.all([
+          invokeWithSchema(Invokes.GetActiveDisplayProfile, {}, activeDisplayProfileSchema),
+          invokeWithSchema(Invokes.GetDisplayPreviewLutStatus, {}, displayPreviewLutStatusSchema),
+        ]);
         if (isActive) setDisplayProfileState({ error: null, loading: false, profile });
+        if (isActive) setDisplayPreviewLutState({ error: null, loading: false, lut });
       } catch (err) {
         if (isActive) {
+          const error = err instanceof Error ? err.message : String(err);
           setDisplayProfileState({
-            error: err instanceof Error ? err.message : String(err),
+            error,
             loading: false,
             profile: null,
+          });
+          setDisplayPreviewLutState({
+            error,
+            loading: false,
+            lut: null,
           });
         }
       }
@@ -726,12 +751,24 @@ export default function MetadataPanel() {
                     variant={TextVariants.small}
                     color={TextColors.primary}
                     className="truncate text-right"
-                    data-display-preview-lut-status={previewLutStatus(displayProfileState.profile)}
+                    data-display-preview-lut-samples={displayPreviewLutState.lut?.sampleCount ?? 0}
+                    data-display-preview-lut-size={displayPreviewLutState.lut?.size ?? 0}
+                    data-display-preview-lut-status={
+                      displayPreviewLutState.lut === null
+                        ? displayPreviewLutState.loading
+                          ? 'loading'
+                          : 'error'
+                        : previewLutStatus(displayPreviewLutState.lut)
+                    }
                     data-testid="metadata-display-preview-lut-status"
                   >
-                    {t(
-                      `editor.metadata.displayProfile.previewLutStatus.${previewLutStatus(displayProfileState.profile)}`,
-                    )}
+                    {displayPreviewLutState.loading
+                      ? t('editor.metadata.displayProfile.loading')
+                      : displayPreviewLutState.lut
+                        ? t(
+                            `editor.metadata.displayProfile.previewLutStatus.${previewLutStatus(displayPreviewLutState.lut)}`,
+                          )
+                        : t('editor.metadata.displayProfile.status.error')}
                   </UiText>
                 </div>
               ) : (
