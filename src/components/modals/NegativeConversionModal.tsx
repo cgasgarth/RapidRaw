@@ -1030,6 +1030,18 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       }
     }
   };
+  const handleClearAcceptedDustCandidates = () => {
+    setDustHealLayerByCandidateId({});
+    setDustCandidateDecisionById((previous) => {
+      const next: typeof previous = {};
+      for (const [candidateId, decision] of Object.entries(previous)) {
+        if (decision !== 'accepted') {
+          next[candidateId] = decision;
+        }
+      }
+      return next;
+    });
+  };
   const handleRejectDustCandidate = (candidate: NegativeLabDustScratchCandidate) => {
     setDustHealLayerByCandidateId((previous) => {
       const next: typeof previous = {};
@@ -3155,6 +3167,16 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             type="button"
           >
             {t('modals.negativeConversion.acceptAllDustCandidates', { candidateCount: bulkAcceptDustCandidateCount })}
+          </button>
+          <button
+            className="rounded border border-yellow-200/40 px-1.5 py-0.5 text-yellow-100 disabled:cursor-not-allowed disabled:opacity-40"
+            data-clear-accepted-count={dustHealLayerCount}
+            data-testid="negative-lab-clear-accepted-dust-candidates"
+            disabled={dustHealLayerCount === 0}
+            onClick={handleClearAcceptedDustCandidates}
+            type="button"
+          >
+            {t('modals.negativeConversion.clearAcceptedDustCandidates')}
           </button>
         </div>
       </div>
