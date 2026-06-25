@@ -42,9 +42,12 @@ const requiredRemoveSourceKeys = [
   'regenerate',
   'search',
   'seed',
+  'sourcePending',
+  'sourceResolved',
   'summary',
   'title',
 ];
+const requiredRemoveGuidanceKeys = ['fallback_unchanged', 'needs_regeneration', 'ready', 'stale'];
 const requiredRetouchSourceKeys = [
   'feather',
   'radius',
@@ -102,8 +105,11 @@ const missingRemoveSourceKeys = requiredRemoveSourceKeys.filter(
 if (
   missingRemoveSourceKeys.length > 0 ||
   typeof layerLocale?.removeSource?.generators?.localPatchFill !== 'string' ||
+  requiredRemoveGuidanceKeys.some((key) => typeof layerLocale?.removeSource?.guidance?.[key] !== 'string') ||
+  typeof layerLocale?.removeSource?.status?.fallback_unchanged !== 'string' ||
   typeof layerLocale?.removeSource?.status?.needs_regeneration !== 'string' ||
-  typeof layerLocale?.removeSource?.status?.ready !== 'string'
+  typeof layerLocale?.removeSource?.status?.ready !== 'string' ||
+  typeof layerLocale?.removeSource?.status?.stale !== 'string'
 ) {
   console.error(`Missing layer stack remove source locale keys: ${missingRemoveSourceKeys.join(', ')}`);
   process.exit(1);
@@ -224,11 +230,19 @@ for (const marker of [
   'editor.layers.newRemoveLayerName',
   'data-testid="layer-retouch-source-editor"',
   'data-testid="layer-retouch-remove-editor"',
+  'data-testid="layer-retouch-remove-status-card"',
+  'data-testid="layer-retouch-remove-status-pill"',
+  'data-testid="layer-retouch-remove-source-state"',
+  'data-testid="layer-retouch-remove-guidance"',
   'data-testid="layer-retouch-remove-regenerate"',
   'const targetMaskId = `${layerId}_remove_region`',
   'const targetPoint = { x: 0.5, y: 0.5 }',
+  'data-remove-source-resolved={String(activeRow.retouchRemoveSource.resolvedSourcePoint !== undefined)}',
+  'data-remove-status-guidance={t(getRemoveStatusGuidanceKey(activeRow.retouchRemoveSource.status))}',
   'data-remove-resolved-source-x={activeRow.retouchRemoveSource.resolvedSourcePoint?.x ??',
   'data-remove-resolved-source-y={activeRow.retouchRemoveSource.resolvedSourcePoint?.y ??',
+  'getRemoveStatusGuidanceKey(activeRow.retouchRemoveSource.status)',
+  'getRemoveStatusTone(activeRow.retouchRemoveSource.status)',
   'data-testid="layer-retouch-remove-resolved-source"',
   'data-retouch-source-x={activeRow.retouchCloneSource.sourcePoint.x}',
   'data-retouch-candidate-confidence={activeRow.retouchCloneSource.candidateProvenance?.confidence ??',

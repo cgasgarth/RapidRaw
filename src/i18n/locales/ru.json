@@ -836,10 +836,18 @@
         "generators": {
           "localPatchFill": "Built-in local fill"
         },
+        "guidance": {
+          "fallback_unchanged": "The remove layer is preserving the original pixels until a better source is available.",
+          "needs_regeneration": "Regenerate after target, radius, feather, search, or seed changes to refresh the remove result.",
+          "ready": "The remove layer has a resolved source and is ready for preview/export replay.",
+          "stale": "The remove layer has a stale result; regenerate before final output."
+        },
         "radius": "Radius",
         "regenerate": "Regenerate",
         "search": "Search",
         "seed": "Seed",
+        "sourcePending": "Source pending",
+        "sourceResolved": "Source resolved",
         "status": {
           "fallback_unchanged": "Fallback unchanged",
           "needs_regeneration": "Needs regeneration",

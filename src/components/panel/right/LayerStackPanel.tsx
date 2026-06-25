@@ -204,6 +204,33 @@ function getRemoveStatusLabelKey(status: RetouchRemoveSource['status']) {
   }
 }
 
+function getRemoveStatusGuidanceKey(status: RetouchRemoveSource['status']) {
+  switch (status) {
+    case 'fallback_unchanged':
+      return 'editor.layers.removeSource.guidance.fallback_unchanged';
+    case 'ready':
+      return 'editor.layers.removeSource.guidance.ready';
+    case 'stale':
+      return 'editor.layers.removeSource.guidance.stale';
+    case 'needs_regeneration':
+    case undefined:
+      return 'editor.layers.removeSource.guidance.needs_regeneration';
+  }
+}
+
+function getRemoveStatusTone(status: RetouchRemoveSource['status']): string {
+  switch (status) {
+    case 'ready':
+      return 'border-green-500/30 bg-green-500/10 text-green-200';
+    case 'fallback_unchanged':
+    case 'stale':
+      return 'border-amber-500/30 bg-amber-500/10 text-amber-200';
+    case 'needs_regeneration':
+    case undefined:
+      return 'border-blue-500/30 bg-blue-500/10 text-blue-200';
+  }
+}
+
 function getCandidateStatusLabelKey(status: RetouchCandidateProvenance['statusAtAcceptance']) {
   switch (status) {
     case 'acknowledged':
@@ -1349,7 +1376,9 @@ export default function LayerStackPanel({
               data-remove-resolved-source-x={activeRow.retouchRemoveSource.resolvedSourcePoint?.x ?? ''}
               data-remove-resolved-source-y={activeRow.retouchRemoveSource.resolvedSourcePoint?.y ?? ''}
               data-remove-status={activeRow.retouchRemoveSource.status ?? 'needs_regeneration'}
+              data-remove-status-guidance={t(getRemoveStatusGuidanceKey(activeRow.retouchRemoveSource.status))}
               data-remove-target-mask-id={activeRow.retouchRemoveSource.targetMaskId}
+              data-remove-source-resolved={String(activeRow.retouchRemoveSource.resolvedSourcePoint !== undefined)}
               data-testid="layer-retouch-remove-editor"
             >
               <div className="flex items-start justify-between gap-2">
@@ -1375,6 +1404,38 @@ export default function LayerStackPanel({
                 >
                   {t('editor.layers.removeSource.regenerate')}
                 </button>
+              </div>
+              <div
+                className="mt-2 grid grid-cols-1 gap-2 rounded-md border border-surface bg-surface/60 p-2"
+                data-testid="layer-retouch-remove-status-card"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={cx(
+                      'inline-flex rounded-full border px-2 py-0.5 text-xs font-medium',
+                      getRemoveStatusTone(activeRow.retouchRemoveSource.status),
+                    )}
+                    data-testid="layer-retouch-remove-status-pill"
+                  >
+                    {t(getRemoveStatusLabelKey(activeRow.retouchRemoveSource.status))}
+                  </span>
+                  <UiText
+                    variant={TextVariants.small}
+                    className="text-text-tertiary"
+                    data-testid="layer-retouch-remove-source-state"
+                  >
+                    {activeRow.retouchRemoveSource.resolvedSourcePoint === undefined
+                      ? t('editor.layers.removeSource.sourcePending')
+                      : t('editor.layers.removeSource.sourceResolved')}
+                  </UiText>
+                </div>
+                <UiText
+                  variant={TextVariants.small}
+                  className="text-text-secondary"
+                  data-testid="layer-retouch-remove-guidance"
+                >
+                  {t(getRemoveStatusGuidanceKey(activeRow.retouchRemoveSource.status))}
+                </UiText>
               </div>
               {activeRow.retouchRemoveSource.resolvedSourcePoint !== undefined && (
                 <div
