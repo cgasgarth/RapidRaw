@@ -2739,13 +2739,20 @@ const ImageCanvas = memo(
               const retouchFeatherRadius =
                 Math.max(0, (activeRetouchSource.radiusPx ?? 0) + (activeRetouchSource.featherRadiusPx ?? 0)) *
                 imageRenderSize.scale;
+              const retouchMode = activeRetouchSource.retouchMode ?? 'clone';
+              const retouchModeLabel = t(
+                retouchMode === 'heal'
+                  ? 'editor.layers.retouchSource.modes.heal'
+                  : 'editor.layers.retouchSource.modes.clone',
+              );
 
               return (
                 <div
                   aria-label={t('editor.layers.retouchSource.title')}
                   className="absolute"
                   data-retouch-handle-layer-id={activeRetouchLayer.id}
-                  data-retouch-handle-mode={activeRetouchSource.retouchMode ?? 'clone'}
+                  data-retouch-handle-mode={retouchMode}
+                  data-retouch-handle-mode-label={retouchModeLabel}
                   data-retouch-handle-radius-px={activeRetouchSource.radiusPx ?? ''}
                   data-retouch-handle-feather-radius-px={activeRetouchSource.featherRadiusPx ?? ''}
                   data-retouch-handle-source-x={activeRetouchSource.sourcePoint.x}
@@ -2828,6 +2835,30 @@ const ImageCanvas = memo(
                             x={sourcePoint.x}
                             y={sourcePoint.y}
                           />
+                          <Label
+                            data-retouch-canvas-handle="sourcePoint"
+                            data-retouch-canvas-mode={retouchMode}
+                            data-testid="image-canvas-retouch-source-label"
+                            listening={false}
+                            x={sourcePoint.x + handleRadius + 8}
+                            y={sourcePoint.y - handleRadius - 28}
+                          >
+                            <Tag
+                              cornerRadius={6}
+                              fill="rgba(15, 23, 42, 0.88)"
+                              lineJoin="round"
+                              stroke="#0ea5e9"
+                              strokeWidth={1}
+                            />
+                            <KonvaText
+                              fill="#f8fafc"
+                              fontFamily="Inter, system-ui, sans-serif"
+                              fontSize={12}
+                              fontStyle="600"
+                              padding={6}
+                              text={`${retouchModeLabel} S`}
+                            />
+                          </Label>
                           <Circle
                             dragBoundFunc={dragBoundRetouchHandle}
                             draggable
@@ -2851,6 +2882,30 @@ const ImageCanvas = memo(
                             x={targetPoint.x}
                             y={targetPoint.y}
                           />
+                          <Label
+                            data-retouch-canvas-handle="targetPoint"
+                            data-retouch-canvas-mode={retouchMode}
+                            data-testid="image-canvas-retouch-target-label"
+                            listening={false}
+                            x={targetPoint.x + handleRadius + 8}
+                            y={targetPoint.y - handleRadius - 28}
+                          >
+                            <Tag
+                              cornerRadius={6}
+                              fill="rgba(15, 23, 42, 0.88)"
+                              lineJoin="round"
+                              stroke="#f97316"
+                              strokeWidth={1}
+                            />
+                            <KonvaText
+                              fill="#f8fafc"
+                              fontFamily="Inter, system-ui, sans-serif"
+                              fontSize={12}
+                              fontStyle="600"
+                              padding={6}
+                              text={`${retouchModeLabel} T`}
+                            />
+                          </Label>
                         </Group>
                       </Group>
                     </Layer>
