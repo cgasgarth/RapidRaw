@@ -149,16 +149,18 @@ const cloneSampleIndex = (
   height: number,
   cloneSource: NonNullable<LayerBlendStackLayer['retouchCloneSource']>,
 ): number | null => {
-  if (cloneSource.rotationDegrees !== 0 || cloneSource.scale !== 1) {
-    throw new Error('Retouch clone layer rendering supports exact translated sampling only.');
-  }
-
   const sourcePoint = normalizedPointToPixel(cloneSource.sourcePoint, width, height);
   const targetPoint = normalizedPointToPixel(cloneSource.targetPoint, width, height);
   const targetX = targetIndex % width;
   const targetY = Math.floor(targetIndex / width);
-  const sourceX = targetX + sourcePoint.x - targetPoint.x;
-  const sourceY = targetY + sourcePoint.y - targetPoint.y;
+  const scale = Math.max(0.1, cloneSource.scale);
+  const radians = (-cloneSource.rotationDegrees * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const targetOffsetX = (targetX - targetPoint.x) / scale;
+  const targetOffsetY = (targetY - targetPoint.y) / scale;
+  const sourceX = Math.round(sourcePoint.x + targetOffsetX * cos - targetOffsetY * sin);
+  const sourceY = Math.round(sourcePoint.y + targetOffsetX * sin + targetOffsetY * cos);
   if (sourceX < 0 || sourceX >= width || sourceY < 0 || sourceY >= height) return null;
   return sourceY * width + sourceX;
 };

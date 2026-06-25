@@ -299,21 +299,6 @@ for (const fixture of manifest.cases) {
     fail(`${fixture.id}: sidecar heal metadata missing`);
   }
 
-  const transformedCloneLayer = {
-    ...cloneLayer,
-    retouchCloneSource: {
-      ...cloneLayer.retouchCloneSource,
-      rotationDegrees: 2,
-    },
-  };
-  let rejectedTransformedClone = false;
-  try {
-    renderLayerPreviewStack({ ...fixture, layers: [transformedCloneLayer] });
-  } catch (error) {
-    rejectedTransformedClone = error instanceof Error && error.message.includes('exact translated sampling only');
-  }
-  if (!rejectedTransformedClone) fail(`${fixture.id}: transformed clone rendering should be gated`);
-
   await writePpm(resolve(OUTPUT_DIR, `${fixture.id}.preview.ppm`), fixture.width, fixture.height, preview.pixels);
   await writePpm(resolve(OUTPUT_DIR, `${fixture.id}.export.ppm`), fixture.width, fixture.height, exported.pixels);
   await writePpm(resolve(OUTPUT_DIR, `${fixture.id}.headless.ppm`), fixture.width, fixture.height, headless.pixels);
@@ -398,6 +383,79 @@ if (removePreviewHash !== hashPixels(removeExport.pixels) || removePreviewHash !
 }
 if (removePreviewHash === hashPixels(removeFixture.basePixels)) {
   fail('remove-local-fill: remove layer did not alter target pixels');
+}
+
+const transformedRetouchBasePixels = Array.from({ length: 25 }, (_, index) => ({
+  b: index + 80,
+  g: index + 40,
+  r: index,
+}));
+const transformedRetouchBase = {
+  basePixels: transformedRetouchBasePixels,
+  height: 5,
+  layers: [
+    {
+      blendMode: 'normal',
+      id: 'retouch-transform',
+      maskAlpha: Array.from({ length: 25 }, () => 0),
+      name: 'Retouch transform',
+      opacity: 1,
+      retouchCloneSource: {
+        featherRadiusPx: 0,
+        radiusPx: 4,
+        retouchMode: 'clone',
+        rotationDegrees: 0,
+        scale: 1,
+        sourcePoint: { x: 0.5, y: 0.5 },
+        targetPoint: { x: 0.5, y: 0.5 },
+      },
+      visible: true,
+    },
+  ],
+  width: 5,
+} satisfies Parameters<typeof renderLayerPreviewStack>[0];
+const transformedRetouchLayer = transformedRetouchBase.layers[0];
+if (transformedRetouchLayer === undefined) {
+  fail('retouch-transform: missing layer');
+}
+const transformedRetouchSource = transformedRetouchLayer.retouchCloneSource;
+if (transformedRetouchSource === undefined) {
+  fail('retouch-transform: missing clone source');
+}
+
+type LayerPreviewInput = Parameters<typeof renderLayerPreviewStack>[0];
+type RetouchCloneSource = NonNullable<LayerPreviewInput['layers'][number]['retouchCloneSource']>;
+
+const renderTransformedRetouchPixel = (retouchCloneSource: RetouchCloneSource, targetIndex: number) => {
+  const maskAlpha = Array.from({ length: 25 }, (_, index) => (index === targetIndex ? 1 : 0));
+  return renderLayerPreviewStack({
+    ...transformedRetouchBase,
+    layers: [
+      {
+        ...transformedRetouchLayer,
+        maskAlpha,
+        retouchCloneSource,
+      },
+    ],
+  }).pixels[targetIndex];
+};
+
+const rotatedRetouchPixel = renderTransformedRetouchPixel({ ...transformedRetouchSource, rotationDegrees: 90 }, 13);
+const rotatedExpectedPixel = transformedRetouchBasePixels[7];
+if (JSON.stringify(rotatedRetouchPixel) !== JSON.stringify(rotatedExpectedPixel)) {
+  fail('retouch-transform: rotation should sample canonical image-space source pixel', [
+    `actual=${JSON.stringify(rotatedRetouchPixel)}`,
+    `expected=${JSON.stringify(rotatedExpectedPixel)}`,
+  ]);
+}
+
+const scaledRetouchPixel = renderTransformedRetouchPixel({ ...transformedRetouchSource, scale: 2 }, 14);
+const scaledExpectedPixel = transformedRetouchBasePixels[13];
+if (JSON.stringify(scaledRetouchPixel) !== JSON.stringify(scaledExpectedPixel)) {
+  fail('retouch-transform: scale should sample canonical image-space source pixel', [
+    `actual=${JSON.stringify(scaledRetouchPixel)}`,
+    `expected=${JSON.stringify(scaledExpectedPixel)}`,
+  ]);
 }
 
 console.log(`layer preview/export parity ok (${manifest.cases.length})`);
