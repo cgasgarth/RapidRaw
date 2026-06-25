@@ -26,6 +26,7 @@ export const watermarkAnchorSchema = z.enum([
 
 export const exportRecipeSchema = z
   .object({
+    blackPointCompensation: z.boolean().default(false),
     colorProfile: exportColorProfileSchema.default('srgb'),
     dontEnlarge: z.boolean(),
     enableResize: z.boolean(),

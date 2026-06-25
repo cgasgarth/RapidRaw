@@ -23,6 +23,7 @@ const isFileFormat = (value: string): value is FileFormats => FILE_FORMAT_IDS.ha
 const isWatermarkAnchor = (value: string): value is WatermarkAnchor => WATERMARK_ANCHORS.has(value);
 
 export function useExportSettings() {
+  const [blackPointCompensation, setBlackPointCompensation] = useState(false);
   const [colorProfile, setColorProfile] = useState<ExportColorProfile>(ExportColorProfile.Srgb);
   const [renderingIntent, setRenderingIntent] = useState<ExportRenderingIntent>(
     ExportRenderingIntent.RelativeColorimetric,
@@ -48,6 +49,7 @@ export function useExportSettings() {
   const [outputSharpening, setOutputSharpening] = useState<OutputSharpeningSettings | null>(null);
 
   const handleApplyPreset = useCallback((preset: ExportPreset) => {
+    setBlackPointCompensation(preset.blackPointCompensation ?? false);
     setColorProfile(preset.colorProfile ?? ExportColorProfile.Srgb);
     setRenderingIntent(preset.renderingIntent ?? ExportRenderingIntent.RelativeColorimetric);
     setFileFormat(isFileFormat(preset.fileFormat) ? preset.fileFormat : FileFormats.Jpeg);
@@ -75,6 +77,7 @@ export function useExportSettings() {
 
   const currentSettingsObject = useMemo(
     () => ({
+      blackPointCompensation,
       colorProfile,
       renderingIntent,
       fileFormat,
@@ -98,6 +101,7 @@ export function useExportSettings() {
       outputSharpening,
     }),
     [
+      blackPointCompensation,
       colorProfile,
       renderingIntent,
       fileFormat,
@@ -131,6 +135,8 @@ export function useExportSettings() {
   }, []);
 
   return {
+    blackPointCompensation,
+    setBlackPointCompensation,
     colorProfile,
     setColorProfile,
     renderingIntent,

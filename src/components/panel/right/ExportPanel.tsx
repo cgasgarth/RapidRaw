@@ -324,6 +324,8 @@ export default function ExportPanel({
     updateOutputSharpening,
     preserveFolders,
     setPreserveFolders,
+    blackPointCompensation,
+    setBlackPointCompensation,
     colorProfile,
     setColorProfile,
     renderingIntent,
@@ -737,6 +739,10 @@ export default function ExportPanel({
     ].filter((option) => supportedIntents.includes(option.value));
   }, [exportColorCapability, t]);
   const blackPointCompensationStatus = exportColorCapability?.blackPointCompensation ?? 'unsupported';
+  const isBlackPointCompensationAvailable =
+    fileFormat === FileFormats.Tiff &&
+    renderingIntent === ExportRenderingIntent.RelativeColorimetric &&
+    blackPointCompensationStatus === 'supported';
 
   useEffect(() => {
     if (!isVisible) return;
@@ -758,6 +764,12 @@ export default function ExportPanel({
       setRenderingIntent(ExportRenderingIntent.RelativeColorimetric);
     }
   }, [hasColorManagedTransform, renderingIntent, renderingIntentOptions, setRenderingIntent]);
+
+  useEffect(() => {
+    if (blackPointCompensation && !isBlackPointCompensationAvailable) {
+      setBlackPointCompensation(false);
+    }
+  }, [blackPointCompensation, isBlackPointCompensationAvailable, setBlackPointCompensation]);
 
   const debouncedEstimateSize = useMemo(
     () =>
@@ -800,6 +812,7 @@ export default function ExportPanel({
 
   useEffect(() => {
     const exportSettings: ExportSettings = {
+      blackPointCompensation,
       colorProfile,
       filenameTemplate,
       jpegQuality,
@@ -832,6 +845,7 @@ export default function ExportPanel({
     adjustments,
     selectedImage?.path,
     fileFormat,
+    blackPointCompensation,
     colorProfile,
     renderingIntent,
     jpegQuality,
@@ -884,6 +898,7 @@ export default function ExportPanel({
     }
 
     const exportSettings: ExportSettings = {
+      blackPointCompensation,
       colorProfile,
       filenameTemplate: finalFilenameTemplate,
       jpegQuality,
@@ -1426,9 +1441,24 @@ export default function ExportPanel({
                                   disabled={isExporting}
                                   className="w-full"
                                 />
-                                <UiText variant={TextVariants.small} color={TextColors.secondary}>
-                                  {t('export.advanced.blackPointCompensationUnavailable')}
-                                </UiText>
+                                {blackPointCompensationStatus === 'supported' ? (
+                                  <Switch
+                                    label={t('export.advanced.blackPointCompensation')}
+                                    checked={blackPointCompensation && isBlackPointCompensationAvailable}
+                                    onChange={setBlackPointCompensation}
+                                    disabled={isExporting || !isBlackPointCompensationAvailable}
+                                    trackClassName="bg-surface"
+                                  />
+                                ) : (
+                                  <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                                    {t('export.advanced.blackPointCompensationUnavailable')}
+                                  </UiText>
+                                )}
+                                {blackPointCompensationStatus === 'supported' && !isBlackPointCompensationAvailable ? (
+                                  <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                                    {t('export.advanced.blackPointCompensationTiffRelativeOnly')}
+                                  </UiText>
+                                ) : null}
                               </div>
                             ) : (
                               <UiText variant={TextVariants.small} color={TextColors.secondary}>

@@ -29,6 +29,7 @@ export const FILENAME_VARIABLES: Array<string> = [
 ];
 
 export interface ExportSettings {
+  blackPointCompensation?: boolean | undefined;
   colorProfile?: ExportColorProfile | undefined;
   filenameTemplate: string | null;
   jpegQuality: number;
@@ -148,6 +149,7 @@ export enum Status {
 }
 
 export interface ExportPreset {
+  blackPointCompensation?: boolean;
   colorProfile?: ExportColorProfile;
   id: string;
   name: string;
