@@ -54,12 +54,15 @@ pub(crate) fn apply_clone_retouch_layers<'a>(
         .and_then(|masks| serde_json::from_value(masks.clone()).ok())
         .unwrap_or_default();
 
-    let clone_layers: Vec<(usize, &RetouchLayer, &RetouchCloneSource)> = layers
+    let retouch_layers: Vec<(usize, &RetouchLayer, &RetouchCloneSource)> = layers
         .iter()
         .enumerate()
         .filter_map(|(index, layer)| {
             let clone_source = layer.retouch_clone_source.as_ref()?;
-            if clone_source.retouch_mode.as_deref().unwrap_or("clone") != "clone" {
+            if !matches!(
+                clone_source.retouch_mode.as_deref().unwrap_or("clone"),
+                "clone" | "heal"
+            ) {
                 return None;
             }
             if !layer.visible || normalized_opacity(layer.opacity) <= 0.0 {
@@ -69,7 +72,7 @@ pub(crate) fn apply_clone_retouch_layers<'a>(
         })
         .collect();
 
-    if clone_layers.is_empty() {
+    if retouch_layers.is_empty() {
         return Cow::Borrowed(image);
     }
 
@@ -79,10 +82,15 @@ pub(crate) fn apply_clone_retouch_layers<'a>(
     }
 
     let mut output = image.to_rgba32f();
-    for (mask_index, layer, clone_source) in clone_layers {
+    for (mask_index, layer, clone_source) in retouch_layers {
         let snapshot = output.clone();
         let layer_opacity = normalized_opacity(layer.opacity);
         let mask = mask_bitmaps.get(mask_index);
+        let heal_anchors = if clone_source.retouch_mode.as_deref() == Some("heal") {
+            heal_anchor_colors(&snapshot, width, height, clone_source)
+        } else {
+            None
+        };
 
         for y in 0..height {
             for x in 0..width {
@@ -102,6 +110,9 @@ pub(crate) fn apply_clone_retouch_layers<'a>(
                 else {
                     continue;
                 };
+                let source = heal_anchors.map_or(source, |(source_anchor, target_anchor)| {
+                    heal_rgba(source, source_anchor, target_anchor)
+                });
                 let base = output.get_pixel(x, y);
                 output.put_pixel(x, y, blend_rgba(base, source, alpha));
             }
@@ -224,6 +235,32 @@ fn sample_bilinear(pixels: &ImageBuffer<Rgba<f32>, Vec<f32>>, x: f32, y: f32) ->
     Some(Rgba(channels))
 }
 
+fn heal_anchor_colors(
+    pixels: &ImageBuffer<Rgba<f32>, Vec<f32>>,
+    width: u32,
+    height: u32,
+    clone_source: &RetouchCloneSource,
+) -> Option<(Rgba<f32>, Rgba<f32>)> {
+    let (target_x, target_y) = normalized_point_to_pixel(&clone_source.target_point, width, height);
+    let target_index = (target_y as u32)
+        .checked_mul(width)?
+        .checked_add(target_x as u32)? as usize;
+    let source_point = clone_sample_point(target_index, width, height, clone_source)?;
+    let source_anchor = sample_bilinear(pixels, source_point.0, source_point.1)?;
+    let target_anchor = sample_bilinear(pixels, target_x, target_y)?;
+
+    Some((source_anchor, target_anchor))
+}
+
+fn heal_rgba(source: Rgba<f32>, source_anchor: Rgba<f32>, target_anchor: Rgba<f32>) -> Rgba<f32> {
+    Rgba([
+        (source[0] + target_anchor[0] - source_anchor[0]).clamp(0.0, 1.0),
+        (source[1] + target_anchor[1] - source_anchor[1]).clamp(0.0, 1.0),
+        (source[2] + target_anchor[2] - source_anchor[2]).clamp(0.0, 1.0),
+        source[3],
+    ])
+}
+
 fn blend_rgba(base: &Rgba<f32>, source: Rgba<f32>, alpha: f32) -> Rgba<f32> {
     let alpha = alpha.clamp(0.0, 1.0);
     Rgba([
@@ -274,5 +311,47 @@ mod tests {
         assert_eq!(rendered.get_pixel(4, 1)[0], 0.0);
         assert_eq!(rendered.get_pixel(4, 1)[1], 0.1);
         assert_eq!(rendered.get_pixel(0, 1)[0], 0.0);
+    }
+
+    #[test]
+    fn heal_retouch_transfers_target_anchor_color() {
+        let image = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(5, 3, |x, y| {
+            if x == 0 && y == 1 {
+                Rgba([0.2, 0.2, 0.2, 1.0])
+            } else if x == 4 && y == 1 {
+                Rgba([0.7, 0.6, 0.5, 1.0])
+            } else {
+                Rgba([0.1, 0.1, 0.1, 1.0])
+            }
+        }));
+        let adjustments = json!({
+            "masks": [{
+                "id": "heal-layer",
+                "name": "Heal",
+                "visible": true,
+                "opacity": 100,
+                "invert": false,
+                "adjustments": {},
+                "retouchCloneSource": {
+                    "retouchMode": "heal",
+                    "sourcePoint": { "x": 0.0, "y": 0.5 },
+                    "targetPoint": { "x": 1.0, "y": 0.5 },
+                    "radiusPx": 1.5,
+                    "featherRadiusPx": 0,
+                    "scale": 1,
+                    "rotationDegrees": 0
+                },
+                "subMasks": []
+            }]
+        });
+
+        let rendered = apply_clone_retouch_layers(&image, &adjustments, &[])
+            .as_ref()
+            .to_rgba32f();
+        let healed = rendered.get_pixel(4, 1);
+
+        assert_eq!(healed[0], 0.7);
+        assert_eq!(healed[1], 0.6);
+        assert_eq!(healed[2], 0.5);
     }
 }
