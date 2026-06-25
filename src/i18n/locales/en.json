@@ -970,10 +970,12 @@
         "resetTransform": "Reset transform",
         "rotation": "Rotation",
         "scale": "Scale",
+        "sourceLabel": "Source",
         "sourceX": "Source X",
         "sourceY": "Source Y",
         "summary": "{{mode}} source {{source}}",
         "swapSourceTarget": "Swap source and target",
+        "targetLabel": "Target",
         "targetX": "Target X",
         "targetY": "Target Y",
         "title": "Retouch source"

@@ -968,10 +968,12 @@
         "resetTransform": "",
         "rotation": "",
         "scale": "",
+        "sourceLabel": "",
         "sourceX": "",
         "sourceY": "",
         "summary": "",
         "swapSourceTarget": "",
+        "targetLabel": "",
         "targetX": "",
         "targetY": "",
         "title": ""

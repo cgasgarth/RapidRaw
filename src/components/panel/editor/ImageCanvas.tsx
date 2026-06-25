@@ -2931,7 +2931,7 @@ const ImageCanvas = memo(
                               fontSize={12}
                               fontStyle="600"
                               padding={6}
-                              text={`${retouchModeLabel} S`}
+                              text={`${retouchModeLabel} ${t('editor.layers.retouchSource.sourceLabel')}`}
                             />
                           </Label>
                           <Circle
@@ -2981,7 +2981,7 @@ const ImageCanvas = memo(
                               fontSize={12}
                               fontStyle="600"
                               padding={6}
-                              text={`${retouchModeLabel} T`}
+                              text={`${retouchModeLabel} ${t('editor.layers.retouchSource.targetLabel')}`}
                             />
                           </Label>
                         </Group>
