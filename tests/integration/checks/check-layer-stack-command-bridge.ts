@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../src/utils/adjustments.ts';
 import {
   applyLayerStackCommandBridgeOperation,
+  applyResolvedRemoveSourcesToLayerStack,
   buildLayerStackSidecarFromMasks,
   type LayerStackCommandBridgeContext,
 } from '../../../src/utils/layerStackCommandBridge.ts';
@@ -221,6 +222,64 @@ if (
   masks[0]?.retouchRemoveSource?.seed !== 3
 ) {
   throw new Error('Expected remove source edits to roundtrip through command, sidecar, and UI masks.');
+}
+const resolvedRemove = applyResolvedRemoveSourcesToLayerStack(
+  masks,
+  [
+    {
+      layerId: 'layer-remove',
+      resolvedSourcePoint: { x: 0.22, y: 0.44 },
+      status: 'ready',
+      targetMaskId: 'layer-remove-target',
+    },
+  ],
+  { ...context, operationId: 'resolve_remove_source' },
+);
+masks = resolvedRemove.masks;
+context = { ...context, graphRevision: resolvedRemove.graphRevision, operationId: 'resolve_remove_source' };
+if (
+  resolvedRemove.appliedLayerIds[0] !== 'layer-remove' ||
+  resolvedRemove.sidecar.layers[0]?.retouchRemoveSource?.resolvedSourcePoint?.x !== 0.22 ||
+  resolvedRemove.sidecar.layers[0]?.retouchRemoveSource?.status !== 'ready' ||
+  masks[0]?.retouchRemoveSource?.resolvedSourcePoint?.y !== 0.44
+) {
+  throw new Error('Expected resolved remove source metadata to persist through command bridge state.');
+}
+const unchangedRemove = applyResolvedRemoveSourcesToLayerStack(
+  masks,
+  [
+    {
+      layerId: 'layer-remove',
+      resolvedSourcePoint: { x: 0.22, y: 0.44 },
+      status: 'ready',
+      targetMaskId: 'layer-remove-target',
+    },
+  ],
+  { ...context, operationId: 'resolve_remove_source_again' },
+);
+if (unchangedRemove.appliedLayerIds.length !== 0 || unchangedRemove.graphRevision !== context.graphRevision) {
+  throw new Error('Expected unchanged resolved remove source metadata to be a no-op.');
+}
+const fallbackRemove = applyResolvedRemoveSourcesToLayerStack(
+  masks,
+  [
+    {
+      layerId: 'layer-remove',
+      status: 'fallback_unchanged',
+      targetMaskId: 'layer-remove-target',
+    },
+  ],
+  { ...context, operationId: 'fallback_remove_source' },
+);
+masks = fallbackRemove.masks;
+context = { ...context, graphRevision: fallbackRemove.graphRevision, operationId: 'fallback_remove_source' };
+if (
+  fallbackRemove.appliedLayerIds[0] !== 'layer-remove' ||
+  fallbackRemove.sidecar.layers[0]?.retouchRemoveSource?.resolvedSourcePoint !== undefined ||
+  fallbackRemove.sidecar.layers[0]?.retouchRemoveSource?.status !== 'fallback_unchanged' ||
+  masks[0]?.retouchRemoveSource?.resolvedSourcePoint !== undefined
+) {
+  throw new Error('Expected fallback remove source metadata to clear persisted source point.');
 }
 run('delete_remove', { layerId: 'layer-remove', type: 'delete' });
 
