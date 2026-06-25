@@ -1435,6 +1435,7 @@
       "reviewHoldCurrent": "Hold current",
       "reviewNewest": "Newest",
       "reviewPinned": "Pinned",
+      "sessionCaptureCounter": "Next capture: {{next}}",
       "sessionClosed": "Session closed",
       "sessionClosedDescription": "Open a discovery session before capture controls are enabled.",
       "sessionDestinationRoot": "",
