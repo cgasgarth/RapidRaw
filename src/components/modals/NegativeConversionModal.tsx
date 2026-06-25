@@ -48,8 +48,8 @@ import {
   type NegativeLabShadowPatchBlackPointSuggestion,
 } from '../../schemas/negativeLabShadowPatchBlackPointSuggestionSchemas';
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
-import { TextColors, TextVariants } from '../../types/typography';
 import { useEditorStore } from '../../store/useEditorStore';
+import { TextColors, TextVariants } from '../../types/typography';
 import { buildDustCandidateHealLayer } from '../../utils/dustCandidateHealLayer';
 import {
   DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID,
