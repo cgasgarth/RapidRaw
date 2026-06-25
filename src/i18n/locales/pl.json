@@ -1117,6 +1117,12 @@
         "iccHash": "Hash ICC",
         "loading": "Wczytywanie",
         "loadingDescription": "Odczytywanie aktywnego profilu monitora...",
+        "previewLut": "LUT podglądu",
+        "previewLutStatus": {
+          "active": "Aktywna transformacja monitora",
+          "fallback": "Transformacja fallback sRGB",
+          "unsupported": "Nieużywane na tej platformie"
+        },
         "profileBytes": "Bajty profilu",
         "status": {
           "active_profile_loaded": "ColorSync aktywny",

@@ -176,6 +176,12 @@ function formatDisplayProfileByteCount(profile: ActiveDisplayProfile) {
   return profile.profileByteCount.toLocaleString();
 }
 
+function previewLutStatus(profile: ActiveDisplayProfile) {
+  if (profile.status === 'active_profile_loaded') return 'active';
+  if (profile.status === 'fallback_no_active_profile') return 'fallback';
+  return 'unsupported';
+}
+
 function xmpChoiceLabel(choice: XmpMetadataConflictChoice, t: TFunction) {
   if (choice === 'local') return t('editor.metadata.xmpConflicts.choices.local');
   if (choice === 'external') return t('editor.metadata.xmpConflicts.choices.external');
@@ -712,6 +718,20 @@ export default function MetadataPanel() {
                   </UiText>
                   <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right">
                     {formatDisplayProfileByteCount(displayProfileState.profile)}
+                  </UiText>
+                  <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                    {t('editor.metadata.displayProfile.previewLut')}
+                  </UiText>
+                  <UiText
+                    variant={TextVariants.small}
+                    color={TextColors.primary}
+                    className="truncate text-right"
+                    data-display-preview-lut-status={previewLutStatus(displayProfileState.profile)}
+                    data-testid="metadata-display-preview-lut-status"
+                  >
+                    {t(
+                      `editor.metadata.displayProfile.previewLutStatus.${previewLutStatus(displayProfileState.profile)}`,
+                    )}
                   </UiText>
                 </div>
               ) : (

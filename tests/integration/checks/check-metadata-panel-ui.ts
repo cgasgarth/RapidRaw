@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs';
 
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
+const displayProfileLocale = locale.editor?.metadata?.displayProfile;
 const readinessLocale = locale.editor?.metadata?.readiness;
 const xmpConflictLocale = locale.editor?.metadata?.xmpConflicts;
 const requiredLocaleKeys = [
@@ -40,6 +41,13 @@ if (missingXmpConflictKeys.length > 0) {
   process.exit(1);
 }
 
+for (const key of ['active', 'fallback', 'unsupported']) {
+  if (typeof displayProfileLocale?.previewLutStatus?.[key] !== 'string') {
+    console.error(`Missing display profile preview LUT status locale key: ${key}`);
+    process.exit(1);
+  }
+}
+
 for (const choice of ['external', 'local', 'merge']) {
   if (typeof xmpConflictLocale?.choices?.[choice] !== 'string') {
     console.error(`Missing XMP conflict choice locale key: ${choice}`);
@@ -56,6 +64,10 @@ for (const marker of [
   'data-editable-field-count={editableMetadataFieldCount}',
   'editor.metadata.readiness.cameraFields',
   'editor.metadata.readiness.editableFields',
+  'data-display-preview-lut-status={previewLutStatus(displayProfileState.profile)}',
+  'data-testid="metadata-display-preview-lut-status"',
+  'editor.metadata.displayProfile.previewLut',
+  'editor.metadata.displayProfile.previewLutStatus',
   'Invokes.CheckXmpMetadataConflicts',
   'Invokes.ResolveXmpMetadataConflicts',
   'data-xmp-conflict-field={field.field}',
