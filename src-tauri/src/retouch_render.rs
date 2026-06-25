@@ -11,6 +11,8 @@ struct RetouchLayer {
     opacity: f32,
     #[serde(default)]
     retouch_clone_source: Option<RetouchCloneSource>,
+    #[serde(default)]
+    retouch_remove_source: Option<RetouchRemoveSource>,
     #[serde(default = "default_visible")]
     visible: bool,
 }
@@ -31,6 +33,17 @@ struct RetouchCloneSource {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RetouchRemoveSource {
+    #[serde(default)]
+    feather_radius_px: Option<f32>,
+    #[serde(default)]
+    radius_px: Option<f32>,
+    #[serde(default)]
+    resolved_source_point: Option<RetouchPoint>,
+}
+
+#[derive(Debug, Deserialize)]
 struct RetouchPoint {
     x: f32,
     y: f32,
@@ -44,6 +57,11 @@ fn default_visible() -> bool {
     true
 }
 
+enum RetouchOperation<'a> {
+    CloneOrHeal(&'a RetouchCloneSource),
+    Remove(&'a RetouchRemoveSource),
+}
+
 pub(crate) fn apply_clone_retouch_layers<'a>(
     image: &'a DynamicImage,
     adjustments: &Value,
@@ -54,21 +72,25 @@ pub(crate) fn apply_clone_retouch_layers<'a>(
         .and_then(|masks| serde_json::from_value(masks.clone()).ok())
         .unwrap_or_default();
 
-    let retouch_layers: Vec<(usize, &RetouchLayer, &RetouchCloneSource)> = layers
+    let retouch_layers: Vec<(usize, &RetouchLayer, RetouchOperation<'_>)> = layers
         .iter()
         .enumerate()
         .filter_map(|(index, layer)| {
-            let clone_source = layer.retouch_clone_source.as_ref()?;
-            if !matches!(
-                clone_source.retouch_mode.as_deref().unwrap_or("clone"),
-                "clone" | "heal"
-            ) {
-                return None;
-            }
             if !layer.visible || normalized_opacity(layer.opacity) <= 0.0 {
                 return None;
             }
-            Some((index, layer, clone_source))
+            if let Some(clone_source) = layer.retouch_clone_source.as_ref() {
+                if !matches!(
+                    clone_source.retouch_mode.as_deref().unwrap_or("clone"),
+                    "clone" | "heal"
+                ) {
+                    return None;
+                }
+                return Some((index, layer, RetouchOperation::CloneOrHeal(clone_source)));
+            }
+            let remove_source = layer.retouch_remove_source.as_ref()?;
+            remove_source.resolved_source_point.as_ref()?;
+            Some((index, layer, RetouchOperation::Remove(remove_source)))
         })
         .collect();
 
@@ -82,14 +104,24 @@ pub(crate) fn apply_clone_retouch_layers<'a>(
     }
 
     let mut output = image.to_rgba32f();
-    for (mask_index, layer, clone_source) in retouch_layers {
+    for (mask_index, layer, operation) in retouch_layers {
         let snapshot = output.clone();
         let layer_opacity = normalized_opacity(layer.opacity);
         let mask = mask_bitmaps.get(mask_index);
-        let heal_anchors = if clone_source.retouch_mode.as_deref() == Some("heal") {
-            heal_anchor_colors(&snapshot, width, height, clone_source)
-        } else {
-            None
+        let remove_plan = match operation {
+            RetouchOperation::CloneOrHeal(clone_source) => RetouchPlan::from_clone_source(
+                &snapshot,
+                width,
+                height,
+                clone_source,
+                clone_source.retouch_mode.as_deref() == Some("heal"),
+            ),
+            RetouchOperation::Remove(remove_source) => {
+                RetouchPlan::from_remove_source(&snapshot, width, height, mask, remove_source)
+            }
+        };
+        let Some(retouch_plan) = remove_plan else {
+            continue;
         };
 
         for y in 0..height {
@@ -97,12 +129,18 @@ pub(crate) fn apply_clone_retouch_layers<'a>(
                 let index = (y * width + x) as usize;
                 let alpha = layer_opacity
                     * mask_alpha(mask, x, y)
-                    * retouch_alpha(index, width, height, clone_source);
+                    * retouch_alpha(
+                        index,
+                        width,
+                        retouch_plan.target_point,
+                        retouch_plan.radius_px,
+                        retouch_plan.feather_radius_px,
+                    );
                 if alpha <= 0.0 {
                     continue;
                 }
 
-                let Some(source_point) = clone_sample_point(index, width, height, clone_source)
+                let Some(source_point) = sample_point_for_plan(index, width, height, &retouch_plan)
                 else {
                     continue;
                 };
@@ -110,9 +148,12 @@ pub(crate) fn apply_clone_retouch_layers<'a>(
                 else {
                     continue;
                 };
-                let source = heal_anchors.map_or(source, |(source_anchor, target_anchor)| {
-                    heal_rgba(source, source_anchor, target_anchor)
-                });
+                let source =
+                    retouch_plan
+                        .heal_anchors
+                        .map_or(source, |(source_anchor, target_anchor)| {
+                            heal_rgba(source, source_anchor, target_anchor)
+                        });
                 let base = output.get_pixel(x, y);
                 output.put_pixel(x, y, blend_rgba(base, source, alpha));
             }
@@ -120,6 +161,70 @@ pub(crate) fn apply_clone_retouch_layers<'a>(
     }
 
     Cow::Owned(DynamicImage::ImageRgba32F(output))
+}
+
+struct RetouchPlan {
+    feather_radius_px: Option<f32>,
+    heal_anchors: Option<(Rgba<f32>, Rgba<f32>)>,
+    radius_px: Option<f32>,
+    rotation_degrees: f32,
+    scale: f32,
+    source_point: (f32, f32),
+    target_point: (f32, f32),
+}
+
+impl RetouchPlan {
+    fn from_clone_source(
+        pixels: &ImageBuffer<Rgba<f32>, Vec<f32>>,
+        width: u32,
+        height: u32,
+        clone_source: &RetouchCloneSource,
+        should_heal: bool,
+    ) -> Option<Self> {
+        let source_point = normalized_point_to_pixel(&clone_source.source_point, width, height);
+        let target_point = normalized_point_to_pixel(&clone_source.target_point, width, height);
+        let heal_anchors = if should_heal {
+            let source_anchor = sample_bilinear(pixels, source_point.0, source_point.1)?;
+            let target_anchor = sample_bilinear(pixels, target_point.0, target_point.1)?;
+            Some((source_anchor, target_anchor))
+        } else {
+            None
+        };
+
+        Some(Self {
+            feather_radius_px: clone_source.feather_radius_px,
+            heal_anchors,
+            radius_px: clone_source.radius_px,
+            rotation_degrees: clone_source.rotation_degrees,
+            scale: clone_source.scale,
+            source_point,
+            target_point,
+        })
+    }
+
+    fn from_remove_source(
+        pixels: &ImageBuffer<Rgba<f32>, Vec<f32>>,
+        width: u32,
+        height: u32,
+        mask: Option<&GrayImage>,
+        remove_source: &RetouchRemoveSource,
+    ) -> Option<Self> {
+        let source_point =
+            normalized_point_to_pixel(remove_source.resolved_source_point.as_ref()?, width, height);
+        let target_point = target_center_from_mask(mask?, width, height)?;
+        let source_anchor = sample_bilinear(pixels, source_point.0, source_point.1)?;
+        let target_anchor = sample_bilinear(pixels, target_point.0, target_point.1)?;
+
+        Some(Self {
+            feather_radius_px: remove_source.feather_radius_px,
+            heal_anchors: Some((source_anchor, target_anchor)),
+            radius_px: remove_source.radius_px,
+            rotation_degrees: 0.0,
+            scale: 1.0,
+            source_point,
+            target_point,
+        })
+    }
 }
 
 fn normalized_opacity(opacity: f32) -> f32 {
@@ -142,18 +247,37 @@ fn normalized_point_to_pixel(point: &RetouchPoint, width: u32, height: u32) -> (
     )
 }
 
-fn clone_sample_point(
+fn target_center_from_mask(mask: &GrayImage, width: u32, height: u32) -> Option<(f32, f32)> {
+    let mut weight = 0.0_f32;
+    let mut sum_x = 0.0_f32;
+    let mut sum_y = 0.0_f32;
+    for y in 0..height.min(mask.height()) {
+        for x in 0..width.min(mask.width()) {
+            let alpha = f32::from(mask.get_pixel(x, y)[0]) / 255.0;
+            if alpha <= 0.01 {
+                continue;
+            }
+            weight += alpha;
+            sum_x += x as f32 * alpha;
+            sum_y += y as f32 * alpha;
+        }
+    }
+
+    (weight > 0.0).then_some((sum_x / weight, sum_y / weight))
+}
+
+fn sample_point_for_plan(
     target_index: usize,
     width: u32,
     height: u32,
-    clone_source: &RetouchCloneSource,
+    plan: &RetouchPlan,
 ) -> Option<(f32, f32)> {
-    let (source_x, source_y) = normalized_point_to_pixel(&clone_source.source_point, width, height);
-    let (target_x, target_y) = normalized_point_to_pixel(&clone_source.target_point, width, height);
+    let (source_x, source_y) = plan.source_point;
+    let (target_x, target_y) = plan.target_point;
     let x = (target_index as u32 % width) as f32;
     let y = (target_index as u32 / width) as f32;
-    let scale = clone_source.scale.max(0.1);
-    let radians = (-clone_source.rotation_degrees).to_radians();
+    let scale = plan.scale.max(0.1);
+    let radians = (-plan.rotation_degrees).to_radians();
     let cos = radians.cos();
     let sin = radians.sin();
     let target_offset_x = (x - target_x) / scale;
@@ -171,10 +295,11 @@ fn clone_sample_point(
 fn retouch_alpha(
     target_index: usize,
     width: u32,
-    height: u32,
-    clone_source: &RetouchCloneSource,
+    target_point: (f32, f32),
+    radius_px: Option<f32>,
+    feather_radius_px: Option<f32>,
 ) -> f32 {
-    let Some(radius_px) = clone_source.radius_px else {
+    let Some(radius_px) = radius_px else {
         return 1.0;
     };
     let radius_px = radius_px.max(0.0);
@@ -182,15 +307,11 @@ fn retouch_alpha(
         return 0.0;
     }
 
-    let (target_x, target_y) = normalized_point_to_pixel(&clone_source.target_point, width, height);
+    let (target_x, target_y) = target_point;
     let x = (target_index as u32 % width) as f32;
     let y = (target_index as u32 / width) as f32;
     let distance = (x - target_x).hypot(y - target_y);
-    let feather_px = clone_source
-        .feather_radius_px
-        .unwrap_or(0.0)
-        .max(0.0)
-        .min(radius_px);
+    let feather_px = feather_radius_px.unwrap_or(0.0).max(0.0).min(radius_px);
     let solid_radius = radius_px - feather_px;
 
     if distance <= solid_radius {
@@ -235,23 +356,6 @@ fn sample_bilinear(pixels: &ImageBuffer<Rgba<f32>, Vec<f32>>, x: f32, y: f32) ->
     Some(Rgba(channels))
 }
 
-fn heal_anchor_colors(
-    pixels: &ImageBuffer<Rgba<f32>, Vec<f32>>,
-    width: u32,
-    height: u32,
-    clone_source: &RetouchCloneSource,
-) -> Option<(Rgba<f32>, Rgba<f32>)> {
-    let (target_x, target_y) = normalized_point_to_pixel(&clone_source.target_point, width, height);
-    let target_index = (target_y as u32)
-        .checked_mul(width)?
-        .checked_add(target_x as u32)? as usize;
-    let source_point = clone_sample_point(target_index, width, height, clone_source)?;
-    let source_anchor = sample_bilinear(pixels, source_point.0, source_point.1)?;
-    let target_anchor = sample_bilinear(pixels, target_x, target_y)?;
-
-    Some((source_anchor, target_anchor))
-}
-
 fn heal_rgba(source: Rgba<f32>, source_anchor: Rgba<f32>, target_anchor: Rgba<f32>) -> Rgba<f32> {
     Rgba([
         (source[0] + target_anchor[0] - source_anchor[0]).clamp(0.0, 1.0),
@@ -273,7 +377,7 @@ fn blend_rgba(base: &Rgba<f32>, source: Rgba<f32>, alpha: f32) -> Rgba<f32> {
 
 #[cfg(test)]
 mod tests {
-    use image::{DynamicImage, ImageBuffer, Rgba};
+    use image::{DynamicImage, GrayImage, ImageBuffer, Luma, Rgba};
     use serde_json::json;
 
     use super::apply_clone_retouch_layers;
@@ -353,5 +457,51 @@ mod tests {
         assert_eq!(healed[0], 0.7);
         assert_eq!(healed[1], 0.6);
         assert_eq!(healed[2], 0.5);
+    }
+
+    #[test]
+    fn remove_retouch_uses_resolved_source_and_target_mask_center() {
+        let image = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(5, 3, |x, y| {
+            if x == 0 && y == 1 {
+                Rgba([0.2, 0.2, 0.2, 1.0])
+            } else if x == 4 && y == 1 {
+                Rgba([0.7, 0.6, 0.5, 1.0])
+            } else {
+                Rgba([0.1, 0.1, 0.1, 1.0])
+            }
+        }));
+        let mut mask = GrayImage::from_pixel(5, 3, Luma([0]));
+        mask.put_pixel(4, 1, Luma([255]));
+        let adjustments = json!({
+            "masks": [{
+                "id": "remove-layer",
+                "name": "Remove",
+                "visible": true,
+                "opacity": 100,
+                "invert": false,
+                "adjustments": {},
+                "retouchRemoveSource": {
+                    "generator": "local_patch_fill_v1",
+                    "generatorVersion": 1,
+                    "resolvedSourcePoint": { "x": 0.0, "y": 0.5 },
+                    "targetMaskId": "remove-target",
+                    "radiusPx": 1.5,
+                    "featherRadiusPx": 0,
+                    "searchRadiusMultiplier": 2,
+                    "seed": 7,
+                    "status": "ready"
+                },
+                "subMasks": []
+            }]
+        });
+
+        let rendered = apply_clone_retouch_layers(&image, &adjustments, &[mask])
+            .as_ref()
+            .to_rgba32f();
+        let removed = rendered.get_pixel(4, 1);
+
+        assert_eq!(removed[0], 0.7);
+        assert_eq!(removed[1], 0.6);
+        assert_eq!(removed[2], 0.5);
     }
 }

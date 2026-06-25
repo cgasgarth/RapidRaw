@@ -114,6 +114,7 @@ fn run_private_retouch_clone_real_raw_proof(
     let unretouched_adjustments = json!({});
     let clone_adjustments = retouch_clone_adjustments(image_width, image_height);
     let heal_adjustments = retouch_heal_adjustments(image_width, image_height);
+    let remove_adjustments = retouch_remove_adjustments(image_width, image_height);
 
     let unretouched_preview = render(
         &source_path_string,
@@ -165,11 +166,33 @@ fn run_private_retouch_clone_real_raw_proof(
         "retouch_heal_real_raw_export",
         tm_override,
     )?;
+    let remove_preview = render(
+        &source_path_string,
+        &base_image,
+        &remove_adjustments,
+        &context,
+        &state,
+        is_raw,
+        "retouch_remove_real_raw_preview",
+        tm_override,
+    )?;
+    let remove_export = render(
+        &source_path_string,
+        &base_image,
+        &remove_adjustments,
+        &context,
+        &state,
+        is_raw,
+        "retouch_remove_real_raw_export",
+        tm_override,
+    )?;
 
     let clone_changed_pixel_ratio = changed_pixel_ratio(&unretouched_preview, &clone_preview);
     let preview_export_mean_abs_delta = mean_abs_delta(&clone_preview, &clone_export);
     let heal_changed_pixel_ratio = changed_pixel_ratio(&unretouched_preview, &heal_preview);
     let heal_preview_export_mean_abs_delta = mean_abs_delta(&heal_preview, &heal_export);
+    let remove_changed_pixel_ratio = changed_pixel_ratio(&unretouched_preview, &remove_preview);
+    let remove_preview_export_mean_abs_delta = mean_abs_delta(&remove_preview, &remove_export);
     let source_hash_after = sha256_file(&source_path)?;
 
     let output_dir = private_root.join(ARTIFACT_DIR);
@@ -197,6 +220,16 @@ fn run_private_retouch_clone_real_raw_proof(
     write_image(
         &heal_export,
         &output_dir.join(format!("{PROOF_SLUG}-heal-export.tiff")),
+        ImageFormat::Tiff,
+    )?;
+    write_image(
+        &remove_preview,
+        &output_dir.join(format!("{PROOF_SLUG}-remove-preview.png")),
+        ImageFormat::Png,
+    )?;
+    write_image(
+        &remove_export,
+        &output_dir.join(format!("{PROOF_SLUG}-remove-export.tiff")),
         ImageFormat::Tiff,
     )?;
 
@@ -228,9 +261,19 @@ fn run_private_retouch_clone_real_raw_proof(
                 "heal_export_private",
                 &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-heal-export.tiff"),
             )?,
+            hashed_artifact(
+                private_root,
+                "remove_preview_private",
+                &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-remove-preview.png"),
+            )?,
+            hashed_artifact(
+                private_root,
+                "remove_export_private",
+                &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-remove-export.tiff"),
+            )?,
         ],
         generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
-        issue: 3252,
+        issue: 3255,
         metrics: vec![
             metric(
                 "clone_changed_pixel_ratio",
@@ -257,6 +300,18 @@ fn run_private_retouch_clone_real_raw_proof(
                 false,
             ),
             metric(
+                "remove_changed_pixel_ratio",
+                remove_changed_pixel_ratio,
+                0.000_001,
+                true,
+            ),
+            metric(
+                "remove_preview_export_mean_abs_delta",
+                remove_preview_export_mean_abs_delta,
+                0.0,
+                false,
+            ),
+            metric(
                 "source_hash_unchanged",
                 if source_hash_before == source_hash_after {
                     1.0
@@ -270,23 +325,25 @@ fn run_private_retouch_clone_real_raw_proof(
         proof_claims: RetouchCloneProofClaims {
             does_not_prove: vec![
                 "manual macOS app UI e2e".to_string(),
-                "multi-stroke heal quality or edge-aware texture synthesis".to_string(),
+                "multi-stroke heal/remove quality or edge-aware texture synthesis".to_string(),
             ],
             proves: vec![
                 "native RAW decode can render a clone retouch layer".to_string(),
                 "native RAW decode can render a heal retouch layer".to_string(),
-                "preview and export use the same clone/heal retouch output".to_string(),
+                "native RAW decode can render a resolved-source remove retouch layer".to_string(),
+                "preview and export use the same clone/heal/remove retouch output".to_string(),
                 "source RAW remains unchanged".to_string(),
             ],
         },
         runtime_proof: RetouchCloneRuntimeProof {
             execution: "cargo tauri-test private proof".to_string(),
-            output_artifact_count: 5,
+            output_artifact_count: 7,
             raw_decode_path: "load_base_image_from_bytes".to_string(),
             render_path: "process_image_for_export_pipeline_with_tonemapper_override".to_string(),
             retouch_path: "retouch_render::apply_clone_retouch_layers".to_string(),
         },
-        validation_mode: "private_raw_native_clone_heal_retouch_preview_export_proof".to_string(),
+        validation_mode: "private_raw_native_clone_heal_remove_retouch_preview_export_proof"
+            .to_string(),
     };
 
     fs::write(
@@ -297,6 +354,7 @@ fn run_private_retouch_clone_real_raw_proof(
 
     assert!(clone_changed_pixel_ratio > 0.000_001);
     assert!(heal_changed_pixel_ratio > 0.000_001);
+    assert!(remove_changed_pixel_ratio > 0.000_001);
     assert_eq!(source_hash_before, source_hash_after);
 
     Ok(report)
@@ -438,6 +496,49 @@ fn retouch_heal_adjustments(image_width: u32, image_height: u32) -> Value {
                     "radiusY": radius,
                     "rotation": 0,
                     "feather": radius * 0.25
+                }
+            }]
+        }]
+    })
+}
+
+fn retouch_remove_adjustments(image_width: u32, image_height: u32) -> Value {
+    let target_x = image_width as f64 * 0.66;
+    let target_y = image_height as f64 * 0.56;
+    let radius = image_width.min(image_height) as f64 * 0.035;
+    json!({
+        "masks": [{
+            "id": "mask.remove-native-proof.v1",
+            "name": "Remove native proof",
+            "visible": true,
+            "invert": false,
+            "opacity": 100,
+            "adjustments": {},
+            "retouchRemoveSource": {
+                "generator": "local_patch_fill_v1",
+                "generatorVersion": 1,
+                "resolvedSourcePoint": { "x": 0.48, "y": 0.56 },
+                "targetMaskId": "submask.remove-native-proof-target.v1",
+                "radiusPx": radius,
+                "featherRadiusPx": radius * 0.3,
+                "searchRadiusMultiplier": 2,
+                "seed": 7,
+                "status": "ready"
+            },
+            "subMasks": [{
+                "id": "submask.remove-native-proof-target.v1",
+                "type": "radial",
+                "visible": true,
+                "invert": false,
+                "opacity": 100,
+                "mode": "additive",
+                "parameters": {
+                    "centerX": target_x,
+                    "centerY": target_y,
+                    "radiusX": radius,
+                    "radiusY": radius,
+                    "rotation": 0,
+                    "feather": radius * 0.3
                 }
             }]
         }]
