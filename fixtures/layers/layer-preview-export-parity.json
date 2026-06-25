@@ -5,7 +5,7 @@
       "id": "layers.synthetic.preview-export-parity.v1",
       "width": 3,
       "height": 2,
-      "expectedPreviewExportHash": "sha256:1e0db991f14f3c6162e809e8d1d57af56fd4f8fbaa1d94b54b78514cf912287a",
+      "expectedPreviewExportHash": "sha256:aae4d7fadbaa98a49f0506e9ef76dcb4dd848d92e3e0a774bb1a1023121f07bf",
       "expectedCoverageByLayer": [
         { "id": "tone-normal", "opacity": 0.25, "touchedPixels": 6 },
         { "id": "shadow-multiply", "opacity": 0.55, "touchedPixels": 5 },

@@ -111,6 +111,35 @@ const cloneSampleIndex = (
   return sourceY * width + sourceX;
 };
 
+const retouchTargetAlpha = (
+  targetIndex: number,
+  width: number,
+  height: number,
+  retouchSource: LayerRetouchCloneSource,
+): number => {
+  if (retouchSource.radiusPx === undefined) return 1;
+
+  const radiusPx = Math.max(0, retouchSource.radiusPx);
+  if (radiusPx === 0) return 0;
+
+  const targetPoint = normalizedPointToPixel(retouchSource.targetPoint, width, height);
+  const targetX = targetIndex % width;
+  const targetY = Math.floor(targetIndex / width);
+  const distance = Math.hypot(targetX - targetPoint.x, targetY - targetPoint.y);
+  const featherPx = Math.min(Math.max(0, retouchSource.featherRadiusPx ?? 0), radiusPx);
+  const solidRadius = radiusPx - featherPx;
+
+  if (distance <= solidRadius) return 1;
+  if (distance >= radiusPx) return 0;
+  return clamp01((radiusPx - distance) / Math.max(featherPx, 1));
+};
+
+const healPixel = (source: LayerRgbPixel, sourceAnchor: LayerRgbPixel, targetAnchor: LayerRgbPixel): LayerRgbPixel => ({
+  b: clampByte(source.b + targetAnchor.b - sourceAnchor.b),
+  g: clampByte(source.g + targetAnchor.g - sourceAnchor.g),
+  r: clampByte(source.r + targetAnchor.r - sourceAnchor.r),
+});
+
 export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendStackRender {
   const pixelCount = input.width * input.height;
   if (input.basePixels.length !== pixelCount) {
@@ -138,19 +167,48 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
     }
 
     let touchedPixels = 0;
+    const retouchBasePixels = layer.retouchCloneSource === undefined ? null : pixels.map((pixel) => ({ ...pixel }));
+    const targetAnchorPoint =
+      layer.retouchCloneSource === undefined
+        ? null
+        : normalizedPointToPixel(layer.retouchCloneSource.targetPoint, input.width, input.height);
+    const targetAnchorIndex =
+      targetAnchorPoint === null ? null : targetAnchorPoint.y * input.width + targetAnchorPoint.x;
+    const sourceAnchorIndex =
+      layer.retouchCloneSource === undefined || targetAnchorIndex === null
+        ? null
+        : cloneSampleIndex(targetAnchorIndex, input.width, input.height, layer.retouchCloneSource);
+
     for (let index = 0; index < pixelCount; index += 1) {
       const cloneSourceIndex =
         layer.retouchCloneSource === undefined
           ? null
           : cloneSampleIndex(index, input.width, input.height, layer.retouchCloneSource);
       if (layer.retouchCloneSource !== undefined && cloneSourceIndex === null) continue;
-      const source = cloneSourceIndex === null ? layer.pixels?.[index] : pixels[cloneSourceIndex];
+      const sampledSource =
+        cloneSourceIndex === null ? layer.pixels?.[index] : (retouchBasePixels ?? pixels)[cloneSourceIndex];
+      const source =
+        layer.retouchCloneSource?.retouchMode === 'heal' &&
+        sampledSource !== undefined &&
+        retouchBasePixels !== null &&
+        sourceAnchorIndex !== null &&
+        targetAnchorIndex !== null
+          ? healPixel(
+              sampledSource,
+              retouchBasePixels[sourceAnchorIndex] ?? sampledSource,
+              retouchBasePixels[targetAnchorIndex] ?? sampledSource,
+            )
+          : sampledSource;
       const base = pixels[index];
       if (!source || !base) {
         throw new Error(`Layer ${layer.id} missing pixel ${index}.`);
       }
 
-      const alpha = opacity * clamp01(layer.maskAlpha?.[index] ?? 1);
+      const retouchAlpha =
+        layer.retouchCloneSource === undefined
+          ? 1
+          : retouchTargetAlpha(index, input.width, input.height, layer.retouchCloneSource);
+      const alpha = opacity * clamp01(layer.maskAlpha?.[index] ?? 1) * retouchAlpha;
       if (alpha === 0) continue;
       pixels[index] = blendPixel(base, source, layer.blendMode, alpha);
       touchedPixels += 1;
