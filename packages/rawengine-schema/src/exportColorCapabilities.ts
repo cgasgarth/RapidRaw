@@ -60,7 +60,7 @@ export const MOXCMS_EXPORT_COLOR_CAPABILITIES_V1 = exportColorCapabilityCatalogV
     renderingIntents: COLOR_MANAGED_RENDERING_INTENTS,
     runtimeSupportNotes: [
       'Rendering intent is passed to moxcms transform options.',
-      'LittleCMS enables black-point compensation for TIFF relative colorimetric wide-gamut exports.',
+      'LittleCMS enables black-point compensation for JPEG/TIFF relative colorimetric wide-gamut exports.',
     ],
   })),
   engine: 'moxcms',

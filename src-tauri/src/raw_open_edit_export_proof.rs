@@ -387,6 +387,7 @@ fn run_raw_open_edit_export_proof_with_context(
             &preview_after,
             &export_color_profile,
             &export_rendering_intent,
+            false,
         )?;
     if (soft_proof_after_width, soft_proof_after_height) != (export_rgb8_width, export_rgb8_height)
     {
