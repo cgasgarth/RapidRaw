@@ -12,8 +12,12 @@ test('export receipt accepts TIFF color profile and bit depth metadata', () => {
         colorProfile: 'sRGB',
         format: 'tiff',
         outputPath: '/tmp/export.tiff',
+        policyStatus: 'applied',
         renderingIntent: 'Relative colorimetric',
         sourcePath: '/tmp/source.arw',
+        requestedRenderingIntent: 'Relative colorimetric',
+        resolvedDisabledReason: null,
+        effectiveRenderingIntent: 'Relative colorimetric',
       },
     ],
     total: 1,
@@ -21,7 +25,9 @@ test('export receipt accepts TIFF color profile and bit depth metadata', () => {
 
   expect(receipt.outputs[0]?.bitDepth).toBe(16);
   expect(receipt.outputs[0]?.colorProfile).toBe('sRGB');
+  expect(receipt.outputs[0]?.policyStatus).toBe('applied');
   expect(receipt.outputs[0]?.renderingIntent).toBe('Relative colorimetric');
+  expect(receipt.outputs[0]?.effectiveRenderingIntent).toBe('Relative colorimetric');
 });
 
 test('export receipt remains compatible with outputs without image metadata', () => {
