@@ -1,4 +1,7 @@
-import { resolveRemoveSamplingPlan } from '../../packages/rawengine-schema/src/retouchRemoveRuntime';
+import {
+  removeSourcePointToNormalized,
+  resolveRemoveSamplingPlan,
+} from '../../packages/rawengine-schema/src/retouchRemoveRuntime';
 
 export type LayerBlendMode = 'multiply' | 'normal' | 'overlay' | 'screen' | 'soft_light';
 
@@ -62,6 +65,12 @@ export interface LayerBlendStackInput {
 export interface LayerBlendStackRender {
   coverageByLayer: Array<{ id: string; opacity: number; touchedPixels: number }>;
   pixels: Array<LayerRgbPixel>;
+  resolvedRemoveSources: Array<{
+    layerId: string;
+    resolvedSourcePoint?: { x: number; y: number };
+    status: 'fallback_unchanged' | 'ready';
+    targetMaskId: string;
+  }>;
 }
 
 const clamp01 = (value: number): number => {
@@ -210,6 +219,7 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
     r: clampByte(pixel.r),
   }));
   const coverageByLayer: LayerBlendStackRender['coverageByLayer'] = [];
+  const resolvedRemoveSources: LayerBlendStackRender['resolvedRemoveSources'] = [];
 
   for (const layer of input.layers) {
     const opacity = clamp01(layer.opacity);
@@ -237,6 +247,16 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
             removeSource: layer.retouchRemoveSource,
             width: input.width,
           });
+    if (layer.retouchRemoveSource !== undefined) {
+      resolvedRemoveSources.push({
+        layerId: layer.id,
+        ...(removePlan === null
+          ? {}
+          : { resolvedSourcePoint: removeSourcePointToNormalized(removePlan, input.width, input.height) }),
+        status: removePlan === null ? 'fallback_unchanged' : 'ready',
+        targetMaskId: layer.retouchRemoveSource.targetMaskId,
+      });
+    }
     const targetAnchorPoint =
       layer.retouchCloneSource === undefined
         ? removePlan === null
@@ -315,7 +335,7 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
     coverageByLayer.push({ id: layer.id, opacity, touchedPixels });
   }
 
-  return { coverageByLayer, pixels };
+  return { coverageByLayer, pixels, resolvedRemoveSources };
 }
 
 export const renderLayerPreviewStack = renderLayerBlendStack;

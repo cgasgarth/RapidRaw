@@ -113,6 +113,21 @@ const coverageSchema = z
   })
   .strict();
 
+const resolvedRemoveSourceSchema = z
+  .object({
+    layerId: z.string().trim().min(1),
+    resolvedSourcePoint: z
+      .object({
+        x: z.number().min(0).max(1),
+        y: z.number().min(0).max(1),
+      })
+      .strict()
+      .optional(),
+    status: z.enum(['fallback_unchanged', 'ready']),
+    targetMaskId: z.string().trim().min(1),
+  })
+  .strict();
+
 const caseSchema = z
   .object({
     basePixels: z.array(pixelSchema).min(1),
@@ -377,12 +392,27 @@ const removeFixture = {
 const removePreview = renderLayerPreviewStack(removeFixture);
 const removeExport = renderLayerExportStack(removeFixture);
 const removePackage = renderPackageLayerPreviewStack(removeFixture);
+const expectedResolvedRemoveSource = z.array(resolvedRemoveSourceSchema).parse([
+  {
+    layerId: 'remove-local-fill',
+    resolvedSourcePoint: { x: 0.25, y: 0.5 },
+    status: 'ready',
+    targetMaskId: 'remove-target',
+  },
+]);
 const removePreviewHash = hashPixels(removePreview.pixels);
 if (removePreviewHash !== hashPixels(removeExport.pixels) || removePreviewHash !== hashPixels(removePackage.pixels)) {
   fail('remove-local-fill: preview/export/package hash mismatch');
 }
 if (removePreviewHash === hashPixels(removeFixture.basePixels)) {
   fail('remove-local-fill: remove layer did not alter target pixels');
+}
+if (
+  JSON.stringify(removePreview.resolvedRemoveSources) !== JSON.stringify(expectedResolvedRemoveSource) ||
+  JSON.stringify(removeExport.resolvedRemoveSources) !== JSON.stringify(expectedResolvedRemoveSource) ||
+  JSON.stringify(removePackage.resolvedRemoveSources) !== JSON.stringify(expectedResolvedRemoveSource)
+) {
+  fail('remove-local-fill: resolved remove source metadata mismatch');
 }
 
 const transformedRetouchBasePixels = Array.from({ length: 25 }, (_, index) => ({
