@@ -1121,6 +1121,24 @@ export default function LayerStackPanel({
                     {`scale ${row.retouchCloneSource.scale.toFixed(2)} | rotate ${row.retouchCloneSource.rotationDegrees.toFixed(1)} deg`}
                   </UiText>
                 )}
+                {row.retouchRemoveSource !== null && (
+                  <UiText
+                    as="span"
+                    variant={TextVariants.small}
+                    color={TextColors.secondary}
+                    className="block truncate tabular-nums"
+                    data-remove-row-search-radius-multiplier={row.retouchRemoveSource.searchRadiusMultiplier}
+                    data-remove-row-seed={row.retouchRemoveSource.seed}
+                    data-remove-row-status={row.retouchRemoveSource.status ?? 'needs_regeneration'}
+                    data-testid="layer-retouch-remove-row-status"
+                  >
+                    {t('editor.layers.removeSource.rowStatus', {
+                      searchMultiplier: row.retouchRemoveSource.searchRadiusMultiplier,
+                      seedValue: row.retouchRemoveSource.seed,
+                      status: t(getRemoveStatusLabelKey(row.retouchRemoveSource.status)),
+                    })}
+                  </UiText>
+                )}
               </span>
               <span className="flex items-center gap-1">
                 <button

@@ -853,6 +853,7 @@
           "stale": "The remove layer has a stale result; regenerate before final output."
         },
         "radius": "Radius",
+        "rowStatus": "{{status}} - Search {{searchMultiplier}}x - Seed {{seedValue}}",
         "regenerate": "Regenerate",
         "revertOriginal": "Revert to original",
         "search": "Search",
