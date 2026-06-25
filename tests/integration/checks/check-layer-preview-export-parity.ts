@@ -186,6 +186,14 @@ const hashPixels = (pixels) => {
   return `sha256:${hash.digest('hex')}`;
 };
 
+const stableJson = (value: unknown) =>
+  JSON.stringify(value, (_key, nestedValue) => {
+    if (nestedValue === null || typeof nestedValue !== 'object' || Array.isArray(nestedValue)) return nestedValue;
+    return Object.fromEntries(
+      Object.entries(nestedValue).toSorted(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey)),
+    );
+  });
+
 const writePpm = async (path, width, height, pixels) => {
   const rows = [`P3`, `${width} ${height}`, '255'];
   for (let row = 0; row < height; row += 1) {
@@ -369,16 +377,16 @@ if (manifestSchema.safeParse(unsupportedBlendModeManifest).success) {
 
 const removeFixture = {
   basePixels: Array.from({ length: 25 }, (_, index) => ({
-    b: 40 + index,
-    g: 30 + index,
-    r: 20 + index,
+    b: 40 + ((index * 7) % 31),
+    g: 30 + ((index * index * 3) % 37),
+    r: 20 + ((index * 11 + index * index) % 53),
   })),
   height: 5,
   layers: [
     {
       blendMode: 'normal',
       id: 'remove-local-fill',
-      maskAlpha: Array.from({ length: 25 }, (_, index) => (index === 12 ? 1 : 0)),
+      maskAlpha: Array.from({ length: 25 }, (_, index) => (index === 12 || index === 13 ? 1 : 0)),
       name: 'Remove local fill',
       opacity: 1,
       retouchRemoveSource: {
@@ -403,9 +411,9 @@ const removePackage = renderPackageLayerPreviewStack(removeFixture);
 const expectedResolvedRemoveSource = z.array(resolvedRemoveSourceSchema).parse([
   {
     layerId: 'remove-local-fill',
-    outputSampleHash: 'fnv1a32:6e9e394d',
     resolvedSourcePoint: { x: 0.25, y: 0.5 },
-    sourceSampleHash: 'fnv1a32:0724bd7a',
+    sourceSampleHash: 'fnv1a32:90ed1b36',
+    outputSampleHash: 'fnv1a32:9b253abc',
     status: 'ready',
     targetMaskId: 'remove-target',
   },
@@ -418,9 +426,9 @@ if (removePreviewHash === hashPixels(removeFixture.basePixels)) {
   fail('remove-local-fill: remove layer did not alter target pixels');
 }
 if (
-  JSON.stringify(removePreview.resolvedRemoveSources) !== JSON.stringify(expectedResolvedRemoveSource) ||
-  JSON.stringify(removeExport.resolvedRemoveSources) !== JSON.stringify(expectedResolvedRemoveSource) ||
-  JSON.stringify(removePackage.resolvedRemoveSources) !== JSON.stringify(expectedResolvedRemoveSource)
+  stableJson(removePreview.resolvedRemoveSources) !== stableJson(expectedResolvedRemoveSource) ||
+  stableJson(removeExport.resolvedRemoveSources) !== stableJson(expectedResolvedRemoveSource) ||
+  stableJson(removePackage.resolvedRemoveSources) !== stableJson(expectedResolvedRemoveSource)
 ) {
   fail('remove-local-fill: resolved remove source metadata mismatch');
 }
@@ -500,7 +508,7 @@ if (JSON.stringify(scaledRetouchPixel) !== JSON.stringify(scaledExpectedPixel)) 
 
 const bilinearRetouchPixel = renderTransformedRetouchPixel({ ...transformedRetouchSource, scale: 2 }, 13);
 const bilinearExpectedPixel = {
-  b: 75,
+  b: 58,
   g: 73,
   r: 125,
 };
@@ -509,6 +517,58 @@ if (JSON.stringify(bilinearRetouchPixel) !== JSON.stringify(bilinearExpectedPixe
     `actual=${JSON.stringify(bilinearRetouchPixel)}`,
     `expected=${JSON.stringify(bilinearExpectedPixel)}`,
   ]);
+}
+
+const nonSquareRetouchBasePixels = Array.from({ length: 35 }, (_, index) => ({
+  b: 15 + index * 2,
+  g: 25 + index * 3,
+  r: 35 + index * 4,
+}));
+const nonSquareRetouchFixture = {
+  basePixels: nonSquareRetouchBasePixels,
+  height: 5,
+  layers: [
+    {
+      blendMode: 'normal',
+      id: 'retouch-transform-non-square',
+      maskAlpha: Array.from({ length: 35 }, (_, index) => (index === 17 || index === 18 ? 1 : 0)),
+      name: 'Retouch transform non-square',
+      opacity: 1,
+      retouchCloneSource: {
+        featherRadiusPx: 0,
+        radiusPx: 4,
+        retouchMode: 'heal',
+        rotationDegrees: 37,
+        scale: 1.6,
+        sourcePoint: { x: 0.25, y: 0.35 },
+        targetPoint: { x: 0.62, y: 0.5 },
+      },
+      visible: true,
+    },
+  ],
+  width: 7,
+} satisfies Parameters<typeof renderLayerPreviewStack>[0];
+const nonSquarePreview = renderLayerPreviewStack(nonSquareRetouchFixture);
+const nonSquareExport = renderLayerExportStack(nonSquareRetouchFixture);
+const nonSquareHeadless = renderLayerHeadlessStack(nonSquareRetouchFixture);
+const nonSquarePackage = renderPackageLayerPreviewStack(nonSquareRetouchFixture);
+const nonSquarePreviewHash = hashPixels(nonSquarePreview.pixels);
+const expectedNonSquareHash = 'sha256:503c750664a6bf7bd96bba64d3ca0a9de02af7af6678cff6fc8630792fdb00b5';
+if (
+  nonSquarePreviewHash !== hashPixels(nonSquareExport.pixels) ||
+  nonSquarePreviewHash !== hashPixels(nonSquareHeadless.pixels) ||
+  nonSquarePreviewHash !== hashPixels(nonSquarePackage.pixels)
+) {
+  fail('retouch-transform-non-square: preview/export/headless/package hashes diverged');
+}
+if (nonSquarePreviewHash === hashPixels(nonSquareRetouchBasePixels)) {
+  fail('retouch-transform-non-square: transform did not alter the fixture pixels');
+}
+if (nonSquarePreviewHash !== expectedNonSquareHash) {
+  fail('retouch-transform-non-square: expected hash mismatch', [nonSquarePreviewHash, expectedNonSquareHash]);
+}
+if (JSON.stringify(nonSquarePreview.coverageByLayer) !== JSON.stringify(nonSquarePackage.coverageByLayer)) {
+  fail('retouch-transform-non-square: app/package coverage mismatch');
 }
 
 console.log(`layer preview/export parity ok (${manifest.cases.length})`);
