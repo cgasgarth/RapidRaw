@@ -49,6 +49,26 @@ const retouchSourceSchema = z
   })
   .strict();
 
+const retouchRemoveSourceSchema = z
+  .object({
+    featherRadiusPx: z.number().min(0).max(4096).optional(),
+    generator: z.literal('local_patch_fill_v1'),
+    generatorVersion: z.literal(1),
+    radiusPx: z.number().positive().max(4096).optional(),
+    resolvedSourcePoint: z
+      .object({
+        x: z.number().min(0).max(1),
+        y: z.number().min(0).max(1),
+      })
+      .strict()
+      .optional(),
+    searchRadiusMultiplier: z.number().min(1).max(12),
+    seed: z.number().int().min(0).max(0xffffffff),
+    status: z.enum(['fallback_unchanged', 'needs_regeneration', 'ready', 'stale']).optional(),
+    targetMaskId: z.string().trim().min(1),
+  })
+  .strict();
+
 const layerSchema = z
   .object({
     blendMode: layerMaskBlendModeV1Schema.extract(['multiply', 'normal', 'overlay', 'screen', 'soft_light']),
@@ -58,6 +78,7 @@ const layerSchema = z
     opacity: z.number().min(0).max(1),
     pixels: z.array(pixelSchema).min(1).optional(),
     retouchCloneSource: retouchSourceSchema.optional(),
+    retouchRemoveSource: retouchRemoveSourceSchema.optional(),
     visible: z.boolean(),
   })
   .strict();
@@ -69,6 +90,7 @@ const sidecarLayerSchema = z
     maskPersisted: z.boolean(),
     opacity: z.number().min(0).max(1),
     retouchCloneSource: retouchSourceSchema.optional(),
+    retouchRemoveSource: retouchRemoveSourceSchema.optional(),
     visible: z.boolean(),
   })
   .strict();
@@ -335,6 +357,47 @@ const unsupportedBlendModeManifest = {
 
 if (manifestSchema.safeParse(unsupportedBlendModeManifest).success) {
   fail('layer preview/export parity accepted unsupported blend mode');
+}
+
+const removeFixture = {
+  basePixels: Array.from({ length: 25 }, (_, index) => ({
+    b: 40 + index,
+    g: 30 + index,
+    r: 20 + index,
+  })),
+  height: 5,
+  layers: [
+    {
+      blendMode: 'normal',
+      id: 'remove-local-fill',
+      maskAlpha: Array.from({ length: 25 }, (_, index) => (index === 12 ? 1 : 0)),
+      name: 'Remove local fill',
+      opacity: 1,
+      retouchRemoveSource: {
+        featherRadiusPx: 0,
+        generator: 'local_patch_fill_v1',
+        generatorVersion: 1,
+        radiusPx: 1,
+        resolvedSourcePoint: { x: 0.25, y: 0.5 },
+        searchRadiusMultiplier: 4,
+        seed: 0,
+        status: 'ready',
+        targetMaskId: 'remove-target',
+      },
+      visible: true,
+    },
+  ],
+  width: 5,
+} satisfies Parameters<typeof renderLayerPreviewStack>[0];
+const removePreview = renderLayerPreviewStack(removeFixture);
+const removeExport = renderLayerExportStack(removeFixture);
+const removePackage = renderPackageLayerPreviewStack(removeFixture);
+const removePreviewHash = hashPixels(removePreview.pixels);
+if (removePreviewHash !== hashPixels(removeExport.pixels) || removePreviewHash !== hashPixels(removePackage.pixels)) {
+  fail('remove-local-fill: preview/export/package hash mismatch');
+}
+if (removePreviewHash === hashPixels(removeFixture.basePixels)) {
+  fail('remove-local-fill: remove layer did not alter target pixels');
 }
 
 console.log(`layer preview/export parity ok (${manifest.cases.length})`);

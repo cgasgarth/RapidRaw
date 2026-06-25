@@ -859,7 +859,8 @@
         "showAllHidden": "Show all hidden",
         "solo": "Solo layer",
         "soloActive": "Solo active",
-        "ungroup": "Ungroup layers"
+        "ungroup": "Ungroup layers",
+        "createRemoveLayer": "Create remove layer"
       },
       "activeRenderState": {
         "hidden": "Hidden",
@@ -938,7 +939,30 @@
       "rowSummary": "{{blendMode}} - {{opacity}}% - {{maskCount}}",
       "title": "Layers",
       "visibleLayerCount": "{{count}} visible",
-      "visibleLayerCount_other": "{{count}} visible"
+      "visibleLayerCount_other": "{{count}} visible",
+      "newRemoveLayerName": "Remove Layer {{count}}",
+      "newRemoveLayerName_one": "Remove Layer {{count}}",
+      "newRemoveLayerName_other": "Remove Layers {{count}}",
+      "removeRowSummary": "{{blendMode}} - {{opacity}}% - remove {{source}} - {{maskCount}}",
+      "removeSource": {
+        "defaultMaskName": "Remove target",
+        "feather": "Feather",
+        "generators": {
+          "localPatchFill": "Built-in local fill"
+        },
+        "radius": "Radius",
+        "regenerate": "Regenerate",
+        "search": "Search",
+        "seed": "Seed",
+        "status": {
+          "fallback_unchanged": "Fallback unchanged",
+          "needs_regeneration": "Needs regeneration",
+          "ready": "Ready",
+          "stale": "Stale"
+        },
+        "summary": "{{generator}} - {{status}}",
+        "title": "Remove"
+      }
     },
     "masks": {
       "actions": {

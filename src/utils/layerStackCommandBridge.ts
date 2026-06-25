@@ -5,6 +5,7 @@ import {
   INITIAL_MASK_ADJUSTMENTS,
   type MaskContainer,
   type RetouchCloneSource,
+  type RetouchRemoveSource,
 } from './adjustments';
 import {
   ActorKind,
@@ -62,6 +63,11 @@ export type LayerStackCommandBridgeOperation =
     }
   | {
       layerId: string;
+      retouchRemoveSource: RetouchRemoveSource;
+      type: 'updateRetouchRemoveSource';
+    }
+  | {
+      layerId: string;
       type: 'delete';
     };
 
@@ -109,6 +115,9 @@ const toSidecarLayer = (layer: MaskContainer): LayerStackSidecarLayerV1 => {
   };
   if (layer.retouchCloneSource !== undefined) {
     sidecarLayer.retouchCloneSource = layer.retouchCloneSource;
+  }
+  if (layer.retouchRemoveSource !== undefined) {
+    sidecarLayer.retouchRemoveSource = layer.retouchRemoveSource;
   }
   return sidecarLayer;
 };
@@ -189,10 +198,15 @@ function buildLayerStackCommand(
       return layerMaskCommandEnvelopeV1Schema.parse({
         ...base,
         commandType: 'layerMask.createLayer',
-        parameters:
-          operation.layer.retouchCloneSource === undefined
-            ? createLayerParameters
-            : { ...createLayerParameters, retouchCloneSource: operation.layer.retouchCloneSource },
+        parameters: {
+          ...createLayerParameters,
+          ...(operation.layer.retouchCloneSource === undefined
+            ? {}
+            : { retouchCloneSource: operation.layer.retouchCloneSource }),
+          ...(operation.layer.retouchRemoveSource === undefined
+            ? {}
+            : { retouchRemoveSource: operation.layer.retouchRemoveSource }),
+        },
       });
     }
     case 'setOpacity':
@@ -258,6 +272,15 @@ function buildLayerStackCommand(
           retouchCloneSource: operation.retouchCloneSource,
         },
       });
+    case 'updateRetouchRemoveSource':
+      return layerMaskCommandEnvelopeV1Schema.parse({
+        ...base,
+        commandType: 'layerMask.updateRetouchRemoveSource',
+        parameters: {
+          layerId: operation.layerId,
+          retouchRemoveSource: operation.retouchRemoveSource,
+        },
+      });
     case 'delete':
       return layerMaskCommandEnvelopeV1Schema.parse({
         ...base,
@@ -310,6 +333,11 @@ function materializeMasksFromSidecar(
       materializedMask.retouchCloneSource = layer.retouchCloneSource;
     } else {
       delete materializedMask.retouchCloneSource;
+    }
+    if (layer.retouchRemoveSource !== undefined) {
+      materializedMask.retouchRemoveSource = layer.retouchRemoveSource;
+    } else {
+      delete materializedMask.retouchRemoveSource;
     }
     return materializedMask;
   });

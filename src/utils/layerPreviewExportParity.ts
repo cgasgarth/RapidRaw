@@ -1,3 +1,5 @@
+import { resolveRemoveSamplingPlan } from '../../packages/rawengine-schema/src/retouchRemoveRuntime';
+
 export type LayerBlendMode = 'multiply' | 'normal' | 'overlay' | 'screen' | 'soft_light';
 
 export interface LayerRgbPixel {
@@ -14,6 +16,7 @@ export interface LayerBlendStackLayer {
   opacity: number;
   pixels?: ReadonlyArray<LayerRgbPixel>;
   retouchCloneSource?: LayerRetouchCloneSource;
+  retouchRemoveSource?: LayerRetouchRemoveSource;
   visible: boolean;
 }
 
@@ -35,6 +38,18 @@ export interface LayerRetouchCloneSource {
   scale: number;
   sourcePoint: { x: number; y: number };
   targetPoint: { x: number; y: number };
+}
+
+export interface LayerRetouchRemoveSource {
+  featherRadiusPx?: number;
+  generator: 'local_patch_fill_v1';
+  generatorVersion: 1;
+  radiusPx?: number;
+  resolvedSourcePoint?: { x: number; y: number };
+  searchRadiusMultiplier: number;
+  seed: number;
+  status?: 'fallback_unchanged' | 'needs_regeneration' | 'ready' | 'stale';
+  targetMaskId: string;
 }
 
 export interface LayerBlendStackInput {
@@ -100,6 +115,11 @@ const normalizedPointToPixel = (
   y: Math.round(clamp01(point.y) * (height - 1)),
 });
 
+const roundPixelPoint = (point: { x: number; y: number }): { x: number; y: number } => ({
+  x: Math.round(point.x),
+  y: Math.round(point.y),
+});
+
 const cloneSampleIndex = (
   targetIndex: number,
   width: number,
@@ -120,28 +140,57 @@ const cloneSampleIndex = (
   return sourceY * width + sourceX;
 };
 
-const retouchTargetAlpha = (
+const translatedSampleIndex = (
   targetIndex: number,
   width: number,
   height: number,
-  retouchSource: LayerRetouchCloneSource,
-): number => {
-  if (retouchSource.radiusPx === undefined) return 1;
+  sourcePoint: { x: number; y: number },
+  targetPoint: { x: number; y: number },
+): number | null => {
+  const targetX = targetIndex % width;
+  const targetY = Math.floor(targetIndex / width);
+  const sourceX = Math.round(targetX + sourcePoint.x - targetPoint.x);
+  const sourceY = Math.round(targetY + sourcePoint.y - targetPoint.y);
+  if (sourceX < 0 || sourceX >= width || sourceY < 0 || sourceY >= height) return null;
+  return sourceY * width + sourceX;
+};
 
-  const radiusPx = Math.max(0, retouchSource.radiusPx);
+const radialRetouchAlpha = (
+  targetIndex: number,
+  width: number,
+  targetPoint: { x: number; y: number },
+  radiusPxInput: number | undefined,
+  featherRadiusPxInput: number | undefined,
+): number => {
+  if (radiusPxInput === undefined) return 1;
+
+  const radiusPx = Math.max(0, radiusPxInput);
   if (radiusPx === 0) return 0;
 
-  const targetPoint = normalizedPointToPixel(retouchSource.targetPoint, width, height);
   const targetX = targetIndex % width;
   const targetY = Math.floor(targetIndex / width);
   const distance = Math.hypot(targetX - targetPoint.x, targetY - targetPoint.y);
-  const featherPx = Math.min(Math.max(0, retouchSource.featherRadiusPx ?? 0), radiusPx);
+  const featherPx = Math.min(Math.max(0, featherRadiusPxInput ?? 0), radiusPx);
   const solidRadius = radiusPx - featherPx;
 
   if (distance <= solidRadius) return 1;
   if (distance >= radiusPx) return 0;
   return clamp01((radiusPx - distance) / Math.max(featherPx, 1));
 };
+
+const retouchTargetAlpha = (
+  targetIndex: number,
+  width: number,
+  height: number,
+  retouchSource: LayerRetouchCloneSource,
+): number =>
+  radialRetouchAlpha(
+    targetIndex,
+    width,
+    normalizedPointToPixel(retouchSource.targetPoint, width, height),
+    retouchSource.radiusPx,
+    retouchSource.featherRadiusPx,
+  );
 
 const healPixel = (source: LayerRgbPixel, sourceAnchor: LayerRgbPixel, targetAnchor: LayerRgbPixel): LayerRgbPixel => ({
   b: clampByte(source.b + targetAnchor.b - sourceAnchor.b),
@@ -165,10 +214,11 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
   for (const layer of input.layers) {
     const opacity = clamp01(layer.opacity);
     if (!layer.visible || opacity === 0) continue;
-    if (layer.retouchCloneSource === undefined && layer.pixels?.length !== pixelCount) {
+    const isRetouchLayer = layer.retouchCloneSource !== undefined || layer.retouchRemoveSource !== undefined;
+    if (!isRetouchLayer && layer.pixels?.length !== pixelCount) {
       throw new Error(`Layer ${layer.id} pixel count mismatch: ${layer.pixels?.length ?? 0} != ${pixelCount}.`);
     }
-    if (layer.retouchCloneSource !== undefined && layer.pixels !== undefined && layer.pixels.length !== pixelCount) {
+    if (isRetouchLayer && layer.pixels !== undefined && layer.pixels.length !== pixelCount) {
       throw new Error(`Layer ${layer.id} pixel count mismatch: ${layer.pixels.length} != ${pixelCount}.`);
     }
     if (layer.maskAlpha !== undefined && layer.maskAlpha.length !== pixelCount) {
@@ -176,17 +226,39 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
     }
 
     let touchedPixels = 0;
-    const retouchBasePixels = layer.retouchCloneSource === undefined ? null : pixels.map((pixel) => ({ ...pixel }));
+    const retouchBasePixels = isRetouchLayer ? pixels.map((pixel) => ({ ...pixel })) : null;
+    const removePlan =
+      layer.retouchRemoveSource === undefined
+        ? null
+        : resolveRemoveSamplingPlan({
+            height: input.height,
+            maskAlpha: layer.maskAlpha,
+            pixels: retouchBasePixels ?? pixels,
+            removeSource: layer.retouchRemoveSource,
+            width: input.width,
+          });
     const targetAnchorPoint =
       layer.retouchCloneSource === undefined
-        ? null
+        ? removePlan === null
+          ? null
+          : roundPixelPoint(removePlan.targetPoint)
         : normalizedPointToPixel(layer.retouchCloneSource.targetPoint, input.width, input.height);
     const targetAnchorIndex =
       targetAnchorPoint === null ? null : targetAnchorPoint.y * input.width + targetAnchorPoint.x;
-    const sourceAnchorIndex =
-      layer.retouchCloneSource === undefined || targetAnchorIndex === null
-        ? null
-        : cloneSampleIndex(targetAnchorIndex, input.width, input.height, layer.retouchCloneSource);
+    let sourceAnchorIndex: number | null = null;
+    if (targetAnchorIndex !== null && retouchBasePixels !== null) {
+      if (removePlan !== null) {
+        sourceAnchorIndex = translatedSampleIndex(
+          targetAnchorIndex,
+          input.width,
+          input.height,
+          removePlan.sourcePoint,
+          removePlan.targetPoint,
+        );
+      } else if (layer.retouchCloneSource !== undefined) {
+        sourceAnchorIndex = cloneSampleIndex(targetAnchorIndex, input.width, input.height, layer.retouchCloneSource);
+      }
+    }
 
     for (let index = 0; index < pixelCount; index += 1) {
       const cloneSourceIndex =
@@ -194,10 +266,19 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
           ? null
           : cloneSampleIndex(index, input.width, input.height, layer.retouchCloneSource);
       if (layer.retouchCloneSource !== undefined && cloneSourceIndex === null) continue;
+      const removeSourceIndex =
+        removePlan === null
+          ? null
+          : translatedSampleIndex(index, input.width, input.height, removePlan.sourcePoint, removePlan.targetPoint);
+      if (layer.retouchRemoveSource !== undefined && removeSourceIndex === null) continue;
       const sampledSource =
-        cloneSourceIndex === null ? layer.pixels?.[index] : (retouchBasePixels ?? pixels)[cloneSourceIndex];
+        removeSourceIndex !== null
+          ? (retouchBasePixels ?? pixels)[removeSourceIndex]
+          : cloneSourceIndex === null
+            ? layer.pixels?.[index]
+            : (retouchBasePixels ?? pixels)[cloneSourceIndex];
       const source =
-        layer.retouchCloneSource?.retouchMode === 'heal' &&
+        (layer.retouchCloneSource?.retouchMode === 'heal' || layer.retouchRemoveSource !== undefined) &&
         sampledSource !== undefined &&
         retouchBasePixels !== null &&
         sourceAnchorIndex !== null &&
@@ -214,9 +295,17 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
       }
 
       const retouchAlpha =
-        layer.retouchCloneSource === undefined
-          ? 1
-          : retouchTargetAlpha(index, input.width, input.height, layer.retouchCloneSource);
+        layer.retouchCloneSource !== undefined
+          ? retouchTargetAlpha(index, input.width, input.height, layer.retouchCloneSource)
+          : removePlan === null || layer.retouchRemoveSource === undefined
+            ? 1
+            : radialRetouchAlpha(
+                index,
+                input.width,
+                removePlan.targetPoint,
+                layer.retouchRemoveSource.radiusPx,
+                layer.retouchRemoveSource.featherRadiusPx,
+              );
       const alpha = opacity * clamp01(layer.maskAlpha?.[index] ?? 1) * retouchAlpha;
       if (alpha === 0) continue;
       pixels[index] = blendPixel(base, source, layer.blendMode, alpha);

@@ -182,6 +182,48 @@ if (
 }
 run('delete_heal', { layerId: 'layer-heal', type: 'delete' });
 
+const removeLayer = {
+  ...toMask({ id: 'layer-remove', name: 'Remove dust', opacity: 100, visible: true }),
+  retouchRemoveSource: {
+    featherRadiusPx: 24,
+    generator: 'local_patch_fill_v1',
+    generatorVersion: 1,
+    radiusPx: 48,
+    searchRadiusMultiplier: 4,
+    seed: 0,
+    status: 'needs_regeneration',
+    targetMaskId: 'layer-remove-target',
+  },
+} satisfies MaskContainer;
+const remove = run('create_remove', { layer: removeLayer, type: 'create' });
+if (
+  remove.command.commandType !== 'layerMask.createLayer' ||
+  remove.command.parameters.retouchRemoveSource?.generator !== 'local_patch_fill_v1' ||
+  remove.sidecar.layers[0]?.retouchRemoveSource?.targetMaskId !== 'layer-remove-target' ||
+  masks[0]?.retouchRemoveSource?.searchRadiusMultiplier !== 4
+) {
+  throw new Error(
+    'Expected remove layer creation to preserve local patch-fill metadata through command, sidecar, and UI masks.',
+  );
+}
+const updatedRemove = run('update_remove_source', {
+  layerId: 'layer-remove',
+  retouchRemoveSource: {
+    ...removeLayer.retouchRemoveSource,
+    seed: 3,
+    status: 'needs_regeneration',
+  },
+  type: 'updateRetouchRemoveSource',
+});
+if (
+  updatedRemove.command.commandType !== 'layerMask.updateRetouchRemoveSource' ||
+  updatedRemove.sidecar.layers[0]?.retouchRemoveSource?.seed !== 3 ||
+  masks[0]?.retouchRemoveSource?.seed !== 3
+) {
+  throw new Error('Expected remove source edits to roundtrip through command, sidecar, and UI masks.');
+}
+run('delete_remove', { layerId: 'layer-remove', type: 'delete' });
+
 const actualFinalLayers = layerSummarySchema.array().parse(summarize(masks));
 if (JSON.stringify(actualFinalLayers) !== JSON.stringify(expectedFinalLayers)) {
   console.error('Expected:', JSON.stringify(expectedFinalLayers));

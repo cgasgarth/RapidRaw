@@ -830,10 +830,34 @@
     },
     "layers": {
       "actions": {
-        "createHealLayer": "Create heal layer"
+        "createHealLayer": "Create heal layer",
+        "createRemoveLayer": "Create remove layer"
       },
       "healRowSummary": "{{blendMode}} - {{opacity}}% - heal {{source}} - {{maskCount}}",
-      "newHealLayerName": "Heal Layer {{count}}"
+      "newHealLayerName": "Heal Layer {{count}}",
+      "newRemoveLayerName": "Remove Layer {{count}}",
+      "newRemoveLayerName_one": "Remove Layer {{count}}",
+      "newRemoveLayerName_other": "Remove Layers {{count}}",
+      "removeRowSummary": "{{blendMode}} - {{opacity}}% - remove {{source}} - {{maskCount}}",
+      "removeSource": {
+        "defaultMaskName": "Remove target",
+        "feather": "Feather",
+        "generators": {
+          "localPatchFill": "Built-in local fill"
+        },
+        "radius": "Radius",
+        "regenerate": "Regenerate",
+        "search": "Search",
+        "seed": "Seed",
+        "status": {
+          "fallback_unchanged": "Fallback unchanged",
+          "needs_regeneration": "Needs regeneration",
+          "ready": "Ready",
+          "stale": "Stale"
+        },
+        "summary": "{{generator}} - {{status}}",
+        "title": "Remove"
+      }
     }
   },
   "export": {

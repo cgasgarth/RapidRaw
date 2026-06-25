@@ -1525,6 +1525,7 @@ export const layerMaskCommandTypeV1Schema = z.enum([
   'layerMask.deleteLayer',
   'layerMask.moveLayer',
   'layerMask.updateRetouchSource',
+  'layerMask.updateRetouchRemoveSource',
   'layerMask.attachMask',
   'layerMask.applyLayerAdjustment',
   'layerMask.createBrushMask',
@@ -1669,6 +1670,20 @@ export const layerMaskCloneSourceV1Schema = z
   })
   .strict();
 
+export const layerMaskRemoveSourceV1Schema = z
+  .object({
+    featherRadiusPx: z.number().min(0).max(4096).optional(),
+    generator: z.literal('local_patch_fill_v1'),
+    generatorVersion: z.literal(1),
+    radiusPx: z.number().positive().max(4096).optional(),
+    resolvedSourcePoint: layerMaskPointV1Schema.optional(),
+    searchRadiusMultiplier: z.number().min(1).max(12),
+    seed: z.number().int().min(0).max(0xffffffff),
+    status: z.enum(['fallback_unchanged', 'needs_regeneration', 'ready', 'stale']).optional(),
+    targetMaskId: z.string().trim().min(1),
+  })
+  .strict();
+
 const layerMaskCommandBaseV1Schema = z.object({
   actor: rawEngineActorSchema,
   approval: approvalRequirementSchema,
@@ -1695,6 +1710,7 @@ export const layerMaskCommandEnvelopeV1Schema = z
             position: z.enum(['top', 'bottom', 'above_layer', 'below_layer']),
             referenceLayerId: z.string().trim().min(1).optional(),
             retouchCloneSource: layerMaskCloneSourceV1Schema.optional(),
+            retouchRemoveSource: layerMaskRemoveSourceV1Schema.optional(),
             visible: z.boolean(),
           })
           .strict()
@@ -1707,6 +1723,13 @@ export const layerMaskCommandEnvelopeV1Schema = z
                 code: 'custom',
                 message: 'Relative layer insertion requires referenceLayerId.',
                 path: ['referenceLayerId'],
+              });
+            }
+            if (parameters.retouchCloneSource !== undefined && parameters.retouchRemoveSource !== undefined) {
+              context.addIssue({
+                code: 'custom',
+                message: 'Layer cannot have both clone/heal and remove retouch sources.',
+                path: ['retouchRemoveSource'],
               });
             }
           }),
@@ -1800,6 +1823,17 @@ export const layerMaskCommandEnvelopeV1Schema = z
           .object({
             layerId: z.string().trim().min(1),
             retouchCloneSource: layerMaskCloneSourceV1Schema,
+          })
+          .strict(),
+      })
+      .strict(),
+    layerMaskCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('layerMask.updateRetouchRemoveSource'),
+        parameters: z
+          .object({
+            layerId: z.string().trim().min(1),
+            retouchRemoveSource: layerMaskRemoveSourceV1Schema,
           })
           .strict(),
       })
