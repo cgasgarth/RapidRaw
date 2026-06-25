@@ -858,7 +858,7 @@ function App() {
           </div>
         </div>
         <AppModals
-          handleImageSelect={handleImageSelectVoid}
+          handleImageSelect={handleImageSelect}
           handleSavePanorama={handleSavePanorama}
           handleStartPanorama={handleStartPanoramaVoid}
           handleSaveHdr={handleSaveHdr}
