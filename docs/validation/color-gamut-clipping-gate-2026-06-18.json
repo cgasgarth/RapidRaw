@@ -141,7 +141,7 @@
   "generatedFromSnapshotDate": "2026-06-15",
   "issue": 3495,
   "parentIssue": 3238,
-  "proofBoundary": "cpu_reference_only_no_preview_or_export_application",
+  "proofBoundary": "export_runtime_applied_for_srgb_perceptual_no_preview_or_display_application",
   "schemaVersion": 1,
   "summary": {
     "clippingFractionMax": 0.666666666667,
@@ -153,7 +153,7 @@
     "perceptualDeltaL1Max": 1.83,
     "perceptualDeltaL1P50": 0.380121190789,
     "perceptualDeltaL1P95": 1.83,
-    "runtimeStatus": "cpu_reference_only"
+    "runtimeStatus": "export_runtime_applied_for_srgb_perceptual"
   },
   "thresholds": {
     "componentBoundaryEpsilon": 1e-12,

@@ -257,15 +257,21 @@ export const rawEngineGamutMappingDestinationV1Schema = z.enum(['srgb', 'display
 export const rawEngineGamutMappingMethodV1Schema = z.enum([
   'none_scene_referred_v1',
   'relative_colorimetric_clip_fallback_v1',
+  'perceptual_oklab_chroma_reduce_export_v1',
   'perceptual_oklch_chroma_reduce_planned_v1',
 ]);
 
-export const rawEngineGamutMappingStatusV1Schema = z.enum(['schema_only', 'cpu_reference_planned']);
+export const rawEngineGamutMappingStatusV1Schema = z.enum([
+  'schema_only',
+  'cpu_reference_planned',
+  'export_runtime_applied',
+]);
 
 export const rawEngineGamutMappingWarningCodeV1Schema = z.enum([
   'output_gamut_high_component_v1',
   'output_gamut_mapping_not_runtime_applied_v1',
   'output_gamut_negative_component_v1',
+  'output_gamut_preview_not_runtime_applied_v1',
   'output_gamut_perceptual_cpu_reference_v1',
   'output_gamut_perceptual_intent_unproven_v1',
 ]);
@@ -290,10 +296,25 @@ export const rawEngineGamutMappingPolicyV1Schema = z
       });
     }
 
-    if (policy.intent === 'perceptual' && !policy.warnings.includes('output_gamut_perceptual_intent_unproven_v1')) {
+    if (
+      policy.intent === 'perceptual' &&
+      policy.status !== 'export_runtime_applied' &&
+      !policy.warnings.includes('output_gamut_perceptual_intent_unproven_v1')
+    ) {
       context.addIssue({
         code: 'custom',
         message: 'Perceptual gamut mapping must remain warning-gated until runtime proof exists.',
+        path: ['warnings'],
+      });
+    }
+
+    if (
+      policy.status === 'export_runtime_applied' &&
+      !policy.warnings.includes('output_gamut_preview_not_runtime_applied_v1')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Export-applied gamut mapping must disclose that preview/display application is not proven.',
         path: ['warnings'],
       });
     }

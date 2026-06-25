@@ -130,7 +130,11 @@ for (const testCase of manifest.cases) {
     failures.push(`${testCase.id}: negative-component case must include output_gamut_negative_component_v1`);
   }
 
-  if (testCase.policy.intent === 'perceptual' && !hasWarning(testCase, 'output_gamut_perceptual_intent_unproven_v1')) {
+  if (
+    testCase.policy.intent === 'perceptual' &&
+    testCase.policy.status !== 'export_runtime_applied' &&
+    !hasWarning(testCase, 'output_gamut_perceptual_intent_unproven_v1')
+  ) {
     failures.push(`${testCase.id}: perceptual intent must include output_gamut_perceptual_intent_unproven_v1`);
   }
 
@@ -156,6 +160,20 @@ for (const testCase of manifest.cases) {
     !hasWarning(testCase, 'output_gamut_mapping_not_runtime_applied_v1')
   ) {
     failures.push(`${testCase.id}: schema-only case must include output_gamut_mapping_not_runtime_applied_v1`);
+  }
+
+  if (
+    testCase.policy.status === 'export_runtime_applied' &&
+    !hasWarning(testCase, 'output_gamut_preview_not_runtime_applied_v1')
+  ) {
+    failures.push(`${testCase.id}: export-applied case must disclose preview/display mapping is not proven`);
+  }
+
+  if (
+    testCase.policy.status === 'export_runtime_applied' &&
+    testCase.policy.method !== 'perceptual_oklab_chroma_reduce_export_v1'
+  ) {
+    failures.push(`${testCase.id}: export-applied perceptual case must name the versioned runtime method`);
   }
 
   if (testCase.policy.method === 'relative_colorimetric_clip_fallback_v1') {
@@ -222,7 +240,7 @@ const report = {
   generatedFromSnapshotDate: manifest.snapshotDate,
   issue: 3495,
   parentIssue: 3238,
-  proofBoundary: 'cpu_reference_only_no_preview_or_export_application',
+  proofBoundary: 'export_runtime_applied_for_srgb_perceptual_no_preview_or_display_application',
   schemaVersion: 1,
   summary: summarizeReportCases(reportCases),
   thresholds: {
@@ -280,6 +298,6 @@ function summarizeReportCases(cases: Array<GamutClipReportCase>) {
     perceptualDeltaL1Max: roundMetric(Math.max(...perceptualDeltas)),
     perceptualDeltaL1P50: roundMetric(percentile(perceptualDeltas, 0.5)),
     perceptualDeltaL1P95: roundMetric(percentile(perceptualDeltas, 0.95)),
-    runtimeStatus: 'cpu_reference_only',
+    runtimeStatus: 'export_runtime_applied_for_srgb_perceptual',
   };
 }
