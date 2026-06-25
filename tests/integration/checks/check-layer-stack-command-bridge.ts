@@ -121,6 +121,7 @@ const cloneLayer = {
   ...toMask({ id: 'layer-clone', name: 'Clone texture', opacity: 100, visible: true }),
   retouchCloneSource: {
     alignmentErrorPx: 0.18,
+    retouchMode: 'clone',
     rotationDegrees: 1,
     scale: 1.1,
     sourcePoint: { x: 0.25, y: 0.35 },
@@ -137,6 +138,30 @@ if (
   throw new Error('Expected clone layer creation to preserve source linkage through command, sidecar, and UI masks.');
 }
 run('delete_clone', { layerId: 'layer-clone', type: 'delete' });
+
+const healLayer = {
+  ...toMask({ id: 'layer-heal', name: 'Heal spot', opacity: 100, visible: true }),
+  retouchCloneSource: {
+    alignmentErrorPx: 0,
+    featherRadiusPx: 24,
+    radiusPx: 48,
+    retouchMode: 'heal',
+    rotationDegrees: 0,
+    scale: 1,
+    sourcePoint: { x: 0.3, y: 0.35 },
+    targetPoint: { x: 0.5, y: 0.55 },
+  },
+} satisfies MaskContainer;
+const heal = run('create_heal', { layer: healLayer, type: 'create' });
+if (
+  heal.command.commandType !== 'layerMask.createLayer' ||
+  heal.command.parameters.retouchCloneSource?.retouchMode !== 'heal' ||
+  heal.sidecar.layers[0]?.retouchCloneSource?.radiusPx !== 48 ||
+  masks[0]?.retouchCloneSource?.featherRadiusPx !== 24
+) {
+  throw new Error('Expected heal layer creation to preserve heal metadata through command, sidecar, and UI masks.');
+}
+run('delete_heal', { layerId: 'layer-heal', type: 'delete' });
 
 const actualFinalLayers = layerSummarySchema.array().parse(summarize(masks));
 if (JSON.stringify(actualFinalLayers) !== JSON.stringify(expectedFinalLayers)) {

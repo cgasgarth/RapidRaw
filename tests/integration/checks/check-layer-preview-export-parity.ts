@@ -25,6 +25,29 @@ const pixelSchema = z
   })
   .strict();
 
+const retouchSourceSchema = z
+  .object({
+    alignmentErrorPx: z.number().min(0).optional(),
+    featherRadiusPx: z.number().min(0).max(4096).optional(),
+    radiusPx: z.number().positive().max(4096).optional(),
+    retouchMode: z.enum(['clone', 'heal']).optional(),
+    rotationDegrees: z.number().min(-180).max(180),
+    scale: z.number().min(0.1).max(10),
+    sourcePoint: z
+      .object({
+        x: z.number().min(0).max(1),
+        y: z.number().min(0).max(1),
+      })
+      .strict(),
+    targetPoint: z
+      .object({
+        x: z.number().min(0).max(1),
+        y: z.number().min(0).max(1),
+      })
+      .strict(),
+  })
+  .strict();
+
 const layerSchema = z
   .object({
     blendMode: layerMaskBlendModeV1Schema.extract(['multiply', 'normal', 'overlay', 'screen', 'soft_light']),
@@ -33,26 +56,7 @@ const layerSchema = z
     name: z.string().trim().min(1),
     opacity: z.number().min(0).max(1),
     pixels: z.array(pixelSchema).min(1).optional(),
-    retouchCloneSource: z
-      .object({
-        alignmentErrorPx: z.number().min(0).optional(),
-        rotationDegrees: z.number().min(-180).max(180),
-        scale: z.number().min(0.1).max(10),
-        sourcePoint: z
-          .object({
-            x: z.number().min(0).max(1),
-            y: z.number().min(0).max(1),
-          })
-          .strict(),
-        targetPoint: z
-          .object({
-            x: z.number().min(0).max(1),
-            y: z.number().min(0).max(1),
-          })
-          .strict(),
-      })
-      .strict()
-      .optional(),
+    retouchCloneSource: retouchSourceSchema.optional(),
     visible: z.boolean(),
   })
   .strict();
@@ -63,26 +67,7 @@ const sidecarLayerSchema = z
     id: z.string().trim().min(1),
     maskPersisted: z.boolean(),
     opacity: z.number().min(0).max(1),
-    retouchCloneSource: z
-      .object({
-        alignmentErrorPx: z.number().min(0).optional(),
-        rotationDegrees: z.number().min(-180).max(180),
-        scale: z.number().min(0.1).max(10),
-        sourcePoint: z
-          .object({
-            x: z.number().min(0).max(1),
-            y: z.number().min(0).max(1),
-          })
-          .strict(),
-        targetPoint: z
-          .object({
-            x: z.number().min(0).max(1),
-            y: z.number().min(0).max(1),
-          })
-          .strict(),
-      })
-      .strict()
-      .optional(),
+    retouchCloneSource: retouchSourceSchema.optional(),
     visible: z.boolean(),
   })
   .strict();
@@ -186,6 +171,12 @@ for (const fixture of manifest.cases) {
   const cloneLayer = fixture.layers.find((layer) => layer.retouchCloneSource !== undefined);
   if (cloneLayer === undefined) fail(`${fixture.id}: missing retouch clone source layer`);
   if (cloneLayer.pixels !== undefined) fail(`${fixture.id}: clone source layer should sample from source pixels`);
+  const retouchSource = cloneLayer.retouchCloneSource;
+  if (retouchSource === undefined) throw new Error(`${fixture.id}: missing retouch source payload`);
+  if (retouchSource.retouchMode !== 'heal') fail(`${fixture.id}: missing heal retouch mode`);
+  if (retouchSource.radiusPx !== 32 || retouchSource.featherRadiusPx !== 16) {
+    fail(`${fixture.id}: heal radius/feather metadata missing`);
+  }
 
   const sidecarLayerIds = fixture.sidecarLayerStack.layers.map((layer) => layer.id);
   const fixtureLayerIds = fixture.layers.map((layer) => layer.id);
@@ -222,6 +213,9 @@ for (const fixture of manifest.cases) {
   if (sidecarRoundtrip.storage !== 'sidecar_artifact') fail(`${fixture.id}: sidecar storage mismatch`);
   if (!sidecarRoundtrip.layers.some((layer) => layer.retouchCloneSource?.sourcePoint.x === 0)) {
     fail(`${fixture.id}: sidecar clone source linkage missing`);
+  }
+  if (!sidecarRoundtrip.layers.some((layer) => layer.retouchCloneSource?.retouchMode === 'heal')) {
+    fail(`${fixture.id}: sidecar heal metadata missing`);
   }
 
   const transformedCloneLayer = {

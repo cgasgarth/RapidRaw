@@ -33,6 +33,7 @@ const requiredOperationReadinessLocaleKeys = [
 const requiredActionLocaleKeys = ['showAllHidden', 'soloActive'];
 const requiredActiveRenderStateKeys = ['hidden', 'summary', 'title', 'visible'];
 const requiredCloneKeys = ['cloneRowSummary', 'newCloneLayerName'];
+const requiredHealKeys = ['healRowSummary', 'newHealLayerName'];
 
 const missingKeys = requiredLocaleKeys.filter((key) => typeof layerLocale?.[key] !== 'string');
 if (missingKeys.length > 0) {
@@ -49,9 +50,18 @@ if (typeof layerLocale?.actions?.createCloneLayer !== 'string') {
   console.error('Missing layer stack clone action locale key: editor.layers.actions.createCloneLayer');
   process.exit(1);
 }
+if (typeof layerLocale?.actions?.createHealLayer !== 'string') {
+  console.error('Missing layer stack heal action locale key: editor.layers.actions.createHealLayer');
+  process.exit(1);
+}
 const missingCloneKeys = requiredCloneKeys.filter((key) => typeof layerLocale?.[key] !== 'string');
 if (missingCloneKeys.length > 0) {
   console.error(`Missing layer stack clone locale keys: ${missingCloneKeys.join(', ')}`);
+  process.exit(1);
+}
+const missingHealKeys = requiredHealKeys.filter((key) => typeof layerLocale?.[key] !== 'string');
+if (missingHealKeys.length > 0) {
+  console.error(`Missing layer stack heal locale keys: ${missingHealKeys.join(', ')}`);
   process.exit(1);
 }
 
@@ -115,6 +125,7 @@ for (const marker of [
   'data-retouch-clone-source={row.retouchCloneSourceLabel ??',
   'applyLayerStackCommandBridgeOperation',
   'data-testid="layer-create-clone-layer"',
+  'data-testid="layer-create-heal-layer"',
   'data-testid="layer-operation-move-ready"',
   'data-testid="layer-operation-group-ready"',
   'data-testid="layer-operation-ungroup-ready"',
@@ -138,9 +149,12 @@ for (const marker of [
   'editor.layers.actions.soloActive',
   'editor.layers.actions.showAllHidden',
   'editor.layers.actions.createCloneLayer',
+  'editor.layers.actions.createHealLayer',
   'editor.layers.activeRenderState.title',
   'editor.layers.cloneRowSummary',
+  'editor.layers.healRowSummary',
   'editor.layers.newCloneLayerName',
+  'editor.layers.newHealLayerName',
   'editor.layers.activeRenderState.summary',
   'editor.layers.activeRenderState.visible',
   'editor.layers.activeRenderState.hidden',
