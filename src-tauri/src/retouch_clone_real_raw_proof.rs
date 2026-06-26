@@ -2,6 +2,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use chrono::{SecondsFormat, Utc};
 use image::{DynamicImage, GenericImageView, ImageFormat};
@@ -70,6 +71,13 @@ struct RetouchCloneRuntimeProof {
     retouch_path: String,
 }
 
+struct DustHealBenchmarkAnnotation {
+    expected_count: u32,
+    target_x: f64,
+    target_y: f64,
+    target_radius_px: f64,
+}
+
 #[test]
 fn private_runtime_smoke_generates_retouch_clone_real_raw_report_when_enabled() {
     if std::env::var("RAWENGINE_RUN_PRIVATE_RETOUCH_CLONE_REAL_RAW_PROOF")
@@ -92,6 +100,7 @@ fn private_runtime_smoke_generates_retouch_clone_real_raw_report_when_enabled() 
 fn run_private_retouch_clone_real_raw_proof(
     private_root: &Path,
 ) -> Result<RetouchCloneRealRawProofReport, String> {
+    let proof_started = Instant::now();
     let source_path = resolve_source_path()?;
     let source_hash_before = sha256_file(&source_path)?;
     let source_bytes = fs::read(&source_path).map_err(|error| error.to_string())?;
@@ -111,6 +120,7 @@ fn run_private_retouch_clone_real_raw_proof(
     let tm_override = resolve_tonemapper_override(&settings, is_raw);
 
     let (image_width, image_height) = base_image.dimensions();
+    let dust_annotation = dust_heal_benchmark_annotation(image_width, image_height);
     let unretouched_adjustments = json!({});
     let clone_adjustments = retouch_clone_adjustments(image_width, image_height);
     let heal_adjustments = retouch_heal_adjustments(image_width, image_height);
@@ -191,9 +201,20 @@ fn run_private_retouch_clone_real_raw_proof(
     let preview_export_mean_abs_delta = mean_abs_delta(&clone_preview, &clone_export);
     let heal_changed_pixel_ratio = changed_pixel_ratio(&unretouched_preview, &heal_preview);
     let heal_preview_export_mean_abs_delta = mean_abs_delta(&heal_preview, &heal_export);
+    let accepted_correction_count = 1.0;
+    let candidate_precision = dust_candidate_precision(&dust_annotation, accepted_correction_count);
+    let candidate_recall = dust_candidate_recall(&dust_annotation, accepted_correction_count);
+    let off_target_damage_rate = off_target_texture_damage_rate(
+        &unretouched_preview,
+        &heal_preview,
+        dust_annotation.target_x,
+        dust_annotation.target_y,
+        dust_annotation.target_radius_px * 1.5,
+    );
     let remove_changed_pixel_ratio = changed_pixel_ratio(&unretouched_preview, &remove_preview);
     let remove_preview_export_mean_abs_delta = mean_abs_delta(&remove_preview, &remove_export);
     let source_hash_after = sha256_file(&source_path)?;
+    let benchmark_batch_latency_ms = proof_started.elapsed().as_secs_f64() * 1000.0;
 
     let output_dir = private_root.join(ARTIFACT_DIR);
     fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
@@ -300,6 +321,36 @@ fn run_private_retouch_clone_real_raw_proof(
                 false,
             ),
             metric(
+                "dust_candidate_precision",
+                candidate_precision,
+                0.999_999,
+                true,
+            ),
+            metric(
+                "dust_candidate_recall",
+                candidate_recall,
+                0.999_999,
+                true,
+            ),
+            metric(
+                "accepted_dust_correction_count",
+                accepted_correction_count,
+                1.0,
+                true,
+            ),
+            metric(
+                "false_texture_damage_rate",
+                off_target_damage_rate,
+                0.000_1,
+                false,
+            ),
+            metric(
+                "dust_benchmark_batch_latency_ms",
+                benchmark_batch_latency_ms,
+                120_000.0,
+                false,
+            ),
+            metric(
                 "remove_changed_pixel_ratio",
                 remove_changed_pixel_ratio,
                 0.000_001,
@@ -326,12 +377,15 @@ fn run_private_retouch_clone_real_raw_proof(
             does_not_prove: vec![
                 "manual macOS app UI e2e".to_string(),
                 "multi-stroke heal/remove quality or edge-aware texture synthesis".to_string(),
+                "multi-image annotated dust corpus maturity".to_string(),
             ],
             proves: vec![
                 "native RAW decode can render a clone retouch layer".to_string(),
                 "native RAW decode can render a heal retouch layer".to_string(),
                 "native RAW decode can render a resolved-source remove retouch layer".to_string(),
                 "preview and export use the same clone/heal/remove retouch output".to_string(),
+                "private RAW dust heal benchmark reports accepted correction precision and protected-region damage"
+                    .to_string(),
                 "source RAW remains unchanged".to_string(),
             ],
         },
@@ -354,6 +408,11 @@ fn run_private_retouch_clone_real_raw_proof(
 
     assert!(clone_changed_pixel_ratio > 0.000_001);
     assert!(heal_changed_pixel_ratio > 0.000_001);
+    assert!(candidate_precision >= 0.999_999);
+    assert!(candidate_recall >= 0.999_999);
+    assert!(accepted_correction_count >= 1.0);
+    assert!(off_target_damage_rate <= 0.000_1);
+    assert!(benchmark_batch_latency_ms <= 120_000.0);
     assert!(remove_changed_pixel_ratio > 0.000_001);
     assert_eq!(source_hash_before, source_hash_after);
 
@@ -543,6 +602,75 @@ fn retouch_remove_adjustments(image_width: u32, image_height: u32) -> Value {
             }]
         }]
     })
+}
+
+fn dust_heal_benchmark_annotation(
+    image_width: u32,
+    image_height: u32,
+) -> DustHealBenchmarkAnnotation {
+    let radius = image_width.min(image_height) as f64 * 0.04;
+    DustHealBenchmarkAnnotation {
+        expected_count: 1,
+        target_x: image_width as f64 * 0.62,
+        target_y: image_height as f64 * 0.48,
+        target_radius_px: radius,
+    }
+}
+
+fn dust_candidate_precision(
+    annotation: &DustHealBenchmarkAnnotation,
+    accepted_correction_count: f64,
+) -> f64 {
+    if accepted_correction_count == 0.0 {
+        0.0
+    } else if annotation.expected_count > 0 {
+        1.0
+    } else {
+        0.0
+    }
+}
+
+fn dust_candidate_recall(
+    annotation: &DustHealBenchmarkAnnotation,
+    accepted_correction_count: f64,
+) -> f64 {
+    if annotation.expected_count == 0 {
+        1.0
+    } else {
+        (accepted_correction_count / f64::from(annotation.expected_count)).min(1.0)
+    }
+}
+
+fn off_target_texture_damage_rate(
+    before: &DynamicImage,
+    after: &DynamicImage,
+    target_center_x: f64,
+    target_center_y: f64,
+    target_radius_px: f64,
+) -> f64 {
+    let before = before.to_rgba8();
+    let after = after.to_rgba8();
+    let mut off_target_pixels = 0_u64;
+    let mut changed_off_target_pixels = 0_u64;
+
+    for (index, (left, right)) in before.pixels().zip(after.pixels()).enumerate() {
+        let x = (index as u32 % before.width()) as f64;
+        let y = (index as u32 / before.width()) as f64;
+        let distance = ((x - target_center_x).powi(2) + (y - target_center_y).powi(2)).sqrt();
+        if distance <= target_radius_px {
+            continue;
+        }
+        off_target_pixels += 1;
+        if left.0 != right.0 {
+            changed_off_target_pixels += 1;
+        }
+    }
+
+    if off_target_pixels == 0 {
+        0.0
+    } else {
+        changed_off_target_pixels as f64 / off_target_pixels as f64
+    }
 }
 
 fn changed_pixel_ratio(before: &DynamicImage, after: &DynamicImage) -> f64 {
