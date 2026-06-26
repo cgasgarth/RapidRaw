@@ -1,0 +1,74 @@
+{
+  "$schema": "https://rawengine.dev/schemas/raw-open-edit-export-proof-request-v1.json",
+  "artifactDirRelative": "private-artifacts/validation/open-edit-export/srgb-relative",
+  "editCommand": {
+    "actor": {
+      "id": "agent.raw-srgb-relative-proof",
+      "kind": "agent",
+      "sessionId": "raw-srgb-relative-proof"
+    },
+    "approval": {
+      "approvalClass": "edit_apply",
+      "reason": "Apply accepted basic tone command for sRGB relative-colorimetric RAW proof comparison.",
+      "state": "approved"
+    },
+    "colorPipeline": {
+      "chromaticAdaptation": {
+        "method": "bradford_v1",
+        "sourceWhitePoint": {
+          "x": 0.3457,
+          "y": 0.3585
+        },
+        "status": "math_validated",
+        "targetWhitePoint": {
+          "x": 0.3127,
+          "y": 0.329
+        },
+        "warnings": []
+      },
+      "inputDomain": "camera_linear_rgb",
+      "operationDomain": "acescg_linear_v1",
+      "renderTarget": {
+        "bitDepth": 16,
+        "embedIcc": true,
+        "intent": "relative_colorimetric",
+        "outputProfile": "srgb",
+        "viewTransform": "rawengine_agx_v1"
+      },
+      "sceneToDisplayTransform": "rawengine_agx_v1",
+      "workingSpace": "acescg_linear_v1"
+    },
+    "commandId": "command.raw-open-edit-export.srgb-relative.v1",
+    "commandType": "toneColor.setBasicTone",
+    "correlationId": "corr.raw-open-edit-export.srgb-relative.v1",
+    "dryRun": false,
+    "expectedGraphRevision": "graph-rev.raw-open-edit-export.professional-color-relative.v1",
+    "idempotencyKey": "idem.raw-open-edit-export.srgb-relative.v1",
+    "parameters": {
+      "acceptedDryRunPlanHash": "sha256:raw-open-edit-export-srgb-relative-accepted-plan-v1",
+      "acceptedDryRunPlanId": "dryrun_raw_open_edit_export_srgb_relative_v1",
+      "blackPoint": -1,
+      "clarity": 3,
+      "contrast": 6,
+      "exposureEv": 0.2,
+      "highlights": -10,
+      "saturation": 12,
+      "shadows": 6,
+      "whitePoint": 2
+    },
+    "schemaVersion": 1,
+    "target": {
+      "imagePath": "private-fixtures/color/professional-workflow-v1/alaska-dsc7853.arw",
+      "kind": "image"
+    }
+  },
+  "fixtureId": "validation.raw-open-edit-export.professional-color-relative.v1",
+  "privateRootPath": "/tmp/rawengine-private-root",
+  "sourceMetadata": {
+    "cameraMake": "Sony",
+    "cameraModel": "ILCE-7M3",
+    "privacySafeCameraId": "camera.raw-open-edit-export.professional-color.v1",
+    "rawFormat": "arw"
+  },
+  "sourceRelativePath": "private-fixtures/color/professional-workflow-v1/alaska-dsc7853.arw"
+}
