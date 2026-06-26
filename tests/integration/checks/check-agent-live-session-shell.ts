@@ -1,0 +1,33 @@
+#!/usr/bin/env bun
+
+import { readFileSync } from 'node:fs';
+
+const shellSource = readFileSync('src/components/panel/right/AgentChatShell.tsx', 'utf8');
+const panelSource = readFileSync('src/components/panel/right/AIPanel.tsx', 'utf8');
+
+const requiredShellMarkers = [
+  'interface LiveSessionEvent',
+  'liveSessionEvents',
+  'data-live-session-event-count',
+  'data-live-session-state',
+  'data-session-input-state',
+  "toolCall.toolName === 'rawengine.live_context'",
+  "toolCall.status === 'succeeded'",
+  "createLiveSessionEvent('user', requestedPrompt, 'prompt')",
+  "t('editor.ai.agent.composer.status.dry_run_ready')",
+  "t('editor.ai.agent.composer.status.applied')",
+  "t('editor.ai.agent.composer.status.rolled_back')",
+  'disabled={!isContextReady}',
+];
+
+for (const marker of requiredShellMarkers) {
+  if (!shellSource.includes(marker)) {
+    throw new Error(`Agent live session shell missing marker: ${marker}`);
+  }
+}
+
+if (panelSource.includes('agentChatTranscriptFixture')) {
+  throw new Error('The live AI panel must not use the static agent transcript fixture.');
+}
+
+console.log('agent live session shell ok');

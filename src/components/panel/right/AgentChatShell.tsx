@@ -163,18 +163,34 @@ function MessageBubble({ message }: { message: AgentChatMessage }) {
 }
 
 interface LivePromptComposerProps {
+  isContextReady: boolean;
   onResultChange?: (result: LivePromptResult) => void;
+  onSessionEvent?: (event: LiveSessionEvent) => void;
 }
 
-function LivePromptComposer({ onResultChange }: LivePromptComposerProps) {
+interface LiveSessionEvent {
+  body: string;
+  id: string;
+  role: AgentChatMessage['role'];
+  timestamp: string;
+}
+
+const createLiveSessionEvent = (role: AgentChatMessage['role'], body: string, suffix: string): LiveSessionEvent => ({
+  body,
+  id: `live-agent-session-${Date.now()}-${suffix}`,
+  role,
+  timestamp: 'now',
+});
+
+function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: LivePromptComposerProps) {
   const { t } = useTranslation();
   const promptInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [prompt, setPrompt] = useState('');
   const [acceptedPrompt, setAcceptedPrompt] = useState('');
   const [result, setResult] = useState<LivePromptResult>({ status: 'idle' });
   const [rollbackSnapshot, setRollbackSnapshot] = useState<AgentRollbackSnapshot | null>(null);
-  const canRun = result.status !== 'applying';
-  const canApply = acceptedPrompt.length > 0 && result.status === 'dry_run_ready';
+  const canRun = isContextReady && result.status !== 'applying';
+  const canApply = isContextReady && acceptedPrompt.length > 0 && result.status === 'dry_run_ready';
   const canRollback = rollbackSnapshot !== null && result.status === 'applied';
   let statusLabel;
 
@@ -201,9 +217,10 @@ function LivePromptComposer({ onResultChange }: LivePromptComposerProps) {
 
   const runDryRun = async () => {
     const requestedPrompt = (promptInputRef.current?.value ?? prompt).trim();
-    if (requestedPrompt.length === 0) return;
+    if (!isContextReady || requestedPrompt.length === 0) return;
 
     try {
+      onSessionEvent?.(createLiveSessionEvent('user', requestedPrompt, 'prompt'));
       const plan = planAgentEditRecipe(requestedPrompt);
       const preview = await runAgentBoundedEditPlannerLoop({
         maxSteps: 5,
@@ -221,13 +238,28 @@ function LivePromptComposer({ onResultChange }: LivePromptComposerProps) {
       } satisfies LivePromptResult;
       setResult(nextResult);
       onResultChange?.(nextResult);
+      onSessionEvent?.(
+        createLiveSessionEvent(
+          'assistant',
+          `${t('editor.ai.agent.composer.status.dry_run_ready')}: ${plan.summary}`,
+          'dry-run-ready',
+        ),
+      );
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError');
       const nextResult = {
-        error: error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError'),
+        error: errorMessage,
         status: 'failed',
       } satisfies LivePromptResult;
       setResult(nextResult);
       onResultChange?.(nextResult);
+      onSessionEvent?.(
+        createLiveSessionEvent(
+          'assistant',
+          `${t('editor.ai.agent.composer.status.failed')}: ${errorMessage}`,
+          'failed',
+        ),
+      );
     }
   };
 
@@ -239,6 +271,7 @@ function LivePromptComposer({ onResultChange }: LivePromptComposerProps) {
       const applyingResult = { ...result, status: 'applying' } satisfies LivePromptResult;
       setResult(applyingResult);
       onResultChange?.(applyingResult);
+      onSessionEvent?.(createLiveSessionEvent('assistant', t('editor.ai.agent.composer.status.applying'), 'applying'));
       const plan = planAgentEditRecipe(acceptedPrompt);
       const basicToneStep = plan.steps.find((step) => step.kind === 'basic_tone');
       if (basicToneStep?.kind !== 'basic_tone') {
@@ -263,14 +296,29 @@ function LivePromptComposer({ onResultChange }: LivePromptComposerProps) {
       } satisfies LivePromptResult;
       setResult(nextResult);
       onResultChange?.(nextResult);
+      onSessionEvent?.(
+        createLiveSessionEvent(
+          'assistant',
+          `${t('editor.ai.agent.composer.status.applied')}: ${nextResult.appliedGraphRevision}`,
+          'applied',
+        ),
+      );
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError');
       const nextResult = {
         ...result,
-        error: error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError'),
+        error: errorMessage,
         status: 'failed',
       } satisfies LivePromptResult;
       setResult(nextResult);
       onResultChange?.(nextResult);
+      onSessionEvent?.(
+        createLiveSessionEvent(
+          'assistant',
+          `${t('editor.ai.agent.composer.status.failed')}: ${errorMessage}`,
+          'apply-failed',
+        ),
+      );
     }
   };
 
@@ -289,12 +337,16 @@ function LivePromptComposer({ onResultChange }: LivePromptComposerProps) {
     const nextResult = { ...result, status: 'rolled_back' } satisfies LivePromptResult;
     setResult(nextResult);
     onResultChange?.(nextResult);
+    onSessionEvent?.(
+      createLiveSessionEvent('assistant', t('editor.ai.agent.composer.status.rolled_back'), 'rolled-back'),
+    );
   };
 
   return (
     <form
       className="pointer-events-auto relative z-10 space-y-3 rounded-md border border-sky-500/20 bg-sky-500/5 p-3"
       data-live-prompt-status={result.status}
+      data-session-input-state={isContextReady ? 'ready' : 'blocked'}
       data-preview-refresh-policy="native-renderer-handoff"
       data-testid="agent-live-prompt-composer"
       onSubmit={(event) => {
@@ -310,6 +362,7 @@ function LivePromptComposer({ onResultChange }: LivePromptComposerProps) {
           className="min-h-20 w-full resize-y rounded-md border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-text-primary outline-none transition-colors placeholder:text-text-secondary focus:border-primary/60"
           data-testid="agent-live-prompt-input"
           id="agent-live-prompt-input"
+          disabled={!isContextReady}
           onChange={(event) => {
             setPrompt(event.target.value);
           }}
@@ -1347,7 +1400,11 @@ function LongEditProgressPanel({ progress }: { progress: AgentLongEditProgress }
 export default function AgentChatShell({ transcript }: AgentChatShellProps) {
   const { t } = useTranslation();
   const [livePromptResult, setLivePromptResult] = useState<LivePromptResult>({ status: 'idle' });
+  const [liveSessionEvents, setLiveSessionEvents] = useState<LiveSessionEvent[]>([]);
   const runtimeBadge = agentRuntimeBadge[transcript.runtimeStatus];
+  const isContextReady = transcript.toolCalls.some(
+    (toolCall) => toolCall.toolName === 'rawengine.live_context' && toolCall.status === 'succeeded',
+  );
   const hasLiveApplyProof = livePromptResult.status === 'applied';
   const liveApplyToolCall =
     hasLiveApplyProof && livePromptResult.appliedGraphRevision
@@ -1378,6 +1435,8 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
     <section
       className="space-y-3 rounded-md border border-white/10 bg-card/40 p-3"
       data-agent-runtime-status={transcript.runtimeStatus}
+      data-live-session-event-count={liveSessionEvents.length}
+      data-live-session-state={isContextReady ? 'ready' : 'blocked'}
       data-testid="agent-chat-shell"
     >
       <div className="flex items-start justify-between gap-3">
@@ -1395,9 +1454,18 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
         </span>
       </div>
 
-      <LivePromptComposer onResultChange={setLivePromptResult} />
+      <LivePromptComposer
+        isContextReady={isContextReady}
+        onResultChange={setLivePromptResult}
+        onSessionEvent={(event) => {
+          setLiveSessionEvents((events) => [...events, event]);
+        }}
+      />
 
       <div className="space-y-2" data-testid="agent-chat-messages">
+        {liveSessionEvents.map((message) => (
+          <MessageBubble key={message.id} message={message} />
+        ))}
         {transcript.messages.map((message) => (
           <MessageBubble key={message.id} message={message} />
         ))}
