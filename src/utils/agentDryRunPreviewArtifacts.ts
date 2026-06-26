@@ -7,6 +7,12 @@ import {
 } from './agentLiveBasicTone';
 import { createLiveEditorAppServerBridge } from './agentLiveEditorState';
 import {
+  agentPreviewEnvelopeSchema,
+  buildAgentPreviewEnvelope,
+  stableAgentPreviewHash,
+  type AgentPreviewEnvelope,
+} from './agentPreviewEnvelope';
+import {
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
   type BasicToneCommandEnvelope,
@@ -28,8 +34,10 @@ export interface AgentBasicToneDryRunPreviewOptions {
 
 export interface AgentBasicToneDryRunPreviewArtifacts {
   afterArtifact: ArtifactHandleV1;
+  afterPreview: AgentPreviewEnvelope;
   afterPreviewHash: string;
   beforeArtifact: ArtifactHandleV1;
+  beforePreview: AgentPreviewEnvelope;
   beforePreviewHash: string;
   changedPixelCount: number;
   command: BasicToneCommandEnvelope;
@@ -41,8 +49,10 @@ export interface AgentBasicToneDryRunPreviewArtifacts {
 const agentBasicToneDryRunPreviewArtifactsProofSchema = z
   .object({
     afterArtifact: artifactHandleV1Schema,
+    afterPreview: agentPreviewEnvelopeSchema,
     afterPreviewHash: z.string().trim().min(1),
     beforeArtifact: artifactHandleV1Schema,
+    beforePreview: agentPreviewEnvelopeSchema,
     beforePreviewHash: z.string().trim().min(1),
     changedPixelCount: z.number().int().positive(),
     graphRevisionAfter: z.string().trim().min(1),
@@ -68,14 +78,47 @@ const buildPreviewArtifact = ({ artifactId, hash }: { artifactId: string; hash: 
     storage: 'temp_cache',
   });
 
+const buildDryRunMediumPreview = ({
+  graphRevision,
+  height,
+  operationId,
+  previewRef,
+  purpose,
+  recipeSeed,
+  renderSeed,
+  width,
+}: {
+  graphRevision: string;
+  height: number;
+  operationId: string;
+  previewRef: string;
+  purpose: AgentPreviewEnvelope['purpose'];
+  recipeSeed: unknown;
+  renderSeed: unknown;
+  width: number;
+}): AgentPreviewEnvelope =>
+  buildAgentPreviewEnvelope({
+    crop: null,
+    height,
+    idSeed: `${operationId}:${purpose}:${graphRevision}`,
+    previewRef,
+    purpose,
+    recipeHash: `recipe:${stableAgentPreviewHash(JSON.stringify(recipeSeed))}`,
+    renderHash: `render:${stableAgentPreviewHash(JSON.stringify(renderSeed))}`,
+    stableHash: stableAgentPreviewHash,
+    width,
+    zoom: null,
+  });
+
 export const buildAgentBasicToneDryRunPreviewArtifacts = async ({
   operationId,
   requestedAdjustments,
   sessionId,
 }: AgentBasicToneDryRunPreviewOptions): Promise<AgentBasicToneDryRunPreviewArtifacts> => {
   const editor = useEditorStore.getState();
-  const imagePath = editor.selectedImage?.path;
-  if (imagePath === undefined) throw new Error('Cannot preview agent basic tone without a selected image.');
+  const selectedImage = editor.selectedImage;
+  if (selectedImage === null) throw new Error('Cannot preview agent basic tone without a selected image.');
+  const imagePath = selectedImage.path;
 
   const graphRevisionBefore = `history_${editor.historyIndex}`;
   const context = buildBasicToneImageCommandContext({
@@ -105,11 +148,49 @@ export const buildAgentBasicToneDryRunPreviewArtifacts = async ({
     artifactId: `artifact_agent_basic_tone_${operationId}_before_preview`,
     hash: beforePreviewHash,
   });
+  const beforePreview = buildDryRunMediumPreview({
+    graphRevision: graphRevisionBefore,
+    height: selectedImage.height,
+    operationId,
+    previewRef: beforeArtifact.artifactId,
+    purpose: 'detail_review',
+    recipeSeed: {
+      adjustments: editor.adjustments,
+      graphRevision: graphRevisionBefore,
+      imagePath,
+    },
+    renderSeed: {
+      artifactHash: beforePreviewHash,
+      graphRevision: graphRevisionBefore,
+      imagePath,
+    },
+    width: selectedImage.width,
+  });
+  const afterPreview = buildDryRunMediumPreview({
+    graphRevision: previewResult.predictedGraphRevision,
+    height: selectedImage.height,
+    operationId,
+    previewRef: afterArtifact.artifactId,
+    purpose: 'refresh',
+    recipeSeed: {
+      commandParameters: command.parameters,
+      graphRevision: previewResult.predictedGraphRevision,
+      imagePath,
+    },
+    renderSeed: {
+      artifactHash: afterPreviewHash,
+      graphRevision: previewResult.predictedGraphRevision,
+      imagePath,
+    },
+    width: selectedImage.width,
+  });
 
   agentBasicToneDryRunPreviewArtifactsProofSchema.parse({
     afterArtifact,
+    afterPreview,
     afterPreviewHash,
     beforeArtifact,
+    beforePreview,
     beforePreviewHash,
     changedPixelCount,
     graphRevisionAfter,
@@ -119,8 +200,10 @@ export const buildAgentBasicToneDryRunPreviewArtifacts = async ({
 
   return {
     afterArtifact,
+    afterPreview,
     afterPreviewHash,
     beforeArtifact,
+    beforePreview,
     beforePreviewHash,
     changedPixelCount,
     command,
