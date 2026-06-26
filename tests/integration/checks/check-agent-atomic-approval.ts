@@ -4,7 +4,9 @@ import { RawStatus, SortDirection } from '../../../src/components/ui/AppProperti
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { useLibraryStore } from '../../../src/store/useLibraryStore.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import type { AgentApprovalState } from '../../../src/utils/agentApprovalGate.ts';
 import { applyApprovedAgentPlanAtomically, rollbackApprovedAgentPlan } from '../../../src/utils/agentAtomicApproval.ts';
+import { buildAgentImageContextSnapshot } from '../../../src/utils/agentImageContextSnapshot.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3160.ARW';
 
@@ -68,10 +70,59 @@ const steps = [
     },
   },
 ];
+const snapshot = buildAgentImageContextSnapshot();
+const buildApproval = (status: AgentApprovalState['status'], overrides: Partial<AgentApprovalState> = {}) => ({
+  approvalId: `approval_${status}_3160`,
+  approvedGraphRevision: snapshot.graphRevision,
+  approvedRecipeHash: snapshot.initialPreview.recipeHash,
+  approvedSelectedImagePath: snapshot.activeImagePath,
+  approvedSessionId: 'agent-atomic-approval-3160',
+  status,
+  ...overrides,
+});
 
 await expectRejects(
   applyApprovedAgentPlanAtomically({
-    approvalId: 'approval_stale_3160',
+    approval: buildApproval('pending'),
+    approvedAfterHash: 'after',
+    approvedBeforeHash: 'before',
+    approvedGraphRevision: 'history_0',
+    operationId: 'atomic_3160_pending',
+    sessionId: 'agent-atomic-approval-3160',
+    steps,
+  }),
+  'pending approval',
+);
+
+await expectRejects(
+  applyApprovedAgentPlanAtomically({
+    approval: buildApproval('cancelled'),
+    approvedAfterHash: 'after',
+    approvedBeforeHash: 'before',
+    approvedGraphRevision: 'history_0',
+    operationId: 'atomic_3160_cancelled',
+    sessionId: 'agent-atomic-approval-3160',
+    steps,
+  }),
+  'cancelled approval',
+);
+
+await expectRejects(
+  applyApprovedAgentPlanAtomically({
+    approval: buildApproval('approved', { approvedSelectedImagePath: '/tmp/other.ARW' }),
+    approvedAfterHash: 'after',
+    approvedBeforeHash: 'before',
+    approvedGraphRevision: 'history_0',
+    operationId: 'atomic_3160_wrong_image',
+    sessionId: 'agent-atomic-approval-3160',
+    steps,
+  }),
+  'wrong selected image',
+);
+
+await expectRejects(
+  applyApprovedAgentPlanAtomically({
+    approval: buildApproval('approved', { approvedGraphRevision: 'history_99' }),
     approvedAfterHash: 'after',
     approvedBeforeHash: 'before',
     approvedGraphRevision: 'history_99',
@@ -83,7 +134,7 @@ await expectRejects(
 );
 
 const applied = await applyApprovedAgentPlanAtomically({
-  approvalId: 'approval_accepted_3160',
+  approval: buildApproval('approved', { approvalId: 'approval_accepted_3160' }),
   approvedAfterHash: 'after',
   approvedBeforeHash: 'before',
   approvedGraphRevision: 'history_0',
@@ -112,7 +163,7 @@ if (rolledBackState.finalPreviewUrl !== 'blob:rawengine-atomic-before') {
   throw new Error('Rollback did not restore original preview identity.');
 }
 
-console.log('agent atomic approval ok (stale reject+apply+rollback)');
+console.log('agent atomic approval ok');
 
 async function expectRejects(promise: Promise<unknown>, label: string) {
   try {

@@ -1,15 +1,17 @@
 import { z } from 'zod';
 
+import { agentApprovalStateSchema, assertAgentApprovalGate, type AgentApprovalState } from './agentApprovalGate';
 import { runAgentCoreEditCommandBundle, type AgentCoreEditCommandBundleStep } from './agentCoreEditCommandBundle';
+import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import { useEditorStore } from '../store/useEditorStore';
 
 import type { Adjustments } from './adjustments';
 
 export interface AgentApprovedPlan {
+  approval: AgentApprovalState;
   approvedAfterHash: string;
   approvedBeforeHash: string;
   approvedGraphRevision: string;
-  approvalId: string;
   operationId: string;
   sessionId: string;
   steps: readonly AgentCoreEditCommandBundleStep[];
@@ -28,25 +30,45 @@ export interface AgentAtomicApplyResult {
 
 const approvedPlanSchema = z
   .object({
+    approval: agentApprovalStateSchema,
     approvedAfterHash: z.string().trim().min(1),
     approvedBeforeHash: z.string().trim().min(1),
     approvedGraphRevision: z.string().trim().min(1),
-    approvalId: z.string().trim().min(1),
     operationId: z.string().trim().min(1),
     sessionId: z.string().trim().min(1),
-    steps: z.array(z.looseObject({ kind: z.enum(['basic_tone', 'selective_color']) })).min(1),
+    steps: z
+      .array(
+        z.custom<AgentCoreEditCommandBundleStep>(
+          (value) =>
+            typeof value === 'object' &&
+            value !== null &&
+            'payload' in value &&
+            'kind' in value &&
+            (value.kind === 'basic_tone' || value.kind === 'selective_color'),
+        ),
+      )
+      .min(1),
   })
   .strict();
 
 export const applyApprovedAgentPlanAtomically = async (plan: AgentApprovedPlan): Promise<AgentAtomicApplyResult> => {
-  approvedPlanSchema.parse(plan);
+  const parsedPlan = approvedPlanSchema.parse(plan);
+  const snapshot = buildAgentImageContextSnapshot();
   const state = useEditorStore.getState();
-  const currentGraphRevision = `history_${state.historyIndex}`;
-  if (currentGraphRevision !== plan.approvedGraphRevision) {
+  const currentGraphRevision = snapshot.graphRevision;
+  if (currentGraphRevision !== parsedPlan.approvedGraphRevision) {
     throw new Error(
-      `Approved plan graph revision mismatch: expected ${plan.approvedGraphRevision}, got ${currentGraphRevision}.`,
+      `Approved plan graph revision mismatch: expected ${parsedPlan.approvedGraphRevision}, got ${currentGraphRevision}.`,
     );
   }
+  const approval = assertAgentApprovalGate({
+    approval: parsedPlan.approval,
+    expectedGraphRevision: parsedPlan.approvedGraphRevision,
+    expectedRecipeHash: snapshot.initialPreview.recipeHash,
+    expectedSessionId: parsedPlan.sessionId,
+    operation: 'atomic apply',
+    selectedImagePath: snapshot.activeImagePath,
+  });
 
   const rollbackTarget = {
     adjustments: state.adjustments,
@@ -56,14 +78,14 @@ export const applyApprovedAgentPlanAtomically = async (plan: AgentApprovedPlan):
   };
 
   const applied = await runAgentCoreEditCommandBundle({
-    operationId: plan.operationId,
-    sessionId: plan.sessionId,
-    steps: plan.steps,
+    operationId: parsedPlan.operationId,
+    sessionId: parsedPlan.sessionId,
+    steps: parsedPlan.steps,
   });
 
   return {
     appliedGraphRevision: applied.appliedGraphRevision,
-    approvalId: plan.approvalId,
+    approvalId: approval.approvalId,
     rollbackTarget,
   };
 };

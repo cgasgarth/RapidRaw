@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { agentApprovalStateSchema, assertAgentApprovalGate } from './agentApprovalGate';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import {
   exportRecipeColorProfileV1Schema,
@@ -23,6 +24,7 @@ const stableHash = (value: string): string => {
 
 export const agentExportProofRequestSchema = z
   .object({
+    approval: agentApprovalStateSchema,
     colorProfile: exportRecipeColorProfileV1Schema.default('srgb'),
     dryRun: z.literal(true),
     expectedRecipeHash: z.string().trim().min(1),
@@ -56,6 +58,7 @@ export const agentExportProofResponseSchema = z
     receipt: z
       .object({
         activeImagePath: z.string().trim().min(1),
+        approvalId: z.string().trim().min(1),
         graphRevision: z.string().trim().min(1),
         operationId: z.string().trim().min(1),
         previewRenderHash: z.string().trim().min(1),
@@ -93,6 +96,14 @@ export const buildAgentExportProof = (request: AgentExportProofRequest): AgentEx
   const editor = useEditorStore.getState();
   const selectedImage = editor.selectedImage;
   if (selectedImage === null) throw new Error('Agent export proof requires a selected image.');
+  const approval = assertAgentApprovalGate({
+    approval: parsedRequest.approval,
+    expectedGraphRevision: snapshot.graphRevision,
+    expectedRecipeHash: snapshot.initialPreview.recipeHash,
+    expectedSessionId: parsedRequest.sessionId,
+    operation: 'export proof',
+    selectedImagePath: snapshot.activeImagePath,
+  });
 
   const dimensions = fitDimensions(selectedImage.width, selectedImage.height, parsedRequest.longEdgePx);
   const mediaType = parsedRequest.fileFormat === 'png' ? 'image/png' : 'image/jpeg';
@@ -104,6 +115,7 @@ export const buildAgentExportProof = (request: AgentExportProofRequest): AgentEx
       dimensions,
       fileFormat: parsedRequest.fileFormat,
       graphRevision: snapshot.graphRevision,
+      approvalId: approval.approvalId,
       jpegQuality: parsedRequest.jpegQuality,
       recipeHash: snapshot.initialPreview.recipeHash,
       renderingIntent: parsedRequest.renderingIntent,
@@ -127,6 +139,7 @@ export const buildAgentExportProof = (request: AgentExportProofRequest): AgentEx
     },
     receipt: {
       activeImagePath: snapshot.activeImagePath,
+      approvalId: approval.approvalId,
       graphRevision: snapshot.graphRevision,
       operationId: parsedRequest.operationId,
       previewRenderHash: snapshot.initialPreview.renderHash,

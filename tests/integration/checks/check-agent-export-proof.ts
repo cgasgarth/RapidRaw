@@ -4,6 +4,7 @@ import { ToolType } from '../../../src/components/panel/right/Masks.tsx';
 import { RawEngineAppServerRouteMode } from '../../../src/schemas/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import type { AgentApprovalState } from '../../../src/utils/agentApprovalGate.ts';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agentImageContextSnapshot.ts';
 import {
   AGENT_EXPORT_PROOF_TOOL_NAME,
@@ -48,8 +49,20 @@ useEditorStore.getState().setEditor({
   uncroppedAdjustedPreviewUrl: null,
 });
 
+const snapshot = buildAgentImageContextSnapshot();
+const buildApproval = (status: AgentApprovalState['status'], overrides: Partial<AgentApprovalState> = {}) => ({
+  approvalId: `approval_export_${status}_3163`,
+  approvedGraphRevision: snapshot.graphRevision,
+  approvedRecipeHash: snapshot.initialPreview.recipeHash,
+  approvedSelectedImagePath: snapshot.activeImagePath,
+  approvedSessionId: 'agent-export-proof-3163',
+  status,
+  ...overrides,
+});
+
 if (
   agentExportProofRequestSchema.safeParse({
+    approval: buildApproval('approved'),
     dryRun: false,
     expectedRecipeHash: 'recipe:test',
     operationId: 'bad_export',
@@ -60,10 +73,10 @@ if (
   throw new Error('agent.export.proof accepted a mutating export request.');
 }
 
-const snapshot = buildAgentImageContextSnapshot();
 let staleRejected = false;
 try {
   buildAgentExportProof({
+    approval: buildApproval('approved'),
     dryRun: true,
     expectedRecipeHash: 'recipe:stale',
     operationId: 'stale_export',
@@ -75,7 +88,30 @@ try {
 }
 if (!staleRejected) throw new Error('agent.export.proof did not reject stale recipe hash.');
 
+expectRejects(() =>
+  buildAgentExportProof({
+    approval: buildApproval('pending'),
+    dryRun: true,
+    expectedRecipeHash: snapshot.initialPreview.recipeHash,
+    operationId: 'pending_export',
+    requestId: 'pending-export',
+    sessionId: 'agent-export-proof-3163',
+  }),
+);
+
+expectRejects(() =>
+  buildAgentExportProof({
+    approval: buildApproval('approved', { approvedSessionId: 'agent-export-proof-other' }),
+    dryRun: true,
+    expectedRecipeHash: snapshot.initialPreview.recipeHash,
+    operationId: 'wrong_session_export',
+    requestId: 'wrong-session-export',
+    sessionId: 'agent-export-proof-3163',
+  }),
+);
+
 const proof = buildAgentExportProof({
+  approval: buildApproval('approved', { approvalId: 'approval_export_accepted_3163' }),
   colorProfile: 'srgb',
   dryRun: true,
   expectedRecipeHash: snapshot.initialPreview.recipeHash,
@@ -97,6 +133,9 @@ if (proof.receipt.recipeHash !== snapshot.initialPreview.recipeHash) {
 if (proof.receipt.previewRenderHash !== snapshot.initialPreview.renderHash) {
   throw new Error('agent.export.proof receipt must bind to the current preview render hash.');
 }
+if (proof.receipt.approvalId !== 'approval_export_accepted_3163') {
+  throw new Error('agent.export.proof receipt must bind to the backend approval id.');
+}
 if (proof.output.width !== 1536 || proof.output.height !== 1024 || proof.output.mediaType !== 'image/jpeg') {
   throw new Error('agent.export.proof did not return bounded JPEG output metadata.');
 }
@@ -105,6 +144,7 @@ if (!proof.output.previewRef.includes(snapshot.initialPreview.renderHash)) {
 }
 
 const pngProof = buildAgentExportProof({
+  approval: buildApproval('approved', { approvalId: 'approval_export_png_3163' }),
   colorProfile: 'displayP3',
   dryRun: true,
   expectedRecipeHash: snapshot.initialPreview.recipeHash,
@@ -134,3 +174,12 @@ if (
 }
 
 console.log('agent export proof ok');
+
+function expectRejects(action: () => unknown) {
+  try {
+    action();
+  } catch {
+    return;
+  }
+  throw new Error('Expected agent export proof rejection.');
+}
