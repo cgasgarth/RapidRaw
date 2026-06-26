@@ -121,6 +121,17 @@ if (
 ) {
   throw new Error('Agent initial prompt request did not attach the medium private preview descriptor.');
 }
+if (
+  result.initialPromptContext.modelInput.initialPreview.artifactId !== result.initialPromptContext.preview.artifactId ||
+  result.initialPromptContext.modelInput.initialPreview.mediaType !== 'image/jpeg' ||
+  result.initialPromptContext.modelInput.initialPreview.longEdgePx !== 1536 ||
+  result.initialPromptContext.modelInput.initialPreview.quality !== 0.86 ||
+  result.initialPromptContext.modelInput.initialPreview.includesOriginalRaw !== false ||
+  result.initialPromptContext.modelInput.initialPreview.width <= 0 ||
+  result.initialPromptContext.modelInput.initialPreview.height <= 0
+) {
+  throw new Error('Agent app-server model input did not carry the initial medium preview attachment.');
+}
 if (!result.transcript[0]?.detail.includes(result.initialPromptContext.preview.artifactId)) {
   throw new Error('Agent planner loop transcript did not prove the initial preview was part of inspection.');
 }
