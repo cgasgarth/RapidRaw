@@ -15,6 +15,7 @@ const GITHUB_FILE_SCHEMA = z
 
 const CONTRACT_CHECKS = [
   'check:agent-approval-boundaries',
+  'check:agent-baseline-gates',
   'check:agent-rollback-proof',
   'check:agent-proof-gallery',
   'check:ui-api-coverage',
@@ -63,6 +64,7 @@ const PACKAGE_SCRIPT_NAMES = new Set([
   'check:ai-app-server-routes',
   'check:ai-denoise-app-server-tool',
   'check:agent-approval-boundaries',
+  'check:agent-baseline-gates',
   'check:agent-proof-gallery',
   'check:agent-rollback-proof',
   'check:computational-merge-app-server-routes',
