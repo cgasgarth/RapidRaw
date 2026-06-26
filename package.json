@@ -641,7 +641,8 @@
     "check:agent-scope-guardrails": "bun tests/integration/checks/check-agent-scope-guardrails.ts",
     "check:agent-edit-recipe-planner": "bun tests/integration/checks/check-agent-edit-recipe-planner.ts",
     "check:agent-prompt-command-evaluation": "bun tests/integration/checks/check-agent-prompt-command-evaluation.ts",
-    "check:filmstrip-edit-thumbnail-refresh": "bun tests/integration/checks/check-filmstrip-edit-thumbnail-refresh.ts"
+    "check:filmstrip-edit-thumbnail-refresh": "bun tests/integration/checks/check-filmstrip-edit-thumbnail-refresh.ts",
+    "check:native-qa-app-launcher": "bun tests/integration/checks/check-native-qa-app-launcher.ts"
   },
   "lint-staged": {
     "*.{cjs,css,html,js,json,jsx,md,ts,tsx,yaml,yml}": "bun prettier --write --log-level warn",
