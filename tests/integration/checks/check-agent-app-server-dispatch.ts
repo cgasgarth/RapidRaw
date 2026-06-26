@@ -11,7 +11,10 @@ import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
 } from '../../../src/utils/agentReadOnlyAppServerTools.ts';
-import { handleRawEngineAppServerHostRequestAsync } from '../../../src/utils/rawEngineAppServerHost.ts';
+import {
+  handleRawEngineAppServerHostRequestAsync,
+  isApprovedAgentAppServerToolName,
+} from '../../../src/utils/rawEngineAppServerHost.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3163.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 10 : 2));
@@ -170,4 +173,33 @@ if (staleApply.dispatchStatus !== 'rejected' || !staleApply.message?.includes('s
   throw new Error('agent dispatch did not reject stale mutating tool calls.');
 }
 
-console.log('agent app-server dispatch ok (state+preview+apply+refresh+stale)');
+const disallowedAgentTools = [
+  'patchRecipe',
+  'setRawAdjustment',
+  'clickUi',
+  'runEditorCommand',
+  'ai.mask.apply_subject',
+] as const;
+for (const runtimeToolName of disallowedAgentTools) {
+  if (isApprovedAgentAppServerToolName(runtimeToolName)) {
+    throw new Error(`${runtimeToolName} was incorrectly approved as an agent app-server tool.`);
+  }
+  const rejected = await dispatch(
+    runtimeToolName,
+    {
+      commandType: runtimeToolName,
+      dryRun: false,
+      operationId: `blocked_${runtimeToolName}`,
+      sessionId: 'agent-dispatch-3163',
+    },
+    `blocked-${runtimeToolName}`,
+  );
+  if (
+    rejected.dispatchStatus !== 'rejected' ||
+    !rejected.message?.includes('not an approved typed agent app-server tool')
+  ) {
+    throw new Error(`${runtimeToolName} did not reject as an untyped agent-session mutation.`);
+  }
+}
+
+console.log('agent app-server dispatch ok (typed tools + blocked generic agent mutations)');

@@ -827,6 +827,37 @@ const getDryRunFlag = (command: unknown): boolean | undefined => {
   return typeof command.dryRun === 'boolean' ? command.dryRun : undefined;
 };
 
+const APPROVED_AGENT_APP_SERVER_TOOL_NAMES = new Set<string>([
+  AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+  AGENT_COLOR_APPLY_TOOL_NAME,
+  AGENT_CURVE_LEVELS_APPLY_TOOL_NAME,
+  AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
+  AGENT_EXPORT_PROOF_TOOL_NAME,
+  AGENT_GEOMETRY_APPLY_TOOL_NAME,
+  AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+  AGENT_LAYER_CREATE_TOOL_NAME,
+  AGENT_LENS_PROFILE_APPLY_TOOL_NAME,
+  AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
+  AGENT_PREVIEW_RENDER_TOOL_NAME,
+  AGENT_RETOUCH_APPLY_TOOL_NAME,
+  AGENT_STATE_GET_TOOL_NAME,
+]);
+
+const hasAgentSessionIntent = ({
+  arguments: args,
+  runtimeToolName,
+}: RawEngineAppServerToolDispatchRequest): boolean => {
+  if (runtimeToolName.startsWith('rawengine.agent.')) return true;
+  if (typeof args !== 'object' || args === null) return false;
+  return (
+    ('sessionId' in args && typeof args.sessionId === 'string' && args.sessionId.trim().length > 0) ||
+    ('operationId' in args && typeof args.operationId === 'string' && args.operationId.trim().length > 0)
+  );
+};
+
+export const isApprovedAgentAppServerToolName = (runtimeToolName: string): boolean =>
+  APPROVED_AGENT_APP_SERVER_TOOL_NAMES.has(runtimeToolName);
+
 const dispatchAgentAppServerTool = async (
   request: RawEngineAppServerToolDispatchRequest,
 ): Promise<RawEngineAppServerToolDispatchResponse | null> => {
@@ -891,6 +922,19 @@ const dispatchAgentAppServerTool = async (
 export const buildRawEngineAppServerToolDispatchResponse = async (
   request: RawEngineAppServerToolDispatchRequest,
 ): Promise<RawEngineAppServerToolDispatchResponse> => {
+  if (hasAgentSessionIntent(request) && !isApprovedAgentAppServerToolName(request.runtimeToolName)) {
+    return rawEngineAppServerToolDispatchResponseSchema.parse({
+      commandType: request.runtimeToolName,
+      dispatchStatus: 'rejected',
+      message: `${request.runtimeToolName} is not an approved typed agent app-server tool.`,
+      requestId: request.requestId,
+      runtime: AgentRuntimeId.AppServer,
+      runtimeToolName: request.runtimeToolName,
+      status: RawEngineAppServerResponseStatus.Ok,
+      transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
+    });
+  }
+
   try {
     const agentToolResponse = await dispatchAgentAppServerTool(request);
     if (agentToolResponse !== null) return agentToolResponse;
