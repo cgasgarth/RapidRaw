@@ -82,6 +82,10 @@ reqwest = { version = "0.13", default-features = false, features = ["json", "mul
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"
+objc2 = "0.6.4"
+objc2-core-video = { version = "0.3.2", default-features = false, features = ["CVBase", "CVBuffer", "CVImageBuffer", "CVPixelBuffer", "CVReturn"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["NSArray", "NSData", "NSDictionary", "NSError", "NSObject", "NSString", "std"] }
+objc2-vision = { version = "0.3.2", default-features = false, features = ["VNGeneratePersonSegmentationRequest", "VNObservation", "VNRequest", "VNRequestHandler", "VNStatefulRequest", "objc2-core-video"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-context = "0.1"

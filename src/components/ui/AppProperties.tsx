@@ -70,6 +70,7 @@ export enum Invokes {
   FrontendLog = 'frontend_log',
   FrontendReady = 'frontend_ready',
   GenerateAiForegroundMask = 'generate_ai_foreground_mask',
+  GenerateAiWholePersonMask = 'generate_ai_whole_person_mask',
   GenerateAiSkyMask = 'generate_ai_sky_mask',
   GenerateAiSubjectMask = 'generate_ai_subject_mask',
   GenerateAiDepthMask = 'generate_ai_depth_mask',

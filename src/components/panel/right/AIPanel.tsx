@@ -208,6 +208,12 @@ const SUB_MASK_CONFIG: Partial<Record<Mask, SubMaskConfig>> = {
       { key: 'feather', min: 0, max: 100, step: 1, defaultValue: 25 },
     ],
   },
+  [Mask.AiPerson]: {
+    parameters: [
+      { key: 'grow', min: -100, max: 100, step: 1, defaultValue: 50 },
+      { key: 'feather', min: 0, max: 100, step: 1, defaultValue: 25 },
+    ],
+  },
   [Mask.AiSky]: {
     parameters: [
       { key: 'grow', min: -100, max: 100, step: 1, defaultValue: 0 },
@@ -418,7 +424,12 @@ export function AIPanel() {
   const setCustomEscapeHandler = useUIStore((s) => s.setCustomEscapeHandler);
 
   const { setAdjustments } = useEditorActions();
-  const { handleGenerativeReplace, handleDeleteAiPatch, handleGenerateAiForegroundMask } = useAiMasking();
+  const {
+    handleGenerativeReplace,
+    handleDeleteAiPatch,
+    handleGenerateAiForegroundMask,
+    handleGenerateAiWholePersonMask,
+  } = useAiMasking();
   const appSettings = useSettingsStore((s) => s.appSettings);
   const aiProvider = normalizeAiProviderId(appSettings?.aiProvider);
 
@@ -517,7 +528,8 @@ export function AIPanel() {
   const activeContainer = adjustments.aiPatches.find((p) => p.id === activePatchContainerId);
   const activeSubMaskData = activeContainer?.subMasks.find((sm) => sm.id === activeSubMaskId);
   const isAiMask =
-    activeSubMaskData && [Mask.AiSubject, Mask.AiForeground, Mask.AiSky].includes(activeSubMaskData.type);
+    activeSubMaskData &&
+    [Mask.AiSubject, Mask.AiForeground, Mask.AiPerson, Mask.AiSky].includes(activeSubMaskData.type);
 
   useEffect(() => {
     const timer = setTimeout(
@@ -678,6 +690,7 @@ export function AIPanel() {
     if (type === Mask.Brush) selectBrushToolForNewMask();
 
     if (type === Mask.AiForeground) void handleGenerateAiForegroundMask(subMask.id);
+    else if (type === Mask.AiPerson) void handleGenerateAiWholePersonMask(subMask.id);
   };
 
   const handleAddSubMask = (
@@ -704,6 +717,7 @@ export function AIPanel() {
     setExpandedContainers((prev) => new Set(prev).add(containerId));
     if (type === Mask.Brush) selectBrushToolForNewMask();
     if (type === Mask.AiForeground) void handleGenerateAiForegroundMask(subMask.id);
+    else if (type === Mask.AiPerson) void handleGenerateAiWholePersonMask(subMask.id);
   };
 
   const handleAddAiContextMenu = (
@@ -2017,6 +2031,7 @@ function SettingsPanel({
     activeSubMask &&
     (activeSubMask.type === Mask.AiSubject ||
       activeSubMask.type === Mask.AiForeground ||
+      activeSubMask.type === Mask.AiPerson ||
       activeSubMask.type === Mask.AiSky);
 
   const handleGenerateClick = () => {

@@ -26,7 +26,7 @@ export const parseAiPatchDataJson = (value: string): JsonValue => {
   return aiPatchDataSchema.parse(parsed);
 };
 
-export const aiMaskCapabilitySchema = z.enum(['background', 'depth', 'foreground', 'sky', 'subject']);
+export const aiMaskCapabilitySchema = z.enum(['background', 'depth', 'foreground', 'person', 'sky', 'subject']);
 
 export const aiMaskCapabilityAuditEntrySchema = z
   .object({
@@ -36,11 +36,12 @@ export const aiMaskCapabilityAuditEntrySchema = z
       .enum([
         'generate_ai_depth_mask',
         'generate_ai_foreground_mask',
+        'generate_ai_whole_person_mask',
         'generate_ai_sky_mask',
         'generate_ai_subject_mask',
       ])
       .nullable(),
-    renderMaskType: z.enum(['ai-depth', 'ai-foreground', 'ai-sky', 'ai-subject']),
+    renderMaskType: z.enum(['ai-depth', 'ai-foreground', 'ai-person', 'ai-sky', 'ai-subject']),
     status: z.enum(['native', 'derived']),
   })
   .strict()

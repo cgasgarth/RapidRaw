@@ -3,7 +3,7 @@
   "serverRuntime": "openai_app_server",
   "tools": [
     {
-      "allowedCapabilities": ["subject_mask", "foreground_mask", "sky_mask", "depth_mask"],
+      "allowedCapabilities": ["subject_mask", "foreground_mask", "person_mask", "sky_mask", "depth_mask"],
       "allowedProviderClasses": ["local_model", "self_hosted_connector"],
       "approvalClass": "external_model",
       "auditEvents": ["ai_tool_dry_run_requested", "ai_tool_dry_run_completed"],
@@ -19,7 +19,7 @@
       "toolName": "ai.mask.dry_run_subject"
     },
     {
-      "allowedCapabilities": ["subject_mask", "foreground_mask", "sky_mask", "depth_mask"],
+      "allowedCapabilities": ["subject_mask", "foreground_mask", "person_mask", "sky_mask", "depth_mask"],
       "allowedProviderClasses": ["local_model", "self_hosted_connector"],
       "approvalClass": "generative_edit",
       "auditEvents": ["ai_tool_apply_requested", "ai_tool_apply_completed"],

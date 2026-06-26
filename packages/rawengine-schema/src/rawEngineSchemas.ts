@@ -8109,6 +8109,7 @@ export const aiToolProviderClassV1Schema = z.enum(['local_model', 'self_hosted_c
 export const aiToolCapabilityV1Schema = z.enum([
   'subject_mask',
   'foreground_mask',
+  'person_mask',
   'sky_mask',
   'depth_mask',
   'inpaint',

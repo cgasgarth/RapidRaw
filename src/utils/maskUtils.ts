@@ -44,6 +44,17 @@ export const createSubMask = (
       return { ...common, parameters: { maskDataBase64: null, grow: 0, feather: 0 } };
     case Mask.AiForeground:
       return { ...common, parameters: { maskDataBase64: null, grow: 0, feather: 0 } };
+    case Mask.AiPerson:
+      return {
+        ...common,
+        parameters: {
+          maskDataBase64: null,
+          grow: 0,
+          feather: 0,
+          providerTier: 'macos_vision',
+          target: { part: 'full_person', personId: null },
+        },
+      };
     case Mask.AiObject:
       return {
         ...common,

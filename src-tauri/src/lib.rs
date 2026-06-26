@@ -57,6 +57,7 @@ mod panorama_opencv_spike;
 mod panorama_real_raw_proof;
 mod panorama_stitching;
 mod panorama_utils;
+mod person_segmentation;
 mod preset_converter;
 mod presets;
 #[cfg(all(test, feature = "tauri-test"))]
@@ -2682,6 +2683,7 @@ pub fn run() {
             ai_commands::generate_ai_foreground_mask,
             ai_commands::generate_ai_sky_mask,
             ai_commands::generate_ai_depth_mask,
+            ai_commands::generate_ai_whole_person_mask,
             ai_commands::check_ai_connector_status,
             ai_commands::test_ai_connector_connection,
             ai_commands::invoke_generative_replace_with_mask_def,
