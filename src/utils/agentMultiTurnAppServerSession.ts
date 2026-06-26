@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AGENT_ADJUSTMENTS_APPLY_TOOL_NAME, agentAdjustmentsApplyResponseSchema } from './agentAdjustmentApplyTool';
 import { agentEditQualityReviewSchema, buildAgentEditQualityReview } from './agentEditQualityReview';
 import { agentInitialPromptContextSchema, buildAgentInitialPromptContext } from './agentInitialPromptContext';
+import { dispatchAgentLiveEditorTool } from './agentLiveToolDispatch';
 import { agentPreviewEnvelopeSchema } from './agentPreviewEnvelope';
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
@@ -11,8 +12,6 @@ import {
   agentStateGetResponseSchema,
 } from './agentReadOnlyAppServerTools';
 import { createAgentSessionCheckpoint } from './agentSessionHistory';
-import { handleRawEngineAppServerHostRequestAsync } from './rawEngineAppServerHost';
-import { RawEngineAppServerHostToolName } from '../schemas/agentRuntimeSchemas';
 
 const sessionAdjustmentPatchSchema = z
   .object({
@@ -133,37 +132,11 @@ export const agentMultiTurnAppServerSessionResultSchema = z
 export type AgentMultiTurnAppServerSessionRequest = z.infer<typeof agentMultiTurnAppServerSessionRequestSchema>;
 export type AgentMultiTurnAppServerSessionResult = z.infer<typeof agentMultiTurnAppServerSessionResultSchema>;
 
-const dispatchResultSchema = z.looseObject({
-  dispatchStatus: z.enum(['completed']),
-  result: z.unknown(),
-  runtimeToolName: z.string().trim().min(1),
-});
-
 const stateRecipeHashSchema = agentStateGetResponseSchema.safeExtend({
   snapshot: z.looseObject({
     initialPreview: z.looseObject({ recipeHash: z.string().trim().min(1) }),
   }),
 });
-
-const dispatchAgentTool = async ({
-  args,
-  requestId,
-  runtimeToolName,
-}: {
-  args: unknown;
-  requestId: string;
-  runtimeToolName: string;
-}): Promise<unknown> => {
-  const response = dispatchResultSchema.parse(
-    await handleRawEngineAppServerHostRequestAsync({
-      arguments: args,
-      requestId,
-      runtimeToolName,
-      toolName: RawEngineAppServerHostToolName.DispatchTool,
-    }),
-  );
-  return response.result;
-};
 
 const getRecipeHash = (stateResult: unknown): string =>
   stateRecipeHashSchema.parse(stateResult).snapshot.initialPreview.recipeHash;
@@ -211,7 +184,7 @@ export const runAgentMultiTurnAppServerSession = async (
 
     const applyToolCallId = `${parsedRequest.requestId}-turn-${turnNumber}-apply`;
     const applyResult = agentAdjustmentsApplyResponseSchema.parse(
-      await dispatchAgentTool({
+      await dispatchAgentLiveEditorTool({
         args: {
           adjustments: turn.adjustment,
           expectedRecipeHash: recipeHash,
@@ -240,7 +213,7 @@ export const runAgentMultiTurnAppServerSession = async (
 
     const stateToolCallId = `${parsedRequest.requestId}-turn-${turnNumber}-state`;
     recipeHash = getRecipeHash(
-      await dispatchAgentTool({
+      await dispatchAgentLiveEditorTool({
         args: { requestId: stateToolCallId },
         requestId: stateToolCallId,
         runtimeToolName: AGENT_STATE_GET_TOOL_NAME,
@@ -250,7 +223,7 @@ export const runAgentMultiTurnAppServerSession = async (
 
     const previewToolCallId = `${parsedRequest.requestId}-turn-${turnNumber}-preview`;
     const previewResult = agentPreviewRenderResponseSchema.parse(
-      await dispatchAgentTool({
+      await dispatchAgentLiveEditorTool({
         args: {
           ...turn.preview,
           expectedRecipeHash: recipeHash,

@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { AGENT_ADJUSTMENTS_APPLY_TOOL_NAME, agentAdjustmentsApplyResponseSchema } from './agentAdjustmentApplyTool';
 import { agentEditQualityReviewSchema, buildAgentEditQualityReview } from './agentEditQualityReview';
+import { dispatchAgentLiveEditorTool } from './agentLiveToolDispatch';
 import { agentPreviewEnvelopeSchema } from './agentPreviewEnvelope';
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
@@ -9,8 +10,6 @@ import {
   agentPreviewRenderResponseSchema,
   agentStateGetResponseSchema,
 } from './agentReadOnlyAppServerTools';
-import { handleRawEngineAppServerHostRequestAsync } from './rawEngineAppServerHost';
-import { RawEngineAppServerHostToolName } from '../schemas/agentRuntimeSchemas';
 
 const agentLoopAdjustmentPatchSchema = z
   .object({
@@ -112,39 +111,13 @@ const getSnapshotRecipeHash = (snapshot: unknown): string => {
   return parsed.initialPreview.recipeHash;
 };
 
-const dispatchResultSchema = z.looseObject({
-  dispatchStatus: z.enum(['completed']),
-  result: z.unknown(),
-  runtimeToolName: z.string().trim().min(1),
-});
-
-const dispatchAgentTool = async ({
-  args,
-  requestId,
-  runtimeToolName,
-}: {
-  args: unknown;
-  requestId: string;
-  runtimeToolName: string;
-}): Promise<unknown> => {
-  const response = dispatchResultSchema.parse(
-    await handleRawEngineAppServerHostRequestAsync({
-      arguments: args,
-      requestId,
-      runtimeToolName,
-      toolName: RawEngineAppServerHostToolName.DispatchTool,
-    }),
-  );
-  return response.result;
-};
-
 export const runAgentIterativeEditLoop = async (
   request: AgentIterativeEditLoopRequest,
 ): Promise<AgentIterativeEditLoopResult> => {
   const parsedRequest = agentIterativeEditLoopRequestSchema.parse(request);
   const transcript: AgentIterativeEditLoopResult['transcript'] = [];
   const initialState = agentStateGetResponseSchema.parse(
-    await dispatchAgentTool({
+    await dispatchAgentLiveEditorTool({
       args: { requestId: `${parsedRequest.requestId}-state-0` },
       requestId: `${parsedRequest.requestId}-state-0`,
       runtimeToolName: AGENT_STATE_GET_TOOL_NAME,
@@ -171,7 +144,7 @@ export const runAgentIterativeEditLoop = async (
     const { preview: previewRequest, ...adjustments } = step;
     const applyRequestId = `${parsedRequest.requestId}-apply-${index + 1}`;
     const apply = agentAdjustmentsApplyResponseSchema.parse(
-      await dispatchAgentTool({
+      await dispatchAgentLiveEditorTool({
         args: {
           adjustments: agentLoopAdjustmentPatchSchema.parse(adjustments),
           expectedRecipeHash: recipeHash,
@@ -198,7 +171,7 @@ export const runAgentIterativeEditLoop = async (
 
     const stateRequestId = `${parsedRequest.requestId}-state-${index + 1}`;
     const state = agentStateGetResponseSchema.parse(
-      await dispatchAgentTool({
+      await dispatchAgentLiveEditorTool({
         args: { requestId: stateRequestId },
         requestId: stateRequestId,
         runtimeToolName: AGENT_STATE_GET_TOOL_NAME,
@@ -207,7 +180,7 @@ export const runAgentIterativeEditLoop = async (
     recipeHash = getSnapshotRecipeHash(state.snapshot);
     const previewRequestId = `${parsedRequest.requestId}-preview-${index + 1}`;
     const preview = agentPreviewRenderResponseSchema.parse(
-      await dispatchAgentTool({
+      await dispatchAgentLiveEditorTool({
         args: {
           crop: previewRequest?.crop,
           expectedRecipeHash: recipeHash,
