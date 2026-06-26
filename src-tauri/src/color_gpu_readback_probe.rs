@@ -3,7 +3,7 @@ use sha2::{Digest, Sha256};
 use wgpu::util::{DeviceExt, TextureDataOrder};
 
 use crate::app_state::AppState;
-use crate::gpu_processing::{get_or_init_gpu_context, read_texture_data_roi};
+use crate::gpu_processing::{get_or_init_gpu_context, read_texture_data_roi_with_bytes_per_pixel};
 
 const EXPECTED_RGBA: [u8; 16] = [
     18, 64, 128, 255, 42, 96, 180, 255, 88, 120, 210, 255, 132, 160, 240, 255,
@@ -61,12 +61,13 @@ fn run_color_gpu_readback_probe_with_context(
         TextureDataOrder::MipMajor,
         &EXPECTED_RGBA,
     );
-    let readback = read_texture_data_roi(
+    let readback = read_texture_data_roi_with_bytes_per_pixel(
         &context.device,
         &context.queue,
         &texture,
         wgpu::Origin3d::ZERO,
         size,
+        4,
     )?;
 
     if readback.len() != EXPECTED_RGBA.len() {

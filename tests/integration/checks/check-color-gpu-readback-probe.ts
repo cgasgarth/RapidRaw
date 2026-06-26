@@ -46,7 +46,7 @@ const failures: string[] = [];
 
 for (const required of [
   'create_texture_with_data',
-  'read_texture_data_roi(',
+  'read_texture_data_roi_with_bytes_per_pixel(',
   'TextureFormat::Rgba8Unorm',
   'max_byte_delta != 0',
   'runtime_smoke_reads_back_gpu_texture_when_enabled',
@@ -55,7 +55,7 @@ for (const required of [
 ]) {
   if (!probeSource.includes(required)) failures.push(`GPU readback probe source missing ${required}.`);
 }
-if (!gpuSource.includes('pub(crate) fn read_texture_data_roi(')) {
+if (!gpuSource.includes('pub(crate) fn read_texture_data_roi_with_bytes_per_pixel(')) {
   failures.push('GPU readback helper must be crate-visible for validation probes.');
 }
 for (const required of [

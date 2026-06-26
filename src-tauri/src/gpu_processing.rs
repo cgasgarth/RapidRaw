@@ -520,16 +520,6 @@ pub fn get_or_init_compute_gpu_context_for_tests(
     Ok(new_context)
 }
 
-pub(crate) fn read_texture_data_roi(
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
-    texture: &wgpu::Texture,
-    origin: wgpu::Origin3d,
-    size: wgpu::Extent3d,
-) -> Result<Vec<u8>, String> {
-    read_texture_data_roi_with_bytes_per_pixel(device, queue, texture, origin, size, 4)
-}
-
 pub(crate) fn read_texture_data_roi_with_bytes_per_pixel(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
