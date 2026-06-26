@@ -618,6 +618,30 @@ fn rgba16float_readback_to_dynamic_image(
     Ok(DynamicImage::ImageRgba16(image))
 }
 
+fn rgba16float_readback_to_unclamped_dynamic_image(
+    width: u32,
+    height: u32,
+    pixels: Vec<u8>,
+) -> Result<DynamicImage, String> {
+    if pixels.len() != (width * height * GPU_OUTPUT_BYTES_PER_PIXEL) as usize {
+        return Err(format!(
+            "Expected {} RGBA16F readback byte(s), got {}.",
+            width * height * GPU_OUTPUT_BYTES_PER_PIXEL,
+            pixels.len()
+        ));
+    }
+
+    let rgba32f = pixels
+        .chunks_exact(2)
+        .map(|bytes| f16::from_bits(u16::from_le_bytes([bytes[0], bytes[1]])).to_f32())
+        .collect::<Vec<_>>();
+    let image =
+        ImageBuffer::<Rgba<f32>, Vec<f32>>::from_raw(width, height, rgba32f).ok_or_else(|| {
+            "Failed to create RGBA32F image buffer from GPU readback data.".to_string()
+        })?;
+    Ok(DynamicImage::ImageRgba32F(image))
+}
+
 fn to_rgba_f16(img: &DynamicImage) -> Vec<f16> {
     let rgba_f32 = img.to_rgba32f();
     rgba_f32.into_raw().into_iter().map(f16::from_f32).collect()
@@ -1731,6 +1755,29 @@ pub fn process_and_get_dynamic_image(
         caller_id,
         false,
         None,
+        false,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn process_and_get_unclamped_dynamic_image(
+    context: &GpuContext,
+    state: &tauri::State<AppState>,
+    base_image: &DynamicImage,
+    transform_hash: u64,
+    request: RenderRequest,
+    caller_id: &str,
+) -> Result<DynamicImage, String> {
+    process_and_get_dynamic_image_inner(
+        context,
+        state,
+        base_image,
+        transform_hash,
+        request,
+        caller_id,
+        false,
+        None,
+        true,
     )
 }
 
@@ -1754,6 +1801,7 @@ pub fn process_and_get_dynamic_image_with_analytics(
         caller_id,
         output_to_display,
         analytics_config,
+        false,
     )
 }
 
@@ -1767,6 +1815,7 @@ fn process_and_get_dynamic_image_inner(
     caller_id: &str,
     output_to_display: bool,
     analytics_config: Option<crate::AnalyticsConfig>,
+    preserve_unclamped_float_readback: bool,
 ) -> Result<DynamicImage, String> {
     let start_time = Instant::now();
     let (width, height) = base_image.dimensions();
@@ -2158,5 +2207,37 @@ fn process_and_get_dynamic_image_inner(
         fps
     );
 
-    rgba16float_readback_to_dynamic_image(out_w, out_h, processed_pixels)
+    if preserve_unclamped_float_readback {
+        rgba16float_readback_to_unclamped_dynamic_image(out_w, out_h, processed_pixels)
+    } else {
+        rgba16float_readback_to_dynamic_image(out_w, out_h, processed_pixels)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::rgba16float_readback_to_unclamped_dynamic_image;
+    use half::f16;
+    use image::DynamicImage;
+
+    #[test]
+    fn unclamped_rgba16float_readback_preserves_out_of_gamut_values() {
+        let values = [-0.25_f32, 0.5, 1.35, 1.0];
+        let pixels = values
+            .into_iter()
+            .flat_map(|value| f16::from_f32(value).to_bits().to_le_bytes())
+            .collect::<Vec<_>>();
+
+        let image = rgba16float_readback_to_unclamped_dynamic_image(1, 1, pixels)
+            .expect("RGBA16F readback should convert to RGBA32F");
+        let DynamicImage::ImageRgba32F(image) = image else {
+            panic!("unclamped readback should return RGBA32F");
+        };
+        let pixel = image.get_pixel(0, 0).0;
+
+        assert!(pixel[0] < 0.0);
+        assert_eq!(pixel[1], 0.5);
+        assert!(pixel[2] > 1.0);
+        assert_eq!(pixel[3], 1.0);
+    }
 }

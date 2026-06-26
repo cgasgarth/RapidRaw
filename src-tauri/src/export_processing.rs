@@ -42,7 +42,7 @@ use crate::image_loader::{
 use crate::image_processing::{
     AllAdjustments, Crop, GpuContext, RenderRequest, downscale_f32_image,
     get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image,
-    resolve_tonemapper_override_from_handle,
+    process_and_get_unclamped_dynamic_image, resolve_tonemapper_override_from_handle,
 };
 use crate::lut_processing::{convert_image_to_cube_lut, generate_identity_lut_image};
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
@@ -501,7 +501,7 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
         mask_bitmaps,
     );
 
-    process_and_get_dynamic_image(
+    process_and_get_unclamped_dynamic_image(
         context,
         state,
         retouched_image.as_ref(),
