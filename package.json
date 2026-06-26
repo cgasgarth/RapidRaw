@@ -638,6 +638,7 @@
     "check:agent-bounded-planner-loop": "bun tests/integration/checks/check-agent-bounded-planner-loop.ts",
     "check:agent-readonly-tools": "bun tests/integration/checks/check-agent-readonly-tools.ts",
     "check:agent-adjustments-apply": "bun tests/integration/checks/check-agent-adjustments-apply.ts",
+    "check:agent-app-server-dispatch": "bun tests/integration/checks/check-agent-app-server-dispatch.ts",
     "check:agent-layer-mask-tools": "bun tests/integration/checks/check-agent-layer-mask-tools.ts",
     "check:agent-retouch-apply": "bun tests/integration/checks/check-agent-retouch-apply.ts",
     "check:agent-export-proof": "bun tests/integration/checks/check-agent-export-proof.ts",
