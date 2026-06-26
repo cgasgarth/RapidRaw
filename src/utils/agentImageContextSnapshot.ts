@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { ActiveChannel } from './adjustments';
+import { buildAgentGeometryRecipeHashInput } from './agentGeometryRecipe';
 import {
   AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX,
   AGENT_MEDIUM_PREVIEW_QUALITY,
@@ -137,7 +138,7 @@ export const buildAgentImageContextSnapshot = (): AgentImageContextSnapshot => {
   const recipeHash = `recipe:${stableAgentPreviewHash(
     JSON.stringify({
       adjustments: summarizeAdjustment(editor.adjustments),
-      crop: editor.adjustments.crop,
+      geometry: buildAgentGeometryRecipeHashInput(editor.adjustments),
       graphRevision,
       masks: editor.adjustments.masks.map((mask) => ({ id: mask.id, name: mask.name, visible: mask.visible })),
     }),
