@@ -29,6 +29,18 @@ const pixelSchema = z
 const retouchSourceSchema = z
   .object({
     alignmentErrorPx: z.number().min(0).optional(),
+    candidateProvenance: z
+      .object({
+        candidateId: z.string().trim().min(1),
+        candidateKind: z.enum(['dust_spot', 'emulsion_scratch']),
+        confidence: z.number().min(0).max(1),
+        confidenceSemantics: z.literal('ranking_score_v1'),
+        origin: z.literal('negative_lab_dust_candidate'),
+        sourceFrameId: z.string().trim().min(1),
+        statusAtAcceptance: z.enum(['acknowledged', 'ignored', 'pending']),
+      })
+      .strict()
+      .optional(),
     featherRadiusPx: z.number().min(0).max(4096).optional(),
     radiusPx: z.number().positive().max(4096).optional(),
     retouchMode: z.enum(['clone', 'heal']).optional(),
@@ -186,6 +198,16 @@ const hashPixels = (pixels) => {
   return `sha256:${hash.digest('hex')}`;
 };
 
+const countChangedPixels = (leftPixels, rightPixels) => {
+  if (leftPixels.length !== rightPixels.length) {
+    fail('changed pixel count requires equal length pixel buffers');
+  }
+  return leftPixels.reduce(
+    (count, pixel, index) => (JSON.stringify(pixel) === JSON.stringify(rightPixels[index]) ? count : count + 1),
+    0,
+  );
+};
+
 const stableJson = (value: unknown) =>
   JSON.stringify(value, (_key, nestedValue) => {
     if (nestedValue === null || typeof nestedValue !== 'object' || Array.isArray(nestedValue)) return nestedValue;
@@ -253,6 +275,13 @@ for (const fixture of manifest.cases) {
   if (retouchSource.radiusPx !== 32 || retouchSource.featherRadiusPx !== 16) {
     fail(`${fixture.id}: heal radius/feather metadata missing`);
   }
+  const dustCandidateProvenance = retouchSource.candidateProvenance;
+  if (dustCandidateProvenance?.origin !== 'negative_lab_dust_candidate') {
+    fail(`${fixture.id}: persisted dust heal candidate provenance missing`);
+  }
+  if (dustCandidateProvenance.statusAtAcceptance !== 'acknowledged') {
+    fail(`${fixture.id}: persisted dust heal acceptance state missing`);
+  }
 
   const sidecarLayerIds = fixture.sidecarLayerStack.layers.map((layer) => layer.id);
   const fixtureLayerIds = fixture.layers.map((layer) => layer.id);
@@ -279,6 +308,10 @@ for (const fixture of manifest.cases) {
   }
   if (previewHash !== fixture.expectedPreviewExportHash) {
     fail(`${fixture.id}: preview/export expected hash mismatch`, [previewHash, fixture.expectedPreviewExportHash]);
+  }
+  const totalChangedPixelCount = countChangedPixels(fixture.basePixels, preview.pixels);
+  if (totalChangedPixelCount <= 0) {
+    fail(`${fixture.id}: accepted persisted dust heal layer did not alter output pixels`);
   }
   if (JSON.stringify(preview.coverageByLayer) !== JSON.stringify(exported.coverageByLayer)) {
     fail(`${fixture.id}: preview/export coverage mismatch`);
@@ -328,6 +361,32 @@ for (const fixture of manifest.cases) {
   }
   if (!sidecarRoundtrip.layers.some((layer) => layer.retouchCloneSource?.retouchMode === 'heal')) {
     fail(`${fixture.id}: sidecar heal metadata missing`);
+  }
+  const sidecarDustLayer = sidecarRoundtrip.layers.find(
+    (layer) => layer.retouchCloneSource?.candidateProvenance?.origin === 'negative_lab_dust_candidate',
+  );
+  if (
+    sidecarDustLayer?.retouchCloneSource?.candidateProvenance?.sourceFrameId !== dustCandidateProvenance.sourceFrameId
+  ) {
+    fail(`${fixture.id}: sidecar dust candidate provenance did not roundtrip`);
+  }
+  const rejectedDustFixture = {
+    ...fixture,
+    layers: fixture.layers.filter((layer) => layer.id !== cloneLayer.id),
+  };
+  const rejectedPreview = renderLayerPreviewStack(rejectedDustFixture);
+  const rejectedDustLayerCount = rejectedDustFixture.layers.filter(
+    (layer) => layer.retouchCloneSource?.candidateProvenance?.origin === 'negative_lab_dust_candidate',
+  ).length;
+  if (rejectedDustLayerCount !== 0) {
+    fail(`${fixture.id}: rejected dust candidate should not persist as a retouch layer`);
+  }
+  if (rejectedPreview.coverageByLayer.some((layer) => layer.id === cloneLayer.id)) {
+    fail(`${fixture.id}: rejected dust candidate should not report retouch coverage`);
+  }
+  const acceptedDustPixelDelta = countChangedPixels(rejectedPreview.pixels, preview.pixels);
+  if (acceptedDustPixelDelta <= 0) {
+    fail(`${fixture.id}: accepted persisted dust heal layer did not alter pixels relative to rejected candidate`);
   }
 
   await writePpm(resolve(OUTPUT_DIR, `${fixture.id}.preview.ppm`), fixture.width, fixture.height, preview.pixels);

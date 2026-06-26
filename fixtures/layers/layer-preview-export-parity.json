@@ -63,6 +63,15 @@
           "maskAlpha": [0, 1, 1, 0, 0, 0],
           "retouchCloneSource": {
             "alignmentErrorPx": 0,
+            "candidateProvenance": {
+              "candidateId": "negative_lab_dust_0001",
+              "candidateKind": "dust_spot",
+              "confidence": 0.92,
+              "confidenceSemantics": "ranking_score_v1",
+              "origin": "negative_lab_dust_candidate",
+              "sourceFrameId": "negative_lab_positive_frame_0001",
+              "statusAtAcceptance": "acknowledged"
+            },
             "featherRadiusPx": 16,
             "radiusPx": 32,
             "retouchMode": "heal",
@@ -123,7 +132,7 @@
         "artifactId": "layer_stack_preview_export_parity_v1",
         "schemaVersion": 1,
         "storage": "sidecar_artifact",
-        "sourceImagePath": "/fixture-roll/IMG_LAYER_0001.CR3",
+        "sourceImagePath": "/fixture-roll/positive/IMG_LAYER_0001.tif",
         "layers": [
           { "id": "tone-normal", "blendMode": "normal", "opacity": 0.25, "visible": true, "maskPersisted": false },
           { "id": "shadow-multiply", "blendMode": "multiply", "opacity": 0.55, "visible": true, "maskPersisted": true },
@@ -135,6 +144,15 @@
             "maskPersisted": true,
             "retouchCloneSource": {
               "alignmentErrorPx": 0,
+              "candidateProvenance": {
+                "candidateId": "negative_lab_dust_0001",
+                "candidateKind": "dust_spot",
+                "confidence": 0.92,
+                "confidenceSemantics": "ranking_score_v1",
+                "origin": "negative_lab_dust_candidate",
+                "sourceFrameId": "negative_lab_positive_frame_0001",
+                "statusAtAcceptance": "acknowledged"
+              },
               "featherRadiusPx": 16,
               "radiusPx": 32,
               "retouchMode": "heal",
