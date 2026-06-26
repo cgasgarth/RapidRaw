@@ -69,10 +69,26 @@ for (const heavyRustGate of ['check:rust:check', 'check:rust:clippy', 'check:rus
   }
 }
 
-for (const requiredFastGate of ['bun lint-staged --quiet --concurrent false', 'bun run check:lint']) {
+for (const requiredFastGate of ['bun lint-staged --quiet --concurrent false']) {
   if (!unconditionalSection.includes(requiredFastGate)) {
     throw new Error(`pre-commit fast path missing required gate: ${requiredFastGate}`);
   }
+}
+
+if (unconditionalSection.split('\n').some((line) => line.trim() === 'bun run check:lint')) {
+  throw new Error('pre-commit must not run full-repo ESLint unconditionally.');
+}
+
+const fullLintLine = hook.split('\n').find((line) => line.trim() === 'bun run check:lint') ?? '';
+const fullLintCondition = hook
+  .split('\n')
+  .slice(
+    0,
+    hook.split('\n').findIndex((line) => line === fullLintLine),
+  )
+  .findLast((line) => line.includes("grep -Eq '"));
+if (!fullLintCondition?.includes('^eslint\\.config\\.js$')) {
+  throw new Error('pre-commit should reserve full-repo ESLint for ESLint config changes.');
 }
 
 console.log('precommit fast path ok');
