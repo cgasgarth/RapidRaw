@@ -640,6 +640,7 @@
     "check:agent-adjustments-apply": "bun tests/integration/checks/check-agent-adjustments-apply.ts",
     "check:agent-layer-mask-tools": "bun tests/integration/checks/check-agent-layer-mask-tools.ts",
     "check:agent-retouch-apply": "bun tests/integration/checks/check-agent-retouch-apply.ts",
+    "check:agent-export-proof": "bun tests/integration/checks/check-agent-export-proof.ts",
     "check:agent-iterative-edit-loop": "bun tests/integration/checks/check-agent-iterative-edit-loop.ts",
     "check:agent-session-history-rollback": "bun tests/integration/checks/check-agent-session-history-rollback.ts",
     "check:agent-atomic-approval": "bun tests/integration/checks/check-agent-atomic-approval.ts",
