@@ -5,6 +5,9 @@ import {
   AGENT_MASK_CREATE_OR_UPDATE_INPUT_SCHEMA_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_OUTPUT_SCHEMA_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
+  AGENT_OBJECT_SELECTION_APPLY_INPUT_SCHEMA_NAME,
+  AGENT_OBJECT_SELECTION_APPLY_OUTPUT_SCHEMA_NAME,
+  AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME,
 } from './agentLayerMaskTools';
 import {
   AGENT_RETOUCH_APPLY_INPUT_SCHEMA_NAME,
@@ -24,7 +27,7 @@ export interface AgentLocalLayerCoverageEntry {
   rollbackProof: readonly string[];
   runtimeCheckScript: string;
   status: AgentLocalLayerCoverageStatus;
-  surface: 'brush_mask' | 'layer_create' | 'retouch_clone_heal_remove';
+  surface: 'brush_mask' | 'layer_create' | 'object_prompt_mask' | 'retouch_clone_heal_remove';
   toolName: string;
 }
 
@@ -61,6 +64,26 @@ export const AGENT_LOCAL_LAYER_COVERAGE_MATRIX = [
     status: 'covered',
     surface: 'brush_mask',
     toolName: AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
+  },
+  {
+    applyPath: 'applyAgentObjectSelection',
+    commandTypes: ['layerMask.createLayer'],
+    inputSchemaName: AGENT_OBJECT_SELECTION_APPLY_INPUT_SCHEMA_NAME,
+    outputSchemaName: AGENT_OBJECT_SELECTION_APPLY_OUTPUT_SCHEMA_NAME,
+    previewProof: [
+      'beforePreviewHash',
+      'afterPreviewHash',
+      'objectPromptHash',
+      'overlayPreview.artifact',
+      'overlayPreview.maskId',
+      'overlayPreview.recipeHash',
+    ],
+    receiptFields: ['layerId', 'maskId', 'providerStatus', 'appliedGraphRevision', 'undoGraphRevision'],
+    rollbackProof: ['undoGraphRevision', 'historyIndex increments by one'],
+    runtimeCheckScript: 'check:agent-object-selection-apply',
+    status: 'covered',
+    surface: 'object_prompt_mask',
+    toolName: AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME,
   },
   {
     applyPath: 'applyAgentRetouch',

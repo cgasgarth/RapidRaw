@@ -651,6 +651,7 @@
     "check:agent-adjustments-apply": "bun tests/integration/checks/check-agent-adjustments-apply.ts",
     "check:agent-app-server-dispatch": "bun tests/integration/checks/check-agent-app-server-dispatch.ts",
     "check:agent-layer-mask-tools": "bun tests/integration/checks/check-agent-layer-mask-tools.ts",
+    "check:agent-object-selection-apply": "bun tests/integration/checks/check-agent-object-selection-apply.ts",
     "check:agent-local-layer-coverage-matrix": "bun tests/integration/checks/check-agent-local-layer-coverage-matrix.ts",
     "check:agent-retouch-apply": "bun tests/integration/checks/check-agent-retouch-apply.ts",
     "check:agent-export-proof": "bun tests/integration/checks/check-agent-export-proof.ts",

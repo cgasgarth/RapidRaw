@@ -26,10 +26,13 @@ import { useEditorStore } from '../store/useEditorStore';
 
 export const AGENT_LAYER_CREATE_TOOL_NAME = 'rawengine.agent.layer.create';
 export const AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME = 'rawengine.agent.mask.create_or_update';
+export const AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME = 'rawengine.agent.object_selection.apply';
 export const AGENT_LAYER_CREATE_INPUT_SCHEMA_NAME = 'AgentLayerCreateRequestV1';
 export const AGENT_LAYER_CREATE_OUTPUT_SCHEMA_NAME = 'AgentLayerCreateResponseV1';
 export const AGENT_MASK_CREATE_OR_UPDATE_INPUT_SCHEMA_NAME = 'AgentMaskCreateOrUpdateRequestV1';
 export const AGENT_MASK_CREATE_OR_UPDATE_OUTPUT_SCHEMA_NAME = 'AgentMaskCreateOrUpdateResponseV1';
+export const AGENT_OBJECT_SELECTION_APPLY_INPUT_SCHEMA_NAME = 'AgentObjectSelectionApplyRequestV1';
+export const AGENT_OBJECT_SELECTION_APPLY_OUTPUT_SCHEMA_NAME = 'AgentObjectSelectionApplyResponseV1';
 
 const idSegmentSchema = z
   .string()
@@ -37,6 +40,33 @@ const idSegmentSchema = z
   .min(1)
   .max(96)
   .regex(/^[a-zA-Z0-9_-]+$/u);
+const normalizedPointSchema = z
+  .object({
+    label: z.enum(['foreground', 'background']).default('foreground'),
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1),
+  })
+  .strict();
+const normalizedBoxSchema = z
+  .object({
+    height: z.number().positive().max(1),
+    width: z.number().positive().max(1),
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1),
+  })
+  .strict()
+  .superRefine((box, context) => {
+    if (box.x + box.width > 1) {
+      context.addIssue({ code: 'custom', message: 'Object selection box exceeds normalized width.', path: ['width'] });
+    }
+    if (box.y + box.height > 1) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Object selection box exceeds normalized height.',
+        path: ['height'],
+      });
+    }
+  });
 
 const agentLayerMaskOverlayPreviewSchema = z
   .object({
@@ -78,6 +108,41 @@ export const agentMaskCreateOrUpdateRequestSchema = z
   })
   .strict();
 
+export const agentObjectSelectionApplyRequestSchema = z
+  .object({
+    adjustments: layerScopedToneAdjustmentV1Schema.optional(),
+    boxPrompt: normalizedBoxSchema.optional(),
+    expectedRecipeHash: z.string().trim().min(1),
+    layerId: idSegmentSchema.optional(),
+    layerName: z.string().trim().min(1).max(80).default('Object selection'),
+    maskId: idSegmentSchema.optional(),
+    operationId: idSegmentSchema,
+    pointPrompts: z.array(normalizedPointSchema).max(12).default([]),
+    requestId: z.string().trim().min(1),
+    sessionId: z.string().trim().min(1),
+  })
+  .strict()
+  .superRefine((request, context) => {
+    if (request.boxPrompt === undefined && request.pointPrompts.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Object selection requires at least one point prompt or a box prompt.',
+        path: ['pointPrompts'],
+      });
+    }
+    if (
+      request.pointPrompts.length > 0 &&
+      !request.pointPrompts.some((prompt) => prompt.label === 'foreground') &&
+      request.boxPrompt === undefined
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Point-only object selection requires at least one foreground point.',
+        path: ['pointPrompts'],
+      });
+    }
+  });
+
 export const agentLayerCreateResponseSchema = z
   .object({
     afterPreviewHash: z.string().trim().min(1),
@@ -109,10 +174,29 @@ export const agentMaskCreateOrUpdateResponseSchema = z
   })
   .strict();
 
+export const agentObjectSelectionApplyResponseSchema = z
+  .object({
+    afterPreviewHash: z.string().trim().min(1),
+    appliedGraphRevision: z.string().trim().min(1),
+    beforePreviewHash: z.string().trim().min(1),
+    layerId: z.string().trim().min(1),
+    maskId: z.string().trim().min(1),
+    objectPromptHash: z.string().trim().min(1),
+    overlayPreview: agentLayerMaskOverlayPreviewSchema,
+    providerStatus: z.literal('prompt_proxy_mask_v1'),
+    requestId: z.string().trim().min(1),
+    staleRecipeHash: z.literal(false),
+    toolName: z.literal(AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME),
+    undoGraphRevision: z.string().trim().min(1),
+  })
+  .strict();
+
 export type AgentLayerCreateRequest = z.infer<typeof agentLayerCreateRequestSchema>;
 export type AgentLayerCreateResponse = z.infer<typeof agentLayerCreateResponseSchema>;
 export type AgentMaskCreateOrUpdateRequest = z.infer<typeof agentMaskCreateOrUpdateRequestSchema>;
 export type AgentMaskCreateOrUpdateResponse = z.infer<typeof agentMaskCreateOrUpdateResponseSchema>;
+export type AgentObjectSelectionApplyRequest = z.infer<typeof agentObjectSelectionApplyRequestSchema>;
+export type AgentObjectSelectionApplyResponse = z.infer<typeof agentObjectSelectionApplyResponseSchema>;
 export type AgentLayerMaskOverlayPreview = z.infer<typeof agentLayerMaskOverlayPreviewSchema>;
 
 const toIdSegment = (value: string): string =>
@@ -310,6 +394,56 @@ const buildBrushMaskCommand = (
     },
   });
 
+const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
+
+const buildObjectSelectionStrokes = (
+  request: z.infer<typeof agentObjectSelectionApplyRequestSchema>,
+  imageWidth: number,
+  imageHeight: number,
+): z.infer<typeof layerMaskBrushStrokeV1Schema>[] => {
+  const box = request.boxPrompt;
+  const foregroundPoints = request.pointPrompts.filter((prompt) => prompt.label === 'foreground');
+  const boxRadius =
+    box === undefined ? 0.045 : Math.max(16 / Math.max(imageWidth, imageHeight), Math.min(box.width, box.height) / 5);
+  const promptRadiusPx = Math.max(12, Math.min(imageWidth, imageHeight) * boxRadius);
+  const boxStroke =
+    box === undefined
+      ? []
+      : [
+          {
+            flow: 0.95,
+            hardness: 0.55,
+            mode: 'paint' as const,
+            points: [
+              { x: clamp01(box.x + box.width * 0.25), y: clamp01(box.y + box.height * 0.25) },
+              { x: clamp01(box.x + box.width * 0.75), y: clamp01(box.y + box.height * 0.25) },
+              { x: clamp01(box.x + box.width * 0.75), y: clamp01(box.y + box.height * 0.75) },
+              { x: clamp01(box.x + box.width * 0.25), y: clamp01(box.y + box.height * 0.75) },
+              { x: clamp01(box.x + box.width * 0.5), y: clamp01(box.y + box.height * 0.5) },
+            ],
+            radiusPx: promptRadiusPx,
+            strokeId: `${request.operationId}_box_prompt`,
+          },
+        ];
+  const pointStrokes = foregroundPoints.map((point, index) => ({
+    flow: 0.85,
+    hardness: 0.45,
+    mode: 'paint' as const,
+    points: [
+      { x: point.x, y: point.y },
+      { x: clamp01(point.x + 0.001), y: point.y },
+    ],
+    radiusPx: Math.max(10, promptRadiusPx * 0.8),
+    strokeId: `${request.operationId}_point_${index + 1}`,
+  }));
+
+  return z
+    .array(layerMaskBrushStrokeV1Schema)
+    .min(1)
+    .max(16)
+    .parse([...boxStroke, ...pointStrokes]);
+};
+
 export const applyAgentBrushMaskCreateOrUpdate = (
   request: AgentMaskCreateOrUpdateRequest,
 ): AgentMaskCreateOrUpdateResponse => {
@@ -386,6 +520,92 @@ export const applyAgentBrushMaskCreateOrUpdate = (
     requestId: parsedRequest.requestId,
     staleRecipeHash: false,
     toolName: AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
+    undoGraphRevision,
+  });
+};
+
+export const applyAgentObjectSelection = (
+  request: AgentObjectSelectionApplyRequest,
+): AgentObjectSelectionApplyResponse => {
+  const parsedRequest = agentObjectSelectionApplyRequestSchema.parse(request);
+  const beforeSnapshot = ensureFreshRecipe(parsedRequest.expectedRecipeHash);
+  const state = useEditorStore.getState();
+  const selectedImage = state.selectedImage;
+  if (selectedImage === null) throw new Error('Agent object selection requires a selected image.');
+
+  const layerId = parsedRequest.layerId ?? `agent_object_${toIdSegment(parsedRequest.operationId)}`;
+  const maskId = parsedRequest.maskId ?? `${layerId}_prompt_mask`;
+  const strokes = buildObjectSelectionStrokes(parsedRequest, selectedImage.width, selectedImage.height);
+  const layer: MaskContainer = {
+    adjustments: toMaskAdjustments(parsedRequest.adjustments),
+    blendMode: DEFAULT_LAYER_BLEND_MODE,
+    id: layerId,
+    invert: false,
+    name: parsedRequest.layerName,
+    opacity: 100,
+    subMasks: [
+      {
+        id: maskId,
+        invert: false,
+        mode: SubMaskMode.Additive,
+        name: 'Object prompt mask',
+        opacity: 100,
+        parameters: {
+          boxPrompt: parsedRequest.boxPrompt ?? null,
+          pointPrompts: parsedRequest.pointPrompts,
+          providerStatus: 'prompt_proxy_mask_v1',
+          strokes,
+        },
+        type: Mask.Brush,
+        visible: true,
+      },
+    ],
+    visible: true,
+  };
+
+  const result = applyLayerStackCommandBridgeOperation(
+    state.adjustments.masks,
+    { layer, type: 'create' },
+    {
+      graphRevision: beforeSnapshot.graphRevision,
+      imagePath: selectedImage.path,
+      operationId: parsedRequest.operationId,
+      sessionId: parsedRequest.sessionId,
+    },
+  );
+  const undoGraphRevision = beforeSnapshot.graphRevision;
+  pushMaskHistory(result.masks);
+  useEditorStore.setState({ activeMaskContainerId: layerId, activeMaskId: maskId });
+  const afterSnapshot = buildAgentImageContextSnapshot();
+  const overlayLayer = result.masks.find((mask) => mask.id === layerId);
+  if (overlayLayer === undefined) throw new Error('Agent object selection could not build an overlay preview.');
+  const objectPromptHash = stableAgentPreviewHash(
+    JSON.stringify({
+      boxPrompt: parsedRequest.boxPrompt ?? null,
+      pointPrompts: parsedRequest.pointPrompts,
+      providerStatus: 'prompt_proxy_mask_v1',
+      strokes,
+    }),
+  );
+
+  return agentObjectSelectionApplyResponseSchema.parse({
+    afterPreviewHash: afterSnapshot.initialPreview.renderHash,
+    appliedGraphRevision: afterSnapshot.graphRevision,
+    beforePreviewHash: beforeSnapshot.initialPreview.renderHash,
+    layerId,
+    maskId,
+    objectPromptHash: `sha256:${objectPromptHash}`,
+    overlayPreview: buildOverlayPreview({
+      afterSnapshot,
+      contentSeed: { maskId, objectPromptHash, operationId: parsedRequest.operationId, strokes },
+      layer: overlayLayer,
+      maskId,
+      operationId: parsedRequest.operationId,
+    }),
+    providerStatus: 'prompt_proxy_mask_v1',
+    requestId: parsedRequest.requestId,
+    staleRecipeHash: false,
+    toolName: AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME,
     undoGraphRevision,
   });
 };

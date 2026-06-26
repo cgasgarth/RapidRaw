@@ -53,10 +53,15 @@ import {
   AGENT_MASK_CREATE_OR_UPDATE_INPUT_SCHEMA_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_OUTPUT_SCHEMA_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
+  AGENT_OBJECT_SELECTION_APPLY_INPUT_SCHEMA_NAME,
+  AGENT_OBJECT_SELECTION_APPLY_OUTPUT_SCHEMA_NAME,
+  AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME,
   agentLayerCreateRequestSchema,
   agentMaskCreateOrUpdateRequestSchema,
+  agentObjectSelectionApplyRequestSchema,
   applyAgentBrushMaskCreateOrUpdate,
   applyAgentLayerCreate,
+  applyAgentObjectSelection,
 } from './agentLayerMaskTools';
 import {
   AGENT_LENS_PROFILE_APPLY_INPUT_SCHEMA_NAME,
@@ -634,6 +639,15 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       toolNames: [AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME],
     }),
     buildRouteCatalogEntry({
+      commandName: AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_OBJECT_SELECTION_APPLY_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.ApplyDryRunPlan],
+      outputSchemaNames: [AGENT_OBJECT_SELECTION_APPLY_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-object-selection-apply'],
+      toolNames: [AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
       commandName: AGENT_RETOUCH_APPLY_TOOL_NAME,
       family: 'agent',
       inputSchemaNames: [AGENT_RETOUCH_APPLY_INPUT_SCHEMA_NAME],
@@ -874,6 +888,7 @@ const APPROVED_AGENT_APP_SERVER_TOOL_NAMES = new Set<string>([
   AGENT_LAYER_CREATE_TOOL_NAME,
   AGENT_LENS_PROFILE_APPLY_TOOL_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
+  AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME,
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_RETOUCH_APPLY_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
@@ -955,6 +970,9 @@ const dispatchAgentAppServerTool = async (
       break;
     case AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME:
       result = applyAgentBrushMaskCreateOrUpdate(agentMaskCreateOrUpdateRequestSchema.parse(request.arguments));
+      break;
+    case AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME:
+      result = applyAgentObjectSelection(agentObjectSelectionApplyRequestSchema.parse(request.arguments));
       break;
     case AGENT_PREVIEW_RENDER_TOOL_NAME:
       result = renderAgentReadOnlyPreview(agentPreviewRenderRequestSchema.parse(request.arguments));
