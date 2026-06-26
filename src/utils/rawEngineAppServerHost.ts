@@ -6,6 +6,13 @@ import {
   applyAgentGlobalAdjustments,
 } from './agentAdjustmentApplyTool';
 import {
+  AGENT_CURVE_LEVELS_APPLY_INPUT_SCHEMA_NAME,
+  AGENT_CURVE_LEVELS_APPLY_OUTPUT_SCHEMA_NAME,
+  AGENT_CURVE_LEVELS_APPLY_TOOL_NAME,
+  agentCurveLevelsApplyRequestSchema,
+  applyAgentCurveLevels,
+} from './agentCurveLevelsApplyTool';
+import {
   AGENT_EXPORT_PROOF_INPUT_SCHEMA_NAME,
   AGENT_EXPORT_PROOF_OUTPUT_SCHEMA_NAME,
   AGENT_EXPORT_PROOF_TOOL_NAME,
@@ -527,6 +534,15 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       toolNames: [AGENT_ADJUSTMENTS_APPLY_TOOL_NAME],
     }),
     buildRouteCatalogEntry({
+      commandName: AGENT_CURVE_LEVELS_APPLY_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_CURVE_LEVELS_APPLY_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.ApplyDryRunPlan],
+      outputSchemaNames: [AGENT_CURVE_LEVELS_APPLY_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-curve-levels-apply'],
+      toolNames: [AGENT_CURVE_LEVELS_APPLY_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
       commandName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
       family: 'agent',
       inputSchemaNames: [AGENT_HISTORY_ROLLBACK_INPUT_SCHEMA_NAME],
@@ -771,6 +787,9 @@ const dispatchAgentAppServerTool = async (
   switch (request.runtimeToolName) {
     case AGENT_ADJUSTMENTS_APPLY_TOOL_NAME:
       result = await applyAgentGlobalAdjustments(agentAdjustmentsApplyRequestSchema.parse(request.arguments));
+      break;
+    case AGENT_CURVE_LEVELS_APPLY_TOOL_NAME:
+      result = applyAgentCurveLevels(agentCurveLevelsApplyRequestSchema.parse(request.arguments));
       break;
     case AGENT_EXPORT_PROOF_TOOL_NAME:
       result = buildAgentExportProof(agentExportProofRequestSchema.parse(request.arguments));
