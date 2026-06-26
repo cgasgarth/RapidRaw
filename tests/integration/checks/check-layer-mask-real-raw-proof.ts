@@ -44,6 +44,10 @@ const metricSchema = z
       'maskCoverageRatio',
       'maskedChangedPixelRatio',
       'refinementChangedPixelRatio',
+      'boundaryFProxyImprovement',
+      'areaDriftRatio',
+      'haloWidthProxyReduction',
+      'edgeColorContaminationProxyReduction',
       'previewExportMeanAbsDelta',
       'sourceHashUnchanged',
     ]),
@@ -56,7 +60,12 @@ const metricSchema = z
 const proofClaimsSchema = z
   .object({
     doesNotProve: z.array(
-      z.enum(['macos_app_ui_e2e_session', 'manual_layer_panel_interaction', 'public_raw_fixture_distribution']),
+      z.enum([
+        'macos_app_ui_e2e_session',
+        'manual_layer_panel_interaction',
+        'annotated_hair_ground_truth_boundary_f',
+        'public_raw_fixture_distribution',
+      ]),
     ),
     proves: z.array(
       z.enum([
@@ -64,6 +73,7 @@ const proofClaimsSchema = z
         'layer_mask_generation',
         'masked_adjustment_changes_pixels',
         'mask_refinement_changes_pixels',
+        'image_evidence_guided_refinement',
         'refined_preview_export_parity',
       ]),
     ),
@@ -75,6 +85,7 @@ const proofClaimsSchema = z
       'layer_mask_generation',
       'masked_adjustment_changes_pixels',
       'mask_refinement_changes_pixels',
+      'image_evidence_guided_refinement',
       'refined_preview_export_parity',
     ]);
     for (const proof of requiredProofs) {
@@ -87,6 +98,13 @@ const proofClaimsSchema = z
       context.addIssue({
         code: 'custom',
         message: 'layer/mask proof must not claim macOS UI E2E without app evidence',
+        path: ['doesNotProve'],
+      });
+    }
+    if (!claims.doesNotProve.includes('annotated_hair_ground_truth_boundary_f')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'boundary-F proxy must not claim annotated hair ground truth',
         path: ['doesNotProve'],
       });
     }
@@ -119,7 +137,7 @@ const reportSchema = z
     fixtureId: z.literal(FIXTURE_ID),
     generatedAt: z.iso.datetime(),
     issue: z.literal(2310),
-    metrics: z.array(metricSchema).length(5),
+    metrics: z.array(metricSchema).length(9),
     proofClaims: proofClaimsSchema,
     reportId: z.literal(REPORT_ID),
     runtimeProof: runtimeProofSchema,
@@ -144,6 +162,26 @@ const reportSchema = z
     }
     if ((metric.get('refinementChangedPixelRatio')?.value ?? 0) <= 0.0001) {
       context.addIssue({ code: 'custom', message: 'refinement controls must change output', path: ['metrics'] });
+    }
+    if ((metric.get('boundaryFProxyImprovement')?.value ?? 0) <= 0.000001) {
+      context.addIssue({ code: 'custom', message: 'image-edge alignment must improve', path: ['metrics'] });
+    }
+    if ((metric.get('areaDriftRatio')?.value ?? Number.POSITIVE_INFINITY) > 0.05) {
+      context.addIssue({ code: 'custom', message: 'refined mask area drift is too high', path: ['metrics'] });
+    }
+    if ((metric.get('haloWidthProxyReduction')?.value ?? 0) <= 0.000001) {
+      context.addIssue({
+        code: 'custom',
+        message: 'refinement must reduce transition-width halo proxy',
+        path: ['metrics'],
+      });
+    }
+    if ((metric.get('edgeColorContaminationProxyReduction')?.value ?? 0) <= 0.000001) {
+      context.addIssue({
+        code: 'custom',
+        message: 'refinement must reduce low-gradient transition contamination proxy',
+        path: ['metrics'],
+      });
     }
     if ((metric.get('previewExportMeanAbsDelta')?.value ?? Number.POSITIVE_INFINITY) > 0.015) {
       context.addIssue({ code: 'custom', message: 'preview/export parity exceeded threshold', path: ['metrics'] });
