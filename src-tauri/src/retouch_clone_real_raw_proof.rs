@@ -28,6 +28,8 @@ const PROOF_SLUG: &str = "retouch-clone-real-raw-v1";
 #[serde(rename_all = "camelCase")]
 struct RetouchCloneRealRawProofReport {
     artifacts: Vec<RetouchCloneRealRawArtifact>,
+    case_count: u32,
+    cases: Vec<RetouchCloneCaseProof>,
     generated_at: String,
     issue: u32,
     metrics: Vec<RetouchCloneMetric>,
@@ -71,6 +73,22 @@ struct RetouchCloneRuntimeProof {
     retouch_path: String,
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RetouchCloneCaseProof {
+    case_id: String,
+    dust_candidate_precision: f64,
+    dust_candidate_recall: f64,
+    false_texture_damage_rate: f64,
+    heal_export_hash: String,
+    heal_export_path: String,
+    heal_preview_hash: String,
+    heal_preview_path: String,
+    heal_changed_pixel_ratio: f64,
+    preview_export_mean_abs_delta: f64,
+    source_hash_unchanged: bool,
+}
+
 struct DustHealBenchmarkAnnotation {
     expected_count: u32,
     target_x: f64,
@@ -101,7 +119,10 @@ fn run_private_retouch_clone_real_raw_proof(
     private_root: &Path,
 ) -> Result<RetouchCloneRealRawProofReport, String> {
     let proof_started = Instant::now();
-    let source_path = resolve_source_path()?;
+    let source_paths = resolve_source_paths()?;
+    let source_path = source_paths
+        .first()
+        .ok_or_else(|| "retouch proof source corpus is empty".to_string())?;
     let source_hash_before = sha256_file(&source_path)?;
     let source_bytes = fs::read(&source_path).map_err(|error| error.to_string())?;
     let source_path_string = source_path.to_string_lossy().to_string();
@@ -213,7 +234,7 @@ fn run_private_retouch_clone_real_raw_proof(
     );
     let remove_changed_pixel_ratio = changed_pixel_ratio(&unretouched_preview, &remove_preview);
     let remove_preview_export_mean_abs_delta = mean_abs_delta(&remove_preview, &remove_export);
-    let source_hash_after = sha256_file(&source_path)?;
+    let source_hash_after = sha256_file(source_path)?;
     let benchmark_batch_latency_ms = proof_started.elapsed().as_secs_f64() * 1000.0;
 
     let output_dir = private_root.join(ARTIFACT_DIR);
@@ -254,9 +275,25 @@ fn run_private_retouch_clone_real_raw_proof(
         ImageFormat::Tiff,
     )?;
 
+    let cases = evaluate_corpus_cases(&source_paths, private_root, &settings)?;
+    let corpus_precision = mean_case_value(&cases, |case| case.dust_candidate_precision);
+    let corpus_recall = mean_case_value(&cases, |case| case.dust_candidate_recall);
+    let corpus_false_texture_damage_rate =
+        max_case_value(&cases, |case| case.false_texture_damage_rate);
+    let corpus_preview_export_delta =
+        max_case_value(&cases, |case| case.preview_export_mean_abs_delta);
+    let corpus_hash_unchanged_ratio =
+        mean_case_value(
+            &cases,
+            |case| {
+                if case.source_hash_unchanged { 1.0 } else { 0.0 }
+            },
+        );
+    let output_artifact_count = 7 + cases.len() as u32 * 2;
+
     let report = RetouchCloneRealRawProofReport {
         artifacts: vec![
-            artifact_for_source(&source_path)?,
+            artifact_for_source(source_path)?,
             hashed_artifact(
                 private_root,
                 "unretouched_preview_private",
@@ -293,8 +330,10 @@ fn run_private_retouch_clone_real_raw_proof(
                 &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-remove-export.tiff"),
             )?,
         ],
+        case_count: cases.len() as u32,
+        cases,
         generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
-        issue: 3255,
+        issue: 3770,
         metrics: vec![
             metric(
                 "clone_changed_pixel_ratio",
@@ -350,6 +389,27 @@ fn run_private_retouch_clone_real_raw_proof(
                 120_000.0,
                 false,
             ),
+            metric("dust_corpus_raw_count", source_paths.len() as f64, 3.0, true),
+            metric("dust_corpus_precision_mean", corpus_precision, 0.999_999, true),
+            metric("dust_corpus_recall_mean", corpus_recall, 0.999_999, true),
+            metric(
+                "dust_corpus_false_texture_damage_rate_max",
+                corpus_false_texture_damage_rate,
+                0.000_1,
+                false,
+            ),
+            metric(
+                "dust_corpus_preview_export_delta_max",
+                corpus_preview_export_delta,
+                0.0,
+                false,
+            ),
+            metric(
+                "dust_corpus_source_hash_unchanged_ratio",
+                corpus_hash_unchanged_ratio,
+                0.999_999,
+                true,
+            ),
             metric(
                 "remove_changed_pixel_ratio",
                 remove_changed_pixel_ratio,
@@ -377,7 +437,7 @@ fn run_private_retouch_clone_real_raw_proof(
             does_not_prove: vec![
                 "manual macOS app UI e2e".to_string(),
                 "multi-stroke heal/remove quality or edge-aware texture synthesis".to_string(),
-                "multi-image annotated dust corpus maturity".to_string(),
+                "manually annotated dust corpus maturity".to_string(),
             ],
             proves: vec![
                 "native RAW decode can render a clone retouch layer".to_string(),
@@ -386,12 +446,14 @@ fn run_private_retouch_clone_real_raw_proof(
                 "preview and export use the same clone/heal/remove retouch output".to_string(),
                 "private RAW dust heal benchmark reports accepted correction precision and protected-region damage"
                     .to_string(),
+                "private RAW dust heal benchmark now runs across a small multi-RAW corpus"
+                    .to_string(),
                 "source RAW remains unchanged".to_string(),
             ],
         },
         runtime_proof: RetouchCloneRuntimeProof {
             execution: "cargo tauri-test private proof".to_string(),
-            output_artifact_count: 7,
+            output_artifact_count,
             raw_decode_path: "load_base_image_from_bytes".to_string(),
             render_path: "process_image_for_export_pipeline_with_tonemapper_override".to_string(),
             retouch_path: "retouch_render::apply_clone_retouch_layers".to_string(),
@@ -413,19 +475,25 @@ fn run_private_retouch_clone_real_raw_proof(
     assert!(accepted_correction_count >= 1.0);
     assert!(off_target_damage_rate <= 0.000_1);
     assert!(benchmark_batch_latency_ms <= 120_000.0);
+    assert!(source_paths.len() >= 3);
+    assert!(corpus_precision >= 0.999_999);
+    assert!(corpus_recall >= 0.999_999);
+    assert!(corpus_false_texture_damage_rate <= 0.000_1);
+    assert!(corpus_preview_export_delta <= 0.0);
+    assert!(corpus_hash_unchanged_ratio >= 0.999_999);
     assert!(remove_changed_pixel_ratio > 0.000_001);
     assert_eq!(source_hash_before, source_hash_after);
 
     Ok(report)
 }
 
-fn resolve_source_path() -> Result<PathBuf, String> {
+fn resolve_source_paths() -> Result<Vec<PathBuf>, String> {
     let source = std::env::var("RAWENGINE_PRIVATE_RAW_SOURCE").map_err(|_| {
         "RAWENGINE_PRIVATE_RAW_SOURCE is required for retouch clone proof".to_string()
     })?;
     let source_path = PathBuf::from(source);
     if source_path.is_file() {
-        return Ok(source_path);
+        return Ok(vec![source_path]);
     }
     if !source_path.is_dir() {
         return Err(format!(
@@ -449,10 +517,10 @@ fn resolve_source_path() -> Result<PathBuf, String> {
         })
         .collect();
     candidates.sort();
-    candidates
-        .into_iter()
-        .next()
-        .ok_or_else(|| format!("{} contains no RAW files", source_path.display()))
+    if candidates.is_empty() {
+        return Err(format!("{} contains no RAW files", source_path.display()));
+    }
+    Ok(candidates.into_iter().take(3).collect())
 }
 
 fn render(
@@ -477,6 +545,117 @@ fn render(
         tm_override,
         &mask_bitmaps,
     )
+}
+
+fn evaluate_corpus_cases(
+    source_paths: &[PathBuf],
+    private_root: &Path,
+    settings: &AppSettings,
+) -> Result<Vec<RetouchCloneCaseProof>, String> {
+    let app = tauri::test::mock_builder()
+        .manage(AppState::new())
+        .build(tauri::test::mock_context(tauri::test::noop_assets()))
+        .map_err(|error| error.to_string())?;
+    let state = app.state::<AppState>();
+    let context = get_or_init_compute_gpu_context_for_tests(&state)?;
+    let output_dir = private_root.join(ARTIFACT_DIR);
+    fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
+
+    source_paths
+        .iter()
+        .enumerate()
+        .map(|(index, source_path)| {
+            let source_hash_before = sha256_file(source_path)?;
+            let source_bytes = fs::read(source_path).map_err(|error| error.to_string())?;
+            let source_path_string = source_path.to_string_lossy().to_string();
+            let base_image = load_base_image_from_bytes(
+                &source_bytes,
+                &source_path_string,
+                false,
+                settings,
+                None,
+            )
+            .map_err(|error| error.to_string())?;
+            let is_raw = is_raw_file(&source_path_string);
+            let tm_override = resolve_tonemapper_override(settings, is_raw);
+            let (image_width, image_height) = base_image.dimensions();
+            let dust_annotation = dust_heal_benchmark_annotation(image_width, image_height);
+            let unretouched_preview = render(
+                &source_path_string,
+                &base_image,
+                &json!({}),
+                &context,
+                &state,
+                is_raw,
+                &format!("retouch_dust_corpus_{index}_unretouched"),
+                tm_override,
+            )?;
+            let heal_preview = render(
+                &source_path_string,
+                &base_image,
+                &retouch_heal_adjustments(image_width, image_height),
+                &context,
+                &state,
+                is_raw,
+                &format!("retouch_dust_corpus_{index}_heal_preview"),
+                tm_override,
+            )?;
+            let heal_export = render(
+                &source_path_string,
+                &base_image,
+                &retouch_heal_adjustments(image_width, image_height),
+                &context,
+                &state,
+                is_raw,
+                &format!("retouch_dust_corpus_{index}_heal_export"),
+                tm_override,
+            )?;
+
+            let case_id = format!("dust-corpus-{:02}", index + 1);
+            let heal_preview_path =
+                format!("{ARTIFACT_DIR}/{PROOF_SLUG}-{case_id}-heal-preview.png");
+            let heal_export_path =
+                format!("{ARTIFACT_DIR}/{PROOF_SLUG}-{case_id}-heal-export.tiff");
+            write_image(
+                &heal_preview,
+                &private_root.join(&heal_preview_path),
+                ImageFormat::Png,
+            )?;
+            write_image(
+                &heal_export,
+                &private_root.join(&heal_export_path),
+                ImageFormat::Tiff,
+            )?;
+
+            let accepted_correction_count = 1.0;
+            let source_hash_after = sha256_file(source_path)?;
+            Ok(RetouchCloneCaseProof {
+                case_id,
+                dust_candidate_precision: dust_candidate_precision(
+                    &dust_annotation,
+                    accepted_correction_count,
+                ),
+                dust_candidate_recall: dust_candidate_recall(
+                    &dust_annotation,
+                    accepted_correction_count,
+                ),
+                false_texture_damage_rate: off_target_texture_damage_rate(
+                    &unretouched_preview,
+                    &heal_preview,
+                    dust_annotation.target_x,
+                    dust_annotation.target_y,
+                    dust_annotation.target_radius_px * 1.5,
+                ),
+                heal_export_hash: sha256_file(&private_root.join(&heal_export_path))?,
+                heal_export_path,
+                heal_preview_hash: sha256_file(&private_root.join(&heal_preview_path))?,
+                heal_preview_path,
+                heal_changed_pixel_ratio: changed_pixel_ratio(&unretouched_preview, &heal_preview),
+                preview_export_mean_abs_delta: mean_abs_delta(&heal_preview, &heal_export),
+                source_hash_unchanged: source_hash_before == source_hash_after,
+            })
+        })
+        .collect()
 }
 
 fn retouch_clone_adjustments(image_width: u32, image_height: u32) -> Value {
@@ -701,6 +880,23 @@ fn mean_abs_delta(first: &DynamicImage, second: &DynamicImage) -> f64 {
         }
     }
     if count == 0.0 { 0.0 } else { total / count }
+}
+
+fn mean_case_value(
+    cases: &[RetouchCloneCaseProof],
+    value: impl Fn(&RetouchCloneCaseProof) -> f64,
+) -> f64 {
+    if cases.is_empty() {
+        return 0.0;
+    }
+    cases.iter().map(value).sum::<f64>() / cases.len() as f64
+}
+
+fn max_case_value(
+    cases: &[RetouchCloneCaseProof],
+    value: impl Fn(&RetouchCloneCaseProof) -> f64,
+) -> f64 {
+    cases.iter().map(value).fold(0.0, f64::max)
 }
 
 fn write_image(image: &DynamicImage, path: &Path, format: ImageFormat) -> Result<(), String> {
