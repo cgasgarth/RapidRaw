@@ -1,9 +1,16 @@
 import { z } from 'zod';
 
-import { applyAgentGlobalAdjustments } from './agentAdjustmentApplyTool';
+import { AGENT_ADJUSTMENTS_APPLY_TOOL_NAME, agentAdjustmentsApplyResponseSchema } from './agentAdjustmentApplyTool';
 import { agentEditQualityReviewSchema, buildAgentEditQualityReview } from './agentEditQualityReview';
 import { agentPreviewEnvelopeSchema } from './agentPreviewEnvelope';
-import { getAgentReadOnlyState, renderAgentReadOnlyPreview } from './agentReadOnlyAppServerTools';
+import {
+  AGENT_PREVIEW_RENDER_TOOL_NAME,
+  AGENT_STATE_GET_TOOL_NAME,
+  agentPreviewRenderResponseSchema,
+  agentStateGetResponseSchema,
+} from './agentReadOnlyAppServerTools';
+import { handleRawEngineAppServerHostRequestAsync } from './rawEngineAppServerHost';
+import { RawEngineAppServerHostToolName } from '../schemas/agentRuntimeSchemas';
 
 const agentLoopAdjustmentPatchSchema = z
   .object({
@@ -105,12 +112,44 @@ const getSnapshotRecipeHash = (snapshot: unknown): string => {
   return parsed.initialPreview.recipeHash;
 };
 
+const dispatchResultSchema = z.looseObject({
+  dispatchStatus: z.enum(['completed']),
+  result: z.unknown(),
+  runtimeToolName: z.string().trim().min(1),
+});
+
+const dispatchAgentTool = async ({
+  args,
+  requestId,
+  runtimeToolName,
+}: {
+  args: unknown;
+  requestId: string;
+  runtimeToolName: string;
+}): Promise<unknown> => {
+  const response = dispatchResultSchema.parse(
+    await handleRawEngineAppServerHostRequestAsync({
+      arguments: args,
+      requestId,
+      runtimeToolName,
+      toolName: RawEngineAppServerHostToolName.DispatchTool,
+    }),
+  );
+  return response.result;
+};
+
 export const runAgentIterativeEditLoop = async (
   request: AgentIterativeEditLoopRequest,
 ): Promise<AgentIterativeEditLoopResult> => {
   const parsedRequest = agentIterativeEditLoopRequestSchema.parse(request);
   const transcript: AgentIterativeEditLoopResult['transcript'] = [];
-  const initialState = getAgentReadOnlyState({ requestId: `${parsedRequest.requestId}-state-0` });
+  const initialState = agentStateGetResponseSchema.parse(
+    await dispatchAgentTool({
+      args: { requestId: `${parsedRequest.requestId}-state-0` },
+      requestId: `${parsedRequest.requestId}-state-0`,
+      runtimeToolName: AGENT_STATE_GET_TOOL_NAME,
+    }),
+  );
   let recipeHash = getSnapshotRecipeHash(initialState.snapshot);
   let appliedGraphRevision = 'unapplied';
   let editCount = 0;
@@ -130,13 +169,20 @@ export const runAgentIterativeEditLoop = async (
     if (editCount >= parsedRequest.maxIterations) break;
 
     const { preview: previewRequest, ...adjustments } = step;
-    const apply = await applyAgentGlobalAdjustments({
-      adjustments: agentLoopAdjustmentPatchSchema.parse(adjustments),
-      expectedRecipeHash: recipeHash,
-      operationId: `${parsedRequest.operationId}-${index + 1}`,
-      requestId: `${parsedRequest.requestId}-apply-${index + 1}`,
-      sessionId: parsedRequest.sessionId,
-    });
+    const applyRequestId = `${parsedRequest.requestId}-apply-${index + 1}`;
+    const apply = agentAdjustmentsApplyResponseSchema.parse(
+      await dispatchAgentTool({
+        args: {
+          adjustments: agentLoopAdjustmentPatchSchema.parse(adjustments),
+          expectedRecipeHash: recipeHash,
+          operationId: `${parsedRequest.operationId}-${index + 1}`,
+          requestId: applyRequestId,
+          sessionId: parsedRequest.sessionId,
+        },
+        requestId: applyRequestId,
+        runtimeToolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+      }),
+    );
     editCount += 1;
     appliedGraphRevision = apply.appliedGraphRevision;
     transcript.push({
@@ -150,18 +196,32 @@ export const runAgentIterativeEditLoop = async (
       toolName: apply.toolName,
     });
 
-    const state = getAgentReadOnlyState({ requestId: `${parsedRequest.requestId}-state-${index + 1}` });
+    const stateRequestId = `${parsedRequest.requestId}-state-${index + 1}`;
+    const state = agentStateGetResponseSchema.parse(
+      await dispatchAgentTool({
+        args: { requestId: stateRequestId },
+        requestId: stateRequestId,
+        runtimeToolName: AGENT_STATE_GET_TOOL_NAME,
+      }),
+    );
     recipeHash = getSnapshotRecipeHash(state.snapshot);
-    const preview = renderAgentReadOnlyPreview({
-      crop: previewRequest?.crop,
-      expectedRecipeHash: recipeHash,
-      longEdgePx: previewRequest?.longEdgePx ?? 1024,
-      maxPixelCount: previewRequest?.maxPixelCount,
-      purpose: previewRequest?.purpose ?? 'refresh',
-      quality: previewRequest?.quality ?? 0.82,
-      requestId: `${parsedRequest.requestId}-preview-${index + 1}`,
-      zoom: previewRequest?.zoom,
-    });
+    const previewRequestId = `${parsedRequest.requestId}-preview-${index + 1}`;
+    const preview = agentPreviewRenderResponseSchema.parse(
+      await dispatchAgentTool({
+        args: {
+          crop: previewRequest?.crop,
+          expectedRecipeHash: recipeHash,
+          longEdgePx: previewRequest?.longEdgePx ?? 1024,
+          maxPixelCount: previewRequest?.maxPixelCount,
+          purpose: previewRequest?.purpose ?? 'refresh',
+          quality: previewRequest?.quality ?? 0.82,
+          requestId: previewRequestId,
+          zoom: previewRequest?.zoom,
+        },
+        requestId: previewRequestId,
+        runtimeToolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+      }),
+    );
     previewRefreshCount += 1;
     previewRefreshes.push(preview.preview);
     const previewPurpose = z.enum(['detail_review', 'refresh']).parse(preview.preview.purpose);
