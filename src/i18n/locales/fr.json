@@ -1182,6 +1182,7 @@
       "brush": "Pinceau",
       "color": "Couleur",
       "depth": "Profondeur",
+      "face": "Face",
       "flow": "Flux",
       "foreground": "Premier plan",
       "linear": "Linéaire",

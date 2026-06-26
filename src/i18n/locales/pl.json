@@ -1901,6 +1901,7 @@
       "brush": "Pędzel",
       "color": "Kolor",
       "depth": "Głębia",
+      "face": "Face",
       "flow": "Przepływ",
       "foreground": "Pierwszy plan",
       "linear": "Liniowy",

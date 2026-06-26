@@ -32,8 +32,8 @@
             "label": "Face",
             "part": "face",
             "recommendedDefault": false,
-            "status": "planned",
-            "validationMode": "dry_run"
+            "status": "supported",
+            "validationMode": "runtime_apply"
           },
           {
             "disabledReason": null,

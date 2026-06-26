@@ -97,6 +97,7 @@ export const aiPeopleMaskPartSchema = z.enum([
 export const aiPeopleMaskProviderTierSchema = z.enum([
   'contract',
   'fake_provider',
+  'macos_face',
   'macos_person',
   'person_parser',
   'face_detail',

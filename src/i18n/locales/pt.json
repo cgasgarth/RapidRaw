@@ -1171,6 +1171,7 @@
       "brush": "Pincel",
       "color": "Cor",
       "depth": "Profundidade",
+      "face": "Face",
       "flow": "Fluxo",
       "foreground": "Primeiro Plano",
       "linear": "Linear",

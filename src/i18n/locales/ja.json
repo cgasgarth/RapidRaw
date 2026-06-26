@@ -1155,6 +1155,7 @@
       "brush": "ブラシ",
       "color": "カラー",
       "depth": "奥行き",
+      "face": "Face",
       "flow": "流量",
       "foreground": "手前",
       "linear": "線形",

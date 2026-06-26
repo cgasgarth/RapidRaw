@@ -2684,6 +2684,7 @@ pub fn run() {
             ai_commands::generate_ai_sky_mask,
             ai_commands::generate_ai_depth_mask,
             ai_commands::generate_ai_whole_person_mask,
+            ai_commands::generate_ai_person_part_mask,
             ai_commands::check_ai_connector_status,
             ai_commands::test_ai_connector_connection,
             ai_commands::invoke_generative_replace_with_mask_def,

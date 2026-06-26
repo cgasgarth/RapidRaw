@@ -1797,6 +1797,7 @@
       "brush": "Pinsel",
       "color": "Farbe",
       "depth": "Tiefe",
+      "face": "Face",
       "flow": "Fluss",
       "foreground": "Vordergrund",
       "linear": "Linear",
