@@ -4,6 +4,11 @@ import {
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
 } from './agentAdjustmentApplyTool';
 import {
+  AGENT_EXPORT_PROOF_INPUT_SCHEMA_NAME,
+  AGENT_EXPORT_PROOF_OUTPUT_SCHEMA_NAME,
+  AGENT_EXPORT_PROOF_TOOL_NAME,
+} from './agentExportProofTool';
+import {
   AGENT_LAYER_CREATE_INPUT_SCHEMA_NAME,
   AGENT_LAYER_CREATE_OUTPUT_SCHEMA_NAME,
   AGENT_LAYER_CREATE_TOOL_NAME,
@@ -533,6 +538,15 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       outputSchemaNames: [AGENT_RETOUCH_APPLY_OUTPUT_SCHEMA_NAME],
       runtimeCheckScripts: ['check:agent-retouch-apply'],
       toolNames: [AGENT_RETOUCH_APPLY_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
+      commandName: AGENT_EXPORT_PROOF_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_EXPORT_PROOF_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.Read],
+      outputSchemaNames: [AGENT_EXPORT_PROOF_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-export-proof'],
+      toolNames: [AGENT_EXPORT_PROOF_TOOL_NAME],
     }),
   );
 
