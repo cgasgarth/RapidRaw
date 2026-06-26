@@ -656,6 +656,7 @@
     "check:agent-atomic-approval": "bun tests/integration/checks/check-agent-atomic-approval.ts",
     "check:agent-session-audit-store": "bun tests/integration/checks/check-agent-session-audit-store.ts",
     "check:agent-session-replay": "bun tests/integration/checks/check-agent-session-replay.ts",
+    "check:agent-multiturn-session": "bun tests/integration/checks/check-agent-multiturn-session.ts",
     "check:agent-scope-guardrails": "bun tests/integration/checks/check-agent-scope-guardrails.ts",
     "check:agent-edit-recipe-planner": "bun tests/integration/checks/check-agent-edit-recipe-planner.ts",
     "check:agent-prompt-command-evaluation": "bun tests/integration/checks/check-agent-prompt-command-evaluation.ts",
