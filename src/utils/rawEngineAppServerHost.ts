@@ -11,6 +11,11 @@ import {
   AGENT_STATE_GET_OUTPUT_SCHEMA_NAME,
   AGENT_STATE_GET_TOOL_NAME,
 } from './agentReadOnlyAppServerTools';
+import {
+  AGENT_HISTORY_ROLLBACK_INPUT_SCHEMA_NAME,
+  AGENT_HISTORY_ROLLBACK_OUTPUT_SCHEMA_NAME,
+  AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+} from './agentSessionHistory';
 import { AI_APP_SERVER_TOOL_ROUTES } from './aiAppServerToolRoutes';
 import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from './computationalMergeAppServerRoutes';
 import { DETAIL_APP_SERVER_ROUTES } from './detailAppServerRoutes';
@@ -479,6 +484,15 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       outputSchemaNames: [AGENT_ADJUSTMENTS_APPLY_OUTPUT_SCHEMA_NAME],
       runtimeCheckScripts: ['check:agent-adjustments-apply'],
       toolNames: [AGENT_ADJUSTMENTS_APPLY_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
+      commandName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_HISTORY_ROLLBACK_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.ApplyDryRunPlan],
+      outputSchemaNames: [AGENT_HISTORY_ROLLBACK_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-session-history-rollback'],
+      toolNames: [AGENT_HISTORY_ROLLBACK_TOOL_NAME],
     }),
   );
 
