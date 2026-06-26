@@ -16,7 +16,6 @@ export RAWENGINE_COMPACT_TAIL_LINES="${RAWENGINE_COMPACT_TAIL_LINES:-8}"
 staged_files="$(git diff --cached --name-only --diff-filter=ACMR)"
 
 bun lint-staged --quiet --concurrent false
-bun run check:lint
 
 if printf '%s\n' "$staged_files" | grep -Eq '^(AGENTS\.md|docs/|.*\.md$)'; then
   bun run docs:check
@@ -28,6 +27,10 @@ fi
 
 if printf '%s\n' "$staged_files" | grep -Eq '^(src/|scripts/|tests/|eslint\.config\.js|package\.json|bun\.lock|tsconfig[^/]*\.json$)'; then
   bun run check:lint-escapes
+fi
+
+if printf '%s\n' "$staged_files" | grep -Eq '^eslint\.config\.js$'; then
+  bun run check:lint
 fi
 
 if printf '%s\n' "$staged_files" | grep -Eq '^(knip\.jsonc|package\.json|bun\.lock|tsconfig[^/]*\.json$)'; then
