@@ -116,6 +116,39 @@ pub async fn generate_ai_whole_person_mask(
     })
 }
 
+#[tauri::command]
+pub async fn generate_ai_person_part_mask(
+    js_adjustments: serde_json::Value,
+    part: String,
+    rotation: f32,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+    orientation_steps: u8,
+    state: tauri::State<'_, AppState>,
+) -> Result<AiForegroundMaskParameters, String> {
+    let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
+    let mask_image = match part.as_str() {
+        "face" => crate::person_segmentation::generate_face_mask(warped_image.as_ref())?,
+        "full_person" => {
+            crate::person_segmentation::generate_whole_person_mask(warped_image.as_ref())?
+        }
+        unsupported => {
+            return Err(format!(
+                "Unsupported person mask part '{unsupported}'. Supported runtime parts: face, full_person"
+            ));
+        }
+    };
+    let base64_data = encode_to_base64_png(&mask_image)?;
+
+    Ok(AiForegroundMaskParameters {
+        mask_data_base64: Some(base64_data),
+        rotation: Some(rotation),
+        flip_horizontal: Some(flip_horizontal),
+        flip_vertical: Some(flip_vertical),
+        orientation_steps: Some(orientation_steps),
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn generate_ai_depth_mask(

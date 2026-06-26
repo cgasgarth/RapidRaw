@@ -74,6 +74,13 @@ export const AI_APP_SERVER_TOOL_ROUTE_MANIFEST = aiAppServerToolRouteManifestSch
     },
     {
       ...aiMaskDryRun,
+      reason: 'Person-part mask generation maps face/full-person targets onto the typed person-mask tool surface.',
+      ...mappedTauriInvoke,
+      sourceOperation: 'generate_ai_person_part_mask',
+      toolCapability: AiAppServerToolCapability.PersonMask,
+    },
+    {
+      ...aiMaskDryRun,
       reason: 'Sky mask generation is supported by the typed AI mask dry-run tool capability set.',
       ...mappedTauriInvoke,
       sourceOperation: 'generate_ai_sky_mask',

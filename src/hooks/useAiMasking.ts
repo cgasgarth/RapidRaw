@@ -380,6 +380,39 @@ export function useAiMasking() {
     }
   };
 
+  const handleGenerateAiPersonPartMask = async (subMaskId: string, part: 'face' | 'full_person') => {
+    const { selectedImage, adjustments, patchesSentToBackend } = useEditorStore.getState();
+    if (!selectedImage?.path) return;
+    setEditor({ isGeneratingAiMask: true });
+
+    try {
+      const transformAdjustments = getTransformAdjustments(adjustments);
+      const newParameters = await invoke<Record<string, unknown>>(Invokes.GenerateAiPersonPartMask, {
+        jsAdjustments: transformAdjustments,
+        part,
+        flipHorizontal: adjustments.flipHorizontal,
+        flipVertical: adjustments.flipVertical,
+        orientationSteps: adjustments.orientationSteps,
+        rotation: adjustments.rotation,
+      });
+
+      const subMask = adjustments.aiPatches
+        .flatMap((p: AiPatch) => p.subMasks)
+        .find((sm: SubMask) => sm.id === subMaskId);
+      const mergedParameters = mergeMaskParameters(subMask?.parameters, {
+        ...newParameters,
+        providerTier: part === 'face' ? 'macos_face' : 'macos_vision',
+        target: { part, personId: null },
+      });
+      patchesSentToBackend.delete(subMaskId);
+      updateSubMask(subMaskId, { parameters: mergedParameters });
+    } catch (error) {
+      toast.error(`AI Person Mask Failed: ${formatUnknownError(error)}`);
+    } finally {
+      setEditor({ isGeneratingAiMask: false });
+    }
+  };
+
   const handleGenerateAiSkyMask = async (subMaskId: string) => {
     const { selectedImage, adjustments, patchesSentToBackend } = useEditorStore.getState();
     if (!selectedImage?.path) return;
@@ -436,6 +469,7 @@ export function useAiMasking() {
     handleGenerateAiDepthMask,
     handleGenerateAiForegroundMask,
     handleGenerateAiWholePersonMask,
+    handleGenerateAiPersonPartMask,
     handleGenerateAiSkyMask,
   };
 }

@@ -1171,6 +1171,7 @@
       "brush": "Pennello",
       "color": "Colore",
       "depth": "Profondità",
+      "face": "Face",
       "flow": "Flusso",
       "foreground": "Primo Piano",
       "linear": "Lineare",

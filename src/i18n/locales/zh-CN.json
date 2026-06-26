@@ -1778,6 +1778,7 @@
       "brush": "画笔",
       "color": "颜色",
       "depth": "深度",
+      "face": "Face",
       "flow": "流线",
       "foreground": "前景",
       "linear": "线性",

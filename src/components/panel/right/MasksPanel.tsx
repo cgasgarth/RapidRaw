@@ -940,6 +940,7 @@ export function MasksPanel() {
   const {
     handleGenerateAiDepthMask,
     handleGenerateAiForegroundMask,
+    handleGenerateAiPersonPartMask,
     handleGenerateAiSkyMask,
     handleGenerateAiWholePersonMask,
   } = useAiMasking();
@@ -1173,7 +1174,11 @@ export function MasksPanel() {
     setAdjustments((prev: Adjustments) => ({ ...prev, masks: [] }));
   };
 
-  const createMaskLogic = (type: Mask, mode: SubMaskMode = SubMaskMode.Additive) => {
+  const createMaskLogic = (
+    type: Mask,
+    mode: SubMaskMode = SubMaskMode.Additive,
+    personPart?: MaskType['personPart'],
+  ) => {
     if (!selectedImage) return createSubMask(type, { width: 1000, height: 1000 }, mode);
     const subMask = createSubMask(type, selectedImage, mode);
 
@@ -1219,12 +1224,16 @@ export function MasksPanel() {
       parameters['maxFade'] = 15;
       parameters['feather'] = 10;
     }
-    subMask.parameters = parameters;
+    subMask.parameters =
+      personPart === undefined ? parameters : { ...parameters, target: { part: personPart, personId: null } };
+    if (personPart === 'face') subMask.name = t('masks.types.face');
     return subMask;
   };
 
-  const handleAddMaskContainer = (type: Mask) => {
-    const subMask = createMaskLogic(type);
+  const handleAddMaskContainer = (maskTypeOrType: MaskType | Mask) => {
+    const type = typeof maskTypeOrType === 'string' ? maskTypeOrType : maskTypeOrType.type;
+    const personPart = typeof maskTypeOrType === 'string' ? undefined : maskTypeOrType.personPart;
+    const subMask = createMaskLogic(type, SubMaskMode.Additive, personPart);
     const count = adjustments.masks.length + 1;
     const newContainer = {
       ...INITIAL_MASK_CONTAINER,
@@ -1238,6 +1247,8 @@ export function MasksPanel() {
     setExpandedContainers((prev) => new Set(prev).add(newContainer.id));
     if (type === Mask.Brush || type === Mask.Flow) selectBrushToolForNewMask();
     if (type === Mask.AiForeground) void handleGenerateAiForegroundMask(subMask.id);
+    else if (type === Mask.AiPerson && personPart !== undefined)
+      void handleGenerateAiPersonPartMask(subMask.id, personPart);
     else if (type === Mask.AiPerson) void handleGenerateAiWholePersonMask(subMask.id);
     else if (type === Mask.AiSky) void handleGenerateAiSkyMask(subMask.id);
     else if (type === Mask.AiDepth)
@@ -1246,11 +1257,13 @@ export function MasksPanel() {
 
   const handleAddSubMask = (
     containerId: string,
-    type: Mask,
+    maskTypeOrType: MaskType | Mask,
     mode: SubMaskMode = SubMaskMode.Additive,
     insertIndex: number = -1,
   ) => {
-    const subMask = createMaskLogic(type, mode);
+    const type = typeof maskTypeOrType === 'string' ? maskTypeOrType : maskTypeOrType.type;
+    const personPart = typeof maskTypeOrType === 'string' ? undefined : maskTypeOrType.personPart;
+    const subMask = createMaskLogic(type, mode, personPart);
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       masks: prev.masks.map((c: MaskContainer) => {
@@ -1271,23 +1284,25 @@ export function MasksPanel() {
     setExpandedContainers((prev) => new Set(prev).add(containerId));
     if (type === Mask.Brush || type === Mask.Flow) selectBrushToolForNewMask();
     if (type === Mask.AiForeground) void handleGenerateAiForegroundMask(subMask.id);
+    else if (type === Mask.AiPerson && personPart !== undefined)
+      void handleGenerateAiPersonPartMask(subMask.id, personPart);
     else if (type === Mask.AiPerson) void handleGenerateAiWholePersonMask(subMask.id);
     else if (type === Mask.AiSky) void handleGenerateAiSkyMask(subMask.id);
     else if (type === Mask.AiDepth)
       void handleGenerateAiDepthMask(subMask.id, aiDepthMaskParametersSchema.parse(subMask.parameters));
   };
 
-  const handleGridClick = (type: Mask, forceNewMaskContainer: boolean = false) => {
-    if (!forceNewMaskContainer && activeMaskContainerId) handleAddSubMask(activeMaskContainerId, type);
-    else handleAddMaskContainer(type);
+  const handleGridClick = (maskTypeOrType: MaskType | Mask, forceNewMaskContainer: boolean = false) => {
+    if (!forceNewMaskContainer && activeMaskContainerId) handleAddSubMask(activeMaskContainerId, maskTypeOrType);
+    else handleAddMaskContainer(maskTypeOrType);
   };
 
-  const handleGridRightClick = (event: ReactMouseEvent<HTMLElement>, type: Mask | null) => {
+  const handleGridRightClick = (event: ReactMouseEvent<HTMLElement>, maskTypeOrType: MaskType | Mask | null) => {
     if (event.button !== 2) return;
     event.preventDefault();
     event.stopPropagation();
-    if (!type) return;
-    handleGridClick(type, true);
+    if (!maskTypeOrType) return;
+    handleGridClick(maskTypeOrType, true);
   };
 
   const handleAddOthersMask = (event: ReactMouseEvent<HTMLElement> | ReactKeyboardEvent<HTMLElement>) => {
@@ -1297,10 +1312,10 @@ export function MasksPanel() {
       label: getMaskTypeName(maskType),
       icon: maskType.icon,
       onClick: () => {
-        handleGridClick(maskType.type);
+        handleGridClick(maskType);
       },
       onRightClick: () => {
-        handleGridClick(maskType.type, true);
+        handleGridClick(maskType, true);
       },
     }));
     showContextMenu(rect.left, rect.bottom + 5, options);
@@ -1321,9 +1336,9 @@ export function MasksPanel() {
         disabled: maskType.disabled,
         onClick: () => {
           if (targetContainerId) {
-            handleAddSubMask(targetContainerId, maskType.type, mode);
+            handleAddSubMask(targetContainerId, maskType, mode);
           } else {
-            handleAddMaskContainer(maskType.type);
+            handleAddMaskContainer(maskType);
           }
         },
       }));
@@ -1348,7 +1363,7 @@ export function MasksPanel() {
           disabled: maskType.disabled,
           onClick: () => {
             if (!targetContainerId) return;
-            handleAddSubMask(targetContainerId, maskType.type, mode);
+            handleAddSubMask(targetContainerId, maskType, mode);
           },
         };
       }),
@@ -1739,19 +1754,19 @@ export function MasksPanel() {
                 >
                   {MASK_PANEL_CREATION_TYPES.map((maskType: MaskType) => (
                     <DraggableGridItem
-                      key={maskType.type}
+                      key={maskType.id ?? maskType.type}
                       maskType={maskType}
                       onClick={(e) => {
                         if (maskType.id === 'others') {
                           handleAddOthersMask(e);
                         } else {
-                          handleGridClick(maskType.type);
+                          handleGridClick(maskType);
                         }
                       }}
                       onRightClick={(e: ReactMouseEvent<HTMLElement>) => {
-                        handleGridRightClick(e, maskType.type);
+                        handleGridRightClick(e, maskType);
                       }}
-                      isDraggable={maskType.id !== 'others'}
+                      isDraggable={maskType.id !== 'others' && maskType.personPart === undefined}
                       activeMaskContainerId={activeMaskContainerId}
                     />
                   ))}

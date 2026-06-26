@@ -22,11 +22,11 @@ export const AI_PEOPLE_MASK_PART_CAPABILITIES: Array<AiPeopleMaskProviderCapabil
       validationMode: 'runtime_apply',
     },
     {
-      notes: 'Face segmentation needs a person parser or face-detail provider before runtime exposure.',
+      notes: 'Face selection uses macOS Vision face detection as the first runtime portrait-part target.',
       part: 'face',
-      providerTier: 'person_parser',
-      status: 'planned',
-      validationMode: 'dry_run',
+      providerTier: 'macos_face',
+      status: 'supported',
+      validationMode: 'runtime_apply',
     },
     {
       notes: 'Skin segmentation needs portrait-specific parsing and confidence warnings.',
