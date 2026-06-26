@@ -122,11 +122,14 @@ if (layer === undefined || subMask === undefined) {
 if (layer.adjustments.exposure !== 0.25 || layer.adjustments.shadows !== 14) {
   throw new Error('agent.object_selection.apply did not preserve layer adjustment payload.');
 }
-if (subMask.type !== 'brush' || subMask.parameters?.providerStatus !== 'prompt_proxy_mask_v1') {
-  throw new Error('agent.object_selection.apply did not create prompt-provenance brush mask parameters.');
+if (subMask.type !== 'ai-object' || subMask.parameters?.providerStatus !== 'prompt_proxy_mask_v1') {
+  throw new Error('agent.object_selection.apply did not create prompt-provenance object mask parameters.');
 }
-if (!Array.isArray(subMask.parameters?.strokes) || subMask.parameters.strokes.length < 2) {
-  throw new Error('agent.object_selection.apply did not turn point/box prompts into brush strokes.');
+if (
+  !Array.isArray(subMask.parameters?.generatedPreviewStrokes) ||
+  subMask.parameters.generatedPreviewStrokes.length < 2
+) {
+  throw new Error('agent.object_selection.apply did not store point/box preview geometry.');
 }
 if (state.activeMaskContainerId !== 'agent_object_product' || state.activeMaskId !== 'agent_object_prompt_mask') {
   throw new Error('agent.object_selection.apply did not activate the created object mask.');

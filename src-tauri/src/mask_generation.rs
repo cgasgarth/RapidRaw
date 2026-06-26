@@ -1213,6 +1213,98 @@ fn generate_ai_subject_bitmap(
     Some(mask)
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ObjectPromptMaskParameters {
+    #[serde(default)]
+    box_prompt: Option<ObjectPromptBox>,
+    #[serde(default)]
+    point_prompts: Vec<ObjectPromptPoint>,
+}
+
+#[derive(Deserialize)]
+struct ObjectPromptBox {
+    height: f32,
+    width: f32,
+    x: f32,
+    y: f32,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ObjectPromptPoint {
+    #[serde(default = "default_object_prompt_label")]
+    label: String,
+    x: f32,
+    y: f32,
+}
+
+fn default_object_prompt_label() -> String {
+    "foreground".to_string()
+}
+
+fn generate_ai_object_prompt_bitmap(
+    params_value: &Value,
+    width: u32,
+    height: u32,
+) -> Option<GrayImage> {
+    let params: ObjectPromptMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
+    if params.box_prompt.is_none() && params.point_prompts.is_empty() {
+        return None;
+    }
+
+    let mut mask = GrayImage::from_pixel(width, height, Luma([0]));
+    if let Some(box_prompt) = params.box_prompt {
+        let left = (box_prompt.x.clamp(0.0, 1.0) * width as f32)
+            .floor()
+            .max(0.0) as u32;
+        let top = (box_prompt.y.clamp(0.0, 1.0) * height as f32)
+            .floor()
+            .max(0.0) as u32;
+        let right = ((box_prompt.x + box_prompt.width).clamp(0.0, 1.0) * width as f32)
+            .ceil()
+            .min(width as f32) as u32;
+        let bottom = ((box_prompt.y + box_prompt.height).clamp(0.0, 1.0) * height as f32)
+            .ceil()
+            .min(height as f32) as u32;
+        for y in top..bottom {
+            for x in left..right {
+                mask.put_pixel(x, y, Luma([220]));
+            }
+        }
+    }
+
+    let radius = ((width.min(height) as f32) * 0.035).max(4.0);
+    let radius_squared = radius * radius;
+    for point in params
+        .point_prompts
+        .iter()
+        .filter(|point| point.label == "foreground")
+    {
+        let center_x = point.x.clamp(0.0, 1.0) * width.saturating_sub(1) as f32;
+        let center_y = point.y.clamp(0.0, 1.0) * height.saturating_sub(1) as f32;
+        let left = (center_x - radius).floor().max(0.0) as u32;
+        let right = (center_x + radius)
+            .ceil()
+            .min(width.saturating_sub(1) as f32) as u32;
+        let top = (center_y - radius).floor().max(0.0) as u32;
+        let bottom = (center_y + radius)
+            .ceil()
+            .min(height.saturating_sub(1) as f32) as u32;
+        for y in top..=bottom {
+            for x in left..=right {
+                let dx = x as f32 - center_x;
+                let dy = y as f32 - center_y;
+                if dx * dx + dy * dy <= radius_squared {
+                    mask.put_pixel(x, y, Luma([255]));
+                }
+            }
+        }
+    }
+
+    Some(mask)
+}
+
 fn generate_color_bitmap(
     params_value: &Value,
     width: u32,
@@ -1478,6 +1570,7 @@ fn generate_sub_mask_bitmap(
         "ai-subject" => {
             generate_ai_subject_bitmap(&sub_mask.parameters, width, height, scale, crop_offset)
         }
+        "ai-object" => generate_ai_object_prompt_bitmap(&sub_mask.parameters, width, height),
         "ai-foreground" => {
             generate_ai_foreground_bitmap(&sub_mask.parameters, width, height, scale, crop_offset)
         }
