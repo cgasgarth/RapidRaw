@@ -7,78 +7,108 @@
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:475b07edef2ac1b418b397fddb5c708701e7580aee6356234321ae7bea31159c",
+      "hash": "sha256:31b0216b13a960e040b4c386badf82e5a53fe32e6335b649530bf273f8bf7ad6",
       "kind": "unmasked_preview_private",
       "path": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-unmasked-preview.png",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:eda6e67e6470a1eaf27a8e979ae9666374624fd7b81e6bad7a597ccc14ea4400",
+      "hash": "sha256:5df6a55ae60a895a9db864b779975afb996ec85ed60657ed759b8a7320b71307",
       "kind": "unrefined_preview_private",
       "path": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-unrefined-preview.png",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:96c9ccc8e79f69a3a36054beefac3a69611c9c5e97d6fdefdc47f8fba348bbbf",
+      "hash": "sha256:8eb0e24739c1a6b1e71219dcca5ae8fba2f281c44b1d33cce97c67f7260b4e60",
       "kind": "refined_preview_private",
       "path": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-refined-preview.png",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:3d226b246d7eeb461d61973eb52a229236b181bc6ab9a34f245c4766efeb5910",
+      "hash": "sha256:6610f46c1ccb276d4d1543e00e08dc2057528bc7ca2c9935dfd2cd0302f6ee4c",
       "kind": "refined_export_private",
       "path": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-refined-export.tiff",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:be35a5fb6492e264ecb72d71fdc85b5c0bc4d3b43dfba2b1d5c1f88e68e71139",
+      "hash": "sha256:d35e8c4a115fee85e54a15cd845bf8e5cfcff1b309aef4f17c09eedc760091dc",
       "kind": "workflow_report_private",
       "path": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-report.json",
       "publicRepoAllowed": false
     }
   ],
   "fixtureId": "validation.layer-mask-real-raw.alaska-local-adjustment.v1",
-  "generatedAt": "2026-06-20T22:04:42.760Z",
+  "generatedAt": "2026-06-26T19:25:32.832Z",
   "issue": 2310,
   "metrics": [
     {
       "name": "maskCoverageRatio",
       "passed": true,
       "threshold": 0.01,
-      "value": 0.086027875
+      "value": 0.036920075163398694
     },
     {
       "name": "maskedChangedPixelRatio",
       "passed": true,
       "threshold": 0.01,
-      "value": 0.08261620833333333
+      "value": 0.0827945
     },
     {
       "name": "refinementChangedPixelRatio",
       "passed": true,
       "threshold": 0.0001,
-      "value": 0.17748720833333334
+      "value": 0.17845241666666667
+    },
+    {
+      "name": "boundaryFProxyImprovement",
+      "passed": true,
+      "threshold": 1e-6,
+      "value": 0.0043929472055276655
+    },
+    {
+      "name": "areaDriftRatio",
+      "passed": true,
+      "threshold": 0.05,
+      "value": 0.027208301143790845
+    },
+    {
+      "name": "haloWidthProxyReduction",
+      "passed": true,
+      "threshold": 1e-6,
+      "value": 0.08193466666666667
+    },
+    {
+      "name": "edgeColorContaminationProxyReduction",
+      "passed": true,
+      "threshold": 1e-6,
+      "value": 0.07746245833333333
     },
     {
       "name": "previewExportMeanAbsDelta",
       "passed": true,
       "threshold": 0.015,
-      "value": 0
+      "value": 0.0
     },
     {
       "name": "sourceHashUnchanged",
       "passed": true,
-      "threshold": 1,
-      "value": 1
+      "threshold": 1.0,
+      "value": 1.0
     }
   ],
   "proofClaims": {
-    "doesNotProve": ["macos_app_ui_e2e_session", "manual_layer_panel_interaction", "public_raw_fixture_distribution"],
+    "doesNotProve": [
+      "macos_app_ui_e2e_session",
+      "manual_layer_panel_interaction",
+      "annotated_hair_ground_truth_boundary_f",
+      "public_raw_fixture_distribution"
+    ],
     "proves": [
       "private_real_raw_decode",
       "layer_mask_generation",
       "masked_adjustment_changes_pixels",
       "mask_refinement_changes_pixels",
+      "image_evidence_guided_refinement",
       "refined_preview_export_parity"
     ]
   },

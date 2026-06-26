@@ -114,7 +114,12 @@ fn smoothstep(value: f32) -> f32 {
     t * t * (3.0 - 2.0 * t)
 }
 
-fn apply_mask_refinement(mask: &mut GrayImage, params_value: &Value, scale: f32) {
+fn apply_mask_refinement(
+    mask: &mut GrayImage,
+    params_value: &Value,
+    scale: f32,
+    warped_image: Option<&DynamicImage>,
+) {
     if !has_refinement_parameters(params_value) {
         return;
     }
@@ -154,6 +159,70 @@ fn apply_mask_refinement(mask: &mut GrayImage, params_value: &Value, scale: f32)
         };
         pixel[0] = (contrasted * density * 255.0).clamp(0.0, 255.0).round() as u8;
     }
+
+    if let Some(image) = warped_image {
+        apply_local_edge_guided_refinement(mask, image, (edge_contrast + smoothness) * 0.5);
+    }
+}
+
+fn apply_local_edge_guided_refinement(mask: &mut GrayImage, image: &DynamicImage, strength: f32) {
+    let strength = strength.clamp(0.0, 1.0);
+    if strength <= 0.001 || mask.width() == 0 || mask.height() == 0 {
+        return;
+    }
+
+    let source = mask.clone();
+    let image_width = image.width().max(1);
+    let image_height = image.height().max(1);
+    let x_scale = image_width as f32 / mask.width().max(1) as f32;
+    let y_scale = image_height as f32 / mask.height().max(1) as f32;
+
+    for y in 0..mask.height() {
+        for x in 0..mask.width() {
+            let alpha = source.get_pixel(x, y)[0] as f32 / 255.0;
+            if !(0.02..=0.98).contains(&alpha) {
+                continue;
+            }
+
+            let image_x = ((x as f32 + 0.5) * x_scale)
+                .floor()
+                .clamp(0.0, (image_width - 1) as f32) as u32;
+            let image_y = ((y as f32 + 0.5) * y_scale)
+                .floor()
+                .clamp(0.0, (image_height - 1) as f32) as u32;
+            let gradient = local_luma_gradient(image, image_x, image_y);
+            let edge_weight = smoothstep((gradient - 0.08) / 0.22) * strength;
+            if edge_weight <= 0.001 {
+                continue;
+            }
+
+            let tightened = if alpha >= 0.5 {
+                alpha + (1.0 - alpha) * edge_weight
+            } else {
+                alpha * (1.0 - edge_weight)
+            };
+            mask.put_pixel(
+                x,
+                y,
+                Luma([(tightened * 255.0).clamp(0.0, 255.0).round() as u8]),
+            );
+        }
+    }
+}
+
+fn local_luma_gradient(image: &DynamicImage, x: u32, y: u32) -> f32 {
+    let left = x.saturating_sub(1);
+    let right = (x + 1).min(image.width().saturating_sub(1));
+    let top = y.saturating_sub(1);
+    let bottom = (y + 1).min(image.height().saturating_sub(1));
+    let dx = (pixel_luma(image, right, y) - pixel_luma(image, left, y)).abs();
+    let dy = (pixel_luma(image, x, bottom) - pixel_luma(image, x, top)).abs();
+    dx.max(dy) / 255.0
+}
+
+fn pixel_luma(image: &DynamicImage, x: u32, y: u32) -> f32 {
+    let pixel = image.get_pixel(x, y);
+    0.299 * pixel[0] as f32 + 0.587 * pixel[1] as f32 + 0.114 * pixel[2] as f32
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -239,9 +308,11 @@ fn mask_overlay_pixel(intensity: u8, settings: MaskOverlaySettings) -> Rgba<u8> 
 
 impl MaskDefinition {
     pub fn requires_warped_image(&self) -> bool {
-        self.sub_masks
-            .iter()
-            .any(|sm| sm.mask_type == "color" || sm.mask_type == "luminance")
+        self.sub_masks.iter().any(|sm| {
+            sm.mask_type == "color"
+                || sm.mask_type == "luminance"
+                || has_refinement_parameters(&sm.parameters)
+        })
     }
 }
 
@@ -1586,7 +1657,7 @@ fn generate_sub_mask_bitmap(
     };
 
     if let Some(mask) = bitmap.as_mut() {
-        apply_mask_refinement(mask, &sub_mask.parameters, scale);
+        apply_mask_refinement(mask, &sub_mask.parameters, scale, warped_image);
     }
 
     bitmap
@@ -1753,6 +1824,11 @@ pub fn get_cached_or_generate_mask(
     scale.to_bits().hash(&mut hasher);
     crop_offset.0.to_bits().hash(&mut hasher);
     crop_offset.1.to_bits().hash(&mut hasher);
+    if def.requires_warped_image() {
+        serde_json::to_string(adjustments)
+            .unwrap_or_default()
+            .hash(&mut hasher);
+    }
 
     let key = hasher.finish();
 
@@ -1859,7 +1935,7 @@ mod tests {
             "smoothness": 0
         });
 
-        apply_mask_refinement(&mut mask, &params, 1.0);
+        apply_mask_refinement(&mut mask, &params, 1.0, None);
 
         assert_eq!(mask.get_pixel(0, 0)[0], 64);
     }
@@ -1876,11 +1952,36 @@ mod tests {
             "smoothness": 0
         });
 
-        apply_mask_refinement(&mut mask, &params, 1.0);
+        apply_mask_refinement(&mut mask, &params, 1.0, None);
 
         assert_eq!(mask.get_pixel(0, 0)[0], 255);
         assert_eq!(mask.get_pixel(1, 0)[0], 255);
         assert_eq!(mask.get_pixel(2, 0)[0], 255);
+    }
+
+    #[test]
+    fn apply_mask_refinement_uses_local_image_edges_for_transition_pixels() {
+        let mut mask = GrayImage::from_pixel(5, 1, Luma([128]));
+        let mut edge_image = RgbaImage::new(5, 1);
+        for x in 0..5 {
+            let value = if x < 2 { 24 } else { 232 };
+            edge_image.put_pixel(x, 0, Rgba([value, value, value, 255]));
+        }
+        let image = DynamicImage::ImageRgba8(edge_image);
+        let params = serde_json::json!({
+            "density": 1,
+            "edgeContrast": 0.8,
+            "edgeShiftPx": 0,
+            "featherPx": 0,
+            "smoothness": 0.8
+        });
+
+        apply_mask_refinement(&mut mask, &params, 1.0, Some(&image));
+
+        assert!(
+            mask.get_pixel(2, 0)[0] > mask.get_pixel(0, 0)[0],
+            "image-edge evidence should tighten the transition at the high-contrast boundary"
+        );
     }
 
     #[test]

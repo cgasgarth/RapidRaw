@@ -167,6 +167,19 @@ fn run_private_layer_mask_real_raw_proof(
     )?;
 
     let mask_coverage_ratio = mask_coverage_ratio(&refined_adjustments, &base_image)?;
+    let unrefined_mask = mask_bitmap(&unrefined_adjustments, &base_image)?;
+    let refined_mask = mask_bitmap(&refined_adjustments, &base_image)?;
+    let unrefined_transition_ratio = transition_pixel_ratio(&unrefined_mask);
+    let refined_transition_ratio = transition_pixel_ratio(&refined_mask);
+    let area_drift_ratio = (mask_alpha_coverage_ratio(&refined_mask)
+        - mask_alpha_coverage_ratio(&unrefined_mask))
+    .abs();
+    let boundary_alignment_gain = boundary_edge_alignment_score(&refined_mask, &base_image)
+        - boundary_edge_alignment_score(&unrefined_mask, &base_image);
+    let halo_width_proxy_reduction = unrefined_transition_ratio - refined_transition_ratio;
+    let edge_color_contamination_proxy_reduction =
+        low_gradient_transition_ratio(&unrefined_mask, &base_image)
+            - low_gradient_transition_ratio(&refined_mask, &base_image);
     let masked_changed_pixel_ratio = changed_pixel_ratio(&unmasked_preview, &refined_preview);
     let refinement_changed_pixel_ratio = changed_pixel_ratio(&unrefined_preview, &refined_preview);
     let preview_export_mean_abs_delta = mean_abs_delta(&refined_preview, &refined_export);
@@ -237,6 +250,30 @@ fn run_private_layer_mask_real_raw_proof(
             refinement_changed_pixel_ratio,
             0.0001,
             refinement_changed_pixel_ratio > 0.0001,
+        ),
+        metric(
+            "boundaryFProxyImprovement",
+            boundary_alignment_gain,
+            0.000001,
+            boundary_alignment_gain > 0.000001,
+        ),
+        metric(
+            "areaDriftRatio",
+            area_drift_ratio,
+            0.05,
+            area_drift_ratio <= 0.05,
+        ),
+        metric(
+            "haloWidthProxyReduction",
+            halo_width_proxy_reduction,
+            0.000001,
+            halo_width_proxy_reduction > 0.000001,
+        ),
+        metric(
+            "edgeColorContaminationProxyReduction",
+            edge_color_contamination_proxy_reduction,
+            0.000001,
+            edge_color_contamination_proxy_reduction > 0.000001,
         ),
         metric(
             "previewExportMeanAbsDelta",
@@ -397,6 +434,7 @@ fn proof_claims() -> LayerMaskProofClaims {
         does_not_prove: vec![
             "macos_app_ui_e2e_session".to_string(),
             "manual_layer_panel_interaction".to_string(),
+            "annotated_hair_ground_truth_boundary_f".to_string(),
             "public_raw_fixture_distribution".to_string(),
         ],
         proves: vec![
@@ -404,24 +442,90 @@ fn proof_claims() -> LayerMaskProofClaims {
             "layer_mask_generation".to_string(),
             "masked_adjustment_changes_pixels".to_string(),
             "mask_refinement_changes_pixels".to_string(),
+            "image_evidence_guided_refinement".to_string(),
             "refined_preview_export_parity".to_string(),
         ],
     }
 }
 
 fn mask_coverage_ratio(adjustments: &Value, base_image: &DynamicImage) -> Result<f64, String> {
+    Ok(mask_alpha_coverage_ratio(&mask_bitmap(
+        adjustments,
+        base_image,
+    )?))
+}
+
+fn mask_bitmap(adjustments: &Value, base_image: &DynamicImage) -> Result<GrayImage, String> {
     let masks: Vec<MaskDefinition> =
         serde_json::from_value(adjustments["masks"].clone()).map_err(|error| error.to_string())?;
     let (width, height) = base_image.dimensions();
-    let nonzero_pixels: usize = masks
-        .iter()
-        .filter_map(|mask| generate_mask_bitmap(mask, width, height, 1.0, (0.0, 0.0), None))
-        .map(|bitmap: GrayImage| bitmap.pixels().filter(|pixel| pixel[0] > 0).count())
-        .sum();
-    let total_pixels = (width as usize)
-        .checked_mul(height as usize)
-        .ok_or_else(|| "mask dimensions overflow".to_string())?;
-    Ok(nonzero_pixels as f64 / total_pixels as f64)
+    let mut combined = GrayImage::new(width, height);
+    for bitmap in masks.iter().filter_map(|mask| {
+        generate_mask_bitmap(mask, width, height, 1.0, (0.0, 0.0), Some(base_image))
+    }) {
+        for (x, y, pixel) in bitmap.enumerate_pixels() {
+            let current = combined.get_pixel(x, y)[0];
+            combined.put_pixel(x, y, image::Luma([current.max(pixel[0])]));
+        }
+    }
+    Ok(combined)
+}
+
+fn mask_alpha_coverage_ratio(mask: &GrayImage) -> f64 {
+    let alpha_sum: u64 = mask.pixels().map(|pixel| pixel[0] as u64).sum();
+    alpha_sum as f64 / (mask_pixel_count(mask) as f64 * 255.0)
+}
+
+fn transition_pixel_ratio(mask: &GrayImage) -> f64 {
+    let transition_pixels = mask
+        .pixels()
+        .filter(|pixel| (24..=230).contains(&pixel[0]))
+        .count();
+    transition_pixels as f64 / mask_pixel_count(mask) as f64
+}
+
+fn low_gradient_transition_ratio(mask: &GrayImage, image: &DynamicImage) -> f64 {
+    let mut count = 0usize;
+    for (x, y, pixel) in mask.enumerate_pixels() {
+        if (24..=230).contains(&pixel[0]) && luma_gradient(image, x, y) < 0.08 {
+            count += 1;
+        }
+    }
+    count as f64 / mask_pixel_count(mask) as f64
+}
+
+fn boundary_edge_alignment_score(mask: &GrayImage, image: &DynamicImage) -> f64 {
+    let mut total = 0.0;
+    let mut count = 0usize;
+    for (x, y, pixel) in mask.enumerate_pixels() {
+        if (24..=230).contains(&pixel[0]) {
+            total += luma_gradient(image, x, y) as f64;
+            count += 1;
+        }
+    }
+    total / count.max(1) as f64
+}
+
+fn luma_gradient(image: &DynamicImage, x: u32, y: u32) -> f32 {
+    let left = x.saturating_sub(1);
+    let right = (x + 1).min(image.width().saturating_sub(1));
+    let top = y.saturating_sub(1);
+    let bottom = (y + 1).min(image.height().saturating_sub(1));
+    let dx = (luma(image, right, y) - luma(image, left, y)).abs();
+    let dy = (luma(image, x, bottom) - luma(image, x, top)).abs();
+    dx.max(dy) / 255.0
+}
+
+fn luma(image: &DynamicImage, x: u32, y: u32) -> f32 {
+    let pixel = image.get_pixel(x, y);
+    0.299 * pixel[0] as f32 + 0.587 * pixel[1] as f32 + 0.114 * pixel[2] as f32
+}
+
+fn mask_pixel_count(mask: &GrayImage) -> usize {
+    (mask.width() as usize)
+        .checked_mul(mask.height() as usize)
+        .unwrap_or(0)
+        .max(1)
 }
 
 fn write_image(image: &DynamicImage, path: &Path, format: ImageFormat) -> Result<(), String> {

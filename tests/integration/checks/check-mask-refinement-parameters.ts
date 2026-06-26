@@ -84,7 +84,7 @@ const requiredRustFragments = [
   'feather_px',
   'grayscale_dilate',
   'grayscale_erode',
-  'apply_mask_refinement(mask, &sub_mask.parameters, scale)',
+  'apply_mask_refinement(mask, &sub_mask.parameters, scale, warped_image)',
 ];
 
 for (const fragment of requiredRustFragments) {
