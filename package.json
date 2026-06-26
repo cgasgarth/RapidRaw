@@ -640,6 +640,7 @@
     "check:agent-core-edit-command-bundle": "bun tests/integration/checks/check-agent-core-edit-command-bundle.ts",
     "check:agent-geometry-apply": "bun tests/integration/checks/check-agent-geometry-apply.ts",
     "check:agent-curve-levels-apply": "bun tests/integration/checks/check-agent-curve-levels-apply.ts",
+    "check:agent-color-apply": "bun tests/integration/checks/check-agent-color-apply.ts",
     "check:agent-bounded-planner-loop": "bun tests/integration/checks/check-agent-bounded-planner-loop.ts",
     "check:agent-readonly-tools": "bun tests/integration/checks/check-agent-readonly-tools.ts",
     "check:agent-adjustments-apply": "bun tests/integration/checks/check-agent-adjustments-apply.ts",
