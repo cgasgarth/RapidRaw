@@ -89,5 +89,14 @@ if (result.plannedSteps.length !== 2 || result.plannedSteps[1]?.kind !== 'select
 if (result.inspected.activeImagePath !== selectedPath || result.inspected.histogramSummary.length === 0) {
   throw new Error('Agent planner loop did not inspect bounded RAW context.');
 }
+if (
+  result.inspected.initialPreview.mediaType !== 'image/jpeg' ||
+  result.inspected.initialPreview.previewRef === 'blob:rawengine-original-3159'
+) {
+  throw new Error('Agent planner loop did not attach the safe initial preview context.');
+}
+if (!result.transcript[0]?.detail.includes(result.inspected.initialPreview.id)) {
+  throw new Error('Agent planner loop transcript did not prove the initial preview was part of inspection.');
+}
 
 console.log('agent bounded planner loop ok (inspect-plan-dry-run-observe)');

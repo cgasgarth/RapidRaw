@@ -81,7 +81,10 @@ export const runAgentBoundedEditPlannerLoop = async ({
 
   const transcript: AgentPlannerLoopResult['transcript'] = [];
   const inspected = buildAgentImageContextSnapshot();
-  transcript.push({ detail: `inspected ${inspected.activeImagePath}`, stage: 'inspect' });
+  transcript.push({
+    detail: `inspected ${inspected.activeImagePath} with ${inspected.initialPreview.id}`,
+    stage: 'inspect',
+  });
 
   const plannedSteps = classifyPrompt(prompt);
   transcript.push({ detail: `planned ${plannedSteps.length} command steps`, stage: 'plan' });
