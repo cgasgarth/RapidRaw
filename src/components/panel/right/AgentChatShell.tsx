@@ -7,6 +7,11 @@ import { buildAgentAppServerToolReadinessSummary } from '../../../utils/agentApp
 import { runAgentBoundedEditPlannerLoop } from '../../../utils/agentBoundedEditPlannerLoop';
 import { planAgentEditRecipe } from '../../../utils/agentEditRecipePlanner';
 import { applyBasicToneToLiveEditor } from '../../../utils/agentLiveBasicTone';
+import {
+  evaluateAgentSafetyPolicy,
+  inferAgentSafetyOperationKind,
+  type AgentSafetyPolicyDecision,
+} from '../../../utils/agentSafetyPolicy';
 
 import type {
   AgentArtifactReview,
@@ -96,7 +101,15 @@ const longEditProgressStageStyles = {
 } satisfies Record<AgentLongEditProgress['stages'][number]['state'], string>;
 
 type LocalReviewDecision = 'approved' | 'pending' | 'rejected';
-type LivePromptStatus = 'applied' | 'applying' | 'dry_run_ready' | 'failed' | 'idle' | 'rolled_back';
+type LivePromptStatus =
+  | 'applied'
+  | 'applying'
+  | 'approval_required'
+  | 'blocked'
+  | 'dry_run_ready'
+  | 'failed'
+  | 'idle'
+  | 'rolled_back';
 
 interface LivePromptResult {
   appliedGraphRevision?: string;
@@ -108,6 +121,7 @@ interface LivePromptResult {
   previewAfterHash?: string;
   previewBeforeHash?: string;
   recipeName?: string;
+  safetyDecision?: AgentSafetyPolicyDecision;
   sampledPixelCount?: number;
   status: LivePromptStatus;
   summary?: string;
@@ -201,6 +215,12 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
     case 'applying':
       statusLabel = t('editor.ai.agent.composer.status.applying');
       break;
+    case 'approval_required':
+      statusLabel = t('editor.ai.agent.composer.status.approval_required');
+      break;
+    case 'blocked':
+      statusLabel = t('editor.ai.agent.composer.status.blocked');
+      break;
     case 'dry_run_ready':
       statusLabel = t('editor.ai.agent.composer.status.dry_run_ready');
       break;
@@ -222,6 +242,10 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
     try {
       onSessionEvent?.(createLiveSessionEvent('user', requestedPrompt, 'prompt'));
       const plan = planAgentEditRecipe(requestedPrompt);
+      const safetyDecision = evaluateAgentSafetyPolicy({
+        operationKind: inferAgentSafetyOperationKind(requestedPrompt),
+        prompt: requestedPrompt,
+      });
       const preview = await runAgentBoundedEditPlannerLoop({
         maxSteps: 5,
         operationId: `agent_chat_${Date.now()}`,
@@ -233,7 +257,12 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
         previewAfterHash: preview.dryRunAfterHash,
         previewBeforeHash: preview.dryRunBeforeHash,
         recipeName: plan.recipeName,
-        status: 'dry_run_ready',
+        safetyDecision,
+        status: safetyDecision.blocked
+          ? 'blocked'
+          : safetyDecision.approvalRequired
+            ? 'approval_required'
+            : 'dry_run_ready',
         summary: plan.summary,
       } satisfies LivePromptResult;
       setResult(nextResult);
@@ -261,6 +290,16 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
         ),
       );
     }
+  };
+
+  const approveSafetyGate = () => {
+    if (result.status !== 'approval_required') return;
+    const nextResult = { ...result, status: 'dry_run_ready' } satisfies LivePromptResult;
+    setResult(nextResult);
+    onResultChange?.(nextResult);
+    onSessionEvent?.(
+      createLiveSessionEvent('assistant', t('editor.ai.agent.composer.policy.approved'), 'approval-granted'),
+    );
   };
 
   const applyDryRun = async () => {
@@ -346,6 +385,8 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
     <form
       className="pointer-events-auto relative z-10 space-y-3 rounded-md border border-sky-500/20 bg-sky-500/5 p-3"
       data-live-prompt-status={result.status}
+      data-safety-decision={result.safetyDecision?.decisionId ?? ''}
+      data-safety-severity={result.safetyDecision?.severity ?? ''}
       data-session-input-state={isContextReady ? 'ready' : 'blocked'}
       data-preview-refresh-policy="native-renderer-handoff"
       data-testid="agent-live-prompt-composer"
@@ -412,6 +453,19 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
           {result.status === 'applying' ? t('editor.ai.agent.composer.applying') : t('editor.ai.agent.composer.apply')}
         </button>
         <button
+          className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          data-testid="agent-live-prompt-approve-policy"
+          disabled={result.status !== 'approval_required'}
+          onMouseDown={(event) => {
+            event.preventDefault();
+            approveSafetyGate();
+          }}
+          onClick={approveSafetyGate}
+          type="button"
+        >
+          {t('editor.ai.agent.composer.policy.approve')}
+        </button>
+        <button
           className="inline-flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
           data-testid="agent-live-prompt-rollback"
           disabled={!canRollback}
@@ -445,6 +499,18 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
           {result.recipeName ? <span className="font-mono text-text-secondary">{result.recipeName}</span> : null}
         </div>
         {result.summary ? <p className="mt-1 leading-4 text-text-secondary">{result.summary}</p> : null}
+        {result.safetyDecision ? (
+          <div
+            className="mt-2 rounded border border-amber-500/25 bg-amber-500/10 p-2 text-amber-100"
+            data-approval-required={result.safetyDecision.approvalRequired ? 'true' : 'false'}
+            data-blocked={result.safetyDecision.blocked ? 'true' : 'false'}
+            data-policy-id={result.safetyDecision.decisionId}
+            data-testid="agent-live-prompt-safety-policy"
+          >
+            <span className="font-semibold">{t('editor.ai.agent.composer.policy.title')}</span>
+            <p className="mt-1 leading-4">{result.safetyDecision.reason}</p>
+          </div>
+        ) : null}
         {result.previewAfterHash ? (
           <div className="mt-1 font-mono text-[10px] text-text-secondary">
             {result.previewBeforeHash} → {result.previewAfterHash}
