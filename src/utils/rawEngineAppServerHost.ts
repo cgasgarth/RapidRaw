@@ -20,6 +20,13 @@ import {
   applyAgentCurveLevels,
 } from './agentCurveLevelsApplyTool';
 import {
+  AGENT_DETAIL_EFFECTS_APPLY_INPUT_SCHEMA_NAME,
+  AGENT_DETAIL_EFFECTS_APPLY_OUTPUT_SCHEMA_NAME,
+  AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
+  agentDetailEffectsApplyRequestSchema,
+  applyAgentDetailEffects,
+} from './agentDetailEffectsApplyTool';
+import {
   AGENT_EXPORT_PROOF_INPUT_SCHEMA_NAME,
   AGENT_EXPORT_PROOF_OUTPUT_SCHEMA_NAME,
   AGENT_EXPORT_PROOF_TOOL_NAME,
@@ -559,6 +566,15 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       toolNames: [AGENT_CURVE_LEVELS_APPLY_TOOL_NAME],
     }),
     buildRouteCatalogEntry({
+      commandName: AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_DETAIL_EFFECTS_APPLY_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.ApplyDryRunPlan],
+      outputSchemaNames: [AGENT_DETAIL_EFFECTS_APPLY_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-detail-effects-apply'],
+      toolNames: [AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
       commandName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
       family: 'agent',
       inputSchemaNames: [AGENT_HISTORY_ROLLBACK_INPUT_SCHEMA_NAME],
@@ -809,6 +825,9 @@ const dispatchAgentAppServerTool = async (
       break;
     case AGENT_CURVE_LEVELS_APPLY_TOOL_NAME:
       result = applyAgentCurveLevels(agentCurveLevelsApplyRequestSchema.parse(request.arguments));
+      break;
+    case AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME:
+      result = applyAgentDetailEffects(agentDetailEffectsApplyRequestSchema.parse(request.arguments));
       break;
     case AGENT_EXPORT_PROOF_TOOL_NAME:
       result = buildAgentExportProof(agentExportProofRequestSchema.parse(request.arguments));

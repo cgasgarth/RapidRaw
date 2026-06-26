@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ActiveChannel } from './adjustments';
 import { buildAgentColorRecipeHashInput } from './agentColorRecipe';
 import { buildAgentCurveLevelsRecipeHashInput } from './agentCurveLevelsRecipe';
+import { buildAgentDetailEffectsRecipeHashInput } from './agentDetailEffectsRecipe';
 import { buildAgentGeometryRecipeHashInput } from './agentGeometryRecipe';
 import {
   AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX,
@@ -141,8 +142,9 @@ export const buildAgentImageContextSnapshot = (): AgentImageContextSnapshot => {
     JSON.stringify({
       adjustments: summarizeAdjustment(editor.adjustments),
       color: buildAgentColorRecipeHashInput(editor.adjustments),
-      geometry: buildAgentGeometryRecipeHashInput(editor.adjustments),
       curveLevels: buildAgentCurveLevelsRecipeHashInput(editor.adjustments),
+      detailEffects: buildAgentDetailEffectsRecipeHashInput(editor.adjustments),
+      geometry: buildAgentGeometryRecipeHashInput(editor.adjustments),
       graphRevision,
       masks: editor.adjustments.masks.map((mask) => ({ id: mask.id, name: mask.name, visible: mask.visible })),
     }),
