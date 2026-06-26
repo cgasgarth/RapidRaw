@@ -132,6 +132,7 @@ export const exportReceiptPayloadSchema = z
           sourcePath: z.string().trim().min(1),
           sourceIccProfileHash: z.string().trim().min(1).optional().nullable(),
           sourcePrecisionPath: z.string().trim().min(1).optional().nullable(),
+          transformPolicyFingerprint: z.string().trim().min(1).optional().nullable(),
           transformApplied: z.boolean().optional().nullable(),
         })
         .strict(),

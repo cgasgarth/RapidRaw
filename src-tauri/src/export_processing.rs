@@ -73,6 +73,7 @@ struct ExportReceiptOutput {
     source_path: String,
     source_icc_profile_hash: Option<String>,
     source_precision_path: Option<String>,
+    transform_policy_fingerprint: Option<String>,
     transform_applied: Option<bool>,
 }
 
@@ -1994,6 +1995,9 @@ fn export_receipt_output(
         source_precision_path: metadata
             .as_ref()
             .map(|metadata| metadata.source_precision_path.clone()),
+        transform_policy_fingerprint: metadata
+            .as_ref()
+            .map(|metadata| metadata.transform_policy_fingerprint.clone()),
         transform_applied: metadata.map(|metadata| metadata.transform_applied),
     })
 }
@@ -2016,6 +2020,7 @@ pub(crate) struct ExportReceiptMetadata {
     effective_rendering_intent: String,
     source_icc_profile_hash: Option<String>,
     source_precision_path: String,
+    transform_policy_fingerprint: String,
     transform_applied: bool,
 }
 
@@ -2043,6 +2048,8 @@ fn export_receipt_metadata(
         export_color_profile_receipt_label(&applied.plan.effective_color_profile);
     let rendering_intent_label =
         export_rendering_intent_receipt_label(&applied.plan.effective_rendering_intent);
+    let transform_policy_fingerprint =
+        export_color_transform_fingerprint(&applied, source_icc_profile_hash.as_deref());
 
     Some(ExportReceiptMetadata {
         bit_depth: applied.bit_depth,
@@ -2065,8 +2072,50 @@ fn export_receipt_metadata(
         effective_rendering_intent: rendering_intent_label,
         source_icc_profile_hash,
         source_precision_path: applied.source_precision_path,
+        transform_policy_fingerprint,
         transform_applied: applied.plan.transform_applied,
     })
+}
+
+fn export_color_transform_fingerprint(
+    applied: &AppliedColorPolicy,
+    source_icc_profile_hash: Option<&str>,
+) -> String {
+    let plan = &applied.plan;
+    let mut hasher = Sha256::new();
+
+    let parts = vec![
+        applied.policy_version.clone(),
+        applied.source_precision_path.clone(),
+        plan.requested.output_format.clone(),
+        export_color_profile_receipt_label(&plan.requested.color_profile),
+        export_rendering_intent_receipt_label(&plan.requested.rendering_intent),
+        export_color_profile_receipt_label(&plan.effective_color_profile),
+        export_rendering_intent_receipt_label(&plan.effective_rendering_intent),
+        export_color_engine_receipt_label(&plan.engine),
+        export_black_point_compensation_receipt_label(plan),
+        plan.status.clone(),
+        if plan.icc_embedded {
+            "icc_embedded".to_string()
+        } else {
+            "icc_not_embedded".to_string()
+        },
+        if plan.transform_applied {
+            "transform_applied".to_string()
+        } else {
+            "transform_not_applied".to_string()
+        },
+        source_icc_profile_hash
+            .unwrap_or("source_icc:none")
+            .to_string(),
+    ];
+
+    for part in parts {
+        hasher.update(part.as_bytes());
+        hasher.update([0]);
+    }
+
+    format!("sha256:{}", hex::encode(hasher.finalize()))
 }
 
 fn export_source_precision_receipt_label(image: &DynamicImage) -> String {
@@ -2835,6 +2884,61 @@ mod tests {
     }
 
     #[test]
+    fn export_receipt_fingerprint_tracks_resolved_transform_policy() {
+        let source_precision = synthetic_source_precision_path();
+        let relative = export_receipt_metadata(
+            "jpg",
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+            false,
+            &source_precision,
+            None,
+        )
+        .expect("Display P3 JPEG metadata should resolve");
+        let relative_repeat = export_receipt_metadata(
+            "jpg",
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+            false,
+            &source_precision,
+            None,
+        )
+        .expect("Display P3 JPEG metadata should resolve repeatedly");
+        let relative_bpc = export_receipt_metadata(
+            "jpg",
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+            true,
+            &source_precision,
+            None,
+        )
+        .expect("Display P3 JPEG BPC metadata should resolve");
+        let srgb_perceptual = export_receipt_metadata(
+            "jpg",
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::Perceptual,
+            false,
+            &source_precision,
+            None,
+        )
+        .expect("sRGB perceptual metadata should resolve");
+
+        assert_eq!(
+            relative.transform_policy_fingerprint,
+            relative_repeat.transform_policy_fingerprint
+        );
+        assert!(relative.transform_policy_fingerprint.starts_with("sha256:"));
+        assert_ne!(
+            relative.transform_policy_fingerprint, relative_bpc.transform_policy_fingerprint,
+            "BPC changes must invalidate preview/export transform identity"
+        );
+        assert_ne!(
+            relative.transform_policy_fingerprint, srgb_perceptual.transform_policy_fingerprint,
+            "profile/intent changes must invalidate preview/export transform identity"
+        );
+    }
+
+    #[test]
     fn tiff_relative_bpc_resolves_to_littlecms_policy() {
         let plan = resolve_export_color_transform_plan(
             "tiff",
@@ -3435,6 +3539,7 @@ mod tests {
             metadata.source_icc_profile_hash.as_deref(),
             Some(source_icc_hash.as_str())
         );
+        assert!(metadata.transform_policy_fingerprint.starts_with("sha256:"));
         assert!(!metadata.transform_applied);
     }
 
