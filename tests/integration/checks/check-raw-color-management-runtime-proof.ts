@@ -11,6 +11,7 @@ const REPORT_PATH = 'docs/validation/raw-color-management-runtime-proof-2026-06-
 const UPDATE_REPORT = process.argv.includes('--update');
 const VALIDATE_ONLY = process.argv.includes('--validate-only');
 const RUN_REPORTS_PATH = valueAfter('--run-reports');
+const REQUEST_OVERRIDE_PATH = valueAfter('--request') ?? REQUEST_PATH;
 
 if (RUN_REPORTS_PATH === undefined) {
   console.error(
@@ -38,8 +39,8 @@ const colorPipelineRequestSchema = z
       .object({
         bitDepth: z.literal(16),
         embedIcc: z.literal(true),
-        intent: z.literal('relative_colorimetric'),
-        outputProfile: z.literal('display_p3'),
+        intent: z.enum(['perceptual', 'relative_colorimetric']),
+        outputProfile: z.enum(['display_p3', 'srgb']),
         viewTransform: z.literal('rawengine_agx_v1'),
       })
       .strict(),
@@ -84,13 +85,13 @@ const proofReportSchema = z
             colorManagement: z.object({
               conformance: z.literal('partial'),
               observedBitDepth: z.literal(16),
-              observedExportColorEncoding: z.literal('display_p3_rgb16_tiff'),
+              observedExportColorEncoding: z.enum(['display_p3_rgb16_tiff', 'srgb_rgb16_tiff']),
               observedIccProfileEmbedded: z.literal(true),
               observedOperationDomain: z.literal('linear_srgb_d65_observed'),
-              observedOutputProfile: z.literal('display_p3'),
+              observedOutputProfile: z.enum(['display_p3', 'srgb']),
               proofLevel: z.literal('private_raw_runtime_color_management_metadata'),
               requestedOperationDomain: z.literal('acescg_linear_v1'),
-              requestedOutputProfile: z.literal('display_p3'),
+              requestedOutputProfile: z.enum(['display_p3', 'srgb']),
               requestedRenderBitDepth: z.literal(16),
               requestedViewTransform: z.literal('rawengine_agx_v1'),
             }),
@@ -117,14 +118,14 @@ const proofReportSchema = z
       )
       .min(1),
     issue: z.literal(2308),
-    requestPath: z.literal(REQUEST_PATH),
+    requestPath: z.literal(REQUEST_OVERRIDE_PATH),
     runReportsPath: z.literal(RUN_REPORTS_PATH),
     schemaVersion: z.literal(1),
     validationMode: z.literal('private_raw_color_management_runtime_metadata'),
   })
   .strict();
 
-const request = rawProofRequestSchema.parse(JSON.parse(await readFile(REQUEST_PATH, 'utf8')));
+const request = rawProofRequestSchema.parse(JSON.parse(await readFile(REQUEST_OVERRIDE_PATH, 'utf8')));
 const reportCollection = parseRawOpenEditExportRunReportCollection(
   JSON.parse(await readFile(RUN_REPORTS_PATH, 'utf8')),
 );
@@ -176,6 +177,16 @@ for (const runReport of reportCollection.reports) {
     request.editCommand.colorPipeline.renderTarget.outputProfile,
   );
   compare(
+    'observed output profile',
+    colorManagement.observedColorPipeline.outputProfile,
+    request.editCommand.colorPipeline.renderTarget.outputProfile,
+  );
+  compare(
+    'observed rendering intent',
+    colorManagement.requestedColorPipeline.renderTarget.intent,
+    request.editCommand.colorPipeline.renderTarget.intent,
+  );
+  compare(
     'view transform',
     colorManagement.observedColorPipeline.viewTransform,
     request.editCommand.colorPipeline.renderTarget.viewTransform,
@@ -198,6 +209,12 @@ for (const runReport of reportCollection.reports) {
   }
   if (sourceHashUnchanged !== 1) {
     failures.push(`${runReport.fixtureId}: sourceHashUnchanged must be 1.`);
+  }
+  if (
+    request.editCommand.colorPipeline.renderTarget.intent === 'perceptual' &&
+    colorManagement.observedColorPipeline.gamutMapping !== 'rawengine.gamut.srgb-oklab-chroma-reduce.v1'
+  ) {
+    failures.push(`${runReport.fixtureId}: perceptual sRGB proof must report the active gamut mapper.`);
   }
   if (exportArtifact === undefined) failures.push(`${runReport.fixtureId}: missing export_after_private artifact.`);
   if (workflowArtifact === undefined)
@@ -248,7 +265,7 @@ if (cases.length === 0) failures.push(`${request.fixtureId}: missing matching pr
 const proofReport = proofReportSchema.parse({
   cases,
   issue: 2308,
-  requestPath: REQUEST_PATH,
+  requestPath: REQUEST_OVERRIDE_PATH,
   runReportsPath: RUN_REPORTS_PATH,
   schemaVersion: 1,
   validationMode: 'private_raw_color_management_runtime_metadata',

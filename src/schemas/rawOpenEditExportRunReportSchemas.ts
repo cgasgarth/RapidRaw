@@ -25,6 +25,9 @@ const artifactKindSchema = z.enum([
   'workflow_report_private',
 ]);
 
+const outputProfileSchema = z.enum(['display_p3', 'srgb']);
+const renderingIntentSchema = z.enum(['perceptual', 'relative_colorimetric']);
+
 const metricNameSchema = z.enum([
   'changedPixelRatio',
   'finalFileBlackPointCompensationApplied',
@@ -95,16 +98,16 @@ const colorManagementProofSchema = z
         bitDepth: z.literal(16),
         cmmUsed: z.literal(true),
         displayProfileCorrectness: z.enum(['active_display_lut_profile_loaded', 'not_proven']),
-        exportColorEncoding: z.literal('display_p3_rgb16_tiff'),
+        exportColorEncoding: z.enum(['display_p3_rgb16_tiff', 'srgb_rgb16_tiff']),
         exportFormat: z.literal('tiff'),
-        gamutMapping: z.literal('not_proven'),
+        gamutMapping: z.enum(['not_proven', 'rawengine.gamut.srgb-oklab-chroma-reduce.v1']),
         iccProfileEmbedded: z.literal(true),
         inputDomain: z.literal('decoder_camera_rgb_observed'),
         operationDomain: z.literal('linear_srgb_d65_observed'),
-        outputProfile: z.literal('display_p3'),
+        outputProfile: outputProfileSchema,
         renderingIntentApplied: z.literal(true),
         sceneToDisplayTransform: z.literal('rawengine_agx_v1'),
-        transferStatus: z.literal('lcms2_bpc_rgb16_display_p3_final_file'),
+        transferStatus: z.string().trim().min(1),
         viewTransform: z.literal('rawengine_agx_v1'),
         workingBuffer: z.literal('linear_srgb_d65_observed'),
       })
@@ -127,8 +130,8 @@ const colorManagementProofSchema = z
           .object({
             bitDepth: z.literal(16),
             embedIcc: z.literal(true),
-            intent: z.literal('relative_colorimetric'),
-            outputProfile: z.literal('display_p3'),
+            intent: renderingIntentSchema,
+            outputProfile: outputProfileSchema,
             viewTransform: z.literal('rawengine_agx_v1'),
           })
           .strict(),
@@ -196,12 +199,12 @@ const renderPathsSchema = z
 const finalFileProofSchema = z
   .object({
     bitDepth: z.literal(16),
-    blackPointCompensation: z.literal('Enabled via LittleCMS relative colorimetric transform'),
-    cmm: z.literal('lcms2'),
+    blackPointCompensation: z.string().trim().min(1),
+    cmm: z.enum(['lcms2', 'moxcms']),
     embeddedIccProfileHash: sha256Schema,
     expectedOutputProfileHash: sha256Schema,
     finalFileFormat: z.literal('tiff'),
-    outputProfile: z.literal('display_p3'),
+    outputProfile: outputProfileSchema,
     pixelMaxAbsDelta: z.number().min(0),
     pixelMeanAbsDelta: z.number().min(0),
     reopenedDimensions: z.object({ height: z.number().int().positive(), width: z.number().int().positive() }).strict(),

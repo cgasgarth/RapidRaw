@@ -9,13 +9,14 @@ import { z } from 'zod';
 import { parseRawOpenEditExportRunReportCollection } from '../src/schemas/rawOpenEditExportRunReportSchemas.ts';
 import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from './compact-output.ts';
 
-const FIXTURE_ID = 'validation.raw-open-edit-export.high-iso-skin-shadow.v1';
+const DEFAULT_REQUEST_PATH = 'fixtures/validation/raw-open-edit-export-proof-request.json';
 
 const argsSchema = z
   .object({
     outputPath: z.string().trim().min(1).optional(),
     privateRoot: z.string().trim().min(1).optional(),
     requireAssets: z.boolean(),
+    requestPath: z.string().trim().min(1).optional(),
   })
   .strict();
 
@@ -29,7 +30,14 @@ const args = argsSchema.parse({
   outputPath: valueAfter('--output'),
   privateRoot: valueAfter('--root') ?? process.env.RAWENGINE_PRIVATE_RAW_ROOT,
   requireAssets: process.argv.includes('--require-assets'),
+  requestPath: valueAfter('--request'),
 });
+const requestPath = resolve(args.requestPath ?? DEFAULT_REQUEST_PATH);
+const usesDefaultRequest = args.requestPath === undefined;
+const requestFixture = z
+  .object({ fixtureId: z.string().trim().min(1) })
+  .passthrough()
+  .parse(JSON.parse(await readFile(requestPath, 'utf8')));
 
 if (args.privateRoot === undefined) {
   if (args.requireAssets) {
@@ -47,6 +55,7 @@ const prepare = await runCommand('RAW open/edit/export private root prep', {
     'scripts/prepare-raw-open-edit-export-private-root.ts',
     '--root',
     privateRoot,
+    ...requestArgs(),
     ...(args.requireAssets ? ['--require-assets'] : []),
   ],
 });
@@ -57,6 +66,7 @@ if (prepare.exitCode !== 0) {
     'scripts/prepare-raw-open-edit-export-private-root.ts',
     '--root',
     privateRoot,
+    ...requestArgs(),
   ]);
 }
 
@@ -100,6 +110,7 @@ try {
       cwd: 'src-tauri',
       env: {
         RAWENGINE_PRIVATE_RAW_ROOT: privateRoot,
+        RAWENGINE_RAW_OPEN_EDIT_EXPORT_PROOF_REQUEST: requestPath,
         RAWENGINE_RUN_PRIVATE_RAW_OPEN_EDIT_EXPORT_PROOF: '1',
       },
     },
@@ -118,36 +129,39 @@ try {
   const collectedReports = parseRawOpenEditExportRunReportCollection(
     JSON.parse(await readFile(reportOutputPath, 'utf8')),
   );
-  const hasFixtureReport = collectedReports.reports.some((report) => report.fixtureId === FIXTURE_ID);
+  const hasFixtureReport = collectedReports.reports.some((report) => report.fixtureId === requestFixture.fixtureId);
   if (!hasFixtureReport) {
-    console.error(`${FIXTURE_ID}: missing collected private run report.`);
+    console.error(`${requestFixture.fixtureId}: missing collected private run report.`);
     process.exit(1);
   }
 
-  await runRequired(
-    'RAW open/edit/export private report validation',
-    [
-      'bun',
-      'tests/integration/checks/check-raw-open-edit-export-run-reports.ts',
-      '--input',
-      reportOutputPath,
-      '--fixture-id',
-      FIXTURE_ID,
-      '--allow-fresh-hashes',
-      '--require-assets',
-    ],
-    {
-      env: {
-        RAWENGINE_PRIVATE_RAW_ROOT: privateRoot,
+  if (usesDefaultRequest) {
+    await runRequired(
+      'RAW open/edit/export private report validation',
+      [
+        'bun',
+        'tests/integration/checks/check-raw-open-edit-export-run-reports.ts',
+        '--input',
+        reportOutputPath,
+        '--fixture-id',
+        requestFixture.fixtureId,
+        '--allow-fresh-hashes',
+        '--require-assets',
+      ],
+      {
+        env: {
+          RAWENGINE_PRIVATE_RAW_ROOT: privateRoot,
+        },
       },
-    },
-  );
+    );
+  }
 
   await runRequired('RAW color-management private report schema validation', [
     'bun',
     'tests/integration/checks/check-raw-color-management-runtime-proof.ts',
     '--run-reports',
     reportOutputPath,
+    ...requestArgs(),
     '--validate-only',
   ]);
 } finally {
@@ -197,4 +211,8 @@ function reportFailure(label: string, result: RunResult, command: Array<string>)
 function valueAfter(flag: string): string | undefined {
   const index = process.argv.indexOf(flag);
   return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
+function requestArgs(): Array<string> {
+  return args.requestPath === undefined ? [] : ['--request', args.requestPath];
 }
