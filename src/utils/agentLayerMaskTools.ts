@@ -7,8 +7,10 @@ import {
   type MaskAdjustments,
 } from './adjustments';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
+import { stableAgentPreviewHash } from './agentPreviewEnvelope';
 import { pushEditHistoryEntry } from './editHistory';
 import { applyLayerStackCommandBridgeOperation } from './layerStackCommandBridge';
+import { artifactHandleV1Schema, type ArtifactHandleV1 } from '../../packages/rawengine-schema/src';
 import {
   ActorKind,
   ApprovalClass,
@@ -35,6 +37,18 @@ const idSegmentSchema = z
   .min(1)
   .max(96)
   .regex(/^[a-zA-Z0-9_-]+$/u);
+
+const agentLayerMaskOverlayPreviewSchema = z
+  .object({
+    artifact: artifactHandleV1Schema,
+    layerId: z.string().trim().min(1),
+    maskId: z.string().trim().min(1).optional(),
+    opacity: z.number().int().min(0).max(100),
+    recipeHash: z.string().trim().min(1),
+    renderHash: z.string().trim().min(1),
+    visible: z.boolean(),
+  })
+  .strict();
 
 export const agentLayerCreateRequestSchema = z
   .object({
@@ -72,6 +86,7 @@ export const agentLayerCreateResponseSchema = z
     layerId: z.string().trim().min(1),
     layerName: z.string().trim().min(1),
     requestId: z.string().trim().min(1),
+    overlayPreview: agentLayerMaskOverlayPreviewSchema,
     staleRecipeHash: z.literal(false),
     toolName: z.literal(AGENT_LAYER_CREATE_TOOL_NAME),
     undoGraphRevision: z.string().trim().min(1),
@@ -86,6 +101,7 @@ export const agentMaskCreateOrUpdateResponseSchema = z
     layerId: z.string().trim().min(1),
     maskContentHash: z.string().trim().min(1),
     maskId: z.string().trim().min(1),
+    overlayPreview: agentLayerMaskOverlayPreviewSchema,
     requestId: z.string().trim().min(1),
     staleRecipeHash: z.literal(false),
     toolName: z.literal(AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME),
@@ -97,6 +113,7 @@ export type AgentLayerCreateRequest = z.infer<typeof agentLayerCreateRequestSche
 export type AgentLayerCreateResponse = z.infer<typeof agentLayerCreateResponseSchema>;
 export type AgentMaskCreateOrUpdateRequest = z.infer<typeof agentMaskCreateOrUpdateRequestSchema>;
 export type AgentMaskCreateOrUpdateResponse = z.infer<typeof agentMaskCreateOrUpdateResponseSchema>;
+export type AgentLayerMaskOverlayPreview = z.infer<typeof agentLayerMaskOverlayPreviewSchema>;
 
 const toIdSegment = (value: string): string =>
   value
@@ -159,6 +176,61 @@ const pushMaskHistory = (masks: ReadonlyArray<MaskContainer>): { historyIndex: n
   return { historyIndex: nextHistoryIndex };
 };
 
+const buildOverlayArtifact = ({
+  contentSeed,
+  height,
+  layerId,
+  maskId,
+  operationId,
+  width,
+}: {
+  contentSeed: unknown;
+  height: number;
+  layerId: string;
+  maskId?: string;
+  operationId: string;
+  width: number;
+}): ArtifactHandleV1 => {
+  const hash = stableAgentPreviewHash(JSON.stringify(contentSeed));
+  return artifactHandleV1Schema.parse({
+    artifactId: `artifact_agent_overlay_${operationId}_${maskId ?? layerId}_${hash}`,
+    contentHash: `sha256:${hash}`,
+    dimensions: { height, width },
+    kind: 'preview',
+    storage: 'temp_cache',
+  });
+};
+
+const buildOverlayPreview = ({
+  afterSnapshot,
+  contentSeed,
+  layer,
+  maskId,
+  operationId,
+}: {
+  afterSnapshot: ReturnType<typeof buildAgentImageContextSnapshot>;
+  contentSeed: unknown;
+  layer: MaskContainer;
+  maskId?: string;
+  operationId: string;
+}): AgentLayerMaskOverlayPreview =>
+  agentLayerMaskOverlayPreviewSchema.parse({
+    artifact: buildOverlayArtifact({
+      contentSeed,
+      height: afterSnapshot.initialPreview.height,
+      layerId: layer.id,
+      ...(maskId === undefined ? {} : { maskId }),
+      operationId,
+      width: afterSnapshot.initialPreview.width,
+    }),
+    layerId: layer.id,
+    ...(maskId === undefined ? {} : { maskId }),
+    opacity: layer.opacity,
+    recipeHash: afterSnapshot.initialPreview.recipeHash,
+    renderHash: afterSnapshot.initialPreview.renderHash,
+    visible: layer.visible,
+  });
+
 export const applyAgentLayerCreate = (request: AgentLayerCreateRequest): AgentLayerCreateResponse => {
   const parsedRequest = agentLayerCreateRequestSchema.parse(request);
   const beforeSnapshot = ensureFreshRecipe(parsedRequest.expectedRecipeHash);
@@ -182,6 +254,8 @@ export const applyAgentLayerCreate = (request: AgentLayerCreateRequest): AgentLa
   if (layerId === undefined) throw new Error('Agent layer create did not return a layer id.');
   useEditorStore.setState({ activeMaskContainerId: layerId });
   const afterSnapshot = buildAgentImageContextSnapshot();
+  const overlayLayer = result.masks.find((mask) => mask.id === layerId);
+  if (overlayLayer === undefined) throw new Error('Agent layer create could not build an overlay preview.');
 
   return agentLayerCreateResponseSchema.parse({
     afterPreviewHash: afterSnapshot.initialPreview.renderHash,
@@ -189,6 +263,12 @@ export const applyAgentLayerCreate = (request: AgentLayerCreateRequest): AgentLa
     beforePreviewHash: beforeSnapshot.initialPreview.renderHash,
     layerId,
     layerName: parsedRequest.name,
+    overlayPreview: buildOverlayPreview({
+      afterSnapshot,
+      contentSeed: { layer: overlayLayer, operationId: parsedRequest.operationId },
+      layer: overlayLayer,
+      operationId: parsedRequest.operationId,
+    }),
     requestId: parsedRequest.requestId,
     staleRecipeHash: false,
     toolName: AGENT_LAYER_CREATE_TOOL_NAME,
@@ -286,6 +366,8 @@ export const applyAgentBrushMaskCreateOrUpdate = (
   pushMaskHistory(nextMasks);
   useEditorStore.setState({ activeMaskContainerId: parsedRequest.layerId, activeMaskId: maskId });
   const afterSnapshot = buildAgentImageContextSnapshot();
+  const overlayLayer = nextMasks.find((mask) => mask.id === parsedRequest.layerId);
+  if (overlayLayer === undefined) throw new Error('Agent mask create/update could not build an overlay preview.');
 
   return agentMaskCreateOrUpdateResponseSchema.parse({
     afterPreviewHash: afterSnapshot.initialPreview.renderHash,
@@ -294,6 +376,13 @@ export const applyAgentBrushMaskCreateOrUpdate = (
     layerId: parsedRequest.layerId,
     maskContentHash,
     maskId,
+    overlayPreview: buildOverlayPreview({
+      afterSnapshot,
+      contentSeed: { maskContentHash, operationId: parsedRequest.operationId, strokes: parsedRequest.strokes },
+      layer: overlayLayer,
+      maskId,
+      operationId: parsedRequest.operationId,
+    }),
     requestId: parsedRequest.requestId,
     staleRecipeHash: false,
     toolName: AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,

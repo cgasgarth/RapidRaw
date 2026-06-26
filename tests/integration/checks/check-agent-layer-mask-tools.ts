@@ -135,8 +135,20 @@ if (afterLayerState.uncroppedAdjustedPreviewUrl !== null) {
 if (layerResult.beforePreviewHash === layerResult.afterPreviewHash) {
   throw new Error('agent.layer.create did not change preview identity.');
 }
-
 const afterLayerSnapshot = buildAgentImageContextSnapshot();
+if (
+  layerResult.overlayPreview.layerId !== 'agent_subject_lift' ||
+  layerResult.overlayPreview.maskId !== undefined ||
+  layerResult.overlayPreview.opacity !== 72 ||
+  !layerResult.overlayPreview.visible ||
+  layerResult.overlayPreview.artifact.kind !== 'preview' ||
+  layerResult.overlayPreview.artifact.storage !== 'temp_cache' ||
+  layerResult.overlayPreview.artifact.dimensions?.width !== afterLayerSnapshot.initialPreview.width ||
+  layerResult.overlayPreview.recipeHash !== afterLayerSnapshot.initialPreview.recipeHash
+) {
+  throw new Error('agent.layer.create did not return a layer overlay preview artifact.');
+}
+
 const maskResult = await applyAgentBrushMaskCreateOrUpdate({
   expectedRecipeHash: afterLayerSnapshot.initialPreview.recipeHash,
   layerId: 'agent_subject_lift',
@@ -179,6 +191,18 @@ if (maskResult.beforePreviewHash === maskResult.afterPreviewHash) {
 }
 if (!maskResult.maskContentHash.startsWith('fnv1a32:')) {
   throw new Error('agent.mask.create_or_update did not return brush mask proof metadata.');
+}
+const afterMaskSnapshot = buildAgentImageContextSnapshot();
+if (
+  maskResult.overlayPreview.layerId !== 'agent_subject_lift' ||
+  maskResult.overlayPreview.maskId !== 'agent_subject_brush' ||
+  maskResult.overlayPreview.artifact.kind !== 'preview' ||
+  maskResult.overlayPreview.artifact.storage !== 'temp_cache' ||
+  maskResult.overlayPreview.artifact.contentHash === layerResult.overlayPreview.artifact.contentHash ||
+  maskResult.overlayPreview.recipeHash !== afterMaskSnapshot.initialPreview.recipeHash ||
+  maskResult.overlayPreview.renderHash !== afterMaskSnapshot.initialPreview.renderHash
+) {
+  throw new Error('agent.mask.create_or_update did not return a mask overlay preview artifact.');
 }
 
 const routes = buildRawEngineAppServerRouteCatalog();
