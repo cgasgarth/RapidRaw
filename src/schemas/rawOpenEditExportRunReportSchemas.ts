@@ -27,11 +27,14 @@ const artifactKindSchema = z.enum([
 
 const metricNameSchema = z.enum([
   'changedPixelRatio',
+  'finalFileBlackPointCompensationApplied',
   'finalFileBitDepth',
+  'finalFileColorEngineLcms2',
   'finalFileIccProfileEmbedded',
   'finalFileReopenSucceeded',
   'finalFileSoftProofRgb8MaxAbsDelta',
   'finalFileSoftProofRgb8MeanAbsDelta',
+  'finalFileTransformApplied',
   'previewExportMeanAbsDelta',
   'softProofExportRgb8MeanAbsDelta',
   'sidecarReloadRevisionMatch',
@@ -79,7 +82,6 @@ const colorManagementProofSchema = z
         z.enum([
           'acescg_working_space',
           'bradford_chromatic_adaptation',
-          'black_point_compensation',
           'camera_profile_quality',
           'capture_one_class_quality',
           'display_device_visual_match',
@@ -102,7 +104,7 @@ const colorManagementProofSchema = z
         outputProfile: z.literal('display_p3'),
         renderingIntentApplied: z.literal(true),
         sceneToDisplayTransform: z.literal('rawengine_agx_v1'),
-        transferStatus: z.literal('moxcms_rgb16_display_p3_final_file'),
+        transferStatus: z.literal('lcms2_bpc_rgb16_display_p3_final_file'),
         viewTransform: z.literal('rawengine_agx_v1'),
         workingBuffer: z.literal('linear_srgb_d65_observed'),
       })
@@ -149,7 +151,6 @@ const colorManagementProofSchema = z
     for (const nonClaim of [
       'acescg_working_space',
       'bradford_chromatic_adaptation',
-      'black_point_compensation',
       'camera_profile_quality',
       'capture_one_class_quality',
       'display_device_visual_match',
@@ -195,6 +196,8 @@ const renderPathsSchema = z
 const finalFileProofSchema = z
   .object({
     bitDepth: z.literal(16),
+    blackPointCompensation: z.literal('Enabled via LittleCMS relative colorimetric transform'),
+    cmm: z.literal('lcms2'),
     embeddedIccProfileHash: sha256Schema,
     expectedOutputProfileHash: sha256Schema,
     finalFileFormat: z.literal('tiff'),
@@ -202,6 +205,8 @@ const finalFileProofSchema = z
     pixelMaxAbsDelta: z.number().min(0),
     pixelMeanAbsDelta: z.number().min(0),
     reopenedDimensions: z.object({ height: z.number().int().positive(), width: z.number().int().positive() }).strict(),
+    transformApplied: z.literal(true),
+    transformPolicyFingerprint: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
     writerId: z.literal('export_processing::save_image_with_metadata'),
   })
   .strict();
