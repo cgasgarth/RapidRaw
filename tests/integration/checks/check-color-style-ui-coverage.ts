@@ -17,6 +17,7 @@ for (const marker of [
   'editor.presets.colorStyles.adjustmentCoverage',
   'data-testid={`color-style-adjustment-count-${preset.id}`}',
   'color-style-default-preset-badge',
+  '!hasBuiltInColorStyles',
 ]) {
   if (!source.includes(marker)) {
     console.error(`Color style UI coverage marker missing: ${marker}`);
