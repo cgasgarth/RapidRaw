@@ -590,11 +590,18 @@
           "label": "",
           "noApplyStep": "",
           "placeholder": "",
+          "policy": {
+            "approve": "",
+            "approved": "",
+            "title": ""
+          },
           "previewDelta": "",
           "rollback": "",
           "status": {
             "applied": "",
             "applying": "",
+            "approval_required": "",
+            "blocked": "",
             "dry_run_ready": "",
             "failed": "",
             "idle": "",

@@ -591,11 +591,18 @@
           "label": "Ask the agent",
           "noApplyStep": "The agent plan did not include an apply-capable tone step.",
           "placeholder": "Example: brighten this RAW, recover shadows, and keep the color natural",
+          "policy": {
+            "approve": "Approve",
+            "approved": "Approval granted for this dry-run.",
+            "title": "Safety policy"
+          },
           "previewDelta": "{{changed}}/{{sampled}} samples changed ({{percent}}%); mean luma delta {{meanLuma}}, max channel delta {{maxDelta}}",
           "rollback": "Rollback",
           "status": {
             "applied": "Applied through the local app-server bridge",
             "applying": "Applying accepted dry-run",
+            "approval_required": "Approval required before apply",
+            "blocked": "Blocked by safety policy",
             "dry_run_ready": "Dry-run ready for review",
             "failed": "Agent request failed",
             "idle": "Waiting for a prompt",
