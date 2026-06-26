@@ -40,6 +40,7 @@ import {
   agentGeometryApplyRequestSchema,
   applyAgentGeometry,
 } from './agentGeometryApplyTool';
+import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import {
   AGENT_LAYER_CREATE_INPUT_SCHEMA_NAME,
   AGENT_LAYER_CREATE_OUTPUT_SCHEMA_NAME,
@@ -152,6 +153,7 @@ import {
   type RawEngineAppServerToolDispatchRequest,
   type RawEngineAppServerToolDispatchResponse,
 } from '../schemas/agentRuntimeSchemas';
+import { useEditorStore } from '../store/useEditorStore';
 
 export const RAW_ENGINE_APP_SERVER_HOST_MANIFEST = rawEngineAppServerHostManifestSchema.parse({
   protocol: RawEngineAppServerProtocol.CodexAppServer,
@@ -827,6 +829,26 @@ const getDryRunFlag = (command: unknown): boolean | undefined => {
   return typeof command.dryRun === 'boolean' ? command.dryRun : undefined;
 };
 
+const rejectToolDispatch = ({
+  commandType,
+  message,
+  request,
+}: {
+  commandType?: string;
+  message: string;
+  request: RawEngineAppServerToolDispatchRequest;
+}): RawEngineAppServerToolDispatchResponse =>
+  rawEngineAppServerToolDispatchResponseSchema.parse({
+    ...(commandType === undefined ? {} : { commandType }),
+    dispatchStatus: 'rejected',
+    message,
+    requestId: request.requestId,
+    runtime: AgentRuntimeId.AppServer,
+    runtimeToolName: request.runtimeToolName,
+    status: RawEngineAppServerResponseStatus.Ok,
+    transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
+  });
+
 const APPROVED_AGENT_APP_SERVER_TOOL_NAMES = new Set<string>([
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
   AGENT_COLOR_APPLY_TOOL_NAME,
@@ -857,6 +879,29 @@ const hasAgentSessionIntent = ({
 
 export const isApprovedAgentAppServerToolName = (runtimeToolName: string): boolean =>
   APPROVED_AGENT_APP_SERVER_TOOL_NAMES.has(runtimeToolName);
+
+const validateDraftSessionForDispatch = (request: RawEngineAppServerToolDispatchRequest): string | null => {
+  const draftSession = request.draftSession;
+  if (draftSession === undefined) return null;
+  if (!isApprovedAgentAppServerToolName(request.runtimeToolName)) {
+    return 'Draft agent sessions can only dispatch approved typed agent app-server tools.';
+  }
+  if (draftSession.status !== 'active') return 'Draft agent session is cancelled.';
+
+  const state = useEditorStore.getState();
+  if (state.selectedImage === null) return 'Draft agent session requires a selected image.';
+  if (state.selectedImage.path !== draftSession.selectedImagePath) {
+    return 'Draft agent session selected image does not match the active editor image.';
+  }
+  const snapshot = buildAgentImageContextSnapshot();
+  if (snapshot.initialPreview.recipeHash !== draftSession.parentRecipeHash) {
+    return 'Draft agent session parent recipe hash is stale.';
+  }
+  if (draftSession.draftRevision !== state.historyIndex) {
+    return 'Draft agent session revision does not match the active edit graph.';
+  }
+  return null;
+};
 
 const dispatchAgentAppServerTool = async (
   request: RawEngineAppServerToolDispatchRequest,
@@ -922,16 +967,16 @@ const dispatchAgentAppServerTool = async (
 export const buildRawEngineAppServerToolDispatchResponse = async (
   request: RawEngineAppServerToolDispatchRequest,
 ): Promise<RawEngineAppServerToolDispatchResponse> => {
+  const draftSessionError = validateDraftSessionForDispatch(request);
+  if (draftSessionError !== null) {
+    return rejectToolDispatch({ commandType: request.runtimeToolName, message: draftSessionError, request });
+  }
+
   if (hasAgentSessionIntent(request) && !isApprovedAgentAppServerToolName(request.runtimeToolName)) {
-    return rawEngineAppServerToolDispatchResponseSchema.parse({
+    return rejectToolDispatch({
       commandType: request.runtimeToolName,
-      dispatchStatus: 'rejected',
       message: `${request.runtimeToolName} is not an approved typed agent app-server tool.`,
-      requestId: request.requestId,
-      runtime: AgentRuntimeId.AppServer,
-      runtimeToolName: request.runtimeToolName,
-      status: RawEngineAppServerResponseStatus.Ok,
-      transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
+      request,
     });
   }
 

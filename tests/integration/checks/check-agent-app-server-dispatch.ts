@@ -71,6 +71,28 @@ const dispatch = async (runtimeToolName: string, args: unknown, requestId: strin
     }),
   );
 
+const dispatchWithDraftSession = async (
+  runtimeToolName: string,
+  args: unknown,
+  requestId: string,
+  draftSession: {
+    draftRevision: number;
+    parentRecipeHash: string;
+    selectedImagePath: string;
+    sessionId: string;
+    status: 'active' | 'cancelled';
+  },
+) =>
+  dispatchResponseSchema.parse(
+    await handleRawEngineAppServerHostRequestAsync({
+      arguments: args,
+      draftSession,
+      requestId,
+      runtimeToolName,
+      toolName: RawEngineAppServerHostToolName.DispatchTool,
+    }),
+  );
+
 useEditorStore.getState().setEditor({
   adjustments: INITIAL_ADJUSTMENTS,
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
@@ -139,10 +161,91 @@ if (refreshedStatePayload.snapshot.initialPreview.recipeHash === initialRecipeHa
   throw new Error('agent dispatch did not update recipe hash after apply.');
 }
 
+const draftSession = {
+  draftRevision: 1,
+  parentRecipeHash: refreshedStatePayload.snapshot.initialPreview.recipeHash,
+  selectedImagePath: selectedPath,
+  sessionId: 'agent-dispatch-3163',
+  status: 'active' as const,
+};
+const draftApply = await dispatchWithDraftSession(
+  AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+  {
+    adjustments: { contrast: 9 },
+    expectedRecipeHash: draftSession.parentRecipeHash,
+    operationId: 'agent_dispatch_draft_apply_3163',
+    requestId: 'agent-dispatch-draft-apply-1',
+    sessionId: draftSession.sessionId,
+  },
+  'dispatch-draft-apply-1',
+  draftSession,
+);
+if (draftApply.dispatchStatus !== 'completed') {
+  throw new Error('agent draft session did not allow current active typed mutation.');
+}
+const postDraftState = await dispatch(
+  AGENT_STATE_GET_TOOL_NAME,
+  { requestId: 'agent-dispatch-state-3' },
+  'dispatch-state-3',
+);
+const postDraftStatePayload = stateResultSchema.parse(postDraftState.result);
+const draftRejectCases = [
+  {
+    expectedMessage: 'cancelled',
+    session: {
+      ...draftSession,
+      parentRecipeHash: postDraftStatePayload.snapshot.initialPreview.recipeHash,
+      status: 'cancelled' as const,
+    },
+  },
+  {
+    expectedMessage: 'parent recipe hash is stale',
+    session: {
+      ...draftSession,
+      draftRevision: 2,
+      parentRecipeHash: refreshedStatePayload.snapshot.initialPreview.recipeHash,
+    },
+  },
+  {
+    expectedMessage: 'selected image does not match',
+    session: {
+      ...draftSession,
+      draftRevision: 2,
+      parentRecipeHash: postDraftStatePayload.snapshot.initialPreview.recipeHash,
+      selectedImagePath: '/tmp/other.ARW',
+    },
+  },
+  {
+    expectedMessage: 'revision does not match',
+    session: {
+      ...draftSession,
+      draftRevision: 1,
+      parentRecipeHash: postDraftStatePayload.snapshot.initialPreview.recipeHash,
+    },
+  },
+];
+for (const { expectedMessage, session } of draftRejectCases) {
+  const rejected = await dispatchWithDraftSession(
+    AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+    {
+      adjustments: { contrast: 12 },
+      expectedRecipeHash: postDraftStatePayload.snapshot.initialPreview.recipeHash,
+      operationId: `agent_dispatch_reject_${expectedMessage}`,
+      requestId: `agent-dispatch-reject-${expectedMessage}`,
+      sessionId: draftSession.sessionId,
+    },
+    `dispatch-reject-${expectedMessage}`,
+    session,
+  );
+  if (rejected.dispatchStatus !== 'rejected' || !rejected.message?.includes(expectedMessage)) {
+    throw new Error(`agent draft session did not reject ${expectedMessage}.`);
+  }
+}
+
 const refreshedPreview = await dispatch(
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   {
-    expectedRecipeHash: refreshedStatePayload.snapshot.initialPreview.recipeHash,
+    expectedRecipeHash: postDraftStatePayload.snapshot.initialPreview.recipeHash,
     longEdgePx: 1024,
     purpose: 'refresh',
     requestId: 'agent-dispatch-preview-2',
