@@ -92,6 +92,8 @@ for (const marker of [
   'read_embedded_source_icc_profile',
   'Source embedded profile passthrough; ICC embedded',
   'source_icc_profile_hash',
+  'transform_policy_fingerprint',
+  'export_color_transform_fingerprint',
 ]) {
   if (!rustExportSource.includes(marker)) failures.push(`Rust export capability matrix missing ${marker}`);
 }

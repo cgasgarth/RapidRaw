@@ -1542,6 +1542,7 @@ export default function ExportPanel({
             data-export-receipt-source-precision-path={firstReceiptOutput.sourcePrecisionPath ?? ''}
             data-export-receipt-total={lastReceipt.total}
             data-export-receipt-transform-applied={String(firstReceiptOutput.transformApplied ?? '')}
+            data-export-receipt-transform-policy-fingerprint={firstReceiptOutput.transformPolicyFingerprint ?? ''}
             data-testid="export-success-receipt"
           >
             <UiText as="p" color={TextColors.primary} variant={TextVariants.small} weight={TextWeights.semibold}>

@@ -124,6 +124,7 @@ export interface ExportReceiptOutput {
   sourcePath: string;
   sourceIccProfileHash?: string | null | undefined;
   sourcePrecisionPath?: string | null | undefined;
+  transformPolicyFingerprint?: string | null | undefined;
   transformApplied?: boolean | null | undefined;
 }
 
