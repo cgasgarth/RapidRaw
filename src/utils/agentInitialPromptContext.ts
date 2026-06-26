@@ -10,6 +10,24 @@ export const agentInitialPromptContextSchema = z
         activeImagePath: z.string().trim().min(1),
         currentAdjustments: z.array(z.object({ key: z.string().trim().min(1), value: z.unknown() }).strict()),
         graphRevision: z.string().trim().min(1),
+        initialPreview: z
+          .object({
+            accessScope: z.literal('local_private'),
+            artifactId: z.string().trim().min(1),
+            colorProfile: z.literal('srgb-preview'),
+            encodedFormat: z.literal('jpeg'),
+            height: z.number().int().positive(),
+            includesOriginalRaw: z.literal(false),
+            longEdgePx: z.literal(1536),
+            mediaType: z.literal('image/jpeg'),
+            previewRef: z.string().trim().min(1),
+            purpose: z.literal('initial_context'),
+            quality: z.literal(0.86),
+            recipeHash: z.string().trim().min(1),
+            renderHash: z.string().trim().min(1),
+            width: z.number().int().positive(),
+          })
+          .strict(),
         promptText: z.string().trim().min(1),
         safetyConstraints: z
           .object({
@@ -62,6 +80,22 @@ export const buildAgentInitialPromptContext = ({
       activeImagePath: snapshot.activeImagePath,
       currentAdjustments: snapshot.adjustmentSummary,
       graphRevision: snapshot.graphRevision,
+      initialPreview: {
+        accessScope: snapshot.initialPreview.accessScope,
+        artifactId: snapshot.initialPreview.artifactId,
+        colorProfile: snapshot.initialPreview.colorProfile,
+        encodedFormat: snapshot.initialPreview.encodedFormat,
+        height: snapshot.initialPreview.height,
+        includesOriginalRaw: snapshot.initialPreview.includesOriginalRaw,
+        longEdgePx: snapshot.initialPreview.longEdgePx,
+        mediaType: snapshot.initialPreview.mediaType,
+        previewRef: snapshot.initialPreview.previewRef,
+        purpose: snapshot.initialPreview.purpose,
+        quality: snapshot.initialPreview.quality,
+        recipeHash: snapshot.initialPreview.recipeHash,
+        renderHash: snapshot.initialPreview.renderHash,
+        width: snapshot.initialPreview.width,
+      },
       promptText: prompt,
       safetyConstraints: {
         allowOriginalRawTransfer: false,
