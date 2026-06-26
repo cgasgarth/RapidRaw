@@ -9,6 +9,7 @@ import { planAgentEditRecipe } from '../../../utils/agentEditRecipePlanner';
 import {
   runAgentMultiTurnAppServerSession,
   type AgentMultiTurnAppServerSessionRequest,
+  type AgentMultiTurnAppServerSessionResult,
 } from '../../../utils/agentMultiTurnAppServerSession';
 import {
   evaluateAgentSafetyPolicy,
@@ -129,6 +130,16 @@ interface LivePromptResult {
   sampledPixelCount?: number;
   status: LivePromptStatus;
   summary?: string;
+}
+
+interface LiveSessionReviewState {
+  applyState: 'applied' | 'pending';
+  finalGraphRevision: string;
+  finalRecipeHash: string;
+  previewLineage: AgentMultiTurnAppServerSessionResult['previewLineage'];
+  rollbackGraphRevision: string;
+  rollbackState: 'available' | 'restored';
+  toolCallCount: number;
 }
 
 type LiveActivityKind = 'approval' | 'error' | 'preview' | 'prompt' | 'rollback' | 'tool_call';
@@ -385,6 +396,71 @@ function LiveActivityTimeline({ entries }: { entries: LiveActivityEntry[] }) {
   );
 }
 
+function LiveSessionReviewPanel({ review }: { review: LiveSessionReviewState | null }) {
+  const { t } = useTranslation();
+  if (review === null) return null;
+
+  const firstPreview = review.previewLineage[0];
+  const finalPreview = review.previewLineage.at(-1);
+
+  return (
+    <div
+      className="space-y-2 rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3 text-[11px]"
+      data-apply-state={review.applyState}
+      data-final-graph-revision={review.finalGraphRevision}
+      data-final-preview-artifact-id={finalPreview?.artifactId ?? ''}
+      data-final-recipe-hash={review.finalRecipeHash}
+      data-initial-preview-artifact-id={firstPreview?.artifactId ?? ''}
+      data-preview-lineage-count={review.previewLineage.length}
+      data-rollback-graph-revision={review.rollbackGraphRevision}
+      data-rollback-state={review.rollbackState}
+      data-testid="agent-live-session-review"
+      data-tool-call-count={review.toolCallCount}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-semibold text-text-primary">{t('editor.ai.agent.review.title')}</span>
+        <span className="rounded border border-white/10 bg-black/20 px-1.5 py-0.5 text-text-secondary">
+          {review.applyState}
+        </span>
+      </div>
+      <div className="grid gap-1.5" data-testid="agent-live-session-preview-lineage">
+        {review.previewLineage.map((preview) => (
+          <div
+            className="rounded border border-white/10 bg-white/[0.03] p-2"
+            data-artifact-id={preview.artifactId}
+            data-graph-revision={preview.graphRevision}
+            data-purpose={preview.purpose}
+            data-recipe-hash={preview.recipeHash}
+            data-render-hash={preview.renderHash}
+            data-testid="agent-live-session-preview-lineage-entry"
+            data-turn={preview.turn}
+            key={`${preview.turn}-${preview.artifactId}`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-text-primary">{t('editor.ai.agent.timeline.control.compare')}</span>
+              <span className="font-mono text-text-secondary">{preview.purpose}</span>
+            </div>
+            <div className="mt-1 truncate font-mono text-sky-100">{preview.renderHash}</div>
+          </div>
+        ))}
+      </div>
+      <div
+        className="flex flex-wrap gap-1.5"
+        data-testid="agent-live-session-review-actions"
+        data-apply-review-state={review.applyState}
+        data-rollback-review-state={review.rollbackState}
+      >
+        <span className="rounded border border-white/10 bg-black/20 px-1.5 py-0.5 text-text-secondary">
+          {t('editor.ai.agent.timeline.control.inspect')}
+        </span>
+        <span className="rounded border border-white/10 bg-black/20 px-1.5 py-0.5 text-text-secondary">
+          {t('editor.ai.agent.timeline.control.rollback')}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: LivePromptComposerProps) {
   const { t } = useTranslation();
   const promptInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -393,6 +469,7 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
   const [activityEntries, setActivityEntries] = useState<LiveActivityEntry[]>([]);
   const [result, setResult] = useState<LivePromptResult>({ status: 'idle' });
   const [rollbackSnapshot, setRollbackSnapshot] = useState<AgentRollbackSnapshot | null>(null);
+  const [sessionReview, setSessionReview] = useState<LiveSessionReviewState | null>(null);
   const canRun = isContextReady && result.status !== 'applying';
   const canApply = isContextReady && acceptedPrompt.length > 0 && result.status === 'dry_run_ready';
   const canRollback = rollbackSnapshot !== null && result.status === 'applied';
@@ -592,6 +669,15 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
         recipeName: sessionResult.finalRecipeHash,
         status: 'applied',
       } satisfies LivePromptResult;
+      setSessionReview({
+        applyState: 'applied',
+        finalGraphRevision: sessionResult.finalGraphRevision,
+        finalRecipeHash: sessionResult.finalRecipeHash,
+        previewLineage: sessionResult.previewLineage,
+        rollbackGraphRevision: sessionResult.rollbackGraphRevision,
+        rollbackState: 'available',
+        toolCallCount: sessionResult.toolCalls.length,
+      });
       pushActivityEntry({
         body: sessionResult.editReview.finalRationale,
         graphRevision: sessionResult.finalGraphRevision,
@@ -668,6 +754,7 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
       uncroppedAdjustedPreviewUrl: rollbackSnapshot.uncroppedAdjustedPreviewUrl,
     });
     setRollbackSnapshot(null);
+    setSessionReview((review) => (review === null ? null : { ...review, rollbackState: 'restored' }));
     pushActivityEntry({
       body: t('editor.ai.agent.composer.status.rolled_back'),
       graphRevision: `history:${rollbackSnapshot.historyIndex}`,
@@ -786,6 +873,7 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
       </div>
 
       <LiveActivityTimeline entries={activityEntries} />
+      <LiveSessionReviewPanel review={sessionReview} />
 
       <div
         className="rounded border border-white/10 bg-black/15 p-2 text-[11px]"
