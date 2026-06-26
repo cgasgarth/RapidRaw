@@ -1012,7 +1012,16 @@ fn write_image(
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
     }
-    image
+    let encodable_image = if matches!(format, ImageFormat::Png)
+        && matches!(
+            image,
+            DynamicImage::ImageRgb32F(_) | DynamicImage::ImageRgba32F(_)
+        ) {
+        DynamicImage::ImageRgba16(image.to_rgba16())
+    } else {
+        image.clone()
+    };
+    encodable_image
         .save_with_format(path, format)
         .map_err(|error| error.to_string())
 }

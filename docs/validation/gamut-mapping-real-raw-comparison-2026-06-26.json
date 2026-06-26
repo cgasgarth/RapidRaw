@@ -7,32 +7,32 @@
     "This report does not prove Capture One-class visual quality, display-device matching, camera-profile accuracy, or final mapper tuning."
   ],
   "comparisonBasis": "soft_proof_rgb8_perceptual_vs_relative_colorimetric",
-  "generatedAt": "2026-06-26T22:46:57.095Z",
+  "generatedAt": "2026-06-26T23:40:11.321Z",
   "issue": 3238,
   "metrics": {
-    "changedPixelRatio": 0,
+    "changedPixelRatio": 0.004107,
     "deltaE00VsRelativeClip": {
-      "max": 0,
+      "max": 8.628958,
       "p50": 0,
       "p95": 0
     },
     "hueAngleDriftDegVsRelativeClip": {
-      "max": 0,
+      "max": 113.261465,
       "p50": 0,
       "p95": 0
     },
-    "maxAbsRgb8Delta": 0,
-    "meanAbsRgb8Delta": 0,
+    "maxAbsRgb8Delta": 17,
+    "meanAbsRgb8Delta": 0.001505,
     "neutralAxisDriftP95": 0,
     "perceptualDeltaE00VsUnmappedDestinationLab": null,
     "pixelCount": 24000000,
-    "saturationMonotonicViolationCount": 0
+    "saturationMonotonicViolationCount": 593
   },
   "perceptualRun": {
     "fixtureId": "validation.raw-open-edit-export.professional-color.v1",
     "gamutMapping": "rawengine.gamut.srgb-oklab-chroma-reduce.v1",
     "reportPath": "/tmp/rawengine-gamut-mapping-real-raw-proof/raw-open-edit-export-run-reports.json",
-    "softProofHash": "sha256:2799b12554a5db4e1be711d9582648e7f6be2241631dca1fa64bdbb2634a2971",
+    "softProofHash": "sha256:323299a575979126d3e2b8a2c9c190c2e412ce0701d95011cff47b2a432d0e92",
     "softProofPath": "private-artifacts/validation/open-edit-export/srgb-perceptual/professional-color-v1-soft-proof-after.png"
   },
   "relativeRun": {
