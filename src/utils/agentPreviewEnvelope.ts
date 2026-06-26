@@ -8,6 +8,8 @@ export const agentPreviewPurposeSchema = z.enum(['detail_review', 'initial_conte
 
 export const agentPreviewEnvelopeSchema = z
   .object({
+    accessScope: z.literal('local_private'),
+    artifactId: z.string().trim().min(1),
     cacheKey: z.string().trim().min(1),
     cachePolicy: z
       .object({
@@ -32,6 +34,13 @@ export const agentPreviewEnvelopeSchema = z
     height: z.number().int().positive(),
     id: z.string().trim().min(1),
     includesOriginalRaw: z.literal(false),
+    lifecycle: z
+      .object({
+        expiresWith: z.array(z.enum(['image_selection_change', 'recipe_hash_change', 'session_cancel'])).min(1),
+        persisted: z.literal(false),
+        storage: z.literal('ephemeral_editor_cache'),
+      })
+      .strict(),
     longEdgePx: z.number().int().min(256).max(2048),
     maxPixelCount: z.number().int().min(65_536).max(AGENT_PREVIEW_MAX_PIXEL_COUNT),
     mediaType: z.literal('image/jpeg'),
@@ -133,7 +142,11 @@ export const buildAgentPreviewEnvelope = (input: AgentPreviewEnvelopeInput): Age
     }),
   );
 
+  const artifactId = `artifact_${purpose}_${variantHash}`;
+
   return agentPreviewEnvelopeSchema.parse({
+    accessScope: 'local_private',
+    artifactId,
     cacheKey: `agent-preview:${purpose}:${variantHash}`,
     cachePolicy: {
       invalidatesOn: ['image_selection', 'recipe_hash', 'render_settings', 'crop', 'mask_stack'],
@@ -145,6 +158,11 @@ export const buildAgentPreviewEnvelope = (input: AgentPreviewEnvelopeInput): Age
     height: dimensions.height,
     id: `${purpose}_${stableHash(`${input.idSeed}:${variantHash}`)}`,
     includesOriginalRaw: false,
+    lifecycle: {
+      expiresWith: ['session_cancel', 'recipe_hash_change', 'image_selection_change'],
+      persisted: false,
+      storage: 'ephemeral_editor_cache',
+    },
     longEdgePx,
     maxPixelCount,
     mediaType: 'image/jpeg',
@@ -159,3 +177,11 @@ export const buildAgentPreviewEnvelope = (input: AgentPreviewEnvelopeInput): Age
     zoom: input.zoom ?? null,
   });
 };
+
+export const isAgentPreviewEnvelopeCurrent = ({
+  preview,
+  recipeHash,
+}: {
+  preview: AgentPreviewEnvelope;
+  recipeHash: string;
+}): boolean => preview.recipeHash === recipeHash && !preview.lifecycle.persisted;

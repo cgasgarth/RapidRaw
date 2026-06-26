@@ -14,12 +14,15 @@ import {
   getAgentReadOnlyState,
   renderAgentReadOnlyPreview,
 } from '../../../src/utils/agentReadOnlyAppServerTools.ts';
+import { isAgentPreviewEnvelopeCurrent } from '../../../src/utils/agentPreviewEnvelope.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../../../src/utils/rawEngineAppServerHost.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3160.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 12 : 1));
 const previewSubsetSchema = z
   .object({
+    accessScope: z.literal('local_private'),
+    artifactId: z.string().min(1),
     cacheKey: z.string().min(1),
     cachePolicy: z
       .object({
@@ -37,6 +40,13 @@ const previewSubsetSchema = z
       })
       .nullable(),
     includesOriginalRaw: z.literal(false),
+    lifecycle: z
+      .object({
+        expiresWith: z.array(z.string()).min(1),
+        persisted: z.literal(false),
+        storage: z.literal('ephemeral_editor_cache'),
+      })
+      .passthrough(),
     longEdgePx: z.number().int().positive(),
     maxPixelCount: z.number().int().positive(),
     previewRef: z.string().min(1),
@@ -115,6 +125,11 @@ if (preview.staleRecipeHash || previewPayload.longEdgePx !== 1024 || previewPayl
 }
 if (
   previewPayload.purpose !== 'refresh' ||
+  previewPayload.accessScope !== 'local_private' ||
+  !previewPayload.artifactId.startsWith('artifact_refresh_') ||
+  previewPayload.lifecycle.persisted ||
+  !previewPayload.lifecycle.expiresWith.includes('recipe_hash_change') ||
+  !previewPayload.lifecycle.expiresWith.includes('session_cancel') ||
   previewPayload.renderIntent !== 'refresh' ||
   !previewPayload.cacheKey.startsWith('agent-preview:refresh:') ||
   previewPayload.renderHash === snapshot.initialPreview.renderHash ||
@@ -161,6 +176,12 @@ const repeatedDetailPreview = renderAgentReadOnlyPreview({
 });
 if (repeatedDetailPreview.preview.cacheKey !== detailPreview.preview.cacheKey) {
   throw new Error('agent.preview.render crop preview metadata must be deterministic for matching requests.');
+}
+if (!isAgentPreviewEnvelopeCurrent({ preview: repeatedDetailPreview.preview, recipeHash })) {
+  throw new Error('agent.preview.render must mark matching private previews current for their recipe hash.');
+}
+if (isAgentPreviewEnvelopeCurrent({ preview: repeatedDetailPreview.preview, recipeHash: 'recipe:other' })) {
+  throw new Error('agent.preview.render private previews must invalidate when recipe hashes change.');
 }
 
 const stalePreview = renderAgentReadOnlyPreview({
