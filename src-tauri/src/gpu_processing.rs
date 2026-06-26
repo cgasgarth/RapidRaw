@@ -15,6 +15,9 @@ use crate::image_processing::{AllAdjustments, GpuContext, MAX_MASKS};
 use crate::lut_processing::Lut;
 use crate::{AppState, GpuImageCache};
 
+const GPU_OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+const GPU_OUTPUT_BYTES_PER_PIXEL: u32 = 8;
+
 #[derive(Clone, Copy, Debug)]
 pub struct Roi {
     pub x: u32,
@@ -517,14 +520,15 @@ pub fn get_or_init_compute_gpu_context_for_tests(
     Ok(new_context)
 }
 
-pub(crate) fn read_texture_data_roi(
+pub(crate) fn read_texture_data_roi_with_bytes_per_pixel(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
     origin: wgpu::Origin3d,
     size: wgpu::Extent3d,
+    bytes_per_pixel: u32,
 ) -> Result<Vec<u8>, String> {
-    let unpadded_bytes_per_row = 4 * size.width;
+    let unpadded_bytes_per_row = bytes_per_pixel * size.width;
     let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
     let padded_bytes_per_row = (unpadded_bytes_per_row + align - 1) & !(align - 1);
     let output_buffer_size = (padded_bytes_per_row * size.height) as u64;
@@ -585,6 +589,33 @@ pub(crate) fn read_texture_data_roi(
         }
         Ok(unpadded_data)
     }
+}
+
+fn rgba16float_readback_to_dynamic_image(
+    width: u32,
+    height: u32,
+    pixels: Vec<u8>,
+) -> Result<DynamicImage, String> {
+    if pixels.len() != (width * height * GPU_OUTPUT_BYTES_PER_PIXEL) as usize {
+        return Err(format!(
+            "Expected {} RGBA16F readback byte(s), got {}.",
+            width * height * GPU_OUTPUT_BYTES_PER_PIXEL,
+            pixels.len()
+        ));
+    }
+
+    let rgba16 = pixels
+        .chunks_exact(2)
+        .map(|bytes| {
+            let channel = f16::from_bits(u16::from_le_bytes([bytes[0], bytes[1]])).to_f32();
+            (channel.clamp(0.0, 1.0) * u16::MAX as f32).round() as u16
+        })
+        .collect::<Vec<_>>();
+    let image =
+        ImageBuffer::<Rgba<u16>, Vec<u16>>::from_raw(width, height, rgba16).ok_or_else(|| {
+            "Failed to create RGBA16 image buffer from GPU readback data.".to_string()
+        })?;
+    Ok(DynamicImage::ImageRgba16(image))
 }
 
 fn to_rgba_f16(img: &DynamicImage) -> Vec<f16> {
@@ -899,7 +930,7 @@ impl GpuProcessor {
                 visibility: wgpu::ShaderStages::COMPUTE,
                 ty: wgpu::BindingType::StorageTexture {
                     access: wgpu::StorageTextureAccess::WriteOnly,
-                    format: wgpu::TextureFormat::Rgba8Unorm,
+                    format: GPU_OUTPUT_TEXTURE_FORMAT,
                     view_dimension: wgpu::TextureViewDimension::D2,
                 },
                 count: None,
@@ -1106,7 +1137,7 @@ impl GpuProcessor {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
+            format: GPU_OUTPUT_TEXTURE_FORMAT,
             usage: wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::STORAGE_BINDING
                 | wgpu::TextureUsages::COPY_SRC,
@@ -1120,7 +1151,7 @@ impl GpuProcessor {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
+            format: GPU_OUTPUT_TEXTURE_FORMAT,
             usage: wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::STORAGE_BINDING
                 | wgpu::TextureUsages::COPY_DST
@@ -1135,7 +1166,7 @@ impl GpuProcessor {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
+            format: GPU_OUTPUT_TEXTURE_FORMAT,
             usage: wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::STORAGE_BINDING
                 | wgpu::TextureUsages::COPY_DST
@@ -1390,7 +1421,7 @@ impl GpuProcessor {
             if skip_cpu_readback {
                 0
             } else {
-                (out_width * out_height * 4) as usize
+                (out_width * out_height * GPU_OUTPUT_BYTES_PER_PIXEL) as usize
             }
         ];
 
@@ -1650,22 +1681,24 @@ impl GpuProcessor {
                 queue.submit(Some(main_encoder.finish()));
 
                 if !skip_cpu_readback {
-                    let processed_tile_data = read_texture_data_roi(
+                    let processed_tile_data = read_texture_data_roi_with_bytes_per_pixel(
                         device,
                         queue,
                         &self.tile_output_texture,
                         wgpu::Origin3d::ZERO,
                         input_texture_size,
+                        GPU_OUTPUT_BYTES_PER_PIXEL,
                     )?;
 
                     for row in 0..tile_height {
                         let final_y = y_start + row - bounds.y;
                         let final_x = x_start - bounds.x;
-                        let final_row_offset = (final_y * out_width + final_x) as usize * 4;
+                        let final_row_offset = (final_y * out_width + final_x) as usize
+                            * GPU_OUTPUT_BYTES_PER_PIXEL as usize;
                         let source_y = crop_y_start + row;
-                        let source_row_offset =
-                            (source_y * input_width + crop_x_start) as usize * 4;
-                        let copy_bytes = (tile_width * 4) as usize;
+                        let source_row_offset = (source_y * input_width + crop_x_start) as usize
+                            * GPU_OUTPUT_BYTES_PER_PIXEL as usize;
+                        let copy_bytes = (tile_width * GPU_OUTPUT_BYTES_PER_PIXEL) as usize;
 
                         final_pixels[final_row_offset..final_row_offset + copy_bytes]
                             .copy_from_slice(
@@ -1910,7 +1943,7 @@ fn process_and_get_dynamic_image_inner(
     let mut async_unpadded_bpr: u32 = 0;
 
     if analytics_config.is_some() && skip_readback {
-        let unpadded_bytes_per_row = 4 * out_w;
+        let unpadded_bytes_per_row = GPU_OUTPUT_BYTES_PER_PIXEL * out_w;
         let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
         let padded_bytes_per_row = (unpadded_bytes_per_row + align - 1) & !(align - 1);
         let output_buffer_size = (padded_bytes_per_row * out_h) as u64;
@@ -2027,10 +2060,9 @@ fn process_and_get_dynamic_image_inner(
                         }
                     }
 
-                    if let Some(img_buf) =
-                        ImageBuffer::<Rgba<u8>, _>::from_raw(out_w, out_h, unpadded_data)
+                    if let Ok(dynamic_img) =
+                        rgba16float_readback_to_dynamic_image(out_w, out_h, unpadded_data)
                     {
-                        let dynamic_img = DynamicImage::ImageRgba8(img_buf);
                         let _ = analytics.sender.send(crate::AnalyticsJob {
                             path: analytics.path,
                             image: std::sync::Arc::new(dynamic_img),
@@ -2043,10 +2075,9 @@ fn process_and_get_dynamic_image_inner(
         } else {
             let pixels_clone = processed_pixels.clone();
             std::thread::spawn(move || {
-                if let Some(img_buf) =
-                    ImageBuffer::<Rgba<u8>, _>::from_raw(out_w, out_h, pixels_clone)
+                if let Ok(dynamic_img) =
+                    rgba16float_readback_to_dynamic_image(out_w, out_h, pixels_clone)
                 {
-                    let dynamic_img = DynamicImage::ImageRgba8(img_buf);
                     let _ = analytics.sender.send(crate::AnalyticsJob {
                         path: analytics.path,
                         image: std::sync::Arc::new(dynamic_img),
@@ -2127,7 +2158,5 @@ fn process_and_get_dynamic_image_inner(
         fps
     );
 
-    let img_buf = ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(out_w, out_h, processed_pixels)
-        .ok_or("Failed to create image buffer from GPU data")?;
-    Ok(DynamicImage::ImageRgba8(img_buf))
+    rgba16float_readback_to_dynamic_image(out_w, out_h, processed_pixels)
 }
