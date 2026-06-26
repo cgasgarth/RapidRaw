@@ -20,11 +20,23 @@ const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3160.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 12 : 1));
 const previewSubsetSchema = z
   .object({
+    cacheKey: z.string().min(1),
+    cachePolicy: z
+      .object({
+        invalidatesOn: z.array(z.string()).min(1),
+        stableWhenRecipeHashMatches: z.boolean(),
+      })
+      .passthrough(),
     includesOriginalRaw: z.literal(false),
     longEdgePx: z.number().int().positive(),
     previewRef: z.string().min(1),
+    purpose: z.string().min(1),
     quality: z.number(),
     recipeHash: z.string().min(1),
+    renderHash: z.string().min(1),
+    renderIntent: z.string().min(1),
+    source: z.literal('editor-preview-derivative'),
+    zoom: z.unknown().nullable(),
   })
   .passthrough();
 const snapshotSubsetSchema = z
@@ -82,6 +94,33 @@ const preview = renderAgentReadOnlyPreview({
 const previewPayload = previewSubsetSchema.parse(preview.preview);
 if (preview.staleRecipeHash || previewPayload.longEdgePx !== 1024 || previewPayload.quality !== 0.82) {
   throw new Error('agent.preview.render did not honor bounded preview request parameters.');
+}
+if (
+  previewPayload.purpose !== 'refresh' ||
+  previewPayload.renderIntent !== 'refresh' ||
+  !previewPayload.cacheKey.startsWith('agent-preview:refresh:') ||
+  previewPayload.renderHash === snapshot.initialPreview.renderHash ||
+  !previewPayload.cachePolicy.invalidatesOn.includes('recipe_hash')
+) {
+  throw new Error('agent.preview.render did not return a standardized refresh preview envelope.');
+}
+
+const detailPreview = renderAgentReadOnlyPreview({
+  expectedRecipeHash: recipeHash,
+  longEdgePx: 2048,
+  purpose: 'detail_review',
+  quality: 0.9,
+  requestId: 'preview-detail',
+  zoom: { centerX: 0.4, centerY: 0.6, scale: 2 },
+});
+const detailPreviewPayload = previewSubsetSchema.parse(detailPreview.preview);
+if (
+  detailPreviewPayload.purpose !== 'detail_review' ||
+  detailPreviewPayload.longEdgePx !== 2048 ||
+  detailPreviewPayload.zoom === null ||
+  detailPreviewPayload.cacheKey === previewPayload.cacheKey
+) {
+  throw new Error('agent.preview.render did not encode detail-review zoom semantics.');
 }
 
 const stalePreview = renderAgentReadOnlyPreview({

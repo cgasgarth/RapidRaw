@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { applyAgentGlobalAdjustments } from './agentAdjustmentApplyTool';
+import { agentPreviewEnvelopeSchema } from './agentPreviewEnvelope';
 import { getAgentReadOnlyState, renderAgentReadOnlyPreview } from './agentReadOnlyAppServerTools';
 
 const agentLoopAdjustmentPatchSchema = z
@@ -28,6 +29,7 @@ export const agentIterativeEditLoopResultSchema = z
     appliedGraphRevision: z.string().trim().min(1),
     editCount: z.number().int().min(2),
     finalRecipeHash: z.string().trim().min(1),
+    previewRefreshes: z.array(agentPreviewEnvelopeSchema).min(2),
     previewRefreshCount: z.number().int().min(2),
     requestId: z.string().trim().min(1),
     stopReason: z.enum(['completed', 'max_iterations']),
@@ -67,6 +69,7 @@ export const runAgentIterativeEditLoop = async (
   let appliedGraphRevision = 'unapplied';
   let editCount = 0;
   let previewRefreshCount = 0;
+  const previewRefreshes: AgentIterativeEditLoopResult['previewRefreshes'] = [];
 
   transcript.push({
     detail: `initial inspect for ${parsedRequest.prompt}`,
@@ -103,8 +106,9 @@ export const runAgentIterativeEditLoop = async (
       requestId: `${parsedRequest.requestId}-preview-${index + 1}`,
     });
     previewRefreshCount += 1;
+    previewRefreshes.push(preview.preview);
     transcript.push({
-      detail: `${preview.requestId} ${preview.staleRecipeHash ? 'stale' : 'fresh'}`,
+      detail: `${preview.requestId} ${preview.preview.id} ${preview.staleRecipeHash ? 'stale' : 'fresh'}`,
       toolName: preview.toolName,
       turn,
     });
@@ -114,6 +118,7 @@ export const runAgentIterativeEditLoop = async (
     appliedGraphRevision,
     editCount,
     finalRecipeHash: recipeHash,
+    previewRefreshes,
     previewRefreshCount,
     requestId: parsedRequest.requestId,
     stopReason: editCount >= parsedRequest.maxIterations ? 'max_iterations' : 'completed',

@@ -69,6 +69,13 @@ const toolNames = result.transcript.map((entry) => entry.toolName);
 if (result.stopReason !== 'completed' || result.editCount !== 2 || result.previewRefreshCount !== 2) {
   throw new Error('agent iterative loop did not complete two edit/preview iterations.');
 }
+if (
+  result.previewRefreshes.length !== 2 ||
+  result.previewRefreshes.some((preview) => preview.purpose !== 'refresh' || preview.longEdgePx !== 1024) ||
+  result.previewRefreshes[0]?.cacheKey === result.previewRefreshes[1]?.cacheKey
+) {
+  throw new Error('agent iterative loop did not preserve distinct refresh preview envelopes.');
+}
 if (state.adjustments.exposure !== 0.34 || state.adjustments.shadows !== 18 || state.historyIndex !== 2) {
   throw new Error('agent iterative loop did not apply both editing turns into history.');
 }
