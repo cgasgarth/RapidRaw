@@ -4,6 +4,14 @@ import {
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
 } from './agentAdjustmentApplyTool';
 import {
+  AGENT_LAYER_CREATE_INPUT_SCHEMA_NAME,
+  AGENT_LAYER_CREATE_OUTPUT_SCHEMA_NAME,
+  AGENT_LAYER_CREATE_TOOL_NAME,
+  AGENT_MASK_CREATE_OR_UPDATE_INPUT_SCHEMA_NAME,
+  AGENT_MASK_CREATE_OR_UPDATE_OUTPUT_SCHEMA_NAME,
+  AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
+} from './agentLayerMaskTools';
+import {
   AGENT_PREVIEW_RENDER_INPUT_SCHEMA_NAME,
   AGENT_PREVIEW_RENDER_OUTPUT_SCHEMA_NAME,
   AGENT_PREVIEW_RENDER_TOOL_NAME,
@@ -493,6 +501,24 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       outputSchemaNames: [AGENT_HISTORY_ROLLBACK_OUTPUT_SCHEMA_NAME],
       runtimeCheckScripts: ['check:agent-session-history-rollback'],
       toolNames: [AGENT_HISTORY_ROLLBACK_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
+      commandName: AGENT_LAYER_CREATE_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_LAYER_CREATE_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.ApplyDryRunPlan],
+      outputSchemaNames: [AGENT_LAYER_CREATE_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-layer-mask-tools'],
+      toolNames: [AGENT_LAYER_CREATE_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
+      commandName: AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_MASK_CREATE_OR_UPDATE_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.ApplyDryRunPlan],
+      outputSchemaNames: [AGENT_MASK_CREATE_OR_UPDATE_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-layer-mask-tools'],
+      toolNames: [AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME],
     }),
   );
 
