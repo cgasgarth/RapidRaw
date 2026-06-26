@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX = 1536;
 export const AGENT_MEDIUM_PREVIEW_QUALITY = 0.86;
+export const AGENT_PREVIEW_MAX_PIXEL_COUNT = 4_194_304;
 
 export const agentPreviewPurposeSchema = z.enum(['detail_review', 'initial_context', 'refresh']);
 
@@ -20,7 +21,7 @@ export const agentPreviewEnvelopeSchema = z
     crop: z
       .object({
         height: z.number().positive(),
-        unit: z.enum(['%', 'px']),
+        unit: z.enum(['%', 'normalized', 'px']),
         width: z.number().positive(),
         x: z.number(),
         y: z.number(),
@@ -32,6 +33,7 @@ export const agentPreviewEnvelopeSchema = z
     id: z.string().trim().min(1),
     includesOriginalRaw: z.literal(false),
     longEdgePx: z.number().int().min(256).max(2048),
+    maxPixelCount: z.number().int().min(65_536).max(AGENT_PREVIEW_MAX_PIXEL_COUNT),
     mediaType: z.literal('image/jpeg'),
     previewRef: z.string().trim().min(1),
     purpose: agentPreviewPurposeSchema,
@@ -73,6 +75,7 @@ export type AgentPreviewEnvelopeInput = {
   height: number;
   idSeed: string;
   longEdgePx?: number;
+  maxPixelCount?: number;
   previewRef: string;
   purpose?: AgentPreviewPurpose;
   quality?: number;
@@ -83,27 +86,44 @@ export type AgentPreviewEnvelopeInput = {
   zoom?: AgentPreviewEnvelope['zoom'];
 };
 
-const fitPreviewDimensions = (width: number, height: number, longEdgePx: number): { height: number; width: number } => {
+const fitPreviewDimensions = (
+  width: number,
+  height: number,
+  longEdgePx: number,
+  maxPixelCount: number,
+): { height: number; width: number } => {
   const longEdge = Math.max(width, height);
   if (longEdge <= 0) return { height: longEdgePx, width: longEdgePx };
 
   const scale = longEdgePx / longEdge;
-  return {
+  const initial = {
     height: Math.max(1, Math.round(height * scale)),
     width: Math.max(1, Math.round(width * scale)),
+  };
+  const pixelCount = initial.width * initial.height;
+  if (pixelCount <= maxPixelCount) return initial;
+
+  const budgetScale = Math.sqrt(maxPixelCount / pixelCount);
+  return {
+    height: Math.max(1, Math.floor(initial.height * budgetScale)),
+    width: Math.max(1, Math.floor(initial.width * budgetScale)),
   };
 };
 
 export const buildAgentPreviewEnvelope = (input: AgentPreviewEnvelopeInput): AgentPreviewEnvelope => {
   const purpose = input.purpose ?? 'initial_context';
   const longEdgePx = input.longEdgePx ?? AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX;
+  const maxPixelCount = input.maxPixelCount ?? AGENT_PREVIEW_MAX_PIXEL_COUNT;
   const quality = input.quality ?? AGENT_MEDIUM_PREVIEW_QUALITY;
-  const dimensions = fitPreviewDimensions(input.width, input.height, longEdgePx);
+  const cropWidth = input.crop?.unit === 'normalized' ? input.width * input.crop.width : input.width;
+  const cropHeight = input.crop?.unit === 'normalized' ? input.height * input.crop.height : input.height;
+  const dimensions = fitPreviewDimensions(cropWidth, cropHeight, longEdgePx, maxPixelCount);
   const stableHash = input.stableHash ?? stableAgentPreviewHash;
   const variantHash = stableHash(
     JSON.stringify({
       crop: input.crop,
       longEdgePx,
+      maxPixelCount,
       previewRef: input.previewRef,
       purpose,
       quality,
@@ -126,6 +146,7 @@ export const buildAgentPreviewEnvelope = (input: AgentPreviewEnvelopeInput): Age
     id: `${purpose}_${stableHash(`${input.idSeed}:${variantHash}`)}`,
     includesOriginalRaw: false,
     longEdgePx,
+    maxPixelCount,
     mediaType: 'image/jpeg',
     previewRef: input.previewRef,
     purpose,

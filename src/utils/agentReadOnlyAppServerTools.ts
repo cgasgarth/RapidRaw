@@ -1,7 +1,11 @@
 import { z } from 'zod';
 
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
-import { agentPreviewEnvelopeSchema, buildAgentPreviewEnvelope } from './agentPreviewEnvelope';
+import {
+  AGENT_PREVIEW_MAX_PIXEL_COUNT,
+  agentPreviewEnvelopeSchema,
+  buildAgentPreviewEnvelope,
+} from './agentPreviewEnvelope';
 
 export const AGENT_STATE_GET_TOOL_NAME = 'rawengine.agent.state.get';
 export const AGENT_PREVIEW_RENDER_TOOL_NAME = 'rawengine.agent.preview.render';
@@ -19,8 +23,31 @@ export const agentStateGetRequestSchema = z
 
 export const agentPreviewRenderRequestSchema = z
   .object({
+    crop: z
+      .object({
+        height: z.number().positive().max(1),
+        width: z.number().positive().max(1),
+        x: z.number().min(0).max(1),
+        y: z.number().min(0).max(1),
+      })
+      .strict()
+      .refine((crop) => crop.x + crop.width <= 1, {
+        message: 'Crop x + width must stay within normalized image bounds.',
+        path: ['width'],
+      })
+      .refine((crop) => crop.y + crop.height <= 1, {
+        message: 'Crop y + height must stay within normalized image bounds.',
+        path: ['height'],
+      })
+      .optional(),
     expectedRecipeHash: z.string().trim().min(1).optional(),
     longEdgePx: z.number().int().min(256).max(2048).default(1536),
+    maxPixelCount: z
+      .number()
+      .int()
+      .min(65_536)
+      .max(AGENT_PREVIEW_MAX_PIXEL_COUNT)
+      .default(AGENT_PREVIEW_MAX_PIXEL_COUNT),
     purpose: z.enum(['detail_review', 'initial_context', 'refresh']).default('refresh'),
     quality: z.number().min(0.5).max(0.95).default(0.86),
     requestId: z.string().trim().min(1),
@@ -54,7 +81,7 @@ export const agentPreviewRenderResponseSchema = z
   .strict();
 
 export type AgentStateGetRequest = z.infer<typeof agentStateGetRequestSchema>;
-export type AgentPreviewRenderRequest = z.infer<typeof agentPreviewRenderRequestSchema>;
+export type AgentPreviewRenderRequest = z.input<typeof agentPreviewRenderRequestSchema>;
 export type AgentStateGetResponse = z.infer<typeof agentStateGetResponseSchema>;
 export type AgentPreviewRenderResponse = z.infer<typeof agentPreviewRenderResponseSchema>;
 
@@ -75,11 +102,19 @@ export const getAgentReadOnlyState = (request: AgentStateGetRequest): AgentState
 export const renderAgentReadOnlyPreview = (request: AgentPreviewRenderRequest): AgentPreviewRenderResponse => {
   const parsedRequest = agentPreviewRenderRequestSchema.parse(request);
   const snapshot = buildAgentImageContextSnapshot();
+  const crop =
+    parsedRequest.crop === undefined
+      ? snapshot.initialPreview.crop
+      : {
+          ...parsedRequest.crop,
+          unit: 'normalized' as const,
+        };
   const preview = buildAgentPreviewEnvelope({
-    crop: snapshot.initialPreview.crop,
+    crop,
     height: snapshot.initialPreview.height,
     idSeed: `${snapshot.initialPreview.id}:${parsedRequest.requestId}`,
     longEdgePx: parsedRequest.longEdgePx,
+    maxPixelCount: parsedRequest.maxPixelCount,
     previewRef: snapshot.initialPreview.previewRef,
     purpose: parsedRequest.purpose,
     quality: parsedRequest.quality,

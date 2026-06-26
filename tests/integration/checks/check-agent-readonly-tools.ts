@@ -27,8 +27,18 @@ const previewSubsetSchema = z
         stableWhenRecipeHashMatches: z.boolean(),
       })
       .passthrough(),
+    crop: z
+      .object({
+        height: z.number().positive(),
+        unit: z.enum(['%', 'normalized', 'px']),
+        width: z.number().positive(),
+        x: z.number(),
+        y: z.number(),
+      })
+      .nullable(),
     includesOriginalRaw: z.literal(false),
     longEdgePx: z.number().int().positive(),
+    maxPixelCount: z.number().int().positive(),
     previewRef: z.string().min(1),
     purpose: z.string().min(1),
     quality: z.number(),
@@ -76,6 +86,14 @@ if (agentStateGetRequestSchema.safeParse({ requestId: 'state-1', unknown: true }
 if (agentPreviewRenderRequestSchema.safeParse({ longEdgePx: 8192, requestId: 'preview-1' }).success) {
   throw new Error('agent.preview.render request schema accepted an out-of-range preview size.');
 }
+if (
+  agentPreviewRenderRequestSchema.safeParse({
+    crop: { height: 0.4, width: 0.4, x: 0.8, y: 0.1 },
+    requestId: 'preview-invalid-crop',
+  }).success
+) {
+  throw new Error('agent.preview.render request schema accepted crop bounds outside the normalized image.');
+}
 
 const state = getAgentReadOnlyState({ requestId: 'state-1' });
 const snapshot = snapshotSubsetSchema.parse(state.snapshot);
@@ -106,8 +124,10 @@ if (
 }
 
 const detailPreview = renderAgentReadOnlyPreview({
+  crop: { height: 0.3, width: 0.25, x: 0.2, y: 0.15 },
   expectedRecipeHash: recipeHash,
   longEdgePx: 2048,
+  maxPixelCount: 1_000_000,
   purpose: 'detail_review',
   quality: 0.9,
   requestId: 'preview-detail',
@@ -117,10 +137,30 @@ const detailPreviewPayload = previewSubsetSchema.parse(detailPreview.preview);
 if (
   detailPreviewPayload.purpose !== 'detail_review' ||
   detailPreviewPayload.longEdgePx !== 2048 ||
+  detailPreviewPayload.maxPixelCount !== 1_000_000 ||
+  detailPreviewPayload.crop?.unit !== 'normalized' ||
+  detailPreviewPayload.crop.width !== 0.25 ||
   detailPreviewPayload.zoom === null ||
   detailPreviewPayload.cacheKey === previewPayload.cacheKey
 ) {
-  throw new Error('agent.preview.render did not encode detail-review zoom semantics.');
+  throw new Error('agent.preview.render did not encode detail-review crop/zoom semantics.');
+}
+if (detailPreviewPayload.width * detailPreviewPayload.height > 1_000_000) {
+  throw new Error('agent.preview.render exceeded the requested crop preview pixel budget.');
+}
+
+const repeatedDetailPreview = renderAgentReadOnlyPreview({
+  crop: { height: 0.3, width: 0.25, x: 0.2, y: 0.15 },
+  expectedRecipeHash: recipeHash,
+  longEdgePx: 2048,
+  maxPixelCount: 1_000_000,
+  purpose: 'detail_review',
+  quality: 0.9,
+  requestId: 'preview-detail',
+  zoom: { centerX: 0.4, centerY: 0.6, scale: 2 },
+});
+if (repeatedDetailPreview.preview.cacheKey !== detailPreview.preview.cacheKey) {
+  throw new Error('agent.preview.render crop preview metadata must be deterministic for matching requests.');
 }
 
 const stalePreview = renderAgentReadOnlyPreview({
