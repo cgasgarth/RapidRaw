@@ -652,6 +652,19 @@
         },
         "runtimeApplyDemo": "",
         "runtimeApplyProof": "",
+        "timeline": {
+          "empty": "",
+          "kind": {
+            "approval": "",
+            "error": "",
+            "preview": "",
+            "prompt": "",
+            "rollback": "",
+            "tool_call": ""
+          },
+          "subtitle": "",
+          "title": ""
+        },
         "title": "",
         "transcript": "",
         "uiOnly": "",

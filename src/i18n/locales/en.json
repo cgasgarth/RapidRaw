@@ -656,6 +656,19 @@
         },
         "runtimeApplyDemo": "Runtime apply demo",
         "runtimeApplyProof": "Runtime apply proof",
+        "timeline": {
+          "empty": "Run an edit to see prompt, preview, tool, and rollback events.",
+          "kind": {
+            "approval": "Approval",
+            "error": "Error",
+            "preview": "Preview",
+            "prompt": "Prompt",
+            "rollback": "Rollback",
+            "tool_call": "Tool call"
+          },
+          "subtitle": "Preview, tool calls, and rollback",
+          "title": "Activity timeline"
+        },
         "title": "Expert Agent",
         "transcript": "Tool-call transcript",
         "uiOnly": "UI-only",
