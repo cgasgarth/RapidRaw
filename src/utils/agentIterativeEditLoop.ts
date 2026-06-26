@@ -117,6 +117,7 @@ export const runAgentIterativeEditLoop = async (
   let previewRefreshCount = 0;
   const previewRefreshes: AgentIterativeEditLoopResult['previewRefreshes'] = [];
   const previewLineage: AgentIterativeEditLoopResult['previewLineage'] = [];
+  const toolReceipts: Array<{ graphRevision: string; summary: string; toolName: string }> = [];
 
   transcript.push({
     detail: `initial inspect for ${parsedRequest.prompt}`,
@@ -142,6 +143,11 @@ export const runAgentIterativeEditLoop = async (
       detail: `${apply.adjustedFields.join(',')} -> ${apply.appliedGraphRevision}`,
       toolName: apply.toolName,
       turn,
+    });
+    toolReceipts.push({
+      graphRevision: apply.appliedGraphRevision,
+      summary: apply.adjustedFields.join(','),
+      toolName: apply.toolName,
     });
 
     const state = getAgentReadOnlyState({ requestId: `${parsedRequest.requestId}-state-${index + 1}` });
@@ -177,11 +183,17 @@ export const runAgentIterativeEditLoop = async (
   if (finalPreview === undefined) {
     throw new Error('Agent iterative loop cannot review an edit without a refreshed preview.');
   }
+  const beforePreview = previewRefreshes[0];
+  if (beforePreview === undefined) {
+    throw new Error('Agent iterative loop cannot review an edit without an initial refreshed preview.');
+  }
   const editReview = buildAgentEditQualityReview({
+    beforePreview,
     maxIterationsReached: editCount >= parsedRequest.maxIterations,
     preview: finalPreview,
     prompt: parsedRequest.prompt,
     toolReceiptCount: transcript.filter((entry) => entry.toolName === 'rawengine.agent.adjustments.apply').length,
+    toolReceipts,
   });
   transcript.push({
     detail: `${editReview.stopReason}: ${editReview.finalRationale}`,
