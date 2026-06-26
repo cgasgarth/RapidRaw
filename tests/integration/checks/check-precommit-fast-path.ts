@@ -28,10 +28,45 @@ if (schemaRoutingCondition?.includes('package\\.json') || schemaRoutingCondition
   throw new Error('pre-commit must not route package/tsconfig-only changes into heavy schema gates.');
 }
 
+const unusedDepsLine = hook.split('\n').find((line) => line.includes('check:unused-deps')) ?? '';
+const unusedDepsCondition = hook
+  .split('\n')
+  .slice(
+    0,
+    hook.split('\n').findIndex((line) => line === unusedDepsLine),
+  )
+  .findLast((line) => line.includes("grep -Eq '"));
+if (unusedDepsCondition && /(src\/|scripts\/|tests\/)/u.test(unusedDepsCondition)) {
+  throw new Error('pre-commit must leave source/test unused-dependency audits to CI.');
+}
+
 if (
   !hook.includes("grep -Eq '^(src-tauri/.*\\.rs|src-tauri/Cargo\\.(toml|lock)|\\.cargo/.*|rust-toolchain\\.toml)$'")
 ) {
   throw new Error('pre-commit must keep Rust checks for Rust file changes.');
+}
+
+const rustRoutingLine = hook.split('\n').find((line) => line.includes('check:rust:fmt')) ?? '';
+const rustRoutingStart = hook
+  .split('\n')
+  .slice(
+    0,
+    hook.split('\n').findIndex((line) => line === rustRoutingLine),
+  )
+  .findLastIndex((line) => line.startsWith('if printf'));
+const rustRoutingEnd = hook
+  .split('\n')
+  .slice(hook.split('\n').findIndex((line) => line === rustRoutingLine))
+  .findIndex((line) => line === 'fi');
+const rustRoutingBlock = hook
+  .split('\n')
+  .slice(rustRoutingStart, hook.split('\n').findIndex((line) => line === rustRoutingLine) + rustRoutingEnd + 1)
+  .join('\n');
+
+for (const heavyRustGate of ['check:rust:check', 'check:rust:clippy', 'check:rust:test']) {
+  if (rustRoutingBlock.includes(heavyRustGate)) {
+    throw new Error(`pre-commit must leave ${heavyRustGate} to CI or explicit local validation.`);
+  }
 }
 
 for (const requiredFastGate of ['bun lint-staged --quiet --concurrent false', 'bun run check:lint']) {
