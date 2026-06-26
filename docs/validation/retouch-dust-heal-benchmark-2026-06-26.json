@@ -1,42 +1,55 @@
 {
   "issue": 3770,
   "sourceIssue": 3255,
-  "validationMode": "private_raw_native_dust_heal_benchmark_preview_export_proof",
-  "generatedAt": "2026-06-26T19:50:29Z",
+  "validationMode": "private_raw_native_dust_heal_benchmark_corpus_preview_export_proof",
+  "generatedAt": "2026-06-26T21:02:17Z",
   "privateSource": {
     "root": "/Users/cgas/Pictures/Capture One/Alaska",
     "selectedRawName": "_DSC7505.ARW",
+    "corpusCaseCount": 3,
     "publicRepoAllowed": false,
     "hash": "sha256:f9eb82844d578f7019bd8c386382fd2b8fe575df10eb8c2fe44e7ffe8f4d78ab"
   },
   "metrics": [
     {
-      "name": "dust_candidate_precision",
+      "name": "dust_corpus_raw_count",
+      "value": 3.0,
+      "threshold": 3.0,
+      "passed": true
+    },
+    {
+      "name": "dust_corpus_precision_mean",
       "value": 1.0,
       "threshold": 0.999999,
       "passed": true
     },
     {
-      "name": "dust_candidate_recall",
+      "name": "dust_corpus_recall_mean",
       "value": 1.0,
       "threshold": 0.999999,
       "passed": true
     },
     {
-      "name": "accepted_dust_correction_count",
-      "value": 1.0,
-      "threshold": 1.0,
-      "passed": true
-    },
-    {
-      "name": "false_texture_damage_rate",
+      "name": "dust_corpus_false_texture_damage_rate_max",
       "value": 0.0,
       "threshold": 0.0001,
       "passed": true
     },
     {
+      "name": "dust_corpus_preview_export_delta_max",
+      "value": 0.0,
+      "threshold": 0.0,
+      "passed": true
+    },
+    {
+      "name": "dust_corpus_source_hash_unchanged_ratio",
+      "value": 1.0,
+      "threshold": 0.999999,
+      "passed": true
+    },
+    {
       "name": "dust_benchmark_batch_latency_ms",
-      "value": 22000.667125,
+      "value": 22421.239583,
       "threshold": 120000.0,
       "passed": true
     },
@@ -59,41 +72,44 @@
       "passed": true
     }
   ],
-  "artifactHashes": [
+  "caseArtifacts": [
     {
-      "kind": "unretouched_preview_private",
-      "hash": "sha256:e9728b0ff56d190c5e18720d2608c2a62fd716ede4822b86693eef7938719717",
+      "caseId": "dust-corpus-01",
+      "healPreviewHash": "sha256:952b0a35de28cd9a2ca3c8578186bb69fdfb9b4c6a9e5f62b42233c91ea12295",
+      "healExportHash": "sha256:ff9e85e836d44d8cf750a23ff6b6fab23558639a85fb7b1105eea52d9823e38a",
       "publicRepoAllowed": false
     },
     {
-      "kind": "heal_preview_private",
-      "hash": "sha256:952b0a35de28cd9a2ca3c8578186bb69fdfb9b4c6a9e5f62b42233c91ea12295",
+      "caseId": "dust-corpus-02",
+      "healPreviewHash": "sha256:f10643e937070ae7665c926f33e39fd67e57b9381d4cfd2be5122bf01323a7d0",
+      "healExportHash": "sha256:c144bc2ea4e79acb1e1a24e1b15911e719fa19565f5561cb736acce68892d30d",
       "publicRepoAllowed": false
     },
     {
-      "kind": "heal_export_private",
-      "hash": "sha256:ff9e85e836d44d8cf750a23ff6b6fab23558639a85fb7b1105eea52d9823e38a",
+      "caseId": "dust-corpus-03",
+      "healPreviewHash": "sha256:8a0a5663832fa42cfc1241b67cd8e7bb068be01831bad5d5920998a1983a4469",
+      "healExportHash": "sha256:836b5b7d7f567f0b4c556f385402650c1521a10519b2130ec6820e7afa51a5a3",
       "publicRepoAllowed": false
     }
   ],
   "proofClaims": {
     "proves": [
-      "native RAW decode can render a heal retouch layer",
-      "preview and export use the same heal retouch output",
-      "private RAW dust heal benchmark reports accepted correction precision and protected-region damage",
-      "source RAW remains unchanged"
+      "native RAW decode can render clone, heal, and remove retouch layers",
+      "preview and export use the same clone/heal/remove retouch output",
+      "private RAW dust heal benchmark reports accepted correction precision and protected-region damage across three Alaska RAW cases",
+      "source RAW files remain unchanged"
     ],
     "doesNotProve": [
       "manual macOS app UI e2e",
       "multi-stroke heal/remove quality or edge-aware texture synthesis",
-      "multi-image annotated dust corpus maturity"
+      "manually annotated dust corpus maturity"
     ]
   },
   "consultDecision": {
     "accepted": [
       "Use numeric precision, recall, off-target texture damage, latency, preview/export parity, and source immutability gates.",
       "Keep private RAWs, previews, exports, and crops out of the public repo; commit only private-safe hashes and proof boundaries.",
-      "Do not claim detector maturity or multi-image corpus maturity in the first benchmark slice."
+      "Grow the proof from one RAW to a small private RAW corpus while keeping explicit proof boundaries."
     ],
     "rejected": [
       "Schema-only benchmark evidence.",
