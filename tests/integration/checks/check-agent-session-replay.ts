@@ -32,13 +32,39 @@ const record = {
   ],
   finalGraphRevision: 'history_1',
   initialGraphRevision: 'history_0',
+  modelId: 'gpt-5.1-codex-app-server',
   planSummary: 'Replay brightening plan.',
   prompt: 'Replay the completed edit.',
   rollbackGraphRevision: 'history_0',
   sessionId: 'session_replay_3162',
   toolCalls: [
-    { id: 'tool_dry_run_3162', name: 'tonecolor.dry_run_command' },
-    { id: 'tool_apply_3162', name: 'tonecolor.apply_command' },
+    { id: 'tool_dry_run_3162', name: 'tonecolor.dry_run_command', status: 'succeeded' },
+    { id: 'tool_apply_3162', name: 'tonecolor.apply_command', status: 'succeeded' },
+  ],
+  traceEvents: [
+    {
+      id: 'trace_replay_prompt_3162',
+      kind: 'prompt',
+      message: 'Replay completed agent edit.',
+      timestamp: '2026-06-26T05:10:00.000Z',
+    },
+    {
+      id: 'trace_replay_preview_3162',
+      kind: 'preview',
+      previewRef: 'blob:agent-replay-preview-3162',
+      recipeHash: 'recipe:replay3162',
+      renderHash: 'render:replay3162',
+      timestamp: '2026-06-26T05:10:01.000Z',
+      toolCallId: 'tool_dry_run_3162',
+    },
+    {
+      graphRevision: 'history_1',
+      id: 'trace_replay_export_3162',
+      kind: 'export',
+      message: 'Export proof receipt captured.',
+      timestamp: '2026-06-26T05:10:02.000Z',
+      toolCallId: 'tool_apply_3162',
+    },
   ],
 };
 
