@@ -1,10 +1,11 @@
 import { z } from 'zod';
 
 import { buildAgentBasicToneDryRunPreviewArtifacts } from './agentDryRunPreviewArtifacts';
-import { buildAgentImageContextSnapshot, type AgentImageContextSnapshot } from './agentImageContextSnapshot';
+import { buildAgentInitialPromptContext, type AgentInitialPromptContext } from './agentInitialPromptContext';
 import { useEditorStore } from '../store/useEditorStore';
 
 import type { AgentCoreEditCommandBundleStep } from './agentCoreEditCommandBundle';
+import type { AgentImageContextSnapshot } from './agentImageContextSnapshot';
 
 export type AgentPlannerLoopStopState = 'approval_ready' | 'blocked' | 'max_steps_reached';
 export type AgentPlannerLoopStage = 'inspect' | 'plan' | 'dry_run' | 'apply' | 'observe';
@@ -21,6 +22,7 @@ export interface AgentPlannerLoopResult {
   dryRunBeforeHash: string;
   finalGraphRevision: string;
   initialGraphRevision: string;
+  initialPromptContext: AgentInitialPromptContext;
   inspected: AgentImageContextSnapshot;
   plannedSteps: readonly AgentCoreEditCommandBundleStep[];
   stopState: AgentPlannerLoopStopState;
@@ -33,6 +35,8 @@ const agentPlannerLoopResultProofSchema = z
     dryRunBeforeHash: z.string().trim().min(1),
     finalGraphRevision: z.string().trim().min(1),
     initialGraphRevision: z.string().trim().min(1),
+    initialPreviewArtifactId: z.string().trim().min(1),
+    initialPreviewRecipeHash: z.string().trim().min(1),
     plannedStepCount: z.number().int().positive(),
     stopState: z.enum(['approval_ready', 'blocked', 'max_steps_reached']),
     transcriptLength: z.number().int().positive().max(6),
@@ -80,9 +84,10 @@ export const runAgentBoundedEditPlannerLoop = async ({
   if (maxSteps < 5) throw new Error('Agent planner loop needs at least five bounded steps.');
 
   const transcript: AgentPlannerLoopResult['transcript'] = [];
-  const inspected = buildAgentImageContextSnapshot();
+  const initialPromptContext = buildAgentInitialPromptContext({ operationId, prompt, sessionId });
+  const inspected = initialPromptContext.imageContext;
   transcript.push({
-    detail: `inspected ${inspected.activeImagePath} with ${inspected.initialPreview.id}`,
+    detail: `sent initial prompt context ${initialPromptContext.preview.artifactId}`,
     stage: 'inspect',
   });
 
@@ -97,6 +102,7 @@ export const runAgentBoundedEditPlannerLoop = async ({
       dryRunBeforeHash: '',
       finalGraphRevision: inspected.graphRevision,
       initialGraphRevision: inspected.graphRevision,
+      initialPromptContext,
       inspected,
       plannedSteps,
       stopState: 'blocked',
@@ -119,6 +125,7 @@ export const runAgentBoundedEditPlannerLoop = async ({
     dryRunBeforeHash: preview.beforePreviewHash,
     finalGraphRevision,
     initialGraphRevision: inspected.graphRevision,
+    initialPromptContext,
     inspected,
     plannedSteps,
     stopState: 'approval_ready',
@@ -130,6 +137,8 @@ export const runAgentBoundedEditPlannerLoop = async ({
     dryRunBeforeHash: result.dryRunBeforeHash,
     finalGraphRevision: result.finalGraphRevision,
     initialGraphRevision: result.initialGraphRevision,
+    initialPreviewArtifactId: result.initialPromptContext.preview.artifactId,
+    initialPreviewRecipeHash: result.initialPromptContext.preview.recipeHash,
     plannedStepCount: result.plannedSteps.length,
     stopState: result.stopState,
     transcriptLength: result.transcript.length,

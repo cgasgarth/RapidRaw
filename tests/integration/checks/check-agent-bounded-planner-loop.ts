@@ -90,13 +90,39 @@ if (result.inspected.activeImagePath !== selectedPath || result.inspected.histog
   throw new Error('Agent planner loop did not inspect bounded RAW context.');
 }
 if (
+  result.initialPromptContext.prompt !==
+    'Make this RAW brighter, warmer, and add contrast without applying until I approve.' ||
+  result.initialPromptContext.sessionId !== 'agent-planner-loop-3159' ||
+  result.initialPromptContext.modelInput.transport !== 'codex_app_server' ||
+  !result.initialPromptContext.modelInput.safetyConstraints.requireTypedTools ||
+  !result.initialPromptContext.modelInput.safetyConstraints.requireUserApprovalBeforeApply
+) {
+  throw new Error('Agent planner loop did not build a bounded app-server initial prompt request.');
+}
+if (
+  result.initialPromptContext.modelInput.activeImagePath !== selectedPath ||
+  result.initialPromptContext.modelInput.graphRevision !== 'history_0' ||
+  result.initialPromptContext.modelInput.currentAdjustments.length === 0
+) {
+  throw new Error('Agent initial prompt request did not include selected image, revision, and adjustment context.');
+}
+if (
   result.inspected.initialPreview.mediaType !== 'image/jpeg' ||
   result.inspected.initialPreview.previewRef === 'blob:rawengine-original-3159'
 ) {
   throw new Error('Agent planner loop did not attach the safe initial preview context.');
 }
-if (!result.transcript[0]?.detail.includes(result.inspected.initialPreview.id)) {
+if (
+  result.initialPromptContext.preview.mediaType !== 'image/jpeg' ||
+  result.initialPromptContext.preview.longEdgePx !== 1536 ||
+  result.initialPromptContext.preview.quality !== 0.86 ||
+  result.initialPromptContext.preview.accessScope !== 'local_private' ||
+  result.initialPromptContext.preview.previewRef !== 'blob:rawengine-planner-before'
+) {
+  throw new Error('Agent initial prompt request did not attach the medium private preview descriptor.');
+}
+if (!result.transcript[0]?.detail.includes(result.initialPromptContext.preview.artifactId)) {
   throw new Error('Agent planner loop transcript did not prove the initial preview was part of inspection.');
 }
 
-console.log('agent bounded planner loop ok (inspect-plan-dry-run-observe)');
+console.log('agent bounded planner loop ok (initial-preview+dry-run)');
