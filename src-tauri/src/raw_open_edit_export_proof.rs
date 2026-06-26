@@ -15,7 +15,7 @@ use crate::app_settings::{AppSettings, load_settings_or_default};
 use crate::app_state::AppState;
 use crate::export_processing::{
     ExportColorProfile, ExportRenderingIntent, ExportSettings, export_jpeg_rgb_pixels_and_profile,
-    export_soft_proof_rgb_pixels_and_profile,
+    export_soft_proof_rgb_pixels_and_profile_with_policy,
     process_image_for_export_pipeline_with_tonemapper_override, save_image_with_metadata,
 };
 use crate::formats::is_raw_file;
@@ -377,10 +377,11 @@ fn run_raw_open_edit_export_proof_with_context(
     let export_rendering_intent =
         export_rendering_intent_for_proof(&request.edit_command.color_pipeline.render_target)?;
     let (soft_proof_after_pixels, soft_proof_after_width, soft_proof_after_height, _) =
-        export_soft_proof_rgb_pixels_and_profile(
+        export_soft_proof_rgb_pixels_and_profile_with_policy(
             &preview_after,
             &export_color_profile,
             &export_rendering_intent,
+            false,
         )?;
     let (export_rgb8_pixels, export_rgb8_width, export_rgb8_height, _) =
         export_jpeg_rgb_pixels_and_profile(
@@ -1376,10 +1377,11 @@ mod tests {
             &settings,
         )
         .expect("final TIFF export writes through production encoder");
-        let (soft_proof, width, height, _) = export_soft_proof_rgb_pixels_and_profile(
+        let (soft_proof, width, height, _) = export_soft_proof_rgb_pixels_and_profile_with_policy(
             &image,
             &ExportColorProfile::DisplayP3,
             &ExportRenderingIntent::RelativeColorimetric,
+            false,
         )
         .expect("soft proof pixels");
 

@@ -25,6 +25,18 @@ export interface CopiedSectionAdjustments {
   values: Partial<Adjustments>;
 }
 
+export interface ExportSoftProofTransformState {
+  blackPointCompensation: string | null;
+  colorManagedTransform: string | null;
+  effectiveColorProfile: string | null;
+  effectiveRenderingIntent: string | null;
+  policyStatus: string | null;
+  policyVersion: string | null;
+  sourcePrecisionPath: string | null;
+  transformApplied: boolean | null;
+  transformPolicyFingerprint: string | null;
+}
+
 interface EditorState {
   // Core Image & Adjustments
   selectedImage: SelectedImage | null;
@@ -49,6 +61,7 @@ interface EditorState {
   isGamutWarningOverlayVisible: boolean;
   isExportSoftProofEnabled: boolean;
   exportSoftProofRecipeId: string | null;
+  exportSoftProofTransform: ExportSoftProofTransformState | null;
   isWaveformVisible: boolean;
   activeWaveformChannel: DisplayMode;
   waveformHeight: number;
@@ -113,6 +126,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   isGamutWarningOverlayVisible: true,
   isExportSoftProofEnabled: false,
   exportSoftProofRecipeId: null,
+  exportSoftProofTransform: null,
   isWaveformVisible: false,
   activeWaveformChannel: DisplayMode.Luma,
   waveformHeight: 220,

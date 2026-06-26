@@ -826,6 +826,7 @@ fn generate_export_soft_proof_preview(
     js_adjustments: serde_json::Value,
     color_profile: export_processing::ExportColorProfile,
     rendering_intent: export_processing::ExportRenderingIntent,
+    black_point_compensation: bool,
     target_resolution: Option<u32>,
     state: tauri::State<AppState>,
 ) -> Result<Response, String> {
@@ -843,10 +844,11 @@ fn generate_export_soft_proof_preview(
     let (preview_image, _, _) =
         generate_transformed_preview(&state, &loaded_image, &adjustments_clone, preview_dim)?;
     let (proof_pixels, width, height, _) =
-        export_processing::export_soft_proof_rgb_pixels_and_profile(
+        export_processing::export_soft_proof_rgb_pixels_and_profile_with_policy(
             &preview_image,
             &color_profile,
             &rendering_intent,
+            black_point_compensation,
         )?;
 
     Encoder::new(Preset::BaselineFastest)
@@ -854,6 +856,37 @@ fn generate_export_soft_proof_preview(
         .encode_rgb(&proof_pixels, width, height)
         .map(Response::new)
         .map_err(|e| format!("Failed to encode export soft proof preview: {}", e))
+}
+
+#[tauri::command]
+fn resolve_export_soft_proof_transform_metadata(
+    js_adjustments: serde_json::Value,
+    color_profile: export_processing::ExportColorProfile,
+    rendering_intent: export_processing::ExportRenderingIntent,
+    black_point_compensation: bool,
+    target_resolution: Option<u32>,
+    state: tauri::State<AppState>,
+) -> Result<export_processing::ExportReceiptMetadata, String> {
+    let mut adjustments_clone = js_adjustments;
+    hydrate_adjustments(&state, &mut adjustments_clone);
+
+    let loaded_image = state
+        .original_image
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or("No original image loaded")?;
+
+    let preview_dim = target_resolution.unwrap_or(1920).clamp(512, 8192);
+    let (preview_image, _, _) =
+        generate_transformed_preview(&state, &loaded_image, &adjustments_clone, preview_dim)?;
+
+    export_processing::export_soft_proof_transform_metadata(
+        &preview_image,
+        &color_profile,
+        &rendering_intent,
+        black_point_compensation,
+    )
 }
 
 #[tauri::command]
@@ -2619,6 +2652,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             apply_adjustments,
             generate_export_soft_proof_preview,
+            resolve_export_soft_proof_transform_metadata,
             generate_preview_for_path,
             generate_original_transformed_preview,
             generate_preset_preview,

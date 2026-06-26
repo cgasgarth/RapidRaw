@@ -18,11 +18,19 @@ const locale = JSON.parse(read('src/i18n/locales/en.json'));
 for (const marker of [
   'isExportSoftProofEnabled',
   'exportSoftProofRecipeId',
+  'exportSoftProofTransform',
   'data-testid="export-soft-proof-toolbar"',
   'data-testid="export-soft-proof-recipe-details"',
   'data-export-soft-proof-color-profile',
+  'data-export-soft-proof-black-point-compensation',
+  'data-export-soft-proof-effective-color-profile',
+  'data-export-soft-proof-effective-rendering-intent',
+  'data-export-soft-proof-fingerprint',
   'data-export-soft-proof-rendering-intent',
+  'data-export-soft-proof-source-precision-path',
   'data-export-soft-proof-status="export-transform-preview"',
+  'data-export-soft-proof-transform-applied',
+  'data-export-soft-proof-transform-policy-fingerprint',
   'data-testid="export-soft-proof-active-dot"',
   'data-testid="export-soft-proof-active-badge"',
   'aria-pressed={isExportSoftProofEnabled}',
@@ -35,14 +43,22 @@ for (const marker of [
 
 for (const marker of [
   'Invokes.GenerateExportSoftProofPreview',
+  'Invokes.ResolveExportSoftProofTransformMetadata',
   'selectedProofRecipe',
+  'blackPointCompensation: selectedProofRecipe.blackPointCompensation ?? false',
   "colorProfile: selectedProofRecipe.colorProfile ?? 'srgb'",
   "renderingIntent: selectedProofRecipe.renderingIntent ?? 'relativeColorimetric'",
+  'exportSoftProofTransformResponseSchema',
 ]) {
   if (!hookSource.includes(marker)) failures.push(`useImageProcessing missing ${marker}`);
 }
 
-for (const marker of ['GenerateExportSoftProofPreview', 'generate_export_soft_proof_preview']) {
+for (const marker of [
+  'GenerateExportSoftProofPreview',
+  'generate_export_soft_proof_preview',
+  'ResolveExportSoftProofTransformMetadata',
+  'resolve_export_soft_proof_transform_metadata',
+]) {
   if (!appPropertiesSource.includes(marker) && !rustLibSource.includes(marker)) {
     failures.push(`soft-proof invoke missing ${marker}`);
   }
@@ -52,9 +68,15 @@ if (!rustLibSource.includes('export_processing::export_soft_proof_rgb_pixels_and
   failures.push('Rust soft-proof command does not reuse export color transform.');
 }
 
+if (!rustLibSource.includes('export_processing::export_soft_proof_transform_metadata')) {
+  failures.push('Rust soft-proof metadata command does not resolve export transform metadata.');
+}
+
 if (
   !rustExportSource.includes('pub(crate) fn export_soft_proof_rgb_pixels_and_profile') ||
-  !rustExportSource.includes('export_rgb_pixels_and_profile(image, color_profile, rendering_intent, false)') ||
+  !rustExportSource.includes('export_soft_proof_rgb_pixels_and_profile_with_policy') ||
+  !rustExportSource.includes('export_soft_proof_transform_metadata') ||
+  !rustExportSource.includes('export_rgb_pixels_and_profile(') ||
   !rustExportSource.includes('resolve_export_color_transform_plan(')
 ) {
   failures.push('export_rgb_pixels_and_profile is not available to the soft-proof command and receipt.');
@@ -93,7 +115,9 @@ for (const marker of [
 
 if (
   !storeSource.includes('isExportSoftProofEnabled: false') ||
-  !storeSource.includes('exportSoftProofRecipeId: null')
+  !storeSource.includes('exportSoftProofRecipeId: null') ||
+  !storeSource.includes('exportSoftProofTransform: null') ||
+  !storeSource.includes('ExportSoftProofTransformState')
 ) {
   failures.push('Editor store missing non-mutating soft-proof defaults.');
 }

@@ -5,7 +5,7 @@ import { debouncedSave } from './useEditorActions';
 import { Invokes, Panel } from '../components/ui/AppProperties';
 import { prepareAdjustmentPayloadForBackend } from '../schemas/adjustmentPayloadSchemas';
 import { emptyTauriResponseSchema } from '../schemas/tauriResponseSchemas';
-import { useEditorStore } from '../store/useEditorStore';
+import { type ExportSoftProofTransformState, useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -36,6 +36,34 @@ interface TransformWrapperRefValue {
 
 const previewBufferResponseSchema = z.instanceof(ArrayBuffer);
 const previewDataUrlResponseSchema = z.string();
+const exportSoftProofTransformResponseSchema = z
+  .object({
+    blackPointCompensation: z.string().trim().min(1),
+    colorManagedTransform: z.string().trim().min(1),
+    effectiveColorProfile: z.string().trim().min(1),
+    effectiveRenderingIntent: z.string().trim().min(1),
+    policyStatus: z.string().trim().min(1),
+    policyVersion: z.string().trim().min(1),
+    sourcePrecisionPath: z.string().trim().min(1),
+    transformApplied: z.boolean(),
+    transformPolicyFingerprint: z
+      .string()
+      .trim()
+      .regex(/^sha256:/),
+  })
+  .transform(
+    (metadata): ExportSoftProofTransformState => ({
+      blackPointCompensation: metadata.blackPointCompensation,
+      colorManagedTransform: metadata.colorManagedTransform,
+      effectiveColorProfile: metadata.effectiveColorProfile,
+      effectiveRenderingIntent: metadata.effectiveRenderingIntent,
+      policyStatus: metadata.policyStatus,
+      policyVersion: metadata.policyVersion,
+      sourcePrecisionPath: metadata.sourcePrecisionPath,
+      transformApplied: metadata.transformApplied,
+      transformPolicyFingerprint: metadata.transformPolicyFingerprint,
+    }),
+  );
 
 export function useImageProcessing(
   transformWrapperRef: React.RefObject<TransformWrapperRefValue | null>,
@@ -159,30 +187,41 @@ export function useImageProcessing(
       const roi = calculateROI();
 
       try {
-        const buffer: ArrayBuffer =
-          !dragging && selectedProofRecipe
-            ? await invokeWithSchema(
-                Invokes.GenerateExportSoftProofPreview,
-                {
-                  jsAdjustments: payload,
-                  colorProfile: selectedProofRecipe.colorProfile ?? 'srgb',
-                  renderingIntent: selectedProofRecipe.renderingIntent ?? 'relativeColorimetric',
-                  targetResolution: targetRes || null,
-                },
-                previewBufferResponseSchema,
-              )
-            : await invokeWithSchema(
-                Invokes.ApplyAdjustments,
-                {
-                  jsAdjustments: payload,
-                  isInteractive: dragging,
-                  targetResolution: targetRes || null,
-                  roi: roi || null,
-                  computeWaveform: isWaveformVisible,
-                  activeWaveformChannel: activeWaveformChannelRef.current,
-                },
-                previewBufferResponseSchema,
-              );
+        const proofRequest = selectedProofRecipe
+          ? {
+              blackPointCompensation: selectedProofRecipe.blackPointCompensation ?? false,
+              colorProfile: selectedProofRecipe.colorProfile ?? 'srgb',
+              jsAdjustments: payload,
+              renderingIntent: selectedProofRecipe.renderingIntent ?? 'relativeColorimetric',
+              targetResolution: targetRes || null,
+            }
+          : null;
+        const proofResult =
+          !dragging && proofRequest
+            ? await Promise.all([
+                invokeWithSchema(Invokes.GenerateExportSoftProofPreview, proofRequest, previewBufferResponseSchema),
+                invokeWithSchema(
+                  Invokes.ResolveExportSoftProofTransformMetadata,
+                  proofRequest,
+                  exportSoftProofTransformResponseSchema,
+                ),
+              ]).then(([buffer, transform]) => ({ buffer, transform }))
+            : {
+                buffer: await invokeWithSchema(
+                  Invokes.ApplyAdjustments,
+                  {
+                    jsAdjustments: payload,
+                    isInteractive: dragging,
+                    targetResolution: targetRes || null,
+                    roi: roi || null,
+                    computeWaveform: isWaveformVisible,
+                    activeWaveformChannel: activeWaveformChannelRef.current,
+                  },
+                  previewBufferResponseSchema,
+                ),
+                transform: null,
+              };
+        const { buffer, transform } = proofResult;
 
         if (newlySentPatchIds.size > 0) {
           newlySentPatchIds.forEach((id) => patchesSentToBackend.add(id));
@@ -250,7 +289,7 @@ export function useImageProcessing(
                   }
                 }, 250);
               }
-              return { finalPreviewUrl: url };
+              return { exportSoftProofTransform: transform, finalPreviewUrl: url };
             });
 
             setEditor((state) => {
