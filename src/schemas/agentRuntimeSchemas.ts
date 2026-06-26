@@ -290,6 +290,16 @@ export const rawEngineAppServerRouteCatalogRequestSchema = z
 export const rawEngineAppServerToolDispatchRequestSchema = z
   .object({
     arguments: z.unknown(),
+    draftSession: z
+      .object({
+        draftRevision: z.number().int().nonnegative(),
+        parentRecipeHash: z.string().trim().min(1),
+        selectedImagePath: z.string().trim().min(1),
+        sessionId: z.string().trim().min(1),
+        status: z.enum(['active', 'cancelled']),
+      })
+      .strict()
+      .optional(),
     requestId: z.string().trim().min(1),
     runtimeToolName: z.string().trim().min(1),
     toolName: z.literal(RawEngineAppServerHostToolName.DispatchTool),

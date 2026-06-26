@@ -186,7 +186,7 @@ assertRejected(
 assertRejected(
   await dispatch('rawengine.agent.unknown_tool', { requestId: 'agent-baseline-unknown' }, 'baseline-unknown'),
   'unknown agent tool',
-  'does not advertise',
+  'not an approved typed agent app-server tool',
 );
 
 const apply = await dispatch(
