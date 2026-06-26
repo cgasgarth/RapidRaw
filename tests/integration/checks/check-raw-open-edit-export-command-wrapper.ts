@@ -98,7 +98,7 @@ rawOpenEditExportProofReportSchema.parse({
     observedColorPipeline: {
       bitDepth: 16,
       cmmUsed: true,
-      displayProfileCorrectness: 'not_proven',
+      displayProfileCorrectness: 'active_display_lut_profile_loaded',
       exportColorEncoding: 'display_p3_rgb16_tiff',
       exportFormat: 'tiff',
       gamutMapping: 'not_proven',
