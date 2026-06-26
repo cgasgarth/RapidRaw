@@ -93,7 +93,6 @@ const colorManagementProofSchema = z
         z.enum([
           'acescg_working_space',
           'bradford_chromatic_adaptation',
-          'black_point_compensation',
           'camera_profile_quality',
           'capture_one_class_quality',
           'display_device_visual_match',
@@ -116,7 +115,7 @@ const colorManagementProofSchema = z
         outputProfile: z.literal('display_p3'),
         renderingIntentApplied: z.literal(true),
         sceneToDisplayTransform: z.literal('rawengine_agx_v1'),
-        transferStatus: z.literal('moxcms_rgb16_display_p3_final_file'),
+        transferStatus: z.literal('lcms2_bpc_rgb16_display_p3_final_file'),
         viewTransform: z.literal('rawengine_agx_v1'),
         workingBuffer: z.literal('linear_srgb_d65_observed'),
       })
@@ -138,7 +137,6 @@ const colorManagementProofSchema = z
     for (const nonClaim of [
       'acescg_working_space',
       'bradford_chromatic_adaptation',
-      'black_point_compensation',
       'camera_profile_quality',
       'capture_one_class_quality',
       'display_device_visual_match',
@@ -303,7 +301,15 @@ export const rawOpenEditExportProofReportSchema = z
         .object({
           name: z.enum([
             'changedPixelRatio',
+            'finalFileBlackPointCompensationApplied',
             'previewExportMeanAbsDelta',
+            'finalFileBitDepth',
+            'finalFileColorEngineLcms2',
+            'finalFileIccProfileEmbedded',
+            'finalFileReopenSucceeded',
+            'finalFileSoftProofRgb8MaxAbsDelta',
+            'finalFileSoftProofRgb8MeanAbsDelta',
+            'finalFileTransformApplied',
             'softProofExportRgb8MeanAbsDelta',
             'sidecarReloadRevisionMatch',
             'sourceHashUnchanged',

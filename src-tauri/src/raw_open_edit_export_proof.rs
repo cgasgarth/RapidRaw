@@ -271,6 +271,8 @@ pub struct RawOpenEditExportRenderPathProof {
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportFinalFileProof {
     pub bit_depth: u32,
+    pub black_point_compensation: String,
+    pub cmm: String,
     pub embedded_icc_profile_hash: String,
     pub expected_output_profile_hash: String,
     pub final_file_format: String,
@@ -278,6 +280,8 @@ pub struct RawOpenEditExportFinalFileProof {
     pub pixel_max_abs_delta: f64,
     pub pixel_mean_abs_delta: f64,
     pub reopened_dimensions: RawOpenEditExportDimensions,
+    pub transform_applied: bool,
+    pub transform_policy_fingerprint: String,
     pub writer_id: String,
 }
 
@@ -381,14 +385,14 @@ fn run_raw_open_edit_export_proof_with_context(
             &preview_after,
             &export_color_profile,
             &export_rendering_intent,
-            false,
+            true,
         )?;
     let (export_rgb8_pixels, export_rgb8_width, export_rgb8_height, _) =
         export_jpeg_rgb_pixels_and_profile(
             &preview_after,
             &export_color_profile,
             &export_rendering_intent,
-            false,
+            true,
         )?;
     if (soft_proof_after_width, soft_proof_after_height) != (export_rgb8_width, export_rgb8_height)
     {
@@ -433,7 +437,7 @@ fn run_raw_open_edit_export_proof_with_context(
         ImageFormat::Png,
     )?;
     let export_settings = ExportSettings {
-        black_point_compensation: false,
+        black_point_compensation: true,
         color_profile: export_color_profile.clone(),
         rendering_intent: export_rendering_intent.clone(),
         jpeg_quality: 95,
@@ -448,12 +452,13 @@ fn run_raw_open_edit_export_proof_with_context(
         preserve_folders: false,
     };
     let export_after_path = resolve_private_relative(&private_root, &export_after_relative)?;
-    save_image_with_metadata(
+    let export_receipt = save_image_with_metadata(
         &export_after,
         &export_after_path,
         &source_path_string,
         &export_settings,
-    )?;
+    )?
+    .ok_or_else(|| "final TIFF export must include color policy receipt metadata.".to_string())?;
     write_rgb8_image(
         &private_root,
         &soft_proof_after_relative,
@@ -477,6 +482,7 @@ fn run_raw_open_edit_export_proof_with_context(
     let final_file = inspect_final_tiff_export(
         &export_after_path,
         &export_color_profile,
+        &export_receipt,
         &soft_proof_after_pixels,
         soft_proof_after_width,
         soft_proof_after_height,
@@ -549,6 +555,35 @@ fn run_raw_open_edit_export_proof_with_context(
             ),
             metric("finalFileIccProfileEmbedded", 1.0, 1.0, true),
             metric(
+                "finalFileBlackPointCompensationApplied",
+                if final_file.black_point_compensation
+                    == "Enabled via LittleCMS relative colorimetric transform"
+                {
+                    1.0
+                } else {
+                    0.0
+                },
+                1.0,
+                final_file.black_point_compensation
+                    == "Enabled via LittleCMS relative colorimetric transform",
+            ),
+            metric(
+                "finalFileColorEngineLcms2",
+                if final_file.cmm == "lcms2" { 1.0 } else { 0.0 },
+                1.0,
+                final_file.cmm == "lcms2",
+            ),
+            metric(
+                "finalFileTransformApplied",
+                if final_file.transform_applied {
+                    1.0
+                } else {
+                    0.0
+                },
+                1.0,
+                final_file.transform_applied,
+            ),
+            metric(
                 "finalFileSoftProofRgb8MeanAbsDelta",
                 final_file.pixel_mean_abs_delta,
                 0.0,
@@ -614,6 +649,7 @@ fn run_raw_open_edit_export_proof_with_context(
 fn inspect_final_tiff_export(
     output_path: &Path,
     color_profile: &ExportColorProfile,
+    color_receipt: &crate::export_processing::ExportReceiptMetadata,
     expected_rgb8: &[u8],
     expected_width: u32,
     expected_height: u32,
@@ -645,6 +681,8 @@ fn inspect_final_tiff_export(
 
     Ok(RawOpenEditExportFinalFileProof {
         bit_depth,
+        black_point_compensation: color_receipt.black_point_compensation.clone(),
+        cmm: color_receipt.cmm.clone(),
         embedded_icc_profile_hash: sha256_bytes(&embedded_icc),
         expected_output_profile_hash: sha256_bytes(&expected_icc),
         final_file_format: "tiff".to_string(),
@@ -652,6 +690,8 @@ fn inspect_final_tiff_export(
         pixel_max_abs_delta,
         pixel_mean_abs_delta,
         reopened_dimensions: RawOpenEditExportDimensions { height, width },
+        transform_applied: color_receipt.transform_applied,
+        transform_policy_fingerprint: color_receipt.transform_policy_fingerprint.clone(),
         writer_id: "export_processing::save_image_with_metadata".to_string(),
     })
 }
@@ -828,7 +868,6 @@ fn color_management_proof(
         does_not_prove: vec![
             "acescg_working_space".to_string(),
             "bradford_chromatic_adaptation".to_string(),
-            "black_point_compensation".to_string(),
             "camera_profile_quality".to_string(),
             "capture_one_class_quality".to_string(),
             "display_device_visual_match".to_string(),
@@ -848,7 +887,7 @@ fn color_management_proof(
             output_profile: "display_p3".to_string(),
             rendering_intent_applied: true,
             scene_to_display_transform: pipeline.scene_to_display_transform.clone(),
-            transfer_status: "moxcms_rgb16_display_p3_final_file".to_string(),
+            transfer_status: "lcms2_bpc_rgb16_display_p3_final_file".to_string(),
             view_transform: pipeline.render_target.view_transform.clone(),
             working_buffer: "linear_srgb_d65_observed".to_string(),
         },
@@ -861,7 +900,7 @@ fn color_management_proof(
         tracking_issue: 2308,
         warnings: vec![
             "Final TIFF proof verifies Display P3 ICC embedding and RGB16 file reopen, but not full chart-based colorimetric accuracy.".to_string(),
-            "Black-point compensation remains unsupported by the active CMM path and is not claimed.".to_string(),
+            "Black-point compensation is proven as an applied LittleCMS export policy, not as a full print-match or chart-based colorimetric result.".to_string(),
             "Decoder calibration and white-balance metadata are not surfaced by this proof trace yet.".to_string(),
             "WGPU adapter/backend are not surfaced by this proof trace yet.".to_string(),
         ],
@@ -1356,7 +1395,7 @@ mod tests {
             image::Rgb([128, 64, 32]),
         ));
         let settings = ExportSettings {
-            black_point_compensation: false,
+            black_point_compensation: true,
             color_profile: ExportColorProfile::DisplayP3,
             rendering_intent: ExportRenderingIntent::RelativeColorimetric,
             jpeg_quality: 95,
@@ -1370,24 +1409,26 @@ mod tests {
             output_sharpening: None,
             preserve_folders: false,
         };
-        save_image_with_metadata(
+        let receipt = save_image_with_metadata(
             &image,
             &output_path,
             "private-fixtures/detail/sample.cr3",
             &settings,
         )
-        .expect("final TIFF export writes through production encoder");
+        .expect("final TIFF export writes through production encoder")
+        .expect("final TIFF export returns color receipt");
         let (soft_proof, width, height, _) = export_soft_proof_rgb_pixels_and_profile_with_policy(
             &image,
             &ExportColorProfile::DisplayP3,
             &ExportRenderingIntent::RelativeColorimetric,
-            false,
+            true,
         )
         .expect("soft proof pixels");
 
         let proof = inspect_final_tiff_export(
             &output_path,
             &ExportColorProfile::DisplayP3,
+            &receipt,
             &soft_proof,
             width,
             height,
@@ -1401,6 +1442,12 @@ mod tests {
         );
         assert_eq!(proof.pixel_mean_abs_delta, 0.0);
         assert_eq!(proof.pixel_max_abs_delta, 0.0);
+        assert_eq!(
+            proof.black_point_compensation,
+            "Enabled via LittleCMS relative colorimetric transform"
+        );
+        assert_eq!(proof.cmm, "lcms2");
+        assert!(proof.transform_applied);
     }
 
     #[test]
@@ -1476,6 +1523,9 @@ mod tests {
             fixture_id: "validation.raw-open-edit-export.sample.v1".to_string(),
             final_file: RawOpenEditExportFinalFileProof {
                 bit_depth: 16,
+                black_point_compensation: "Enabled via LittleCMS relative colorimetric transform"
+                    .to_string(),
+                cmm: "lcms2".to_string(),
                 embedded_icc_profile_hash:
                     "sha256:0000000000000000000000000000000000000000000000000000000000000000"
                         .to_string(),
@@ -1490,6 +1540,10 @@ mod tests {
                     height: 2,
                     width: 2,
                 },
+                transform_applied: true,
+                transform_policy_fingerprint:
+                    "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+                        .to_string(),
                 writer_id: "export_processing::save_image_with_metadata".to_string(),
             },
             generated_at: "2026-06-17T00:00:00Z".to_string(),
