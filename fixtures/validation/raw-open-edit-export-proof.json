@@ -168,6 +168,89 @@
         {
           "hash": "sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b",
           "kind": "source_raw_private",
+          "path": "private-fixtures/color/professional-workflow-v1/alaska-dsc7853.arw",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "preview_before_private",
+          "path": "private-artifacts/validation/open-edit-export/srgb-relative/professional-color-relative-v1-preview-before.png",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "preview_after_private",
+          "path": "private-artifacts/validation/open-edit-export/srgb-relative/professional-color-relative-v1-preview-after.png",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "export_after_private",
+          "path": "private-artifacts/validation/open-edit-export/srgb-relative/professional-color-relative-v1-export-after.tiff",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "soft_proof_after_private",
+          "path": "private-artifacts/validation/open-edit-export/srgb-relative/professional-color-relative-v1-soft-proof-after.png",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "sidecar_after_private",
+          "path": "private-artifacts/validation/open-edit-export/srgb-relative/professional-color-relative-v1-after.rrdata",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "workflow_report_private",
+          "path": "private-artifacts/validation/open-edit-export/srgb-relative/professional-color-relative-v1-workflow-report.json",
+          "publicRepoAllowed": false
+        }
+      ],
+      "editGraphRevision": "graph-rev.raw-open-edit-export.professional-color-relative.v1",
+      "evidenceId": "raw-evidence.color.professional-workflow.v1",
+      "expectedMetrics": [
+        {
+          "name": "previewExportMeanAbsDelta",
+          "required": true,
+          "threshold": 0.015
+        },
+        {
+          "name": "softProofExportRgb8MeanAbsDelta",
+          "required": true,
+          "threshold": 0
+        },
+        {
+          "name": "sidecarReloadRevisionMatch",
+          "required": true,
+          "threshold": 1
+        },
+        {
+          "name": "sourceHashUnchanged",
+          "required": true,
+          "threshold": 1
+        }
+      ],
+      "fixtureId": "validation.raw-open-edit-export.professional-color-relative.v1",
+      "localRelativePath": "private-fixtures/color/professional-workflow-v1/alaska-dsc7853.arw",
+      "notes": "Relative-colorimetric comparison slot for #3238 real-RAW sRGB perceptual gamut mapping review. Public repo stores metadata only until local runtime reports are generated.",
+      "status": "pending_private_asset",
+      "trackingIssue": 1376,
+      "workflowSteps": [
+        "open_raw",
+        "apply_edit_graph",
+        "render_preview",
+        "export_image",
+        "write_sidecar",
+        "reload_sidecar"
+      ]
+    },
+    {
+      "artifacts": [
+        {
+          "hash": "sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b",
+          "kind": "source_raw_private",
           "path": "private-fixtures/color/selective-color-orange-v1/alaska-dsc7853.arw",
           "publicRepoAllowed": false
         },

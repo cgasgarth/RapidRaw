@@ -1,0 +1,51 @@
+{
+  "caveats": [
+    "DeltaE00 is a pairwise guardrail, not a final image-quality score.",
+    "The comparison uses soft-proof RGB8 artifacts because the runtime report proves soft proof and TIFF export parity.",
+    "perceptualDeltaE00VsRelativeClip compares against relative colorimetric clipping, not a ground-truth visual target.",
+    "perceptualDeltaE00VsUnmappedDestinationLab is null because the current private report does not persist pre-map destination-space pixels.",
+    "This report does not prove Capture One-class visual quality, display-device matching, camera-profile accuracy, or final mapper tuning."
+  ],
+  "comparisonBasis": "soft_proof_rgb8_perceptual_vs_relative_colorimetric",
+  "generatedAt": "2026-06-26T22:46:57.095Z",
+  "issue": 3238,
+  "metrics": {
+    "changedPixelRatio": 0,
+    "deltaE00VsRelativeClip": {
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+    },
+    "hueAngleDriftDegVsRelativeClip": {
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+    },
+    "maxAbsRgb8Delta": 0,
+    "meanAbsRgb8Delta": 0,
+    "neutralAxisDriftP95": 0,
+    "perceptualDeltaE00VsUnmappedDestinationLab": null,
+    "pixelCount": 24000000,
+    "saturationMonotonicViolationCount": 0
+  },
+  "perceptualRun": {
+    "fixtureId": "validation.raw-open-edit-export.professional-color.v1",
+    "gamutMapping": "rawengine.gamut.srgb-oklab-chroma-reduce.v1",
+    "reportPath": "/tmp/rawengine-gamut-mapping-real-raw-proof/raw-open-edit-export-run-reports.json",
+    "softProofHash": "sha256:2799b12554a5db4e1be711d9582648e7f6be2241631dca1fa64bdbb2634a2971",
+    "softProofPath": "private-artifacts/validation/open-edit-export/srgb-perceptual/professional-color-v1-soft-proof-after.png"
+  },
+  "relativeRun": {
+    "fixtureId": "validation.raw-open-edit-export.professional-color-relative.v1",
+    "gamutMapping": "not_proven",
+    "reportPath": "/tmp/rawengine-gamut-mapping-real-raw-proof/raw-open-edit-export-relative-run-reports.json",
+    "softProofHash": "sha256:2799b12554a5db4e1be711d9582648e7f6be2241631dca1fa64bdbb2634a2971",
+    "softProofPath": "private-artifacts/validation/open-edit-export/srgb-relative/professional-color-relative-v1-soft-proof-after.png"
+  },
+  "schemaVersion": 1,
+  "validationCommands": [
+    "RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun run check:raw-color-management-srgb-perceptual-private-proof --root /tmp/rawengine-gamut-mapping-real-raw-proof --output /tmp/rawengine-gamut-mapping-real-raw-proof/raw-open-edit-export-run-reports.json --require-assets",
+    "RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun scripts/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export-srgb-relative-proof-request.json --root /tmp/rawengine-gamut-mapping-real-raw-proof --output /tmp/rawengine-gamut-mapping-real-raw-proof/raw-open-edit-export-relative-run-reports.json --require-assets"
+  ],
+  "validationMode": "local_alaska_raw_srgb_perceptual_vs_relative_comparison"
+}

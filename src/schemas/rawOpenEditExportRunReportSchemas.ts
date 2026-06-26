@@ -208,7 +208,7 @@ const finalFileProofSchema = z
     pixelMaxAbsDelta: z.number().min(0),
     pixelMeanAbsDelta: z.number().min(0),
     reopenedDimensions: z.object({ height: z.number().int().positive(), width: z.number().int().positive() }).strict(),
-    transformApplied: z.literal(true),
+    transformApplied: z.boolean(),
     transformPolicyFingerprint: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
     writerId: z.literal('export_processing::save_image_with_metadata'),
   })

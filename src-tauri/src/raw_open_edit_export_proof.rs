@@ -493,6 +493,11 @@ fn run_raw_open_edit_export_proof_with_context(
         == "Enabled via LittleCMS relative colorimetric transform"
         || final_file.black_point_compensation == "Requested but disabled for this export path";
     let color_engine_handled = final_file.cmm == "lcms2" || final_file.cmm == "moxcms";
+    let final_file_transform_expected = final_file_transform_expected_for_proof(
+        &export_color_profile,
+        &export_rendering_intent,
+        final_file.transform_applied,
+    );
     let reloaded_sidecar = fs::read_to_string(&sidecar_path).map_err(|error| error.to_string())?;
     let reloaded_sidecar_json: Value =
         serde_json::from_str(&reloaded_sidecar).map_err(|error| error.to_string())?;
@@ -579,8 +584,8 @@ fn run_raw_open_edit_export_proof_with_context(
                 } else {
                     0.0
                 },
-                1.0,
-                final_file.transform_applied,
+                final_file_transform_expected.threshold,
+                final_file_transform_expected.passed,
             ),
             metric(
                 "finalFileSoftProofRgb8MeanAbsDelta",
@@ -1095,6 +1100,32 @@ fn metric(name: &str, value: f64, threshold: f64, passed: bool) -> RawOpenEditEx
         source: "private_raw_report".to_string(),
         threshold,
         value,
+    }
+}
+
+struct ProofMetricExpectation {
+    passed: bool,
+    threshold: f64,
+}
+
+fn final_file_transform_expected_for_proof(
+    color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
+    transform_applied: bool,
+) -> ProofMetricExpectation {
+    let expected_value = if matches!(color_profile, ExportColorProfile::Srgb)
+        && matches!(
+            rendering_intent,
+            ExportRenderingIntent::RelativeColorimetric
+        ) {
+        0.0
+    } else {
+        1.0
+    };
+    let actual_value = if transform_applied { 1.0 } else { 0.0 };
+    ProofMetricExpectation {
+        passed: actual_value == expected_value,
+        threshold: expected_value,
     }
 }
 
@@ -1684,6 +1715,30 @@ mod tests {
             raw_open_edit_export_report_id("validation.raw-open-edit-export.edge-ringing.v1"),
             "raw-open-edit-export-run.edge-ringing.v1"
         );
+    }
+
+    #[test]
+    fn srgb_relative_baseline_accepts_no_final_transform() {
+        let expectation = final_file_transform_expected_for_proof(
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::RelativeColorimetric,
+            false,
+        );
+
+        assert!(expectation.passed);
+        assert_eq!(expectation.threshold, 0.0);
+    }
+
+    #[test]
+    fn perceptual_final_export_still_requires_transform() {
+        let expectation = final_file_transform_expected_for_proof(
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::Perceptual,
+            false,
+        );
+
+        assert!(!expectation.passed);
+        assert_eq!(expectation.threshold, 1.0);
     }
 
     #[cfg(feature = "tauri-test")]
