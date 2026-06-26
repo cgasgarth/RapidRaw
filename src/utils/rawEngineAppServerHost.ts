@@ -53,6 +53,13 @@ import {
   applyAgentLayerCreate,
 } from './agentLayerMaskTools';
 import {
+  AGENT_LENS_PROFILE_APPLY_INPUT_SCHEMA_NAME,
+  AGENT_LENS_PROFILE_APPLY_OUTPUT_SCHEMA_NAME,
+  AGENT_LENS_PROFILE_APPLY_TOOL_NAME,
+  agentLensProfileApplyRequestSchema,
+  applyAgentLensProfile,
+} from './agentLensProfileApplyTool';
+import {
   AGENT_PREVIEW_RENDER_INPUT_SCHEMA_NAME,
   AGENT_PREVIEW_RENDER_OUTPUT_SCHEMA_NAME,
   AGENT_PREVIEW_RENDER_TOOL_NAME,
@@ -593,6 +600,15 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       toolNames: [AGENT_GEOMETRY_APPLY_TOOL_NAME],
     }),
     buildRouteCatalogEntry({
+      commandName: AGENT_LENS_PROFILE_APPLY_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_LENS_PROFILE_APPLY_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.ApplyDryRunPlan],
+      outputSchemaNames: [AGENT_LENS_PROFILE_APPLY_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-lens-profile-apply'],
+      toolNames: [AGENT_LENS_PROFILE_APPLY_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
       commandName: AGENT_LAYER_CREATE_TOOL_NAME,
       family: 'agent',
       inputSchemaNames: [AGENT_LAYER_CREATE_INPUT_SCHEMA_NAME],
@@ -837,6 +853,9 @@ const dispatchAgentAppServerTool = async (
       break;
     case AGENT_GEOMETRY_APPLY_TOOL_NAME:
       result = applyAgentGeometry(agentGeometryApplyRequestSchema.parse(request.arguments));
+      break;
+    case AGENT_LENS_PROFILE_APPLY_TOOL_NAME:
+      result = applyAgentLensProfile(agentLensProfileApplyRequestSchema.parse(request.arguments));
       break;
     case AGENT_LAYER_CREATE_TOOL_NAME:
       result = applyAgentLayerCreate(agentLayerCreateRequestSchema.parse(request.arguments));

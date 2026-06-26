@@ -17,6 +17,7 @@ import { AGENT_COLOR_APPLY_TOOL_NAME } from '../../../src/utils/agentColorApplyT
 import { AGENT_CURVE_LEVELS_APPLY_TOOL_NAME } from '../../../src/utils/agentCurveLevelsApplyTool.ts';
 import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../src/utils/agentDetailEffectsApplyTool.ts';
 import { AGENT_GEOMETRY_APPLY_TOOL_NAME } from '../../../src/utils/agentGeometryApplyTool.ts';
+import { AGENT_LENS_PROFILE_APPLY_TOOL_NAME } from '../../../src/utils/agentLensProfileApplyTool.ts';
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
@@ -225,6 +226,7 @@ for (const [toolName, expectedCheck] of [
   [AGENT_CURVE_LEVELS_APPLY_TOOL_NAME, 'check:agent-curve-levels-apply'],
   [AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME, 'check:agent-detail-effects-apply'],
   [AGENT_GEOMETRY_APPLY_TOOL_NAME, 'check:agent-geometry-apply'],
+  [AGENT_LENS_PROFILE_APPLY_TOOL_NAME, 'check:agent-lens-profile-apply'],
   [AGENT_HISTORY_ROLLBACK_TOOL_NAME, 'check:agent-session-history-rollback'],
   [AGENT_RETOUCH_APPLY_TOOL_NAME, 'check:agent-retouch-apply'],
 ] satisfies [string, string][]) {

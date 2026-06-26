@@ -5,6 +5,7 @@ import { buildAgentColorRecipeHashInput } from './agentColorRecipe';
 import { buildAgentCurveLevelsRecipeHashInput } from './agentCurveLevelsRecipe';
 import { buildAgentDetailEffectsRecipeHashInput } from './agentDetailEffectsRecipe';
 import { buildAgentGeometryRecipeHashInput } from './agentGeometryRecipe';
+import { buildAgentLensProfileRecipeHashInput } from './agentLensProfileRecipe';
 import {
   AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX,
   AGENT_MEDIUM_PREVIEW_QUALITY,
@@ -146,6 +147,7 @@ export const buildAgentImageContextSnapshot = (): AgentImageContextSnapshot => {
       detailEffects: buildAgentDetailEffectsRecipeHashInput(editor.adjustments),
       geometry: buildAgentGeometryRecipeHashInput(editor.adjustments),
       graphRevision,
+      lensProfile: buildAgentLensProfileRecipeHashInput(editor.adjustments),
       masks: editor.adjustments.masks.map((mask) => ({ id: mask.id, name: mask.name, visible: mask.visible })),
     }),
   )}`;
