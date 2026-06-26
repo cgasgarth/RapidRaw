@@ -803,7 +803,10 @@
       "sessionOpen": "Session open",
       "sessionOpenDescription": "{{camera}} is reserved for this tether session.",
       "recoveryFailed": "Tether recovery failed: {{message}}",
-      "recoveryQuarantined": "Quarantined {{count}} partial tether download(s)."
+      "recoveryReconnectRequired": "Reconnect required: {{message}}",
+      "recoveryQuarantined": "Quarantined {{count}} partial tether download(s).",
+      "sessionReconnectRequired": "Reconnect required",
+      "sessionReconnectRequiredDescription": "Refresh tether discovery and reopen the session before capturing again."
     },
     "layers": {
       "actions": {

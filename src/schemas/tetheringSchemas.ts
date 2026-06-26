@@ -69,7 +69,7 @@ export const tetherRecoverySummarySchema = z.object({
   message: z.string().trim().min(1),
   partialFilesFound: z.number().int().nonnegative(),
   quarantinedFiles: z.array(z.string().trim().min(1)),
-  status: z.enum(['clean', 'failed', 'not_checked', 'quarantined']),
+  status: z.enum(['clean', 'failed', 'not_checked', 'quarantined', 'reconnect_required']),
 });
 
 export const tetherSessionSnapshotSchema = z.object({
@@ -81,7 +81,7 @@ export const tetherSessionSnapshotSchema = z.object({
   providerMode: z.enum(['auto', 'fake']),
   recovery: tetherRecoverySummarySchema,
   sessionId: z.string().trim().min(1),
-  status: z.literal('open'),
+  status: z.enum(['open', 'reconnect_required']),
 });
 
 export const tetherSessionResponseSchema = z.object({

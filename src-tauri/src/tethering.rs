@@ -503,6 +503,11 @@ fn trigger_tether_capture_for_state(
     if session.provider_mode != "fake" {
         return Err("Native camera capture is not implemented yet.".to_string());
     }
+    ensure_session_camera_available_for_state(
+        state,
+        &session,
+        &discover_with_provider_mode(&session.provider_mode),
+    )?;
 
     let source_path = request
         .fake_source_path
@@ -612,6 +617,34 @@ fn trigger_tether_capture_for_state(
     };
     record_tether_import(state, &response);
     Ok(response)
+}
+
+fn ensure_session_camera_available_for_state(
+    state: &AppState,
+    session: &TetherSessionSnapshot,
+    discovery: &TetherDiscoveryResponse,
+) -> Result<(), String> {
+    if discovery
+        .cameras
+        .iter()
+        .any(|camera| camera.id == session.camera_id)
+    {
+        return Ok(());
+    }
+
+    let message = format!(
+        "{} disconnected. Refresh tether discovery and reopen the session before the next capture.",
+        session.camera_display_name
+    );
+    let mut guard = state.tether_session.lock().unwrap();
+    if let Some(current_session) = guard.as_mut() {
+        if current_session.session_id == session.session_id {
+            current_session.status = "reconnect_required".to_string();
+            current_session.recovery =
+                tether_recovery_summary("reconnect_required", 0, Vec::new(), &message);
+        }
+    }
+    Err(message)
 }
 
 fn find_previous_tether_import(
@@ -2061,6 +2094,34 @@ mod tests {
         assert_eq!(imported_files, 1);
 
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn capture_marks_session_reconnect_required_when_camera_detaches() {
+        let state = AppState::new();
+        let session = open_tether_session_for_state(
+            TetherSessionOpenRequest {
+                camera_id: "fake-sony-ilce-7m4-usb".to_string(),
+                destination_root: None,
+                provider_mode: Some("fake".to_string()),
+            },
+            &state,
+        )
+        .unwrap()
+        .session
+        .unwrap();
+        let mut detached_discovery = discover_with_provider_mode("fake");
+        detached_discovery.cameras.clear();
+
+        let error =
+            ensure_session_camera_available_for_state(&state, &session, &detached_discovery)
+                .unwrap_err();
+        let current_session = state.tether_session.lock().unwrap().clone().unwrap();
+
+        assert!(error.contains("disconnected"));
+        assert_eq!(current_session.status, "reconnect_required");
+        assert_eq!(current_session.recovery.status, "reconnect_required");
+        assert_eq!(current_session.recovery.partial_files_found, 0);
     }
 
     #[test]
