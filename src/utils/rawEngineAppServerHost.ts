@@ -1,4 +1,9 @@
 import {
+  AGENT_ADJUSTMENTS_APPLY_INPUT_SCHEMA_NAME,
+  AGENT_ADJUSTMENTS_APPLY_OUTPUT_SCHEMA_NAME,
+  AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+} from './agentAdjustmentApplyTool';
+import {
   AGENT_PREVIEW_RENDER_INPUT_SCHEMA_NAME,
   AGENT_PREVIEW_RENDER_OUTPUT_SCHEMA_NAME,
   AGENT_PREVIEW_RENDER_TOOL_NAME,
@@ -465,6 +470,15 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       outputSchemaNames: [AGENT_PREVIEW_RENDER_OUTPUT_SCHEMA_NAME],
       runtimeCheckScripts: ['check:agent-readonly-tools'],
       toolNames: [AGENT_PREVIEW_RENDER_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
+      commandName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_ADJUSTMENTS_APPLY_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.ApplyDryRunPlan],
+      outputSchemaNames: [AGENT_ADJUSTMENTS_APPLY_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-adjustments-apply'],
+      toolNames: [AGENT_ADJUSTMENTS_APPLY_TOOL_NAME],
     }),
   );
 
