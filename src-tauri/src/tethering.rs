@@ -637,12 +637,12 @@ fn ensure_session_camera_available_for_state(
         session.camera_display_name
     );
     let mut guard = state.tether_session.lock().unwrap();
-    if let Some(current_session) = guard.as_mut() {
-        if current_session.session_id == session.session_id {
-            current_session.status = "reconnect_required".to_string();
-            current_session.recovery =
-                tether_recovery_summary("reconnect_required", 0, Vec::new(), &message);
-        }
+    if let Some(current_session) = guard.as_mut()
+        && current_session.session_id == session.session_id
+    {
+        current_session.status = "reconnect_required".to_string();
+        current_session.recovery =
+            tether_recovery_summary("reconnect_required", 0, Vec::new(), &message);
     }
     Err(message)
 }
