@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { ActiveChannel } from './adjustments';
+import { buildAgentCurveLevelsRecipeHashInput } from './agentCurveLevelsRecipe';
 import { buildAgentGeometryRecipeHashInput } from './agentGeometryRecipe';
 import {
   AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX,
@@ -139,6 +140,7 @@ export const buildAgentImageContextSnapshot = (): AgentImageContextSnapshot => {
     JSON.stringify({
       adjustments: summarizeAdjustment(editor.adjustments),
       geometry: buildAgentGeometryRecipeHashInput(editor.adjustments),
+      curveLevels: buildAgentCurveLevelsRecipeHashInput(editor.adjustments),
       graphRevision,
       masks: editor.adjustments.masks.map((mask) => ({ id: mask.id, name: mask.name, visible: mask.visible })),
     }),

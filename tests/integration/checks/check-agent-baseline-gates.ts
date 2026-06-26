@@ -13,6 +13,7 @@ import {
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import { AGENT_ADJUSTMENTS_APPLY_TOOL_NAME } from '../../../src/utils/agentAdjustmentApplyTool.ts';
+import { AGENT_CURVE_LEVELS_APPLY_TOOL_NAME } from '../../../src/utils/agentCurveLevelsApplyTool.ts';
 import { AGENT_GEOMETRY_APPLY_TOOL_NAME } from '../../../src/utils/agentGeometryApplyTool.ts';
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
@@ -218,6 +219,7 @@ for (const [toolName, expectedCheck] of [
   [AGENT_STATE_GET_TOOL_NAME, 'check:agent-readonly-tools'],
   [AGENT_PREVIEW_RENDER_TOOL_NAME, 'check:agent-readonly-tools'],
   [AGENT_ADJUSTMENTS_APPLY_TOOL_NAME, 'check:agent-adjustments-apply'],
+  [AGENT_CURVE_LEVELS_APPLY_TOOL_NAME, 'check:agent-curve-levels-apply'],
   [AGENT_GEOMETRY_APPLY_TOOL_NAME, 'check:agent-geometry-apply'],
   [AGENT_HISTORY_ROLLBACK_TOOL_NAME, 'check:agent-session-history-rollback'],
   [AGENT_RETOUCH_APPLY_TOOL_NAME, 'check:agent-retouch-apply'],
