@@ -2,11 +2,15 @@ import {
   AGENT_ADJUSTMENTS_APPLY_INPUT_SCHEMA_NAME,
   AGENT_ADJUSTMENTS_APPLY_OUTPUT_SCHEMA_NAME,
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+  agentAdjustmentsApplyRequestSchema,
+  applyAgentGlobalAdjustments,
 } from './agentAdjustmentApplyTool';
 import {
   AGENT_EXPORT_PROOF_INPUT_SCHEMA_NAME,
   AGENT_EXPORT_PROOF_OUTPUT_SCHEMA_NAME,
   AGENT_EXPORT_PROOF_TOOL_NAME,
+  agentExportProofRequestSchema,
+  buildAgentExportProof,
 } from './agentExportProofTool';
 import {
   AGENT_LAYER_CREATE_INPUT_SCHEMA_NAME,
@@ -15,6 +19,10 @@ import {
   AGENT_MASK_CREATE_OR_UPDATE_INPUT_SCHEMA_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_OUTPUT_SCHEMA_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
+  agentLayerCreateRequestSchema,
+  agentMaskCreateOrUpdateRequestSchema,
+  applyAgentBrushMaskCreateOrUpdate,
+  applyAgentLayerCreate,
 } from './agentLayerMaskTools';
 import {
   AGENT_PREVIEW_RENDER_INPUT_SCHEMA_NAME,
@@ -23,16 +31,24 @@ import {
   AGENT_STATE_GET_INPUT_SCHEMA_NAME,
   AGENT_STATE_GET_OUTPUT_SCHEMA_NAME,
   AGENT_STATE_GET_TOOL_NAME,
+  agentPreviewRenderRequestSchema,
+  agentStateGetRequestSchema,
+  getAgentReadOnlyState,
+  renderAgentReadOnlyPreview,
 } from './agentReadOnlyAppServerTools';
 import {
   AGENT_RETOUCH_APPLY_INPUT_SCHEMA_NAME,
   AGENT_RETOUCH_APPLY_OUTPUT_SCHEMA_NAME,
   AGENT_RETOUCH_APPLY_TOOL_NAME,
+  agentRetouchApplyRequestSchema,
+  applyAgentRetouch,
 } from './agentRetouchApplyTool';
 import {
   AGENT_HISTORY_ROLLBACK_INPUT_SCHEMA_NAME,
   AGENT_HISTORY_ROLLBACK_OUTPUT_SCHEMA_NAME,
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+  agentHistoryRollbackRequestSchema,
+  rollbackAgentSessionHistory,
 } from './agentSessionHistory';
 import { AI_APP_SERVER_TOOL_ROUTES } from './aiAppServerToolRoutes';
 import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from './computationalMergeAppServerRoutes';
@@ -731,9 +747,71 @@ const getDryRunFlag = (command: unknown): boolean | undefined => {
   return typeof command.dryRun === 'boolean' ? command.dryRun : undefined;
 };
 
+const dispatchAgentAppServerTool = async (
+  request: RawEngineAppServerToolDispatchRequest,
+): Promise<RawEngineAppServerToolDispatchResponse | null> => {
+  let result: unknown;
+
+  switch (request.runtimeToolName) {
+    case AGENT_ADJUSTMENTS_APPLY_TOOL_NAME:
+      result = await applyAgentGlobalAdjustments(agentAdjustmentsApplyRequestSchema.parse(request.arguments));
+      break;
+    case AGENT_EXPORT_PROOF_TOOL_NAME:
+      result = buildAgentExportProof(agentExportProofRequestSchema.parse(request.arguments));
+      break;
+    case AGENT_HISTORY_ROLLBACK_TOOL_NAME:
+      result = rollbackAgentSessionHistory(agentHistoryRollbackRequestSchema.parse(request.arguments));
+      break;
+    case AGENT_LAYER_CREATE_TOOL_NAME:
+      result = applyAgentLayerCreate(agentLayerCreateRequestSchema.parse(request.arguments));
+      break;
+    case AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME:
+      result = applyAgentBrushMaskCreateOrUpdate(agentMaskCreateOrUpdateRequestSchema.parse(request.arguments));
+      break;
+    case AGENT_PREVIEW_RENDER_TOOL_NAME:
+      result = renderAgentReadOnlyPreview(agentPreviewRenderRequestSchema.parse(request.arguments));
+      break;
+    case AGENT_RETOUCH_APPLY_TOOL_NAME:
+      result = applyAgentRetouch(agentRetouchApplyRequestSchema.parse(request.arguments));
+      break;
+    case AGENT_STATE_GET_TOOL_NAME:
+      result = getAgentReadOnlyState(agentStateGetRequestSchema.parse(request.arguments));
+      break;
+    default:
+      return null;
+  }
+
+  return rawEngineAppServerToolDispatchResponseSchema.parse({
+    commandType: request.runtimeToolName,
+    dispatchStatus: 'completed',
+    requestId: request.requestId,
+    result,
+    runtime: AgentRuntimeId.AppServer,
+    runtimeToolName: request.runtimeToolName,
+    status: RawEngineAppServerResponseStatus.Ok,
+    transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
+  });
+};
+
 export const buildRawEngineAppServerToolDispatchResponse = async (
   request: RawEngineAppServerToolDispatchRequest,
 ): Promise<RawEngineAppServerToolDispatchResponse> => {
+  try {
+    const agentToolResponse = await dispatchAgentAppServerTool(request);
+    if (agentToolResponse !== null) return agentToolResponse;
+  } catch (error) {
+    return rawEngineAppServerToolDispatchResponseSchema.parse({
+      commandType: request.runtimeToolName,
+      dispatchStatus: 'rejected',
+      message: error instanceof Error ? error.message : 'Agent app-server tool dispatch failed.',
+      requestId: request.requestId,
+      runtime: AgentRuntimeId.AppServer,
+      runtimeToolName: request.runtimeToolName,
+      status: RawEngineAppServerResponseStatus.Ok,
+      transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
+    });
+  }
+
   const bridge = createRawEngineLocalAppServerBridge();
   const registryResult = await bridge.dispatch(buildRawEngineLocalAppServerToolRegistryQuery(request.requestId));
   if (!registryResult.ok) {
