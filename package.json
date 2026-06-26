@@ -220,6 +220,7 @@
     "check:library-auto-stacks": "bun scripts/run-compact-command.ts --label library-auto-stacks -- bun test --reporter=dot tests/pure-ts/library-auto-stacks.test.ts",
     "check:presets-composition-ui": "bun tests/integration/checks/check-presets-composition-ui.ts",
     "check:library-header-ui": "bun tests/integration/checks/check-library-header-ui.ts",
+    "check:folder-tree-disclosure-a11y": "bun tests/integration/checks/check-folder-tree-disclosure-a11y.ts",
     "check:virtual-copy-compare-ui": "bun tests/integration/checks/check-virtual-copy-compare-ui.ts",
     "check:virtual-copy-sidecar-independence": "bun tests/integration/checks/check-virtual-copy-sidecar-independence.ts",
     "check:histogram-clipping-ui": "bun tests/integration/checks/check-histogram-clipping-ui.ts",

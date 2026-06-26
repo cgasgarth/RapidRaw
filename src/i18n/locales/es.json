@@ -1107,10 +1107,13 @@
     },
     "items": {
       "collapseFolder": "Contraer carpeta",
+      "collapseFolderNamed": "Contraer carpeta {{name}}",
       "currentFolder": "Carpeta actual",
       "expandFolder": "Expandir carpeta",
+      "expandFolderNamed": "Expandir carpeta {{name}}",
       "imagesCount_one": "1 imagen",
       "imagesCount_other": "{{count}} imágenes",
+      "selectFolderNamed": "Seleccionar carpeta {{name}}",
       "tooltipAperture": "Apertura",
       "tooltipFocalLength": "Distancia focal",
       "tooltipIso": "ISO",

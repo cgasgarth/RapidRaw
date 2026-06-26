@@ -322,6 +322,9 @@ function TreeNode({
       onToggle(node.path);
     }
   };
+  const disclosureLabel = isExpanded
+    ? t('library.items.collapseFolderNamed', { name: node.name })
+    : t('library.items.expandFolderNamed', { name: node.name });
 
   const containerVariants: Variants = {
     closed: { height: 0, opacity: 0, transition: { duration: 0.2, ease: 'easeInOut' } },
@@ -360,12 +363,14 @@ function TreeNode({
           onContextMenu(e, node.path, isPinned);
         }}
         onKeyDown={handleNameKeyDown}
+        aria-label={t('library.items.selectFolderNamed', { name: node.name })}
         role="button"
         tabIndex={0}
       >
         <button
           type="button"
-          aria-label={isExpanded ? t('library.items.collapseFolder') : t('library.items.expandFolder')}
+          aria-expanded={hasChildren ? isExpanded : undefined}
+          aria-label={disclosureLabel}
           className={cx(
             'relative w-5 h-5 flex items-center justify-center p-0.5 rounded-sm transition-colors shrink-0 bg-transparent',
             {
@@ -409,6 +414,8 @@ function TreeNode({
         {hasChildren && (
           <button
             type="button"
+            aria-expanded={isExpanded}
+            aria-label={disclosureLabel}
             className={cx('p-0.5 rounded-sm hover:bg-surface/50 bg-transparent', TEXT_COLOR_KEYS[TextColors.secondary])}
             onClick={handleFolderIconClick}
           >
