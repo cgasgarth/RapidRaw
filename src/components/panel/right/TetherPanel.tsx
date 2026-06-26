@@ -99,6 +99,7 @@ export function TetherPanel({
   const camera = discovery?.cameras[0] ?? null;
   const providerStatus = discovery?.provider.status ?? 'hardware_adapter_pending';
   const isSessionOpen = session !== null;
+  const isSessionCaptureReady = session?.status === 'open';
 
   const discover = useCallback(async () => {
     setIsLoading(true);
@@ -301,7 +302,7 @@ export function TetherPanel({
 
       <Button
         className={tetherDisabledControlClassName}
-        disabled={!isSessionOpen || isCaptureBusy}
+        disabled={!isSessionCaptureReady || isCaptureBusy}
         onClick={() => {
           void triggerCapture();
         }}
@@ -320,13 +321,13 @@ export function TetherPanel({
         <div className="flex items-center justify-between gap-3">
           <UiText variant={TextVariants.label}>{t('editor.tether.exposureControls')}</UiText>
           <UiText variant={TextVariants.small} color={TextColors.secondary}>
-            {isSessionOpen ? t('editor.tether.controlsReady') : t('editor.tether.controlsRequireSession')}
+            {isSessionCaptureReady ? t('editor.tether.controlsReady') : t('editor.tether.controlsRequireSession')}
           </UiText>
         </div>
         <div className="mt-3 grid gap-2">
           {cameraControls.map((control) => {
             const isWritable =
-              isSessionOpen && control.writable && control.status === 'ready' && busyControlId === null;
+              isSessionCaptureReady && control.writable && control.status === 'ready' && busyControlId === null;
             return (
               <label
                 className="grid grid-cols-[86px_1fr] items-center gap-2 rounded border border-border-color bg-bg-primary p-2"
@@ -659,12 +660,18 @@ export function TetherPanel({
         data-testid="tether-session-status"
       >
         <UiText variant={TextVariants.label}>
-          {isSessionOpen ? t('editor.tether.sessionOpen') : t('editor.tether.sessionClosed')}
+          {session?.status === 'reconnect_required'
+            ? t('editor.tether.sessionReconnectRequired')
+            : isSessionOpen
+              ? t('editor.tether.sessionOpen')
+              : t('editor.tether.sessionClosed')}
         </UiText>
         <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1">
-          {isSessionOpen
-            ? t('editor.tether.sessionOpenDescription', { camera: session.cameraDisplayName })
-            : t('editor.tether.sessionClosedDescription')}
+          {session?.status === 'reconnect_required'
+            ? t('editor.tether.sessionReconnectRequiredDescription')
+            : isSessionOpen
+              ? t('editor.tether.sessionOpenDescription', { camera: session.cameraDisplayName })
+              : t('editor.tether.sessionClosedDescription')}
         </UiText>
         {session?.destinationRoot && (
           <UiText
@@ -706,7 +713,9 @@ export function TetherPanel({
                 ? t('editor.tether.recoveryQuarantined', { count: session.recovery.partialFilesFound })
                 : session.recovery.status === 'failed'
                   ? t('editor.tether.recoveryFailed', { message: session.recovery.message })
-                  : session.recovery.message}
+                  : session.recovery.status === 'reconnect_required'
+                    ? t('editor.tether.recoveryReconnectRequired', { message: session.recovery.message })
+                    : session.recovery.message}
             </UiText>
             {session.recovery.quarantinedFiles.length > 0 && (
               <UiText
