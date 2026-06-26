@@ -13,6 +13,13 @@ import {
   buildAgentExportProof,
 } from './agentExportProofTool';
 import {
+  AGENT_GEOMETRY_APPLY_INPUT_SCHEMA_NAME,
+  AGENT_GEOMETRY_APPLY_OUTPUT_SCHEMA_NAME,
+  AGENT_GEOMETRY_APPLY_TOOL_NAME,
+  agentGeometryApplyRequestSchema,
+  applyAgentGeometry,
+} from './agentGeometryApplyTool';
+import {
   AGENT_LAYER_CREATE_INPUT_SCHEMA_NAME,
   AGENT_LAYER_CREATE_OUTPUT_SCHEMA_NAME,
   AGENT_LAYER_CREATE_TOOL_NAME,
@@ -529,6 +536,15 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       toolNames: [AGENT_HISTORY_ROLLBACK_TOOL_NAME],
     }),
     buildRouteCatalogEntry({
+      commandName: AGENT_GEOMETRY_APPLY_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_GEOMETRY_APPLY_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.ApplyDryRunPlan],
+      outputSchemaNames: [AGENT_GEOMETRY_APPLY_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-geometry-apply'],
+      toolNames: [AGENT_GEOMETRY_APPLY_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
       commandName: AGENT_LAYER_CREATE_TOOL_NAME,
       family: 'agent',
       inputSchemaNames: [AGENT_LAYER_CREATE_INPUT_SCHEMA_NAME],
@@ -761,6 +777,9 @@ const dispatchAgentAppServerTool = async (
       break;
     case AGENT_HISTORY_ROLLBACK_TOOL_NAME:
       result = rollbackAgentSessionHistory(agentHistoryRollbackRequestSchema.parse(request.arguments));
+      break;
+    case AGENT_GEOMETRY_APPLY_TOOL_NAME:
+      result = applyAgentGeometry(agentGeometryApplyRequestSchema.parse(request.arguments));
       break;
     case AGENT_LAYER_CREATE_TOOL_NAME:
       result = applyAgentLayerCreate(agentLayerCreateRequestSchema.parse(request.arguments));
