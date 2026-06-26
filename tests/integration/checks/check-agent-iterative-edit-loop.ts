@@ -59,7 +59,16 @@ const result = await runAgentIterativeEditLoop({
   sessionId: 'agent-loop-3162',
   steps: [
     { exposure: 0.28, highlights: -12 },
-    { shadows: 18, exposure: 0.34 },
+    {
+      exposure: 0.34,
+      preview: {
+        crop: { height: 0.35, width: 0.3, x: 0.25, y: 0.2 },
+        maxPixelCount: 800_000,
+        purpose: 'detail_review',
+        zoom: { centerX: 0.5, centerY: 0.55, scale: 2.5 },
+      },
+      shadows: 18,
+    },
   ],
 });
 
@@ -71,10 +80,30 @@ if (result.stopReason !== 'completed' || result.editCount !== 2 || result.previe
 }
 if (
   result.previewRefreshes.length !== 2 ||
-  result.previewRefreshes.some((preview) => preview.purpose !== 'refresh' || preview.longEdgePx !== 1024) ||
+  result.previewRefreshes[0]?.purpose !== 'refresh' ||
+  result.previewRefreshes[0]?.longEdgePx !== 1024 ||
   result.previewRefreshes[0]?.cacheKey === result.previewRefreshes[1]?.cacheKey
 ) {
-  throw new Error('agent iterative loop did not preserve distinct refresh preview envelopes.');
+  throw new Error('agent iterative loop did not preserve distinct preview envelopes.');
+}
+const detailPreview = result.previewRefreshes[1];
+if (
+  detailPreview?.purpose !== 'detail_review' ||
+  detailPreview.crop?.unit !== 'normalized' ||
+  detailPreview.crop.width !== 0.3 ||
+  detailPreview.zoom?.scale !== 2.5 ||
+  detailPreview.width * detailPreview.height > 800_000
+) {
+  throw new Error('agent iterative loop did not honor the second-turn detail preview request.');
+}
+if (
+  result.previewLineage.length !== 2 ||
+  result.previewLineage[0]?.appliedGraphRevision !== 'history_1' ||
+  result.previewLineage[1]?.appliedGraphRevision !== 'history_2' ||
+  result.previewLineage[1]?.previewArtifactId !== detailPreview.artifactId ||
+  result.previewLineage.some((lineage) => lineage.sourceToolName !== 'rawengine.agent.adjustments.apply')
+) {
+  throw new Error('agent iterative loop did not bind preview refreshes to apply receipt lineage.');
 }
 if (state.adjustments.exposure !== 0.34 || state.adjustments.shadows !== 18 || state.historyIndex !== 2) {
   throw new Error('agent iterative loop did not apply both editing turns into history.');
