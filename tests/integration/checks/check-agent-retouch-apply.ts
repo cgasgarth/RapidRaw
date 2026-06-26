@@ -121,6 +121,17 @@ if (
 if (cloneResult.beforePreviewHash === cloneResult.afterPreviewHash) {
   throw new Error('agent.retouch.apply clone did not change preview identity.');
 }
+if (
+  cloneResult.overlayPreview.artifact.kind !== 'preview' ||
+  cloneResult.overlayPreview.artifact.storage !== 'temp_cache' ||
+  cloneResult.overlayPreview.layerId !== cloneResult.layerId ||
+  cloneResult.overlayPreview.overlayMaskId !== cloneResult.overlayMaskId ||
+  cloneResult.overlayPreview.mode !== 'clone' ||
+  cloneResult.overlayPreview.recipeHash.length === 0 ||
+  cloneResult.overlayPreview.renderHash !== cloneResult.afterPreviewHash
+) {
+  throw new Error('agent.retouch.apply clone did not return a complete overlay preview receipt.');
+}
 
 resetEditor();
 const removeSnapshot = buildAgentImageContextSnapshot();
@@ -144,6 +155,16 @@ if (
   removeLayer.retouchRemoveSource.seed !== 7
 ) {
   throw new Error('agent.retouch.apply did not create a bounded remove retouch layer.');
+}
+if (
+  removeResult.overlayPreview.artifact.kind !== 'preview' ||
+  removeResult.overlayPreview.artifact.storage !== 'temp_cache' ||
+  removeResult.overlayPreview.layerId !== removeResult.layerId ||
+  removeResult.overlayPreview.overlayMaskId !== removeResult.overlayMaskId ||
+  removeResult.overlayPreview.mode !== 'remove' ||
+  removeResult.overlayPreview.renderHash !== removeResult.afterPreviewHash
+) {
+  throw new Error('agent.retouch.apply remove did not return a complete overlay preview receipt.');
 }
 
 const route = buildRawEngineAppServerRouteCatalog().find(

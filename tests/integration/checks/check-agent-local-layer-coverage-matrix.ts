@@ -45,16 +45,13 @@ for (const entry of AGENT_LOCAL_LAYER_COVERAGE_MATRIX) {
   if (!entry.previewProof.includes('beforePreviewHash') || !entry.previewProof.includes('afterPreviewHash')) {
     failures.push(`${entry.toolName}: preview proof must include before/after preview hashes`);
   }
-  if (
-    entry.surface !== 'retouch_clone_heal_remove' &&
-    !entry.previewProof.some((field) => field.startsWith('overlayPreview.'))
-  ) {
+  if (!entry.previewProof.some((field) => field.startsWith('overlayPreview.'))) {
     failures.push(`${entry.toolName}: local layer/mask coverage must include overlayPreview proof`);
   }
 }
 
-if (AGENT_LOCAL_LAYER_COVERAGE_MATRIX.every((entry) => entry.status !== 'partial')) {
-  failures.push('coverage matrix should keep partial retouch overlay artifact follow-up visible until implemented');
+if (AGENT_LOCAL_LAYER_COVERAGE_MATRIX.some((entry) => entry.status !== 'covered')) {
+  failures.push('coverage matrix should not include partial local layer tool entries');
 }
 
 if (failures.length > 0) {
