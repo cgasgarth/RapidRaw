@@ -27,10 +27,15 @@ import {
   applyAgentDetailEffects,
 } from './agentDetailEffectsApplyTool';
 import {
+  AGENT_FINAL_EXPORT_INPUT_SCHEMA_NAME,
+  AGENT_FINAL_EXPORT_OUTPUT_SCHEMA_NAME,
+  AGENT_FINAL_EXPORT_TOOL_NAME,
   AGENT_EXPORT_PROOF_INPUT_SCHEMA_NAME,
   AGENT_EXPORT_PROOF_OUTPUT_SCHEMA_NAME,
   AGENT_EXPORT_PROOF_TOOL_NAME,
+  agentFinalExportRequestSchema,
   agentExportProofRequestSchema,
+  buildAgentFinalExport,
   buildAgentExportProof,
 } from './agentExportProofTool';
 import {
@@ -646,6 +651,15 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       runtimeCheckScripts: ['check:agent-export-proof'],
       toolNames: [AGENT_EXPORT_PROOF_TOOL_NAME],
     }),
+    buildRouteCatalogEntry({
+      commandName: AGENT_FINAL_EXPORT_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_FINAL_EXPORT_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.ApplyDryRunPlan],
+      outputSchemaNames: [AGENT_FINAL_EXPORT_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-export-proof'],
+      toolNames: [AGENT_FINAL_EXPORT_TOOL_NAME],
+    }),
   );
 
   const mappedToneColorRoutes = TONE_COLOR_APP_SERVER_ROUTES.filter(
@@ -923,6 +937,9 @@ const dispatchAgentAppServerTool = async (
       break;
     case AGENT_EXPORT_PROOF_TOOL_NAME:
       result = buildAgentExportProof(agentExportProofRequestSchema.parse(request.arguments));
+      break;
+    case AGENT_FINAL_EXPORT_TOOL_NAME:
+      result = buildAgentFinalExport(agentFinalExportRequestSchema.parse(request.arguments));
       break;
     case AGENT_HISTORY_ROLLBACK_TOOL_NAME:
       result = rollbackAgentSessionHistory(agentHistoryRollbackRequestSchema.parse(request.arguments));

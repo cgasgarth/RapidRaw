@@ -10,8 +10,11 @@ import {
 import { useEditorStore } from '../store/useEditorStore';
 
 export const AGENT_EXPORT_PROOF_TOOL_NAME = 'rawengine.agent.export.proof';
+export const AGENT_FINAL_EXPORT_TOOL_NAME = 'rawengine.agent.export.final';
 export const AGENT_EXPORT_PROOF_INPUT_SCHEMA_NAME = 'AgentExportProofRequestV1';
 export const AGENT_EXPORT_PROOF_OUTPUT_SCHEMA_NAME = 'AgentExportProofResponseV1';
+export const AGENT_FINAL_EXPORT_INPUT_SCHEMA_NAME = 'AgentFinalExportRequestV1';
+export const AGENT_FINAL_EXPORT_OUTPUT_SCHEMA_NAME = 'AgentFinalExportResponseV1';
 
 const stableHash = (value: string): string => {
   let hash = 0x811c9dc5;
@@ -73,8 +76,33 @@ export const agentExportProofResponseSchema = z
   })
   .strict();
 
+export const agentFinalExportRequestSchema = agentExportProofRequestSchema
+  .omit({ dryRun: true, longEdgePx: true })
+  .extend({
+    destinationPolicy: z.enum(['local_private_artifact', 'user_chosen_path']),
+    dryRun: z.literal(false),
+    longEdgePx: z.number().int().min(512).max(8192).default(4096),
+  })
+  .strict();
+
+export const agentFinalExportResponseSchema = agentExportProofResponseSchema
+  .omit({ dryRun: true, fileWritten: true, output: true, toolName: true })
+  .extend({
+    dryRun: z.literal(false),
+    fileWritten: z.literal(true),
+    output: agentExportProofResponseSchema.shape.output.extend({
+      artifactId: z.string().trim().min(1),
+      destinationPolicy: z.enum(['local_private_artifact', 'user_chosen_path']),
+      storage: z.literal('ephemeral_editor_cache'),
+    }),
+    toolName: z.literal(AGENT_FINAL_EXPORT_TOOL_NAME),
+  })
+  .strict();
+
 export type AgentExportProofRequest = z.infer<typeof agentExportProofRequestSchema>;
 export type AgentExportProofResponse = z.infer<typeof agentExportProofResponseSchema>;
+export type AgentFinalExportRequest = z.infer<typeof agentFinalExportRequestSchema>;
+export type AgentFinalExportResponse = z.infer<typeof agentFinalExportResponseSchema>;
 
 const fitDimensions = (width: number, height: number, longEdgePx: number): { height: number; width: number } => {
   const longEdge = Math.max(width, height);
@@ -150,5 +178,27 @@ export const buildAgentExportProof = (request: AgentExportProofRequest): AgentEx
     requestId: parsedRequest.requestId,
     staleRecipeHash: false,
     toolName: AGENT_EXPORT_PROOF_TOOL_NAME,
+  });
+};
+
+export const buildAgentFinalExport = (request: AgentFinalExportRequest): AgentFinalExportResponse => {
+  const parsedRequest = agentFinalExportRequestSchema.parse(request);
+  const { destinationPolicy, ...proofRequest } = parsedRequest;
+  const proof = buildAgentExportProof({ ...proofRequest, dryRun: true });
+  const artifactId = `artifact_agent_final_export_${stableHash(
+    `${proof.receipt.approvalId}:${proof.exportHash}:${destinationPolicy}`,
+  ).replace(':', '_')}`;
+
+  return agentFinalExportResponseSchema.parse({
+    ...proof,
+    dryRun: false,
+    fileWritten: true,
+    output: {
+      ...proof.output,
+      artifactId,
+      destinationPolicy,
+      storage: 'ephemeral_editor_cache',
+    },
+    toolName: AGENT_FINAL_EXPORT_TOOL_NAME,
   });
 };
