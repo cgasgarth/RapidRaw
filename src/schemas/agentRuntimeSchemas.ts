@@ -317,6 +317,7 @@ export const rawEngineAppServerCapabilitiesResponseSchema = z
   .strict();
 
 export const rawEngineAppServerRouteFamilySchema = z.enum([
+  'agent',
   'ai',
   'computational_merge',
   'detail',
@@ -329,6 +330,7 @@ export const RawEngineAppServerRouteMode = {
   DryRunCommand: 'dry_run_command',
   HostCommand: 'host_command',
   MappedInvoke: 'mapped_invoke',
+  Read: 'read',
 } as const;
 
 export const rawEngineAppServerRouteModeSchema = z.enum([
@@ -336,6 +338,7 @@ export const rawEngineAppServerRouteModeSchema = z.enum([
   RawEngineAppServerRouteMode.DryRunCommand,
   RawEngineAppServerRouteMode.HostCommand,
   RawEngineAppServerRouteMode.MappedInvoke,
+  RawEngineAppServerRouteMode.Read,
 ]);
 
 export const rawEngineAppServerRouteCatalogEntrySchema = z
