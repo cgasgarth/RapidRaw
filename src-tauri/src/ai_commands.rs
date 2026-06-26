@@ -93,6 +93,29 @@ pub async fn generate_ai_sky_mask(
     })
 }
 
+#[tauri::command]
+pub async fn generate_ai_whole_person_mask(
+    js_adjustments: serde_json::Value,
+    rotation: f32,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+    orientation_steps: u8,
+    state: tauri::State<'_, AppState>,
+) -> Result<AiForegroundMaskParameters, String> {
+    let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
+    let full_mask_image =
+        crate::person_segmentation::generate_whole_person_mask(warped_image.as_ref())?;
+    let base64_data = encode_to_base64_png(&full_mask_image)?;
+
+    Ok(AiForegroundMaskParameters {
+        mask_data_base64: Some(base64_data),
+        rotation: Some(rotation),
+        flip_horizontal: Some(flip_horizontal),
+        flip_vertical: Some(flip_vertical),
+        orientation_steps: Some(orientation_steps),
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn generate_ai_depth_mask(

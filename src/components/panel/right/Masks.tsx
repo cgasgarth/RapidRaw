@@ -23,6 +23,7 @@ export enum Mask {
   AiDepth = 'ai-depth',
   AiForeground = 'ai-foreground',
   AiObject = 'ai-object',
+  AiPerson = 'ai-person',
   AiSky = 'ai-sky',
   AiSubject = 'ai-subject',
   All = 'all',
@@ -78,6 +79,8 @@ export function formatMaskTypeName(type: Mask) {
       return t('masks.types.object');
     case Mask.AiForeground:
       return t('masks.types.foreground');
+    case Mask.AiPerson:
+      return t('masks.types.person');
     case Mask.AiSky:
       return t('masks.types.sky');
     case Mask.All:
@@ -115,6 +118,7 @@ export const MASK_ICON_MAP: Record<Mask, LucideIcon> = {
   [Mask.AiDepth]: BringToFront,
   [Mask.AiForeground]: User,
   [Mask.AiObject]: Sparkles,
+  [Mask.AiPerson]: User,
   [Mask.AiSky]: Cloud,
   [Mask.AiSubject]: Sparkles,
   [Mask.All]: RectangleHorizontal,
@@ -139,6 +143,12 @@ export const MASK_PANEL_CREATION_TYPES: Array<MaskType> = [
     icon: Cloud,
     name: 'Sky',
     type: Mask.AiSky,
+  },
+  {
+    disabled: false,
+    icon: User,
+    name: 'Person',
+    type: Mask.AiPerson,
   },
   {
     disabled: false,
@@ -183,6 +193,12 @@ export const AI_PANEL_CREATION_TYPES: Array<MaskType> = [
   {
     disabled: false,
     icon: User,
+    name: 'Person',
+    type: Mask.AiPerson,
+  },
+  {
+    disabled: false,
+    icon: User,
     name: 'Foreground',
     type: Mask.AiForeground,
   },
@@ -218,6 +234,12 @@ export const SUB_MASK_COMPONENT_TYPES: Array<MaskType> = [
     icon: Cloud,
     name: 'Sky',
     type: Mask.AiSky,
+  },
+  {
+    disabled: false,
+    icon: User,
+    name: 'Person',
+    type: Mask.AiPerson,
   },
   {
     disabled: false,
@@ -291,6 +313,12 @@ export const AI_SUB_MASK_COMPONENT_TYPES: Array<MaskType> = [
     icon: Sparkles,
     name: 'Subject',
     type: Mask.AiSubject,
+  },
+  {
+    disabled: false,
+    icon: User,
+    name: 'Person',
+    type: Mask.AiPerson,
   },
   {
     disabled: false,

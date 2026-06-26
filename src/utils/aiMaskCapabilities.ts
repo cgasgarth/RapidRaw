@@ -25,6 +25,12 @@ export const AI_MASK_CAPABILITY_AUDIT: Array<AiMaskCapabilityAuditEntry> = aiMas
     status: 'native',
   },
   {
+    capability: 'person',
+    invokeCommand: 'generate_ai_whole_person_mask',
+    renderMaskType: 'ai-person',
+    status: 'native',
+  },
+  {
     capability: 'background',
     derivedFrom: 'foreground',
     invokeCommand: null,

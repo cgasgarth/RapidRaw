@@ -4017,7 +4017,7 @@ export const sampleAiAppServerToolManifestV1: AiAppServerToolManifestV1 = aiAppS
   serverRuntime: 'openai_app_server',
   tools: [
     {
-      allowedCapabilities: ['subject_mask', 'foreground_mask', 'sky_mask', 'depth_mask'],
+      allowedCapabilities: ['subject_mask', 'foreground_mask', 'person_mask', 'sky_mask', 'depth_mask'],
       allowedProviderClasses: ['local_model', 'self_hosted_connector'],
       approvalClass: ApprovalClass.ExternalModel,
       auditEvents: ['ai_tool_dry_run_requested', 'ai_tool_dry_run_completed'],
@@ -4033,7 +4033,7 @@ export const sampleAiAppServerToolManifestV1: AiAppServerToolManifestV1 = aiAppS
       toolName: 'ai.mask.dry_run_subject',
     },
     {
-      allowedCapabilities: ['subject_mask', 'foreground_mask', 'sky_mask', 'depth_mask'],
+      allowedCapabilities: ['subject_mask', 'foreground_mask', 'person_mask', 'sky_mask', 'depth_mask'],
       allowedProviderClasses: ['local_model', 'self_hosted_connector'],
       approvalClass: ApprovalClass.GenerativeEdit,
       auditEvents: ['ai_tool_apply_requested', 'ai_tool_apply_completed'],

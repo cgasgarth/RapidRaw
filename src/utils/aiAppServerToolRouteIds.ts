@@ -38,6 +38,7 @@ export const AiAppServerToolCapability = {
   Enhance: 'enhance',
   ForegroundMask: 'foreground_mask',
   Inpaint: 'inpaint',
+  PersonMask: 'person_mask',
   SkyMask: 'sky_mask',
   SubjectMask: 'subject_mask',
 } as const;
@@ -48,6 +49,7 @@ export const AI_APP_SERVER_TOOL_CAPABILITIES = [
   AiAppServerToolCapability.Enhance,
   AiAppServerToolCapability.ForegroundMask,
   AiAppServerToolCapability.Inpaint,
+  AiAppServerToolCapability.PersonMask,
   AiAppServerToolCapability.SkyMask,
   AiAppServerToolCapability.SubjectMask,
 ] as const;

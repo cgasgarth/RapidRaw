@@ -349,6 +349,12 @@ const SUB_MASK_CONFIG: Record<Mask, SubMaskConfig> = {
       { key: 'feather', min: 0, max: 100, step: 1, defaultValue: 0 },
     ],
   },
+  [Mask.AiPerson]: {
+    parameters: [
+      { key: 'grow', min: -100, max: 100, step: 1, defaultValue: 0 },
+      { key: 'feather', min: 0, max: 100, step: 1, defaultValue: 0 },
+    ],
+  },
   [Mask.AiObject]: {
     parameters: [
       { key: 'grow', min: -100, max: 100, step: 1, defaultValue: 0 },
@@ -931,7 +937,12 @@ function LinearGradientMaskControls({
 export function MasksPanel() {
   const { t } = useTranslation();
   const { setAdjustments, handleLutSelect } = useEditorActions();
-  const { handleGenerateAiDepthMask, handleGenerateAiForegroundMask, handleGenerateAiSkyMask } = useAiMasking();
+  const {
+    handleGenerateAiDepthMask,
+    handleGenerateAiForegroundMask,
+    handleGenerateAiSkyMask,
+    handleGenerateAiWholePersonMask,
+  } = useAiMasking();
   const setCustomEscapeHandler = useUIStore((s) => s.setCustomEscapeHandler);
   const { appSettings } = useSettingsStore(
     useShallow((state) => ({
@@ -1067,7 +1078,8 @@ export function MasksPanel() {
     activeContainer?.subMasks.some((subMask) => subMask.type === Mask.Color || subMask.type === Mask.Luminance) ??
     false;
   const isAiMask =
-    activeSubMaskData && [Mask.AiSubject, Mask.AiForeground, Mask.AiSky, Mask.AiDepth].includes(activeSubMaskData.type);
+    activeSubMaskData &&
+    [Mask.AiSubject, Mask.AiForeground, Mask.AiPerson, Mask.AiSky, Mask.AiDepth].includes(activeSubMaskData.type);
 
   useEffect(() => {
     const timer = setTimeout(
@@ -1226,6 +1238,7 @@ export function MasksPanel() {
     setExpandedContainers((prev) => new Set(prev).add(newContainer.id));
     if (type === Mask.Brush || type === Mask.Flow) selectBrushToolForNewMask();
     if (type === Mask.AiForeground) void handleGenerateAiForegroundMask(subMask.id);
+    else if (type === Mask.AiPerson) void handleGenerateAiWholePersonMask(subMask.id);
     else if (type === Mask.AiSky) void handleGenerateAiSkyMask(subMask.id);
     else if (type === Mask.AiDepth)
       void handleGenerateAiDepthMask(subMask.id, aiDepthMaskParametersSchema.parse(subMask.parameters));
@@ -1258,6 +1271,7 @@ export function MasksPanel() {
     setExpandedContainers((prev) => new Set(prev).add(containerId));
     if (type === Mask.Brush || type === Mask.Flow) selectBrushToolForNewMask();
     if (type === Mask.AiForeground) void handleGenerateAiForegroundMask(subMask.id);
+    else if (type === Mask.AiPerson) void handleGenerateAiWholePersonMask(subMask.id);
     else if (type === Mask.AiSky) void handleGenerateAiSkyMask(subMask.id);
     else if (type === Mask.AiDepth)
       void handleGenerateAiDepthMask(subMask.id, aiDepthMaskParametersSchema.parse(subMask.parameters));
@@ -2836,7 +2850,7 @@ function SettingsPanel({
   const subMaskConfig = activeSubMaskType ? SUB_MASK_CONFIG[activeSubMaskType] : {};
   const isAiMask =
     activeSubMaskType !== undefined &&
-    ['ai-subject', 'ai-foreground', 'ai-sky', 'ai-depth'].includes(activeSubMaskType);
+    ['ai-subject', 'ai-foreground', 'ai-person', 'ai-sky', 'ai-depth'].includes(activeSubMaskType);
   const isComponentMode = !!activeSubMask;
 
   const setMaskContainerAdjustments = (updater: MaskAdjustmentUpdater) => {

@@ -51,6 +51,7 @@ const runtimeCheckScripts = [
 const toolCapabilityByAiMaskCapability = new Map([
   ['depth', AiAppServerToolCapability.DepthMask],
   ['foreground', AiAppServerToolCapability.ForegroundMask],
+  ['person', AiAppServerToolCapability.PersonMask],
   ['sky', AiAppServerToolCapability.SkyMask],
   ['subject', AiAppServerToolCapability.SubjectMask],
 ]);
