@@ -20,6 +20,11 @@ import {
   AGENT_STATE_GET_TOOL_NAME,
 } from './agentReadOnlyAppServerTools';
 import {
+  AGENT_RETOUCH_APPLY_INPUT_SCHEMA_NAME,
+  AGENT_RETOUCH_APPLY_OUTPUT_SCHEMA_NAME,
+  AGENT_RETOUCH_APPLY_TOOL_NAME,
+} from './agentRetouchApplyTool';
+import {
   AGENT_HISTORY_ROLLBACK_INPUT_SCHEMA_NAME,
   AGENT_HISTORY_ROLLBACK_OUTPUT_SCHEMA_NAME,
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
@@ -519,6 +524,15 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       outputSchemaNames: [AGENT_MASK_CREATE_OR_UPDATE_OUTPUT_SCHEMA_NAME],
       runtimeCheckScripts: ['check:agent-layer-mask-tools'],
       toolNames: [AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
+      commandName: AGENT_RETOUCH_APPLY_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_RETOUCH_APPLY_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.ApplyDryRunPlan],
+      outputSchemaNames: [AGENT_RETOUCH_APPLY_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-retouch-apply'],
+      toolNames: [AGENT_RETOUCH_APPLY_TOOL_NAME],
     }),
   );
 
