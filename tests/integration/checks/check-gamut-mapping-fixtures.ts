@@ -3,6 +3,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
+import Color from 'colorjs.io';
+
 import { rawEngineGamutMappingFixtureManifestV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   applyPerceptualOklchChromaReduceReference,
@@ -11,6 +13,7 @@ import {
   type GamutMappingDestination,
   type GamutClassification,
 } from '../../../src/utils/gamutMappingRuntime.ts';
+import { calculateDeltaE00, type LabColor } from '../../../src/utils/deltaE00.ts';
 
 const FIXTURE_PATH = 'fixtures/color/gamut-mapping-fixtures.json';
 const REPORT_PATH = 'docs/validation/color-gamut-clipping-gate-2026-06-18.json';
@@ -41,6 +44,8 @@ interface GamutClipReportCase {
   outOfGamutChannelCount: number;
   outOfGamutMagnitude: number;
   perceptualDeltaL1: number | null;
+  perceptualDeltaE00FromSource: number | null;
+  perceptualDeltaE00VsClip: number | null;
   perceptualHueAngleDriftDeg: number | null;
   perceptualLinearRgb: Array<number> | null;
   perceptualNeutralAxisDrift: number | null;
@@ -77,6 +82,15 @@ for (const testCase of manifest.cases) {
   const clipDeltaL1 = clipDeltas.reduce((sum, delta) => sum + delta, 0);
   const clipDeltaMax = Math.max(...clipDeltas);
   const outOfGamutMagnitude = Math.max(maxOvershoot, maxUndershoot);
+  const perceptualDeltaE00 =
+    perceptualRuntime === null
+      ? null
+      : calculatePerceptualDeltaE00({
+          clippedLinearRgb: runtime.clippedLinearRgb,
+          destination: testCase.policy.destination as GamutMappingDestination,
+          perceptualLinearRgb: perceptualRuntime.perceptualLinearRgb,
+          sourceLinearRgb: rgb,
+        });
 
   if (actualClassification !== testCase.expectedClassification) {
     failures.push(`${testCase.id}: expected ${testCase.expectedClassification}, got ${actualClassification}`);
@@ -196,6 +210,9 @@ for (const testCase of manifest.cases) {
     outOfGamutChannelCount,
     outOfGamutMagnitude: roundMetric(outOfGamutMagnitude),
     perceptualDeltaL1: perceptualRuntime === null ? null : roundMetric(perceptualRuntime.perceptualDeltaL1),
+    perceptualDeltaE00FromSource:
+      perceptualDeltaE00 === null ? null : roundMetric(perceptualDeltaE00.fromSourceProjection),
+    perceptualDeltaE00VsClip: perceptualDeltaE00 === null ? null : roundMetric(perceptualDeltaE00.vsClippedFallback),
     perceptualHueAngleDriftDeg: perceptualRuntime === null ? null : roundMetric(perceptualRuntime.hueAngleDriftDeg),
     perceptualLinearRgb: perceptualRuntime === null ? null : perceptualRuntime.perceptualLinearRgb.map(roundMetric),
     perceptualNeutralAxisDrift: perceptualRuntime === null ? null : roundMetric(perceptualRuntime.neutralAxisDrift),
@@ -283,6 +300,12 @@ function summarizeReportCases(cases: Array<GamutClipReportCase>) {
   const perceptualDeltas = cases
     .map((testCase) => testCase.perceptualDeltaL1)
     .filter((value): value is number => value !== null);
+  const perceptualDeltaE00FromSource = cases
+    .map((testCase) => testCase.perceptualDeltaE00FromSource)
+    .filter((value): value is number => value !== null);
+  const perceptualDeltaE00VsClip = cases
+    .map((testCase) => testCase.perceptualDeltaE00VsClip)
+    .filter((value): value is number => value !== null);
   const hueDrifts = cases
     .map((testCase) => testCase.perceptualHueAngleDriftDeg)
     .filter((value): value is number => value !== null);
@@ -298,6 +321,48 @@ function summarizeReportCases(cases: Array<GamutClipReportCase>) {
     perceptualDeltaL1Max: roundMetric(Math.max(...perceptualDeltas)),
     perceptualDeltaL1P50: roundMetric(percentile(perceptualDeltas, 0.5)),
     perceptualDeltaL1P95: roundMetric(percentile(perceptualDeltas, 0.95)),
+    perceptualDeltaE00FromSourceMax: roundMetric(Math.max(...perceptualDeltaE00FromSource)),
+    perceptualDeltaE00FromSourceP50: roundMetric(percentile(perceptualDeltaE00FromSource, 0.5)),
+    perceptualDeltaE00FromSourceP95: roundMetric(percentile(perceptualDeltaE00FromSource, 0.95)),
+    perceptualDeltaE00VsClipMax: roundMetric(Math.max(...perceptualDeltaE00VsClip)),
+    perceptualDeltaE00VsClipP50: roundMetric(percentile(perceptualDeltaE00VsClip, 0.5)),
+    perceptualDeltaE00VsClipP95: roundMetric(percentile(perceptualDeltaE00VsClip, 0.95)),
     runtimeStatus: 'export_runtime_applied_for_srgb_perceptual',
   };
+}
+
+function calculatePerceptualDeltaE00({
+  clippedLinearRgb,
+  destination,
+  perceptualLinearRgb,
+  sourceLinearRgb,
+}: {
+  clippedLinearRgb: readonly [number, number, number];
+  destination: GamutMappingDestination;
+  perceptualLinearRgb: readonly [number, number, number];
+  sourceLinearRgb: readonly [number, number, number];
+}) {
+  const sourceLab = linearRgbToLab(sourceLinearRgb, destination);
+  const clippedLab = linearRgbToLab(clippedLinearRgb, destination);
+  const perceptualLab = linearRgbToLab(perceptualLinearRgb, destination);
+
+  return {
+    fromSourceProjection: calculateDeltaE00(sourceLab, perceptualLab),
+    vsClippedFallback: calculateDeltaE00(clippedLab, perceptualLab),
+  };
+}
+
+function linearRgbToLab(rgb: readonly [number, number, number], destination: GamutMappingDestination): LabColor {
+  const colorSpace = destination === 'display_p3' ? 'p3-linear' : 'srgb-linear';
+  const [l, a, b] = new Color(colorSpace, [...rgb]).to('lab').coords;
+
+  return {
+    a: finiteOrZero(a),
+    b: finiteOrZero(b),
+    l: Math.min(100, Math.max(0, finiteOrZero(l))),
+  };
+}
+
+function finiteOrZero(value: number | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
