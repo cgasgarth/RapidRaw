@@ -127,6 +127,31 @@ interface LivePromptResult {
   summary?: string;
 }
 
+type LiveActivityKind = 'approval' | 'error' | 'preview' | 'prompt' | 'rollback' | 'tool_call';
+
+interface LiveActivityEntry {
+  body: string;
+  graphRevision?: string;
+  id: string;
+  kind: LiveActivityKind;
+  previewAfterHash?: string;
+  previewBeforeHash?: string;
+  recipeHash?: string;
+  status: 'blocked' | 'completed' | 'pending' | 'rolled_back';
+  toolName?: string;
+}
+
+type LiveActivityEntryInput = Omit<
+  LiveActivityEntry,
+  'graphRevision' | 'id' | 'previewAfterHash' | 'previewBeforeHash' | 'recipeHash' | 'toolName'
+> & {
+  graphRevision?: string | undefined;
+  previewAfterHash?: string | undefined;
+  previewBeforeHash?: string | undefined;
+  recipeHash?: string | undefined;
+  toolName?: string | undefined;
+};
+
 const createAgentRollbackSnapshot = () => {
   const state = useEditorStore.getState();
 
@@ -196,11 +221,72 @@ const createLiveSessionEvent = (role: AgentChatMessage['role'], body: string, su
   timestamp: 'now',
 });
 
+function LiveActivityTimeline({ entries }: { entries: LiveActivityEntry[] }) {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      className="space-y-2 rounded-md border border-white/10 bg-black/15 p-3"
+      data-testid="agent-live-activity-timeline"
+      data-timeline-entry-count={entries.length}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold text-text-primary">{t('editor.ai.agent.timeline.title')}</span>
+        <span className="text-[11px] text-text-secondary">{t('editor.ai.agent.timeline.subtitle')}</span>
+      </div>
+      <div className="space-y-1.5" data-testid="agent-live-activity-timeline-entries">
+        {entries.length === 0 ? (
+          <div className="rounded border border-white/10 bg-white/[0.03] p-2 text-[11px] text-text-secondary">
+            {t('editor.ai.agent.timeline.empty')}
+          </div>
+        ) : (
+          entries.map((entry) => (
+            <div
+              className="rounded border border-white/10 bg-white/[0.03] p-2 text-[11px]"
+              data-graph-revision={entry.graphRevision ?? ''}
+              data-kind={entry.kind}
+              data-preview-after-hash={entry.previewAfterHash ?? ''}
+              data-preview-before-hash={entry.previewBeforeHash ?? ''}
+              data-recipe-hash={entry.recipeHash ?? ''}
+              data-status={entry.status}
+              data-testid={`agent-live-activity-${entry.kind}`}
+              data-tool-name={entry.toolName ?? ''}
+              key={entry.id}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold text-text-primary">
+                  {t(`editor.ai.agent.timeline.kind.${entry.kind}`)}
+                </span>
+                <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-text-secondary">
+                  {entry.status}
+                </span>
+              </div>
+              <p className="mt-1 leading-4 text-text-secondary">{entry.body}</p>
+              {entry.previewAfterHash ? (
+                <div
+                  className="mt-1 truncate font-mono text-[10px] text-sky-100"
+                  data-testid="agent-live-activity-preview-hash"
+                >
+                  {entry.previewBeforeHash} → {entry.previewAfterHash}
+                </div>
+              ) : null}
+              {entry.graphRevision ? (
+                <div className="mt-1 truncate font-mono text-[10px] text-emerald-100">{entry.graphRevision}</div>
+              ) : null}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: LivePromptComposerProps) {
   const { t } = useTranslation();
   const promptInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [prompt, setPrompt] = useState('');
   const [acceptedPrompt, setAcceptedPrompt] = useState('');
+  const [activityEntries, setActivityEntries] = useState<LiveActivityEntry[]>([]);
   const [result, setResult] = useState<LivePromptResult>({ status: 'idle' });
   const [rollbackSnapshot, setRollbackSnapshot] = useState<AgentRollbackSnapshot | null>(null);
   const canRun = isContextReady && result.status !== 'applying';
@@ -235,11 +321,36 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
       break;
   }
 
+  const pushActivityEntry = (entry: LiveActivityEntryInput) => {
+    setActivityEntries((entries) => {
+      const nextEntry: LiveActivityEntry = {
+        body: entry.body,
+        id: `live-activity-${Date.now()}-${entries.length}`,
+        kind: entry.kind,
+        status: entry.status,
+      };
+
+      if (entry.graphRevision !== undefined) nextEntry.graphRevision = entry.graphRevision;
+      if (entry.previewAfterHash !== undefined) nextEntry.previewAfterHash = entry.previewAfterHash;
+      if (entry.previewBeforeHash !== undefined) nextEntry.previewBeforeHash = entry.previewBeforeHash;
+      if (entry.recipeHash !== undefined) nextEntry.recipeHash = entry.recipeHash;
+      if (entry.toolName !== undefined) nextEntry.toolName = entry.toolName;
+
+      return [...entries, nextEntry];
+    });
+  };
+
   const runDryRun = async () => {
     const requestedPrompt = (promptInputRef.current?.value ?? prompt).trim();
     if (!isContextReady || requestedPrompt.length === 0) return;
 
     try {
+      pushActivityEntry({
+        body: requestedPrompt,
+        kind: 'prompt',
+        status: 'completed',
+        toolName: 'rawengine.agent.session.prompt',
+      });
       onSessionEvent?.(createLiveSessionEvent('user', requestedPrompt, 'prompt'));
       const plan = planAgentEditRecipe(requestedPrompt);
       const safetyDecision = evaluateAgentSafetyPolicy({
@@ -252,6 +363,24 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
         prompt: requestedPrompt,
         sessionId: 'agent-chat-shell',
       });
+      pushActivityEntry({
+        body: plan.summary,
+        kind: 'preview',
+        previewAfterHash: preview.dryRunAfterHash,
+        previewBeforeHash: preview.dryRunBeforeHash,
+        recipeHash: plan.recipeName,
+        status: 'completed',
+        toolName: 'rawengine.agent.preview.render',
+      });
+      if (safetyDecision.blocked || safetyDecision.approvalRequired) {
+        pushActivityEntry({
+          body: safetyDecision.reason,
+          kind: 'approval',
+          recipeHash: safetyDecision.decisionId,
+          status: safetyDecision.blocked ? 'blocked' : 'pending',
+          toolName: 'rawengine.agent.safety_policy',
+        });
+      }
       setAcceptedPrompt(requestedPrompt);
       const nextResult = {
         previewAfterHash: preview.dryRunAfterHash,
@@ -276,6 +405,12 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
       );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError');
+      pushActivityEntry({
+        body: errorMessage,
+        kind: 'error',
+        status: 'blocked',
+        toolName: 'rawengine.agent.session.prompt',
+      });
       const nextResult = {
         error: errorMessage,
         status: 'failed',
@@ -294,6 +429,13 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
 
   const approveSafetyGate = () => {
     if (result.status !== 'approval_required') return;
+    pushActivityEntry({
+      body: t('editor.ai.agent.composer.policy.approved'),
+      kind: 'approval',
+      recipeHash: result.safetyDecision?.decisionId,
+      status: 'completed',
+      toolName: 'rawengine.agent.safety_policy',
+    });
     const nextResult = { ...result, status: 'dry_run_ready' } satisfies LivePromptResult;
     setResult(nextResult);
     onResultChange?.(nextResult);
@@ -307,6 +449,15 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
 
     try {
       setRollbackSnapshot(createAgentRollbackSnapshot());
+      pushActivityEntry({
+        body: t('editor.ai.agent.composer.status.applying'),
+        kind: 'tool_call',
+        previewAfterHash: result.previewAfterHash,
+        previewBeforeHash: result.previewBeforeHash,
+        recipeHash: result.recipeName,
+        status: 'pending',
+        toolName: 'rawengine.live_basic_tone.apply',
+      });
       const applyingResult = { ...result, status: 'applying' } satisfies LivePromptResult;
       setResult(applyingResult);
       onResultChange?.(applyingResult);
@@ -333,6 +484,22 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
         sampledPixelCount: applyResult.sampledPixelCount,
         status: 'applied',
       } satisfies LivePromptResult;
+      pushActivityEntry({
+        body: t('editor.ai.agent.composer.previewDelta', {
+          changed: applyResult.changedPixelCount,
+          maxDelta: applyResult.maxChannelDelta,
+          meanLuma: applyResult.meanLuminanceDelta,
+          percent: applyResult.changedPixelPercent,
+          sampled: applyResult.sampledPixelCount,
+        }),
+        graphRevision: applyResult.appliedGraphRevision,
+        kind: 'tool_call',
+        previewAfterHash: result.previewAfterHash,
+        previewBeforeHash: result.previewBeforeHash,
+        recipeHash: result.recipeName,
+        status: 'completed',
+        toolName: 'rawengine.live_basic_tone.apply',
+      });
       setResult(nextResult);
       onResultChange?.(nextResult);
       onSessionEvent?.(
@@ -344,6 +511,13 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
       );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError');
+      pushActivityEntry({
+        body: errorMessage,
+        kind: 'error',
+        recipeHash: result.recipeName,
+        status: 'blocked',
+        toolName: 'rawengine.live_basic_tone.apply',
+      });
       const nextResult = {
         ...result,
         error: errorMessage,
@@ -373,6 +547,14 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
       uncroppedAdjustedPreviewUrl: rollbackSnapshot.uncroppedAdjustedPreviewUrl,
     });
     setRollbackSnapshot(null);
+    pushActivityEntry({
+      body: t('editor.ai.agent.composer.status.rolled_back'),
+      graphRevision: `history:${rollbackSnapshot.historyIndex}`,
+      kind: 'rollback',
+      recipeHash: result.recipeName,
+      status: 'rolled_back',
+      toolName: 'rawengine.agent.history.rollback',
+    });
     const nextResult = { ...result, status: 'rolled_back' } satisfies LivePromptResult;
     setResult(nextResult);
     onResultChange?.(nextResult);
@@ -467,6 +649,7 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
         </button>
         <button
           className="inline-flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          data-discard-control="rollback-session"
           data-testid="agent-live-prompt-rollback"
           disabled={!canRollback}
           onMouseDown={(event) => {
@@ -480,6 +663,8 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
           {t('editor.ai.agent.composer.rollback')}
         </button>
       </div>
+
+      <LiveActivityTimeline entries={activityEntries} />
 
       <div
         className="rounded border border-white/10 bg-black/15 p-2 text-[11px]"
