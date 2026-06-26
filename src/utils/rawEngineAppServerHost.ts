@@ -1,3 +1,11 @@
+import {
+  AGENT_PREVIEW_RENDER_INPUT_SCHEMA_NAME,
+  AGENT_PREVIEW_RENDER_OUTPUT_SCHEMA_NAME,
+  AGENT_PREVIEW_RENDER_TOOL_NAME,
+  AGENT_STATE_GET_INPUT_SCHEMA_NAME,
+  AGENT_STATE_GET_OUTPUT_SCHEMA_NAME,
+  AGENT_STATE_GET_TOOL_NAME,
+} from './agentReadOnlyAppServerTools';
 import { AI_APP_SERVER_TOOL_ROUTES } from './aiAppServerToolRoutes';
 import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from './computationalMergeAppServerRoutes';
 import { DETAIL_APP_SERVER_ROUTES } from './detailAppServerRoutes';
@@ -439,6 +447,27 @@ const buildRouteCatalogEntry = ({
 
 export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCatalogEntry[] => {
   const catalog: RawEngineAppServerRouteCatalogEntry[] = [];
+  catalog.push(
+    buildRouteCatalogEntry({
+      commandName: AGENT_STATE_GET_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_STATE_GET_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.Read],
+      outputSchemaNames: [AGENT_STATE_GET_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-readonly-tools'],
+      toolNames: [AGENT_STATE_GET_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
+      commandName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_PREVIEW_RENDER_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.Read],
+      outputSchemaNames: [AGENT_PREVIEW_RENDER_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-readonly-tools'],
+      toolNames: [AGENT_PREVIEW_RENDER_TOOL_NAME],
+    }),
+  );
+
   const mappedToneColorRoutes = TONE_COLOR_APP_SERVER_ROUTES.filter(
     (route) => route.status === ToneColorAppServerRouteStatus.Mapped,
   );
