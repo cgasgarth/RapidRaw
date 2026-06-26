@@ -183,8 +183,11 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   fixtures/metrics, implement runtime behavior, verify preview/export parity,
   then prove quality on representative real images before closing runtime
   feature issues.
-- When using consult for repo-aware decisions, prefer the RapidRaw ChatGPT
-  project with the GitHub repo attached when available.
+- For RawEngine/RapidRaw consults, start the chat inside the RapidRaw ChatGPT
+  project. Do not use a generic ChatGPT project for this repo unless the
+  RapidRaw project is unavailable and that limitation is recorded.
+- When using consult for repo-aware decisions, attach the `cgasgarth/RapidRaw`
+  GitHub repo/app data source before sending the prompt when available.
 - For consult chats, start directly with the concrete milestone, feature, bug,
   PR, or decision context. Do not announce that the prompt is a new chat, do
   not write literal labels such as "new topic", and do not add meta labels
