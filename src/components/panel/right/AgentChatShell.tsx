@@ -130,7 +130,9 @@ interface LivePromptResult {
 type LiveActivityKind = 'approval' | 'error' | 'preview' | 'prompt' | 'rollback' | 'tool_call';
 
 interface LiveActivityEntry {
+  approvalId?: string;
   body: string;
+  exportArtifactId?: string;
   graphRevision?: string;
   id: string;
   kind: LiveActivityKind;
@@ -143,8 +145,17 @@ interface LiveActivityEntry {
 
 type LiveActivityEntryInput = Omit<
   LiveActivityEntry,
-  'graphRevision' | 'id' | 'previewAfterHash' | 'previewBeforeHash' | 'recipeHash' | 'toolName'
+  | 'approvalId'
+  | 'exportArtifactId'
+  | 'graphRevision'
+  | 'id'
+  | 'previewAfterHash'
+  | 'previewBeforeHash'
+  | 'recipeHash'
+  | 'toolName'
 > & {
+  approvalId?: string | undefined;
+  exportArtifactId?: string | undefined;
   graphRevision?: string | undefined;
   previewAfterHash?: string | undefined;
   previewBeforeHash?: string | undefined;
@@ -243,6 +254,8 @@ function LiveActivityTimeline({ entries }: { entries: LiveActivityEntry[] }) {
           entries.map((entry) => (
             <div
               className="rounded border border-white/10 bg-white/[0.03] p-2 text-[11px]"
+              data-approval-id={entry.approvalId ?? ''}
+              data-export-artifact-id={entry.exportArtifactId ?? ''}
               data-graph-revision={entry.graphRevision ?? ''}
               data-kind={entry.kind}
               data-preview-after-hash={entry.previewAfterHash ?? ''}
@@ -273,6 +286,26 @@ function LiveActivityTimeline({ entries }: { entries: LiveActivityEntry[] }) {
               {entry.graphRevision ? (
                 <div className="mt-1 truncate font-mono text-[10px] text-emerald-100">{entry.graphRevision}</div>
               ) : null}
+              <div
+                className="mt-2 flex flex-wrap gap-1.5"
+                data-testid="agent-live-activity-review-controls"
+                data-timeline-review-state={entry.status}
+              >
+                <span className="rounded border border-white/10 bg-black/20 px-1.5 py-0.5 text-text-secondary">
+                  {entry.kind === 'rollback'
+                    ? t('editor.ai.agent.timeline.control.rollback')
+                    : entry.kind === 'approval'
+                      ? t('editor.ai.agent.timeline.control.approval')
+                      : entry.kind === 'preview'
+                        ? t('editor.ai.agent.timeline.control.compare')
+                        : t('editor.ai.agent.timeline.control.inspect')}
+                </span>
+                {entry.toolName ? (
+                  <span className="rounded border border-white/10 bg-black/20 px-1.5 py-0.5 font-mono text-text-secondary">
+                    {entry.toolName}
+                  </span>
+                ) : null}
+              </div>
             </div>
           ))
         )}
@@ -331,6 +364,8 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
       };
 
       if (entry.graphRevision !== undefined) nextEntry.graphRevision = entry.graphRevision;
+      if (entry.approvalId !== undefined) nextEntry.approvalId = entry.approvalId;
+      if (entry.exportArtifactId !== undefined) nextEntry.exportArtifactId = entry.exportArtifactId;
       if (entry.previewAfterHash !== undefined) nextEntry.previewAfterHash = entry.previewAfterHash;
       if (entry.previewBeforeHash !== undefined) nextEntry.previewBeforeHash = entry.previewBeforeHash;
       if (entry.recipeHash !== undefined) nextEntry.recipeHash = entry.recipeHash;

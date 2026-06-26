@@ -656,6 +656,12 @@
         "runtimeApplyDemo": "",
         "runtimeApplyProof": "",
         "timeline": {
+          "control": {
+            "approval": "",
+            "compare": "",
+            "inspect": "",
+            "rollback": ""
+          },
           "empty": "",
           "kind": {
             "approval": "",

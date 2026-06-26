@@ -36,6 +36,10 @@ for (const marker of [
   'data-testid="agent-live-activity-timeline"',
   'data-testid="agent-live-activity-timeline-entries"',
   'data-testid="agent-live-activity-preview-hash"',
+  'data-testid="agent-live-activity-review-controls"',
+  'data-approval-id={entry.approvalId',
+  'data-export-artifact-id={entry.exportArtifactId',
+  'data-timeline-review-state={entry.status}',
   'rawengine.agent.preview.render',
   'rawengine.live_basic_tone.apply',
   'rawengine.agent.history.rollback',
@@ -76,6 +80,12 @@ const localeSchema = z
             }),
           }),
           timeline: z.object({
+            control: z.object({
+              approval: z.string().min(1),
+              compare: z.string().min(1),
+              inspect: z.string().min(1),
+              rollback: z.string().min(1),
+            }),
             empty: z.string().min(1),
             kind: z.object({
               approval: z.string().min(1),
