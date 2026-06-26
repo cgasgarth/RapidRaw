@@ -22,6 +22,7 @@ export type SubMaskParameters = Record<string, unknown>;
 export enum Mask {
   AiDepth = 'ai-depth',
   AiForeground = 'ai-foreground',
+  AiObject = 'ai-object',
   AiSky = 'ai-sky',
   AiSubject = 'ai-subject',
   All = 'all',
@@ -73,6 +74,8 @@ export function formatMaskTypeName(type: Mask) {
       return t('masks.types.depth');
     case Mask.AiSubject:
       return t('masks.types.subject');
+    case Mask.AiObject:
+      return t('masks.types.object');
     case Mask.AiForeground:
       return t('masks.types.foreground');
     case Mask.AiSky:
@@ -111,6 +114,7 @@ export function getSubMaskName(subMask: Pick<SubMask, 'name' | 'type'>) {
 export const MASK_ICON_MAP: Record<Mask, LucideIcon> = {
   [Mask.AiDepth]: BringToFront,
   [Mask.AiForeground]: User,
+  [Mask.AiObject]: Sparkles,
   [Mask.AiSky]: Cloud,
   [Mask.AiSubject]: Sparkles,
   [Mask.All]: RectangleHorizontal,

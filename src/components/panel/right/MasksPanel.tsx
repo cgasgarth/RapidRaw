@@ -349,6 +349,12 @@ const SUB_MASK_CONFIG: Record<Mask, SubMaskConfig> = {
       { key: 'feather', min: 0, max: 100, step: 1, defaultValue: 0 },
     ],
   },
+  [Mask.AiObject]: {
+    parameters: [
+      { key: 'grow', min: -100, max: 100, step: 1, defaultValue: 0 },
+      { key: 'feather', min: 0, max: 100, step: 1, defaultValue: 0 },
+    ],
+  },
   [Mask.AiSky]: {
     parameters: [
       { key: 'grow', min: -100, max: 100, step: 1, defaultValue: 0 },

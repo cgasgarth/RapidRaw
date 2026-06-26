@@ -1804,6 +1804,7 @@
       "foreground": "Foreground",
       "linear": "Linear",
       "luminance": "Luminance",
+      "object": "Object",
       "others": "Others",
       "quickErase": "Quick Erase",
       "quickEraser": "Quick Eraser",

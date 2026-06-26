@@ -552,11 +552,11 @@ export const applyAgentObjectSelection = (
         opacity: 100,
         parameters: {
           boxPrompt: parsedRequest.boxPrompt ?? null,
+          generatedPreviewStrokes: strokes,
           pointPrompts: parsedRequest.pointPrompts,
           providerStatus: 'prompt_proxy_mask_v1',
-          strokes,
         },
-        type: Mask.Brush,
+        type: Mask.AiObject,
         visible: true,
       },
     ],
