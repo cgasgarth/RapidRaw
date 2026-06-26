@@ -657,6 +657,12 @@
         "runtimeApplyDemo": "Runtime apply demo",
         "runtimeApplyProof": "Runtime apply proof",
         "timeline": {
+          "control": {
+            "approval": "Approve",
+            "compare": "Compare",
+            "inspect": "Inspect",
+            "rollback": "Rollback"
+          },
           "empty": "Run an edit to see prompt, preview, tool, and rollback events.",
           "kind": {
             "approval": "Approval",
