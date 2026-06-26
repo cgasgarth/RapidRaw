@@ -3,6 +3,7 @@
 import { ToolType } from '../../../src/components/panel/right/Masks.tsx';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { buildAgentEditQualityReview } from '../../../src/utils/agentEditQualityReview.ts';
 import {
   agentIterativeEditLoopRequestSchema,
   runAgentIterativeEditLoop,
@@ -124,10 +125,14 @@ if (result.appliedGraphRevision !== 'history_2' || result.finalRecipeHash.length
 if (
   result.editReview.stopReason !== 'finish' ||
   result.editReview.preview.id !== result.previewRefreshes.at(-1)?.id ||
+  result.editReview.beforePreview.id !== result.previewRefreshes[0]?.id ||
+  result.editReview.afterPreview.id !== result.previewRefreshes[1]?.id ||
   result.editReview.preview.recipeHash !== result.finalRecipeHash ||
-  result.editReview.toolReceiptCount !== 2
+  result.editReview.toolReceiptCount !== 2 ||
+  result.editReview.toolReceipts.length !== 2 ||
+  result.editReview.followUpRequests.length !== 0
 ) {
-  throw new Error('agent iterative loop did not bind the edit-quality review to the final preview and receipts.');
+  throw new Error('agent iterative loop did not bind review to before/after previews and receipts.');
 }
 if (
   !result.editReview.rubric.some((entry) => entry.area === 'exposure_tone' && entry.status === 'pass') ||
@@ -137,6 +142,22 @@ if (
 }
 if (!result.transcript.some((entry) => entry.toolName === 'rawengine.agent.edit_review')) {
   throw new Error('agent iterative loop transcript did not persist the edit review decision.');
+}
+
+const detailReview = buildAgentEditQualityReview({
+  beforePreview: result.previewRefreshes[0],
+  maxIterationsReached: false,
+  preview: result.previewRefreshes[0],
+  prompt: 'Retouch the distracting object and inspect detail artifacts.',
+  toolReceiptCount: 1,
+  toolReceipts: [{ graphRevision: 'history_1', summary: 'exposure', toolName: 'rawengine.agent.adjustments.apply' }],
+});
+if (
+  detailReview.stopReason !== 'request_detail_preview' ||
+  detailReview.followUpRequests[0]?.toolName !== 'rawengine.agent.preview.render' ||
+  !detailReview.rubric.some((entry) => entry.area === 'retouch_artifacts' && entry.status === 'attention')
+) {
+  throw new Error('agent edit review did not request a detail preview for retouch/detail prompts.');
 }
 
 console.log('agent iterative edit loop ok');

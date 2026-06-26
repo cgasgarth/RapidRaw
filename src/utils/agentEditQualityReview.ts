@@ -21,7 +21,30 @@ export const agentEditReviewRubricEntrySchema = z
 
 export const agentEditQualityReviewSchema = z
   .object({
+    afterPreview: z
+      .object({
+        id: z.string().trim().min(1),
+        recipeHash: z.string().trim().min(1),
+        renderHash: z.string().trim().min(1),
+      })
+      .strict(),
+    beforePreview: z
+      .object({
+        id: z.string().trim().min(1),
+        recipeHash: z.string().trim().min(1),
+        renderHash: z.string().trim().min(1),
+      })
+      .strict(),
     finalRationale: z.string().trim().min(1),
+    followUpRequests: z.array(
+      z
+        .object({
+          reason: z.string().trim().min(1),
+          toolName: z.string().trim().min(1),
+          urgency: z.enum(['before_finalize', 'optional_refinement']),
+        })
+        .strict(),
+    ),
     preview: z
       .object({
         id: z.string().trim().min(1),
@@ -33,16 +56,29 @@ export const agentEditQualityReviewSchema = z
     rubric: z.array(agentEditReviewRubricEntrySchema).length(6),
     stopReason: z.enum(['continue_iterating', 'finish', 'request_detail_preview', 'request_user_approval']),
     toolReceiptCount: z.number().int().nonnegative(),
+    toolReceipts: z
+      .array(
+        z
+          .object({
+            graphRevision: z.string().trim().min(1),
+            summary: z.string().trim().min(1),
+            toolName: z.string().trim().min(1),
+          })
+          .strict(),
+      )
+      .min(1),
   })
   .strict();
 
 export type AgentEditQualityReview = z.infer<typeof agentEditQualityReviewSchema>;
 
 export const buildAgentEditQualityReview = (input: {
+  beforePreview: AgentPreviewEnvelope;
   maxIterationsReached: boolean;
   preview: AgentPreviewEnvelope;
   prompt: string;
   toolReceiptCount: number;
+  toolReceipts?: readonly { graphRevision: string; summary: string; toolName: string }[];
 }): AgentEditQualityReview => {
   const prompt = input.prompt.toLowerCase();
   const asksForDetail = /\b(detail|sharp|retouch|heal|clone|mask|local|crop)\b/u.test(prompt);
@@ -55,8 +91,49 @@ export const buildAgentEditQualityReview = (input: {
       : asksForDetail && !hasDetailPreview
         ? 'request_detail_preview'
         : 'finish';
+  const toolReceipts =
+    input.toolReceipts && input.toolReceipts.length > 0
+      ? input.toolReceipts
+      : [{ graphRevision: input.preview.recipeHash, summary: 'Legacy receipt count only.', toolName: 'unknown' }];
+  const followUpRequests =
+    stopReason === 'request_detail_preview'
+      ? [
+          {
+            reason: 'Inspect a bounded crop/detail preview before finalizing local/detail quality.',
+            toolName: 'rawengine.agent.preview.render',
+            urgency: 'before_finalize' as const,
+          },
+        ]
+      : stopReason === 'continue_iterating'
+        ? [
+            {
+              reason:
+                'Iteration budget reached before review could finalize; request one additional bounded edit pass.',
+              toolName: 'rawengine.agent.adjustments.apply',
+              urgency: 'before_finalize' as const,
+            },
+          ]
+        : stopReason === 'request_user_approval'
+          ? [
+              {
+                reason: 'User approval is required before gated output or destructive actions.',
+                toolName: 'rawengine.agent.approval.request',
+                urgency: 'before_finalize' as const,
+              },
+            ]
+          : [];
 
   return agentEditQualityReviewSchema.parse({
+    afterPreview: {
+      id: input.preview.id,
+      recipeHash: input.preview.recipeHash,
+      renderHash: input.preview.renderHash,
+    },
+    beforePreview: {
+      id: input.beforePreview.id,
+      recipeHash: input.beforePreview.recipeHash,
+      renderHash: input.beforePreview.renderHash,
+    },
     finalRationale:
       stopReason === 'finish'
         ? 'Current preview and tool receipts satisfy the prompt; stop without another edit.'
@@ -65,6 +142,7 @@ export const buildAgentEditQualityReview = (input: {
           : stopReason === 'request_user_approval'
             ? 'Prompt includes a gated action; wait for user approval before continuing.'
             : 'Iteration budget was reached; stop and ask for review before more edits.',
+    followUpRequests,
     preview: {
       id: input.preview.id,
       recipeHash: input.preview.recipeHash,
@@ -108,5 +186,6 @@ export const buildAgentEditQualityReview = (input: {
     ],
     stopReason,
     toolReceiptCount: input.toolReceiptCount,
+    toolReceipts,
   });
 };
