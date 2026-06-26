@@ -6,7 +6,10 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { buildAgentAppServerToolReadinessSummary } from '../../../utils/agentAppServerToolReadiness';
 import { runAgentBoundedEditPlannerLoop } from '../../../utils/agentBoundedEditPlannerLoop';
 import { planAgentEditRecipe } from '../../../utils/agentEditRecipePlanner';
-import { applyBasicToneToLiveEditor } from '../../../utils/agentLiveBasicTone';
+import {
+  runAgentMultiTurnAppServerSession,
+  type AgentMultiTurnAppServerSessionRequest,
+} from '../../../utils/agentMultiTurnAppServerSession';
 import {
   evaluateAgentSafetyPolicy,
   inferAgentSafetyOperationKind,
@@ -101,6 +104,7 @@ const longEditProgressStageStyles = {
 } satisfies Record<AgentLongEditProgress['stages'][number]['state'], string>;
 
 type LocalReviewDecision = 'approved' | 'pending' | 'rejected';
+type AgentSessionAdjustmentPatch = AgentMultiTurnAppServerSessionRequest['turns'][number]['adjustment'];
 type LivePromptStatus =
   | 'applied'
   | 'applying'
@@ -188,6 +192,73 @@ const agentRuntimeBadge = {
     className: 'border-amber-500/25 bg-amber-500/10 text-amber-100',
   },
 } satisfies Record<AgentChatTranscript['runtimeStatus'], { className: string }>;
+
+const pickSessionAdjustments = (
+  source: AgentSessionAdjustmentPatch,
+  keys: readonly (keyof AgentSessionAdjustmentPatch)[],
+): AgentSessionAdjustmentPatch => {
+  const patch: AgentSessionAdjustmentPatch = {};
+  for (const key of keys) {
+    const value = source[key];
+    if (value !== undefined) patch[key] = value;
+  }
+  return patch;
+};
+
+const buildLiveMultiTurnSessionRequest = ({
+  operationId,
+  plan,
+  prompt,
+  requestId,
+  sessionId,
+}: {
+  operationId: string;
+  plan: ReturnType<typeof planAgentEditRecipe>;
+  prompt: string;
+  requestId: string;
+  sessionId: string;
+}): AgentMultiTurnAppServerSessionRequest => {
+  const basicToneStep = plan.steps.find((step) => step.kind === 'basic_tone');
+  if (basicToneStep?.kind !== 'basic_tone') throw new Error('Agent session needs a basic-tone apply step.');
+
+  const firstPass = pickSessionAdjustments(basicToneStep.payload, [
+    'exposure',
+    'highlights',
+    'whites',
+    'blacks',
+    'brightness',
+  ]);
+  const secondPass = pickSessionAdjustments(basicToneStep.payload, [
+    'shadows',
+    'contrast',
+    'clarity',
+    'saturation',
+    'vibrance',
+    'temperature',
+    'tint',
+  ]);
+
+  return {
+    modelId: 'gpt-5.1-codex-app-server',
+    operationId,
+    prompt,
+    requestId,
+    sessionId,
+    turns: [
+      {
+        adjustment: firstPass,
+        assistantRationale: 'First pass: establish global exposure and highlight protection.',
+        preview: { purpose: 'refresh' },
+      },
+      {
+        adjustment: secondPass,
+        assistantRationale: 'Second pass: inspect the preview and refine contrast, color, and shadow balance.',
+        preview: { longEdgePx: 1536, purpose: 'detail_review', quality: 0.86 },
+        userFollowUp: 'Inspect the medium preview and refine the image before final review.',
+      },
+    ],
+  };
+};
 
 function MessageBubble({ message }: { message: AgentChatMessage }) {
   const isUser = message.role === 'user';
@@ -498,42 +569,57 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
       onResultChange?.(applyingResult);
       onSessionEvent?.(createLiveSessionEvent('assistant', t('editor.ai.agent.composer.status.applying'), 'applying'));
       const plan = planAgentEditRecipe(acceptedPrompt);
-      const basicToneStep = plan.steps.find((step) => step.kind === 'basic_tone');
-      if (basicToneStep?.kind !== 'basic_tone') {
+      const sessionResult = await runAgentMultiTurnAppServerSession({
+        ...buildLiveMultiTurnSessionRequest({
+          operationId: `agent_chat_apply_${Date.now()}`,
+          plan,
+          prompt: acceptedPrompt,
+          requestId: `agent-chat-apply-${Date.now()}`,
+          sessionId: 'agent-chat-shell',
+        }),
+      });
+      const beforePreview = sessionResult.previews[0];
+      const afterPreview = sessionResult.previews.at(-1);
+      if (beforePreview === undefined || afterPreview === undefined) {
         throw new Error(t('editor.ai.agent.composer.noApplyStep'));
       }
 
-      const applyResult = await applyBasicToneToLiveEditor({
-        operationId: `agent_chat_apply_${Date.now()}`,
-        requestedAdjustments: basicToneStep.payload,
-        sessionId: 'agent-chat-shell',
-      });
-
       const nextResult = {
         ...applyingResult,
-        appliedGraphRevision: applyResult.appliedGraphRevision,
-        changedPixelCount: applyResult.changedPixelCount,
-        changedPixelPercent: applyResult.changedPixelPercent,
-        maxChannelDelta: applyResult.maxChannelDelta,
-        meanLuminanceDelta: applyResult.meanLuminanceDelta,
-        sampledPixelCount: applyResult.sampledPixelCount,
+        appliedGraphRevision: sessionResult.finalGraphRevision,
+        previewAfterHash: afterPreview.renderHash,
+        previewBeforeHash: beforePreview.renderHash,
+        recipeName: sessionResult.finalRecipeHash,
         status: 'applied',
       } satisfies LivePromptResult;
       pushActivityEntry({
-        body: t('editor.ai.agent.composer.previewDelta', {
-          changed: applyResult.changedPixelCount,
-          maxDelta: applyResult.maxChannelDelta,
-          meanLuma: applyResult.meanLuminanceDelta,
-          percent: applyResult.changedPixelPercent,
-          sampled: applyResult.sampledPixelCount,
-        }),
-        graphRevision: applyResult.appliedGraphRevision,
+        body: sessionResult.editReview.finalRationale,
+        graphRevision: sessionResult.finalGraphRevision,
         kind: 'tool_call',
-        previewAfterHash: result.previewAfterHash,
-        previewBeforeHash: result.previewBeforeHash,
-        recipeHash: result.recipeName,
+        previewAfterHash: afterPreview.renderHash,
+        previewBeforeHash: beforePreview.renderHash,
+        recipeHash: sessionResult.finalRecipeHash,
         status: 'completed',
-        toolName: 'rawengine.live_basic_tone.apply',
+        toolName: 'rawengine.agent.session.multiturn',
+      });
+      for (const previewLineage of sessionResult.previewLineage) {
+        pushActivityEntry({
+          body: `${previewLineage.purpose} ${previewLineage.artifactId}`,
+          graphRevision: previewLineage.graphRevision,
+          kind: 'preview',
+          previewAfterHash: previewLineage.renderHash,
+          recipeHash: previewLineage.recipeHash,
+          status: 'completed',
+          toolName: 'rawengine.agent.preview.render',
+        });
+      }
+      pushActivityEntry({
+        body: `${sessionResult.toolCalls.length} typed tool calls completed.`,
+        graphRevision: sessionResult.finalGraphRevision,
+        kind: 'tool_call',
+        recipeHash: sessionResult.finalRecipeHash,
+        status: 'completed',
+        toolName: 'rawengine.agent.app_server_session',
       });
       setResult(nextResult);
       onResultChange?.(nextResult);
@@ -551,7 +637,7 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
         kind: 'error',
         recipeHash: result.recipeName,
         status: 'blocked',
-        toolName: 'rawengine.live_basic_tone.apply',
+        toolName: 'rawengine.agent.session.multiturn',
       });
       const nextResult = {
         ...result,
@@ -736,7 +822,7 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
             {result.previewBeforeHash} → {result.previewAfterHash}
           </div>
         ) : null}
-        {result.appliedGraphRevision ? (
+        {result.appliedGraphRevision && result.changedPixelCount !== undefined ? (
           <div className="mt-1 font-mono text-[10px] text-emerald-100">
             {result.appliedGraphRevision} ·{' '}
             {t('editor.ai.agent.composer.previewDelta', {
@@ -747,6 +833,9 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
               sampled: result.sampledPixelCount,
             })}
           </div>
+        ) : null}
+        {result.appliedGraphRevision && result.changedPixelCount === undefined ? (
+          <div className="mt-1 font-mono text-[10px] text-emerald-100">{result.appliedGraphRevision}</div>
         ) : null}
         {result.error ? <p className="mt-1 leading-4 text-red-100">{result.error}</p> : null}
       </div>
