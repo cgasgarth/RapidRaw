@@ -73,7 +73,31 @@ if (!snapshot.adjustmentSummary.some((entry) => entry.key === 'exposure' && entr
 if (!snapshot.metadataSummary.some((entry) => entry.key === 'LensModel' && entry.value === 'FE 35mm F1.4 GM')) {
   throw new Error('Agent image context did not include bounded EXIF metadata.');
 }
-if (JSON.stringify(snapshot).length > 4_000) {
+if (
+  snapshot.initialPreview.mediaType !== 'image/jpeg' ||
+  snapshot.initialPreview.encodedFormat !== 'jpeg' ||
+  snapshot.initialPreview.longEdgePx !== 1536 ||
+  snapshot.initialPreview.quality !== 0.86
+) {
+  throw new Error('Agent image context did not include a medium-quality initial preview descriptor.');
+}
+if (
+  snapshot.initialPreview.includesOriginalRaw ||
+  snapshot.initialPreview.previewRef === 'blob:rawengine-original-3156'
+) {
+  throw new Error('Agent image context must not attach the original RAW by default.');
+}
+if (snapshot.initialPreview.width !== 1536 || snapshot.initialPreview.height !== 1024) {
+  throw new Error('Agent image context did not scale initial preview dimensions to the configured long edge.');
+}
+if (
+  !snapshot.initialPreview.cacheKey.startsWith('agent-initial-preview:render:') ||
+  !snapshot.initialPreview.recipeHash.startsWith('recipe:') ||
+  !snapshot.initialPreview.renderHash.startsWith('render:')
+) {
+  throw new Error('Agent image context did not include stable preview cache, recipe, and render identities.');
+}
+if (JSON.stringify(snapshot).length > 4_800) {
   throw new Error('Agent image context snapshot exceeded bounded payload budget.');
 }
 

@@ -9,6 +9,17 @@ import type { Adjustments } from './adjustments';
 const MAX_HISTOGRAM_BINS = 16;
 const MAX_METADATA_ENTRIES = 8;
 const MAX_ADJUSTMENT_ENTRIES = 16;
+const INITIAL_PREVIEW_LONG_EDGE_PX = 1536;
+const INITIAL_PREVIEW_QUALITY = 0.86;
+
+const stableHash = (value: string): string => {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+};
 
 const agentImageContextClippingSchema = z
   .object({
@@ -37,6 +48,24 @@ const agentImageContextSnapshotSchema = z
       )
       .max(4),
     metadataSummary: z.array(z.object({ key: z.string().trim().min(1), value: z.string() }).strict()),
+    initialPreview: z
+      .object({
+        cacheKey: z.string().trim().min(1),
+        colorProfile: z.literal('srgb-preview'),
+        encodedFormat: z.literal('jpeg'),
+        height: z.number().int().positive(),
+        id: z.string().trim().min(1),
+        includesOriginalRaw: z.literal(false),
+        longEdgePx: z.literal(INITIAL_PREVIEW_LONG_EDGE_PX),
+        mediaType: z.literal('image/jpeg'),
+        previewRef: z.string().trim().min(1),
+        quality: z.literal(INITIAL_PREVIEW_QUALITY),
+        recipeHash: z.string().trim().min(1),
+        renderHash: z.string().trim().min(1),
+        renderIntent: z.literal('initial_context'),
+        width: z.number().int().positive(),
+      })
+      .strict(),
     previewIdentity: z.string().trim().min(1).nullable(),
     subjectHint: z.object({ hasActiveMask: z.boolean(), maskCount: z.number().int().nonnegative() }).strict(),
   })
@@ -107,6 +136,17 @@ const summarizeClipping = (
   };
 };
 
+const fitPreviewDimensions = (width: number, height: number): { height: number; width: number } => {
+  const longEdge = Math.max(width, height);
+  if (longEdge <= 0) return { height: INITIAL_PREVIEW_LONG_EDGE_PX, width: INITIAL_PREVIEW_LONG_EDGE_PX };
+
+  const scale = INITIAL_PREVIEW_LONG_EDGE_PX / longEdge;
+  return {
+    height: Math.max(1, Math.round(height * scale)),
+    width: Math.max(1, Math.round(width * scale)),
+  };
+};
+
 export const buildAgentImageContextSnapshot = (): AgentImageContextSnapshot => {
   const editor = useEditorStore.getState();
   if (editor.selectedImage === null) {
@@ -114,16 +154,52 @@ export const buildAgentImageContextSnapshot = (): AgentImageContextSnapshot => {
   }
 
   const histogramSummary = summarizeHistogram(editor.histogram);
+  const graphRevision = `history_${editor.historyIndex}`;
+  const previewRef = editor.finalPreviewUrl ?? editor.uncroppedAdjustedPreviewUrl ?? editor.selectedImage.thumbnailUrl;
+  const previewDimensions = fitPreviewDimensions(editor.selectedImage.width, editor.selectedImage.height);
+  const recipeHash = `recipe:${stableHash(
+    JSON.stringify({
+      adjustments: summarizeAdjustment(editor.adjustments),
+      crop: editor.adjustments.crop,
+      graphRevision,
+      masks: editor.adjustments.masks.map((mask) => ({ id: mask.id, name: mask.name, visible: mask.visible })),
+    }),
+  )}`;
+  const renderHash = `render:${stableHash(
+    JSON.stringify({
+      graphRevision,
+      previewRef,
+      recipeHash,
+      selectedImagePath: editor.selectedImage.path,
+      ...previewDimensions,
+    }),
+  )}`;
 
   return agentImageContextSnapshotSchema.parse({
     activeImagePath: editor.selectedImage.path,
     adjustmentSummary: summarizeAdjustment(editor.adjustments),
     clipping: summarizeClipping(histogramSummary),
     cropHint: { active: editor.adjustments.crop !== null, aspectRatio: editor.adjustments.aspectRatio },
-    graphRevision: `history_${editor.historyIndex}`,
+    graphRevision,
     histogramSummary,
+    initialPreview: {
+      cacheKey: `agent-initial-preview:${renderHash}`,
+      colorProfile: 'srgb-preview',
+      encodedFormat: 'jpeg',
+      height: previewDimensions.height,
+      id: `initial_context_${stableHash(`${editor.selectedImage.path}:${graphRevision}`)}`,
+      includesOriginalRaw: false,
+      longEdgePx: INITIAL_PREVIEW_LONG_EDGE_PX,
+      mediaType: 'image/jpeg',
+      previewRef,
+      quality: INITIAL_PREVIEW_QUALITY,
+      recipeHash,
+      renderHash,
+      renderIntent: 'initial_context',
+      width: previewDimensions.width,
+    },
     metadataSummary: summarizeMetadata(editor.selectedImage.exif ?? undefined),
-    previewIdentity: editor.finalPreviewUrl,
+    previewIdentity: previewRef,
     subjectHint: {
       hasActiveMask: editor.activeMaskContainerId !== null,
       maskCount: editor.adjustments.masks.length,
