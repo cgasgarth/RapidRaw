@@ -66,6 +66,7 @@ const EditorToolbar = memo(
     const appSettings = useSettingsStore((state) => state.appSettings);
     const isExportSoftProofEnabled = useEditorStore((state) => state.isExportSoftProofEnabled);
     const exportSoftProofRecipeId = useEditorStore((state) => state.exportSoftProofRecipeId);
+    const exportSoftProofTransform = useEditorStore((state) => state.exportSoftProofTransform);
     const setEditor = useEditorStore((state) => state.setEditor);
     const exportProofRecipeOptions = useMemo(
       () =>
@@ -761,6 +762,7 @@ const EditorToolbar = memo(
           <div
             className="hidden xl:flex items-center gap-2"
             data-export-soft-proof-enabled={String(isExportSoftProofEnabled)}
+            data-export-soft-proof-fingerprint={exportSoftProofTransform?.transformPolicyFingerprint ?? ''}
             data-export-soft-proof-recipe-id={selectedExportProofRecipeId ?? ''}
             data-export-soft-proof-recipe-name={selectedExportProofName}
             data-export-soft-proof-status={
@@ -812,8 +814,22 @@ const EditorToolbar = memo(
                   <div
                     className="mt-1 flex items-center justify-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-2 py-1"
                     data-export-soft-proof-color-profile={selectedExportProofProfile}
+                    data-export-soft-proof-black-point-compensation={
+                      exportSoftProofTransform?.blackPointCompensation ?? ''
+                    }
+                    data-export-soft-proof-effective-color-profile={
+                      exportSoftProofTransform?.effectiveColorProfile ?? ''
+                    }
+                    data-export-soft-proof-effective-rendering-intent={
+                      exportSoftProofTransform?.effectiveRenderingIntent ?? ''
+                    }
+                    data-export-soft-proof-source-precision-path={exportSoftProofTransform?.sourcePrecisionPath ?? ''}
+                    data-export-soft-proof-transform-applied={String(exportSoftProofTransform?.transformApplied ?? '')}
                     data-export-soft-proof-rendering-intent={selectedExportProofIntent}
                     data-export-soft-proof-status="export-transform-preview"
+                    data-export-soft-proof-transform-policy-fingerprint={
+                      exportSoftProofTransform?.transformPolicyFingerprint ?? ''
+                    }
                     data-testid="export-soft-proof-active-badge"
                   >
                     <UiText as="span" className="uppercase" color={TextColors.secondary} variant={TextVariants.small}>

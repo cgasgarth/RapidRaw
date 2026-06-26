@@ -1080,12 +1080,35 @@ pub(crate) fn export_jpeg_rgb_pixels_and_profile(
     )
 }
 
-pub(crate) fn export_soft_proof_rgb_pixels_and_profile(
+pub(crate) fn export_soft_proof_rgb_pixels_and_profile_with_policy(
     image: &DynamicImage,
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
+    black_point_compensation: bool,
 ) -> Result<(Vec<u8>, u32, u32, ColorProfile), String> {
-    export_rgb_pixels_and_profile(image, color_profile, rendering_intent, false)
+    export_rgb_pixels_and_profile(
+        image,
+        color_profile,
+        rendering_intent,
+        black_point_compensation,
+    )
+}
+
+pub(crate) fn export_soft_proof_transform_metadata(
+    image: &DynamicImage,
+    color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
+    black_point_compensation: bool,
+) -> Result<ExportReceiptMetadata, String> {
+    export_receipt_metadata(
+        "jpg",
+        color_profile,
+        rendering_intent,
+        black_point_compensation,
+        &export_source_precision_receipt_label(image),
+        None,
+    )
+    .ok_or_else(|| "Failed to resolve export soft-proof transform metadata.".to_string())
 }
 
 fn export_rgb_pixels_and_profile(
@@ -2002,7 +2025,8 @@ fn export_receipt_output(
     })
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct ExportReceiptMetadata {
     bit_depth: u8,
     black_point_compensation: String,
@@ -2530,10 +2554,10 @@ mod tests {
         encode_image_with_applied_policy_and_source_profile, export_color_profile_receipt_label,
         export_jpeg_rgb_pixels_and_profile, export_receipt_metadata, export_rgb_pixels_and_profile,
         export_rgb16_pixels_and_profile, export_rgb16_pixels_with_shared_conversion_core,
-        export_soft_proof_rgb_pixels_and_profile, export_source_precision_receipt_label,
-        export_transform_options, mox_rendering_intent, quantize_rgb16_to_rgb8,
-        resolve_export_color_capabilities, resolve_export_color_transform_plan,
-        should_apply_srgb_perceptual_gamut_mapping,
+        export_soft_proof_rgb_pixels_and_profile_with_policy,
+        export_source_precision_receipt_label, export_transform_options, mox_rendering_intent,
+        quantize_rgb16_to_rgb8, resolve_export_color_capabilities,
+        resolve_export_color_transform_plan, should_apply_srgb_perceptual_gamut_mapping,
     };
     use crate::gamut_mapping::SRGB_OKLAB_CHROMA_REDUCE_V1;
     use moxcms::ColorProfile;
@@ -3354,10 +3378,11 @@ mod tests {
         )
         .expect("Display P3 JPEG export should run");
         let (soft_proof_pixels, soft_proof_width, soft_proof_height, _) =
-            export_soft_proof_rgb_pixels_and_profile(
+            export_soft_proof_rgb_pixels_and_profile_with_policy(
                 &image,
                 &ExportColorProfile::DisplayP3,
                 &ExportRenderingIntent::RelativeColorimetric,
+                false,
             )
             .expect("Display P3 soft proof should run");
 
@@ -3417,10 +3442,11 @@ mod tests {
             }
         }));
         let (soft_proof_pixels, soft_proof_width, soft_proof_height, _) =
-            export_soft_proof_rgb_pixels_and_profile(
+            export_soft_proof_rgb_pixels_and_profile_with_policy(
                 &image,
                 &ExportColorProfile::Srgb,
                 &ExportRenderingIntent::Perceptual,
+                false,
             )
             .expect("sRGB perceptual soft proof should run");
         let (jpeg_pixels, jpeg_width, jpeg_height, _) = export_jpeg_rgb_pixels_and_profile(
@@ -3614,10 +3640,11 @@ mod tests {
         }));
 
         let (soft_proof_pixels, soft_proof_width, soft_proof_height, _) =
-            export_soft_proof_rgb_pixels_and_profile(
+            export_soft_proof_rgb_pixels_and_profile_with_policy(
                 &image,
                 &ExportColorProfile::DisplayP3,
                 &ExportRenderingIntent::RelativeColorimetric,
+                false,
             )
             .expect("Display P3 soft-proof RGB8 transform should succeed");
         let (jpeg_pixels, jpeg_width, jpeg_height, _) = export_jpeg_rgb_pixels_and_profile(
