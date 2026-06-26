@@ -2153,7 +2153,8 @@ fn export_source_precision_receipt_label(image: &DynamicImage) -> String {
         }
         DynamicImage::ImageRgb16(_) => "rgb16 source; shared RGB16 export/proof core".to_string(),
         DynamicImage::ImageRgba16(_) => {
-            "rgba16 source; alpha dropped for RGB color-managed export/proof".to_string()
+            "rgba16 source; high-precision shared RGB16 export/proof core; alpha dropped for RGB output"
+                .to_string()
         }
         DynamicImage::ImageRgb8(_) | DynamicImage::ImageRgba8(_) => {
             "rgba8/rgb8 source; GPU readback-limited before color-managed export/proof".to_string()
@@ -2565,7 +2566,7 @@ mod tests {
     use std::io::Cursor;
 
     use image::{
-        ColorType, DynamicImage, ImageBuffer, ImageDecoder, Rgb, codecs::tiff::TiffDecoder,
+        ColorType, DynamicImage, ImageBuffer, ImageDecoder, Rgb, Rgba, codecs::tiff::TiffDecoder,
     };
 
     fn synthetic_export_edge() -> DynamicImage {
@@ -2828,6 +2829,32 @@ mod tests {
             metadata.source_precision_path,
             "rgb32f source; quantized only at color-managed encoder boundary"
         );
+    }
+
+    #[test]
+    fn export_receipt_preserves_rgba16_high_precision_source_provenance() {
+        let image = DynamicImage::ImageRgba16(ImageBuffer::from_pixel(
+            1,
+            1,
+            Rgba([u16::MAX, 32768, 0, u16::MAX]),
+        ));
+        let source_precision = export_source_precision_receipt_label(&image);
+        let metadata = export_receipt_metadata(
+            "tiff",
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+            false,
+            &source_precision,
+            None,
+        )
+        .expect("TIFF receipt metadata should be available");
+
+        assert_eq!(
+            metadata.source_precision_path,
+            "rgba16 source; high-precision shared RGB16 export/proof core; alpha dropped for RGB output"
+        );
+        assert!(metadata.transform_applied);
+        assert_eq!(metadata.bit_depth, 16);
     }
 
     #[test]
