@@ -8,8 +8,10 @@ import {
   type RetouchRemoveSource,
 } from './adjustments';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
+import { stableAgentPreviewHash } from './agentPreviewEnvelope';
 import { pushEditHistoryEntry } from './editHistory';
 import { applyLayerStackCommandBridgeOperation } from './layerStackCommandBridge';
+import { artifactHandleV1Schema, type ArtifactHandleV1 } from '../../packages/rawengine-schema/src';
 import { Mask, SubMaskMode } from '../components/panel/right/Masks';
 import { useEditorStore } from '../store/useEditorStore';
 
@@ -32,6 +34,19 @@ const idSegmentSchema = z
   .min(1)
   .max(96)
   .regex(/^[a-zA-Z0-9_-]+$/u);
+
+const agentRetouchOverlayPreviewSchema = z
+  .object({
+    artifact: artifactHandleV1Schema,
+    layerId: z.string().trim().min(1),
+    mode: retouchModeSchema,
+    opacity: z.number().int().min(0).max(100),
+    overlayMaskId: z.string().trim().min(1),
+    recipeHash: z.string().trim().min(1),
+    renderHash: z.string().trim().min(1),
+    visible: z.boolean(),
+  })
+  .strict();
 
 export const agentRetouchApplyRequestSchema = z
   .object({
@@ -74,6 +89,7 @@ export const agentRetouchApplyResponseSchema = z
     beforePreviewHash: z.string().trim().min(1),
     layerId: z.string().trim().min(1),
     mode: retouchModeSchema,
+    overlayPreview: agentRetouchOverlayPreviewSchema,
     overlayMaskId: z.string().trim().min(1),
     requestId: z.string().trim().min(1),
     staleRecipeHash: z.literal(false),
@@ -84,6 +100,7 @@ export const agentRetouchApplyResponseSchema = z
 
 export type AgentRetouchApplyRequest = z.infer<typeof agentRetouchApplyRequestSchema>;
 export type AgentRetouchApplyResponse = z.infer<typeof agentRetouchApplyResponseSchema>;
+export type AgentRetouchOverlayPreview = z.infer<typeof agentRetouchOverlayPreviewSchema>;
 
 const toIdSegment = (value: string): string =>
   value
@@ -200,6 +217,70 @@ const pushMaskHistory = (masks: ReadonlyArray<MaskContainer>): void => {
   });
 };
 
+const buildOverlayArtifact = ({
+  contentSeed,
+  height,
+  layerId,
+  operationId,
+  overlayMaskId,
+  width,
+}: {
+  contentSeed: unknown;
+  height: number;
+  layerId: string;
+  operationId: string;
+  overlayMaskId: string;
+  width: number;
+}): ArtifactHandleV1 => {
+  const hash = stableAgentPreviewHash(JSON.stringify(contentSeed));
+  return artifactHandleV1Schema.parse({
+    artifactId: `artifact_agent_retouch_overlay_${operationId}_${layerId}_${overlayMaskId}_${hash}`,
+    contentHash: `sha256:${hash}`,
+    dimensions: { height, width },
+    kind: 'preview',
+    storage: 'temp_cache',
+  });
+};
+
+const buildOverlayPreview = ({
+  afterSnapshot,
+  layer,
+  mode,
+  operationId,
+  overlayMaskId,
+}: {
+  afterSnapshot: ReturnType<typeof buildAgentImageContextSnapshot>;
+  layer: MaskContainer;
+  mode: z.infer<typeof retouchModeSchema>;
+  operationId: string;
+  overlayMaskId: string;
+}): AgentRetouchOverlayPreview =>
+  agentRetouchOverlayPreviewSchema.parse({
+    artifact: buildOverlayArtifact({
+      contentSeed: {
+        layerId: layer.id,
+        mode,
+        operationId,
+        overlayMaskId,
+        retouchCloneSource: layer.retouchCloneSource,
+        retouchRemoveSource: layer.retouchRemoveSource,
+        subMasks: layer.subMasks,
+      },
+      height: afterSnapshot.initialPreview.height,
+      layerId: layer.id,
+      operationId,
+      overlayMaskId,
+      width: afterSnapshot.initialPreview.width,
+    }),
+    layerId: layer.id,
+    mode,
+    opacity: layer.opacity,
+    overlayMaskId,
+    recipeHash: afterSnapshot.initialPreview.recipeHash,
+    renderHash: afterSnapshot.initialPreview.renderHash,
+    visible: layer.visible,
+  });
+
 export const applyAgentRetouch = (request: AgentRetouchApplyRequest): AgentRetouchApplyResponse => {
   const parsedRequest = agentRetouchApplyRequestSchema.parse(request);
   const beforeSnapshot = ensureFreshRecipe(parsedRequest.expectedRecipeHash);
@@ -220,7 +301,9 @@ export const applyAgentRetouch = (request: AgentRetouchApplyRequest): AgentRetou
   );
 
   pushMaskHistory(result.masks);
-  useEditorStore.setState({ activeMaskContainerId: layer.id, activeMaskId: layer.subMasks[0]?.id ?? null });
+  const overlayMaskId = layer.subMasks[0]?.id;
+  if (overlayMaskId === undefined) throw new Error('Agent retouch apply did not create an overlay mask.');
+  useEditorStore.setState({ activeMaskContainerId: layer.id, activeMaskId: overlayMaskId });
   const afterSnapshot = buildAgentImageContextSnapshot();
 
   return agentRetouchApplyResponseSchema.parse({
@@ -229,7 +312,14 @@ export const applyAgentRetouch = (request: AgentRetouchApplyRequest): AgentRetou
     beforePreviewHash: beforeSnapshot.initialPreview.renderHash,
     layerId: layer.id,
     mode: parsedRequest.mode,
-    overlayMaskId: layer.subMasks[0]?.id,
+    overlayPreview: buildOverlayPreview({
+      afterSnapshot,
+      layer,
+      mode: parsedRequest.mode,
+      operationId: parsedRequest.operationId,
+      overlayMaskId,
+    }),
+    overlayMaskId,
     requestId: parsedRequest.requestId,
     staleRecipeHash: false,
     toolName: AGENT_RETOUCH_APPLY_TOOL_NAME,
