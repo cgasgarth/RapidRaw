@@ -130,6 +130,7 @@ export const exportReceiptPayloadSchema = z
           resolvedDisabledReason: z.string().trim().min(1).optional().nullable(),
           effectiveRenderingIntent: z.string().trim().min(1).optional().nullable(),
           sourcePath: z.string().trim().min(1),
+          sourceIccProfileHash: z.string().trim().min(1).optional().nullable(),
           sourcePrecisionPath: z.string().trim().min(1).optional().nullable(),
           transformApplied: z.boolean().optional().nullable(),
         })

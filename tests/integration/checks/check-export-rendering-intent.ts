@@ -55,7 +55,8 @@ for (const marker of [
   'blackPointCompensation',
   'exportColorCapabilityCatalogV1Schema',
   'MOXCMS_EXPORT_COLOR_CAPABILITIES_V1',
-  "blackPointCompensation: colorProfile === 'srgb' ? 'unsupported' : 'supported'",
+  "colorProfile === 'srgb' || colorProfile === 'sourceEmbedded' ? 'unsupported' : 'supported'",
+  "renderingIntents: colorProfile === 'sourceEmbedded' ? ['relativeColorimetric'] : COLOR_MANAGED_RENDERING_INTENTS",
   'LittleCMS enables black-point compensation for JPEG/TIFF relative colorimetric wide-gamut exports.',
 ]) {
   if (!capabilitySource.includes(marker)) failures.push(`Export color capability descriptor missing ${marker}`);
@@ -87,6 +88,9 @@ for (const marker of [
   'display_p3_jpeg_bpc_encodes_with_littlecms_receipt',
   'export_rgb16_pixels_with_shared_conversion_core',
   'quantize_rgb16_to_rgb8',
+  'read_embedded_source_icc_profile',
+  'Source embedded profile passthrough; ICC embedded',
+  'source_icc_profile_hash',
 ]) {
   if (!rustExportSource.includes(marker)) failures.push(`Rust export capability matrix missing ${marker}`);
 }
@@ -105,6 +109,15 @@ const displayP3Capability = capabilityCatalog.capabilities.find(
 );
 if (displayP3Capability?.blackPointCompensation !== 'supported') {
   failures.push('Display P3 JPEG/TIFF relative colorimetric export must advertise BPC support.');
+}
+const sourceEmbeddedCapability = capabilityCatalog.capabilities.find(
+  (capability) => capability.colorProfile === 'sourceEmbedded',
+);
+if (sourceEmbeddedCapability?.blackPointCompensation !== 'unsupported') {
+  failures.push('Source embedded export must not advertise BPC support in the passthrough slice.');
+}
+if (sourceEmbeddedCapability?.renderingIntents.join(',') !== 'relativeColorimetric') {
+  failures.push('Source embedded export must advertise only relative colorimetric intent.');
 }
 if (
   !capabilityCatalog.capabilities.every((capability) => capability.renderingIntents.includes('relativeColorimetric'))
