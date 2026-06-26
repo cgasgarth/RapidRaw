@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { applyAgentGlobalAdjustments } from './agentAdjustmentApplyTool';
+import { agentEditQualityReviewSchema, buildAgentEditQualityReview } from './agentEditQualityReview';
 import { agentPreviewEnvelopeSchema } from './agentPreviewEnvelope';
 import { getAgentReadOnlyState, renderAgentReadOnlyPreview } from './agentReadOnlyAppServerTools';
 
@@ -28,6 +29,7 @@ export const agentIterativeEditLoopResultSchema = z
   .object({
     appliedGraphRevision: z.string().trim().min(1),
     editCount: z.number().int().min(2),
+    editReview: agentEditQualityReviewSchema,
     finalRecipeHash: z.string().trim().min(1),
     previewRefreshes: z.array(agentPreviewEnvelopeSchema).min(2),
     previewRefreshCount: z.number().int().min(2),
@@ -113,10 +115,26 @@ export const runAgentIterativeEditLoop = async (
       turn,
     });
   }
+  const finalPreview = previewRefreshes.at(-1);
+  if (finalPreview === undefined) {
+    throw new Error('Agent iterative loop cannot review an edit without a refreshed preview.');
+  }
+  const editReview = buildAgentEditQualityReview({
+    maxIterationsReached: editCount >= parsedRequest.maxIterations,
+    preview: finalPreview,
+    prompt: parsedRequest.prompt,
+    toolReceiptCount: transcript.filter((entry) => entry.toolName === 'rawengine.agent.adjustments.apply').length,
+  });
+  transcript.push({
+    detail: `${editReview.stopReason}: ${editReview.finalRationale}`,
+    toolName: 'rawengine.agent.edit_review',
+    turn: editCount + 2,
+  });
 
   return agentIterativeEditLoopResultSchema.parse({
     appliedGraphRevision,
     editCount,
+    editReview,
     finalRecipeHash: recipeHash,
     previewRefreshes,
     previewRefreshCount,

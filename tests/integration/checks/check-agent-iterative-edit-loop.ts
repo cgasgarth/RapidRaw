@@ -92,5 +92,22 @@ if (
 if (result.appliedGraphRevision !== 'history_2' || result.finalRecipeHash.length === 0) {
   throw new Error('agent iterative loop did not report final graph and recipe hash.');
 }
+if (
+  result.editReview.stopReason !== 'finish' ||
+  result.editReview.preview.id !== result.previewRefreshes.at(-1)?.id ||
+  result.editReview.preview.recipeHash !== result.finalRecipeHash ||
+  result.editReview.toolReceiptCount !== 2
+) {
+  throw new Error('agent iterative loop did not bind the edit-quality review to the final preview and receipts.');
+}
+if (
+  !result.editReview.rubric.some((entry) => entry.area === 'exposure_tone' && entry.status === 'pass') ||
+  !result.editReview.rubric.some((entry) => entry.area === 'crop_detail')
+) {
+  throw new Error('agent iterative loop edit review is missing required rubric areas.');
+}
+if (!result.transcript.some((entry) => entry.toolName === 'rawengine.agent.edit_review')) {
+  throw new Error('agent iterative loop transcript did not persist the edit review decision.');
+}
 
 console.log('agent iterative edit loop ok');
