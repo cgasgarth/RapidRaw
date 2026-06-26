@@ -47,6 +47,17 @@ export const agentAdjustmentsApplyResponseSchema = z
     appliedGraphRevision: z.string().trim().min(1),
     beforePreviewHash: z.string().trim().min(1),
     changedPixelCount: z.number().int().positive(),
+    receipt: z
+      .object({
+        adjustedFields: z.array(z.string().trim().min(1)).min(1),
+        afterPreviewHash: z.string().trim().min(1),
+        appliedGraphRevision: z.string().trim().min(1),
+        beforePreviewHash: z.string().trim().min(1),
+        operationId: z.string().trim().min(1),
+        sessionId: z.string().trim().min(1),
+        undoGraphRevision: z.string().trim().min(1),
+      })
+      .strict(),
     requestId: z.string().trim().min(1),
     staleRecipeHash: z.literal(false),
     toolName: z.literal(AGENT_ADJUSTMENTS_APPLY_TOOL_NAME),
@@ -112,15 +123,27 @@ export const applyAgentGlobalAdjustments = async (
     });
   }
 
+  const adjustedFields = [
+    ...BASIC_TONE_ADJUSTMENT_KEYS.filter((key) => parsedRequest.adjustments[key] !== undefined),
+    ...EXTRA_ADJUSTMENT_KEYS.filter((key) => parsedRequest.adjustments[key] !== undefined),
+  ];
+  const appliedGraphRevision = `history_${useEditorStore.getState().historyIndex}`;
+
   return agentAdjustmentsApplyResponseSchema.parse({
-    adjustedFields: [
-      ...BASIC_TONE_ADJUSTMENT_KEYS.filter((key) => parsedRequest.adjustments[key] !== undefined),
-      ...EXTRA_ADJUSTMENT_KEYS.filter((key) => parsedRequest.adjustments[key] !== undefined),
-    ],
+    adjustedFields,
     afterPreviewHash: basicToneResult.afterPreviewHash,
-    appliedGraphRevision: `history_${useEditorStore.getState().historyIndex}`,
+    appliedGraphRevision,
     beforePreviewHash: basicToneResult.beforePreviewHash,
     changedPixelCount: basicToneResult.changedPixelCount,
+    receipt: {
+      adjustedFields,
+      afterPreviewHash: basicToneResult.afterPreviewHash,
+      appliedGraphRevision,
+      beforePreviewHash: basicToneResult.beforePreviewHash,
+      operationId: parsedRequest.operationId,
+      sessionId: parsedRequest.sessionId,
+      undoGraphRevision,
+    },
     requestId: parsedRequest.requestId,
     staleRecipeHash: false,
     toolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,

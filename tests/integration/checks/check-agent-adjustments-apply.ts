@@ -119,9 +119,22 @@ if (result.undoGraphRevision !== 'history_0' || result.appliedGraphRevision !== 
 if (result.beforePreviewHash === result.afterPreviewHash || result.changedPixelCount < 64) {
   throw new Error('agent.adjustments.apply did not prove changed preview output.');
 }
+if (
+  result.receipt.sessionId !== 'agent-adjustments-apply-3161' ||
+  result.receipt.operationId !== 'agent_adjustments_apply_3161' ||
+  result.receipt.undoGraphRevision !== result.undoGraphRevision ||
+  result.receipt.appliedGraphRevision !== result.appliedGraphRevision ||
+  result.receipt.beforePreviewHash !== result.beforePreviewHash ||
+  result.receipt.afterPreviewHash !== result.afterPreviewHash
+) {
+  throw new Error('agent.adjustments.apply did not return a complete mutation receipt.');
+}
 for (const field of ['exposure', 'contrast', 'temperature', 'tint', 'vibrance']) {
   if (!result.adjustedFields.includes(field)) {
     throw new Error(`agent.adjustments.apply response missing adjusted field: ${field}`);
+  }
+  if (!result.receipt.adjustedFields.includes(field)) {
+    throw new Error(`agent.adjustments.apply receipt missing adjusted field: ${field}`);
   }
 }
 

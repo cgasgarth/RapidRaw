@@ -25,6 +25,7 @@ export const agentHistoryRollbackRequestSchema = z
     checkpoint: z.custom<AgentSessionCheckpoint>(),
     requestId: z.string().trim().min(1),
     scope: rollbackScopeSchema,
+    sessionId: z.string().trim().min(1),
   })
   .strict();
 
@@ -35,6 +36,7 @@ export const agentHistoryRollbackResponseSchema = z
     requestId: z.string().trim().min(1),
     restoredHistoryIndex: z.number().int().nonnegative(),
     scope: rollbackScopeSchema,
+    sessionId: z.string().trim().min(1),
     toolName: z.literal(AGENT_HISTORY_ROLLBACK_TOOL_NAME),
   })
   .strict();
@@ -59,6 +61,9 @@ export const createAgentSessionCheckpoint = (sessionId: string): AgentSessionChe
 export const rollbackAgentSessionHistory = (request: AgentHistoryRollbackRequest): AgentHistoryRollbackResponse => {
   const parsedRequest = agentHistoryRollbackRequestSchema.parse(request);
   const { checkpoint } = parsedRequest;
+  if (checkpoint.sessionId !== parsedRequest.sessionId) {
+    throw new Error('Agent history rollback rejected checkpoint from a different session.');
+  }
   useEditorStore.setState((state) => ({
     adjustments: checkpoint.adjustments,
     finalPreviewUrl: checkpoint.previewRef,
@@ -74,6 +79,7 @@ export const rollbackAgentSessionHistory = (request: AgentHistoryRollbackRequest
     requestId: parsedRequest.requestId,
     restoredHistoryIndex: checkpoint.historyIndex,
     scope: parsedRequest.scope,
+    sessionId: parsedRequest.sessionId,
     toolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
   });
 };

@@ -67,9 +67,14 @@ const rollback = rollbackAgentSessionHistory({
   checkpoint,
   requestId: 'agent-history-rollback-3163',
   scope: 'session_start',
+  sessionId: 'agent-history-3163',
 });
 const restoredState = useEditorStore.getState();
-if (rollback.graphRevision !== 'history_0' || rollback.restoredHistoryIndex !== 0) {
+if (
+  rollback.graphRevision !== 'history_0' ||
+  rollback.restoredHistoryIndex !== 0 ||
+  rollback.sessionId !== checkpoint.sessionId
+) {
   throw new Error('Agent history rollback did not report the session-start graph revision.');
 }
 if (restoredState.historyIndex !== 0 || restoredState.history.length !== 1) {
@@ -84,6 +89,14 @@ if (restoredState.finalPreviewUrl !== beforePreviewRef || restoredState.uncroppe
 if (rollback.previewRecipeHash !== beforeRecipeHash) {
   throw new Error('Agent history rollback did not restore the original recipe hash.');
 }
+expectRejects(() =>
+  rollbackAgentSessionHistory({
+    checkpoint,
+    requestId: 'agent-history-rollback-wrong-session',
+    scope: 'session_start',
+    sessionId: 'agent-history-other',
+  }),
+);
 
 const route = buildRawEngineAppServerRouteCatalog().find(
   (candidate) => candidate.commandName === AGENT_HISTORY_ROLLBACK_TOOL_NAME,
@@ -97,3 +110,12 @@ if (
 }
 
 console.log('agent session history rollback ok');
+
+function expectRejects(action: () => unknown) {
+  try {
+    action();
+  } catch {
+    return;
+  }
+  throw new Error('Expected cross-session rollback rejection.');
+}
