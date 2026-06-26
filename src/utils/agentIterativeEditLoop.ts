@@ -1,0 +1,122 @@
+import { z } from 'zod';
+
+import { applyAgentGlobalAdjustments } from './agentAdjustmentApplyTool';
+import { getAgentReadOnlyState, renderAgentReadOnlyPreview } from './agentReadOnlyAppServerTools';
+
+const agentLoopAdjustmentPatchSchema = z
+  .object({
+    exposure: z.number().min(-2).max(2).optional(),
+    highlights: z.number().min(-100).max(100).optional(),
+    shadows: z.number().min(-100).max(100).optional(),
+  })
+  .strict()
+  .refine((patch) => Object.keys(patch).length > 0, { message: 'Loop step requires at least one adjustment.' });
+
+export const agentIterativeEditLoopRequestSchema = z
+  .object({
+    maxIterations: z.number().int().min(2).max(6).default(4),
+    operationId: z.string().trim().min(1),
+    prompt: z.string().trim().min(1),
+    requestId: z.string().trim().min(1),
+    sessionId: z.string().trim().min(1),
+    steps: z.array(agentLoopAdjustmentPatchSchema).min(2).max(6),
+  })
+  .strict();
+
+export const agentIterativeEditLoopResultSchema = z
+  .object({
+    appliedGraphRevision: z.string().trim().min(1),
+    editCount: z.number().int().min(2),
+    finalRecipeHash: z.string().trim().min(1),
+    previewRefreshCount: z.number().int().min(2),
+    requestId: z.string().trim().min(1),
+    stopReason: z.enum(['completed', 'max_iterations']),
+    transcript: z
+      .array(
+        z
+          .object({
+            detail: z.string().trim().min(1),
+            toolName: z.string().trim().min(1),
+            turn: z.number().int().positive(),
+          })
+          .strict(),
+      )
+      .min(5),
+  })
+  .strict();
+
+export type AgentIterativeEditLoopRequest = z.infer<typeof agentIterativeEditLoopRequestSchema>;
+export type AgentIterativeEditLoopResult = z.infer<typeof agentIterativeEditLoopResultSchema>;
+
+const getSnapshotRecipeHash = (snapshot: unknown): string => {
+  const parsed = z
+    .looseObject({
+      initialPreview: z.looseObject({ recipeHash: z.string().trim().min(1) }),
+    })
+    .parse(snapshot);
+  return parsed.initialPreview.recipeHash;
+};
+
+export const runAgentIterativeEditLoop = async (
+  request: AgentIterativeEditLoopRequest,
+): Promise<AgentIterativeEditLoopResult> => {
+  const parsedRequest = agentIterativeEditLoopRequestSchema.parse(request);
+  const transcript: AgentIterativeEditLoopResult['transcript'] = [];
+  const initialState = getAgentReadOnlyState({ requestId: `${parsedRequest.requestId}-state-0` });
+  let recipeHash = getSnapshotRecipeHash(initialState.snapshot);
+  let appliedGraphRevision = 'unapplied';
+  let editCount = 0;
+  let previewRefreshCount = 0;
+
+  transcript.push({
+    detail: `initial inspect for ${parsedRequest.prompt}`,
+    toolName: initialState.toolName,
+    turn: 1,
+  });
+
+  for (const [index, adjustments] of parsedRequest.steps.entries()) {
+    const turn = index + 2;
+    if (editCount >= parsedRequest.maxIterations) break;
+
+    const apply = await applyAgentGlobalAdjustments({
+      adjustments,
+      expectedRecipeHash: recipeHash,
+      operationId: `${parsedRequest.operationId}-${index + 1}`,
+      requestId: `${parsedRequest.requestId}-apply-${index + 1}`,
+      sessionId: parsedRequest.sessionId,
+    });
+    editCount += 1;
+    appliedGraphRevision = apply.appliedGraphRevision;
+    transcript.push({
+      detail: `${apply.adjustedFields.join(',')} -> ${apply.appliedGraphRevision}`,
+      toolName: apply.toolName,
+      turn,
+    });
+
+    const state = getAgentReadOnlyState({ requestId: `${parsedRequest.requestId}-state-${index + 1}` });
+    recipeHash = getSnapshotRecipeHash(state.snapshot);
+    const preview = renderAgentReadOnlyPreview({
+      expectedRecipeHash: recipeHash,
+      longEdgePx: 1024,
+      purpose: 'refresh',
+      quality: 0.82,
+      requestId: `${parsedRequest.requestId}-preview-${index + 1}`,
+    });
+    previewRefreshCount += 1;
+    transcript.push({
+      detail: `${preview.requestId} ${preview.staleRecipeHash ? 'stale' : 'fresh'}`,
+      toolName: preview.toolName,
+      turn,
+    });
+  }
+
+  return agentIterativeEditLoopResultSchema.parse({
+    appliedGraphRevision,
+    editCount,
+    finalRecipeHash: recipeHash,
+    previewRefreshCount,
+    requestId: parsedRequest.requestId,
+    stopReason: editCount >= parsedRequest.maxIterations ? 'max_iterations' : 'completed',
+    transcript,
+  });
+};
