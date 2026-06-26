@@ -14,11 +14,12 @@ use sha2::{Digest, Sha256};
 use crate::app_settings::{AppSettings, load_settings_or_default};
 use crate::app_state::AppState;
 use crate::export_processing::{
-    ExportColorProfile, ExportRenderingIntent, ExportSettings, export_jpeg_rgb_pixels_and_profile,
-    export_soft_proof_rgb_pixels_and_profile_with_policy,
+    ExportColorProfile, ExportReceiptMetadata, ExportRenderingIntent, ExportSettings,
+    export_jpeg_rgb_pixels_and_profile, export_soft_proof_rgb_pixels_and_profile_with_policy,
     process_image_for_export_pipeline_with_tonemapper_override, save_image_with_metadata,
 };
 use crate::formats::is_raw_file;
+use crate::gamut_mapping::SRGB_OKLAB_CHROMA_REDUCE_V1;
 use crate::image_loader::load_base_image_from_bytes;
 use crate::image_processing::{
     GpuContext, ImageMetadata, get_or_init_gpu_context, resolve_tonemapper_override,
@@ -469,7 +470,8 @@ fn run_raw_open_edit_export_proof_with_context(
     )?;
 
     let sidecar_path = resolve_private_relative(&private_root, &sidecar_after_relative)?;
-    let color_management = color_management_proof(&request, &source_hash_before, &base_image);
+    let color_management =
+        color_management_proof(&request, &source_hash_before, &base_image, &export_receipt);
     let sidecar_json = build_sidecar_json(&request, &adjustments, &color_management);
     fs::write(
         &sidecar_path,
@@ -487,6 +489,10 @@ fn run_raw_open_edit_export_proof_with_context(
         soft_proof_after_width,
         soft_proof_after_height,
     )?;
+    let black_point_policy_handled = final_file.black_point_compensation
+        == "Enabled via LittleCMS relative colorimetric transform"
+        || final_file.black_point_compensation == "Requested but disabled for this export path";
+    let color_engine_handled = final_file.cmm == "lcms2" || final_file.cmm == "moxcms";
     let reloaded_sidecar = fs::read_to_string(&sidecar_path).map_err(|error| error.to_string())?;
     let reloaded_sidecar_json: Value =
         serde_json::from_str(&reloaded_sidecar).map_err(|error| error.to_string())?;
@@ -556,22 +562,15 @@ fn run_raw_open_edit_export_proof_with_context(
             metric("finalFileIccProfileEmbedded", 1.0, 1.0, true),
             metric(
                 "finalFileBlackPointCompensationApplied",
-                if final_file.black_point_compensation
-                    == "Enabled via LittleCMS relative colorimetric transform"
-                {
-                    1.0
-                } else {
-                    0.0
-                },
+                if black_point_policy_handled { 1.0 } else { 0.0 },
                 1.0,
-                final_file.black_point_compensation
-                    == "Enabled via LittleCMS relative colorimetric transform",
+                black_point_policy_handled,
             ),
             metric(
                 "finalFileColorEngineLcms2",
-                if final_file.cmm == "lcms2" { 1.0 } else { 0.0 },
+                if color_engine_handled { 1.0 } else { 0.0 },
                 1.0,
-                final_file.cmm == "lcms2",
+                color_engine_handled,
             ),
             metric(
                 "finalFileTransformApplied",
@@ -848,9 +847,20 @@ fn color_management_proof(
     request: &RawOpenEditExportProofRequest,
     source_hash: &str,
     decoded_image: &DynamicImage,
+    color_receipt: &ExportReceiptMetadata,
 ) -> RawOpenEditExportColorManagementProof {
     let pipeline = &request.edit_command.color_pipeline;
     let display_profile_correctness = display_preview_profile_correctness();
+    let output_profile = export_color_profile_label_for_render_target(&pipeline.render_target);
+    let output_encoding = format!("{output_profile}_rgb16_tiff");
+    let gamut_mapping = if color_receipt
+        .color_managed_transform
+        .contains(SRGB_OKLAB_CHROMA_REDUCE_V1)
+    {
+        SRGB_OKLAB_CHROMA_REDUCE_V1.to_string()
+    } else {
+        "not_proven".to_string()
+    };
     RawOpenEditExportColorManagementProof {
         conformance: "partial".to_string(),
         decoder_trace: RawOpenEditExportDecoderTrace {
@@ -879,16 +889,16 @@ fn color_management_proof(
             bit_depth: 16,
             cmm_used: true,
             display_profile_correctness,
-            export_color_encoding: "display_p3_rgb16_tiff".to_string(),
+            export_color_encoding: output_encoding,
             export_format: "tiff".to_string(),
-            gamut_mapping: "not_proven".to_string(),
+            gamut_mapping,
             icc_profile_embedded: true,
             input_domain: "decoder_camera_rgb_observed".to_string(),
             operation_domain: "linear_srgb_d65_observed".to_string(),
-            output_profile: "display_p3".to_string(),
+            output_profile,
             rendering_intent_applied: true,
             scene_to_display_transform: pipeline.scene_to_display_transform.clone(),
-            transfer_status: "lcms2_bpc_rgb16_display_p3_final_file".to_string(),
+            transfer_status: color_receipt.color_managed_transform.clone(),
             view_transform: pipeline.render_target.view_transform.clone(),
             working_buffer: "linear_srgb_d65_observed".to_string(),
         },
@@ -906,6 +916,20 @@ fn color_management_proof(
             "WGPU adapter/backend are not surfaced by this proof trace yet.".to_string(),
         ],
     }
+}
+
+fn export_color_profile_label_for_render_target(
+    render_target: &RawOpenEditExportRenderTarget,
+) -> String {
+    match render_target.output_profile.as_str() {
+        "adobe_rgb_1998" => "adobe_rgb_1998",
+        "display_p3" => "display_p3",
+        "prophoto_rgb" => "prophoto_rgb",
+        "source_embedded" => "source_embedded",
+        "srgb" => "srgb",
+        other => other,
+    }
+    .to_string()
 }
 
 fn display_preview_profile_correctness() -> String {
@@ -1382,6 +1406,29 @@ mod tests {
             &request,
             "sha256:0000000000000000000000000000000000000000000000000000000000000000",
             &decoded_image,
+            &ExportReceiptMetadata {
+                bit_depth: 16,
+                black_point_compensation: "Enabled via LittleCMS relative colorimetric transform"
+                    .to_string(),
+                cmm: "lcms2".to_string(),
+                color_managed_transform: "sRGB to display_p3 conversion applied".to_string(),
+                color_profile: "display_p3".to_string(),
+                effective_color_profile: "display_p3".to_string(),
+                icc_embedded: true,
+                policy_version: "rawengine-export-color-policy-v2".to_string(),
+                policy_status: "applied".to_string(),
+                rendering_intent: "Relative colorimetric".to_string(),
+                requested_color_profile: "display_p3".to_string(),
+                requested_rendering_intent: "Relative colorimetric".to_string(),
+                resolved_disabled_reason: None,
+                effective_rendering_intent: "Relative colorimetric".to_string(),
+                source_icc_profile_hash: None,
+                source_precision_path: "rgb16 source; shared RGB16 export/proof core".to_string(),
+                transform_policy_fingerprint:
+                    "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+                        .to_string(),
+                transform_applied: true,
+            },
         );
 
         let sidecar = build_sidecar_json(&request, &adjustments, &color_management);
@@ -1534,6 +1581,30 @@ mod tests {
                 &sample_request(),
                 "sha256:0000000000000000000000000000000000000000000000000000000000000000",
                 &DynamicImage::new_rgba8(2, 3),
+                &ExportReceiptMetadata {
+                    bit_depth: 16,
+                    black_point_compensation:
+                        "Enabled via LittleCMS relative colorimetric transform".to_string(),
+                    cmm: "lcms2".to_string(),
+                    color_managed_transform: "sRGB to display_p3 conversion applied".to_string(),
+                    color_profile: "display_p3".to_string(),
+                    effective_color_profile: "display_p3".to_string(),
+                    icc_embedded: true,
+                    policy_version: "rawengine-export-color-policy-v2".to_string(),
+                    policy_status: "applied".to_string(),
+                    rendering_intent: "Relative colorimetric".to_string(),
+                    requested_color_profile: "display_p3".to_string(),
+                    requested_rendering_intent: "Relative colorimetric".to_string(),
+                    resolved_disabled_reason: None,
+                    effective_rendering_intent: "Relative colorimetric".to_string(),
+                    source_icc_profile_hash: None,
+                    source_precision_path: "rgb16 source; shared RGB16 export/proof core"
+                        .to_string(),
+                    transform_policy_fingerprint:
+                        "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+                            .to_string(),
+                    transform_applied: true,
+                },
             ),
             edit_command_id: "command.raw-open-edit-export.basic-tone.v1".to_string(),
             edit_graph_revision: "graph-rev.raw-open-edit-export.sample.v1".to_string(),
@@ -1627,9 +1698,12 @@ mod tests {
             return;
         }
 
+        let request_path = std::env::var("RAWENGINE_RAW_OPEN_EDIT_EXPORT_PROOF_REQUEST")
+            .unwrap_or_else(|_| {
+                "../fixtures/validation/raw-open-edit-export-proof-request.json".to_string()
+            });
         let mut request: RawOpenEditExportProofRequest = serde_json::from_str(
-            &fs::read_to_string("../fixtures/validation/raw-open-edit-export-proof-request.json")
-                .expect("proof request fixture reads"),
+            &fs::read_to_string(request_path).expect("proof request fixture reads"),
         )
         .expect("proof request fixture parses");
         if let Ok(private_root) = std::env::var("RAWENGINE_PRIVATE_RAW_ROOT") {
