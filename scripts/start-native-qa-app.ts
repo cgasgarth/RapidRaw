@@ -1,8 +1,15 @@
 #!/usr/bin/env bun
 
-const appPath = 'src-tauri/target/debug/bundle/macos/RapidRAW.app';
+import { mkdir, rm } from 'node:fs/promises';
+import { dirname } from 'node:path';
+
+const sourceAppPath = 'src-tauri/target/debug/bundle/macos/RapidRAW.app';
+const qaAppPath = 'src-tauri/target/debug/bundle/macos/RawEngine QA Current.app';
+const qaAppName = 'RawEngine QA Current';
+const qaBundleIdentifier = 'dev.rawengine.RapidRAW.qa-current';
 const args = process.argv.slice(2);
 const shouldBuild = !args.includes('--no-build');
+const shouldLaunch = !args.includes('--no-launch');
 
 async function run(command: string, commandArgs: string[], label: string): Promise<void> {
   const proc = Bun.spawn([command, ...commandArgs], {
@@ -32,5 +39,23 @@ if (shouldBuild) {
   );
 }
 
-await run('open', [appPath], 'native qa app launch');
-console.log(`native qa app ok (${appPath})`);
+await rm(qaAppPath, { force: true, recursive: true });
+await mkdir(dirname(qaAppPath), { recursive: true });
+await run('cp', ['-R', sourceAppPath, qaAppPath], 'native qa app copy');
+
+const plistPath = `${qaAppPath}/Contents/Info.plist`;
+for (const [key, value] of [
+  ['CFBundleName', qaAppName],
+  ['CFBundleDisplayName', qaAppName],
+  ['CFBundleIdentifier', qaBundleIdentifier],
+]) {
+  await run('/usr/libexec/PlistBuddy', ['-c', `Set :${key} ${value}`, plistPath], `native qa app plist ${key}`);
+}
+
+await run('codesign', ['--force', '--deep', '--sign', '-', qaAppPath], 'native qa app ad-hoc codesign');
+
+if (shouldLaunch) {
+  await run('open', ['-n', qaAppPath], 'native qa app launch');
+}
+
+console.log(`native qa app ok (${qaAppName}; ${qaBundleIdentifier}; ${qaAppPath})`);
