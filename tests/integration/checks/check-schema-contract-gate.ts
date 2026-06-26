@@ -16,6 +16,7 @@ const GITHUB_FILE_SCHEMA = z
 const CONTRACT_CHECKS = [
   'check:agent-approval-boundaries',
   'check:agent-baseline-gates',
+  'check:agent-color-apply',
   'check:agent-curve-levels-apply',
   'check:agent-geometry-apply',
   'check:agent-rollback-proof',
@@ -67,6 +68,7 @@ const PACKAGE_SCRIPT_NAMES = new Set([
   'check:ai-denoise-app-server-tool',
   'check:agent-approval-boundaries',
   'check:agent-baseline-gates',
+  'check:agent-color-apply',
   'check:agent-curve-levels-apply',
   'check:agent-geometry-apply',
   'check:agent-proof-gallery',

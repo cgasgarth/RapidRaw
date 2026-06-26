@@ -6,6 +6,13 @@ import {
   applyAgentGlobalAdjustments,
 } from './agentAdjustmentApplyTool';
 import {
+  AGENT_COLOR_APPLY_INPUT_SCHEMA_NAME,
+  AGENT_COLOR_APPLY_OUTPUT_SCHEMA_NAME,
+  AGENT_COLOR_APPLY_TOOL_NAME,
+  agentColorApplyRequestSchema,
+  applyAgentColor,
+} from './agentColorApplyTool';
+import {
   AGENT_CURVE_LEVELS_APPLY_INPUT_SCHEMA_NAME,
   AGENT_CURVE_LEVELS_APPLY_OUTPUT_SCHEMA_NAME,
   AGENT_CURVE_LEVELS_APPLY_TOOL_NAME,
@@ -534,6 +541,15 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       toolNames: [AGENT_ADJUSTMENTS_APPLY_TOOL_NAME],
     }),
     buildRouteCatalogEntry({
+      commandName: AGENT_COLOR_APPLY_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_COLOR_APPLY_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.ApplyDryRunPlan],
+      outputSchemaNames: [AGENT_COLOR_APPLY_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-color-apply'],
+      toolNames: [AGENT_COLOR_APPLY_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
       commandName: AGENT_CURVE_LEVELS_APPLY_TOOL_NAME,
       family: 'agent',
       inputSchemaNames: [AGENT_CURVE_LEVELS_APPLY_INPUT_SCHEMA_NAME],
@@ -787,6 +803,9 @@ const dispatchAgentAppServerTool = async (
   switch (request.runtimeToolName) {
     case AGENT_ADJUSTMENTS_APPLY_TOOL_NAME:
       result = await applyAgentGlobalAdjustments(agentAdjustmentsApplyRequestSchema.parse(request.arguments));
+      break;
+    case AGENT_COLOR_APPLY_TOOL_NAME:
+      result = applyAgentColor(agentColorApplyRequestSchema.parse(request.arguments));
       break;
     case AGENT_CURVE_LEVELS_APPLY_TOOL_NAME:
       result = applyAgentCurveLevels(agentCurveLevelsApplyRequestSchema.parse(request.arguments));

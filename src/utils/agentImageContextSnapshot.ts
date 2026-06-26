@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { ActiveChannel } from './adjustments';
+import { buildAgentColorRecipeHashInput } from './agentColorRecipe';
 import { buildAgentCurveLevelsRecipeHashInput } from './agentCurveLevelsRecipe';
 import { buildAgentGeometryRecipeHashInput } from './agentGeometryRecipe';
 import {
@@ -139,6 +140,7 @@ export const buildAgentImageContextSnapshot = (): AgentImageContextSnapshot => {
   const recipeHash = `recipe:${stableAgentPreviewHash(
     JSON.stringify({
       adjustments: summarizeAdjustment(editor.adjustments),
+      color: buildAgentColorRecipeHashInput(editor.adjustments),
       geometry: buildAgentGeometryRecipeHashInput(editor.adjustments),
       curveLevels: buildAgentCurveLevelsRecipeHashInput(editor.adjustments),
       graphRevision,
