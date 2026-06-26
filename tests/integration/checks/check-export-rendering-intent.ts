@@ -56,7 +56,7 @@ for (const marker of [
   'exportColorCapabilityCatalogV1Schema',
   'MOXCMS_EXPORT_COLOR_CAPABILITIES_V1',
   "colorProfile === 'srgb' || colorProfile === 'sourceEmbedded' ? 'unsupported' : 'supported'",
-  "renderingIntents: colorProfile === 'sourceEmbedded' ? ['relativeColorimetric'] : COLOR_MANAGED_RENDERING_INTENTS",
+  "renderingIntents: colorProfile === 'srgb' ? SRGB_RENDERING_INTENTS : RELATIVE_COLORIMETRIC_ONLY",
   'LittleCMS enables black-point compensation for JPEG/TIFF relative colorimetric wide-gamut exports.',
 ]) {
   if (!capabilitySource.includes(marker)) failures.push(`Export color capability descriptor missing ${marker}`);
@@ -86,6 +86,7 @@ for (const marker of [
   'Enabled via LittleCMS relative colorimetric transform',
   'jpeg_relative_bpc_resolves_to_littlecms_policy',
   'display_p3_jpeg_bpc_encodes_with_littlecms_receipt',
+  'unproven_wide_gamut_rendering_intents_are_rejected',
   'export_rgb16_pixels_with_shared_conversion_core',
   'quantize_rgb16_to_rgb8',
   'read_embedded_source_icc_profile',
@@ -118,6 +119,13 @@ if (sourceEmbeddedCapability?.blackPointCompensation !== 'unsupported') {
 }
 if (sourceEmbeddedCapability?.renderingIntents.join(',') !== 'relativeColorimetric') {
   failures.push('Source embedded export must advertise only relative colorimetric intent.');
+}
+if (displayP3Capability?.renderingIntents.join(',') !== 'relativeColorimetric') {
+  failures.push('Display P3 export must advertise only proven relative colorimetric intent.');
+}
+const srgbCapability = capabilityCatalog.capabilities.find((capability) => capability.colorProfile === 'srgb');
+if (srgbCapability?.renderingIntents.join(',') !== 'relativeColorimetric,perceptual') {
+  failures.push('sRGB export must advertise relative colorimetric and proven perceptual intents.');
 }
 if (
   !capabilityCatalog.capabilities.every((capability) => capability.renderingIntents.includes('relativeColorimetric'))

@@ -1196,13 +1196,19 @@ fn export_color_profile_requires_transform(color_profile: &ExportColorProfile) -
     )
 }
 
-fn moxcms_export_rendering_intents() -> Vec<ExportRenderingIntent> {
-    vec![
-        ExportRenderingIntent::RelativeColorimetric,
-        ExportRenderingIntent::Perceptual,
-        ExportRenderingIntent::Saturation,
-        ExportRenderingIntent::AbsoluteColorimetric,
-    ]
+fn proven_export_rendering_intents(
+    color_profile: &ExportColorProfile,
+) -> Vec<ExportRenderingIntent> {
+    match color_profile {
+        ExportColorProfile::Srgb => vec![
+            ExportRenderingIntent::RelativeColorimetric,
+            ExportRenderingIntent::Perceptual,
+        ],
+        ExportColorProfile::AdobeRgb1998
+        | ExportColorProfile::DisplayP3
+        | ExportColorProfile::ProPhotoRgb
+        | ExportColorProfile::SourceEmbedded => vec![ExportRenderingIntent::RelativeColorimetric],
+    }
 }
 
 fn resolve_export_color_transform_plan(
@@ -1219,6 +1225,15 @@ fn resolve_export_color_transform_plan(
     };
     let supports_color_managed_profile =
         supports_color_managed_receipt_metadata(&requested.output_format);
+    let supported_intents = proven_export_rendering_intents(color_profile);
+
+    if !supported_intents.contains(rendering_intent) {
+        return Err(format!(
+            "{} export does not have proven {} rendering-intent support yet.",
+            export_color_profile_receipt_label(color_profile),
+            export_rendering_intent_receipt_label(rendering_intent)
+        ));
+    }
 
     if matches!(color_profile, ExportColorProfile::SourceEmbedded)
         && !supports_color_managed_profile
@@ -1321,11 +1336,7 @@ pub(crate) fn resolve_export_color_capabilities() -> ExportColorCapabilityCatalo
         } else {
             ExportBlackPointCompensationStatus::Unsupported
         },
-        rendering_intents: if matches!(color_profile, ExportColorProfile::SourceEmbedded) {
-            vec![ExportRenderingIntent::RelativeColorimetric]
-        } else {
-            moxcms_export_rendering_intents()
-        },
+        rendering_intents: proven_export_rendering_intents(&color_profile),
         color_profile,
         engine: ExportColorEngineId::Moxcms,
         runtime_support_notes: runtime_support_notes.clone(),
@@ -2678,6 +2689,33 @@ mod tests {
             source_embedded.rendering_intents,
             vec![ExportRenderingIntent::RelativeColorimetric]
         );
+        let srgb = catalog
+            .capabilities
+            .iter()
+            .find(|capability| matches!(capability.color_profile, ExportColorProfile::Srgb))
+            .expect("sRGB capability should be advertised");
+        assert_eq!(
+            srgb.rendering_intents,
+            vec![
+                ExportRenderingIntent::RelativeColorimetric,
+                ExportRenderingIntent::Perceptual
+            ]
+        );
+        for profile in [
+            ExportColorProfile::AdobeRgb1998,
+            ExportColorProfile::DisplayP3,
+            ExportColorProfile::ProPhotoRgb,
+        ] {
+            let capability = catalog
+                .capabilities
+                .iter()
+                .find(|capability| capability.color_profile == profile)
+                .expect("wide-gamut capability should be advertised");
+            assert_eq!(
+                capability.rendering_intents,
+                vec![ExportRenderingIntent::RelativeColorimetric]
+            );
+        }
     }
 
     #[test]
@@ -2769,21 +2807,21 @@ mod tests {
     fn export_color_transform_plan_resolves_requested_and_effective_policy() {
         let plan = resolve_export_color_transform_plan(
             "tiff",
-            &ExportColorProfile::DisplayP3,
-            &ExportRenderingIntent::Saturation,
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::Perceptual,
             false,
         )
-        .expect("Display P3 TIFF policy should resolve");
+        .expect("sRGB perceptual TIFF policy should resolve");
 
-        assert_eq!(plan.requested.color_profile, ExportColorProfile::DisplayP3);
+        assert_eq!(plan.requested.color_profile, ExportColorProfile::Srgb);
         assert_eq!(
             plan.requested.rendering_intent,
-            ExportRenderingIntent::Saturation
+            ExportRenderingIntent::Perceptual
         );
-        assert_eq!(plan.effective_color_profile, ExportColorProfile::DisplayP3);
+        assert_eq!(plan.effective_color_profile, ExportColorProfile::Srgb);
         assert_eq!(
             plan.effective_rendering_intent,
-            ExportRenderingIntent::Saturation
+            ExportRenderingIntent::Perceptual
         );
         assert_eq!(plan.engine, ExportColorEngineId::Moxcms);
         assert_eq!(
@@ -2918,8 +2956,8 @@ mod tests {
     fn unsupported_bpc_request_is_reported_without_silent_enablement() {
         let metadata = export_receipt_metadata(
             "jpg",
-            &ExportColorProfile::DisplayP3,
-            &ExportRenderingIntent::Saturation,
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::Perceptual,
             true,
             &synthetic_source_precision_path(),
             None,
@@ -2937,6 +2975,30 @@ mod tests {
                 "Black-point compensation is only available for JPEG/TIFF wide-gamut relative colorimetric LittleCMS exports."
             )
         );
+    }
+
+    #[test]
+    fn unproven_wide_gamut_rendering_intents_are_rejected() {
+        for profile in [
+            ExportColorProfile::AdobeRgb1998,
+            ExportColorProfile::DisplayP3,
+            ExportColorProfile::ProPhotoRgb,
+            ExportColorProfile::SourceEmbedded,
+        ] {
+            for intent in [
+                ExportRenderingIntent::AbsoluteColorimetric,
+                ExportRenderingIntent::Perceptual,
+                ExportRenderingIntent::Saturation,
+            ] {
+                let error = resolve_export_color_transform_plan("jpg", &profile, &intent, false)
+                    .expect_err("unproven non-relative intent should be rejected");
+
+                assert!(
+                    error.contains("does not have proven"),
+                    "unexpected unproven intent error: {error}"
+                );
+            }
+        }
     }
 
     #[test]

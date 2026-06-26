@@ -38,12 +38,8 @@ export const exportColorCapabilityCatalogV1Schema = z
 export type ExportColorCapabilityV1 = z.infer<typeof exportColorCapabilityV1Schema>;
 export type ExportColorCapabilityCatalogV1 = z.infer<typeof exportColorCapabilityCatalogV1Schema>;
 
-const COLOR_MANAGED_RENDERING_INTENTS: ExportColorCapabilityV1['renderingIntents'] = [
-  'relativeColorimetric',
-  'perceptual',
-  'saturation',
-  'absoluteColorimetric',
-];
+const RELATIVE_COLORIMETRIC_ONLY: ExportColorCapabilityV1['renderingIntents'] = ['relativeColorimetric'];
+const SRGB_RENDERING_INTENTS: ExportColorCapabilityV1['renderingIntents'] = ['relativeColorimetric', 'perceptual'];
 
 const MOXCMS_SUPPORTED_PROFILES: Array<ExportColorCapabilityV1['colorProfile']> = [
   'srgb',
@@ -58,7 +54,7 @@ export const MOXCMS_EXPORT_COLOR_CAPABILITIES_V1 = exportColorCapabilityCatalogV
     blackPointCompensation: colorProfile === 'srgb' || colorProfile === 'sourceEmbedded' ? 'unsupported' : 'supported',
     colorProfile,
     engine: 'moxcms',
-    renderingIntents: colorProfile === 'sourceEmbedded' ? ['relativeColorimetric'] : COLOR_MANAGED_RENDERING_INTENTS,
+    renderingIntents: colorProfile === 'srgb' ? SRGB_RENDERING_INTENTS : RELATIVE_COLORIMETRIC_ONLY,
     runtimeSupportNotes: [
       'Rendering intent is passed to moxcms transform options.',
       'LittleCMS enables black-point compensation for JPEG/TIFF relative colorimetric wide-gamut exports.',
