@@ -642,6 +642,7 @@
     "check:agent-curve-levels-apply": "bun tests/integration/checks/check-agent-curve-levels-apply.ts",
     "check:agent-color-apply": "bun tests/integration/checks/check-agent-color-apply.ts",
     "check:agent-detail-effects-apply": "bun tests/integration/checks/check-agent-detail-effects-apply.ts",
+    "check:agent-lens-profile-apply": "bun tests/integration/checks/check-agent-lens-profile-apply.ts",
     "check:agent-bounded-planner-loop": "bun tests/integration/checks/check-agent-bounded-planner-loop.ts",
     "check:agent-readonly-tools": "bun tests/integration/checks/check-agent-readonly-tools.ts",
     "check:agent-adjustments-apply": "bun tests/integration/checks/check-agent-adjustments-apply.ts",
