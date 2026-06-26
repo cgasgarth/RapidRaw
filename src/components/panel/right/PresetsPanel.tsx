@@ -1028,6 +1028,7 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
 
   const folders = useMemo<Array<FolderEntry>>(() => presets.filter(isFolderEntry), [presets]);
   const rootPresets = useMemo<Array<PresetEntry>>(() => presets.filter(isPresetEntry), [presets]);
+  const hasBuiltInColorStyles = BUILT_IN_COLOR_STYLE_PRESETS.length > 0;
   const userPresetCount = useMemo(
     () => rootPresets.length + folders.reduce((count, item) => count + item.folder.children.length, 0),
     [folders, rootPresets.length],
@@ -1126,7 +1127,7 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
               <Loader2 size={14} className="animate-spin inline-block mr-2" /> {t('editor.presets.status.loading')}
             </UiText>
           )}
-          {!isLoading && presets.length === 0 ? (
+          {!isLoading && presets.length === 0 && !hasBuiltInColorStyles ? (
             <div className="text-center text-text-secondary flex flex-col items-center gap-4 pt-4">
               <UiText className="max-w-xs">{t('editor.presets.status.empty')}</UiText>
               <Button variant="secondary" onClick={onNavigateToCommunity}>
