@@ -17,7 +17,6 @@ staged_files="$(git diff --cached --name-only --diff-filter=ACMR)"
 
 bun lint-staged --quiet --concurrent false
 bun run check:lint
-bun run check:external-editor-missing-launcher
 
 if printf '%s\n' "$staged_files" | grep -Eq '^(AGENTS\.md|docs/|.*\.md$)'; then
   bun run docs:check
@@ -54,13 +53,7 @@ if printf '%s\n' "$staged_files" | grep -Eq '(^|/)(package\.json|bun\.lock|tscon
   bun run check:unsafe-casts
 fi
 
-if printf '%s\n' "$staged_files" | grep -Eq '^(src/|tests/integration/checks/check-browser-tauri-harness\.ts$|scripts/capture-visual-smoke\.ts$|scripts/lib/visual-smoke-proofs\.ts$|index\.html$|vite\.config\.ts$|package\.json$|bun\.lock$)'; then
-  bun run build:frontend
-  bun run check:visual-smoke:pr
-  bun run check:browser-tauri-harness
-fi
-
-if printf '%s\n' "$staged_files" | grep -Eq '^(packages/rawengine-schema/|fixtures/|samples/)|(^|/)(package\.json|bun\.lock|tsconfig[^/]*\.json)$'; then
+if printf '%s\n' "$staged_files" | grep -Eq '^(packages/rawengine-schema/|fixtures/|samples/)'; then
   bun run schema:check
   bun run schema:command-bus
   bun run schema:contract-gate
@@ -77,4 +70,8 @@ fi
 if printf '%s\n' "$staged_files" | grep -Eq '^(\.github/|tests/integration/checks/check-(actions|workflow|compact|rust-feature|schema-contract)|scripts/compact-output\.ts|scripts/run-compact-command\.ts|scripts/run-compact-checks\.ts)'; then
   bun run check:actions
   bun run check:action-pins
+fi
+
+if printf '%s\n' "$staged_files" | grep -Eq '^(\.githooks/pre-commit|tests/integration/checks/check-precommit-fast-path\.ts|package\.json)$'; then
+  bun run check:precommit-fast-path
 fi

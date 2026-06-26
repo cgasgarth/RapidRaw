@@ -501,6 +501,7 @@
     "check:computational-merge-review-panel-contract": "bun tests/integration/checks/check-computational-merge-review-panel-contract.ts",
     "check:lint-escapes": "bun tests/integration/checks/check-eslint-escape-hatches.ts",
     "check:lint": "bun scripts/run-compact-command.ts --label lint -- eslint . --max-warnings 0",
+    "check:precommit-fast-path": "bun tests/integration/checks/check-precommit-fast-path.ts",
     "check:format": "bun scripts/run-compact-command.ts --label format -- prettier --check .",
     "check:actions": "bun run check:actions:lint && bun run check:workflow-policy && bun run check:workflow-policy:self-test && bun run check:compact-commands && bun run check:compact-commands:self-test && bun run check:rust-feature-policy && bun run check:rust-feature-policy:self-test && bun run schema:contract-gate:self-test",
     "check:actions:lint": "bun scripts/run-compact-command.ts --label actionlint -- go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml",
