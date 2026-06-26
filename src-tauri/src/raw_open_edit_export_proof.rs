@@ -850,6 +850,7 @@ fn color_management_proof(
     decoded_image: &DynamicImage,
 ) -> RawOpenEditExportColorManagementProof {
     let pipeline = &request.edit_command.color_pipeline;
+    let display_profile_correctness = display_preview_profile_correctness();
     RawOpenEditExportColorManagementProof {
         conformance: "partial".to_string(),
         decoder_trace: RawOpenEditExportDecoderTrace {
@@ -877,7 +878,7 @@ fn color_management_proof(
         observed_color_pipeline: RawOpenEditExportObservedColorPipeline {
             bit_depth: 16,
             cmm_used: true,
-            display_profile_correctness: "not_proven".to_string(),
+            display_profile_correctness,
             export_color_encoding: "display_p3_rgb16_tiff".to_string(),
             export_format: "tiff".to_string(),
             gamut_mapping: "not_proven".to_string(),
@@ -905,6 +906,22 @@ fn color_management_proof(
             "WGPU adapter/backend are not surfaced by this proof trace yet.".to_string(),
         ],
     }
+}
+
+fn display_preview_profile_correctness() -> String {
+    let Ok(lut) = crate::display_profile::display_preview_lut_status() else {
+        return "not_proven".to_string();
+    };
+    let status = serde_json::to_value(lut.status)
+        .ok()
+        .and_then(|value| value.as_str().map(str::to_string));
+    if status.as_deref() == Some("active_display_transform")
+        && lut.sample_count > 0
+        && lut.profile.icc_sha256.is_some()
+    {
+        return "active_display_lut_profile_loaded".to_string();
+    }
+    "not_proven".to_string()
 }
 
 fn trace_status_not_surfaced() -> RawOpenEditExportTraceStatus {

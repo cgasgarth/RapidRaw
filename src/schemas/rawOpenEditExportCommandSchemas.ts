@@ -105,7 +105,7 @@ const colorManagementProofSchema = z
       .object({
         bitDepth: z.literal(16),
         cmmUsed: z.literal(true),
-        displayProfileCorrectness: z.literal('not_proven'),
+        displayProfileCorrectness: z.enum(['active_display_lut_profile_loaded', 'not_proven']),
         exportColorEncoding: z.literal('display_p3_rgb16_tiff'),
         exportFormat: z.literal('tiff'),
         gamutMapping: z.literal('not_proven'),
