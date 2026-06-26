@@ -91,11 +91,27 @@ if (snapshot.initialPreview.width !== 1536 || snapshot.initialPreview.height !==
   throw new Error('Agent image context did not scale initial preview dimensions to the configured long edge.');
 }
 if (
-  !snapshot.initialPreview.cacheKey.startsWith('agent-initial-preview:render:') ||
+  !snapshot.initialPreview.cacheKey.startsWith('agent-preview:initial_context:') ||
   !snapshot.initialPreview.recipeHash.startsWith('recipe:') ||
   !snapshot.initialPreview.renderHash.startsWith('render:')
 ) {
   throw new Error('Agent image context did not include stable preview cache, recipe, and render identities.');
+}
+if (
+  snapshot.initialPreview.purpose !== 'initial_context' ||
+  snapshot.initialPreview.renderIntent !== 'initial_context' ||
+  snapshot.initialPreview.source !== 'editor-preview-derivative' ||
+  snapshot.initialPreview.crop?.width !== 90 ||
+  snapshot.initialPreview.zoom !== null
+) {
+  throw new Error('Agent image context did not include the standardized initial preview envelope.');
+}
+if (
+  !snapshot.initialPreview.cachePolicy.stableWhenRecipeHashMatches ||
+  !snapshot.initialPreview.cachePolicy.invalidatesOn.includes('recipe_hash') ||
+  !snapshot.initialPreview.cachePolicy.invalidatesOn.includes('crop')
+) {
+  throw new Error('Agent preview envelope did not declare recipe/crop invalidation policy.');
 }
 if (JSON.stringify(snapshot).length > 4_800) {
   throw new Error('Agent image context snapshot exceeded bounded payload budget.');

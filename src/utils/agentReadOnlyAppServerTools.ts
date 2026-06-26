@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
+import { agentPreviewEnvelopeSchema, buildAgentPreviewEnvelope } from './agentPreviewEnvelope';
 
 export const AGENT_STATE_GET_TOOL_NAME = 'rawengine.agent.state.get';
 export const AGENT_PREVIEW_RENDER_TOOL_NAME = 'rawengine.agent.preview.render';
@@ -23,6 +24,14 @@ export const agentPreviewRenderRequestSchema = z
     purpose: z.enum(['detail_review', 'initial_context', 'refresh']).default('refresh'),
     quality: z.number().min(0.5).max(0.95).default(0.86),
     requestId: z.string().trim().min(1),
+    zoom: z
+      .object({
+        centerX: z.number().min(0).max(1),
+        centerY: z.number().min(0).max(1),
+        scale: z.number().min(1).max(8),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -37,7 +46,7 @@ export const agentStateGetResponseSchema = z
 
 export const agentPreviewRenderResponseSchema = z
   .object({
-    preview: z.unknown(),
+    preview: agentPreviewEnvelopeSchema,
     requestId: z.string().trim().min(1),
     staleRecipeHash: z.boolean(),
     toolName: z.literal(AGENT_PREVIEW_RENDER_TOOL_NAME),
@@ -66,14 +75,22 @@ export const getAgentReadOnlyState = (request: AgentStateGetRequest): AgentState
 export const renderAgentReadOnlyPreview = (request: AgentPreviewRenderRequest): AgentPreviewRenderResponse => {
   const parsedRequest = agentPreviewRenderRequestSchema.parse(request);
   const snapshot = buildAgentImageContextSnapshot();
+  const preview = buildAgentPreviewEnvelope({
+    crop: snapshot.initialPreview.crop,
+    height: snapshot.initialPreview.height,
+    idSeed: `${snapshot.initialPreview.id}:${parsedRequest.requestId}`,
+    longEdgePx: parsedRequest.longEdgePx,
+    previewRef: snapshot.initialPreview.previewRef,
+    purpose: parsedRequest.purpose,
+    quality: parsedRequest.quality,
+    recipeHash: snapshot.initialPreview.recipeHash,
+    renderHash: snapshot.initialPreview.renderHash,
+    width: snapshot.initialPreview.width,
+    zoom: parsedRequest.zoom ?? null,
+  });
 
   return agentPreviewRenderResponseSchema.parse({
-    preview: {
-      ...snapshot.initialPreview,
-      longEdgePx: parsedRequest.longEdgePx,
-      purpose: parsedRequest.purpose,
-      quality: parsedRequest.quality,
-    },
+    preview,
     requestId: parsedRequest.requestId,
     staleRecipeHash:
       parsedRequest.expectedRecipeHash !== undefined &&
