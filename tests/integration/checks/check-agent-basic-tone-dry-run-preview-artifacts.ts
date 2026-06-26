@@ -85,6 +85,39 @@ if (result.beforePreviewHash === result.afterPreviewHash || result.changedPixelC
 if (result.beforeArtifact.kind !== 'preview' || result.afterArtifact.kind !== 'preview') {
   throw new Error('Agent dry-run before/after artifacts must be preview artifacts.');
 }
+if (
+  result.beforePreview.mediaType !== 'image/jpeg' ||
+  result.afterPreview.mediaType !== 'image/jpeg' ||
+  result.beforePreview.longEdgePx !== 1536 ||
+  result.afterPreview.longEdgePx !== 1536 ||
+  result.beforePreview.quality !== 0.86 ||
+  result.afterPreview.quality !== 0.86
+) {
+  throw new Error('Agent dry-run previews must use the standardized medium-preview artifact contract.');
+}
+if (
+  result.beforePreview.previewRef !== result.beforeArtifact.artifactId ||
+  result.afterPreview.previewRef !== result.afterArtifact.artifactId ||
+  result.beforePreview.purpose !== 'detail_review' ||
+  result.afterPreview.purpose !== 'refresh'
+) {
+  throw new Error('Agent dry-run preview envelopes must bind to before/after tool receipt artifacts.');
+}
+if (
+  result.beforePreview.recipeHash === result.afterPreview.recipeHash ||
+  result.beforePreview.renderHash === result.afterPreview.renderHash ||
+  result.beforePreview.cacheKey === result.afterPreview.cacheKey
+) {
+  throw new Error('Agent dry-run preview envelopes must invalidate after tool-proposed edits.');
+}
+if (
+  !result.afterPreview.cachePolicy.invalidatesOn.includes('recipe_hash') ||
+  !result.afterPreview.cachePolicy.invalidatesOn.includes('render_settings') ||
+  result.afterPreview.lifecycle.persisted ||
+  result.afterPreview.includesOriginalRaw
+) {
+  throw new Error('Agent dry-run preview envelopes must stay ephemeral and recipe/render invalidated.');
+}
 if (result.beforeArtifact.contentHash !== `sha256:${result.beforePreviewHash}`) {
   throw new Error('Before artifact hash does not match renderer output.');
 }
@@ -98,4 +131,4 @@ if (result.previewResult.sourceGraphRevision !== 'history_0') {
   throw new Error('Agent dry-run preview result must be tied to current graph revision.');
 }
 
-console.log('agent basic tone dry-run preview artifacts ok (before-after+nonmutating)');
+console.log('agent basic tone dry-run preview artifacts ok (medium-contract+nonmutating)');
