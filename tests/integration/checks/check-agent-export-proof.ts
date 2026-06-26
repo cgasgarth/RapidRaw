@@ -7,8 +7,11 @@ import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustmen
 import type { AgentApprovalState } from '../../../src/utils/agentApprovalGate.ts';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agentImageContextSnapshot.ts';
 import {
+  AGENT_FINAL_EXPORT_TOOL_NAME,
   AGENT_EXPORT_PROOF_TOOL_NAME,
+  agentFinalExportRequestSchema,
   agentExportProofRequestSchema,
+  buildAgentFinalExport,
   buildAgentExportProof,
 } from '../../../src/utils/agentExportProofTool.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../../../src/utils/rawEngineAppServerHost.ts';
@@ -161,6 +164,62 @@ if (pngProof.exportHash === proof.exportHash) {
   throw new Error('agent.export.proof export hash must change when output transform changes.');
 }
 
+if (
+  agentFinalExportRequestSchema.safeParse({
+    approval: buildApproval('approved'),
+    destinationPolicy: 'local_private_artifact',
+    dryRun: true,
+    expectedRecipeHash: snapshot.initialPreview.recipeHash,
+    operationId: 'bad_final_export',
+    requestId: 'bad-final-export',
+    sessionId: 'agent-export-proof-3163',
+  }).success
+) {
+  throw new Error('agent.export.final accepted a dry-run request.');
+}
+expectRejects(() =>
+  buildAgentFinalExport({
+    approval: buildApproval('pending'),
+    destinationPolicy: 'local_private_artifact',
+    dryRun: false,
+    expectedRecipeHash: snapshot.initialPreview.recipeHash,
+    operationId: 'pending_final_export',
+    requestId: 'pending-final-export',
+    sessionId: 'agent-export-proof-3163',
+  }),
+);
+
+const finalExport = buildAgentFinalExport({
+  approval: buildApproval('approved', { approvalId: 'approval_export_final_3163' }),
+  colorProfile: 'displayP3',
+  destinationPolicy: 'local_private_artifact',
+  dryRun: false,
+  expectedRecipeHash: snapshot.initialPreview.recipeHash,
+  fileFormat: 'png',
+  longEdgePx: 2048,
+  operationId: 'agent_final_export_3163',
+  requestId: 'agent-final-export-3163',
+  sessionId: 'agent-export-proof-3163',
+});
+if (
+  finalExport.dryRun ||
+  !finalExport.fileWritten ||
+  finalExport.toolName !== AGENT_FINAL_EXPORT_TOOL_NAME ||
+  finalExport.output.storage !== 'ephemeral_editor_cache' ||
+  finalExport.output.destinationPolicy !== 'local_private_artifact' ||
+  finalExport.output.artifactId.length === 0
+) {
+  throw new Error('agent.export.final did not return bounded final artifact metadata.');
+}
+if (
+  finalExport.receipt.approvalId !== 'approval_export_final_3163' ||
+  finalExport.receipt.recipeHash !== snapshot.initialPreview.recipeHash ||
+  finalExport.output.width !== 2048 ||
+  finalExport.output.height !== 1365
+) {
+  throw new Error('agent.export.final did not bind approval, recipe, and output transform metadata.');
+}
+
 const route = buildRawEngineAppServerRouteCatalog().find(
   (candidate) => candidate.commandName === AGENT_EXPORT_PROOF_TOOL_NAME,
 );
@@ -171,6 +230,17 @@ if (
   !route.runtimeCheckScripts.includes('check:agent-export-proof')
 ) {
   throw new Error('agent.export.proof is missing from the agent route catalog.');
+}
+const finalRoute = buildRawEngineAppServerRouteCatalog().find(
+  (candidate) => candidate.commandName === AGENT_FINAL_EXPORT_TOOL_NAME,
+);
+if (
+  finalRoute === undefined ||
+  finalRoute.family !== 'agent' ||
+  !finalRoute.modes.includes(RawEngineAppServerRouteMode.ApplyDryRunPlan) ||
+  !finalRoute.runtimeCheckScripts.includes('check:agent-export-proof')
+) {
+  throw new Error('agent.export.final is missing from the mutating agent route catalog.');
 }
 
 console.log('agent export proof ok');
