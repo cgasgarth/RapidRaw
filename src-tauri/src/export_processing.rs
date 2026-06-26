@@ -8,8 +8,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use chrono::{SecondsFormat, Utc};
 use image::{
-    DynamicImage, ExtendedColorType, GenericImageView, GrayImage, ImageBuffer, ImageEncoder,
-    ImageFormat, Luma, codecs::tiff::TiffEncoder, imageops,
+    DynamicImage, ExtendedColorType, GenericImageView, GrayImage, ImageBuffer, ImageDecoder,
+    ImageEncoder, ImageFormat, Luma,
+    codecs::{jpeg::JpegDecoder, tiff::TiffDecoder, tiff::TiffEncoder},
+    imageops,
 };
 use jxl_encoder::{LosslessConfig, LossyConfig, PixelLayout};
 use lcms2::{
@@ -20,6 +22,7 @@ use moxcms::{ColorProfile, Layout, RenderingIntent as MoxRenderingIntent, Transf
 use mozjpeg_rs::{Encoder as MozJpegEncoder, Preset};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use tauri::Emitter;
 use tauri::Manager;
 
@@ -68,6 +71,7 @@ struct ExportReceiptOutput {
     resolved_disabled_reason: Option<String>,
     effective_rendering_intent: Option<String>,
     source_path: String,
+    source_icc_profile_hash: Option<String>,
     source_precision_path: Option<String>,
     transform_applied: Option<bool>,
 }
@@ -533,14 +537,26 @@ pub(crate) fn save_image_with_metadata(
         .and_then(|s| s.to_str())
         .unwrap_or("")
         .to_lowercase();
+    let source_embedded_icc = if matches!(
+        export_settings.color_profile,
+        ExportColorProfile::SourceEmbedded
+    ) {
+        Some(read_embedded_source_icc_profile(
+            Path::new(source_path_str),
+            &extension,
+        )?)
+    } else {
+        None
+    };
 
-    let encoded_image = encode_image_with_applied_policy(
+    let encoded_image = encode_image_with_applied_policy_and_source_profile(
         image,
         &extension,
         export_settings.jpeg_quality,
         &export_settings.color_profile,
         &export_settings.rendering_intent,
         export_settings.black_point_compensation,
+        source_embedded_icc.as_ref(),
     )?;
     let mut image_bytes = encoded_image.bytes;
 
@@ -569,6 +585,63 @@ pub(crate) fn save_image_with_metadata(
     fs::write(output_path, image_bytes).map_err(|e| e.to_string())?;
 
     Ok(encoded_image.color_policy)
+}
+
+fn read_embedded_source_icc_profile(
+    source_path: &Path,
+    output_format: &str,
+) -> Result<EmbeddedSourceIccProfile, String> {
+    if !matches!(output_format, "jpg" | "jpeg" | "tif" | "tiff") {
+        return Err(format!(
+            "Source embedded export profile is only supported for JPEG and TIFF, not {output_format}."
+        ));
+    }
+
+    let source_extension = source_path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    if !matches!(source_extension.as_str(), "jpg" | "jpeg" | "tif" | "tiff") {
+        return Err(
+            "Source embedded export profile requires a tagged JPEG or TIFF source.".to_string(),
+        );
+    }
+
+    let bytes = fs::read(source_path)
+        .map_err(|error| format!("Failed to read source image ICC profile: {error}"))?;
+    let icc_profile = match source_extension.as_str() {
+        "jpg" | "jpeg" => {
+            let mut decoder = JpegDecoder::new(Cursor::new(bytes.as_slice()))
+                .map_err(|error| format!("Failed to inspect source JPEG ICC profile: {error}"))?;
+            decoder
+                .icc_profile()
+                .map_err(|error| format!("Failed to read source JPEG ICC profile: {error}"))?
+        }
+        "tif" | "tiff" => {
+            let mut decoder = TiffDecoder::new(Cursor::new(bytes.as_slice()))
+                .map_err(|error| format!("Failed to inspect source TIFF ICC profile: {error}"))?;
+            decoder
+                .icc_profile()
+                .map_err(|error| format!("Failed to read source TIFF ICC profile: {error}"))?
+        }
+        _ => None,
+    }
+    .ok_or_else(|| {
+        "Source embedded export profile requires an embedded ICC profile.".to_string()
+    })?;
+
+    ColorProfile::new_from_slice(&icc_profile).map_err(|error| {
+        format!("Source embedded ICC profile is not a supported RGB profile: {error}")
+    })?;
+    LcmsProfile::new_icc(&icc_profile).map_err(|error| {
+        format!("Source embedded ICC profile could not be opened by LittleCMS: {error}")
+    })?;
+
+    Ok(EmbeddedSourceIccProfile {
+        sha256: format!("sha256:{}", hex::encode(Sha256::digest(&icc_profile))),
+        bytes: icc_profile,
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -627,6 +700,12 @@ struct EncodedExportImage {
     color_policy: Option<ExportReceiptMetadata>,
 }
 
+#[derive(Debug)]
+struct EmbeddedSourceIccProfile {
+    bytes: Vec<u8>,
+    sha256: String,
+}
+
 fn encode_image_to_bytes(
     image: &DynamicImage,
     output_format: &str,
@@ -652,6 +731,26 @@ fn encode_image_with_applied_policy(
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
     black_point_compensation: bool,
+) -> Result<EncodedExportImage, String> {
+    encode_image_with_applied_policy_and_source_profile(
+        image,
+        output_format,
+        jpeg_quality,
+        color_profile,
+        rendering_intent,
+        black_point_compensation,
+        None,
+    )
+}
+
+fn encode_image_with_applied_policy_and_source_profile(
+    image: &DynamicImage,
+    output_format: &str,
+    jpeg_quality: u8,
+    color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
+    black_point_compensation: bool,
+    source_embedded_icc: Option<&EmbeddedSourceIccProfile>,
 ) -> Result<EncodedExportImage, String> {
     validate_export_color_policy(output_format, color_profile)?;
     let normalized_format = output_format.to_lowercase();
@@ -715,6 +814,7 @@ fn encode_image_with_applied_policy(
                     color_profile,
                     rendering_intent,
                     black_point_compensation,
+                    source_embedded_icc,
                 )?,
                 color_policy: export_receipt_metadata(
                     &normalized_format,
@@ -722,6 +822,7 @@ fn encode_image_with_applied_policy(
                     rendering_intent,
                     black_point_compensation,
                     &export_source_precision_receipt_label(image),
+                    source_embedded_icc.map(|profile| profile.sha256.clone()),
                 ),
             });
         }
@@ -743,6 +844,7 @@ fn encode_image_with_applied_policy(
                     color_profile,
                     rendering_intent,
                     black_point_compensation,
+                    source_embedded_icc,
                 )?,
                 color_policy: export_receipt_metadata(
                     &normalized_format,
@@ -750,6 +852,7 @@ fn encode_image_with_applied_policy(
                     rendering_intent,
                     black_point_compensation,
                     &export_source_precision_receipt_label(image),
+                    source_embedded_icc.map(|profile| profile.sha256.clone()),
                 ),
             });
         }
@@ -771,14 +874,25 @@ fn encode_tiff16_to_bytes(
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
     black_point_compensation: bool,
+    source_embedded_icc: Option<&EmbeddedSourceIccProfile>,
 ) -> Result<Vec<u8>, String> {
-    let (pixels, width, height, output_profile) = export_rgb16_pixels_and_profile(
-        image,
-        color_profile,
-        rendering_intent,
-        black_point_compensation,
-    )?;
-    let icc_profile = encode_icc_profile(&output_profile)?;
+    let (pixels, width, height, icc_profile) =
+        if matches!(color_profile, ExportColorProfile::SourceEmbedded) {
+            let (pixels, width, height) =
+                export_source_rgb16_pixels(image, color_profile, rendering_intent);
+            let source_icc = source_embedded_icc.ok_or_else(|| {
+                "Source embedded export profile requires a source ICC profile.".to_string()
+            })?;
+            (pixels, width, height, source_icc.bytes.clone())
+        } else {
+            let (pixels, width, height, output_profile) = export_rgb16_pixels_and_profile(
+                image,
+                color_profile,
+                rendering_intent,
+                black_point_compensation,
+            )?;
+            (pixels, width, height, encode_icc_profile(&output_profile)?)
+        };
     let mut image_bytes = Vec::new();
     let mut cursor = Cursor::new(&mut image_bytes);
     let mut encoder = TiffEncoder::new(&mut cursor);
@@ -914,14 +1028,35 @@ fn encode_jpeg_to_bytes(
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
     black_point_compensation: bool,
+    source_embedded_icc: Option<&EmbeddedSourceIccProfile>,
 ) -> Result<Vec<u8>, String> {
-    let (rgb_pixels, width, height, output_profile) = export_jpeg_rgb_pixels_and_profile(
-        image,
-        color_profile,
-        rendering_intent,
-        black_point_compensation,
-    )?;
-    let icc_profile = encode_icc_profile(&output_profile)?;
+    let (rgb_pixels, width, height, icc_profile) =
+        if matches!(color_profile, ExportColorProfile::SourceEmbedded) {
+            let (rgb16_pixels, width, height) =
+                export_source_rgb16_pixels(image, color_profile, rendering_intent);
+            let source_icc = source_embedded_icc.ok_or_else(|| {
+                "Source embedded export profile requires a source ICC profile.".to_string()
+            })?;
+            (
+                quantize_rgb16_to_rgb8(&rgb16_pixels),
+                width,
+                height,
+                source_icc.bytes.clone(),
+            )
+        } else {
+            let (rgb_pixels, width, height, output_profile) = export_jpeg_rgb_pixels_and_profile(
+                image,
+                color_profile,
+                rendering_intent,
+                black_point_compensation,
+            )?;
+            (
+                rgb_pixels,
+                width,
+                height,
+                encode_icc_profile(&output_profile)?,
+            )
+        };
 
     MozJpegEncoder::new(Preset::BaselineBalanced)
         .quality(jpeg_quality.clamp(1, 100))
@@ -1085,8 +1220,13 @@ fn resolve_export_color_transform_plan(
     let supports_color_managed_profile =
         supports_color_managed_receipt_metadata(&requested.output_format);
 
-    if matches!(color_profile, ExportColorProfile::SourceEmbedded) {
-        return Err("Source embedded export profile is not implemented yet.".to_string());
+    if matches!(color_profile, ExportColorProfile::SourceEmbedded)
+        && !supports_color_managed_profile
+    {
+        return Err(format!(
+            "Source embedded export profile is only supported for JPEG and TIFF, not {}.",
+            output_format
+        ));
     }
 
     if export_color_profile_requires_transform(color_profile) && !supports_color_managed_profile {
@@ -1172,6 +1312,7 @@ pub(crate) fn resolve_export_color_capabilities() -> ExportColorCapabilityCatalo
         ExportColorProfile::DisplayP3,
         ExportColorProfile::AdobeRgb1998,
         ExportColorProfile::ProPhotoRgb,
+        ExportColorProfile::SourceEmbedded,
     ]
     .into_iter()
     .map(|color_profile| ExportColorCapability {
@@ -1180,9 +1321,13 @@ pub(crate) fn resolve_export_color_capabilities() -> ExportColorCapabilityCatalo
         } else {
             ExportBlackPointCompensationStatus::Unsupported
         },
+        rendering_intents: if matches!(color_profile, ExportColorProfile::SourceEmbedded) {
+            vec![ExportRenderingIntent::RelativeColorimetric]
+        } else {
+            moxcms_export_rendering_intents()
+        },
         color_profile,
         engine: ExportColorEngineId::Moxcms,
-        rendering_intents: moxcms_export_rendering_intents(),
         runtime_support_notes: runtime_support_notes.clone(),
     })
     .collect();
@@ -1832,6 +1977,9 @@ fn export_receipt_output(
             .as_ref()
             .map(|metadata| metadata.effective_rendering_intent.clone()),
         source_path: source_path.to_string(),
+        source_icc_profile_hash: metadata
+            .as_ref()
+            .and_then(|metadata| metadata.source_icc_profile_hash.clone()),
         source_precision_path: metadata
             .as_ref()
             .map(|metadata| metadata.source_precision_path.clone()),
@@ -1855,6 +2003,7 @@ pub(crate) struct ExportReceiptMetadata {
     requested_rendering_intent: String,
     resolved_disabled_reason: Option<String>,
     effective_rendering_intent: String,
+    source_icc_profile_hash: Option<String>,
     source_precision_path: String,
     transform_applied: bool,
 }
@@ -1865,6 +2014,7 @@ fn export_receipt_metadata(
     rendering_intent: &ExportRenderingIntent,
     black_point_compensation: bool,
     source_precision_path: &str,
+    source_icc_profile_hash: Option<String>,
 ) -> Option<ExportReceiptMetadata> {
     if !supports_color_managed_receipt_metadata(format) {
         return None;
@@ -1902,6 +2052,7 @@ fn export_receipt_metadata(
         ),
         resolved_disabled_reason: applied.plan.disabled_reason,
         effective_rendering_intent: rendering_intent_label,
+        source_icc_profile_hash,
         source_precision_path: applied.source_precision_path,
         transform_applied: applied.plan.transform_applied,
     })
@@ -1942,6 +2093,9 @@ fn export_color_transform_receipt_label(
     }
 
     if !export_color_profile_requires_transform(color_profile) {
+        if matches!(color_profile, ExportColorProfile::SourceEmbedded) {
+            return "Source embedded profile passthrough; ICC embedded".to_string();
+        }
         return "sRGB identity output; ICC embedded".to_string();
     }
 
@@ -2309,18 +2463,21 @@ pub async fn estimate_export_sizes(
 #[cfg(test)]
 mod tests {
     use super::{
-        ExportBlackPointCompensationStatus, ExportColorEngineId, ExportColorProfile,
-        ExportRenderingIntent, ExportSettings, OutputSharpeningSettings, OutputSharpeningTarget,
-        applied_export_color_policy, apply_export_resize_and_watermark, encode_icc_profile,
-        encode_image_to_bytes, encode_image_with_applied_policy,
-        export_color_profile_receipt_label, export_jpeg_rgb_pixels_and_profile,
-        export_receipt_metadata, export_rgb_pixels_and_profile, export_rgb16_pixels_and_profile,
-        export_rgb16_pixels_with_shared_conversion_core, export_soft_proof_rgb_pixels_and_profile,
-        export_source_precision_receipt_label, export_transform_options, mox_rendering_intent,
-        quantize_rgb16_to_rgb8, resolve_export_color_capabilities,
-        resolve_export_color_transform_plan, should_apply_srgb_perceptual_gamut_mapping,
+        EmbeddedSourceIccProfile, ExportBlackPointCompensationStatus, ExportColorEngineId,
+        ExportColorProfile, ExportRenderingIntent, ExportSettings, OutputSharpeningSettings,
+        OutputSharpeningTarget, applied_export_color_policy, apply_export_resize_and_watermark,
+        encode_icc_profile, encode_image_to_bytes, encode_image_with_applied_policy,
+        encode_image_with_applied_policy_and_source_profile, export_color_profile_receipt_label,
+        export_jpeg_rgb_pixels_and_profile, export_receipt_metadata, export_rgb_pixels_and_profile,
+        export_rgb16_pixels_and_profile, export_rgb16_pixels_with_shared_conversion_core,
+        export_soft_proof_rgb_pixels_and_profile, export_source_precision_receipt_label,
+        export_transform_options, mox_rendering_intent, quantize_rgb16_to_rgb8,
+        resolve_export_color_capabilities, resolve_export_color_transform_plan,
+        should_apply_srgb_perceptual_gamut_mapping,
     };
     use crate::gamut_mapping::SRGB_OKLAB_CHROMA_REDUCE_V1;
+    use moxcms::ColorProfile;
+    use sha2::{Digest, Sha256};
     use std::io::Cursor;
 
     use image::{
@@ -2470,7 +2627,7 @@ mod tests {
     fn export_color_capability_resolver_reports_color_engine_limits() {
         let catalog = resolve_export_color_capabilities();
         assert_eq!(catalog.schema_version, 1);
-        assert_eq!(catalog.capabilities.len(), 4);
+        assert_eq!(catalog.capabilities.len(), 5);
 
         for capability in &catalog.capabilities {
             assert!(matches!(capability.engine, ExportColorEngineId::Moxcms));
@@ -2510,6 +2667,17 @@ mod tests {
                 ExportColorProfile::DisplayP3
             ))
         );
+        let source_embedded = catalog
+            .capabilities
+            .iter()
+            .find(|capability| {
+                matches!(capability.color_profile, ExportColorProfile::SourceEmbedded)
+            })
+            .expect("source embedded capability should be advertised");
+        assert_eq!(
+            source_embedded.rendering_intents,
+            vec![ExportRenderingIntent::RelativeColorimetric]
+        );
     }
 
     #[test]
@@ -2521,6 +2689,7 @@ mod tests {
             &settings.rendering_intent,
             false,
             &synthetic_source_precision_path(),
+            None,
         )
         .expect("TIFF receipt metadata should be available");
 
@@ -2558,6 +2727,7 @@ mod tests {
             &ExportRenderingIntent::Perceptual,
             false,
             &synthetic_source_precision_path(),
+            None,
         )
         .expect("TIFF receipt metadata should be available");
 
@@ -2579,6 +2749,7 @@ mod tests {
             &settings.rendering_intent,
             false,
             &synthetic_source_precision_path(),
+            None,
         )
         .expect("JPEG receipt metadata should be available");
 
@@ -2751,6 +2922,7 @@ mod tests {
             &ExportRenderingIntent::Saturation,
             true,
             &synthetic_source_precision_path(),
+            None,
         )
         .expect("JPEG receipt metadata should be available");
 
@@ -3122,6 +3294,7 @@ mod tests {
                 &ExportRenderingIntent::RelativeColorimetric,
                 false,
                 &export_source_precision_receipt_label(&image),
+                None,
             )
             .expect("wide-gamut export should emit receipt metadata");
 
@@ -3144,21 +3317,92 @@ mod tests {
     }
 
     #[test]
-    fn source_embedded_export_profile_is_rejected_instead_of_falling_back_to_srgb() {
+    fn source_embedded_export_profile_requires_embedded_icc_context() {
         let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(1, 1, Rgb([128, 64, 32])));
-        let error = encode_image_to_bytes(
+        let error = encode_image_with_applied_policy(
             &image,
             "jpg",
             90,
             &ExportColorProfile::SourceEmbedded,
             &ExportRenderingIntent::RelativeColorimetric,
+            false,
         )
         .expect_err("source embedded profile should not silently export as sRGB");
 
         assert!(
-            error.contains("not implemented yet"),
+            error.contains("requires a source ICC profile"),
             "unexpected source-embedded profile error: {error}"
         );
+    }
+
+    #[test]
+    fn source_embedded_jpeg_export_embeds_source_icc_and_receipt_hash() {
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(1, 1, Rgb([128, 64, 32])));
+        let source_icc =
+            encode_icc_profile(&ColorProfile::new_display_p3()).expect("source ICC should encode");
+        let source_icc_hash = format!("sha256:{}", hex::encode(Sha256::digest(&source_icc)));
+        let source_profile = EmbeddedSourceIccProfile {
+            bytes: source_icc.clone(),
+            sha256: source_icc_hash.clone(),
+        };
+
+        let encoded = encode_image_with_applied_policy_and_source_profile(
+            &image,
+            "jpg",
+            90,
+            &ExportColorProfile::SourceEmbedded,
+            &ExportRenderingIntent::RelativeColorimetric,
+            false,
+            Some(&source_profile),
+        )
+        .expect("source embedded JPEG should encode with source ICC");
+        let metadata = encoded
+            .color_policy
+            .expect("source embedded JPEG should emit receipt metadata");
+
+        assert_eq!(
+            &single_icc_payload(&encoded.bytes)[b"ICC_PROFILE\0\x01\x01".len()..],
+            source_icc.as_slice()
+        );
+        assert_eq!(metadata.color_profile, "Source embedded");
+        assert_eq!(
+            metadata.color_managed_transform,
+            "Source embedded profile passthrough; ICC embedded"
+        );
+        assert_eq!(
+            metadata.source_icc_profile_hash.as_deref(),
+            Some(source_icc_hash.as_str())
+        );
+        assert!(!metadata.transform_applied);
+    }
+
+    #[test]
+    fn source_embedded_tiff_export_embeds_source_icc() {
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(1, 1, Rgb([128, 64, 32])));
+        let source_icc =
+            encode_icc_profile(&ColorProfile::new_adobe_rgb()).expect("source ICC should encode");
+        let source_profile = EmbeddedSourceIccProfile {
+            sha256: format!("sha256:{}", hex::encode(Sha256::digest(&source_icc))),
+            bytes: source_icc.clone(),
+        };
+
+        let encoded = encode_image_with_applied_policy_and_source_profile(
+            &image,
+            "tiff",
+            90,
+            &ExportColorProfile::SourceEmbedded,
+            &ExportRenderingIntent::RelativeColorimetric,
+            false,
+            Some(&source_profile),
+        )
+        .expect("source embedded TIFF should encode with source ICC");
+        let mut decoder = tiff_decoder(&encoded.bytes);
+        let embedded_icc = decoder
+            .icc_profile()
+            .expect("TIFF ICC should read")
+            .expect("TIFF ICC should be present");
+
+        assert_eq!(embedded_icc, source_icc);
     }
 
     #[test]

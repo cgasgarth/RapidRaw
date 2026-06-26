@@ -50,14 +50,15 @@ const MOXCMS_SUPPORTED_PROFILES: Array<ExportColorCapabilityV1['colorProfile']> 
   'displayP3',
   'adobeRgb1998',
   'proPhotoRgb',
+  'sourceEmbedded',
 ];
 
 export const MOXCMS_EXPORT_COLOR_CAPABILITIES_V1 = exportColorCapabilityCatalogV1Schema.parse({
   capabilities: MOXCMS_SUPPORTED_PROFILES.map((colorProfile) => ({
-    blackPointCompensation: colorProfile === 'srgb' ? 'unsupported' : 'supported',
+    blackPointCompensation: colorProfile === 'srgb' || colorProfile === 'sourceEmbedded' ? 'unsupported' : 'supported',
     colorProfile,
     engine: 'moxcms',
-    renderingIntents: COLOR_MANAGED_RENDERING_INTENTS,
+    renderingIntents: colorProfile === 'sourceEmbedded' ? ['relativeColorimetric'] : COLOR_MANAGED_RENDERING_INTENTS,
     runtimeSupportNotes: [
       'Rendering intent is passed to moxcms transform options.',
       'LittleCMS enables black-point compensation for JPEG/TIFF relative colorimetric wide-gamut exports.',

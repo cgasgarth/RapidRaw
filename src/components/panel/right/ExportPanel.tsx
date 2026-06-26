@@ -1538,6 +1538,7 @@ export default function ExportPanel({
             data-export-receipt-requested-rendering-intent={firstReceiptOutput.requestedRenderingIntent ?? ''}
             data-export-receipt-resolved-disabled-reason={firstReceiptOutput.resolvedDisabledReason ?? ''}
             data-export-receipt-effective-rendering-intent={firstReceiptOutput.effectiveRenderingIntent ?? ''}
+            data-export-receipt-source-icc-profile-hash={firstReceiptOutput.sourceIccProfileHash ?? ''}
             data-export-receipt-source-precision-path={firstReceiptOutput.sourcePrecisionPath ?? ''}
             data-export-receipt-total={lastReceipt.total}
             data-export-receipt-transform-applied={String(firstReceiptOutput.transformApplied ?? '')}

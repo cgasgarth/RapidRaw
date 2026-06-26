@@ -122,6 +122,7 @@ export interface ExportReceiptOutput {
   resolvedDisabledReason?: string | null | undefined;
   effectiveRenderingIntent?: string | null | undefined;
   sourcePath: string;
+  sourceIccProfileHash?: string | null | undefined;
   sourcePrecisionPath?: string | null | undefined;
   transformApplied?: boolean | null | undefined;
 }
