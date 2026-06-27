@@ -19,12 +19,8 @@ import RightPanelSwitcher from '../panel/right/RightPanelSwitcher';
 import { type ImageFile, Orientation, Panel, type ThumbnailAspectRatio } from '../ui/AppProperties';
 import Resizer from '../ui/Resizer';
 
-import type {
-  KeyboardEvent as ReactKeyboardEvent,
-  MouseEvent,
-  RefObject,
-  PointerEvent as ReactPointerEvent,
-} from 'react';
+import type { CreateResizeHandler } from '../../hooks/usePanelResize';
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent, RefObject } from 'react';
 
 const AIPanel = lazy(() => import('../panel/right/AIPanel.js').then((module) => ({ default: module.AIPanel })));
 const MasksPanel = lazy(() =>
@@ -70,7 +66,7 @@ interface EditorViewProps {
   compactEditorPanelCollapsedHeight: number;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   sortedImageList: ImageFile[];
-  createResizeHandler: (stateKey: string, startSize: number) => (e: ReactPointerEvent<HTMLDivElement>) => void;
+  createResizeHandler: CreateResizeHandler;
   handleBackToLibrary: () => void;
   handleEditorContextMenu: (event: MouseEvent<HTMLElement>) => void;
   handleThumbnailContextMenu: (event: MouseEvent<HTMLElement>, path: string) => void;

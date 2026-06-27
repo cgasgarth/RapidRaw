@@ -2,7 +2,7 @@ import { ClerkProvider } from '@clerk/react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import cx from 'clsx';
-import { type PointerEvent as ReactPointerEvent, useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ToastContainer, toast, Slide } from 'react-toastify';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -34,6 +34,7 @@ import { useEditorActions } from './hooks/useEditorActions';
 import { useFileOperations } from './hooks/useFileOperations';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useLibraryActions } from './hooks/useLibraryActions';
+import { usePanelResize } from './hooks/usePanelResize';
 import { useProductivityActions } from './hooks/useProductivityActions';
 import { useSortedLibrary } from './hooks/useSortedLibrary';
 import { useTauriListeners } from './hooks/useTauriListeners';
@@ -281,6 +282,39 @@ function App() {
     Math.min(compactEditorPanelHeightOverride ?? compactEditorPanelDefaultHeight, compactEditorPanelMaxHeight),
   );
   const compactEditorPanelCollapsedHeight = 96;
+  const handleLeftPanelWidthChange = useCallback(
+    (width: number) => {
+      setUI({ leftPanelWidth: width });
+    },
+    [setUI],
+  );
+  const handleRightPanelWidthChange = useCallback(
+    (width: number) => {
+      setUI({ rightPanelWidth: width });
+    },
+    [setUI],
+  );
+  const handleBottomPanelHeightChange = useCallback(
+    (height: number) => {
+      setUI({ bottomPanelHeight: height });
+    },
+    [setUI],
+  );
+  const handleCompactEditorPanelHeightOverrideChange = useCallback(
+    (height: number) => {
+      setUI({ compactEditorPanelHeightOverride: height });
+    },
+    [setUI],
+  );
+  const createResizeHandler = usePanelResize({
+    compactEditorPanelMaxHeight,
+    compactEditorPanelMinHeight,
+    onBottomPanelHeightChange: handleBottomPanelHeightChange,
+    onCompactEditorPanelHeightOverrideChange: handleCompactEditorPanelHeightOverrideChange,
+    onLeftPanelWidthChange: handleLeftPanelWidthChange,
+    onResizingChange: setIsResizing,
+    onRightPanelWidthChange: handleRightPanelWidthChange,
+  });
 
   const { handleCopyAdjustments, handlePasteAdjustments, handleResetAdjustments, handleZoomChange } =
     useEditorActions();
@@ -554,69 +588,6 @@ function App() {
         });
     };
   }, [setEditor]);
-
-  const createResizeHandler = (stateKey: string, startSize: number) => (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    setIsResizing(true);
-
-    const pointerId = e.pointerId;
-    const target = e.currentTarget;
-    const startX = e.clientX;
-    const startY = e.clientY;
-
-    const previousTouchAction = document.documentElement.style.touchAction;
-    const previousUserSelect = document.documentElement.style.userSelect;
-
-    target.setPointerCapture(pointerId);
-    document.documentElement.style.touchAction = 'none';
-    document.documentElement.style.userSelect = 'none';
-
-    const doDrag = (moveEvent: PointerEvent) => {
-      if (moveEvent.pointerId !== pointerId) return;
-      moveEvent.preventDefault();
-
-      if (stateKey === 'left') {
-        setUI({ leftPanelWidth: Math.round(Math.max(200, Math.min(startSize + (moveEvent.clientX - startX), 500))) });
-      } else if (stateKey === 'right') {
-        setUI({ rightPanelWidth: Math.round(Math.max(280, Math.min(startSize - (moveEvent.clientX - startX), 600))) });
-      } else if (stateKey === 'bottom') {
-        setUI({
-          bottomPanelHeight: Math.round(Math.max(100, Math.min(startSize - (moveEvent.clientY - startY), 400))),
-        });
-      } else if (stateKey === 'compact') {
-        setUI({
-          compactEditorPanelHeightOverride: Math.round(
-            Math.max(
-              compactEditorPanelMinHeight,
-              Math.min(startSize - (moveEvent.clientY - startY), compactEditorPanelMaxHeight),
-            ),
-          ),
-        });
-      }
-    };
-
-    const stopDrag = (upEvent: PointerEvent) => {
-      if (upEvent.pointerId !== pointerId) return;
-      if (target.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId);
-
-      document.documentElement.style.cursor = '';
-      document.documentElement.style.touchAction = previousTouchAction;
-      document.documentElement.style.userSelect = previousUserSelect;
-
-      window.removeEventListener('pointermove', doDrag);
-      window.removeEventListener('pointerup', stopDrag);
-      window.removeEventListener('pointercancel', stopDrag);
-      setIsResizing(false);
-    };
-    document.documentElement.style.cursor =
-      stateKey === 'bottom' || stateKey === 'compact' ? 'row-resize' : 'col-resize';
-
-    window.addEventListener('pointermove', doDrag, { passive: false });
-    window.addEventListener('pointerup', stopDrag);
-    window.addEventListener('pointercancel', stopDrag);
-  };
 
   useEffect(() => {
     const appWindow = getOptionalCurrentWindow();
