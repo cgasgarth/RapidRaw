@@ -28,9 +28,8 @@ use tauri::Manager;
 
 use crate::AppState;
 use crate::exif_processing;
-use crate::file_management::{
-    generate_filename_from_template, parse_virtual_path, read_file_mapped,
-};
+use crate::export_output_targets::{ExportOutputTargetRequest, resolve_export_output_target};
+use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
 use crate::gamut_mapping::{
     SRGB_OKLAB_CHROMA_REDUCE_V1, map_srgb_oklab_chroma_reduce_rgb16_pixels,
@@ -1704,8 +1703,26 @@ pub async fn export_images(
                 }
 
                 let state = app_handle_clone.state::<AppState>();
-                let (source_path, sidecar_path) = parse_virtual_path(&image_path_str);
-                let source_path_str = source_path.to_string_lossy().to_string();
+                let filename_template = export_settings
+                    .filename_template
+                    .as_deref()
+                    .unwrap_or("{original_filename}_edited");
+                let target = resolve_export_output_target(ExportOutputTargetRequest {
+                    image_path: &image_path_str,
+                    output_folder_path: &output_folder_path,
+                    is_explicit_file_path,
+                    base_origin_folders: &base_origin_folders,
+                    filename_template,
+                    preserve_folders: export_settings.preserve_folders,
+                    output_format: &output_format,
+                    total_paths,
+                    global_index,
+                    appearance_count,
+                    explicit_virtual_copy: explicit_vc,
+                });
+                let sidecar_path = target.sidecar_path;
+                let source_path_str = target.source_path_str;
+                let output_path = target.output_path;
                 let is_current_edit = Some(&source_path_str) == current_edit_path.as_ref();
 
                 let mut js_adjustments = match (is_current_edit, current_edit_adjustments) {
@@ -1720,65 +1737,6 @@ pub async fn export_images(
                 let effective_settings =
                     raw_processing_settings_for_adjustments(&settings, &js_adjustments);
                 let is_raw = is_raw_file(&source_path_str);
-                let original_path = std::path::Path::new(&source_path_str);
-                let file_date = exif_processing::get_creation_date_from_path(original_path);
-
-                let filename_template = export_settings
-                    .filename_template
-                    .as_deref()
-                    .unwrap_or("{original_filename}_edited");
-
-                let mut new_stem = generate_filename_from_template(
-                    filename_template,
-                    original_path,
-                    global_index + 1,
-                    total_paths,
-                    &file_date,
-                );
-
-                if let Some(vc_id) = explicit_vc {
-                    new_stem = format!("{}_VC{:02}", new_stem, vc_id);
-                } else if appearance_count > 1 {
-                    new_stem = format!("{}_VC{:02}", new_stem, appearance_count - 1);
-                }
-
-                let new_filename = format!("{}.{}", new_stem, output_format);
-                let output_path = if is_explicit_file_path && total_paths == 1 {
-                    output_folder_path
-                } else if export_settings.preserve_folders {
-                    let matched_base = base_origin_folders
-                        .iter()
-                        .map(std::path::Path::new)
-                        .find(|b| source_path.starts_with(b));
-                    if let Some(base_origin) = matched_base {
-                        if let Ok(rel_path) = source_path.strip_prefix(base_origin) {
-                            let rel_dir = rel_path
-                                .parent()
-                                .unwrap_or_else(|| std::path::Path::new(""));
-                            let rel_dir_is_safe = rel_dir.components().all(|component| {
-                                matches!(
-                                    component,
-                                    std::path::Component::Normal(_) | std::path::Component::CurDir
-                                )
-                            });
-                            if rel_dir_is_safe {
-                                let full_dir = output_folder_path.join(rel_dir);
-                                if let Err(e) = std::fs::create_dir_all(&full_dir) {
-                                    log::warn!("Failed to create export subdirectory: {}", e);
-                                }
-                                full_dir.join(&new_filename)
-                            } else {
-                                output_folder_path.join(&new_filename)
-                            }
-                        } else {
-                            output_folder_path.join(&new_filename)
-                        }
-                    } else {
-                        output_folder_path.join(&new_filename)
-                    }
-                } else {
-                    output_folder_path.join(&new_filename)
-                };
 
                 let extension = output_format.to_lowercase();
 
