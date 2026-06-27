@@ -52,6 +52,15 @@ pub struct AiObjectMaskProposal {
     pub click_to_mask_latency_ms: f64,
 }
 
+struct SamPromptGeometry {
+    rotation: f32,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+    orientation_steps: u8,
+    image_width: u32,
+    image_height: u32,
+}
+
 fn sam_path_hash(path: &str, js_adjustments: &Value) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(path.as_bytes());
@@ -69,17 +78,12 @@ fn sam_path_hash(path: &str, js_adjustments: &Value) -> String {
 fn unwarp_sam_prompt(
     start_point: (f64, f64),
     end_point: (f64, f64),
-    rotation: f32,
-    flip_horizontal: bool,
-    flip_vertical: bool,
-    orientation_steps: u8,
-    image_width: u32,
-    image_height: u32,
+    geometry: &SamPromptGeometry,
 ) -> ((f64, f64), (f64, f64)) {
-    let (coarse_rotated_w, coarse_rotated_h) = if orientation_steps % 2 == 1 {
-        (image_height as f64, image_width as f64)
+    let (coarse_rotated_w, coarse_rotated_h) = if geometry.orientation_steps % 2 == 1 {
+        (geometry.image_height as f64, geometry.image_width as f64)
     } else {
-        (image_width as f64, image_height as f64)
+        (geometry.image_width as f64, geometry.image_height as f64)
     };
 
     let center = (coarse_rotated_w / 2.0, coarse_rotated_h / 2.0);
@@ -88,7 +92,7 @@ fn unwarp_sam_prompt(
     let p3 = end_point;
     let p4 = (end_point.0, start_point.1);
 
-    let angle_rad = (rotation as f64).to_radians();
+    let angle_rad = (geometry.rotation as f64).to_radians();
     let cos_a = angle_rad.cos();
     let sin_a = angle_rad.sin();
 
@@ -103,21 +107,24 @@ fn unwarp_sam_prompt(
     let unflip = |p: (f64, f64)| {
         let mut new_px = p.0;
         let mut new_py = p.1;
-        if flip_horizontal {
+        if geometry.flip_horizontal {
             new_px = coarse_rotated_w - p.0;
         }
-        if flip_vertical {
+        if geometry.flip_vertical {
             new_py = coarse_rotated_h - p.1;
         }
         (new_px, new_py)
     };
 
     let un_coarse_rotate = |p: (f64, f64)| -> (f64, f64) {
-        match orientation_steps {
+        match geometry.orientation_steps {
             0 => p,
-            1 => (p.1, image_height as f64 - p.0),
-            2 => (image_width as f64 - p.0, image_height as f64 - p.1),
-            3 => (image_width as f64 - p.1, p.0),
+            1 => (p.1, geometry.image_height as f64 - p.0),
+            2 => (
+                geometry.image_width as f64 - p.0,
+                geometry.image_height as f64 - p.1,
+            ),
+            3 => (geometry.image_width as f64 - p.1, p.0),
             _ => p,
         }
     };
@@ -399,12 +406,14 @@ pub async fn generate_ai_subject_mask(
     let (unrotated_start_point, unrotated_end_point) = unwarp_sam_prompt(
         start_point,
         end_point,
-        rotation,
-        flip_horizontal,
-        flip_vertical,
-        orientation_steps,
-        img_w,
-        img_h,
+        &SamPromptGeometry {
+            rotation,
+            flip_horizontal,
+            flip_vertical,
+            orientation_steps,
+            image_width: img_w,
+            image_height: img_h,
+        },
     );
 
     let mask_bitmap = run_sam_decoder(
@@ -454,12 +463,14 @@ pub async fn generate_ai_object_mask_proposal(
     let (unrotated_start_point, unrotated_end_point) = unwarp_sam_prompt(
         start_point,
         end_point,
-        rotation,
-        flip_horizontal,
-        flip_vertical,
-        orientation_steps,
-        image_width,
-        image_height,
+        &SamPromptGeometry {
+            rotation,
+            flip_horizontal,
+            flip_vertical,
+            orientation_steps,
+            image_width,
+            image_height,
+        },
     );
 
     let decoder_start = Instant::now();
