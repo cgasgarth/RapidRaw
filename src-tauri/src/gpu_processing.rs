@@ -13,6 +13,7 @@ use wgpu::util::{DeviceExt, TextureDataOrder};
 use crate::display_profile::build_srgb_to_active_display_lut;
 use crate::image_processing::{AllAdjustments, GpuContext, MAX_MASKS};
 use crate::lut_processing::Lut;
+use crate::render_caches::RenderCaches;
 use crate::{AppState, GpuImageCache};
 
 const GPU_OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
@@ -1927,15 +1928,9 @@ fn process_and_get_dynamic_image_inner(
         }
     }
 
-    let mut cache_lock = state.gpu_image_cache.lock().unwrap();
-    if let Some(cache) = &*cache_lock
-        && (cache.transform_hash != transform_hash
-            || cache.width != width
-            || cache.height != height)
-    {
-        *cache_lock = None;
-    }
+    RenderCaches::new(state).clear_stale_gpu_image_cache(transform_hash, width, height);
 
+    let mut cache_lock = state.gpu_image_cache.lock().unwrap();
     if cache_lock.is_none() {
         let img_rgba_f16 = to_rgba_f16(base_image);
         let texture_size = wgpu::Extent3d {

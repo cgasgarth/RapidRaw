@@ -7,6 +7,7 @@ use serde_json::Value;
 use tauri::{AppHandle, Manager};
 
 use crate::app_state::AppState;
+use crate::render_caches::RenderCaches;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -660,10 +661,6 @@ pub fn save_settings(settings: AppSettings, app_handle: AppHandle) -> Result<(),
 
     let state = app_handle.state::<AppState>();
     let cache_size = settings.image_cache_size.unwrap_or(5) as usize;
-    state
-        .decoded_image_cache
-        .lock()
-        .unwrap()
-        .set_capacity(cache_size);
+    RenderCaches::new(state.inner()).set_decoded_image_cache_capacity(cache_size);
     Ok(())
 }
