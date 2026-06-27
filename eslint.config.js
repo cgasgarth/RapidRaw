@@ -171,6 +171,7 @@ module.exports = [
         boundaryElement('hooks', 'src/hooks/**'),
         boundaryElement('schemas', 'src/schemas/**'),
         boundaryElement('store', 'src/store/**'),
+        boundaryElement('tauri', 'src/tauri/**'),
         boundaryElement('types', 'src/types/**'),
         boundaryElement('declarations', 'src/@types/**'),
         boundaryElement('utils', 'src/utils/**'),

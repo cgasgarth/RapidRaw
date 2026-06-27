@@ -6,7 +6,6 @@ import { toast } from 'react-toastify';
 
 import { debouncedSave, debouncedSetHistory } from './useEditorActions';
 import {
-  Invokes,
   LibraryViewMode,
   type Album,
   type AlbumItem,
@@ -18,6 +17,7 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
+import { Invokes } from '../tauri/commands';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { formatUnknownError } from '../utils/errorFormatting';
 import { globalImageCache, type ImageCacheEntry } from '../utils/ImageLRUCache';

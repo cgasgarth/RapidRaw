@@ -20,13 +20,13 @@ import {
   type TetherSessionOpenRequest,
   type TetherSessionResponse,
 } from '../../../schemas/tetheringSchemas';
+import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants } from '../../../types/typography';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import {
   buildTetherIngestProofReceipt,
   buildTetherRecoveryProofReceipt,
 } from '../../../utils/tetherIngestProofReceipt';
-import { Invokes } from '../../ui/AppProperties';
 import Button from '../../ui/Button';
 import UiText from '../../ui/Text';
 

@@ -5,9 +5,9 @@ import { toast } from 'react-toastify';
 
 import { useEditorActions } from './useEditorActions';
 import { Mask, type SubMask } from '../components/panel/right/Masks';
-import { Invokes } from '../components/ui/AppProperties';
 import { parseAiPatchDataJson } from '../schemas/aiMaskingSchemas';
 import { useEditorStore } from '../store/useEditorStore';
+import { Invokes } from '../tauri/commands';
 import { formatUnknownError } from '../utils/errorFormatting';
 import { mergeMaskParameters } from '../utils/maskParameterAccess';
 

@@ -9,7 +9,7 @@ const toolbarSource = read('src/components/panel/editor/EditorToolbar.tsx');
 const exportPanelSource = read('src/components/panel/right/ExportPanel.tsx');
 const hookSource = read('src/hooks/useImageProcessing.ts');
 const storeSource = read('src/store/useEditorStore.ts');
-const appPropertiesSource = read('src/components/ui/AppProperties.tsx');
+const commandsSource = read('src/tauri/commands.ts');
 const rustLibSource = read('src-tauri/src/lib.rs');
 const rustExportSource = read('src-tauri/src/export_processing.rs');
 const tauriEventSchemasSource = read('src/schemas/tauriEventSchemas.ts');
@@ -59,7 +59,7 @@ for (const marker of [
   'ResolveExportSoftProofTransformMetadata',
   'resolve_export_soft_proof_transform_metadata',
 ]) {
-  if (!appPropertiesSource.includes(marker) && !rustLibSource.includes(marker)) {
+  if (!commandsSource.includes(marker) && !rustLibSource.includes(marker)) {
     failures.push(`soft-proof invoke missing ${marker}`);
   }
 }

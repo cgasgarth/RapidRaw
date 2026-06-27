@@ -23,7 +23,7 @@ const schemaByName = {
 } satisfies Record<TauriBoundaryEntry['zodSchema'], z.ZodType<unknown>>;
 
 const ledger = parseTauriBoundaryLedger(readJson('fixtures/validation/tauri-boundary-ledger.json'));
-const appProperties = readFileSync('src/components/ui/AppProperties.tsx', 'utf8');
+const commandsSource = readFileSync('src/tauri/commands.ts', 'utf8');
 const failures: string[] = [];
 
 const recordFailure = (message: string) => {
@@ -31,7 +31,7 @@ const recordFailure = (message: string) => {
 };
 
 for (const entry of ledger.entries) {
-  if (!appProperties.includes(`${entry.invokeEnumMember} = '${entry.command}'`)) {
+  if (!commandsSource.includes(`${entry.invokeEnumMember} = '${entry.command}'`)) {
     recordFailure(`${entry.command}: Invokes.${entry.invokeEnumMember} mapping missing`);
   }
 

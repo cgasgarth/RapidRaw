@@ -1,4 +1,5 @@
-import { Invokes, LibraryViewMode, Theme, ThumbnailSize, type AppSettings } from '../components/ui/AppProperties.tsx';
+import { LibraryViewMode, Theme, ThumbnailSize, type AppSettings } from '../components/ui/AppProperties.tsx';
+import { Invokes } from '../tauri/commands.ts';
 
 type BrowserTauriInvoke = (command: string, args?: Record<string, unknown>, options?: unknown) => Promise<unknown>;
 type BrowserTauriEventCallback = (event: unknown) => void;
@@ -80,8 +81,8 @@ const commandNames: Record<
   frontendReady: Invokes.FrontendReady,
   generateUncroppedPreview: Invokes.GenerateUncroppedPreview,
   generatePreviewForPath: Invokes.GeneratePreviewForPath,
-  getLensfunMakers: 'get_lensfun_makers',
-  getLogFilePath: 'get_log_file_path',
+  getLensfunMakers: Invokes.GetLensfunMakers,
+  getLogFilePath: Invokes.GetLogFilePath,
   getAlbumImages: Invokes.GetAlbumImages,
   getFolderTree: Invokes.GetFolderTree,
   getPinnedFolderTrees: Invokes.GetPinnedFolderTrees,

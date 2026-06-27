@@ -10,7 +10,7 @@ const fixture = aiMaskCapabilityAuditSchema.parse(
   JSON.parse(readFileSync(resolve('fixtures/masks/ai-mask-capabilities.json'), 'utf8')),
 );
 const masksSource = readFileSync(resolve('src/components/panel/right/Masks.tsx'), 'utf8');
-const invokesSource = readFileSync(resolve('src/components/ui/AppProperties.tsx'), 'utf8');
+const invokesSource = readFileSync(resolve('src/tauri/commands.ts'), 'utf8');
 const rustCommandsSource = readFileSync(resolve('src-tauri/src/ai_commands.rs'), 'utf8');
 const rustRenderSource = readFileSync(resolve('src-tauri/src/mask_generation.rs'), 'utf8');
 

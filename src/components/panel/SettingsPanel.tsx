@@ -45,6 +45,7 @@ import {
 } from '../../schemas/aiProviderSchemas';
 import { cloudUsageSchema, type CloudUsage } from '../../schemas/cloudUsageSchemas';
 import { normalizeKeyboardShortcutMap, parseKeyboardShortcutCombo } from '../../schemas/keyboardShortcutSchemas';
+import { Invokes } from '../../tauri/commands';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import {
   buildCaptureSharpeningProcessingPatch,
@@ -68,7 +69,6 @@ import {
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { type ThemeProps, THEMES } from '../../utils/themes';
 import ConfirmModal from '../modals/ConfirmModal';
-import { type AppSettings, Invokes, type Theme } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import Input from '../ui/Input';
@@ -76,6 +76,7 @@ import Slider from '../ui/Slider';
 import Switch from '../ui/Switch';
 import UiText from '../ui/Text';
 
+import type { AppSettings, Theme } from '../ui/AppProperties';
 import type { TFunction } from 'i18next';
 
 interface ConfirmModalState {

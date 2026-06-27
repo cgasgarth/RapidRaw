@@ -40,9 +40,10 @@ import { useTranslation } from 'react-i18next';
 import { albumTreeSchema } from '../../schemas/albumSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
+import { Invokes } from '../../tauri/commands';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
-import { type AlbumItem, type FolderTreeSort, Invokes, SortDirection } from '../ui/AppProperties';
+import { type AlbumItem, type FolderTreeSort, SortDirection } from '../ui/AppProperties';
 import UiText from '../ui/Text';
 
 export interface FolderTree {

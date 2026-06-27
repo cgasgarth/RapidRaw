@@ -4,7 +4,8 @@ import { z } from 'zod';
 
 import VisualSmokeApp from './VisualSmokeApp';
 import { VISUAL_SMOKE_SCENARIO_IDS } from './visualSmokeScenarios';
-import { Invokes } from '../../components/ui/AppProperties';
+import { Invokes } from '../../tauri/commands';
+
 import '../../i18n';
 import '../../styles.css';
 

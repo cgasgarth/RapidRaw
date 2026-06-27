@@ -4,9 +4,9 @@ import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 
-import { Invokes } from './AppProperties';
 import Slider from './Slider';
 import { useOsPlatform } from '../../hooks/useOsPlatform';
+import { Invokes } from '../../tauri/commands';
 
 interface LUTControlProps {
   lutName: string | null;

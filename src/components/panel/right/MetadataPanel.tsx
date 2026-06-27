@@ -23,11 +23,11 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
+import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { COLOR_LABELS, type Color } from '../../../utils/adjustments';
 import { buildCameraProfileProvenanceReceipt } from '../../../utils/cameraProfileProvenanceReceipt';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
-import { Invokes } from '../../ui/AppProperties';
 import UiText from '../../ui/Text';
 import { IconAperture, IconShutter, IconIso, IconFocalLength, IconLens } from '../editor/ExifIcons';
 

@@ -1,10 +1,12 @@
 import { platform } from '@tauri-apps/plugin-os';
 import { create } from 'zustand';
 
-import { type AppSettings, type SupportedTypes, Invokes, type Theme } from '../components/ui/AppProperties';
 import { emptyTauriResponseSchema } from '../schemas/tauriResponseSchemas';
+import { Invokes } from '../tauri/commands';
 import { invokeWithSchema } from '../utils/tauriSchemaInvoke';
 import { DEFAULT_THEME_ID } from '../utils/themes';
+
+import type { AppSettings, SupportedTypes, Theme } from '../components/ui/AppProperties';
 
 interface SettingsState {
   appSettings: AppSettings | null;

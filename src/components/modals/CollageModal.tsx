@@ -18,17 +18,18 @@ import { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } fr
 import { useTranslation } from 'react-i18next';
 
 import { useModalTransition } from '../../hooks/useModalTransition';
+import { Invokes } from '../../tauri/commands';
 import { TextColors, TextVariants } from '../../types/typography';
 import { createBlobFromUint8Array } from '../../utils/blobUtils';
 import { LAYOUTS, type Layout, type LayoutDefinition } from '../../utils/CollageVariants';
 import { getDisplayFileName } from '../../utils/displayFilePath';
-import { type ImageFile, Invokes } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
 import Switch from '../ui/Switch';
 import UiText from '../ui/Text';
 
 import type { Adjustments } from '../../utils/adjustments';
+import type { ImageFile } from '../ui/AppProperties';
 
 interface CollageModalProps {
   isOpen: boolean;

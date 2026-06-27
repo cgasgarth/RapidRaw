@@ -2,11 +2,11 @@ import { invoke } from '@tauri-apps/api/core';
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
 
-import { Invokes } from '../components/ui/AppProperties';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { Invokes } from '../tauri/commands';
 import {
   type Adjustments,
   INITIAL_ADJUSTMENTS,

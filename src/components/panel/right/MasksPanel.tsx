@@ -77,6 +77,7 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
+import { Invokes } from '../../../tauri/commands';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import {
   type Adjustments,
@@ -126,7 +127,6 @@ import {
   OPTION_SEPARATOR,
   Orientation,
   Theme,
-  Invokes,
   type AppSettings,
   type BrushSettings,
   type Option,

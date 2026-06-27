@@ -28,6 +28,7 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
+import { Invokes } from '../../tauri/commands';
 import { calculateCenteredCrop } from '../../utils/cropUtils';
 import { getEditorPreviewDimensions } from '../../utils/editorPreviewDimensions';
 import { normalizeMaskOverlaySettings } from '../../utils/maskOverlayModes';
@@ -39,7 +40,7 @@ import {
   writeObjectPromptCanvasState,
 } from '../../utils/objectMaskPromptCanvas';
 import { debounce } from '../../utils/timing';
-import { Panel, type TransformState, Invokes } from '../ui/AppProperties';
+import { Panel, type TransformState } from '../ui/AppProperties';
 
 import type { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
 import type { Crop, PercentCrop } from 'react-image-crop';

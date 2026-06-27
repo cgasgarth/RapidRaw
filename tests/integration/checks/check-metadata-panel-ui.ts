@@ -56,7 +56,7 @@ for (const choice of ['external', 'local', 'merge']) {
 }
 
 const source = readFileSync('src/components/panel/right/MetadataPanel.tsx', 'utf8');
-const appPropertiesSource = readFileSync('src/components/ui/AppProperties.tsx', 'utf8');
+const commandsSource = readFileSync('src/tauri/commands.ts', 'utf8');
 const rustSource = readFileSync('src-tauri/src/display_profile.rs', 'utf8');
 const libSource = readFileSync('src-tauri/src/lib.rs', 'utf8');
 const schemaSource = readFileSync('src/schemas/displayProfileSchemas.ts', 'utf8');
@@ -90,7 +90,7 @@ for (const marker of [
 for (const [haystack, marker] of [
   [schemaSource, 'displayPreviewLutStatusSchema'],
   [schemaSource, 'displayPreviewLutTransformStatusSchema'],
-  [appPropertiesSource, "GetDisplayPreviewLutStatus = 'get_display_preview_lut_status'"],
+  [commandsSource, "GetDisplayPreviewLutStatus = 'get_display_preview_lut_status'"],
   [libSource, 'display_profile::get_display_preview_lut_status'],
   [rustSource, 'pub fn get_display_preview_lut_status()'],
   [rustSource, 'build_srgb_to_active_display_lut()'],

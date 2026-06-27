@@ -8,6 +8,7 @@ const schemaSource = readFileSync('src/schemas/tetheringSchemas.ts', 'utf8');
 const proofReceiptSource = readFileSync('src/utils/tetherIngestProofReceipt.ts', 'utf8');
 const registrySource = readFileSync('src/components/panel/right/rightPanelRegistry.ts', 'utf8');
 const appPropertiesSource = readFileSync('src/components/ui/AppProperties.tsx', 'utf8');
+const commandsSource = readFileSync('src/tauri/commands.ts', 'utf8');
 const visualSmokeSource = readFileSync('src/validation/visual/VisualSmokeApp.tsx', 'utf8');
 const visualSmokeScriptSource = readFileSync('scripts/capture-visual-smoke.ts', 'utf8');
 const libSource = readFileSync('src-tauri/src/lib.rs', 'utf8');
@@ -128,11 +129,11 @@ const requiredSnippets = [
   [schemaSource, 'cameraControlValues'],
   [registrySource, 'Panel.Tether'],
   [appPropertiesSource, "Tether = 'tether'"],
-  [appPropertiesSource, "DiscoverTetheredCameras = 'discover_tethered_cameras'"],
-  [appPropertiesSource, "OpenTetherSession = 'open_tether_session'"],
-  [appPropertiesSource, "CloseTetherSession = 'close_tether_session'"],
-  [appPropertiesSource, "SetTetherCameraControl = 'set_tether_camera_control'"],
-  [appPropertiesSource, "TriggerTetherCapture = 'trigger_tether_capture'"],
+  [commandsSource, "DiscoverTetheredCameras = 'discover_tethered_cameras'"],
+  [commandsSource, "OpenTetherSession = 'open_tether_session'"],
+  [commandsSource, "CloseTetherSession = 'close_tether_session'"],
+  [commandsSource, "SetTetherCameraControl = 'set_tether_camera_control'"],
+  [commandsSource, "TriggerTetherCapture = 'trigger_tether_capture'"],
   [libSource, 'tethering::discover_tethered_cameras'],
   [libSource, 'tethering::open_tether_session'],
   [libSource, 'tethering::close_tether_session'],

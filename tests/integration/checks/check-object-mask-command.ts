@@ -4,13 +4,13 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const files = {
-  appProperties: readFileSync(resolve('src/components/ui/AppProperties.tsx'), 'utf8'),
+  commands: readFileSync(resolve('src/tauri/commands.ts'), 'utf8'),
   aiCommands: readFileSync(resolve('src-tauri/src/ai_commands.rs'), 'utf8'),
   lib: readFileSync(resolve('src-tauri/src/lib.rs'), 'utf8'),
 };
 
 const requiredSnippets = [
-  [files.appProperties, "GenerateAiObjectMaskProposal = 'generate_ai_object_mask_proposal'"],
+  [files.commands, "GenerateAiObjectMaskProposal = 'generate_ai_object_mask_proposal'"],
   [files.aiCommands, 'pub struct AiObjectMaskProposal'],
   [files.aiCommands, 'pub async fn generate_ai_object_mask_proposal'],
   [files.aiCommands, 'provider_id: "rapidraw-sam-vit-b-onnx-v1".to_string()'],
