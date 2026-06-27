@@ -23,6 +23,17 @@ import { useState, useEffect, useMemo, useRef, type PointerEvent } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { z } from 'zod';
 
+import {
+  ACQUISITION_SOURCE_FAMILY_LABEL_KEYS,
+  ACQUISITION_WARNING_LABEL_KEYS,
+  BATCH_DISPOSITION_LABEL_KEYS,
+  FRAME_WARNING_SEVERITY_SCORE,
+  getNegativeLabFrameWarningCount,
+  type NegativeLabFrameHealthFilter,
+  type NegativeLabFrameHealthSort,
+  type NegativeLabQcDecision,
+} from './NegativeLabRollHealthModel';
+import { NegativeLabRollHealthPanel } from './NegativeLabRollHealthPanel';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { usePreviewViewport } from '../../hooks/usePreviewViewport';
 import { negativeLabAcquisitionProfileIdSchema } from '../../schemas/negativeLabAcquisitionProfileSchemas';
@@ -123,11 +134,7 @@ import type { LayerStackSidecarLayerV1 } from '../../../packages/rawengine-schem
 import type { NegativeLabAcquisitionProfileId } from '../../schemas/negativeLabAcquisitionProfileSchemas';
 import type {
   NegativeLabAcquisitionHealthReport,
-  NegativeLabAcquisitionSourceFamily,
-  NegativeLabAcquisitionWarningCode,
   NegativeLabFrameCropStatus,
-  NegativeLabFrameHealthEntry,
-  NegativeLabFrameWarningSeverity,
 } from '../../schemas/negativeLabFrameHealthSchemas';
 import type { NegativeLabFrameRgbBalanceOffset } from '../../schemas/negativeLabFrameRgbBalanceOverrideSchemas';
 import type { NegativeLabRuntimeProfileBrowserRow } from '../../schemas/negativeLabMeasuredProfileSchemas';
@@ -141,7 +148,6 @@ type NegativeLabProfileFilter = 'all' | 'black_and_white_silver' | 'color_negati
 type NegativeLabProfileSort = 'catalog' | 'evidence_desc' | 'name_asc' | 'runtime_applied';
 type NegativeLabPatchRole = 'highlight' | 'neutral';
 type NegativeLabBaseSampleStudioDecision = 'accepted' | 'candidate' | 'rejected';
-type NegativeLabQcDecision = 'approved' | 'pending' | 'rejected';
 type NegativeLabQcOverlayKey = 'densityWarnings' | 'frameBounds' | 'rejectedMarkers';
 type NegativeLabQcOverlayVisibility = Record<NegativeLabQcOverlayKey, boolean>;
 type NegativeLabProfileFilterLabelKey =
@@ -195,34 +201,10 @@ type DensitometerPatchLabelKey =
   | BaseFogSampleLabelKey
   | 'modals.negativeConversion.sampleHighlightPatch'
   | 'modals.negativeConversion.sampleShadowPatch';
-type AcquisitionSourceFamilyLabelKey =
-  | 'modals.negativeConversion.acquisitionSourceJpeg'
-  | 'modals.negativeConversion.acquisitionSourceRaw'
-  | 'modals.negativeConversion.acquisitionSourceTiff'
-  | 'modals.negativeConversion.acquisitionSourceUnknown';
-type AcquisitionWarningLabelKey =
-  | 'modals.negativeConversion.acquisitionWarningLabProcessed'
-  | 'modals.negativeConversion.acquisitionWarningLossy'
-  | 'modals.negativeConversion.acquisitionWarningMixed'
-  | 'modals.negativeConversion.acquisitionWarningUnknown';
-type BatchDispositionLabelKey =
-  | 'modals.negativeConversion.batchDispositionApply'
-  | 'modals.negativeConversion.batchDispositionReview'
-  | 'modals.negativeConversion.batchDispositionSkip';
-type BatchDispositionReasonLabelKey =
-  | 'modals.negativeConversion.batchDispositionReasonAcquisition'
-  | 'modals.negativeConversion.batchDispositionReasonBase'
-  | 'modals.negativeConversion.batchDispositionReasonExcluded'
-  | 'modals.negativeConversion.batchDispositionReasonPreview'
-  | 'modals.negativeConversion.batchDispositionReasonReady';
 type ConversionScopeLabelKey =
   | 'modals.negativeConversion.scopeActive'
   | 'modals.negativeConversion.scopeAll'
   | 'modals.negativeConversion.scopeReady';
-type QcDecisionLabelKey =
-  | 'modals.negativeConversion.qcDecisionApproved'
-  | 'modals.negativeConversion.qcDecisionPending'
-  | 'modals.negativeConversion.qcDecisionRejected';
 type BaseSampleWarningLabelKey =
   | 'modals.negativeConversion.baseSampleWarningClipped'
   | 'modals.negativeConversion.baseSampleWarningLowConfidence'
@@ -451,41 +433,6 @@ const getDustCandidateFilterState = (
   candidateId: string,
   dustCandidateDecisionById: Record<string, NegativeLabDustCandidateDecision>,
 ): Exclude<NegativeLabDustCandidateFilter, 'all'> => dustCandidateDecisionById[candidateId] ?? 'pending';
-type NegativeLabFrameHealthFilter = 'all' | NegativeLabFrameWarningSeverity;
-type NegativeLabFrameHealthSort = 'roll_order' | 'warning_severity';
-const NEGATIVE_LAB_FRAME_HEALTH_FILTERS = ['all', 'review', 'info', 'ok'] satisfies Array<NegativeLabFrameHealthFilter>;
-const NEGATIVE_LAB_FRAME_HEALTH_SORTS = ['roll_order', 'warning_severity'] satisfies Array<NegativeLabFrameHealthSort>;
-const FRAME_WARNING_SEVERITY_SCORE = {
-  info: 1,
-  ok: 0,
-  review: 2,
-} satisfies Record<NegativeLabFrameWarningSeverity, number>;
-const getNegativeLabFrameWarningCount = (frame: NegativeLabFrameHealthEntry) =>
-  frame.warningCodes.length + frame.acquisitionWarningCodes.length;
-const ACQUISITION_SOURCE_FAMILY_LABEL_KEYS = {
-  jpeg_lossy: 'modals.negativeConversion.acquisitionSourceJpeg',
-  raw_like: 'modals.negativeConversion.acquisitionSourceRaw',
-  tiff_scan: 'modals.negativeConversion.acquisitionSourceTiff',
-  unknown: 'modals.negativeConversion.acquisitionSourceUnknown',
-} satisfies Record<NegativeLabAcquisitionSourceFamily, AcquisitionSourceFamilyLabelKey>;
-const ACQUISITION_WARNING_LABEL_KEYS = {
-  lab_processed_input_for_negative_lab: 'modals.negativeConversion.acquisitionWarningLabProcessed',
-  lossy_source_for_negative_lab: 'modals.negativeConversion.acquisitionWarningLossy',
-  mixed_source_families: 'modals.negativeConversion.acquisitionWarningMixed',
-  unknown_acquisition_state: 'modals.negativeConversion.acquisitionWarningUnknown',
-} satisfies Record<NegativeLabAcquisitionWarningCode, AcquisitionWarningLabelKey>;
-const BATCH_DISPOSITION_LABEL_KEYS = {
-  apply: 'modals.negativeConversion.batchDispositionApply',
-  review: 'modals.negativeConversion.batchDispositionReview',
-  skip: 'modals.negativeConversion.batchDispositionSkip',
-} satisfies Record<NegativeLabFrameHealthEntry['batchDisposition'], BatchDispositionLabelKey>;
-const BATCH_DISPOSITION_REASON_LABEL_KEYS = {
-  acquisition_review_required: 'modals.negativeConversion.batchDispositionReasonAcquisition',
-  base_not_estimated: 'modals.negativeConversion.batchDispositionReasonBase',
-  excluded_from_batch: 'modals.negativeConversion.batchDispositionReasonExcluded',
-  preview_required: 'modals.negativeConversion.batchDispositionReasonPreview',
-  ready_to_apply: 'modals.negativeConversion.batchDispositionReasonReady',
-} satisfies Record<NegativeLabFrameHealthEntry['batchDispositionReason'], BatchDispositionReasonLabelKey>;
 const CONVERSION_SCOPE_LABEL_KEYS = {
   active: 'modals.negativeConversion.scopeActive',
   all: 'modals.negativeConversion.scopeAll',
@@ -496,11 +443,6 @@ const CONVERSION_SCOPE_TEST_IDS = {
   all: 'negative-lab-scope-all',
   ready: 'negative-lab-scope-ready',
 } satisfies Record<NegativeConversionScope, string>;
-const QC_DECISION_LABEL_KEYS = {
-  approved: 'modals.negativeConversion.qcDecisionApproved',
-  pending: 'modals.negativeConversion.qcDecisionPending',
-  rejected: 'modals.negativeConversion.qcDecisionRejected',
-} satisfies Record<NegativeLabQcDecision, QcDecisionLabelKey>;
 const BASE_SAMPLE_WARNING_LABEL_KEYS = {
   clipped_base_channel: 'modals.negativeConversion.baseSampleWarningClipped',
   low_acquisition_confidence: 'modals.negativeConversion.baseSampleWarningLowConfidence',
@@ -512,10 +454,6 @@ const BASE_SAMPLE_DECISION_LABEL_KEYS = {
   candidate: 'modals.negativeConversion.baseSampleDecision.candidate',
   rejected: 'modals.negativeConversion.baseSampleDecision.rejected',
 } satisfies Record<NegativeLabBaseSampleStudioDecision, BaseSampleDecisionLabelKey>;
-const isNegativeLabFrameHealthFilter = (value: string): value is NegativeLabFrameHealthFilter =>
-  NEGATIVE_LAB_FRAME_HEALTH_FILTERS.some((filter) => filter === value);
-const isNegativeLabFrameHealthSort = (value: string): value is NegativeLabFrameHealthSort =>
-  NEGATIVE_LAB_FRAME_HEALTH_SORTS.some((sort) => sort === value);
 const BASE_FOG_SAMPLE_PRESETS = [
   {
     labelKey: 'modals.negativeConversion.sampleLeftEdge',
@@ -2670,433 +2608,36 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           {t('modals.negativeConversion.includedScans', { includedCount: includedPathSet.size })}
         </span>
       </div>
-      {frameHealthReport.frames.length > 0 && (
-        <div className="space-y-1" data-testid="negative-lab-frame-health-grid">
-          <div className="flex items-center justify-between gap-2">
-            <UiText variant={TextVariants.small} className="text-text-tertiary">
-              {t('modals.negativeConversion.frameHealth')}
-            </UiText>
-            <div className="flex items-center gap-1 text-[11px] text-text-tertiary">
-              <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-frame-count">
-                {t('modals.negativeConversion.frameHealthFrameCount', { frameCount: frameHealthReport.frames.length })}
-              </span>
-              <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-roll-warning-count">
-                {t('modals.negativeConversion.frameHealthWarningCount', {
-                  warningCount: rollWarningCount,
-                })}
-              </span>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-1 text-[11px] text-text-tertiary">
-            <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-planned-apply-count">
-              {t('modals.negativeConversion.batchPlanApplyCount', {
-                applyCount: batchApplyFrameCount,
-              })}
-            </span>
-            <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-skipped-frame-count">
-              {t('modals.negativeConversion.batchPlanSkippedCount', {
-                skippedCount: batchSkippedFrameCount,
-              })}
-            </span>
-            <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-review-frame-count">
-              {t('modals.negativeConversion.batchPlanReviewCount', {
-                reviewCount: batchReviewFrameCount,
-              })}
-            </span>
-            <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-qc-approved-count">
-              {t('modals.negativeConversion.qcApprovedCount', {
-                approvedCount: approvedQcFrameIds.length,
-              })}
-            </span>
-            <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-qc-rejected-count">
-              {t('modals.negativeConversion.qcRejectedCount', {
-                rejectedCount: rejectedQcFrameIds.length,
-              })}
-            </span>
-            <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-batch-workload-summary">
-              {t('modals.negativeConversion.batchWorkloadSummary', {
-                applyCount: batchApplyFrameCount,
-                reviewCount: batchReviewFrameCount,
-                skippedCount: batchSkippedFrameCount,
-              })}
-            </span>
-            <span
-              className="col-span-3 rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary"
-              data-testid="negative-lab-roll-normalization-plan"
-            >
-              {`${rollNormalizationPlan.affectedFrameIds.length} frames ${rollNormalizationPlan.proposedExposureDeltaEv >= 0 ? '+' : ''}${rollNormalizationPlan.proposedExposureDeltaEv.toFixed(2)} EV / WB ${rollNormalizationPlan.proposedWhiteBalanceDelta.toFixed(2)}`}
-            </span>
-            <button
-              type="button"
-              className="col-span-3 inline-flex items-center justify-center gap-1 rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
-              data-testid="negative-lab-apply-roll-normalization"
-              disabled={rollNormalizationPlan.affectedFrameIds.length === 0}
-              onClick={handleApplyRollNormalizationPlan}
-            >
-              <WandSparkles size={11} />
-              {t('modals.negativeConversion.applyRollNormalizationPlan')}
-            </button>
-            <button
-              type="button"
-              className="col-span-3 inline-flex items-center justify-center gap-1 rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary transition-colors hover:bg-surface"
-              data-testid="negative-lab-copy-batch-plan"
-              onClick={() => {
-                void handleCopyBatchPlan();
-              }}
-            >
-              <Copy size={11} />
-              {isBatchPlanCopied
-                ? t('modals.negativeConversion.batchPlanCopied')
-                : t('modals.negativeConversion.copyBatchPlan')}
-            </button>
-            <button
-              type="button"
-              className={cx(
-                'col-span-3 inline-flex items-center justify-center rounded px-1.5 py-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-                isBatchPlanAccepted
-                  ? 'bg-accent/15 text-text-primary'
-                  : 'bg-bg-secondary text-text-secondary hover:bg-surface',
-              )}
-              data-testid="negative-lab-accept-batch-plan"
-              disabled={batchDryRunSummary.blocked}
-              onClick={handleAcceptBatchPlan}
-            >
-              {isBatchPlanAccepted
-                ? t('modals.negativeConversion.batchPlanAccepted')
-                : t('modals.negativeConversion.acceptBatchPlan')}
-            </button>
-          </div>
-          <div
-            className="grid grid-cols-2 gap-2 rounded-sm bg-bg-secondary p-2 text-[11px]"
-            data-filter={frameHealthFilter}
-            data-sort={frameHealthSort}
-            data-testid="negative-lab-frame-health-controls"
-          >
-            <label className="space-y-1">
-              <span className="block text-text-tertiary">
-                {t('modals.negativeConversion.frameHealthSeverityFilter')}
-              </span>
-              <select
-                className="w-full rounded border border-surface bg-bg-primary px-2 py-1 text-text-secondary"
-                data-testid="negative-lab-frame-health-filter"
-                onChange={(event) => {
-                  if (isNegativeLabFrameHealthFilter(event.target.value)) {
-                    setFrameHealthFilter(event.target.value);
-                  }
-                }}
-                value={frameHealthFilter}
-              >
-                {NEGATIVE_LAB_FRAME_HEALTH_FILTERS.map((filter) => (
-                  <option key={filter} value={filter}>
-                    {t(`modals.negativeConversion.frameHealthFilter.${filter}`)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-1">
-              <span className="block text-text-tertiary">{t('modals.negativeConversion.frameHealthSort')}</span>
-              <select
-                className="w-full rounded border border-surface bg-bg-primary px-2 py-1 text-text-secondary"
-                data-testid="negative-lab-frame-health-sort"
-                onChange={(event) => {
-                  if (isNegativeLabFrameHealthSort(event.target.value)) {
-                    setFrameHealthSort(event.target.value);
-                  }
-                }}
-                value={frameHealthSort}
-              >
-                {NEGATIVE_LAB_FRAME_HEALTH_SORTS.map((sort) => (
-                  <option key={sort} value={sort}>
-                    {t(`modals.negativeConversion.frameHealthSortModes.${sort}`)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <span className="col-span-2 text-text-tertiary" data-testid="negative-lab-frame-health-visible-count">
-              {t('modals.negativeConversion.frameHealthVisibleCount', {
-                total: frameHealthReport.frames.length,
-                visibleCount: visibleFrameHealthRows.length,
-              })}
-            </span>
-            <div
-              className="col-span-2 grid grid-cols-3 gap-1"
-              data-visible-frame-count={visibleFrameHealthRows.length}
-              data-testid="negative-lab-qc-visible-actions"
-            >
-              {(
-                [
-                  {
-                    decision: 'approved',
-                    label: t('modals.negativeConversion.qcDecisionApproveVisible', {
-                      count: visibleFrameHealthRows.length,
-                    }),
-                    testId: 'negative-lab-qc-approved-visible',
-                  },
-                  {
-                    decision: 'rejected',
-                    label: t('modals.negativeConversion.qcDecisionRejectVisible', {
-                      count: visibleFrameHealthRows.length,
-                    }),
-                    testId: 'negative-lab-qc-rejected-visible',
-                  },
-                  {
-                    decision: 'pending',
-                    label: t('modals.negativeConversion.qcDecisionResetVisible', {
-                      count: visibleFrameHealthRows.length,
-                    }),
-                    testId: 'negative-lab-qc-pending-visible',
-                  },
-                ] satisfies Array<{
-                  decision: NegativeLabQcDecision;
-                  label: string;
-                  testId: string;
-                }>
-              ).map(({ decision, label, testId }) => (
-                <button
-                  className="rounded bg-bg-primary px-1.5 py-1 text-text-tertiary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
-                  data-testid={testId}
-                  disabled={visibleFrameHealthRows.length === 0}
-                  key={decision}
-                  onClick={() => {
-                    handleSetVisibleQcDecision(decision);
-                  }}
-                  type="button"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="grid gap-1">
-            {visibleFrameHealthRows.map((row: NegativeLabFrameHealthEntry, index) => (
-              <div
-                className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto_auto_auto_auto] items-center gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
-                data-acquisition-source={row.acquisitionSourceFamily}
-                data-conversion-status={row.conversionStatus}
-                data-crop-status={row.cropStatus}
-                data-disposition={row.batchDisposition}
-                data-qc-status={row.qcStatus}
-                data-severity={row.warningSeverity}
-                data-warning-count={getNegativeLabFrameWarningCount(row)}
-                data-testid={`negative-lab-frame-health-row-${index}`}
-                key={row.frameId}
-              >
-                <span className="truncate text-text-secondary">{row.scanLabel}</span>
-                <span
-                  className={cx(
-                    'rounded px-1.5 py-0.5',
-                    row.acquisitionWarningCodes.length > 0
-                      ? 'bg-yellow-500/15 text-yellow-200'
-                      : 'bg-surface text-text-secondary',
-                  )}
-                  data-testid={`negative-lab-frame-source-${index}`}
-                >
-                  {t(ACQUISITION_SOURCE_FAMILY_LABEL_KEYS[row.acquisitionSourceFamily])}
-                </span>
-                <span
-                  className={cx(
-                    'rounded px-1.5 py-0.5',
-                    row.warningSeverity === 'review' && 'bg-yellow-500/15 text-yellow-200',
-                    row.warningSeverity === 'info' && 'bg-blue-500/15 text-blue-200',
-                    row.warningSeverity === 'ok' && 'bg-surface text-text-secondary',
-                  )}
-                  data-testid={`negative-lab-frame-severity-${index}`}
-                >
-                  {t(`modals.negativeConversion.frameWarningSeverity.${row.warningSeverity}`)}
-                </span>
-                <span
-                  className={cx(
-                    'rounded px-1.5 py-0.5',
-                    row.healthStatus === 'active' && 'bg-accent/15 text-text-primary',
-                    row.healthStatus === 'queued' && 'bg-surface text-text-secondary',
-                    row.healthStatus === 'skipped' && 'bg-bg-primary text-text-tertiary',
-                  )}
-                  data-testid={`negative-lab-frame-health-status-${index}`}
-                >
-                  {t(
-                    row.healthStatus === 'skipped'
-                      ? 'modals.negativeConversion.frameHealthSkipped'
-                      : row.healthStatus === 'active'
-                        ? 'modals.negativeConversion.frameHealthActive'
-                        : 'modals.negativeConversion.frameHealthQueued',
-                  )}
-                </span>
-                <span className="text-text-tertiary">
-                  {row.baseStatus === 'estimated' && row.baseConfidence !== null
-                    ? t(
-                        row.baseScope === 'roll'
-                          ? 'modals.negativeConversion.baseReadyRoll'
-                          : 'modals.negativeConversion.baseReadyFrame',
-                        { confidence: Math.round(row.baseConfidence * 100) },
-                      )
-                    : t('modals.negativeConversion.basePending')}
-                </span>
-                <span
-                  className="flex items-center gap-1 text-text-tertiary"
-                  data-testid={`negative-lab-frame-crop-status-${index}`}
-                >
-                  <span>{t(`modals.negativeConversion.frameCropStatus.${row.cropStatus}`)}</span>
-                  {row.active && (
-                    <span className="inline-flex gap-1" data-testid="negative-lab-active-frame-crop-actions">
-                      <button
-                        className="rounded bg-bg-primary px-1 py-0.5 transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
-                        data-testid="negative-lab-accept-detected-crop"
-                        disabled={isSaving}
-                        onClick={() => {
-                          handleSetActiveFrameCropStatus('detected_frame');
-                        }}
-                        type="button"
-                      >
-                        {t('modals.negativeConversion.acceptDetectedCrop')}
-                      </button>
-                      <button
-                        className="rounded bg-bg-primary px-1 py-0.5 transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
-                        data-testid="negative-lab-set-manual-crop"
-                        disabled={isSaving}
-                        onClick={() => {
-                          handleSetActiveFrameCropStatus('manual_override');
-                        }}
-                        type="button"
-                      >
-                        {t('modals.negativeConversion.manualCrop')}
-                      </button>
-                      <button
-                        className="rounded bg-bg-primary px-1 py-0.5 transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
-                        data-testid="negative-lab-reset-frame-crop"
-                        disabled={isSaving || row.cropStatus === 'active_frame_editable'}
-                        onClick={() => {
-                          handleSetActiveFrameCropStatus('active_frame_editable');
-                        }}
-                        type="button"
-                      >
-                        {t('modals.negativeConversion.resetFrameCrop')}
-                      </button>
-                    </span>
-                  )}
-                </span>
-                <span className="text-text-tertiary" data-testid={`negative-lab-frame-conversion-status-${index}`}>
-                  {t(`modals.negativeConversion.frameConversionStatus.${row.conversionStatus}`)}
-                </span>
-                <span
-                  className={cx(
-                    'rounded px-1.5 py-0.5',
-                    row.batchDisposition === 'apply' && 'bg-accent/15 text-text-primary',
-                    row.batchDisposition === 'review' && 'bg-yellow-500/15 text-yellow-200',
-                    row.batchDisposition === 'skip' && 'bg-bg-primary text-text-tertiary',
-                  )}
-                  data-testid={`negative-lab-frame-disposition-${index}`}
-                  title={t(BATCH_DISPOSITION_REASON_LABEL_KEYS[row.batchDispositionReason])}
-                >
-                  {t(BATCH_DISPOSITION_LABEL_KEYS[row.batchDisposition])}
-                </span>
-                <span className="text-text-tertiary" data-testid={`negative-lab-frame-qc-status-${index}`}>
-                  {t(`modals.negativeConversion.frameQcStatus.${row.qcStatus}`)}
-                </span>
-                <span
-                  className={cx(
-                    'rounded px-1.5 py-0.5 tabular-nums',
-                    snapNegativeLabFrameExposureOffset(frameExposureOffsetByFrameId[row.frameId] ?? 0) === 0
-                      ? 'bg-bg-primary text-text-tertiary'
-                      : 'bg-blue-500/15 text-blue-200',
-                  )}
-                  data-exposure-offset={snapNegativeLabFrameExposureOffset(
-                    frameExposureOffsetByFrameId[row.frameId] ?? 0,
-                  )}
-                  data-testid={`negative-lab-frame-exposure-override-${index}`}
-                >
-                  {formatSignedRecipeValue(
-                    snapNegativeLabFrameExposureOffset(frameExposureOffsetByFrameId[row.frameId] ?? 0),
-                  )}
-                </span>
-                <span
-                  className={cx(
-                    'rounded px-1.5 py-0.5 tabular-nums',
-                    negativeLabFrameRgbBalanceOffsetIsZero(
-                      snapNegativeLabFrameRgbBalanceOffsets({
-                        baselineParams: params,
-                        offsets: frameRgbBalanceOffsetByFrameId[row.frameId],
-                      }),
-                    )
-                      ? 'bg-bg-primary text-text-tertiary'
-                      : 'bg-fuchsia-500/15 text-fuchsia-200',
-                  )}
-                  data-testid={`negative-lab-frame-rgb-balance-override-${index}`}
-                >
-                  {negativeLabFrameRgbBalanceOffsetIsZero(
-                    snapNegativeLabFrameRgbBalanceOffsets({
-                      baselineParams: params,
-                      offsets: frameRgbBalanceOffsetByFrameId[row.frameId],
-                    }),
-                  )
-                    ? 'RGB 0.00'
-                    : `RGB ${formatSignedRecipeValue(
-                        snapNegativeLabFrameRgbBalanceOffsets({
-                          baselineParams: params,
-                          offsets: frameRgbBalanceOffsetByFrameId[row.frameId],
-                        }).redWeight,
-                      )}`}
-                </span>
-                <span
-                  className="col-span-10 flex flex-wrap items-center gap-1 text-[11px]"
-                  data-qc-decision={qcDecisionByFrameId[row.frameId] ?? 'pending'}
-                  data-testid={`negative-lab-frame-qc-decision-${index}`}
-                >
-                  <span className="mr-1 text-text-tertiary">
-                    {t(QC_DECISION_LABEL_KEYS[qcDecisionByFrameId[row.frameId] ?? 'pending'])}
-                  </span>
-                  {(['approved', 'rejected', 'pending'] satisfies Array<NegativeLabQcDecision>).map((decision) => (
-                    <button
-                      className={cx(
-                        'rounded px-1.5 py-0.5 transition-colors',
-                        (qcDecisionByFrameId[row.frameId] ?? 'pending') === decision
-                          ? 'bg-accent/15 text-text-primary'
-                          : 'bg-bg-primary text-text-tertiary hover:bg-surface',
-                      )}
-                      data-testid={`negative-lab-frame-qc-${decision}-${row.frameId}`}
-                      key={decision}
-                      onClick={() => {
-                        handleSetQcDecision(row.frameId, decision);
-                      }}
-                      type="button"
-                    >
-                      {t(QC_DECISION_LABEL_KEYS[decision])}
-                    </button>
-                  ))}
-                </span>
-                {getNegativeLabFrameWarningCount(row) > 0 && (
-                  <span
-                    className="col-span-8 flex flex-wrap gap-1"
-                    data-testid={`negative-lab-frame-warning-row-${index}`}
-                  >
-                    {row.warningCodes.map((warningCode) => (
-                      <span
-                        className="rounded bg-bg-primary px-1.5 py-0.5 text-[11px] text-text-tertiary"
-                        data-testid={`negative-lab-frame-warning-chip-${warningCode}`}
-                        key={warningCode}
-                      >
-                        {warningCode === 'base_estimate_active_frame_only'
-                          ? t('modals.negativeConversion.frameWarningBaseEstimateActiveOnly')
-                          : warningCode === 'excluded_from_batch'
-                            ? t('modals.negativeConversion.frameWarningExcluded')
-                            : t('modals.negativeConversion.frameWarningPreviewNotReady')}
-                      </span>
-                    ))}
-                    {row.acquisitionWarningCodes.map((warningCode) => (
-                      <span
-                        className="rounded bg-yellow-500/15 px-1.5 py-0.5 text-[11px] text-yellow-200"
-                        data-testid={`negative-lab-frame-acquisition-warning-chip-${warningCode}`}
-                        key={warningCode}
-                      >
-                        {t(ACQUISITION_WARNING_LABEL_KEYS[warningCode])}
-                      </span>
-                    ))}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <NegativeLabRollHealthPanel
+        approvedQcFrameIds={approvedQcFrameIds}
+        batchApplyFrameCount={batchApplyFrameCount}
+        batchDryRunSummary={batchDryRunSummary}
+        batchReviewFrameCount={batchReviewFrameCount}
+        batchSkippedFrameCount={batchSkippedFrameCount}
+        frameExposureOffsetByFrameId={frameExposureOffsetByFrameId}
+        frameHealthFilter={frameHealthFilter}
+        frameHealthReport={frameHealthReport}
+        frameHealthSort={frameHealthSort}
+        frameRgbBalanceOffsetByFrameId={frameRgbBalanceOffsetByFrameId}
+        handleAcceptBatchPlan={handleAcceptBatchPlan}
+        handleApplyRollNormalizationPlan={handleApplyRollNormalizationPlan}
+        handleCopyBatchPlan={handleCopyBatchPlan}
+        handleSetActiveFrameCropStatus={handleSetActiveFrameCropStatus}
+        handleSetQcDecision={handleSetQcDecision}
+        handleSetVisibleQcDecision={handleSetVisibleQcDecision}
+        isBatchPlanAccepted={isBatchPlanAccepted}
+        isBatchPlanCopied={isBatchPlanCopied}
+        isSaving={isSaving}
+        params={params}
+        qcDecisionByFrameId={qcDecisionByFrameId}
+        rejectedQcFrameIds={rejectedQcFrameIds}
+        rollNormalizationPlan={rollNormalizationPlan}
+        rollWarningCount={rollWarningCount}
+        setFrameHealthFilter={setFrameHealthFilter}
+        setFrameHealthSort={setFrameHealthSort}
+        t={t}
+        visibleFrameHealthRows={visibleFrameHealthRows}
+      />
     </div>
   );
 
