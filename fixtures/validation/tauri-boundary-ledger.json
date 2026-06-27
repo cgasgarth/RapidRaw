@@ -9,7 +9,7 @@
       "positiveFixturePath": "fixtures/validation/tauri-folder-tree-valid.json",
       "rustParityState": "manual-rust-command-shape",
       "status": "runtime-parse-tested",
-      "tsCallSites": ["src/App.tsx"],
+      "tsCallSites": ["src/hooks/useFolderExpansionLoader.ts"],
       "zodSchema": "folderTreeListSchema"
     },
     {
