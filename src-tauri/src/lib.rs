@@ -18,6 +18,7 @@ mod bayer_hq;
 mod cache_utils;
 #[cfg(feature = "validation-harness")]
 mod color_gpu_readback_probe;
+mod community_presets;
 mod culling;
 mod deblur_api;
 pub mod deblur_cpu_reference;
@@ -1359,11 +1360,10 @@ fn generate_preset_preview(
 #[tauri::command]
 async fn fetch_community_presets() -> Result<Vec<CommunityPreset>, String> {
     let client = reqwest::Client::new();
-    let url = "https://raw.githubusercontent.com/CyberTimon/RapidRAW-Presets/main/manifest.json";
 
     let response = client
-        .get(url)
-        .header("User-Agent", "RapidRAW-App")
+        .get(community_presets::COMMUNITY_PRESET_MANIFEST_URL)
+        .header("User-Agent", community_presets::COMMUNITY_PRESET_USER_AGENT)
         .send()
         .await
         .map_err(|e| format!("Failed to fetch manifest from GitHub: {}", e))?;
