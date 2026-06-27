@@ -1337,6 +1337,10 @@ export default function ColorPanel({
         <div
           className="rounded-md border border-border bg-bg-tertiary p-2"
           data-coverage-ratio={(gamutWarningOverlay?.coverage_ratio ?? 0).toFixed(6)}
+          data-proof-mask-height={gamutWarningOverlay?.height ?? 0}
+          data-proof-mask-width={gamutWarningOverlay?.width ?? 0}
+          data-proof-ready={String(gamutWarningOverlay !== null)}
+          data-warning-pixel-count={gamutWarningOverlay?.warning_pixel_count ?? 0}
           data-testid="gamut-warning-controls"
           data-visible={String(isGamutWarningOverlayVisible)}
         >
@@ -1345,6 +1349,18 @@ export default function ColorPanel({
               <UiText variant={TextVariants.heading}>{t('adjustments.color.gamutWarning.title')}</UiText>
               <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
                 {t('adjustments.color.gamutWarning.coverage', { value: gamutWarningCoverage })}
+              </UiText>
+              <UiText
+                variant={TextVariants.small}
+                color={TextColors.secondary}
+                className="mt-1 block"
+                data-testid="gamut-warning-proof-details"
+              >
+                {t('adjustments.color.gamutWarning.proofDetails', {
+                  height: gamutWarningOverlay?.height ?? 0,
+                  pixels: gamutWarningOverlay?.warning_pixel_count ?? 0,
+                  width: gamutWarningOverlay?.width ?? 0,
+                })}
               </UiText>
             </div>
             <button

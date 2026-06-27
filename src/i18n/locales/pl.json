@@ -82,6 +82,7 @@
         "coverage": "",
         "off": "",
         "on": "",
+        "proofDetails": "Dowod: {{pixels}} pikseli ostrzezen · {{width}} x {{height}}",
         "title": ""
       },
       "grading": {
