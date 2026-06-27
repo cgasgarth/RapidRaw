@@ -1,3 +1,4 @@
+use anyhow::Result;
 use rawler::{
     cfa::{CFA, CFA_COLOR_B, CFA_COLOR_G, CFA_COLOR_R},
     imgop::Rect,
@@ -286,17 +287,25 @@ fn luma(pixel: [f32; 3]) -> f32 {
     pixel[0] * 0.2126 + pixel[1] * 0.7152 + pixel[2] * 0.0722
 }
 
-fn refine_chroma(image: &mut Color2D<f32, 3>, report: &mut XTransHqReport) {
+fn refine_chroma<F>(
+    image: &mut Color2D<f32, 3>,
+    report: &mut XTransHqReport,
+    check_cancel: &mut F,
+) -> Result<()>
+where
+    F: FnMut() -> Result<()>,
+{
     const CHROMA_DELTA_THRESHOLD: f32 = 0.044;
     const MAX_CHROMA_BLEND: f32 = 0.66;
     const MIN_EDGE_CHROMA_BLEND: f32 = 0.24;
 
     if image.width < 3 || image.height < 3 {
-        return;
+        return Ok(());
     }
 
     let original = image.data.clone();
     for row in 1..image.height - 1 {
+        check_cancel()?;
         for col in 1..image.width - 1 {
             report.evaluated_pixels += 1;
             let index = pixel_index(image.width, row, col);
@@ -345,13 +354,24 @@ fn refine_chroma(image: &mut Color2D<f32, 3>, report: &mut XTransHqReport) {
             }
         }
     }
+    Ok(())
 }
 
-pub fn demosaic_xtrans_hq(
+#[cfg(test)]
+fn demosaic_xtrans_hq(pixels: &PixF32, cfa: &CFA, roi: Rect) -> (Color2D<f32, 3>, XTransHqReport) {
+    demosaic_xtrans_hq_with_cancel(pixels, cfa, roi, || Ok(()))
+        .expect("no-op cancellation check cannot fail")
+}
+
+pub fn demosaic_xtrans_hq_with_cancel<F>(
     pixels: &PixF32,
     cfa: &CFA,
     roi: Rect,
-) -> (Color2D<f32, 3>, XTransHqReport) {
+    mut check_cancel: F,
+) -> Result<(Color2D<f32, 3>, XTransHqReport)>
+where
+    F: FnMut() -> Result<()>,
+{
     let shifted_cfa = cfa.shift(roi.p.x, roi.p.y);
     let mut report = XTransHqReport {
         scratch_memory: estimate_xtrans_hq_scratch_memory(pixels, roi),
@@ -360,6 +380,7 @@ pub fn demosaic_xtrans_hq(
     let mut greens = vec![0.0; pixels.width * pixels.height];
 
     for sensor_row in 0..pixels.height {
+        check_cancel()?;
         for sensor_col in 0..pixels.width {
             let index = pixel_index(pixels.width, sensor_row, sensor_col);
             greens[index] = adaptive_green(pixels, cfa, sensor_row, sensor_col, &mut report);
@@ -368,6 +389,7 @@ pub fn demosaic_xtrans_hq(
 
     let mut output = Vec::with_capacity(roi.d.w * roi.d.h);
     for row_out in 0..roi.d.h {
+        check_cancel()?;
         let sensor_row = roi.p.y + row_out;
         for col_out in 0..roi.d.w {
             let sensor_col = roi.p.x + col_out;
@@ -413,8 +435,8 @@ pub fn demosaic_xtrans_hq(
     }
 
     let mut image = Color2D::new_with(output, roi.d.w, roi.d.h);
-    refine_chroma(&mut image, &mut report);
-    (image, report)
+    refine_chroma(&mut image, &mut report, &mut check_cancel)?;
+    Ok((image, report))
 }
 
 fn estimate_xtrans_hq_scratch_memory(pixels: &PixF32, roi: Rect) -> XTransHqScratchMemoryReport {
@@ -837,6 +859,32 @@ mod tests {
                 + report.scratch_memory.output_rgb_bytes
                 + report.scratch_memory.chroma_working_bytes
         );
+    }
+
+    #[test]
+    fn xtrans_hq_demosaic_cancels_before_returning_output() {
+        let cfa = CFA::new(XTRANS_PATTERN);
+        let pixels = PixF32::new_with(vec![0.2; 144], 12, 12);
+        let roi = Rect::new(
+            rawler::imgop::Point::new(0, 0),
+            rawler::imgop::Dim2::new(12, 12),
+        );
+        let mut checks = 0usize;
+
+        let result = demosaic_xtrans_hq_with_cancel(&pixels, &cfa, roi, || {
+            checks += 1;
+            if checks == 3 {
+                return Err(anyhow::anyhow!("cancelled by test"));
+            }
+            Ok(())
+        });
+
+        let error = match result {
+            Ok(_) => panic!("expected cancellation before output"),
+            Err(error) => error,
+        };
+        assert_eq!(error.to_string(), "cancelled by test");
+        assert_eq!(checks, 3);
     }
 
     #[test]
