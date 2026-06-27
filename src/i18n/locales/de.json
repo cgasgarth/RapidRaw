@@ -1070,7 +1070,8 @@
         "generate": "Generate SAM proposal",
         "points": "{{count}} points",
         "points_one": "{{count}} point",
-        "points_other": "{{count}} points"
+        "points_other": "{{count}} points",
+        "receipt": "Replay-Beleg: {{provider}}, {{promptKind}}, {{latency}} ms"
       },
       "overlay": {
         "edgeThreshold": "Kantenschwellenwert",

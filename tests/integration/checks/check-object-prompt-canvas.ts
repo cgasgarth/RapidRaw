@@ -8,6 +8,7 @@ import {
   buildObjectMaskProposalCommandInput,
   clearObjectPromptCanvasState,
   imagePointFromCanvasClick,
+  readObjectMaskProposalReplayReceipt,
   readObjectPromptCanvasState,
   setObjectPromptMode,
   writeObjectPromptCanvasState,
@@ -77,6 +78,17 @@ if (
 ) {
   throw new Error('Object prompt canvas did not persist accepted SAM proposal provenance.');
 }
+const replayReceipt = readObjectMaskProposalReplayReceipt(acceptedParameters);
+if (
+  replayReceipt === null ||
+  replayReceipt.providerStatus !== 'local_sam_proposal_v1' ||
+  replayReceipt.promptKind !== 'box' ||
+  replayReceipt.pointCount !== 2 ||
+  !replayReceipt.boxReady ||
+  !replayReceipt.hasRaster
+) {
+  throw new Error('Object prompt canvas did not expose a replay receipt for accepted SAM proposals.');
+}
 if (clearObjectPromptCanvasState(reparsed).pointPrompts.length !== 0) {
   throw new Error('Object prompt canvas clear did not remove points.');
 }
@@ -89,6 +101,9 @@ for (const [label, source, needle] of [
   ['prompt controls', maskPanelSource, 'data-testid="object-prompt-controls"'],
   ['proposal action', maskPanelSource, 'GenerateAiObjectMaskProposal'],
   ['accepted proposal persistence', maskPanelSource, 'acceptObjectMaskProposal'],
+  ['proposal replay receipt reader', maskPanelSource, 'readObjectMaskProposalReplayReceipt'],
+  ['proposal replay receipt UI', maskPanelSource, 'data-testid="object-prompt-replay-receipt"'],
+  ['proposal replay receipt locale', maskPanelSource, "t('editor.masks.objectPrompt.receipt'"],
   ['mode buttons', maskPanelSource, 'object-prompt-mode-'],
 ] as const) {
   if (!source.includes(needle)) throw new Error(`Object prompt UI is missing ${label}.`);

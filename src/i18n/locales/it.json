@@ -628,7 +628,8 @@
         "points": "{{count}} points",
         "points_one": "{{count}} point",
         "points_other": "{{count}} points",
-        "generate": "Generate SAM proposal"
+        "generate": "Generate SAM proposal",
+        "receipt": "Ricevuta replay: {{provider}}, {{promptKind}}, {{latency}} ms"
       }
     },
     "metadata": {
