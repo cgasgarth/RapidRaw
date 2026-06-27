@@ -657,6 +657,7 @@
     "check:agent-object-selection-apply": "bun tests/integration/checks/check-agent-object-selection-apply.ts",
     "check:agent-local-layer-coverage-matrix": "bun tests/integration/checks/check-agent-local-layer-coverage-matrix.ts",
     "check:agent-retouch-apply": "bun tests/integration/checks/check-agent-retouch-apply.ts",
+    "check:retouch-dust-heal-benchmark": "bun tests/integration/checks/check-retouch-dust-heal-benchmark.ts",
     "check:agent-export-proof": "bun tests/integration/checks/check-agent-export-proof.ts",
     "check:agent-safety-policy": "bun tests/integration/checks/check-agent-safety-policy.ts",
     "check:agent-iterative-edit-loop": "bun tests/integration/checks/check-agent-iterative-edit-loop.ts",
