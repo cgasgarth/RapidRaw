@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
@@ -9,9 +8,18 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
-import { Invokes } from '../tauri/commands';
 import { formatUnknownError } from '../utils/errorFormatting';
-import { renameFilesWithSchema } from '../utils/fileOperationInvokes';
+import {
+  copyFilesWithSchema,
+  createFolderWithSchema,
+  deleteFilesFromDiskWithSchema,
+  deleteFilesWithAssociatedWithSchema,
+  importFilesWithSchema,
+  moveFilesWithSchema,
+  renameFilesWithSchema,
+  renameFolderWithSchema,
+  resolveAndroidContentUriNameWithSchema,
+} from '../utils/fileOperationInvokes';
 
 import type { AppSettings, ImageFile } from '../components/ui/AppProperties';
 
@@ -76,8 +84,10 @@ export function useFileOperations(
       }
 
       try {
-        const command = options.includeAssociated ? Invokes.DeleteFilesWithAssociated : Invokes.DeleteFilesFromDisk;
-        await invoke(command, { paths: pathsToDelete });
+        const deleteFiles = options.includeAssociated
+          ? deleteFilesWithAssociatedWithSchema
+          : deleteFilesFromDiskWithSchema;
+        await deleteFiles({ paths: pathsToDelete });
         await refreshImageList();
 
         if (selectedImage) {
@@ -160,7 +170,7 @@ export function useFileOperations(
 
       if (folderName && folderName.trim() !== '' && folderActionTarget) {
         try {
-          await invoke(Invokes.CreateFolder, { path: `${folderActionTarget}/${folderName.trim()}` });
+          await createFolderWithSchema({ path: `${folderActionTarget}/${folderName.trim()}` });
           await refreshAllFolderTrees();
         } catch (err) {
           toast.error(`Failed to create folder: ${formatUnknownError(err)}`);
@@ -181,7 +191,7 @@ export function useFileOperations(
           const oldPath = folderActionTarget;
           const trimmedNewName = newName.trim();
 
-          await invoke(Invokes.RenameFolder, { path: oldPath, newName: trimmedNewName });
+          await renameFolderWithSchema({ path: oldPath, newName: trimmedNewName });
 
           const parentDir = getParentDir(oldPath);
           const separator = oldPath.includes('/') ? '/' : '\\';
@@ -277,7 +287,7 @@ export function useFileOperations(
       if (sourcePaths.length === 0 || !destinationFolder) return;
 
       try {
-        await invoke(Invokes.ImportFiles, { destinationFolder, settings, sourcePaths });
+        await importFilesWithSchema({ destinationFolder, settings, sourcePaths });
       } catch (err) {
         console.error('Failed to start import:', err);
         useProcessStore
@@ -338,7 +348,7 @@ export function useFileOperations(
             selected.map(async (path) => {
               if (isAndroid) {
                 try {
-                  return await invoke<string>(Invokes.ResolveAndroidContentUriName, { uriStr: path });
+                  return await resolveAndroidContentUriNameWithSchema({ uriStr: path });
                 } catch (e) {
                   console.error('Failed to resolve URI:', e);
                   return path;
@@ -395,9 +405,9 @@ export function useFileOperations(
 
       try {
         if (mode === 'copy') {
-          await invoke(Invokes.CopyFiles, { sourcePaths: copiedFilePaths, destinationFolder: currentFolderPath });
+          await copyFilesWithSchema({ sourcePaths: copiedFilePaths, destinationFolder: currentFolderPath });
         } else {
-          await invoke(Invokes.MoveFiles, { sourcePaths: copiedFilePaths, destinationFolder: currentFolderPath });
+          await moveFilesWithSchema({ sourcePaths: copiedFilePaths, destinationFolder: currentFolderPath });
           setProcess({ copiedFilePaths: [] });
           setLibrary({ multiSelectedPaths: [] });
           await refreshAllFolderTrees();

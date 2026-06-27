@@ -24,6 +24,8 @@ const tauriBoundaryEntrySchema = z
       'albumTreeSchema',
       'emptyTauriResponseSchema',
       'fileOperationPathListSchema',
+      'fileOperationPathSchema',
+      'fileOperationVoidResponseSchema',
       'folderTreeListSchema',
     ]),
   })
@@ -66,7 +68,7 @@ export const tauriBoundaryLedgerSchema = z
       });
     }
 
-    for (const requiredCommand of ['get_folder_children', 'get_albums', 'rename_files']) {
+    for (const requiredCommand of ['get_folder_children', 'get_albums', 'rename_files', 'copy_files', 'move_files']) {
       if (!commands.includes(requiredCommand)) {
         context.addIssue({
           code: 'custom',
