@@ -18,6 +18,32 @@ use crate::{AppState, GpuImageCache};
 
 const GPU_OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 const GPU_OUTPUT_BYTES_PER_PIXEL: u32 = 8;
+const MAX_MASK_BINDINGS: u32 = 1;
+
+// Keep these Rust bindings in sync with src-tauri/src/shaders/shader.wgsl.
+const MAIN_BINDING_INPUT_TEXTURE: u32 = 0;
+const MAIN_BINDING_OUTPUT_TEXTURE: u32 = 1;
+const MAIN_BINDING_ADJUSTMENTS: u32 = 2;
+const MAIN_BINDING_MASK_TEXTURES: u32 = 3;
+const MAIN_BINDING_LUT_TEXTURE: u32 = MAIN_BINDING_MASK_TEXTURES + MAX_MASK_BINDINGS;
+const MAIN_BINDING_LUT_SAMPLER: u32 = MAIN_BINDING_LUT_TEXTURE + 1;
+const MAIN_BINDING_SHARPNESS_BLUR: u32 = MAIN_BINDING_LUT_SAMPLER + 1;
+const MAIN_BINDING_TONAL_BLUR: u32 = MAIN_BINDING_SHARPNESS_BLUR + 1;
+const MAIN_BINDING_CLARITY_BLUR: u32 = MAIN_BINDING_TONAL_BLUR + 1;
+const MAIN_BINDING_STRUCTURE_BLUR: u32 = MAIN_BINDING_CLARITY_BLUR + 1;
+const MAIN_BINDING_FLARE_TEXTURE: u32 = MAIN_BINDING_STRUCTURE_BLUR + 1;
+const MAIN_BINDING_FLARE_SAMPLER: u32 = MAIN_BINDING_FLARE_TEXTURE + 1;
+
+// Keep these Rust bindings in sync with blur.wgsl and flare.wgsl.
+const BLUR_BINDING_INPUT_TEXTURE: u32 = 0;
+const BLUR_BINDING_OUTPUT_TEXTURE: u32 = 1;
+const BLUR_BINDING_PARAMS: u32 = 2;
+const FLARE_GROUP0_BINDING_INPUT_TEXTURE: u32 = 0;
+const FLARE_GROUP0_BINDING_OUTPUT_TEXTURE: u32 = 1;
+const FLARE_GROUP0_BINDING_PARAMS: u32 = 2;
+const FLARE_GROUP0_BINDING_SAMPLER: u32 = 3;
+const FLARE_GROUP1_BINDING_INPUT_TEXTURE: u32 = 0;
+const FLARE_GROUP1_BINDING_OUTPUT_TEXTURE: u32 = 1;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Roi {
@@ -716,7 +742,6 @@ const FLARE_MAP_SIZE: u32 = 512;
 impl GpuProcessor {
     pub fn new(context: GpuContext, max_width: u32, max_height: u32) -> Result<Self, String> {
         let device = &context.device;
-        const MAX_MASK_BINDINGS: u32 = 1;
 
         let blur_shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Blur Shader"),
@@ -727,7 +752,7 @@ impl GpuProcessor {
             label: Some("Blur BGL"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
-                    binding: 0,
+                    binding: BLUR_BINDING_INPUT_TEXTURE,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Texture {
                         sample_type: wgpu::TextureSampleType::Float { filterable: false },
@@ -737,7 +762,7 @@ impl GpuProcessor {
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    binding: 1,
+                    binding: BLUR_BINDING_OUTPUT_TEXTURE,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::StorageTexture {
                         access: wgpu::StorageTextureAccess::WriteOnly,
@@ -747,7 +772,7 @@ impl GpuProcessor {
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    binding: 2,
+                    binding: BLUR_BINDING_PARAMS,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
@@ -799,7 +824,7 @@ impl GpuProcessor {
             label: Some("Flare BGL 0"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
-                    binding: 0,
+                    binding: FLARE_GROUP0_BINDING_INPUT_TEXTURE,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Texture {
                         sample_type: wgpu::TextureSampleType::Float { filterable: true },
@@ -809,7 +834,7 @@ impl GpuProcessor {
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    binding: 1,
+                    binding: FLARE_GROUP0_BINDING_OUTPUT_TEXTURE,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::StorageTexture {
                         access: wgpu::StorageTextureAccess::WriteOnly,
@@ -819,7 +844,7 @@ impl GpuProcessor {
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    binding: 2,
+                    binding: FLARE_GROUP0_BINDING_PARAMS,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
@@ -829,7 +854,7 @@ impl GpuProcessor {
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    binding: 3,
+                    binding: FLARE_GROUP0_BINDING_SAMPLER,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
@@ -841,7 +866,7 @@ impl GpuProcessor {
             label: Some("Flare BGL 1"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
-                    binding: 0,
+                    binding: FLARE_GROUP1_BINDING_INPUT_TEXTURE,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Texture {
                         sample_type: wgpu::TextureSampleType::Float { filterable: false },
@@ -851,7 +876,7 @@ impl GpuProcessor {
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    binding: 1,
+                    binding: FLARE_GROUP1_BINDING_OUTPUT_TEXTURE,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::StorageTexture {
                         access: wgpu::StorageTextureAccess::WriteOnly,
@@ -941,7 +966,7 @@ impl GpuProcessor {
 
         let mut bind_group_layout_entries = vec![
             wgpu::BindGroupLayoutEntry {
-                binding: 0,
+                binding: MAIN_BINDING_INPUT_TEXTURE,
                 visibility: wgpu::ShaderStages::COMPUTE,
                 ty: wgpu::BindingType::Texture {
                     sample_type: wgpu::TextureSampleType::Float { filterable: false },
@@ -951,7 +976,7 @@ impl GpuProcessor {
                 count: None,
             },
             wgpu::BindGroupLayoutEntry {
-                binding: 1,
+                binding: MAIN_BINDING_OUTPUT_TEXTURE,
                 visibility: wgpu::ShaderStages::COMPUTE,
                 ty: wgpu::BindingType::StorageTexture {
                     access: wgpu::StorageTextureAccess::WriteOnly,
@@ -961,7 +986,7 @@ impl GpuProcessor {
                 count: None,
             },
             wgpu::BindGroupLayoutEntry {
-                binding: 2,
+                binding: MAIN_BINDING_ADJUSTMENTS,
                 visibility: wgpu::ShaderStages::COMPUTE,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Storage { read_only: true },
@@ -973,7 +998,7 @@ impl GpuProcessor {
         ];
 
         bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
-            binding: 3,
+            binding: MAIN_BINDING_MASK_TEXTURES,
             visibility: wgpu::ShaderStages::COMPUTE,
             ty: wgpu::BindingType::Texture {
                 sample_type: wgpu::TextureSampleType::Float { filterable: false },
@@ -984,7 +1009,7 @@ impl GpuProcessor {
         });
 
         bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
-            binding: 3 + MAX_MASK_BINDINGS,
+            binding: MAIN_BINDING_LUT_TEXTURE,
             visibility: wgpu::ShaderStages::COMPUTE,
             ty: wgpu::BindingType::Texture {
                 sample_type: wgpu::TextureSampleType::Float { filterable: false },
@@ -994,14 +1019,14 @@ impl GpuProcessor {
             count: None,
         });
         bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
-            binding: 4 + MAX_MASK_BINDINGS,
+            binding: MAIN_BINDING_LUT_SAMPLER,
             visibility: wgpu::ShaderStages::COMPUTE,
             ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
             count: None,
         });
 
         bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
-            binding: 5 + MAX_MASK_BINDINGS,
+            binding: MAIN_BINDING_SHARPNESS_BLUR,
             visibility: wgpu::ShaderStages::COMPUTE,
             ty: wgpu::BindingType::Texture {
                 sample_type: wgpu::TextureSampleType::Float { filterable: false },
@@ -1011,7 +1036,7 @@ impl GpuProcessor {
             count: None,
         });
         bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
-            binding: 6 + MAX_MASK_BINDINGS,
+            binding: MAIN_BINDING_TONAL_BLUR,
             visibility: wgpu::ShaderStages::COMPUTE,
             ty: wgpu::BindingType::Texture {
                 sample_type: wgpu::TextureSampleType::Float { filterable: false },
@@ -1021,7 +1046,7 @@ impl GpuProcessor {
             count: None,
         });
         bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
-            binding: 7 + MAX_MASK_BINDINGS,
+            binding: MAIN_BINDING_CLARITY_BLUR,
             visibility: wgpu::ShaderStages::COMPUTE,
             ty: wgpu::BindingType::Texture {
                 sample_type: wgpu::TextureSampleType::Float { filterable: false },
@@ -1031,7 +1056,7 @@ impl GpuProcessor {
             count: None,
         });
         bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
-            binding: 8 + MAX_MASK_BINDINGS,
+            binding: MAIN_BINDING_STRUCTURE_BLUR,
             visibility: wgpu::ShaderStages::COMPUTE,
             ty: wgpu::BindingType::Texture {
                 sample_type: wgpu::TextureSampleType::Float { filterable: false },
@@ -1042,7 +1067,7 @@ impl GpuProcessor {
         });
 
         bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
-            binding: 9 + MAX_MASK_BINDINGS,
+            binding: MAIN_BINDING_FLARE_TEXTURE,
             visibility: wgpu::ShaderStages::COMPUTE,
             ty: wgpu::BindingType::Texture {
                 sample_type: wgpu::TextureSampleType::Float { filterable: true },
@@ -1052,7 +1077,7 @@ impl GpuProcessor {
             count: None,
         });
         bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
-            binding: 10 + MAX_MASK_BINDINGS,
+            binding: MAIN_BINDING_FLARE_SAMPLER,
             visibility: wgpu::ShaderStages::COMPUTE,
             ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
             count: None,
@@ -1247,7 +1272,6 @@ impl GpuProcessor {
         let device = &self.context.device;
         let queue = &self.context.queue;
         let scale = (width.min(height) as f32) / 1080.0;
-        const MAX_MASK_BINDINGS: u32 = 1;
 
         let bounds = request.roi.unwrap_or(Roi {
             x: 0,
@@ -1364,19 +1388,19 @@ impl GpuProcessor {
                 layout: &self.flare_bgl_0,
                 entries: &[
                     wgpu::BindGroupEntry {
-                        binding: 0,
+                        binding: FLARE_GROUP0_BINDING_INPUT_TEXTURE,
                         resource: wgpu::BindingResource::TextureView(input_texture_view),
                     },
                     wgpu::BindGroupEntry {
-                        binding: 1,
+                        binding: FLARE_GROUP0_BINDING_OUTPUT_TEXTURE,
                         resource: wgpu::BindingResource::TextureView(&self.flare_threshold_view),
                     },
                     wgpu::BindGroupEntry {
-                        binding: 2,
+                        binding: FLARE_GROUP0_BINDING_PARAMS,
                         resource: self.flare_params_buffer.as_entire_binding(),
                     },
                     wgpu::BindGroupEntry {
-                        binding: 3,
+                        binding: FLARE_GROUP0_BINDING_SAMPLER,
                         resource: wgpu::BindingResource::Sampler(&self.flare_sampler),
                     },
                 ],
@@ -1394,19 +1418,19 @@ impl GpuProcessor {
                 layout: &self.flare_bgl_0,
                 entries: &[
                     wgpu::BindGroupEntry {
-                        binding: 0,
+                        binding: FLARE_GROUP0_BINDING_INPUT_TEXTURE,
                         resource: wgpu::BindingResource::TextureView(input_texture_view),
                     },
                     wgpu::BindGroupEntry {
-                        binding: 1,
+                        binding: FLARE_GROUP0_BINDING_OUTPUT_TEXTURE,
                         resource: wgpu::BindingResource::TextureView(&self.flare_final_view),
                     },
                     wgpu::BindGroupEntry {
-                        binding: 2,
+                        binding: FLARE_GROUP0_BINDING_PARAMS,
                         resource: self.flare_params_buffer.as_entire_binding(),
                     },
                     wgpu::BindGroupEntry {
-                        binding: 3,
+                        binding: FLARE_GROUP0_BINDING_SAMPLER,
                         resource: wgpu::BindingResource::Sampler(&self.flare_sampler),
                     },
                 ],
@@ -1417,11 +1441,11 @@ impl GpuProcessor {
                 layout: &self.flare_bgl_1,
                 entries: &[
                     wgpu::BindGroupEntry {
-                        binding: 0,
+                        binding: FLARE_GROUP1_BINDING_INPUT_TEXTURE,
                         resource: wgpu::BindingResource::TextureView(&self.flare_threshold_view),
                     },
                     wgpu::BindGroupEntry {
-                        binding: 1,
+                        binding: FLARE_GROUP1_BINDING_OUTPUT_TEXTURE,
                         resource: wgpu::BindingResource::TextureView(&self.flare_ghosts_view),
                     },
                 ],
@@ -1510,15 +1534,15 @@ impl GpuProcessor {
                         layout: &self.blur_bgl,
                         entries: &[
                             wgpu::BindGroupEntry {
-                                binding: 0,
+                                binding: BLUR_BINDING_INPUT_TEXTURE,
                                 resource: wgpu::BindingResource::TextureView(input_texture_view),
                             },
                             wgpu::BindGroupEntry {
-                                binding: 1,
+                                binding: BLUR_BINDING_OUTPUT_TEXTURE,
                                 resource: wgpu::BindingResource::TextureView(&self.ping_pong_view),
                             },
                             wgpu::BindGroupEntry {
-                                binding: 2,
+                                binding: BLUR_BINDING_PARAMS,
                                 resource: self.blur_params_buffer.as_entire_binding(),
                             },
                         ],
@@ -1536,15 +1560,15 @@ impl GpuProcessor {
                         layout: &self.blur_bgl,
                         entries: &[
                             wgpu::BindGroupEntry {
-                                binding: 0,
+                                binding: BLUR_BINDING_INPUT_TEXTURE,
                                 resource: wgpu::BindingResource::TextureView(&self.ping_pong_view),
                             },
                             wgpu::BindGroupEntry {
-                                binding: 1,
+                                binding: BLUR_BINDING_OUTPUT_TEXTURE,
                                 resource: wgpu::BindingResource::TextureView(output_view),
                             },
                             wgpu::BindGroupEntry {
-                                binding: 2,
+                                binding: BLUR_BINDING_PARAMS,
                                 resource: self.blur_params_buffer.as_entire_binding(),
                             },
                         ],
@@ -1579,35 +1603,35 @@ impl GpuProcessor {
 
                 let mut bind_group_entries = vec![
                     wgpu::BindGroupEntry {
-                        binding: 0,
+                        binding: MAIN_BINDING_INPUT_TEXTURE,
                         resource: wgpu::BindingResource::TextureView(input_texture_view),
                     },
                     wgpu::BindGroupEntry {
-                        binding: 1,
+                        binding: MAIN_BINDING_OUTPUT_TEXTURE,
                         resource: wgpu::BindingResource::TextureView(
                             &self.tile_output_texture_view,
                         ),
                     },
                     wgpu::BindGroupEntry {
-                        binding: 2,
+                        binding: MAIN_BINDING_ADJUSTMENTS,
                         resource: self.adjustments_buffer.as_entire_binding(),
                     },
                 ];
                 bind_group_entries.push(wgpu::BindGroupEntry {
-                    binding: 3,
+                    binding: MAIN_BINDING_MASK_TEXTURES,
                     resource: wgpu::BindingResource::TextureView(&mask_texture_view),
                 });
                 bind_group_entries.push(wgpu::BindGroupEntry {
-                    binding: 3 + MAX_MASK_BINDINGS,
+                    binding: MAIN_BINDING_LUT_TEXTURE,
                     resource: wgpu::BindingResource::TextureView(&lut_texture_view),
                 });
                 bind_group_entries.push(wgpu::BindGroupEntry {
-                    binding: 4 + MAX_MASK_BINDINGS,
+                    binding: MAIN_BINDING_LUT_SAMPLER,
                     resource: wgpu::BindingResource::Sampler(&lut_sampler),
                 });
 
                 bind_group_entries.push(wgpu::BindGroupEntry {
-                    binding: 5 + MAX_MASK_BINDINGS,
+                    binding: MAIN_BINDING_SHARPNESS_BLUR,
                     resource: wgpu::BindingResource::TextureView(if did_create_sharpness_blur {
                         &self.sharpness_blur_view
                     } else {
@@ -1615,7 +1639,7 @@ impl GpuProcessor {
                     }),
                 });
                 bind_group_entries.push(wgpu::BindGroupEntry {
-                    binding: 6 + MAX_MASK_BINDINGS,
+                    binding: MAIN_BINDING_TONAL_BLUR,
                     resource: wgpu::BindingResource::TextureView(if did_create_tonal_blur {
                         &self.tonal_blur_view
                     } else {
@@ -1623,7 +1647,7 @@ impl GpuProcessor {
                     }),
                 });
                 bind_group_entries.push(wgpu::BindGroupEntry {
-                    binding: 7 + MAX_MASK_BINDINGS,
+                    binding: MAIN_BINDING_CLARITY_BLUR,
                     resource: wgpu::BindingResource::TextureView(if did_create_clarity_blur {
                         &self.clarity_blur_view
                     } else {
@@ -1631,7 +1655,7 @@ impl GpuProcessor {
                     }),
                 });
                 bind_group_entries.push(wgpu::BindGroupEntry {
-                    binding: 8 + MAX_MASK_BINDINGS,
+                    binding: MAIN_BINDING_STRUCTURE_BLUR,
                     resource: wgpu::BindingResource::TextureView(if did_create_structure_blur {
                         &self.structure_blur_view
                     } else {
@@ -1641,7 +1665,7 @@ impl GpuProcessor {
 
                 let use_flare = adjustments.global.flare_amount > 0.0;
                 bind_group_entries.push(wgpu::BindGroupEntry {
-                    binding: 9 + MAX_MASK_BINDINGS,
+                    binding: MAIN_BINDING_FLARE_TEXTURE,
                     resource: wgpu::BindingResource::TextureView(if use_flare {
                         &self.flare_ghosts_view
                     } else {
@@ -1649,7 +1673,7 @@ impl GpuProcessor {
                     }),
                 });
                 bind_group_entries.push(wgpu::BindGroupEntry {
-                    binding: 10 + MAX_MASK_BINDINGS,
+                    binding: MAIN_BINDING_FLARE_SAMPLER,
                     resource: wgpu::BindingResource::Sampler(&self.flare_sampler),
                 });
 
