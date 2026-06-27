@@ -1127,6 +1127,18 @@
       "maskAdjustmentsTitle": "Ustawienia maski",
       "maskingTitle": "Maskowanie",
       "masksTitle": "Maski",
+      "objectPrompt": {
+        "background": "Background",
+        "box": "Box",
+        "boxReady": "1 box",
+        "clear": "Clear",
+        "foreground": "Foreground",
+        "points": "{{count}} points",
+        "points_one": "{{count}} point",
+        "points_few": "{{count}} points",
+        "points_many": "{{count}} points",
+        "points_other": "{{count}} points"
+      },
       "overlay": {
         "edgeThreshold": "Próg krawędzi",
         "enabled": "Podgląd nakładki",

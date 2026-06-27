@@ -1061,6 +1061,16 @@
       "maskAdjustmentsTitle": "Maskenanpassungen",
       "maskingTitle": "Maskieren",
       "masksTitle": "Masken",
+      "objectPrompt": {
+        "background": "Background",
+        "box": "Box",
+        "boxReady": "1 box",
+        "clear": "Clear",
+        "foreground": "Foreground",
+        "points": "{{count}} points",
+        "points_one": "{{count}} point",
+        "points_other": "{{count}} points"
+      },
       "overlay": {
         "edgeThreshold": "Kantenschwellenwert",
         "enabled": "Overlay-Prüfung",

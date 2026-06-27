@@ -98,6 +98,14 @@ import {
 import { getMaskParameterNumber, mergeMaskParameters, toMaskParameterRecord } from '../../../utils/maskParameterAccess';
 import { createMaskRefinementCommand, dispatchMaskRefinementCommand } from '../../../utils/maskRefinementCommandBus';
 import { createSubMask } from '../../../utils/maskUtils';
+import {
+  clearObjectPromptCanvasState,
+  objectPromptModeSchema,
+  readObjectPromptCanvasState,
+  setObjectPromptMode,
+  writeObjectPromptCanvasState,
+  type ObjectPromptMode,
+} from '../../../utils/objectMaskPromptCanvas';
 import AdjustmentSlider from '../../adjustments/AdjustmentSlider';
 import BasicAdjustments from '../../adjustments/Basic';
 import ColorPanel from '../../adjustments/Color';
@@ -2863,6 +2871,25 @@ function SettingsPanel({
 
   const activeSubMaskType = activeSubMask?.type;
   const subMaskConfig = activeSubMaskType ? SUB_MASK_CONFIG[activeSubMaskType] : {};
+  const objectPromptState =
+    activeSubMaskType === Mask.AiObject && activeSubMask !== null
+      ? readObjectPromptCanvasState(activeSubMask.parameters)
+      : null;
+  const handleObjectPromptModeChange = (mode: ObjectPromptMode) => {
+    if (!activeSubMask || objectPromptState === null) return;
+    updateSubMask(activeSubMask.id, {
+      parameters: writeObjectPromptCanvasState(activeSubMask.parameters, setObjectPromptMode(objectPromptState, mode)),
+    });
+  };
+  const handleClearObjectPrompts = () => {
+    if (!activeSubMask || objectPromptState === null) return;
+    updateSubMask(activeSubMask.id, {
+      parameters: writeObjectPromptCanvasState(
+        activeSubMask.parameters,
+        clearObjectPromptCanvasState(objectPromptState),
+      ),
+    });
+  };
   const isAiMask =
     activeSubMaskType !== undefined &&
     ['ai-subject', 'ai-foreground', 'ai-person', 'ai-sky', 'ai-depth'].includes(activeSubMaskType);
@@ -3114,6 +3141,59 @@ function SettingsPanel({
                   onChange={handleDepthRangeChange}
                   onDragStateChange={onDragStateChange}
                 />
+              )}
+
+              {objectPromptState !== null && (
+                <div
+                  className="rounded-md border border-surface bg-bg-primary p-2"
+                  data-object-prompt-box-ready={String(objectPromptState.boxPrompt !== null)}
+                  data-object-prompt-mode={objectPromptState.mode}
+                  data-object-prompt-point-count={objectPromptState.pointPrompts.length}
+                  data-testid="object-prompt-controls"
+                >
+                  <div className="grid grid-cols-4 gap-1">
+                    {[
+                      { label: t('editor.masks.objectPrompt.foreground'), mode: 'foreground_point' },
+                      { label: t('editor.masks.objectPrompt.background'), mode: 'background_point' },
+                      { label: t('editor.masks.objectPrompt.box'), mode: 'box' },
+                    ].map((action) => (
+                      <button
+                        className={cx(
+                          'min-w-0 rounded px-2 py-1 text-xs transition-colors',
+                          objectPromptState.mode === action.mode
+                            ? 'bg-accent text-white'
+                            : 'bg-bg-secondary text-text-secondary hover:text-text-primary',
+                        )}
+                        data-testid={`object-prompt-mode-${action.mode}`}
+                        key={action.mode}
+                        onClick={() => {
+                          handleObjectPromptModeChange(objectPromptModeSchema.parse(action.mode));
+                        }}
+                        type="button"
+                      >
+                        <span className="block truncate">{action.label}</span>
+                      </button>
+                    ))}
+                    <button
+                      className="min-w-0 rounded bg-bg-secondary px-2 py-1 text-xs text-text-secondary transition-colors hover:text-text-primary"
+                      data-testid="object-prompt-clear"
+                      onClick={handleClearObjectPrompts}
+                      type="button"
+                    >
+                      <span className="block truncate">{t('editor.masks.objectPrompt.clear')}</span>
+                    </button>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-text-tertiary">
+                    <span data-testid="object-prompt-point-summary">
+                      {t('editor.masks.objectPrompt.points', { count: objectPromptState.pointPrompts.length })}
+                    </span>
+                    <span data-testid="object-prompt-box-summary">
+                      {objectPromptState.boxPrompt === null
+                        ? t('editor.masks.objectPrompt.box')
+                        : t('editor.masks.objectPrompt.boxReady')}
+                    </span>
+                  </div>
+                </div>
               )}
 
               {activeSubMask.type === Mask.Linear && (

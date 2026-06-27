@@ -1054,6 +1054,16 @@
       "maskAdjustmentsTitle": "蒙版调整",
       "maskingTitle": "蒙版",
       "masksTitle": "蒙版",
+      "objectPrompt": {
+        "background": "Background",
+        "box": "Box",
+        "boxReady": "1 box",
+        "clear": "Clear",
+        "foreground": "Foreground",
+        "points": "{{count}} points",
+        "points_one": "{{count}} point",
+        "points_other": "{{count}} points"
+      },
       "overlay": {
         "edgeThreshold": "边缘阈值",
         "enabled": "叠加检查",
