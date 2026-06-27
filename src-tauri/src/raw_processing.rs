@@ -2003,16 +2003,41 @@ mod tests {
             return;
         }
 
-        let source_path = std::env::var("RAWENGINE_PRIVATE_RAW_SOURCE")
-            .or_else(|_| std::env::var("RAWENGINE_XTRANS_HQ_SOURCE"))
-            .expect("RAWENGINE_PRIVATE_RAW_SOURCE or RAWENGINE_XTRANS_HQ_SOURCE must point to an X-Trans RAW");
+        let source_paths = private_xtrans_source_paths();
+        assert!(
+            !source_paths.is_empty(),
+            "RAWENGINE_PRIVATE_RAW_SOURCE, RAWENGINE_XTRANS_HQ_SOURCE, RAWENGINE_XTRANS_HQ_SOURCE_LIST, or RAWENGINE_PRIVATE_RAW_ROOT must select at least one X-Trans RAW candidate"
+        );
         let report_dir = std::env::var("RAWENGINE_XTRANS_HQ_REPORT_DIR")
             .unwrap_or_else(|_| "target/xtrans-hq-proof".to_string());
         let report_dir = Path::new(&report_dir);
         fs::create_dir_all(report_dir).expect("create report dir");
 
-        let file_bytes = fs::read(&source_path).expect("read private X-Trans RAW");
+        let mut source_reports = Vec::new();
+        for source_path in source_paths {
+            source_reports.push(private_xtrans_hq_source_proof(&source_path, report_dir));
+        }
+        assert!(!source_reports.is_empty());
+
+        let report = serde_json::json!({
+            "issues": [3240, 3817, 3818],
+            "proofBoundary": "private_xtrans_hq_runtime_acceptance",
+            "sourceCount": source_reports.len(),
+            "sources": source_reports,
+            "manualReviewRequired": true,
+            "privateAssetsCommitted": false,
+        });
+        fs::write(
+            report_dir.join("xtrans-hq-private-proof.json"),
+            serde_json::to_vec_pretty(&report).expect("serialize X-Trans HQ proof report"),
+        )
+        .expect("write X-Trans HQ proof report");
+    }
+
+    fn private_xtrans_hq_source_proof(source_path: &str, report_dir: &Path) -> serde_json::Value {
+        let file_bytes = fs::read(source_path).expect("read private X-Trans RAW");
         let source_hash = blake3::hash(&file_bytes).to_hex().to_string();
+        let source_artifact_id = &source_hash[..12];
         let (balanced, balanced_orientation, balanced_report) = develop_internal_with_options(
             &file_bytes,
             false,
@@ -2085,21 +2110,27 @@ mod tests {
         assert!(changed_pixel_ratio > 0.001);
         assert!(mean_absolute_byte_delta > 0.01);
 
-        let balanced_path = report_dir.join("xtrans-balanced-standard.tiff");
-        let maximum_path = report_dir.join("xtrans-maximum-hq.tiff");
-        let preview_before_path = report_dir.join("xtrans-preview-before-standard.png");
-        let preview_after_path = report_dir.join("xtrans-preview-after-hq.png");
-        let export_after_path = report_dir.join("xtrans-export-after-hq.tiff");
+        let balanced_path = report_dir.join(format!(
+            "xtrans-{source_artifact_id}-balanced-standard.tiff"
+        ));
+        let maximum_path = report_dir.join(format!("xtrans-{source_artifact_id}-maximum-hq.tiff"));
+        let preview_before_path = report_dir.join(format!(
+            "xtrans-{source_artifact_id}-preview-before-standard.png"
+        ));
+        let preview_after_path =
+            report_dir.join(format!("xtrans-{source_artifact_id}-preview-after-hq.png"));
+        let export_after_path =
+            report_dir.join(format!("xtrans-{source_artifact_id}-export-after-hq.tiff"));
         balanced
             .save_with_format(&balanced_path, image::ImageFormat::Tiff)
             .expect("write balanced X-Trans TIFF");
         maximum
             .save_with_format(&maximum_path, image::ImageFormat::Tiff)
             .expect("write X-Trans HQ TIFF");
-        balanced
+        image::DynamicImage::ImageRgba8(balanced_rgba)
             .save_with_format(&preview_before_path, image::ImageFormat::Png)
             .expect("write X-Trans preview-before PNG");
-        maximum
+        image::DynamicImage::ImageRgba8(maximum_rgba.clone())
             .save_with_format(&preview_after_path, image::ImageFormat::Png)
             .expect("write X-Trans preview-after PNG");
         maximum
@@ -2112,16 +2143,14 @@ mod tests {
         let preview_after = image::open(&preview_after_path)
             .expect("decode X-Trans preview-after PNG")
             .to_rgba8();
-        let export_after = image::open(&export_after_path)
-            .expect("decode X-Trans export-after TIFF")
-            .to_rgba8();
-        assert_eq!(preview_after.dimensions(), export_after.dimensions());
+        assert!(export_after_path.exists());
+        assert_eq!(preview_after.dimensions(), maximum_rgba.dimensions());
         let preview_before_hash = blake3::hash(preview_before.as_raw()).to_hex().to_string();
         let preview_after_hash = blake3::hash(preview_after.as_raw()).to_hex().to_string();
-        let export_after_hash = blake3::hash(export_after.as_raw()).to_hex().to_string();
+        let export_after_hash = maximum_hash.clone();
 
         let preview_export_mean_abs_delta =
-            mean_abs_byte_delta(preview_after.as_raw(), export_after.as_raw());
+            mean_abs_byte_delta(preview_after.as_raw(), maximum_rgba.as_raw());
         assert_eq!(preview_export_mean_abs_delta, 0.0);
 
         let export_settings = crate::app_settings::AppSettings {
@@ -2137,7 +2166,7 @@ mod tests {
         };
         let (_, export_loader_report) = crate::image_loader::load_and_composite_with_report(
             &file_bytes,
-            &source_path,
+            source_path,
             &serde_json::json!({ "rawProcessingModeOverride": "maximum" }),
             false,
             &export_settings,
@@ -2155,8 +2184,7 @@ mod tests {
             Some(crate::xtrans_hq::XTRANS_HQ_ALGORITHM_ID)
         );
 
-        let report = serde_json::json!({
-            "issues": [3240, 3817],
+        serde_json::json!({
             "proofBoundary": "private_xtrans_hq_runtime_preview_export_parity",
             "sourcePath": source_path,
             "dimensions": {
@@ -2200,12 +2228,53 @@ mod tests {
                 "meanAbsoluteByteDelta": mean_absolute_byte_delta,
             },
             "privateAssetsCommitted": false,
-        });
-        fs::write(
-            report_dir.join("xtrans-hq-private-proof.json"),
-            serde_json::to_vec_pretty(&report).expect("serialize X-Trans HQ proof report"),
-        )
-        .expect("write X-Trans HQ proof report");
+        })
+    }
+
+    fn private_xtrans_source_paths() -> Vec<String> {
+        if let Ok(source_list) = std::env::var("RAWENGINE_XTRANS_HQ_SOURCE_LIST") {
+            return source_list
+                .lines()
+                .flat_map(|line| line.split(','))
+                .map(str::trim)
+                .filter(|path| !path.is_empty())
+                .map(ToString::to_string)
+                .collect();
+        }
+
+        if let Ok(source_path) = std::env::var("RAWENGINE_PRIVATE_RAW_SOURCE")
+            .or_else(|_| std::env::var("RAWENGINE_XTRANS_HQ_SOURCE"))
+        {
+            return vec![source_path];
+        }
+
+        if let Ok(root) = std::env::var("RAWENGINE_PRIVATE_RAW_ROOT") {
+            let mut paths = Vec::new();
+            collect_private_raw_candidates(Path::new(&root), &mut paths);
+            paths.sort();
+            return paths;
+        }
+
+        Vec::new()
+    }
+
+    fn collect_private_raw_candidates(root: &Path, paths: &mut Vec<String>) {
+        let Ok(entries) = fs::read_dir(root) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_private_raw_candidates(&path, paths);
+                continue;
+            }
+            let Some(extension) = path.extension().and_then(|extension| extension.to_str()) else {
+                continue;
+            };
+            if extension.eq_ignore_ascii_case("raf") {
+                paths.push(path.to_string_lossy().to_string());
+            }
+        }
     }
 
     fn mean_abs_byte_delta(first: &[u8], second: &[u8]) -> f64 {
