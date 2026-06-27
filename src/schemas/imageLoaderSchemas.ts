@@ -52,6 +52,7 @@ export const rawDevelopmentReportSchema = z
           .object({
             borderFallbackPixels: z.number().int().nonnegative(),
             chromaInterpolatedPixels: z.number().int().nonnegative(),
+            chromaLimitedPixels: z.number().int().nonnegative(),
             chromaRefinedPixels: z.number().int().nonnegative(),
             evaluatedPixels: z.number().int().nonnegative(),
             greenDirectionalPixels: z.number().int().nonnegative(),
@@ -59,6 +60,7 @@ export const rawDevelopmentReportSchema = z
             greenLowConfidencePixels: z.number().int().nonnegative(),
             greenMediumConfidencePixels: z.number().int().nonnegative(),
             greenSecondOrderCorrectedPixels: z.number().int().nonnegative(),
+            period6ChromaSuppressedPixels: z.number().int().nonnegative(),
           })
           .strict(),
       })
