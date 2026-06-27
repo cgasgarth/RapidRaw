@@ -31,7 +31,14 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
-import { calculateCenteredCrop } from '../../utils/cropUtils';
+import {
+  didCropGeometryChange,
+  isCropChangeMeaningful,
+  isCropValidAfterRotation,
+  percentCropFromPixelCrop,
+  resolveNextCropForGeometryChange,
+  type CropGeometryParams,
+} from '../../utils/cropUtils';
 import {
   applyPointerOverscrollResistance,
   applyWheelPanResistance,
@@ -59,34 +66,6 @@ import { Panel } from '../ui/AppProperties';
 import type { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
 import type { Crop, PercentCrop } from 'react-image-crop';
 
-const checkCropValid = (pixelCrop: Partial<Crop>, imageW: number, imageH: number, rotation: number) => {
-  if (pixelCrop.x === undefined || pixelCrop.y === undefined || !pixelCrop.width || !pixelCrop.height) {
-    return false;
-  }
-
-  const cx = imageW / 2;
-  const cy = imageH / 2;
-  const rad = (-rotation * Math.PI) / 180;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-
-  const pts = [
-    { x: pixelCrop.x, y: pixelCrop.y },
-    { x: pixelCrop.x + pixelCrop.width, y: pixelCrop.y },
-    { x: pixelCrop.x, y: pixelCrop.y + pixelCrop.height },
-    { x: pixelCrop.x + pixelCrop.width, y: pixelCrop.y + pixelCrop.height },
-  ];
-
-  for (const p of pts) {
-    const nx = cos * (p.x - cx) - sin * (p.y - cy) + cx;
-    const ny = sin * (p.x - cx) + cos * (p.y - cy) + cy;
-    if (nx < -1 || nx > imageW + 1 || ny < -1 || ny > imageH + 1) {
-      return false;
-    }
-  }
-  return true;
-};
-
 interface TransformController {
   resetTransform(time?: number): void;
   setTransform(x: number, y: number, scale: number, time?: number): void;
@@ -96,12 +75,6 @@ interface TransformController {
 
 interface DisplaySizeUpdate extends BaseRenderSize {
   scale: number;
-}
-
-interface CropGeometryParams {
-  aspectRatio: number | null;
-  orientationSteps: number;
-  rotation: number;
 }
 
 type MaskPreviewDefinition =
@@ -1150,170 +1123,34 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     const cropTimer = setTimeout(() => {
       const { aspectRatio, orientationSteps, crop: currentAdjCrop, rotation } = adjustments;
       const effectiveRotation = liveRotation !== null ? liveRotation : rotation;
-
-      const geometryChanged =
-        prevCropParams.current?.rotation !== rotation ||
-        prevCropParams.current.aspectRatio !== aspectRatio ||
-        prevCropParams.current.orientationSteps !== orientationSteps;
-
+      const nextCropParams = { rotation, aspectRatio, orientationSteps };
+      const geometryChanged = didCropGeometryChange(prevCropParams.current, nextCropParams);
       const isDraggingRotation = liveRotation !== null;
       const needsRecalc = currentAdjCrop === null || geometryChanged || isDraggingRotation;
 
       if (needsRecalc) {
-        const isSwapped = orientationSteps === 1 || orientationSteps === 3;
-        const W = isSwapped ? selectedImage.height : selectedImage.width;
-        const H = isSwapped ? selectedImage.width : selectedImage.height;
-        const A = aspectRatio || W / H;
-
-        let nextPixelCrop = currentAdjCrop;
-        const aspectChanged = prevCropParams.current?.aspectRatio !== aspectRatio;
-        const orientationChanged = prevCropParams.current?.orientationSteps !== orientationSteps;
-        const rotationChanged = prevCropParams.current?.rotation !== rotation || isDraggingRotation;
-
-        let isMaximized = false;
-        if (currentAdjCrop) {
-          const referenceRotation = prevCropParams.current?.rotation ?? rotation;
-          const maxCropForReference = calculateCenteredCrop(
-            selectedImage.width,
-            selectedImage.height,
-            orientationSteps,
-            A,
-            referenceRotation,
-          );
-
-          if (
-            maxCropForReference &&
-            Math.abs(currentAdjCrop.x - maxCropForReference.x) <= 2 &&
-            Math.abs(currentAdjCrop.y - maxCropForReference.y) <= 2 &&
-            Math.abs(currentAdjCrop.width - maxCropForReference.width) <= 2 &&
-            Math.abs(currentAdjCrop.height - maxCropForReference.height) <= 2
-          ) {
-            isMaximized = true;
-          }
-        }
-
-        if (!currentAdjCrop || orientationChanged) {
-          nextPixelCrop = calculateCenteredCrop(
-            selectedImage.width,
-            selectedImage.height,
-            orientationSteps,
-            A,
-            effectiveRotation,
-          );
-        } else if (aspectChanged) {
-          if (!aspectRatio) {
-            nextPixelCrop = currentAdjCrop;
-          } else {
-            const curW = currentAdjCrop.width;
-            const curH = currentAdjCrop.height;
-            const curCx = currentAdjCrop.x + curW / 2;
-            const curCy = currentAdjCrop.y + curH / 2;
-
-            let newW = curW;
-            let newH = curW / A;
-
-            if (newH > curH) {
-              newH = curH;
-              newW = curH * A;
-            }
-
-            nextPixelCrop = {
-              unit: 'px',
-              x: Math.ceil(curCx - newW / 2),
-              y: Math.ceil(curCy - newH / 2),
-              width: Math.floor(newW),
-              height: Math.floor(newH),
-            };
-          }
-
-          if (!checkCropValid(nextPixelCrop, W, H, effectiveRotation)) {
-            nextPixelCrop = calculateCenteredCrop(
-              selectedImage.width,
-              selectedImage.height,
-              orientationSteps,
-              A,
-              effectiveRotation,
-            );
-          }
-        } else if (isMaximized && rotationChanged) {
-          nextPixelCrop = calculateCenteredCrop(
-            selectedImage.width,
-            selectedImage.height,
-            orientationSteps,
-            A,
-            effectiveRotation,
-          );
-        } else {
-          if (!checkCropValid(currentAdjCrop, W, H, effectiveRotation)) {
-            let low = 0.1;
-            let high = 1.0;
-            let bestCrop = currentAdjCrop;
-
-            for (let i = 0; i < 10; i++) {
-              const mid = (low + high) / 2;
-              const cx = currentAdjCrop.x + currentAdjCrop.width / 2;
-              const cy = currentAdjCrop.y + currentAdjCrop.height / 2;
-              const nw = currentAdjCrop.width * mid;
-              const nh = currentAdjCrop.height * mid;
-              const testCrop = {
-                unit: 'px' as const,
-                x: cx - nw / 2,
-                y: cy - nh / 2,
-                width: nw,
-                height: nh,
-              };
-
-              if (checkCropValid(testCrop, W, H, effectiveRotation)) {
-                bestCrop = testCrop;
-                low = mid;
-              } else {
-                high = mid;
-              }
-            }
-
-            if (low < 0.15) {
-              nextPixelCrop = calculateCenteredCrop(
-                selectedImage.width,
-                selectedImage.height,
-                orientationSteps,
-                A,
-                effectiveRotation,
-              );
-            } else {
-              nextPixelCrop = {
-                unit: 'px',
-                x: Math.ceil(bestCrop.x),
-                y: Math.ceil(bestCrop.y),
-                width: Math.floor(bestCrop.width),
-                height: Math.floor(bestCrop.height),
-              };
-            }
-          }
-        }
+        const { nextPixelCrop, orientedWidth, orientedHeight } = resolveNextCropForGeometryChange({
+          aspectRatio,
+          currentCrop: currentAdjCrop,
+          effectiveRotation,
+          imageHeight: selectedImage.height,
+          imageWidth: selectedImage.width,
+          isDraggingRotation,
+          orientationSteps,
+          previousParams: prevCropParams.current,
+          rotation,
+        });
 
         if (isDraggingRotation) {
           if (nextPixelCrop) {
-            const pc: PercentCrop = {
-              unit: '%',
-              x: (nextPixelCrop.x / W) * 100,
-              y: (nextPixelCrop.y / H) * 100,
-              width: (nextPixelCrop.width / W) * 100,
-              height: (nextPixelCrop.height / H) * 100,
-            };
+            const pc = percentCropFromPixelCrop(nextPixelCrop, orientedWidth, orientedHeight);
             setCrop(pc);
             lastValidCropRef.current = pc;
           }
         } else {
-          prevCropParams.current = { rotation, aspectRatio, orientationSteps };
+          prevCropParams.current = nextCropParams;
 
-          if (
-            nextPixelCrop &&
-            (!currentAdjCrop ||
-              Math.abs(currentAdjCrop.x - nextPixelCrop.x) > 1 ||
-              Math.abs(currentAdjCrop.y - nextPixelCrop.y) > 1 ||
-              Math.abs(currentAdjCrop.width - nextPixelCrop.width) > 1 ||
-              Math.abs(currentAdjCrop.height - nextPixelCrop.height) > 1)
-          ) {
+          if (isCropChangeMeaningful(currentAdjCrop, nextPixelCrop)) {
             setAdjustments((prev: Adjustments) => ({ ...prev, crop: nextPixelCrop }));
           }
         }
@@ -1397,7 +1234,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         height: (pc.height / 100) * H,
       });
 
-      if (checkCropValid(toPixel(percentCrop), W, H, rotation)) {
+      if (isCropValidAfterRotation(toPixel(percentCrop), W, H, rotation)) {
         setCrop(percentCrop);
         lastValidCropRef.current = percentCrop;
         return;
@@ -1409,7 +1246,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         return;
       }
 
-      if (!checkCropValid(toPixel(lastValidCropRef.current), W, H, rotation)) {
+      if (!isCropValidAfterRotation(toPixel(lastValidCropRef.current), W, H, rotation)) {
         const lv = lastValidCropRef.current;
         const cx = lv.x + lv.width / 2;
         const cy = lv.y + lv.height / 2;
@@ -1426,7 +1263,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
             width: lv.width * factor,
             height: lv.height * factor,
           };
-          if (checkCropValid(toPixel(test), W, H, rotation)) {
+          if (isCropValidAfterRotation(toPixel(test), W, H, rotation)) {
             healed = test;
             hi = mid;
           } else {
@@ -1469,7 +1306,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
               testCrop.y = finalCrop.y + (percentCrop.y - lastValid.y) * mid;
             }
 
-            if (checkCropValid(toPixel(testCrop), W, H, rotation)) {
+            if (isCropValidAfterRotation(toPixel(testCrop), W, H, rotation)) {
               bestValid = { ...testCrop };
               low = mid;
             } else {
@@ -1539,7 +1376,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           targetCrop = { unit: '%', x: oldCX - newW / 2, y: oldCY - newH / 2, width: newW, height: newH };
         }
 
-        const isValidInitially = checkCropValid(toPixel(targetCrop), W, H, rotation);
+        const isValidInitially = isCropValidAfterRotation(toPixel(targetCrop), W, H, rotation);
 
         if (newW <= oldW && isValidInitially) {
           setCrop(targetCrop);
@@ -1559,7 +1396,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
               height: oldH + (targetCrop.height - oldH) * mid,
             };
 
-            if (checkCropValid(toPixel(testCrop), W, H, rotation)) {
+            if (isCropValidAfterRotation(toPixel(testCrop), W, H, rotation)) {
               bestValid = testCrop;
               low = mid;
             } else {
@@ -1599,7 +1436,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
               height: (edge === 'B' ? testVal : currB) - (edge === 'T' ? testVal : currT),
             };
 
-            if (checkCropValid(toPixel(testCrop), W, H, rotation)) {
+            if (isCropValidAfterRotation(toPixel(testCrop), W, H, rotation)) {
               bestVal = testVal;
               low = mid;
             } else {
