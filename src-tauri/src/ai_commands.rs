@@ -10,6 +10,7 @@ use image::{
 };
 use serde_json::Value;
 
+use crate::adjustment_fields::GEOMETRY_KEYS;
 use crate::ai_connector;
 use crate::ai_processing::{
     self, AiDepthMaskParameters, AiForegroundMaskParameters, AiSkyMaskParameters,
@@ -19,7 +20,6 @@ use crate::ai_processing::{
 };
 use crate::app_settings::load_settings_or_default;
 use crate::app_state::AppState;
-use crate::cache_utils::GEOMETRY_KEYS;
 use crate::formats::png_data_url;
 use crate::image_loader::composite_patches_on_image;
 use crate::image_processing::apply_unwarp_geometry;

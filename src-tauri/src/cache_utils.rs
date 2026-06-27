@@ -6,6 +6,8 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
+use crate::adjustment_fields;
+
 type DecodedImageCacheEntry = (
     String,
     Arc<DynamicImage>,
@@ -18,36 +20,18 @@ type DecodedImageCacheValue = (
     Option<RawDevelopmentReport>,
 );
 
-pub const GEOMETRY_KEYS: &[&str] = &[
-    "transformDistortion",
-    "transformVertical",
-    "transformHorizontal",
-    "transformRotate",
-    "transformAspect",
-    "transformScale",
-    "transformXOffset",
-    "transformYOffset",
-    "lensDistortionAmount",
-    "lensVignetteAmount",
-    "lensTcaAmount",
-    "lensDistortionParams",
-    "lensMaker",
-    "lensModel",
-    "lensDistortionEnabled",
-    "lensTcaEnabled",
-    "lensVignetteEnabled",
-];
-
 pub fn calculate_geometry_hash(adjustments: &serde_json::Value) -> u64 {
     let mut hasher = DefaultHasher::new();
 
-    if let Some(patches) = adjustments.get("aiPatches") {
+    if let Some(patches) = adjustments.get(adjustment_fields::AI_PATCHES) {
         patches.to_string().hash(&mut hasher);
     }
 
-    adjustments["orientationSteps"].as_u64().hash(&mut hasher);
+    adjustments[adjustment_fields::ORIENTATION_STEPS]
+        .as_u64()
+        .hash(&mut hasher);
 
-    for key in GEOMETRY_KEYS {
+    for key in adjustment_fields::GEOMETRY_KEYS {
         if let Some(val) = adjustments.get(key) {
             key.hash(&mut hasher);
             val.to_string().hash(&mut hasher);
@@ -63,12 +47,12 @@ pub fn calculate_visual_hash(path: &str, adjustments: &serde_json::Value) -> u64
 
     if let Some(obj) = adjustments.as_object() {
         for (key, value) in obj {
-            if GEOMETRY_KEYS.contains(&key.as_str()) {
+            if adjustment_fields::GEOMETRY_KEYS.contains(&key.as_str()) {
                 continue;
             }
 
             match key.as_str() {
-                "crop" | "rotation" | "orientationSteps" | "flipHorizontal" | "flipVertical" => (),
+                key if adjustment_fields::TRANSFORM_HASH_KEYS.contains(&key) => (),
                 _ => {
                     key.hash(&mut hasher);
                     value.to_string().hash(&mut hasher);
@@ -83,76 +67,84 @@ pub fn calculate_visual_hash(path: &str, adjustments: &serde_json::Value) -> u64
 pub fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
     let mut hasher = DefaultHasher::new();
 
-    let orientation_steps = adjustments["orientationSteps"].as_u64().unwrap_or(0);
+    let orientation_steps = adjustments[adjustment_fields::ORIENTATION_STEPS]
+        .as_u64()
+        .unwrap_or(0);
     orientation_steps.hash(&mut hasher);
 
-    let rotation = adjustments["rotation"].as_f64().unwrap_or(0.0);
+    let rotation = adjustments[adjustment_fields::ROTATION]
+        .as_f64()
+        .unwrap_or(0.0);
     (rotation.to_bits()).hash(&mut hasher);
 
-    let flip_h = adjustments["flipHorizontal"].as_bool().unwrap_or(false);
+    let flip_h = adjustments[adjustment_fields::FLIP_HORIZONTAL]
+        .as_bool()
+        .unwrap_or(false);
     flip_h.hash(&mut hasher);
 
-    let flip_v = adjustments["flipVertical"].as_bool().unwrap_or(false);
+    let flip_v = adjustments[adjustment_fields::FLIP_VERTICAL]
+        .as_bool()
+        .unwrap_or(false);
     flip_v.hash(&mut hasher);
 
-    if let Some(crop_val) = adjustments.get("crop")
+    if let Some(crop_val) = adjustments.get(adjustment_fields::CROP)
         && !crop_val.is_null()
     {
         crop_val.to_string().hash(&mut hasher);
     }
 
-    for key in GEOMETRY_KEYS {
+    for key in adjustment_fields::GEOMETRY_KEYS {
         if let Some(val) = adjustments.get(key) {
             key.hash(&mut hasher);
             val.to_string().hash(&mut hasher);
         }
     }
 
-    if let Some(patches_val) = adjustments.get("aiPatches")
+    if let Some(patches_val) = adjustments.get(adjustment_fields::AI_PATCHES)
         && let Some(patches_arr) = patches_val.as_array()
     {
         patches_arr.len().hash(&mut hasher);
 
         for patch in patches_arr {
-            if let Some(id) = patch.get("id").and_then(|v| v.as_str()) {
+            if let Some(id) = patch.get(adjustment_fields::ID).and_then(|v| v.as_str()) {
                 id.hash(&mut hasher);
             }
 
             let is_visible = patch
-                .get("visible")
+                .get(adjustment_fields::VISIBLE)
                 .and_then(|v| v.as_bool())
                 .unwrap_or(true);
             is_visible.hash(&mut hasher);
 
-            if let Some(patch_data) = patch.get("patchData") {
+            if let Some(patch_data) = patch.get(adjustment_fields::PATCH_DATA) {
                 let color_len = patch_data
-                    .get("color")
+                    .get(adjustment_fields::PATCH_DATA_COLOR)
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .len();
                 color_len.hash(&mut hasher);
 
                 let mask_len = patch_data
-                    .get("mask")
+                    .get(adjustment_fields::PATCH_DATA_MASK)
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .len();
                 mask_len.hash(&mut hasher);
             } else {
                 let data_len = patch
-                    .get("patchDataBase64")
+                    .get(adjustment_fields::PATCH_DATA_BASE64)
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .len();
                 data_len.hash(&mut hasher);
             }
 
-            if let Some(sub_masks_val) = patch.get("subMasks") {
+            if let Some(sub_masks_val) = patch.get(adjustment_fields::SUB_MASKS) {
                 sub_masks_val.to_string().hash(&mut hasher);
             }
 
             let invert = patch
-                .get("invert")
+                .get(adjustment_fields::INVERT)
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
             invert.hash(&mut hasher);
