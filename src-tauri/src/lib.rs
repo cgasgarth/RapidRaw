@@ -72,6 +72,7 @@ mod render_caches;
 #[cfg(all(test, feature = "tauri-test"))]
 mod retouch_clone_real_raw_proof;
 mod retouch_render;
+mod smart_preview_cache;
 #[cfg(all(test, feature = "tauri-test"))]
 mod sr_real_raw_proof;
 mod tagging;
