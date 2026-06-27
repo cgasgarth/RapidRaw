@@ -1,6 +1,4 @@
 import { ClerkProvider } from '@clerk/react';
-import { invoke } from '@tauri-apps/api/core';
-import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import cx from 'clsx';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ToastContainer, toast, Slide } from 'react-toastify';
@@ -27,6 +25,7 @@ import Resizer from './components/ui/Resizer';
 import EditorView from './components/views/EditorView';
 import LibraryView from './components/views/LibraryView';
 import { ContextMenuProvider } from './context/ContextMenuContext';
+import { useAiConnectorStatus } from './hooks/useAiConnectorStatus';
 import { useAppContextMenus } from './hooks/useAppContextMenus';
 import { useAppInitialization } from './hooks/useAppInitialization';
 import { useAppNavigation } from './hooks/useAppNavigation';
@@ -42,14 +41,12 @@ import { useThumbnails } from './hooks/useThumbnails';
 import { useTooltipAccessibility } from './hooks/useTooltipAccessibility';
 import './i18n';
 import { folderTreeListSchema } from './schemas/folderTreeSchemas';
-import { parseAiConnectorStatusPayload } from './schemas/tauriEventSchemas';
 import { useEditorStore } from './store/useEditorStore';
 import { useLibraryStore } from './store/useLibraryStore';
 import { useProcessStore } from './store/useProcessStore';
 import { useSettingsStore } from './store/useSettingsStore';
 import { useUIStore } from './store/useUIStore';
 import { Invokes } from './tauri/commands';
-import { AI_CONNECTOR_STATUS_UPDATE_EVENT } from './utils/tauriEventNames';
 import { invokeWithSchema } from './utils/tauriSchemaInvoke';
 import { getOptionalCurrentWindow } from './window/currentWindow';
 import TitleBar from './window/TitleBar';
@@ -58,6 +55,7 @@ import type { FolderTree as FolderTreeNode } from './components/panel/FolderTree
 import type { ImageDimensions } from './hooks/useImageRenderSize';
 import type { Adjustments } from './utils/adjustments';
 import type { ImageCacheEntry } from './utils/ImageLRUCache';
+import type { UnlistenFn } from '@tauri-apps/api/event';
 
 const CLERK_PUBLISHABLE_KEY = 'pk_test_YnJpZWYtc2Vhc25haWwtMTIuY2xlcmsuYWNjb3VudHMuZGV2JA'; // local dev key
 
@@ -243,6 +241,7 @@ function App() {
     libraryViewMode,
     setLibraryViewMode,
   });
+  useAiConnectorStatus();
 
   const isAndroid = osPlatform === 'android';
   const isPortraitViewport = viewportSize.width > 0 && viewportSize.height > viewportSize.width;
@@ -564,31 +563,6 @@ function App() {
       setEditor({ isMaskControlHovered: false });
     }
   }, [activeRightPanel, activeMaskContainerId, activeAiPatchContainerId, setEditor]);
-
-  useEffect(() => {
-    const unlisten = listen<unknown>(AI_CONNECTOR_STATUS_UPDATE_EVENT, (event) => {
-      const payload = parseAiConnectorStatusPayload(event.payload);
-      setEditor({ isAIConnectorConnected: payload.connected });
-    });
-    void invoke(Invokes.CheckAIConnectorStatus).catch((err: unknown) => {
-      console.error('Failed to check AI connector status:', err);
-    });
-    const interval = setInterval(() => {
-      void invoke(Invokes.CheckAIConnectorStatus).catch((err: unknown) => {
-        console.error('Failed to check AI connector status:', err);
-      });
-    }, 10000);
-    return () => {
-      clearInterval(interval);
-      void unlisten
-        .then((f) => {
-          f();
-        })
-        .catch((err: unknown) => {
-          console.error('Failed to remove AI connector status listener:', err);
-        });
-    };
-  }, [setEditor]);
 
   useEffect(() => {
     const appWindow = getOptionalCurrentWindow();
