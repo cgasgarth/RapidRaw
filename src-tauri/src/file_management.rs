@@ -29,6 +29,7 @@ use crate::album_management::{add_to_album, sync_album_path_changes};
 #[cfg(target_os = "android")]
 use crate::android_integration::*;
 use crate::app_settings::*;
+use crate::auto_adjust::{auto_results_to_json, perform_auto_analysis};
 use crate::cache_utils::calculate_geometry_hash;
 use crate::delete_plan::{
     associated_files_for_source, plan_stem_associated_deletes, plan_virtual_path_deletes,
@@ -42,7 +43,7 @@ use crate::image_processing::GpuContext;
 use crate::image_processing::{
     Crop, ImageMetadata, RawEngineArtifacts, apply_coarse_rotation,
     apply_cpu_default_raw_processing, apply_crop, apply_flip, apply_geometry_warp, apply_rotation,
-    auto_results_to_json, get_all_adjustments_from_json, perform_auto_analysis,
+    get_all_adjustments_from_json,
 };
 use crate::library_identity::{
     LibraryRelinkIdentity, read_exif_for_paths_blocking, read_library_relink_identity_blocking,

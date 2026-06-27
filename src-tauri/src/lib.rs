@@ -14,6 +14,7 @@ mod album_management;
 mod android_integration;
 mod app_settings;
 mod app_state;
+mod auto_adjust;
 mod bayer_hq;
 mod cache_utils;
 #[cfg(feature = "validation-harness")]
@@ -2439,7 +2440,7 @@ pub fn run() {
             export_processing::export_images,
             export_processing::cancel_export,
             export_processing::estimate_export_sizes,
-            image_processing::calculate_auto_adjustments,
+            auto_adjust::calculate_auto_adjustments,
             mask_generation::generate_mask_overlay,
             file_management::update_exif_fields,
             file_management::get_supported_file_types,
