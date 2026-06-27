@@ -27,6 +27,8 @@ export const maskRefinementUiCommandSchema = z
 
 export type MaskRefinementUiCommand = z.infer<typeof maskRefinementUiCommandSchema>;
 
+export const MASK_REFINEMENT_REPLAY_PARAMETER_KEY = 'refinementReplayCommand';
+
 const DEFAULT_REFINEMENT_PARAMETERS: z.infer<typeof maskRefinementParametersCommandSchema> = {
   density: 1,
   edgeContrast: 0,
@@ -64,5 +66,11 @@ export function createMaskRefinementCommand(
 
 export function dispatchMaskRefinementCommand(command: MaskRefinementUiCommand): MaskParameterRecord {
   const parsed = maskRefinementUiCommandSchema.parse(command);
-  return { ...parsed.parameters.refinement };
+  return {
+    ...parsed.parameters.refinement,
+    [MASK_REFINEMENT_REPLAY_PARAMETER_KEY]: {
+      command: parsed,
+      replaySchemaVersion: 1,
+    },
+  };
 }
