@@ -122,6 +122,8 @@ try {
     '--root',
     privateRoot,
     '--require-root',
+    '--fixture-id',
+    requestFixture.fixtureId,
     '--output',
     reportOutputPath,
   ]);

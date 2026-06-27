@@ -38,6 +38,13 @@ const metricNameSchema = z.enum([
   'finalFileSoftProofRgb8MaxAbsDelta',
   'finalFileSoftProofRgb8MeanAbsDelta',
   'finalFileTransformApplied',
+  'gamutMapperChangedPixelRatio',
+  'gamutMapperInputPixelRatio',
+  'gamutPostMapOutOfGamutPixelRatio',
+  'gamutPreMapMaxLinearRgb',
+  'gamutPreMapMinLinearRgb',
+  'gamutPreMapOutOfGamutChannelRatio',
+  'gamutPreMapOutOfGamutPixelRatio',
   'previewExportMeanAbsDelta',
   'softProofExportRgb8MeanAbsDelta',
   'sidecarReloadRevisionMatch',
@@ -180,7 +187,7 @@ const qualityMetricSchema = z
     passed: z.literal(true),
     source: z.literal('private_raw_report'),
     threshold: z.number().min(0),
-    value: z.number().min(0),
+    value: z.number(),
   })
   .strict();
 
