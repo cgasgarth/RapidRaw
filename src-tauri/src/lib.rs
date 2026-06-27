@@ -47,6 +47,7 @@ mod file_management;
 mod focus_real_raw_proof;
 mod formats;
 mod gamut_mapping;
+mod geometry;
 mod gpu_processing;
 mod gpu_readback;
 mod gpu_textures;
