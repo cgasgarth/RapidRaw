@@ -1101,6 +1101,7 @@
         "edgeContrast": "Edge Contrast",
         "edgeShiftPx": "Edge Shift",
         "featherPx": "Feather",
+        "replayReceipt": "Replay-Beleg: Feder {{featherPx}} px, Kante {{edgeShiftPx}} px, Glaettung {{smoothness}}%",
         "reset": "Reset",
         "smoothness": "Smoothness",
         "title": "Refinement"

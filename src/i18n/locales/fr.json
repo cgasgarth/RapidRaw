@@ -624,7 +624,8 @@
         "featherPx": "Feather",
         "edgeShiftPx": "Edge Shift",
         "edgeContrast": "Edge Contrast",
-        "smoothness": "Smoothness"
+        "smoothness": "Smoothness",
+        "replayReceipt": "Recu de relecture : contour progressif {{featherPx}} px, bord {{edgeShiftPx}} px, lissage {{smoothness}}%"
       },
       "objectPrompt": {
         "background": "Background",
