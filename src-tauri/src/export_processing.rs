@@ -446,6 +446,34 @@ pub(crate) fn prepare_export_masks<'a>(
     (transformed_image, mask_bitmaps)
 }
 
+struct ExportRenderInputs {
+    adjustments: AllAdjustments,
+    lut: Option<Arc<crate::lut_processing::Lut>>,
+    unique_hash: u64,
+}
+
+fn prepare_export_render_inputs(
+    path: &str,
+    js_adjustments: &Value,
+    state: &tauri::State<AppState>,
+    is_raw: bool,
+    tm_override: Option<u32>,
+    hash_salt: u64,
+) -> ExportRenderInputs {
+    let mut adjustments = get_all_adjustments_from_json(js_adjustments, is_raw, tm_override);
+    adjustments.global.show_clipping = 0;
+    let lut = js_adjustments["lutPath"]
+        .as_str()
+        .and_then(|p| get_or_load_lut(state, p).ok());
+    let unique_hash = calculate_full_job_hash(path, js_adjustments).wrapping_add(hash_salt);
+
+    ExportRenderInputs {
+        adjustments,
+        lut,
+        unique_hash,
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn process_image_for_export_pipeline(
     path: &str,
@@ -484,15 +512,11 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
     tm_override: Option<u32>,
     mask_bitmaps: &[GrayImage],
 ) -> Result<DynamicImage, String> {
-    let mut all_adjustments = get_all_adjustments_from_json(js_adjustments, is_raw, tm_override);
-    all_adjustments.global.show_clipping = 0;
+    let render_inputs =
+        prepare_export_render_inputs(path, js_adjustments, state, is_raw, tm_override, 0);
 
-    let lut_path = js_adjustments["lutPath"].as_str();
-    let lut = lut_path.and_then(|p| get_or_load_lut(state, p).ok());
-
-    let unique_hash = calculate_full_job_hash(path, js_adjustments);
-
-    let detail_stage = apply_pre_gpu_detail_stages(transformed_image, unique_hash, js_adjustments);
+    let detail_stage =
+        apply_pre_gpu_detail_stages(transformed_image, render_inputs.unique_hash, js_adjustments);
     let retouched_image = crate::retouch_render::apply_clone_retouch_layers(
         detail_stage.image.as_ref(),
         js_adjustments,
@@ -503,11 +527,11 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
         context,
         state,
         retouched_image.as_ref(),
-        unique_hash,
+        render_inputs.unique_hash,
         RenderRequest {
-            adjustments: all_adjustments,
+            adjustments: render_inputs.adjustments,
             mask_bitmaps,
-            lut,
+            lut: render_inputs.lut,
             roi: None,
         },
         debug_tag,
@@ -2346,26 +2370,24 @@ pub async fn estimate_export_sizes(
             })
             .collect();
 
-        let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
-        let mut all_adjustments =
-            get_all_adjustments_from_json(&adjustments_clone, is_raw, tm_override);
-        all_adjustments.global.show_clipping = 0;
-
-        let lut = adjustments_clone["lutPath"]
-            .as_str()
-            .and_then(|p| get_or_load_lut(&state, p).ok());
-        let unique_hash =
-            calculate_full_job_hash(&loaded_image.path, &adjustments_clone).wrapping_add(1);
+        let render_inputs = prepare_export_render_inputs(
+            &loaded_image.path,
+            &adjustments_clone,
+            &state,
+            is_raw,
+            resolve_tonemapper_override_from_handle(&app_handle, is_raw),
+            1,
+        );
 
         let processed_preview = process_and_get_dynamic_image(
             &context,
             &state,
             &preview_image,
-            unique_hash,
+            render_inputs.unique_hash,
             RenderRequest {
-                adjustments: all_adjustments,
+                adjustments: render_inputs.adjustments,
                 mask_bitmaps: &mask_bitmaps,
-                lut,
+                lut: render_inputs.lut,
                 roi: None,
             },
             "estimate_export_size",
@@ -2493,26 +2515,24 @@ pub async fn estimate_export_sizes(
             })
             .collect();
 
-        let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
-        let mut all_adjustments =
-            get_all_adjustments_from_json(&js_adjustments, is_raw, tm_override);
-        all_adjustments.global.show_clipping = 0;
-
-        let lut = js_adjustments["lutPath"]
-            .as_str()
-            .and_then(|p| get_or_load_lut(&state, p).ok());
-        let unique_hash =
-            calculate_full_job_hash(&source_path_str, &js_adjustments).wrapping_add(1);
+        let render_inputs = prepare_export_render_inputs(
+            &source_path_str,
+            &js_adjustments,
+            &state,
+            is_raw,
+            resolve_tonemapper_override_from_handle(&app_handle, is_raw),
+            1,
+        );
 
         let processed_preview = process_and_get_dynamic_image(
             &context,
             &state,
             &preview_base,
-            unique_hash,
+            render_inputs.unique_hash,
             RenderRequest {
-                adjustments: all_adjustments,
+                adjustments: render_inputs.adjustments,
                 mask_bitmaps: &mask_bitmaps,
-                lut,
+                lut: render_inputs.lut,
                 roi: None,
             },
             "estimate_batch_export_size",
