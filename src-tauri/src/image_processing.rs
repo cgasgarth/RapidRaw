@@ -191,61 +191,150 @@ impl Default for GeometryParams {
     }
 }
 
+fn default_transform_scale() -> f32 {
+    100.0
+}
+
+fn default_lens_amount() -> f32 {
+    100.0
+}
+
+fn default_lens_enabled() -> bool {
+    true
+}
+
+fn default_tca_scale() -> f32 {
+    1.0
+}
+
+#[derive(Debug, Deserialize)]
+struct RawLensDistortionParams {
+    #[serde(default)]
+    k1: f32,
+    #[serde(default)]
+    k2: f32,
+    #[serde(default)]
+    k3: f32,
+    #[serde(default)]
+    model: u32,
+    #[serde(rename = "tca_vr")]
+    #[serde(default = "default_tca_scale")]
+    tca_vr: f32,
+    #[serde(rename = "tca_vb")]
+    #[serde(default = "default_tca_scale")]
+    tca_vb: f32,
+    #[serde(rename = "vig_k1")]
+    #[serde(default)]
+    vig_k1: f32,
+    #[serde(rename = "vig_k2")]
+    #[serde(default)]
+    vig_k2: f32,
+    #[serde(rename = "vig_k3")]
+    #[serde(default)]
+    vig_k3: f32,
+}
+
+impl Default for RawLensDistortionParams {
+    fn default() -> Self {
+        Self {
+            k1: 0.0,
+            k2: 0.0,
+            k3: 0.0,
+            model: 0,
+            tca_vr: default_tca_scale(),
+            tca_vb: default_tca_scale(),
+            vig_k1: 0.0,
+            vig_k2: 0.0,
+            vig_k3: 0.0,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawGeometryAdjustments {
+    #[serde(default)]
+    transform_distortion: f32,
+    #[serde(default)]
+    transform_vertical: f32,
+    #[serde(default)]
+    transform_horizontal: f32,
+    #[serde(default)]
+    transform_rotate: f32,
+    #[serde(default)]
+    transform_aspect: f32,
+    #[serde(default = "default_transform_scale")]
+    transform_scale: f32,
+    #[serde(default)]
+    transform_x_offset: f32,
+    #[serde(default)]
+    transform_y_offset: f32,
+    #[serde(default = "default_lens_amount")]
+    lens_distortion_amount: f32,
+    #[serde(default = "default_lens_amount")]
+    lens_vignette_amount: f32,
+    #[serde(default = "default_lens_amount")]
+    lens_tca_amount: f32,
+    #[serde(default = "default_lens_enabled")]
+    lens_distortion_enabled: bool,
+    #[serde(default = "default_lens_enabled")]
+    lens_tca_enabled: bool,
+    #[serde(default = "default_lens_enabled")]
+    lens_vignette_enabled: bool,
+    #[serde(default)]
+    lens_distortion_params: RawLensDistortionParams,
+}
+
+impl Default for RawGeometryAdjustments {
+    fn default() -> Self {
+        Self {
+            transform_distortion: 0.0,
+            transform_vertical: 0.0,
+            transform_horizontal: 0.0,
+            transform_rotate: 0.0,
+            transform_aspect: 0.0,
+            transform_scale: default_transform_scale(),
+            transform_x_offset: 0.0,
+            transform_y_offset: 0.0,
+            lens_distortion_amount: default_lens_amount(),
+            lens_vignette_amount: default_lens_amount(),
+            lens_tca_amount: default_lens_amount(),
+            lens_distortion_enabled: default_lens_enabled(),
+            lens_tca_enabled: default_lens_enabled(),
+            lens_vignette_enabled: default_lens_enabled(),
+            lens_distortion_params: RawLensDistortionParams::default(),
+        }
+    }
+}
+
 pub fn get_geometry_params_from_json(adjustments: &serde_json::Value) -> GeometryParams {
-    let lens_params = adjustments
-        .get("lensDistortionParams")
-        .and_then(|v| v.as_object());
+    let raw = serde_json::from_value::<RawGeometryAdjustments>(adjustments.clone())
+        .unwrap_or_else(|_| RawGeometryAdjustments::default());
 
     GeometryParams {
-        distortion: adjustments["transformDistortion"].as_f64().unwrap_or(0.0) as f32,
-        vertical: adjustments["transformVertical"].as_f64().unwrap_or(0.0) as f32,
-        horizontal: adjustments["transformHorizontal"].as_f64().unwrap_or(0.0) as f32,
-        rotate: adjustments["transformRotate"].as_f64().unwrap_or(0.0) as f32,
-        aspect: adjustments["transformAspect"].as_f64().unwrap_or(0.0) as f32,
-        scale: adjustments["transformScale"].as_f64().unwrap_or(100.0) as f32,
-        x_offset: adjustments["transformXOffset"].as_f64().unwrap_or(0.0) as f32,
-        y_offset: adjustments["transformYOffset"].as_f64().unwrap_or(0.0) as f32,
-
-        lens_distortion_amount: adjustments["lensDistortionAmount"]
-            .as_f64()
-            .unwrap_or(100.0) as f32
-            / 100.0,
-        lens_vignette_amount: adjustments["lensVignetteAmount"].as_f64().unwrap_or(100.0) as f32
-            / 100.0,
-        lens_tca_amount: adjustments["lensTcaAmount"].as_f64().unwrap_or(100.0) as f32 / 100.0,
-        lens_distortion_enabled: adjustments["lensDistortionEnabled"]
-            .as_bool()
-            .unwrap_or(true),
-        lens_tca_enabled: adjustments["lensTcaEnabled"].as_bool().unwrap_or(true),
-        lens_vignette_enabled: adjustments["lensVignetteEnabled"].as_bool().unwrap_or(true),
-
-        lens_dist_k1: lens_params
-            .and_then(|p| p.get("k1").and_then(|k| k.as_f64()))
-            .unwrap_or(0.0) as f32,
-        lens_dist_k2: lens_params
-            .and_then(|p| p.get("k2").and_then(|k| k.as_f64()))
-            .unwrap_or(0.0) as f32,
-        lens_dist_k3: lens_params
-            .and_then(|p| p.get("k3").and_then(|k| k.as_f64()))
-            .unwrap_or(0.0) as f32,
-        lens_model: lens_params
-            .and_then(|p| p.get("model").and_then(|m| m.as_u64()))
-            .unwrap_or(0) as u32,
-        tca_vr: lens_params
-            .and_then(|p| p.get("tca_vr").and_then(|k| k.as_f64()))
-            .unwrap_or(1.0) as f32,
-        tca_vb: lens_params
-            .and_then(|p| p.get("tca_vb").and_then(|k| k.as_f64()))
-            .unwrap_or(1.0) as f32,
-        vig_k1: lens_params
-            .and_then(|p| p.get("vig_k1").and_then(|k| k.as_f64()))
-            .unwrap_or(0.0) as f32,
-        vig_k2: lens_params
-            .and_then(|p| p.get("vig_k2").and_then(|k| k.as_f64()))
-            .unwrap_or(0.0) as f32,
-        vig_k3: lens_params
-            .and_then(|p| p.get("vig_k3").and_then(|k| k.as_f64()))
-            .unwrap_or(0.0) as f32,
+        distortion: raw.transform_distortion,
+        vertical: raw.transform_vertical,
+        horizontal: raw.transform_horizontal,
+        rotate: raw.transform_rotate,
+        aspect: raw.transform_aspect,
+        scale: raw.transform_scale,
+        x_offset: raw.transform_x_offset,
+        y_offset: raw.transform_y_offset,
+        lens_distortion_amount: raw.lens_distortion_amount / 100.0,
+        lens_vignette_amount: raw.lens_vignette_amount / 100.0,
+        lens_tca_amount: raw.lens_tca_amount / 100.0,
+        lens_distortion_enabled: raw.lens_distortion_enabled,
+        lens_tca_enabled: raw.lens_tca_enabled,
+        lens_vignette_enabled: raw.lens_vignette_enabled,
+        lens_dist_k1: raw.lens_distortion_params.k1,
+        lens_dist_k2: raw.lens_distortion_params.k2,
+        lens_dist_k3: raw.lens_distortion_params.k3,
+        lens_model: raw.lens_distortion_params.model,
+        tca_vr: raw.lens_distortion_params.tca_vr,
+        tca_vb: raw.lens_distortion_params.tca_vb,
+        vig_k1: raw.lens_distortion_params.vig_k1,
+        vig_k2: raw.lens_distortion_params.vig_k2,
+        vig_k3: raw.lens_distortion_params.vig_k3,
     }
 }
 
@@ -3760,8 +3849,9 @@ pub fn calculate_auto_adjustments(
 #[cfg(test)]
 mod tests {
     use super::{
-        CapturePreSharpeningSettings, ImageMetadata, RawEngineArtifacts, WaveletDetailSettings,
-        apply_wavelet_detail_by_scale, calculate_gamut_warning_overlay_from_image,
+        CapturePreSharpeningSettings, GeometryParams, ImageMetadata, RawEngineArtifacts,
+        WaveletDetailSettings, apply_wavelet_detail_by_scale,
+        calculate_gamut_warning_overlay_from_image, get_geometry_params_from_json,
         remove_raw_artifacts_and_enhance_with_settings,
     };
     use image::{DynamicImage, ImageBuffer, Rgb, Rgb32FImage, Rgba, RgbaImage};
@@ -3780,6 +3870,94 @@ mod tests {
 
     fn red_channel(image: &DynamicImage, x: u32, y: u32) -> f32 {
         image.to_rgb32f().get_pixel(x, y).0[0]
+    }
+
+    fn assert_close(left: f32, right: f32) {
+        assert!((left - right).abs() < 1e-6, "{left} != {right}");
+    }
+
+    #[test]
+    fn geometry_params_deserialize_defaults_from_empty_adjustments() {
+        let params = get_geometry_params_from_json(&json!({}));
+
+        assert_eq!(params.distortion, 0.0);
+        assert_eq!(params.scale, 100.0);
+        assert_eq!(params.lens_distortion_amount, 1.0);
+        assert_eq!(params.lens_vignette_amount, 1.0);
+        assert_eq!(params.lens_tca_amount, 1.0);
+        assert!(params.lens_distortion_enabled);
+        assert!(params.lens_tca_enabled);
+        assert!(params.lens_vignette_enabled);
+        assert_eq!(params.lens_dist_k1, 0.0);
+        assert_eq!(params.tca_vr, 1.0);
+        assert_eq!(params.tca_vb, 1.0);
+    }
+
+    #[test]
+    fn geometry_params_deserialize_transform_and_lens_values() {
+        let params = get_geometry_params_from_json(&json!({
+            "transformDistortion": 12.5,
+            "transformVertical": -3.0,
+            "transformHorizontal": 4.0,
+            "transformRotate": 1.5,
+            "transformAspect": -2.0,
+            "transformScale": 88.0,
+            "transformXOffset": 9.0,
+            "transformYOffset": -7.0,
+            "lensDistortionAmount": 55.0,
+            "lensVignetteAmount": 70.0,
+            "lensTcaAmount": 80.0,
+            "lensDistortionEnabled": false,
+            "lensTcaEnabled": false,
+            "lensVignetteEnabled": false,
+            "lensDistortionParams": {
+                "k1": 0.12,
+                "k2": -0.03,
+                "k3": 0.004,
+                "model": 2,
+                "tca_vr": 0.99,
+                "tca_vb": 1.02,
+                "vig_k1": -0.2,
+                "vig_k2": 0.05,
+                "vig_k3": -0.01
+            }
+        }));
+
+        assert_eq!(params.distortion, 12.5);
+        assert_eq!(params.vertical, -3.0);
+        assert_eq!(params.horizontal, 4.0);
+        assert_eq!(params.rotate, 1.5);
+        assert_eq!(params.aspect, -2.0);
+        assert_eq!(params.scale, 88.0);
+        assert_eq!(params.x_offset, 9.0);
+        assert_eq!(params.y_offset, -7.0);
+        assert_close(params.lens_distortion_amount, 0.55);
+        assert_close(params.lens_vignette_amount, 0.7);
+        assert_close(params.lens_tca_amount, 0.8);
+        assert!(!params.lens_distortion_enabled);
+        assert!(!params.lens_tca_enabled);
+        assert!(!params.lens_vignette_enabled);
+        assert_close(params.lens_dist_k1, 0.12);
+        assert_close(params.lens_dist_k2, -0.03);
+        assert_close(params.lens_dist_k3, 0.004);
+        assert_eq!(params.lens_model, 2);
+        assert_close(params.tca_vr, 0.99);
+        assert_close(params.tca_vb, 1.02);
+        assert_close(params.vig_k1, -0.2);
+        assert_close(params.vig_k2, 0.05);
+        assert_close(params.vig_k3, -0.01);
+    }
+
+    #[test]
+    fn geometry_params_deserialize_malformed_adjustments_as_defaults() {
+        let params = get_geometry_params_from_json(&json!("not an adjustment object"));
+
+        assert_eq!(params.scale, GeometryParams::default().scale);
+        assert_eq!(
+            params.lens_distortion_amount,
+            GeometryParams::default().lens_distortion_amount
+        );
+        assert!(params.lens_distortion_enabled);
     }
 
     #[test]
