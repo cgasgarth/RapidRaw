@@ -2,7 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 
-const RUST_SOURCE = 'src-tauri/src/image_processing.rs';
+const RUST_SOURCE = 'src-tauri/src/adjustments/abi.rs';
 const WGSL_SOURCE = 'src-tauri/src/shaders/shader.wgsl';
 
 const rustSource = readFileSync(RUST_SOURCE, 'utf8');
@@ -65,7 +65,7 @@ const parseRustFields = (structName) =>
     .split(/\r?\n/u)
     .map((line) => line.trim().replace(/,$/u, ''))
     .filter(Boolean)
-    .map((line) => line.replace(/^pub\s+/u, ''))
+    .map((line) => line.replace(/^pub(?:\([^)]*\))?\s+/u, ''))
     .filter((line) => !line.startsWith('#['))
     .map((line) => {
       const match = line.match(/^([A-Za-z0-9_é]+)\s*:\s*(.+)$/u);
