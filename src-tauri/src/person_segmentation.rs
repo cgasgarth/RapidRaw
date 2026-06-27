@@ -21,7 +21,7 @@ mod macos {
 
     pub fn generate_whole_person_mask(image: &DynamicImage) -> Result<GrayImage, String> {
         let mut png_bytes = Vec::new();
-        image
+        DynamicImage::ImageRgba8(image.to_rgba8())
             .write_to(&mut Cursor::new(&mut png_bytes), ImageFormat::Png)
             .map_err(|error| error.to_string())?;
 
@@ -57,7 +57,7 @@ mod macos {
 
     pub fn generate_face_mask(image: &DynamicImage) -> Result<GrayImage, String> {
         let mut png_bytes = Vec::new();
-        image
+        DynamicImage::ImageRgba8(image.to_rgba8())
             .write_to(&mut Cursor::new(&mut png_bytes), ImageFormat::Png)
             .map_err(|error| error.to_string())?;
 
@@ -182,9 +182,10 @@ mod tests {
 
     #[derive(Serialize)]
     #[serde(rename_all = "camelCase")]
-    struct FaceMaskPrivateProof {
+    struct PersonMaskPrivateProof {
         issue: u32,
         source_hash: String,
+        source_media_kind: String,
         source_name: String,
         mask_coverage: f64,
         mask_hash: String,
@@ -246,9 +247,10 @@ mod tests {
             let mask_path = output_dir.join("face-mask-private.png");
             mask.save_with_format(&mask_path, ImageFormat::Png)
                 .map_err(|error| error.to_string())?;
-            let proof = FaceMaskPrivateProof {
+            let proof = PersonMaskPrivateProof {
                 issue: 3248,
                 source_hash: hash_bytes(&source_bytes),
+                source_media_kind: source_media_kind(&source_path).to_string(),
                 source_name: source_path
                     .file_name()
                     .and_then(|name| name.to_str())
@@ -273,6 +275,103 @@ mod tests {
         ))
     }
 
+    #[test]
+    fn private_whole_person_mask_real_raw_proof_when_enabled() -> Result<(), String> {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_WHOLE_PERSON_MASK_PROOF")
+            .ok()
+            .as_deref()
+            != Some("1")
+        {
+            return Ok(());
+        }
+
+        let source_root = PathBuf::from(
+            std::env::var("RAWENGINE_PRIVATE_PERSON_RAW_SOURCE")
+                .map_err(|_| "RAWENGINE_PRIVATE_PERSON_RAW_SOURCE is required".to_string())?,
+        );
+        let private_root = PathBuf::from(
+            std::env::var("RAWENGINE_PRIVATE_PERSON_RAW_ROOT")
+                .unwrap_or_else(|_| "/tmp/rawengine-whole-person-mask-proof".to_string()),
+        );
+        let output_dir = private_root.join("private-artifacts/validation/whole-person-mask");
+        fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
+        let scan_limit = std::env::var("RAWENGINE_PRIVATE_PERSON_RAW_SCAN_LIMIT")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .unwrap_or(24);
+
+        let mut rejected_sources = Vec::new();
+        for source_path in resolve_private_raw_candidates(&source_root)?
+            .into_iter()
+            .take(scan_limit)
+        {
+            let source_bytes = fs::read(&source_path).map_err(|error| error.to_string())?;
+            let source_path_string = source_path.to_string_lossy().to_string();
+            let image = match load_private_proof_image(&source_bytes, &source_path_string) {
+                Ok(image) => image,
+                Err(error) => {
+                    rejected_sources
+                        .push(format!("{}: load failed: {error}", source_path.display()));
+                    continue;
+                }
+            };
+
+            let mask = match generate_whole_person_mask(&image) {
+                Ok(mask) => mask,
+                Err(error) => {
+                    rejected_sources
+                        .push(format!("{}: mask failed: {error}", source_path.display()));
+                    continue;
+                }
+            };
+            let coverage = mask_coverage(&mask);
+            if !(0.001..=0.85).contains(&coverage) {
+                rejected_sources.push(format!(
+                    "{}: coverage {coverage:.6} outside proof bounds",
+                    source_path.display()
+                ));
+                continue;
+            }
+
+            let mask_path = output_dir.join("whole-person-mask-private.png");
+            mask.save_with_format(&mask_path, ImageFormat::Png)
+                .map_err(|error| error.to_string())?;
+            let proof = PersonMaskPrivateProof {
+                issue: 3247,
+                source_hash: hash_bytes(&source_bytes),
+                source_media_kind: source_media_kind(&source_path).to_string(),
+                source_name: source_path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("private-image")
+                    .to_string(),
+                mask_coverage: coverage,
+                mask_hash: hash_bytes(&fs::read(&mask_path).map_err(|error| error.to_string())?),
+                output_path: mask_path.to_string_lossy().to_string(),
+                validation_mode: format!(
+                    "private_{}_macos_vision_whole_person_mask_runtime_proof",
+                    source_media_kind(&source_path)
+                ),
+            };
+            fs::write(
+                output_dir.join("whole-person-mask-private-proof.json"),
+                serde_json::to_string_pretty(&proof).map_err(|error| error.to_string())?,
+            )
+            .map_err(|error| error.to_string())?;
+            return Ok(());
+        }
+
+        let rejection_summary = rejected_sources
+            .into_iter()
+            .take(3)
+            .collect::<Vec<_>>()
+            .join("; ");
+        Err(format!(
+            "No whole-person mask proof source found under {}. {rejection_summary}",
+            source_root.display()
+        ))
+    }
+
     fn resolve_private_raw_candidates(source: &Path) -> Result<Vec<PathBuf>, String> {
         if source.is_file() {
             return Ok(vec![source.to_path_buf()]);
@@ -288,7 +387,17 @@ mod tests {
                     .map(|extension| {
                         matches!(
                             extension.to_ascii_lowercase().as_str(),
-                            "arw" | "cr2" | "cr3" | "dng" | "nef" | "raf"
+                            "arw"
+                                | "cr2"
+                                | "cr3"
+                                | "dng"
+                                | "nef"
+                                | "raf"
+                                | "jpg"
+                                | "jpeg"
+                                | "png"
+                                | "tif"
+                                | "tiff"
                         )
                     })
                     .unwrap_or(false)
@@ -296,6 +405,23 @@ mod tests {
             .collect();
         candidates.sort();
         Ok(candidates)
+    }
+
+    fn load_private_proof_image(bytes: &[u8], path: &str) -> Result<DynamicImage, String> {
+        load_base_image_from_bytes(bytes, path, false, &AppSettings::default(), None)
+            .or_else(|_| image::load_from_memory(bytes).map_err(|error| error.to_string()))
+    }
+
+    fn source_media_kind(path: &Path) -> &'static str {
+        match path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .map(str::to_ascii_lowercase)
+            .as_deref()
+        {
+            Some("arw" | "cr2" | "cr3" | "dng" | "nef" | "raf") => "raw",
+            _ => "raster",
+        }
     }
 
     fn mask_coverage(mask: &GrayImage) -> f64 {
