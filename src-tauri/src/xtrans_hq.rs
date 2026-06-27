@@ -11,6 +11,7 @@ pub const XTRANS_HQ_ALGORITHM_ID: &str = "rawengine_xtrans_directional_hq_v1";
 pub struct XTransHqReport {
     pub border_fallback_pixels: usize,
     pub chroma_interpolated_pixels: usize,
+    pub chroma_limited_pixels: usize,
     pub chroma_refined_pixels: usize,
     pub evaluated_pixels: usize,
     pub green_directional_pixels: usize,
@@ -18,6 +19,7 @@ pub struct XTransHqReport {
     pub green_low_confidence_pixels: usize,
     pub green_medium_confidence_pixels: usize,
     pub green_second_order_corrected_pixels: usize,
+    pub period6_chroma_suppressed_pixels: usize,
 }
 
 fn pixel_index(width: usize, row: usize, col: usize) -> usize {
@@ -272,8 +274,9 @@ fn luma(pixel: [f32; 3]) -> f32 {
 }
 
 fn refine_chroma(image: &mut Color2D<f32, 3>, report: &mut XTransHqReport) {
-    const CHROMA_DELTA_THRESHOLD: f32 = 0.06;
-    const CHROMA_BLEND: f32 = 0.42;
+    const CHROMA_DELTA_THRESHOLD: f32 = 0.044;
+    const MAX_CHROMA_BLEND: f32 = 0.66;
+    const MIN_EDGE_CHROMA_BLEND: f32 = 0.24;
 
     if image.width < 3 || image.height < 3 {
         return;
@@ -291,6 +294,7 @@ fn refine_chroma(image: &mut Color2D<f32, 3>, report: &mut XTransHqReport) {
             let south = original[pixel_index(image.width, row + 1, col)];
             let horizontal_gradient = (luma(west) - luma(east)).abs();
             let vertical_gradient = (luma(north) - luma(south)).abs();
+            let local_luma_structure = horizontal_gradient.max(vertical_gradient);
             let (a, b, gradient) = if horizontal_gradient <= vertical_gradient {
                 (west, east, horizontal_gradient)
             } else {
@@ -307,12 +311,25 @@ fn refine_chroma(image: &mut Color2D<f32, 3>, report: &mut XTransHqReport) {
                 continue;
             }
 
+            let period6_phase = (row + col) % 6 == 0 || row % 6 == col % 6;
+            let edge_protection = (local_luma_structure * 3.5).clamp(0.0, 0.32);
+            let period6_boost = if period6_phase && local_luma_structure < 0.09 {
+                0.10
+            } else {
+                0.0
+            };
+            let chroma_blend = (MAX_CHROMA_BLEND - edge_protection + period6_boost)
+                .clamp(MIN_EDGE_CHROMA_BLEND, MAX_CHROMA_BLEND);
             image.data[index] = [
-                (center[1] + center_rg + (target_rg - center_rg) * CHROMA_BLEND).max(0.0),
+                (center[1] + center_rg + (target_rg - center_rg) * chroma_blend).max(0.0),
                 center[1].max(0.0),
-                (center[1] + center_bg + (target_bg - center_bg) * CHROMA_BLEND).max(0.0),
+                (center[1] + center_bg + (target_bg - center_bg) * chroma_blend).max(0.0),
             ];
             report.chroma_refined_pixels += 1;
+            report.chroma_limited_pixels += 1;
+            if period6_phase {
+                report.period6_chroma_suppressed_pixels += 1;
+            }
         }
     }
 }
@@ -402,6 +419,7 @@ mod tests {
         edge_displacement_px: f32,
         flat_field_chroma_noise_amplification: f32,
         period6_artifact_energy: f32,
+        color_detail_retention: f32,
     }
 
     fn synthetic_color(row: usize, col: usize, width: usize, fixture: &str) -> [f32; 3] {
@@ -605,6 +623,38 @@ mod tests {
         variance.sqrt()
     }
 
+    fn chroma_detail_energy(image: &Color2D<f32, 3>) -> f32 {
+        if image.width < 3 || image.height < 3 {
+            return 0.0;
+        }
+        let mut total = 0.0;
+        let mut count = 0usize;
+        for row in 1..image.height - 1 {
+            for col in 1..image.width - 1 {
+                let center = image.data[pixel_index(image.width, row, col)];
+                let west = image.data[pixel_index(image.width, row, col - 1)];
+                let east = image.data[pixel_index(image.width, row, col + 1)];
+                let north = image.data[pixel_index(image.width, row - 1, col)];
+                let south = image.data[pixel_index(image.width, row + 1, col)];
+                let center_rg = center[0] - center[1];
+                let center_bg = center[2] - center[1];
+                let neighbor_rg = ((west[0] - west[1])
+                    + (east[0] - east[1])
+                    + (north[0] - north[1])
+                    + (south[0] - south[1]))
+                    * 0.25;
+                let neighbor_bg = ((west[2] - west[1])
+                    + (east[2] - east[1])
+                    + (north[2] - north[1])
+                    + (south[2] - south[1]))
+                    * 0.25;
+                total += (center_rg - neighbor_rg).abs() + (center_bg - neighbor_bg).abs();
+                count += 2;
+            }
+        }
+        total / count.max(1) as f32
+    }
+
     fn period6_artifact_energy(image: &Color2D<f32, 3>, truth: &[[f32; 3]]) -> f32 {
         let mut phase_sum = [0.0; 6];
         let mut phase_count = [0usize; 6];
@@ -662,7 +712,7 @@ mod tests {
         let flat_pixels = mosaic_truth(&cfa, &flat_truth, width, height);
         let fabric_pixels = mosaic_truth(&cfa, &fabric_truth, width, height);
 
-        let (hq, _) = demosaic_xtrans_hq(&pixels, &cfa, roi);
+        let (hq, hq_report) = demosaic_xtrans_hq(&pixels, &cfa, roi);
         let baseline = nearest_color_baseline(&pixels, &cfa, roi);
         let (zone_hq, _) = demosaic_xtrans_hq(&zone_pixels, &cfa, roi);
         let zone_baseline = nearest_color_baseline(&zone_pixels, &cfa, roi);
@@ -671,8 +721,13 @@ mod tests {
         let (fabric_hq, _) = demosaic_xtrans_hq(&fabric_pixels, &cfa, roi);
         let fabric_baseline = nearest_color_baseline(&fabric_pixels, &cfa, roi);
 
+        assert!(hq_report.chroma_limited_pixels > 0);
+        assert!(hq_report.period6_chroma_suppressed_pixels > 0);
+
         let truth_image = Color2D::new_with(truth.clone(), width, height);
+        let fabric_truth_image = Color2D::new_with(fabric_truth.clone(), width, height);
         let truth_acutance = edge_acutance(&truth_image).max(0.000_1);
+        let fabric_truth_chroma_detail = chroma_detail_energy(&fabric_truth_image).max(0.000_1);
         let flat_truth_noise =
             flat_field_chroma_noise(&Color2D::new_with(flat_truth, width, height)).max(0.000_1);
 
@@ -692,6 +747,9 @@ mod tests {
                 flat_field_chroma_noise_amplification: flat_field_chroma_noise(flat_image)
                     / flat_truth_noise,
                 period6_artifact_energy: period6_artifact_energy(zone_image, &zone_truth),
+                color_detail_retention: chroma_detail_energy(fabric_image)
+                    .min(fabric_truth_chroma_detail)
+                    / fabric_truth_chroma_detail,
             }
         };
 
@@ -739,6 +797,7 @@ mod tests {
         assert!(hq.edge_displacement_px.is_finite());
         assert!(hq.flat_field_chroma_noise_amplification.is_finite());
         assert!(hq.period6_artifact_energy.is_finite());
+        assert!(hq.color_detail_retention.is_finite());
 
         assert!(hq.rgb_mae_against_synthetic_truth <= baseline.rgb_mae_against_synthetic_truth);
         assert!(hq.green_plane_mae <= baseline.green_plane_mae);
@@ -751,5 +810,7 @@ mod tests {
         );
         assert!(hq.period6_artifact_energy < 0.06);
         assert!(hq.edge_displacement_px < 3.0);
+        assert!(hq.color_detail_retention > 0.65);
+        assert!(hq.color_detail_retention <= 1.0);
     }
 }
