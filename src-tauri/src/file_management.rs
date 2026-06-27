@@ -43,6 +43,7 @@ use crate::image_processing::{
 };
 use crate::mask_generation::MaskDefinition;
 use crate::tagging::{COLOR_TAG_PREFIX, USER_TAG_PREFIX};
+use crate::xmp_sidecar::{extract_xmp_label, extract_xmp_rating, extract_xmp_tags};
 
 fn resolve_thumbnail_cache_dir(app_handle: &AppHandle) -> std::result::Result<PathBuf, String> {
     let cache_dir = app_handle
@@ -3743,54 +3744,6 @@ pub fn create_virtual_copy(
     }
 
     Ok(new_virtual_path)
-}
-
-pub fn extract_xmp_rating(content: &str) -> Option<u8> {
-    if let Some(idx) = content.find("xmp:Rating=\"") {
-        let start = idx + 12;
-        let end = content[start..].find('"').map(|i| start + i)?;
-        return content[start..end].parse().ok();
-    }
-    if let Some(idx) = content.find("<xmp:Rating>") {
-        let start = idx + 12;
-        let end = content[start..].find('<').map(|i| start + i)?;
-        return content[start..end].parse().ok();
-    }
-    None
-}
-
-pub fn extract_xmp_label(content: &str) -> Option<String> {
-    if let Some(idx) = content.find("xmp:Label=\"") {
-        let start = idx + 11;
-        let end = content[start..].find('"').map(|i| start + i)?;
-        return Some(content[start..end].to_string());
-    }
-    if let Some(idx) = content.find("<xmp:Label>") {
-        let start = idx + 11;
-        let end = content[start..].find('<').map(|i| start + i)?;
-        return Some(content[start..end].to_string());
-    }
-    None
-}
-
-pub fn extract_xmp_tags(content: &str) -> Vec<String> {
-    let mut tags = Vec::new();
-    if let Some(start_idx) = content.find("<dc:subject>")
-        && let Some(end_idx) = content[start_idx..].find("</dc:subject>")
-    {
-        let subject_block = &content[start_idx..start_idx + end_idx];
-        let mut current_idx = 0;
-        while let Some(li_start) = subject_block[current_idx..].find("<rdf:li>") {
-            let val_start = current_idx + li_start + 8;
-            if let Some(li_end) = subject_block[val_start..].find("</rdf:li>") {
-                tags.push(subject_block[val_start..val_start + li_end].to_string());
-                current_idx = val_start + li_end + 9;
-            } else {
-                break;
-            }
-        }
-    }
-    tags
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
