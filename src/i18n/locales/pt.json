@@ -838,7 +838,8 @@
       "recoveryQuarantined": "Quarantined {{count}} partial tether download(s).",
       "sessionReconnectRequired": "Reconnect required",
       "sessionReconnectRequiredDescription": "Refresh tether discovery and reopen the session before capturing again.",
-      "ingestProofReceipt": "Recibo de prova: {{preset}}, colisao {{collisionIndex}}, {{checksum}}"
+      "ingestProofReceipt": "Recibo de prova: {{preset}}, colisao {{collisionIndex}}, {{checksum}}",
+      "recoveryProofReceipt": "Recibo de recuperacao: {{status}}, {{count}} arquivos parciais"
     },
     "layers": {
       "actions": {

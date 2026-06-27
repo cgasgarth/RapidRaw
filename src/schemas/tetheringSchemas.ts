@@ -183,6 +183,22 @@ export const tetherIngestProofReceiptSchema = z.object({
   status: tetherCaptureResponseSchema.shape.status,
 });
 
+export const tetherRecoveryProofReceiptSchema = z.object({
+  cameraDisplayName: tetherSessionSnapshotSchema.shape.cameraDisplayName,
+  captureCounter: tetherSessionSnapshotSchema.shape.captureCounter,
+  destinationRoot: tetherSessionSnapshotSchema.shape.destinationRoot,
+  firstQuarantinedFile: z.string().trim().min(1).nullable(),
+  partialFilesFound: tetherRecoverySummarySchema.shape.partialFilesFound,
+  providerMode: tetherSessionSnapshotSchema.shape.providerMode,
+  quarantinedFileCount: z.number().int().nonnegative(),
+  receiptVersion: z.literal(1),
+  recoveryMessage: tetherRecoverySummarySchema.shape.message,
+  recoveryStatus: tetherRecoverySummarySchema.shape.status,
+  reconnectRequired: z.boolean(),
+  sessionId: tetherSessionSnapshotSchema.shape.sessionId,
+  sessionStatus: tetherSessionSnapshotSchema.shape.status,
+});
+
 export type TetherCapability = z.infer<typeof tetherCapabilitySchema>;
 export type TetherCameraControl = z.infer<typeof tetherCameraControlSchema>;
 export type TetherCameraControlWriteRequest = z.infer<typeof tetherCameraControlWriteRequestSchema>;
@@ -191,6 +207,7 @@ export type TetherCaptureRequest = z.infer<typeof tetherCaptureRequestSchema>;
 export type TetherCaptureResponse = z.infer<typeof tetherCaptureResponseSchema>;
 export type TetherDiscoveryResponse = z.infer<typeof tetherDiscoveryResponseSchema>;
 export type TetherIngestProofReceipt = z.infer<typeof tetherIngestProofReceiptSchema>;
+export type TetherRecoveryProofReceipt = z.infer<typeof tetherRecoveryProofReceiptSchema>;
 export type TetherRecoverySummary = z.infer<typeof tetherRecoverySummarySchema>;
 export type TetherSessionResponse = z.infer<typeof tetherSessionResponseSchema>;
 export type TetherSessionSnapshot = z.infer<typeof tetherSessionSnapshotSchema>;

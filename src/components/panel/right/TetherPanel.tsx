@@ -20,7 +20,10 @@ import {
 } from '../../../schemas/tetheringSchemas';
 import { TextColors, TextVariants } from '../../../types/typography';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
-import { buildTetherIngestProofReceipt } from '../../../utils/tetherIngestProofReceipt';
+import {
+  buildTetherIngestProofReceipt,
+  buildTetherRecoveryProofReceipt,
+} from '../../../utils/tetherIngestProofReceipt';
 import { Invokes } from '../../ui/AppProperties';
 import Button from '../../ui/Button';
 import UiText from '../../ui/Text';
@@ -102,6 +105,7 @@ export function TetherPanel({
   const isSessionOpen = session !== null;
   const isSessionCaptureReady = session?.status === 'open';
   const captureProofReceipt = capture === null ? null : buildTetherIngestProofReceipt(capture);
+  const recoveryProofReceipt = session === null ? null : buildTetherRecoveryProofReceipt(session);
 
   const discover = useCallback(async () => {
     setIsLoading(true);
@@ -734,6 +738,28 @@ export function TetherPanel({
             data-recovery-status={session.recovery.status}
             data-testid="tether-recovery-status"
           >
+            {recoveryProofReceipt !== null && (
+              <UiText
+                variant={TextVariants.small}
+                color={TextColors.secondary}
+                className="mb-1 block truncate"
+                data-capture-counter={recoveryProofReceipt.captureCounter}
+                data-first-quarantined-file={recoveryProofReceipt.firstQuarantinedFile ?? ''}
+                data-partial-files-found={recoveryProofReceipt.partialFilesFound}
+                data-quarantined-file-count={recoveryProofReceipt.quarantinedFileCount}
+                data-receipt-version={recoveryProofReceipt.receiptVersion}
+                data-reconnect-required={String(recoveryProofReceipt.reconnectRequired)}
+                data-recovery-status={recoveryProofReceipt.recoveryStatus}
+                data-session-id={recoveryProofReceipt.sessionId}
+                data-session-status={recoveryProofReceipt.sessionStatus}
+                data-testid="tether-recovery-proof-receipt"
+              >
+                {t('editor.tether.recoveryProofReceipt', {
+                  count: recoveryProofReceipt.partialFilesFound,
+                  status: recoveryProofReceipt.recoveryStatus,
+                })}
+              </UiText>
+            )}
             <UiText
               variant={TextVariants.small}
               color={session.recovery.status === 'failed' ? TextColors.error : TextColors.secondary}

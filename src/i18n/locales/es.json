@@ -847,7 +847,8 @@
       "sessionReconnectRequired": "Reconnect required",
       "sessionReconnectRequiredDescription": "Refresh tether discovery and reopen the session before capturing again.",
       "none": "None",
-      "ingestProofReceipt": "Recibo de prueba: {{preset}}, colision {{collisionIndex}}, {{checksum}}"
+      "ingestProofReceipt": "Recibo de prueba: {{preset}}, colision {{collisionIndex}}, {{checksum}}",
+      "recoveryProofReceipt": "Recibo de recuperacion: {{status}}, {{count}} archivos parciales"
     },
     "layers": {
       "actions": {
