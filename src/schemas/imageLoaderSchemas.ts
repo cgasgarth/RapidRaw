@@ -55,6 +55,10 @@ export const rawDevelopmentReportSchema = z
             chromaRefinedPixels: z.number().int().nonnegative(),
             evaluatedPixels: z.number().int().nonnegative(),
             greenDirectionalPixels: z.number().int().nonnegative(),
+            greenHighConfidencePixels: z.number().int().nonnegative(),
+            greenLowConfidencePixels: z.number().int().nonnegative(),
+            greenMediumConfidencePixels: z.number().int().nonnegative(),
+            greenSecondOrderCorrectedPixels: z.number().int().nonnegative(),
           })
           .strict(),
       })
