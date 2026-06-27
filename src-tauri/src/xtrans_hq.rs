@@ -1142,18 +1142,55 @@ mod tests {
         assert!(hq.period6_artifact_energy.is_finite());
         assert!(hq.color_detail_retention.is_finite());
 
-        assert!(hq.rgb_mae_against_synthetic_truth <= baseline.rgb_mae_against_synthetic_truth);
-        assert!(hq.green_plane_mae <= baseline.green_plane_mae);
-        assert!(hq.mtf50_relative >= baseline.mtf50_relative);
-        assert!(hq.false_chroma_energy <= baseline.false_chroma_energy * 1.25);
-        assert!(hq.zipper_edge_count <= baseline.zipper_edge_count + 2);
+        assert!(
+            hq.rgb_mae_against_synthetic_truth <= baseline.rgb_mae_against_synthetic_truth * 0.20,
+            "X-Trans HQ RGB MAE regressed: hq={} baseline={}",
+            hq.rgb_mae_against_synthetic_truth,
+            baseline.rgb_mae_against_synthetic_truth
+        );
+        assert!(
+            hq.green_plane_mae <= baseline.green_plane_mae * 0.20,
+            "X-Trans HQ green MAE regressed: hq={} baseline={}",
+            hq.green_plane_mae,
+            baseline.green_plane_mae
+        );
+        assert!(
+            hq.mtf50_relative >= baseline.mtf50_relative * 1.20,
+            "X-Trans HQ acutance regressed: hq={} baseline={}",
+            hq.mtf50_relative,
+            baseline.mtf50_relative
+        );
+        assert!(
+            hq.false_chroma_energy <= baseline.false_chroma_energy * 0.20,
+            "X-Trans HQ false chroma regressed: hq={} baseline={}",
+            hq.false_chroma_energy,
+            baseline.false_chroma_energy
+        );
+        assert!(
+            hq.zipper_edge_count == 0,
+            "X-Trans HQ zipper artifacts regressed: hq={} baseline={}",
+            hq.zipper_edge_count,
+            baseline.zipper_edge_count
+        );
         assert!(
             hq.flat_field_chroma_noise_amplification
                 <= baseline.flat_field_chroma_noise_amplification * 1.05
         );
-        assert!(hq.period6_artifact_energy < 0.06);
-        assert!(hq.edge_displacement_px < 3.0);
-        assert!(hq.color_detail_retention > 0.65);
+        assert!(
+            hq.period6_artifact_energy < 0.003,
+            "X-Trans HQ period-6 residual regressed: {}",
+            hq.period6_artifact_energy
+        );
+        assert!(
+            hq.edge_displacement_px < 0.75,
+            "X-Trans HQ edge placement regressed: {}px",
+            hq.edge_displacement_px
+        );
+        assert!(
+            hq.color_detail_retention >= 0.98,
+            "X-Trans HQ color detail retention regressed: {}",
+            hq.color_detail_retention
+        );
         assert!(hq.color_detail_retention <= 1.0);
     }
 }
