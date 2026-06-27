@@ -558,7 +558,7 @@ pub async fn check_ai_connector_status(app_handle: tauri::AppHandle) {
     };
     use tauri::Emitter;
     let _ = app_handle.emit(
-        "ai-connector-status-update",
+        crate::events::AI_CONNECTOR_STATUS_UPDATE,
         serde_json::json!({ "connected": is_connected }),
     );
 }

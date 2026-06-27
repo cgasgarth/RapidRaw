@@ -1,5 +1,6 @@
 export const AI_MODEL_DOWNLOAD_FINISH_EVENT = 'ai-model-download-finish';
 export const AI_MODEL_DOWNLOAD_START_EVENT = 'ai-model-download-start';
+export const AI_CONNECTOR_STATUS_UPDATE_EVENT = 'ai-connector-status-update';
 export const BATCH_EXPORT_PROGRESS_EVENT = 'batch-export-progress';
 export const CULLING_COMPLETE_EVENT = 'culling-complete';
 export const CULLING_ERROR_EVENT = 'culling-error';

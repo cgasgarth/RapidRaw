@@ -722,7 +722,7 @@ fn start_analytics_worker(app_handle: tauri::AppHandle) {
             if let Ok(histogram_data) = image_processing::calculate_histogram_from_image(&job.image)
             {
                 let _ = app_handle.emit(
-                    "histogram-update",
+                    crate::events::HISTOGRAM_UPDATE,
                     serde_json::json!({ "path": job.path, "data": histogram_data }),
                 );
             }
@@ -731,7 +731,7 @@ fn start_analytics_worker(app_handle: tauri::AppHandle) {
                 image_processing::calculate_gamut_warning_overlay_from_image(&job.image)
             {
                 let _ = app_handle.emit(
-                    "gamut-warning-update",
+                    crate::events::GAMUT_WARNING_UPDATE,
                     serde_json::json!({ "path": job.path, "data": gamut_warning_data }),
                 );
             }
@@ -743,7 +743,7 @@ fn start_analytics_worker(app_handle: tauri::AppHandle) {
                 )
             {
                 let _ = app_handle.emit(
-                    "waveform-update",
+                    crate::events::WAVEFORM_UPDATE,
                     serde_json::json!({ "path": job.path, "data": waveform_data }),
                 );
             }
