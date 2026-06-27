@@ -46,6 +46,7 @@ import { useSettingsStore } from './store/useSettingsStore';
 import { useUIStore } from './store/useUIStore';
 import { Invokes } from './tauri/commands';
 import { findAlbumById, insertChildrenIntoTree } from './utils/folderTreeUtils';
+import { getViteEnv } from './utils/frontendEnv.mjs';
 import { invokeWithSchema } from './utils/tauriSchemaInvoke';
 import { getOptionalCurrentWindow } from './window/currentWindow';
 import TitleBar from './window/TitleBar';
@@ -56,7 +57,8 @@ import type { Adjustments } from './utils/adjustments';
 import type { ImageCacheEntry } from './utils/ImageLRUCache';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 
-const CLERK_PUBLISHABLE_KEY = 'pk_test_YnJpZWYtc2Vhc25haWwtMTIuY2xlcmsuYWNjb3VudHMuZGV2JA'; // local dev key
+const LOCAL_DEV_CLERK_PUBLISHABLE_KEY = 'pk_test_YnJpZWYtc2Vhc25haWwtMTIuY2xlcmsuYWNjb3VudHMuZGV2JA';
+const CLERK_PUBLISHABLE_KEY = getViteEnv().VITE_CLERK_PUBLISHABLE_KEY ?? LOCAL_DEV_CLERK_PUBLISHABLE_KEY;
 
 interface PreviousAdjustments {
   adjustments: Adjustments;
