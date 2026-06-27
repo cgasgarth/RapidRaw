@@ -704,7 +704,9 @@
           "single_illuminant": "Single illuminant",
           "unavailable": "Unavailable"
         },
-        "title": "Camera Input Profile"
+        "title": "Camera Input Profile",
+        "receipt": "Receipt",
+        "receiptSummary": "{{status}} · {{demosaicPath}}"
       }
     },
     "presets": {

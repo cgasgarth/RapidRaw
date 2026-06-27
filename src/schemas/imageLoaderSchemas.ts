@@ -45,6 +45,23 @@ export const rawDevelopmentReportSchema = z
   })
   .strict();
 
+export const rawCameraProfileProvenanceReceiptSchema = z
+  .object({
+    algorithmId: rawCameraProfileReportSchema.shape.algorithmId,
+    candidateCount: rawCameraProfileReportSchema.shape.candidateCount,
+    coolIlluminant: rawCameraProfileReportSchema.shape.coolIlluminant,
+    coolWeight: rawCameraProfileReportSchema.shape.coolWeight,
+    demosaicPath: rawDemosaicPathSchema,
+    estimatedCctKelvin: rawCameraProfileReportSchema.shape.estimatedCctKelvin,
+    fallbackReason: rawCameraProfileReportSchema.shape.fallbackReason,
+    matrixHash: rawCameraProfileReportSchema.shape.matrixHash,
+    receiptVersion: z.literal(1),
+    status: rawCameraProfileStatusSchema,
+    warmIlluminant: rawCameraProfileReportSchema.shape.warmIlluminant,
+    warningCount: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export const loadedMetadataSchema = z
   .object({
     adjustments: z.union([legacyAdjustmentSnapshotSchema, nullAdjustmentSnapshotSchema]).nullable().optional(),
@@ -65,6 +82,7 @@ export const loadImageResultSchema = z
 
 export type LoadedMetadata = z.infer<typeof loadedMetadataSchema>;
 export type LoadImageResult = z.infer<typeof loadImageResultSchema>;
+export type RawCameraProfileProvenanceReceipt = z.infer<typeof rawCameraProfileProvenanceReceiptSchema>;
 export type RawDevelopmentReport = z.infer<typeof rawDevelopmentReportSchema>;
 
 export const isNullAdjustmentSnapshot = (

@@ -1225,6 +1225,8 @@
         "fallbackReason": "Fallback",
         "illuminants": "Illuminants",
         "matrixHash": "Matrix hash",
+        "receipt": "Potwierdzenie",
+        "receiptSummary": "{{status}} · {{demosaicPath}}",
         "status": {
           "fallback": "Fallback",
           "interpolated": "Interpolated",

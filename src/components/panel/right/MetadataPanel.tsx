@@ -25,6 +25,7 @@ import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { COLOR_LABELS, type Color } from '../../../utils/adjustments';
+import { buildCameraProfileProvenanceReceipt } from '../../../utils/cameraProfileProvenanceReceipt';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import { Invokes } from '../../ui/AppProperties';
 import UiText from '../../ui/Text';
@@ -457,6 +458,8 @@ export default function MetadataPanel() {
   const megapixels = selectedImage ? ((selectedImage.width * selectedImage.height) / 1000000).toFixed(1) : null;
   const rawDevelopmentReport = selectedImage?.rawDevelopmentReport ?? null;
   const cameraProfileReport = rawDevelopmentReport?.cameraProfile ?? null;
+  const cameraProfileReceipt =
+    rawDevelopmentReport === null ? null : buildCameraProfileProvenanceReceipt(rawDevelopmentReport);
   const populatedCameraFieldCount = cameraGridSettings.filter((setting) => setting.value !== '-').length;
   const editableMetadataFieldCount = EDITABLE_FIELDS.length;
 
@@ -827,6 +830,34 @@ export default function MetadataPanel() {
                   </UiText>
                 </div>
                 <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                  {cameraProfileReceipt !== null && (
+                    <>
+                      <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                        {t('editor.metadata.cameraProfile.receipt')}
+                      </UiText>
+                      <UiText
+                        variant={TextVariants.small}
+                        color={TextColors.primary}
+                        className="truncate text-right"
+                        data-candidate-count={cameraProfileReceipt.candidateCount}
+                        data-cool-illuminant={cameraProfileReceipt.coolIlluminant ?? ''}
+                        data-cool-weight={cameraProfileReceipt.coolWeight ?? ''}
+                        data-demosaic-path={cameraProfileReceipt.demosaicPath}
+                        data-estimated-cct-kelvin={cameraProfileReceipt.estimatedCctKelvin ?? ''}
+                        data-matrix-hash={cameraProfileReceipt.matrixHash ?? ''}
+                        data-receipt-version={cameraProfileReceipt.receiptVersion}
+                        data-status={cameraProfileReceipt.status}
+                        data-testid="metadata-camera-profile-provenance-receipt"
+                        data-warm-illuminant={cameraProfileReceipt.warmIlluminant ?? ''}
+                        data-warning-count={cameraProfileReceipt.warningCount}
+                      >
+                        {t('editor.metadata.cameraProfile.receiptSummary', {
+                          demosaicPath: cameraProfileReceipt.demosaicPath,
+                          status: cameraProfileReceipt.status,
+                        })}
+                      </UiText>
+                    </>
+                  )}
                   <UiText variant={TextVariants.small} color={TextColors.secondary}>
                     {t('editor.metadata.cameraProfile.algorithm')}
                   </UiText>
