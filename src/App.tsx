@@ -49,6 +49,7 @@ import { useProcessStore } from './store/useProcessStore';
 import { useSettingsStore } from './store/useSettingsStore';
 import { useUIStore } from './store/useUIStore';
 import { Invokes } from './tauri/commands';
+import { AI_CONNECTOR_STATUS_UPDATE_EVENT } from './utils/tauriEventNames';
 import { invokeWithSchema } from './utils/tauriSchemaInvoke';
 import { getOptionalCurrentWindow } from './window/currentWindow';
 import TitleBar from './window/TitleBar';
@@ -565,7 +566,7 @@ function App() {
   }, [activeRightPanel, activeMaskContainerId, activeAiPatchContainerId, setEditor]);
 
   useEffect(() => {
-    const unlisten = listen<unknown>('ai-connector-status-update', (event) => {
+    const unlisten = listen<unknown>(AI_CONNECTOR_STATUS_UPDATE_EVENT, (event) => {
       const payload = parseAiConnectorStatusPayload(event.payload);
       setEditor({ isAIConnectorConnected: payload.connected });
     });
