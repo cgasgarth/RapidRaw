@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use half::f16;
-use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, Rgba};
+use image::{DynamicImage, GenericImageView, ImageBuffer, Luma};
 use std::num::NonZero;
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
@@ -11,13 +11,21 @@ use wgpu::util::{DeviceExt, TextureDataOrder};
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
 use crate::display_profile::build_srgb_to_active_display_lut;
+use crate::gpu_readback::{
+    RGBA16_FLOAT_BYTES_PER_PIXEL, read_texture_data_roi_with_bytes_per_pixel,
+    rgba16float_readback_to_dynamic_image, rgba16float_readback_to_unclamped_dynamic_image,
+};
+use crate::gpu_textures::{
+    create_dummy_lut_texture_view, create_dummy_rgba16f_texture_view,
+    create_rgba16f_texture_with_view,
+};
 use crate::image_processing::{AllAdjustments, GpuContext, MAX_MASKS};
 use crate::lut_processing::Lut;
 use crate::render_caches::RenderCaches;
 use crate::{AppState, GpuImageCache};
 
 const GPU_OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
-const GPU_OUTPUT_BYTES_PER_PIXEL: u32 = 8;
+const GPU_OUTPUT_BYTES_PER_PIXEL: u32 = RGBA16_FLOAT_BYTES_PER_PIXEL;
 const MAX_MASK_BINDINGS: u32 = 1;
 
 // Keep these Rust bindings in sync with src-tauri/src/shaders/shader.wgsl.
@@ -547,128 +555,6 @@ pub fn get_or_init_compute_gpu_context_for_tests(
     Ok(new_context)
 }
 
-pub(crate) fn read_texture_data_roi_with_bytes_per_pixel(
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
-    texture: &wgpu::Texture,
-    origin: wgpu::Origin3d,
-    size: wgpu::Extent3d,
-    bytes_per_pixel: u32,
-) -> Result<Vec<u8>, String> {
-    let unpadded_bytes_per_row = bytes_per_pixel * size.width;
-    let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-    let padded_bytes_per_row = (unpadded_bytes_per_row + align - 1) & !(align - 1);
-    let output_buffer_size = (padded_bytes_per_row * size.height) as u64;
-
-    let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("Readback Buffer"),
-        size: output_buffer_size,
-        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-        mapped_at_creation: false,
-    });
-
-    let mut encoder =
-        device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-    encoder.copy_texture_to_buffer(
-        wgpu::TexelCopyTextureInfo {
-            texture,
-            mip_level: 0,
-            origin,
-            aspect: wgpu::TextureAspect::All,
-        },
-        wgpu::TexelCopyBufferInfo {
-            buffer: &output_buffer,
-            layout: wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(padded_bytes_per_row),
-                rows_per_image: Some(size.height),
-            },
-        },
-        size,
-    );
-
-    queue.submit(Some(encoder.finish()));
-    let buffer_slice = output_buffer.slice(..);
-    let (tx, rx) = std::sync::mpsc::channel();
-    buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-        let _ = tx.send(result);
-    });
-    device
-        .poll(wgpu::PollType::Wait {
-            submission_index: None,
-            timeout: Some(std::time::Duration::from_secs(60)),
-        })
-        .map_err(|e| format!("Failed while polling mapped GPU buffer: {}", e))?;
-    let map_result = rx
-        .recv()
-        .map_err(|e| format!("Failed receiving GPU map result: {}", e))?;
-    map_result.map_err(|e| e.to_string())?;
-
-    let padded_data = buffer_slice.get_mapped_range().to_vec();
-    output_buffer.unmap();
-
-    if padded_bytes_per_row == unpadded_bytes_per_row {
-        Ok(padded_data)
-    } else {
-        let mut unpadded_data = Vec::with_capacity((unpadded_bytes_per_row * size.height) as usize);
-        for chunk in padded_data.chunks(padded_bytes_per_row as usize) {
-            unpadded_data.extend_from_slice(&chunk[..unpadded_bytes_per_row as usize]);
-        }
-        Ok(unpadded_data)
-    }
-}
-
-fn rgba16float_readback_to_dynamic_image(
-    width: u32,
-    height: u32,
-    pixels: Vec<u8>,
-) -> Result<DynamicImage, String> {
-    if pixels.len() != (width * height * GPU_OUTPUT_BYTES_PER_PIXEL) as usize {
-        return Err(format!(
-            "Expected {} RGBA16F readback byte(s), got {}.",
-            width * height * GPU_OUTPUT_BYTES_PER_PIXEL,
-            pixels.len()
-        ));
-    }
-
-    let rgba16 = pixels
-        .chunks_exact(2)
-        .map(|bytes| {
-            let channel = f16::from_bits(u16::from_le_bytes([bytes[0], bytes[1]])).to_f32();
-            (channel.clamp(0.0, 1.0) * u16::MAX as f32).round() as u16
-        })
-        .collect::<Vec<_>>();
-    let image =
-        ImageBuffer::<Rgba<u16>, Vec<u16>>::from_raw(width, height, rgba16).ok_or_else(|| {
-            "Failed to create RGBA16 image buffer from GPU readback data.".to_string()
-        })?;
-    Ok(DynamicImage::ImageRgba16(image))
-}
-
-fn rgba16float_readback_to_unclamped_dynamic_image(
-    width: u32,
-    height: u32,
-    pixels: Vec<u8>,
-) -> Result<DynamicImage, String> {
-    if pixels.len() != (width * height * GPU_OUTPUT_BYTES_PER_PIXEL) as usize {
-        return Err(format!(
-            "Expected {} RGBA16F readback byte(s), got {}.",
-            width * height * GPU_OUTPUT_BYTES_PER_PIXEL,
-            pixels.len()
-        ));
-    }
-
-    let rgba32f = pixels
-        .chunks_exact(2)
-        .map(|bytes| f16::from_bits(u16::from_le_bytes([bytes[0], bytes[1]])).to_f32())
-        .collect::<Vec<_>>();
-    let image =
-        ImageBuffer::<Rgba<f32>, Vec<f32>>::from_raw(width, height, rgba32f).ok_or_else(|| {
-            "Failed to create RGBA32F image buffer from GPU readback data.".to_string()
-        })?;
-    Ok(DynamicImage::ImageRgba32F(image))
-}
-
 fn to_rgba_f16(img: &DynamicImage) -> Vec<f16> {
     let rgba_f32 = img.to_rgba32f();
     rgba_f32.into_raw().into_iter().map(f16::from_f32).collect()
@@ -1110,28 +996,8 @@ impl GpuProcessor {
             mapped_at_creation: false,
         });
 
-        let dummy_texture_desc = wgpu::TextureDescriptor {
-            label: Some("Dummy Texture"),
-            size: wgpu::Extent3d {
-                width: 1,
-                height: 1,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba16Float,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        };
-        let dummy_blur_texture = device.create_texture(&dummy_texture_desc);
-        let dummy_blur_view = dummy_blur_texture.create_view(&Default::default());
-
-        let dummy_lut_texture = device.create_texture(&wgpu::TextureDescriptor {
-            dimension: wgpu::TextureDimension::D3,
-            ..dummy_texture_desc
-        });
-        let dummy_lut_view = dummy_lut_texture.create_view(&Default::default());
+        let dummy_blur_view = create_dummy_rgba16f_texture_view(device);
+        let dummy_lut_view = create_dummy_lut_texture_view(device);
         let dummy_lut_sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
 
         let max_tile_size = wgpu::Extent3d {
@@ -1140,90 +1006,60 @@ impl GpuProcessor {
             depth_or_array_layers: 1,
         };
 
-        let reusable_texture_desc = wgpu::TextureDescriptor {
-            label: None,
-            size: max_tile_size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba16Float,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::STORAGE_BINDING,
-            view_formats: &[],
-        };
+        let blur_texture_usage =
+            wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::STORAGE_BINDING;
+        let (_, ping_pong_view) = create_rgba16f_texture_with_view(
+            device,
+            "Ping Pong Texture",
+            max_tile_size,
+            blur_texture_usage,
+        );
+        let (_, sharpness_blur_view) = create_rgba16f_texture_with_view(
+            device,
+            "Sharpness Blur Texture",
+            max_tile_size,
+            blur_texture_usage,
+        );
+        let (_, tonal_blur_view) = create_rgba16f_texture_with_view(
+            device,
+            "Tonal Blur Texture",
+            max_tile_size,
+            blur_texture_usage,
+        );
+        let (_, clarity_blur_view) = create_rgba16f_texture_with_view(
+            device,
+            "Clarity Blur Texture",
+            max_tile_size,
+            blur_texture_usage,
+        );
+        let (_, structure_blur_view) = create_rgba16f_texture_with_view(
+            device,
+            "Structure Blur Texture",
+            max_tile_size,
+            blur_texture_usage,
+        );
 
-        let ping_pong_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Ping Pong Texture"),
-            ..reusable_texture_desc
-        });
-        let ping_pong_view = ping_pong_texture.create_view(&Default::default());
+        let (tile_output_texture, tile_output_texture_view) = create_rgba16f_texture_with_view(
+            device,
+            "Tile Output Texture",
+            max_tile_size,
+            blur_texture_usage | wgpu::TextureUsages::COPY_SRC,
+        );
 
-        let sharpness_blur_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Sharpness Blur Texture"),
-            ..reusable_texture_desc
-        });
-        let sharpness_blur_view = sharpness_blur_texture.create_view(&Default::default());
-
-        let tonal_blur_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Tonal Blur Texture"),
-            ..reusable_texture_desc
-        });
-        let tonal_blur_view = tonal_blur_texture.create_view(&Default::default());
-
-        let clarity_blur_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Clarity Blur Texture"),
-            ..reusable_texture_desc
-        });
-        let clarity_blur_view = clarity_blur_texture.create_view(&Default::default());
-
-        let structure_blur_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Structure Blur Texture"),
-            ..reusable_texture_desc
-        });
-        let structure_blur_view = structure_blur_texture.create_view(&Default::default());
-
-        let tile_output_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Tile Output Texture"),
-            size: max_tile_size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: GPU_OUTPUT_TEXTURE_FORMAT,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::STORAGE_BINDING
-                | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
-        let tile_output_texture_view = tile_output_texture.create_view(&Default::default());
-
-        let working_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Working Output Texture"),
-            size: max_tile_size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: GPU_OUTPUT_TEXTURE_FORMAT,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::STORAGE_BINDING
-                | wgpu::TextureUsages::COPY_DST
-                | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
-        let working_texture_view = working_texture.create_view(&Default::default());
-
-        let output_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Full Output Texture"),
-            size: max_tile_size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: GPU_OUTPUT_TEXTURE_FORMAT,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::STORAGE_BINDING
-                | wgpu::TextureUsages::COPY_DST
-                | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
-        let output_texture_view = output_texture.create_view(&Default::default());
+        let display_output_texture_usage =
+            blur_texture_usage | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC;
+        let (working_texture, working_texture_view) = create_rgba16f_texture_with_view(
+            device,
+            "Working Output Texture",
+            max_tile_size,
+            display_output_texture_usage,
+        );
+        let (output_texture, output_texture_view) = create_rgba16f_texture_with_view(
+            device,
+            "Full Output Texture",
+            max_tile_size,
+            display_output_texture_usage,
+        );
 
         Ok(Self {
             context,
@@ -2230,33 +2066,5 @@ fn process_and_get_dynamic_image_inner(
         rgba16float_readback_to_unclamped_dynamic_image(out_w, out_h, processed_pixels)
     } else {
         rgba16float_readback_to_dynamic_image(out_w, out_h, processed_pixels)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::rgba16float_readback_to_unclamped_dynamic_image;
-    use half::f16;
-    use image::DynamicImage;
-
-    #[test]
-    fn unclamped_rgba16float_readback_preserves_out_of_gamut_values() {
-        let values = [-0.25_f32, 0.5, 1.35, 1.0];
-        let pixels = values
-            .into_iter()
-            .flat_map(|value| f16::from_f32(value).to_bits().to_le_bytes())
-            .collect::<Vec<_>>();
-
-        let image = rgba16float_readback_to_unclamped_dynamic_image(1, 1, pixels)
-            .expect("RGBA16F readback should convert to RGBA32F");
-        let DynamicImage::ImageRgba32F(image) = image else {
-            panic!("unclamped readback should return RGBA32F");
-        };
-        let pixel = image.get_pixel(0, 0).0;
-
-        assert!(pixel[0] < 0.0);
-        assert_eq!(pixel[1], 0.5);
-        assert!(pixel[2] > 1.0);
-        assert_eq!(pixel[3], 1.0);
     }
 }
