@@ -1,4 +1,4 @@
-use crate::gpu_processing::WgpuDisplay;
+use crate::gpu_display::WgpuDisplay;
 use glam::{Mat3, Vec2, Vec3};
 use image::{DynamicImage, GenericImageView, Rgb32FImage};
 use rawler::decoders::Orientation;
