@@ -1949,8 +1949,10 @@ mod tests {
         let pixel_count = (balanced_rgba.width() as usize) * (balanced_rgba.height() as usize);
         let changed_pixel_ratio = changed_pixels as f64 / pixel_count.max(1) as f64;
         let mean_absolute_byte_delta = absolute_delta_sum as f64 / (pixel_count.max(1) * 3) as f64;
-        assert!(changed_pixel_ratio > 0.001);
-        assert!(mean_absolute_byte_delta > 0.01);
+        const MIN_CHANGED_PIXEL_RATIO: f64 = 0.001;
+        const MIN_MEAN_ABSOLUTE_BYTE_DELTA: f64 = 0.01;
+        assert!(changed_pixel_ratio > MIN_CHANGED_PIXEL_RATIO);
+        assert!(mean_absolute_byte_delta > MIN_MEAN_ABSOLUTE_BYTE_DELTA);
 
         let balanced_path = report_dir.join("bayer-balanced-ppg.tiff");
         let maximum_path = report_dir.join("bayer-maximum-hq.tiff");
@@ -2116,8 +2118,10 @@ mod tests {
         let pixel_count = (balanced_rgba.width() as usize) * (balanced_rgba.height() as usize);
         let changed_pixel_ratio = changed_pixels as f64 / pixel_count.max(1) as f64;
         let mean_absolute_byte_delta = absolute_delta_sum as f64 / (pixel_count.max(1) * 3) as f64;
-        assert!(changed_pixel_ratio > 0.001);
-        assert!(mean_absolute_byte_delta > 0.01);
+        const MIN_CHANGED_PIXEL_RATIO: f64 = 0.001;
+        const MIN_MEAN_ABSOLUTE_BYTE_DELTA: f64 = 0.01;
+        assert!(changed_pixel_ratio > MIN_CHANGED_PIXEL_RATIO);
+        assert!(mean_absolute_byte_delta > MIN_MEAN_ABSOLUTE_BYTE_DELTA);
 
         let balanced_path = report_dir.join(format!(
             "xtrans-{source_artifact_id}-balanced-standard.tiff"
@@ -2160,7 +2164,11 @@ mod tests {
 
         let preview_export_mean_abs_delta =
             mean_abs_byte_delta(preview_after.as_raw(), maximum_rgba.as_raw());
-        assert_eq!(preview_export_mean_abs_delta, 0.0);
+        const MAX_PREVIEW_EXPORT_MEAN_ABS_DELTA: f64 = 0.0;
+        assert_eq!(
+            preview_export_mean_abs_delta,
+            MAX_PREVIEW_EXPORT_MEAN_ABS_DELTA
+        );
 
         let export_settings = crate::app_settings::AppSettings {
             raw_processing_mode: Some("maximum".to_string()),
@@ -2191,6 +2199,37 @@ mod tests {
         assert_eq!(
             export_loader_report.demosaic_algorithm_id,
             Some(crate::xtrans_hq::XTRANS_HQ_ALGORITHM_ID)
+        );
+
+        let quality_metrics = serde_json::json!([
+            {
+                "name": "changedPixelRatio",
+                "value": changed_pixel_ratio,
+                "threshold": MIN_CHANGED_PIXEL_RATIO,
+                "operator": "gt",
+                "passed": changed_pixel_ratio > MIN_CHANGED_PIXEL_RATIO,
+            },
+            {
+                "name": "meanAbsoluteByteDelta",
+                "value": mean_absolute_byte_delta,
+                "threshold": MIN_MEAN_ABSOLUTE_BYTE_DELTA,
+                "operator": "gt",
+                "passed": mean_absolute_byte_delta > MIN_MEAN_ABSOLUTE_BYTE_DELTA,
+            },
+            {
+                "name": "previewExportMeanAbsDelta",
+                "value": preview_export_mean_abs_delta,
+                "threshold": MAX_PREVIEW_EXPORT_MEAN_ABS_DELTA,
+                "operator": "eq",
+                "passed": preview_export_mean_abs_delta == MAX_PREVIEW_EXPORT_MEAN_ABS_DELTA,
+            },
+        ]);
+        assert!(
+            quality_metrics
+                .as_array()
+                .expect("quality metrics array")
+                .iter()
+                .all(|metric| metric["passed"].as_bool() == Some(true))
         );
 
         serde_json::json!({
@@ -2232,6 +2271,7 @@ mod tests {
                 "exportLoaderRawDemosaicPath": format!("{:?}", export_loader_report.demosaic_path),
                 "exportLoaderDemosaicAlgorithmId": export_loader_report.demosaic_algorithm_id,
             },
+            "qualityMetrics": quality_metrics,
             "outputDiff": {
                 "changedPixelRatio": changed_pixel_ratio,
                 "meanAbsoluteByteDelta": mean_absolute_byte_delta,
