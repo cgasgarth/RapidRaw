@@ -243,7 +243,8 @@ export const aiPeopleMaskPickerOptionSchema = z
   })
   .strict()
   .superRefine((option, context) => {
-    const isUnavailable = option.status === 'unsupported' || option.validationMode === 'schema_only';
+    const isUnavailable =
+      option.status === 'planned' || option.status === 'unsupported' || option.validationMode === 'schema_only';
     if (isUnavailable && option.disabledReason === null) {
       context.addIssue({
         code: 'custom',
