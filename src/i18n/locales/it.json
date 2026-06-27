@@ -634,6 +634,10 @@
         "points_other": "{{count}} points",
         "generate": "Generate SAM proposal",
         "receipt": "Ricevuta replay: {{provider}}, {{promptKind}}, {{latency}} ms"
+      },
+      "aiPeopleParts": {
+        "description": "Le parti con runtime sono attive; capelli e vestiti restano disattivati fino alla prova provider.",
+        "title": "Maschere parti persona"
       }
     },
     "metadata": {

@@ -8,6 +8,10 @@ import { buildAiPeopleMaskPickerModel } from '../../../src/utils/aiPeopleMaskPic
 
 const fixtureJson: unknown = JSON.parse(readFileSync(resolve('fixtures/masks/ai-people-picker-model.json'), 'utf8'));
 const fixture = aiPeopleMaskPickerModelFixtureSchema.parse(fixtureJson);
+const maskPanelSource = readFileSync(resolve('src/components/panel/right/MasksPanel.tsx'), 'utf8');
+const locale = JSON.parse(readFileSync(resolve('src/i18n/locales/en.json'), 'utf8')) as {
+  editor?: { masks?: { aiPeopleParts?: Record<string, unknown> } };
+};
 
 const actualModel = buildAiPeopleMaskPickerModel();
 
@@ -33,6 +37,30 @@ for (const expectedDisabledPart of ['hair', 'clothing']) {
   const option = options.find((candidate) => candidate.part === expectedDisabledPart);
   if (option?.disabledReason === null || option === undefined) {
     console.error(`${expectedDisabledPart}: expected disabled until a real parser provider lands`);
+    process.exit(1);
+  }
+}
+
+for (const marker of [
+  'buildAiPeopleMaskPickerModel',
+  'data-testid="ai-people-part-picker"',
+  'data-testid="ai-people-part-group"',
+  'data-testid={`ai-people-part-option-${option.part}`}',
+  "data-disabled-reason={option.disabledReason ?? ''}",
+  'data-validation-mode={option.validationMode}',
+  'activeSubMask.type === Mask.AiPerson',
+  "t('editor.masks.aiPeopleParts.title')",
+  "t('editor.masks.aiPeopleParts.description')",
+]) {
+  if (!maskPanelSource.includes(marker)) {
+    console.error(`AI people picker UI missing marker: ${marker}`);
+    process.exit(1);
+  }
+}
+
+for (const key of ['description', 'title']) {
+  if (typeof locale.editor?.masks?.aiPeopleParts?.[key] !== 'string') {
+    console.error(`Missing AI people picker locale: editor.masks.aiPeopleParts.${key}`);
     process.exit(1);
   }
 }
