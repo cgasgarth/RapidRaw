@@ -59,7 +59,6 @@ import {
   OPTION_SEPARATOR,
   Panel,
   type AlbumItem,
-  type Album,
   type ImageFile,
   type AppSettings,
 } from '../components/ui/AppProperties';
@@ -76,6 +75,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 import { Invokes } from '../tauri/commands';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
+import { findAlbumById } from '../utils/folderTreeUtils';
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { buildLibraryAutoStacks } from '../utils/libraryAutoStacks';
 import {
@@ -142,21 +142,6 @@ const findHdrAutoStackPaths = (imageList: ImageFile[], path: string): string[] |
   return (
     findInOrder(imageList) ?? findInOrder([...imageList].sort((left, right) => left.path.localeCompare(right.path)))
   );
-};
-
-const findAlbumById = (items: AlbumItem[], albumId: string): Album | null => {
-  for (const item of items) {
-    if (item.type === 'album' && item.id === albumId) {
-      return item;
-    }
-
-    if (item.type === 'group') {
-      const found = findAlbumById(item.children, albumId);
-      if (found) return found;
-    }
-  }
-
-  return null;
 };
 
 export function useAppContextMenus(props: UseAppContextMenusProps) {

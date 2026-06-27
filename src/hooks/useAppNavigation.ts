@@ -5,13 +5,7 @@ import { useCallback, type RefObject } from 'react';
 import { toast } from 'react-toastify';
 
 import { debouncedSave, debouncedSetHistory } from './useEditorActions';
-import {
-  LibraryViewMode,
-  type Album,
-  type AlbumItem,
-  type AppSettings,
-  type ImageFile,
-} from '../components/ui/AppProperties';
+import { LibraryViewMode, type AlbumItem, type AppSettings, type ImageFile } from '../components/ui/AppProperties';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useProcessStore } from '../store/useProcessStore';
@@ -20,6 +14,7 @@ import { useUIStore } from '../store/useUIStore';
 import { Invokes } from '../tauri/commands';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { formatUnknownError } from '../utils/errorFormatting';
+import { findAlbumById } from '../utils/folderTreeUtils';
 import { globalImageCache, type ImageCacheEntry } from '../utils/ImageLRUCache';
 import { consumePendingNegativeConversionDustHealLayers } from '../utils/negativeLabEditorHandoff';
 
@@ -79,21 +74,6 @@ export interface AppNavigationProps {
 }
 
 const getNavigationSettings = (): NavigationSettings | null => useSettingsStore.getState().appSettings;
-
-const findAlbumById = (nodes: AlbumItem[], albumId: string): Album | null => {
-  for (const node of nodes) {
-    if (node.type === 'album' && node.id === albumId) {
-      return node;
-    }
-
-    if (node.type === 'group') {
-      const found = findAlbumById(node.children, albumId);
-      if (found) return found;
-    }
-  }
-
-  return null;
-};
 
 const folderTreeContainsPath = (nodes: FolderTree[], path: string): boolean =>
   nodes.some((node) => node.path === path || folderTreeContainsPath(node.children, path));
