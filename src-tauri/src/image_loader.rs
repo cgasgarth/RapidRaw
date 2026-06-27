@@ -9,6 +9,7 @@ use crate::mask_generation::{MaskDefinition, SubMask, generate_mask_bitmap};
 use crate::raw_processing::{
     RawDemosaicPath, RawDevelopmentReport, RawProcessingProfile, develop_raw_image_with_report,
 };
+use crate::render_caches::RenderCaches;
 use anyhow::{Context, Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
 use exif::{Reader as ExifReader, Tag};
@@ -749,15 +750,7 @@ pub async fn load_image(
     let cancel_token = Some((generation_tracker.clone(), my_generation));
 
     {
-        *state.original_image.lock().unwrap() = None;
-        *state.cached_preview.lock().unwrap() = None;
-        *state.gpu_image_cache.lock().unwrap() = None;
-        *state.full_warped_cache.lock().unwrap() = None;
-        *state.full_transformed_cache.lock().unwrap() = None;
-
-        state.mask_cache.lock().unwrap().clear();
-        state.patch_cache.lock().unwrap().clear();
-        state.geometry_cache.lock().unwrap().clear();
+        RenderCaches::new(state.inner()).clear_active_image_render_state();
 
         *state.denoise_result.lock().unwrap() = None;
         *state.hdr_result.lock().unwrap() = None;

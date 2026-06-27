@@ -67,6 +67,7 @@ mod private_decode_raw_proof;
 #[cfg(feature = "validation-harness")]
 mod raw_open_edit_export_proof;
 mod raw_processing;
+mod render_caches;
 #[cfg(all(test, feature = "tauri-test"))]
 mod retouch_clone_real_raw_proof;
 mod retouch_render;
@@ -458,7 +459,7 @@ fn process_preview_job(
             cached.unscaled_crop_offset,
         )
     } else {
-        *state.gpu_image_cache.lock().unwrap() = None;
+        render_caches::RenderCaches::new(&state).clear_gpu_image_cache();
 
         let (base, scale, offset) =
             generate_transformed_preview(&state, &loaded_image, &adjustments_clone, preview_dim)?;
@@ -488,7 +489,7 @@ fn process_preview_job(
         };
 
         if is_interactive && base_valid {
-            *state.gpu_image_cache.lock().unwrap() = None;
+            render_caches::RenderCaches::new(&state).clear_gpu_image_cache();
         }
 
         small
