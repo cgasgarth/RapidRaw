@@ -32,6 +32,10 @@ const toDisabledReason = (capability: AiPeopleMaskProviderCapability): string | 
     return capability.notes;
   }
 
+  if (capability.status === 'planned') {
+    return `Planned runtime target: ${capability.notes}`;
+  }
+
   if (capability.validationMode === 'schema_only') {
     return 'Schema-only capability; runtime and dry-run output are not available yet.';
   }

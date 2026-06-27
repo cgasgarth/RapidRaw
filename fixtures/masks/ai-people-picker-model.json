@@ -36,7 +36,7 @@
             "validationMode": "runtime_apply"
           },
           {
-            "disabledReason": null,
+            "disabledReason": "Planned runtime target: Skin segmentation needs portrait-specific parsing and confidence warnings.",
             "label": "Skin",
             "part": "skin",
             "recommendedDefault": false,
@@ -44,7 +44,7 @@
             "validationMode": "dry_run"
           },
           {
-            "disabledReason": null,
+            "disabledReason": "Planned runtime target: Hair is high-value but requires dedicated parser validation around edges and wisps.",
             "label": "Hair",
             "part": "hair",
             "recommendedDefault": false,
@@ -52,7 +52,7 @@
             "validationMode": "dry_run"
           },
           {
-            "disabledReason": null,
+            "disabledReason": "Planned runtime target: Eyes need face-detail parsing and should stay out of runtime until quality proof exists.",
             "label": "Eyes",
             "part": "eyes",
             "recommendedDefault": false,
@@ -60,7 +60,7 @@
             "validationMode": "dry_run"
           },
           {
-            "disabledReason": null,
+            "disabledReason": "Planned runtime target: Lips need face-detail parsing with makeup and profile-pose fixtures.",
             "label": "Lips",
             "part": "lips",
             "recommendedDefault": false,
@@ -82,7 +82,7 @@
         "id": "body_parts",
         "options": [
           {
-            "disabledReason": null,
+            "disabledReason": "Planned runtime target: Clothing is a coarse parser target and should land before tiny face details.",
             "label": "Clothing",
             "part": "clothing",
             "recommendedDefault": false,
@@ -90,7 +90,7 @@
             "validationMode": "dry_run"
           },
           {
-            "disabledReason": null,
+            "disabledReason": "Planned runtime target: Arms require body-part parsing and should not be claimed by whole-person masks.",
             "label": "Arms",
             "part": "arms",
             "recommendedDefault": false,
@@ -98,7 +98,7 @@
             "validationMode": "dry_run"
           },
           {
-            "disabledReason": null,
+            "disabledReason": "Planned runtime target: Hands require body-part parsing with low-confidence warnings for occlusion.",
             "label": "Hands",
             "part": "hands",
             "recommendedDefault": false,
@@ -106,7 +106,7 @@
             "validationMode": "dry_run"
           },
           {
-            "disabledReason": null,
+            "disabledReason": "Planned runtime target: Legs require body-part parsing and cropped-person coordinate validation.",
             "label": "Legs",
             "part": "legs",
             "recommendedDefault": false,
