@@ -297,6 +297,47 @@ interface ContainerRowProps {
   updateSubMask: (id: string, data: SubMaskPatch) => void;
 }
 
+interface MaskListProps {
+  activeDragItem: DragData | null;
+  activeMaskContainerId: string | null;
+  activeMaskId: string | null;
+  analyzingSubMaskId: string | null;
+  containers: Array<MaskContainerWithId>;
+  copiedMask: MaskContainer | null;
+  copiedSubMask: SubMask | null;
+  copyMaskToClipboard: (container: MaskContainer) => void;
+  copySubMaskToClipboard: (subMask: SubMask) => void;
+  expandedContainers: Set<string>;
+  handleDeleteContainer: (containerId: string) => void;
+  handleDeleteSubMask: (containerId: string, subMaskId: string) => void;
+  handleDuplicateAndInvertContainer: (container: MaskContainer) => void;
+  handleDuplicateAndInvertSubMask: (containerId: string, subMask: SubMask) => void;
+  handleDuplicateContainer: (container: MaskContainer) => void;
+  handleDuplicateSubMask: (containerId: string, subMask: SubMask, insertIndex: number) => void;
+  handlePasteMask: (containerId?: string) => void;
+  handlePasteSubMask: (containerId: string, insertIndex?: number) => void;
+  isRootOver: boolean;
+  onAddComponent: (
+    event: ReactMouseEvent<HTMLElement> | ReactKeyboardEvent<HTMLElement>,
+    containerId: string | null,
+  ) => void;
+  onExitComplete: () => void;
+  onRootClick: () => void;
+  onSelectContainer: (containerId: string | null) => void;
+  onSelectMask: (subMaskId: string | null) => void;
+  onToggleContainer: (containerId: string) => void;
+  presets: Array<PresetMenuItem>;
+  renamingId: string | null;
+  rootDroppableRef: (element: HTMLElement | null) => void;
+  setAdjustments: AdjustmentsUpdater;
+  setIsMaskControlHovered: (isHovered: boolean) => void;
+  setRenamingId: (id: string | null) => void;
+  setTempName: (name: string) => void;
+  tempName: string;
+  updateContainer: (id: string, data: MaskContainerPatch) => void;
+  updateSubMask: (id: string, data: SubMaskPatch) => void;
+}
+
 interface SubMaskRowProps {
   activeDragItem: DragData | null;
   analyzingSubMaskId: string | null;
@@ -1843,104 +1884,48 @@ export function MasksPanel() {
                 </div>
               </motion.div>
             ) : (
-              <motion.div
-                key="masks-list-container"
-                ref={setRootDroppableRef}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className={`flex-col transition-colors ${isRootOver ? 'bg-surface' : ''}`}
-                onClick={handleDeselect}
-              >
-                <UiText variant={TextVariants.heading} className="mb-2">
-                  {t('editor.masks.masksTitle')}
-                </UiText>
-
-                <AnimatePresence
-                  initial={false}
-                  mode="popLayout"
-                  onExitComplete={() => {
-                    if (pendingAction) {
-                      pendingAction();
-                      setPendingAction(null);
-                    }
-                  }}
-                >
-                  {adjustments.masks.map((container) => (
-                    <ContainerRow
-                      key={container.id}
-                      container={container}
-                      isSelected={activeMaskContainerId === container.id && activeMaskId === null}
-                      hasActiveChild={activeMaskContainerId === container.id && activeMaskId !== null}
-                      isExpanded={expandedContainers.has(container.id)}
-                      onToggle={() => {
-                        handleToggleExpand(container.id);
-                      }}
-                      onSelect={() => {
-                        onSelectContainer(container.id);
-                        onSelectMask(null);
-                      }}
-                      renamingId={renamingId}
-                      setRenamingId={setRenamingId}
-                      tempName={tempName}
-                      setTempName={setTempName}
-                      updateContainer={updateContainer}
-                      handleDelete={handleDeleteContainer}
-                      handleDuplicate={handleDuplicateContainer}
-                      handleDuplicateAndInvert={handleDuplicateAndInvertContainer}
-                      handlePasteMask={handlePasteMask}
-                      copyMaskToClipboard={copyMaskToClipboard}
-                      copiedMask={copiedMask}
-                      presets={presets}
-                      setAdjustments={setAdjustments}
-                      activeDragItem={activeDragItem}
-                      activeMaskId={activeMaskId}
-                      onSelectContainer={onSelectContainer}
-                      onSelectMask={onSelectMask}
-                      updateSubMask={updateSubMask}
-                      handleDeleteSubMask={handleDeleteSubMask}
-                      handleDuplicateSubMask={handleDuplicateSubMask}
-                      handleDuplicateAndInvertSubMask={handleDuplicateAndInvertSubMask}
-                      handlePasteSubMask={handlePasteSubMask}
-                      copySubMaskToClipboard={copySubMaskToClipboard}
-                      copiedSubMask={copiedSubMask}
-                      analyzingSubMaskId={analyzingSubMaskId}
-                      setIsMaskControlHovered={setIsMaskControlHovered}
-                      onAddComponent={(e: ReactMouseEvent<HTMLElement>) => {
-                        handleAddMaskContextMenu(e, container.id);
-                      }}
-                    />
-                  ))}
-                </AnimatePresence>
-
-                <AnimatePresence>
-                  {activeDragItem?.type === 'Creation' && adjustments.masks.length > 0 && (
-                    <NewMaskDropZone isOver={isRootOver} />
-                  )}
-                </AnimatePresence>
-
-                <UiText
-                  as="div"
-                  weight={TextWeights.medium}
-                  className="flex items-center gap-2 p-2 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
-                  onClick={(e: ReactMouseEvent<HTMLElement>) => {
-                    handleAddMaskContextMenu(e, null);
-                  }}
-                  onKeyDown={(e: ReactKeyboardEvent<HTMLElement>) => {
-                    if (e.key !== 'Enter' && e.key !== ' ') return;
-                    e.preventDefault();
-                    handleAddMaskContextMenu(e, null);
-                  }}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div className="p-0.5">
-                    <Plus size={18} />
-                  </div>
-                  <span>{t('editor.masks.addNewMask')}</span>
-                </UiText>
-              </motion.div>
+              <MaskList
+                activeDragItem={activeDragItem}
+                activeMaskContainerId={activeMaskContainerId}
+                activeMaskId={activeMaskId}
+                analyzingSubMaskId={analyzingSubMaskId}
+                containers={adjustments.masks}
+                copiedMask={copiedMask}
+                copiedSubMask={copiedSubMask}
+                copyMaskToClipboard={copyMaskToClipboard}
+                copySubMaskToClipboard={copySubMaskToClipboard}
+                expandedContainers={expandedContainers}
+                handleDeleteContainer={handleDeleteContainer}
+                handleDeleteSubMask={handleDeleteSubMask}
+                handleDuplicateAndInvertContainer={handleDuplicateAndInvertContainer}
+                handleDuplicateAndInvertSubMask={handleDuplicateAndInvertSubMask}
+                handleDuplicateContainer={handleDuplicateContainer}
+                handleDuplicateSubMask={handleDuplicateSubMask}
+                handlePasteMask={handlePasteMask}
+                handlePasteSubMask={handlePasteSubMask}
+                isRootOver={isRootOver}
+                onAddComponent={handleAddMaskContextMenu}
+                onExitComplete={() => {
+                  if (pendingAction) {
+                    pendingAction();
+                    setPendingAction(null);
+                  }
+                }}
+                onRootClick={handleDeselect}
+                onSelectContainer={onSelectContainer}
+                onSelectMask={onSelectMask}
+                onToggleContainer={handleToggleExpand}
+                presets={presets}
+                renamingId={renamingId}
+                rootDroppableRef={setRootDroppableRef}
+                setAdjustments={setAdjustments}
+                setIsMaskControlHovered={setIsMaskControlHovered}
+                setRenamingId={setRenamingId}
+                setTempName={setTempName}
+                tempName={tempName}
+                updateContainer={updateContainer}
+                updateSubMask={updateSubMask}
+              />
             )}
           </AnimatePresence>
 
@@ -2198,6 +2183,136 @@ function DraggableGridItem({
       <maskType.icon size={24} />{' '}
       <UiText as="span" variant={TextVariants.small} color={TextColors.primary}>
         {getMaskTypeName(maskType)}
+      </UiText>
+    </motion.div>
+  );
+}
+
+function MaskList({
+  activeDragItem,
+  activeMaskContainerId,
+  activeMaskId,
+  analyzingSubMaskId,
+  containers,
+  copiedMask,
+  copiedSubMask,
+  copyMaskToClipboard,
+  copySubMaskToClipboard,
+  expandedContainers,
+  handleDeleteContainer,
+  handleDeleteSubMask,
+  handleDuplicateAndInvertContainer,
+  handleDuplicateAndInvertSubMask,
+  handleDuplicateContainer,
+  handleDuplicateSubMask,
+  handlePasteMask,
+  handlePasteSubMask,
+  isRootOver,
+  onAddComponent,
+  onExitComplete,
+  onRootClick,
+  onSelectContainer,
+  onSelectMask,
+  onToggleContainer,
+  presets,
+  renamingId,
+  rootDroppableRef,
+  setAdjustments,
+  setIsMaskControlHovered,
+  setRenamingId,
+  setTempName,
+  tempName,
+  updateContainer,
+  updateSubMask,
+}: MaskListProps) {
+  const { t } = useTranslation();
+
+  return (
+    <motion.div
+      key="masks-list-container"
+      ref={rootDroppableRef}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className={`flex-col transition-colors ${isRootOver ? 'bg-surface' : ''}`}
+      onClick={onRootClick}
+    >
+      <UiText variant={TextVariants.heading} className="mb-2">
+        {t('editor.masks.masksTitle')}
+      </UiText>
+
+      <AnimatePresence initial={false} mode="popLayout" onExitComplete={onExitComplete}>
+        {containers.map((container) => (
+          <ContainerRow
+            key={container.id}
+            container={container}
+            isSelected={activeMaskContainerId === container.id && activeMaskId === null}
+            hasActiveChild={activeMaskContainerId === container.id && activeMaskId !== null}
+            isExpanded={expandedContainers.has(container.id)}
+            onToggle={() => {
+              onToggleContainer(container.id);
+            }}
+            onSelect={() => {
+              onSelectContainer(container.id);
+              onSelectMask(null);
+            }}
+            renamingId={renamingId}
+            setRenamingId={setRenamingId}
+            tempName={tempName}
+            setTempName={setTempName}
+            updateContainer={updateContainer}
+            handleDelete={handleDeleteContainer}
+            handleDuplicate={handleDuplicateContainer}
+            handleDuplicateAndInvert={handleDuplicateAndInvertContainer}
+            handlePasteMask={handlePasteMask}
+            copyMaskToClipboard={copyMaskToClipboard}
+            copiedMask={copiedMask}
+            presets={presets}
+            setAdjustments={setAdjustments}
+            activeDragItem={activeDragItem}
+            activeMaskId={activeMaskId}
+            onSelectContainer={onSelectContainer}
+            onSelectMask={onSelectMask}
+            updateSubMask={updateSubMask}
+            handleDeleteSubMask={handleDeleteSubMask}
+            handleDuplicateSubMask={handleDuplicateSubMask}
+            handleDuplicateAndInvertSubMask={handleDuplicateAndInvertSubMask}
+            handlePasteSubMask={handlePasteSubMask}
+            copySubMaskToClipboard={copySubMaskToClipboard}
+            copiedSubMask={copiedSubMask}
+            analyzingSubMaskId={analyzingSubMaskId}
+            setIsMaskControlHovered={setIsMaskControlHovered}
+            onAddComponent={(event: ReactMouseEvent<HTMLElement>) => {
+              onAddComponent(event, container.id);
+            }}
+          />
+        ))}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {activeDragItem?.type === 'Creation' && containers.length > 0 && <NewMaskDropZone isOver={isRootOver} />}
+      </AnimatePresence>
+
+      <UiText
+        as="div"
+        weight={TextWeights.medium}
+        className="flex items-center gap-2 p-2 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
+        onClick={(event: ReactMouseEvent<HTMLElement>) => {
+          onAddComponent(event, null);
+        }}
+        onKeyDown={(event: ReactKeyboardEvent<HTMLElement>) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          onAddComponent(event, null);
+        }}
+        role="button"
+        tabIndex={0}
+      >
+        <div className="p-0.5">
+          <Plus size={18} />
+        </div>
+        <span>{t('editor.masks.addNewMask')}</span>
       </UiText>
     </motion.div>
   );
