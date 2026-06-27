@@ -10,8 +10,6 @@ import AppModals from './components/modals/AppModals';
 import FolderTreePanel from './components/panel/FolderTree';
 import ExportPanel from './components/panel/right/ExportPanel';
 import {
-  type Album,
-  type AlbumItem,
   type ImageFile,
   LibraryViewMode,
   Panel,
@@ -47,6 +45,7 @@ import { useProcessStore } from './store/useProcessStore';
 import { useSettingsStore } from './store/useSettingsStore';
 import { useUIStore } from './store/useUIStore';
 import { Invokes } from './tauri/commands';
+import { findAlbumById, insertChildrenIntoTree } from './utils/folderTreeUtils';
 import { invokeWithSchema } from './utils/tauriSchemaInvoke';
 import { getOptionalCurrentWindow } from './window/currentWindow';
 import TitleBar from './window/TitleBar';
@@ -77,47 +76,6 @@ interface PreloadedAppData {
   rootPaths?: string[];
   trees?: Promise<FolderTreeNode[]> | undefined;
 }
-
-const findAlbumById = (nodes: AlbumItem[], albumId: string): Album | null => {
-  for (const node of nodes) {
-    if (node.type === 'album' && node.id === albumId) {
-      return node;
-    }
-
-    if (node.type === 'group') {
-      const found = findAlbumById(node.children, albumId);
-      if (found) return found;
-    }
-  }
-
-  return null;
-};
-
-const insertChildrenIntoTree = (
-  node: FolderTreeNode,
-  targetPath: string,
-  newChildren: FolderTreeNode[],
-): FolderTreeNode => {
-  if (node.path === targetPath) {
-    const mergedChildren = newChildren.map((newChild) => {
-      const existingChild = node.children.find((child) => child.path === newChild.path);
-      if (existingChild && existingChild.children.length > 0) {
-        return { ...newChild, children: existingChild.children };
-      }
-      return newChild;
-    });
-    return { ...node, children: mergedChildren };
-  }
-
-  if (node.children.length > 0) {
-    return {
-      ...node,
-      children: node.children.map((child) => insertChildrenIntoTree(child, targetPath, newChildren)),
-    };
-  }
-
-  return node;
-};
 
 function App() {
   const COMPACT_EDITOR_MAX_WIDTH = 900;
