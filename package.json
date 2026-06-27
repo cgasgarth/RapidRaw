@@ -655,6 +655,7 @@
     "check:agent-app-server-dispatch": "bun tests/integration/checks/check-agent-app-server-dispatch.ts",
     "check:agent-layer-mask-tools": "bun tests/integration/checks/check-agent-layer-mask-tools.ts",
     "check:agent-object-selection-apply": "bun tests/integration/checks/check-agent-object-selection-apply.ts",
+    "check:object-prompt-canvas": "bun tests/integration/checks/check-object-prompt-canvas.ts",
     "check:agent-local-layer-coverage-matrix": "bun tests/integration/checks/check-agent-local-layer-coverage-matrix.ts",
     "check:agent-retouch-apply": "bun tests/integration/checks/check-agent-retouch-apply.ts",
     "check:retouch-dust-heal-benchmark": "bun tests/integration/checks/check-retouch-dust-heal-benchmark.ts",

@@ -32,6 +32,12 @@ import { calculateCenteredCrop } from '../../utils/cropUtils';
 import { getEditorPreviewDimensions } from '../../utils/editorPreviewDimensions';
 import { normalizeMaskOverlaySettings } from '../../utils/maskOverlayModes';
 import { toMaskParameterRecord } from '../../utils/maskParameterAccess';
+import {
+  applyObjectPromptClick,
+  imagePointFromCanvasClick,
+  readObjectPromptCanvasState,
+  writeObjectPromptCanvasState,
+} from '../../utils/objectMaskPromptCanvas';
 import { debounce } from '../../utils/timing';
 import { Panel, type TransformState, Invokes } from '../ui/AppProperties';
 
@@ -651,6 +657,11 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     () => toMaskParameterRecord(activeSubMask?.parameters),
     [activeSubMask?.parameters],
   );
+  const isObjectPromptActive = isMasking && activeSubMask?.type === Mask.AiObject;
+  const activeObjectPromptState = useMemo(
+    () => (isObjectPromptActive ? readObjectPromptCanvasState(activeSubMask.parameters) : null),
+    [activeSubMask, isObjectPromptActive],
+  );
 
   const isPanningDisabled =
     isMaskHovered ||
@@ -660,6 +671,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       (activeSubMask?.type === Mask.Brush ||
         activeSubMask?.type === Mask.Flow ||
         activeSubMask?.type === Mask.AiSubject ||
+        activeSubMask?.type === Mask.AiObject ||
         activeSubMask?.type === Mask.Color ||
         activeSubMask?.type === Mask.Luminance ||
         activeSubMaskParameters['isInitialDraw'] === true)) ||
@@ -930,6 +942,26 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.button !== 0) return;
+      const container = imageContainerRef.current;
+
+      if (isObjectPromptActive && activeObjectPromptState !== null && activeMaskId !== null && container !== null) {
+        const rect = container.getBoundingClientRect();
+        const point = imagePointFromCanvasClick(
+          {
+            x: (e.clientX - rect.left - transformStateRef.current.positionX) / transformStateRef.current.scale,
+            y: (e.clientY - rect.top - transformStateRef.current.positionY) / transformStateRef.current.scale,
+          },
+          imageRenderSize,
+        );
+        if (point !== null) {
+          const nextState = applyObjectPromptClick(activeObjectPromptState, point);
+          updateSubMaskLocal(activeMaskId, {
+            parameters: writeObjectPromptCanvasState(activeSubMask.parameters, nextState),
+          });
+        }
+        return;
+      }
+
       if (isPanningDisabled || wasPanningDisabledOnDown.current) return;
 
       if (mouseDownPos.current) {
@@ -956,7 +988,6 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           isClickAnimating.current = false;
         }, clickAnimationTime + 50);
 
-        const container = imageContainerRef.current;
         if (!container) return;
 
         const currentPositionX = transformStateRef.current.positionX;
@@ -977,7 +1008,16 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         animateTransform(newPositionX, newPositionY, zoomTarget, clickAnimationTime);
       }
     },
-    [animateTransform, isPanningDisabled],
+    [
+      activeMaskId,
+      activeObjectPromptState,
+      activeSubMask,
+      animateTransform,
+      imageRenderSize,
+      isObjectPromptActive,
+      isPanningDisabled,
+      updateSubMaskLocal,
+    ],
   );
 
   useEffect(() => {
@@ -2050,6 +2090,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     } else {
       cursorStyle = 'zoom-in';
     }
+  } else if (isObjectPromptActive) {
+    cursorStyle = 'crosshair';
   }
 
   const isWgpuActive = appSettings?.useWgpuRenderer !== false && hasRenderedFirstFrame;
@@ -2137,7 +2179,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
           <div
             ref={contentRef}
-            className="w-full h-full flex items-center justify-center origin-top-left"
+            className="relative w-full h-full flex items-center justify-center origin-top-left"
             style={{
               transform: `translate(${transformState.positionX}px, ${transformState.positionY}px) scale(${transformState.scale})`,
             }}
@@ -2199,6 +2241,50 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
               transformState={transformState}
               hasRenderedFirstFrame={hasRenderedFirstFrame}
             />
+            {activeObjectPromptState !== null && (
+              <div className="pointer-events-none absolute inset-0" data-testid="object-prompt-canvas-overlay">
+                {activeObjectPromptState.pointPrompts.map((point, index) => (
+                  <span
+                    className={cx(
+                      'absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 shadow-lg',
+                      point.label === 'foreground' ? 'border-white bg-emerald-400' : 'border-white bg-rose-500',
+                    )}
+                    data-object-prompt-label={point.label}
+                    data-object-prompt-x={point.x}
+                    data-object-prompt-y={point.y}
+                    key={`${point.label}-${point.x}-${point.y}-${index}`}
+                    style={{
+                      left: imageRenderSize.offsetX + point.x * imageRenderSize.width,
+                      top: imageRenderSize.offsetY + point.y * imageRenderSize.height,
+                    }}
+                  />
+                ))}
+                {activeObjectPromptState.pendingBoxAnchor !== null && (
+                  <span
+                    className="absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-sky-400 shadow-lg"
+                    data-testid="object-prompt-pending-box-anchor"
+                    style={{
+                      left:
+                        imageRenderSize.offsetX + activeObjectPromptState.pendingBoxAnchor.x * imageRenderSize.width,
+                      top:
+                        imageRenderSize.offsetY + activeObjectPromptState.pendingBoxAnchor.y * imageRenderSize.height,
+                    }}
+                  />
+                )}
+                {activeObjectPromptState.boxPrompt !== null && (
+                  <span
+                    className="absolute border-2 border-sky-300 bg-sky-300/15 shadow-lg"
+                    data-testid="object-prompt-box"
+                    style={{
+                      height: activeObjectPromptState.boxPrompt.height * imageRenderSize.height,
+                      left: imageRenderSize.offsetX + activeObjectPromptState.boxPrompt.x * imageRenderSize.width,
+                      top: imageRenderSize.offsetY + activeObjectPromptState.boxPrompt.y * imageRenderSize.height,
+                      width: activeObjectPromptState.boxPrompt.width * imageRenderSize.width,
+                    }}
+                  />
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
