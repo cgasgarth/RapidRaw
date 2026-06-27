@@ -37,9 +37,38 @@ export interface ObjectPromptCanvasState {
   pointPrompts: Array<ObjectPromptPoint>;
 }
 
+export const aiObjectMaskProposalSchema = z
+  .object({
+    clickToMaskLatencyMs: z.number().nonnegative(),
+    decoderLatencyMs: z.number().nonnegative(),
+    embeddingLatencyMs: z.number().nonnegative().nullable().optional(),
+    imageHeight: z.number().int().positive(),
+    imageWidth: z.number().int().positive(),
+    maskDataBase64: z.string().trim().startsWith('data:image/png;base64,'),
+    modelId: z.string().trim().min(1),
+    promptCount: z.number().int().positive(),
+    promptKind: z.enum(['box', 'point']),
+    providerId: z.string().trim().min(1),
+  })
+  .strict();
+
+export type AiObjectMaskProposal = z.infer<typeof aiObjectMaskProposalSchema>;
+
 export interface CanvasHitPoint {
   x: number;
   y: number;
+}
+
+export interface ObjectMaskProposalCommandInput {
+  endPoint: [number, number];
+  promptKind: 'box' | 'point';
+  startPoint: [number, number];
+}
+
+export interface ObjectPromptImageDimensions {
+  height: number;
+  orientationSteps: number;
+  width: number;
 }
 
 const DEFAULT_MODE: ObjectPromptMode = 'foreground_point';
@@ -123,6 +152,48 @@ export function clearObjectPromptCanvasState(current: ObjectPromptCanvasState): 
   return { ...current, boxPrompt: null, pendingBoxAnchor: null, pointPrompts: [] };
 }
 
+export function buildObjectMaskProposalCommandInput(
+  state: ObjectPromptCanvasState,
+  dimensions: ObjectPromptImageDimensions,
+): ObjectMaskProposalCommandInput | null {
+  const orientedWidth = dimensions.orientationSteps % 2 === 1 ? dimensions.height : dimensions.width;
+  const orientedHeight = dimensions.orientationSteps % 2 === 1 ? dimensions.width : dimensions.height;
+  if (orientedWidth <= 0 || orientedHeight <= 0) return null;
+
+  if (state.boxPrompt !== null) {
+    const start = toPixelPoint(state.boxPrompt.x, state.boxPrompt.y, orientedWidth, orientedHeight);
+    const end = toPixelPoint(
+      state.boxPrompt.x + state.boxPrompt.width,
+      state.boxPrompt.y + state.boxPrompt.height,
+      orientedWidth,
+      orientedHeight,
+    );
+    return { endPoint: end, promptKind: 'box', startPoint: start };
+  }
+
+  const foregroundPoint =
+    state.pointPrompts.find((prompt) => prompt.label === 'foreground') ??
+    state.pointPrompts.find((prompt) => prompt.label !== 'background');
+  if (foregroundPoint === undefined) return null;
+  const point = toPixelPoint(foregroundPoint.x, foregroundPoint.y, orientedWidth, orientedHeight);
+  return { endPoint: point, promptKind: 'point', startPoint: point };
+}
+
+export function acceptObjectMaskProposal(
+  parameters: SubMask['parameters'],
+  state: ObjectPromptCanvasState,
+  proposal: AiObjectMaskProposal,
+): MaskParameterRecord {
+  const parsedProposal = aiObjectMaskProposalSchema.parse(proposal);
+  return {
+    ...writeObjectPromptCanvasState(parameters, state),
+    maskDataBase64: parsedProposal.maskDataBase64,
+    objectPromptAcceptedAt: new Date().toISOString(),
+    proposal: parsedProposal,
+    providerStatus: 'local_sam_proposal_v1',
+  };
+}
+
 function parseBoxAnchor(record: MaskParameterRecord): ObjectPromptPoint | null {
   const parsed = objectPromptPointSchema.nullable().safeParse(record['pendingBoxAnchor']);
   return parsed.success ? parsed.data : null;
@@ -143,4 +214,8 @@ function buildBox(anchor: ObjectPromptPoint, point: ObjectPromptPoint): ObjectPr
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
+}
+
+function toPixelPoint(x: number, y: number, width: number, height: number): [number, number] {
+  return [Math.round(clamp01(x) * width), Math.round(clamp01(y) * height)];
 }

@@ -634,7 +634,8 @@
         "foreground": "Foreground",
         "points": "{{count}} points",
         "points_one": "{{count}} point",
-        "points_other": "{{count}} points"
+        "points_other": "{{count}} points",
+        "generate": "Generate SAM proposal"
       }
     },
     "metadata": {

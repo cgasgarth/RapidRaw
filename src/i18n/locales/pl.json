@@ -1133,6 +1133,7 @@
         "boxReady": "1 box",
         "clear": "Clear",
         "foreground": "Foreground",
+        "generate": "Generate SAM proposal",
         "points": "{{count}} points",
         "points_one": "{{count}} point",
         "points_few": "{{count}} points",

@@ -3,7 +3,9 @@
 import { readFileSync } from 'node:fs';
 
 import {
+  acceptObjectMaskProposal,
   applyObjectPromptClick,
+  buildObjectMaskProposalCommandInput,
   clearObjectPromptCanvasState,
   imagePointFromCanvasClick,
   readObjectPromptCanvasState,
@@ -37,11 +39,43 @@ state = applyObjectPromptClick(state, { label: 'foreground', x: 0.55, y: 0.7 });
 if (state.boxPrompt?.x !== 0.25 || state.boxPrompt.width < 0.29 || state.pendingBoxAnchor !== null) {
   throw new Error('Object prompt canvas did not materialize normalized box prompt.');
 }
+const boxCommand = buildObjectMaskProposalCommandInput(state, { height: 4000, orientationSteps: 0, width: 6000 });
+if (boxCommand?.promptKind !== 'box' || boxCommand.startPoint[0] !== 1500 || boxCommand.endPoint[1] !== 2800) {
+  throw new Error('Object prompt canvas did not build the expected box SAM command payload.');
+}
+const rotatedBoxCommand = buildObjectMaskProposalCommandInput(state, {
+  height: 4000,
+  orientationSteps: 1,
+  width: 6000,
+});
+if (rotatedBoxCommand?.startPoint[0] !== 1000 || rotatedBoxCommand.endPoint[1] !== 4200) {
+  throw new Error('Object prompt canvas did not build oriented SAM command payload coordinates.');
+}
 
 const serialized = writeObjectPromptCanvasState({}, state);
 const reparsed = readObjectPromptCanvasState(serialized);
 if (reparsed.boxPrompt === null || reparsed.pointPrompts.length !== 2 || reparsed.mode !== 'box') {
   throw new Error('Object prompt canvas state did not round-trip through submask parameters.');
+}
+const acceptedParameters = acceptObjectMaskProposal({}, reparsed, {
+  clickToMaskLatencyMs: 221,
+  decoderLatencyMs: 84,
+  embeddingLatencyMs: 137,
+  imageHeight: 4000,
+  imageWidth: 6000,
+  maskDataBase64:
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP8z8DwnwEJMDGgAcICDAAUDAICjW8RLwAAAABJRU5ErkJggg==',
+  modelId: 'sam_vit_b_01ec64',
+  promptCount: 2,
+  promptKind: 'box',
+  providerId: 'rapidraw-sam-vit-b-onnx-v1',
+});
+if (
+  acceptedParameters['providerStatus'] !== 'local_sam_proposal_v1' ||
+  acceptedParameters['maskDataBase64'] === undefined ||
+  acceptedParameters['proposal'] === undefined
+) {
+  throw new Error('Object prompt canvas did not persist accepted SAM proposal provenance.');
 }
 if (clearObjectPromptCanvasState(reparsed).pointPrompts.length !== 0) {
   throw new Error('Object prompt canvas clear did not remove points.');
@@ -53,6 +87,8 @@ for (const [label, source, needle] of [
   ['canvas overlay', editorSource, 'data-testid="object-prompt-canvas-overlay"'],
   ['box overlay', editorSource, 'data-testid="object-prompt-box"'],
   ['prompt controls', maskPanelSource, 'data-testid="object-prompt-controls"'],
+  ['proposal action', maskPanelSource, 'GenerateAiObjectMaskProposal'],
+  ['accepted proposal persistence', maskPanelSource, 'acceptObjectMaskProposal'],
   ['mode buttons', maskPanelSource, 'object-prompt-mode-'],
 ] as const) {
   if (!source.includes(needle)) throw new Error(`Object prompt UI is missing ${label}.`);
