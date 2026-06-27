@@ -8,18 +8,15 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use chrono::{SecondsFormat, Utc};
 use image::{
-    DynamicImage, ExtendedColorType, GenericImageView, GrayImage, ImageBuffer, ImageDecoder,
-    ImageEncoder, ImageFormat, Luma,
-    codecs::{jpeg::JpegDecoder, tiff::TiffDecoder, tiff::TiffEncoder},
+    DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageDecoder, ImageFormat, Luma,
+    codecs::{jpeg::JpegDecoder, tiff::TiffDecoder},
     imageops,
 };
-use jxl_encoder::{LosslessConfig, LossyConfig, PixelLayout};
 use lcms2::{
     Flags as LcmsFlags, Intent as LcmsIntent, PixelFormat as LcmsPixelFormat,
     Profile as LcmsProfile, Transform as LcmsTransform,
 };
 use moxcms::{ColorProfile, Layout, RenderingIntent as MoxRenderingIntent, TransformOptions};
-use mozjpeg_rs::{Encoder as MozJpegEncoder, Preset};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -28,6 +25,10 @@ use tauri::Manager;
 
 use crate::AppState;
 use crate::exif_processing;
+pub(crate) use crate::export_encoders::{
+    EmbeddedSourceIccProfile, encode_image_to_bytes,
+    encode_image_with_applied_policy_and_source_profile,
+};
 use crate::export_output_targets::{ExportOutputTargetRequest, resolve_export_output_target};
 pub use crate::export_postprocess::{OutputSharpeningSettings, ResizeOptions, WatermarkSettings};
 use crate::export_postprocess::{apply_export_postprocess, calculate_resize_target};
@@ -513,225 +514,7 @@ fn encode_grayscale_to_png(bitmap: &GrayImage) -> Result<Vec<u8>, String> {
     Ok(buf)
 }
 
-#[derive(Debug)]
-struct EncodedExportImage {
-    bytes: Vec<u8>,
-    color_policy: Option<ExportReceiptMetadata>,
-}
-
-#[derive(Debug)]
-struct EmbeddedSourceIccProfile {
-    bytes: Vec<u8>,
-    sha256: String,
-}
-
-fn encode_image_to_bytes(
-    image: &DynamicImage,
-    output_format: &str,
-    jpeg_quality: u8,
-    color_profile: &ExportColorProfile,
-    rendering_intent: &ExportRenderingIntent,
-) -> Result<Vec<u8>, String> {
-    encode_image_with_applied_policy(
-        image,
-        output_format,
-        jpeg_quality,
-        color_profile,
-        rendering_intent,
-        false,
-    )
-    .map(|encoded| encoded.bytes)
-}
-
-fn encode_image_with_applied_policy(
-    image: &DynamicImage,
-    output_format: &str,
-    jpeg_quality: u8,
-    color_profile: &ExportColorProfile,
-    rendering_intent: &ExportRenderingIntent,
-    black_point_compensation: bool,
-) -> Result<EncodedExportImage, String> {
-    encode_image_with_applied_policy_and_source_profile(
-        image,
-        output_format,
-        jpeg_quality,
-        color_profile,
-        rendering_intent,
-        black_point_compensation,
-        None,
-    )
-}
-
-fn encode_image_with_applied_policy_and_source_profile(
-    image: &DynamicImage,
-    output_format: &str,
-    jpeg_quality: u8,
-    color_profile: &ExportColorProfile,
-    rendering_intent: &ExportRenderingIntent,
-    black_point_compensation: bool,
-    source_embedded_icc: Option<&EmbeddedSourceIccProfile>,
-) -> Result<EncodedExportImage, String> {
-    validate_export_color_policy(output_format, color_profile)?;
-    let normalized_format = output_format.to_lowercase();
-
-    let mut image_bytes = Vec::new();
-    let mut cursor = Cursor::new(&mut image_bytes);
-
-    match normalized_format.as_str() {
-        "jxl" => {
-            let (width, height) = image.dimensions();
-            let has_alpha = image.color().has_alpha();
-
-            let jxl_data = if jpeg_quality == 100 {
-                if has_alpha {
-                    let rgba = image.to_rgba8();
-                    LosslessConfig::new()
-                        .encode(rgba.as_raw(), width, height, PixelLayout::Rgba8)
-                        .map_err(|e| format!("Failed to encode lossless JXL: {}", e))?
-                } else {
-                    let rgb = image.to_rgb8();
-                    LosslessConfig::new()
-                        .encode(rgb.as_raw(), width, height, PixelLayout::Rgb8)
-                        .map_err(|e| format!("Failed to encode lossless JXL: {}", e))?
-                }
-            } else {
-                let distance = (100.0 - jpeg_quality as f32) / 10.0;
-                let distance = distance.max(0.01);
-
-                if has_alpha {
-                    let rgba = image.to_rgba8();
-                    LossyConfig::new(distance)
-                        .encode(rgba.as_raw(), width, height, PixelLayout::Rgba8)
-                        .map_err(|e| format!("Failed to encode lossy JXL: {}", e))?
-                } else {
-                    let rgb = image.to_rgb8();
-                    LossyConfig::new(distance)
-                        .encode(rgb.as_raw(), width, height, PixelLayout::Rgb8)
-                        .map_err(|e| format!("Failed to encode lossy JXL: {}", e))?
-                }
-            };
-
-            return Ok(EncodedExportImage {
-                bytes: jxl_data,
-                color_policy: None,
-            });
-        }
-        "webp" => {
-            let encoder = webp::Encoder::from_image(image)
-                .map_err(|_| "Failed to create WebP encoder".to_string())?;
-            let webp_mem = encoder.encode(jpeg_quality as f32);
-            return Ok(EncodedExportImage {
-                bytes: webp_mem.to_vec(),
-                color_policy: None,
-            });
-        }
-        "jpg" | "jpeg" => {
-            return Ok(EncodedExportImage {
-                bytes: encode_jpeg_to_bytes(
-                    image,
-                    jpeg_quality,
-                    color_profile,
-                    rendering_intent,
-                    black_point_compensation,
-                    source_embedded_icc,
-                )?,
-                color_policy: export_receipt_metadata(
-                    &normalized_format,
-                    color_profile,
-                    rendering_intent,
-                    black_point_compensation,
-                    &export_source_precision_receipt_label(image),
-                    source_embedded_icc.map(|profile| profile.sha256.clone()),
-                ),
-            });
-        }
-        "png" => {
-            let image_to_encode = if image.as_rgb32f().is_some() {
-                DynamicImage::ImageRgb16(image.to_rgb16())
-            } else {
-                image.clone()
-            };
-
-            image_to_encode
-                .write_to(&mut cursor, image::ImageFormat::Png)
-                .map_err(|e| e.to_string())?;
-        }
-        "tiff" => {
-            return Ok(EncodedExportImage {
-                bytes: encode_tiff16_to_bytes(
-                    image,
-                    color_profile,
-                    rendering_intent,
-                    black_point_compensation,
-                    source_embedded_icc,
-                )?,
-                color_policy: export_receipt_metadata(
-                    &normalized_format,
-                    color_profile,
-                    rendering_intent,
-                    black_point_compensation,
-                    &export_source_precision_receipt_label(image),
-                    source_embedded_icc.map(|profile| profile.sha256.clone()),
-                ),
-            });
-        }
-        "avif" => {
-            image
-                .write_to(&mut cursor, image::ImageFormat::Avif)
-                .map_err(|e| e.to_string())?;
-        }
-        _ => return Err(format!("Unsupported file format: {}", output_format)),
-    };
-    Ok(EncodedExportImage {
-        bytes: image_bytes,
-        color_policy: None,
-    })
-}
-
-fn encode_tiff16_to_bytes(
-    image: &DynamicImage,
-    color_profile: &ExportColorProfile,
-    rendering_intent: &ExportRenderingIntent,
-    black_point_compensation: bool,
-    source_embedded_icc: Option<&EmbeddedSourceIccProfile>,
-) -> Result<Vec<u8>, String> {
-    let (pixels, width, height, icc_profile) =
-        if matches!(color_profile, ExportColorProfile::SourceEmbedded) {
-            let (pixels, width, height) =
-                export_source_rgb16_pixels(image, color_profile, rendering_intent);
-            let source_icc = source_embedded_icc.ok_or_else(|| {
-                "Source embedded export profile requires a source ICC profile.".to_string()
-            })?;
-            (pixels, width, height, source_icc.bytes.clone())
-        } else {
-            let (pixels, width, height, output_profile) = export_rgb16_pixels_and_profile(
-                image,
-                color_profile,
-                rendering_intent,
-                black_point_compensation,
-            )?;
-            (pixels, width, height, encode_icc_profile(&output_profile)?)
-        };
-    let mut image_bytes = Vec::new();
-    let mut cursor = Cursor::new(&mut image_bytes);
-    let mut encoder = TiffEncoder::new(&mut cursor);
-
-    encoder
-        .set_icc_profile(icc_profile)
-        .map_err(|e| format!("Failed to attach TIFF ICC profile: {}", e))?;
-    encoder
-        .write_image(
-            bytemuck::cast_slice(&pixels),
-            width,
-            height,
-            ExtendedColorType::Rgb16,
-        )
-        .map_err(|e| format!("Failed to encode 16-bit TIFF: {}", e))?;
-
-    Ok(image_bytes)
-}
-
-fn export_rgb16_pixels_and_profile(
+pub(crate) fn export_rgb16_pixels_and_profile(
     image: &DynamicImage,
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
@@ -799,7 +582,7 @@ fn export_rgb16_pixels_with_shared_conversion_core(
     }
 }
 
-fn export_source_rgb16_pixels(
+pub(crate) fn export_source_rgb16_pixels(
     image: &DynamicImage,
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
@@ -839,49 +622,6 @@ fn should_apply_srgb_perceptual_gamut_mapping(
 ) -> bool {
     matches!(color_profile, ExportColorProfile::Srgb)
         && matches!(rendering_intent, ExportRenderingIntent::Perceptual)
-}
-
-fn encode_jpeg_to_bytes(
-    image: &DynamicImage,
-    jpeg_quality: u8,
-    color_profile: &ExportColorProfile,
-    rendering_intent: &ExportRenderingIntent,
-    black_point_compensation: bool,
-    source_embedded_icc: Option<&EmbeddedSourceIccProfile>,
-) -> Result<Vec<u8>, String> {
-    let (rgb_pixels, width, height, icc_profile) =
-        if matches!(color_profile, ExportColorProfile::SourceEmbedded) {
-            let (rgb16_pixels, width, height) =
-                export_source_rgb16_pixels(image, color_profile, rendering_intent);
-            let source_icc = source_embedded_icc.ok_or_else(|| {
-                "Source embedded export profile requires a source ICC profile.".to_string()
-            })?;
-            (
-                quantize_rgb16_to_rgb8(&rgb16_pixels),
-                width,
-                height,
-                source_icc.bytes.clone(),
-            )
-        } else {
-            let (rgb_pixels, width, height, output_profile) = export_jpeg_rgb_pixels_and_profile(
-                image,
-                color_profile,
-                rendering_intent,
-                black_point_compensation,
-            )?;
-            (
-                rgb_pixels,
-                width,
-                height,
-                encode_icc_profile(&output_profile)?,
-            )
-        };
-
-    MozJpegEncoder::new(Preset::BaselineBalanced)
-        .quality(jpeg_quality.clamp(1, 100))
-        .icc_profile(icc_profile)
-        .encode_rgb(&rgb_pixels, width, height)
-        .map_err(|e| format!("Failed to encode JPEG: {}", e))
 }
 
 pub(crate) fn export_jpeg_rgb_pixels_and_profile(
@@ -949,7 +689,7 @@ fn export_rgb_pixels_and_profile(
     ))
 }
 
-fn quantize_rgb16_to_rgb8(pixels: &[u16]) -> Vec<u8> {
+pub(crate) fn quantize_rgb16_to_rgb8(pixels: &[u16]) -> Vec<u8> {
     pixels
         .iter()
         .map(|value| (((*value as u32) + 128) / 257) as u8)
@@ -1016,7 +756,7 @@ fn output_color_profile(color_profile: &ExportColorProfile) -> Result<ColorProfi
     }
 }
 
-fn validate_export_color_policy(
+pub(crate) fn validate_export_color_policy(
     output_format: &str,
     color_profile: &ExportColorProfile,
 ) -> Result<(), String> {
@@ -1235,7 +975,7 @@ fn is_lcms_relative_bpc_supported(
         )
 }
 
-fn encode_icc_profile(profile: &ColorProfile) -> Result<Vec<u8>, String> {
+pub(crate) fn encode_icc_profile(profile: &ColorProfile) -> Result<Vec<u8>, String> {
     profile
         .encode()
         .map_err(|e| format!("Failed to encode export ICC profile: {}", e))
@@ -1832,7 +1572,7 @@ pub(crate) struct ExportReceiptMetadata {
     pub transform_applied: bool,
 }
 
-fn export_receipt_metadata(
+pub(crate) fn export_receipt_metadata(
     format: &str,
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
@@ -1926,7 +1666,7 @@ fn export_color_transform_fingerprint(
     format!("sha256:{}", hex::encode(hasher.finalize()))
 }
 
-fn export_source_precision_receipt_label(image: &DynamicImage) -> String {
+pub(crate) fn export_source_precision_receipt_label(image: &DynamicImage) -> String {
     match image {
         DynamicImage::ImageRgb32F(_) => {
             "rgb32f source; quantized only at color-managed encoder boundary".to_string()
@@ -2331,16 +2071,16 @@ mod tests {
         EmbeddedSourceIccProfile, ExportBlackPointCompensationStatus, ExportColorEngineId,
         ExportColorProfile, ExportRenderingIntent, ExportSettings, OutputSharpeningSettings,
         applied_export_color_policy, apply_export_resize_and_watermark, encode_icc_profile,
-        encode_image_to_bytes, encode_image_with_applied_policy,
-        encode_image_with_applied_policy_and_source_profile, export_color_profile_receipt_label,
-        export_jpeg_rgb_pixels_and_profile, export_receipt_metadata, export_receipt_output,
-        export_rgb_pixels_and_profile, export_rgb16_pixels_and_profile,
-        export_rgb16_pixels_with_shared_conversion_core,
+        encode_image_to_bytes, encode_image_with_applied_policy_and_source_profile,
+        export_color_profile_receipt_label, export_jpeg_rgb_pixels_and_profile,
+        export_receipt_metadata, export_receipt_output, export_rgb_pixels_and_profile,
+        export_rgb16_pixels_and_profile, export_rgb16_pixels_with_shared_conversion_core,
         export_soft_proof_rgb_pixels_and_profile_with_policy,
         export_source_precision_receipt_label, export_transform_options, mox_rendering_intent,
         quantize_rgb16_to_rgb8, resolve_export_color_capabilities,
         resolve_export_color_transform_plan, should_apply_srgb_perceptual_gamut_mapping,
     };
+    use crate::export_encoders::encode_image_with_applied_policy;
     use crate::export_postprocess::OutputSharpeningTarget;
     use crate::gamut_mapping::SRGB_OKLAB_CHROMA_REDUCE_V1;
     use crate::raw_processing::{RawCameraProfileReport, RawDemosaicPath, RawDevelopmentReport};

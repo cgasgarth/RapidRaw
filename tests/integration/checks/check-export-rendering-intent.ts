@@ -15,6 +15,7 @@ const hookSource = read('src/hooks/useExportSettings.ts');
 const panelSource = read('src/components/panel/right/ExportPanel.tsx');
 const exportTypesSource = read('src/components/ui/ExportImportProperties.ts');
 const rustExportSource = read('src-tauri/src/export_processing.rs');
+const rustEncoderSource = read('src-tauri/src/export_encoders.rs');
 const capabilitySource = read('packages/rawengine-schema/src/exportColorCapabilities.ts');
 const locale = JSON.parse(read('src/i18n/locales/en.json'));
 
@@ -76,7 +77,6 @@ for (const marker of [
   if (!rustExportSource.includes(marker)) failures.push(`Rust export runtime capability resolver missing ${marker}`);
 }
 for (const marker of [
-  'validate_export_color_policy(output_format, color_profile)',
   'ColorProfile::new_adobe_rgb()',
   'ColorProfile::new_pro_photo_rgb()',
   'only supported for JPEG and TIFF',
@@ -96,6 +96,10 @@ for (const marker of [
   'export_color_transform_fingerprint',
 ]) {
   if (!rustExportSource.includes(marker)) failures.push(`Rust export capability matrix missing ${marker}`);
+}
+
+for (const marker of ['validate_export_color_policy(output_format, color_profile)']) {
+  if (!rustEncoderSource.includes(marker)) failures.push(`Rust export encoder missing ${marker}`);
 }
 
 if (!exportTypesSource.includes('renderingIntent?: ExportRenderingIntent')) {
