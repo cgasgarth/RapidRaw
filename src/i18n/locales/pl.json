@@ -1109,6 +1109,10 @@
         "switchToSubtract": "Przełącz na Odejmowanie"
       },
       "addNewMask": "Dodaj nową maskę",
+      "aiPeopleParts": {
+        "description": "Czesci z runtime sa wlaczone; wlosy i ubranie pozostaja wylaczone do czasu dowodu provider.",
+        "title": "Maski czesci osoby"
+      },
       "brush": {
         "brush": "Pędzel",
         "eraser": "Gumka",

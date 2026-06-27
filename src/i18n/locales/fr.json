@@ -641,6 +641,10 @@
         "points_other": "{{count}} points",
         "generate": "Generate SAM proposal",
         "receipt": "Recu de relecture : {{provider}}, {{promptKind}}, {{latency}} ms"
+      },
+      "aiPeopleParts": {
+        "description": "Les parties prises en charge sont actives; cheveux et vetements restent desactives avant la preuve fournisseur.",
+        "title": "Masques de parties de personne"
       }
     },
     "metadata": {
