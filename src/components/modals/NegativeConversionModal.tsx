@@ -41,6 +41,18 @@ import {
 } from './NegativeLabRollHealthModel';
 import { NegativeLabRollHealthPanel } from './NegativeLabRollHealthPanel';
 import { useModalTransition } from '../../hooks/useModalTransition';
+import {
+  NEGATIVE_LAB_PROFILE_BROWSER_ROWS,
+  NEGATIVE_LAB_PROFILE_BROWSER_ROW_BY_ID,
+  NEGATIVE_LAB_PROFILE_FILTERS,
+  NEGATIVE_LAB_PROFILE_FILTER_TEST_IDS,
+  NEGATIVE_LAB_PROFILE_SORTS,
+  NEGATIVE_LAB_PROFILE_SORT_TEST_IDS,
+  isNegativeLabProfileSort,
+  useNegativeLabProfileBrowser,
+  type NegativeLabProfileFilter,
+  type NegativeLabProfileSort,
+} from '../../hooks/useNegativeLabProfileBrowser';
 import { usePreviewViewport } from '../../hooks/usePreviewViewport';
 import { negativeLabAcquisitionProfileIdSchema } from '../../schemas/negativeLabAcquisitionProfileSchemas';
 import {
@@ -122,7 +134,6 @@ import {
   DEFAULT_NEGATIVE_LAB_UI_PRESET,
   NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG,
 } from '../../utils/negativeLabPresetCatalog';
-import { buildNegativeLabProfileBrowserRows } from '../../utils/negativeLabProfileBrowserRows';
 import {
   buildNegativeLabBrowserProfileProvenanceHash,
   buildNegativeLabProfileBoundPlanIdentity,
@@ -137,7 +148,6 @@ import { buildNegativeLabRollNormalizationPlan } from '../../utils/negativeLabRo
 import {
   NEGATIVE_LAB_STOCK_METADATA_CATALOG,
   buildNegativeLabStockMetadataCounts,
-  listNegativeLabStockMetadataReferencesForPreset,
 } from '../../utils/negativeLabStockMetadataCatalog';
 import { NEGATIVE_LAB_STOCK_REGISTRY, buildNegativeLabStockRegistryCounts } from '../../utils/negativeLabStockRegistry';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
@@ -160,19 +170,7 @@ import type { NegativeConversionEditorHandoff } from '../../utils/negativeLabEdi
 
 type NegativeParams = NegativeLabPresetParams;
 type NegativeConversionScope = 'active' | 'all' | 'ready';
-type NegativeLabProfileFilter = 'all' | 'black_and_white_silver' | 'color_negative' | 'measured';
-type NegativeLabProfileSort = 'catalog' | 'evidence_desc' | 'name_asc' | 'runtime_applied';
 type NegativeLabBaseSampleStudioDecision = 'accepted' | 'candidate' | 'rejected';
-type NegativeLabProfileFilterLabelKey =
-  | 'modals.negativeConversion.profileFilterAll'
-  | 'modals.negativeConversion.profileFilterBlackAndWhite'
-  | 'modals.negativeConversion.profileFilterColorNegative'
-  | 'modals.negativeConversion.profileFilterMeasured';
-type NegativeLabProfileSortLabelKey =
-  | 'modals.negativeConversion.profileSortCatalog'
-  | 'modals.negativeConversion.profileSortEvidence'
-  | 'modals.negativeConversion.profileSortName'
-  | 'modals.negativeConversion.profileSortRuntime';
 type NegativeLabAgentCommitState = 'committing' | 'not_committed' | 'ready_to_commit';
 type NegativeLabAgentDryRunState = 'accepted' | 'blocked' | 'ready';
 const NEGATIVE_LAB_AGENT_DRY_RUN_LABELS = {
@@ -185,30 +183,6 @@ const NEGATIVE_LAB_AGENT_COMMIT_LABELS = {
   not_committed: 'modals.negativeConversion.agentCommitNotCommitted',
   ready_to_commit: 'modals.negativeConversion.agentCommitReady',
 } satisfies Record<NegativeLabAgentCommitState, `modals.negativeConversion.${string}`>;
-const NEGATIVE_LAB_PROFILE_FILTERS = [
-  { id: 'all', labelKey: 'modals.negativeConversion.profileFilterAll' },
-  { id: 'color_negative', labelKey: 'modals.negativeConversion.profileFilterColorNegative' },
-  { id: 'black_and_white_silver', labelKey: 'modals.negativeConversion.profileFilterBlackAndWhite' },
-  { id: 'measured', labelKey: 'modals.negativeConversion.profileFilterMeasured' },
-] satisfies Array<{ id: NegativeLabProfileFilter; labelKey: NegativeLabProfileFilterLabelKey }>;
-const NEGATIVE_LAB_PROFILE_FILTER_TEST_IDS = {
-  all: 'negative-lab-profile-filter-all',
-  black_and_white_silver: 'negative-lab-profile-filter-black_and_white_silver',
-  color_negative: 'negative-lab-profile-filter-color_negative',
-  measured: 'negative-lab-profile-filter-measured',
-} satisfies Record<NegativeLabProfileFilter, string>;
-const NEGATIVE_LAB_PROFILE_SORTS = [
-  { id: 'catalog', labelKey: 'modals.negativeConversion.profileSortCatalog' },
-  { id: 'name_asc', labelKey: 'modals.negativeConversion.profileSortName' },
-  { id: 'evidence_desc', labelKey: 'modals.negativeConversion.profileSortEvidence' },
-  { id: 'runtime_applied', labelKey: 'modals.negativeConversion.profileSortRuntime' },
-] satisfies Array<{ id: NegativeLabProfileSort; labelKey: NegativeLabProfileSortLabelKey }>;
-const NEGATIVE_LAB_PROFILE_SORT_TEST_IDS = {
-  catalog: 'negative-lab-profile-sort-catalog',
-  evidence_desc: 'negative-lab-profile-sort-evidence_desc',
-  name_asc: 'negative-lab-profile-sort-name_asc',
-  runtime_applied: 'negative-lab-profile-sort-runtime_applied',
-} satisfies Record<NegativeLabProfileSort, string>;
 type BaseFogSampleLabelKey = 'modals.negativeConversion.sampleCenterPatch' | 'modals.negativeConversion.sampleLeftEdge';
 type ConversionScopeLabelKey =
   | 'modals.negativeConversion.scopeActive'
@@ -291,78 +265,9 @@ const formatPercentValue = (value: number) => `${Math.round(value)}%`;
 const formatDensityValue = (value: number) => value.toFixed(3);
 const formatRgbValue = (value: number) => `${Math.round(value * 255)}`;
 const formatSignedRecipeValue = (value: number) => (value > 0 ? `+${value.toFixed(2)}` : value.toFixed(2));
-const NEGATIVE_LAB_PROFILE_BROWSER_ROWS = buildNegativeLabProfileBrowserRows();
-const NEGATIVE_LAB_PROFILE_BROWSER_ROW_BY_ID = new Map(
-  NEGATIVE_LAB_PROFILE_BROWSER_ROWS.map((row) => [row.presetId, row]),
-);
 const NEGATIVE_LAB_STOCK_REGISTRY_COUNTS = buildNegativeLabStockRegistryCounts(NEGATIVE_LAB_STOCK_REGISTRY);
 const NEGATIVE_LAB_STOCK_METADATA_COUNTS = buildNegativeLabStockMetadataCounts(NEGATIVE_LAB_STOCK_METADATA_CATALOG);
 const formatStockRegistryToken = (value: string) => value.split('_').join(' ');
-const getNegativeLabProfileSearchText = (profile: NegativeLabRuntimeProfileBrowserRow) =>
-  [
-    profile.claimLevel,
-    profile.claimPolicy,
-    profile.displayName,
-    profile.filmClass,
-    profile.measurementProfileId ?? '',
-    profile.presetId,
-    profile.processFamily,
-    profile.profileStatus,
-    profile.provenanceSummary,
-    profile.runtimeStatus,
-    profile.sourceGenericPresetId ?? '',
-    String(profile.evidenceFixtureCount),
-    String(profile.params.base_fog_strength),
-    String(profile.params.black_point),
-    String(profile.params.blue_weight),
-    String(profile.params.contrast),
-    String(profile.params.exposure),
-    String(profile.params.green_weight),
-    String(profile.params.red_weight),
-    String(profile.params.white_point),
-    ...profile.doesNotProve,
-  ]
-    .join(' ')
-    .toLocaleLowerCase('en-US');
-const matchesNegativeLabProfileFilter = (
-  profile: NegativeLabRuntimeProfileBrowserRow,
-  filter: NegativeLabProfileFilter,
-) => {
-  if (filter === 'all') return true;
-  if (filter === 'measured') return profile.profileStatus === 'fixture_measured';
-  return profile.filmClass === filter;
-};
-const compareNegativeLabProfileNames = (
-  left: NegativeLabRuntimeProfileBrowserRow,
-  right: NegativeLabRuntimeProfileBrowserRow,
-) => left.displayName.localeCompare(right.displayName, 'en-US', { sensitivity: 'base' });
-const sortNegativeLabProfiles = (
-  profiles: Array<NegativeLabRuntimeProfileBrowserRow>,
-  sortMode: NegativeLabProfileSort,
-) => {
-  if (sortMode === 'name_asc') {
-    return profiles.toSorted(compareNegativeLabProfileNames);
-  }
-
-  if (sortMode === 'evidence_desc') {
-    return profiles.toSorted(
-      (left, right) =>
-        right.evidenceFixtureCount - left.evidenceFixtureCount || compareNegativeLabProfileNames(left, right),
-    );
-  }
-
-  if (sortMode === 'runtime_applied') {
-    return profiles.toSorted((left, right) => {
-      const leftScore = left.runtimeStatus === 'runtime_parameter_applied' ? 1 : 0;
-      const rightScore = right.runtimeStatus === 'runtime_parameter_applied' ? 1 : 0;
-      return rightScore - leftScore || compareNegativeLabProfileNames(left, right);
-    });
-  }
-
-  return profiles;
-};
-const isNegativeLabProfileSort = (value: string): value is NegativeLabProfileSort =>
-  NEGATIVE_LAB_PROFILE_SORTS.some((sort) => sort.id === value);
 const formatStockMetadataIso = (
   nominalIso: (typeof NEGATIVE_LAB_STOCK_METADATA_CATALOG.entries)[number]['nominalIso'],
 ) => (nominalIso === null ? 'ISO -' : `${nominalIso.unit} ${nominalIso.value}`);
@@ -644,10 +549,13 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.find((preset) => preset.presetId === selectedPresetId) ?? null,
     [selectedPresetId],
   );
-  const selectedProfile = useMemo(
-    () => NEGATIVE_LAB_PROFILE_BROWSER_ROWS.find((profile) => profile.presetId === selectedPresetId) ?? null,
-    [selectedPresetId],
-  );
+  const { profileFilterCounts, selectedProfile, selectedProfileStockReferences, visibleProfileRows } =
+    useNegativeLabProfileBrowser({
+      profileFilter,
+      profileSearchQuery,
+      profileSort,
+      selectedPresetId,
+    });
   const selectedAcquisitionProfile = useMemo(
     () => getNegativeLabAcquisitionProfile(selectedAcquisitionProfileId),
     [selectedAcquisitionProfileId],
@@ -681,46 +589,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     selectedProfile?.runtimeStatus === 'runtime_parameter_applied'
       ? t('modals.negativeConversion.presetRuntimeApplied')
       : t('modals.negativeConversion.presetRuntimeCatalogOnly');
-  const normalizedProfileSearchQuery = profileSearchQuery.trim().toLocaleLowerCase('en-US');
-  const profileFilterCounts = useMemo(
-    () =>
-      NEGATIVE_LAB_PROFILE_FILTERS.reduce<Record<NegativeLabProfileFilter, number>>(
-        (counts, filter) => ({
-          ...counts,
-          [filter.id]: NEGATIVE_LAB_PROFILE_BROWSER_ROWS.filter((profile) =>
-            matchesNegativeLabProfileFilter(profile, filter.id),
-          ).length,
-        }),
-        {
-          all: 0,
-          black_and_white_silver: 0,
-          color_negative: 0,
-          measured: 0,
-        },
-      ),
-    [],
-  );
-  const visibleProfileRows = useMemo(() => {
-    const filteredProfiles = NEGATIVE_LAB_PROFILE_BROWSER_ROWS.filter((profile) => {
-      if (!matchesNegativeLabProfileFilter(profile, profileFilter)) {
-        return false;
-      }
-
-      if (normalizedProfileSearchQuery.length === 0) {
-        return true;
-      }
-
-      return getNegativeLabProfileSearchText(profile).includes(normalizedProfileSearchQuery);
-    });
-
-    return sortNegativeLabProfiles(filteredProfiles, profileSort);
-  }, [normalizedProfileSearchQuery, profileFilter, profileSort]);
-  const selectedProfileStockReferences = useMemo(() => {
-    if (selectedProfile === null) return [];
-    return listNegativeLabStockMetadataReferencesForPreset(
-      selectedProfile.sourceGenericPresetId ?? selectedProfile.presetId,
-    );
-  }, [selectedProfile]);
   const frameHealthReport = useMemo(
     () =>
       buildNegativeLabFrameHealthReport({
