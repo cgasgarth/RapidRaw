@@ -269,9 +269,36 @@ pub fn load_and_composite(
     settings: &AppSettings,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<DynamicImage> {
-    let base_image =
-        load_base_image_from_bytes(base_image, path, use_fast_raw_dev, settings, cancel_token)?;
-    composite_patches_on_image(&base_image, adjustments)
+    load_and_composite_with_report(
+        base_image,
+        path,
+        adjustments,
+        use_fast_raw_dev,
+        settings,
+        cancel_token,
+    )
+    .map(|(image, _)| image)
+}
+
+pub(crate) fn load_and_composite_with_report(
+    base_image: &[u8],
+    path: &str,
+    adjustments: &Value,
+    use_fast_raw_dev: bool,
+    settings: &AppSettings,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
+    let (base_image, raw_development_report) = load_base_image_from_bytes_with_report(
+        base_image,
+        path,
+        use_fast_raw_dev,
+        settings,
+        cancel_token,
+    )?;
+    Ok((
+        composite_patches_on_image(&base_image, adjustments)?,
+        raw_development_report,
+    ))
 }
 
 pub fn load_base_image_from_bytes(
