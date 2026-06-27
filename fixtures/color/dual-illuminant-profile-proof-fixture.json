@@ -1,6 +1,6 @@
 {
   "$schema": "https://rawengine.local/schemas/dual-illuminant-profile-proof.v1.json",
-  "issue": 3244,
+  "issue": 3824,
   "schemaVersion": 1,
   "snapshotDate": "2026-06-27",
   "proofBoundary": "public_dual_illuminant_profile_receipt_and_metric_math",
@@ -33,18 +33,19 @@
       "id": "light_skin",
       "referenceLab": { "l": 65, "a": 14, "b": 18 },
       "measuredLab": { "l": 64.6, "a": 13.5, "b": 18.4 },
-      "role": "memory_color"
+      "role": "skin"
     },
     {
       "id": "foliage",
       "referenceLab": { "l": 45, "a": -12, "b": 22 },
       "measuredLab": { "l": 45.7, "a": -11.4, "b": 21.6 },
-      "role": "memory_color"
+      "role": "foliage"
     }
   ],
   "thresholds": {
     "deltaE00MeanMax": 1.25,
     "deltaE00MaxMax": 2,
+    "deltaE00P95Max": 2,
     "neutralChromaMax": 0.3
   }
 }
