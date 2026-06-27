@@ -30,6 +30,10 @@ use crate::album_management::{add_to_album, sync_album_path_changes};
 use crate::android_integration::*;
 use crate::app_settings::*;
 use crate::cache_utils::calculate_geometry_hash;
+use crate::delete_plan::{
+    associated_files_for_source, plan_stem_associated_deletes, plan_virtual_path_deletes,
+    rrdata_sidecar_path, rrexif_sidecar_path, trash_or_remove_paths,
+};
 use crate::exif_processing;
 use crate::formats::{is_raw_file, is_supported_image_file, jpeg_data_url};
 use crate::gpu_processing;
@@ -203,21 +207,6 @@ fn split_rrdata_sidecar_filename(file_name: &str) -> Option<(String, Option<Stri
     Some((base.to_string(), None))
 }
 
-fn rrdata_sidecar_filename(source_path: &Path, copy_id: Option<&str>) -> String {
-    let source_filename = source_path
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy();
-    match copy_id {
-        Some(id) => format!("{}.{}.rrdata", source_filename, id),
-        None => format!("{}.rrdata", source_filename),
-    }
-}
-
-fn rrdata_sidecar_path(source_path: &Path, copy_id: Option<&str>) -> PathBuf {
-    source_path.with_file_name(rrdata_sidecar_filename(source_path, copy_id))
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VirtualImagePath {
     source_path: PathBuf,
@@ -256,12 +245,6 @@ impl VirtualImagePath {
             None => self.source_path.to_string_lossy().to_string(),
         }
     }
-}
-
-fn rrexif_sidecar_path(source_path: &Path) -> PathBuf {
-    let mut rrexif_name = source_path.file_name().unwrap_or_default().to_os_string();
-    rrexif_name.push(".rrexif");
-    source_path.with_file_name(rrexif_name)
 }
 
 fn save_metadata_sidecar(sidecar_path: &Path, metadata: &ImageMetadata) -> Result<(), String> {
@@ -1730,45 +1713,7 @@ pub fn duplicate_file(
 }
 
 fn find_all_associated_files(source_image_path: &Path) -> Result<Vec<PathBuf>, String> {
-    let mut associated_files = vec![source_image_path.to_path_buf()];
-
-    let rrexif_path = rrexif_sidecar_path(source_image_path);
-
-    if rrexif_path.exists() {
-        associated_files.push(rrexif_path);
-    }
-
-    let parent_dir = source_image_path
-        .parent()
-        .ok_or("Could not determine parent directory")?;
-    let source_filename = source_image_path
-        .file_name()
-        .ok_or("Could not get source filename")?
-        .to_string_lossy();
-
-    let primary_sidecar_name = rrdata_sidecar_filename(source_image_path, None);
-    let virtual_copy_prefix = format!("{}.", source_filename);
-
-    if let Ok(entries) = fs::read_dir(parent_dir) {
-        for entry in entries.filter_map(Result::ok) {
-            let entry_path = entry.path();
-            if !entry_path.is_file() {
-                continue;
-            }
-
-            let entry_os_filename = entry.file_name();
-            let entry_filename = entry_os_filename.to_string_lossy();
-
-            if entry_filename == primary_sidecar_name
-                || (entry_filename.starts_with(&virtual_copy_prefix)
-                    && entry_filename.ends_with(".rrdata"))
-            {
-                associated_files.push(entry_path);
-            }
-        }
-    }
-
-    Ok(associated_files)
+    associated_files_for_source(source_image_path)
 }
 
 #[tauri::command]
@@ -2557,70 +2502,12 @@ pub fn show_in_finder(path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn delete_files_from_disk(paths: Vec<String>, app_handle: AppHandle) -> Result<(), String> {
-    let mut files_to_trash = HashSet::new();
-
-    let mut deletions = HashSet::new();
-
-    for path_str in paths {
-        let (source_path, sidecar_path) = parse_virtual_path(&path_str);
-        deletions.insert(path_str.clone());
-
-        if path_str.contains("?vc=") {
-            if sidecar_path.exists() {
-                files_to_trash.insert(sidecar_path);
-            }
-        } else {
-            if source_path.exists() {
-                match find_all_associated_files(&source_path) {
-                    Ok(associated_files) => {
-                        for file in associated_files {
-                            files_to_trash.insert(file);
-                        }
-                    }
-                    Err(e) => {
-                        log::warn!(
-                            "Could not find associated files for {}: {}",
-                            source_path.display(),
-                            e
-                        );
-                    }
-                }
-            }
-        }
-    }
-
-    if files_to_trash.is_empty() {
+    let (paths_to_delete, deletions) = plan_virtual_path_deletes(&paths, parse_virtual_path);
+    if paths_to_delete.is_empty() {
         return Ok(());
     }
 
-    let final_paths_to_delete: Vec<PathBuf> = files_to_trash.into_iter().collect();
-    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
-    if let Err(trash_error) = trash::delete_all(&final_paths_to_delete) {
-        log::warn!(
-            "Failed to move files to trash: {}. Falling back to permanent delete.",
-            trash_error
-        );
-        for path in final_paths_to_delete {
-            if path.is_file() {
-                fs::remove_file(&path)
-                    .map_err(|e| format!("Failed to delete file {}: {}", path.display(), e))?;
-            } else if path.is_dir() {
-                fs::remove_dir_all(&path)
-                    .map_err(|e| format!("Failed to delete directory {}: {}", path.display(), e))?;
-            }
-        }
-    }
-
-    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-    for path in final_paths_to_delete {
-        if path.is_file() {
-            fs::remove_file(&path)
-                .map_err(|e| format!("Failed to delete file {}: {}", path.display(), e))?;
-        } else if path.is_dir() {
-            fs::remove_dir_all(&path)
-                .map_err(|e| format!("Failed to delete directory {}: {}", path.display(), e))?;
-        }
-    }
+    trash_or_remove_paths(paths_to_delete)?;
 
     sync_album_path_changes(&app_handle, None, Some(&deletions), None);
 
@@ -2636,78 +2523,15 @@ pub fn delete_files_with_associated(
         return Ok(());
     }
 
-    let mut stems_to_delete = HashSet::new();
-    let mut parent_dirs = HashSet::new();
-    let mut deletions = HashSet::new();
-
-    for path_str in &paths {
-        deletions.insert(path_str.clone());
-        let (source_path, _) = parse_virtual_path(path_str);
-        if let Some(file_name) = source_path.file_name().and_then(|s| s.to_str())
-            && let Some(stem) = file_name.split('.').next()
-        {
-            stems_to_delete.insert(stem.to_string());
-        }
-        if let Some(parent) = source_path.parent() {
-            parent_dirs.insert(parent.to_path_buf());
-        }
-    }
-
-    if stems_to_delete.is_empty() {
+    let (paths_to_delete, deletions) =
+        plan_stem_associated_deletes(&paths, parse_virtual_path, |file_name| {
+            is_supported_image_file(file_name)
+        });
+    if paths_to_delete.is_empty() {
         return Ok(());
     }
 
-    let mut files_to_trash = HashSet::new();
-
-    for parent_dir in parent_dirs {
-        if let Ok(entries) = fs::read_dir(parent_dir) {
-            for entry in entries.filter_map(Result::ok) {
-                let entry_path = entry.path();
-                if !entry_path.is_file() {
-                    continue;
-                }
-
-                let entry_filename = entry.file_name();
-                let entry_filename_str = entry_filename.to_string_lossy();
-
-                if let Some(base_stem) = entry_filename_str.split('.').next()
-                    && stems_to_delete.contains(base_stem)
-                    && (is_supported_image_file(entry_filename_str.as_ref())
-                        || entry_filename_str.ends_with(".rrdata")
-                        || entry_filename_str.ends_with(".rrexif"))
-                {
-                    files_to_trash.insert(entry_path);
-                }
-            }
-        }
-    }
-
-    if files_to_trash.is_empty() {
-        return Ok(());
-    }
-
-    let final_paths_to_delete: Vec<PathBuf> = files_to_trash.into_iter().collect();
-    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
-    if let Err(trash_error) = trash::delete_all(&final_paths_to_delete) {
-        log::warn!(
-            "Failed to move files to trash: {}. Falling back to permanent delete.",
-            trash_error
-        );
-        for path in final_paths_to_delete {
-            if path.is_file() {
-                fs::remove_file(&path)
-                    .map_err(|e| format!("Failed to delete file {}: {}", path.display(), e))?;
-            }
-        }
-    }
-
-    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-    for path in final_paths_to_delete {
-        if path.is_file() {
-            fs::remove_file(&path)
-                .map_err(|e| format!("Failed to delete file {}: {}", path.display(), e))?;
-        }
-    }
+    trash_or_remove_paths(paths_to_delete)?;
 
     sync_album_path_changes(&app_handle, None, Some(&deletions), None);
 
