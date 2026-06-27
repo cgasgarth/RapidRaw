@@ -88,6 +88,7 @@ import {
   ADJUSTMENT_SECTIONS,
 } from '../../../utils/adjustments';
 import { buildAiPeopleMaskPickerModel } from '../../../utils/aiPeopleMaskPickerModel';
+import { createEditorSubMaskFallback, createEditorSubMaskForImage } from '../../../utils/editorSubMaskFactory';
 import {
   cloneMaskContainerForPaste,
   cloneSubMaskForPaste,
@@ -104,7 +105,6 @@ import {
   dispatchMaskRefinementCommand,
   readMaskRefinementReplayReceipt,
 } from '../../../utils/maskRefinementCommandBus';
-import { createSubMask } from '../../../utils/maskUtils';
 import {
   clearObjectPromptCanvasState,
   acceptObjectMaskProposal,
@@ -1289,55 +1289,15 @@ export function MasksPanel() {
     mode: SubMaskMode = SubMaskMode.Additive,
     personPart?: MaskType['personPart'],
   ) => {
-    if (!selectedImage) return createSubMask(type, { width: 1000, height: 1000 }, mode);
-    const subMask = createSubMask(type, selectedImage, mode);
-
-    const steps = adjustments.orientationSteps;
-    const isRotated = steps === 1 || steps === 3;
-    const imgW = isRotated ? selectedImage.height || 1000 : selectedImage.width || 1000;
-    const imgH = isRotated ? selectedImage.width || 1000 : selectedImage.height || 1000;
-    const parameters = toMaskParameterRecord(subMask.parameters);
-
-    if (type === Mask.Linear) {
-      parameters['imageHeight'] = imgH;
-      parameters['imageWidth'] = imgW;
-      parameters['range'] = Math.min(imgW, imgH) * 0.12;
-      parameters['startX'] = imgW * 0.5;
-      parameters['startY'] = imgH * 0.12;
-      parameters['endX'] = imgW * 0.5;
-      parameters['endY'] = imgH * 0.72;
-    }
-
-    if (type === Mask.Linear || type === Mask.Radial || type === Mask.Color || type === Mask.Luminance) {
-      parameters['isInitialDraw'] = true;
-      if (type === Mask.Radial) {
-        parameters['startX'] = -10000;
-        parameters['startY'] = -10000;
-        parameters['endX'] = -10000;
-        parameters['endY'] = -10000;
-        parameters['centerX'] = -10000;
-        parameters['centerY'] = -10000;
-        parameters['radiusX'] = 0;
-        parameters['radiusY'] = 0;
-      } else {
-        parameters['targetX'] = -10000;
-        parameters['targetY'] = -10000;
-        parameters['tolerance'] = 20;
-        parameters['feather'] = 35;
-      }
-    }
-
-    if (type === Mask.AiDepth) {
-      parameters['minDepth'] = 20;
-      parameters['maxDepth'] = 100;
-      parameters['minFade'] = 15;
-      parameters['maxFade'] = 15;
-      parameters['feather'] = 10;
-    }
-    subMask.parameters =
-      personPart === undefined ? parameters : { ...parameters, target: { part: personPart, personId: null } };
-    if (personPart === 'face') subMask.name = t('masks.types.face');
-    return subMask;
+    if (!selectedImage) return createEditorSubMaskFallback(type, mode);
+    return createEditorSubMaskForImage({
+      type,
+      imageDimensions: selectedImage,
+      mode,
+      orientationSteps: adjustments.orientationSteps,
+      personPart,
+      faceName: t('masks.types.face'),
+    });
   };
 
   const handleAddMaskContainer = (maskTypeOrType: MaskType | Mask) => {
