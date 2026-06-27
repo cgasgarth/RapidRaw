@@ -1114,6 +1114,7 @@ fn develop_bayer_hq_intermediate(
 
 fn develop_xtrans_hq_intermediate(
     raw_image: &RawImage,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<(Intermediate, XTransHqDevelopmentReport)> {
     let mut scaled = raw_image.clone();
     scaled.apply_scaling()?;
@@ -1128,7 +1129,14 @@ fn develop_xtrans_hq_intermediate(
     );
     let roi = scaled.active_area.unwrap_or(pixels.rect());
     let (demosaiced, reconstruction_report) =
-        crate::xtrans_hq::demosaic_xtrans_hq(&pixels, &config.cfa, roi);
+        crate::xtrans_hq::demosaic_xtrans_hq_with_cancel(&pixels, &config.cfa, roi, || {
+            if let Some((tracker, generation)) = &cancel_token
+                && tracker.load(Ordering::SeqCst) != *generation
+            {
+                return Err(anyhow!("Load cancelled"));
+            }
+            Ok(())
+        })?;
     let calibrated = calibrate_three_color(&scaled, demosaiced);
 
     Ok((
@@ -1314,7 +1322,8 @@ fn develop_internal_with_options(
     let mut developed_intermediate = if use_bayer_hq {
         develop_bayer_hq_intermediate(&raw_image)?.0
     } else if use_xtrans_hq {
-        let (intermediate, report) = develop_xtrans_hq_intermediate(&raw_image)?;
+        let (intermediate, report) =
+            develop_xtrans_hq_intermediate(&raw_image, cancel_token.clone())?;
         xtrans_hq_report = Some(report);
         intermediate
     } else {
