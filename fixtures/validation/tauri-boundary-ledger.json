@@ -44,6 +44,78 @@
       "status": "runtime-parse-tested",
       "tsCallSites": ["src/utils/fileOperationInvokes.ts"],
       "zodSchema": "fileOperationPathListSchema"
+    },
+    {
+      "command": "delete_files_from_disk",
+      "invokeEnumMember": "DeleteFilesFromDisk",
+      "notes": "Library delete operations parse request paths before invoking Tauri and normalize the void response through the file operation client.",
+      "rustParityState": "manual-rust-command-shape",
+      "status": "schema-only",
+      "tsCallSites": ["src/utils/fileOperationInvokes.ts"],
+      "zodSchema": "fileOperationVoidResponseSchema"
+    },
+    {
+      "command": "delete_files_with_associated",
+      "invokeEnumMember": "DeleteFilesWithAssociated",
+      "notes": "Associated-file deletes share the schema-backed delete request and void response parser.",
+      "rustParityState": "manual-rust-command-shape",
+      "status": "schema-only",
+      "tsCallSites": ["src/utils/fileOperationInvokes.ts"],
+      "zodSchema": "fileOperationVoidResponseSchema"
+    },
+    {
+      "command": "create_folder",
+      "invokeEnumMember": "CreateFolder",
+      "notes": "Folder creation validates the destination path before invoking Tauri and normalizes the void response.",
+      "rustParityState": "manual-rust-command-shape",
+      "status": "schema-only",
+      "tsCallSites": ["src/utils/fileOperationInvokes.ts"],
+      "zodSchema": "fileOperationVoidResponseSchema"
+    },
+    {
+      "command": "rename_folder",
+      "invokeEnumMember": "RenameFolder",
+      "notes": "Folder rename validates the source path and new name before invoking Tauri and normalizes the void response.",
+      "rustParityState": "manual-rust-command-shape",
+      "status": "schema-only",
+      "tsCallSites": ["src/utils/fileOperationInvokes.ts"],
+      "zodSchema": "fileOperationVoidResponseSchema"
+    },
+    {
+      "command": "import_files",
+      "invokeEnumMember": "ImportFiles",
+      "notes": "Import start validates source paths, destination folder, and import settings before invoking Tauri.",
+      "rustParityState": "manual-rust-command-shape",
+      "status": "schema-only",
+      "tsCallSites": ["src/utils/fileOperationInvokes.ts"],
+      "zodSchema": "fileOperationVoidResponseSchema"
+    },
+    {
+      "command": "copy_files",
+      "invokeEnumMember": "CopyFiles",
+      "notes": "Paste-copy validates source paths and destination folder before invoking Tauri.",
+      "rustParityState": "manual-rust-command-shape",
+      "status": "schema-only",
+      "tsCallSites": ["src/utils/fileOperationInvokes.ts"],
+      "zodSchema": "fileOperationVoidResponseSchema"
+    },
+    {
+      "command": "move_files",
+      "invokeEnumMember": "MoveFiles",
+      "notes": "Paste-move validates source paths and destination folder before invoking Tauri.",
+      "rustParityState": "manual-rust-command-shape",
+      "status": "schema-only",
+      "tsCallSites": ["src/utils/fileOperationInvokes.ts"],
+      "zodSchema": "fileOperationVoidResponseSchema"
+    },
+    {
+      "command": "resolve_android_content_uri_name",
+      "invokeEnumMember": "ResolveAndroidContentUriName",
+      "notes": "Android import display-name resolution validates the content URI argument and returned file name.",
+      "rustParityState": "manual-rust-command-shape",
+      "status": "schema-only",
+      "tsCallSites": ["src/utils/fileOperationInvokes.ts"],
+      "zodSchema": "fileOperationPathSchema"
     }
   ],
   "issue": 1301,
