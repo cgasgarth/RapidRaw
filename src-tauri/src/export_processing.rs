@@ -29,9 +29,7 @@ use tauri::Manager;
 use crate::AppState;
 use crate::exif_processing;
 use crate::export_output_targets::{ExportOutputTargetRequest, resolve_export_output_target};
-pub use crate::export_postprocess::{
-    OutputSharpeningSettings, OutputSharpeningTarget, ResizeOptions, WatermarkSettings,
-};
+pub use crate::export_postprocess::{OutputSharpeningSettings, ResizeOptions, WatermarkSettings};
 use crate::export_postprocess::{apply_export_postprocess, calculate_resize_target};
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
@@ -2332,8 +2330,8 @@ mod tests {
     use super::{
         EmbeddedSourceIccProfile, ExportBlackPointCompensationStatus, ExportColorEngineId,
         ExportColorProfile, ExportRenderingIntent, ExportSettings, OutputSharpeningSettings,
-        OutputSharpeningTarget, applied_export_color_policy, apply_export_resize_and_watermark,
-        encode_icc_profile, encode_image_to_bytes, encode_image_with_applied_policy,
+        applied_export_color_policy, apply_export_resize_and_watermark, encode_icc_profile,
+        encode_image_to_bytes, encode_image_with_applied_policy,
         encode_image_with_applied_policy_and_source_profile, export_color_profile_receipt_label,
         export_jpeg_rgb_pixels_and_profile, export_receipt_metadata, export_receipt_output,
         export_rgb_pixels_and_profile, export_rgb16_pixels_and_profile,
@@ -2343,6 +2341,7 @@ mod tests {
         quantize_rgb16_to_rgb8, resolve_export_color_capabilities,
         resolve_export_color_transform_plan, should_apply_srgb_perceptual_gamut_mapping,
     };
+    use crate::export_postprocess::OutputSharpeningTarget;
     use crate::gamut_mapping::SRGB_OKLAB_CHROMA_REDUCE_V1;
     use crate::raw_processing::{RawCameraProfileReport, RawDemosaicPath, RawDevelopmentReport};
     use moxcms::ColorProfile;
