@@ -87,6 +87,14 @@ export const AI_APP_SERVER_TOOL_ROUTE_MANIFEST = aiAppServerToolRouteManifestSch
       toolCapability: AiAppServerToolCapability.SkyMask,
     },
     {
+      deferredIssue: '#3250',
+      reason:
+        'Promptable object-mask proposals need their own app-server command schema with point/box prompts, preview artifacts, and provider provenance before mapping.',
+      sourceKind: AiAppServerToolRouteSourceKind.TauriInvoke,
+      sourceOperation: 'generate_ai_object_mask_proposal',
+      status: AiAppServerToolRouteStatus.Deferred,
+    },
+    {
       appServerToolName: AiAppServerToolName.MaskApplySubject,
       commandSchemaName: AiAppServerToolSchemaName.ToolCommandEnvelope,
       executionMode: AiAppServerToolRouteExecutionMode.ApplyDryRunPlan,

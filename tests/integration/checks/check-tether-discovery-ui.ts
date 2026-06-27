@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const panelSource = readFileSync('src/components/panel/right/TetherPanel.tsx', 'utf8');
 const editorViewSource = readFileSync('src/components/views/EditorView.tsx', 'utf8');
 const schemaSource = readFileSync('src/schemas/tetheringSchemas.ts', 'utf8');
+const proofReceiptSource = readFileSync('src/utils/tetherIngestProofReceipt.ts', 'utf8');
 const registrySource = readFileSync('src/components/panel/right/rightPanelRegistry.ts', 'utf8');
 const appPropertiesSource = readFileSync('src/components/ui/AppProperties.tsx', 'utf8');
 const visualSmokeSource = readFileSync('src/validation/visual/VisualSmokeApp.tsx', 'utf8');
@@ -64,6 +65,18 @@ const requiredSnippets = [
   [panelSource, 'data-ingest-preset-id={capture.ingest.presetId}'],
   [panelSource, 'data-metadata-template-id={capture.metadata.templateId}'],
   [panelSource, 'data-backup-status={capture.backup.status}'],
+  [panelSource, 'buildTetherIngestProofReceipt(capture)'],
+  [panelSource, 'data-testid="tether-ingest-proof-receipt"'],
+  [panelSource, 'data-receipt-version={captureProofReceipt.receiptVersion}'],
+  [panelSource, 'data-receipt-checksum={captureProofReceipt.checksum}'],
+  [panelSource, 'data-receipt-ingest-preset-id={captureProofReceipt.ingestPresetId}'],
+  [panelSource, 'data-receipt-metadata-template-id={captureProofReceipt.metadataTemplateId}'],
+  [panelSource, 'data-receipt-backup-status={captureProofReceipt.backupStatus}'],
+  [panelSource, 'data-camera-control-count={captureProofReceipt.cameraControlCount}'],
+  [panelSource, "t('editor.tether.ingestProofReceipt'"],
+  [schemaSource, 'tetherIngestProofReceiptSchema'],
+  [proofReceiptSource, 'buildTetherIngestProofReceipt'],
+  [proofReceiptSource, "duplicateSuppressed: capture.status === 'duplicate'"],
   [panelSource, 'backupDestinationRoot:'],
   [panelSource, 'isBackupEnabled && backupDestinationRoot.trim()'],
   [panelSource, 'data-pinned={String(isPinned)}'],
@@ -185,6 +198,7 @@ for (const key of [
   'backupVerified',
   'exposureControls',
   'ingestApplied',
+  'ingestProofReceipt',
   'ingestPreset',
   'ingestPresetCameraSequence',
   'ingestPresetSourceSequence',

@@ -20,6 +20,7 @@ import {
 } from '../../../schemas/tetheringSchemas';
 import { TextColors, TextVariants } from '../../../types/typography';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
+import { buildTetherIngestProofReceipt } from '../../../utils/tetherIngestProofReceipt';
 import { Invokes } from '../../ui/AppProperties';
 import Button from '../../ui/Button';
 import UiText from '../../ui/Text';
@@ -100,6 +101,7 @@ export function TetherPanel({
   const providerStatus = discovery?.provider.status ?? 'hardware_adapter_pending';
   const isSessionOpen = session !== null;
   const isSessionCaptureReady = session?.status === 'open';
+  const captureProofReceipt = capture === null ? null : buildTetherIngestProofReceipt(capture);
 
   const discover = useCallback(async () => {
     setIsLoading(true);
@@ -471,6 +473,34 @@ export function TetherPanel({
           <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
             {t('editor.tether.captureVerified', { bytes: capture.bytes })}
           </UiText>
+          {captureProofReceipt !== null && (
+            <UiText
+              variant={TextVariants.small}
+              color={TextColors.secondary}
+              className="mt-1 block truncate"
+              data-backup-enabled={String(captureProofReceipt.backupEnabled)}
+              data-camera-control-count={captureProofReceipt.cameraControlCount}
+              data-duplicate-suppressed={String(captureProofReceipt.duplicateSuppressed)}
+              data-receipt-backup-status={captureProofReceipt.backupStatus}
+              data-receipt-checksum={captureProofReceipt.checksum}
+              data-receipt-collision-index={captureProofReceipt.collisionIndex}
+              data-receipt-imported-path={captureProofReceipt.importedPath}
+              data-receipt-ingest-preset-id={captureProofReceipt.ingestPresetId}
+              data-receipt-metadata-sidecar-path={captureProofReceipt.metadataSidecarPath ?? ''}
+              data-receipt-metadata-template-id={captureProofReceipt.metadataTemplateId}
+              data-receipt-provider-mode={captureProofReceipt.providerMode}
+              data-receipt-session-id={captureProofReceipt.sessionId}
+              data-receipt-status={captureProofReceipt.status}
+              data-receipt-version={captureProofReceipt.receiptVersion}
+              data-testid="tether-ingest-proof-receipt"
+            >
+              {t('editor.tether.ingestProofReceipt', {
+                checksum: captureProofReceipt.checksum,
+                collisionIndex: captureProofReceipt.collisionIndex,
+                preset: t(tetherIngestPresetLocaleKey(captureProofReceipt.ingestPresetId)),
+              })}
+            </UiText>
+          )}
           <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
             {t('editor.tether.ingestApplied', {
               collisionIndex: capture.ingest.collisionIndex,
