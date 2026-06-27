@@ -1385,6 +1385,9 @@
         "fake": "Fake CI"
       },
       "recoveryFailed": "Tether recovery failed: {{message}}",
+      "recoveryProofReceipt": "Recovery receipt: {{status}}, {{count}} partial files",
+      "recoveryProofReceipt_one": "",
+      "recoveryProofReceipt_other": "",
       "recoveryQuarantined": "Quarantined {{count}} partial tether download(s).",
       "recoveryQuarantined_one": "",
       "recoveryQuarantined_other": "",

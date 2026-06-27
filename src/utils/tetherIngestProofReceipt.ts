@@ -1,7 +1,10 @@
 import {
   tetherIngestProofReceiptSchema,
+  tetherRecoveryProofReceiptSchema,
   type TetherCaptureResponse,
   type TetherIngestProofReceipt,
+  type TetherRecoveryProofReceipt,
+  type TetherSessionSnapshot,
 } from '../schemas/tetheringSchemas';
 
 export function buildTetherIngestProofReceipt(capture: TetherCaptureResponse): TetherIngestProofReceipt {
@@ -24,5 +27,23 @@ export function buildTetherIngestProofReceipt(capture: TetherCaptureResponse): T
     receiptVersion: 1,
     sessionId: capture.sessionId,
     status: capture.status,
+  });
+}
+
+export function buildTetherRecoveryProofReceipt(session: TetherSessionSnapshot): TetherRecoveryProofReceipt {
+  return tetherRecoveryProofReceiptSchema.parse({
+    cameraDisplayName: session.cameraDisplayName,
+    captureCounter: session.captureCounter,
+    destinationRoot: session.destinationRoot,
+    firstQuarantinedFile: session.recovery.quarantinedFiles[0] ?? null,
+    partialFilesFound: session.recovery.partialFilesFound,
+    providerMode: session.providerMode,
+    quarantinedFileCount: session.recovery.quarantinedFiles.length,
+    receiptVersion: 1,
+    recoveryMessage: session.recovery.message,
+    recoveryStatus: session.recovery.status,
+    reconnectRequired: session.status === 'reconnect_required' || session.recovery.status === 'reconnect_required',
+    sessionId: session.sessionId,
+    sessionStatus: session.status,
   });
 }
