@@ -29,6 +29,21 @@ export type MaskRefinementUiCommand = z.infer<typeof maskRefinementUiCommandSche
 
 export const MASK_REFINEMENT_REPLAY_PARAMETER_KEY = 'refinementReplayCommand';
 
+export const maskRefinementReplayReceiptSchema = z
+  .object({
+    density: maskRefinementParametersCommandSchema.shape.density,
+    edgeContrast: maskRefinementParametersCommandSchema.shape.edgeContrast,
+    edgeShiftPx: maskRefinementParametersCommandSchema.shape.edgeShiftPx,
+    featherPx: maskRefinementParametersCommandSchema.shape.featherPx,
+    maskId: z.string().trim().min(1),
+    receiptVersion: z.literal(1),
+    schemaVersion: z.literal(1),
+    smoothness: maskRefinementParametersCommandSchema.shape.smoothness,
+  })
+  .strict();
+
+export type MaskRefinementReplayReceipt = z.infer<typeof maskRefinementReplayReceiptSchema>;
+
 const DEFAULT_REFINEMENT_PARAMETERS: z.infer<typeof maskRefinementParametersCommandSchema> = {
   density: 1,
   edgeContrast: 0,
@@ -73,4 +88,20 @@ export function dispatchMaskRefinementCommand(command: MaskRefinementUiCommand):
       replaySchemaVersion: 1,
     },
   };
+}
+
+export function readMaskRefinementReplayReceipt(parameters: unknown): MaskRefinementReplayReceipt | null {
+  const record = toMaskParameterRecord(parameters);
+  const replay = record[MASK_REFINEMENT_REPLAY_PARAMETER_KEY];
+  if (typeof replay !== 'object' || replay === null || !('command' in replay)) return null;
+
+  const command = maskRefinementUiCommandSchema.safeParse(replay.command);
+  if (!command.success) return null;
+
+  return maskRefinementReplayReceiptSchema.parse({
+    ...command.data.parameters.refinement,
+    maskId: command.data.parameters.maskId,
+    receiptVersion: 1,
+    schemaVersion: command.data.schemaVersion,
+  });
 }

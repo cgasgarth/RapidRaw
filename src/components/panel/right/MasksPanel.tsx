@@ -97,7 +97,11 @@ import {
   splitSubMaskToContainer,
 } from '../../../utils/maskClipboard';
 import { getMaskParameterNumber, mergeMaskParameters, toMaskParameterRecord } from '../../../utils/maskParameterAccess';
-import { createMaskRefinementCommand, dispatchMaskRefinementCommand } from '../../../utils/maskRefinementCommandBus';
+import {
+  createMaskRefinementCommand,
+  dispatchMaskRefinementCommand,
+  readMaskRefinementReplayReceipt,
+} from '../../../utils/maskRefinementCommandBus';
 import { createSubMask } from '../../../utils/maskUtils';
 import {
   clearObjectPromptCanvasState,
@@ -864,6 +868,7 @@ function MaskRefinementControls({
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }) {
   const { t } = useTranslation();
+  const replayReceipt = readMaskRefinementReplayReceipt(parameters);
 
   return (
     <div className="space-y-3 rounded-md border border-surface p-3">
@@ -898,6 +903,29 @@ function MaskRefinementControls({
           />
         );
       })}
+      {replayReceipt !== null && (
+        <UiText
+          as="div"
+          variant={TextVariants.small}
+          color={TextColors.secondary}
+          className="truncate text-[11px]"
+          data-density={replayReceipt.density}
+          data-edge-contrast={replayReceipt.edgeContrast}
+          data-edge-shift-px={replayReceipt.edgeShiftPx}
+          data-feather-px={replayReceipt.featherPx}
+          data-mask-id={replayReceipt.maskId}
+          data-receipt-version={replayReceipt.receiptVersion}
+          data-schema-version={replayReceipt.schemaVersion}
+          data-smoothness={replayReceipt.smoothness}
+          data-testid="mask-refinement-replay-receipt"
+        >
+          {t('editor.masks.refinement.replayReceipt', {
+            edgeShiftPx: replayReceipt.edgeShiftPx,
+            featherPx: replayReceipt.featherPx,
+            smoothness: Math.round(replayReceipt.smoothness * 100),
+          })}
+        </UiText>
+      )}
     </div>
   );
 }

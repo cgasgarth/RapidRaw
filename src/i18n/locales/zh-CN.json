@@ -1094,6 +1094,7 @@
         "edgeContrast": "Edge Contrast",
         "edgeShiftPx": "Edge Shift",
         "featherPx": "Feather",
+        "replayReceipt": "Replay receipt: feather {{featherPx}} px, edge {{edgeShiftPx}} px, smooth {{smoothness}}%",
         "reset": "Reset",
         "smoothness": "Smoothness",
         "title": "Refinement"

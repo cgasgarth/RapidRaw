@@ -4,6 +4,7 @@ import {
   createMaskRefinementCommand,
   dispatchMaskRefinementCommand,
   MASK_REFINEMENT_REPLAY_PARAMETER_KEY,
+  readMaskRefinementReplayReceipt,
   maskRefinementUiCommandSchema,
 } from '../../../src/utils/maskRefinementCommandBus.ts';
 
@@ -15,6 +16,8 @@ const requiredBusFragments: string[] = [
   "commandType: z.literal('layerMask.refineMask')",
   'createMaskRefinementCommand',
   'dispatchMaskRefinementCommand',
+  'maskRefinementReplayReceiptSchema',
+  'readMaskRefinementReplayReceipt',
   'MASK_REFINEMENT_REPLAY_PARAMETER_KEY',
   'edgeShiftPx: z.number().min(-512).max(512)',
   'featherPx: z.number().min(0).max(4096)',
@@ -24,6 +27,8 @@ const requiredPanelFragments: string[] = [
   'createMaskRefinementCommand',
   'dispatchMaskRefinementCommand',
   'handleMaskRefinementParametersChange',
+  'data-testid="mask-refinement-replay-receipt"',
+  "t('editor.masks.refinement.replayReceipt'",
   'onChange={handleMaskRefinementParametersChange}',
 ];
 
@@ -58,6 +63,16 @@ if (dispatched['edgeContrast'] !== 0.35 || dispatched['featherPx'] !== 12) {
 }
 if (!maskRefinementUiCommandSchema.safeParse(replayCommand).success) {
   throw new Error('Mask refinement dispatch did not persist a replayable command envelope.');
+}
+const receipt = readMaskRefinementReplayReceipt(dispatched);
+if (
+  receipt === null ||
+  receipt.maskId !== 'mask_refine_replay' ||
+  receipt.edgeShiftPx !== 3 ||
+  receipt.featherPx !== 12 ||
+  receipt.schemaVersion !== 1
+) {
+  throw new Error('Mask refinement replay receipt did not expose bounded command values.');
 }
 
 console.log('mask refinement command UI ok');

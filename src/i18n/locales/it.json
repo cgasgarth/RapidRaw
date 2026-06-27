@@ -617,7 +617,8 @@
         "featherPx": "Feather",
         "edgeShiftPx": "Edge Shift",
         "edgeContrast": "Edge Contrast",
-        "smoothness": "Smoothness"
+        "smoothness": "Smoothness",
+        "replayReceipt": "Ricevuta replay: sfuma {{featherPx}} px, bordo {{edgeShiftPx}} px, leviga {{smoothness}}%"
       },
       "objectPrompt": {
         "background": "Background",
