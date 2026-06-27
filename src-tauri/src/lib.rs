@@ -5,6 +5,7 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
+mod adjustment_fields;
 mod adjustment_utils;
 mod ai_commands;
 mod ai_connector;
@@ -133,7 +134,7 @@ fn encode_jpeg_response(image: &DynamicImage, quality: u8) -> Result<Response, S
 }
 
 use crate::cache_utils::{
-    GEOMETRY_KEYS, calculate_full_job_hash, calculate_geometry_hash, calculate_transform_hash,
+    calculate_full_job_hash, calculate_geometry_hash, calculate_transform_hash,
     calculate_visual_hash,
 };
 use crate::exif_processing::{read_exposure_time_secs, read_iso};
@@ -933,13 +934,17 @@ fn generate_uncropped_preview(
 
         let warped_image = apply_geometry_warp(patched_image, &adjustments_clone);
 
-        let orientation_steps = adjustments_clone["orientationSteps"].as_u64().unwrap_or(0) as u8;
+        let orientation_steps = adjustments_clone[adjustment_fields::ORIENTATION_STEPS]
+            .as_u64()
+            .unwrap_or(0) as u8;
         let coarse_rotated_image = apply_coarse_rotation(warped_image, orientation_steps);
 
-        let flip_horizontal = adjustments_clone["flipHorizontal"]
+        let flip_horizontal = adjustments_clone[adjustment_fields::FLIP_HORIZONTAL]
             .as_bool()
             .unwrap_or(false);
-        let flip_vertical = adjustments_clone["flipVertical"].as_bool().unwrap_or(false);
+        let flip_vertical = adjustments_clone[adjustment_fields::FLIP_VERTICAL]
+            .as_bool()
+            .unwrap_or(false);
 
         let flipped_image =
             apply_flip(coarse_rotated_image, flip_horizontal, flip_vertical).into_owned();
@@ -1106,23 +1111,39 @@ async fn preview_geometry_transform(
             hydrate_adjustments(&state, &mut temp_adjustments);
 
             if let Some(obj) = temp_adjustments.as_object_mut() {
-                obj.insert("crop".to_string(), serde_json::Value::Null);
-                obj.insert("rotation".to_string(), serde_json::json!(0.0));
-                obj.insert("orientationSteps".to_string(), serde_json::json!(0));
-                obj.insert("flipHorizontal".to_string(), serde_json::json!(false));
-                obj.insert("flipVertical".to_string(), serde_json::json!(false));
-                for key in GEOMETRY_KEYS {
+                obj.insert(adjustment_fields::CROP.to_string(), serde_json::Value::Null);
+                obj.insert(
+                    adjustment_fields::ROTATION.to_string(),
+                    serde_json::json!(0.0),
+                );
+                obj.insert(
+                    adjustment_fields::ORIENTATION_STEPS.to_string(),
+                    serde_json::json!(0),
+                );
+                obj.insert(
+                    adjustment_fields::FLIP_HORIZONTAL.to_string(),
+                    serde_json::json!(false),
+                );
+                obj.insert(
+                    adjustment_fields::FLIP_VERTICAL.to_string(),
+                    serde_json::json!(false),
+                );
+                for key in adjustment_fields::GEOMETRY_KEYS {
                     match *key {
-                        "transformScale"
-                        | "lensDistortionAmount"
-                        | "lensVignetteAmount"
-                        | "lensTcaAmount" => {
+                        adjustment_fields::TRANSFORM_SCALE
+                        | adjustment_fields::LENS_DISTORTION_AMOUNT
+                        | adjustment_fields::LENS_VIGNETTE_AMOUNT
+                        | adjustment_fields::LENS_TCA_AMOUNT => {
                             obj.insert(key.to_string(), serde_json::json!(100.0));
                         }
-                        "lensDistortionParams" | "lensMaker" | "lensModel" => {
+                        adjustment_fields::LENS_DISTORTION_PARAMS
+                        | adjustment_fields::LENS_MAKER
+                        | adjustment_fields::LENS_MODEL => {
                             obj.insert(key.to_string(), serde_json::Value::Null);
                         }
-                        "lensDistortionEnabled" | "lensTcaEnabled" | "lensVignetteEnabled" => {
+                        adjustment_fields::LENS_DISTORTION_ENABLED
+                        | adjustment_fields::LENS_TCA_ENABLED
+                        | adjustment_fields::LENS_VIGNETTE_ENABLED => {
                             obj.insert(key.to_string(), serde_json::json!(true));
                         }
                         _ => {
@@ -1174,9 +1195,15 @@ async fn preview_geometry_transform(
         }
 
         let warped_image = warp_image_geometry(&base_image_to_warp, adjusted_params);
-        let orientation_steps = js_adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
-        let flip_horizontal = js_adjustments["flipHorizontal"].as_bool().unwrap_or(false);
-        let flip_vertical = js_adjustments["flipVertical"].as_bool().unwrap_or(false);
+        let orientation_steps = js_adjustments[adjustment_fields::ORIENTATION_STEPS]
+            .as_u64()
+            .unwrap_or(0) as u8;
+        let flip_horizontal = js_adjustments[adjustment_fields::FLIP_HORIZONTAL]
+            .as_bool()
+            .unwrap_or(false);
+        let flip_vertical = js_adjustments[adjustment_fields::FLIP_VERTICAL]
+            .as_bool()
+            .unwrap_or(false);
 
         let coarse_rotated_image =
             apply_coarse_rotation(Cow::Owned(warped_image), orientation_steps);
@@ -1405,7 +1432,7 @@ async fn generate_all_community_previews(
 
         for (i, (base_image, is_raw, base_scale)) in base_thumbnails.iter().enumerate() {
             let mut scaled_adjustments = js_adjustments.clone();
-            if let Some(crop_val) = scaled_adjustments.get_mut("crop")
+            if let Some(crop_val) = scaled_adjustments.get_mut(adjustment_fields::CROP)
                 && let Ok(c) = serde_json::from_value::<Crop>(crop_val.clone())
             {
                 *crop_val = serde_json::to_value(Crop {
@@ -1427,7 +1454,7 @@ async fn generate_all_community_previews(
                 .unwrap_or_else(Vec::new);
 
             let unscaled_crop_offset = js_adjustments
-                .get("crop")
+                .get(adjustment_fields::CROP)
                 .and_then(|c| serde_json::from_value::<Crop>(c.clone()).ok())
                 .map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32));
             let actual_scaled_crop_offset = (

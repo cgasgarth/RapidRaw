@@ -143,6 +143,45 @@ export enum LensAdjustment {
   LensVignetteEnabled = 'lensVignetteEnabled',
 }
 
+export const ADJUSTMENT_FIELDS = {
+  aiPatches: 'aiPatches',
+  crop: 'crop',
+  flipHorizontal: 'flipHorizontal',
+  flipVertical: 'flipVertical',
+  masks: 'masks',
+  orientationSteps: 'orientationSteps',
+  rotation: 'rotation',
+  lens: {
+    distortionAmount: LensAdjustment.LensDistortionAmount,
+    distortionEnabled: LensAdjustment.LensDistortionEnabled,
+    distortionParams: LensAdjustment.LensDistortionParams,
+    maker: LensAdjustment.LensMaker,
+    model: LensAdjustment.LensModel,
+    tcaAmount: LensAdjustment.LensTcaAmount,
+    tcaEnabled: LensAdjustment.LensTcaEnabled,
+    vignetteAmount: LensAdjustment.LensVignetteAmount,
+    vignetteEnabled: LensAdjustment.LensVignetteEnabled,
+  },
+  patch: {
+    data: 'patchData',
+    dataBase64: 'patchDataBase64',
+    id: 'id',
+    invert: 'invert',
+    subMasks: 'subMasks',
+    visible: 'visible',
+  },
+  transform: {
+    aspect: TransformAdjustment.TransformAspect,
+    distortion: TransformAdjustment.TransformDistortion,
+    horizontal: TransformAdjustment.TransformHorizontal,
+    rotate: TransformAdjustment.TransformRotate,
+    scale: TransformAdjustment.TransformScale,
+    vertical: TransformAdjustment.TransformVertical,
+    xOffset: TransformAdjustment.TransformXOffset,
+    yOffset: TransformAdjustment.TransformYOffset,
+  },
+} as const;
+
 export interface ColorCalibration {
   shadowsTint: number;
   redHue: number;
