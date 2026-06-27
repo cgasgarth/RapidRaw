@@ -42,6 +42,8 @@ mod focus_real_raw_proof;
 mod formats;
 mod gamut_mapping;
 mod gpu_processing;
+mod gpu_readback;
+mod gpu_textures;
 mod hdr_artifact_sidecar;
 #[cfg(all(test, feature = "tauri-test"))]
 mod hdr_real_raw_proof;
