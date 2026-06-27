@@ -28,6 +28,7 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { type ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
+import { parseVirtualImagePath } from '../../utils/virtualImagePath';
 import {
   type AppSettings,
   type ImageFile,
@@ -102,10 +103,10 @@ interface GitHubReleaseResponse {
   tag_name?: unknown;
 }
 
-const getPhysicalImagePath = (path: string): string => path.split('?vc=')[0] ?? path;
+const getPhysicalImagePath = (path: string): string => parseVirtualImagePath(path).path;
 
 const getVirtualCopyLabel = (path: string): string => {
-  const copyId = path.split('?vc=')[1];
+  const copyId = parseVirtualImagePath(path).virtualCopyId;
   return copyId ? copyId.slice(0, 6).toUpperCase() : '';
 };
 

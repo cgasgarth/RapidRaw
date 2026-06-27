@@ -357,6 +357,46 @@ fn rrdata_sidecar_path(source_path: &Path, copy_id: Option<&str>) -> PathBuf {
     source_path.with_file_name(rrdata_sidecar_filename(source_path, copy_id))
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VirtualImagePath {
+    source_path: PathBuf,
+    copy_id: Option<String>,
+}
+
+impl VirtualImagePath {
+    pub fn parse(virtual_path: &str) -> Self {
+        let (source_path, copy_id) = if let Some((base, id)) = virtual_path.rsplit_once("?vc=") {
+            (PathBuf::from(base), Some(id.to_string()))
+        } else {
+            (PathBuf::from(virtual_path), None)
+        };
+
+        Self {
+            source_path,
+            copy_id,
+        }
+    }
+
+    pub fn source_path(&self) -> &Path {
+        &self.source_path
+    }
+
+    pub fn copy_id(&self) -> Option<&str> {
+        self.copy_id.as_deref()
+    }
+
+    pub fn sidecar_path(&self) -> PathBuf {
+        rrdata_sidecar_path(&self.source_path, self.copy_id())
+    }
+
+    pub fn to_serialized(&self) -> String {
+        match self.copy_id() {
+            Some(copy_id) => format!("{}?vc={}", self.source_path.to_string_lossy(), copy_id),
+            None => self.source_path.to_string_lossy().to_string(),
+        }
+    }
+}
+
 fn rrexif_sidecar_path(source_path: &Path) -> PathBuf {
     let mut rrexif_name = source_path.file_name().unwrap_or_default().to_os_string();
     rrexif_name.push(".rrexif");
@@ -401,10 +441,11 @@ fn copy_primary_sidecars(
 }
 
 fn virtual_path_for_copy(source_path: &Path, copy_id: Option<&str>) -> (String, bool) {
-    match copy_id {
-        Some(id) => (format!("{}?vc={}", source_path.to_string_lossy(), id), true),
-        None => (source_path.to_string_lossy().into_owned(), false),
-    }
+    let virtual_image_path = VirtualImagePath {
+        source_path: source_path.to_path_buf(),
+        copy_id: copy_id.map(str::to_string),
+    };
+    (virtual_image_path.to_serialized(), copy_id.is_some())
 }
 
 fn expand_image_file_rows(
@@ -461,15 +502,11 @@ fn expand_image_file_rows(
 }
 
 pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
-    let (source_path_str, copy_id) = if let Some((base, id)) = virtual_path.rsplit_once("?vc=") {
-        (base.to_string(), Some(id.to_string()))
-    } else {
-        (virtual_path.to_string(), None)
-    };
-
-    let source_path = PathBuf::from(source_path_str);
-    let sidecar_path = rrdata_sidecar_path(&source_path, copy_id.as_deref());
-    (source_path, sidecar_path)
+    let virtual_image_path = VirtualImagePath::parse(virtual_path);
+    (
+        virtual_image_path.source_path().to_path_buf(),
+        virtual_image_path.sidecar_path(),
+    )
 }
 
 #[tauri::command]
@@ -3605,7 +3642,11 @@ pub fn create_virtual_copy(
     let (source_path, source_sidecar_path) = parse_virtual_path(&source_virtual_path);
 
     let new_copy_id = Uuid::new_v4().to_string()[..6].to_string();
-    let new_virtual_path = format!("{}?vc={}", source_path.to_string_lossy(), new_copy_id);
+    let new_virtual_path = VirtualImagePath {
+        source_path,
+        copy_id: Some(new_copy_id),
+    }
+    .to_serialized();
     let (_, new_sidecar_path) = parse_virtual_path(&new_virtual_path);
 
     if source_sidecar_path.exists() {
@@ -4089,6 +4130,57 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
 mod tests {
     use super::*;
     use image::{ImageEncoder, codecs::tiff::TiffEncoder};
+
+    #[test]
+    fn virtual_image_path_parses_primary_path() {
+        let path = VirtualImagePath::parse("/roll/IMG_0001.CR3");
+
+        assert_eq!(path.source_path(), Path::new("/roll/IMG_0001.CR3"));
+        assert_eq!(path.copy_id(), None);
+        assert_eq!(
+            path.sidecar_path(),
+            PathBuf::from("/roll/IMG_0001.CR3.rrdata")
+        );
+        assert_eq!(path.to_serialized(), "/roll/IMG_0001.CR3");
+    }
+
+    #[test]
+    fn virtual_image_path_parses_virtual_copy_path() {
+        let path = VirtualImagePath::parse("/roll/IMG_0001.CR3?vc=abc123");
+
+        assert_eq!(path.source_path(), Path::new("/roll/IMG_0001.CR3"));
+        assert_eq!(path.copy_id(), Some("abc123"));
+        assert_eq!(
+            path.sidecar_path(),
+            PathBuf::from("/roll/IMG_0001.CR3.abc123.rrdata")
+        );
+        assert_eq!(path.to_serialized(), "/roll/IMG_0001.CR3?vc=abc123");
+    }
+
+    #[test]
+    fn virtual_image_path_keeps_question_mark_without_virtual_copy_suffix() {
+        let path = VirtualImagePath::parse("/roll/IMG?draft_0001.CR3");
+
+        assert_eq!(path.source_path(), Path::new("/roll/IMG?draft_0001.CR3"));
+        assert_eq!(path.copy_id(), None);
+        assert_eq!(
+            path.sidecar_path(),
+            PathBuf::from("/roll/IMG?draft_0001.CR3.rrdata")
+        );
+    }
+
+    #[test]
+    fn virtual_image_path_preserves_empty_virtual_copy_id_behavior() {
+        let path = VirtualImagePath::parse("/roll/IMG_0001.CR3?vc=");
+
+        assert_eq!(path.source_path(), Path::new("/roll/IMG_0001.CR3"));
+        assert_eq!(path.copy_id(), Some(""));
+        assert_eq!(
+            path.sidecar_path(),
+            PathBuf::from("/roll/IMG_0001.CR3..rrdata")
+        );
+        assert_eq!(path.to_serialized(), "/roll/IMG_0001.CR3?vc=");
+    }
 
     #[test]
     fn update_exif_fields_blocking_writes_primary_sidecar_atomically() {
