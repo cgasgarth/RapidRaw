@@ -18,7 +18,6 @@ pub(crate) struct ExportOutputTargetRequest<'a> {
 }
 
 pub(crate) struct ResolvedExportOutputTarget {
-    pub source_path: PathBuf,
     pub sidecar_path: PathBuf,
     pub source_path_str: String,
     pub output_path: PathBuf,
@@ -59,7 +58,6 @@ pub(crate) fn resolve_export_output_target(
     };
 
     ResolvedExportOutputTarget {
-        source_path,
         sidecar_path,
         source_path_str,
         output_path,
