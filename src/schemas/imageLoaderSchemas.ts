@@ -61,6 +61,17 @@ export const rawDevelopmentReportSchema = z
             greenMediumConfidencePixels: z.number().int().nonnegative(),
             greenSecondOrderCorrectedPixels: z.number().int().nonnegative(),
             period6ChromaSuppressedPixels: z.number().int().nonnegative(),
+            scratchMemory: z
+              .object({
+                chromaWorkingBytes: z.number().int().nonnegative(),
+                greenPlaneBytes: z.number().int().nonnegative(),
+                inputPlaneBytes: z.number().int().nonnegative(),
+                outputRgbBytes: z.number().int().nonnegative(),
+                roiPixelCount: z.number().int().nonnegative(),
+                sensorPixelCount: z.number().int().nonnegative(),
+                totalEstimatedPeakBytes: z.number().int().nonnegative(),
+              })
+              .strict(),
           })
           .strict(),
       })
