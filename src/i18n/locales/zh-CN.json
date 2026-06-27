@@ -1344,6 +1344,7 @@
       "ingestPresetSourceSequence": "Source sequence",
       "ingestPresetTimestampCamera": "Timestamp + camera",
       "ingestPresetWeddingCopyIngest": "",
+      "ingestProofReceipt": "Proof receipt: {{preset}}, collision {{collisionIndex}}, {{checksum}}",
       "ingestTagsApplied": "",
       "metadataApplied": "{{template}} metadata applied · {{fields}} fields",
       "metadataSkipped": "No metadata template applied",

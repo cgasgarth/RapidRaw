@@ -162,6 +162,27 @@ export const tetherCaptureResponseSchema = z.object({
   status: z.enum(['captured', 'duplicate']),
 });
 
+export const tetherIngestProofReceiptSchema = z.object({
+  backupDestinationPath: z.string().trim().min(1).nullable(),
+  backupEnabled: z.boolean(),
+  backupStatus: tetherCaptureBackupSchema.shape.status,
+  bytes: z.number().int().nonnegative(),
+  cameraControlCount: z.number().int().nonnegative(),
+  capturedAt: z.string().trim().min(1),
+  checksum: tetherCaptureResponseSchema.shape.checksum,
+  collisionIndex: tetherCaptureIngestSchema.shape.collisionIndex,
+  duplicateSuppressed: z.boolean(),
+  ingestPresetId: tetherIngestPresetIdSchema,
+  importedPath: tetherCaptureResponseSchema.shape.importedPath,
+  metadataApplied: z.boolean(),
+  metadataSidecarPath: z.string().trim().min(1).nullable(),
+  metadataTemplateId: tetherMetadataTemplateIdSchema,
+  providerMode: tetherCaptureResponseSchema.shape.providerMode,
+  receiptVersion: z.literal(1),
+  sessionId: tetherCaptureResponseSchema.shape.sessionId,
+  status: tetherCaptureResponseSchema.shape.status,
+});
+
 export type TetherCapability = z.infer<typeof tetherCapabilitySchema>;
 export type TetherCameraControl = z.infer<typeof tetherCameraControlSchema>;
 export type TetherCameraControlWriteRequest = z.infer<typeof tetherCameraControlWriteRequestSchema>;
@@ -169,6 +190,7 @@ export type TetherCameraControlWriteResponse = z.infer<typeof tetherCameraContro
 export type TetherCaptureRequest = z.infer<typeof tetherCaptureRequestSchema>;
 export type TetherCaptureResponse = z.infer<typeof tetherCaptureResponseSchema>;
 export type TetherDiscoveryResponse = z.infer<typeof tetherDiscoveryResponseSchema>;
+export type TetherIngestProofReceipt = z.infer<typeof tetherIngestProofReceiptSchema>;
 export type TetherRecoverySummary = z.infer<typeof tetherRecoverySummarySchema>;
 export type TetherSessionResponse = z.infer<typeof tetherSessionResponseSchema>;
 export type TetherSessionSnapshot = z.infer<typeof tetherSessionSnapshotSchema>;
