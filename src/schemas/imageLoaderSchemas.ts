@@ -23,10 +23,13 @@ export const rawCameraProfileReportSchema = z
   .object({
     algorithmId: z.string().trim().min(1),
     candidateCount: z.number().int().nonnegative(),
+    cctClamped: z.boolean().nullable().optional(),
     coolIlluminant: z.string().trim().min(1).nullable().optional(),
     coolWeight: z.number().min(0).max(1).nullable().optional(),
     estimatedCctKelvin: z.number().positive().nullable().optional(),
     fallbackReason: z.string().trim().min(1).nullable().optional(),
+    illuminantEstimateConfidence: z.enum(['high', 'medium', 'low']),
+    illuminantEstimateMethod: z.enum(['as_shot_white_xy', 'camera_neutral_iterative', 'wb_coeff_ratio', 'fallback']),
     matrixHash: z
       .string()
       .regex(/^blake3:[0-9a-f]+$/u)
@@ -65,11 +68,14 @@ export const rawCameraProfileProvenanceReceiptSchema = z
   .object({
     algorithmId: rawCameraProfileReportSchema.shape.algorithmId,
     candidateCount: rawCameraProfileReportSchema.shape.candidateCount,
+    cctClamped: rawCameraProfileReportSchema.shape.cctClamped,
     coolIlluminant: rawCameraProfileReportSchema.shape.coolIlluminant,
     coolWeight: rawCameraProfileReportSchema.shape.coolWeight,
     demosaicPath: rawDemosaicPathSchema,
     estimatedCctKelvin: rawCameraProfileReportSchema.shape.estimatedCctKelvin,
     fallbackReason: rawCameraProfileReportSchema.shape.fallbackReason,
+    illuminantEstimateConfidence: rawCameraProfileReportSchema.shape.illuminantEstimateConfidence,
+    illuminantEstimateMethod: rawCameraProfileReportSchema.shape.illuminantEstimateMethod,
     matrixHash: rawCameraProfileReportSchema.shape.matrixHash,
     receiptVersion: z.literal(1),
     status: rawCameraProfileStatusSchema,

@@ -2863,10 +2863,13 @@ mod tests {
             camera_profile: RawCameraProfileReport {
                 algorithm_id: "dual_illuminant_mired_v1",
                 candidate_count: 2,
+                cct_clamped: Some(false),
                 cool_illuminant: Some("D65".to_string()),
                 cool_weight: Some(0.42),
                 estimated_cct_kelvin: Some(5_100.0),
                 fallback_reason: None,
+                illuminant_estimate_confidence: "low",
+                illuminant_estimate_method: "wb_coeff_ratio",
                 matrix_hash: Some("blake3:abcdef0123456789".to_string()),
                 status: "interpolated",
                 warm_illuminant: Some("StandardLightA".to_string()),
