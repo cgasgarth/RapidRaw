@@ -54,6 +54,29 @@ export const aiObjectMaskProposalSchema = z
 
 export type AiObjectMaskProposal = z.infer<typeof aiObjectMaskProposalSchema>;
 
+export const objectMaskProposalReplayReceiptSchema = z
+  .object({
+    boxHeight: z.number().min(0).max(1).nullable(),
+    boxReady: z.boolean(),
+    boxWidth: z.number().min(0).max(1).nullable(),
+    boxX: z.number().min(0).max(1).nullable(),
+    boxY: z.number().min(0).max(1).nullable(),
+    clickToMaskLatencyMs: z.number().nonnegative(),
+    hasRaster: z.boolean(),
+    imageHeight: z.number().int().positive(),
+    imageWidth: z.number().int().positive(),
+    modelId: z.string().trim().min(1),
+    pointCount: z.number().int().nonnegative(),
+    promptCount: z.number().int().positive(),
+    promptKind: z.enum(['box', 'point']),
+    providerId: z.string().trim().min(1),
+    providerStatus: z.string().trim().min(1),
+    receiptVersion: z.literal(1),
+  })
+  .strict();
+
+export type ObjectMaskProposalReplayReceipt = z.infer<typeof objectMaskProposalReplayReceiptSchema>;
+
 export interface CanvasHitPoint {
   x: number;
   y: number;
@@ -192,6 +215,37 @@ export function acceptObjectMaskProposal(
     proposal: parsedProposal,
     providerStatus: 'local_sam_proposal_v1',
   };
+}
+
+export function readObjectMaskProposalReplayReceipt(
+  parameters: SubMask['parameters'],
+): ObjectMaskProposalReplayReceipt | null {
+  const record = toMaskParameterRecord(parameters);
+  const proposal = aiObjectMaskProposalSchema.safeParse(record['proposal']);
+  if (!proposal.success) return null;
+
+  const state = readObjectPromptCanvasState(parameters);
+  const receipt = {
+    boxHeight: state.boxPrompt?.height ?? null,
+    boxReady: state.boxPrompt !== null,
+    boxWidth: state.boxPrompt?.width ?? null,
+    boxX: state.boxPrompt?.x ?? null,
+    boxY: state.boxPrompt?.y ?? null,
+    clickToMaskLatencyMs: proposal.data.clickToMaskLatencyMs,
+    hasRaster:
+      typeof record['maskDataBase64'] === 'string' && record['maskDataBase64'].startsWith('data:image/png;base64,'),
+    imageHeight: proposal.data.imageHeight,
+    imageWidth: proposal.data.imageWidth,
+    modelId: proposal.data.modelId,
+    pointCount: state.pointPrompts.length,
+    promptCount: proposal.data.promptCount,
+    promptKind: proposal.data.promptKind,
+    providerId: proposal.data.providerId,
+    providerStatus: typeof record['providerStatus'] === 'string' ? record['providerStatus'] : 'unknown',
+    receiptVersion: 1,
+  };
+
+  return objectMaskProposalReplayReceiptSchema.parse(receipt);
 }
 
 function parseBoxAnchor(record: MaskParameterRecord): ObjectPromptPoint | null {

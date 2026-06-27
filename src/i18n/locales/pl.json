@@ -1138,7 +1138,8 @@
         "points_one": "{{count}} point",
         "points_few": "{{count}} points",
         "points_many": "{{count}} points",
-        "points_other": "{{count}} points"
+        "points_other": "{{count}} points",
+        "receipt": "Potwierdzenie replay: {{provider}}, {{promptKind}}, {{latency}} ms"
       },
       "overlay": {
         "edgeThreshold": "Próg krawędzi",

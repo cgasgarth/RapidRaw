@@ -105,6 +105,7 @@ import {
   buildObjectMaskProposalCommandInput,
   type AiObjectMaskProposal,
   objectPromptModeSchema,
+  readObjectMaskProposalReplayReceipt,
   readObjectPromptCanvasState,
   setObjectPromptMode,
   writeObjectPromptCanvasState,
@@ -2913,6 +2914,10 @@ function SettingsPanel({
   const objectPromptProviderStatus = toMaskParameterRecord(activeSubMask?.parameters)['providerStatus'];
   const objectPromptProviderStatusText =
     typeof objectPromptProviderStatus === 'string' ? objectPromptProviderStatus : 'empty';
+  const objectPromptReplayReceipt =
+    activeSubMaskType === Mask.AiObject && activeSubMask !== null
+      ? readObjectMaskProposalReplayReceipt(activeSubMask.parameters)
+      : null;
   const handleObjectPromptModeChange = (mode: ObjectPromptMode) => {
     if (!activeSubMask || objectPromptState === null) return;
     updateSubMask(activeSubMask.id, {
@@ -3277,6 +3282,31 @@ function SettingsPanel({
                     {isGeneratingObjectProposal && <Loader2 size={14} className="animate-spin" />}
                     <span className="truncate">{t('editor.masks.objectPrompt.generate')}</span>
                   </button>
+                  {objectPromptReplayReceipt !== null && (
+                    <UiText
+                      as="div"
+                      variant={TextVariants.small}
+                      color={TextColors.secondary}
+                      className="mt-2 truncate text-[11px]"
+                      data-has-raster={String(objectPromptReplayReceipt.hasRaster)}
+                      data-image-height={objectPromptReplayReceipt.imageHeight}
+                      data-image-width={objectPromptReplayReceipt.imageWidth}
+                      data-model-id={objectPromptReplayReceipt.modelId}
+                      data-point-count={objectPromptReplayReceipt.pointCount}
+                      data-prompt-count={objectPromptReplayReceipt.promptCount}
+                      data-prompt-kind={objectPromptReplayReceipt.promptKind}
+                      data-provider-id={objectPromptReplayReceipt.providerId}
+                      data-provider-status={objectPromptReplayReceipt.providerStatus}
+                      data-receipt-version={objectPromptReplayReceipt.receiptVersion}
+                      data-testid="object-prompt-replay-receipt"
+                    >
+                      {t('editor.masks.objectPrompt.receipt', {
+                        latency: objectPromptReplayReceipt.clickToMaskLatencyMs,
+                        promptKind: objectPromptReplayReceipt.promptKind,
+                        provider: objectPromptReplayReceipt.providerStatus,
+                      })}
+                    </UiText>
+                  )}
                 </div>
               )}
 
