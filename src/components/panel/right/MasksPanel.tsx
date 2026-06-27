@@ -10,6 +10,7 @@ import {
   type DragStartEvent,
   pointerWithin,
 } from '@dnd-kit/core';
+import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -100,6 +101,9 @@ import { createMaskRefinementCommand, dispatchMaskRefinementCommand } from '../.
 import { createSubMask } from '../../../utils/maskUtils';
 import {
   clearObjectPromptCanvasState,
+  acceptObjectMaskProposal,
+  buildObjectMaskProposalCommandInput,
+  type AiObjectMaskProposal,
   objectPromptModeSchema,
   readObjectPromptCanvasState,
   setObjectPromptMode,
@@ -116,6 +120,7 @@ import {
   OPTION_SEPARATOR,
   Orientation,
   Theme,
+  Invokes,
   type AppSettings,
   type BrushSettings,
   type Option,
@@ -216,6 +221,26 @@ function readAdjustmentValue(adjustments: Partial<Adjustments> | null | undefine
 function writeAdjustmentPatchValue(patch: MaskAdjustmentPatch, key: string, value: unknown): void {
   (patch as Record<string, unknown>)[key] = structuredClone(value);
 }
+
+const getObjectMaskTransformAdjustments = (adjustments: Adjustments) => ({
+  lensDistortionAmount: adjustments.lensDistortionAmount,
+  lensDistortionEnabled: adjustments.lensDistortionEnabled,
+  lensDistortionParams: adjustments.lensDistortionParams,
+  lensMaker: adjustments.lensMaker,
+  lensModel: adjustments.lensModel,
+  lensTcaAmount: adjustments.lensTcaAmount,
+  lensTcaEnabled: adjustments.lensTcaEnabled,
+  lensVignetteAmount: adjustments.lensVignetteAmount,
+  lensVignetteEnabled: adjustments.lensVignetteEnabled,
+  transformAspect: adjustments.transformAspect,
+  transformDistortion: adjustments.transformDistortion,
+  transformHorizontal: adjustments.transformHorizontal,
+  transformRotate: adjustments.transformRotate,
+  transformScale: adjustments.transformScale,
+  transformVertical: adjustments.transformVertical,
+  transformXOffset: adjustments.transformXOffset,
+  transformYOffset: adjustments.transformYOffset,
+});
 
 interface CopiedSectionAdjustments {
   section: string;
@@ -2767,6 +2792,8 @@ function SettingsPanel({
   const { showContextMenu } = useContextMenu();
   const isActive = !!container;
   const presetButtonRef = useRef<HTMLButtonElement>(null);
+  const selectedImage = useEditorStore((state) => state.selectedImage);
+  const [isGeneratingObjectProposal, setIsGeneratingObjectProposal] = useState(false);
 
   const placeholderContainer = {
     ...INITIAL_MASK_CONTAINER,
@@ -2875,6 +2902,17 @@ function SettingsPanel({
     activeSubMaskType === Mask.AiObject && activeSubMask !== null
       ? readObjectPromptCanvasState(activeSubMask.parameters)
       : null;
+  const objectPromptCommandInput =
+    objectPromptState !== null && selectedImage !== null
+      ? buildObjectMaskProposalCommandInput(objectPromptState, {
+          height: selectedImage.height,
+          orientationSteps: displayAdjustments.orientationSteps,
+          width: selectedImage.width,
+        })
+      : null;
+  const objectPromptProviderStatus = toMaskParameterRecord(activeSubMask?.parameters)['providerStatus'];
+  const objectPromptProviderStatusText =
+    typeof objectPromptProviderStatus === 'string' ? objectPromptProviderStatus : 'empty';
   const handleObjectPromptModeChange = (mode: ObjectPromptMode) => {
     if (!activeSubMask || objectPromptState === null) return;
     updateSubMask(activeSubMask.id, {
@@ -2889,6 +2927,38 @@ function SettingsPanel({
         clearObjectPromptCanvasState(objectPromptState),
       ),
     });
+  };
+  const handleGenerateObjectProposal = async () => {
+    if (!activeSubMask || objectPromptState === null || objectPromptCommandInput === null || !selectedImage?.path)
+      return;
+    setIsGeneratingObjectProposal(true);
+    useEditorStore.getState().setEditor({ isGeneratingAiMask: true });
+    try {
+      const proposal = await invoke<AiObjectMaskProposal>(Invokes.GenerateAiObjectMaskProposal, {
+        endPoint: objectPromptCommandInput.endPoint,
+        flipHorizontal: displayAdjustments.flipHorizontal,
+        flipVertical: displayAdjustments.flipVertical,
+        jsAdjustments: getObjectMaskTransformAdjustments(displayAdjustments),
+        orientationSteps: displayAdjustments.orientationSteps,
+        path: selectedImage.path,
+        rotation: displayAdjustments.rotation,
+        startPoint: objectPromptCommandInput.startPoint,
+      });
+      updateSubMask(activeSubMask.id, {
+        parameters: acceptObjectMaskProposal(activeSubMask.parameters, objectPromptState, proposal),
+      });
+    } catch (error) {
+      updateSubMask(activeSubMask.id, {
+        parameters: {
+          ...toMaskParameterRecord(activeSubMask.parameters),
+          objectPromptError: error instanceof Error ? error.message : String(error),
+          providerStatus: 'local_sam_proposal_failed',
+        },
+      });
+    } finally {
+      setIsGeneratingObjectProposal(false);
+      useEditorStore.getState().setEditor({ isGeneratingAiMask: false });
+    }
   };
   const isAiMask =
     activeSubMaskType !== undefined &&
@@ -3193,6 +3263,20 @@ function SettingsPanel({
                         : t('editor.masks.objectPrompt.boxReady')}
                     </span>
                   </div>
+                  <button
+                    className="mt-2 flex w-full items-center justify-center gap-2 rounded bg-accent px-2 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+                    data-object-prompt-command-ready={String(objectPromptCommandInput !== null)}
+                    data-object-prompt-provider-status={objectPromptProviderStatusText}
+                    data-testid="object-prompt-generate-proposal"
+                    disabled={objectPromptCommandInput === null || isGeneratingObjectProposal || !selectedImage?.path}
+                    onClick={() => {
+                      void handleGenerateObjectProposal();
+                    }}
+                    type="button"
+                  >
+                    {isGeneratingObjectProposal && <Loader2 size={14} className="animate-spin" />}
+                    <span className="truncate">{t('editor.masks.objectPrompt.generate')}</span>
+                  </button>
                 </div>
               )}
 
