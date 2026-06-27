@@ -1290,7 +1290,17 @@ struct ObjectPromptMaskParameters {
     #[serde(default)]
     box_prompt: Option<ObjectPromptBox>,
     #[serde(default)]
+    flip_horizontal: Option<bool>,
+    #[serde(default)]
+    flip_vertical: Option<bool>,
+    #[serde(default)]
+    mask_data_base64: Option<String>,
+    #[serde(default)]
+    orientation_steps: Option<u8>,
+    #[serde(default)]
     point_prompts: Vec<ObjectPromptPoint>,
+    #[serde(default)]
+    rotation: Option<f32>,
 }
 
 #[derive(Deserialize)]
@@ -1318,8 +1328,24 @@ fn generate_ai_object_prompt_bitmap(
     params_value: &Value,
     width: u32,
     height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
 ) -> Option<GrayImage> {
     let params: ObjectPromptMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
+    if let Some(data_url) = params.mask_data_base64 {
+        let tf = TransformParams {
+            rotation: params.rotation.unwrap_or(0.0),
+            flip_horizontal: params.flip_horizontal.unwrap_or(false),
+            flip_vertical: params.flip_vertical.unwrap_or(false),
+            orientation_steps: params.orientation_steps.unwrap_or(0),
+            width,
+            height,
+            scale,
+            crop_offset,
+        };
+        return generate_ai_bitmap_from_base64(&data_url, &tf);
+    }
+
     if params.box_prompt.is_none() && params.point_prompts.is_empty() {
         return None;
     }
@@ -1641,7 +1667,13 @@ fn generate_sub_mask_bitmap(
         "ai-subject" => {
             generate_ai_subject_bitmap(&sub_mask.parameters, width, height, scale, crop_offset)
         }
-        "ai-object" => generate_ai_object_prompt_bitmap(&sub_mask.parameters, width, height),
+        "ai-object" => generate_ai_object_prompt_bitmap(
+            &sub_mask.parameters,
+            width,
+            height,
+            scale,
+            crop_offset,
+        ),
         "ai-foreground" => {
             generate_ai_foreground_bitmap(&sub_mask.parameters, width, height, scale, crop_offset)
         }

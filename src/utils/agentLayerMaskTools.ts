@@ -68,6 +68,21 @@ const normalizedBoxSchema = z
     }
   });
 
+const objectMaskProposalSchema = z
+  .object({
+    clickToMaskLatencyMs: z.number().nonnegative(),
+    decoderLatencyMs: z.number().nonnegative(),
+    embeddingLatencyMs: z.number().nonnegative().nullable().optional(),
+    imageHeight: z.number().int().positive(),
+    imageWidth: z.number().int().positive(),
+    maskDataBase64: z.string().trim().startsWith('data:image/png;base64,'),
+    modelId: z.string().trim().min(1),
+    promptCount: z.number().int().positive(),
+    promptKind: z.enum(['box', 'point']),
+    providerId: z.string().trim().min(1),
+  })
+  .strict();
+
 const agentLayerMaskOverlayPreviewSchema = z
   .object({
     artifact: artifactHandleV1Schema,
@@ -118,6 +133,7 @@ export const agentObjectSelectionApplyRequestSchema = z
     maskId: idSegmentSchema.optional(),
     operationId: idSegmentSchema,
     pointPrompts: z.array(normalizedPointSchema).max(12).default([]),
+    proposal: objectMaskProposalSchema.optional(),
     requestId: z.string().trim().min(1),
     sessionId: z.string().trim().min(1),
   })
@@ -183,7 +199,7 @@ export const agentObjectSelectionApplyResponseSchema = z
     maskId: z.string().trim().min(1),
     objectPromptHash: z.string().trim().min(1),
     overlayPreview: agentLayerMaskOverlayPreviewSchema,
-    providerStatus: z.literal('prompt_proxy_mask_v1'),
+    providerStatus: z.enum(['local_sam_proposal_v1', 'prompt_proxy_mask_v1']),
     requestId: z.string().trim().min(1),
     staleRecipeHash: z.literal(false),
     toolName: z.literal(AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME),
@@ -198,6 +214,7 @@ export type AgentMaskCreateOrUpdateResponse = z.infer<typeof agentMaskCreateOrUp
 export type AgentObjectSelectionApplyRequest = z.infer<typeof agentObjectSelectionApplyRequestSchema>;
 export type AgentObjectSelectionApplyResponse = z.infer<typeof agentObjectSelectionApplyResponseSchema>;
 export type AgentLayerMaskOverlayPreview = z.infer<typeof agentLayerMaskOverlayPreviewSchema>;
+type ObjectSelectionProviderStatus = z.infer<typeof agentObjectSelectionApplyResponseSchema>['providerStatus'];
 
 const toIdSegment = (value: string): string =>
   value
@@ -536,6 +553,16 @@ export const applyAgentObjectSelection = (
   const layerId = parsedRequest.layerId ?? `agent_object_${toIdSegment(parsedRequest.operationId)}`;
   const maskId = parsedRequest.maskId ?? `${layerId}_prompt_mask`;
   const strokes = buildObjectSelectionStrokes(parsedRequest, selectedImage.width, selectedImage.height);
+  const providerStatus: ObjectSelectionProviderStatus =
+    parsedRequest.proposal === undefined ? 'prompt_proxy_mask_v1' : 'local_sam_proposal_v1';
+  const objectParameters = {
+    boxPrompt: parsedRequest.boxPrompt ?? null,
+    generatedPreviewStrokes: strokes,
+    maskDataBase64: parsedRequest.proposal?.maskDataBase64 ?? null,
+    pointPrompts: parsedRequest.pointPrompts,
+    proposal: parsedRequest.proposal ?? null,
+    providerStatus,
+  };
   const layer: MaskContainer = {
     adjustments: toMaskAdjustments(parsedRequest.adjustments),
     blendMode: DEFAULT_LAYER_BLEND_MODE,
@@ -550,12 +577,7 @@ export const applyAgentObjectSelection = (
         mode: SubMaskMode.Additive,
         name: 'Object prompt mask',
         opacity: 100,
-        parameters: {
-          boxPrompt: parsedRequest.boxPrompt ?? null,
-          generatedPreviewStrokes: strokes,
-          pointPrompts: parsedRequest.pointPrompts,
-          providerStatus: 'prompt_proxy_mask_v1',
-        },
+        parameters: objectParameters,
         type: Mask.AiObject,
         visible: true,
       },
@@ -583,7 +605,8 @@ export const applyAgentObjectSelection = (
     JSON.stringify({
       boxPrompt: parsedRequest.boxPrompt ?? null,
       pointPrompts: parsedRequest.pointPrompts,
-      providerStatus: 'prompt_proxy_mask_v1',
+      proposal: parsedRequest.proposal ?? null,
+      providerStatus,
       strokes,
     }),
   );
@@ -602,7 +625,7 @@ export const applyAgentObjectSelection = (
       maskId,
       operationId: parsedRequest.operationId,
     }),
-    providerStatus: 'prompt_proxy_mask_v1',
+    providerStatus,
     requestId: parsedRequest.requestId,
     staleRecipeHash: false,
     toolName: AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME,
