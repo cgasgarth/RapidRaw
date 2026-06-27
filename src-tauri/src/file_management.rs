@@ -17,7 +17,6 @@ use chrono::{DateTime, Utc};
 use image::codecs::{jpeg::JpegEncoder, tiff::TiffDecoder};
 use image::{ColorType, DynamicImage, GenericImageView, ImageBuffer, ImageDecoder, Luma};
 use rayon::prelude::*;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -50,7 +49,9 @@ use crate::smart_preview_cache::{
     read_smart_preview_artifact, resolve_smart_preview_cache_dir, write_smart_preview_artifact,
 };
 use crate::tagging::{COLOR_TAG_PREFIX, USER_TAG_PREFIX};
-use crate::xmp_sidecar::{extract_xmp_label, extract_xmp_rating, extract_xmp_tags};
+use crate::xmp_sidecar::{
+    extract_xmp_label, extract_xmp_rating, extract_xmp_tags, sync_metadata_to_xmp_sidecar,
+};
 
 fn resolve_thumbnail_cache_dir(app_handle: &AppHandle) -> std::result::Result<PathBuf, String> {
     let cache_dir = app_handle
@@ -3868,121 +3869,17 @@ pub fn sync_metadata_from_xmp(source_path: &Path, metadata: &mut ImageMetadata) 
 }
 
 pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create_if_missing: bool) {
-    let xmp_path = source_path.with_extension("xmp");
-    let xmp_path_upper = source_path.with_extension("XMP");
-
-    let mut actual_xmp = if xmp_path.exists() {
-        Some(xmp_path.clone())
-    } else if xmp_path_upper.exists() {
-        Some(xmp_path_upper)
-    } else {
-        None
-    };
-
-    if actual_xmp.is_none() {
-        if !create_if_missing {
-            return;
-        }
-        let skeleton = r#"<?xml version="1.0" encoding="UTF-8"?>
-<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="RapidRAW">
- <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
-  <rdf:Description rdf:about=""
-    xmlns:xmp="http://ns.adobe.com/xap/1.0/"
-    xmlns:dc="http://purl.org/dc/elements/1.1/">
-  </rdf:Description>
- </rdf:RDF>
-</x:xmpmeta>"#;
-        if let Err(e) = crate::exif_processing::write_text_file_atomic(&xmp_path, skeleton) {
-            log::error!("Failed to create skeleton XMP: {}", e);
-            return;
-        }
-        actual_xmp = Some(xmp_path);
-    }
-
-    if let Some(xmp_file) = actual_xmp
-        && let Ok(mut content) = fs::read_to_string(&xmp_file)
-    {
-        let rating_str = metadata.rating.to_string();
-        let re_rating_attr = Regex::new(r#"xmp:Rating\s*=\s*"[^"]*""#).unwrap();
-        let re_rating_tag = Regex::new(r#"<xmp:Rating\s*>[^<]*</xmp:Rating>"#).unwrap();
-
-        if re_rating_attr.is_match(&content) {
-            content = re_rating_attr
-                .replace(&content, format!("xmp:Rating=\"{}\"", rating_str))
-                .to_string();
-        } else if re_rating_tag.is_match(&content) {
-            content = re_rating_tag
-                .replace(&content, format!("<xmp:Rating>{}</xmp:Rating>", rating_str))
-                .to_string();
-        } else if let Some(last_index) = content.rfind("</rdf:Description>") {
-            let (start, end) = content.split_at(last_index);
-            content = format!("{} <xmp:Rating>{}</xmp:Rating>\n{}", start, rating_str, end);
-        }
-
-        let current_tags = metadata.tags.clone().unwrap_or_default();
-        let mut label = None;
-        let mut normal_tags = Vec::new();
-
-        for t in current_tags {
-            if let Some(color) = t.strip_prefix(COLOR_TAG_PREFIX) {
-                let mut c = color.chars();
-                let cap_color = match c.next() {
-                    None => String::new(),
-                    Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-                };
-                label = Some(cap_color);
-            } else if let Some(user_tag) = t.strip_prefix(USER_TAG_PREFIX) {
-                normal_tags.push(user_tag.to_string());
-            } else {
-                normal_tags.push(t);
-            }
-        }
-
-        if let Some(lbl) = label {
-            let re_label_attr = Regex::new(r#"xmp:Label\s*=\s*"[^"]*""#).unwrap();
-            let re_label_tag = Regex::new(r#"<xmp:Label\s*>[^<]*</xmp:Label>"#).unwrap();
-
-            if re_label_attr.is_match(&content) {
-                content = re_label_attr
-                    .replace(&content, format!("xmp:Label=\"{}\"", lbl))
-                    .to_string();
-            } else if re_label_tag.is_match(&content) {
-                content = re_label_tag
-                    .replace(&content, format!("<xmp:Label>{}</xmp:Label>", lbl))
-                    .to_string();
-            } else if let Some(last_index) = content.rfind("</rdf:Description>") {
-                let (start, end) = content.split_at(last_index);
-                content = format!("{} <xmp:Label>{}</xmp:Label>\n{}", start, lbl, end);
-            }
-        } else {
-            let re_label_attr = Regex::new(r#"\s*xmp:Label\s*=\s*"[^"]*""#).unwrap();
-            let re_label_tag = Regex::new(r#"\s*<xmp:Label\s*>[^<]*</xmp:Label>"#).unwrap();
-            content = re_label_attr.replace_all(&content, "").to_string();
-            content = re_label_tag.replace_all(&content, "").to_string();
-        }
-
-        let re_subject =
-            Regex::new(r#"(?s)<dc:subject>\s*<rdf:Bag>.*?</rdf:Bag>\s*</dc:subject>"#).unwrap();
-        if normal_tags.is_empty() {
-            content = re_subject.replace_all(&content, "").to_string();
-        } else {
-            let mut bag = String::from("<dc:subject>\n    <rdf:Bag>\n");
-            for t in normal_tags {
-                bag.push_str(&format!("     <rdf:li>{}</rdf:li>\n", t));
-            }
-            bag.push_str("    </rdf:Bag>\n   </dc:subject>");
-
-            if re_subject.is_match(&content) {
-                content = re_subject.replace(&content, bag).to_string();
-            } else if let Some(last_index) = content.rfind("</rdf:Description>") {
-                let (start, end) = content.split_at(last_index);
-                content = format!("{} {}\n  {}", start, bag, end);
-            }
-        }
-
-        if let Err(e) = crate::exif_processing::write_text_file_atomic(&xmp_file, &content) {
-            log::warn!("Failed to sync XMP sidecar {}: {}", xmp_file.display(), e);
-        }
+    if let Err(e) = sync_metadata_to_xmp_sidecar(
+        source_path,
+        metadata.rating,
+        metadata.tags.as_deref(),
+        create_if_missing,
+    ) {
+        log::warn!(
+            "Failed to sync XMP sidecar {}: {}",
+            source_path.display(),
+            e
+        );
     }
 }
 
