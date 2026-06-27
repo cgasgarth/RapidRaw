@@ -25,6 +25,7 @@ import {
   type RenderSize,
   useImageRenderSize,
 } from '../../hooks/useImageRenderSize';
+import { useWgpuTransformSync } from '../../hooks/useWgpuTransformSync';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -58,15 +59,6 @@ import { Panel } from '../ui/AppProperties';
 import type { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
 import type { Crop, PercentCrop } from 'react-image-crop';
 
-const parseRgb = (rgbStr: string): [number, number, number, number] => {
-  const match = rgbStr.match(/[\d.]+/g);
-  const [r, g, b] = match ?? [];
-  if (r !== undefined && g !== undefined && b !== undefined) {
-    return [parseFloat(r) / 255, parseFloat(g) / 255, parseFloat(b) / 255, 1.0];
-  }
-  return [0, 0, 0, 1.0];
-};
-
 const checkCropValid = (pixelCrop: Partial<Crop>, imageW: number, imageH: number, rotation: number) => {
   if (pixelCrop.x === undefined || pixelCrop.y === undefined || !pixelCrop.width || !pixelCrop.height) {
     return false;
@@ -94,17 +86,6 @@ const checkCropValid = (pixelCrop: Partial<Crop>, imageW: number, imageH: number
   }
   return true;
 };
-
-interface WgpuRenderState {
-  useWgpuRenderer: boolean | undefined;
-  isReady: boolean;
-  hasRenderedFirstFrame: boolean;
-  isCropping: boolean;
-  uncroppedAdjustedPreviewUrl: string | null;
-  showOriginal: boolean;
-  bgPrimary: [number, number, number, number];
-  bgSecondary: [number, number, number, number];
-}
 
 interface TransformController {
   resetTransform(time?: number): void;
@@ -251,9 +232,6 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     screenImageTop: number;
     physicalImageWidth: number;
   } | null>(null);
-  const wgpuSyncRef = useRef<number | null>(null);
-  const lastWgpuTransformRef = useRef<string | null>(null);
-
   const toggleShowOriginal = useCallback(() => {
     setEditor((state) => ({ showOriginal: !state.showOriginal }));
   }, [setEditor]);
@@ -1009,182 +987,20 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     croppedDimensionsRef.current = croppedDimensions;
   }, [croppedDimensions]);
 
-  const wgpuStateRef = useRef<WgpuRenderState>({
-    useWgpuRenderer: appSettings?.useWgpuRenderer,
-    isReady: selectedImage?.isReady ?? false,
-    hasRenderedFirstFrame,
-    isCropping,
-    uncroppedAdjustedPreviewUrl,
-    showOriginal,
-    bgPrimary: [24 / 255, 24 / 255, 24 / 255, 1.0],
-    bgSecondary: [35 / 255, 35 / 255, 35 / 255, 1.0],
-  });
-
-  useEffect(() => {
-    const rootStyle = getComputedStyle(document.documentElement);
-    const bgPrimaryStr = rootStyle.getPropertyValue('--app-bg-primary') || 'rgb(24, 24, 24)';
-    const bgSecondaryStr = rootStyle.getPropertyValue('--app-bg-secondary') || 'rgb(35, 35, 35)';
-
-    wgpuStateRef.current = {
-      useWgpuRenderer: appSettings?.useWgpuRenderer,
-      isReady: selectedImage?.isReady ?? false,
-      hasRenderedFirstFrame,
-      isCropping,
-      uncroppedAdjustedPreviewUrl,
-      showOriginal,
-      bgPrimary: parseRgb(bgPrimaryStr),
-      bgSecondary: parseRgb(bgSecondaryStr),
-    };
-  }, [
-    appSettings?.useWgpuRenderer,
-    selectedImage?.isReady,
-    hasRenderedFirstFrame,
-    isCropping,
-    uncroppedAdjustedPreviewUrl,
-    showOriginal,
-    appSettings?.theme,
+  useWgpuTransformSync({
     finalPreviewUrl,
-  ]);
-
-  useEffect(() => {
-    let isEffectActive = true;
-    let isInvoking = false;
-
-    const syncWgpu = () => {
-      if (!isEffectActive) return;
-
-      const state = wgpuStateRef.current;
-      const container = imageContainerRef.current;
-
-      if (!container) {
-        wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
-        return;
-      }
-
-      const currentRect = container.getBoundingClientRect();
-
-      if (currentRect.width < 10 || currentRect.height < 10) {
-        wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
-        return;
-      }
-
-      const dpr = window.devicePixelRatio || 1;
-      const windowWidth = Math.max(window.innerWidth * dpr, 1);
-      const windowHeight = Math.max(window.innerHeight * dpr, 1);
-
-      const OVERLAP = 2;
-      const clipX = (currentRect.left - OVERLAP) * dpr;
-      const clipY = (currentRect.top - OVERLAP) * dpr;
-      const clipW = Math.max((currentRect.width + OVERLAP * 2) * dpr, 1);
-      const clipH = Math.max((currentRect.height + OVERLAP * 2) * dpr, 1);
-
-      if (state.useWgpuRenderer === false || !state.isReady || !state.hasRenderedFirstFrame) {
-        const hiddenTransform = `${windowWidth},${windowHeight},-999999,-999999,1,1,${clipX},${clipY},${clipW},${clipH},${state.bgPrimary.join(',')},${state.bgSecondary.join(',')}`;
-
-        if (lastWgpuTransformRef.current !== hiddenTransform && !isInvoking) {
-          lastWgpuTransformRef.current = hiddenTransform;
-          isInvoking = true;
-          invoke(Invokes.UpdateWgpuTransform, {
-            payload: {
-              windowWidth,
-              windowHeight,
-              x: -999999,
-              y: -999999,
-              width: 1,
-              height: 1,
-              clipX,
-              clipY,
-              clipWidth: clipW,
-              clipHeight: clipH,
-              bgPrimary: state.bgPrimary,
-              bgSecondary: state.bgSecondary,
-              pixelated: false,
-            },
-          })
-            .catch(() => {})
-            .finally(() => {
-              isInvoking = false;
-            });
-        }
-        wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
-        return;
-      }
-
-      const scale = transformStateRef.current.scale;
-      const posX = transformStateRef.current.positionX;
-      const posY = transformStateRef.current.positionY;
-
-      const cw = currentRect.width;
-      const ch = currentRect.height;
-
-      const irs = imageRenderSizeRef.current;
-      const offsetX = irs.width > 0 ? irs.offsetX : 0;
-      const offsetY = irs.height > 0 ? irs.offsetY : 0;
-      const baseW = irs.width > 0 ? irs.width : cw;
-      const baseH = irs.height > 0 ? irs.height : ch;
-
-      let screenX = (currentRect.left + posX + offsetX * scale) * dpr || 0;
-      let screenY = (currentRect.top + posY + offsetY * scale) * dpr || 0;
-      let screenW = baseW * scale * dpr || 1;
-      let screenH = baseH * scale * dpr || 1;
-
-      const isCropViewVisible = state.isCropping && state.uncroppedAdjustedPreviewUrl;
-
-      if (isCropViewVisible) {
-        screenX = -999999;
-        screenY = -999999;
-        screenW = 1;
-        screenH = 1;
-      } else {
-        screenW = Math.max(screenW, 1);
-        screenH = Math.max(screenH, 1);
-      }
-
-      const currentTransform = `${windowWidth},${windowHeight},${screenX},${screenY},${screenW},${screenH},${clipX},${clipY},${clipW},${clipH},${state.bgPrimary.join(',')},${state.bgSecondary.join(',')}`;
-
-      if (lastWgpuTransformRef.current !== currentTransform && !isInvoking) {
-        lastWgpuTransformRef.current = currentTransform;
-        isInvoking = true;
-
-        const isZoomedIn = scale >= maxScaleRef.current - 0.5;
-
-        invoke(Invokes.UpdateWgpuTransform, {
-          payload: {
-            windowWidth,
-            windowHeight,
-            x: screenX,
-            y: screenY,
-            width: screenW,
-            height: screenH,
-            clipX,
-            clipY,
-            clipWidth: clipW,
-            clipHeight: clipH,
-            bgPrimary: state.bgPrimary,
-            bgSecondary: state.bgSecondary,
-            pixelated: isZoomedIn,
-          },
-        })
-          .catch((err: unknown) => {
-            console.warn('WGPU Sync Error:', err);
-          })
-          .finally(() => {
-            isInvoking = false;
-          });
-      }
-
-      wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
-    };
-
-    wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
-
-    return () => {
-      isEffectActive = false;
-      if (wgpuSyncRef.current !== null) {
-        cancelAnimationFrame(wgpuSyncRef.current);
-      }
-    };
-  }, [imageRenderSizeRef, maxScaleRef, transformStateRef]);
+    hasRenderedFirstFrame,
+    imageContainerRef,
+    imageRenderSizeRef,
+    isCropping,
+    isReady: selectedImage?.isReady ?? false,
+    maxScaleRef,
+    showOriginal,
+    theme: appSettings?.theme,
+    transformStateRef,
+    uncroppedAdjustedPreviewUrl,
+    useWgpuRenderer: appSettings?.useWgpuRenderer,
+  });
 
   const overlayTriggerHash = useMemo(() => {
     let activeMaskDef: MaskContainer | AiPatch | undefined;
