@@ -39,6 +39,22 @@ impl Default for FilterCriteria {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct FolderTreeSort {
+    pub key: String,
+    pub order: String,
+}
+
+impl Default for FolderTreeSort {
+    fn default() -> Self {
+        Self {
+            key: "name".to_string(),
+            order: "asc".to_string(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct LastFolderState {
     #[serde(default)]
     pub current_folder_path: Option<String>,
@@ -69,6 +85,9 @@ pub fn all_available_adjustments() -> HashSet<String> {
         "brightness",
         "contrast",
         "curves",
+        "pointCurves",
+        "parametricCurve",
+        "curveMode",
         "highlights",
         "shadows",
         "whites",
@@ -79,6 +98,7 @@ pub fn all_available_adjustments() -> HashSet<String> {
         "saturation",
         "vibrance",
         "hsl",
+        "hue",
         "colorGrading",
         "colorCalibration",
         "clarity",
@@ -460,6 +480,8 @@ pub struct AppSettings {
     pub exif_overlay: Option<String>,
     #[serde(default)]
     pub language: Option<String>,
+    #[serde(default)]
+    pub folder_tree_sort: Option<FolderTreeSort>,
 }
 
 impl Default for AppSettings {
@@ -550,6 +572,7 @@ impl Default for AppSettings {
             apply_preprocessing_to_non_raws: Some(false),
             exif_overlay: Some("off".to_string()),
             language: Some("en".to_string()),
+            folder_tree_sort: Some(FolderTreeSort::default()),
         }
     }
 }

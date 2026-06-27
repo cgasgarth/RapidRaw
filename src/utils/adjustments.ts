@@ -216,6 +216,7 @@ export interface Adjustments {
   grainSize: number;
   halationAmount: number;
   highlights: number;
+  hue: number;
   hsl: Hsl;
   levels: LevelsSettings;
   lensCorrectionMode: 'auto' | 'manual';
@@ -416,6 +417,7 @@ export interface MaskAdjustments {
   glowAmount: number;
   halationAmount: number;
   highlights: number;
+  hue: number;
   hsl: Hsl;
   id?: string;
   lumaNoiseReduction: number;
@@ -645,6 +647,7 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   glowAmount: 0,
   halationAmount: 0,
   highlights: 0,
+  hue: 0,
   hsl: {
     aquas: { hue: 0, saturation: 0, luminance: 0 },
     blues: { hue: 0, saturation: 0, luminance: 0 },
@@ -728,6 +731,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   grainSize: 25,
   halationAmount: 0,
   highlights: 0,
+  hue: 0,
   hsl: {
     aquas: { hue: 0, saturation: 0, luminance: 0 },
     blues: { hue: 0, saturation: 0, luminance: 0 },
@@ -900,6 +904,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     filmLookStrength: loadedAdjustments.filmLookStrength ?? INITIAL_ADJUSTMENTS.filmLookStrength,
     glowAmount: loadedAdjustments.glowAmount ?? INITIAL_ADJUSTMENTS.glowAmount,
     halationAmount: loadedAdjustments.halationAmount ?? INITIAL_ADJUSTMENTS.halationAmount,
+    hue: loadedAdjustments.hue ?? INITIAL_ADJUSTMENTS.hue,
     lensCorrectionMode: loadedAdjustments.lensCorrectionMode || 'manual',
     lensMaker: loadedAdjustments.lensMaker ?? INITIAL_ADJUSTMENTS.lensMaker,
     lensModel: loadedAdjustments.lensModel ?? INITIAL_ADJUSTMENTS.lensModel,
@@ -1023,6 +1028,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
     },
     { label: 'modals.copyPaste.groups.whiteBalance', keys: [ColorAdjustment.Temperature, ColorAdjustment.Tint] },
     { label: 'modals.copyPaste.groups.presence', keys: [ColorAdjustment.Saturation, ColorAdjustment.Vibrance] },
+    { label: 'modals.copyPaste.groups.hueShift', keys: [ColorAdjustment.Hue] },
     { label: 'modals.copyPaste.groups.colorBalanceRgb', keys: [ColorAdjustment.ColorBalanceRgb] },
     { label: 'modals.copyPaste.groups.colorGrading', keys: [ColorAdjustment.ColorGrading] },
     { label: 'modals.copyPaste.groups.levels', keys: [ColorAdjustment.Levels] },
@@ -1175,6 +1181,7 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     ColorAdjustment.Temperature,
     ColorAdjustment.Tint,
     ColorAdjustment.Vibrance,
+    ColorAdjustment.Hue,
     ColorAdjustment.BlackWhiteMixer,
     ColorAdjustment.ColorBalanceRgb,
     ColorAdjustment.ChannelMixer,

@@ -1762,6 +1762,18 @@ export default function ColorPanel({
           value={adjustments.saturation || 0}
           onDragStateChange={onDragStateChange}
         />
+        <AdjustmentSlider
+          label={isForMask ? t('adjustments.color.localHue') : t('adjustments.color.hue')}
+          max={180}
+          min={-180}
+          onValueChange={(value) => {
+            handleGlobalChange(ColorAdjustment.Hue, value);
+          }}
+          step={1}
+          value={adjustments.hue || 0}
+          trackClassName="hue-range-track"
+          onDragStateChange={onDragStateChange}
+        />
       </div>
 
       {!isForMask && adjustmentVisibility[ColorAdjustment.BlackWhiteMixer] !== false && (

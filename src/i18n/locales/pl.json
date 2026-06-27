@@ -120,6 +120,7 @@
           "shadowClipping": "Shadow clipping active"
         }
       },
+      "localHue": "Lokalny odcień",
       "luminance": "Luminancja",
       "maskPreview": "",
       "maskPreviewEnabled": "",
@@ -1332,6 +1333,7 @@
       "warning": "Oryginalny plik jest odłączony. Edycje działają tylko na podglądzie do czasu ponownego podłączenia oryginału; eksport w pełnej rozdzielczości jest niedostępny."
     },
     "presets": {
+      "amount": "Siła",
       "applyPresetLabel": "Zastosuj preset {{name}}",
       "colorStyles": {
         "adjustmentCoverage_one": "{{count}} korekta",
@@ -1757,10 +1759,17 @@
         "folders": "Foldery",
         "pinned": "Przypięte"
       },
+      "sort": {
+        "created": "Data utworzenia",
+        "imageCount": "Liczba obrazów",
+        "modified": "Data modyfikacji",
+        "name": "Alfabetycznie"
+      },
       "tooltips": {
         "clearSearch": "Wyczyść wyszukiwanie",
         "collapse": "Zwiń",
-        "expand": "Rozwiń"
+        "expand": "Rozwiń",
+        "sortFolders": "Sortuj foldery"
       }
     },
     "grid": {
@@ -2069,6 +2078,7 @@
         "exposureToneMapper": "Ekspozycja i Mapowanie tonów",
         "grain": "Ziarno",
         "halationGlow": "Halacja i Poświata",
+        "hueShift": "Globalne przesunięcie odcienia",
         "lensCorrection": "Korekcja obiektywu",
         "lut": "LUT",
         "masks": "Maski",
@@ -3850,6 +3860,7 @@
         "expandFilmstrip": "Rozwiń pasek z klatkami",
         "export": "Eksport",
         "pasteSettings": "Wklej Ustawienia",
+        "quickFilter": "Szybki filtr",
         "rateStars_one": "Oceń na 1 gwiazdkę",
         "rateStars_few": "Oceń na {{count}} gwiazdki",
         "rateStars_many": "Oceń na {{count}} gwiazdek",
