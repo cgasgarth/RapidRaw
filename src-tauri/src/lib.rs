@@ -619,7 +619,7 @@ fn process_preview_job(
                 timeout: Some(std::time::Duration::from_millis(500)),
             });
             let _ = app_handle.emit(
-                "wgpu-frame-ready",
+                crate::events::WGPU_FRAME_READY,
                 serde_json::json!({ "path": loaded_image.path }),
             );
             return Ok(b"WGPU_RENDER".to_vec());
