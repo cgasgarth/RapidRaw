@@ -1,4 +1,12 @@
 {
+  "artifacts": {
+    "deltaHeatmap": {
+      "hash": "sha256:837d21601a40ed1011887651042a1a5b359102e105ef4a3948dd631bcae656aa",
+      "kind": "changed_pixel_heatmap_private",
+      "path": "private-artifacts/validation/open-edit-export/gamut-mapping-delta-heatmap.png",
+      "publicRepoAllowed": false
+    }
+  },
   "caveats": [
     "DeltaE00 is a pairwise guardrail, not a final image-quality score.",
     "The comparison uses soft-proof RGB8 artifacts because the runtime report proves soft proof and TIFF export parity.",
@@ -7,7 +15,7 @@
     "This report does not prove Capture One-class visual quality, display-device matching, camera-profile accuracy, or final mapper tuning."
   ],
   "comparisonBasis": "soft_proof_rgb8_perceptual_vs_relative_colorimetric",
-  "generatedAt": "2026-06-26T23:40:11.321Z",
+  "generatedAt": "2026-06-27T00:10:41.070Z",
   "issue": 3238,
   "metrics": {
     "changedPixelRatio": 0.004107,
@@ -25,6 +33,15 @@
     "meanAbsRgb8Delta": 0.001505,
     "neutralAxisDriftP95": 0,
     "perceptualDeltaE00VsUnmappedDestinationLab": null,
+    "perceptualMapperCoverage": {
+      "changedPixelRatio": 0.027322,
+      "inputPixelRatio": 1,
+      "postMapOutOfGamutPixelRatio": 0,
+      "preMapMaxLinearRgb": 0.981934,
+      "preMapMinLinearRgb": -0.001961,
+      "preMapOutOfGamutChannelRatio": 0.009844,
+      "preMapOutOfGamutPixelRatio": 0.027325
+    },
     "pixelCount": 24000000,
     "saturationMonotonicViolationCount": 593
   },

@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 
 import { createHash } from 'node:crypto';
-import { inflateSync } from 'node:zlib';
-import { access, readFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { deflateSync, inflateSync } from 'node:zlib';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 
 import Color from 'colorjs.io';
 import { z } from 'zod';
@@ -16,6 +16,7 @@ const PERCEPTUAL_REPORT_PATH = `${PRIVATE_ROOT}/raw-open-edit-export-run-reports
 const RELATIVE_REPORT_PATH = `${PRIVATE_ROOT}/raw-open-edit-export-relative-run-reports.json`;
 const PERCEPTUAL_FIXTURE_ID = 'validation.raw-open-edit-export.professional-color.v1';
 const RELATIVE_FIXTURE_ID = 'validation.raw-open-edit-export.professional-color-relative.v1';
+const DELTA_HEATMAP_PATH = 'private-artifacts/validation/open-edit-export/gamut-mapping-delta-heatmap.png';
 const PRIVATE_SOURCE = '/Users/cgas/Pictures/Capture One/Alaska';
 const PERCEPTUAL_COMMAND = `RAWENGINE_PRIVATE_RAW_SOURCE="${PRIVATE_SOURCE}" bun run check:raw-color-management-srgb-perceptual-private-proof --root ${PRIVATE_ROOT} --output ${PERCEPTUAL_REPORT_PATH} --require-assets`;
 const RELATIVE_COMMAND = `RAWENGINE_PRIVATE_RAW_SOURCE="${PRIVATE_SOURCE}" bun scripts/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export-srgb-relative-proof-request.json --root ${PRIVATE_ROOT} --output ${RELATIVE_REPORT_PATH} --require-assets`;
@@ -34,8 +35,28 @@ const metricSetSchema = z
     p95: z.number().nonnegative(),
   })
   .strict();
+const artifactSchema = z
+  .object({
+    hash: hashSchema,
+    kind: z.literal('changed_pixel_heatmap_private'),
+    path: z.literal(DELTA_HEATMAP_PATH),
+    publicRepoAllowed: z.literal(false),
+  })
+  .strict();
+const mapperCoverageSchema = z
+  .object({
+    changedPixelRatio: z.number().min(0).max(1),
+    inputPixelRatio: z.number().min(0).max(1),
+    postMapOutOfGamutPixelRatio: z.number().min(0).max(1),
+    preMapMaxLinearRgb: z.number(),
+    preMapMinLinearRgb: z.number(),
+    preMapOutOfGamutChannelRatio: z.number().min(0).max(1),
+    preMapOutOfGamutPixelRatio: z.number().min(0).max(1),
+  })
+  .strict();
 const reportSchema = z
   .object({
+    artifacts: z.object({ deltaHeatmap: artifactSchema }).strict(),
     caveats: z.array(z.string().min(1)).min(5),
     comparisonBasis: z.literal('soft_proof_rgb8_perceptual_vs_relative_colorimetric'),
     generatedAt: z.iso.datetime({ offset: true }),
@@ -49,6 +70,7 @@ const reportSchema = z
         meanAbsRgb8Delta: z.number().min(0).max(255),
         neutralAxisDriftP95: z.number().nonnegative(),
         perceptualDeltaE00VsUnmappedDestinationLab: z.null(),
+        perceptualMapperCoverage: mapperCoverageSchema,
         pixelCount: z.number().int().positive(),
         saturationMonotonicViolationCount: z.number().int().nonnegative(),
       })
@@ -83,6 +105,24 @@ const reportSchema = z
     if (report.metrics.deltaE00VsRelativeClip.p95 > report.metrics.deltaE00VsRelativeClip.max) {
       context.addIssue({ code: 'custom', message: 'DeltaE00 p95 must not exceed max.' });
     }
+    if (report.metrics.changedPixelRatio <= 0) {
+      context.addIssue({ code: 'custom', message: 'changedPixelRatio must prove visible output changed.' });
+    }
+    if (report.metrics.maxAbsRgb8Delta <= 0) {
+      context.addIssue({ code: 'custom', message: 'maxAbsRgb8Delta must prove visible output changed.' });
+    }
+    if (report.metrics.perceptualMapperCoverage.inputPixelRatio <= 0) {
+      context.addIssue({ code: 'custom', message: 'perceptual mapper must receive input pixels.' });
+    }
+    if (report.metrics.perceptualMapperCoverage.changedPixelRatio <= 0) {
+      context.addIssue({ code: 'custom', message: 'perceptual mapper must change at least one pixel.' });
+    }
+    if (report.metrics.perceptualMapperCoverage.preMapOutOfGamutPixelRatio <= 0) {
+      context.addIssue({ code: 'custom', message: 'perceptual mapper must receive out-of-gamut pixels.' });
+    }
+    if (report.metrics.perceptualMapperCoverage.postMapOutOfGamutPixelRatio !== 0) {
+      context.addIssue({ code: 'custom', message: 'perceptual mapper output must be in gamut.' });
+    }
   });
 
 const failures: Array<string> = [];
@@ -98,6 +138,7 @@ if (UPDATE_REPORT) {
 if (requireAssets) {
   await verifyArtifact(report.perceptualRun.softProofPath, report.perceptualRun.softProofHash);
   await verifyArtifact(report.relativeRun.softProofPath, report.relativeRun.softProofHash);
+  await verifyArtifact(report.artifacts.deltaHeatmap.path, report.artifacts.deltaHeatmap.hash);
 }
 
 if (failures.length > 0) {
@@ -125,6 +166,7 @@ async function buildReport() {
   let sumAbs = 0;
   let saturationMonotonicViolationCount = 0;
   const pixelCount = perceptualPng.width * perceptualPng.height;
+  const deltaHeatmap = new Uint8Array(pixelCount * 3);
 
   for (let index = 0; index < perceptualPng.rgb.length; index += 3) {
     const perceptualRgb = [
@@ -138,6 +180,10 @@ async function buildReport() {
     if (pixelChanged) changed += 1;
     maxAbs = Math.max(maxAbs, ...channelDeltas);
     sumAbs += channelDeltas[0] + channelDeltas[1] + channelDeltas[2];
+    const heat = Math.min(255, Math.max(...channelDeltas) * 16);
+    deltaHeatmap[index] = heat;
+    deltaHeatmap[index + 1] = pixelChanged ? 32 : 0;
+    deltaHeatmap[index + 2] = pixelChanged ? 255 - heat : 0;
 
     const perceptualLab = rgb8ToLab(perceptualRgb);
     const relativeLab = rgb8ToLab(relativeRgb);
@@ -153,8 +199,22 @@ async function buildReport() {
       saturationMonotonicViolationCount += 1;
     }
   }
+  const deltaHeatmapHash = await writePngArtifact(
+    DELTA_HEATMAP_PATH,
+    deltaHeatmap,
+    perceptualPng.width,
+    perceptualPng.height,
+  );
 
   return {
+    artifacts: {
+      deltaHeatmap: {
+        hash: deltaHeatmapHash,
+        kind: 'changed_pixel_heatmap_private',
+        path: DELTA_HEATMAP_PATH,
+        publicRepoAllowed: false,
+      },
+    },
     caveats: [
       'DeltaE00 is a pairwise guardrail, not a final image-quality score.',
       'The comparison uses soft-proof RGB8 artifacts because the runtime report proves soft proof and TIFF export parity.',
@@ -173,6 +233,7 @@ async function buildReport() {
       meanAbsRgb8Delta: round(sumAbs / (pixelCount * 3)),
       neutralAxisDriftP95: round(quantile(neutralDrifts, 0.95)),
       perceptualDeltaE00VsUnmappedDestinationLab: null,
+      perceptualMapperCoverage: coverageMetrics(perceptual.metrics),
       pixelCount,
       saturationMonotonicViolationCount,
     },
@@ -204,9 +265,28 @@ async function loadRun(runReportsPath: string, fixtureId: string) {
   if (softProof === undefined) throw new Error(`${fixtureId}: missing soft proof artifact`);
   return {
     gamutMapping: runReport.colorManagement.observedColorPipeline.gamutMapping,
+    metrics: runReport.metrics,
     softProofHash: softProof.hash,
     softProofPath: softProof.path,
   };
+}
+
+function coverageMetrics(metrics: Array<{ name: string; value: number }>) {
+  return {
+    changedPixelRatio: metricValue(metrics, 'gamutMapperChangedPixelRatio'),
+    inputPixelRatio: metricValue(metrics, 'gamutMapperInputPixelRatio'),
+    postMapOutOfGamutPixelRatio: metricValue(metrics, 'gamutPostMapOutOfGamutPixelRatio'),
+    preMapMaxLinearRgb: metricValue(metrics, 'gamutPreMapMaxLinearRgb'),
+    preMapMinLinearRgb: metricValue(metrics, 'gamutPreMapMinLinearRgb'),
+    preMapOutOfGamutChannelRatio: metricValue(metrics, 'gamutPreMapOutOfGamutChannelRatio'),
+    preMapOutOfGamutPixelRatio: metricValue(metrics, 'gamutPreMapOutOfGamutPixelRatio'),
+  };
+}
+
+function metricValue(metrics: Array<{ name: string; value: number }>, name: string): number {
+  const metric = metrics.find((candidate) => candidate.name === name);
+  if (metric === undefined) throw new Error(`missing metric ${name}`);
+  return round(metric.value);
 }
 
 async function verifyArtifact(path: string, expectedHash: string) {
@@ -219,6 +299,65 @@ async function verifyArtifact(path: string, expectedHash: string) {
   }
   const actualHash = hashBuffer(await readFile(absolutePath));
   if (!allowFreshHashes && actualHash !== expectedHash) failures.push(`hash mismatch for ${path}`);
+}
+
+async function writePngArtifact(path: string, rgb: Uint8Array, width: number, height: number): Promise<string> {
+  const absolutePath = resolve(privateRoot, path);
+  await mkdir(dirname(absolutePath), { recursive: true });
+  const png = encodePngRgb8(rgb, width, height);
+  await writeFile(absolutePath, png);
+  return hashBuffer(png);
+}
+
+function encodePngRgb8(rgb: Uint8Array, width: number, height: number): Buffer {
+  const rowBytes = width * 3;
+  if (rgb.length !== rowBytes * height) throw new Error('RGB buffer dimensions are invalid');
+  const scanlines = Buffer.alloc((rowBytes + 1) * height);
+  for (let y = 0; y < height; y += 1) {
+    const target = y * (rowBytes + 1);
+    scanlines[target] = 0;
+    Buffer.from(rgb.buffer, rgb.byteOffset + y * rowBytes, rowBytes).copy(scanlines, target + 1);
+  }
+
+  return Buffer.concat([
+    Buffer.from('89504e470d0a1a0a', 'hex'),
+    pngChunk('IHDR', ihdr(width, height)),
+    pngChunk('IDAT', deflateSync(scanlines)),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+function ihdr(width: number, height: number): Buffer {
+  const data = Buffer.alloc(13);
+  data.writeUInt32BE(width, 0);
+  data.writeUInt32BE(height, 4);
+  data[8] = 8;
+  data[9] = 2;
+  data[10] = 0;
+  data[11] = 0;
+  data[12] = 0;
+  return data;
+}
+
+function pngChunk(type: string, data: Buffer): Buffer {
+  const typeBytes = Buffer.from(type, 'ascii');
+  const chunk = Buffer.alloc(12 + data.length);
+  chunk.writeUInt32BE(data.length, 0);
+  typeBytes.copy(chunk, 4);
+  data.copy(chunk, 8);
+  chunk.writeUInt32BE(crc32(Buffer.concat([typeBytes, data])), 8 + data.length);
+  return chunk;
+}
+
+function crc32(bytes: Buffer): number {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = crc & 1 ? 0xedb88320 ^ (crc >>> 1) : crc >>> 1;
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
 }
 
 function readPngRgb8(bytes: Buffer): { height: number; rgb: Uint8Array; width: number } {

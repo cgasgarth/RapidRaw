@@ -19,7 +19,7 @@ use crate::export_processing::{
     process_image_for_export_pipeline_with_tonemapper_override, save_image_with_metadata,
 };
 use crate::formats::is_raw_file;
-use crate::gamut_mapping::SRGB_OKLAB_CHROMA_REDUCE_V1;
+use crate::gamut_mapping::{SRGB_OKLAB_CHROMA_REDUCE_V1, map_srgb_oklab_chroma_reduce_v1};
 use crate::image_loader::load_base_image_from_bytes;
 use crate::image_processing::{
     GpuContext, ImageMetadata, get_or_init_gpu_context, resolve_tonemapper_override,
@@ -481,6 +481,11 @@ fn run_raw_open_edit_export_proof_with_context(
 
     let changed_pixel_ratio = changed_pixel_ratio(&preview_before, &preview_after);
     let preview_export_mean_abs_delta = mean_abs_delta(&preview_after, &export_after);
+    let gamut_coverage = gamut_mapping_coverage_metrics(
+        &export_after,
+        &export_color_profile,
+        &export_rendering_intent,
+    );
     let final_file = inspect_final_tiff_export(
         &export_after_path,
         &export_color_profile,
@@ -556,6 +561,50 @@ fn run_raw_open_edit_export_proof_with_context(
                 soft_proof_export_rgb8_mean_abs_delta,
                 0.0,
                 soft_proof_export_rgb8_mean_abs_delta == 0.0,
+            ),
+            metric(
+                "gamutMapperInputPixelRatio",
+                gamut_coverage.input_pixel_ratio,
+                0.0,
+                !gamut_coverage.mapper_expected || gamut_coverage.input_pixel_ratio > 0.0,
+            ),
+            metric(
+                "gamutMapperChangedPixelRatio",
+                gamut_coverage.changed_pixel_ratio,
+                0.0,
+                !gamut_coverage.mapper_expected || gamut_coverage.changed_pixel_ratio > 0.0,
+            ),
+            metric(
+                "gamutPreMapOutOfGamutPixelRatio",
+                gamut_coverage.pre_map_out_of_gamut_pixel_ratio,
+                0.0,
+                !gamut_coverage.mapper_expected
+                    || gamut_coverage.pre_map_out_of_gamut_pixel_ratio > 0.0,
+            ),
+            metric(
+                "gamutPreMapOutOfGamutChannelRatio",
+                gamut_coverage.pre_map_out_of_gamut_channel_ratio,
+                0.0,
+                !gamut_coverage.mapper_expected
+                    || gamut_coverage.pre_map_out_of_gamut_channel_ratio > 0.0,
+            ),
+            metric(
+                "gamutPostMapOutOfGamutPixelRatio",
+                gamut_coverage.post_map_out_of_gamut_pixel_ratio,
+                0.0,
+                gamut_coverage.post_map_out_of_gamut_pixel_ratio == 0.0,
+            ),
+            metric(
+                "gamutPreMapMinLinearRgb",
+                gamut_coverage.pre_map_min_linear_rgb,
+                0.0,
+                true,
+            ),
+            metric(
+                "gamutPreMapMaxLinearRgb",
+                gamut_coverage.pre_map_max_linear_rgb,
+                1.0,
+                true,
             ),
             metric("finalFileReopenSucceeded", 1.0, 1.0, true),
             metric(
@@ -1178,6 +1227,118 @@ fn mean_abs_delta(first: &DynamicImage, second: &DynamicImage) -> f64 {
         }
     }
     total / f64::from(width * height * 4)
+}
+
+struct GamutMappingCoverageMetrics {
+    changed_pixel_ratio: f64,
+    input_pixel_ratio: f64,
+    mapper_expected: bool,
+    post_map_out_of_gamut_pixel_ratio: f64,
+    pre_map_max_linear_rgb: f64,
+    pre_map_min_linear_rgb: f64,
+    pre_map_out_of_gamut_channel_ratio: f64,
+    pre_map_out_of_gamut_pixel_ratio: f64,
+}
+
+fn gamut_mapping_coverage_metrics(
+    image: &DynamicImage,
+    color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
+) -> GamutMappingCoverageMetrics {
+    let mapper_expected = matches!(color_profile, ExportColorProfile::Srgb)
+        && matches!(rendering_intent, ExportRenderingIntent::Perceptual);
+    let mut total_pixels = 0_u64;
+    let mut pre_map_out_of_gamut_pixels = 0_u64;
+    let mut pre_map_out_of_gamut_channels = 0_u64;
+    let mut changed_pixels = 0_u64;
+    let mut post_map_out_of_gamut_pixels = 0_u64;
+    let mut pre_map_min_linear_rgb = f64::INFINITY;
+    let mut pre_map_max_linear_rgb = f64::NEG_INFINITY;
+
+    for rgb in dynamic_image_rgb32f_pixels(image) {
+        total_pixels += 1;
+        let mut pre_pixel_out_of_gamut = false;
+        for component in rgb {
+            let value = f64::from(component);
+            pre_map_min_linear_rgb = pre_map_min_linear_rgb.min(value);
+            pre_map_max_linear_rgb = pre_map_max_linear_rgb.max(value);
+            if !component.is_finite() || !(0.0..=1.0).contains(&component) {
+                pre_pixel_out_of_gamut = true;
+                pre_map_out_of_gamut_channels += 1;
+            }
+        }
+        if pre_pixel_out_of_gamut {
+            pre_map_out_of_gamut_pixels += 1;
+        }
+
+        let mapped = if mapper_expected {
+            map_srgb_oklab_chroma_reduce_v1(rgb)
+        } else {
+            rgb.map(|component| component.clamp(0.0, 1.0))
+        };
+        if rgb
+            .iter()
+            .zip(mapped.iter())
+            .any(|(before, after)| (*before - *after).abs() > 1.0e-6)
+        {
+            changed_pixels += 1;
+        }
+        if mapped
+            .iter()
+            .any(|component| !component.is_finite() || !(0.0..=1.0).contains(component))
+        {
+            post_map_out_of_gamut_pixels += 1;
+        }
+    }
+
+    if total_pixels == 0 {
+        return GamutMappingCoverageMetrics {
+            changed_pixel_ratio: 0.0,
+            input_pixel_ratio: 0.0,
+            mapper_expected,
+            post_map_out_of_gamut_pixel_ratio: 0.0,
+            pre_map_max_linear_rgb: 0.0,
+            pre_map_min_linear_rgb: 0.0,
+            pre_map_out_of_gamut_channel_ratio: 0.0,
+            pre_map_out_of_gamut_pixel_ratio: 0.0,
+        };
+    }
+
+    GamutMappingCoverageMetrics {
+        changed_pixel_ratio: changed_pixels as f64 / total_pixels as f64,
+        input_pixel_ratio: if mapper_expected { 1.0 } else { 0.0 },
+        mapper_expected,
+        post_map_out_of_gamut_pixel_ratio: post_map_out_of_gamut_pixels as f64
+            / total_pixels as f64,
+        pre_map_max_linear_rgb,
+        pre_map_min_linear_rgb,
+        pre_map_out_of_gamut_channel_ratio: pre_map_out_of_gamut_channels as f64
+            / (total_pixels * 3) as f64,
+        pre_map_out_of_gamut_pixel_ratio: pre_map_out_of_gamut_pixels as f64 / total_pixels as f64,
+    }
+}
+
+fn dynamic_image_rgb32f_pixels(image: &DynamicImage) -> Vec<[f32; 3]> {
+    match image {
+        DynamicImage::ImageRgb32F(buffer) => buffer
+            .as_raw()
+            .chunks_exact(3)
+            .map(|pixel| [pixel[0], pixel[1], pixel[2]])
+            .collect(),
+        DynamicImage::ImageRgba32F(buffer) => buffer
+            .as_raw()
+            .chunks_exact(4)
+            .map(|pixel| [pixel[0], pixel[1], pixel[2]])
+            .collect(),
+        _ => {
+            let buffer = image.to_rgb32f();
+            buffer
+                .as_raw()
+                .chunks_exact(3)
+                .map(|pixel| [pixel[0], pixel[1], pixel[2]])
+                .collect()
+        }
+    }
 }
 
 fn mean_abs_delta_rgb8(first: &[u8], second: &[u8]) -> Result<f64, String> {
