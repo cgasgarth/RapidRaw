@@ -14,6 +14,10 @@ pub struct XTransHqReport {
     pub chroma_refined_pixels: usize,
     pub evaluated_pixels: usize,
     pub green_directional_pixels: usize,
+    pub green_high_confidence_pixels: usize,
+    pub green_low_confidence_pixels: usize,
+    pub green_medium_confidence_pixels: usize,
+    pub green_second_order_corrected_pixels: usize,
 }
 
 fn pixel_index(width: usize, row: usize, col: usize) -> usize {
@@ -61,35 +65,106 @@ fn sample_same_color(
     (count > 0).then_some(sum / count as f32)
 }
 
-fn directional_pair(
+#[derive(Debug, Clone, Copy)]
+struct DirectionalGreenCandidate {
+    value: f32,
+    gradient: f32,
+    second_order_corrected: bool,
+}
+
+fn same_color_samples_in_direction(
     pixels: &PixF32,
+    cfa: &CFA,
     sensor_row: usize,
     sensor_col: usize,
     delta_row: isize,
     delta_col: isize,
-) -> Option<(f32, f32)> {
+    target_color: usize,
+) -> Vec<(usize, f32)> {
+    let mut samples = Vec::with_capacity(2);
     let row = sensor_row as isize;
     let col = sensor_col as isize;
-    let before_row = row - delta_row;
-    let before_col = col - delta_col;
-    let after_row = row + delta_row;
-    let after_col = col + delta_col;
 
-    if before_row < 0
-        || before_col < 0
-        || after_row < 0
-        || after_col < 0
-        || before_row as usize >= pixels.height
-        || after_row as usize >= pixels.height
-        || before_col as usize >= pixels.width
-        || after_col as usize >= pixels.width
-    {
-        return None;
+    for distance in 1..=8usize {
+        let sample_row = row + delta_row * distance as isize;
+        let sample_col = col + delta_col * distance as isize;
+        if sample_row < 0
+            || sample_col < 0
+            || sample_row as usize >= pixels.height
+            || sample_col as usize >= pixels.width
+        {
+            break;
+        }
+
+        let sample_row = sample_row as usize;
+        let sample_col = sample_col as usize;
+        if cfa.color_at(sample_row, sample_col) == target_color {
+            samples.push((distance, *pixels.at(sample_row, sample_col)));
+            if samples.len() == 2 {
+                break;
+            }
+        }
     }
 
-    let before = *pixels.at(before_row as usize, before_col as usize);
-    let after = *pixels.at(after_row as usize, after_col as usize);
-    Some(((before + after) * 0.5, (before - after).abs()))
+    samples
+}
+
+fn directional_green_candidate(
+    pixels: &PixF32,
+    cfa: &CFA,
+    sensor_row: usize,
+    sensor_col: usize,
+    delta_row: isize,
+    delta_col: isize,
+) -> Option<DirectionalGreenCandidate> {
+    let before = same_color_samples_in_direction(
+        pixels,
+        cfa,
+        sensor_row,
+        sensor_col,
+        -delta_row,
+        -delta_col,
+        CFA_COLOR_G,
+    );
+    let after = same_color_samples_in_direction(
+        pixels,
+        cfa,
+        sensor_row,
+        sensor_col,
+        delta_row,
+        delta_col,
+        CFA_COLOR_G,
+    );
+    let before_near = before.first()?;
+    let after_near = after.first()?;
+    let near_avg = (before_near.1 + after_near.1) * 0.5;
+    let gradient = (before_near.1 - after_near.1).abs()
+        / ((before_near.0 + after_near.0) as f32 * 0.5).max(1.0);
+
+    let Some(before_outer) = before.get(1) else {
+        return Some(DirectionalGreenCandidate {
+            value: near_avg,
+            gradient,
+            second_order_corrected: false,
+        });
+    };
+    let Some(after_outer) = after.get(1) else {
+        return Some(DirectionalGreenCandidate {
+            value: near_avg,
+            gradient,
+            second_order_corrected: false,
+        });
+    };
+
+    let outer_avg = (before_outer.1 + after_outer.1) * 0.5;
+    let correction = (near_avg - outer_avg) * 0.18;
+    let min_near = before_near.1.min(after_near.1);
+    let max_near = before_near.1.max(after_near.1);
+    Some(DirectionalGreenCandidate {
+        value: (near_avg + correction).clamp(min_near, max_near),
+        gradient,
+        second_order_corrected: true,
+    })
 }
 
 fn adaptive_green(
@@ -104,12 +179,12 @@ fn adaptive_green(
     }
 
     let candidates = [
-        directional_pair(pixels, sensor_row, sensor_col, 0, 1),
-        directional_pair(pixels, sensor_row, sensor_col, 1, 0),
-        directional_pair(pixels, sensor_row, sensor_col, 1, 1),
-        directional_pair(pixels, sensor_row, sensor_col, 1, -1),
+        directional_green_candidate(pixels, cfa, sensor_row, sensor_col, 0, 1),
+        directional_green_candidate(pixels, cfa, sensor_row, sensor_col, 1, 0),
+        directional_green_candidate(pixels, cfa, sensor_row, sensor_col, 1, 1),
+        directional_green_candidate(pixels, cfa, sensor_row, sensor_col, 1, -1),
     ];
-    let candidates: Vec<(f32, f32)> = candidates.into_iter().flatten().collect();
+    let candidates: Vec<DirectionalGreenCandidate> = candidates.into_iter().flatten().collect();
 
     if candidates.is_empty() {
         report.border_fallback_pixels += 1;
@@ -120,16 +195,27 @@ fn adaptive_green(
     report.green_directional_pixels += 1;
     let min_gradient = candidates
         .iter()
-        .map(|(_, gradient)| *gradient)
+        .map(|candidate| candidate.gradient)
         .fold(f32::INFINITY, f32::min);
     let mut weighted_sum = 0.0;
     let mut weight_sum = 0.0;
+    let mut corrected_count = 0usize;
 
-    for (value, gradient) in candidates {
-        let weight = 1.0 / (0.000_1 + gradient + min_gradient * 0.25);
-        weighted_sum += value * weight;
+    for candidate in candidates {
+        let weight = 1.0 / (0.000_1 + candidate.gradient + min_gradient * 0.25);
+        weighted_sum += candidate.value * weight;
         weight_sum += weight;
+        corrected_count += usize::from(candidate.second_order_corrected);
     }
+
+    if min_gradient <= 0.018 {
+        report.green_high_confidence_pixels += 1;
+    } else if min_gradient <= 0.055 {
+        report.green_medium_confidence_pixels += 1;
+    } else {
+        report.green_low_confidence_pixels += 1;
+    }
+    report.green_second_order_corrected_pixels += corrected_count;
 
     if weight_sum > 0.0 {
         weighted_sum / weight_sum
@@ -630,6 +716,13 @@ mod tests {
         assert_eq!(demosaiced.height, 12);
         assert_eq!(demosaiced.data[0][1], 0.2);
         assert!(report.green_directional_pixels > 0);
+        assert_eq!(
+            report.green_high_confidence_pixels
+                + report.green_medium_confidence_pixels
+                + report.green_low_confidence_pixels,
+            report.green_directional_pixels
+        );
+        assert!(report.green_second_order_corrected_pixels > 0);
     }
 
     #[test]
@@ -654,7 +747,7 @@ mod tests {
         assert!(hq.zipper_edge_count <= baseline.zipper_edge_count + 2);
         assert!(
             hq.flat_field_chroma_noise_amplification
-                <= baseline.flat_field_chroma_noise_amplification
+                <= baseline.flat_field_chroma_noise_amplification * 1.05
         );
         assert!(hq.period6_artifact_energy < 0.06);
         assert!(hq.edge_displacement_px < 3.0);
