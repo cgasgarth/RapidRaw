@@ -12,6 +12,8 @@ const storeSource = read('src/store/useEditorStore.ts');
 const commandsSource = read('src/tauri/commands.ts');
 const rustLibSource = read('src-tauri/src/lib.rs');
 const rustExportSource = read('src-tauri/src/export_processing.rs');
+const rustExportColorPolicySource = read('src-tauri/src/export_color_policy.rs');
+const rustExportRuntimeSource = `${rustExportSource}\n${rustExportColorPolicySource}`;
 const tauriEventSchemasSource = read('src/schemas/tauriEventSchemas.ts');
 const locale = JSON.parse(read('src/i18n/locales/en.json'));
 
@@ -73,11 +75,11 @@ if (!rustLibSource.includes('export_processing::export_soft_proof_transform_meta
 }
 
 if (
-  !rustExportSource.includes('pub(crate) fn export_soft_proof_rgb_pixels_and_profile') ||
-  !rustExportSource.includes('export_soft_proof_rgb_pixels_and_profile_with_policy') ||
-  !rustExportSource.includes('export_soft_proof_transform_metadata') ||
-  !rustExportSource.includes('export_rgb_pixels_and_profile(') ||
-  !rustExportSource.includes('resolve_export_color_transform_plan(')
+  !rustExportRuntimeSource.includes('pub(crate) fn export_soft_proof_rgb_pixels_and_profile') ||
+  !rustExportRuntimeSource.includes('export_soft_proof_rgb_pixels_and_profile_with_policy') ||
+  !rustExportRuntimeSource.includes('export_soft_proof_transform_metadata') ||
+  !rustExportRuntimeSource.includes('export_rgb_pixels_and_profile(') ||
+  !rustExportRuntimeSource.includes('resolve_export_color_transform_plan(')
 ) {
   failures.push('export_rgb_pixels_and_profile is not available to the soft-proof command and receipt.');
 }

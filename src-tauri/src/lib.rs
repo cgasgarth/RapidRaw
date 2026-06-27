@@ -36,6 +36,7 @@ mod denoising;
 mod display_profile;
 mod events;
 mod exif_processing;
+mod export_color_policy;
 mod export_encoders;
 mod export_output_targets;
 mod export_postprocess;
