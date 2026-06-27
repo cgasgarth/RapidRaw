@@ -31,6 +31,18 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { calculateCenteredCrop } from '../../utils/cropUtils';
+import {
+  applyPointerOverscrollResistance,
+  applyWheelPanResistance,
+  getRecentPanVelocity,
+  getWheelPanDelta,
+  getWheelZoomExponent,
+  getWheelZoomMultiplier,
+  isWheelZoomIntent,
+  MAX_PAN_VELOCITY_SAMPLES,
+  PAN_VELOCITY_THRESHOLD,
+  WHEEL_SNAP_DELAY_MS,
+} from '../../utils/editorGestureMath';
 import { getEditorPreviewDimensions } from '../../utils/editorPreviewDimensions';
 import { normalizeMaskOverlaySettings } from '../../utils/maskOverlayModes';
 import { toMaskParameterRecord } from '../../utils/maskParameterAccess';
@@ -498,22 +510,15 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       const isPinch = e.ctrlKey;
 
       const isTrackpad = appSettings?.canvasInputMode === 'trackpad';
-      let zoomSpeedMult = appSettings?.zoomSpeedMultiplier ?? 1.0;
-
-      if (isTrackpad) {
-        zoomSpeedMult *= 5;
-      }
-
-      const isZoomIntent = isPinch || (!isTrackpad && !e.shiftKey && !e.altKey);
+      const zoomSpeedMult = getWheelZoomMultiplier(isTrackpad, appSettings?.zoomSpeedMultiplier ?? 1);
+      const isZoomIntent = isPinch || isWheelZoomIntent(e, isTrackpad);
 
       if (isZoomIntent) {
         const rect = container.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
-        const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
-        const zoomSensitivity = 0.002 * zoomSpeedMult;
-        const exponent = delta * zoomSensitivity;
+        const exponent = getWheelZoomExponent(e, zoomSpeedMult);
 
         let newScale = transformStateRef.current.scale * Math.exp(-exponent);
         newScale = Math.max(minScaleRef.current, Math.min(maxScaleRef.current, newScale));
@@ -530,39 +535,16 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         const { positionX: curX, positionY: curY, scale } = transformStateRef.current;
         const bounds = getTransformBounds(scale);
 
-        let dx = e.deltaX;
-        let dy = e.deltaY;
+        const { dx, dy } = getWheelPanDelta(e, isTrackpad);
 
-        if (!isTrackpad) {
-          if (e.shiftKey && e.altKey) {
-            dx = e.deltaY !== 0 ? e.deltaY : e.deltaX;
-            dy = dx;
-          } else if (e.shiftKey) {
-            dx = e.deltaY !== 0 ? e.deltaY : e.deltaX;
-            dy = 0;
-          } else if (e.altKey) {
-            dx = 0;
-            dy = e.deltaY !== 0 ? e.deltaY : e.deltaX;
-          }
-        }
-
-        let newX = curX - dx;
-        let newY = curY - dy;
-
-        const resistance = 0.5;
-
-        if (newX > bounds.maxX) newX = bounds.maxX + (newX - bounds.maxX) * resistance;
-        else if (newX < bounds.minX) newX = bounds.minX + (newX - bounds.minX) * resistance;
-
-        if (newY > bounds.maxY) newY = bounds.maxY + (newY - bounds.maxY) * resistance;
-        else if (newY < bounds.minY) newY = bounds.minY + (newY - bounds.minY) * resistance;
+        const { x: newX, y: newY } = applyWheelPanResistance(curX - dx, curY - dy, bounds);
 
         applyTransform(newX, newY, scale);
 
         if (wheelSnapTimeout.current) clearTimeout(wheelSnapTimeout.current);
         wheelSnapTimeout.current = window.setTimeout(() => {
           startPhysicsLoop(0, 0);
-        }, 150);
+        }, WHEEL_SNAP_DELAY_MS);
       }
     };
 
@@ -648,7 +630,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
       if (activePointers.current.size === 1 && lastPanPos.current && isPanningState && canPan) {
         panVelocityHistory.current.push({ x: e.clientX, y: e.clientY, t: performance.now() });
-        if (panVelocityHistory.current.length > 6) panVelocityHistory.current.shift();
+        if (panVelocityHistory.current.length > MAX_PAN_VELOCITY_SAMPLES) panVelocityHistory.current.shift();
 
         let dx = e.clientX - lastPanPos.current.x;
         let dy = e.clientY - lastPanPos.current.y;
@@ -658,10 +640,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         const curX = transformStateRef.current.positionX;
         const curY = transformStateRef.current.positionY;
 
-        if (curX < bounds.minX && dx < 0) dx *= 0.35;
-        if (curX > bounds.maxX && dx > 0) dx *= 0.35;
-        if (curY < bounds.minY && dy < 0) dy *= 0.35;
-        if (curY > bounds.maxY && dy > 0) dy *= 0.35;
+        ({ dx, dy } = applyPointerOverscrollResistance(dx, dy, { x: curX, y: curY }, bounds));
 
         applyTransform(curX + dx, curY + dy, transformStateRef.current.scale);
       } else if (activePointers.current.size === 2 && lastPinch.current) {
@@ -728,26 +707,14 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         isMiddleMousePanning.current = false;
         setIsMiddleMousePanningState(false);
 
-        let vx = 0,
-          vy = 0;
-        const history = panVelocityHistory.current;
-        if (history.length > 1) {
-          const first = history[0];
-          const last = history[history.length - 1];
-          if (!first || !last) return;
-          const dt = last.t - first.t;
-          if (dt > 0 && performance.now() - last.t < 50) {
-            vx = (last.x - first.x) / dt;
-            vy = (last.y - first.y) / dt;
-          }
-        }
+        const { vx, vy } = getRecentPanVelocity(panVelocityHistory.current, performance.now());
 
         const { positionX, positionY, scale } = transformStateRef.current;
         const bounds = getTransformBounds(scale);
         const outOfBounds =
           positionX > bounds.maxX || positionX < bounds.minX || positionY > bounds.maxY || positionY < bounds.minY;
 
-        if (Math.abs(vx) > 0.05 || Math.abs(vy) > 0.05 || outOfBounds) {
+        if (Math.abs(vx) > PAN_VELOCITY_THRESHOLD || Math.abs(vy) > PAN_VELOCITY_THRESHOLD || outOfBounds) {
           startPhysicsLoop(vx, vy);
         }
       }
