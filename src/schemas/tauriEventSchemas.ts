@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { rawDevelopmentReportSchema } from './imageLoaderSchemas';
 import { panoramaRenderedReviewSchema } from './panoramaUiSchemas';
 
 import type { CullingSuggestions, Progress } from '../components/ui/AppProperties';
@@ -124,6 +125,7 @@ export const exportReceiptPayloadSchema = z
           outputPath: z.string().trim().min(1),
           policyStatus: z.string().trim().min(1).optional().nullable(),
           policyVersion: z.string().trim().min(1).optional().nullable(),
+          rawDevelopmentReport: rawDevelopmentReportSchema.optional().nullable(),
           renderingIntent: z.string().trim().min(1).optional().nullable(),
           requestedColorProfile: z.string().trim().min(1).optional().nullable(),
           requestedRenderingIntent: z.string().trim().min(1).optional().nullable(),

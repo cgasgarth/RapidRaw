@@ -5,6 +5,7 @@ import {
 } from '../../utils/exportFormatIds';
 
 import type { Progress } from './AppProperties';
+import type { RawDevelopmentReport } from '../../schemas/imageLoaderSchemas';
 
 export const EXPORT_TIMEOUT = 4000;
 export const IMPORT_TIMEOUT = 5000;
@@ -116,6 +117,7 @@ export interface ExportReceiptOutput {
   outputPath: string;
   policyStatus?: string | null | undefined;
   policyVersion?: string | null | undefined;
+  rawDevelopmentReport?: RawDevelopmentReport | null | undefined;
   renderingIntent?: string | null | undefined;
   requestedColorProfile?: string | null | undefined;
   requestedRenderingIntent?: string | null | undefined;

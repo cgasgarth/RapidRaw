@@ -36,7 +36,7 @@ use crate::gamut_mapping::{
     SRGB_OKLAB_CHROMA_REDUCE_V1, map_srgb_oklab_chroma_reduce_rgb16_pixels,
 };
 use crate::image_loader::{
-    composite_patches_on_image, load_and_composite, load_base_image_from_bytes,
+    composite_patches_on_image, load_and_composite_with_report, load_base_image_from_bytes,
     raw_processing_settings_for_adjustments,
 };
 use crate::image_processing::{
@@ -46,6 +46,7 @@ use crate::image_processing::{
 };
 use crate::lut_processing::{convert_image_to_cube_lut, generate_identity_lut_image};
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
+use crate::raw_processing::RawDevelopmentReport;
 
 use crate::cache_utils::{calculate_full_job_hash, calculate_transform_hash};
 use crate::deblur_render::apply_deblur_stage;
@@ -64,6 +65,7 @@ struct ExportReceiptOutput {
     icc_embedded: Option<bool>,
     output_path: String,
     policy_version: Option<String>,
+    raw_development_report: Option<RawDevelopmentReport>,
     policy_status: Option<String>,
     rendering_intent: Option<String>,
     requested_color_profile: Option<String>,
@@ -1788,19 +1790,23 @@ pub async fn export_images(
                             &source_path_str,
                             &extension,
                             None,
+                            None,
                         );
                     }
 
-                    let base_image = if is_current_edit {
+                    let (base_image, raw_development_report) = if is_current_edit {
                         match get_full_image_for_processing(&state) {
                             Ok((orig_data, _)) => {
-                                composite_patches_on_image(&orig_data, &js_adjustments)
-                                    .map_err(|e| format!("Failed to composite AI patches: {}", e))?
+                                let image = composite_patches_on_image(&orig_data, &js_adjustments)
+                                    .map_err(|e| {
+                                        format!("Failed to composite AI patches: {}", e)
+                                    })?;
+                                (image, None)
                             }
                             Err(_) => {
                                 let bytes =
                                     fs::read(&source_path_str).map_err(|e| e.to_string())?;
-                                load_and_composite(
+                                load_and_composite_with_report(
                                     &bytes,
                                     &source_path_str,
                                     &js_adjustments,
@@ -1813,7 +1819,7 @@ pub async fn export_images(
                         }
                     } else {
                         match read_file_mapped(Path::new(&source_path_str)) {
-                            Ok(mmap) => load_and_composite(
+                            Ok(mmap) => load_and_composite_with_report(
                                 &mmap,
                                 &source_path_str,
                                 &js_adjustments,
@@ -1825,7 +1831,7 @@ pub async fn export_images(
                             Err(_) => {
                                 let bytes =
                                     fs::read(&source_path_str).map_err(|e| e.to_string())?;
-                                load_and_composite(
+                                load_and_composite_with_report(
                                     &bytes,
                                     &source_path_str,
                                     &js_adjustments,
@@ -1885,6 +1891,7 @@ pub async fn export_images(
                         &source_path_str,
                         &extension,
                         export_color_policy,
+                        raw_development_report,
                     )
                 })();
 
@@ -1966,6 +1973,7 @@ fn export_receipt_output(
     source_path: &str,
     format: &str,
     metadata: Option<ExportReceiptMetadata>,
+    raw_development_report: Option<RawDevelopmentReport>,
 ) -> Result<ExportReceiptOutput, String> {
     let byte_size = fs::metadata(output_path)
         .map_err(|error| error.to_string())?
@@ -1993,6 +2001,7 @@ fn export_receipt_output(
         policy_version: metadata
             .as_ref()
             .map(|metadata| metadata.policy_version.clone()),
+        raw_development_report,
         policy_status: metadata
             .as_ref()
             .map(|metadata| metadata.policy_status.clone()),
@@ -2553,17 +2562,19 @@ mod tests {
         OutputSharpeningTarget, applied_export_color_policy, apply_export_resize_and_watermark,
         encode_icc_profile, encode_image_to_bytes, encode_image_with_applied_policy,
         encode_image_with_applied_policy_and_source_profile, export_color_profile_receipt_label,
-        export_jpeg_rgb_pixels_and_profile, export_receipt_metadata, export_rgb_pixels_and_profile,
-        export_rgb16_pixels_and_profile, export_rgb16_pixels_with_shared_conversion_core,
+        export_jpeg_rgb_pixels_and_profile, export_receipt_metadata, export_receipt_output,
+        export_rgb_pixels_and_profile, export_rgb16_pixels_and_profile,
+        export_rgb16_pixels_with_shared_conversion_core,
         export_soft_proof_rgb_pixels_and_profile_with_policy,
         export_source_precision_receipt_label, export_transform_options, mox_rendering_intent,
         quantize_rgb16_to_rgb8, resolve_export_color_capabilities,
         resolve_export_color_transform_plan, should_apply_srgb_perceptual_gamut_mapping,
     };
     use crate::gamut_mapping::SRGB_OKLAB_CHROMA_REDUCE_V1;
+    use crate::raw_processing::{RawCameraProfileReport, RawDemosaicPath, RawDevelopmentReport};
     use moxcms::ColorProfile;
     use sha2::{Digest, Sha256};
-    use std::io::Cursor;
+    use std::{fs, io::Cursor};
 
     use image::{
         ColorType, DynamicImage, ImageBuffer, ImageDecoder, Rgb, Rgba, codecs::tiff::TiffDecoder,
@@ -2829,6 +2840,62 @@ mod tests {
             metadata.source_precision_path,
             "rgb32f source; quantized only at color-managed encoder boundary"
         );
+    }
+
+    #[test]
+    fn export_receipt_preserves_raw_development_report() {
+        let output_path = std::env::temp_dir().join(format!(
+            "rawengine-export-receipt-raw-report-{}.tiff",
+            std::process::id()
+        ));
+        fs::write(&output_path, [0u8]).expect("write receipt output placeholder");
+        let settings = base_export_settings(None);
+        let metadata = export_receipt_metadata(
+            "tiff",
+            &settings.color_profile,
+            &settings.rendering_intent,
+            false,
+            &synthetic_source_precision_path(),
+            None,
+        )
+        .expect("TIFF receipt metadata should be available");
+        let raw_development_report = RawDevelopmentReport {
+            camera_profile: RawCameraProfileReport {
+                algorithm_id: "dual_illuminant_mired_v1",
+                candidate_count: 2,
+                cool_illuminant: Some("D65".to_string()),
+                cool_weight: Some(0.42),
+                estimated_cct_kelvin: Some(5_100.0),
+                fallback_reason: None,
+                matrix_hash: Some("blake3:abcdef0123456789".to_string()),
+                status: "interpolated",
+                warm_illuminant: Some("StandardLightA".to_string()),
+                warning_codes: Vec::new(),
+            },
+            demosaic_algorithm_id: None,
+            demosaic_path: RawDemosaicPath::BayerHq,
+            xtrans_hq: None,
+        };
+
+        let receipt = export_receipt_output(
+            &output_path,
+            "/private/input.ARW",
+            "tiff",
+            Some(metadata),
+            Some(raw_development_report),
+        )
+        .expect("receipt output should serialize RAW development report");
+        fs::remove_file(output_path).ok();
+
+        let report = receipt
+            .raw_development_report
+            .expect("RAW export receipt includes development report");
+        assert_eq!(report.camera_profile.status, "interpolated");
+        assert_eq!(
+            report.camera_profile.matrix_hash.as_deref(),
+            Some("blake3:abcdef0123456789")
+        );
+        assert_eq!(report.demosaic_path, RawDemosaicPath::BayerHq);
     }
 
     #[test]
