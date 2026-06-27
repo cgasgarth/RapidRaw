@@ -79,6 +79,9 @@
           "outputCompression": "Output range compressed",
           "shadowClipping": "Shadow clipping active"
         }
+      },
+      "gamutWarning": {
+        "proofDetails": "Prueba: {{pixels}} pixeles de aviso · {{width}} x {{height}}"
       }
     },
     "curves": {

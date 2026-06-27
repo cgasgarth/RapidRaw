@@ -82,6 +82,7 @@
         "coverage": "",
         "off": "",
         "on": "",
+        "proofDetails": "Proof: {{pixels}} warning pixels · {{width}} x {{height}}",
         "title": ""
       },
       "grading": {

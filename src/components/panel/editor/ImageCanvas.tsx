@@ -2753,6 +2753,7 @@ const ImageCanvas = memo(
                   aria-label={t('editor.canvas.gamutWarningOverlay')}
                   className="pointer-events-none absolute"
                   data-coverage-ratio={gamutWarningOverlay.coverage_ratio.toFixed(6)}
+                  data-proof-ready="true"
                   data-mask-height={gamutWarningOverlay.height}
                   data-mask-width={gamutWarningOverlay.width}
                   data-testid="gamut-warning-overlay"
