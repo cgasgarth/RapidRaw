@@ -15,6 +15,8 @@ const hookSource = read('src/hooks/useExportSettings.ts');
 const panelSource = read('src/components/panel/right/ExportPanel.tsx');
 const exportTypesSource = read('src/components/ui/ExportImportProperties.ts');
 const rustExportSource = read('src-tauri/src/export_processing.rs');
+const rustExportColorPolicySource = read('src-tauri/src/export_color_policy.rs');
+const rustExportRuntimeSource = `${rustExportSource}\n${rustExportColorPolicySource}`;
 const rustEncoderSource = read('src-tauri/src/export_encoders.rs');
 const capabilitySource = read('packages/rawengine-schema/src/exportColorCapabilities.ts');
 const locale = JSON.parse(read('src/i18n/locales/en.json'));
@@ -64,7 +66,7 @@ for (const marker of [
 }
 
 for (const marker of ['export_transform_options(rendering_intent)', 'rendering_intent: mox_rendering_intent']) {
-  if (!rustExportSource.includes(marker)) failures.push(`Rust export runtime missing ${marker}`);
+  if (!rustExportRuntimeSource.includes(marker)) failures.push(`Rust export runtime missing ${marker}`);
 }
 for (const marker of [
   'pub fn get_export_color_capabilities() -> ExportColorCapabilityCatalog',
@@ -74,7 +76,8 @@ for (const marker of [
   'ExportColorEngineId::Lcms2',
   'ExportColorEngineId::Moxcms',
 ]) {
-  if (!rustExportSource.includes(marker)) failures.push(`Rust export runtime capability resolver missing ${marker}`);
+  if (!rustExportRuntimeSource.includes(marker))
+    failures.push(`Rust export runtime capability resolver missing ${marker}`);
 }
 for (const marker of [
   'ColorProfile::new_adobe_rgb()',
@@ -95,7 +98,7 @@ for (const marker of [
   'transform_policy_fingerprint',
   'export_color_transform_fingerprint',
 ]) {
-  if (!rustExportSource.includes(marker)) failures.push(`Rust export capability matrix missing ${marker}`);
+  if (!rustExportRuntimeSource.includes(marker)) failures.push(`Rust export capability matrix missing ${marker}`);
 }
 
 for (const marker of ['validate_export_color_policy(output_format, color_profile)']) {
