@@ -18,6 +18,7 @@ import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
 import { Mask, type SubMask } from './right/Masks';
 import { useAiMasking } from '../../hooks/useAiMasking';
+import { useEditorViewportPhysics } from '../../hooks/useEditorViewportPhysics';
 import {
   type BaseRenderSize,
   type ImageDimensions,
@@ -40,7 +41,7 @@ import {
   writeObjectPromptCanvasState,
 } from '../../utils/objectMaskPromptCanvas';
 import { debounce } from '../../utils/timing';
-import { Panel, type TransformState } from '../ui/AppProperties';
+import { Panel } from '../ui/AppProperties';
 
 import type { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
 import type { Crop, PercentCrop } from 'react-image-crop';
@@ -206,32 +207,22 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const [isLoaderVisible, setIsLoaderVisible] = useState(false);
   const [showExifDateView, setShowExifDateView] = useState(false);
   const [maskOverlayUrl, setMaskOverlayUrl] = useState<string | null>(null);
-  const [transformState, setTransformState] = useState<TransformState>({ scale: 1, positionX: 0, positionY: 0 });
 
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
-  const transformStateRef = useRef<TransformState>(transformState);
-  const [isPanningState, setIsPanningState] = useState(false);
-  const [isMiddleMousePanningState, setIsMiddleMousePanningState] = useState(false);
   const isClickAnimating = useRef(false);
   const clickAnimationTime = 250;
-  const zoomDebounceTimeoutRef = useRef<number | null>(null);
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
   const savedZoomState = useRef<{ scale: number; positionX: number; positionY: number } | null>(null);
-  const focalPointRef = useRef({ x: 0.5, y: 0.5 });
-  const isTransitioningRef = useRef(false);
   const [toolbarOverflowVisible, setToolbarOverflowVisible] = useState(!isFullScreen);
   const isGeneratingOverlayRef = useRef(false);
   const pendingOverlayRequestRef = useRef<MaskOverlayRequest | null>(null);
   const processOverlayQueueRef = useRef<() => Promise<void>>(async () => {});
-  const animationFrameId = useRef<number | null>(null);
-  const physicsFrameId = useRef<number | null>(null);
   const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map());
   const lastPanPos = useRef<{ x: number; y: number } | null>(null);
   const lastPinch = useRef<{ dist: number; midX: number; midY: number } | null>(null);
   const panVelocityHistory = useRef<{ x: number; y: number; t: number }[]>([]);
-  const wheelSnapTimeout = useRef<number | null>(null);
   const isMiddleMousePanning = useRef(false);
   const wasPanningDisabledOnDown = useRef(false);
 
@@ -292,13 +283,6 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     [setEditor],
   );
 
-  const handleZoomed = useCallback(
-    (state: TransformState) => {
-      setEditor({ zoom: state.scale });
-    },
-    [setEditor],
-  );
-
   const handleStraighten = useCallback(
     (angleCorrection: number) => {
       setAdjustments((prev: Adjustments) => {
@@ -354,222 +338,38 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   }, [selectedImage, adjustments.crop, adjustments.orientationSteps]);
 
   const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions);
-  const imageRenderSizeRef = useRef(imageRenderSize);
-  useLayoutEffect(() => {
-    transformStateRef.current = transformState;
-    imageRenderSizeRef.current = imageRenderSize;
-  }, [imageRenderSize, transformState]);
-
-  const transformConfig = useMemo(() => {
-    if (!selectedImage || !imageRenderSize.scale) {
-      return { minScale: 0.1, maxScale: 20 };
-    }
-
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    const scaleFor100Percent = 1 / imageRenderSize.scale;
-
-    const minScale = (0.1 / dpr) * scaleFor100Percent;
-    const maxScale = (2.0 / dpr) * scaleFor100Percent;
-
-    return {
-      minScale: Math.max(0.1, minScale),
-      maxScale: Math.max(20, maxScale),
-    };
-  }, [selectedImage, imageRenderSize.scale]);
-
-  const minScaleRef = useRef(transformConfig.minScale);
-  const maxScaleRef = useRef(transformConfig.maxScale);
-
-  useEffect(() => {
-    minScaleRef.current = transformConfig.minScale;
-    maxScaleRef.current = transformConfig.maxScale;
-  }, [transformConfig.minScale, transformConfig.maxScale]);
-
-  const getTransformBounds = useCallback((scale: number) => {
-    const container = imageContainerRef.current;
-    if (!container) return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
-
-    const cw = container.clientWidth;
-    const ch = container.clientHeight;
-    const scaledW = cw * scale;
-    const scaledH = ch * scale;
-
-    let minX, maxX, minY, maxY;
-
-    if (scaledW <= cw) {
-      minX = maxX = (cw - scaledW) / 2;
-    } else {
-      minX = cw - scaledW;
-      maxX = 0;
-    }
-
-    if (scaledH <= ch) {
-      minY = maxY = (ch - scaledH) / 2;
-    } else {
-      minY = ch - scaledH;
-      maxY = 0;
-    }
-
-    return { minX, maxX, minY, maxY };
-  }, []);
-
-  const clampToBounds = useCallback(
-    (x: number, y: number, scale: number) => {
-      const safeScale = Math.min(
-        Math.max(Number.isFinite(scale) ? scale : 1, minScaleRef.current),
-        maxScaleRef.current,
-      );
-
-      const bounds = getTransformBounds(safeScale);
-
-      const safeX = Number.isFinite(x) ? x : 0;
-      const safeY = Number.isFinite(y) ? y : 0;
-
-      const newX = Math.min(Math.max(safeX, bounds.minX), bounds.maxX);
-      const newY = Math.min(Math.max(safeY, bounds.minY), bounds.maxY);
-
-      return { x: newX, y: newY, scale: safeScale };
+  const handleZoomed = useCallback(
+    (state: { scale: number }) => {
+      setEditor({ zoom: state.scale });
     },
-    [getTransformBounds],
+    [setEditor],
   );
-
-  const applyTransform = useCallback(
-    (x: number, y: number, scale: number) => {
-      transformStateRef.current = { positionX: x, positionY: y, scale };
-      setTransformState({ scale, positionX: x, positionY: y });
-
-      if (contentRef.current) {
-        contentRef.current.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
-      }
-
-      if (!isTransitioningRef.current) {
-        if (scale > 1.01) {
-          const container = imageContainerRef.current;
-          if (container) {
-            const cw = container.offsetWidth;
-            const ch = container.offsetHeight;
-            focalPointRef.current = {
-              x: (cw / 2 - x) / (cw * scale),
-              y: (ch / 2 - y) / (ch * scale),
-            };
-          }
-        } else {
-          focalPointRef.current = { x: 0.5, y: 0.5 };
-        }
-      }
-
-      if (zoomDebounceTimeoutRef.current) clearTimeout(zoomDebounceTimeoutRef.current);
-      zoomDebounceTimeoutRef.current = window.setTimeout(() => {
-        handleZoomed({ scale, positionX: x, positionY: y });
-      }, 100);
-    },
-    [handleZoomed],
-  );
-
-  const animateTransform = useCallback(
-    (targetX: number, targetY: number, targetScale: number, duration: number) => {
-      if (physicsFrameId.current) cancelAnimationFrame(physicsFrameId.current);
-
-      const startX = transformStateRef.current.positionX;
-      const startY = transformStateRef.current.positionY;
-      const startScale = transformStateRef.current.scale;
-      const boundedTarget = clampToBounds(targetX, targetY, targetScale);
-
-      const startTime = performance.now();
-
-      const step = (currentTime: number) => {
-        const elapsed = currentTime - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        const easeProgress = 1 - Math.pow(1 - progress, 3);
-
-        const currX = startX + (boundedTarget.x - startX) * easeProgress;
-        const currY = startY + (boundedTarget.y - startY) * easeProgress;
-        const currScale = startScale + (boundedTarget.scale - startScale) * easeProgress;
-
-        applyTransform(currX, currY, currScale);
-
-        if (progress < 1) {
-          animationFrameId.current = requestAnimationFrame(step);
-        }
-      };
-
-      if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
-      animationFrameId.current = requestAnimationFrame(step);
-    },
-    [applyTransform, clampToBounds],
-  );
-
-  const startPhysicsLoop = useCallback(
-    (initialVx: number, initialVy: number) => {
-      if (physicsFrameId.current) cancelAnimationFrame(physicsFrameId.current);
-      if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
-
-      let vx = initialVx;
-      let vy = initialVy;
-      let lastTime = performance.now();
-
-      const step = (time: number) => {
-        const dt = Math.min(time - lastTime, 32);
-        lastTime = time;
-
-        const { scale } = transformStateRef.current;
-        let { positionX: x, positionY: y } = transformStateRef.current;
-        const bounds = getTransformBounds(scale);
-
-        x += vx * dt;
-        y += vy * dt;
-
-        const decay = Math.pow(0.994, dt);
-        vx *= decay;
-        vy *= decay;
-
-        let outOfBounds = false;
-        if (x > bounds.maxX || x < bounds.minX || y > bounds.maxY || y < bounds.minY) {
-          outOfBounds = true;
-        }
-
-        if (outOfBounds) {
-          vx *= 0.5;
-          vy *= 0.5;
-
-          const correction = 0.15;
-          if (x > bounds.maxX) x += (bounds.maxX - x) * correction;
-          else if (x < bounds.minX) x += (bounds.minX - x) * correction;
-
-          if (y > bounds.maxY) y += (bounds.maxY - y) * correction;
-          else if (y < bounds.minY) y += (bounds.minY - y) * correction;
-        }
-
-        applyTransform(x, y, scale);
-
-        const speed = Math.hypot(vx, vy);
-
-        if (speed < 0.02 && !outOfBounds) {
-          const finalPos = clampToBounds(x, y, scale);
-          if (Math.abs(x - finalPos.x) > 0.05 || Math.abs(y - finalPos.y) > 0.05) {
-            applyTransform(finalPos.x, finalPos.y, scale);
-          }
-          return;
-        }
-
-        if (outOfBounds && speed < 0.05 && Math.abs(vx) < 0.05 && Math.abs(vy) < 0.05) {
-          const dist = Math.max(
-            x > bounds.maxX ? x - bounds.maxX : x < bounds.minX ? bounds.minX - x : 0,
-            y > bounds.maxY ? y - bounds.maxY : y < bounds.minY ? bounds.minY - y : 0,
-          );
-          if (dist < 0.5) {
-            const finalPos = clampToBounds(x, y, scale);
-            applyTransform(finalPos.x, finalPos.y, scale);
-            return;
-          }
-        }
-
-        physicsFrameId.current = requestAnimationFrame(step);
-      };
-      physicsFrameId.current = requestAnimationFrame(step);
-    },
-    [applyTransform, getTransformBounds, clampToBounds],
-  );
+  const {
+    animationFrameId,
+    animateTransform,
+    applyTransform,
+    clampToBounds,
+    getTransformBounds,
+    imageRenderSizeRef,
+    isMiddleMousePanningState,
+    isPanningState,
+    maxScaleRef,
+    minScaleRef,
+    physicsFrameId,
+    setIsMiddleMousePanningState,
+    setIsPanningState,
+    startPhysicsLoop,
+    transformConfig,
+    transformState,
+    transformStateRef,
+    wheelSnapTimeout,
+  } = useEditorViewportPhysics({
+    contentRef,
+    hasSelectedImage: selectedImage !== null,
+    imageContainerRef,
+    imageRenderSize,
+    onZoomed: handleZoomed,
+  });
 
   const zoomToCenter = useCallback(
     (newScale: number, duration: number) => {
@@ -591,7 +391,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         applyTransform(bounded.x, bounded.y, bounded.scale);
       }
     },
-    [animateTransform, applyTransform, clampToBounds],
+    [animateTransform, applyTransform, clampToBounds, transformStateRef],
   );
 
   useImperativeHandle(
@@ -622,7 +422,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         },
       },
     }),
-    [animateTransform, applyTransform, clampToBounds, zoomToCenter],
+    [animateTransform, applyTransform, clampToBounds, transformStateRef, zoomToCenter],
   );
 
   useEffect(() => {
@@ -637,7 +437,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     } else {
       transformWrapperRef.current.zoomOut(Math.log(currentScale / targetZoom), animationTime);
     }
-  }, [targetZoom, transformWrapperRef]);
+  }, [targetZoom, transformStateRef, transformWrapperRef]);
 
   const activeSubMask = useMemo(() => {
     if (isMasking && activeMaskId) {
@@ -772,9 +572,15 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     };
   }, [
     applyTransform,
+    animationFrameId,
     clampToBounds,
     getTransformBounds,
+    maxScaleRef,
+    minScaleRef,
+    physicsFrameId,
     startPhysicsLoop,
+    transformStateRef,
+    wheelSnapTimeout,
     appSettings?.canvasInputMode,
     appSettings?.zoomSpeedMultiplier,
   ]);
@@ -817,7 +623,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
       if (e.pointerType === 'mouse') e.currentTarget.setPointerCapture(e.pointerId);
     },
-    [isPanningDisabled],
+    [animationFrameId, isPanningDisabled, physicsFrameId, setIsMiddleMousePanningState, setIsPanningState],
   );
 
   useEffect(() => {
@@ -831,7 +637,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     mouseDownPos.current = null;
     setIsPanningState(false);
     setIsMiddleMousePanningState(false);
-  }, [isPanningDisabled]);
+  }, [isPanningDisabled, setIsMiddleMousePanningState, setIsPanningState]);
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -889,7 +695,16 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         lastPinch.current = { dist, midX, midY };
       }
     },
-    [applyTransform, clampToBounds, getTransformBounds, isPanningDisabled, isPanningState],
+    [
+      applyTransform,
+      clampToBounds,
+      getTransformBounds,
+      isPanningDisabled,
+      isPanningState,
+      maxScaleRef,
+      minScaleRef,
+      transformStateRef,
+    ],
   );
 
   const handlePointerUp = useCallback(
@@ -937,7 +752,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         }
       }
     },
-    [getTransformBounds, startPhysicsLoop],
+    [getTransformBounds, setIsMiddleMousePanningState, setIsPanningState, startPhysicsLoop, transformStateRef],
   );
 
   const handleClick = useCallback(
@@ -1017,6 +832,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       imageRenderSize,
       isObjectPromptActive,
       isPanningDisabled,
+      maxScaleRef,
+      transformStateRef,
       updateSubMaskLocal,
     ],
   );
@@ -1099,7 +916,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       offsetY: imageRenderSize.offsetY,
       width: imageRenderSize.width,
     };
-  }, [isFullScreen, imageRenderSize, isInstantTransition, applyTransform]);
+  }, [isFullScreen, imageRenderSize, isInstantTransition, applyTransform, transformStateRef]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1400,7 +1217,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         cancelAnimationFrame(wgpuSyncRef.current);
       }
     };
-  }, []);
+  }, [imageRenderSizeRef, maxScaleRef, transformStateRef]);
 
   const overlayTriggerHash = useMemo(() => {
     let activeMaskDef: MaskContainer | AiPatch | undefined;
