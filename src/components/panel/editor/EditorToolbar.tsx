@@ -8,6 +8,7 @@ import { IconAperture, IconCalendar, IconClock, IconFocalLength, IconIso, IconSh
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { parseVirtualImagePath } from '../../../utils/virtualImagePath';
 import Dropdown from '../../ui/Dropdown';
 import UiText from '../../ui/Text';
 
@@ -96,8 +97,7 @@ const EditorToolbar = memo(
 
     const { baseName, fileTypeLabel, isVirtualCopy, vcId, exifData, hasExif } = useMemo(() => {
       const path = selectedImage.path;
-      const parts = path.split('?vc=');
-      const imagePath = parts[0] ?? path;
+      const { path: imagePath, virtualCopyId } = parseVirtualImagePath(path);
       const fullFileName = imagePath.split(/[\\/]/).pop() || '';
       const extensionMatch = /\.([a-z0-9]+)$/i.exec(fullFileName);
       const fileType = extensionMatch?.[1]?.toUpperCase() ?? 'FILE';
@@ -138,8 +138,8 @@ const EditorToolbar = memo(
       return {
         baseName: fullFileName,
         fileTypeLabel: fileType,
-        isVirtualCopy: parts.length > 1,
-        vcId: parts.length > 1 ? (parts[1] ?? null) : null,
+        isVirtualCopy: virtualCopyId !== null,
+        vcId: virtualCopyId,
         exifData: data,
         hasExif: hasData,
       };
