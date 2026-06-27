@@ -149,6 +149,45 @@ if (
   throw new Error('agent.object_selection.apply did not return complete preview/provenance receipt.');
 }
 
+resetEditor();
+const proposalSnapshot = buildAgentImageContextSnapshot();
+const proposalResult = applyAgentObjectSelection({
+  boxPrompt: { height: 0.24, width: 0.2, x: 0.36, y: 0.26 },
+  expectedRecipeHash: proposalSnapshot.initialPreview.recipeHash,
+  layerId: 'agent_object_sam_product',
+  layerName: 'Agent SAM object product',
+  maskId: 'agent_object_sam_mask',
+  operationId: 'agent_object_sam_product',
+  proposal: {
+    clickToMaskLatencyMs: 221,
+    decoderLatencyMs: 84,
+    embeddingLatencyMs: 137,
+    imageHeight: 4000,
+    imageWidth: 6000,
+    maskDataBase64:
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP8z8DwnwEJMDGgAcICDAAUDAICjW8RLwAAAABJRU5ErkJggg==',
+    modelId: 'sam_vit_b_01ec64',
+    promptCount: 2,
+    promptKind: 'box',
+    providerId: 'rapidraw-sam-vit-b-onnx-v1',
+  },
+  requestId: 'agent-object-sam-3163',
+  sessionId: 'agent-object-3163',
+});
+const proposalLayer = useEditorStore
+  .getState()
+  .adjustments.masks.find((mask) => mask.id === 'agent_object_sam_product');
+const proposalSubMask = proposalLayer?.subMasks.find((mask) => mask.id === 'agent_object_sam_mask');
+if (
+  proposalResult.providerStatus !== 'local_sam_proposal_v1' ||
+  proposalSubMask?.type !== 'ai-object' ||
+  proposalSubMask.parameters?.providerStatus !== 'local_sam_proposal_v1' ||
+  proposalSubMask.parameters?.maskDataBase64 === undefined ||
+  proposalSubMask.parameters?.proposal === null
+) {
+  throw new Error('agent.object_selection.apply did not preserve accepted SAM proposal raster/provenance.');
+}
+
 const route = buildRawEngineAppServerRouteCatalog().find(
   (candidate) => candidate.commandName === AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME,
 );
