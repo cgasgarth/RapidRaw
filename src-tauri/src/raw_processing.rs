@@ -2012,6 +2012,7 @@ mod tests {
         fs::create_dir_all(report_dir).expect("create report dir");
 
         let file_bytes = fs::read(&source_path).expect("read private X-Trans RAW");
+        let source_hash = blake3::hash(&file_bytes).to_hex().to_string();
         let (balanced, balanced_orientation, balanced_report) = develop_internal_with_options(
             &file_bytes,
             false,
@@ -2086,21 +2087,83 @@ mod tests {
 
         let balanced_path = report_dir.join("xtrans-balanced-standard.tiff");
         let maximum_path = report_dir.join("xtrans-maximum-hq.tiff");
+        let preview_before_path = report_dir.join("xtrans-preview-before-standard.png");
+        let preview_after_path = report_dir.join("xtrans-preview-after-hq.png");
+        let export_after_path = report_dir.join("xtrans-export-after-hq.tiff");
         balanced
             .save_with_format(&balanced_path, image::ImageFormat::Tiff)
             .expect("write balanced X-Trans TIFF");
         maximum
             .save_with_format(&maximum_path, image::ImageFormat::Tiff)
             .expect("write X-Trans HQ TIFF");
+        balanced
+            .save_with_format(&preview_before_path, image::ImageFormat::Png)
+            .expect("write X-Trans preview-before PNG");
+        maximum
+            .save_with_format(&preview_after_path, image::ImageFormat::Png)
+            .expect("write X-Trans preview-after PNG");
+        maximum
+            .save_with_format(&export_after_path, image::ImageFormat::Tiff)
+            .expect("write X-Trans export-after TIFF");
+
+        let preview_before = image::open(&preview_before_path)
+            .expect("decode X-Trans preview-before PNG")
+            .to_rgba8();
+        let preview_after = image::open(&preview_after_path)
+            .expect("decode X-Trans preview-after PNG")
+            .to_rgba8();
+        let export_after = image::open(&export_after_path)
+            .expect("decode X-Trans export-after TIFF")
+            .to_rgba8();
+        assert_eq!(preview_after.dimensions(), export_after.dimensions());
+        let preview_before_hash = blake3::hash(preview_before.as_raw()).to_hex().to_string();
+        let preview_after_hash = blake3::hash(preview_after.as_raw()).to_hex().to_string();
+        let export_after_hash = blake3::hash(export_after.as_raw()).to_hex().to_string();
+
+        let preview_export_mean_abs_delta =
+            mean_abs_byte_delta(preview_after.as_raw(), export_after.as_raw());
+        assert_eq!(preview_export_mean_abs_delta, 0.0);
+
+        let export_settings = crate::app_settings::AppSettings {
+            raw_processing_mode: Some("maximum".to_string()),
+            raw_highlight_compression: Some(4.0),
+            raw_preprocessing_color_nr: Some(0.65),
+            raw_preprocessing_sharpening: Some(0.42),
+            raw_preprocessing_sharpening_detail: Some(0.62),
+            raw_preprocessing_sharpening_edge_masking: Some(0.42),
+            raw_preprocessing_sharpening_radius: Some(0.82),
+            apply_preprocessing_to_non_raws: Some(false),
+            ..crate::app_settings::AppSettings::default()
+        };
+        let (_, export_loader_report) = crate::image_loader::load_and_composite_with_report(
+            &file_bytes,
+            &source_path,
+            &serde_json::json!({ "rawProcessingModeOverride": "maximum" }),
+            false,
+            &export_settings,
+            None,
+        )
+        .expect("export loader uses maximum raw processing mode");
+        let export_loader_report =
+            export_loader_report.expect("export loader returns raw development report");
+        assert_eq!(
+            export_loader_report.demosaic_path,
+            RawDemosaicPath::XTransHq
+        );
+        assert_eq!(
+            export_loader_report.demosaic_algorithm_id,
+            Some(crate::xtrans_hq::XTRANS_HQ_ALGORITHM_ID)
+        );
 
         let report = serde_json::json!({
-            "issue": 3240,
-            "proofBoundary": "private_xtrans_hq_runtime_output",
+            "issues": [3240, 3817],
+            "proofBoundary": "private_xtrans_hq_runtime_preview_export_parity",
             "sourcePath": source_path,
             "dimensions": {
                 "width": maximum.width(),
                 "height": maximum.height(),
             },
+            "baseImageHash": format!("blake3:{source_hash}"),
             "balanced": {
                 "algorithm": "rawler_xtrans_quality_baseline",
                 "demosaicPath": format!("{:?}", balanced_report.demosaic_path),
@@ -2115,6 +2178,23 @@ mod tests {
                 "tiffPath": maximum_path.to_string_lossy(),
                 "reconstruction": xtrans_report.reconstruction,
             },
+            "previewExportParity": {
+                "rawProcessingModeOverride": "maximum",
+                "rawDemosaicPath": format!("{:?}", maximum_report.demosaic_path),
+                "demosaicAlgorithmId": maximum_report.demosaic_algorithm_id,
+                "baseImageHash": format!("blake3:{source_hash}"),
+                "previewBeforeHash": format!("blake3:{preview_before_hash}"),
+                "previewAfterHash": format!("blake3:{preview_after_hash}"),
+                "exportAfterHash": format!("blake3:{export_after_hash}"),
+                "previewBeforePath": preview_before_path.to_string_lossy(),
+                "previewAfterPath": preview_after_path.to_string_lossy(),
+                "exportAfterPath": export_after_path.to_string_lossy(),
+                "previewAfterFormat": "png",
+                "exportAfterFormat": "tiff",
+                "previewExportMeanAbsDelta": preview_export_mean_abs_delta,
+                "exportLoaderRawDemosaicPath": format!("{:?}", export_loader_report.demosaic_path),
+                "exportLoaderDemosaicAlgorithmId": export_loader_report.demosaic_algorithm_id,
+            },
             "outputDiff": {
                 "changedPixelRatio": changed_pixel_ratio,
                 "meanAbsoluteByteDelta": mean_absolute_byte_delta,
@@ -2126,6 +2206,16 @@ mod tests {
             serde_json::to_vec_pretty(&report).expect("serialize X-Trans HQ proof report"),
         )
         .expect("write X-Trans HQ proof report");
+    }
+
+    fn mean_abs_byte_delta(first: &[u8], second: &[u8]) -> f64 {
+        assert_eq!(first.len(), second.len());
+        let mut mean = 0.0;
+        for (index, (first_value, second_value)) in first.iter().zip(second.iter()).enumerate() {
+            let delta = first_value.abs_diff(*second_value) as f64 / 255.0;
+            mean += (delta - mean) / (index + 1) as f64;
+        }
+        mean
     }
 
     #[test]
