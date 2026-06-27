@@ -81,6 +81,8 @@
     "check:camera-profile-lookup": "bun tests/integration/checks/check-camera-profile-lookup-fixtures.ts",
     "check:camera-profile-input-transform": "bun tests/integration/checks/check-camera-profile-input-transform-proof.ts",
     "check:camera-profile-provenance": "bun tests/integration/checks/check-camera-profile-provenance.ts",
+    "check:xtrans-hq-runtime": "cargo +1.95.0 test --manifest-path src-tauri/Cargo.toml --locked xtrans_hq --lib -- --nocapture",
+    "check:xtrans-hq-private-proof": "RAWENGINE_RUN_PRIVATE_XTRANS_HQ_PROOF=1 cargo +1.95.0 test --manifest-path src-tauri/Cargo.toml --locked private_xtrans_hq_generates_distinct_maximum_output_when_enabled --lib -- --nocapture",
     "check:colorchecker-fixtures": "bun tests/integration/checks/check-colorchecker-fixtures.ts",
     "check:colorchecker-render-gate": "bun tests/integration/checks/check-colorchecker-render-gate.ts",
     "check:colorchecker-render-gate:update": "bun tests/integration/checks/check-colorchecker-render-gate.ts --update",

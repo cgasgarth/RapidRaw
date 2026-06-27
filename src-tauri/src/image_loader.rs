@@ -70,6 +70,7 @@ enum DemosaicSharpeningPath {
     Fast,
     Standard,
     BayerHq,
+    XTransHq,
 }
 
 fn normalize_raw_processing_mode(mode: Option<&str>) -> &'static str {
@@ -157,6 +158,7 @@ fn demosaic_sharpening_path(demosaic_path: RawDemosaicPath) -> DemosaicSharpenin
         RawDemosaicPath::BayerHq => DemosaicSharpeningPath::BayerHq,
         RawDemosaicPath::Fast | RawDemosaicPath::LinearBypass => DemosaicSharpeningPath::Fast,
         RawDemosaicPath::Standard => DemosaicSharpeningPath::Standard,
+        RawDemosaicPath::XTransHq => DemosaicSharpeningPath::XTransHq,
     }
 }
 
@@ -207,6 +209,12 @@ fn resolve_capture_pre_sharpening_settings(
             edge_masking: base.edge_masking.max(0.46),
             radius_px: (base.radius_px + 0.15 + high_resolution_radius_offset).min(2.5),
         },
+        DemosaicSharpeningPath::XTransHq => crate::image_processing::CapturePreSharpeningSettings {
+            amount: (base.amount * 0.9).min(0.36),
+            detail: (base.detail * 0.82).min(0.42),
+            edge_masking: base.edge_masking.max(0.42),
+            radius_px: (base.radius_px + high_resolution_radius_offset).min(2.15),
+        },
     }
     .normalized()
 }
@@ -236,7 +244,7 @@ pub(crate) fn raw_processing_settings_for_adjustments(
 
 pub(crate) fn raw_processing_mode_cache_key(source_path: &str, settings: &AppSettings) -> String {
     format!(
-        "{}::raw-processing-mode={}::camera-profile-resolver=1",
+        "{}::raw-processing-mode={}::camera-profile-resolver=1::raw-reconstruction=2",
         source_path,
         normalize_raw_processing_mode(settings.raw_processing_mode.as_deref())
     )
@@ -1057,6 +1065,44 @@ mod tests {
     }
 
     #[test]
+    fn xtrans_hq_capture_sharpening_stays_conservative() {
+        let maximum_recipe = raw_processing_mode_recipe(Some("maximum"));
+        let maximum_settings = AppSettings {
+            raw_processing_mode: Some("maximum".to_string()),
+            raw_preprocessing_color_nr: Some(maximum_recipe.raw_preprocessing_color_nr),
+            raw_preprocessing_sharpening: Some(maximum_recipe.raw_preprocessing_sharpening),
+            raw_preprocessing_sharpening_detail: Some(
+                maximum_recipe.raw_preprocessing_sharpening_detail,
+            ),
+            raw_preprocessing_sharpening_edge_masking: Some(
+                maximum_recipe.raw_preprocessing_sharpening_edge_masking,
+            ),
+            raw_preprocessing_sharpening_radius: Some(
+                maximum_recipe.raw_preprocessing_sharpening_radius,
+            ),
+            ..AppSettings::default()
+        };
+
+        let bayer_hq = resolve_capture_pre_sharpening_settings(
+            &maximum_settings,
+            &maximum_recipe,
+            DemosaicSharpeningPath::BayerHq,
+            (8000, 6000),
+        );
+        let xtrans_hq = resolve_capture_pre_sharpening_settings(
+            &maximum_settings,
+            &maximum_recipe,
+            DemosaicSharpeningPath::XTransHq,
+            (8000, 6000),
+        );
+
+        assert!(xtrans_hq.amount < bayer_hq.amount);
+        assert!(xtrans_hq.detail < bayer_hq.detail);
+        assert!(xtrans_hq.radius_px < bayer_hq.radius_px);
+        assert!(xtrans_hq.edge_masking >= 0.42);
+    }
+
+    #[test]
     fn unknown_raw_processing_mode_uses_balanced_recipe() {
         let unknown = raw_processing_mode_recipe(Some("experimental"));
         let balanced = raw_processing_mode_recipe(Some("balanced"));
@@ -1085,7 +1131,7 @@ mod tests {
         assert_eq!(resolved.raw_preprocessing_sharpening, Some(0.42));
         assert_eq!(
             raw_processing_mode_cache_key("/tmp/image.arw", &resolved),
-            "/tmp/image.arw::raw-processing-mode=maximum::camera-profile-resolver=1"
+            "/tmp/image.arw::raw-processing-mode=maximum::camera-profile-resolver=1::raw-reconstruction=2"
         );
 
         let inherited =
@@ -1093,7 +1139,7 @@ mod tests {
         assert_eq!(inherited.raw_processing_mode.as_deref(), Some("fast"));
         assert_eq!(
             raw_processing_mode_cache_key("/tmp/image.arw", &inherited),
-            "/tmp/image.arw::raw-processing-mode=fast::camera-profile-resolver=1"
+            "/tmp/image.arw::raw-processing-mode=fast::camera-profile-resolver=1::raw-reconstruction=2"
         );
     }
 

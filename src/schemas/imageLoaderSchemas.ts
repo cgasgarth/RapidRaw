@@ -15,7 +15,7 @@ const nullAdjustmentSnapshotSchema = z
 
 const exifSchema = z.record(z.string(), z.string()).nullable();
 
-export const rawDemosaicPathSchema = z.enum(['bayer_hq', 'fast', 'linear_bypass', 'standard']);
+export const rawDemosaicPathSchema = z.enum(['bayer_hq', 'fast', 'linear_bypass', 'standard', 'x_trans_hq']);
 
 export const rawCameraProfileStatusSchema = z.enum(['fallback', 'interpolated', 'single_illuminant', 'unavailable']);
 
@@ -41,7 +41,23 @@ export const rawCameraProfileReportSchema = z
 export const rawDevelopmentReportSchema = z
   .object({
     cameraProfile: rawCameraProfileReportSchema,
+    demosaicAlgorithmId: z.string().trim().min(1).nullable().optional(),
     demosaicPath: rawDemosaicPathSchema,
+    xtransHq: z
+      .object({
+        reconstruction: z
+          .object({
+            borderFallbackPixels: z.number().int().nonnegative(),
+            chromaInterpolatedPixels: z.number().int().nonnegative(),
+            chromaRefinedPixels: z.number().int().nonnegative(),
+            evaluatedPixels: z.number().int().nonnegative(),
+            greenDirectionalPixels: z.number().int().nonnegative(),
+          })
+          .strict(),
+      })
+      .strict()
+      .nullable()
+      .optional(),
   })
   .strict();
 
