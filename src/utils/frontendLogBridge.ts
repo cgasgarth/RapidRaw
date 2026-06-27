@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 
-import { Invokes } from '../components/ui/AppProperties';
+import { Invokes } from '../tauri/commands';
 
 type FrontendLogLevel = 'debug' | 'info' | 'warn' | 'error';
 

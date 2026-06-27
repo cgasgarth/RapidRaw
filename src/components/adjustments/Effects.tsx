@@ -4,6 +4,7 @@ import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import AdjustmentSlider from './AdjustmentSlider';
+import { Invokes } from '../../tauri/commands';
 import { TextVariants } from '../../types/typography';
 import { type Adjustments, Effect, CreativeAdjustment } from '../../utils/adjustments';
 import { buildFilmGrainPresetAdjustmentPatch, FILM_GRAIN_UI_PRESETS } from '../../utils/filmGrainControls';
@@ -13,9 +14,10 @@ import {
   formatFilmLookPresetName,
   type FilmLookBrowserItem,
 } from '../../utils/filmLookBrowser';
-import { type AppSettings, Invokes, type Preset } from '../ui/AppProperties';
 import LUTControl from '../ui/LUTControl';
 import UiText from '../ui/Text';
+
+import type { AppSettings, Preset } from '../ui/AppProperties';
 
 const FilmLookBrowser = lazy(() =>
   import('./FilmLookBrowser.js').then((module) => ({ default: module.FilmLookBrowser })),

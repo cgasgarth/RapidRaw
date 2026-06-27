@@ -13,6 +13,7 @@ import { emptyTauriResponseSchema } from '../../../schemas/tauriResponseSchemas'
 import { type CopiedSectionAdjustments, useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { type CollapsibleSectionsState, useUIStore } from '../../../store/useUIStore';
+import { Invokes } from '../../../tauri/commands';
 import { TextVariants } from '../../../types/typography';
 import {
   type Adjustments,
@@ -33,7 +34,7 @@ import ColorPanel from '../../adjustments/Color';
 import CurveGraph from '../../adjustments/Curves';
 import DetailsPanel from '../../adjustments/Details';
 import EffectsPanel from '../../adjustments/Effects';
-import { Invokes, OPTION_SEPARATOR, Orientation, type Option } from '../../ui/AppProperties';
+import { OPTION_SEPARATOR, Orientation, type Option } from '../../ui/AppProperties';
 import CollapsibleSection from '../../ui/CollapsibleSection';
 import Dropdown, { type OptionItem } from '../../ui/Dropdown';
 import Resizer from '../../ui/Resizer';

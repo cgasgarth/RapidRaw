@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 import { z } from 'zod';
 
-const APP_PROPERTIES_PATH = 'src/components/ui/AppProperties.tsx';
+const COMMANDS_PATH = 'src/tauri/commands.ts';
 const RUST_LIB_PATH = 'src-tauri/src/lib.rs';
 
 const knownFrontendOnlyInvokes = {} as const;
@@ -13,9 +13,9 @@ const knownRegisteredStringInvokes = {} as const;
 
 const commandNameSchema = z.string().regex(/^[a-z][a-z0-9_]*$/u);
 
-const appProperties = readFileSync(APP_PROPERTIES_PATH, 'utf8');
+const commandsSource = readFileSync(COMMANDS_PATH, 'utf8');
 const rustLib = readFileSync(RUST_LIB_PATH, 'utf8');
-const invokes = parseInvokesEnum(appProperties);
+const invokes = parseInvokesEnum(commandsSource);
 const registered = parseTauriRegisteredCommands(rustLib);
 const failures: string[] = [];
 

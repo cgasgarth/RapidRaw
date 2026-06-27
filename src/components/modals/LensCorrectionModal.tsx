@@ -20,9 +20,9 @@ import { useTranslation, Trans } from 'react-i18next';
 
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { usePreviewViewport } from '../../hooks/usePreviewViewport';
+import { Invokes } from '../../tauri/commands';
 import { TextColors, TextVariants } from '../../types/typography';
 import { throttle } from '../../utils/timing';
-import { Invokes, type SelectedImage } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
 import Slider from '../ui/Slider';
@@ -30,6 +30,7 @@ import Switch from '../ui/Switch';
 import UiText from '../ui/Text';
 
 import type { Adjustments } from '../../utils/adjustments';
+import type { SelectedImage } from '../ui/AppProperties';
 
 interface GeometryParams {
   distortion: number;

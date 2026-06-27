@@ -6,7 +6,6 @@ import { useShallow } from 'zustand/react/shallow';
 import {
   type AppSettings,
   type FilterCriteria,
-  Invokes,
   LibraryViewMode,
   EditedStatus,
   type Theme,
@@ -18,6 +17,7 @@ import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
+import { Invokes } from '../tauri/commands';
 import { COPYABLE_ADJUSTMENT_KEYS, DisplayMode, PasteMode } from '../utils/adjustments';
 import { THEMES, DEFAULT_THEME_ID, type ThemeProps } from '../utils/themes';
 

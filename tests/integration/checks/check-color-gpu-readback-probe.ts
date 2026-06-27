@@ -32,13 +32,13 @@ const reportSchema = z
   })
   .strict();
 
-const [probeSource, gpuSource, shaderSource, libSource, appPropertiesSource, packageSource, runtimeProofSource] =
+const [probeSource, gpuSource, shaderSource, libSource, commandsSource, packageSource, runtimeProofSource] =
   await Promise.all([
     readFile('src-tauri/src/color_gpu_readback_probe.rs', 'utf8'),
     readFile('src-tauri/src/gpu_processing.rs', 'utf8'),
     readFile('src-tauri/src/shaders/shader.wgsl', 'utf8'),
     readFile('src-tauri/src/lib.rs', 'utf8'),
-    readFile('src/components/ui/AppProperties.tsx', 'utf8'),
+    readFile('src/tauri/commands.ts', 'utf8'),
     readFile('package.json', 'utf8'),
     readFile(RUNTIME_PROOF_PATH, 'utf8'),
   ]);
@@ -78,7 +78,7 @@ if (
 ) {
   failures.push('GPU readback probe command must be registered behind validation-harness.');
 }
-if (appPropertiesSource.includes('run_color_gpu_readback_probe')) {
+if (commandsSource.includes('run_color_gpu_readback_probe')) {
   failures.push('Validation-only GPU readback command must not be exposed through product Invokes.');
 }
 if (!packageSource.includes('check:color-gpu-readback-runtime-smoke')) {

@@ -16,9 +16,9 @@ import {
   AiAppServerToolRouteStatus,
 } from '../../../src/utils/aiAppServerToolRouteIds.ts';
 
-const APP_PROPERTIES_PATH = 'src/components/ui/AppProperties.tsx';
-const appProperties = readFileSync(APP_PROPERTIES_PATH, 'utf8');
-const invokesEnum = /export enum Invokes \{(?<body>[\s\S]*?)\n\}/u.exec(appProperties)?.groups?.body;
+const COMMANDS_PATH = 'src/tauri/commands.ts';
+const commandsSource = readFileSync(COMMANDS_PATH, 'utf8');
+const invokesEnum = /export enum Invokes \{(?<body>[\s\S]*?)\n\}/u.exec(commandsSource)?.groups?.body;
 if (invokesEnum === undefined) {
   throw new Error('Unable to locate Invokes enum.');
 }

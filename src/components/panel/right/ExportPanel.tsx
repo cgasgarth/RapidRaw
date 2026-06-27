@@ -20,6 +20,7 @@ import { outputSharpeningSettingsSchema } from '../../../schemas/outputSharpenin
 import { emptyTauriResponseSchema } from '../../../schemas/tauriResponseSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useProcessStore } from '../../../store/useProcessStore';
+import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { formatUnknownError } from '../../../utils/errorFormatting';
 import {
@@ -28,7 +29,6 @@ import {
 } from '../../../utils/exportSmartPreviewReadiness';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import { debounce } from '../../../utils/timing';
-import { Invokes, type SelectedImage, type AppSettings } from '../../ui/AppProperties';
 import Button from '../../ui/Button';
 import Dropdown from '../../ui/Dropdown';
 import {
@@ -52,6 +52,7 @@ import Switch from '../../ui/Switch';
 import UiText from '../../ui/Text';
 
 import type { Adjustments } from '../../../utils/adjustments';
+import type { SelectedImage, AppSettings } from '../../ui/AppProperties';
 import type { TFunction } from 'i18next';
 
 const QUALITY_FILE_FORMATS: ReadonlySet<FileFormats> = new Set([FileFormats.Jpeg, FileFormats.Webp, FileFormats.Jxl]);

@@ -55,7 +55,6 @@ import {
 import { useEditorActions } from './useEditorActions';
 import { useLibraryActions } from './useLibraryActions';
 import {
-  Invokes,
   type Option,
   OPTION_SEPARATOR,
   Panel,
@@ -75,6 +74,7 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
+import { Invokes } from '../tauri/commands';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { buildLibraryAutoStacks } from '../utils/libraryAutoStacks';

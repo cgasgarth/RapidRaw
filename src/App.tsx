@@ -14,7 +14,6 @@ import ExportPanel from './components/panel/right/ExportPanel';
 import {
   type Album,
   type AlbumItem,
-  Invokes,
   type ImageFile,
   LibraryViewMode,
   Panel,
@@ -48,6 +47,7 @@ import { useLibraryStore } from './store/useLibraryStore';
 import { useProcessStore } from './store/useProcessStore';
 import { useSettingsStore } from './store/useSettingsStore';
 import { useUIStore } from './store/useUIStore';
+import { Invokes } from './tauri/commands';
 import { invokeWithSchema } from './utils/tauriSchemaInvoke';
 import { getOptionalCurrentWindow } from './window/currentWindow';
 import TitleBar from './window/TitleBar';

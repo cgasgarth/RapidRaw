@@ -4,10 +4,12 @@ import { X, Plus } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Invokes, type AppSettings } from '../components/ui/AppProperties';
 import UiText from '../components/ui/Text';
+import { Invokes } from '../tauri/commands';
 import { TextVariants } from '../types/typography';
 import { formatUnknownError } from '../utils/errorFormatting';
+
+import type { AppSettings } from '../components/ui/AppProperties';
 
 interface TaggingSubMenuProps {
   paths: string[];

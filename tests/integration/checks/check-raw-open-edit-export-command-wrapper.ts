@@ -8,9 +8,9 @@ import {
   rawOpenEditExportProofRequestSchema,
 } from '../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
 
-const [wrapperSource, appPropertiesSource, rustSource, rustLibSource, proofRequestFixtureSource] = await Promise.all([
+const [wrapperSource, commandsSource, rustSource, rustLibSource, proofRequestFixtureSource] = await Promise.all([
   readFile('src/utils/rawOpenEditExportProofCommand.ts', 'utf8'),
-  readFile('src/components/ui/AppProperties.tsx', 'utf8'),
+  readFile('src/tauri/commands.ts', 'utf8'),
   readFile('src-tauri/src/raw_open_edit_export_proof.rs', 'utf8'),
   readFile('src-tauri/src/lib.rs', 'utf8'),
   readFile('fixtures/validation/raw-open-edit-export-proof-request.json', 'utf8'),
@@ -30,7 +30,7 @@ if (!wrapperSource.includes('rawOpenEditExportProofReportSchema')) {
 if (!wrapperSource.includes("const RAW_OPEN_EDIT_EXPORT_PROOF_COMMAND = 'run_raw_open_edit_export_proof'")) {
   failures.push('RAW proof wrapper must keep the validation command string private to the wrapper.');
 }
-if (appPropertiesSource.includes('run_raw_open_edit_export_proof')) {
+if (commandsSource.includes('run_raw_open_edit_export_proof')) {
   failures.push('Validation-only RAW proof command must not be exposed through the product Invokes enum.');
 }
 if (!rustSource.includes('pub async fn run_raw_open_edit_export_proof(')) {

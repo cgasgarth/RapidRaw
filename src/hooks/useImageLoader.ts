@@ -2,11 +2,11 @@ import { invoke } from '@tauri-apps/api/core';
 import { useEffect, type RefObject } from 'react';
 import { toast } from 'react-toastify';
 
-import { Invokes } from '../components/ui/AppProperties';
 import { isNullAdjustmentSnapshot, parseLoadedMetadata, parseLoadImageResult } from '../schemas/imageLoaderSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { Invokes } from '../tauri/commands';
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { formatUnknownError } from '../utils/errorFormatting';
 import { consumePendingNegativeConversionDustHealLayers } from '../utils/negativeLabEditorHandoff';

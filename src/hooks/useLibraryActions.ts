@@ -3,17 +3,18 @@ import { useCallback, type MouseEvent } from 'react';
 import { toast } from 'react-toastify';
 
 import { computeSortedLibrary } from './useSortedLibrary';
-import { Invokes, type ImageFile, type AlbumItem } from '../components/ui/AppProperties';
 import { albumTreeSchema } from '../schemas/albumSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
+import { Invokes } from '../tauri/commands';
 import { formatUnknownError } from '../utils/errorFormatting';
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { invokeWithSchema } from '../utils/tauriSchemaInvoke';
 
 import type { FolderTree } from '../components/panel/FolderTree';
+import type { ImageFile, AlbumItem } from '../components/ui/AppProperties';
 
 type LibraryClickEvent = Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey'>;
 
