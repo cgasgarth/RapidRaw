@@ -8,6 +8,7 @@ import {
   tetherDiscoveryResponseSchema,
   tetherIngestPresetIdSchema,
   tetherMetadataTemplateIdSchema,
+  tetherSessionOpenRequestSchema,
   tetherSessionResponseSchema,
   type TetherCapability,
   type TetherCameraControl,
@@ -16,6 +17,7 @@ import {
   type TetherCaptureRequest,
   type TetherCaptureResponse,
   type TetherDiscoveryResponse,
+  type TetherSessionOpenRequest,
   type TetherSessionResponse,
 } from '../../../schemas/tetheringSchemas';
 import { TextColors, TextVariants } from '../../../types/typography';
@@ -33,7 +35,7 @@ interface TetherPanelProps {
   closeSession?: () => Promise<TetherSessionResponse>;
   discoverCameras?: () => Promise<TetherDiscoveryResponse>;
   onOpenCapture?: (path: string) => void;
-  openSession?: (cameraId: string) => Promise<TetherSessionResponse>;
+  openSession?: (request: TetherSessionOpenRequest) => Promise<TetherSessionResponse>;
   setCameraControl?: (request: TetherCameraControlWriteRequest) => Promise<TetherCameraControlWriteResponse>;
 }
 
@@ -58,10 +60,10 @@ const defaultDiscoverCameras = (): Promise<TetherDiscoveryResponse> =>
     tetherDiscoveryResponseSchema,
   );
 
-const defaultOpenSession = (cameraId: string): Promise<TetherSessionResponse> =>
+const defaultOpenSession = (request: TetherSessionOpenRequest): Promise<TetherSessionResponse> =>
   invokeWithSchema(
     Invokes.OpenTetherSession,
-    { request: { cameraId, providerMode: 'auto' } },
+    { request: tetherSessionOpenRequestSchema.parse(request) },
     tetherSessionResponseSchema,
   );
 
@@ -91,6 +93,7 @@ export function TetherPanel({
   const [pinnedCaptureKey, setPinnedCaptureKey] = useState<string | null>(null);
   const [controlStatus, setControlStatus] = useState<Record<string, string>>({});
   const [busyControlId, setBusyControlId] = useState<string | null>(null);
+  const [destinationRoot, setDestinationRoot] = useState('');
   const [backupDestinationRoot, setBackupDestinationRoot] = useState('');
   const [isBackupEnabled, setIsBackupEnabled] = useState(false);
   const [ingestPresetId, setIngestPresetId] = useState<TetherCaptureRequest['ingestPresetId']>('timestampCamera');
@@ -127,14 +130,18 @@ export function TetherPanel({
     setIsSessionBusy(true);
     setError(null);
     try {
-      const response = await openSession(camera.id);
+      const response = await openSession({
+        cameraId: camera.id,
+        destinationRoot: destinationRoot.trim() ? destinationRoot.trim() : undefined,
+        providerMode: discovery?.provider.mode ?? 'auto',
+      });
       setSession(response.session);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsSessionBusy(false);
     }
-  }, [camera, openSession]);
+  }, [camera, destinationRoot, discovery, openSession]);
 
   const closeCameraSession = useCallback(async () => {
     setIsSessionBusy(true);
@@ -452,6 +459,29 @@ export function TetherPanel({
         />
         <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
           {t('editor.tether.backupCopyDescription')}
+        </UiText>
+      </section>
+
+      <section
+        className="rounded-md border border-border-color bg-bg-secondary p-3"
+        data-destination-root={destinationRoot.trim()}
+        data-testid="tether-destination-root"
+      >
+        <label className="block">
+          <UiText variant={TextVariants.label}>{t('editor.tether.destinationRoot')}</UiText>
+          <input
+            className="mt-2 w-full rounded border border-border-color bg-bg-primary px-2 py-2 text-sm text-text-primary"
+            data-testid="tether-destination-root-path"
+            disabled={isSessionOpen || isSessionBusy}
+            onChange={(event) => {
+              setDestinationRoot(event.target.value);
+            }}
+            placeholder={t('editor.tether.destinationRootPlaceholder')}
+            value={destinationRoot}
+          />
+        </label>
+        <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+          {t('editor.tether.destinationRootDescription')}
         </UiText>
       </section>
 
