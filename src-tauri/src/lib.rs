@@ -1177,11 +1177,11 @@ async fn preview_geometry_transform(
                 "preview_geometry_transform_base_gen",
             )?;
 
-            let mut cache = state.geometry_cache.lock().unwrap();
-            if cache.len() > 5 {
-                cache.clear();
-            }
-            cache.insert(visual_hash, processed_base.clone());
+            render_caches::RenderCaches::new(&state).insert_geometry_cache_entry(
+                visual_hash,
+                processed_base.clone(),
+                5,
+            );
 
             processed_base
         }
@@ -2453,7 +2453,7 @@ pub fn run() {
             {
                 let state = app.state::<AppState>();
                 let cache_size = settings.image_cache_size.unwrap_or(5) as usize;
-                state.decoded_image_cache.lock().unwrap().set_capacity(cache_size);
+                render_caches::RenderCaches::new(&state).set_decoded_image_cache_capacity(cache_size);
             }
 
             if crash_flag_path.exists() {

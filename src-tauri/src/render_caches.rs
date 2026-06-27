@@ -1,4 +1,5 @@
 use crate::app_state::AppState;
+use image::DynamicImage;
 
 pub struct RenderCaches<'a> {
     state: &'a AppState,
@@ -25,6 +26,32 @@ impl<'a> RenderCaches<'a> {
     pub fn clear_gpu_image_cache(&self) {
         if let Ok(mut gpu_cache) = self.state.gpu_image_cache.lock() {
             *gpu_cache = None;
+        }
+    }
+
+    pub fn clear_stale_gpu_image_cache(&self, transform_hash: u64, width: u32, height: u32) {
+        if let Ok(mut gpu_cache) = self.state.gpu_image_cache.lock()
+            && let Some(cache) = gpu_cache.as_ref()
+            && (cache.transform_hash != transform_hash
+                || cache.width != width
+                || cache.height != height)
+        {
+            *gpu_cache = None;
+        }
+    }
+
+    pub fn insert_geometry_cache_entry(&self, key: u64, image: DynamicImage, max_entries: usize) {
+        if let Ok(mut geometry_cache) = self.state.geometry_cache.lock() {
+            if geometry_cache.len() > max_entries {
+                geometry_cache.clear();
+            }
+            geometry_cache.insert(key, image);
+        }
+    }
+
+    pub fn set_decoded_image_cache_capacity(&self, capacity: usize) {
+        if let Ok(mut decoded_cache) = self.state.decoded_image_cache.lock() {
+            decoded_cache.set_capacity(capacity);
         }
     }
 
