@@ -479,6 +479,7 @@
     "check:negative-lab-stock-metadata-coverage": "bun tests/integration/checks/check-negative-lab-stock-metadata-coverage.ts",
     "check:negative-lab-stock-metadata-coverage:update": "bun tests/integration/checks/check-negative-lab-stock-metadata-coverage.ts --update",
     "check:negative-lab-workspace": "bun tests/integration/checks/check-negative-lab-workspace.ts",
+    "check:negative-lab-export-handoff": "bun tests/integration/checks/check-negative-lab-export-handoff.ts",
     "check:negative-lab-roll-cockpit": "bun tests/integration/checks/check-negative-lab-roll-cockpit.ts",
     "check:negative-lab-roll-normalization": "bun tests/integration/checks/check-negative-lab-roll-normalization.ts",
     "check:negative-lab-roll-session-reload": "bun tests/integration/checks/check-negative-lab-roll-session-reload.ts",
