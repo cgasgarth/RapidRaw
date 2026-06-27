@@ -1,0 +1,20 @@
+{
+  "issue": 3247,
+  "validationMode": "private_raster_macos_vision_whole_person_mask_runtime_proof",
+  "source": {
+    "name": "Man_Standing.jpg",
+    "mediaKind": "raster",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Man_Standing.jpg",
+    "license": "CC BY-SA 3.0",
+    "hash": "blake3:c2bd60071d17e6f0dca6e7716c0b2961f973758687d5863035e26ce9b5fb5dd5"
+  },
+  "output": {
+    "maskCoverage": 0.22855631510416666,
+    "maskHash": "blake3:3aa740dbf643637b4a30e618f362cc66a0459d41c94dfea79bc801df04a2f58a",
+    "privateArtifactPath": "/tmp/rawengine-whole-person-mask-proof/private-artifacts/validation/whole-person-mask/whole-person-mask-private.png"
+  },
+  "notes": [
+    "The user's Alaska RAW folder was scanned first, but no usable whole-person source was found.",
+    "This proof validates the macOS Vision whole-person provider against a license-clear full-body raster source; RAW whole-person proof should be rerun when a private portrait RAW is available."
+  ]
+}
