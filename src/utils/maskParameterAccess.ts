@@ -11,6 +11,6 @@ export function getMaskParameterNumber(parameters: unknown, key: string, fallbac
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
-export function mergeMaskParameters(parameters: unknown, patch: MaskParameterRecord): MaskParameterRecord {
+export function mergeMaskParameters(parameters: unknown, patch: object): MaskParameterRecord {
   return { ...toMaskParameterRecord(parameters), ...patch };
 }
