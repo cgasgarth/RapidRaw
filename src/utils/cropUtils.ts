@@ -1,4 +1,4 @@
-import type { Crop } from 'react-image-crop';
+import type { Crop, PercentCrop } from 'react-image-crop';
 
 export function getOrientedDimensions(
   imageWidth: number,
@@ -36,5 +36,267 @@ export function calculateCenteredCrop(
     y: Math.round((H - h_c) / 2),
     width: Math.round(w_c),
     height: Math.round(h_c),
+  };
+}
+
+export interface CropGeometryParams {
+  aspectRatio: number | null;
+  orientationSteps: number;
+  rotation: number;
+}
+
+export interface ResolveNextCropForGeometryChangeInput {
+  aspectRatio: number | null;
+  currentCrop: Crop | null;
+  effectiveRotation: number;
+  imageHeight: number;
+  imageWidth: number;
+  isDraggingRotation: boolean;
+  orientationSteps: number;
+  previousParams: CropGeometryParams | null;
+  rotation: number;
+}
+
+export interface ResolveNextCropForGeometryChangeResult {
+  nextPixelCrop: Crop | null;
+  orientedHeight: number;
+  orientedWidth: number;
+}
+
+const CROP_VALIDITY_TOLERANCE_PX = 1;
+const MAXIMIZED_CROP_TOLERANCE_PX = 2;
+const SHRINK_ITERATIONS = 10;
+const MIN_ACCEPTABLE_SHRINK = 0.15;
+
+export function isCropValidAfterRotation(
+  pixelCrop: Partial<Crop> | null,
+  imageWidth: number,
+  imageHeight: number,
+  rotation: number,
+): boolean {
+  if (
+    pixelCrop === null ||
+    pixelCrop.x === undefined ||
+    pixelCrop.y === undefined ||
+    !pixelCrop.width ||
+    !pixelCrop.height
+  ) {
+    return false;
+  }
+
+  const cx = imageWidth / 2;
+  const cy = imageHeight / 2;
+  const rad = (-rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+
+  const points = [
+    { x: pixelCrop.x, y: pixelCrop.y },
+    { x: pixelCrop.x + pixelCrop.width, y: pixelCrop.y },
+    { x: pixelCrop.x, y: pixelCrop.y + pixelCrop.height },
+    { x: pixelCrop.x + pixelCrop.width, y: pixelCrop.y + pixelCrop.height },
+  ];
+
+  return points.every((point) => {
+    const nx = cos * (point.x - cx) - sin * (point.y - cy) + cx;
+    const ny = sin * (point.x - cx) + cos * (point.y - cy) + cy;
+    return (
+      nx >= -CROP_VALIDITY_TOLERANCE_PX &&
+      nx <= imageWidth + CROP_VALIDITY_TOLERANCE_PX &&
+      ny >= -CROP_VALIDITY_TOLERANCE_PX &&
+      ny <= imageHeight + CROP_VALIDITY_TOLERANCE_PX
+    );
+  });
+}
+
+export function percentCropFromPixelCrop(pixelCrop: Crop, imageWidth: number, imageHeight: number): PercentCrop {
+  return {
+    unit: '%',
+    x: (pixelCrop.x / imageWidth) * 100,
+    y: (pixelCrop.y / imageHeight) * 100,
+    width: (pixelCrop.width / imageWidth) * 100,
+    height: (pixelCrop.height / imageHeight) * 100,
+  };
+}
+
+export function isCropChangeMeaningful(currentCrop: Crop | null, nextCrop: Crop | null): boolean {
+  return (
+    nextCrop !== null &&
+    (currentCrop === null ||
+      Math.abs(currentCrop.x - nextCrop.x) > CROP_VALIDITY_TOLERANCE_PX ||
+      Math.abs(currentCrop.y - nextCrop.y) > CROP_VALIDITY_TOLERANCE_PX ||
+      Math.abs(currentCrop.width - nextCrop.width) > CROP_VALIDITY_TOLERANCE_PX ||
+      Math.abs(currentCrop.height - nextCrop.height) > CROP_VALIDITY_TOLERANCE_PX)
+  );
+}
+
+export function didCropGeometryChange(
+  previousParams: CropGeometryParams | null,
+  nextParams: CropGeometryParams,
+): boolean {
+  return (
+    previousParams === null ||
+    previousParams.rotation !== nextParams.rotation ||
+    previousParams.aspectRatio !== nextParams.aspectRatio ||
+    previousParams.orientationSteps !== nextParams.orientationSteps
+  );
+}
+
+export function resolveNextCropForGeometryChange({
+  aspectRatio,
+  currentCrop,
+  effectiveRotation,
+  imageHeight,
+  imageWidth,
+  isDraggingRotation,
+  orientationSteps,
+  previousParams,
+  rotation,
+}: ResolveNextCropForGeometryChangeInput): ResolveNextCropForGeometryChangeResult {
+  const { width: orientedWidth, height: orientedHeight } = getOrientedDimensions(
+    imageWidth,
+    imageHeight,
+    orientationSteps,
+  );
+  const effectiveAspectRatio = aspectRatio || orientedWidth / orientedHeight;
+  const aspectChanged = previousParams?.aspectRatio !== aspectRatio;
+  const orientationChanged = previousParams?.orientationSteps !== orientationSteps;
+  const rotationChanged = previousParams?.rotation !== rotation || isDraggingRotation;
+  let nextPixelCrop = currentCrop;
+
+  if (!currentCrop || orientationChanged) {
+    nextPixelCrop = calculateCenteredCrop(
+      imageWidth,
+      imageHeight,
+      orientationSteps,
+      effectiveAspectRatio,
+      effectiveRotation,
+    );
+  } else if (aspectChanged) {
+    nextPixelCrop =
+      aspectRatio === null ? currentCrop : fitCropToAspectRatioAtCenter(currentCrop, effectiveAspectRatio);
+
+    if (!isCropValidAfterRotation(nextPixelCrop, orientedWidth, orientedHeight, effectiveRotation)) {
+      nextPixelCrop = calculateCenteredCrop(
+        imageWidth,
+        imageHeight,
+        orientationSteps,
+        effectiveAspectRatio,
+        effectiveRotation,
+      );
+    }
+  } else if (
+    rotationChanged &&
+    isMaximizedCrop(
+      currentCrop,
+      imageWidth,
+      imageHeight,
+      orientationSteps,
+      effectiveAspectRatio,
+      previousParams.rotation,
+    )
+  ) {
+    nextPixelCrop = calculateCenteredCrop(
+      imageWidth,
+      imageHeight,
+      orientationSteps,
+      effectiveAspectRatio,
+      effectiveRotation,
+    );
+  } else if (!isCropValidAfterRotation(currentCrop, orientedWidth, orientedHeight, effectiveRotation)) {
+    nextPixelCrop =
+      shrinkCropToFitRotation(currentCrop, orientedWidth, orientedHeight, effectiveRotation) ??
+      calculateCenteredCrop(imageWidth, imageHeight, orientationSteps, effectiveAspectRatio, effectiveRotation);
+  }
+
+  return { nextPixelCrop, orientedWidth, orientedHeight };
+}
+
+function fitCropToAspectRatioAtCenter(currentCrop: Crop, aspectRatio: number): Crop {
+  const curCx = currentCrop.x + currentCrop.width / 2;
+  const curCy = currentCrop.y + currentCrop.height / 2;
+
+  let newW = currentCrop.width;
+  let newH = currentCrop.width / aspectRatio;
+
+  if (newH > currentCrop.height) {
+    newH = currentCrop.height;
+    newW = currentCrop.height * aspectRatio;
+  }
+
+  return {
+    unit: 'px',
+    x: Math.ceil(curCx - newW / 2),
+    y: Math.ceil(curCy - newH / 2),
+    width: Math.floor(newW),
+    height: Math.floor(newH),
+  };
+}
+
+function isMaximizedCrop(
+  currentCrop: Crop,
+  imageWidth: number,
+  imageHeight: number,
+  orientationSteps: number,
+  aspectRatio: number,
+  referenceRotation: number,
+): boolean {
+  const maxCropForReference = calculateCenteredCrop(
+    imageWidth,
+    imageHeight,
+    orientationSteps,
+    aspectRatio,
+    referenceRotation,
+  );
+
+  return (
+    maxCropForReference !== null &&
+    Math.abs(currentCrop.x - maxCropForReference.x) <= MAXIMIZED_CROP_TOLERANCE_PX &&
+    Math.abs(currentCrop.y - maxCropForReference.y) <= MAXIMIZED_CROP_TOLERANCE_PX &&
+    Math.abs(currentCrop.width - maxCropForReference.width) <= MAXIMIZED_CROP_TOLERANCE_PX &&
+    Math.abs(currentCrop.height - maxCropForReference.height) <= MAXIMIZED_CROP_TOLERANCE_PX
+  );
+}
+
+function shrinkCropToFitRotation(
+  currentCrop: Crop,
+  imageWidth: number,
+  imageHeight: number,
+  rotation: number,
+): Crop | null {
+  let low = 0.1;
+  let high = 1.0;
+  let bestCrop = currentCrop;
+
+  for (let i = 0; i < SHRINK_ITERATIONS; i++) {
+    const mid = (low + high) / 2;
+    const cx = currentCrop.x + currentCrop.width / 2;
+    const cy = currentCrop.y + currentCrop.height / 2;
+    const nw = currentCrop.width * mid;
+    const nh = currentCrop.height * mid;
+    const testCrop = {
+      unit: 'px' as const,
+      x: cx - nw / 2,
+      y: cy - nh / 2,
+      width: nw,
+      height: nh,
+    };
+
+    if (isCropValidAfterRotation(testCrop, imageWidth, imageHeight, rotation)) {
+      bestCrop = testCrop;
+      low = mid;
+    } else {
+      high = mid;
+    }
+  }
+
+  if (low < MIN_ACCEPTABLE_SHRINK) return null;
+
+  return {
+    unit: 'px',
+    x: Math.ceil(bestCrop.x),
+    y: Math.ceil(bestCrop.y),
+    width: Math.floor(bestCrop.width),
+    height: Math.floor(bestCrop.height),
   };
 }
