@@ -52,7 +52,11 @@ import {
   WHEEL_SNAP_DELAY_MS,
 } from '../../utils/editorGestureMath';
 import { getEditorPreviewDimensions } from '../../utils/editorPreviewDimensions';
-import { normalizeMaskOverlaySettings } from '../../utils/maskOverlayModes';
+import {
+  buildMaskOverlayInvokePayload,
+  buildMaskOverlayTriggerHash,
+  type MaskPreviewDefinition,
+} from '../../utils/maskOverlayRequest';
 import { toMaskParameterRecord } from '../../utils/maskParameterAccess';
 import {
   applyObjectPromptClick,
@@ -76,14 +80,6 @@ interface TransformController {
 interface DisplaySizeUpdate extends BaseRenderSize {
   scale: number;
 }
-
-type MaskPreviewDefinition =
-  | (Omit<MaskContainer, 'adjustments'> & { adjustments: Partial<Adjustments> })
-  | (AiPatch & { adjustments?: Partial<Adjustments>; opacity?: number });
-type SerializableMaskParameters = Record<string, unknown> & {
-  mask_data_base64?: string | null | undefined;
-  maskDataBase64?: string | null | undefined;
-};
 
 interface MaskOverlayRequest {
   jsAdjustments: Adjustments;
@@ -862,54 +858,23 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     const { maskDef, renderSize, jsAdjustments } = pendingOverlayRequestRef.current;
     pendingOverlayRequestRef.current = null;
 
-    if (!maskDef.visible || renderSize.width === 0) {
+    const { maskOverlaySettings, patchesSentToBackend } = useEditorStore.getState();
+    const overlayPayload = buildMaskOverlayInvokePayload({
+      jsAdjustments,
+      maskDef,
+      maskOverlaySettings,
+      patchesSentToBackend,
+      renderSize,
+    });
+
+    if (overlayPayload === null) {
       setMaskOverlayUrl(null);
       return;
     }
 
     isGeneratingOverlayRef.current = true;
     try {
-      const cropOffset = [jsAdjustments.crop?.x || 0, jsAdjustments.crop?.y || 0];
-
-      const { maskOverlaySettings, patchesSentToBackend } = useEditorStore.getState();
-      const normalizedOverlaySettings = normalizeMaskOverlaySettings(maskOverlaySettings);
-      if (normalizedOverlaySettings.mode === 'hidden') {
-        setMaskOverlayUrl(null);
-        return;
-      }
-
-      const stripSubMasks = (subMasks?: Array<SubMask>) => {
-        if (!Array.isArray(subMasks)) return;
-        subMasks.forEach((sm) => {
-          if (sm.id && sm.parameters && patchesSentToBackend.has(sm.id)) {
-            const parameters = toMaskParameterRecord(sm.parameters);
-            if (parameters['mask_data_base64'] !== undefined) parameters['mask_data_base64'] = null;
-            if (parameters['maskDataBase64'] !== undefined) parameters['maskDataBase64'] = null;
-            sm.parameters = parameters;
-          }
-        });
-      };
-
-      const strippedAdjustments = structuredClone(jsAdjustments);
-      strippedAdjustments.masks.forEach((m) => {
-        stripSubMasks(m.subMasks);
-      });
-      strippedAdjustments.aiPatches.forEach((p) => {
-        stripSubMasks(p.subMasks);
-      });
-
-      const strippedMaskDef = structuredClone(maskDef);
-      stripSubMasks(strippedMaskDef.subMasks);
-
-      const dataUrl: string = await invoke(Invokes.GenerateMaskOverlay, {
-        cropOffset,
-        height: Math.round(renderSize.height),
-        maskDef: strippedMaskDef,
-        overlaySettings: normalizedOverlaySettings,
-        scale: renderSize.scale,
-        width: Math.round(renderSize.width),
-        jsAdjustments: strippedAdjustments,
-      });
+      const dataUrl: string = await invoke(Invokes.GenerateMaskOverlay, { ...overlayPayload });
 
       if (dataUrl) {
         setMaskOverlayUrl(dataUrl);
@@ -985,73 +950,11 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
     if (!activeMaskDef) return null;
 
-    const geometryKeys = [
-      'crop',
-      'rotation',
-      'flipHorizontal',
-      'flipVertical',
-      'orientationSteps',
-      'transformDistortion',
-      'transformVertical',
-      'transformHorizontal',
-      'transformRotate',
-      'transformAspect',
-      'transformScale',
-      'transformXOffset',
-      'transformYOffset',
-      'lensDistortionAmount',
-      'lensVignetteAmount',
-      'lensTcaAmount',
-      'lensDistortionParams',
-      'lensMaker',
-      'lensModel',
-      'lensDistortionEnabled',
-      'lensTcaEnabled',
-      'lensVignetteEnabled',
-    ];
-
-    const geometry: Record<string, unknown> = {};
-    geometryKeys.forEach((k) => {
-      geometry[k] = adjustments[k];
-    });
-
-    const subMasks = activeMaskDef.subMasks.map((sm: SubMask) => {
-      const rest: Omit<SubMask, 'parameters'> = {
-        id: sm.id,
-        invert: sm.invert,
-        mode: sm.mode,
-        opacity: sm.opacity,
-        type: sm.type,
-        visible: sm.visible,
-        ...(sm.name !== undefined ? { name: sm.name } : {}),
-      };
-      const cleanParams: SerializableMaskParameters = toMaskParameterRecord(sm.parameters);
-      const maskDataBase64 = cleanParams.mask_data_base64;
-      const maskDataCamelBase64 = cleanParams.maskDataBase64;
-      const maskDataFingerprint =
-        typeof maskDataBase64 === 'string' ? `${maskDataBase64.length}-${maskDataBase64.slice(-20)}` : null;
-      const maskDataCamelFingerprint =
-        typeof maskDataCamelBase64 === 'string'
-          ? `${maskDataCamelBase64.length}-${maskDataCamelBase64.slice(-20)}`
-          : null;
-      delete cleanParams.mask_data_base64;
-      delete cleanParams.maskDataBase64;
-      return {
-        ...rest,
-        parameters: cleanParams,
-        _maskDataFingerprint: maskDataFingerprint,
-        _maskDataCamelFingerprint: maskDataCamelFingerprint,
-      };
-    });
-
-    return JSON.stringify({
-      id: activeMaskDef.id,
-      invert: activeMaskDef.invert,
-      opacity: 'opacity' in activeMaskDef ? activeMaskDef.opacity : 100,
-      subMasks,
-      geometry,
-      maskOverlaySettings: normalizeMaskOverlaySettings(maskOverlaySettings),
-      renderSize: { w: imageRenderSize.width, h: imageRenderSize.height },
+    return buildMaskOverlayTriggerHash({
+      activeMaskDef,
+      adjustments,
+      imageRenderSize: { height: imageRenderSize.height, width: imageRenderSize.width },
+      maskOverlaySettings,
     });
   }, [
     activeRightPanel,
