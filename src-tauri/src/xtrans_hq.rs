@@ -40,6 +40,62 @@ fn pixel_index(width: usize, row: usize, col: usize) -> usize {
     row * width + col
 }
 
+const GREEN_PLANE_CHROMA_HALO: usize = 4;
+
+#[derive(Debug)]
+struct GreenPlaneWindow {
+    data: Vec<f32>,
+    height: usize,
+    origin_col: usize,
+    origin_row: usize,
+    width: usize,
+}
+
+impl GreenPlaneWindow {
+    fn get(&self, sensor_row: usize, sensor_col: usize) -> Option<f32> {
+        let row = sensor_row.checked_sub(self.origin_row)?;
+        let col = sensor_col.checked_sub(self.origin_col)?;
+        if row >= self.height || col >= self.width {
+            return None;
+        }
+
+        Some(self.data[pixel_index(self.width, row, col)])
+    }
+}
+
+fn green_plane_window_bounds(
+    pixels: &PixF32,
+    roi: Rect,
+    halo: usize,
+) -> (usize, usize, usize, usize) {
+    let origin_row = roi.p.y.saturating_sub(halo);
+    let origin_col = roi.p.x.saturating_sub(halo);
+    let end_row = roi
+        .p
+        .y
+        .saturating_add(roi.d.h)
+        .saturating_add(halo)
+        .min(pixels.height);
+    let end_col = roi
+        .p
+        .x
+        .saturating_add(roi.d.w)
+        .saturating_add(halo)
+        .min(pixels.width);
+
+    (
+        origin_row,
+        origin_col,
+        end_row.saturating_sub(origin_row),
+        end_col.saturating_sub(origin_col),
+    )
+}
+
+fn green_plane_window_pixel_count(pixels: &PixF32, roi: Rect) -> usize {
+    let (_, _, height, width) = green_plane_window_bounds(pixels, roi, GREEN_PLANE_CHROMA_HALO);
+    width.saturating_mul(height)
+}
+
 fn sample_same_color(
     pixels: &PixF32,
     cfa: &CFA,
@@ -244,8 +300,7 @@ fn adaptive_green(
 fn sample_color_difference(
     pixels: &PixF32,
     cfa: &CFA,
-    greens: &[f32],
-    width: usize,
+    greens: &GreenPlaneWindow,
     sensor_row: usize,
     sensor_col: usize,
     color: usize,
@@ -269,8 +324,8 @@ fn sample_color_difference(
                     continue;
                 }
 
-                let sample_index = pixel_index(width, sample_row as usize, sample_col as usize);
-                sum += *pixels.at(sample_row as usize, sample_col as usize) - greens[sample_index];
+                let green = greens.get(sample_row as usize, sample_col as usize)?;
+                sum += *pixels.at(sample_row as usize, sample_col as usize) - green;
                 count += 1;
             }
         }
@@ -357,6 +412,102 @@ where
     Ok(())
 }
 
+fn build_green_plane_window<F>(
+    pixels: &PixF32,
+    cfa: &CFA,
+    roi: Rect,
+    report: &mut XTransHqReport,
+    check_cancel: &mut F,
+) -> Result<GreenPlaneWindow>
+where
+    F: FnMut() -> Result<()>,
+{
+    let (origin_row, origin_col, height, width) =
+        green_plane_window_bounds(pixels, roi, GREEN_PLANE_CHROMA_HALO);
+    let mut green_window = GreenPlaneWindow {
+        data: vec![0.0; width.saturating_mul(height)],
+        height,
+        origin_col,
+        origin_row,
+        width,
+    };
+
+    for row_offset in 0..height {
+        check_cancel()?;
+        let sensor_row = origin_row + row_offset;
+        for col_offset in 0..width {
+            let sensor_col = origin_col + col_offset;
+            let index = pixel_index(width, row_offset, col_offset);
+            green_window.data[index] = adaptive_green(pixels, cfa, sensor_row, sensor_col, report);
+        }
+    }
+
+    Ok(green_window)
+}
+
+fn render_xtrans_hq_with_green_plane<F>(
+    pixels: &PixF32,
+    cfa: &CFA,
+    roi: Rect,
+    greens: &GreenPlaneWindow,
+    report: &mut XTransHqReport,
+    check_cancel: &mut F,
+) -> Result<Color2D<f32, 3>>
+where
+    F: FnMut() -> Result<()>,
+{
+    let shifted_cfa = cfa.shift(roi.p.x, roi.p.y);
+    let mut output = Vec::with_capacity(roi.d.w * roi.d.h);
+    for row_out in 0..roi.d.h {
+        check_cancel()?;
+        let sensor_row = roi.p.y + row_out;
+        for col_out in 0..roi.d.w {
+            let sensor_col = roi.p.x + col_out;
+            let cfa_color = shifted_cfa.color_at(row_out, col_out);
+            let current = *pixels.at(sensor_row, sensor_col);
+            let green = greens
+                .get(sensor_row, sensor_col)
+                .expect("ROI pixels must be inside the X-Trans green plane window");
+            let red = if cfa_color == CFA_COLOR_R {
+                current
+            } else {
+                report.chroma_interpolated_pixels += 1;
+                green
+                    + sample_color_difference(
+                        pixels,
+                        cfa,
+                        greens,
+                        sensor_row,
+                        sensor_col,
+                        CFA_COLOR_R,
+                    )
+                    .unwrap_or(0.0)
+            };
+            let blue = if cfa_color == CFA_COLOR_B {
+                current
+            } else {
+                report.chroma_interpolated_pixels += 1;
+                green
+                    + sample_color_difference(
+                        pixels,
+                        cfa,
+                        greens,
+                        sensor_row,
+                        sensor_col,
+                        CFA_COLOR_B,
+                    )
+                    .unwrap_or(0.0)
+            };
+
+            output.push([red.max(0.0), green.max(0.0), blue.max(0.0)]);
+        }
+    }
+
+    let mut image = Color2D::new_with(output, roi.d.w, roi.d.h);
+    refine_chroma(&mut image, report, check_cancel)?;
+    Ok(image)
+}
+
 #[cfg(test)]
 fn demosaic_xtrans_hq(pixels: &PixF32, cfa: &CFA, roi: Rect) -> (Color2D<f32, 3>, XTransHqReport) {
     demosaic_xtrans_hq_with_cancel(pixels, cfa, roi, || Ok(()))
@@ -372,70 +523,19 @@ pub fn demosaic_xtrans_hq_with_cancel<F>(
 where
     F: FnMut() -> Result<()>,
 {
-    let shifted_cfa = cfa.shift(roi.p.x, roi.p.y);
     let mut report = XTransHqReport {
         scratch_memory: estimate_xtrans_hq_scratch_memory(pixels, roi),
         ..XTransHqReport::default()
     };
-    let mut greens = vec![0.0; pixels.width * pixels.height];
-
-    for sensor_row in 0..pixels.height {
-        check_cancel()?;
-        for sensor_col in 0..pixels.width {
-            let index = pixel_index(pixels.width, sensor_row, sensor_col);
-            greens[index] = adaptive_green(pixels, cfa, sensor_row, sensor_col, &mut report);
-        }
-    }
-
-    let mut output = Vec::with_capacity(roi.d.w * roi.d.h);
-    for row_out in 0..roi.d.h {
-        check_cancel()?;
-        let sensor_row = roi.p.y + row_out;
-        for col_out in 0..roi.d.w {
-            let sensor_col = roi.p.x + col_out;
-            let sensor_index = pixel_index(pixels.width, sensor_row, sensor_col);
-            let cfa_color = shifted_cfa.color_at(row_out, col_out);
-            let current = *pixels.at(sensor_row, sensor_col);
-            let green = greens[sensor_index];
-            let red = if cfa_color == CFA_COLOR_R {
-                current
-            } else {
-                report.chroma_interpolated_pixels += 1;
-                green
-                    + sample_color_difference(
-                        pixels,
-                        cfa,
-                        &greens,
-                        pixels.width,
-                        sensor_row,
-                        sensor_col,
-                        CFA_COLOR_R,
-                    )
-                    .unwrap_or(0.0)
-            };
-            let blue = if cfa_color == CFA_COLOR_B {
-                current
-            } else {
-                report.chroma_interpolated_pixels += 1;
-                green
-                    + sample_color_difference(
-                        pixels,
-                        cfa,
-                        &greens,
-                        pixels.width,
-                        sensor_row,
-                        sensor_col,
-                        CFA_COLOR_B,
-                    )
-                    .unwrap_or(0.0)
-            };
-
-            output.push([red.max(0.0), green.max(0.0), blue.max(0.0)]);
-        }
-    }
-
-    let mut image = Color2D::new_with(output, roi.d.w, roi.d.h);
-    refine_chroma(&mut image, &mut report, &mut check_cancel)?;
+    let greens = build_green_plane_window(pixels, cfa, roi, &mut report, &mut check_cancel)?;
+    let image = render_xtrans_hq_with_green_plane(
+        pixels,
+        cfa,
+        roi,
+        &greens,
+        &mut report,
+        &mut check_cancel,
+    )?;
     Ok((image, report))
 }
 
@@ -443,12 +543,13 @@ fn estimate_xtrans_hq_scratch_memory(pixels: &PixF32, roi: Rect) -> XTransHqScra
     let sensor_pixel_count = pixels.width.saturating_mul(pixels.height);
     let roi_pixel_count = roi.d.w.saturating_mul(roi.d.h);
     let input_plane_bytes = sensor_pixel_count.saturating_mul(std::mem::size_of::<f32>());
-    let green_plane_bytes = sensor_pixel_count.saturating_mul(std::mem::size_of::<f32>());
+    let green_plane_bytes =
+        green_plane_window_pixel_count(pixels, roi).saturating_mul(std::mem::size_of::<f32>());
     let output_rgb_bytes = roi_pixel_count
         .saturating_mul(3)
         .saturating_mul(std::mem::size_of::<f32>());
-    let chroma_working_bytes = sensor_pixel_count
-        .saturating_mul(2)
+    let chroma_working_bytes = roi_pixel_count
+        .saturating_mul(3)
         .saturating_mul(std::mem::size_of::<f32>());
     let total_estimated_peak_bytes = input_plane_bytes
         .saturating_add(green_plane_bytes)
@@ -553,6 +654,52 @@ mod tests {
             }
         }
         Color2D::new_with(output, roi.d.w, roi.d.h)
+    }
+
+    fn demosaic_xtrans_hq_with_full_green_plane_for_test(
+        pixels: &PixF32,
+        cfa: &CFA,
+        roi: Rect,
+    ) -> Color2D<f32, 3> {
+        let mut report = XTransHqReport {
+            scratch_memory: estimate_xtrans_hq_scratch_memory(pixels, roi),
+            ..XTransHqReport::default()
+        };
+        let mut greens = GreenPlaneWindow {
+            data: vec![0.0; pixels.width * pixels.height],
+            height: pixels.height,
+            origin_col: 0,
+            origin_row: 0,
+            width: pixels.width,
+        };
+        for sensor_row in 0..pixels.height {
+            for sensor_col in 0..pixels.width {
+                let index = pixel_index(pixels.width, sensor_row, sensor_col);
+                greens.data[index] =
+                    adaptive_green(pixels, cfa, sensor_row, sensor_col, &mut report);
+            }
+        }
+
+        render_xtrans_hq_with_green_plane(pixels, cfa, roi, &greens, &mut report, &mut || Ok(()))
+            .expect("test cancellation is disabled")
+    }
+
+    fn assert_matches_full_green_reference(actual: &Color2D<f32, 3>, reference: &Color2D<f32, 3>) {
+        assert_eq!(actual.width, reference.width);
+        assert_eq!(actual.height, reference.height);
+        for row in 1..actual.height.saturating_sub(1) {
+            for col in 1..actual.width.saturating_sub(1) {
+                let index = pixel_index(actual.width, row, col);
+                for channel in 0..3 {
+                    let delta =
+                        (reference.data[index][channel] - actual.data[index][channel]).abs();
+                    assert!(
+                        delta <= 0.000_001,
+                        "ROI interior pixel ({row},{col}) channel {channel} drifted by {delta}"
+                    );
+                }
+            }
+        }
     }
 
     fn mean_abs_rgb(image: &Color2D<f32, 3>, truth: &[[f32; 3]]) -> f32 {
@@ -851,7 +998,7 @@ mod tests {
         assert_eq!(report.scratch_memory.input_plane_bytes, 144 * 4);
         assert_eq!(report.scratch_memory.green_plane_bytes, 144 * 4);
         assert_eq!(report.scratch_memory.output_rgb_bytes, 144 * 3 * 4);
-        assert_eq!(report.scratch_memory.chroma_working_bytes, 144 * 2 * 4);
+        assert_eq!(report.scratch_memory.chroma_working_bytes, 144 * 3 * 4);
         assert_eq!(
             report.scratch_memory.total_estimated_peak_bytes,
             report.scratch_memory.input_plane_bytes
@@ -859,6 +1006,98 @@ mod tests {
                 + report.scratch_memory.output_rgb_bytes
                 + report.scratch_memory.chroma_working_bytes
         );
+    }
+
+    #[test]
+    fn xtrans_hq_roi_green_plane_is_halo_bounded_and_matches_full_frame_interior() {
+        let width = 48;
+        let height = 48;
+        let cfa = CFA::new(XTRANS_PATTERN);
+        let truth = (0..height)
+            .flat_map(|row| {
+                (0..width).map(move |col| synthetic_color(row, col, width, "zone_plate"))
+            })
+            .collect::<Vec<_>>();
+        let pixels = mosaic_truth(&cfa, &truth, width, height);
+        let full_roi = Rect::new(
+            rawler::imgop::Point::new(0, 0),
+            rawler::imgop::Dim2::new(width, height),
+        );
+        let crop_roi = Rect::new(
+            rawler::imgop::Point::new(10, 8),
+            rawler::imgop::Dim2::new(20, 18),
+        );
+
+        let (_, full_report) = demosaic_xtrans_hq(&pixels, &cfa, full_roi);
+        let (crop, crop_report) = demosaic_xtrans_hq(&pixels, &cfa, crop_roi);
+        let full_green_crop =
+            demosaic_xtrans_hq_with_full_green_plane_for_test(&pixels, &cfa, crop_roi);
+
+        assert_eq!(
+            full_report.scratch_memory.green_plane_bytes,
+            width * height * 4
+        );
+        assert!(crop_report.scratch_memory.green_plane_bytes < width * height * 4);
+        assert_eq!(
+            crop_report.scratch_memory.green_plane_bytes,
+            (20 + GREEN_PLANE_CHROMA_HALO * 2) * (18 + GREEN_PLANE_CHROMA_HALO * 2) * 4
+        );
+        assert_matches_full_green_reference(&crop, &full_green_crop);
+    }
+
+    #[test]
+    fn xtrans_hq_edge_roi_green_plane_is_clamped_and_matches_full_green_reference() {
+        let width = 48;
+        let height = 48;
+        let cfa = CFA::new(XTRANS_PATTERN);
+        let truth = (0..height)
+            .flat_map(|row| (0..width).map(move |col| synthetic_color(row, col, width, "fabric")))
+            .collect::<Vec<_>>();
+        let pixels = mosaic_truth(&cfa, &truth, width, height);
+        let edge_roi = Rect::new(
+            rawler::imgop::Point::new(0, 0),
+            rawler::imgop::Dim2::new(20, 18),
+        );
+
+        let (edge, edge_report) = demosaic_xtrans_hq(&pixels, &cfa, edge_roi);
+        let full_green_edge =
+            demosaic_xtrans_hq_with_full_green_plane_for_test(&pixels, &cfa, edge_roi);
+
+        assert_eq!(
+            edge_report.scratch_memory.green_plane_bytes,
+            (20 + GREEN_PLANE_CHROMA_HALO) * (18 + GREEN_PLANE_CHROMA_HALO) * 4
+        );
+        assert_matches_full_green_reference(&edge, &full_green_edge);
+    }
+
+    #[test]
+    fn xtrans_hq_cancellation_checkpoints_are_bounded_to_green_window() {
+        let width = 96;
+        let height = 96;
+        let cfa = CFA::new(XTRANS_PATTERN);
+        let truth = (0..height)
+            .flat_map(|row| {
+                (0..width).map(move |col| synthetic_color(row, col, width, "slanted_edge"))
+            })
+            .collect::<Vec<_>>();
+        let pixels = mosaic_truth(&cfa, &truth, width, height);
+        let roi = Rect::new(
+            rawler::imgop::Point::new(40, 40),
+            rawler::imgop::Dim2::new(10, 10),
+        );
+        let mut checks = 0usize;
+
+        let (_, report) = demosaic_xtrans_hq_with_cancel(&pixels, &cfa, roi, || {
+            checks += 1;
+            Ok(())
+        })
+        .expect("bounded window should complete");
+
+        assert_eq!(
+            report.scratch_memory.green_plane_bytes,
+            (10 + GREEN_PLANE_CHROMA_HALO * 2) * (10 + GREEN_PLANE_CHROMA_HALO * 2) * 4
+        );
+        assert!(checks < height);
     }
 
     #[test]
