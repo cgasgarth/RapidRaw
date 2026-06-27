@@ -32,16 +32,25 @@ const reportSchema = z
   })
   .strict();
 
-const [probeSource, gpuSource, shaderSource, libSource, commandsSource, packageSource, runtimeProofSource] =
-  await Promise.all([
-    readFile('src-tauri/src/color_gpu_readback_probe.rs', 'utf8'),
-    readFile('src-tauri/src/gpu_processing.rs', 'utf8'),
-    readFile('src-tauri/src/shaders/shader.wgsl', 'utf8'),
-    readFile('src-tauri/src/lib.rs', 'utf8'),
-    readFile('src/tauri/commands.ts', 'utf8'),
-    readFile('package.json', 'utf8'),
-    readFile(RUNTIME_PROOF_PATH, 'utf8'),
-  ]);
+const [
+  probeSource,
+  gpuSource,
+  gpuReadbackSource,
+  shaderSource,
+  libSource,
+  commandsSource,
+  packageSource,
+  runtimeProofSource,
+] = await Promise.all([
+  readFile('src-tauri/src/color_gpu_readback_probe.rs', 'utf8'),
+  readFile('src-tauri/src/gpu_processing.rs', 'utf8'),
+  readFile('src-tauri/src/gpu_readback.rs', 'utf8'),
+  readFile('src-tauri/src/shaders/shader.wgsl', 'utf8'),
+  readFile('src-tauri/src/lib.rs', 'utf8'),
+  readFile('src/tauri/commands.ts', 'utf8'),
+  readFile('package.json', 'utf8'),
+  readFile(RUNTIME_PROOF_PATH, 'utf8'),
+]);
 const failures: string[] = [];
 
 for (const required of [
@@ -55,16 +64,23 @@ for (const required of [
 ]) {
   if (!probeSource.includes(required)) failures.push(`GPU readback probe source missing ${required}.`);
 }
-if (!gpuSource.includes('pub(crate) fn read_texture_data_roi_with_bytes_per_pixel(')) {
+if (!gpuReadbackSource.includes('pub(crate) fn read_texture_data_roi_with_bytes_per_pixel(')) {
   failures.push('GPU readback helper must be crate-visible for validation probes.');
 }
 for (const required of [
   'const GPU_OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float',
-  'const GPU_OUTPUT_BYTES_PER_PIXEL: u32 = 8',
   'read_texture_data_roi_with_bytes_per_pixel(',
-  'DynamicImage::ImageRgba16',
 ]) {
   if (!gpuSource.includes(required)) failures.push(`High-precision GPU export/readback path missing ${required}.`);
+}
+if (
+  !gpuSource.includes('const GPU_OUTPUT_BYTES_PER_PIXEL: u32 = 8') &&
+  !gpuSource.includes('const GPU_OUTPUT_BYTES_PER_PIXEL: u32 = RGBA16_FLOAT_BYTES_PER_PIXEL')
+) {
+  failures.push('High-precision GPU export/readback path missing GPU_OUTPUT_BYTES_PER_PIXEL constant.');
+}
+if (!gpuReadbackSource.includes('DynamicImage::ImageRgba16')) {
+  failures.push('GPU readback conversion must preserve high-precision RGBA16 output.');
 }
 if (!gpuSource.includes('format: GPU_OUTPUT_TEXTURE_FORMAT')) {
   failures.push('GPU processor output textures must use the shared high-precision output format.');
