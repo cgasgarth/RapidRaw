@@ -48,6 +48,7 @@ mod image_processing;
 #[cfg(all(test, feature = "tauri-test"))]
 mod layer_mask_real_raw_proof;
 mod lens_correction;
+mod library_identity;
 #[cfg(feature = "validation-harness")]
 mod linear_gradient_mask_real_raw_proof;
 mod lut_processing;

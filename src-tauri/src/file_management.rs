@@ -13,7 +13,7 @@ use std::thread;
 
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use image::codecs::{jpeg::JpegEncoder, tiff::TiffDecoder};
 use image::{ColorType, DynamicImage, GenericImageView, ImageBuffer, ImageDecoder, Luma};
 use rayon::prelude::*;
@@ -40,6 +40,9 @@ use crate::image_processing::{
     Crop, ImageMetadata, RawEngineArtifacts, apply_coarse_rotation,
     apply_cpu_default_raw_processing, apply_crop, apply_flip, apply_geometry_warp, apply_rotation,
     auto_results_to_json, get_all_adjustments_from_json, perform_auto_analysis,
+};
+use crate::library_identity::{
+    LibraryRelinkIdentity, read_exif_for_paths_blocking, read_library_relink_identity_blocking,
 };
 use crate::mask_generation::MaskDefinition;
 use crate::tagging::{COLOR_TAG_PREFIX, USER_TAG_PREFIX};
@@ -320,18 +323,6 @@ pub struct FileWatchSnapshot {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct LibraryRelinkIdentity {
-    path: String,
-    byte_length: Option<u64>,
-    content_hash: Option<String>,
-    capture_timestamp: Option<String>,
-    camera_make: Option<String>,
-    camera_model: Option<String>,
-    lens_model: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
 pub struct ImportSettings {
     pub filename_template: String,
     pub organize_by_date: bool,
@@ -485,37 +476,9 @@ pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
 pub async fn read_exif_for_paths(
     paths: Vec<String>,
 ) -> Result<HashMap<String, HashMap<String, String>>, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let exif_data: HashMap<String, HashMap<String, String>> = paths
-            .par_iter()
-            .filter_map(|virtual_path| {
-                let (source_path, _) = parse_virtual_path(virtual_path);
-                let source_path_str = source_path.to_string_lossy().to_string();
-
-                let map = if let Some(sidecar_exif) =
-                    crate::exif_processing::read_rrexif_sidecar(&source_path)
-                {
-                    sidecar_exif
-                } else if let Ok(mmap) = read_file_mapped(&source_path) {
-                    crate::exif_processing::read_exif_data(&source_path_str, &mmap)
-                } else if let Ok(bytes) = fs::read(&source_path) {
-                    crate::exif_processing::read_exif_data(&source_path_str, &bytes)
-                } else {
-                    HashMap::new()
-                };
-
-                if map.is_empty() {
-                    None
-                } else {
-                    Some((virtual_path.clone(), map))
-                }
-            })
-            .collect();
-
-        Ok(exif_data)
-    })
-    .await
-    .unwrap_or_else(|e| Err(format!("Task failed: {}", e)))
+    tauri::async_runtime::spawn_blocking(move || Ok(read_exif_for_paths_blocking(paths)))
+        .await
+        .unwrap_or_else(|e| Err(format!("Task failed: {}", e)))
 }
 
 #[tauri::command]
@@ -523,90 +486,6 @@ pub async fn read_library_relink_identity(path: String) -> Result<LibraryRelinkI
     tauri::async_runtime::spawn_blocking(move || read_library_relink_identity_blocking(path))
         .await
         .map_err(|e| format!("Task failed: {}", e))?
-}
-
-fn read_library_relink_identity_blocking(path: String) -> Result<LibraryRelinkIdentity, String> {
-    let (source_path, _) = parse_virtual_path(&path);
-    let source_path_str = source_path.to_string_lossy().to_string();
-    let metadata = fs::metadata(&source_path).ok();
-    let exif = read_relink_exif(&source_path, &source_path_str);
-
-    Ok(LibraryRelinkIdentity {
-        path,
-        byte_length: metadata.as_ref().map(|item| item.len()),
-        content_hash: metadata
-            .as_ref()
-            .filter(|item| item.is_file())
-            .map(|_| sha256_file(&source_path))
-            .transpose()?,
-        capture_timestamp: capture_timestamp_from_exif(&exif),
-        camera_make: non_empty_exif(&exif, "Make"),
-        camera_model: non_empty_exif(&exif, "Model"),
-        lens_model: non_empty_exif(&exif, "LensModel"),
-    })
-}
-
-fn read_relink_exif(source_path: &Path, source_path_str: &str) -> HashMap<String, String> {
-    if let Some(sidecar_exif) = crate::exif_processing::read_rrexif_sidecar(source_path) {
-        return sidecar_exif;
-    }
-
-    if let Ok(mmap) = read_file_mapped(source_path) {
-        return crate::exif_processing::read_exif_data(source_path_str, &mmap);
-    }
-
-    if let Ok(bytes) = fs::read(source_path) {
-        return crate::exif_processing::read_exif_data(source_path_str, &bytes);
-    }
-
-    HashMap::new()
-}
-
-fn capture_timestamp_from_exif(exif: &HashMap<String, String>) -> Option<String> {
-    exif.get("DateTimeOriginal")
-        .or_else(|| exif.get("CreateDate"))
-        .and_then(|value| parse_relink_datetime(value))
-        .map(|datetime| DateTime::<Utc>::from_naive_utc_and_offset(datetime, Utc).to_rfc3339())
-}
-
-fn parse_relink_datetime(value: &str) -> Option<NaiveDateTime> {
-    let trimmed = value.trim();
-    for format in [
-        "%Y:%m:%d %H:%M:%S",
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%dT%H:%M:%S",
-    ] {
-        if let Ok(datetime) = NaiveDateTime::parse_from_str(trimmed, format) {
-            return Some(datetime);
-        }
-    }
-    None
-}
-
-fn non_empty_exif(exif: &HashMap<String, String>, key: &str) -> Option<String> {
-    exif.get(key)
-        .map(|value| value.trim())
-        .filter(|value| !value.is_empty())
-        .map(str::to_string)
-}
-
-fn sha256_file(path: &Path) -> Result<String, String> {
-    let mut file =
-        fs::File::open(path).map_err(|e| format!("Failed to open file for hashing: {e}"))?;
-    let mut hasher = Sha256::new();
-    let mut buffer = [0_u8; 1024 * 64];
-
-    loop {
-        let read = file
-            .read(&mut buffer)
-            .map_err(|e| format!("Failed to hash file: {e}"))?;
-        if read == 0 {
-            break;
-        }
-        hasher.update(&buffer[..read]);
-    }
-
-    Ok(format!("sha256:{}", hex::encode(hasher.finalize())))
 }
 
 #[tauri::command]
