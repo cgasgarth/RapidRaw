@@ -451,6 +451,16 @@ const stockMetadataLocaleKeys = [
   'stockMetadataUseSuggestedPreset',
 ];
 const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
+const extractedUiSource = [
+  'src/components/modals/NegativeLabPatchSamplerPanel.tsx',
+  'src/components/modals/NegativeLabQcProofPanel.tsx',
+  'src/components/modals/NegativeLabRollHealthPanel.tsx',
+  'src/components/modals/NegativeLabRollHealthModel.ts',
+  'src/hooks/useNegativeLabProfileBrowser.ts',
+]
+  .map((path) => readFileSync(path, 'utf8'))
+  .join('\n');
+const negativeLabUiSource = `${modalSource}\n${extractedUiSource}`;
 const backendSource = readFileSync('src-tauri/src/negative_conversion.rs', 'utf8');
 
 for (const marker of [
@@ -613,8 +623,8 @@ for (const marker of [
   'NEGATIVE_LAB_STOCK_METADATA_COUNTS',
   'NEGATIVE_LAB_STOCK_REGISTRY',
 ]) {
-  if (!modalSource.includes(marker)) {
-    failures.push(`negative conversion modal is missing workflow marker: ${marker}`);
+  if (!negativeLabUiSource.includes(marker)) {
+    failures.push(`negative conversion UI is missing workflow marker: ${marker}`);
   }
 }
 
