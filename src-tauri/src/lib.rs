@@ -75,6 +75,7 @@ mod tagging_utils;
 mod tethering;
 mod wavelet_render;
 mod window_customizer;
+mod xmp_sidecar;
 mod xtrans_hq;
 
 use std::collections::{HashMap, hash_map::DefaultHasher};
