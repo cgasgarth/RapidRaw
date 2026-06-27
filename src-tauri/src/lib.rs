@@ -49,6 +49,7 @@ mod gpu_textures;
 mod hdr_artifact_sidecar;
 #[cfg(all(test, feature = "tauri-test"))]
 mod hdr_real_raw_proof;
+mod image_analytics;
 mod image_codecs;
 mod image_loader;
 mod image_processing;
@@ -706,7 +707,7 @@ fn start_analytics_worker(app_handle: tauri::AppHandle) {
                 job = latest;
             }
 
-            if let Ok(histogram_data) = image_processing::calculate_histogram_from_image(&job.image)
+            if let Ok(histogram_data) = image_analytics::calculate_histogram_from_image(&job.image)
             {
                 let _ = app_handle.emit(
                     crate::events::HISTOGRAM_UPDATE,
@@ -715,7 +716,7 @@ fn start_analytics_worker(app_handle: tauri::AppHandle) {
             }
 
             if let Ok(gamut_warning_data) =
-                image_processing::calculate_gamut_warning_overlay_from_image(&job.image)
+                image_analytics::calculate_gamut_warning_overlay_from_image(&job.image)
             {
                 let _ = app_handle.emit(
                     crate::events::GAMUT_WARNING_UPDATE,
@@ -724,7 +725,7 @@ fn start_analytics_worker(app_handle: tauri::AppHandle) {
             }
 
             if job.compute_waveform
-                && let Ok(waveform_data) = image_processing::calculate_waveform_from_image(
+                && let Ok(waveform_data) = image_analytics::calculate_waveform_from_image(
                     &job.image,
                     job.active_waveform_channel.as_deref(),
                 )
