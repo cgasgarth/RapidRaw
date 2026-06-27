@@ -75,6 +75,7 @@ mod panorama_utils;
 mod person_segmentation;
 mod preset_converter;
 mod presets;
+mod preview_worker;
 #[cfg(all(test, feature = "tauri-test"))]
 mod private_decode_raw_proof;
 #[cfg(feature = "validation-harness")]
@@ -119,9 +120,7 @@ use image_hdr::input::HDRInput;
 use imageproc::drawing::draw_line_segment_mut;
 use imageproc::edges::canny;
 use imageproc::hough::{LineDetectionOptions, detect_lines};
-use imgref::ImgRef;
 use mozjpeg_rs::{Encoder, Preset};
-use rgb::{FromSlice, RGBA8};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -399,307 +398,6 @@ async fn update_wgpu_transform(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
-fn process_preview_job(
-    app_handle: &tauri::AppHandle,
-    state: tauri::State<AppState>,
-    mut adjustments_json: serde_json::Value,
-    is_interactive: bool,
-    target_resolution: Option<u32>,
-    roi: Option<(f32, f32, f32, f32)>,
-    compute_waveform: bool,
-    active_waveform_channel: Option<&str>,
-) -> Result<Vec<u8>, String> {
-    let fn_start = std::time::Instant::now();
-    let context = get_or_init_gpu_context(&state, app_handle)?;
-    hydrate_adjustments(&state, &mut adjustments_json);
-    let adjustments_clone = adjustments_json;
-
-    let loaded_image_guard = state.original_image.lock().unwrap();
-    let loaded_image = loaded_image_guard
-        .as_ref()
-        .ok_or("No original image loaded")?
-        .clone();
-    drop(loaded_image_guard);
-
-    let new_transform_hash = calculate_transform_hash(&adjustments_clone);
-    let settings = load_settings_or_default(app_handle);
-    let live_quality = settings.live_preview_quality.as_deref().unwrap_or("high");
-
-    let default_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
-    let preview_dim = target_resolution.unwrap_or(default_preview_dim);
-    #[cfg(not(any(target_os = "linux", target_os = "android")))]
-    let use_wgpu_renderer = settings.use_wgpu_renderer.unwrap_or(true);
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    let use_wgpu_renderer = false;
-
-    let has_roi = roi.is_some();
-    let (interactive_divisor, interactive_quality) = match live_quality {
-        "full" => (1.0_f32, 85_u8),
-        "performance" => (if has_roi { 1.8_f32 } else { 1.5_f32 }, 65_u8),
-        _ => (if has_roi { 1.4_f32 } else { 1.0_f32 }, 75_u8),
-    };
-
-    let mut cached_preview_lock = state.cached_preview.lock().unwrap();
-
-    let base_valid = cached_preview_lock
-        .as_ref()
-        .is_some_and(|c| c.transform_hash == new_transform_hash && c.preview_dim == preview_dim);
-    let small_valid = base_valid
-        && cached_preview_lock
-            .as_ref()
-            .is_some_and(|c| c.interactive_divisor == interactive_divisor);
-
-    let (final_preview_base, scale_for_gpu, unscaled_crop_offset) = if base_valid {
-        let cached = cached_preview_lock.as_ref().unwrap();
-        (
-            Arc::clone(&cached.image),
-            cached.scale,
-            cached.unscaled_crop_offset,
-        )
-    } else {
-        render_caches::RenderCaches::new(&state).clear_gpu_image_cache();
-
-        let (base, scale, offset) =
-            generate_transformed_preview(&state, &loaded_image, &adjustments_clone, preview_dim)?;
-        (Arc::new(base), scale, offset)
-    };
-
-    let small_preview_base = if small_valid {
-        Arc::clone(&cached_preview_lock.as_ref().unwrap().small_image)
-    } else {
-        let small = if interactive_divisor > 1.0 {
-            let target_size = (preview_dim as f32 / interactive_divisor) as u32;
-            let (w, h) = final_preview_base.dimensions();
-            let (small_w, small_h) = if w > h {
-                let ratio = h as f32 / w as f32;
-                (target_size, (target_size as f32 * ratio) as u32)
-            } else {
-                let ratio = w as f32 / h as f32;
-                ((target_size as f32 * ratio) as u32, target_size)
-            };
-            Arc::new(image_processing::downscale_f32_image(
-                &final_preview_base,
-                small_w,
-                small_h,
-            ))
-        } else {
-            Arc::clone(&final_preview_base)
-        };
-
-        if is_interactive && base_valid {
-            render_caches::RenderCaches::new(&state).clear_gpu_image_cache();
-        }
-
-        small
-    };
-
-    *cached_preview_lock = Some(CachedPreview {
-        image: Arc::clone(&final_preview_base),
-        small_image: Arc::clone(&small_preview_base),
-        transform_hash: new_transform_hash,
-        scale: scale_for_gpu,
-        unscaled_crop_offset,
-        preview_dim,
-        interactive_divisor,
-    });
-
-    drop(cached_preview_lock);
-
-    let (processing_image, effective_scale, jpeg_quality) = if is_interactive {
-        let orig_w = final_preview_base.width() as f32;
-        let small_w = small_preview_base.width() as f32;
-        let scale_factor = if orig_w > 0.0 { small_w / orig_w } else { 1.0 };
-        let new_scale = scale_for_gpu * scale_factor;
-        (small_preview_base, new_scale, interactive_quality)
-    } else {
-        (final_preview_base, scale_for_gpu, 94)
-    };
-
-    let pre_gpu_detail_stage = render_pipeline::apply_pre_gpu_detail_stages(
-        processing_image.as_ref(),
-        new_transform_hash,
-        &adjustments_clone,
-    );
-    let render_input_hash = pre_gpu_detail_stage.render_hash;
-    let processing_image_ref = pre_gpu_detail_stage.image.as_ref();
-
-    let (preview_width, preview_height) = processing_image_ref.dimensions();
-
-    let pixel_roi = if is_interactive {
-        roi.map(|(nx, ny, nw, nh)| crate::gpu_processing::Roi {
-            x: (nx * preview_width as f32).round() as u32,
-            y: (ny * preview_height as f32).round() as u32,
-            width: (nw * preview_width as f32).round() as u32,
-            height: (nh * preview_height as f32).round() as u32,
-        })
-    } else {
-        None
-    };
-
-    let mask_definitions: Vec<MaskDefinition> = adjustments_clone
-        .get("masks")
-        .and_then(|m| serde_json::from_value(m.clone()).ok())
-        .unwrap_or_default();
-
-    let scaled_crop_offset = (
-        unscaled_crop_offset.0 * effective_scale,
-        unscaled_crop_offset.1 * effective_scale,
-    );
-
-    let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
-        .iter()
-        .filter_map(|def| {
-            get_cached_or_generate_mask(
-                &state,
-                def,
-                preview_width,
-                preview_height,
-                effective_scale,
-                scaled_crop_offset,
-                &adjustments_clone,
-            )
-        })
-        .collect();
-
-    let retouched_processing_image = crate::retouch_render::apply_clone_retouch_layers(
-        processing_image_ref,
-        &adjustments_clone,
-        &mask_bitmaps,
-    );
-
-    let is_raw = loaded_image.is_raw;
-    let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
-    let final_adjustments = get_all_adjustments_from_json(&adjustments_clone, is_raw, tm_override);
-    let lut_path = adjustments_clone["lutPath"].as_str();
-    let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
-
-    let wants_analytics = !(is_interactive && pixel_roi.is_some());
-    let channel_filter = if is_interactive {
-        active_waveform_channel.map(|s| s.to_string())
-    } else {
-        None
-    };
-
-    let analytics_config = if wants_analytics {
-        state
-            .analytics_worker_tx
-            .lock()
-            .unwrap()
-            .clone()
-            .map(|tx| crate::AnalyticsConfig {
-                path: loaded_image.path.clone(),
-                compute_waveform,
-                active_waveform_channel: channel_filter,
-                sender: tx,
-            })
-    } else {
-        None
-    };
-
-    let final_processed_image_result =
-        crate::image_processing::process_and_get_dynamic_image_with_analytics(
-            &context,
-            &state,
-            retouched_processing_image.as_ref(),
-            render_input_hash,
-            RenderRequest {
-                adjustments: final_adjustments,
-                mask_bitmaps: &mask_bitmaps,
-                lut,
-                roi: pixel_roi,
-            },
-            "apply_adjustments",
-            use_wgpu_renderer,
-            analytics_config,
-        );
-
-    if let Ok(final_processed_image) = final_processed_image_result {
-        if use_wgpu_renderer {
-            let _ = context.device.poll(wgpu::PollType::Wait {
-                submission_index: None,
-                timeout: Some(std::time::Duration::from_millis(500)),
-            });
-            let _ = app_handle.emit(
-                crate::events::WGPU_FRAME_READY,
-                serde_json::json!({ "path": loaded_image.path }),
-            );
-            return Ok(b"WGPU_RENDER".to_vec());
-        }
-
-        let final_processed_image = Arc::new(final_processed_image);
-        let final_rgba_image = match &*final_processed_image {
-            DynamicImage::ImageRgba8(img) => img,
-            _ => return Err("Expected Rgba8 image from GPU for encoding".to_string()),
-        };
-
-        let raw_bytes: &[u8] = final_rgba_image.as_raw();
-        let rgba8_pixels: &[RGBA8] = raw_bytes.as_rgba();
-
-        let img_ref = ImgRef::new(
-            rgba8_pixels,
-            final_rgba_image.width() as usize,
-            final_rgba_image.height() as usize,
-        );
-
-        let step_start = std::time::Instant::now();
-
-        let encode_result = Encoder::new(Preset::BaselineFastest)
-            .quality(jpeg_quality)
-            .fast_color(true)
-            .encode_imgref(img_ref);
-
-        match encode_result {
-            Ok(jpeg_bytes) => {
-                if is_interactive {
-                    let (roi_w, roi_h) = final_rgba_image.dimensions();
-                    let (rx, ry) = if let Some(r) = pixel_roi {
-                        (r.x, r.y)
-                    } else {
-                        (0, 0)
-                    };
-
-                    let mut response = Vec::with_capacity(24 + jpeg_bytes.len());
-                    response.extend_from_slice(&rx.to_le_bytes());
-                    response.extend_from_slice(&ry.to_le_bytes());
-                    response.extend_from_slice(&roi_w.to_le_bytes());
-                    response.extend_from_slice(&roi_h.to_le_bytes());
-                    response.extend_from_slice(&preview_width.to_le_bytes());
-                    response.extend_from_slice(&preview_height.to_le_bytes());
-                    response.extend_from_slice(&jpeg_bytes);
-
-                    log::info!(
-                        "[process_preview_job] interactive ROI {}x{} encode in {:.2?}, total {:.2?}",
-                        roi_w,
-                        roi_h,
-                        step_start.elapsed(),
-                        fn_start.elapsed()
-                    );
-                    Ok(response)
-                } else {
-                    let (width, height) = final_rgba_image.dimensions();
-                    log::info!(
-                        "[process_preview_job] full {}x{} q={} encode in {:.2?}, total {:.2?}",
-                        width,
-                        height,
-                        jpeg_quality,
-                        step_start.elapsed(),
-                        fn_start.elapsed()
-                    );
-                    Ok(jpeg_bytes)
-                }
-            }
-            Err(e) => Err(format!("Failed to encode preview: {}", e)),
-        }
-    } else {
-        log::error!(
-            "[process_preview_job] processing failed after {:.2?}",
-            fn_start.elapsed()
-        );
-        Err("Processing failed".to_string())
-    }
-}
-
 fn start_analytics_worker(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<AppState>();
     let (tx, rx): (Sender<AnalyticsJob>, Receiver<AnalyticsJob>) = mpsc::channel();
@@ -738,41 +436,6 @@ fn start_analytics_worker(app_handle: tauri::AppHandle) {
                     crate::events::WAVEFORM_UPDATE,
                     serde_json::json!({ "path": job.path, "data": waveform_data }),
                 );
-            }
-        }
-    });
-}
-
-fn start_preview_worker(app_handle: tauri::AppHandle) {
-    let state = app_handle.state::<AppState>();
-    let (tx, rx): (Sender<PreviewJob>, Receiver<PreviewJob>) = mpsc::channel();
-
-    *state.preview_worker_tx.lock().unwrap() = Some(tx);
-
-    std::thread::spawn(move || {
-        while let Ok(mut job) = rx.recv() {
-            while let Ok(latest_job) = rx.try_recv() {
-                job = latest_job;
-            }
-
-            let state = app_handle.state::<AppState>();
-            let responder = job.responder;
-            match process_preview_job(
-                &app_handle,
-                state,
-                job.adjustments,
-                job.is_interactive,
-                job.target_resolution,
-                job.roi,
-                job.compute_waveform,
-                job.active_waveform_channel.as_deref(),
-            ) {
-                Ok(bytes) => {
-                    let _ = responder.send(bytes);
-                }
-                Err(e) => {
-                    log::error!("Preview worker error: {}", e);
-                }
             }
         }
     });
@@ -2225,7 +1888,7 @@ pub fn run() {
                 }
             }
 
-            start_preview_worker(app_handle.clone());
+            preview_worker::start_preview_worker(app_handle.clone());
             start_analytics_worker(app_handle.clone());
             file_management::start_thumbnail_workers(app_handle);
             jxl_oxide::integration::register_image_decoding_hook();
