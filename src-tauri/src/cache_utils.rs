@@ -1,5 +1,6 @@
 use crate::AppState;
 use crate::raw_processing::RawDevelopmentReport;
+use crate::render_caches::RenderCaches;
 use image::DynamicImage;
 use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
@@ -214,32 +215,10 @@ impl DecodedImageCache {
 
 #[tauri::command]
 pub fn clear_image_caches(state: tauri::State<AppState>) {
-    if let Ok(mut decoded_cache) = state.decoded_image_cache.lock() {
-        decoded_cache.clear();
-    }
-    if let Ok(mut gpu_cache) = state.gpu_image_cache.lock() {
-        *gpu_cache = None;
-    }
-    if let Ok(mut preview_cache) = state.cached_preview.lock() {
-        *preview_cache = None;
-    }
-    if let Ok(mut warped_cache) = state.full_warped_cache.lock() {
-        *warped_cache = None;
-    }
-    if let Ok(mut transformed_cache) = state.full_transformed_cache.lock() {
-        *transformed_cache = None;
-    }
+    RenderCaches::new(state.inner()).clear_image_caches();
 }
 
 #[tauri::command]
 pub fn clear_session_caches(state: tauri::State<AppState>) {
-    if let Ok(mut patch_cache) = state.patch_cache.lock() {
-        patch_cache.clear();
-    }
-    if let Ok(mut mask_cache) = state.mask_cache.lock() {
-        mask_cache.clear();
-    }
-    if let Ok(mut geometry_cache) = state.geometry_cache.lock() {
-        geometry_cache.clear();
-    }
+    RenderCaches::new(state.inner()).clear_session_caches();
 }
