@@ -56,6 +56,9 @@ const proof = negativeLabWorkspaceProofSchema.parse({
   targetCount: targetPaths.length,
 });
 const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
+const rollHealthPanelSource = readFileSync('src/components/modals/NegativeLabRollHealthPanel.tsx', 'utf8');
+const rollHealthModelSource = readFileSync('src/components/modals/NegativeLabRollHealthModel.ts', 'utf8');
+const workspaceUiSource = `${modalSource}\n${rollHealthPanelSource}\n${rollHealthModelSource}`;
 const firstReviewFrame = mixedReviewReport.frames.find((frame) =>
   frame.candidates.some((candidate) => candidate.kind === 'dust_spot'),
 );
@@ -415,7 +418,7 @@ for (const marker of [
   "data-can-save={canSave ? 'true' : 'false'}",
   'disabled:opacity-100',
 ]) {
-  if (!modalSource.includes(marker)) {
+  if (!workspaceUiSource.includes(marker)) {
     throw new Error(`Negative Lab workspace UI marker missing: ${marker}`);
   }
 }

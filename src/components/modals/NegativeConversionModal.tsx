@@ -82,6 +82,13 @@ import {
   buildNegativeLabQcProofReport,
 } from '../../utils/negativeLabDustScratchReview';
 import {
+  buildNegativeLabCanSave,
+  buildNegativeLabPositiveHandoffReadiness,
+  buildNegativeLabSaveBlockedReason,
+  buildNegativeLabWorkspaceProof,
+  selectNegativeLabActivePositiveVariant,
+} from '../../utils/negativeLabExportHandoff';
+import {
   buildNegativeLabFrameExposureOverridePayload,
   getNegativeLabEffectiveFrameExposure,
   snapNegativeLabFrameExposureOffset,
@@ -261,7 +268,6 @@ const CUSTOM_BASE_SAMPLE_DEFAULT = {
   x: 0.25,
   y: 0.25,
 } satisfies NegativeLabBaseFogSampleRect;
-const NEGATIVE_LAB_WORKSPACE_UI_SCHEMA_VERSION = 1 satisfies NegativeLabWorkspaceProof['schemaVersion'];
 const getInitialIncludedPaths = (paths: string[]) => new Set(paths);
 const readNegativeLabQcOverlayVisibility = (): NegativeLabQcOverlayVisibility => {
   if (typeof window === 'undefined') return DEFAULT_NEGATIVE_LAB_QC_OVERLAY_VISIBILITY;
@@ -1135,34 +1141,44 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     ? acceptedBatchPlanIdentity.acceptedDryRunPlanId
     : 'accept_dry_run_plan_first';
   const requiresAcceptedBatchPlan = hasMultipleScans && conversionScope !== 'active';
-  const canSave =
-    !isSaving &&
-    !isLoading &&
-    previewUrl !== null &&
-    baseFogEstimate !== null &&
-    pathsToConvert.length > 0 &&
-    (!requiresAcceptedBatchPlan || isBatchPlanAccepted);
-  const saveBlockedReasonKey =
-    canSave || isSaving
-      ? null
-      : isLoading || previewUrl === null
-        ? 'modals.negativeConversion.previewPending'
-        : baseFogEstimate === null
-          ? 'modals.negativeConversion.basePending'
-          : pathsToConvert.length === 0
-            ? 'modals.negativeConversion.workflowExportBlocked'
-            : requiresAcceptedBatchPlan && !isBatchPlanAccepted
-              ? 'modals.negativeConversion.agentDryRunBlocked'
-              : 'modals.negativeConversion.workflowExportBlocked';
-  const qcProofReport = useMemo(
-    () =>
-      buildNegativeLabQcProofReport(
-        dustScratchReviewReport,
-        previewUrl !== null,
-        canSave && pathsToConvert.length === targetPaths.length,
-      ),
-    [canSave, dustScratchReviewReport, pathsToConvert.length, previewUrl, targetPaths.length],
-  );
+  const exportReadinessInput = {
+    baseReady: baseFogEstimate !== null,
+    batchPlanAccepted: isBatchPlanAccepted,
+    isLoading,
+    isSaving,
+    pathCount: pathsToConvert.length,
+    previewReady: previewUrl !== null,
+    requiresAcceptedBatchPlan,
+  };
+  const canSave = buildNegativeLabCanSave(exportReadinessInput);
+  const saveBlockedReasonKey = buildNegativeLabSaveBlockedReason({ ...exportReadinessInput, canSave });
+  const qcProofReport = useMemo(() => {
+    const exportReady = buildNegativeLabCanSave({
+      baseReady: baseFogEstimate !== null,
+      batchPlanAccepted: isBatchPlanAccepted,
+      isLoading,
+      isSaving,
+      pathCount: pathsToConvert.length,
+      previewReady: previewUrl !== null,
+      requiresAcceptedBatchPlan,
+    });
+
+    return buildNegativeLabQcProofReport(
+      dustScratchReviewReport,
+      previewUrl !== null,
+      exportReady && pathsToConvert.length === targetPaths.length,
+    );
+  }, [
+    baseFogEstimate,
+    dustScratchReviewReport,
+    isBatchPlanAccepted,
+    isLoading,
+    isSaving,
+    pathsToConvert.length,
+    previewUrl,
+    requiresAcceptedBatchPlan,
+    targetPaths.length,
+  ]);
   const qcProofArtifact = useMemo(() => {
     const sourcePathsByFrameId = new Map(
       frameHealthReport.frames.map((frame) => [frame.frameId, frame.sourcePath] as const),
@@ -1184,24 +1200,38 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     targetPaths.length,
   ]);
   const activePositiveVariant = useMemo(
-    () =>
-      qcProofArtifact.positiveVariants.find((variant) => variant.frameId === frameHealthReport.activeFrameId) ??
-      qcProofArtifact.positiveVariants[0] ??
-      null,
+    () => selectNegativeLabActivePositiveVariant(qcProofArtifact.positiveVariants, frameHealthReport.activeFrameId),
     [frameHealthReport.activeFrameId, qcProofArtifact.positiveVariants],
   );
-  const workspaceProof = useMemo(
-    (): NegativeLabWorkspaceProof => ({
-      activeStage: canSave ? 'export' : previewUrl === null ? 'colorInversion' : 'inspection',
-      exportReady: canSave,
+  const workspaceProof = useMemo((): NegativeLabWorkspaceProof => {
+    const exportReady = buildNegativeLabCanSave({
+      baseReady: baseFogEstimate !== null,
+      batchPlanAccepted: isBatchPlanAccepted,
+      isLoading,
+      isSaving,
+      pathCount: pathsToConvert.length,
+      previewReady: previewUrl !== null,
+      requiresAcceptedBatchPlan,
+    });
+
+    return buildNegativeLabWorkspaceProof({
+      canSave: exportReady,
       previewReady: previewUrl !== null,
       queuedCount: pathsToConvert.length,
       reviewReport: dustScratchReviewReport,
-      schemaVersion: NEGATIVE_LAB_WORKSPACE_UI_SCHEMA_VERSION,
       targetCount: targetPaths.length,
-    }),
-    [canSave, dustScratchReviewReport, pathsToConvert.length, previewUrl, targetPaths.length],
-  );
+    });
+  }, [
+    baseFogEstimate,
+    dustScratchReviewReport,
+    isBatchPlanAccepted,
+    isLoading,
+    isSaving,
+    pathsToConvert.length,
+    previewUrl,
+    requiresAcceptedBatchPlan,
+    targetPaths.length,
+  ]);
 
   const workflowStages = useMemo<NegativeLabWorkflowStage[]>(
     () => [
@@ -3095,7 +3125,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const renderPositiveVariantHandoff = () => {
     if (activePositiveVariant === null) return null;
 
-    const handoffReady = canSave && qcProofReport.exportReady && activePositiveVariant.warnings.length === 0;
+    const handoffReady = buildNegativeLabPositiveHandoffReadiness({
+      activePositiveVariant,
+      canSave,
+      qcExportReady: qcProofReport.exportReady,
+    });
     const baseScopeLabelKey =
       baseFogScope === 'roll' ? 'modals.negativeConversion.baseScopeRoll' : 'modals.negativeConversion.baseScopeFrame';
     const selectedProfileId = selectedProfile?.presetId ?? 'custom';
