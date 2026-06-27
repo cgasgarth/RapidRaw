@@ -30,6 +30,8 @@ const MODE_PRIORITY = new Map([
 
 const RELEASE_PREFIXES = ['.cargo/', 'src-tauri/'];
 
+const RELEASE_ASSET_FILES = new Set(['data/io.github.CyberTimon.RapidRAW.metainfo.xml', 'public/splash-dark.jpg']);
+
 const ALWAYS_REQUIRE_FILES = new Set([
   'bun.lock',
   'Cargo.lock',
@@ -51,7 +53,13 @@ const ALWAYS_REQUIRE_FILES = new Set([
 
 const SAFE_ROOT_FILES = new Set(['.gitignore', 'AGENTS.md', 'LICENSE', 'README.md', 'RAW_EDITOR_PLAN.md']);
 
-const SAFE_TOOLING_FILES = new Set(['.githooks/pre-commit', 'eslint.config.js', 'i18next.config.ts', 'knip.jsonc']);
+const SAFE_TOOLING_FILES = new Set([
+  '.githooks/pre-commit',
+  'eslint.config.js',
+  'i18next.config.ts',
+  'knip.jsonc',
+  'src/i18n/update_translations.py',
+]);
 
 const SAFE_FRONTEND_EXTENSIONS = new Set([
   '.css',
@@ -387,6 +395,14 @@ function classifyPathChange(change) {
 
   if (ALWAYS_REQUIRE_FILES.has(path)) {
     return { decision: SMOKE_DECISIONS.MAIN, mode: SMOKE_MODES.RELEASE, reason: 'build configuration changed' };
+  }
+
+  if (RELEASE_ASSET_FILES.has(path)) {
+    return {
+      decision: SMOKE_DECISIONS.MAIN,
+      mode: SMOKE_MODES.RELEASE,
+      reason: 'release metadata or app asset changed',
+    };
   }
 
   if (RELEASE_PREFIXES.some((prefix) => path.startsWith(prefix))) {
@@ -884,6 +900,13 @@ function runSelfTest() {
     SMOKE_MODES.NONE,
   );
   assertClassification('public styles can skip smoke', ['public/theme.css'], SMOKE_MODES.NONE);
+  assertClassification('release app splash requires smoke', ['public/splash-dark.jpg'], SMOKE_MODES.RELEASE);
+  assertClassification(
+    'release app metadata requires smoke',
+    ['data/io.github.CyberTimon.RapidRAW.metainfo.xml'],
+    SMOKE_MODES.RELEASE,
+  );
+  assertClassification('i18n helper tooling can skip smoke', ['src/i18n/update_translations.py'], SMOKE_MODES.NONE);
   assertClassification('color fixture outputs can skip smoke', ['fixtures/color/channel-mixer.json'], SMOKE_MODES.NONE);
   assertClassification(
     'film fixture outputs can skip smoke',

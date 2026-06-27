@@ -1,12 +1,14 @@
 import cx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Copy, ClipboardPaste, ChevronUp, ChevronDown, Check, FileInput, Settings } from 'lucide-react';
+import { Star, Copy, ClipboardPaste, ChevronUp, ChevronDown, Check, FileInput, Settings, Filter } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 
 import Filmstrip from './Filmstrip';
 import { useEditorStore } from '../../store/useEditorStore';
+import { useLibraryStore } from '../../store/useLibraryStore';
+import { COLOR_LABELS } from '../../utils/adjustments';
 import { GLOBAL_KEYS, type ImageFile, type SelectedImage, type ThumbnailAspectRatio } from '../ui/AppProperties';
 import UiText from '../ui/Text';
 
@@ -156,6 +158,14 @@ export default function BottomBar({
   const total = totalImages ?? 0;
   const showSelectionCounter = numSelected > 1;
   const visibleFilmstripHeight = filmstripHeight ?? 0;
+  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+  const { filterCriteria, setFilterCriteria } = useLibraryStore(
+    useShallow((state) => ({
+      filterCriteria: state.filterCriteria,
+      setFilterCriteria: state.setFilterCriteria,
+    })),
+  );
+  const allColors = [...COLOR_LABELS, { name: 'none' as const, color: '#9ca3af' }];
 
   useEffect(() => {
     if (isZoomReady && !isDraggingSlider.current) {
@@ -358,6 +368,97 @@ export default function BottomBar({
             >
               <Settings size={18} />
             </button>
+          </div>
+          <div className="h-5 w-px bg-surface mx-4"></div>
+          <div
+            className={cx(
+              'flex items-center transition-all duration-300',
+              isFilterExpanded ? 'bg-surface rounded-md' : 'bg-transparent',
+            )}
+          >
+            <button
+              className={cx(
+                'relative w-8 h-8 flex items-center justify-center rounded-md transition-colors shrink-0',
+                isFilterExpanded ? 'text-text-primary' : 'text-text-secondary hover:bg-surface hover:text-text-primary',
+              )}
+              onClick={() => {
+                setIsFilterExpanded((value) => !value);
+              }}
+              data-tooltip={t('ui.bottomBar.tooltips.quickFilter')}
+            >
+              <Filter size={18} />
+            </button>
+            <div
+              className={cx(
+                'flex items-center transition-all duration-300 ease-in-out overflow-hidden',
+                isFilterExpanded ? 'max-w-100 opacity-100 pr-2 ml-1' : 'max-w-0 opacity-0 pr-0 ml-0',
+              )}
+            >
+              <div className="flex items-center gap-3 whitespace-nowrap">
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map((starValue) => {
+                    const isFilled = filterCriteria.rating > 0 && starValue <= filterCriteria.rating;
+                    return (
+                      <button
+                        key={`qf-star-${starValue}`}
+                        aria-label={t('library.header.viewOptions.filterByRating', { rating: starValue })}
+                        onClick={() => {
+                          setFilterCriteria((prev) => ({
+                            ...prev,
+                            rating: prev.rating === starValue ? 0 : starValue,
+                          }));
+                        }}
+                        className="p-0.5 focus:outline-none"
+                      >
+                        <Star
+                          size={16}
+                          className={cx(
+                            'transition-colors duration-150',
+                            isFilled ? 'text-accent fill-accent' : 'text-text-secondary hover:text-accent',
+                          )}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="h-4 w-px bg-border-color"></div>
+                <div className="flex items-center gap-1.5">
+                  {allColors.map((color) => {
+                    const isSelected = filterCriteria.colors.includes(color.name);
+                    const tooltipTitle =
+                      color.name === 'none'
+                        ? t('library.header.viewOptions.noLabel')
+                        : t(`contextMenus.colors.${color.name}`, {
+                            defaultValue: color.name.charAt(0).toUpperCase() + color.name.slice(1),
+                          });
+
+                    return (
+                      <button
+                        key={`qf-color-${color.name}`}
+                        aria-label={t('library.header.viewOptions.filterByColorLabel', {
+                          color: tooltipTitle,
+                        })}
+                        onClick={() => {
+                          const currentColors = filterCriteria.colors;
+                          const nextColors = currentColors.includes(color.name)
+                            ? currentColors.filter((name) => name !== color.name)
+                            : [...currentColors, color.name];
+                          setFilterCriteria((prev) => ({ ...prev, colors: nextColors }));
+                        }}
+                        className={cx(
+                          'w-4 h-4 rounded-full transition-transform hover:scale-105 flex items-center justify-center focus:outline-none',
+                          isSelected ? 'ring-2 ring-accent ring-offset-1 ring-offset-bg-primary' : '',
+                        )}
+                        style={{ backgroundColor: color.color }}
+                        data-tooltip={tooltipTitle}
+                      >
+                        {isSelected && <Check size={10} className="text-white drop-shadow-md" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
           <div
             className={cx(

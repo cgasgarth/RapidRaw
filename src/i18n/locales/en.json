@@ -120,6 +120,7 @@
           "shadowClipping": "Shadow clipping active"
         }
       },
+      "localHue": "Local Hue",
       "luminance": "Luminance",
       "maskPreview": "Mask preview",
       "maskPreviewEnabled": "Mask",
@@ -1258,6 +1259,7 @@
       "warning": "Original file is disconnected. Edits are preview-only until the original is reconnected; full-resolution export is unavailable."
     },
     "presets": {
+      "amount": "Amount",
       "applyPresetLabel": "Apply preset {{name}}",
       "colorStyles": {
         "adjustmentCoverage_one": "{{count}} adjustment",
@@ -1662,10 +1664,17 @@
         "folders": "Folders",
         "pinned": "Pinned"
       },
+      "sort": {
+        "created": "Date Created",
+        "imageCount": "Image Count",
+        "modified": "Date Modified",
+        "name": "Alphabetically"
+      },
       "tooltips": {
         "clearSearch": "Clear search",
         "collapse": "Collapse",
-        "expand": "Expand"
+        "expand": "Expand",
+        "sortFolders": "Sort Folders"
       }
     },
     "grid": {
@@ -1961,6 +1970,7 @@
         "exposureToneMapper": "Exposure & Tone Mapper",
         "grain": "Grain",
         "halationGlow": "Halation & Glow",
+        "hueShift": "Global Hue Shift",
         "lensCorrection": "Lens Correction",
         "lut": "LUT",
         "masks": "Masks",
@@ -3769,6 +3779,7 @@
         "expandFilmstrip": "Expand Filmstrip",
         "export": "Export",
         "pasteSettings": "Paste Settings",
+        "quickFilter": "Quick Filter",
         "rateStars_one": "Rate 1 star",
         "rateStars_other": "Rate {{count}} stars",
         "resetZoom": "Reset Zoom to Fit Window",

@@ -120,6 +120,7 @@
           "shadowClipping": "Shadow clipping active"
         }
       },
+      "localHue": "局部色调",
       "luminance": "亮度",
       "maskPreview": "",
       "maskPreviewEnabled": "",
@@ -1249,6 +1250,7 @@
       "warning": "原始文件已断开连接。在重新连接原始文件之前，编辑仅适用于预览；无法进行全分辨率导出。"
     },
     "presets": {
+      "amount": "数量",
       "applyPresetLabel": "应用预设 {{name}}",
       "colorStyles": {
         "adjustmentCoverage_other": "{{count}} 项调整",
@@ -1643,10 +1645,17 @@
         "folders": "文件夹",
         "pinned": "已固定"
       },
+      "sort": {
+        "created": "创建日期",
+        "imageCount": "图像数量",
+        "modified": "修改日期",
+        "name": "按字母顺序"
+      },
       "tooltips": {
         "clearSearch": "清除搜索",
         "collapse": "折叠",
-        "expand": "展开"
+        "expand": "展开",
+        "sortFolders": "对文件夹排序"
       }
     },
     "grid": {
@@ -1936,6 +1945,7 @@
         "exposureToneMapper": "曝光与色调映射",
         "grain": "颗粒",
         "halationGlow": "光晕与发光",
+        "hueShift": "全局色相偏移",
         "lensCorrection": "镜头校正",
         "lut": "LUT",
         "masks": "蒙版",
@@ -3633,6 +3643,7 @@
         "expandFilmstrip": "展开胶片条",
         "export": "导出",
         "pasteSettings": "粘贴设置",
+        "quickFilter": "快速筛选",
         "rateStars_one": "评分 1 星",
         "rateStars_other": "评分 {{count}} 星",
         "resetZoom": "重置缩放以适应窗口",

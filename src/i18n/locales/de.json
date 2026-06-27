@@ -120,6 +120,7 @@
           "shadowClipping": "Shadow clipping active"
         }
       },
+      "localHue": "Lokaler Farbton",
       "luminance": "Luminanz",
       "maskPreview": "",
       "maskPreviewEnabled": "",
@@ -1256,6 +1257,7 @@
       "warning": "Die Originaldatei ist getrennt. Bearbeitungen sind nur Vorschau-Bearbeitungen, bis das Original wieder verbunden ist; Export in voller Auflösung ist nicht verfügbar."
     },
     "presets": {
+      "amount": "Stärke",
       "applyPresetLabel": "Vorgabe {{name}} anwenden",
       "colorStyles": {
         "adjustmentCoverage_one": "{{count}} Anpassung",
@@ -1659,10 +1661,17 @@
         "folders": "Ordner",
         "pinned": "Angeheftet"
       },
+      "sort": {
+        "created": "Erstellungsdatum",
+        "imageCount": "Bildanzahl",
+        "modified": "Änderungsdatum",
+        "name": "Alphabetisch"
+      },
       "tooltips": {
         "clearSearch": "Suche löschen",
         "collapse": "Zuklappen",
-        "expand": "Aufklappen"
+        "expand": "Aufklappen",
+        "sortFolders": "Ordner sortieren"
       }
     },
     "grid": {
@@ -1957,6 +1966,7 @@
         "exposureToneMapper": "Belichtung & Tonemapper",
         "grain": "Körnung",
         "halationGlow": "Lichthof & Glühen",
+        "hueShift": "Globaler Farbton-Shift",
         "lensCorrection": "Objektivkorrektur",
         "lut": "LUT",
         "masks": "Masken",
@@ -3668,6 +3678,7 @@
         "expandFilmstrip": "Filmstreifen erweitern",
         "export": "Exportieren",
         "pasteSettings": "Einstellungen einfügen",
+        "quickFilter": "Schnellfilter",
         "rateStars_one": "Mit 1 Stern bewerten",
         "rateStars_other": "Mit {{count}} Sternen bewerten",
         "resetZoom": "Zoom auf Einpassen zurücksetzen",

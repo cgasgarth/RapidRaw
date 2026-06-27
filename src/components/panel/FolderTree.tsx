@@ -22,12 +22,15 @@ import {
   User,
   Car,
   Briefcase,
+  ArrowUpDown,
+  Check,
   type LucideIcon,
 } from 'lucide-react';
 import {
   useState,
   useMemo,
   useEffect,
+  useRef,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
@@ -39,7 +42,7 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
-import { type AlbumItem, Invokes } from '../ui/AppProperties';
+import { type AlbumItem, type FolderTreeSort, Invokes, SortDirection } from '../ui/AppProperties';
 import UiText from '../ui/Text';
 
 export interface FolderTree {
@@ -49,6 +52,8 @@ export interface FolderTree {
   path: string;
   imageCount?: number | undefined;
   hasSubdirs?: boolean | undefined;
+  modified?: number | undefined;
+  created?: number | undefined;
 }
 
 interface FolderTreeProps {
@@ -130,6 +135,63 @@ const getAutoExpandedPaths = (node: FolderTree, paths: Set<string>) => {
   }
 };
 
+const filterAlbumTree = (node: AlbumItem | null, query: string): AlbumItem | null => {
+  if (!node) return null;
+
+  const lowerCaseQuery = query.toLowerCase();
+  const isMatch = node.name.toLowerCase().includes(lowerCaseQuery);
+
+  if (node.type === 'album') {
+    return isMatch ? node : null;
+  }
+
+  const filteredChildren = node.children
+    .map((child) => filterAlbumTree(child, query))
+    .filter((child): child is AlbumItem => child !== null);
+
+  if (isMatch || filteredChildren.length > 0) {
+    return { ...node, children: filteredChildren };
+  }
+
+  return null;
+};
+
+const getAutoExpandedAlbumGroups = (node: AlbumItem, groups: Set<string>) => {
+  if (node.type === 'group' && node.children.length > 0) {
+    groups.add(node.id);
+    node.children.forEach((child) => {
+      getAutoExpandedAlbumGroups(child, groups);
+    });
+  }
+};
+
+const sortFolderTree = (nodes: FolderTree[], sort: FolderTreeSort): FolderTree[] => {
+  const sorted = [...nodes].sort((a, b) => {
+    const comparison =
+      sort.key === 'name'
+        ? a.name.localeCompare(b.name)
+        : sort.key === 'modified'
+          ? (a.modified || 0) - (b.modified || 0)
+          : sort.key === 'created'
+            ? (a.created || 0) - (b.created || 0)
+            : (a.imageCount || 0) - (b.imageCount || 0);
+    return sort.order === SortDirection.Ascending ? comparison : -comparison;
+  });
+
+  return sorted.map((node) => ({
+    ...node,
+    children: node.children.length > 0 ? sortFolderTree(node.children, sort) : node.children,
+  }));
+};
+
+const getAlbumImageCount = (item: AlbumItem): number => {
+  if (item.type === 'album') {
+    return item.images.length;
+  }
+
+  return item.children.reduce((sum, child) => sum + getAlbumImageCount(child), 0);
+};
+
 function SectionHeader({ title, isOpen, onToggle }: { title: string; isOpen: boolean; onToggle: () => void }) {
   const { t } = useTranslation();
 
@@ -154,6 +216,123 @@ function SectionHeader({ title, isOpen, onToggle }: { title: string; isOpen: boo
   );
 }
 
+function FolderSortMenu({
+  sort,
+  onChange,
+  isOpen,
+  setIsOpen,
+}: {
+  sort: FolderTreeSort;
+  onChange: (sort: FolderTreeSort) => void;
+  isOpen: boolean;
+  setIsOpen: (open: boolean) => void;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [setIsOpen]);
+
+  const options = [
+    { key: 'name', label: t('library.folders.sort.name') },
+    { key: 'created', label: t('library.folders.sort.created') },
+    { key: 'modified', label: t('library.folders.sort.modified') },
+    { key: 'imageCount', label: t('library.folders.sort.imageCount') },
+  ] as const;
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        className={cx(
+          'bg-surface rounded-md hover:bg-card-active flex items-center justify-center shrink-0 overflow-hidden transition-colors w-9 h-9',
+          isOpen && 'bg-card-active',
+        )}
+        onClick={() => {
+          setIsOpen(!isOpen);
+        }}
+        data-tooltip={t('library.folders.tooltips.sortFolders')}
+      >
+        <ArrowUpDown size={16} className="text-text-secondary" />
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.1, ease: 'easeOut' }}
+            className="absolute right-0 top-full mt-2 w-48 origin-top-right z-50"
+          >
+            <div className="bg-surface/90 backdrop-blur-md border border-border-color/50 rounded-lg shadow-xl p-2 flex flex-col">
+              <div className="px-3 py-2 relative flex items-center">
+                <UiText as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="uppercase">
+                  {t('library.header.viewOptions.sortBy')}
+                </UiText>
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onChange({
+                      ...sort,
+                      order:
+                        sort.order === SortDirection.Ascending ? SortDirection.Descending : SortDirection.Ascending,
+                    });
+                  }}
+                  data-tooltip={
+                    sort.order === SortDirection.Ascending
+                      ? t('library.header.viewOptions.sortDescending')
+                      : t('library.header.viewOptions.sortAscending')
+                  }
+                  className="absolute top-1/2 right-3 -translate-y-1/2 p-1 bg-transparent border-none text-text-secondary hover:text-text-primary rounded-sm transition-colors"
+                >
+                  {sort.order === SortDirection.Ascending ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
+              </div>
+
+              {options.map((option) => {
+                const isSelected = sort.key === option.key;
+                return (
+                  <button
+                    key={option.key}
+                    className={cx(
+                      'w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors duration-150',
+                      isSelected ? 'bg-card-active' : 'hover:bg-bg-primary',
+                    )}
+                    onClick={() => {
+                      if (sort.key !== option.key) {
+                        onChange({ key: option.key, order: sort.order });
+                      }
+                      setIsOpen(false);
+                    }}
+                  >
+                    <UiText
+                      variant={TextVariants.label}
+                      color={TextColors.primary}
+                      weight={isSelected ? TextWeights.semibold : TextWeights.normal}
+                    >
+                      {option.label}
+                    </UiText>
+                    {isSelected && <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />}
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function AlbumTreeNode({
   item,
   expandedGroups,
@@ -161,6 +340,7 @@ function AlbumTreeNode({
   onSelectAlbum,
   onContextMenu,
   selectedAlbumId,
+  showImageCounts,
 }: {
   item: AlbumItem;
   expandedGroups: Set<string>;
@@ -168,10 +348,12 @@ function AlbumTreeNode({
   onSelectAlbum: (id: string, name: string, images: string[]) => void;
   onContextMenu: (event: ReactMouseEvent<HTMLElement>, item: AlbumItem) => void;
   selectedAlbumId: string | null;
+  showImageCounts: boolean;
 }) {
   const isGroup = item.type === 'group';
   const isExpanded = expandedGroups.has(item.id);
   const isSelected = item.id === selectedAlbumId;
+  const imageCount = getAlbumImageCount(item);
   const handleSelect = () => {
     if (isGroup) {
       onToggle(item.id);
@@ -231,6 +413,19 @@ function AlbumTreeNode({
           className="truncate flex-1 select-none"
         >
           {item.name}
+          {imageCount > 0 && (
+            <UiText
+              as="span"
+              variant={TextVariants.small}
+              color={TextColors.secondary}
+              className={cx(
+                'inline-block ml-1 transition-all ease-in-out duration-300',
+                showImageCounts ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2',
+              )}
+            >
+              ({imageCount})
+            </UiText>
+          )}
         </span>
         {isGroup && (
           <button
@@ -271,6 +466,7 @@ function AlbumTreeNode({
                       onSelectAlbum={onSelectAlbum}
                       onContextMenu={onContextMenu}
                       selectedAlbumId={selectedAlbumId}
+                      showImageCounts={showImageCounts}
                     />
                   </motion.div>
                 ))}
@@ -498,10 +694,16 @@ export default function FolderTree({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isHovering, setIsHovering] = useState(false);
+  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const pinnedFolders = appSettings?.pinnedFolders || [];
   const openSections = useMemo(() => appSettings?.openTreeSections ?? ['current'], [appSettings?.openTreeSections]);
   const showImageCounts = appSettings?.enableFolderImageCounts ?? false;
   const folderIcons = appSettings?.folderIcons || {};
+  const folderTreeSort = useMemo<FolderTreeSort>(
+    () => appSettings?.folderTreeSort ?? { key: 'name', order: SortDirection.Ascending },
+    [appSettings?.folderTreeSort],
+  );
+  const showHeaderButtons = isHovering || isSortMenuOpen;
 
   useEffect(() => {
     void invokeWithSchema(Invokes.GetAlbums, {}, albumTreeSchema)
@@ -541,18 +743,20 @@ export default function FolderTree({
   const isSearching = trimmedQuery.length > 1;
 
   const filteredTrees = useMemo(() => {
-    if (!isSearching) return folderTrees;
-    return folderTrees
-      .map((tree) => filterTree(tree, trimmedQuery))
-      .filter((tree): tree is FolderTree => tree !== null);
-  }, [folderTrees, trimmedQuery, isSearching]);
+    const base = isSearching
+      ? folderTrees.map((tree) => filterTree(tree, trimmedQuery)).filter((tree): tree is FolderTree => tree !== null)
+      : folderTrees;
+    return sortFolderTree(base, folderTreeSort);
+  }, [folderTrees, trimmedQuery, isSearching, folderTreeSort]);
 
   const filteredPinnedTrees = useMemo(() => {
-    if (!isSearching) return pinnedFolderTrees;
-    return pinnedFolderTrees
-      .map((pinnedTree) => filterTree(pinnedTree, trimmedQuery))
-      .filter((t): t is FolderTree => t !== null);
-  }, [pinnedFolderTrees, trimmedQuery, isSearching]);
+    const base = isSearching
+      ? pinnedFolderTrees
+          .map((pinnedTree) => filterTree(pinnedTree, trimmedQuery))
+          .filter((tree): tree is FolderTree => tree !== null)
+      : pinnedFolderTrees;
+    return sortFolderTree(base, folderTreeSort);
+  }, [pinnedFolderTrees, trimmedQuery, isSearching, folderTreeSort]);
 
   const searchAutoExpandedFolders = useMemo(() => {
     if (!isSearching) return new Set<string>();
@@ -570,10 +774,31 @@ export default function FolderTree({
     return new Set([...expandedFolders, ...searchAutoExpandedFolders]);
   }, [expandedFolders, searchAutoExpandedFolders]);
 
+  const filteredAlbumTree = useMemo(() => {
+    if (!isSearching) return albumTree;
+    return albumTree
+      .map((item) => filterAlbumTree(item, trimmedQuery))
+      .filter((item): item is AlbumItem => item !== null);
+  }, [albumTree, trimmedQuery, isSearching]);
+
+  const searchAutoExpandedAlbumGroups = useMemo(() => {
+    if (!isSearching) return new Set<string>();
+    const next = new Set<string>();
+    filteredAlbumTree.forEach((item) => {
+      getAutoExpandedAlbumGroups(item, next);
+    });
+    return next;
+  }, [isSearching, filteredAlbumTree]);
+
+  const effectiveExpandedAlbumGroups = useMemo(() => {
+    return new Set([...expandedAlbumGroups, ...searchAutoExpandedAlbumGroups]);
+  }, [expandedAlbumGroups, searchAutoExpandedAlbumGroups]);
+
   useEffect(() => {
     if (isSearching && appSettings) {
       const hasPinnedResults = filteredPinnedTrees.length > 0;
       const hasBaseResults = filteredTrees.length > 0;
+      const hasAlbumResults = filteredAlbumTree.length > 0;
 
       const newSections = [...openSections];
       let changed = false;
@@ -586,18 +811,32 @@ export default function FolderTree({
         newSections.push('current');
         changed = true;
       }
+      if (hasAlbumResults && !newSections.includes('albums')) {
+        newSections.push('albums');
+        changed = true;
+      }
 
       if (changed) {
         void handleSettingsChange({ ...appSettings, openTreeSections: newSections });
       }
     }
-  }, [isSearching, filteredTrees, filteredPinnedTrees, openSections, handleSettingsChange, appSettings]);
+  }, [
+    isSearching,
+    filteredTrees,
+    filteredPinnedTrees,
+    filteredAlbumTree,
+    openSections,
+    handleSettingsChange,
+    appSettings,
+  ]);
 
   const isPinnedOpen = openSections.includes('pinned');
   const isCurrentOpen = openSections.includes('current');
   const isAlbumsOpen = openSections.includes('albums');
 
   const hasVisiblePinnedTrees = filteredPinnedTrees.length > 0;
+  const hasVisibleAlbums = filteredAlbumTree.length > 0;
+  const showAlbumsSection = hasVisibleAlbums || (!isSearching && albumTree.length === 0);
 
   return (
     <div
@@ -630,7 +869,7 @@ export default function FolderTree({
           <div className="pt-1 pb-2">
             <div className="flex items-center">
               <AnimatePresence>
-                {isHovering && (
+                {showHeaderButtons && (
                   <motion.button
                     initial={{ width: 0, padding: 0, marginRight: 0, opacity: 0 }}
                     animate={{ width: 36, padding: 10, marginRight: 6, opacity: 1 }}
@@ -669,6 +908,31 @@ export default function FolderTree({
                   </button>
                 )}
               </div>
+              <AnimatePresence>
+                {showHeaderButtons && (
+                  <motion.div
+                    initial={{ width: 0, opacity: 0, marginLeft: 0 }}
+                    animate={{ width: 'auto', opacity: 1, marginLeft: 4 }}
+                    exit={{ width: 0, opacity: 0, marginLeft: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                    className={cx(
+                      'flex items-center shrink-0',
+                      isSortMenuOpen ? 'overflow-visible' : 'overflow-hidden',
+                    )}
+                  >
+                    <FolderSortMenu
+                      sort={folderTreeSort}
+                      onChange={(newSort) => {
+                        if (appSettings) {
+                          void handleSettingsChange({ ...appSettings, folderTreeSort: newSort });
+                        }
+                      }}
+                      isOpen={isSortMenuOpen}
+                      setIsOpen={setIsSortMenuOpen}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 
@@ -736,7 +1000,7 @@ export default function FolderTree({
               </>
             )}
 
-            {!isSearching && (
+            {showAlbumsSection && (
               <>
                 <div>
                   <SectionHeader
@@ -762,7 +1026,7 @@ export default function FolderTree({
                     >
                       <div className="pt-1 pb-2">
                         <AnimatePresence>
-                          {albumTree.map((item) => (
+                          {filteredAlbumTree.map((item) => (
                             <motion.div
                               key={item.id}
                               initial={{ opacity: 0, height: 0, x: -15 }}
@@ -773,16 +1037,17 @@ export default function FolderTree({
                             >
                               <AlbumTreeNode
                                 item={item}
-                                expandedGroups={expandedAlbumGroups}
+                                expandedGroups={effectiveExpandedAlbumGroups}
                                 onToggle={toggleAlbumGroup}
                                 onSelectAlbum={onSelectAlbum}
                                 onContextMenu={onAlbumContextMenu}
                                 selectedAlbumId={activeAlbumId}
+                                showImageCounts={showImageCounts && isHovering}
                               />
                             </motion.div>
                           ))}
                         </AnimatePresence>
-                        {albumTree.length === 0 && (
+                        {albumTree.length === 0 && !isSearching && (
                           <motion.div layout="position">
                             <UiText variant={TextVariants.small} className="p-2 text-center">
                               {t('library.folders.albumsEmpty')}
@@ -886,7 +1151,7 @@ export default function FolderTree({
               </>
             )}
 
-            {filteredTrees.length === 0 && !hasVisiblePinnedTrees && isSearching && (
+            {filteredTrees.length === 0 && !hasVisiblePinnedTrees && !hasVisibleAlbums && isSearching && (
               <UiText className="p-2 text-center">{t('library.folders.noFoldersFound')}</UiText>
             )}
 
