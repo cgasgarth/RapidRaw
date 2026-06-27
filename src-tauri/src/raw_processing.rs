@@ -2070,4 +2070,71 @@ mod tests {
         )
         .expect("write X-Trans HQ proof report");
     }
+
+    #[test]
+    fn private_dual_illuminant_profile_runtime_proof_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_DUAL_ILLUMINANT_PROFILE_PROOF").ok()
+            != Some("1".to_string())
+        {
+            return;
+        }
+
+        let source_path = std::env::var("RAWENGINE_PRIVATE_RAW_SOURCE")
+            .expect("RAWENGINE_PRIVATE_RAW_SOURCE must point to a private RAW");
+        let report_dir = std::env::var("RAWENGINE_DUAL_ILLUMINANT_PROFILE_REPORT_DIR")
+            .unwrap_or_else(|_| "target/dual-illuminant-profile-proof".to_string());
+        let report_dir = Path::new(&report_dir);
+        fs::create_dir_all(report_dir).expect("create report dir");
+
+        let file_bytes = fs::read(&source_path).expect("read private RAW");
+        let started = std::time::Instant::now();
+        let (developed, report) = develop_raw_image_with_report(
+            &file_bytes,
+            false,
+            RawProcessingProfile::Balanced,
+            2.5,
+            "default".to_string(),
+            None,
+        )
+        .expect("develop private RAW with camera-profile report");
+        let elapsed_ms = started.elapsed().as_millis();
+
+        assert!(developed.width() > 0);
+        assert!(developed.height() > 0);
+        assert_eq!(
+            report.camera_profile.algorithm_id,
+            CAMERA_PROFILE_RESOLVER_ALGORITHM_ID
+        );
+
+        let rgba = developed.to_rgba8();
+        let image_hash = format!("blake3:{}", blake3::hash(rgba.as_raw()).to_hex());
+        let tiff_path = report_dir.join("dual-illuminant-profile-preview.tiff");
+        developed
+            .save_with_format(&tiff_path, image::ImageFormat::Tiff)
+            .expect("write dual-illuminant proof TIFF");
+
+        let proof_report = serde_json::json!({
+            "issue": 3244,
+            "proofBoundary": "private_dual_illuminant_profile_runtime_report",
+            "proofLevel": "private_raw_smoke_not_colorchecker_accuracy",
+            "sourcePath": source_path,
+            "dimensions": {
+                "width": developed.width(),
+                "height": developed.height(),
+            },
+            "elapsedMs": elapsed_ms,
+            "rawDevelopmentReport": report,
+            "output": {
+                "imageHash": image_hash,
+                "tiffPath": tiff_path.to_string_lossy(),
+            },
+            "colorimetricProof": false,
+            "privateAssetsCommitted": false,
+        });
+        fs::write(
+            report_dir.join("dual-illuminant-profile-private-proof.json"),
+            serde_json::to_vec_pretty(&proof_report).expect("serialize dual-illuminant proof"),
+        )
+        .expect("write dual-illuminant proof report");
+    }
 }
