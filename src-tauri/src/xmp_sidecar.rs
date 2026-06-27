@@ -274,7 +274,7 @@ pub fn sync_metadata_to_xmp_sidecar(
         }
     }
 
-    crate::exif_processing::write_text_file_atomic(&xmp_file, &content).map_err(|e| e.to_string())
+    crate::exif_processing::write_text_file_atomic(&xmp_file, &content)
 }
 
 #[cfg(test)]
