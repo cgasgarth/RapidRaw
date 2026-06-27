@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
+use std::time::Instant;
 
 use base64::{Engine as _, engine::general_purpose};
 use image::{
@@ -12,8 +13,9 @@ use serde_json::Value;
 use crate::ai_connector;
 use crate::ai_processing::{
     self, AiDepthMaskParameters, AiForegroundMaskParameters, AiSkyMaskParameters,
-    AiSubjectMaskParameters, CachedDepthMap, generate_image_embeddings, get_or_init_ai_models,
-    run_depth_anything_model, run_sam_decoder, run_sky_seg_model, run_u2netp_model,
+    AiSubjectMaskParameters, CachedDepthMap, ImageEmbeddings, generate_image_embeddings,
+    get_or_init_ai_models, run_depth_anything_model, run_sam_decoder, run_sky_seg_model,
+    run_u2netp_model,
 };
 use crate::app_settings::load_settings_or_default;
 use crate::app_state::AppState;
@@ -33,6 +35,137 @@ fn encode_to_base64_png(image: &GrayImage) -> Result<String, String> {
         .map_err(|e| e.to_string())?;
     let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
     Ok(png_data_url(base64_str))
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiObjectMaskProposal {
+    pub mask_data_base64: String,
+    pub provider_id: String,
+    pub model_id: String,
+    pub image_width: u32,
+    pub image_height: u32,
+    pub prompt_count: usize,
+    pub prompt_kind: String,
+    pub embedding_latency_ms: Option<f64>,
+    pub decoder_latency_ms: f64,
+    pub click_to_mask_latency_ms: f64,
+}
+
+fn sam_path_hash(path: &str, js_adjustments: &Value) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(path.as_bytes());
+    let mut geo_hasher = DefaultHasher::new();
+    for key in GEOMETRY_KEYS {
+        if let Some(val) = js_adjustments.get(key) {
+            key.hash(&mut geo_hasher);
+            val.to_string().hash(&mut geo_hasher);
+        }
+    }
+    hasher.update(&geo_hasher.finish().to_le_bytes());
+    hasher.finalize().to_hex().to_string()
+}
+
+fn unwarp_sam_prompt(
+    start_point: (f64, f64),
+    end_point: (f64, f64),
+    rotation: f32,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+    orientation_steps: u8,
+    image_width: u32,
+    image_height: u32,
+) -> ((f64, f64), (f64, f64)) {
+    let (coarse_rotated_w, coarse_rotated_h) = if orientation_steps % 2 == 1 {
+        (image_height as f64, image_width as f64)
+    } else {
+        (image_width as f64, image_height as f64)
+    };
+
+    let center = (coarse_rotated_w / 2.0, coarse_rotated_h / 2.0);
+    let p1 = start_point;
+    let p2 = (start_point.0, end_point.1);
+    let p3 = end_point;
+    let p4 = (end_point.0, start_point.1);
+
+    let angle_rad = (rotation as f64).to_radians();
+    let cos_a = angle_rad.cos();
+    let sin_a = angle_rad.sin();
+
+    let unrotate = |p: (f64, f64)| {
+        let px = p.0 - center.0;
+        let py = p.1 - center.1;
+        let new_px = px * cos_a + py * sin_a + center.0;
+        let new_py = -px * sin_a + py * cos_a + center.1;
+        (new_px, new_py)
+    };
+
+    let unflip = |p: (f64, f64)| {
+        let mut new_px = p.0;
+        let mut new_py = p.1;
+        if flip_horizontal {
+            new_px = coarse_rotated_w - p.0;
+        }
+        if flip_vertical {
+            new_py = coarse_rotated_h - p.1;
+        }
+        (new_px, new_py)
+    };
+
+    let un_coarse_rotate = |p: (f64, f64)| -> (f64, f64) {
+        match orientation_steps {
+            0 => p,
+            1 => (p.1, image_height as f64 - p.0),
+            2 => (image_width as f64 - p.0, image_height as f64 - p.1),
+            3 => (image_width as f64 - p.1, p.0),
+            _ => p,
+        }
+    };
+
+    let transformed = [p1, p2, p3, p4].map(|point| un_coarse_rotate(unflip(unrotate(point))));
+    let min_x = transformed
+        .iter()
+        .map(|point| point.0)
+        .fold(f64::INFINITY, f64::min);
+    let min_y = transformed
+        .iter()
+        .map(|point| point.1)
+        .fold(f64::INFINITY, f64::min);
+    let max_x = transformed
+        .iter()
+        .map(|point| point.0)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let max_y = transformed
+        .iter()
+        .map(|point| point.1)
+        .fold(f64::NEG_INFINITY, f64::max);
+
+    ((min_x, min_y), (max_x, max_y))
+}
+
+fn get_cached_or_generate_sam_embeddings(
+    state: &tauri::State<'_, AppState>,
+    models: &ai_processing::AiModels,
+    js_adjustments: &Value,
+    path_hash: &str,
+) -> Result<(ImageEmbeddings, Option<f64>), String> {
+    let mut ai_state_lock = state.ai_state.lock().unwrap();
+    let ai_state = ai_state_lock.as_mut().unwrap();
+
+    if let Some(cached_embeddings) = &ai_state.embeddings
+        && cached_embeddings.path_hash == path_hash
+    {
+        return Ok((cached_embeddings.clone(), None));
+    }
+
+    let embedding_start = Instant::now();
+    let warped_image = get_cached_full_warped_image(state, js_adjustments)?;
+    let mut new_embeddings = generate_image_embeddings(warped_image.as_ref(), &models.sam_encoder)
+        .map_err(|e| e.to_string())?;
+    new_embeddings.path_hash = path_hash.to_string();
+    let embedding_latency_ms = embedding_start.elapsed().as_secs_f64() * 1000.0;
+    ai_state.embeddings = Some(new_embeddings.clone());
+    Ok((new_embeddings, Some(embedding_latency_ms)))
 }
 
 #[tauri::command]
@@ -259,118 +392,20 @@ pub async fn generate_ai_subject_mask(
         .await
         .map_err(|e| e.to_string())?;
 
-    let path_hash = {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(path.as_bytes());
-        let mut geo_hasher = DefaultHasher::new();
-        for key in GEOMETRY_KEYS {
-            if let Some(val) = js_adjustments.get(key) {
-                key.hash(&mut geo_hasher);
-                val.to_string().hash(&mut geo_hasher);
-            }
-        }
-        hasher.update(&geo_hasher.finish().to_le_bytes());
-        hasher.finalize().to_hex().to_string()
-    };
-
-    let embeddings = {
-        let mut ai_state_lock = state.ai_state.lock().unwrap();
-        let ai_state = ai_state_lock.as_mut().unwrap();
-
-        if let Some(cached_embeddings) = &ai_state.embeddings {
-            if cached_embeddings.path_hash == path_hash {
-                cached_embeddings.clone()
-            } else {
-                let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
-                let mut new_embeddings =
-                    generate_image_embeddings(warped_image.as_ref(), &models.sam_encoder)
-                        .map_err(|e| e.to_string())?;
-                new_embeddings.path_hash = path_hash;
-                ai_state.embeddings = Some(new_embeddings.clone());
-                new_embeddings
-            }
-        } else {
-            let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
-            let mut new_embeddings =
-                generate_image_embeddings(warped_image.as_ref(), &models.sam_encoder)
-                    .map_err(|e| e.to_string())?;
-            new_embeddings.path_hash = path_hash;
-            ai_state.embeddings = Some(new_embeddings.clone());
-            new_embeddings
-        }
-    };
-
+    let path_hash = sam_path_hash(&path, &js_adjustments);
+    let (embeddings, _) =
+        get_cached_or_generate_sam_embeddings(&state, &models, &js_adjustments, &path_hash)?;
     let (img_w, img_h) = embeddings.original_size;
-
-    let (coarse_rotated_w, coarse_rotated_h) = if orientation_steps % 2 == 1 {
-        (img_h as f64, img_w as f64)
-    } else {
-        (img_w as f64, img_h as f64)
-    };
-
-    let center = (coarse_rotated_w / 2.0, coarse_rotated_h / 2.0);
-
-    let p1 = start_point;
-    let p2 = (start_point.0, end_point.1);
-    let p3 = end_point;
-    let p4 = (end_point.0, start_point.1);
-
-    let angle_rad = (rotation as f64).to_radians();
-    let cos_a = angle_rad.cos();
-    let sin_a = angle_rad.sin();
-
-    let unrotate = |p: (f64, f64)| {
-        let px = p.0 - center.0;
-        let py = p.1 - center.1;
-        let new_px = px * cos_a + py * sin_a + center.0;
-        let new_py = -px * sin_a + py * cos_a + center.1;
-        (new_px, new_py)
-    };
-
-    let up1 = unrotate(p1);
-    let up2 = unrotate(p2);
-    let up3 = unrotate(p3);
-    let up4 = unrotate(p4);
-
-    let unflip = |p: (f64, f64)| {
-        let mut new_px = p.0;
-        let mut new_py = p.1;
-        if flip_horizontal {
-            new_px = coarse_rotated_w - p.0;
-        }
-        if flip_vertical {
-            new_py = coarse_rotated_h - p.1;
-        }
-        (new_px, new_py)
-    };
-
-    let ufp1 = unflip(up1);
-    let ufp2 = unflip(up2);
-    let ufp3 = unflip(up3);
-    let ufp4 = unflip(up4);
-
-    let un_coarse_rotate = |p: (f64, f64)| -> (f64, f64) {
-        match orientation_steps {
-            0 => p,
-            1 => (p.1, img_h as f64 - p.0),
-            2 => (img_w as f64 - p.0, img_h as f64 - p.1),
-            3 => (img_w as f64 - p.1, p.0),
-            _ => p,
-        }
-    };
-
-    let ucrp1 = un_coarse_rotate(ufp1);
-    let ucrp2 = un_coarse_rotate(ufp2);
-    let ucrp3 = un_coarse_rotate(ufp3);
-    let ucrp4 = un_coarse_rotate(ufp4);
-
-    let min_x = ucrp1.0.min(ucrp2.0).min(ucrp3.0).min(ucrp4.0);
-    let min_y = ucrp1.1.min(ucrp2.1).min(ucrp3.1).min(ucrp4.1);
-    let max_x = ucrp1.0.max(ucrp2.0).max(ucrp3.0).max(ucrp4.0);
-    let max_y = ucrp1.1.max(ucrp2.1).max(ucrp3.1).max(ucrp4.1);
-
-    let unrotated_start_point = (min_x, min_y);
-    let unrotated_end_point = (max_x, max_y);
+    let (unrotated_start_point, unrotated_end_point) = unwarp_sam_prompt(
+        start_point,
+        end_point,
+        rotation,
+        flip_horizontal,
+        flip_vertical,
+        orientation_steps,
+        img_w,
+        img_h,
+    );
 
     let mask_bitmap = run_sam_decoder(
         &models.sam_decoder,
@@ -391,6 +426,70 @@ pub async fn generate_ai_subject_mask(
         flip_horizontal: Some(flip_horizontal),
         flip_vertical: Some(flip_vertical),
         orientation_steps: Some(orientation_steps),
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+pub async fn generate_ai_object_mask_proposal(
+    js_adjustments: serde_json::Value,
+    path: String,
+    start_point: (f64, f64),
+    end_point: (f64, f64),
+    rotation: f32,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+    orientation_steps: u8,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<AiObjectMaskProposal, String> {
+    let total_start = Instant::now();
+    let models = get_or_init_ai_models(&app_handle, &state.ai_state, &state.ai_init_lock)
+        .await
+        .map_err(|e| e.to_string())?;
+    let path_hash = sam_path_hash(&path, &js_adjustments);
+    let (embeddings, embedding_latency_ms) =
+        get_cached_or_generate_sam_embeddings(&state, &models, &js_adjustments, &path_hash)?;
+    let (image_width, image_height) = embeddings.original_size;
+    let (unrotated_start_point, unrotated_end_point) = unwarp_sam_prompt(
+        start_point,
+        end_point,
+        rotation,
+        flip_horizontal,
+        flip_vertical,
+        orientation_steps,
+        image_width,
+        image_height,
+    );
+
+    let decoder_start = Instant::now();
+    let mask_bitmap = run_sam_decoder(
+        &models.sam_decoder,
+        &embeddings,
+        unrotated_start_point,
+        unrotated_end_point,
+    )
+    .map_err(|e| e.to_string())?;
+    let decoder_latency_ms = decoder_start.elapsed().as_secs_f64() * 1000.0;
+    let prompt_kind = if (start_point.0 - end_point.0).abs() < 1e-6
+        && (start_point.1 - end_point.1).abs() < 1e-6
+    {
+        "point"
+    } else {
+        "box"
+    };
+
+    Ok(AiObjectMaskProposal {
+        mask_data_base64: encode_to_base64_png(&mask_bitmap)?,
+        provider_id: "rapidraw-sam-vit-b-onnx-v1".to_string(),
+        model_id: "sam_vit_b_01ec64".to_string(),
+        image_width,
+        image_height,
+        prompt_count: if prompt_kind == "point" { 1 } else { 2 },
+        prompt_kind: prompt_kind.to_string(),
+        embedding_latency_ms,
+        decoder_latency_ms,
+        click_to_mask_latency_ms: total_start.elapsed().as_secs_f64() * 1000.0,
     })
 }
 

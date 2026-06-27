@@ -159,6 +159,7 @@
     "check:noise-separation": "bun tests/integration/checks/check-noise-separation-fixtures.ts",
     "check:ai-people-picker": "bun tests/integration/checks/check-ai-people-picker-model.ts",
     "check:ai-people-fake-provider": "bun tests/integration/checks/check-ai-people-fake-provider.ts",
+    "check:object-mask-command": "bun tests/integration/checks/check-object-mask-command.ts",
     "check:deltae-fixtures": "bun tests/integration/checks/check-deltae-fixtures.ts",
     "check:math-invariants": "bun tests/integration/checks/check-math-invariants.ts",
     "check:color-cpu-gpu-parity": "bun tests/integration/checks/check-color-cpu-gpu-parity.ts",

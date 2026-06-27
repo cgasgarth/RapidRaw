@@ -72,6 +72,7 @@ export enum Invokes {
   GenerateAiForegroundMask = 'generate_ai_foreground_mask',
   GenerateAiWholePersonMask = 'generate_ai_whole_person_mask',
   GenerateAiPersonPartMask = 'generate_ai_person_part_mask',
+  GenerateAiObjectMaskProposal = 'generate_ai_object_mask_proposal',
   GenerateAiSkyMask = 'generate_ai_sky_mask',
   GenerateAiSubjectMask = 'generate_ai_subject_mask',
   GenerateAiDepthMask = 'generate_ai_depth_mask',
