@@ -43,6 +43,7 @@ pub(crate) enum RawDemosaicPath {
     Fast,
     LinearBypass,
     Standard,
+    XTransHq,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -81,7 +82,9 @@ impl RawCameraProfileReport {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RawDevelopmentReport {
     pub demosaic_path: RawDemosaicPath,
+    pub demosaic_algorithm_id: Option<&'static str>,
     pub camera_profile: RawCameraProfileReport,
+    pub xtrans_hq: Option<XTransHqDevelopmentReport>,
 }
 
 pub(crate) fn develop_raw_image_with_report(
@@ -138,6 +141,17 @@ fn is_rgb_bayer_raw(raw_image: &RawImage) -> bool {
     )
 }
 
+fn is_rgb_xtrans_raw(raw_image: &RawImage) -> bool {
+    matches!(
+        &raw_image.photometric,
+        RawPhotometricInterpretation::Cfa(config)
+            if raw_image.cpp == 1
+                && config.cfa.is_rgb()
+                && config.cfa.width == 6
+                && config.cfa.height == 6
+    )
+}
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 struct RawDefectCorrectionReport {
     hot_pixels: usize,
@@ -154,6 +168,12 @@ struct HighlightReconstructionReport {
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 struct BayerHqDevelopmentReport {
     artifact_suppression: crate::bayer_hq::ArtifactSuppressionReport,
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct XTransHqDevelopmentReport {
+    reconstruction: crate::xtrans_hq::XTransHqReport,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1057,6 +1077,33 @@ fn develop_bayer_hq_intermediate(
     ))
 }
 
+fn develop_xtrans_hq_intermediate(
+    raw_image: &RawImage,
+) -> Result<(Intermediate, XTransHqDevelopmentReport)> {
+    let mut scaled = raw_image.clone();
+    scaled.apply_scaling()?;
+    let RawPhotometricInterpretation::Cfa(config) = &scaled.photometric else {
+        return Err(anyhow!("X-Trans HQ requires CFA RAW input"));
+    };
+
+    let pixels = rawler::pixarray::PixF32::new_with(
+        scaled.data.as_f32().into_owned(),
+        scaled.width,
+        scaled.height,
+    );
+    let roi = scaled.active_area.unwrap_or(pixels.rect());
+    let (demosaiced, reconstruction_report) =
+        crate::xtrans_hq::demosaic_xtrans_hq(&pixels, &config.cfa, roi);
+    let calibrated = calibrate_three_color(&scaled, demosaiced);
+
+    Ok((
+        apply_default_crop(&scaled, Intermediate::ThreeColor(calibrated)),
+        XTransHqDevelopmentReport {
+            reconstruction: reconstruction_report,
+        },
+    ))
+}
+
 #[cfg(test)]
 fn inject_raw_defect_proof_pixels(
     raw_image: &mut RawImage,
@@ -1197,8 +1244,15 @@ fn develop_internal_with_options(
         && !is_linear_format
         && is_rgb_bayer_raw(&raw_image)
         && apply_calibration;
+    let use_xtrans_hq = profile == RawProcessingProfile::Maximum
+        && !fast_demosaic
+        && !is_linear_format
+        && is_rgb_xtrans_raw(&raw_image)
+        && apply_calibration;
     let demosaic_path = if use_bayer_hq {
         RawDemosaicPath::BayerHq
+    } else if use_xtrans_hq {
+        RawDemosaicPath::XTransHq
     } else if is_linear_format {
         RawDemosaicPath::LinearBypass
     } else if fast_demosaic {
@@ -1221,8 +1275,13 @@ fn develop_internal_with_options(
     }
 
     check_cancel()?;
+    let mut xtrans_hq_report = None;
     let mut developed_intermediate = if use_bayer_hq {
         develop_bayer_hq_intermediate(&raw_image)?.0
+    } else if use_xtrans_hq {
+        let (intermediate, report) = develop_xtrans_hq_intermediate(&raw_image)?;
+        xtrans_hq_report = Some(report);
+        intermediate
     } else {
         developer.develop_intermediate(&raw_image)?
     };
@@ -1339,7 +1398,13 @@ fn develop_internal_with_options(
         orientation,
         RawDevelopmentReport {
             demosaic_path,
+            demosaic_algorithm_id: if use_xtrans_hq {
+                Some(crate::xtrans_hq::XTRANS_HQ_ALGORITHM_ID)
+            } else {
+                None
+            },
             camera_profile,
+            xtrans_hq: xtrans_hq_report,
         },
     ))
 }
@@ -1873,5 +1938,136 @@ mod tests {
             serde_json::to_vec_pretty(&report).expect("serialize Bayer HQ proof report"),
         )
         .expect("write Bayer HQ proof report");
+    }
+
+    #[test]
+    fn private_xtrans_hq_generates_distinct_maximum_output_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_XTRANS_HQ_PROOF").ok() != Some("1".to_string()) {
+            return;
+        }
+
+        let source_path = std::env::var("RAWENGINE_PRIVATE_RAW_SOURCE")
+            .or_else(|_| std::env::var("RAWENGINE_XTRANS_HQ_SOURCE"))
+            .expect("RAWENGINE_PRIVATE_RAW_SOURCE or RAWENGINE_XTRANS_HQ_SOURCE must point to an X-Trans RAW");
+        let report_dir = std::env::var("RAWENGINE_XTRANS_HQ_REPORT_DIR")
+            .unwrap_or_else(|_| "target/xtrans-hq-proof".to_string());
+        let report_dir = Path::new(&report_dir);
+        fs::create_dir_all(report_dir).expect("create report dir");
+
+        let file_bytes = fs::read(&source_path).expect("read private X-Trans RAW");
+        let (balanced, balanced_orientation, balanced_report) = develop_internal_with_options(
+            &file_bytes,
+            false,
+            RawProcessingProfile::Balanced,
+            2.5,
+            "default".to_string(),
+            None,
+            RawDefectDevelopmentOptions::default(),
+        )
+        .expect("develop balanced private X-Trans RAW");
+        let balanced = apply_orientation(balanced, balanced_orientation);
+
+        let started = std::time::Instant::now();
+        let (maximum, maximum_orientation, maximum_report) = develop_internal_with_options(
+            &file_bytes,
+            false,
+            RawProcessingProfile::Maximum,
+            4.0,
+            "default".to_string(),
+            None,
+            RawDefectDevelopmentOptions::default(),
+        )
+        .expect("develop X-Trans HQ private RAW");
+        let maximum_elapsed_ms = started.elapsed().as_millis();
+        let maximum = apply_orientation(maximum, maximum_orientation);
+
+        assert_eq!(balanced_report.demosaic_path, RawDemosaicPath::Standard);
+        assert_eq!(maximum_report.demosaic_path, RawDemosaicPath::XTransHq);
+        assert_eq!(
+            maximum_report.demosaic_algorithm_id,
+            Some(crate::xtrans_hq::XTRANS_HQ_ALGORITHM_ID)
+        );
+        let xtrans_report = maximum_report
+            .xtrans_hq
+            .expect("maximum X-Trans report includes reconstruction details");
+        assert!(xtrans_report.reconstruction.evaluated_pixels > 0);
+        assert!(xtrans_report.reconstruction.green_directional_pixels > 0);
+
+        assert_eq!(balanced.width(), maximum.width());
+        assert_eq!(balanced.height(), maximum.height());
+
+        let balanced_rgba = balanced.to_rgba8();
+        let maximum_rgba = maximum.to_rgba8();
+        let balanced_hash = blake3::hash(balanced_rgba.as_raw()).to_hex().to_string();
+        let maximum_hash = blake3::hash(maximum_rgba.as_raw()).to_hex().to_string();
+        assert_ne!(balanced_hash, maximum_hash);
+
+        let mut changed_pixels = 0usize;
+        let mut absolute_delta_sum = 0u64;
+        for (balanced_pixel, maximum_pixel) in balanced_rgba
+            .as_raw()
+            .chunks_exact(4)
+            .zip(maximum_rgba.as_raw().chunks_exact(4))
+        {
+            if balanced_pixel != maximum_pixel {
+                changed_pixels += 1;
+            }
+            absolute_delta_sum += balanced_pixel
+                .iter()
+                .zip(maximum_pixel.iter())
+                .take(3)
+                .map(|(balanced_value, maximum_value)| {
+                    balanced_value.abs_diff(*maximum_value) as u64
+                })
+                .sum::<u64>();
+        }
+        let pixel_count = (balanced_rgba.width() as usize) * (balanced_rgba.height() as usize);
+        let changed_pixel_ratio = changed_pixels as f64 / pixel_count.max(1) as f64;
+        let mean_absolute_byte_delta = absolute_delta_sum as f64 / (pixel_count.max(1) * 3) as f64;
+        assert!(changed_pixel_ratio > 0.001);
+        assert!(mean_absolute_byte_delta > 0.01);
+
+        let balanced_path = report_dir.join("xtrans-balanced-standard.tiff");
+        let maximum_path = report_dir.join("xtrans-maximum-hq.tiff");
+        balanced
+            .save_with_format(&balanced_path, image::ImageFormat::Tiff)
+            .expect("write balanced X-Trans TIFF");
+        maximum
+            .save_with_format(&maximum_path, image::ImageFormat::Tiff)
+            .expect("write X-Trans HQ TIFF");
+
+        let report = serde_json::json!({
+            "issue": 3240,
+            "proofBoundary": "private_xtrans_hq_runtime_output",
+            "sourcePath": source_path,
+            "dimensions": {
+                "width": maximum.width(),
+                "height": maximum.height(),
+            },
+            "balanced": {
+                "algorithm": "rawler_xtrans_quality_baseline",
+                "demosaicPath": format!("{:?}", balanced_report.demosaic_path),
+                "imageHash": balanced_hash,
+                "tiffPath": balanced_path.to_string_lossy(),
+            },
+            "maximum": {
+                "algorithm": crate::xtrans_hq::XTRANS_HQ_ALGORITHM_ID,
+                "demosaicPath": format!("{:?}", maximum_report.demosaic_path),
+                "elapsedMs": maximum_elapsed_ms,
+                "imageHash": maximum_hash,
+                "tiffPath": maximum_path.to_string_lossy(),
+                "reconstruction": xtrans_report.reconstruction,
+            },
+            "outputDiff": {
+                "changedPixelRatio": changed_pixel_ratio,
+                "meanAbsoluteByteDelta": mean_absolute_byte_delta,
+            },
+            "privateAssetsCommitted": false,
+        });
+        fs::write(
+            report_dir.join("xtrans-hq-private-proof.json"),
+            serde_json::to_vec_pretty(&report).expect("serialize X-Trans HQ proof report"),
+        )
+        .expect("write X-Trans HQ proof report");
     }
 }
