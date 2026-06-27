@@ -20,6 +20,19 @@ pub struct XTransHqReport {
     pub green_medium_confidence_pixels: usize,
     pub green_second_order_corrected_pixels: usize,
     pub period6_chroma_suppressed_pixels: usize,
+    pub scratch_memory: XTransHqScratchMemoryReport,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct XTransHqScratchMemoryReport {
+    pub chroma_working_bytes: usize,
+    pub green_plane_bytes: usize,
+    pub input_plane_bytes: usize,
+    pub output_rgb_bytes: usize,
+    pub roi_pixel_count: usize,
+    pub sensor_pixel_count: usize,
+    pub total_estimated_peak_bytes: usize,
 }
 
 fn pixel_index(width: usize, row: usize, col: usize) -> usize {
@@ -340,7 +353,10 @@ pub fn demosaic_xtrans_hq(
     roi: Rect,
 ) -> (Color2D<f32, 3>, XTransHqReport) {
     let shifted_cfa = cfa.shift(roi.p.x, roi.p.y);
-    let mut report = XTransHqReport::default();
+    let mut report = XTransHqReport {
+        scratch_memory: estimate_xtrans_hq_scratch_memory(pixels, roi),
+        ..XTransHqReport::default()
+    };
     let mut greens = vec![0.0; pixels.width * pixels.height];
 
     for sensor_row in 0..pixels.height {
@@ -399,6 +415,33 @@ pub fn demosaic_xtrans_hq(
     let mut image = Color2D::new_with(output, roi.d.w, roi.d.h);
     refine_chroma(&mut image, &mut report);
     (image, report)
+}
+
+fn estimate_xtrans_hq_scratch_memory(pixels: &PixF32, roi: Rect) -> XTransHqScratchMemoryReport {
+    let sensor_pixel_count = pixels.width.saturating_mul(pixels.height);
+    let roi_pixel_count = roi.d.w.saturating_mul(roi.d.h);
+    let input_plane_bytes = sensor_pixel_count.saturating_mul(std::mem::size_of::<f32>());
+    let green_plane_bytes = sensor_pixel_count.saturating_mul(std::mem::size_of::<f32>());
+    let output_rgb_bytes = roi_pixel_count
+        .saturating_mul(3)
+        .saturating_mul(std::mem::size_of::<f32>());
+    let chroma_working_bytes = sensor_pixel_count
+        .saturating_mul(2)
+        .saturating_mul(std::mem::size_of::<f32>());
+    let total_estimated_peak_bytes = input_plane_bytes
+        .saturating_add(green_plane_bytes)
+        .saturating_add(output_rgb_bytes)
+        .saturating_add(chroma_working_bytes);
+
+    XTransHqScratchMemoryReport {
+        chroma_working_bytes,
+        green_plane_bytes,
+        input_plane_bytes,
+        output_rgb_bytes,
+        roi_pixel_count,
+        sensor_pixel_count,
+        total_estimated_peak_bytes,
+    }
 }
 
 #[cfg(test)]
@@ -781,6 +824,19 @@ mod tests {
             report.green_directional_pixels
         );
         assert!(report.green_second_order_corrected_pixels > 0);
+        assert_eq!(report.scratch_memory.sensor_pixel_count, 144);
+        assert_eq!(report.scratch_memory.roi_pixel_count, 144);
+        assert_eq!(report.scratch_memory.input_plane_bytes, 144 * 4);
+        assert_eq!(report.scratch_memory.green_plane_bytes, 144 * 4);
+        assert_eq!(report.scratch_memory.output_rgb_bytes, 144 * 3 * 4);
+        assert_eq!(report.scratch_memory.chroma_working_bytes, 144 * 2 * 4);
+        assert_eq!(
+            report.scratch_memory.total_estimated_peak_bytes,
+            report.scratch_memory.input_plane_bytes
+                + report.scratch_memory.green_plane_bytes
+                + report.scratch_memory.output_rgb_bytes
+                + report.scratch_memory.chroma_working_bytes
+        );
     }
 
     #[test]
