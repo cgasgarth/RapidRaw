@@ -18,4 +18,23 @@ if (JSON.stringify(actualModel) !== JSON.stringify(fixture.expectedModel)) {
 }
 
 const optionCount = actualModel.groups.reduce((total, group) => total + group.options.length, 0);
-console.log(`Validated ${actualModel.groups.length} people-mask picker groups and ${optionCount} options.`);
+const options = actualModel.groups.flatMap((group) => group.options);
+const selectableParts = new Set(
+  options.filter((option) => option.disabledReason === null).map((option) => option.part),
+);
+for (const expectedSelectablePart of ['background', 'face', 'full_person']) {
+  if (!selectableParts.has(expectedSelectablePart)) {
+    console.error(`${expectedSelectablePart}: expected selectable runtime people-mask part`);
+    process.exit(1);
+  }
+}
+
+for (const expectedDisabledPart of ['hair', 'clothing']) {
+  const option = options.find((candidate) => candidate.part === expectedDisabledPart);
+  if (option?.disabledReason === null || option === undefined) {
+    console.error(`${expectedDisabledPart}: expected disabled until a real parser provider lands`);
+    process.exit(1);
+  }
+}
+
+console.log(`ai people picker ok (${actualModel.groups.length} groups, ${optionCount} options)`);
