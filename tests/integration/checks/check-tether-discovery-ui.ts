@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs';
 
 const panelSource = readFileSync('src/components/panel/right/TetherPanel.tsx', 'utf8');
+const rightPanelHostSource = readFileSync('src/components/panel/right/EditorRightPanelHost.tsx', 'utf8');
 const editorViewSource = readFileSync('src/components/views/EditorView.tsx', 'utf8');
 const schemaSource = readFileSync('src/schemas/tetheringSchemas.ts', 'utf8');
 const proofReceiptSource = readFileSync('src/utils/tetherIngestProofReceipt.ts', 'utf8');
@@ -173,9 +174,14 @@ const requiredSnippets = [
   [panelSource, 'data-testid="tether-incoming-capture-strip"'],
   [panelSource, 'data-testid="tether-review-mode-control"'],
   [panelSource, 'data-review-mode-option={mode}'],
+  [rightPanelHostSource, 'Panel.Tether'],
+  [rightPanelHostSource, '<TetherPanel'],
+  [rightPanelHostSource, 'onOpenCapture={(path) =>'],
+  [rightPanelHostSource, 'void onOpenTetherCapture(path)'],
   [editorViewSource, 'handleTetherCaptureOpen'],
   [editorViewSource, 'handleImageSelect(path)'],
-  [editorViewSource, 'onOpenCapture={(path) =>'],
+  [editorViewSource, '<EditorRightPanelHost'],
+  [editorViewSource, 'onOpenTetherCapture={(path) =>'],
   [visualSmokeSource, "data-opened-capture-path={openedCapturePath ?? ''}"],
   [visualSmokeScriptSource, '[data-review-mode-option="pinned"]'],
   [visualSmokeScriptSource, "getByTestId('tether-destination-root-path').fill('/tmp/rawengine-tether-captures')"],
