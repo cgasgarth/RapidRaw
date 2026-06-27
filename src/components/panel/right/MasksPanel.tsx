@@ -66,6 +66,7 @@ import {
   getSubMaskName,
   getMaskTypeName,
 } from './Masks';
+import { ObjectPromptControls } from './ObjectPromptControls';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { useAiMasking } from '../../../hooks/useAiMasking';
 import { useEditorActions } from '../../../hooks/useEditorActions';
@@ -110,7 +111,6 @@ import {
   acceptObjectMaskProposal,
   buildObjectMaskProposalCommandInput,
   type AiObjectMaskProposal,
-  objectPromptModeSchema,
   readObjectMaskProposalReplayReceipt,
   readObjectPromptCanvasState,
   setObjectPromptMode,
@@ -3257,95 +3257,20 @@ function SettingsPanel({
               {activeSubMask.type === Mask.AiPerson && <AiPeoplePartPickerStatus />}
 
               {objectPromptState !== null && (
-                <div
-                  className="rounded-md border border-surface bg-bg-primary p-2"
-                  data-object-prompt-box-ready={String(objectPromptState.boxPrompt !== null)}
-                  data-object-prompt-mode={objectPromptState.mode}
-                  data-object-prompt-point-count={objectPromptState.pointPrompts.length}
-                  data-testid="object-prompt-controls"
-                >
-                  <div className="grid grid-cols-4 gap-1">
-                    {[
-                      { label: t('editor.masks.objectPrompt.foreground'), mode: 'foreground_point' },
-                      { label: t('editor.masks.objectPrompt.background'), mode: 'background_point' },
-                      { label: t('editor.masks.objectPrompt.box'), mode: 'box' },
-                    ].map((action) => (
-                      <button
-                        className={cx(
-                          'min-w-0 rounded px-2 py-1 text-xs transition-colors',
-                          objectPromptState.mode === action.mode
-                            ? 'bg-accent text-white'
-                            : 'bg-bg-secondary text-text-secondary hover:text-text-primary',
-                        )}
-                        data-testid={`object-prompt-mode-${action.mode}`}
-                        key={action.mode}
-                        onClick={() => {
-                          handleObjectPromptModeChange(objectPromptModeSchema.parse(action.mode));
-                        }}
-                        type="button"
-                      >
-                        <span className="block truncate">{action.label}</span>
-                      </button>
-                    ))}
-                    <button
-                      className="min-w-0 rounded bg-bg-secondary px-2 py-1 text-xs text-text-secondary transition-colors hover:text-text-primary"
-                      data-testid="object-prompt-clear"
-                      onClick={handleClearObjectPrompts}
-                      type="button"
-                    >
-                      <span className="block truncate">{t('editor.masks.objectPrompt.clear')}</span>
-                    </button>
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-text-tertiary">
-                    <span data-testid="object-prompt-point-summary">
-                      {t('editor.masks.objectPrompt.points', { count: objectPromptState.pointPrompts.length })}
-                    </span>
-                    <span data-testid="object-prompt-box-summary">
-                      {objectPromptState.boxPrompt === null
-                        ? t('editor.masks.objectPrompt.box')
-                        : t('editor.masks.objectPrompt.boxReady')}
-                    </span>
-                  </div>
-                  <button
-                    className="mt-2 flex w-full items-center justify-center gap-2 rounded bg-accent px-2 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
-                    data-object-prompt-command-ready={String(objectPromptCommandInput !== null)}
-                    data-object-prompt-provider-status={objectPromptProviderStatusText}
-                    data-testid="object-prompt-generate-proposal"
-                    disabled={objectPromptCommandInput === null || isGeneratingObjectProposal || !selectedImage?.path}
-                    onClick={() => {
-                      void handleGenerateObjectProposal();
-                    }}
-                    type="button"
-                  >
-                    {isGeneratingObjectProposal && <Loader2 size={14} className="animate-spin" />}
-                    <span className="truncate">{t('editor.masks.objectPrompt.generate')}</span>
-                  </button>
-                  {objectPromptReplayReceipt !== null && (
-                    <UiText
-                      as="div"
-                      variant={TextVariants.small}
-                      color={TextColors.secondary}
-                      className="mt-2 truncate text-[11px]"
-                      data-has-raster={String(objectPromptReplayReceipt.hasRaster)}
-                      data-image-height={objectPromptReplayReceipt.imageHeight}
-                      data-image-width={objectPromptReplayReceipt.imageWidth}
-                      data-model-id={objectPromptReplayReceipt.modelId}
-                      data-point-count={objectPromptReplayReceipt.pointCount}
-                      data-prompt-count={objectPromptReplayReceipt.promptCount}
-                      data-prompt-kind={objectPromptReplayReceipt.promptKind}
-                      data-provider-id={objectPromptReplayReceipt.providerId}
-                      data-provider-status={objectPromptReplayReceipt.providerStatus}
-                      data-receipt-version={objectPromptReplayReceipt.receiptVersion}
-                      data-testid="object-prompt-replay-receipt"
-                    >
-                      {t('editor.masks.objectPrompt.receipt', {
-                        latency: objectPromptReplayReceipt.clickToMaskLatencyMs,
-                        promptKind: objectPromptReplayReceipt.promptKind,
-                        provider: objectPromptReplayReceipt.providerStatus,
-                      })}
-                    </UiText>
-                  )}
-                </div>
+                <ObjectPromptControls
+                  commandInput={objectPromptCommandInput}
+                  isGenerating={isGeneratingObjectProposal}
+                  onClear={handleClearObjectPrompts}
+                  onGenerate={() => {
+                    void handleGenerateObjectProposal();
+                  }}
+                  onModeChange={handleObjectPromptModeChange}
+                  providerStatusText={objectPromptProviderStatusText}
+                  replayReceipt={objectPromptReplayReceipt}
+                  selectedImagePath={selectedImage?.path}
+                  state={objectPromptState}
+                  t={t}
+                />
               )}
 
               {activeSubMask.type === Mask.Linear && (
