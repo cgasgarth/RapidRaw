@@ -49,7 +49,6 @@ use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 use crate::raw_processing::RawDevelopmentReport;
 
 use crate::cache_utils::{calculate_full_job_hash, calculate_transform_hash};
-use crate::deblur_render::apply_deblur_stage;
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -86,8 +85,7 @@ struct ExportReceipt {
     outputs: Vec<ExportReceiptOutput>,
     total: usize,
 }
-use crate::denoise_render::apply_denoise_stage;
-use crate::wavelet_render::apply_wavelet_detail_stage;
+use crate::render_pipeline::apply_pre_gpu_detail_stages;
 use crate::{
     apply_all_transformations, generate_transformed_preview, get_cached_or_generate_mask,
     get_full_image_for_processing, get_or_load_lut, hydrate_adjustments, load_settings_or_default,
@@ -494,11 +492,9 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
 
     let unique_hash = calculate_full_job_hash(path, js_adjustments);
 
-    let denoised_image = apply_denoise_stage(transformed_image, js_adjustments);
-    let deblurred_image = apply_deblur_stage(denoised_image.as_ref(), js_adjustments);
-    let wavelet_image = apply_wavelet_detail_stage(deblurred_image.image.as_ref(), js_adjustments);
+    let detail_stage = apply_pre_gpu_detail_stages(transformed_image, unique_hash, js_adjustments);
     let retouched_image = crate::retouch_render::apply_clone_retouch_layers(
-        wavelet_image.as_ref(),
+        detail_stage.image.as_ref(),
         js_adjustments,
         mask_bitmaps,
     );

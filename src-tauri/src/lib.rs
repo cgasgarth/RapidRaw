@@ -70,6 +70,7 @@ mod private_decode_raw_proof;
 mod raw_open_edit_export_proof;
 mod raw_processing;
 mod render_caches;
+mod render_pipeline;
 #[cfg(all(test, feature = "tauri-test"))]
 mod retouch_clone_real_raw_proof;
 mod retouch_render;
@@ -521,23 +522,13 @@ fn process_preview_job(
         (final_preview_base, scale_for_gpu, 94)
     };
 
-    let denoised_processing_image =
-        denoise_render::apply_denoise_stage(processing_image.as_ref(), &adjustments_clone);
-    let denoise_render_hash =
-        denoise_render::calculate_denoise_render_hash(new_transform_hash, &adjustments_clone);
-    let deblurred_processing_image =
-        deblur_render::apply_deblur_stage(denoised_processing_image.as_ref(), &adjustments_clone);
-    let deblur_render_hash =
-        deblur_render::calculate_deblur_render_hash(denoise_render_hash, &adjustments_clone);
-    let wavelet_processing_image = wavelet_render::apply_wavelet_detail_stage(
-        deblurred_processing_image.image.as_ref(),
+    let pre_gpu_detail_stage = render_pipeline::apply_pre_gpu_detail_stages(
+        processing_image.as_ref(),
+        new_transform_hash,
         &adjustments_clone,
     );
-    let render_input_hash = wavelet_render::calculate_wavelet_detail_render_hash(
-        deblur_render_hash,
-        &adjustments_clone,
-    );
-    let processing_image_ref = wavelet_processing_image.as_ref();
+    let render_input_hash = pre_gpu_detail_stage.render_hash;
+    let processing_image_ref = pre_gpu_detail_stage.image.as_ref();
 
     let (preview_width, preview_height) = processing_image_ref.dimensions();
 
@@ -1871,16 +1862,15 @@ fn generate_preview_for_path(
     let lut_path = js_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
     let unique_hash = calculate_full_job_hash(&source_path_str, &js_adjustments);
-    let denoised_image =
-        denoise_render::apply_denoise_stage(transformed_image.as_ref(), &js_adjustments);
-    let deblurred_image =
-        deblur_render::apply_deblur_stage(denoised_image.as_ref(), &js_adjustments);
-    let wavelet_image =
-        wavelet_render::apply_wavelet_detail_stage(deblurred_image.image.as_ref(), &js_adjustments);
+    let detail_stage = render_pipeline::apply_pre_gpu_detail_stages(
+        transformed_image.as_ref(),
+        unique_hash,
+        &js_adjustments,
+    );
     let final_image = process_and_get_dynamic_image(
         &context,
         &state,
-        wavelet_image.as_ref(),
+        detail_stage.image.as_ref(),
         unique_hash,
         RenderRequest {
             adjustments: all_adjustments,
