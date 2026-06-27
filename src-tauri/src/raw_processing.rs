@@ -51,10 +51,13 @@ pub(crate) enum RawDemosaicPath {
 pub(crate) struct RawCameraProfileReport {
     pub algorithm_id: &'static str,
     pub candidate_count: usize,
+    pub cct_clamped: Option<bool>,
     pub cool_illuminant: Option<String>,
     pub cool_weight: Option<f32>,
     pub estimated_cct_kelvin: Option<f32>,
     pub fallback_reason: Option<&'static str>,
+    pub illuminant_estimate_confidence: &'static str,
+    pub illuminant_estimate_method: &'static str,
     pub matrix_hash: Option<String>,
     pub status: &'static str,
     pub warm_illuminant: Option<String>,
@@ -66,10 +69,13 @@ impl RawCameraProfileReport {
         Self {
             algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
             candidate_count,
+            cct_clamped: None,
             cool_illuminant: None,
             cool_weight: None,
             estimated_cct_kelvin: None,
             fallback_reason: Some(reason),
+            illuminant_estimate_confidence: "low",
+            illuminant_estimate_method: "fallback",
             matrix_hash: None,
             status: "unavailable",
             warm_illuminant: None,
@@ -699,14 +705,30 @@ fn valid_color_matrix(matrix: &[f32]) -> bool {
         && matrix.iter().all(|value| value.is_finite())
 }
 
-fn estimate_scene_cct_from_wb(wb: [f32; 4]) -> Option<f32> {
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct SceneCctEstimate {
+    cct_kelvin: f32,
+    clamped: bool,
+    confidence: &'static str,
+    method: &'static str,
+}
+
+fn estimate_scene_cct_from_wb(wb: [f32; 4]) -> Option<SceneCctEstimate> {
     let [red, _green, blue, _extra] = wb;
     if !red.is_finite() || !blue.is_finite() || red <= f32::EPSILON || blue <= f32::EPSILON {
         return None;
     }
 
-    let blue_to_red = (blue / red).clamp(0.44, 2.28);
-    Some((6_504.0 / blue_to_red).clamp(2_856.0, 8_000.0))
+    let blue_to_red = blue / red;
+    let clamped_blue_to_red = blue_to_red.clamp(0.44, 2.28);
+    let unclamped_cct = 6_504.0 / clamped_blue_to_red;
+    let cct_kelvin = unclamped_cct.clamp(2_856.0, 8_000.0);
+    Some(SceneCctEstimate {
+        cct_kelvin,
+        clamped: blue_to_red != clamped_blue_to_red || unclamped_cct != cct_kelvin,
+        confidence: "low",
+        method: "wb_coeff_ratio",
+    })
 }
 
 fn interpolation_weight_for_cct(target_cct: f32, warm_cct: f32, cool_cct: f32) -> f32 {
@@ -770,7 +792,7 @@ fn resolve_camera_color_profile(
 
     let candidate_count = candidates.len();
 
-    let Some(target_cct) = estimate_scene_cct_from_wb(wb) else {
+    let Some(cct_estimate) = estimate_scene_cct_from_wb(wb) else {
         let selected = d65.cloned().or_else(|| {
             candidates
                 .first()
@@ -786,10 +808,13 @@ fn resolve_camera_color_profile(
             report: RawCameraProfileReport {
                 algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
                 candidate_count,
+                cct_clamped: None,
                 cool_illuminant: None,
                 cool_weight: None,
                 estimated_cct_kelvin: None,
                 fallback_reason: Some(fallback_reason),
+                illuminant_estimate_confidence: "low",
+                illuminant_estimate_method: "fallback",
                 matrix_hash: selected.as_deref().map(camera_matrix_hash),
                 status: if selected.is_some() {
                     "fallback"
@@ -801,6 +826,7 @@ fn resolve_camera_color_profile(
             },
         };
     };
+    let target_cct = cct_estimate.cct_kelvin;
 
     if candidates.len() >= 2 {
         let warm = candidates
@@ -824,10 +850,13 @@ fn resolve_camera_color_profile(
                 report: RawCameraProfileReport {
                     algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
                     candidate_count,
+                    cct_clamped: Some(cct_estimate.clamped),
                     cool_illuminant: Some(illuminant_label(cool.0)),
                     cool_weight: Some(cool_weight),
                     estimated_cct_kelvin: Some(target_cct),
                     fallback_reason: None,
+                    illuminant_estimate_confidence: cct_estimate.confidence,
+                    illuminant_estimate_method: cct_estimate.method,
                     matrix_hash: Some(camera_matrix_hash(&matrix)),
                     status: "interpolated",
                     warm_illuminant: Some(illuminant_label(warm.0)),
@@ -842,10 +871,13 @@ fn resolve_camera_color_profile(
             report: RawCameraProfileReport {
                 algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
                 candidate_count,
+                cct_clamped: Some(cct_estimate.clamped),
                 cool_illuminant: Some(illuminant_label(warm.0)),
                 cool_weight: Some(1.0),
                 estimated_cct_kelvin: Some(target_cct),
                 fallback_reason: None,
+                illuminant_estimate_confidence: cct_estimate.confidence,
+                illuminant_estimate_method: cct_estimate.method,
                 matrix_hash: Some(camera_matrix_hash(&matrix)),
                 status: "single_illuminant",
                 warm_illuminant: Some(illuminant_label(warm.0)),
@@ -865,6 +897,7 @@ fn resolve_camera_color_profile(
         report: RawCameraProfileReport {
             algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
             candidate_count,
+            cct_clamped: Some(cct_estimate.clamped),
             cool_illuminant: candidates
                 .first()
                 .map(|candidate| illuminant_label(candidate.0)),
@@ -875,6 +908,8 @@ fn resolve_camera_color_profile(
             } else {
                 Some("no_valid_camera_matrix")
             },
+            illuminant_estimate_confidence: cct_estimate.confidence,
+            illuminant_estimate_method: cct_estimate.method,
             matrix_hash: selected.as_deref().map(camera_matrix_hash),
             status: if selected.is_some() {
                 "single_illuminant"
@@ -1481,8 +1516,19 @@ mod tests {
         let daylight = estimate_scene_cct_from_wb([1.0, 1.0, 1.0, f32::NAN]).unwrap();
         let tungsten = estimate_scene_cct_from_wb([1.0, 1.0, 2.28, f32::NAN]).unwrap();
 
-        assert!((daylight - 6_504.0).abs() < 0.1);
-        assert!((tungsten - 2_856.0).abs() < 0.1);
+        assert!((daylight.cct_kelvin - 6_504.0).abs() < 0.1);
+        assert!((tungsten.cct_kelvin - 2_856.0).abs() < 0.1);
+        assert_eq!(daylight.method, "wb_coeff_ratio");
+        assert_eq!(daylight.confidence, "low");
+        assert!(!daylight.clamped);
+    }
+
+    #[test]
+    fn scene_cct_from_wb_reports_clamping() {
+        let clamped = estimate_scene_cct_from_wb([1.0, 1.0, 9.0, f32::NAN]).unwrap();
+
+        assert!((clamped.cct_kelvin - 2_856.0).abs() < 0.1);
+        assert!(clamped.clamped);
     }
 
     #[test]
@@ -1501,7 +1547,9 @@ mod tests {
     fn interpolates_dual_illuminant_matrices_for_warm_white_balance() {
         let warm = vec![0.80, -0.20, 0.10, -0.30, 1.20, 0.20, -0.04, 0.08, 0.66];
         let cool = vec![0.60, -0.10, 0.04, -0.20, 1.05, 0.14, -0.02, 0.05, 0.52];
-        let target_cct = estimate_scene_cct_from_wb([1.0, 1.0, 1.5, f32::NAN]).unwrap();
+        let target_cct = estimate_scene_cct_from_wb([1.0, 1.0, 1.5, f32::NAN])
+            .unwrap()
+            .cct_kelvin;
         let cool_weight = interpolation_weight_for_cct(target_cct, 2_856.0, 6_504.0);
         let interpolated = interpolate_color_matrix(&warm, &cool, cool_weight);
 
@@ -1533,6 +1581,12 @@ mod tests {
             CAMERA_PROFILE_RESOLVER_ALGORITHM_ID
         );
         assert_eq!(resolution.report.candidate_count, 2);
+        assert_eq!(
+            resolution.report.illuminant_estimate_method,
+            "wb_coeff_ratio"
+        );
+        assert_eq!(resolution.report.illuminant_estimate_confidence, "low");
+        assert_eq!(resolution.report.cct_clamped, Some(false));
         assert!(resolution.report.cool_weight.unwrap() > 0.0);
         assert!(
             resolution
@@ -1565,6 +1619,9 @@ mod tests {
             resolution.report.warning_codes,
             vec!["invalid_white_balance"]
         );
+        assert_eq!(resolution.report.illuminant_estimate_method, "fallback");
+        assert_eq!(resolution.report.illuminant_estimate_confidence, "low");
+        assert_eq!(resolution.report.cct_clamped, None);
     }
 
     #[test]

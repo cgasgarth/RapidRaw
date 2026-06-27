@@ -9,10 +9,13 @@ const fixture = rawDevelopmentReportSchema.parse({
   cameraProfile: {
     algorithmId: 'dual_illuminant_mired_v1',
     candidateCount: 2,
+    cctClamped: false,
     coolIlluminant: 'D65',
     coolWeight: 0.42,
     estimatedCctKelvin: 5100,
     fallbackReason: null,
+    illuminantEstimateConfidence: 'low',
+    illuminantEstimateMethod: 'wb_coeff_ratio',
     matrixHash: 'blake3:abcdef0123456789',
     status: 'interpolated',
     warmIlluminant: 'StandardLightA',
@@ -68,6 +71,7 @@ if (fixture.cameraProfile.status !== 'interpolated' || fixture.cameraProfile.mat
 const receipt = buildCameraProfileProvenanceReceipt(fixture);
 if (
   receipt.status !== 'interpolated' ||
+  receipt.illuminantEstimateMethod !== 'wb_coeff_ratio' ||
   receipt.receiptVersion !== 1 ||
   receipt.demosaicPath !== 'bayer_hq' ||
   receipt.warningCount !== 0 ||
