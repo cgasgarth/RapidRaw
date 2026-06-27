@@ -12,6 +12,7 @@ const hookSource = read('src/hooks/useExportSettings.ts');
 const panelSource = read('src/components/panel/right/ExportPanel.tsx');
 const exportTypesSource = read('src/components/ui/ExportImportProperties.ts');
 const rustExportSource = read('src-tauri/src/export_processing.rs');
+const rustPostprocessSource = read('src-tauri/src/export_postprocess.rs');
 const locale = JSON.parse(read('src/i18n/locales/en.json'));
 
 for (const marker of [
@@ -73,12 +74,16 @@ exportRecipeSchema.parse({
   watermarkSpacing: 5,
 });
 
+for (const marker of ['pub output_sharpening: Option<OutputSharpeningSettings>']) {
+  if (!rustExportSource.includes(marker)) failures.push(`Rust export runtime missing ${marker}`);
+}
+
 for (const marker of [
-  'pub output_sharpening: Option<OutputSharpeningSettings>',
+  'apply_export_postprocess(',
   'apply_output_sharpening(image, output_sharpening)',
   'fn output_sharpening_increases_export_edge_contrast()',
 ]) {
-  if (!rustExportSource.includes(marker)) failures.push(`Rust export runtime missing ${marker}`);
+  if (!rustPostprocessSource.includes(marker)) failures.push(`Rust postprocess runtime missing ${marker}`);
 }
 
 for (const key of [

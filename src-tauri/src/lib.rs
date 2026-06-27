@@ -35,6 +35,7 @@ mod display_profile;
 mod events;
 mod exif_processing;
 mod export_output_targets;
+mod export_postprocess;
 mod export_processing;
 mod file_management;
 #[cfg(all(test, feature = "tauri-test"))]
