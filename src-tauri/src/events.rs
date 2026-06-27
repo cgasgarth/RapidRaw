@@ -29,3 +29,4 @@ pub const PREVIEW_UPDATE_UNCROPPED: &str = "preview-update-uncropped";
 pub const THUMBNAIL_GENERATION_COMPLETE: &str = "thumbnail-generation-complete";
 pub const THUMBNAIL_PROGRESS: &str = "thumbnail-progress";
 pub const WAVEFORM_UPDATE: &str = "waveform-update";
+pub const WGPU_FRAME_READY: &str = "wgpu-frame-ready";
