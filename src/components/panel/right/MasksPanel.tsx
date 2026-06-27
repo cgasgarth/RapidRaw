@@ -73,7 +73,7 @@ import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useManagedFocus } from '../../../hooks/useManagedFocus';
 import { usePresets, type UserPreset } from '../../../hooks/usePresets';
 import { useWaveformControls } from '../../../hooks/useWaveformControls';
-import { aiDepthMaskParametersSchema } from '../../../schemas/maskParameterSchemas';
+import { aiDepthMaskParametersSchema, type MaskRefinementParameters } from '../../../schemas/maskParameterSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
@@ -140,16 +140,29 @@ import Waveform from '../editor/Waveform';
 import type { MaskOverlaySettings } from '../../../schemas/maskOverlaySchemas';
 import type { LucideIcon } from 'lucide-react';
 
-interface SubMaskParameterConfig {
+type NumericMaskParameterPatch<TKey extends string> = Partial<Record<TKey, number>>;
+type SubMaskControlParameterKey = 'feather' | 'flow' | 'grow' | 'tolerance';
+type LinearGradientControlParameterKey = 'endY' | 'imageHeight' | 'range' | 'startY';
+type AiDepthControlParameterKey = 'maxDepth' | 'maxFade' | 'minDepth' | 'minFade';
+type MaskRefinementParameterKey = keyof MaskRefinementParameters;
+type PanelMaskParameterKey =
+  | AiDepthControlParameterKey
+  | LinearGradientControlParameterKey
+  | MaskRefinementParameterKey
+  | SubMaskControlParameterKey;
+
+interface NumericParameterConfig<TKey extends string> {
   defaultValue: number;
-  key: string;
+  key: TKey;
   max: number;
   min: number;
   multiplier?: number;
   step: number;
 }
 
-interface MaskRefinementParameterConfig extends SubMaskParameterConfig {
+type SubMaskParameterConfig = NumericParameterConfig<SubMaskControlParameterKey>;
+
+interface MaskRefinementParameterConfig extends NumericParameterConfig<MaskRefinementParameterKey> {
   labelKey:
     | 'editor.masks.refinement.density'
     | 'editor.masks.refinement.edgeContrast'
@@ -180,6 +193,14 @@ type PresetMenuItem = UserPreset & {
   folder?: { children?: Array<PresetMenuItem> | undefined; name?: string | undefined } | undefined;
   preset?: { adjustments: Partial<Adjustments>; name?: string | undefined } | undefined;
 };
+
+const getPanelMaskParameterNumber = (parameters: unknown, key: PanelMaskParameterKey, fallback = 0): number =>
+  getMaskParameterNumber(parameters, key, fallback);
+
+const mergePanelMaskParameters = <TKey extends PanelMaskParameterKey>(
+  parameters: unknown,
+  patch: NumericMaskParameterPatch<TKey>,
+) => mergeMaskParameters(parameters, patch);
 
 const MASK_REFINEMENT_PARAMETERS: Array<MaskRefinementParameterConfig> = [
   {
@@ -905,7 +926,7 @@ function MaskRefinementControls({
   onDragStateChange,
 }: {
   parameters: unknown;
-  onChange: (changes: Record<string, number>) => void;
+  onChange: (changes: NumericMaskParameterPatch<MaskRefinementParameterKey>) => void;
   onReset: () => void;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }) {
@@ -936,7 +957,7 @@ function MaskRefinementControls({
             max={param.max}
             step={param.step}
             defaultValue={param.defaultValue}
-            value={getMaskParameterNumber(parameters, param.key, param.defaultValue / multiplier) * multiplier}
+            value={getPanelMaskParameterNumber(parameters, param.key, param.defaultValue / multiplier) * multiplier}
             onValueChange={(value) => {
               onChange({ [param.key]: value / multiplier });
             }}
@@ -1024,14 +1045,14 @@ function LinearGradientMaskControls({
   onChange,
   onDragStateChange,
 }: {
-  onChange: (changes: Record<string, number>) => void;
+  onChange: (changes: NumericMaskParameterPatch<LinearGradientControlParameterKey>) => void;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
   parameters: unknown;
 }) {
-  const imageHeight = Math.max(1, getMaskParameterNumber(parameters, 'imageHeight', 1000));
-  const startYPercent = Math.round((getMaskParameterNumber(parameters, 'startY') / imageHeight) * 100);
-  const endYPercent = Math.round((getMaskParameterNumber(parameters, 'endY') / imageHeight) * 100);
-  const range = getMaskParameterNumber(parameters, 'range', 120);
+  const imageHeight = Math.max(1, getPanelMaskParameterNumber(parameters, 'imageHeight', 1000));
+  const startYPercent = Math.round((getPanelMaskParameterNumber(parameters, 'startY') / imageHeight) * 100);
+  const endYPercent = Math.round((getPanelMaskParameterNumber(parameters, 'endY') / imageHeight) * 100);
+  const range = getPanelMaskParameterNumber(parameters, 'range', 120);
 
   return (
     <div
@@ -3009,13 +3030,13 @@ function SettingsPanel({
     updateContainer(container.id, { [key]: value });
   };
 
-  const handleSubMaskParametersChange = (changes: Record<string, number>) => {
+  const handleSubMaskParametersChange = (changes: NumericMaskParameterPatch<PanelMaskParameterKey>) => {
     if (!isActive || !activeSubMask) return;
-    const newParams = mergeMaskParameters(activeSubMask.parameters, changes);
+    const newParams = mergePanelMaskParameters(activeSubMask.parameters, changes);
     updateSubMask(activeSubMask.id, { parameters: newParams });
   };
 
-  const handleMaskRefinementParametersChange = (changes: Record<string, number>) => {
+  const handleMaskRefinementParametersChange = (changes: NumericMaskParameterPatch<MaskRefinementParameterKey>) => {
     if (!isActive || !activeSubMask) return;
     const command = createMaskRefinementCommand(activeSubMask.id, activeSubMask.parameters, changes);
     const refinedParameters = dispatchMaskRefinementCommand(command);
@@ -3036,10 +3057,10 @@ function SettingsPanel({
     updateSubMask(activeSubMask.id, { parameters: newParams });
   };
 
-  const handleDepthRangeChange = (values: { minDepth: number; maxDepth: number; minFade: number; maxFade: number }) => {
+  const handleDepthRangeChange = (values: Record<AiDepthControlParameterKey, number>) => {
     if (!isActive || !activeSubMask) return;
 
-    const newParams = mergeMaskParameters(activeSubMask.parameters, {
+    const newParams = mergePanelMaskParameters(activeSubMask.parameters, {
       minDepth: 100 - values.maxDepth,
       maxDepth: 100 - values.minDepth,
       minFade: values.maxFade,
@@ -3360,10 +3381,10 @@ function SettingsPanel({
 
               {activeSubMask.type === Mask.AiDepth && (
                 <DepthRangePicker
-                  minDepth={100 - getMaskParameterNumber(activeSubMask.parameters, 'maxDepth', 100)}
-                  maxDepth={100 - getMaskParameterNumber(activeSubMask.parameters, 'minDepth')}
-                  minFade={getMaskParameterNumber(activeSubMask.parameters, 'maxFade', 15)}
-                  maxFade={getMaskParameterNumber(activeSubMask.parameters, 'minFade', 15)}
+                  minDepth={100 - getPanelMaskParameterNumber(activeSubMask.parameters, 'maxDepth', 100)}
+                  maxDepth={100 - getPanelMaskParameterNumber(activeSubMask.parameters, 'minDepth')}
+                  minFade={getPanelMaskParameterNumber(activeSubMask.parameters, 'maxFade', 15)}
+                  maxFade={getPanelMaskParameterNumber(activeSubMask.parameters, 'minFade', 15)}
                   onChange={handleDepthRangeChange}
                   onDragStateChange={onDragStateChange}
                 />
@@ -3408,7 +3429,7 @@ function SettingsPanel({
                   max={param.max}
                   step={param.step}
                   defaultValue={param.defaultValue}
-                  value={getMaskParameterNumber(activeSubMask.parameters, param.key) * (param.multiplier || 1)}
+                  value={getPanelMaskParameterNumber(activeSubMask.parameters, param.key) * (param.multiplier || 1)}
                   onValueChange={(value) => {
                     handleSubMaskParametersChange({
                       [param.key]: value / (param.multiplier || 1),
@@ -3430,7 +3451,7 @@ function SettingsPanel({
                 brushSettings &&
                 (activeSubMask.type === Mask.Flow ? (
                   <FlowBrushTool
-                    flow={getMaskParameterNumber(activeSubMask.parameters, 'flow', 10)}
+                    flow={getPanelMaskParameterNumber(activeSubMask.parameters, 'flow', 10)}
                     onFlowChange={(flow: number) => {
                       handleSubMaskParametersChange({ flow });
                     }}
