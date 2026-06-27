@@ -1,7 +1,7 @@
 use crate::gpu_processing::WgpuDisplay;
 use bytemuck::{Pod, Zeroable};
 use glam::{Mat3, Vec2, Vec3};
-use image::{DynamicImage, GenericImageView, ImageFormat, Rgb32FImage, Rgba, RgbaImage};
+use image::{DynamicImage, GenericImageView, Rgb32FImage, Rgba, RgbaImage};
 use imageproc::geometric_transformations::{Border, Interpolation, rotate_about_center};
 use nalgebra::{Matrix3 as NaMatrix3, Vector3 as NaVector3};
 use rawler::decoders::Orientation;
@@ -11,7 +11,6 @@ use serde_json::Value;
 use serde_json::json;
 use std::borrow::Cow;
 use std::f32::consts::PI;
-use std::io::Cursor;
 use std::sync::Arc;
 
 pub use crate::gpu_processing::{
@@ -3208,15 +3207,12 @@ pub fn calculate_gamut_warning_overlay_from_image(
 
     let pixel_count = u64::from(width) * u64::from(height);
     let coverage_ratio = warning_pixel_count as f32 / pixel_count.max(1) as f32;
-    let mut png = Cursor::new(Vec::new());
-    DynamicImage::ImageRgba8(mask)
-        .write_to(&mut png, ImageFormat::Png)
-        .map_err(|error| format!("Failed to encode gamut warning overlay: {}", error))?;
+    let mask_data_url = crate::image_codecs::encode_png_data_url(&DynamicImage::ImageRgba8(mask))?;
 
     Ok(GamutWarningOverlayData {
         coverage_ratio,
         height,
-        mask_data_url: format!("data:image/png;base64,{}", BASE64.encode(png.get_ref())),
+        mask_data_url,
         max_channel_value,
         min_channel_value,
         pixel_count,

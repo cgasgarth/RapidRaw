@@ -48,6 +48,7 @@ mod gpu_textures;
 mod hdr_artifact_sidecar;
 #[cfg(all(test, feature = "tauri-test"))]
 mod hdr_real_raw_proof;
+mod image_codecs;
 mod image_loader;
 mod image_processing;
 #[cfg(all(test, feature = "tauri-test"))]
@@ -106,7 +107,7 @@ use std::time::Duration;
 
 use base64::{Engine as _, engine::general_purpose};
 use image::codecs::jpeg::JpegEncoder;
-use image::{DynamicImage, GenericImageView, ImageBuffer, ImageFormat, Luma, RgbImage, Rgba};
+use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, RgbImage, Rgba};
 use image_hdr::hdr_merge_images;
 use image_hdr::input::HDRInput;
 use imageproc::drawing::draw_line_segment_mut;
@@ -121,28 +122,11 @@ use serde_json::Value;
 use tauri::{Emitter, Manager, ipc::Response};
 use tempfile::NamedTempFile;
 
-use crate::formats::{PNG_DATA_URL_PREFIX, jpeg_data_url, png_data_url};
+use crate::formats::PNG_DATA_URL_PREFIX;
 use crate::hdr_artifact_sidecar::{
     build_hdr_runtime_plan, build_unique_hdr_output_path, write_hdr_output_sidecar,
 };
-
-fn encode_jpeg_bytes(image: &DynamicImage, quality: u8) -> Result<Vec<u8>, String> {
-    let (width, height) = image.dimensions();
-    let rgb_pixels = image.to_rgb8().into_vec();
-    Encoder::new(Preset::BaselineFastest)
-        .quality(quality)
-        .encode_rgb(&rgb_pixels, width, height)
-        .map_err(|e| format!("Failed to encode JPEG preview with mozjpeg-rs: {}", e))
-}
-
-fn encode_jpeg_data_url(image: &DynamicImage, quality: u8) -> Result<String, String> {
-    let bytes = encode_jpeg_bytes(image, quality)?;
-    Ok(jpeg_data_url(general_purpose::STANDARD.encode(&bytes)))
-}
-
-fn encode_jpeg_response(image: &DynamicImage, quality: u8) -> Result<Response, String> {
-    encode_jpeg_bytes(image, quality).map(Response::new)
-}
+use crate::image_codecs::{encode_jpeg_data_url, encode_jpeg_response, encode_png_data_url};
 
 use crate::cache_utils::{
     calculate_full_job_hash, calculate_geometry_hash, calculate_transform_hash,
@@ -1677,13 +1661,7 @@ async fn merge_hdr(
     hdr_merged = apply_linear_to_srgb(hdr_merged);
     log::info!("HDR merge completed");
 
-    let mut buf = Cursor::new(Vec::new());
-    if let Err(e) = hdr_merged.to_rgb8().write_to(&mut buf, ImageFormat::Png) {
-        return Err(format!("Failed to encode hdr preview: {}", e));
-    }
-
-    let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
-    let final_base64 = png_data_url(base64_str);
+    let final_base64 = encode_png_data_url(&DynamicImage::ImageRgb8(hdr_merged.to_rgb8()))?;
     let runtime_plan =
         build_hdr_runtime_plan(&source_refs, hdr_merged.width(), hdr_merged.height());
 
