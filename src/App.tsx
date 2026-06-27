@@ -1,7 +1,7 @@
 import { ClerkProvider } from '@clerk/react';
 import cx from 'clsx';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { ToastContainer, toast, Slide } from 'react-toastify';
+import { ToastContainer, Slide } from 'react-toastify';
 import { useShallow } from 'zustand/react/shallow';
 
 import ImageLoaderManager from './components/managers/ImageLoaderManager';
@@ -29,6 +29,7 @@ import { useAppInitialization } from './hooks/useAppInitialization';
 import { useAppNavigation } from './hooks/useAppNavigation';
 import { useEditorActions } from './hooks/useEditorActions';
 import { useFileOperations } from './hooks/useFileOperations';
+import { useFolderExpansionLoader } from './hooks/useFolderExpansionLoader';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useLibraryActions } from './hooks/useLibraryActions';
 import { usePanelResize } from './hooks/usePanelResize';
@@ -38,16 +39,13 @@ import { useTauriListeners } from './hooks/useTauriListeners';
 import { useThumbnails } from './hooks/useThumbnails';
 import { useTooltipAccessibility } from './hooks/useTooltipAccessibility';
 import './i18n';
-import { folderTreeListSchema } from './schemas/folderTreeSchemas';
 import { useEditorStore } from './store/useEditorStore';
 import { useLibraryStore } from './store/useLibraryStore';
 import { useProcessStore } from './store/useProcessStore';
 import { useSettingsStore } from './store/useSettingsStore';
 import { useUIStore } from './store/useUIStore';
-import { Invokes } from './tauri/commands';
-import { findAlbumById, insertChildrenIntoTree } from './utils/folderTreeUtils';
+import { findAlbumById } from './utils/folderTreeUtils';
 import { getViteEnv } from './utils/frontendEnv.mjs';
-import { invokeWithSchema } from './utils/tauriSchemaInvoke';
 import { getOptionalCurrentWindow } from './window/currentWindow';
 import TitleBar from './window/TitleBar';
 
@@ -128,13 +126,11 @@ function App() {
     })),
   );
 
-  const { rootPaths, currentFolderPath, expandedFolders, multiSelectedPaths, setLibrary } = useLibraryStore(
+  const { rootPaths, currentFolderPath, multiSelectedPaths } = useLibraryStore(
     useShallow((state) => ({
       rootPaths: state.rootPaths,
       currentFolderPath: state.currentFolderPath,
-      expandedFolders: state.expandedFolders,
       multiSelectedPaths: state.multiSelectedPaths,
-      setLibrary: state.setLibrary,
     })),
   );
 
@@ -564,42 +560,7 @@ function App() {
   );
 
   const enableFolderImageCounts = appSettings?.enableFolderImageCounts ?? false;
-
-  const handleToggleFolder = useCallback(
-    async (path: string) => {
-      const isExpanding = !expandedFolders.has(path);
-      setLibrary((state) => {
-        const newSet = new Set(state.expandedFolders);
-        if (isExpanding) {
-          newSet.add(path);
-        } else {
-          newSet.delete(path);
-        }
-        return { expandedFolders: newSet };
-      });
-      if (!isExpanding) return;
-      try {
-        const newChildren = await invokeWithSchema(
-          Invokes.GetFolderChildren,
-          {
-            path,
-            showImageCounts: enableFolderImageCounts,
-          },
-          folderTreeListSchema,
-        );
-        setLibrary((state) => ({
-          folderTrees: state.folderTrees.map((tree) => insertChildrenIntoTree(tree, path, newChildren)),
-        }));
-        setLibrary((state) => ({
-          pinnedFolderTrees: state.pinnedFolderTrees.map((tree) => insertChildrenIntoTree(tree, path, newChildren)),
-        }));
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        toast.error(`Failed to load folder: ${message}`);
-      }
-    },
-    [expandedFolders, enableFolderImageCounts, setLibrary],
-  );
+  const handleToggleFolder = useFolderExpansionLoader(enableFolderImageCounts);
 
   const hasRoots = rootPaths.length > 0;
 
