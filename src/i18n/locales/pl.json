@@ -1399,7 +1399,11 @@
         "count_many": "{{count}} stylów",
         "count_other": "{{count}} stylu",
         "defaultBadge": "Domyślny",
-        "title": "Style kolorów"
+        "genericLegalNote": "",
+        "genericSafeBadge": "",
+        "legalNote": "",
+        "title": "Style kolorów",
+        "userBadge": ""
       },
       "composition": {
         "colorStyles_one": "",

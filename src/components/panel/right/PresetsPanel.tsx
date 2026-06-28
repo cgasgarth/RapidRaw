@@ -152,6 +152,7 @@ function PresetItemDisplay({ preset, previewUrl, isGeneratingPreviews }: PresetI
   const supportsGeometry =
     preset.includeCropTransform ?? geometryKeys.some((key) => preset.adjustments[key] !== undefined);
   const isTool = preset.presetType === 'tool';
+  const colorStyleProvenance = preset.presetType === 'style' ? preset.colorStyleProvenance : undefined;
   const tooltipContent = useMemo(() => {
     const features = [];
     if (supportsMasks) features.push(t('editor.presets.supports.masks'));
@@ -192,9 +193,22 @@ function PresetItemDisplay({ preset, previewUrl, isGeneratingPreviews }: PresetI
       </div>
 
       <div className="grow min-w-0 flex flex-col justify-center">
-        <UiText color={TextColors.primary} weight={TextWeights.medium} className="truncate">
-          {preset.name}
-        </UiText>
+        <div className="flex min-w-0 items-center gap-2">
+          <UiText color={TextColors.primary} weight={TextWeights.medium} className="truncate">
+            {preset.name}
+          </UiText>
+          {colorStyleProvenance && (
+            <UiText
+              className="shrink-0 rounded border border-border-color px-1 text-text-secondary"
+              data-color-style-legal-warning={colorStyleProvenance.legalWarning}
+              data-color-style-provenance-source={colorStyleProvenance.source}
+              data-testid={`user-color-style-provenance-${preset.id}`}
+              variant={TextVariants.small}
+            >
+              {t('editor.presets.colorStyles.userBadge')}
+            </UiText>
+          )}
+        </div>
         <div className="flex items-center gap-1.5 mt-0.5">
           {isTool ? (
             <Wrench size={12} className="text-text-secondary" />
@@ -209,6 +223,16 @@ function PresetItemDisplay({ preset, previewUrl, isGeneratingPreviews }: PresetI
             {isTool ? t('editor.presets.types.tool') : t('editor.presets.types.style')}
           </UiText>
         </div>
+        {colorStyleProvenance && (
+          <UiText
+            className="mt-1 line-clamp-2"
+            color={TextColors.secondary}
+            data-testid={`user-color-style-legal-note-${preset.id}`}
+            variant={TextVariants.small}
+          >
+            {t('editor.presets.colorStyles.legalNote')}
+          </UiText>
+        )}
       </div>
     </div>
   );
@@ -1176,6 +1200,15 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
                                 {t('editor.presets.colorStyles.defaultBadge')}
                               </UiText>
                             )}
+                            <UiText
+                              className="shrink-0 rounded border border-border-color px-1 text-text-secondary"
+                              data-color-style-built-in-claim="generic_safe_name"
+                              data-color-style-built-in-provenance="generic_engineered_starting_point"
+                              data-testid={`color-style-generic-safe-badge-${preset.id}`}
+                              variant={TextVariants.small}
+                            >
+                              {t('editor.presets.colorStyles.genericSafeBadge')}
+                            </UiText>
                           </span>
                           <UiText
                             variant={TextVariants.small}
@@ -1186,6 +1219,13 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
                         </span>
                         <UiText variant={TextVariants.small} className="mt-1 block text-text-secondary">
                           {preset.previewTags.join(' / ')}
+                        </UiText>
+                        <UiText
+                          className="mt-1 block text-text-secondary"
+                          data-testid={`color-style-generic-safe-note-${preset.id}`}
+                          variant={TextVariants.small}
+                        >
+                          {t('editor.presets.colorStyles.genericLegalNote')}
                         </UiText>
                         <UiText
                           as="span"

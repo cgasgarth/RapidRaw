@@ -237,6 +237,15 @@ export enum Orientation {
 
 export interface Preset {
   adjustments: Partial<Adjustments>;
+  colorStyleProvenance?:
+    | {
+        createdAt: string;
+        legalNamingStatus: 'user_named';
+        legalWarning: string;
+        source: 'user_created';
+        updatedAt: string;
+      }
+    | undefined;
   folder?: Folder;
   id: string;
   name: string;

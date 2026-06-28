@@ -1319,7 +1319,11 @@
         "count_one": "{{count}} Stil",
         "count_other": "{{count}} Stile",
         "defaultBadge": "Standard",
-        "title": "Farbstile"
+        "genericLegalNote": "",
+        "genericSafeBadge": "",
+        "legalNote": "",
+        "title": "Farbstile",
+        "userBadge": ""
       },
       "composition": {
         "colorStyles_one": "",

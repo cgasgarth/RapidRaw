@@ -45,6 +45,10 @@ const catalog = parseColorStylePresetCatalog({
 });
 const invalidCases = await readJson('fixtures/color/invalid-color-style-presets.json');
 const presetsPanelSource = await readFile('src/components/panel/right/PresetsPanel.tsx', 'utf8');
+const usePresetsSource = await readFile('src/hooks/usePresets.ts', 'utf8');
+const appPropertiesSource = await readFile('src/components/ui/AppProperties.tsx', 'utf8');
+const rustPresetsSource = await readFile('src-tauri/src/presets.rs', 'utf8');
+const locale = await readJson('src/i18n/locales/en.json');
 const failures = [];
 
 const sourceCatalog = parseColorStylePresetCatalog(COLOR_STYLE_PRESET_CATALOG);
@@ -57,10 +61,44 @@ if (sourceCatalog.defaultPresetId !== catalog.defaultPresetId || sourceIds !== f
 for (const marker of [
   'COLOR_STYLE_PRESET_CATALOG.defaultPresetId',
   'color-style-default-preset-badge',
+  'color-style-generic-safe-badge-${preset.id}',
+  'color-style-generic-safe-note-${preset.id}',
+  'user-color-style-provenance-${preset.id}',
+  'user-color-style-legal-note-${preset.id}',
+  'data-color-style-built-in-claim="generic_safe_name"',
+  'data-color-style-provenance-source={colorStyleProvenance.source}',
   'editor.presets.colorStyles.defaultBadge',
 ]) {
   if (!presetsPanelSource.includes(marker)) {
     failures.push(`PresetsPanel.tsx missing color style UI marker: ${marker}.`);
+  }
+}
+
+for (const marker of [
+  'USER_COLOR_STYLE_LEGAL_WARNING',
+  'buildUserColorStyleProvenance',
+  "legalNamingStatus: 'user_named'",
+  "source: 'user_created'",
+  "presetType === 'style' ? { colorStyleProvenance: buildUserColorStyleProvenance() } : {}",
+]) {
+  if (!usePresetsSource.includes(marker)) {
+    failures.push(`usePresets.ts missing color style provenance marker: ${marker}.`);
+  }
+}
+
+for (const marker of ['colorStyleProvenance?:', "legalNamingStatus: 'user_named'", "source: 'user_created'"]) {
+  if (!appPropertiesSource.includes(marker)) {
+    failures.push(`Preset type missing color style provenance marker: ${marker}.`);
+  }
+}
+
+if (!rustPresetsSource.includes('colorStyleProvenance') || !rustPresetsSource.includes('color_style_provenance')) {
+  failures.push('Rust preset persistence must preserve colorStyleProvenance.');
+}
+
+for (const key of ['genericLegalNote', 'genericSafeBadge', 'legalNote', 'userBadge']) {
+  if (typeof locale.editor?.presets?.colorStyles?.[key] !== 'string') {
+    failures.push(`Missing color style locale key: ${key}.`);
   }
 }
 

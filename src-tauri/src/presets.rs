@@ -23,6 +23,11 @@ pub struct Preset {
     pub include_crop_transform: Option<bool>,
     #[serde(rename = "presetType", skip_serializing_if = "Option::is_none")]
     pub preset_type: Option<String>,
+    #[serde(
+        rename = "colorStyleProvenance",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub color_style_provenance: Option<Value>,
 }
 
 #[derive(Serialize)]
@@ -247,6 +252,7 @@ pub fn save_community_preset(
         include_crop_transform,
         include_masks,
         name,
+        color_style_provenance: None,
         preset_type: preset_type.or(Some("style".to_string())),
     };
 

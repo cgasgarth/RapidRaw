@@ -4,7 +4,15 @@ import { readFileSync } from 'node:fs';
 
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
 const colorStylesLocale = locale.editor?.presets?.colorStyles;
-const requiredLocaleKeys = ['adjustmentCoverage_one', 'adjustmentCoverage_other', 'defaultBadge'];
+const requiredLocaleKeys = [
+  'adjustmentCoverage_one',
+  'adjustmentCoverage_other',
+  'defaultBadge',
+  'genericLegalNote',
+  'genericSafeBadge',
+  'legalNote',
+  'userBadge',
+];
 const missingKeys = requiredLocaleKeys.filter((key) => typeof colorStylesLocale?.[key] !== 'string');
 if (missingKeys.length > 0) {
   console.error(`Missing color style UI locale keys: ${missingKeys.join(', ')}`);
@@ -17,6 +25,10 @@ for (const marker of [
   'editor.presets.colorStyles.adjustmentCoverage',
   'data-testid={`color-style-adjustment-count-${preset.id}`}',
   'color-style-default-preset-badge',
+  'color-style-generic-safe-badge-${preset.id}',
+  'color-style-generic-safe-note-${preset.id}',
+  'user-color-style-provenance-${preset.id}',
+  'user-color-style-legal-note-${preset.id}',
   '!hasBuiltInColorStyles',
 ]) {
   if (!source.includes(marker)) {

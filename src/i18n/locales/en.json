@@ -1322,7 +1322,11 @@
         "count_one": "{{count}} style",
         "count_other": "{{count}} styles",
         "defaultBadge": "Default",
-        "title": "Color Styles"
+        "genericLegalNote": "Generic RawEngine recipe. No manufacturer, film-stock, official, or exact-emulation claim.",
+        "genericSafeBadge": "Generic",
+        "legalNote": "User-created style. Naming and source stay user supplied; RawEngine does not claim an official or exact emulation.",
+        "title": "Color Styles",
+        "userBadge": "User"
       },
       "composition": {
         "colorStyles_one": "{{count}} style",

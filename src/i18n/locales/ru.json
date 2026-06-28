@@ -1332,7 +1332,11 @@
         "count_many": "",
         "count_other": "",
         "defaultBadge": "",
-        "title": ""
+        "genericLegalNote": "",
+        "genericSafeBadge": "",
+        "legalNote": "",
+        "title": "",
+        "userBadge": ""
       },
       "composition": {
         "colorStyles_one": "",
