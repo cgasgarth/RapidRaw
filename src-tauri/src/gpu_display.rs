@@ -1,7 +1,9 @@
 use std::num::NonZero;
 
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
 use half::f16;
 
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
 use crate::display_profile::build_srgb_to_active_display_lut;
 
 #[repr(C)]

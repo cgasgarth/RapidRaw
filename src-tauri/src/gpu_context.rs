@@ -3,10 +3,12 @@ use std::sync::Arc;
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
 use tauri::Manager;
 
+use crate::AppState;
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+use crate::app_settings;
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
 use crate::gpu_display::create_wgpu_display;
 use crate::image_processing::GpuContext;
-use crate::{AppState, app_settings};
 
 pub fn get_or_init_gpu_context(
     state: &tauri::State<AppState>,
