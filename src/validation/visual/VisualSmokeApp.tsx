@@ -16,6 +16,7 @@ import ImageCanvas from '../../components/panel/editor/ImageCanvas';
 import AgentChatShell from '../../components/panel/right/AgentChatShell';
 import { MaskOverlayReviewControls } from '../../components/panel/right/MaskOverlayReviewControls';
 import { Mask, SubMaskMode, ToolType, type SubMask } from '../../components/panel/right/Masks';
+import { ObjectPromptControls } from '../../components/panel/right/ObjectPromptControls';
 import RightPanelSwitcher from '../../components/panel/right/RightPanelSwitcher';
 import { TetherPanel } from '../../components/panel/right/TetherPanel';
 import {
@@ -225,6 +226,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabEditorLayerHandoff]: NegativeLabEditorLayerHandoffVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabRealRawPrivateReview]: NegativeLabRealRawPrivateReviewSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabWorkspace]: NegativeLabVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ObjectPromptUi]: ObjectPromptVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaPrivateRawUi]: PanoramaPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaSavedReview]: PanoramaSavedReviewVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaUi]: PanoramaVisualSmoke,
@@ -1186,6 +1188,15 @@ const copy = {
   layerMaskPrivateRawRefined: 'Refined mask preview',
   layerMaskPrivateRawExport: 'TIFF export handoff',
   layerMaskPrivateRawMetricCount: (count: string) => `${count} metrics`,
+  objectPromptBoxReady: 'Box ready',
+  objectPromptClear: 'Clear',
+  objectPromptControlsTitle: 'Object prompt masks',
+  objectPromptGenerate: 'Generate mask',
+  objectPromptModeBackground: 'Background',
+  objectPromptModeBox: 'Box',
+  objectPromptModeForeground: 'Foreground',
+  objectPromptProposal: 'SAM proposal',
+  objectPromptVisualProof: 'Object prompt visual proof',
   selectedLayer: 'Selected layer',
   maskBlendOpacity: 'Mask / blend / opacity',
   comparePreviewExport: 'Compare preview/export',
@@ -2709,6 +2720,132 @@ function LayerMaskPrivateRawVisualSmoke() {
               <p className="break-all">{proof.exportArtifact}</p>
             </div>
           </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function ObjectPromptVisualSmoke() {
+  const pointPrompts = [
+    { label: 'foreground' as const, x: 0.46, y: 0.38 },
+    { label: 'foreground' as const, x: 0.52, y: 0.5 },
+    { label: 'background' as const, x: 0.22, y: 0.76 },
+  ];
+  const boxPrompt = { height: 0.34, width: 0.28, x: 0.34, y: 0.24 };
+  const commandInput = {
+    endPoint: [3720, 2320] as [number, number],
+    promptKind: 'box' as const,
+    startPoint: [2040, 960] as [number, number],
+  };
+  const receipt = {
+    boxHeight: boxPrompt.height,
+    boxReady: true,
+    boxWidth: boxPrompt.width,
+    boxX: boxPrompt.x,
+    boxY: boxPrompt.y,
+    clickToMaskLatencyMs: 221,
+    hasRaster: true,
+    imageHeight: 4000,
+    imageWidth: 6000,
+    modelId: 'sam_vit_b_01ec64',
+    pointCount: pointPrompts.length,
+    promptCount: 4,
+    promptKind: 'box' as const,
+    providerId: 'rapidraw-sam-vit-b-onnx-v1',
+    providerStatus: 'local_sam_proposal_v1',
+    receiptVersion: 1 as const,
+  };
+  const t = ((key: string, options?: Record<string, unknown>) => {
+    const optionText = (name: string, fallback: string): string => {
+      const value = options?.[name];
+      return typeof value === 'string' || typeof value === 'number' ? String(value) : fallback;
+    };
+    if (key === 'editor.masks.objectPrompt.points') return `${optionText('count', '0')} point(s)`;
+    if (key === 'editor.masks.objectPrompt.receipt') {
+      return `${optionText('provider', 'provider')} ${optionText('promptKind', 'prompt')} ${optionText(
+        'latency',
+        '0',
+      )}ms`;
+    }
+    const labels: Record<string, string> = {
+      'editor.masks.objectPrompt.background': copy.objectPromptModeBackground,
+      'editor.masks.objectPrompt.box': copy.objectPromptModeBox,
+      'editor.masks.objectPrompt.boxReady': copy.objectPromptBoxReady,
+      'editor.masks.objectPrompt.clear': copy.objectPromptClear,
+      'editor.masks.objectPrompt.foreground': copy.objectPromptModeForeground,
+      'editor.masks.objectPrompt.generate': copy.objectPromptGenerate,
+    };
+    return labels[key] ?? key;
+  }) as Parameters<typeof ObjectPromptControls>[0]['t'];
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ObjectPromptUi}
+    >
+      <div className="grid h-screen grid-cols-[1fr_360px] bg-[#0f1114]">
+        <section className="grid grid-rows-[44px_1fr]" data-visual-smoke-section="object-prompt-canvas">
+          <div className="flex items-center justify-between border-b border-white/10 bg-[#181b1f] px-4">
+            <span className="text-sm font-semibold tracking-normal">{copy.brand}</span>
+            <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">
+              {copy.objectPromptVisualProof}
+            </span>
+          </div>
+          <div className="relative m-5 rounded-md border border-white/10 bg-[#15191e]">
+            <div className="absolute inset-[9%] rounded bg-gradient-to-br from-slate-700 via-stone-500 to-zinc-900" />
+            {pointPrompts.map((point, index) => (
+              <span
+                className={`absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white ${
+                  point.label === 'foreground' ? 'bg-emerald-400' : 'bg-rose-500'
+                }`}
+                data-object-prompt-label={point.label}
+                data-testid={`object-prompt-proof-point-${index}`}
+                key={`${point.label}-${index}`}
+                style={{ left: `${point.x * 100}%`, top: `${point.y * 100}%` }}
+              />
+            ))}
+            <span
+              className="absolute border-2 border-sky-300 bg-sky-300/15 shadow-lg"
+              data-testid="object-prompt-proof-box"
+              style={{
+                height: `${boxPrompt.height * 100}%`,
+                left: `${boxPrompt.x * 100}%`,
+                top: `${boxPrompt.y * 100}%`,
+                width: `${boxPrompt.width * 100}%`,
+              }}
+            />
+          </div>
+        </section>
+        <aside className="border-l border-white/10 bg-[#171a1f] p-4" data-visual-smoke-section="object-prompt-controls">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="font-semibold">{copy.objectPromptControlsTitle}</span>
+            <span className="rounded bg-white/10 px-2 py-0.5 text-xs">{copy.objectPromptProposal}</span>
+          </div>
+          <ObjectPromptControls
+            commandInput={commandInput}
+            isGenerating={false}
+            onClear={() => undefined}
+            onGenerate={() => undefined}
+            onModeChange={() => undefined}
+            providerStatusText="local_sam_proposal_v1"
+            replayReceipt={receipt}
+            selectedImagePath="/private-fixtures/layers/alaska-layer-mask-v1.arw"
+            state={{ boxPrompt, mode: 'box', pendingBoxAnchor: null, pointPrompts }}
+            t={t}
+          />
+          <div
+            className="sr-only"
+            data-box-ready="true"
+            data-fixture-id="validation.object-prompt.alaska-local-selection.v1"
+            data-has-raster="true"
+            data-model-id={receipt.modelId}
+            data-point-count={pointPrompts.length}
+            data-prompt-kind={commandInput.promptKind}
+            data-provider-status={receipt.providerStatus}
+            data-testid="object-prompt-visual-proof"
+          />
         </aside>
       </div>
     </main>
