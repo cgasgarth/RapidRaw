@@ -36,6 +36,16 @@ import type { NegativeLabRollNormalizationPlan } from '../../schemas/negativeLab
 import type { TFunction } from 'i18next';
 import type { Dispatch, SetStateAction } from 'react';
 
+export interface NegativeLabRollNormalizationApplyReceipt {
+  acceptedDryRunPlanHash: string;
+  acceptedDryRunPlanId: string;
+  appliedFrameCount: number;
+  exposureOverrideCount: number;
+  reviewFrameCount: number;
+  rgbBalanceOverrideCount: number;
+  skippedFrameCount: number;
+}
+
 interface NegativeLabRollHealthPanelProps {
   approvedQcFrameIds: readonly string[];
   batchApplyFrameCount: number;
@@ -59,6 +69,7 @@ interface NegativeLabRollHealthPanelProps {
   params: NegativeLabPresetParams;
   qcDecisionByFrameId: Record<string, NegativeLabQcDecision>;
   rejectedQcFrameIds: readonly string[];
+  rollNormalizationApplyReceipt: NegativeLabRollNormalizationApplyReceipt | null;
   rollNormalizationPlan: NegativeLabRollNormalizationPlan;
   rollWarningCount: number;
   setFrameHealthFilter: Dispatch<SetStateAction<NegativeLabFrameHealthFilter>>;
@@ -92,6 +103,7 @@ export function NegativeLabRollHealthPanel({
   params,
   qcDecisionByFrameId,
   rejectedQcFrameIds,
+  rollNormalizationApplyReceipt,
   rollNormalizationPlan,
   rollWarningCount,
   setFrameHealthFilter,
@@ -155,6 +167,26 @@ export function NegativeLabRollHealthPanel({
           <WandSparkles size={11} />
           {t('modals.negativeConversion.applyRollNormalizationPlan')}
         </button>
+        {rollNormalizationApplyReceipt !== null && (
+          <span
+            className="col-span-3 rounded border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-text-secondary"
+            data-accepted-dry-run-plan-hash={rollNormalizationApplyReceipt.acceptedDryRunPlanHash}
+            data-accepted-dry-run-plan-id={rollNormalizationApplyReceipt.acceptedDryRunPlanId}
+            data-applied-frame-count={rollNormalizationApplyReceipt.appliedFrameCount}
+            data-exposure-override-count={rollNormalizationApplyReceipt.exposureOverrideCount}
+            data-review-frame-count={rollNormalizationApplyReceipt.reviewFrameCount}
+            data-rgb-balance-override-count={rollNormalizationApplyReceipt.rgbBalanceOverrideCount}
+            data-skipped-frame-count={rollNormalizationApplyReceipt.skippedFrameCount}
+            data-testid="negative-lab-roll-normalization-apply-receipt"
+          >
+            {t('modals.negativeConversion.rollNormalizationApplyReceipt', {
+              applyCount: rollNormalizationApplyReceipt.appliedFrameCount,
+              planId: rollNormalizationApplyReceipt.acceptedDryRunPlanId,
+              reviewCount: rollNormalizationApplyReceipt.reviewFrameCount,
+              skippedCount: rollNormalizationApplyReceipt.skippedFrameCount,
+            })}
+          </span>
+        )}
         <button
           type="button"
           className="col-span-3 inline-flex items-center justify-center gap-1 rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary transition-colors hover:bg-surface"
