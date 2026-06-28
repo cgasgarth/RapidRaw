@@ -133,6 +133,7 @@ interface LivePromptResult {
   meanLuminanceDelta?: number;
   previewAfterHash?: string;
   previewBeforeHash?: string;
+  previewStaleRecipeHash?: boolean;
   recipeName?: string;
   safetyDecision?: AgentSafetyPolicyDecision;
   sampledPixelCount?: number;
@@ -683,6 +684,7 @@ function LivePromptComposer({
       const nextResult = {
         ...result,
         previewAfterHash: snapshot.initialPreview.renderHash,
+        previewStaleRecipeHash: stateResult.staleRecipeHash,
         recipeName: snapshot.initialPreview.recipeHash,
         stateAdjustmentCount: snapshot.adjustmentSummary.length,
         stateGraphRevision: snapshot.graphRevision,
@@ -731,6 +733,7 @@ function LivePromptComposer({
       const nextResult = {
         ...result,
         previewAfterHash: previewResult.preview.renderHash,
+        previewStaleRecipeHash: previewResult.staleRecipeHash,
         recipeName: previewResult.preview.recipeHash,
       } satisfies LivePromptResult;
       setResult(nextResult);
@@ -782,6 +785,7 @@ function LivePromptComposer({
       const nextResult = {
         ...result,
         previewAfterHash: previewResult.preview.renderHash,
+        previewStaleRecipeHash: previewResult.staleRecipeHash,
         recipeName: previewResult.preview.recipeHash,
       } satisfies LivePromptResult;
       if (result.previewAfterHash !== undefined) nextResult.previewBeforeHash = result.previewAfterHash;
@@ -1118,6 +1122,16 @@ function LivePromptComposer({
           {result.recipeName ? <span className="font-mono text-text-secondary">{result.recipeName}</span> : null}
         </div>
         {result.summary ? <p className="mt-1 leading-4 text-text-secondary">{result.summary}</p> : null}
+        {result.previewStaleRecipeHash || result.stateStaleRecipeHash ? (
+          <p
+            className="mt-1 rounded border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-100"
+            data-preview-stale-recipe-hash={result.previewStaleRecipeHash ? 'true' : 'false'}
+            data-state-stale-recipe-hash={result.stateStaleRecipeHash ? 'true' : 'false'}
+            data-testid="agent-live-prompt-stale-preview-warning"
+          >
+            {t('editor.ai.agent.composer.stalePreviewWarning')}
+          </p>
+        ) : null}
         {result.stateGraphRevision ? (
           <div
             className="mt-1 space-y-1 font-mono text-[10px] text-text-secondary"

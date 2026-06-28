@@ -563,6 +563,7 @@
           "previewDelta": "",
           "refreshPreview": "",
           "rollback": "",
+          "stalePreviewWarning": "",
           "status": {
             "applied": "",
             "applying": "",
