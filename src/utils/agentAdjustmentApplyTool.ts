@@ -47,6 +47,9 @@ export const agentAdjustmentsApplyResponseSchema = z
     appliedGraphRevision: z.string().trim().min(1),
     beforePreviewHash: z.string().trim().min(1),
     changedPixelCount: z.number().int().positive(),
+    changedPixelPercent: z.number().min(0).max(100),
+    maxChannelDelta: z.number().nonnegative(),
+    meanLuminanceDelta: z.number().nonnegative(),
     receipt: z
       .object({
         adjustedFields: z.array(z.string().trim().min(1)).min(1),
@@ -59,6 +62,7 @@ export const agentAdjustmentsApplyResponseSchema = z
       })
       .strict(),
     requestId: z.string().trim().min(1),
+    sampledPixelCount: z.number().int().positive(),
     staleRecipeHash: z.literal(false),
     toolName: z.literal(AGENT_ADJUSTMENTS_APPLY_TOOL_NAME),
     undoGraphRevision: z.string().trim().min(1),
@@ -135,6 +139,9 @@ export const applyAgentGlobalAdjustments = async (
     appliedGraphRevision,
     beforePreviewHash: basicToneResult.beforePreviewHash,
     changedPixelCount: basicToneResult.changedPixelCount,
+    changedPixelPercent: basicToneResult.changedPixelPercent,
+    maxChannelDelta: basicToneResult.maxChannelDelta,
+    meanLuminanceDelta: basicToneResult.meanLuminanceDelta,
     receipt: {
       adjustedFields,
       afterPreviewHash: basicToneResult.afterPreviewHash,
@@ -145,6 +152,7 @@ export const applyAgentGlobalAdjustments = async (
       undoGraphRevision,
     },
     requestId: parsedRequest.requestId,
+    sampledPixelCount: basicToneResult.sampledPixelCount,
     staleRecipeHash: false,
     toolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
     undoGraphRevision,
