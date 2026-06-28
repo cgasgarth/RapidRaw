@@ -15,6 +15,7 @@ import {
   Sun,
 } from 'lucide-react';
 
+import type { AiPeopleMaskPart } from '../../../schemas/aiMaskingSchemas';
 import type { LucideIcon } from 'lucide-react';
 
 export type SubMaskParameters = Record<string, unknown>;
@@ -55,7 +56,7 @@ export interface MaskType {
   icon: LucideIcon;
   id?: string;
   name: string;
-  personPart?: 'face' | 'full_person';
+  personPart?: AiPeopleMaskPart;
   type: Mask;
 }
 

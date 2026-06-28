@@ -8,7 +8,10 @@ import { buildAiPeopleMaskPickerModel } from '../../../src/utils/aiPeopleMaskPic
 
 const fixtureJson: unknown = JSON.parse(readFileSync(resolve('fixtures/masks/ai-people-picker-model.json'), 'utf8'));
 const fixture = aiPeopleMaskPickerModelFixtureSchema.parse(fixtureJson);
+const aiPanelSource = readFileSync(resolve('src/components/panel/right/AIPanel.tsx'), 'utf8');
+const pickerSource = readFileSync(resolve('src/components/panel/right/AiPeoplePartPickerStatus.tsx'), 'utf8');
 const maskPanelSource = readFileSync(resolve('src/components/panel/right/MasksPanel.tsx'), 'utf8');
+const hookSource = readFileSync(resolve('src/hooks/useAiMasking.ts'), 'utf8');
 const locale = JSON.parse(readFileSync(resolve('src/i18n/locales/en.json'), 'utf8')) as {
   editor?: { masks?: { aiPeopleParts?: Record<string, unknown> } };
 };
@@ -48,12 +51,42 @@ for (const marker of [
   'data-testid={`ai-people-part-option-${option.part}`}',
   "data-disabled-reason={option.disabledReason ?? ''}",
   'data-validation-mode={option.validationMode}',
-  'activeSubMask.type === Mask.AiPerson',
   "t('editor.masks.aiPeopleParts.title')",
   "t('editor.masks.aiPeopleParts.description')",
 ]) {
-  if (!maskPanelSource.includes(marker)) {
-    console.error(`AI people picker UI missing marker: ${marker}`);
+  if (!pickerSource.includes(marker)) {
+    console.error(`AI people picker component missing marker: ${marker}`);
+    process.exit(1);
+  }
+}
+
+for (const [surface, source] of [
+  ['AI panel', aiPanelSource],
+  ['Masks panel', maskPanelSource],
+] as const) {
+  if (!source.includes('<AiPeoplePartPickerStatus />')) {
+    console.error(`${surface}: expected shared AI people picker status component`);
+    process.exit(1);
+  }
+}
+
+if (!aiPanelSource.includes('activeSubMask?.type === Mask.AiPerson')) {
+  console.error('AI panel: expected AI people picker to render for active person masks');
+  process.exit(1);
+}
+
+if (!maskPanelSource.includes('activeSubMask.type === Mask.AiPerson')) {
+  console.error('Masks panel: expected AI people picker to render for active person masks');
+  process.exit(1);
+}
+
+for (const marker of [
+  'getAiPeopleMaskPartCapability(part)',
+  "part === 'face' || part === 'full_person'",
+  "capability.validationMode !== 'runtime_apply'",
+]) {
+  if (!hookSource.includes(marker)) {
+    console.error(`AI people runtime guard missing marker: ${marker}`);
     process.exit(1);
   }
 }

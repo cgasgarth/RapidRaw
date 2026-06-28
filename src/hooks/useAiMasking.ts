@@ -5,9 +5,10 @@ import { toast } from 'react-toastify';
 
 import { useEditorActions } from './useEditorActions';
 import { Mask, type SubMask } from '../components/panel/right/Masks';
-import { parseAiPatchDataJson } from '../schemas/aiMaskingSchemas';
+import { parseAiPatchDataJson, type AiPeopleMaskPart } from '../schemas/aiMaskingSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import { Invokes } from '../tauri/commands';
+import { getAiPeopleMaskPartCapability } from '../utils/aiPeopleMaskContracts';
 import { formatUnknownError } from '../utils/errorFormatting';
 import { mergeMaskParameters } from '../utils/maskParameterAccess';
 
@@ -380,9 +381,17 @@ export function useAiMasking() {
     }
   };
 
-  const handleGenerateAiPersonPartMask = async (subMaskId: string, part: 'face' | 'full_person') => {
+  const handleGenerateAiPersonPartMask = async (subMaskId: string, part: AiPeopleMaskPart) => {
     const { selectedImage, adjustments, patchesSentToBackend } = useEditorStore.getState();
     if (!selectedImage?.path) return;
+
+    const capability = getAiPeopleMaskPartCapability(part);
+    const isCommandSupported = part === 'face' || part === 'full_person';
+    if (capability.validationMode !== 'runtime_apply' || !isCommandSupported) {
+      toast.error(`AI ${part} Mask unavailable: ${capability.notes}`);
+      return;
+    }
+
     setEditor({ isGeneratingAiMask: true });
 
     try {
