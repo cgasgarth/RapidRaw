@@ -475,6 +475,18 @@ function LiveSessionReviewPanel({ review }: { review: LiveSessionReviewState | n
 
   const firstPreview = review.previewLineage[0];
   const finalPreview = review.previewLineage.at(-1);
+  const purposeLabel = (purpose: AgentMultiTurnAppServerSessionResult['previewLineage'][number]['purpose']) =>
+    t(`editor.ai.agent.previewLineage.purpose.${purpose}`);
+  const roleLabel = (
+    preview: AgentMultiTurnAppServerSessionResult['previewLineage'][number],
+    index: number,
+    count: number,
+  ) => {
+    if (index === 0 || preview.purpose === 'initial_context') return t('editor.ai.agent.previewLineage.role.before');
+    if (index === count - 1) return t('editor.ai.agent.previewLineage.role.final');
+    if (preview.purpose === 'detail_review') return t('editor.ai.agent.previewLineage.role.detail');
+    return t('editor.ai.agent.previewLineage.role.refresh');
+  };
 
   return (
     <div
@@ -496,24 +508,39 @@ function LiveSessionReviewPanel({ review }: { review: LiveSessionReviewState | n
           {review.applyState}
         </span>
       </div>
-      <div className="grid gap-1.5" data-testid="agent-live-session-preview-lineage">
-        {review.previewLineage.map((preview) => (
+      <div
+        className="grid gap-1.5"
+        data-testid="agent-live-session-preview-lineage"
+        data-validation-mode="runtime-preview-lineage-compare-strip"
+      >
+        {review.previewLineage.map((preview, index) => (
           <div
             className="rounded border border-white/10 bg-white/[0.03] p-2"
             data-artifact-id={preview.artifactId}
             data-graph-revision={preview.graphRevision}
+            data-lineage-role={roleLabel(preview, index, review.previewLineage.length)}
             data-purpose={preview.purpose}
             data-recipe-hash={preview.recipeHash}
             data-render-hash={preview.renderHash}
             data-testid="agent-live-session-preview-lineage-entry"
+            data-tool-name={AGENT_PREVIEW_RENDER_TOOL_NAME}
             data-turn={preview.turn}
             key={`${preview.turn}-${preview.artifactId}`}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-text-primary">{t('editor.ai.agent.timeline.control.compare')}</span>
-              <span className="font-mono text-text-secondary">{preview.purpose}</span>
+              <span className="text-text-primary">{roleLabel(preview, index, review.previewLineage.length)}</span>
+              <span className="font-mono text-text-secondary">{purposeLabel(preview.purpose)}</span>
             </div>
-            <div className="mt-1 truncate font-mono text-sky-100">{preview.renderHash}</div>
+            <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 font-mono text-[10px]">
+              <dt className="text-text-tertiary">{t('editor.ai.agent.previewLineage.meta.tool')}</dt>
+              <dd className="truncate text-text-secondary">{AGENT_PREVIEW_RENDER_TOOL_NAME}</dd>
+              <dt className="text-text-tertiary">{t('editor.ai.agent.previewLineage.meta.renderHash')}</dt>
+              <dd className="truncate text-sky-100">{preview.renderHash}</dd>
+              <dt className="text-text-tertiary">{t('editor.ai.agent.previewLineage.meta.recipeHash')}</dt>
+              <dd className="truncate text-text-secondary">{preview.recipeHash}</dd>
+              <dt className="text-text-tertiary">{t('editor.ai.agent.previewLineage.meta.artifact')}</dt>
+              <dd className="truncate text-text-secondary">{preview.artifactId}</dd>
+            </dl>
           </div>
         ))}
       </div>

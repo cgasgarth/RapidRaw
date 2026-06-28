@@ -57,6 +57,13 @@ for (const marker of [
   'hasLiveApplyProof || transcript.runtimeStatus',
   'runAgentMultiTurnAppServerSession',
   'editor.ai.agent.composer.previewDelta',
+  'data-testid="agent-live-session-preview-lineage"',
+  'data-validation-mode="runtime-preview-lineage-compare-strip"',
+  'data-lineage-role={roleLabel(preview, index, review.previewLineage.length)}',
+  'data-tool-name={AGENT_PREVIEW_RENDER_TOOL_NAME}',
+  'editor.ai.agent.previewLineage.meta.renderHash',
+  'editor.ai.agent.previewLineage.role.before',
+  'editor.ai.agent.previewLineage.role.final',
   'runAgentBoundedEditPlannerLoop',
   'editor.ai.agent.walkthrough.title',
 ]) {
@@ -98,6 +105,25 @@ const localeSchema = z
             }),
             subtitle: z.string().min(1),
             title: z.string().min(1),
+          }),
+          previewLineage: z.object({
+            meta: z.object({
+              artifact: z.string().min(1),
+              recipeHash: z.string().min(1),
+              renderHash: z.string().min(1),
+              tool: z.string().min(1),
+            }),
+            purpose: z.object({
+              detail_review: z.string().min(1),
+              initial_context: z.string().min(1),
+              refresh: z.string().min(1),
+            }),
+            role: z.object({
+              before: z.string().min(1),
+              detail: z.string().min(1),
+              final: z.string().min(1),
+              refresh: z.string().min(1),
+            }),
           }),
           walkthrough: z.object({
             plan: z.string().min(1),
