@@ -3,7 +3,8 @@ use sha2::{Digest, Sha256};
 use wgpu::util::{DeviceExt, TextureDataOrder};
 
 use crate::app_state::AppState;
-use crate::gpu_processing::{get_or_init_gpu_context, read_texture_data_roi_with_bytes_per_pixel};
+use crate::gpu_processing::get_or_init_gpu_context;
+use crate::gpu_readback::read_texture_data_roi_with_bytes_per_pixel;
 
 const EXPECTED_RGBA: [u8; 16] = [
     18, 64, 128, 255, 42, 96, 180, 255, 88, 120, 210, 255, 132, 160, 240, 255,
