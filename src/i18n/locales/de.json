@@ -3839,6 +3839,12 @@
         "highlights": "",
         "shadows": ""
       },
+      "scopeStatus": {
+        "pending": "",
+        "ready": "",
+        "transformPath": "",
+        "updating": ""
+      },
       "tooltips": {
         "hideClipping": "Clipping-Warnungen ausblenden",
         "histogram": "Histogramm",

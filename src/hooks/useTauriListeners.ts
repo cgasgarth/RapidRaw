@@ -82,6 +82,10 @@ interface ImageAnalyticsPayload<TData> {
   path: string;
 }
 
+const PREVIEW_SCOPE_DISPLAY_TRANSFORM_LABEL = 'Display preview transform';
+const PREVIEW_SCOPE_SOURCE_LABEL = 'Edited preview';
+const PREVIEW_SCOPE_WORKING_TRANSFORM_LABEL = 'Working RGB';
+
 export function useTauriListeners({
   refreshAllFolderTrees,
   handleSelectSubfolder,
@@ -154,7 +158,19 @@ export function useTauriListeners({
       }),
       listen<ImageAnalyticsPayload<ChannelConfig>>(HISTOGRAM_UPDATE_EVENT, (event) => {
         if (isEffectActive && event.payload.path === useEditorStore.getState().selectedImage?.path) {
-          useEditorStore.getState().setEditor({ histogram: event.payload.data });
+          useEditorStore.getState().setEditor((state) => ({
+            histogram: event.payload.data,
+            previewScopeStatus: {
+              displayTransformLabel: PREVIEW_SCOPE_DISPLAY_TRANSFORM_LABEL,
+              histogramReady: true,
+              path: event.payload.path,
+              sourceLabel: PREVIEW_SCOPE_SOURCE_LABEL,
+              updatedAt: new Date().toISOString(),
+              waveformReady:
+                state.previewScopeStatus?.path === event.payload.path ? state.previewScopeStatus.waveformReady : false,
+              workingTransformLabel: PREVIEW_SCOPE_WORKING_TRANSFORM_LABEL,
+            },
+          }));
         }
       }),
       listen<ImageAnalyticsPayload<unknown>>(GAMUT_WARNING_UPDATE_EVENT, (event) => {
@@ -170,7 +186,19 @@ export function useTauriListeners({
       }),
       listen<ImageAnalyticsPayload<WaveformData>>(WAVEFORM_UPDATE_EVENT, (event) => {
         if (isEffectActive && event.payload.path === useEditorStore.getState().selectedImage?.path) {
-          useEditorStore.getState().setEditor({ waveform: event.payload.data });
+          useEditorStore.getState().setEditor((state) => ({
+            previewScopeStatus: {
+              displayTransformLabel: PREVIEW_SCOPE_DISPLAY_TRANSFORM_LABEL,
+              histogramReady:
+                state.previewScopeStatus?.path === event.payload.path ? state.previewScopeStatus.histogramReady : false,
+              path: event.payload.path,
+              sourceLabel: PREVIEW_SCOPE_SOURCE_LABEL,
+              updatedAt: new Date().toISOString(),
+              waveformReady: true,
+              workingTransformLabel: PREVIEW_SCOPE_WORKING_TRANSFORM_LABEL,
+            },
+            waveform: event.payload.data,
+          }));
         }
       }),
       listen<unknown>(THUMBNAIL_PROGRESS_EVENT, (event) => {

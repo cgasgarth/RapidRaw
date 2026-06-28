@@ -137,6 +137,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       uncroppedAdjustedPreviewUrl: null,
       histogram: null,
       waveform: null,
+      previewScopeStatus: null,
       gamutWarningOverlay: null,
       activeMaskId: null,
       activeMaskContainerId: null,
@@ -310,6 +311,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         previewSize: { width: 0, height: 0 },
         histogram: null,
         waveform: null,
+        previewScopeStatus: null,
         gamutWarningOverlay: null,
         uncroppedAdjustedPreviewUrl: null,
       });

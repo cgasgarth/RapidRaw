@@ -38,6 +38,16 @@ export interface ExportSoftProofTransformState {
   transformPolicyFingerprint: string | null;
 }
 
+export interface PreviewScopeStatus {
+  displayTransformLabel: string;
+  histogramReady: boolean;
+  path: string;
+  sourceLabel: string;
+  updatedAt: string;
+  waveformReady: boolean;
+  workingTransformLabel: string;
+}
+
 interface EditorState {
   // Core Image & Adjustments
   selectedImage: SelectedImage | null;
@@ -58,6 +68,7 @@ interface EditorState {
   // Analytics
   histogram: ChannelConfig | null;
   waveform: WaveformData | null;
+  previewScopeStatus: PreviewScopeStatus | null;
   gamutWarningOverlay: GamutWarningOverlayPayload | null;
   isGamutWarningOverlayVisible: boolean;
   isExportSoftProofEnabled: boolean;
@@ -123,6 +134,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   showOriginal: false,
   histogram: null,
   waveform: null,
+  previewScopeStatus: null,
   gamutWarningOverlay: null,
   isGamutWarningOverlayVisible: false,
   isExportSoftProofEnabled: false,

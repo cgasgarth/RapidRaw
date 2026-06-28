@@ -3796,6 +3796,12 @@
         "highlights": "",
         "shadows": ""
       },
+      "scopeStatus": {
+        "pending": "",
+        "ready": "",
+        "transformPath": "",
+        "updating": ""
+      },
       "tooltips": {
         "hideClipping": "Ocultar advertencias de recorte",
         "histogram": "Histograma",

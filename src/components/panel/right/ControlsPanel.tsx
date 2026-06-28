@@ -98,6 +98,7 @@ export default function Controls() {
     copiedSectionAdjustments,
     histogram,
     selectedImage,
+    previewScopeStatus,
     isWbPickerActive,
     isWaveformVisible,
     waveform,
@@ -110,6 +111,7 @@ export default function Controls() {
       copiedSectionAdjustments: state.copiedSectionAdjustments,
       histogram: state.histogram,
       selectedImage: state.selectedImage,
+      previewScopeStatus: state.previewScopeStatus,
       isWbPickerActive: state.isWbPickerActive,
       isWaveformVisible: state.isWaveformVisible,
       waveform: state.waveform,
@@ -421,6 +423,7 @@ export default function Controls() {
               <Waveform
                 waveformData={waveform || null}
                 histogram={histogram}
+                previewScopeStatus={previewScopeStatus}
                 displayMode={activeWaveformChannel}
                 setDisplayMode={setActiveWaveformChannel}
                 showClipping={adjustments.showClipping || false}

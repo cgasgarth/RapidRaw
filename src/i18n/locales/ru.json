@@ -3888,6 +3888,12 @@
         "highlights": "",
         "shadows": ""
       },
+      "scopeStatus": {
+        "pending": "",
+        "ready": "",
+        "transformPath": "",
+        "updating": ""
+      },
       "tooltips": {
         "hideClipping": "Скрыть предупреждения о переэкспозиции",
         "histogram": "Гистограмма",

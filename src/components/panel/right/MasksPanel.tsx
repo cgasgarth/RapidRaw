@@ -1149,6 +1149,7 @@ export function MasksPanel() {
     histogram,
     isGeneratingAiMask,
     maskOverlaySettings,
+    previewScopeStatus,
     selectedImage,
     isWaveformVisible,
     waveform,
@@ -1165,6 +1166,7 @@ export function MasksPanel() {
       histogram: state.histogram,
       isGeneratingAiMask: state.isGeneratingAiMask,
       maskOverlaySettings: state.maskOverlaySettings,
+      previewScopeStatus: state.previewScopeStatus,
       selectedImage: state.selectedImage,
       isWaveformVisible: state.isWaveformVisible,
       waveform: state.waveform,
@@ -1888,6 +1890,7 @@ export function MasksPanel() {
                 <Waveform
                   waveformData={waveform || null}
                   histogram={histogram}
+                  previewScopeStatus={previewScopeStatus}
                   displayMode={activeWaveformChannel}
                   setDisplayMode={setActiveWaveformChannel}
                   showClipping={adjustments.showClipping || false}
