@@ -29,6 +29,7 @@ interface PanoramaModalProps {
   imageCount?: number;
   isOpen: boolean;
   isProcessing: boolean;
+  lastApplyCommand: PanoramaModalState['lastApplyCommand'];
   lastDryRunCommand: PanoramaModalState['lastDryRunCommand'];
   loadingImageUrl?: string | null;
   onClose: () => void;
@@ -48,6 +49,7 @@ export default function PanoramaModal({
   imageCount,
   isOpen,
   isProcessing,
+  lastApplyCommand,
   lastDryRunCommand,
   loadingImageUrl,
   onClose,
@@ -240,6 +242,42 @@ export default function PanoramaModal({
             savedPath={savedPath}
             savedSuccessLabel={t('modals.panorama.savedSuccess')}
           />
+          {lastApplyCommand && (
+            <section
+              className="mx-auto mt-4 grid max-w-2xl grid-cols-3 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-left"
+              data-accepted-dry-run-plan-hash={lastApplyCommand.acceptedDryRunPlanHash}
+              data-accepted-dry-run-plan-id={lastApplyCommand.acceptedDryRunPlanId}
+              data-command-type={lastApplyCommand.commandType}
+              data-dry-run={String(lastApplyCommand.dryRun)}
+              data-source-count={lastApplyCommand.sourceCount}
+              data-testid="panorama-apply-command-state"
+              data-tool-name={lastApplyCommand.toolName}
+            >
+              {[
+                {
+                  label: t('modals.panorama.dryRunCommandTool'),
+                  value: lastApplyCommand.toolName,
+                },
+                {
+                  label: t('modals.panorama.summaryQuality'),
+                  value: t('modals.panorama.summaryReady'),
+                },
+                {
+                  label: t('modals.panorama.review.projectionCrop'),
+                  value: lastApplyCommand.acceptedDryRunPlanId,
+                },
+              ].map((item) => (
+                <div className="min-w-0 rounded border border-border-color bg-surface px-2 py-1.5" key={item.label}>
+                  <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                    {item.label}
+                  </UiText>
+                  <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                    {item.value}
+                  </UiText>
+                </div>
+              ))}
+            </section>
+          )}
           {savedReviewSummary && (
             <section
               className="mx-auto mt-4 grid max-w-2xl grid-cols-5 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-left"

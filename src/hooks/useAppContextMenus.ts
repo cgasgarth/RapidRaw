@@ -704,6 +704,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     finalImageBase64: null,
                     isOpen: true,
                     isProcessing: false,
+                    lastApplyCommand: null,
                     lastDryRunCommand: null,
                     progressMessage: null,
                     renderedReview: null,

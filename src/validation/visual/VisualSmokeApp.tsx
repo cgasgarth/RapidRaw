@@ -3677,6 +3677,7 @@ function PanoramaVisualSmoke() {
           imageCount={5}
           isOpen
           isProcessing={false}
+          lastApplyCommand={null}
           lastDryRunCommand={null}
           loadingImageUrl={panoramaPreviewUrl}
           onClose={() => {}}
@@ -3735,6 +3736,14 @@ function PanoramaSavedReviewVisualSmoke() {
         imageCount={5}
         isOpen
         isProcessing={false}
+        lastApplyCommand={{
+          acceptedDryRunPlanHash: 'sha256:panorama-visual-smoke',
+          acceptedDryRunPlanId: 'panorama_plan_5',
+          commandType: 'computationalMerge.createPanorama',
+          dryRun: false,
+          sourceCount: 5,
+          toolName: getComputationalMergeAppServerRoutePairSummary('panorama').applyToolName,
+        }}
         lastDryRunCommand={null}
         loadingImageUrl={panoramaPreviewUrl}
         onClose={() => {}}
@@ -3768,6 +3777,7 @@ function PanoramaProcessingCommandVisualSmoke() {
         imageCount={3}
         isOpen
         isProcessing
+        lastApplyCommand={null}
         lastDryRunCommand={{
           appServerToolName: getComputationalMergeAppServerRoutePairSummary('panorama').dryRunToolName,
           boundaryMode: 'auto_crop',
