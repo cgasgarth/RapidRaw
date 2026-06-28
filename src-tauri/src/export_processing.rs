@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs;
 use std::io::Cursor;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -78,6 +78,7 @@ struct ExportReceiptOutput {
     icc_embedded: Option<bool>,
     output_path: String,
     policy_version: Option<String>,
+    raw_provenance_sidecar_path: Option<String>,
     raw_development_report: Option<RawDevelopmentReport>,
     policy_status: Option<String>,
     rendering_intent: Option<String>,
@@ -98,6 +99,21 @@ struct ExportReceipt {
     completed_at: String,
     outputs: Vec<ExportReceiptOutput>,
     total: usize,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RawExportProvenanceSidecar {
+    byte_size: u64,
+    completed_at: String,
+    edit_graph_revision: String,
+    format: String,
+    output_hash: String,
+    output_path: String,
+    raw_development_report: RawDevelopmentReport,
+    schema_version: u8,
+    source_hash: String,
+    source_path: String,
 }
 use crate::render_pipeline::apply_pre_gpu_detail_stages;
 use crate::{
@@ -773,6 +789,7 @@ pub async fn export_images(
                             &extension,
                             None,
                             None,
+                            None,
                         );
                     }
 
@@ -874,6 +891,10 @@ pub async fn export_images(
                         &extension,
                         export_color_policy,
                         raw_development_report,
+                        Some(format!(
+                            "export_job:{:016x}",
+                            calculate_full_job_hash(&source_path_str, &js_adjustments)
+                        )),
                     )
                 })();
 
@@ -956,10 +977,24 @@ fn export_receipt_output(
     format: &str,
     metadata: Option<ExportReceiptMetadata>,
     raw_development_report: Option<RawDevelopmentReport>,
+    edit_graph_revision: Option<String>,
 ) -> Result<ExportReceiptOutput, String> {
     let byte_size = fs::metadata(output_path)
         .map_err(|error| error.to_string())?
         .len();
+    let raw_provenance_sidecar_path = match raw_development_report.as_ref() {
+        Some(report) => Some(write_raw_export_provenance_sidecar(
+            output_path,
+            source_path,
+            format,
+            byte_size,
+            edit_graph_revision
+                .as_deref()
+                .unwrap_or("export_job:unknown"),
+            report,
+        )?),
+        None => None,
+    };
 
     Ok(ExportReceiptOutput {
         bit_depth: metadata.as_ref().map(|metadata| metadata.bit_depth),
@@ -983,6 +1018,7 @@ fn export_receipt_output(
         policy_version: metadata
             .as_ref()
             .map(|metadata| metadata.policy_version.clone()),
+        raw_provenance_sidecar_path,
         raw_development_report,
         policy_status: metadata
             .as_ref()
@@ -1014,6 +1050,44 @@ fn export_receipt_output(
             .map(|metadata| metadata.transform_policy_fingerprint.clone()),
         transform_applied: metadata.map(|metadata| metadata.transform_applied),
     })
+}
+
+fn raw_export_provenance_sidecar_path(output_path: &Path) -> PathBuf {
+    PathBuf::from(format!(
+        "{}.rawengine-provenance.json",
+        output_path.to_string_lossy()
+    ))
+}
+
+fn sha256_file(path: &Path) -> Result<String, String> {
+    let bytes = fs::read(path).map_err(|error| error.to_string())?;
+    Ok(format!("sha256:{}", hex::encode(Sha256::digest(&bytes))))
+}
+
+fn write_raw_export_provenance_sidecar(
+    output_path: &Path,
+    source_path: &str,
+    format: &str,
+    byte_size: u64,
+    edit_graph_revision: &str,
+    raw_development_report: &RawDevelopmentReport,
+) -> Result<String, String> {
+    let sidecar_path = raw_export_provenance_sidecar_path(output_path);
+    let sidecar = RawExportProvenanceSidecar {
+        byte_size,
+        completed_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+        edit_graph_revision: edit_graph_revision.to_string(),
+        format: format.to_string(),
+        output_hash: sha256_file(output_path)?,
+        output_path: output_path.to_string_lossy().to_string(),
+        raw_development_report: raw_development_report.clone(),
+        schema_version: 1,
+        source_hash: sha256_file(Path::new(source_path))?,
+        source_path: source_path.to_string(),
+    };
+    let json = serde_json::to_vec_pretty(&sidecar).map_err(|error| error.to_string())?;
+    fs::write(&sidecar_path, json).map_err(|error| error.to_string())?;
+    Ok(sidecar_path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -1624,7 +1698,12 @@ mod tests {
             "rawengine-export-receipt-raw-report-{}.tiff",
             std::process::id()
         ));
+        let source_path = std::env::temp_dir().join(format!(
+            "rawengine-export-receipt-raw-source-{}.ARW",
+            std::process::id()
+        ));
         fs::write(&output_path, [0u8]).expect("write receipt output placeholder");
+        fs::write(&source_path, [1u8, 2, 3, 4]).expect("write receipt source placeholder");
         let settings = base_export_settings(None);
         let metadata = export_receipt_metadata(
             "tiff",
@@ -1659,12 +1738,36 @@ mod tests {
 
         let receipt = export_receipt_output(
             &output_path,
-            "/private/input.ARW",
+            &source_path.to_string_lossy(),
             "tiff",
             Some(metadata),
             Some(raw_development_report),
+            Some("export_job:test".to_string()),
         )
         .expect("receipt output should serialize RAW development report");
+        let sidecar_path = receipt
+            .raw_provenance_sidecar_path
+            .as_ref()
+            .expect("RAW export receipt includes provenance sidecar path");
+        let sidecar_json =
+            fs::read_to_string(sidecar_path).expect("read RAW export provenance sidecar");
+        let sidecar: serde_json::Value =
+            serde_json::from_str(&sidecar_json).expect("parse RAW export provenance sidecar");
+        assert_eq!(sidecar["schemaVersion"], 1);
+        assert_eq!(sidecar["editGraphRevision"], "export_job:test");
+        assert_eq!(sidecar["rawDevelopmentReport"]["demosaicPath"], "bayer_hq");
+        assert!(
+            sidecar["sourceHash"]
+                .as_str()
+                .is_some_and(|value| value.starts_with("sha256:"))
+        );
+        assert!(
+            sidecar["outputHash"]
+                .as_str()
+                .is_some_and(|value| value.starts_with("sha256:"))
+        );
+        fs::remove_file(sidecar_path).ok();
+        fs::remove_file(source_path).ok();
         fs::remove_file(output_path).ok();
 
         let report = receipt

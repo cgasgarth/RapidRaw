@@ -125,6 +125,7 @@ export const exportReceiptPayloadSchema = z
           outputPath: z.string().trim().min(1),
           policyStatus: z.string().trim().min(1).optional().nullable(),
           policyVersion: z.string().trim().min(1).optional().nullable(),
+          rawProvenanceSidecarPath: z.string().trim().min(1).optional().nullable(),
           rawDevelopmentReport: rawDevelopmentReportSchema.optional().nullable(),
           renderingIntent: z.string().trim().min(1).optional().nullable(),
           requestedColorProfile: z.string().trim().min(1).optional().nullable(),
