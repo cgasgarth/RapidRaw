@@ -27,6 +27,7 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useUIStore } from '../../store/useUIStore';
 import { TextColors, TextVariants } from '../../types/typography';
+import { createSuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
 import { Panel } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -424,7 +425,10 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
               progressMessage: null,
               sourceMetadata:
                 selectedCommandPaths.length > 0
-                  ? selectedCommandPaths.map((path) => ({ exif: null, path }))
+                  ? selectedCommandPaths.map((path) => ({
+                      exif: imageList.find((image) => image.path === path)?.exif ?? null,
+                      path,
+                    }))
                   : state.hdrModalState.sourceMetadata,
               stitchingSourcePaths:
                 selectedCommandPaths.length > 0 ? selectedCommandPaths : state.hdrModalState.stitchingSourcePaths,
@@ -463,7 +467,10 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
               ...superResolutionModalState,
               isOpen: true,
               outputReview: null,
-              sourcePreflightMetadata: [],
+              sourcePreflightMetadata:
+                selectedCommandPaths.length > 0
+                  ? createSuperResolutionSourcePreflightMetadata(selectedCommandPaths, imageList)
+                  : state.superResolutionModalState.sourcePreflightMetadata,
               sourcePaths:
                 selectedCommandPaths.length > 0 ? selectedCommandPaths : state.superResolutionModalState.sourcePaths,
             },
