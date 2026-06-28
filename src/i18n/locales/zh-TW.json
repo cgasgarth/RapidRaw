@@ -1039,7 +1039,13 @@
       "refinement": {
         "replayReceipt": "",
         "reset": "",
-        "title": ""
+        "title": "",
+        "warnings": {
+          "densityLow": "",
+          "featherHigh": "",
+          "hairDetailHigh": "",
+          "shiftLarge": ""
+        }
       },
       "resetMaskingTooltip": "重置遮色片",
       "settings": {

@@ -1124,7 +1124,13 @@
         "replayReceipt": "Replay-Beleg: Feder {{featherPx}} px, Kante {{edgeShiftPx}} px, Glaettung {{smoothness}}%",
         "reset": "Reset",
         "smoothness": "Smoothness",
-        "title": "Refinement"
+        "title": "Refinement",
+        "warnings": {
+          "densityLow": "Low density can hide the mask effect.",
+          "featherHigh": "High feathering can blur fine edges.",
+          "hairDetailHigh": "High hair detail can amplify edge noise.",
+          "shiftLarge": "Large edge shifts can create halos."
+        }
       },
       "resetMaskingTooltip": "Maskierung zurücksetzen",
       "settings": {
