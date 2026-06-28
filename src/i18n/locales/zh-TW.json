@@ -2791,6 +2791,10 @@
       "alignmentOpticalFlow": "",
       "alignmentTranslation": "",
       "close": "",
+      "dryRunCommandMode": "",
+      "dryRunCommandModeValue": "",
+      "dryRunCommandSources": "",
+      "dryRunCommandTool": "",
       "mode": {
         "aggressive": {
           "status": ""

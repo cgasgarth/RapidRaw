@@ -84,6 +84,15 @@ if (!appModalsSource.includes("getComputationalMergeAppServerRoutePairSummary('s
 if (!appModalsSource.includes('lastDryRunCommand')) {
   failures.push('Super-resolution preview-plan action must persist dry-run command metadata.');
 }
+if (!appModalsSource.includes('lastDryRunCommand={superResolutionModalState.lastDryRunCommand}')) {
+  failures.push('AppModals must pass super-resolution dry-run command metadata into SuperResolutionModal.');
+}
+if (!modalSource.includes('data-testid="sr-dry-run-command-state"')) {
+  failures.push('Super-resolution modal must render dry-run command state.');
+}
+if (!modalSource.includes('data-tool-name={lastDryRunCommand.toolName}')) {
+  failures.push('Super-resolution modal must expose the dry-run tool name.');
+}
 if (!appModalsSource.includes('buildSuperResolutionOutputReviewWorkflow')) {
   failures.push('Super-resolution preview-plan action must materialize a visible output review.');
 }

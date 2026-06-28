@@ -63,6 +63,7 @@ import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from
 import { applyLayerStackCommandBridgeOperation } from '../../utils/layerStackCommandBridge';
 import { handleNegativeConversionEditorHandoff } from '../../utils/negativeLabEditorHandoff';
 import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
+import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
 
 import type { FocusStackOutputReviewWorkflow } from '../../schemas/focusStackOutputReviewSchemas';
 import type { MaskOverlaySettings } from '../../schemas/maskOverlaySchemas';
@@ -3174,6 +3175,11 @@ function SuperResolutionVisualSmoke() {
     reconstruction_preview: buildSrReviewPreviewDataUrl('#22384d', '#d6b46e', 'Preview'),
     reconstruction_review_crop: buildSrReviewPreviewDataUrl('#273f38', '#93c47d', 'Crop'),
   };
+  const outputReview = buildSuperResolutionOutputReviewWorkflow({
+    artifactPath: '/tmp/rawengine-super-resolution-preview-plan-5.tif',
+    settings,
+    sourceCount: 5,
+  });
 
   return (
     <main
@@ -3233,9 +3239,16 @@ function SuperResolutionVisualSmoke() {
         </div>
         <SuperResolutionModal
           isOpen
+          lastDryRunCommand={{
+            commandType: 'computationalMerge.createSuperResolution',
+            dryRun: true,
+            sources: 5,
+            toolName: getComputationalMergeAppServerRoutePairSummary('super_resolution').dryRunToolName,
+          }}
           loadingImageUrl={panoramaPreviewUrl}
           onClose={() => {}}
           onPreviewPlan={() => {}}
+          outputReview={outputReview}
           reviewArtifactPreviewUrls={reviewArtifactPreviewUrls}
           onSettingsChange={setSettings}
           settings={settings}
