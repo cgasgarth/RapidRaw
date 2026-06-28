@@ -93,6 +93,7 @@ const requiredLocaleKeys = [
   'summarySourceCount_one',
   'summarySourceCount_other',
   'summarySources',
+  'summaryStartState',
   'summaryStrategy',
   'summaryToneMapPreview',
   'summaryToneMappingPreset',
@@ -193,6 +194,7 @@ for (const marker of [
   'modals.hdr.bracketPreflightAccepted',
   'modals.hdr.summarySourceCount',
   'modals.hdr.summaryReady',
+  'modals.hdr.summaryStartState',
   'modals.hdr.summaryStrategy',
   'modals.hdr.summaryToneMapPreview',
   'modals.hdr.summaryToneMappingPreset',
@@ -203,6 +205,8 @@ for (const marker of [
   'modals.hdr.previewWorkload',
   'modals.hdr.summaryAlignment',
   'settings.maxPreviewDimensionPx',
+  'applyReadinessLabel',
+  'isApplyReady',
 ]) {
   if (!source.includes(marker)) {
     console.error(`HDR modal missing setup summary marker: ${marker}`);
