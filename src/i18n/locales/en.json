@@ -603,6 +603,7 @@
           "previewDelta": "{{changed}}/{{sampled}} samples changed ({{percent}}%); mean luma delta {{meanLuma}}, max channel delta {{maxDelta}}",
           "refreshPreview": "Refresh preview",
           "rollback": "Rollback",
+          "stalePreviewWarning": "Preview may be stale; inspect state or rerun before applying.",
           "status": {
             "applied": "Applied through the local app-server bridge",
             "applying": "Applying accepted dry-run",
