@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { AlertTriangle, Aperture, CheckCircle2, Eye, Layers3, ShieldCheck } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
@@ -12,6 +12,7 @@ import {
 } from './ComputationalSetupModalShell';
 import { TextColors, TextVariants } from '../../types/typography';
 import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
+import { buildFocusStackSourcePreflight } from '../../utils/focusStackSourcePreflight';
 import Button from '../ui/Button';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
@@ -24,6 +25,7 @@ import type {
   FocusStackUiSettings,
 } from '../../schemas/focusStackUiSchemas';
 import type { FocusStackModalState } from '../../store/useUIStore';
+import type { FocusStackSourcePreflightMetadata } from '../../utils/focusStackSourcePreflight';
 
 interface FocusStackModalProps {
   isOpen: boolean;
@@ -36,6 +38,7 @@ interface FocusStackModalProps {
   outputReviewArtifactPath?: string;
   settings: FocusStackUiSettings;
   sourceCount: number;
+  sourcePreflightMetadata?: FocusStackSourcePreflightMetadata[];
 }
 
 const previewDimensionOptions = [2400, 4096, 8192] as const;
@@ -54,9 +57,15 @@ export default function FocusStackModal({
   outputReviewArtifactPath = reviewArtifactPath,
   settings,
   sourceCount,
+  sourcePreflightMetadata = [],
 }: FocusStackModalProps) {
   const { t } = useTranslation();
 
+  const sourcePreflight = useMemo(
+    () =>
+      sourcePreflightMetadata.length > 0 ? buildFocusStackSourcePreflight({ sources: sourcePreflightMetadata }) : null,
+    [sourcePreflightMetadata],
+  );
   const isSourceCountValid = sourceCount >= 2;
   const isDepthMapPreviewOnly = settings.blendMethod === 'depth_map';
 
@@ -93,6 +102,22 @@ export default function FocusStackModal({
   const stackReadinessLabel = isSourceCountValid
     ? t('modals.focusStack.preflight.ready')
     : t('modals.focusStack.preflight.blocked');
+  const sourcePreflightStatusLabel =
+    sourcePreflight === null
+      ? t('modals.focusStack.preflight.pending')
+      : sourcePreflight.status === 'metadata_missing'
+        ? t('modals.focusStack.preflight.pending')
+        : sourcePreflight.status === 'blocked'
+          ? t('modals.focusStack.preflight.blocked')
+          : t('modals.focusStack.preflight.ready');
+  const sourcePreflightConfidenceLabel =
+    sourcePreflight?.validation === null || sourcePreflight === null
+      ? t('modals.focusStack.preflight.pending')
+      : `${Math.round(sourcePreflight.validation.detectionConfidence * 100)}%`;
+  const sourcePreflightFocusSpanLabel =
+    sourcePreflight?.validation?.focusSpanMm === null || sourcePreflight?.validation?.focusSpanMm === undefined
+      ? t('modals.focusStack.preflight.pending')
+      : `${sourcePreflight.validation.focusSpanMm} mm`;
   const fallbackOutputReviewSourceCount = Math.max(2, sourceCount);
   const outputReview =
     runtimeOutputReview ??
@@ -226,6 +251,34 @@ export default function FocusStackModal({
         />
         <ComputationalSetupStatusLine label={t('modals.focusStack.workflowTitle')} value={stackReadinessLabel} />
         <ComputationalSetupStatusLine label={t('modals.focusStack.previewPlanStatus')} value={previewPlanStatusLabel} />
+      </section>
+
+      <section
+        className="grid grid-cols-2 gap-2 rounded-md border border-border-color bg-bg-secondary/70 p-2 text-sm lg:grid-cols-5"
+        data-block-count={sourcePreflight?.validation?.blockCodes.length ?? 0}
+        data-focus-span-mm={sourcePreflight?.validation?.focusSpanMm ?? ''}
+        data-missing-metadata-count={sourcePreflight?.missingMetadataCount ?? sourceCount}
+        data-source-preflight-status={sourcePreflight?.status ?? 'not_measured'}
+        data-testid="focus-stack-source-preflight"
+        data-warning-count={sourcePreflight?.validation?.warningCodes.length ?? 0}
+      >
+        <ComputationalSetupStatusLine
+          label={t('modals.focusStack.preflight.sources')}
+          value={sourcePreflightStatusLabel}
+        />
+        <ComputationalSetupStatusLine
+          label={t('modals.focusStack.preflight.provenance')}
+          value={sourcePreflightConfidenceLabel}
+        />
+        <ComputationalSetupStatusLine label={t('modals.focusStack.preflight.required')} value={String(sourceCount)} />
+        <ComputationalSetupStatusLine
+          label={t('modals.focusStack.preflight.previewBudget')}
+          value={sourcePreflightFocusSpanLabel}
+        />
+        <ComputationalSetupStatusLine
+          label={t('modals.focusStack.preflight.blocked')}
+          value={String(sourcePreflight?.validation?.blockCodes.length ?? 0)}
+        />
       </section>
 
       {lastDryRunCommand && (

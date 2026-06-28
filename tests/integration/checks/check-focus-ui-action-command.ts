@@ -89,8 +89,14 @@ if (!appModalsSource.includes('lastDryRunCommand')) {
 if (!appModalsSource.includes('lastDryRunCommand={focusStackModalState.lastDryRunCommand}')) {
   failures.push('AppModals must pass focus-stack dry-run command metadata into FocusStackModal.');
 }
+if (!appModalsSource.includes('sourcePreflightMetadata={focusStackModalState.sourcePreflightMetadata}')) {
+  failures.push('AppModals must pass focus-stack source preflight metadata into FocusStackModal.');
+}
 if (!appModalsSource.includes('lastDryRunCommand: _lastDryRunCommand')) {
   failures.push('Focus stack settings changes must clear stale dry-run command metadata.');
+}
+if (!modalSource.includes('data-testid="focus-stack-source-preflight"')) {
+  failures.push('Focus stack modal must render source preflight readiness.');
 }
 if (!modalSource.includes('data-testid="focus-dry-run-command-state"')) {
   failures.push('Focus stack modal must render dry-run command state.');

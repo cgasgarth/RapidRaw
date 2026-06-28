@@ -27,6 +27,7 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useUIStore } from '../../store/useUIStore';
 import { TextColors, TextVariants } from '../../types/typography';
+import { createFocusStackSourcePreflightMetadata } from '../../utils/focusStackSourcePreflight';
 import { createSuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
 import { Panel } from '../ui/AppProperties';
 import Button from '../ui/Button';
@@ -448,6 +449,10 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
               ...focusStackModalState,
               isOpen: true,
               outputReview: null,
+              sourcePreflightMetadata:
+                selectedCommandPaths.length > 0
+                  ? createFocusStackSourcePreflightMetadata(selectedCommandPaths, imageList)
+                  : state.focusStackModalState.sourcePreflightMetadata,
               sourcePaths:
                 selectedCommandPaths.length > 0 ? selectedCommandPaths : state.focusStackModalState.sourcePaths,
             },

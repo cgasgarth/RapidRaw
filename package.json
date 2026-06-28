@@ -432,6 +432,7 @@
     "check:focus-synthetic-output-artifact:update": "bun tests/integration/checks/check-focus-synthetic-output-artifact.ts --update",
     "check:focus-blend-halo-proof": "bun tests/integration/checks/check-focus-blend-halo-proof.ts",
     "check:focus-blend-halo-proof:update": "bun tests/integration/checks/check-focus-blend-halo-proof.ts --update",
+    "check:focus-stack-source-preflight-ui": "bun tests/integration/checks/check-focus-stack-source-preflight-ui.ts",
     "check:focus-ui-preflight": "bun tests/integration/checks/check-focus-ui-preflight.ts",
     "check:focus-ui-action-command": "bun tests/integration/checks/check-focus-ui-action-command.ts",
     "check:focus-ui-api": "bun tests/integration/checks/check-focus-ui-api.ts",

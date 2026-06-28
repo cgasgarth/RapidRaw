@@ -391,6 +391,7 @@ export default function AppModals(props: AppModalsProps) {
         outputReview={focusStackModalState.outputReview}
         settings={focusStackModalState.settings}
         sourceCount={focusStackModalState.sourcePaths.length}
+        sourcePreflightMetadata={focusStackModalState.sourcePreflightMetadata}
       />
       {negativeModalState.isOpen && (
         <Suspense fallback={null}>
