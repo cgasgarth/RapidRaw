@@ -1,22 +1,22 @@
 {
   "actions/cache": {
-    "sha": "27d5ce7f107fe9357f9df03efb73ab90386fccae",
-    "version": "v5.0.5",
+    "sha": "55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+    "version": "v6.1.0",
     "versionPrefix": "v"
   },
   "actions/checkout": {
-    "sha": "df4cb1c069e1874edd31b4311f1884172cec0e10",
-    "version": "v6.0.3",
+    "sha": "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
+    "version": "v7.0.0",
     "versionPrefix": "v"
   },
   "actions/setup-go": {
-    "sha": "4a3601121dd01d1626a1e23e37211e3254c1c06c",
-    "version": "v6.4.0",
+    "sha": "924ae3a1cded613372ab5595356fb5720e22ba16",
+    "version": "v6.5.0",
     "versionPrefix": "v"
   },
   "actions/setup-java": {
-    "sha": "be666c2fcd27ec809703dec50e508c2fdc7f6654",
-    "version": "v5.2.0",
+    "sha": "1bcf9fb12cf4aa7d266a90ae39939e61372fe520",
+    "version": "v5.4.0",
     "versionPrefix": "v"
   },
   "actions/upload-artifact": {
@@ -25,8 +25,8 @@
     "versionPrefix": "v"
   },
   "actions-rust-lang/setup-rust-toolchain": {
-    "sha": "46268bd060767258de96ed93c1251119784f2ab6",
-    "version": "v1.16.1",
+    "sha": "166cdcfd11aee3cb47222f9ddb555ce30ddb9659",
+    "version": "v1.17.0",
     "versionPrefix": "v"
   },
   "android-actions/setup-android": {
