@@ -27,6 +27,7 @@ import type {
   AgentChatTranscript,
   AgentE2eClosure,
   AgentFailureRecovery,
+  AgentInitialPromptPreviewContext,
   AgentLongEditProgress,
   AgentPrivateRawArtifacts,
   AgentReviewHandoff,
@@ -1585,6 +1586,58 @@ function ToolCallRow({ toolCall }: { toolCall: AgentChatToolCall }) {
   );
 }
 
+function InitialPromptPreviewContextCard({ context }: { context: AgentInitialPromptPreviewContext }) {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      className="rounded-md border border-sky-500/25 bg-sky-500/10 p-3"
+      data-access-scope={context.accessScope}
+      data-artifact-id={context.artifactId}
+      data-color-profile={context.colorProfile}
+      data-encoded-format={context.encodedFormat}
+      data-graph-revision={context.graphRevision}
+      data-height={context.height}
+      data-includes-original-raw={String(context.includesOriginalRaw)}
+      data-long-edge-px={context.longEdgePx}
+      data-media-type={context.mediaType}
+      data-preview-ref={context.previewRef}
+      data-purpose={context.purpose}
+      data-quality={context.quality}
+      data-recipe-hash={context.recipeHash}
+      data-render-hash={context.renderHash}
+      data-testid="agent-initial-prompt-preview-context"
+      data-transport={context.transport}
+      data-width={context.width}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-text-primary">
+            {t('editor.ai.agent.initialPreviewContext.title')}
+          </div>
+          <p className="mt-1 text-[11px] leading-4 text-text-secondary">
+            {t('editor.ai.agent.initialPreviewContext.summary', {
+              format: context.encodedFormat.toUpperCase(),
+              height: context.height,
+              longEdge: context.longEdgePx,
+              width: context.width,
+            })}
+          </p>
+        </div>
+        <span className="shrink-0 rounded border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[11px] text-sky-100">
+          {context.purpose}
+        </span>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-text-secondary">
+        <span className="truncate font-mono">{context.artifactId}</span>
+        <span className="truncate font-mono">{context.recipeHash}</span>
+        <span className="truncate font-mono">{context.renderHash}</span>
+        <span className="truncate font-mono">{context.previewRef}</span>
+      </div>
+    </div>
+  );
+}
+
 function AppServerToolReadinessSummary() {
   const { t } = useTranslation();
   const summary = buildAgentAppServerToolReadinessSummary();
@@ -1929,6 +1982,10 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
           setLiveSessionEvents((events) => [...events, event]);
         }}
       />
+
+      {transcript.initialPromptPreviewContext ? (
+        <InitialPromptPreviewContextCard context={transcript.initialPromptPreviewContext} />
+      ) : null}
 
       <div className="space-y-2" data-testid="agent-chat-messages">
         {liveSessionEvents.map((message) => (

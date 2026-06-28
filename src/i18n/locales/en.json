@@ -618,6 +618,10 @@
         "e2e": {
           "verified": "Verified"
         },
+        "initialPreviewContext": {
+          "summary": "{{format}} {{width}}x{{height}} preview, {{longEdge}}px long edge, local/private",
+          "title": "Initial prompt preview"
+        },
         "mode": {
           "apply": "Apply",
           "dryRun": "Dry-run",

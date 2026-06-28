@@ -419,6 +419,27 @@ export const agentPrivateRawArtifactsSchema = z
   })
   .strict();
 
+export const agentInitialPromptPreviewContextSchema = z
+  .object({
+    accessScope: z.literal('local_private'),
+    artifactId: z.string().min(1),
+    colorProfile: z.literal('srgb-preview'),
+    encodedFormat: z.literal('jpeg'),
+    graphRevision: z.string().min(1),
+    height: z.number().int().positive(),
+    includesOriginalRaw: z.literal(false),
+    longEdgePx: z.literal(1536),
+    mediaType: z.literal('image/jpeg'),
+    previewRef: z.string().min(1),
+    purpose: z.literal('initial_context'),
+    quality: z.literal(0.86),
+    recipeHash: z.string().min(1),
+    renderHash: z.string().min(1),
+    transport: z.literal('codex_app_server'),
+    width: z.number().int().positive(),
+  })
+  .strict();
+
 export const agentChatTranscriptSchema = z
   .object({
     artifactReview: agentArtifactReviewSchema.optional(),
@@ -427,6 +448,7 @@ export const agentChatTranscriptSchema = z
     e2eClosure: agentE2eClosureSchema.optional(),
     failureRecovery: agentFailureRecoverySchema.optional(),
     id: z.string().min(1),
+    initialPromptPreviewContext: agentInitialPromptPreviewContextSchema.optional(),
     livePromptWalkthrough: agentLivePromptWalkthroughSchema.optional(),
     longEditProgress: agentLongEditProgressSchema.optional(),
     messages: z.array(agentChatMessageSchema).min(1),
@@ -443,6 +465,7 @@ export type AgentChatMessage = z.infer<typeof agentChatMessageSchema>;
 export type AgentArtifactReview = z.infer<typeof agentArtifactReviewSchema>;
 export type AgentAuditTranscript = z.infer<typeof agentAuditTranscriptSchema>;
 export type AgentChatToolCall = z.infer<typeof agentChatToolCallSchema>;
+export type AgentInitialPromptPreviewContext = z.infer<typeof agentInitialPromptPreviewContextSchema>;
 export type AgentChatDryRunReview = z.infer<typeof agentChatDryRunReviewSchema>;
 export type AgentE2eClosure = z.infer<typeof agentE2eClosureSchema>;
 export type AgentFailureRecovery = z.infer<typeof agentFailureRecoverySchema>;

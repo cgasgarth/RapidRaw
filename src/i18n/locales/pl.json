@@ -659,6 +659,10 @@
         "e2e": {
           "verified": ""
         },
+        "initialPreviewContext": {
+          "summary": "",
+          "title": ""
+        },
         "mode": {
           "apply": "",
           "dryRun": "",
