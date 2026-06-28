@@ -1823,6 +1823,7 @@
     "types": {
       "all": "Intera Immagine",
       "brush": "Pennello",
+      "clothing": "",
       "color": "Colore",
       "depth": "Profondità",
       "face": "Face",

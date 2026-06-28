@@ -82,12 +82,12 @@
         "id": "body_parts",
         "options": [
           {
-            "disabledReason": "Planned runtime target: Clothing is a coarse parser target and should land before tiny face details.",
+            "disabledReason": null,
             "label": "Clothing",
             "part": "clothing",
             "recommendedDefault": false,
-            "status": "planned",
-            "validationMode": "dry_run"
+            "status": "supported",
+            "validationMode": "runtime_apply"
           },
           {
             "disabledReason": "Planned runtime target: Arms require body-part parsing and should not be claimed by whole-person masks.",

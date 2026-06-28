@@ -43,11 +43,11 @@ export const AI_PEOPLE_MASK_PART_CAPABILITIES: Array<AiPeopleMaskProviderCapabil
       validationMode: 'dry_run',
     },
     {
-      notes: 'Clothing is a coarse parser target and should land before tiny face details.',
+      notes: 'Clothing uses the model-backed human parser by merging top-clothes and bottom-clothes classes.',
       part: 'clothing',
       providerTier: 'person_parser',
-      status: 'planned',
-      validationMode: 'dry_run',
+      status: 'supported',
+      validationMode: 'runtime_apply',
     },
     {
       notes: 'Arms require body-part parsing and should not be claimed by whole-person masks.',

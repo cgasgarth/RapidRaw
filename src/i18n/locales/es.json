@@ -1823,6 +1823,7 @@
     "types": {
       "all": "Imagen entera",
       "brush": "Pincel",
+      "clothing": "",
       "color": "Color",
       "depth": "Profundidad",
       "face": "Face",

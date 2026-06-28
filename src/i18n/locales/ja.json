@@ -1741,6 +1741,7 @@
     "types": {
       "all": "画像全体",
       "brush": "ブラシ",
+      "clothing": "",
       "color": "カラー",
       "depth": "奥行き",
       "face": "Face",

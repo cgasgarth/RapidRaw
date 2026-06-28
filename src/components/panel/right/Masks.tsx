@@ -107,6 +107,7 @@ export function formatMaskTypeName(type: Mask) {
 export function getMaskTypeName(mask: MaskType) {
   if (mask.id === 'others') return t('masks.types.others');
   if (mask.personPart === 'face') return t('masks.types.face');
+  if (mask.personPart === 'clothing') return t('masks.types.clothing');
   if (mask.type === Mask.QuickEraser && mask.name === 'Quick Erase') {
     return t('masks.types.quickErase');
   }
@@ -159,6 +160,14 @@ export const MASK_PANEL_CREATION_TYPES: Array<MaskType> = [
     id: 'person-face',
     name: 'Face',
     personPart: 'face',
+    type: Mask.AiPerson,
+  },
+  {
+    disabled: false,
+    icon: User,
+    id: 'person-clothing',
+    name: 'Clothing',
+    personPart: 'clothing',
     type: Mask.AiPerson,
   },
   {
@@ -224,6 +233,14 @@ export const AI_PANEL_CREATION_TYPES: Array<MaskType> = [
   {
     disabled: false,
     icon: User,
+    id: 'person-clothing',
+    name: 'Clothing',
+    personPart: 'clothing',
+    type: Mask.AiPerson,
+  },
+  {
+    disabled: false,
+    icon: User,
     name: 'Foreground',
     type: Mask.AiForeground,
   },
@@ -278,6 +295,14 @@ export const SUB_MASK_COMPONENT_TYPES: Array<MaskType> = [
     id: 'person-face',
     name: 'Face',
     personPart: 'face',
+    type: Mask.AiPerson,
+  },
+  {
+    disabled: false,
+    icon: User,
+    id: 'person-clothing',
+    name: 'Clothing',
+    personPart: 'clothing',
     type: Mask.AiPerson,
   },
   {
@@ -371,6 +396,14 @@ export const AI_SUB_MASK_COMPONENT_TYPES: Array<MaskType> = [
     id: 'person-face',
     name: 'Face',
     personPart: 'face',
+    type: Mask.AiPerson,
+  },
+  {
+    disabled: false,
+    icon: User,
+    id: 'person-clothing',
+    name: 'Clothing',
+    personPart: 'clothing',
     type: Mask.AiPerson,
   },
   {

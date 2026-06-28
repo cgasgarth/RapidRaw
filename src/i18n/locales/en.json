@@ -1838,6 +1838,7 @@
     "types": {
       "all": "Whole Image",
       "brush": "Brush",
+      "clothing": "Clothing",
       "color": "Color",
       "depth": "Depth",
       "face": "Face",

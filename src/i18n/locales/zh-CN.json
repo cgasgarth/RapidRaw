@@ -1815,6 +1815,7 @@
     "types": {
       "all": "整个图像",
       "brush": "画笔",
+      "clothing": "",
       "color": "颜色",
       "depth": "深度",
       "face": "Face",

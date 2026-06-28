@@ -58,6 +58,13 @@ const DEPTH_FILENAME: &str = "depth_anything_v2_vits.onnx";
 const DEPTH_INPUT_SIZE: u32 = 518;
 const DEPTH_SHA256: &str = "d2b11a11c1d4a12b47608fa65a17ee9a4c605b55ee1730c8e3b526304f2562be";
 
+pub const PERSON_PART_PARSER_MODEL_ID: &str = "Metal3d/deeplabv3p-resnet50-human";
+pub const PERSON_PART_PARSER_URL: &str = "https://huggingface.co/Metal3d/deeplabv3p-resnet50-human/resolve/main/deeplabv3p-resnet50-human.onnx?download=true";
+pub const PERSON_PART_PARSER_FILENAME: &str = "deeplabv3p-resnet50-human.onnx";
+pub const PERSON_PART_PARSER_INPUT_SIZE: u32 = 512;
+pub const PERSON_PART_PARSER_SHA256: &str =
+    "a6e823a82da10ba24c29adfb544130684568c46bfac865e215bbace3b4035a71";
+
 pub struct AiModels {
     pub sam_encoder: Mutex<Session>,
     pub sam_decoder: Mutex<Session>,
@@ -90,6 +97,7 @@ pub struct AiState {
     pub denoise_model: Option<Arc<Mutex<Session>>>,
     pub clip_models: Option<Arc<ClipModels>>,
     pub lama_model: Option<Arc<Mutex<Session>>>,
+    pub person_part_parser_model: Option<Arc<Mutex<Session>>>,
     pub embeddings: Option<ImageEmbeddings>,
     pub depth_map: Option<CachedDepthMap>,
 }
@@ -170,7 +178,7 @@ fn get_models_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf> {
     Ok(models_dir)
 }
 
-async fn download_model(url: &str, dest: &Path) -> Result<()> {
+pub(crate) async fn download_model(url: &str, dest: &Path) -> Result<()> {
     let response = reqwest::get(url).await?;
     let mut file = fs::File::create(dest)?;
     let mut content = Cursor::new(response.bytes().await?);
@@ -178,7 +186,7 @@ async fn download_model(url: &str, dest: &Path) -> Result<()> {
     Ok(())
 }
 
-fn verify_sha256(path: &Path, expected_hash: &str) -> Result<bool> {
+pub(crate) fn verify_sha256(path: &Path, expected_hash: &str) -> Result<bool> {
     if !path.exists() {
         return Ok(false);
     }
@@ -333,6 +341,7 @@ pub async fn get_or_init_ai_models(
             denoise_model: None,
             clip_models: None,
             lama_model: None,
+            person_part_parser_model: None,
             embeddings: None,
             depth_map: None,
         });
@@ -393,6 +402,7 @@ pub async fn get_or_init_denoise_model(
             denoise_model: Some(denoise_model.clone()),
             clip_models: None,
             lama_model: None,
+            person_part_parser_model: None,
             embeddings: None,
             depth_map: None,
         });
@@ -464,6 +474,7 @@ pub async fn get_or_init_clip_models(
             denoise_model: None,
             clip_models: Some(clip_models.clone()),
             lama_model: None,
+            person_part_parser_model: None,
             embeddings: None,
             depth_map: None,
         });
@@ -524,12 +535,74 @@ pub async fn get_or_init_lama_model(
             denoise_model: None,
             clip_models: None,
             lama_model: Some(lama_model.clone()),
+            person_part_parser_model: None,
             embeddings: None,
             depth_map: None,
         });
     }
 
     Ok(lama_model)
+}
+
+pub async fn get_or_init_person_part_parser_model(
+    app_handle: &tauri::AppHandle,
+    ai_state_mutex: &Mutex<Option<AiState>>,
+    ai_init_lock: &TokioMutex<()>,
+) -> Result<Arc<Mutex<Session>>> {
+    if let Some(model) = ai_state_mutex
+        .lock()
+        .unwrap()
+        .as_ref()
+        .and_then(|state| state.person_part_parser_model.clone())
+    {
+        return Ok(model);
+    }
+
+    let _guard = ai_init_lock.lock().await;
+
+    if let Some(model) = ai_state_mutex
+        .lock()
+        .unwrap()
+        .as_ref()
+        .and_then(|state| state.person_part_parser_model.clone())
+    {
+        return Ok(model);
+    }
+
+    let models_dir = get_models_dir(app_handle)?;
+    download_and_verify_model(
+        app_handle,
+        &models_dir,
+        PERSON_PART_PARSER_FILENAME,
+        PERSON_PART_PARSER_URL,
+        PERSON_PART_PARSER_SHA256,
+        "Person Part Parser",
+    )
+    .await?;
+
+    let _ = ort::init().with_name("AI-Person-Part-Parser").commit();
+    let model_path = models_dir.join(PERSON_PART_PARSER_FILENAME);
+    let session = Session::builder()?.commit_from_file(model_path)?;
+    let model = Arc::new(Mutex::new(session));
+
+    crate::register_exit_handler();
+
+    let mut ai_state_lock = ai_state_mutex.lock().unwrap();
+    if let Some(state) = ai_state_lock.as_mut() {
+        state.person_part_parser_model = Some(model.clone());
+    } else {
+        *ai_state_lock = Some(AiState {
+            models: None,
+            denoise_model: None,
+            clip_models: None,
+            lama_model: None,
+            person_part_parser_model: Some(model.clone()),
+            embeddings: None,
+            depth_map: None,
+        });
+    }
+
+    Ok(model)
 }
 
 #[derive(Clone, Copy)]
@@ -1565,6 +1638,8 @@ pub struct AiForegroundMaskParameters {
     #[serde(default)]
     pub mask_data_base64: Option<String>,
     #[serde(default)]
+    pub class_ids: Option<Vec<u8>>,
+    #[serde(default)]
     pub rotation: Option<f32>,
     #[serde(default)]
     pub flip_horizontal: Option<bool>,
@@ -1572,6 +1647,14 @@ pub struct AiForegroundMaskParameters {
     pub flip_vertical: Option<bool>,
     #[serde(default)]
     pub orientation_steps: Option<u8>,
+    #[serde(default)]
+    pub model_id: Option<String>,
+    #[serde(default)]
+    pub model_sha256: Option<String>,
+    #[serde(default)]
+    pub provider_id: Option<String>,
+    #[serde(default)]
+    pub target_part: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
