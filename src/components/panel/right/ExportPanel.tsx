@@ -27,6 +27,7 @@ import {
   hasStaleOrOfflineSmartPreview,
   isResolvingStaleSmartPreviewExport,
 } from '../../../utils/exportSmartPreviewReadiness';
+import { buildRawWarningChips } from '../../../utils/rawWarningReceipts';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import { debounce } from '../../../utils/timing';
 import Button from '../../ui/Button';
@@ -413,6 +414,19 @@ export default function ExportPanel({
   );
   const firstReceiptOutput = lastReceipt?.outputs[0];
   const firstReceiptFileName = firstReceiptOutput?.outputPath.split(/[\\/]/).pop() ?? '';
+  const exportRawWarningChips = useMemo(
+    () =>
+      buildRawWarningChips(
+        {
+          policyStatus: firstReceiptOutput?.policyStatus,
+          rawDevelopmentReport: firstReceiptOutput?.rawDevelopmentReport,
+          resolvedDisabledReason: firstReceiptOutput?.resolvedDisabledReason,
+          transformApplied: firstReceiptOutput?.transformApplied,
+        },
+        t,
+      ),
+    [firstReceiptOutput, t],
+  );
   const canOpenReceiptInEditor = firstReceiptOutput?.format.toLowerCase() === 'tiff';
   const configuredExternalEditorPath = useMemo(
     () => appSettings?.externalEditorPath?.trim() ?? '',
@@ -1552,6 +1566,25 @@ export default function ExportPanel({
             <UiText as="p" className="break-all" color={TextColors.secondary} variant={TextVariants.small}>
               {firstReceiptOutput.outputPath}
             </UiText>
+            {exportRawWarningChips.length > 0 && (
+              <div
+                className="mt-2 flex flex-wrap gap-1"
+                data-export-raw-warning-codes={exportRawWarningChips.map((chip) => chip.code).join(',')}
+                data-testid="export-raw-warning-chips"
+              >
+                {exportRawWarningChips.map((chip) => (
+                  <span
+                    key={chip.code}
+                    className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                      chip.tone === 'warning' ? 'bg-yellow-500/15 text-yellow-200' : 'bg-sky-500/15 text-sky-200'
+                    }`}
+                    data-export-raw-warning-code={chip.code}
+                  >
+                    {chip.label.replaceAll('_', ' ')}
+                  </span>
+                ))}
+              </div>
+            )}
             {currentExternalVariantImportedPath && (
               <UiText
                 as="p"

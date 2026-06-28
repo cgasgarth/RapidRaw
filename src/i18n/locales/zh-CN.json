@@ -1180,7 +1180,11 @@
           "single_illuminant": "Single illuminant",
           "unavailable": "Unavailable"
         },
-        "title": "Camera Input Profile"
+        "title": "Camera Input Profile",
+        "warning": {
+          "colorTransformNotApplied": "Color transform not applied"
+        },
+        "warnings": "Warnings"
       },
       "clickToEdit": "点击编辑",
       "copied": "已复制",

@@ -27,6 +27,7 @@ import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { COLOR_LABELS, type Color } from '../../../utils/adjustments';
 import { buildCameraProfileProvenanceReceipt } from '../../../utils/cameraProfileProvenanceReceipt';
+import { buildRawWarningChips } from '../../../utils/rawWarningReceipts';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import UiText from '../../ui/Text';
 import { IconAperture, IconShutter, IconIso, IconFocalLength, IconLens } from '../editor/ExifIcons';
@@ -484,6 +485,16 @@ export default function MetadataPanel() {
   const cameraProfileReport = rawDevelopmentReport?.cameraProfile ?? null;
   const cameraProfileReceipt =
     rawDevelopmentReport === null ? null : buildCameraProfileProvenanceReceipt(rawDevelopmentReport);
+  const rawWarningChips = useMemo(
+    () =>
+      buildRawWarningChips(
+        {
+          rawDevelopmentReport,
+        },
+        t,
+      ),
+    [rawDevelopmentReport, t],
+  );
   const populatedCameraFieldCount = cameraGridSettings.filter((setting) => setting.value !== '-').length;
   const editableMetadataFieldCount = EDITABLE_FIELDS.length;
 
@@ -917,6 +928,33 @@ export default function MetadataPanel() {
                               : formatElapsedMs(cameraProfileReceipt.previewElapsedMs),
                         })}
                       </UiText>
+                    </>
+                  )}
+                  {rawWarningChips.length > 0 && (
+                    <>
+                      <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                        {t('editor.metadata.cameraProfile.warnings')}
+                      </UiText>
+                      <div
+                        className="flex flex-wrap justify-end gap-1"
+                        data-raw-warning-codes={rawWarningChips.map((chip) => chip.code).join(',')}
+                        data-testid="metadata-raw-warning-chips"
+                      >
+                        {rawWarningChips.map((chip) => (
+                          <span
+                            key={chip.code}
+                            className={cx(
+                              'rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                              chip.tone === 'warning'
+                                ? 'bg-yellow-500/15 text-yellow-200'
+                                : 'bg-sky-500/15 text-sky-200',
+                            )}
+                            data-raw-warning-code={chip.code}
+                          >
+                            {formatRawReceiptToken(chip.label)}
+                          </span>
+                        ))}
+                      </div>
                     </>
                   )}
                   <UiText variant={TextVariants.small} color={TextColors.secondary}>

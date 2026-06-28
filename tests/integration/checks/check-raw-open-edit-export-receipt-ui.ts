@@ -36,6 +36,13 @@ const failures = [
   ['Zod export receipt parser', eventSchemaSource.includes('exportReceiptPayloadSchema')],
   ['listener parses export receipt', listenerSource.includes('parseExportReceiptPayload(event.payload)')],
   ['receipt UI test id', exportPanelSource.includes('data-testid="export-success-receipt"')],
+  ['export raw warning chips', exportPanelSource.includes('data-testid="export-raw-warning-chips"')],
+  [
+    'export raw warning codes',
+    exportPanelSource.includes(
+      "data-export-raw-warning-codes={exportRawWarningChips.map((chip) => chip.code).join(',')}",
+    ),
+  ],
   ['show in Finder action', exportPanelSource.includes('data-testid="export-success-show-in-finder"')],
   ['open in editor action', exportPanelSource.includes('data-testid="export-success-open-in-editor"')],
   ['choose external editor action', exportPanelSource.includes('data-testid="export-success-choose-external-editor"')],

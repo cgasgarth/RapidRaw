@@ -1096,7 +1096,11 @@
         "runtime": "",
         "runtimeSummary": "",
         "scratchMemory": "Scratch memory",
-        "title": ""
+        "title": "",
+        "warning": {
+          "colorTransformNotApplied": ""
+        },
+        "warnings": ""
       },
       "clickToEdit": "點選編輯",
       "copied": "已複製",
