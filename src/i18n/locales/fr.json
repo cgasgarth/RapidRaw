@@ -3204,6 +3204,9 @@
         "supportMap": "",
         "supportMapCoverage": "",
         "supportMapCoverageValue": "",
+        "supportMapStatus": {
+          "apply_ready": ""
+        },
         "supportMapSummary": "",
         "supportMapTitle": "",
         "supportMapWeak": "",

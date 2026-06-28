@@ -34,8 +34,10 @@ import type { SuperResolutionSourcePreflightMetadata } from '../../utils/superRe
 
 interface SuperResolutionModalProps {
   isOpen: boolean;
+  lastApplyCommand?: SuperResolutionModalState['lastApplyCommand'];
   lastDryRunCommand?: SuperResolutionModalState['lastDryRunCommand'];
   loadingImageUrl?: string | null;
+  onApplyPlan: () => void;
   onClose: () => void;
   onPreviewPlan: () => void;
   reviewArtifactPreviewUrls?: Partial<
@@ -56,8 +58,10 @@ const getShortHash = (hash: string): string => `${hash.slice(0, 18)}...`;
 
 export default function SuperResolutionModal({
   isOpen,
+  lastApplyCommand,
   lastDryRunCommand,
   loadingImageUrl,
+  onApplyPlan,
   onClose,
   onPreviewPlan,
   reviewArtifactPreviewUrls = {},
@@ -161,6 +165,11 @@ export default function SuperResolutionModal({
       sourceCount: fallbackOutputReviewSourceCount,
     });
   const hasRuntimeOutputReview = runtimeOutputReview !== null && runtimeOutputReview !== undefined;
+  const isApplyPlanReady =
+    isSourceCountValid &&
+    hasRuntimeOutputReview &&
+    outputReview.decision !== 'preview_only' &&
+    outputReview.editableGate !== 'blocked_stale';
   const previewPlanStatusLabel = hasRuntimeOutputReview
     ? t('modals.superResolution.previewPlanReady')
     : t('modals.superResolution.previewPlanPending');
@@ -295,6 +304,10 @@ export default function SuperResolutionModal({
               ? t('modals.superResolution.refreshPreviewPlan')
               : t('modals.superResolution.previewPlan')}
           </Button>
+          <Button onClick={onApplyPlan} disabled={!isApplyPlanReady}>
+            <CheckCircle2 className="w-4 h-4" />
+            {t('modals.transform.apply')}
+          </Button>
         </>
       }
     >
@@ -408,6 +421,43 @@ export default function SuperResolutionModal({
             {
               label: t('modals.superResolution.dryRunCommandMode'),
               value: t('modals.superResolution.dryRunCommandModeValue'),
+            },
+          ].map((item) => (
+            <div className="rounded border border-border-color bg-bg-primary px-2 py-1.5" key={item.label}>
+              <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                {item.label}
+              </UiText>
+              <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                {item.value}
+              </UiText>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {lastApplyCommand && (
+        <section
+          className="grid grid-cols-3 gap-2 rounded-md border border-border-color bg-bg-secondary/70 p-3 text-xs"
+          data-accepted-dry-run-plan-hash={lastApplyCommand.acceptedDryRunPlanHash}
+          data-accepted-dry-run-plan-id={lastApplyCommand.acceptedDryRunPlanId}
+          data-command-type={lastApplyCommand.commandType}
+          data-dry-run={String(lastApplyCommand.dryRun)}
+          data-source-count={lastApplyCommand.sources}
+          data-testid="sr-apply-command-state"
+          data-tool-name={lastApplyCommand.toolName}
+        >
+          {[
+            {
+              label: t('modals.superResolution.dryRunCommandTool'),
+              value: lastApplyCommand.toolName,
+            },
+            {
+              label: t('modals.superResolution.previewPlanStatus'),
+              value: t('modals.superResolution.review.supportMapStatus.apply_ready'),
+            },
+            {
+              label: t('modals.superResolution.review.outputArtifact'),
+              value: lastApplyCommand.acceptedDryRunPlanId,
             },
           ].map((item) => (
             <div className="rounded border border-border-color bg-bg-primary px-2 py-1.5" key={item.label}>
