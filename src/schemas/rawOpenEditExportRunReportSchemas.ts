@@ -111,6 +111,7 @@ const colorManagementProofSchema = z
           'not_proven',
           'rawengine.gamut.srgb-oklab-chroma-reduce.v1',
           'rawengine.gamut.srgb-oklab-chroma-reduce.v2',
+          'rawengine.gamut.srgb-oklab-chroma-reduce.v3',
         ]),
         iccProfileEmbedded: z.literal(true),
         inputDomain: z.literal('decoder_camera_rgb_observed'),
