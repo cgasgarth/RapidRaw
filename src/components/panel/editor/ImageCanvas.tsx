@@ -22,6 +22,10 @@ import {
   buildBrushMaskCommandFromParameters,
 } from '../../../utils/brushMaskCommandBridge';
 import { formatGamutWarningCoverage } from '../../../utils/gamutWarningDisplay';
+import {
+  normalizeLinearGradientParameters,
+  normalizeRadialGradientParameters,
+} from '../../../utils/gradientMaskParameters';
 import { calculateWhiteBalancePickerAdjustment } from '../../../utils/whiteBalancePicker';
 import { Mask, type SubMask, SubMaskMode, ToolType } from '../right/Masks';
 
@@ -152,6 +156,31 @@ const numberParameter = (parameters: SubMask['parameters'], key: string, fallbac
   const value = parameters?.[key];
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 };
+const normalizeLinearMaskParametersForLiveHandle = (parameters: MaskParameters): MaskParameters => ({
+  ...parameters,
+  ...normalizeLinearGradientParameters({
+    endX: parameters.endX,
+    endY: parameters.endY,
+    range: parameters.range,
+    startX: parameters.startX,
+    startY: parameters.startY,
+  }),
+});
+const normalizeLiveGradientRotation = (rotation: number): number => {
+  if (!Number.isFinite(rotation)) return 0;
+  return ((((rotation + 180) % 360) + 360) % 360) - 180;
+};
+const normalizeRadialMaskParametersForLiveHandle = (parameters: MaskParameters): MaskParameters => ({
+  ...parameters,
+  ...normalizeRadialGradientParameters({
+    centerX: parameters.centerX,
+    centerY: parameters.centerY,
+    feather: typeof parameters['feather'] === 'number' ? parameters['feather'] : 0.5,
+    radiusX: Math.abs(parameters.radiusX),
+    radiusY: Math.abs(parameters.radiusY),
+    rotation: normalizeLiveGradientRotation(parameters.rotation),
+  }),
+});
 
 interface ImageCanvasProps {
   appSettings: AppSettings | null;
@@ -368,11 +397,11 @@ const MaskOverlay = memo(
         const dx = (pointerPos.x - dragStartPointer.current.x) / scale;
         const dy = (pointerPos.y - dragStartPointer.current.y) / scale;
 
-        const newP = {
+        const newP = normalizeRadialMaskParametersForLiveHandle({
           ...dragStartParams.current,
           centerX: dragStartParams.current.centerX + dx,
           centerY: dragStartParams.current.centerY + dy,
-        };
+        });
 
         updateP(newP);
         if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
@@ -414,14 +443,14 @@ const MaskOverlay = memo(
       const newRadiusX = pRef.current.radiusX * node.scaleX();
       const newRadiusY = pRef.current.radiusY * node.scaleY();
 
-      const newP = {
+      const newP = normalizeRadialMaskParametersForLiveHandle({
         ...pRef.current,
         centerX: node.x() / scale + cropX,
         centerY: node.y() / scale + cropY,
         radiusX: newRadiusX,
         radiusY: newRadiusY,
         rotation: node.rotation(),
-      };
+      });
 
       if (onPreviewUpdate) {
         onPreviewUpdate(subMask.id, { parameters: newP });
@@ -443,14 +472,14 @@ const MaskOverlay = memo(
       node.scaleX(1);
       node.scaleY(1);
 
-      const newP = {
+      const newP = normalizeRadialMaskParametersForLiveHandle({
         ...pRef.current,
         centerX: node.x() / scale + cropX,
         centerY: node.y() / scale + cropY,
         radiusX: newRadiusX,
         radiusY: newRadiusY,
         rotation: node.rotation(),
-      };
+      });
 
       updateP(newP);
       isDragging.current = false;
@@ -520,10 +549,10 @@ const MaskOverlay = memo(
 
         const newRotation = rotateStartRef.current.rotation + angleDiffDeg;
 
-        const newP = {
+        const newP = normalizeRadialMaskParametersForLiveHandle({
           ...pRef.current,
           rotation: newRotation,
-        };
+        });
 
         updateP(newP);
         if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
@@ -596,13 +625,13 @@ const MaskOverlay = memo(
         const dx = (pointerPos.x - dragStartPointer.current.x) / scale;
         const dy = (pointerPos.y - dragStartPointer.current.y) / scale;
 
-        const newP = {
+        const newP = normalizeLinearMaskParametersForLiveHandle({
           ...dragStartParams.current,
           startX: dragStartParams.current.startX + dx,
           startY: dragStartParams.current.startY + dy,
           endX: dragStartParams.current.endX + dx,
           endY: dragStartParams.current.endY + dy,
-        };
+        });
 
         updateP(newP);
         if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
@@ -640,14 +669,15 @@ const MaskOverlay = memo(
         const newX = pointerPos.x / scale + cropX;
         const newY = pointerPos.y / scale + cropY;
 
-        const newP = { ...pRef.current };
+        const nextP = { ...pRef.current };
         if (pointType === 'start') {
-          newP.startX = newX;
-          newP.startY = newY;
+          nextP.startX = newX;
+          nextP.startY = newY;
         } else {
-          newP.endX = newX;
-          newP.endY = newY;
+          nextP.endX = newX;
+          nextP.endY = newY;
         }
+        const newP = normalizeLinearMaskParametersForLiveHandle(nextP);
         updateP(newP);
         if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
         onUpdate(subMask.id, { parameters: newP });
@@ -677,7 +707,7 @@ const MaskOverlay = memo(
           newRange = Math.max(0.1, dist / scale);
         }
 
-        const newP = { ...pRef.current, range: newRange };
+        const newP = normalizeLinearMaskParametersForLiveHandle({ ...pRef.current, range: newRange });
         updateP(newP);
         if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
 

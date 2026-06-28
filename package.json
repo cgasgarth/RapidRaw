@@ -141,6 +141,7 @@
     "check:brush-mask-refine-workflow-e2e": "bun tests/integration/checks/check-brush-mask-refine-workflow-e2e.ts",
     "check:brush-mask-refine-workflow-e2e:update": "bun tests/integration/checks/check-brush-mask-refine-workflow-e2e.ts --update",
     "check:gradient-mask": "bun tests/integration/checks/check-gradient-mask-parameters.ts",
+    "check:gradient-mask-live-handles": "bun tests/integration/checks/check-gradient-mask-live-handles.ts",
     "check:linear-gradient-mask-command": "bun tests/integration/checks/check-linear-gradient-mask-command.ts",
     "check:linear-gradient-mask-apply-slice": "bun tests/integration/checks/check-linear-gradient-mask-apply-slice.ts",
     "check:linear-gradient-mask-apply-slice:update": "bun tests/integration/checks/check-linear-gradient-mask-apply-slice.ts --update",
