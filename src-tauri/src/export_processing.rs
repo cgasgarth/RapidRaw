@@ -1653,6 +1653,7 @@ mod tests {
             },
             demosaic_algorithm_id: None,
             demosaic_path: RawDemosaicPath::BayerHq,
+            processing_profile: crate::raw_processing::RawProcessingProfile::Maximum,
             xtrans_hq: None,
         };
 

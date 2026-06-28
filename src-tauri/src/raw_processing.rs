@@ -19,7 +19,8 @@ use std::{
 
 const CAMERA_PROFILE_RESOLVER_ALGORITHM_ID: &str = "dual_illuminant_mired_v1";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum RawProcessingProfile {
     Fast,
     Balanced,
@@ -89,6 +90,7 @@ impl RawCameraProfileReport {
 pub(crate) struct RawDevelopmentReport {
     pub demosaic_path: RawDemosaicPath,
     pub demosaic_algorithm_id: Option<&'static str>,
+    pub processing_profile: RawProcessingProfile,
     pub camera_profile: RawCameraProfileReport,
     pub xtrans_hq: Option<XTransHqDevelopmentReport>,
 }
@@ -1447,6 +1449,7 @@ fn develop_internal_with_options(
             } else {
                 None
             },
+            processing_profile: profile,
             camera_profile,
             xtrans_hq: xtrans_hq_report,
         },

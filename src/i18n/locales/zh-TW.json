@@ -1078,12 +1078,17 @@
       "cameraProfile": {
         "algorithm": "",
         "coolWeight": "",
+        "defaultDemosaic": "Default demosaic",
+        "demosaicProvenance": "Demosaic",
         "estimatedCct": "",
         "fallbackReason": "",
         "illuminants": "",
         "matrixHash": "",
+        "notApplicable": "N/A",
+        "processingMode": "Processing mode",
         "receipt": "",
-        "receiptSummary": "",
+        "receiptSummary": "{{status}} · {{processingProfile}} · {{demosaicPath}}",
+        "scratchMemory": "Scratch memory",
         "title": ""
       },
       "clickToEdit": "點選編輯",

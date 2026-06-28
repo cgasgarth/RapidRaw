@@ -22,6 +22,7 @@ const fixture = rawDevelopmentReportSchema.parse({
     warningCodes: [],
   },
   demosaicPath: 'bayer_hq',
+  processingProfile: 'maximum',
 });
 
 const files = {
@@ -37,6 +38,7 @@ const files = {
 
 const requiredMarkers: Array<[keyof typeof files, string]> = [
   ['schemas', 'rawDevelopmentReportSchema'],
+  ['schemas', 'rawProcessingProfileSchema'],
   ['schemas', 'rawCameraProfileReportSchema'],
   ['schemas', 'rawCameraProfileProvenanceReceiptSchema'],
   ['receipt', 'buildCameraProfileProvenanceReceipt'],
@@ -50,9 +52,13 @@ const requiredMarkers: Array<[keyof typeof files, string]> = [
   ['useAppNavigation', 'rawDevelopmentReport: result.raw_development_report ?? null'],
   ['metadataPanel', 'data-testid="metadata-camera-profile-report"'],
   ['metadataPanel', 'data-testid="metadata-camera-profile-provenance-receipt"'],
+  ['metadataPanel', 'data-testid="metadata-raw-processing-mode"'],
+  ['metadataPanel', 'data-testid="metadata-raw-demosaic-provenance"'],
+  ['metadataPanel', 'data-testid="metadata-raw-scratch-memory"'],
   ['metadataPanel', 'data-camera-profile-status={cameraProfileReport.status}'],
   ['metadataPanel', "data-camera-profile-matrix-hash={cameraProfileReport.matrixHash ?? ''}"],
   ['metadataPanel', 'data-demosaic-path={cameraProfileReceipt.demosaicPath}'],
+  ['metadataPanel', 'data-processing-profile={cameraProfileReceipt.processingProfile}'],
   ['metadataPanel', "t('editor.metadata.cameraProfile.receiptSummary'"],
 ];
 
@@ -74,6 +80,8 @@ if (
   receipt.illuminantEstimateMethod !== 'wb_coeff_ratio' ||
   receipt.receiptVersion !== 1 ||
   receipt.demosaicPath !== 'bayer_hq' ||
+  receipt.processingProfile !== 'maximum' ||
+  receipt.scratchMemoryBytes !== null ||
   receipt.warningCount !== 0 ||
   receipt.coolWeight !== 0.42
 ) {

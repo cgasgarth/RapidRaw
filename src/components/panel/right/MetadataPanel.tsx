@@ -81,6 +81,25 @@ function formatExifTag(str: string) {
   return str.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/([A-Z])([A-Z][a-z])/g, '$1 $2');
 }
 
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB'] as const;
+  let value = bytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unitIndex] ?? 'GB'}`;
+}
+
+function formatRawReceiptToken(value: string) {
+  return value
+    .split('_')
+    .map((part) => (part.length <= 3 ? part.toUpperCase() : `${part[0]?.toUpperCase() ?? ''}${part.slice(1)}`))
+    .join(' ');
+}
+
 function parseDms(dmsString: string) {
   if (!dmsString) return null;
   const parts = /(\d+\.?\d*)\s+deg\s+(\d+\.?\d*)\s+min\s+(\d+\.?\d*)\s+sec/.exec(dmsString);
@@ -801,14 +820,14 @@ export default function MetadataPanel() {
                 </UiText>
               )}
             </section>
-            {selectedImage.isRaw && cameraProfileReport !== null && (
+            {selectedImage.isRaw && rawDevelopmentReport !== null && cameraProfileReport !== null && (
               <section
                 className="rounded-md border border-surface bg-bg-secondary/70 p-3 text-xs"
                 data-camera-profile-algorithm={cameraProfileReport.algorithmId}
                 data-camera-profile-candidate-count={cameraProfileReport.candidateCount}
                 data-camera-profile-matrix-hash={cameraProfileReport.matrixHash ?? ''}
                 data-camera-profile-status={cameraProfileReport.status}
-                data-demosaic-path={rawDevelopmentReport?.demosaicPath ?? ''}
+                data-demosaic-path={rawDevelopmentReport.demosaicPath}
                 data-testid="metadata-camera-profile-report"
               >
                 <div className="mb-2 flex items-center justify-between gap-3">
@@ -842,19 +861,65 @@ export default function MetadataPanel() {
                         data-candidate-count={cameraProfileReceipt.candidateCount}
                         data-cool-illuminant={cameraProfileReceipt.coolIlluminant ?? ''}
                         data-cool-weight={cameraProfileReceipt.coolWeight ?? ''}
+                        data-demosaic-algorithm-id={cameraProfileReceipt.demosaicAlgorithmId ?? ''}
                         data-demosaic-path={cameraProfileReceipt.demosaicPath}
                         data-estimated-cct-kelvin={cameraProfileReceipt.estimatedCctKelvin ?? ''}
                         data-matrix-hash={cameraProfileReceipt.matrixHash ?? ''}
+                        data-processing-profile={cameraProfileReceipt.processingProfile}
                         data-receipt-version={cameraProfileReceipt.receiptVersion}
+                        data-scratch-memory-bytes={cameraProfileReceipt.scratchMemoryBytes ?? ''}
                         data-status={cameraProfileReceipt.status}
                         data-testid="metadata-camera-profile-provenance-receipt"
                         data-warm-illuminant={cameraProfileReceipt.warmIlluminant ?? ''}
                         data-warning-count={cameraProfileReceipt.warningCount}
                       >
                         {t('editor.metadata.cameraProfile.receiptSummary', {
-                          demosaicPath: cameraProfileReceipt.demosaicPath,
+                          demosaicPath: formatRawReceiptToken(cameraProfileReceipt.demosaicPath),
+                          processingProfile: formatRawReceiptToken(cameraProfileReceipt.processingProfile),
                           status: cameraProfileReceipt.status,
                         })}
+                      </UiText>
+                    </>
+                  )}
+                  <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                    {t('editor.metadata.cameraProfile.processingMode')}
+                  </UiText>
+                  <UiText
+                    variant={TextVariants.small}
+                    color={TextColors.primary}
+                    className="truncate text-right"
+                    data-testid="metadata-raw-processing-mode"
+                  >
+                    {formatRawReceiptToken(rawDevelopmentReport.processingProfile)}
+                    {' / '}
+                    {formatRawReceiptToken(rawDevelopmentReport.demosaicPath)}
+                  </UiText>
+                  <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                    {t('editor.metadata.cameraProfile.demosaicProvenance')}
+                  </UiText>
+                  <UiText
+                    variant={TextVariants.small}
+                    color={TextColors.primary}
+                    className="truncate text-right"
+                    data-demosaic-algorithm-id={rawDevelopmentReport.demosaicAlgorithmId ?? ''}
+                    data-testid="metadata-raw-demosaic-provenance"
+                  >
+                    {rawDevelopmentReport.demosaicAlgorithmId ?? t('editor.metadata.cameraProfile.defaultDemosaic')}
+                  </UiText>
+                  {cameraProfileReceipt !== null && (
+                    <>
+                      <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                        {t('editor.metadata.cameraProfile.scratchMemory')}
+                      </UiText>
+                      <UiText
+                        variant={TextVariants.small}
+                        color={TextColors.primary}
+                        className="truncate text-right"
+                        data-testid="metadata-raw-scratch-memory"
+                      >
+                        {cameraProfileReceipt.scratchMemoryBytes === null
+                          ? t('editor.metadata.cameraProfile.notApplicable')
+                          : formatBytes(cameraProfileReceipt.scratchMemoryBytes)}
                       </UiText>
                     </>
                   )}
