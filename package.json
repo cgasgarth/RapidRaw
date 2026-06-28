@@ -147,6 +147,7 @@
     "check:linear-gradient-mask-real-raw-proof": "RAWENGINE_RUN_PRIVATE_LINEAR_GRADIENT_MASK_REAL_RAW_PROOF=1 RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root cargo +1.95.0 test --manifest-path src-tauri/Cargo.toml --locked --no-default-features --features required-ci,validation-harness,tauri-test linear_gradient_mask_real_raw_proof::private_runtime_smoke_generates_linear_gradient_mask_real_raw_report_when_enabled -- --nocapture",
     "check:luminance-range-mask": "bun tests/integration/checks/check-luminance-range-mask-parameters.ts",
     "check:color-range-mask": "bun tests/integration/checks/check-color-range-mask-parameters.ts",
+    "check:range-mask-layer-output": "bun tests/integration/checks/check-range-mask-layer-output.ts",
     "check:mask-compose": "bun tests/integration/checks/check-mask-compose-operations.ts",
     "check:mask-compose-command": "bun tests/integration/checks/check-mask-compose-command.ts",
     "check:mask-compose-layer-output": "bun tests/integration/checks/check-mask-compose-layer-output.ts",

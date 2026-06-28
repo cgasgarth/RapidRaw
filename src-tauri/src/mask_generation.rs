@@ -391,6 +391,8 @@ impl MaskDefinition {
         self.sub_masks.iter().any(|sm| {
             sm.mask_type == "color"
                 || sm.mask_type == "luminance"
+                || sm.mask_type == "color_range"
+                || sm.mask_type == "luminance_range"
                 || has_refinement_parameters(&sm.parameters)
         })
     }
@@ -536,6 +538,26 @@ struct ParametricMaskParameters {
     flip_vertical: bool,
     #[serde(default)]
     orientation_steps: u8,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+struct LuminanceRangeMaskParameters {
+    min_luma: f32,
+    max_luma: f32,
+    feather: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ColorRangeMaskParameters {
+    center_hue_degrees: f32,
+    hue_tolerance_degrees: f32,
+    feather: f32,
+    min_luma: f32,
+    max_luma: f32,
+    min_saturation: f32,
+    max_saturation: f32,
 }
 
 fn default_tolerance() -> f32 {
@@ -1583,6 +1605,148 @@ fn generate_color_bitmap(
     Some(mask)
 }
 
+fn rec709_luma(red: f32, green: f32, blue: f32) -> f32 {
+    (0.2126 * red + 0.7152 * green + 0.0722 * blue).clamp(0.0, 1.0)
+}
+
+fn hue_distance_degrees(left: f32, right: f32) -> f32 {
+    let delta = (left - right).rem_euclid(360.0).abs();
+    delta.min(360.0 - delta)
+}
+
+fn rgb_to_hsv_sample(pixel: Rgba<u8>) -> (f32, f32, f32) {
+    let red = pixel[0] as f32 / 255.0;
+    let green = pixel[1] as f32 / 255.0;
+    let blue = pixel[2] as f32 / 255.0;
+    let max = red.max(green).max(blue);
+    let min = red.min(green).min(blue);
+    let delta = max - min;
+    let mut hue_degrees = 0.0;
+
+    if delta > 0.000001 {
+        hue_degrees = if (max - red).abs() <= f32::EPSILON {
+            60.0 * ((green - blue) / delta).rem_euclid(6.0)
+        } else if (max - green).abs() <= f32::EPSILON {
+            60.0 * ((blue - red) / delta + 2.0)
+        } else {
+            60.0 * ((red - green) / delta + 4.0)
+        };
+    }
+
+    let saturation = if max <= 0.000001 { 0.0 } else { delta / max };
+    (
+        hue_degrees.rem_euclid(360.0),
+        saturation,
+        rec709_luma(red, green, blue),
+    )
+}
+
+fn evaluate_luminance_range_weight(luma: f32, params: &LuminanceRangeMaskParameters) -> f32 {
+    if luma < params.min_luma || luma > params.max_luma {
+        return 0.0;
+    }
+
+    let fade = ((params.max_luma - params.min_luma) * params.feather).max(0.0001);
+    let lower_weight = ((luma - params.min_luma) / fade).min(1.0);
+    let upper_weight = ((params.max_luma - luma) / fade).min(1.0);
+    lower_weight.min(upper_weight).clamp(0.0, 1.0)
+}
+
+fn evaluate_color_range_weight(
+    hue_degrees: f32,
+    saturation: f32,
+    luma: f32,
+    params: &ColorRangeMaskParameters,
+) -> f32 {
+    if luma < params.min_luma
+        || luma > params.max_luma
+        || saturation < params.min_saturation
+        || saturation > params.max_saturation
+    {
+        return 0.0;
+    }
+
+    let hue_distance = hue_distance_degrees(hue_degrees, params.center_hue_degrees);
+    let feather = params.feather.clamp(0.0, 1.0);
+    let inner_radius = params.hue_tolerance_degrees * (1.0 - feather);
+    if hue_distance <= inner_radius {
+        return 1.0;
+    }
+    if hue_distance >= params.hue_tolerance_degrees {
+        return 0.0;
+    }
+
+    let fade = (params.hue_tolerance_degrees - inner_radius).max(0.0001);
+    (1.0 - (hue_distance - inner_radius) / fade).clamp(0.0, 1.0)
+}
+
+fn generate_warped_range_bitmap(
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+    warped_image: Option<&image::DynamicImage>,
+    evaluate: impl Fn(Rgba<u8>) -> f32,
+) -> Option<GrayImage> {
+    let warped = warped_image?;
+    let (full_w, full_h) = warped.dimensions();
+    let mut mask = GrayImage::new(width, height);
+    let inv_scale = 1.0 / scale.max(0.0001);
+
+    for y_out in 0..height {
+        let y_src = ((y_out as f32 + crop_offset.1) * inv_scale) as u32;
+        if y_src >= full_h {
+            continue;
+        }
+
+        for x_out in 0..width {
+            let x_src = ((x_out as f32 + crop_offset.0) * inv_scale) as u32;
+            if x_src >= full_w {
+                continue;
+            }
+
+            let alpha = evaluate(warped.get_pixel(x_src, y_src));
+            mask.put_pixel(
+                x_out,
+                y_out,
+                Luma([(alpha.clamp(0.0, 1.0) * 255.0).round() as u8]),
+            );
+        }
+    }
+
+    Some(mask)
+}
+
+fn generate_luminance_range_bitmap(
+    params_value: &Value,
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+    warped_image: Option<&image::DynamicImage>,
+) -> Option<GrayImage> {
+    let params: LuminanceRangeMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
+    generate_warped_range_bitmap(width, height, scale, crop_offset, warped_image, |pixel| {
+        let (_, _, luma) = rgb_to_hsv_sample(pixel);
+        evaluate_luminance_range_weight(luma, &params)
+    })
+}
+
+fn generate_color_range_bitmap(
+    params_value: &Value,
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+    warped_image: Option<&image::DynamicImage>,
+) -> Option<GrayImage> {
+    let params: ColorRangeMaskParameters = serde_json::from_value(params_value.clone()).ok()?;
+    generate_warped_range_bitmap(width, height, scale, crop_offset, warped_image, |pixel| {
+        let (hue_degrees, saturation, luma) = rgb_to_hsv_sample(pixel);
+        evaluate_color_range_weight(hue_degrees, saturation, luma, &params)
+    })
+}
+
 fn generate_luminance_bitmap(
     params_value: &Value,
     width: u32,
@@ -1737,6 +1901,22 @@ fn generate_sub_mask_bitmap(
             warped_image,
         ),
         "luminance" => generate_luminance_bitmap(
+            &sub_mask.parameters,
+            width,
+            height,
+            scale,
+            crop_offset,
+            warped_image,
+        ),
+        "color_range" => generate_color_range_bitmap(
+            &sub_mask.parameters,
+            width,
+            height,
+            scale,
+            crop_offset,
+            warped_image,
+        ),
+        "luminance_range" => generate_luminance_range_bitmap(
             &sub_mask.parameters,
             width,
             height,
@@ -2137,6 +2317,81 @@ mod tests {
             refined.get_pixel(2, 0)[0] > baseline.get_pixel(2, 0)[0],
             "hair detail should tighten chroma-only transition edges"
         );
+    }
+
+    #[test]
+    fn range_masks_require_warped_image_data() {
+        let definition = MaskDefinition {
+            id: "mask_range".to_string(),
+            name: "Range".to_string(),
+            visible: true,
+            invert: false,
+            opacity: 100.0,
+            adjustments: serde_json::json!({}),
+            sub_masks: vec![SubMask {
+                id: "mask_range_luma".to_string(),
+                mask_type: "luminance_range".to_string(),
+                visible: true,
+                invert: false,
+                opacity: 100.0,
+                mode: SubMaskMode::Additive,
+                parameters: serde_json::json!({
+                    "minLuma": 0.2,
+                    "maxLuma": 0.8,
+                    "feather": 0.25
+                }),
+            }],
+        };
+
+        assert!(definition.requires_warped_image());
+    }
+
+    #[test]
+    fn luminance_range_bitmap_uses_rec709_luma() {
+        let mut image = RgbaImage::new(3, 1);
+        image.put_pixel(0, 0, Rgba([8, 8, 8, 255]));
+        image.put_pixel(1, 0, Rgba([128, 128, 128, 255]));
+        image.put_pixel(2, 0, Rgba([245, 245, 245, 255]));
+        let warped = DynamicImage::ImageRgba8(image);
+        let params = serde_json::json!({
+            "minLuma": 0.2,
+            "maxLuma": 0.8,
+            "feather": 0.1
+        });
+
+        let mask = generate_luminance_range_bitmap(&params, 3, 1, 1.0, (0.0, 0.0), Some(&warped))
+            .expect("range mask should render from warped image");
+
+        assert_eq!(mask.get_pixel(0, 0)[0], 0);
+        assert_eq!(mask.get_pixel(1, 0)[0], 255);
+        assert_eq!(mask.get_pixel(2, 0)[0], 0);
+    }
+
+    #[test]
+    fn color_range_bitmap_uses_hsv_hue_and_luma_gates() {
+        let mut image = RgbaImage::new(4, 1);
+        image.put_pixel(0, 0, Rgba([240, 16, 16, 255]));
+        image.put_pixel(1, 0, Rgba([240, 154, 16, 255]));
+        image.put_pixel(2, 0, Rgba([16, 48, 240, 255]));
+        image.put_pixel(3, 0, Rgba([28, 28, 28, 255]));
+        let warped = DynamicImage::ImageRgba8(image);
+        let params = serde_json::json!({
+            "centerHueDegrees": 0,
+            "hueToleranceDegrees": 35,
+            "feather": 0.35,
+            "minLuma": 0.05,
+            "maxLuma": 0.95,
+            "minSaturation": 0.2,
+            "maxSaturation": 1.0
+        });
+
+        let mask = generate_color_range_bitmap(&params, 4, 1, 1.0, (0.0, 0.0), Some(&warped))
+            .expect("range mask should render from warped image");
+
+        assert_eq!(mask.get_pixel(0, 0)[0], 255);
+        assert_eq!(mask.get_pixel(1, 0)[0], 0);
+        assert_eq!(mask.get_pixel(2, 0)[0], 0);
+        assert_eq!(mask.get_pixel(3, 0)[0], 0);
     }
 
     #[test]

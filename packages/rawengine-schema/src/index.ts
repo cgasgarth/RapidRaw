@@ -40,6 +40,7 @@ export * from './panoramaHomographyDiagnostics.js';
 export * from './panoramaLocalOptimizationRansac.js';
 export * from './panoramaRuntimePlan.js';
 export * from './panoramaSyntheticStitch.js';
+export * from './rangeMaskCommandRuntime.js';
 export * from './rawEngineSchemas.js';
 export * from './retouchRemoveRuntime.js';
 export * from './superResolutionAlignmentDiagnostics.js';
