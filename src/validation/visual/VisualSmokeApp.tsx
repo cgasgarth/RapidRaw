@@ -228,6 +228,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabWorkspace]: NegativeLabVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ObjectPromptUi]: ObjectPromptVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaPrivateRawUi]: PanoramaPrivateRawVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.PanoramaProcessingCommand]: PanoramaProcessingCommandVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaSavedReview]: PanoramaSavedReviewVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaUi]: PanoramaVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawModalReview]: SuperResolutionPrivateRawModalReviewSmoke,
@@ -1124,6 +1125,7 @@ const copy = {
   panoramaSmoke: 'Panorama UI Smoke',
   panoramaReview: 'Panorama review',
   panoramaSavedReview: 'Panorama saved review',
+  panoramaDryRunCommand: 'Panorama dry-run command',
   panoramaDryRunPreview: 'Dry-run preview',
   panoramaArtifactHandoff: 'Artifact handoff',
   panoramaPrivateRawMissing: 'Missing panorama private RAW proof payload',
@@ -3635,6 +3637,7 @@ function PanoramaVisualSmoke() {
           imageCount={5}
           isOpen
           isProcessing={false}
+          lastDryRunCommand={null}
           loadingImageUrl={panoramaPreviewUrl}
           onClose={() => {}}
           onOpenFile={() => {}}
@@ -3692,6 +3695,7 @@ function PanoramaSavedReviewVisualSmoke() {
         imageCount={5}
         isOpen
         isProcessing={false}
+        lastDryRunCommand={null}
         loadingImageUrl={panoramaPreviewUrl}
         onClose={() => {}}
         onOpenFile={setOpenedPath}
@@ -3700,6 +3704,47 @@ function PanoramaSavedReviewVisualSmoke() {
         onStitch={() => {}}
         progressMessage={null}
         renderedReview={panoramaRenderedReviewFixture}
+        runtimePlan={panoramaRuntimePlanFixture}
+        settings={panoramaSavedReviewSmokeSettings}
+      />
+    </main>
+  );
+}
+
+function PanoramaProcessingCommandVisualSmoke() {
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.PanoramaProcessingCommand}
+    >
+      <div className="absolute inset-0 bg-[#0f1114]" data-visual-smoke-section="panorama-processing-command" />
+      <div className="fixed left-4 top-4 z-50 rounded-md border border-white/10 bg-black/75 px-3 py-2 text-sm font-semibold">
+        {copy.panoramaDryRunCommand}
+      </div>
+      <PanoramaModal
+        error={null}
+        finalImageBase64={null}
+        imageCount={3}
+        isOpen
+        isProcessing
+        lastDryRunCommand={{
+          appServerToolName: getComputationalMergeAppServerRoutePairSummary('panorama').dryRunToolName,
+          boundaryMode: 'auto_crop',
+          commandType: 'computationalMerge.createPanorama',
+          dryRun: true,
+          maxPreviewDimensionPx: 8192,
+          projection: 'rectilinear',
+          sourceCount: 3,
+        }}
+        loadingImageUrl={panoramaPreviewUrl}
+        onClose={() => {}}
+        onOpenFile={() => {}}
+        onSave={() => Promise.resolve('/tmp/panorama.tif')}
+        onSettingsChange={() => {}}
+        onStitch={() => {}}
+        progressMessage="Panorama preflight complete."
+        renderedReview={null}
         runtimePlan={panoramaRuntimePlanFixture}
         settings={panoramaSavedReviewSmokeSettings}
       />

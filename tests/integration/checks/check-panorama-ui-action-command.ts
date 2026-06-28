@@ -66,6 +66,8 @@ const actionMetadata = actionMetadataSchema.parse({
   sourceCount: packageCommand.parameters.sources.length,
 });
 const productivityActionsSource = await readFile('src/hooks/useProductivityActions.ts', 'utf8');
+const appModalsSource = await readFile('src/components/modals/AppModals.tsx', 'utf8');
+const panoramaModalSource = await readFile('src/components/modals/PanoramaModal.tsx', 'utf8');
 const failures: string[] = [];
 
 if (!productivityActionsSource.includes("getComputationalMergeAppServerRoutePairSummary('panorama').dryRunToolName")) {
@@ -73,6 +75,15 @@ if (!productivityActionsSource.includes("getComputationalMergeAppServerRoutePair
 }
 if (!productivityActionsSource.includes('lastDryRunCommand: dryRunCommand')) {
   failures.push('Panorama start action must persist dry-run command metadata.');
+}
+if (!appModalsSource.includes('lastDryRunCommand={panoramaModalState.lastDryRunCommand}')) {
+  failures.push('AppModals must pass panorama dry-run command metadata into PanoramaModal.');
+}
+if (!panoramaModalSource.includes('data-testid="panorama-dry-run-command-state"')) {
+  failures.push('Panorama processing UI must render dry-run command state.');
+}
+if (!panoramaModalSource.includes('data-tool-name={lastDryRunCommand.appServerToolName}')) {
+  failures.push('Panorama processing UI must expose the dry-run tool name.');
 }
 for (const marker of [
   'boundaryMode: settings.boundaryMode',

@@ -26,6 +26,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   NegativeLabWorkspace: 'negative-lab-workspace',
   ObjectPromptUi: 'object-prompt-ui',
   PanoramaPrivateRawUi: 'panorama-private-raw-ui',
+  PanoramaProcessingCommand: 'panorama-processing-command',
   PanoramaSavedReview: 'panorama-saved-review',
   PanoramaUi: 'panorama-ui',
   SrPrivateRawModalReview: 'sr-private-raw-modal-review',
@@ -107,6 +108,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Private RAW panorama review',
     mode: VISUAL_SMOKE_SCENARIO_IDS.PanoramaPrivateRawUi,
     outputFile: 'panorama-private-raw-ui.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Panorama dry-run command',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.PanoramaProcessingCommand,
+    outputFile: 'panorama-processing-command.png',
     sectionMinimum: 1,
   },
   {
