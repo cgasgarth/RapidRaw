@@ -86,6 +86,18 @@ if (!appModalsSource.includes("getComputationalMergeAppServerRoutePairSummary('f
 if (!appModalsSource.includes('lastDryRunCommand')) {
   failures.push('Focus stack preview-plan action must persist dry-run command metadata.');
 }
+if (!appModalsSource.includes('lastDryRunCommand={focusStackModalState.lastDryRunCommand}')) {
+  failures.push('AppModals must pass focus-stack dry-run command metadata into FocusStackModal.');
+}
+if (!appModalsSource.includes('lastDryRunCommand: _lastDryRunCommand')) {
+  failures.push('Focus stack settings changes must clear stale dry-run command metadata.');
+}
+if (!modalSource.includes('data-testid="focus-dry-run-command-state"')) {
+  failures.push('Focus stack modal must render dry-run command state.');
+}
+if (!modalSource.includes('data-tool-name={lastDryRunCommand.toolName}')) {
+  failures.push('Focus stack modal must expose the dry-run tool name.');
+}
 if (!appModalsSource.includes('outputReview: buildFocusStackOutputReviewWorkflow')) {
   failures.push('Focus stack preview-plan action must update outputReview instead of leaving the UI unchanged.');
 }
