@@ -590,6 +590,7 @@
           "changedPixels_one": "{{count}} preview pixel changed",
           "changedPixels_other": "{{count}} preview pixels changed",
           "dryRun": "Dry-run",
+          "inspectState": "Inspect state",
           "label": "Ask the agent",
           "noApplyStep": "The agent plan did not include an apply-capable tone step.",
           "placeholder": "Example: brighten this RAW, recover shadows, and keep the color natural",
@@ -677,6 +678,7 @@
             "preview": "Preview",
             "prompt": "Prompt",
             "rollback": "Rollback",
+            "state": "State",
             "tool_call": "Tool call"
           },
           "subtitle": "Preview, tool calls, and rollback",

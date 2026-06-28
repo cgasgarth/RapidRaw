@@ -6,12 +6,18 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { buildAgentAppServerToolReadinessSummary } from '../../../utils/agentAppServerToolReadiness';
 import { runAgentBoundedEditPlannerLoop } from '../../../utils/agentBoundedEditPlannerLoop';
 import { planAgentEditRecipe } from '../../../utils/agentEditRecipePlanner';
+import { agentImageContextSnapshotSchema } from '../../../utils/agentImageContextSnapshot';
 import {
   runAgentMultiTurnAppServerSession,
   type AgentMultiTurnAppServerSessionRequest,
   type AgentMultiTurnAppServerSessionResult,
 } from '../../../utils/agentMultiTurnAppServerSession';
-import { AGENT_PREVIEW_RENDER_TOOL_NAME, renderAgentReadOnlyPreview } from '../../../utils/agentReadOnlyAppServerTools';
+import {
+  AGENT_PREVIEW_RENDER_TOOL_NAME,
+  AGENT_STATE_GET_TOOL_NAME,
+  getAgentReadOnlyState,
+  renderAgentReadOnlyPreview,
+} from '../../../utils/agentReadOnlyAppServerTools';
 import {
   evaluateAgentSafetyPolicy,
   inferAgentSafetyOperationKind,
@@ -130,6 +136,13 @@ interface LivePromptResult {
   recipeName?: string;
   safetyDecision?: AgentSafetyPolicyDecision;
   sampledPixelCount?: number;
+  stateAdjustmentCount?: number;
+  stateGraphRevision?: string;
+  stateImagePath?: string;
+  stateMaskCount?: number;
+  stateMetadataCount?: number;
+  stateRecipeHash?: string;
+  stateStaleRecipeHash?: boolean;
   status: LivePromptStatus;
   summary?: string;
 }
@@ -144,7 +157,7 @@ interface LiveSessionReviewState {
   toolCallCount: number;
 }
 
-type LiveActivityKind = 'approval' | 'error' | 'preview' | 'prompt' | 'rollback' | 'tool_call';
+type LiveActivityKind = 'approval' | 'error' | 'preview' | 'prompt' | 'rollback' | 'state' | 'tool_call';
 
 interface LiveActivityEntry {
   approvalId?: string;
@@ -480,6 +493,7 @@ function LivePromptComposer({
   const [sessionReview, setSessionReview] = useState<LiveSessionReviewState | null>(null);
   const canRun = isContextReady && result.status !== 'applying';
   const canApply = isContextReady && acceptedPrompt.length > 0 && result.status === 'dry_run_ready';
+  const canInspectState = isContextReady && result.status !== 'applying';
   const canRefreshPreview = isContextReady && result.status !== 'applying';
   const canRollback = rollbackSnapshot !== null && result.status === 'applied';
   let statusLabel;
@@ -645,6 +659,52 @@ function LivePromptComposer({
     onSessionEvent?.(
       createLiveSessionEvent('assistant', t('editor.ai.agent.composer.policy.approved'), 'approval-granted'),
     );
+  };
+
+  const inspectState = () => {
+    if (!canInspectState) return;
+
+    try {
+      const stateResult = getAgentReadOnlyState({
+        expectedRecipeHash: result.recipeName ?? initialPromptPreviewContext?.recipeHash,
+        requestId: `agent-live-state-inspect-${Date.now()}`,
+      });
+      const snapshot = agentImageContextSnapshotSchema.parse(stateResult.snapshot);
+      pushActivityEntry({
+        body: `${snapshot.graphRevision} · ${snapshot.activeImagePath}`,
+        graphRevision: snapshot.graphRevision,
+        kind: 'state',
+        previewAfterHash: snapshot.initialPreview.renderHash,
+        recipeHash: snapshot.initialPreview.recipeHash,
+        status: stateResult.staleRecipeHash ? 'pending' : 'completed',
+        toolName: AGENT_STATE_GET_TOOL_NAME,
+      });
+      const nextResult = {
+        ...result,
+        previewAfterHash: snapshot.initialPreview.renderHash,
+        recipeName: snapshot.initialPreview.recipeHash,
+        stateAdjustmentCount: snapshot.adjustmentSummary.length,
+        stateGraphRevision: snapshot.graphRevision,
+        stateImagePath: snapshot.activeImagePath,
+        stateMaskCount: snapshot.subjectHint.maskCount,
+        stateMetadataCount: snapshot.metadataSummary.length,
+        stateRecipeHash: snapshot.initialPreview.recipeHash,
+        stateStaleRecipeHash: stateResult.staleRecipeHash,
+      } satisfies LivePromptResult;
+      setResult(nextResult);
+      onResultChange?.(nextResult);
+      onSessionEvent?.(
+        createLiveSessionEvent('assistant', `${AGENT_STATE_GET_TOOL_NAME}: ${snapshot.graphRevision}`, 'state-inspect'),
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError');
+      pushActivityEntry({
+        body: errorMessage,
+        kind: 'error',
+        status: 'blocked',
+        toolName: AGENT_STATE_GET_TOOL_NAME,
+      });
+    }
   };
 
   const refreshPreview = () => {
@@ -898,6 +958,20 @@ function LivePromptComposer({
           {t('editor.ai.agent.composer.dryRun')}
         </button>
         <button
+          className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-text-primary disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          data-testid="agent-live-prompt-inspect-state"
+          disabled={!canInspectState}
+          onMouseDown={(event) => {
+            event.preventDefault();
+            inspectState();
+          }}
+          onClick={inspectState}
+          type="button"
+        >
+          <Server size={14} />
+          {t('editor.ai.agent.composer.inspectState')}
+        </button>
+        <button
           className="inline-flex items-center gap-2 rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
           data-testid="agent-live-prompt-refresh-preview"
           disabled={!canRefreshPreview}
@@ -977,6 +1051,22 @@ function LivePromptComposer({
           {result.recipeName ? <span className="font-mono text-text-secondary">{result.recipeName}</span> : null}
         </div>
         {result.summary ? <p className="mt-1 leading-4 text-text-secondary">{result.summary}</p> : null}
+        {result.stateGraphRevision ? (
+          <div
+            className="mt-1 space-y-1 font-mono text-[10px] text-text-secondary"
+            data-state-adjustment-count={result.stateAdjustmentCount?.toString() ?? ''}
+            data-state-graph-revision={result.stateGraphRevision}
+            data-state-image-path={result.stateImagePath ?? ''}
+            data-state-mask-count={result.stateMaskCount?.toString() ?? ''}
+            data-state-metadata-count={result.stateMetadataCount?.toString() ?? ''}
+            data-state-recipe-hash={result.stateRecipeHash ?? ''}
+            data-state-stale-recipe-hash={result.stateStaleRecipeHash ? 'true' : 'false'}
+            data-testid="agent-live-prompt-state-inspection"
+          >
+            <div className="truncate text-emerald-100">{result.stateGraphRevision}</div>
+            <div className="truncate">{result.stateImagePath}</div>
+          </div>
+        ) : null}
         {result.safetyDecision ? (
           <div
             className="mt-2 rounded border border-amber-500/25 bg-amber-500/10 p-2 text-amber-100"
