@@ -168,6 +168,12 @@ export const MASK_PANEL_CREATION_TYPES: Array<MaskType> = [
   },
   {
     disabled: false,
+    icon: Sparkles,
+    name: 'Object',
+    type: Mask.AiObject,
+  },
+  {
+    disabled: false,
     icon: TriangleRight,
     name: 'Linear',
     type: Mask.Linear,
@@ -222,6 +228,12 @@ export const AI_PANEL_CREATION_TYPES: Array<MaskType> = [
   },
   {
     disabled: false,
+    icon: Sparkles,
+    name: 'Object',
+    type: Mask.AiObject,
+  },
+  {
+    disabled: false,
     icon: Brush,
     name: 'Brush',
     type: Mask.Brush,
@@ -272,6 +284,12 @@ export const SUB_MASK_COMPONENT_TYPES: Array<MaskType> = [
     icon: User,
     name: 'Foreground',
     type: Mask.AiForeground,
+  },
+  {
+    disabled: false,
+    icon: Sparkles,
+    name: 'Object',
+    type: Mask.AiObject,
   },
   {
     disabled: false,
