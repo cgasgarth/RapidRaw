@@ -300,13 +300,17 @@ export default function AppModals(props: AppModalsProps) {
           });
         }}
         onSettingsChange={(settings) => {
-          setUI((state) => ({
-            superResolutionModalState: {
-              ...state.superResolutionModalState,
-              outputReview: null,
-              settings,
-            },
-          }));
+          setUI((state) => {
+            const { lastDryRunCommand: _lastDryRunCommand, ...superResolutionModalState } =
+              state.superResolutionModalState;
+            return {
+              superResolutionModalState: {
+                ...superResolutionModalState,
+                outputReview: null,
+                settings,
+              },
+            };
+          });
         }}
         outputReview={superResolutionModalState.outputReview}
         settings={superResolutionModalState.settings}
