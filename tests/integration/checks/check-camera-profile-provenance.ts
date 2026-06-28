@@ -62,6 +62,8 @@ const requiredMarkers: Array<[keyof typeof files, string]> = [
   ['metadataPanel', 'data-testid="metadata-raw-processing-mode"'],
   ['metadataPanel', 'data-testid="metadata-raw-demosaic-provenance"'],
   ['metadataPanel', 'data-testid="metadata-raw-runtime-receipt"'],
+  ['metadataPanel', 'data-testid="metadata-raw-warning-chips"'],
+  ['metadataPanel', "data-raw-warning-codes={rawWarningChips.map((chip) => chip.code).join(',')}"],
   ['metadataPanel', 'data-testid="metadata-raw-scratch-memory"'],
   ['metadataPanel', "data-decode-elapsed-ms={cameraProfileReceipt.decodeElapsedMs ?? ''}"],
   ['metadataPanel', "data-preview-elapsed-ms={cameraProfileReceipt.previewElapsedMs ?? ''}"],

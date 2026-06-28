@@ -1160,7 +1160,11 @@
           "single_illuminant": "Single illuminant",
           "unavailable": "Unavailable"
         },
-        "title": "Camera Input Profile"
+        "title": "Camera Input Profile",
+        "warning": {
+          "colorTransformNotApplied": ""
+        },
+        "warnings": ""
       },
       "clickToEdit": "Haz clic para editar",
       "copied": "Copiado",
