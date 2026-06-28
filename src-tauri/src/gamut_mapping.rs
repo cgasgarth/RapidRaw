@@ -2,11 +2,15 @@
 pub(crate) const SRGB_OKLAB_CHROMA_REDUCE_V1: &str = "rawengine.gamut.srgb-oklab-chroma-reduce.v1";
 #[cfg(test)]
 pub(crate) const SRGB_OKLAB_CHROMA_REDUCE_V2: &str = "rawengine.gamut.srgb-oklab-chroma-reduce.v2";
+#[cfg(test)]
 pub(crate) const SRGB_OKLAB_CHROMA_REDUCE_V3: &str = "rawengine.gamut.srgb-oklab-chroma-reduce.v3";
-pub(crate) const ACTIVE_SRGB_OKLAB_CHROMA_REDUCE: &str = SRGB_OKLAB_CHROMA_REDUCE_V3;
+pub(crate) const SRGB_OKLAB_CHROMA_REDUCE_V4: &str = "rawengine.gamut.srgb-oklab-chroma-reduce.v4";
+pub(crate) const ACTIVE_SRGB_OKLAB_CHROMA_REDUCE: &str = SRGB_OKLAB_CHROMA_REDUCE_V4;
 
 const EPSILON: f32 = 1.0e-6;
+#[cfg(test)]
 const CHROMA_MONOTONIC_EPSILON: f32 = 1.0e-3;
+const CHROMA_SAFE_CLIP_FALLBACK_RATIO: f32 = 0.8;
 
 #[cfg(test)]
 pub(crate) fn map_srgb_oklab_chroma_reduce_v1(rgb: [f32; 3]) -> [f32; 3] {
@@ -88,6 +92,7 @@ pub(crate) fn map_srgb_oklab_chroma_reduce_v2(rgb: [f32; 3]) -> [f32; 3] {
     clamp_rgb(best)
 }
 
+#[cfg(test)]
 pub(crate) fn map_srgb_oklab_chroma_reduce_v3(rgb: [f32; 3]) -> [f32; 3] {
     if rgb
         .iter()
@@ -114,11 +119,35 @@ pub(crate) fn map_srgb_oklab_chroma_reduce_v3(rgb: [f32; 3]) -> [f32; 3] {
     clipped
 }
 
+pub(crate) fn map_srgb_oklab_chroma_reduce_v4(rgb: [f32; 3]) -> [f32; 3] {
+    if rgb
+        .iter()
+        .all(|component| component.is_finite() && (0.0..=1.0).contains(component))
+    {
+        return rgb;
+    }
+
+    let fitted = map_srgb_oklab_chroma_reduce_v2(rgb);
+    let clipped = clamp_rgb([
+        finite_or_zero(rgb[0]),
+        finite_or_zero(rgb[1]),
+        finite_or_zero(rgb[2]),
+    ]);
+    let clipped_chroma = oklab_chroma(linear_srgb_to_oklab(clipped));
+    let fitted_chroma = oklab_chroma(linear_srgb_to_oklab(fitted));
+
+    if fitted_chroma <= clipped_chroma * CHROMA_SAFE_CLIP_FALLBACK_RATIO {
+        return fitted;
+    }
+
+    clipped
+}
+
 pub(crate) fn map_srgb_oklab_chroma_reduce_rgb16_pixels(pixels: &[f32]) -> Vec<u16> {
     pixels
         .chunks_exact(3)
         .flat_map(|pixel| {
-            let mapped = map_srgb_oklab_chroma_reduce_v3([pixel[0], pixel[1], pixel[2]]);
+            let mapped = map_srgb_oklab_chroma_reduce_v4([pixel[0], pixel[1], pixel[2]]);
             mapped.map(quantize_linear_component_to_u16)
         })
         .collect()
@@ -205,9 +234,9 @@ fn cbrt_signed(value: f32) -> f32 {
 mod tests {
     use super::{
         ACTIVE_SRGB_OKLAB_CHROMA_REDUCE, CHROMA_MONOTONIC_EPSILON, SRGB_OKLAB_CHROMA_REDUCE_V1,
-        SRGB_OKLAB_CHROMA_REDUCE_V2, SRGB_OKLAB_CHROMA_REDUCE_V3, linear_srgb_to_oklab,
-        map_srgb_oklab_chroma_reduce_v1, map_srgb_oklab_chroma_reduce_v2,
-        map_srgb_oklab_chroma_reduce_v3, oklab_chroma,
+        SRGB_OKLAB_CHROMA_REDUCE_V2, SRGB_OKLAB_CHROMA_REDUCE_V3, SRGB_OKLAB_CHROMA_REDUCE_V4,
+        linear_srgb_to_oklab, map_srgb_oklab_chroma_reduce_v1, map_srgb_oklab_chroma_reduce_v2,
+        map_srgb_oklab_chroma_reduce_v3, map_srgb_oklab_chroma_reduce_v4, oklab_chroma,
     };
 
     fn assert_in_gamut(rgb: [f32; 3]) {
@@ -233,19 +262,23 @@ mod tests {
             SRGB_OKLAB_CHROMA_REDUCE_V3,
             "rawengine.gamut.srgb-oklab-chroma-reduce.v3"
         );
-        assert_eq!(ACTIVE_SRGB_OKLAB_CHROMA_REDUCE, SRGB_OKLAB_CHROMA_REDUCE_V3);
+        assert_eq!(
+            SRGB_OKLAB_CHROMA_REDUCE_V4,
+            "rawengine.gamut.srgb-oklab-chroma-reduce.v4"
+        );
+        assert_eq!(ACTIVE_SRGB_OKLAB_CHROMA_REDUCE, SRGB_OKLAB_CHROMA_REDUCE_V4);
     }
 
     #[test]
     fn mapper_preserves_in_gamut_values_exactly() {
         let rgb = [0.25, 0.5, 0.75];
 
-        assert_eq!(map_srgb_oklab_chroma_reduce_v3(rgb), rgb);
+        assert_eq!(map_srgb_oklab_chroma_reduce_v4(rgb), rgb);
     }
 
     #[test]
     fn mapper_reduces_high_component_without_channel_clip_shape() {
-        let mapped = map_srgb_oklab_chroma_reduce_v3([1.35, 0.05, 0.0]);
+        let mapped = map_srgb_oklab_chroma_reduce_v4([1.35, 0.05, 0.0]);
 
         assert_in_gamut(mapped);
         assert!(
@@ -256,14 +289,14 @@ mod tests {
 
     #[test]
     fn mapper_handles_negative_components() {
-        let mapped = map_srgb_oklab_chroma_reduce_v3([0.1, -0.2, 0.8]);
+        let mapped = map_srgb_oklab_chroma_reduce_v4([0.1, -0.2, 0.8]);
 
         assert_in_gamut(mapped);
     }
 
     #[test]
     fn mapper_v2_fits_hdr_neutral_without_channel_clip_shape() {
-        let mapped = map_srgb_oklab_chroma_reduce_v3([1.8, 1.8, 1.8]);
+        let mapped = map_srgb_oklab_chroma_reduce_v4([1.8, 1.8, 1.8]);
 
         assert_in_gamut(mapped);
         assert!(
@@ -295,5 +328,20 @@ mod tests {
     #[test]
     fn mapper_v2_remains_available_as_historical_id() {
         assert_in_gamut(map_srgb_oklab_chroma_reduce_v2([0.1, -0.2, 0.8]));
+    }
+
+    #[test]
+    fn mapper_v4_falls_back_to_clip_for_risky_chroma() {
+        let rgb = [1.35, 0.05, 0.0];
+        let mapped = map_srgb_oklab_chroma_reduce_v4(rgb);
+        let clipped = [1.0, 0.05, 0.0];
+        let mapped_chroma = oklab_chroma(linear_srgb_to_oklab(mapped));
+        let clipped_chroma = oklab_chroma(linear_srgb_to_oklab(clipped));
+
+        assert_in_gamut(mapped);
+        assert!(
+            mapped_chroma <= clipped_chroma,
+            "v4 should avoid fitted chroma when it risks exceeding relative clipping"
+        );
     }
 }
