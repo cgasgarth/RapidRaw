@@ -21,6 +21,7 @@ const fixtureReport = {
     warningCodes: [],
   },
   demosaicPath: 'bayer_hq',
+  processingProfile: 'maximum',
 };
 
 const receipt = exportReceiptPayloadSchema.parse({
@@ -41,6 +42,7 @@ const rawReport = receipt.outputs[0]?.rawDevelopmentReport;
 const failures = [
   rawReport?.cameraProfile.status === 'interpolated' ? null : 'export receipt did not parse interpolated report',
   rawReport?.cameraProfile.matrixHash === 'blake3:abcdef0123456789' ? null : 'export receipt lost matrix hash',
+  rawReport?.processingProfile === 'maximum' ? null : 'export receipt lost RAW processing profile',
   hasMarker('src-tauri/src/image_loader.rs', 'load_and_composite_with_report')
     ? null
     : 'image loader must expose report-preserving composite helper',

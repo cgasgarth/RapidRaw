@@ -17,6 +17,8 @@ const exifSchema = z.record(z.string(), z.string()).nullable();
 
 export const rawDemosaicPathSchema = z.enum(['bayer_hq', 'fast', 'linear_bypass', 'standard', 'x_trans_hq']);
 
+export const rawProcessingProfileSchema = z.enum(['balanced', 'fast', 'maximum']);
+
 export const rawCameraProfileStatusSchema = z.enum(['fallback', 'interpolated', 'single_illuminant', 'unavailable']);
 
 export const rawCameraProfileReportSchema = z
@@ -46,6 +48,7 @@ export const rawDevelopmentReportSchema = z
     cameraProfile: rawCameraProfileReportSchema,
     demosaicAlgorithmId: z.string().trim().min(1).nullable().optional(),
     demosaicPath: rawDemosaicPathSchema,
+    processingProfile: rawProcessingProfileSchema,
     xtransHq: z
       .object({
         reconstruction: z
@@ -89,13 +92,16 @@ export const rawCameraProfileProvenanceReceiptSchema = z
     coolIlluminant: rawCameraProfileReportSchema.shape.coolIlluminant,
     coolWeight: rawCameraProfileReportSchema.shape.coolWeight,
     demosaicPath: rawDemosaicPathSchema,
+    demosaicAlgorithmId: rawDevelopmentReportSchema.shape.demosaicAlgorithmId,
     estimatedCctKelvin: rawCameraProfileReportSchema.shape.estimatedCctKelvin,
     fallbackReason: rawCameraProfileReportSchema.shape.fallbackReason,
     illuminantEstimateConfidence: rawCameraProfileReportSchema.shape.illuminantEstimateConfidence,
     illuminantEstimateMethod: rawCameraProfileReportSchema.shape.illuminantEstimateMethod,
     matrixHash: rawCameraProfileReportSchema.shape.matrixHash,
     receiptVersion: z.literal(1),
+    processingProfile: rawProcessingProfileSchema,
     status: rawCameraProfileStatusSchema,
+    scratchMemoryBytes: z.number().int().nonnegative().nullable(),
     warmIlluminant: rawCameraProfileReportSchema.shape.warmIlluminant,
     warningCount: z.number().int().nonnegative(),
   })

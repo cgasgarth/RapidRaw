@@ -1136,12 +1136,17 @@
       "cameraProfile": {
         "algorithm": "Algorithm",
         "coolWeight": "Cool weight",
+        "defaultDemosaic": "Default demosaic",
+        "demosaicProvenance": "Demosaic",
         "estimatedCct": "Estimated CCT",
         "fallbackReason": "Fallback",
         "illuminants": "Illuminants",
         "matrixHash": "Matrix hash",
+        "notApplicable": "N/A",
+        "processingMode": "Processing mode",
         "receipt": "Recu",
-        "receiptSummary": "{{status}} · {{demosaicPath}}",
+        "receiptSummary": "{{status}} · {{processingProfile}} · {{demosaicPath}}",
+        "scratchMemory": "Scratch memory",
         "status": {
           "fallback": "Fallback",
           "interpolated": "Interpolated",
