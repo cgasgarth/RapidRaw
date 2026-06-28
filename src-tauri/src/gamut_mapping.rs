@@ -1,9 +1,11 @@
+#[cfg(test)]
 pub(crate) const SRGB_OKLAB_CHROMA_REDUCE_V1: &str = "rawengine.gamut.srgb-oklab-chroma-reduce.v1";
 pub(crate) const SRGB_OKLAB_CHROMA_REDUCE_V2: &str = "rawengine.gamut.srgb-oklab-chroma-reduce.v2";
 pub(crate) const ACTIVE_SRGB_OKLAB_CHROMA_REDUCE: &str = SRGB_OKLAB_CHROMA_REDUCE_V2;
 
 const EPSILON: f32 = 1.0e-6;
 
+#[cfg(test)]
 pub(crate) fn map_srgb_oklab_chroma_reduce_v1(rgb: [f32; 3]) -> [f32; 3] {
     if rgb
         .iter()
