@@ -11,7 +11,7 @@ const args = process.argv.slice(2);
 const shouldBuild = !args.includes('--no-build');
 const shouldLaunch = !args.includes('--no-launch');
 
-async function run(command: string, commandArgs: string[], label: string): Promise<void> {
+async function run(command: string, commandArgs: string[], label: string, allowedExitCodes = [0]): Promise<void> {
   const proc = Bun.spawn([command, ...commandArgs], {
     stderr: 'pipe',
     stdout: 'pipe',
@@ -23,7 +23,7 @@ async function run(command: string, commandArgs: string[], label: string): Promi
     proc.exited,
   ]);
 
-  if (exitCode === 0) return;
+  if (allowedExitCodes.includes(exitCode)) return;
 
   console.error(`${label} failed`);
   const output = `${stdout}\n${stderr}`.trim();
@@ -39,6 +39,7 @@ if (shouldBuild) {
   );
 }
 
+await run('pkill', ['-f', `${qaAppName}.app/Contents/MacOS/RapidRAW`], 'native qa stale app quit', [0, 1]);
 await rm(qaAppPath, { force: true, recursive: true });
 await mkdir(dirname(qaAppPath), { recursive: true });
 await run('cp', ['-R', sourceAppPath, qaAppPath], 'native qa app copy');
