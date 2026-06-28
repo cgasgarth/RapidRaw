@@ -2424,6 +2424,7 @@
       "summaryReady": "Ready",
       "summarySourceCount_other": "{{count}} sources",
       "summarySources": "Sources",
+      "summaryStartState": "Start",
       "summaryStrategy": "Strategy",
       "summaryTitle": "Merge summary",
       "summaryToneMappingPreset": "",

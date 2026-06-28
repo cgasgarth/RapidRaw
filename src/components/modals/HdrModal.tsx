@@ -132,6 +132,11 @@ export default function HdrModal({
   const [isDeghostReviewApproved, setIsDeghostReviewApproved] = useState(false);
   const isDeghostReviewResolved = !isDeghostReviewRequired || isDeghostReviewApproved;
   const isApplyReady = isMergeReady && isDeghostReviewResolved;
+  const applyReadinessLabel = !isMergeReady
+    ? t('modals.hdr.summaryBlocked')
+    : isApplyReady
+      ? t('modals.hdr.summaryReady')
+      : t('modals.hdr.deghostReviewRequired');
 
   const setSetting = useCallback(
     (patch: Partial<HdrMergeUiSettings>) => {
@@ -488,6 +493,10 @@ export default function HdrModal({
               {
                 label: t('modals.hdr.summaryStrategy'),
                 value: selectedStrategyLabel,
+              },
+              {
+                label: t('modals.hdr.summaryStartState'),
+                value: applyReadinessLabel,
               },
               {
                 label: t('modals.hdr.summaryPreviewBudget'),
