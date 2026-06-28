@@ -87,6 +87,9 @@ if (!appModalsSource.includes('lastDryRunCommand')) {
 if (!appModalsSource.includes('lastDryRunCommand={superResolutionModalState.lastDryRunCommand}')) {
   failures.push('AppModals must pass super-resolution dry-run command metadata into SuperResolutionModal.');
 }
+if (!appModalsSource.includes('lastDryRunCommand: _lastDryRunCommand')) {
+  failures.push('Super-resolution settings changes must clear stale dry-run command metadata.');
+}
 if (!modalSource.includes('data-testid="sr-dry-run-command-state"')) {
   failures.push('Super-resolution modal must render dry-run command state.');
 }
