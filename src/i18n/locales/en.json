@@ -2211,6 +2211,10 @@
       },
       "close": "Close",
       "depthMapNotice": "Depth-map blending is preview-only until validated depth estimation and edge refinement land.",
+      "dryRunCommandMode": "Mode",
+      "dryRunCommandModeValue": "Dry-run",
+      "dryRunCommandSources": "Sources",
+      "dryRunCommandTool": "Tool",
       "haloSuppressionLabel": "Halo suppression",
       "haloSuppressionOff": "No suppression",
       "haloSuppressionOn": "Edge transition guard",
@@ -3135,6 +3139,10 @@
         }
       },
       "detailPolicyLabel": "Detail policy",
+      "dryRunCommandMode": "",
+      "dryRunCommandModeValue": "",
+      "dryRunCommandSources": "",
+      "dryRunCommandTool": "",
       "mode": {
         "aggressive": {
           "label": "Aggressive",

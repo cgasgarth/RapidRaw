@@ -264,6 +264,7 @@ export default function AppModals(props: AppModalsProps) {
       />
       <SuperResolutionModal
         isOpen={superResolutionModalState.isOpen}
+        lastDryRunCommand={superResolutionModalState.lastDryRunCommand}
         loadingImageUrl={
           superResolutionModalState.sourcePaths.length > 0
             ? thumbnails[

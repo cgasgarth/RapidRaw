@@ -3065,6 +3065,10 @@
         }
       },
       "detailPolicyLabel": "Detail policy",
+      "dryRunCommandMode": "",
+      "dryRunCommandModeValue": "",
+      "dryRunCommandSources": "",
+      "dryRunCommandTool": "",
       "mode": {
         "aggressive": {
           "label": "Aggressive",
