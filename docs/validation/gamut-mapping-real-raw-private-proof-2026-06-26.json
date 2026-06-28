@@ -9,12 +9,12 @@
     "icc_colorimetric_accuracy"
   ],
   "fixtureId": "validation.raw-open-edit-export.professional-color.v1",
-  "generatedAt": "2026-06-28T00:39:23.252Z",
+  "generatedAt": "2026-06-28T03:28:59.261Z",
   "issue": 3238,
   "localRawRuntime": {
     "artifactRoot": "private-artifacts/validation/open-edit-export/srgb-perceptual",
     "command": "RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun run check:raw-color-management-srgb-perceptual-private-proof --root /tmp/rawengine-gamut-mapping-v2-real-raw-proof --output /tmp/rawengine-gamut-mapping-v2-real-raw-proof/raw-open-edit-export-run-reports.json --require-assets",
-    "gamutMapping": "rawengine.gamut.srgb-oklab-chroma-reduce.v2",
+    "gamutMapping": "rawengine.gamut.srgb-oklab-chroma-reduce.v3",
     "metrics": {
       "changedPixelRatio": 0.9781435,
       "finalFileBitDepth": 16,
@@ -66,25 +66,25 @@
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:242450c352b3f7b0e430d3e5e57bee3e9af3ac6d877a470c2b458e5df2ae2ef1",
+      "hash": "sha256:e3052380029b2842290392289876a0944eae094fa8eb11a801dad3ac4e8f04ee",
       "kind": "export_after_private",
       "path": "private-artifacts/validation/open-edit-export/srgb-perceptual/professional-color-v1-export-after.tiff",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:956bf938154a0746809fe34d575ede28cee24556dda1cc563585a655ff070c6d",
+      "hash": "sha256:6ee15158ebf68f2e08df5323b9ec0012f817be1bcdd5575dc4981755b87b6f61",
       "kind": "soft_proof_after_private",
       "path": "private-artifacts/validation/open-edit-export/srgb-perceptual/professional-color-v1-soft-proof-after.png",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:d615f4c9b2347a2b6b623926dec5f8a40212b2d20751045dac54af4cb442430b",
+      "hash": "sha256:9bad787ebdd158240d4dc2bb6861b25d3e4b6a6ce34cfe017d65ca699563eaa9",
       "kind": "sidecar_after_private",
       "path": "private-artifacts/validation/open-edit-export/srgb-perceptual/professional-color-v1-after.rrdata",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:0361c72f68bc35462afd39a46a2a7eef64f6bcbb8f62551771d9cf0e275cfd6e",
+      "hash": "sha256:b8d9b6b035e247aa0435b153c8741066de7f2b2a3600e782526a87d6c156cca7",
       "kind": "workflow_report_private",
       "path": "private-artifacts/validation/open-edit-export/srgb-perceptual/professional-color-v1-workflow-report.json",
       "publicRepoAllowed": false

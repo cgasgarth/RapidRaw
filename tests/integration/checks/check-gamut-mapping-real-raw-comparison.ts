@@ -81,7 +81,7 @@ const reportSchema = z
     perceptualRun: z
       .object({
         fixtureId: z.literal(PERCEPTUAL_FIXTURE_ID),
-        gamutMapping: z.literal('rawengine.gamut.srgb-oklab-chroma-reduce.v2'),
+        gamutMapping: z.literal('rawengine.gamut.srgb-oklab-chroma-reduce.v3'),
         reportPath: z.string().trim().min(1),
         softProofHash: hashSchema,
         softProofPath: z.string().trim().min(1),

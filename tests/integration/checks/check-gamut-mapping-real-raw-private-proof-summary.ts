@@ -65,7 +65,7 @@ const committedReportSchema = z
       .object({
         artifactRoot: z.literal('private-artifacts/validation/open-edit-export/srgb-perceptual'),
         command: z.literal(SOURCE_COMMAND),
-        gamutMapping: z.literal('rawengine.gamut.srgb-oklab-chroma-reduce.v2'),
+        gamutMapping: z.literal('rawengine.gamut.srgb-oklab-chroma-reduce.v3'),
         metrics: metricSchema,
         observedExportColorEncoding: z.literal('srgb_rgb16_tiff'),
         observedOutputProfile: z.literal('srgb'),
