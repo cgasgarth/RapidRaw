@@ -1608,6 +1608,13 @@
       "outputSharpening": "Output Sharpening",
       "watermark": "Watermark"
     },
+    "softProofWarnings": {
+      "gamutClipping": "Gamut warning overlay is active: {{coverage}} of the preview is flagged before export.",
+      "intentMismatch": "Soft proof intent is {{proofIntent}}, while export is set to {{exportIntent}}.",
+      "previewOff": "Preview display is not soft-proofing {{profile}} / {{intent}}; export may differ from the on-screen edit.",
+      "profileMismatch": "Soft proof profile is {{proofProfile}}, while export is set to {{exportProfile}}.",
+      "title": "Soft-proof export warnings"
+    },
     "status": {
       "cancelExport": "Cancel Export",
       "cancelled": "Export cancelled",

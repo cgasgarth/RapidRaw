@@ -1700,6 +1700,13 @@
       "outputSharpening": "",
       "watermark": "Znak wodny"
     },
+    "softProofWarnings": {
+      "gamutClipping": "",
+      "intentMismatch": "",
+      "previewOff": "",
+      "profileMismatch": "",
+      "title": ""
+    },
     "status": {
       "cancelExport": "Anuluj eksport",
       "cancelled": "Eksport anulowany",

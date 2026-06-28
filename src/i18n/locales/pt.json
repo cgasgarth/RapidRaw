@@ -1586,6 +1586,13 @@
       "outputSharpening": "",
       "watermark": "Marca D'água"
     },
+    "softProofWarnings": {
+      "gamutClipping": "",
+      "intentMismatch": "",
+      "previewOff": "",
+      "profileMismatch": "",
+      "title": ""
+    },
     "status": {
       "cancelExport": "Cancelar Exportação",
       "cancelled": "Exportação cancelada",
