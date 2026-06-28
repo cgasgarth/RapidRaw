@@ -19,6 +19,16 @@ const actionMetadataSchema = z
     sources: z.number().int().min(2),
   })
   .strict();
+const applyActionMetadataSchema = z
+  .object({
+    acceptedDryRunPlanHash: z.string().trim().min(1),
+    acceptedDryRunPlanId: z.string().trim().min(1),
+    commandType: z.literal('computationalMerge.createHdr'),
+    dryRun: z.literal(false),
+    sources: z.number().int().min(2),
+    toolName: z.literal(getComputationalMergeAppServerRoutePairSummary('hdr').applyToolName),
+  })
+  .strict();
 
 const sourcePaths = [
   '/private-fixtures/hdr/bracket-alignment-v1/frame-01-under.arw',
@@ -72,12 +82,22 @@ const actionMetadata = actionMetadataSchema.parse({
   dryRun: packageCommand.dryRun,
   sources: packageCommand.parameters.sources.length,
 });
-const [appModalsSource, contextMenuSource, hdrModalSource, productivityActionsSource] = await Promise.all([
-  readFile('src/components/modals/AppModals.tsx', 'utf8'),
-  readFile('src/hooks/useAppContextMenus.ts', 'utf8'),
-  readFile('src/components/modals/HdrModal.tsx', 'utf8'),
-  readFile('src/hooks/useProductivityActions.ts', 'utf8'),
-]);
+const applyActionMetadata = applyActionMetadataSchema.parse({
+  acceptedDryRunPlanHash: 'sha256:hdr-preview-plan',
+  acceptedDryRunPlanId: 'hdr_plan_3',
+  commandType: packageCommand.commandType,
+  dryRun: false,
+  sources: packageCommand.parameters.sources.length,
+  toolName: routePair.applyToolName,
+});
+const [appModalsSource, contextMenuSource, hdrModalSource, productivityActionsSource, tauriListenersSource] =
+  await Promise.all([
+    readFile('src/components/modals/AppModals.tsx', 'utf8'),
+    readFile('src/hooks/useAppContextMenus.ts', 'utf8'),
+    readFile('src/components/modals/HdrModal.tsx', 'utf8'),
+    readFile('src/hooks/useProductivityActions.ts', 'utf8'),
+    readFile('src/hooks/useTauriListeners.ts', 'utf8'),
+  ]);
 const failures: string[] = [];
 const syntheticCaptureTime = Date.parse('2026-01-01T00:00:00Z') / 1000;
 const syntheticHdrImages: ImageFile[] = [
@@ -149,8 +169,14 @@ if (!productivityActionsSource.includes("getComputationalMergeAppServerRoutePair
 if (!productivityActionsSource.includes('lastDryRunCommand: dryRunCommand')) {
   failures.push('HDR start action must persist dry-run command metadata.');
 }
+if (!productivityActionsSource.includes('lastApplyCommand: _lastApplyCommand')) {
+  failures.push('HDR start action must clear stale apply command metadata.');
+}
 if (!appModalsSource.includes('lastDryRunCommand={hdrModalState.lastDryRunCommand}')) {
   failures.push('AppModals must pass HDR dry-run command metadata into the modal.');
+}
+if (!appModalsSource.includes('lastApplyCommand={hdrModalState.lastApplyCommand}')) {
+  failures.push('AppModals must pass HDR apply command metadata into the modal.');
 }
 const hdrSettingsHandlerMatch = appModalsSource.match(
   /<HdrModal[\s\S]*?onSettingsChange=\{\(settings\) => \{(?<handler>[\s\S]*?)\}\}\s*progressMessage=/u,
@@ -165,6 +191,9 @@ if (!hdrSettingsHandler.includes('finalImageBase64: null')) {
 if (!hdrSettingsHandler.includes('lastDryRunCommand: _lastDryRunCommand')) {
   failures.push('HDR settings changes must clear stale dry-run command metadata.');
 }
+if (!hdrSettingsHandler.includes('lastApplyCommand: _lastApplyCommand')) {
+  failures.push('HDR settings changes must clear stale apply command metadata.');
+}
 if (!hdrSettingsHandler.includes('progressMessage: null')) {
   failures.push('HDR settings changes must clear stale progress text.');
 }
@@ -173,6 +202,18 @@ if (!hdrModalSource.includes('data-testid="hdr-dry-run-command-state"')) {
 }
 if (!hdrModalSource.includes('data-tool-name={lastDryRunCommand.toolName}')) {
   failures.push('HDR dry-run command state must expose the app-server tool name.');
+}
+if (!hdrModalSource.includes('data-testid="hdr-apply-command-state"')) {
+  failures.push('HDR result view must render apply command state.');
+}
+if (!hdrModalSource.includes('data-accepted-dry-run-plan-hash={lastApplyCommand.acceptedDryRunPlanHash}')) {
+  failures.push('HDR apply command state must expose accepted dry-run hash.');
+}
+if (!tauriListenersSource.includes("getComputationalMergeAppServerRoutePairSummary('hdr').applyToolName")) {
+  failures.push('HDR complete listener must store the typed app-server apply route.');
+}
+if (!tauriListenersSource.includes('lastApplyCommand:')) {
+  failures.push('HDR complete listener must persist apply command metadata.');
 }
 if (!contextMenuSource.includes('findHdrAutoStackPaths')) {
   failures.push('Thumbnail context menu must inspect library auto-stacks for HDR source expansion.');
@@ -201,14 +242,23 @@ if (syntheticPathSortedHdrStack?.paths.length !== 3) {
 if (actionMetadata.toolName !== routePair.dryRunToolName) {
   failures.push('HDR UI action command must use the typed app-server dry-run route.');
 }
+if (applyActionMetadata.toolName !== routePair.applyToolName) {
+  failures.push('HDR UI action command must use the typed app-server apply route.');
+}
 if (actionMetadata.commandType !== packageCommand.commandType) {
   failures.push('HDR UI action command type must match package command builder.');
 }
 if (actionMetadata.dryRun !== true || packageCommand.dryRun !== true) {
   failures.push('HDR UI action command must be dry-run only.');
 }
+if (applyActionMetadata.dryRun !== false) {
+  failures.push('HDR apply command metadata must be mutating.');
+}
 if (actionMetadata.sources !== packageCommand.parameters.sources.length) {
   failures.push('HDR UI action source count must match package command builder.');
+}
+if (applyActionMetadata.sources !== packageCommand.parameters.sources.length) {
+  failures.push('HDR apply command source count must match package command builder.');
 }
 if (packageCommand.parameters.sources.some((source) => source.role !== 'hdr_bracket')) {
   failures.push('Package HDR UI command sources must use hdr_bracket roles.');

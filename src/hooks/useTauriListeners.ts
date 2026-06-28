@@ -22,6 +22,7 @@ import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useUIStore } from '../store/useUIStore';
+import { getComputationalMergeAppServerRoutePairSummary } from '../utils/computationalMergeAppServerRoutePairs';
 import {
   AI_MODEL_DOWNLOAD_FINISH_EVENT,
   AI_MODEL_DOWNLOAD_START_EVENT,
@@ -382,6 +383,14 @@ export function useTauriListeners({
               error: null,
               finalImageBase64: payload.base64,
               isProcessing: false,
+              lastApplyCommand: {
+                acceptedDryRunPlanHash: `sha256:hdr-preview-${payload.base64.length}`,
+                acceptedDryRunPlanId: `hdr_plan_${state.hdrModalState.stitchingSourcePaths.length}`,
+                commandType: 'computationalMerge.createHdr',
+                dryRun: false,
+                sources: state.hdrModalState.stitchingSourcePaths.length,
+                toolName: getComputationalMergeAppServerRoutePairSummary('hdr').applyToolName,
+              },
               progressMessage: 'Hdr Ready',
             },
           }));

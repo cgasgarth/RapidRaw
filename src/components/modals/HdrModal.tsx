@@ -35,6 +35,7 @@ interface HdrModalProps {
   imageCount?: number;
   isOpen: boolean;
   isProcessing: boolean;
+  lastApplyCommand?: HdrModalState['lastApplyCommand'];
   lastDryRunCommand?: HdrModalState['lastDryRunCommand'];
   loadingImageUrl?: string | null;
   onClose: () => void;
@@ -54,6 +55,7 @@ export default function HdrModal({
   imageCount,
   isOpen,
   isProcessing,
+  lastApplyCommand,
   lastDryRunCommand,
   loadingImageUrl,
   onClose,
@@ -299,6 +301,42 @@ export default function HdrModal({
           savedPath={savedPath}
           savedSuccessLabel={t('modals.hdr.savedSuccess')}
         >
+          {lastApplyCommand && (
+            <section
+              className="mx-auto mt-4 grid max-w-2xl grid-cols-3 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-left"
+              data-accepted-dry-run-plan-hash={lastApplyCommand.acceptedDryRunPlanHash}
+              data-accepted-dry-run-plan-id={lastApplyCommand.acceptedDryRunPlanId}
+              data-command-type={lastApplyCommand.commandType}
+              data-dry-run={String(lastApplyCommand.dryRun)}
+              data-source-count={lastApplyCommand.sources}
+              data-testid="hdr-apply-command-state"
+              data-tool-name={lastApplyCommand.toolName}
+            >
+              {[
+                {
+                  label: t('modals.hdr.dryRunCommandTool'),
+                  value: lastApplyCommand.toolName,
+                },
+                {
+                  label: t('modals.hdr.summaryStartState'),
+                  value: t('modals.hdr.summaryReady'),
+                },
+                {
+                  label: t('modals.hdr.handoffEditableAsset'),
+                  value: lastApplyCommand.acceptedDryRunPlanId,
+                },
+              ].map((item) => (
+                <div className="min-w-0 rounded border border-border-color bg-surface px-2 py-1.5" key={item.label}>
+                  <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                    {item.label}
+                  </UiText>
+                  <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                    {item.value}
+                  </UiText>
+                </div>
+              ))}
+            </section>
+          )}
           {handoffSummary && (
             <section
               className="mx-auto mt-4 grid max-w-2xl grid-cols-3 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-left"

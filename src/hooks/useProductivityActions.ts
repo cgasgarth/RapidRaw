@@ -117,16 +117,19 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
         sources: selectedPaths.length,
         toneMappingPreset: settings.toneMappingPreset,
       };
-      setUI((state) => ({
-        hdrModalState: {
-          ...state.hdrModalState,
-          isProcessing: true,
-          lastDryRunCommand: dryRunCommand,
-          error: null,
-          finalImageBase64: null,
-          progressMessage: 'Starting HDR',
-        },
-      }));
+      setUI((state) => {
+        const { lastApplyCommand: _lastApplyCommand, ...hdrModalState } = state.hdrModalState;
+        return {
+          hdrModalState: {
+            ...hdrModalState,
+            isProcessing: true,
+            lastDryRunCommand: dryRunCommand,
+            error: null,
+            finalImageBase64: null,
+            progressMessage: 'Starting HDR',
+          },
+        };
+      });
       invoke(Invokes.MergeHdr, { paths: selectedPaths }).catch((err: unknown) => {
         setUI((state) => ({ hdrModalState: { ...state.hdrModalState, isProcessing: false, error: String(err) } }));
       });
