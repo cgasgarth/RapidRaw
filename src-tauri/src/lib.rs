@@ -491,6 +491,7 @@ fn generate_export_soft_proof_preview(
     black_point_compensation: bool,
     target_resolution: Option<u32>,
     state: tauri::State<AppState>,
+    app_handle: tauri::AppHandle,
 ) -> Result<Response, String> {
     let mut adjustments_clone = js_adjustments;
     hydrate_adjustments(&state, &mut adjustments_clone);
@@ -503,8 +504,13 @@ fn generate_export_soft_proof_preview(
         .ok_or("No original image loaded")?;
 
     let preview_dim = target_resolution.unwrap_or(1920).clamp(512, 8192);
-    let (preview_image, _, _) =
-        generate_transformed_preview(&state, &loaded_image, &adjustments_clone, preview_dim)?;
+    let preview_image = render_processed_export_soft_proof_preview(
+        &state,
+        &app_handle,
+        &loaded_image,
+        &adjustments_clone,
+        preview_dim,
+    )?;
     let (proof_pixels, width, height, _) =
         export_processing::export_soft_proof_rgb_pixels_and_profile_with_policy(
             &preview_image,
@@ -528,6 +534,7 @@ fn resolve_export_soft_proof_transform_metadata(
     black_point_compensation: bool,
     target_resolution: Option<u32>,
     state: tauri::State<AppState>,
+    app_handle: tauri::AppHandle,
 ) -> Result<export_processing::ExportReceiptMetadata, String> {
     let mut adjustments_clone = js_adjustments;
     hydrate_adjustments(&state, &mut adjustments_clone);
@@ -540,14 +547,83 @@ fn resolve_export_soft_proof_transform_metadata(
         .ok_or("No original image loaded")?;
 
     let preview_dim = target_resolution.unwrap_or(1920).clamp(512, 8192);
-    let (preview_image, _, _) =
-        generate_transformed_preview(&state, &loaded_image, &adjustments_clone, preview_dim)?;
+    let preview_image = render_processed_export_soft_proof_preview(
+        &state,
+        &app_handle,
+        &loaded_image,
+        &adjustments_clone,
+        preview_dim,
+    )?;
 
     export_processing::export_soft_proof_transform_metadata(
         &preview_image,
         &color_profile,
         &rendering_intent,
         black_point_compensation,
+    )
+}
+
+fn render_processed_export_soft_proof_preview(
+    state: &tauri::State<AppState>,
+    app_handle: &tauri::AppHandle,
+    loaded_image: &LoadedImage,
+    adjustments: &serde_json::Value,
+    preview_dim: u32,
+) -> Result<DynamicImage, String> {
+    let context = get_or_init_gpu_context(state, app_handle)?;
+    let transform_hash = calculate_transform_hash(adjustments);
+    let (preview_image, scale, unscaled_crop_offset) =
+        generate_transformed_preview(state, loaded_image, adjustments, preview_dim)?;
+    let detail_stage =
+        render_pipeline::apply_pre_gpu_detail_stages(&preview_image, transform_hash, adjustments);
+    let processing_image = detail_stage.image.as_ref();
+    let (preview_width, preview_height) = processing_image.dimensions();
+    let mask_definitions: Vec<MaskDefinition> = adjustments
+        .get("masks")
+        .and_then(|m| serde_json::from_value(m.clone()).ok())
+        .unwrap_or_default();
+    let scaled_crop_offset = (
+        unscaled_crop_offset.0 * scale,
+        unscaled_crop_offset.1 * scale,
+    );
+    let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
+        .iter()
+        .filter_map(|def| {
+            get_cached_or_generate_mask(
+                state,
+                def,
+                preview_width,
+                preview_height,
+                scale,
+                scaled_crop_offset,
+                adjustments,
+            )
+        })
+        .collect();
+    let retouched_image = crate::retouch_render::apply_clone_retouch_layers(
+        processing_image,
+        adjustments,
+        &mask_bitmaps,
+    );
+    let tm_override = resolve_tonemapper_override_from_handle(app_handle, loaded_image.is_raw);
+    let final_adjustments =
+        get_all_adjustments_from_json(adjustments, loaded_image.is_raw, tm_override);
+    let lut: Option<Arc<Lut>> = adjustments["lutPath"]
+        .as_str()
+        .and_then(|path| get_or_load_lut(state, path).ok());
+
+    process_and_get_dynamic_image(
+        &context,
+        state,
+        retouched_image.as_ref(),
+        detail_stage.render_hash,
+        RenderRequest {
+            adjustments: final_adjustments,
+            mask_bitmaps: &mask_bitmaps,
+            lut,
+            roi: None,
+        },
+        "export_soft_proof_preview",
     )
 }
 
