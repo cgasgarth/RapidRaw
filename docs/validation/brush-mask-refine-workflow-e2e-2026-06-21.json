@@ -9,7 +9,7 @@
   "fixtureId": "validation.layer-mask-real-raw.alaska-local-adjustment.v1",
   "issue": 2887,
   "privateRawRuntime": {
-    "metricCount": 5,
+    "metricCount": 11,
     "provesMaskRefinementChangesPixels": true,
     "runtimeReportPath": "docs/validation/layer-mask-real-raw-proof-2026-06-18.json"
   },
@@ -26,7 +26,7 @@
   "visualSmoke": {
     "brushCommandType": "layerMask.createBrushMask",
     "refineCommandType": "layerMask.refineMask",
-    "screenshotHash": "sha256:523bdbd5bdd6b343d8aeb25421ab8ca11f08f3b5932913a3331e0d648322a381",
+    "screenshotHash": "sha256:d3cf08a7749b7f8fc49cba7d0e7578d72c2df3a5eae802859b3639e6acdec0ca",
     "screenshotPath": "artifacts/visual-smoke/layer-mask-private-raw-ui.png"
   }
 }

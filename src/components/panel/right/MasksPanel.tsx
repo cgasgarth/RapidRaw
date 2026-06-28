@@ -255,6 +255,15 @@ const MASK_REFINEMENT_PARAMETERS: Array<MaskRefinementParameterConfig> = [
   },
 ];
 
+const MASK_REFINEMENT_WARNING_LABEL_KEYS = {
+  densityLow: 'editor.masks.refinement.warnings.densityLow',
+  featherHigh: 'editor.masks.refinement.warnings.featherHigh',
+  hairDetailHigh: 'editor.masks.refinement.warnings.hairDetailHigh',
+  shiftLarge: 'editor.masks.refinement.warnings.shiftLarge',
+} as const;
+
+type MaskRefinementWarning = keyof typeof MASK_REFINEMENT_WARNING_LABEL_KEYS;
+
 function readAdjustmentValue(adjustments: Partial<Adjustments> | null | undefined, key: string): unknown {
   return adjustments ? (adjustments as Record<string, unknown>)[key] : undefined;
 }
@@ -946,9 +955,22 @@ function MaskRefinementControls({
 }) {
   const { t } = useTranslation();
   const replayReceipt = readMaskRefinementReplayReceipt(parameters);
+  const warningIds: Array<MaskRefinementWarning> =
+    replayReceipt === null
+      ? []
+      : [
+          ...(replayReceipt.density <= 0.1 ? (['densityLow'] as const) : []),
+          ...(replayReceipt.featherPx >= 40 ? (['featherHigh'] as const) : []),
+          ...(Math.abs(replayReceipt.edgeShiftPx) >= 48 ? (['shiftLarge'] as const) : []),
+          ...(replayReceipt.hairDetail >= 0.75 ? (['hairDetailHigh'] as const) : []),
+        ];
 
   return (
-    <div className="space-y-3 rounded-md border border-surface p-3">
+    <div
+      className="space-y-3 rounded-md border border-surface p-3"
+      data-refinement-warning-count={warningIds.length}
+      data-testid="mask-refinement-controls"
+    >
       <div className="flex items-center justify-between gap-3">
         <UiText variant={TextVariants.label} className="select-none">
           {t('editor.masks.refinement.title')}
@@ -964,22 +986,43 @@ function MaskRefinementControls({
       {MASK_REFINEMENT_PARAMETERS.map((param) => {
         const multiplier = param.multiplier ?? 1;
         return (
-          <AdjustmentSlider
+          <div
             key={param.key}
-            label={t(param.labelKey)}
-            min={param.min}
-            max={param.max}
-            step={param.step}
-            defaultValue={param.defaultValue}
-            value={getPanelMaskParameterNumber(parameters, param.key, param.defaultValue / multiplier) * multiplier}
-            onValueChange={(value) => {
-              onChange({ [param.key]: value / multiplier });
-            }}
-            {...(param.min >= 0 && { fillOrigin: 'min' })}
-            onDragStateChange={onDragStateChange}
-          />
+            data-refinement-parameter={param.key}
+            data-testid={`mask-refinement-control-${param.key}`}
+          >
+            <AdjustmentSlider
+              label={t(param.labelKey)}
+              min={param.min}
+              max={param.max}
+              step={param.step}
+              defaultValue={param.defaultValue}
+              value={getPanelMaskParameterNumber(parameters, param.key, param.defaultValue / multiplier) * multiplier}
+              onValueChange={(value) => {
+                onChange({ [param.key]: value / multiplier });
+              }}
+              {...(param.min >= 0 && { fillOrigin: 'min' })}
+              onDragStateChange={onDragStateChange}
+            />
+          </div>
         );
       })}
+      {warningIds.length > 0 && (
+        <div className="space-y-1" data-testid="mask-refinement-warning-list">
+          {warningIds.map((warningId) => (
+            <UiText
+              key={warningId}
+              as="p"
+              variant={TextVariants.small}
+              color={TextColors.secondary}
+              className="text-[11px]"
+              data-mask-refinement-warning={warningId}
+            >
+              {t(MASK_REFINEMENT_WARNING_LABEL_KEYS[warningId])}
+            </UiText>
+          ))}
+        </div>
+      )}
       {replayReceipt !== null && (
         <UiText
           as="div"
