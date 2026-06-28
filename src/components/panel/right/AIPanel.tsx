@@ -44,6 +44,7 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import AgentChatShell from './AgentChatShell';
+import { AiPeoplePartPickerStatus } from './AiPeoplePartPickerStatus';
 import {
   getMaskLikeContainerDropClass,
   getMaskLikeSubMaskDropClass,
@@ -2115,6 +2116,8 @@ function SettingsPanel({
               </div>
             </UiText>
           )}
+
+          {activeSubMask?.type === Mask.AiPerson && <AiPeoplePartPickerStatus />}
 
           <UiText variant={TextVariants.small}>
             {isQuickErasePatch
