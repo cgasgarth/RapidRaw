@@ -1201,6 +1201,7 @@ const ImageCanvas = memo(
     const [previewBox, setPreviewBox] = useState<{ start: Coord; end: Coord } | null>(null);
 
     const [cursorPreview, setCursorPreview] = useState<CursorPreview>({ x: 0, y: 0, visible: false });
+    const [liveBrushLine, setLiveBrushLine] = useState<DrawnLine | null>(null);
     const [straightenLine, setStraightenLine] = useState<StraightenLine | null>(null);
     const isStraightening = useRef(false);
 
@@ -1400,6 +1401,15 @@ const ImageCanvas = memo(
       }
       return { width: w, height: h };
     }, [selectedImage.width, selectedImage.height, adjustments.orientationSteps]);
+    const imageCropOffset = useMemo(() => {
+      const crop = adjustments.crop;
+      const isPercent = crop?.unit === '%';
+
+      return {
+        x: crop ? (isPercent ? (crop.x / 100) * effectiveImageDimensions.width : crop.x) : 0,
+        y: crop ? (isPercent ? (crop.y / 100) * effectiveImageDimensions.height : crop.y) : 0,
+      };
+    }, [adjustments.crop, effectiveImageDimensions.height, effectiveImageDimensions.width]);
 
     const effectiveZoomScale = transformState.scale > 0 ? transformState.scale : 1;
     const brushStageSize = (brushSettings?.size ?? 0) / effectiveZoomScale;
@@ -1412,6 +1422,17 @@ const ImageCanvas = memo(
       [activeSubMask],
     );
     const activeLineFlow = activeSubMask?.type === Mask.Flow ? (activeSubMaskParameters?.flow ?? 10) : undefined;
+    const getImageSpacePoint = useCallback(
+      (point: Coord): Coord => {
+        const { scale } = imageRenderSize;
+
+        return {
+          x: point.x / scale + imageCropOffset.x,
+          y: point.y / scale + imageCropOffset.y,
+        };
+      },
+      [imageCropOffset.x, imageCropOffset.y, imageRenderSize],
+    );
     const recordBrushMaskCommandCapture = useCallback(
       (subMaskId: string | null, subMask: SubMask | null, parameters: MaskParameters) => {
         if (!subMaskId || !subMask || (subMask.type !== Mask.Brush && subMask.type !== Mask.Flow)) return;
@@ -1524,6 +1545,7 @@ const ImageCanvas = memo(
       dragStartPointer.current = null;
       currentLine.current = null;
       lastBrushPoint.current = null;
+      setLiveBrushLine(null);
       setPreviewBox(null);
       previewBoxRef.current = null;
       setLocalInitialDrawParams(null);
@@ -1827,6 +1849,7 @@ const ImageCanvas = memo(
             lastBrushPoint.current = endImageSpace;
             isDrawing.current = false;
             currentLine.current = null;
+            setLiveBrushLine(null);
             return;
           }
 
@@ -1839,6 +1862,15 @@ const ImageCanvas = memo(
             tool: effectiveTool,
           };
           currentLine.current = newLine;
+          if (isBrushActive) {
+            setLiveBrushLine({
+              brushSize: brushImageSpaceSize,
+              feather: brushSettings?.feather ? brushSettings.feather / 100 : 0,
+              points: [getImageSpacePoint(pos)],
+              tool: effectiveTool,
+              ...(activeLineFlow !== undefined ? { flow: activeLineFlow } : {}),
+            });
+          }
         } else {
           if (e.target === e.target.getStage()) {
             if (isMasking) {
@@ -1877,6 +1909,7 @@ const ImageCanvas = memo(
         brushStageSize,
         baseTool,
         getCanvasPointer,
+        getImageSpacePoint,
       ],
     );
 
@@ -2011,13 +2044,7 @@ const ImageCanvas = memo(
           };
           currentLine.current = updatedLine;
 
-          if (onLiveMaskPreview && activeContainer && isBrushActive) {
-            const { scale } = imageRenderSize;
-            const crop = adjustments.crop;
-            const isPercent = crop?.unit === '%';
-            const cropX = crop ? (isPercent ? (crop.x / 100) * effectiveImageDimensions.width : crop.x) : 0;
-            const cropY = crop ? (isPercent ? (crop.y / 100) * effectiveImageDimensions.height : crop.y) : 0;
-
+          if (isBrushActive) {
             const isAltPressedDuringMove = window.altKeyDown || false;
             let effectiveToolForPreview;
 
@@ -2030,31 +2057,32 @@ const ImageCanvas = memo(
             const imageSpaceLine: DrawnLine = {
               brushSize: brushImageSpaceSize,
               feather: brushSettings?.feather ? brushSettings.feather / 100 : 0,
-              points: updatedLine.points.map((p: Coord) => ({
-                x: p.x / scale + cropX,
-                y: p.y / scale + cropY,
-              })),
+              points: updatedLine.points.map(getImageSpacePoint),
               tool: effectiveToolForPreview,
               ...(activeLineFlow !== undefined ? { flow: activeLineFlow } : {}),
             };
 
-            const existingLines = activeSubMaskParameters?.lines || [];
-            const previewSubMask = {
-              ...activeSubMask,
-              parameters: {
-                ...activeSubMaskParameters,
-                lines: [...existingLines, imageSpaceLine],
-              },
-            };
+            setLiveBrushLine(imageSpaceLine);
 
-            const previewContainer = {
-              ...activeContainer,
-              subMasks: activeContainer.subMasks.map((sm: SubMask) =>
-                sm.id === activeSubMask.id ? previewSubMask : sm,
-              ),
-            };
+            if (onLiveMaskPreview && activeContainer) {
+              const existingLines = activeSubMaskParameters?.lines || [];
+              const previewSubMask = {
+                ...activeSubMask,
+                parameters: {
+                  ...activeSubMaskParameters,
+                  lines: [...existingLines, imageSpaceLine],
+                },
+              };
 
-            onLiveMaskPreview(previewContainer);
+              const previewContainer = {
+                ...activeContainer,
+                subMasks: activeContainer.subMasks.map((sm: SubMask) =>
+                  sm.id === activeSubMask.id ? previewSubMask : sm,
+                ),
+              };
+
+              onLiveMaskPreview(previewContainer);
+            }
           }
           if (isKonvaEvent(e) && e.evt.cancelable) e.evt.preventDefault();
         }
@@ -2082,6 +2110,7 @@ const ImageCanvas = memo(
         brushImageSpaceSize,
         baseTool,
         getCanvasPointer,
+        getImageSpacePoint,
       ],
     );
 
@@ -2170,6 +2199,7 @@ const ImageCanvas = memo(
       const line = currentLine.current;
       currentLine.current = null;
       drawingStageRef.current = null;
+      setLiveBrushLine(null);
 
       if (!line) {
         return;
@@ -3334,6 +3364,9 @@ const ImageCanvas = memo(
               data-brush-command-last-point-count={lastBrushCommandCapture?.lastPointCount ?? 0}
               data-brush-command-stroke-count={lastBrushCommandCapture?.strokeCount ?? 0}
               data-brush-command-type={lastBrushCommandCapture?.commandType ?? ''}
+              data-brush-live-preview-mode={liveBrushLine?.tool ?? ''}
+              data-brush-live-preview-point-count={liveBrushLine?.points.length ?? 0}
+              data-brush-live-preview-visible={String(liveBrushLine !== null)}
               data-testid="image-canvas-brush-command-capture"
               style={{
                 position: 'absolute',
@@ -3423,6 +3456,14 @@ const ImageCanvas = memo(
                           strokeWidth={2}
                           dash={[4, 4]}
                           listening={false}
+                        />
+                      )}
+                      {isBrushActive && liveBrushLine && (
+                        <OptimizedBrushLine
+                          line={liveBrushLine}
+                          scale={imageRenderSize.scale}
+                          cropX={imageCropOffset.x}
+                          cropY={imageCropOffset.y}
                         />
                       )}
                       {isBrushActive && cursorPreview.visible && (

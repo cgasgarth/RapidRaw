@@ -1391,7 +1391,7 @@ async function prepareScenario(page, mode) {
       startY: number,
       endX: number,
       endY: number,
-      options: { alt?: boolean } = {},
+      options: { alt?: boolean; expectLivePreview?: boolean } = {},
     ) => {
       const start = toCanvasPoint(startX, startY);
       const middle = toCanvasPoint((startX + endX) / 2, (startY + endY) / 2);
@@ -1400,12 +1400,22 @@ async function prepareScenario(page, mode) {
       await page.mouse.move(box.x + start.x, box.y + start.y);
       await page.mouse.down();
       await page.mouse.move(box.x + middle.x, box.y + middle.y, { steps: 8 });
+      if (options.expectLivePreview === true) {
+        await page.waitForFunction(
+          () => {
+            const marker = document.querySelector('[data-testid="image-canvas-brush-command-capture"]');
+            const pointCount = Number(marker?.getAttribute('data-brush-live-preview-point-count') ?? '0');
+            return marker?.getAttribute('data-brush-live-preview-visible') === 'true' && pointCount >= 2;
+          },
+          { timeout: 10_000 },
+        );
+      }
       await page.mouse.move(box.x + end.x, box.y + end.y, { steps: 8 });
       await page.mouse.up();
       if (options.alt === true) await page.keyboard.up('Alt');
     };
 
-    await drag(130, 170, 430, 170);
+    await drag(130, 170, 430, 170, { expectLivePreview: true });
     await page.waitForFunction(
       () =>
         document
