@@ -1284,6 +1284,7 @@
       "pendingAdapter": "",
       "pendingMessage": "",
       "pinCapture": "",
+      "reconnectSession": "",
       "recoveryFailed": "",
       "recoveryProofReceipt_other": "",
       "recoveryQuarantined_other": "",

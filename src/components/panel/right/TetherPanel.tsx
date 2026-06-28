@@ -107,6 +107,7 @@ export function TetherPanel({
   const providerStatus = discovery?.provider.status ?? 'hardware_adapter_pending';
   const isSessionOpen = session !== null;
   const isSessionCaptureReady = session?.status === 'open';
+  const isReconnectRequired = session?.status === 'reconnect_required';
   const captureProofReceipt = capture === null ? null : buildTetherIngestProofReceipt(capture);
   const recoveryProofReceipt = session === null ? null : buildTetherRecoveryProofReceipt(session);
 
@@ -130,9 +131,10 @@ export function TetherPanel({
     setIsSessionBusy(true);
     setError(null);
     try {
+      const trimmedDestinationRoot = destinationRoot.trim();
       const response = await openSession({
         cameraId: camera.id,
-        destinationRoot: destinationRoot.trim() ? destinationRoot.trim() : undefined,
+        destinationRoot: trimmedDestinationRoot ? trimmedDestinationRoot : (session?.destinationRoot ?? undefined),
         providerMode: discovery?.provider.mode ?? 'auto',
       });
       setSession(response.session);
@@ -141,7 +143,7 @@ export function TetherPanel({
     } finally {
       setIsSessionBusy(false);
     }
-  }, [camera, destinationRoot, discovery, openSession]);
+  }, [camera, destinationRoot, discovery, openSession, session]);
 
   const closeCameraSession = useCallback(async () => {
     setIsSessionBusy(true);
@@ -828,6 +830,20 @@ export function TetherPanel({
           >
             {t('editor.tether.openSession')}
           </Button>
+          {isReconnectRequired && (
+            <Button
+              className={tetherDisabledControlClassName}
+              disabled={camera === null || isSessionBusy}
+              onClick={() => {
+                void openCameraSession();
+              }}
+              size="sm"
+              data-preserves-destination-root={session.destinationRoot ?? ''}
+              data-testid="tether-reconnect-session"
+            >
+              {t('editor.tether.reconnectSession')}
+            </Button>
+          )}
           <Button
             className={tetherDisabledControlClassName}
             disabled={!isSessionOpen || isSessionBusy}
