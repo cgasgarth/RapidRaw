@@ -491,14 +491,14 @@ fn trigger_tether_capture_for_state(
         ingest_preset_id: None,
         metadata_template_id: None,
     });
-    let (session, capture_counter) = {
-        let mut guard = state.tether_session.lock().unwrap();
+    let session = {
+        let guard = state.tether_session.lock().unwrap();
         let session = guard
-            .as_mut()
+            .as_ref()
             .ok_or_else(|| "Open a tether session before capture.".to_string())?;
-        session.capture_counter += 1;
-        (session.clone(), session.capture_counter)
+        session.clone()
     };
+    let capture_counter = session.capture_counter + 1;
 
     if session.provider_mode != "fake" {
         return Err("Native camera capture is not implemented yet.".to_string());
@@ -599,6 +599,7 @@ fn trigger_tether_capture_for_state(
         &imported_path,
         &output_checksum,
     );
+    let committed_capture_counter = capture_counter + ingest.collision_index - 1;
 
     let response = TetherCaptureResponse {
         backup,
@@ -615,6 +616,7 @@ fn trigger_tether_capture_for_state(
         source_path: source_path.to_string_lossy().to_string(),
         status: "captured".to_string(),
     };
+    commit_tether_capture_counter(state, &response.session_id, committed_capture_counter);
     record_tether_import(state, &response);
     Ok(response)
 }
@@ -678,6 +680,17 @@ fn record_tether_import(state: &AppState, response: &TetherCaptureResponse) {
             metadata: response.metadata.clone(),
         },
     );
+}
+
+fn commit_tether_capture_counter(state: &AppState, session_id: &str, capture_counter: usize) {
+    let mut guard = state.tether_session.lock().unwrap();
+    let Some(session) = guard.as_mut() else {
+        return;
+    };
+    if session.session_id != session_id {
+        return;
+    }
+    session.capture_counter = session.capture_counter.max(capture_counter);
 }
 
 fn write_verified_primary_capture(
@@ -2022,6 +2035,16 @@ mod tests {
 
         assert_eq!(capture.ingest.collision_index, 1);
         assert_eq!(capture.ingest.file_name, "source_0012.ARW");
+        assert_eq!(
+            state
+                .tether_session
+                .lock()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .capture_counter,
+            12
+        );
 
         let _ = fs::remove_dir_all(root);
     }
@@ -2080,6 +2103,17 @@ mod tests {
         assert_eq!(duplicate.ingest.file_name, first.ingest.file_name);
         assert_eq!(duplicate.backup.status, "disabled");
         assert_eq!(duplicate.backup.destination_path, None);
+        assert_eq!(
+            state
+                .tether_session
+                .lock()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .capture_counter,
+            1,
+            "duplicate suppression should not consume the next capture sequence"
+        );
         let imported_files = fs::read_dir(&destination_root)
             .unwrap()
             .filter_map(Result::ok)
@@ -2092,6 +2126,55 @@ mod tests {
             })
             .count();
         assert_eq!(imported_files, 1);
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn fake_provider_does_not_advance_counter_on_failed_capture() {
+        let state = AppState::new();
+        let root = std::env::temp_dir().join(format!(
+            "rawengine-tether-failed-counter-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let destination_root = root.join("destination");
+        fs::create_dir_all(&destination_root).unwrap();
+
+        open_tether_session_for_state(
+            TetherSessionOpenRequest {
+                camera_id: "fake-sony-ilce-7m4-usb".to_string(),
+                destination_root: Some(destination_root.to_string_lossy().to_string()),
+                provider_mode: Some("fake".to_string()),
+            },
+            &state,
+        )
+        .unwrap();
+
+        let error = trigger_tether_capture_for_state(
+            Some(TetherCaptureRequest {
+                backup_destination_root: None,
+                camera_control_values: BTreeMap::new(),
+                destination_root: None,
+                fake_source_path: Some(root.join("missing.ARW").to_string_lossy().to_string()),
+                ingest_preset_id: Some("sourceSequence".to_string()),
+                metadata_template_id: None,
+            }),
+            &state,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("Fake capture source does not exist"));
+        assert_eq!(
+            state
+                .tether_session
+                .lock()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .capture_counter,
+            0,
+            "failed capture attempts should not consume the next capture sequence"
+        );
 
         let _ = fs::remove_dir_all(root);
     }

@@ -191,8 +191,10 @@ export function TetherPanel({
         if (reviewMode === 'pinned' && pinnedCaptureKey !== null) return current;
         return current;
       });
+      await refreshSession();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      await refreshSession();
     } finally {
       setIsCaptureBusy(false);
     }
@@ -204,6 +206,7 @@ export function TetherPanel({
     isBackupEnabled,
     metadataTemplateId,
     pinnedCaptureKey,
+    refreshSession,
     reviewMode,
   ]);
 
