@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { ToolType } from '../components/panel/right/Masks';
 import { type Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, type MaskContainer } from '../utils/adjustments';
 import { goToEditHistoryIndex, pushEditHistoryEntry, redoEditHistory, undoEditHistory } from '../utils/editHistory';
+import { loadMaskOverlaySettingsPreference } from '../utils/maskOverlayPreferences';
 
 import type { ChannelConfig } from '../components/adjustments/Curves';
 import type { OverlayMode } from '../components/panel/right/CropPanel';
@@ -147,7 +148,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   isRotationActive: false,
   overlayMode: 'thirds',
   overlayRotation: 0,
-  maskOverlaySettings: { edgeThreshold: 0.5, mode: 'rubylith', opacity: 0.5 },
+  maskOverlaySettings: loadMaskOverlaySettingsPreference(),
   transformedOriginalUrl: null,
   isStraightenActive: false,
   isWbPickerActive: false,
