@@ -266,7 +266,18 @@ export default function AppModals(props: AppModalsProps) {
           props.handleStartHdr(hdrModalState.stitchingSourcePaths);
         }}
         onSettingsChange={(settings) => {
-          setUI((state) => ({ hdrModalState: { ...state.hdrModalState, settings } }));
+          setUI((state) => {
+            const { lastDryRunCommand: _lastDryRunCommand, ...hdrModalState } = state.hdrModalState;
+            return {
+              hdrModalState: {
+                ...hdrModalState,
+                error: null,
+                finalImageBase64: null,
+                progressMessage: null,
+                settings,
+              },
+            };
+          });
         }}
         progressMessage={hdrModalState.progressMessage}
         settings={hdrModalState.settings}
