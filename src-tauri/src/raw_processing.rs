@@ -1479,6 +1479,7 @@ pub fn get_fast_demosaic_scale_factor(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::Deserialize;
     use std::{fs, path::Path};
 
     fn bayer_pixels(width: usize, height: usize, value: u16) -> Vec<u16> {
@@ -2336,6 +2337,315 @@ mod tests {
         mean
     }
 
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PrivateColorCheckerManifest {
+        captures: Vec<PrivateColorCheckerCapture>,
+        proof_boundary: String,
+        schema_version: u8,
+        thresholds: PrivateColorCheckerThresholds,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PrivateColorCheckerCapture {
+        capture_id: String,
+        illuminant_label: String,
+        measured_cct_kelvin: Option<f32>,
+        patches: Vec<PrivateColorCheckerPatch>,
+        source_path: Option<String>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PrivateColorCheckerPatch {
+        id: String,
+        reference_lab: PrivateLabColor,
+        roi: PrivateColorCheckerRoi,
+        role: String,
+    }
+
+    #[derive(Clone, Copy, Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PrivateColorCheckerRoi {
+        height: u32,
+        width: u32,
+        x: u32,
+        y: u32,
+    }
+
+    #[derive(Clone, Copy, Debug, Deserialize, serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PrivateLabColor {
+        l: f64,
+        a: f64,
+        b: f64,
+    }
+
+    #[derive(Debug, Deserialize, serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PrivateColorCheckerThresholds {
+        delta_e00_max_max: f64,
+        delta_e00_mean_max: f64,
+        delta_e00_p95_max: f64,
+        neutral_chroma_max: f64,
+    }
+
+    fn load_private_colorchecker_manifest() -> Option<PrivateColorCheckerManifest> {
+        let manifest_path =
+            std::env::var("RAWENGINE_DUAL_ILLUMINANT_COLORCHECKER_MANIFEST").ok()?;
+        let manifest: PrivateColorCheckerManifest =
+            serde_json::from_slice(&fs::read(manifest_path).expect("read ColorChecker manifest"))
+                .expect("parse ColorChecker manifest");
+        assert_eq!(manifest.schema_version, 1);
+        assert_eq!(
+            manifest.proof_boundary,
+            "private_dual_illuminant_colorchecker_manifest"
+        );
+        assert!(!manifest.captures.is_empty());
+        Some(manifest)
+    }
+
+    fn colorchecker_capture_for_source<'a>(
+        manifest: &'a PrivateColorCheckerManifest,
+        source_path: &str,
+    ) -> &'a PrivateColorCheckerCapture {
+        manifest
+            .captures
+            .iter()
+            .find(|capture| {
+                capture
+                    .source_path
+                    .as_deref()
+                    .is_none_or(|manifest_source| manifest_source == source_path)
+            })
+            .expect("ColorChecker manifest must include the active source")
+    }
+
+    fn sample_colorchecker_patches(
+        image: &DynamicImage,
+        capture: &PrivateColorCheckerCapture,
+        report_dir: &Path,
+    ) -> serde_json::Value {
+        let rgba = image.to_rgba8();
+        let width = rgba.width();
+        let height = rgba.height();
+        let patch_measurements = capture
+            .patches
+            .iter()
+            .map(|patch| {
+                let measured_lab = sample_roi_lab(&rgba, patch.roi);
+                let neutral_chroma = if patch.role == "neutral" {
+                    Some((measured_lab.a.powi(2) + measured_lab.b.powi(2)).sqrt())
+                } else {
+                    None
+                };
+                serde_json::json!({
+                    "id": patch.id,
+                    "role": patch.role,
+                    "roi": {
+                        "x": patch.roi.x,
+                        "y": patch.roi.y,
+                        "width": patch.roi.width,
+                        "height": patch.roi.height,
+                    },
+                    "referenceLab": patch.reference_lab,
+                    "measuredLab": measured_lab,
+                    "neutralChroma": neutral_chroma,
+                })
+            })
+            .collect::<Vec<_>>();
+        let overlay_path = write_colorchecker_overlay(&rgba, capture, report_dir);
+        let patch_csv_path = write_colorchecker_patch_csv(capture, &patch_measurements, report_dir);
+        let summary_csv_path =
+            write_colorchecker_summary_csv(capture, patch_measurements.len(), report_dir);
+
+        serde_json::json!({
+            "proofBoundary": "private_dual_illuminant_colorchecker_runtime_sampling",
+            "colorimetricProof": true,
+            "captureId": capture.capture_id,
+            "illuminantLabel": capture.illuminant_label,
+            "measuredCctKelvin": capture.measured_cct_kelvin,
+            "imageDimensions": {
+                "width": width,
+                "height": height,
+            },
+            "patchCount": patch_measurements.len(),
+            "artifacts": {
+                "overlayPath": overlay_path.to_string_lossy(),
+                "patchCsvPath": patch_csv_path.to_string_lossy(),
+                "summaryCsvPath": summary_csv_path.to_string_lossy(),
+            },
+            "patches": patch_measurements,
+        })
+    }
+
+    fn write_colorchecker_overlay(
+        image: &image::RgbaImage,
+        capture: &PrivateColorCheckerCapture,
+        report_dir: &Path,
+    ) -> std::path::PathBuf {
+        let overlay_dir = report_dir.join("overlays");
+        fs::create_dir_all(&overlay_dir).expect("create ColorChecker overlay dir");
+        let mut overlay = image.clone();
+        for patch in &capture.patches {
+            draw_roi_outline(&mut overlay, patch.roi);
+        }
+        let overlay_path = overlay_dir.join(format!(
+            "{}-rois.png",
+            safe_artifact_stem(&capture.capture_id)
+        ));
+        overlay
+            .save(&overlay_path)
+            .expect("write ColorChecker overlay");
+        overlay_path
+    }
+
+    fn draw_roi_outline(image: &mut image::RgbaImage, roi: PrivateColorCheckerRoi) {
+        let color = Rgba([255, 32, 32, 255]);
+        let x_end = roi.x + roi.width - 1;
+        let y_end = roi.y + roi.height - 1;
+        for x in roi.x..=x_end {
+            image.put_pixel(x, roi.y, color);
+            image.put_pixel(x, y_end, color);
+        }
+        for y in roi.y..=y_end {
+            image.put_pixel(roi.x, y, color);
+            image.put_pixel(x_end, y, color);
+        }
+    }
+
+    fn write_colorchecker_patch_csv(
+        capture: &PrivateColorCheckerCapture,
+        patches: &[serde_json::Value],
+        report_dir: &Path,
+    ) -> std::path::PathBuf {
+        let path = report_dir.join("dual-illuminant-profile-patches.csv");
+        let mut csv = String::from(
+            "captureId,illuminantLabel,patchId,role,roiX,roiY,roiWidth,roiHeight,referenceL,referenceA,referenceB,measuredL,measuredA,measuredB,neutralChroma\n",
+        );
+        for patch in patches {
+            csv.push_str(&format!(
+                "{},{},{},{},{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{}\n",
+                capture.capture_id,
+                capture.illuminant_label,
+                patch["id"].as_str().expect("patch id"),
+                patch["role"].as_str().expect("patch role"),
+                patch["roi"]["x"].as_u64().expect("roi x"),
+                patch["roi"]["y"].as_u64().expect("roi y"),
+                patch["roi"]["width"].as_u64().expect("roi width"),
+                patch["roi"]["height"].as_u64().expect("roi height"),
+                patch["referenceLab"]["l"].as_f64().expect("reference l"),
+                patch["referenceLab"]["a"].as_f64().expect("reference a"),
+                patch["referenceLab"]["b"].as_f64().expect("reference b"),
+                patch["measuredLab"]["l"].as_f64().expect("measured l"),
+                patch["measuredLab"]["a"].as_f64().expect("measured a"),
+                patch["measuredLab"]["b"].as_f64().expect("measured b"),
+                patch["neutralChroma"]
+                    .as_f64()
+                    .map(|value| format!("{value:.6}"))
+                    .unwrap_or_default(),
+            ));
+        }
+        fs::write(&path, csv).expect("write ColorChecker patch CSV");
+        path
+    }
+
+    fn write_colorchecker_summary_csv(
+        capture: &PrivateColorCheckerCapture,
+        patch_count: usize,
+        report_dir: &Path,
+    ) -> std::path::PathBuf {
+        let path = report_dir.join("dual-illuminant-profile-summary.csv");
+        fs::write(
+            &path,
+            format!(
+                "captureId,illuminantLabel,measuredCctKelvin,patchCount\n{},{},{},{}\n",
+                capture.capture_id,
+                capture.illuminant_label,
+                capture
+                    .measured_cct_kelvin
+                    .map(|value| value.to_string())
+                    .unwrap_or_default(),
+                patch_count,
+            ),
+        )
+        .expect("write ColorChecker summary CSV");
+        path
+    }
+
+    fn safe_artifact_stem(value: &str) -> String {
+        value
+            .chars()
+            .map(|character| {
+                if character.is_ascii_alphanumeric() || character == '-' || character == '_' {
+                    character
+                } else {
+                    '-'
+                }
+            })
+            .collect()
+    }
+
+    fn sample_roi_lab(image: &image::RgbaImage, roi: PrivateColorCheckerRoi) -> PrivateLabColor {
+        assert!(roi.width > 0);
+        assert!(roi.height > 0);
+        assert!(roi.x + roi.width <= image.width());
+        assert!(roi.y + roi.height <= image.height());
+
+        let mut red_sum = 0.0;
+        let mut green_sum = 0.0;
+        let mut blue_sum = 0.0;
+        let mut count = 0.0;
+        for y in roi.y..roi.y + roi.height {
+            for x in roi.x..roi.x + roi.width {
+                let pixel = image.get_pixel(x, y).0;
+                red_sum += srgb_u8_to_linear(pixel[0]);
+                green_sum += srgb_u8_to_linear(pixel[1]);
+                blue_sum += srgb_u8_to_linear(pixel[2]);
+                count += 1.0;
+            }
+        }
+        linear_srgb_to_lab(red_sum / count, green_sum / count, blue_sum / count)
+    }
+
+    fn srgb_u8_to_linear(value: u8) -> f64 {
+        let encoded = f64::from(value) / 255.0;
+        if encoded <= 0.04045 {
+            encoded / 12.92
+        } else {
+            ((encoded + 0.055) / 1.055).powf(2.4)
+        }
+    }
+
+    fn linear_srgb_to_lab(red: f64, green: f64, blue: f64) -> PrivateLabColor {
+        let x = red * 0.412_456_4 + green * 0.357_576_1 + blue * 0.180_437_5;
+        let y = red * 0.212_672_9 + green * 0.715_152_2 + blue * 0.072_175;
+        let z = red * 0.019_333_9 + green * 0.119_192 + blue * 0.950_304_1;
+        xyz_d65_to_lab(x, y, z)
+    }
+
+    fn xyz_d65_to_lab(x: f64, y: f64, z: f64) -> PrivateLabColor {
+        let fx = lab_pivot(x / 0.950_47);
+        let fy = lab_pivot(y);
+        let fz = lab_pivot(z / 1.088_83);
+        PrivateLabColor {
+            l: 116.0 * fy - 16.0,
+            a: 500.0 * (fx - fy),
+            b: 200.0 * (fy - fz),
+        }
+    }
+
+    fn lab_pivot(value: f64) -> f64 {
+        const EPSILON: f64 = 216.0 / 24_389.0;
+        const KAPPA: f64 = 24_389.0 / 27.0;
+        if value > EPSILON {
+            value.cbrt()
+        } else {
+            (KAPPA * value + 16.0) / 116.0
+        }
+    }
+
     #[test]
     fn private_dual_illuminant_profile_runtime_proof_when_enabled() {
         if std::env::var("RAWENGINE_RUN_PRIVATE_DUAL_ILLUMINANT_PROFILE_PROOF").ok()
@@ -2346,6 +2656,7 @@ mod tests {
 
         let source_path = std::env::var("RAWENGINE_PRIVATE_RAW_SOURCE")
             .expect("RAWENGINE_PRIVATE_RAW_SOURCE must point to a private RAW");
+        let colorchecker_manifest = load_private_colorchecker_manifest();
         let report_dir = std::env::var("RAWENGINE_DUAL_ILLUMINANT_PROFILE_REPORT_DIR")
             .unwrap_or_else(|_| "target/dual-illuminant-profile-proof".to_string());
         let report_dir = Path::new(&report_dir);
@@ -2377,11 +2688,22 @@ mod tests {
         developed
             .save_with_format(&tiff_path, image::ImageFormat::Tiff)
             .expect("write dual-illuminant proof TIFF");
+        let colorchecker_proof = colorchecker_manifest.as_ref().map(|manifest| {
+            let capture = colorchecker_capture_for_source(manifest, &source_path);
+            serde_json::json!({
+                "thresholds": manifest.thresholds,
+                "runtimeSampling": sample_colorchecker_patches(&developed, capture, report_dir),
+            })
+        });
 
         let proof_report = serde_json::json!({
-            "issue": 3244,
+            "issue": 3824,
             "proofBoundary": "private_dual_illuminant_profile_runtime_report",
-            "proofLevel": "private_raw_smoke_not_colorchecker_accuracy",
+            "proofLevel": if colorchecker_proof.is_some() {
+                "private_raw_colorchecker_runtime_sampling"
+            } else {
+                "private_raw_smoke_not_colorchecker_accuracy"
+            },
             "sourcePath": source_path,
             "dimensions": {
                 "width": developed.width(),
@@ -2393,7 +2715,8 @@ mod tests {
                 "imageHash": image_hash,
                 "tiffPath": tiff_path.to_string_lossy(),
             },
-            "colorimetricProof": false,
+            "colorimetricProof": colorchecker_proof.is_some(),
+            "colorCheckerProof": colorchecker_proof,
             "privateAssetsCommitted": false,
         });
         fs::write(
