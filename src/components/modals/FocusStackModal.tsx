@@ -67,6 +67,8 @@ export default function FocusStackModal({
     [sourcePreflightMetadata],
   );
   const isSourceCountValid = sourceCount >= 2;
+  const isSourcePreflightBlocked = sourcePreflight?.status === 'blocked';
+  const isPreviewPlanReady = isSourceCountValid && !isSourcePreflightBlocked;
   const isDepthMapPreviewOnly = settings.blendMethod === 'depth_map';
 
   const alignmentOptions: Array<OptionItem<FocusStackAlignmentMode>> = [
@@ -97,9 +99,9 @@ export default function FocusStackModal({
     Math.round((sourceCount * settings.maxPreviewDimensionPx ** 2 * 4) / 1_000_000),
   );
   const sourceReadinessLabel = `${t('modals.focusStack.sourceSummary', { count: sourceCount })} - ${
-    isSourceCountValid ? t('modals.focusStack.preflight.ready') : t('modals.focusStack.preflight.blocked')
+    isPreviewPlanReady ? t('modals.focusStack.preflight.ready') : t('modals.focusStack.preflight.blocked')
   }`;
-  const stackReadinessLabel = isSourceCountValid
+  const stackReadinessLabel = isPreviewPlanReady
     ? t('modals.focusStack.preflight.ready')
     : t('modals.focusStack.preflight.blocked');
   const sourcePreflightStatusLabel =
@@ -188,14 +190,14 @@ export default function FocusStackModal({
           >
             {t('modals.focusStack.close')}
           </button>
-          <Button onClick={onPreviewPlan} disabled={!isSourceCountValid}>
+          <Button onClick={onPreviewPlan} disabled={!isPreviewPlanReady}>
             <Layers3 className="w-4 h-4" />
             {hasRuntimeOutputReview ? t('modals.focusStack.refreshPreviewPlan') : t('modals.focusStack.previewPlan')}
           </Button>
         </>
       }
     >
-      {!isSourceCountValid && (
+      {!isPreviewPlanReady && (
         <ComputationalSetupSourceWarning>{t('modals.focusStack.sourceCountBlocked')}</ComputationalSetupSourceWarning>
       )}
 
@@ -234,7 +236,7 @@ export default function FocusStackModal({
         data-alignment-mode={settings.alignmentMode}
         data-blend-method={settings.blendMethod}
         data-source-count={sourceCount}
-        data-stack-ready={String(isSourceCountValid)}
+        data-stack-ready={String(isPreviewPlanReady)}
         data-testid="focus-stack-readiness-summary"
       >
         <ComputationalSetupStatusLine

@@ -71,8 +71,8 @@ const failures: string[] = [];
 if (!modalSource.includes('onPreviewPlan')) {
   failures.push('Focus stack modal must expose a preview-plan action callback.');
 }
-if (!modalSource.includes('disabled={!isSourceCountValid}')) {
-  failures.push('Focus stack preview-plan action must stay source-count gated.');
+if (!modalSource.includes('disabled={!isPreviewPlanReady}')) {
+  failures.push('Focus stack preview-plan action must stay source-preflight gated.');
 }
 if (!modalSource.includes('previewPlanStatusLabel')) {
   failures.push('Focus stack modal must show explicit preview-plan state.');
@@ -97,6 +97,12 @@ if (!appModalsSource.includes('lastDryRunCommand: _lastDryRunCommand')) {
 }
 if (!modalSource.includes('data-testid="focus-stack-source-preflight"')) {
   failures.push('Focus stack modal must render source preflight readiness.');
+}
+if (!modalSource.includes("sourcePreflight?.status === 'blocked'")) {
+  failures.push('Focus stack source preflight blocks must gate preview-plan readiness.');
+}
+if (!modalSource.includes('const isPreviewPlanReady = isSourceCountValid && !isSourcePreflightBlocked')) {
+  failures.push('Focus stack preview-plan readiness must combine source count and preflight block state.');
 }
 if (!modalSource.includes('data-testid="focus-dry-run-command-state"')) {
   failures.push('Focus stack modal must render dry-run command state.');
