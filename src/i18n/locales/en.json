@@ -1396,6 +1396,7 @@
         "auto": "macOS",
         "fake": "Fake CI"
       },
+      "reconnectSession": "Reconnect session",
       "recoveryFailed": "Tether recovery failed: {{message}}",
       "recoveryProofReceipt": "Recovery receipt: {{status}}, {{count}} partial files",
       "recoveryProofReceipt_one": "",

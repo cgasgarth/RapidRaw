@@ -1372,6 +1372,7 @@
         "auto": "macOS",
         "fake": "Fake CI"
       },
+      "reconnectSession": "",
       "recoveryFailed": "Tether recovery failed: {{message}}",
       "recoveryProofReceipt": "Ricevuta recupero: {{status}}, {{count}} file parziali",
       "recoveryProofReceipt_one": "",
