@@ -27,6 +27,7 @@ import {
   hasStaleOrOfflineSmartPreview,
   isResolvingStaleSmartPreviewExport,
 } from '../../../utils/exportSmartPreviewReadiness';
+import { formatGamutWarningCoverage } from '../../../utils/gamutWarningDisplay';
 import { buildRawWarningChips } from '../../../utils/rawWarningReceipts';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import { debounce } from '../../../utils/timing';
@@ -336,9 +337,19 @@ export default function ExportPanel({
     currentSettingsObject,
   } = useExportSettings();
 
-  const { adjustments } = useEditorStore(
+  const {
+    adjustments,
+    exportSoftProofTransform,
+    gamutWarningOverlay,
+    isExportSoftProofEnabled,
+    isGamutWarningOverlayVisible,
+  } = useEditorStore(
     useShallow((state) => ({
       adjustments: state.adjustments,
+      exportSoftProofTransform: state.exportSoftProofTransform,
+      gamutWarningOverlay: state.gamutWarningOverlay,
+      isExportSoftProofEnabled: state.isExportSoftProofEnabled,
+      isGamutWarningOverlayVisible: state.isGamutWarningOverlayVisible,
     })),
   );
   const thumbnailSmartPreviews = useProcessStore((state) => state.thumbnailSmartPreviews);
@@ -1059,6 +1070,65 @@ export default function ExportPanel({
         : t('export.readiness.metadataOn')
       : t('export.readiness.metadataOff'),
   ];
+  const softProofWarningItems = useMemo(() => {
+    if (fileFormat === FileFormats.Cube || !hasColorManagedTransform) return [];
+
+    const warnings: Array<{ code: string; message: string }> = [];
+    const transformProfile = exportSoftProofTransform?.effectiveColorProfile;
+    const transformIntent = exportSoftProofTransform?.effectiveRenderingIntent;
+    const gamutCoverage = gamutWarningOverlay?.coverage_ratio ?? 0;
+
+    if (!isExportSoftProofEnabled || exportSoftProofTransform === null) {
+      warnings.push({
+        code: 'soft-proof-preview-off',
+        message: t('export.softProofWarnings.previewOff', {
+          intent: selectedRenderingIntentLabel,
+          profile: selectedColorProfileLabel,
+        }),
+      });
+    }
+
+    if (transformProfile && transformProfile !== selectedColorProfileLabel) {
+      warnings.push({
+        code: 'soft-proof-profile-mismatch',
+        message: t('export.softProofWarnings.profileMismatch', {
+          exportProfile: selectedColorProfileLabel,
+          proofProfile: transformProfile,
+        }),
+      });
+    }
+
+    if (transformIntent && transformIntent !== selectedRenderingIntentLabel) {
+      warnings.push({
+        code: 'soft-proof-intent-mismatch',
+        message: t('export.softProofWarnings.intentMismatch', {
+          exportIntent: selectedRenderingIntentLabel,
+          proofIntent: transformIntent,
+        }),
+      });
+    }
+
+    if (isGamutWarningOverlayVisible && gamutCoverage > 0) {
+      warnings.push({
+        code: 'gamut-clipping-visible',
+        message: t('export.softProofWarnings.gamutClipping', {
+          coverage: formatGamutWarningCoverage(gamutWarningOverlay),
+        }),
+      });
+    }
+
+    return warnings;
+  }, [
+    exportSoftProofTransform,
+    fileFormat,
+    gamutWarningOverlay,
+    hasColorManagedTransform,
+    isExportSoftProofEnabled,
+    isGamutWarningOverlayVisible,
+    selectedColorProfileLabel,
+    selectedRenderingIntentLabel,
+    t,
+  ]);
 
   return (
     <div className={onClose ? 'h-full bg-bg-secondary rounded-lg flex flex-col' : 'flex flex-col h-full'}>
@@ -1509,20 +1579,43 @@ export default function ExportPanel({
 
       <div className="p-4 border-t border-surface shrink-0 space-y-2">
         {canExport && (
-          <div className="flex flex-wrap justify-center gap-1.5" data-testid="export-readiness-summary">
-            {exportReadinessItems.map((item) => (
-              <UiText
-                as="span"
-                className="rounded bg-surface px-2 py-1"
-                color={TextColors.secondary}
-                data-export-readiness-item={item}
-                key={item}
-                variant={TextVariants.small}
+          <>
+            <div className="flex flex-wrap justify-center gap-1.5" data-testid="export-readiness-summary">
+              {exportReadinessItems.map((item) => (
+                <UiText
+                  as="span"
+                  className="rounded bg-surface px-2 py-1"
+                  color={TextColors.secondary}
+                  data-export-readiness-item={item}
+                  key={item}
+                  variant={TextVariants.small}
+                >
+                  {item}
+                </UiText>
+              ))}
+            </div>
+            {softProofWarningItems.length > 0 ? (
+              <div
+                className="rounded border border-yellow-500/40 bg-yellow-500/10 px-3 py-2"
+                data-export-soft-proof-warning-codes={softProofWarningItems.map((item) => item.code).join(',')}
+                data-export-soft-proof-warning-count={softProofWarningItems.length}
+                data-testid="export-soft-proof-warnings"
               >
-                {item}
-              </UiText>
-            ))}
-          </div>
+                <UiText variant={TextVariants.small} weight={TextWeights.medium}>
+                  {t('export.softProofWarnings.title')}
+                </UiText>
+                <ul className="mt-1 space-y-1">
+                  {softProofWarningItems.map((item) => (
+                    <li data-export-soft-proof-warning-code={item.code} key={item.code}>
+                      <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                        {item.message}
+                      </UiText>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </>
         )}
         <UiText as="div" variant={TextVariants.small} color={TextColors.primary} className="text-center">
           {isEstimating ? (

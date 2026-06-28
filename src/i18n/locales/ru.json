@@ -1633,6 +1633,13 @@
       "outputSharpening": "",
       "watermark": "Водяной знак"
     },
+    "softProofWarnings": {
+      "gamutClipping": "",
+      "intentMismatch": "",
+      "previewOff": "",
+      "profileMismatch": "",
+      "title": ""
+    },
     "status": {
       "cancelExport": "Отменить экспорт",
       "cancelled": "Экспорт отменен",

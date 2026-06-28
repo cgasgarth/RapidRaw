@@ -1586,6 +1586,13 @@
       "outputSharpening": "",
       "watermark": "Filigrana"
     },
+    "softProofWarnings": {
+      "gamutClipping": "",
+      "intentMismatch": "",
+      "previewOff": "",
+      "profileMismatch": "",
+      "title": ""
+    },
     "status": {
       "cancelExport": "Annulla Esportazione",
       "cancelled": "Esportazione annullata",

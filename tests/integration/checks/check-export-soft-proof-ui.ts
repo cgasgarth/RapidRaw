@@ -108,6 +108,14 @@ for (const marker of [
   'data-export-receipt-transform-applied',
   'data-testid="export-success-color-managed-transform"',
   'data-testid="export-success-color-policy"',
+  'data-testid="export-soft-proof-warnings"',
+  'data-export-soft-proof-warning-codes',
+  'data-export-soft-proof-warning-count',
+  'soft-proof-preview-off',
+  'soft-proof-profile-mismatch',
+  'soft-proof-intent-mismatch',
+  'gamut-clipping-visible',
+  'formatGamutWarningCoverage(gamutWarningOverlay)',
   'export.status.colorManagedTransform',
 ]) {
   if (!exportPanelSource.includes(marker) && !tauriEventSchemasSource.includes(marker)) {
@@ -138,6 +146,12 @@ if (typeof locale.editor?.toolbar?.exportSoftProofActive !== 'string') {
 
 if (typeof locale.export?.status?.colorManagedTransform !== 'string') {
   failures.push('Missing export receipt color-managed transform locale.');
+}
+
+for (const key of ['title', 'previewOff', 'profileMismatch', 'intentMismatch', 'gamutClipping']) {
+  if (typeof locale.export?.softProofWarnings?.[key] !== 'string') {
+    failures.push(`Missing export soft-proof warning locale: ${key}`);
+  }
 }
 
 for (const key of ['cmm', 'iccEmbedded', 'identityTransform', 'transformApplied']) {

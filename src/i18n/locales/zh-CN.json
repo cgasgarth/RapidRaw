@@ -1588,6 +1588,13 @@
       "outputSharpening": "",
       "watermark": "水印"
     },
+    "softProofWarnings": {
+      "gamutClipping": "",
+      "intentMismatch": "",
+      "previewOff": "",
+      "profileMismatch": "",
+      "title": ""
+    },
     "status": {
       "cancelExport": "取消导出",
       "cancelled": "导出已取消",

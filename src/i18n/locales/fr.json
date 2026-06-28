@@ -1586,6 +1586,13 @@
       "outputSharpening": "",
       "watermark": "Filigrane"
     },
+    "softProofWarnings": {
+      "gamutClipping": "",
+      "intentMismatch": "",
+      "previewOff": "",
+      "profileMismatch": "",
+      "title": ""
+    },
     "status": {
       "cancelExport": "Annuler l'exportation",
       "cancelled": "Exportation annulée",

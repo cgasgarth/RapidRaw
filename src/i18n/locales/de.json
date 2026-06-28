@@ -1604,6 +1604,13 @@
       "outputSharpening": "",
       "watermark": "Wasserzeichen"
     },
+    "softProofWarnings": {
+      "gamutClipping": "",
+      "intentMismatch": "",
+      "previewOff": "",
+      "profileMismatch": "",
+      "title": ""
+    },
     "status": {
       "cancelExport": "Export abbrechen",
       "cancelled": "Export abgebrochen",
