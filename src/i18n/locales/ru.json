@@ -593,6 +593,8 @@
         "composer": {
           "apply": "",
           "applying": "",
+          "applyReceipt": "",
+          "applyReceiptPixels": "",
           "detailPreview": "",
           "dryRun": "",
           "inspectState": "",

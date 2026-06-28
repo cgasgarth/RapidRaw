@@ -584,6 +584,8 @@
         "composer": {
           "apply": "",
           "applying": "",
+          "applyReceipt": "",
+          "applyReceiptPixels": "",
           "changedPixels_other": "",
           "detailPreview": "",
           "dryRun": "",

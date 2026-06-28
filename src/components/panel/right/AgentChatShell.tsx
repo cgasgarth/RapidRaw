@@ -1148,6 +1148,38 @@ function LivePromptComposer({
             <div className="truncate">{result.stateImagePath}</div>
           </div>
         ) : null}
+        {result.status === 'applied' && result.appliedGraphRevision ? (
+          <div
+            className="mt-2 grid gap-1.5 rounded border border-emerald-500/25 bg-emerald-500/10 p-2 text-[10px]"
+            data-applied-graph-revision={result.appliedGraphRevision}
+            data-changed-pixel-count={result.changedPixelCount?.toString() ?? ''}
+            data-final-recipe-hash={result.recipeName ?? ''}
+            data-policy-decision-id={result.safetyDecision?.decisionId ?? ''}
+            data-preview-after-hash={result.previewAfterHash ?? ''}
+            data-preview-before-hash={result.previewBeforeHash ?? ''}
+            data-sampled-pixel-count={result.sampledPixelCount?.toString() ?? ''}
+            data-testid="agent-live-apply-receipt"
+            data-tool-call-count={sessionReview?.toolCallCount.toString() ?? ''}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-emerald-100">{t('editor.ai.agent.composer.applyReceipt')}</span>
+              <span className="font-mono text-text-secondary">{sessionReview?.toolCallCount ?? 0}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <span className="truncate font-mono text-text-secondary">{result.appliedGraphRevision}</span>
+              <span className="truncate font-mono text-text-secondary">{result.recipeName}</span>
+              <span className="truncate font-mono text-sky-100">{result.previewBeforeHash}</span>
+              <span className="truncate font-mono text-sky-100">{result.previewAfterHash}</span>
+            </div>
+            <div className="font-mono text-emerald-100">
+              {t('editor.ai.agent.composer.applyReceiptPixels', {
+                changed: result.changedPixelCount,
+                percent: result.changedPixelPercent,
+                sampled: result.sampledPixelCount,
+              })}
+            </div>
+          </div>
+        ) : null}
         {result.safetyDecision ? (
           <div
             className="mt-2 rounded border border-amber-500/25 bg-amber-500/10 p-2 text-amber-100"

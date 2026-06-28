@@ -586,6 +586,8 @@
         "composer": {
           "apply": "Apply edit",
           "applying": "Applying",
+          "applyReceipt": "Apply receipt",
+          "applyReceiptPixels": "{{changed}}/{{sampled}} preview samples changed ({{percent}}%)",
           "changedPixels": "{{count}} preview pixels changed",
           "changedPixels_one": "{{count}} preview pixel changed",
           "changedPixels_other": "{{count}} preview pixels changed",
