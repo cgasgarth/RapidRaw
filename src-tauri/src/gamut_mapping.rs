@@ -1,7 +1,11 @@
+#[cfg(test)]
 pub(crate) const SRGB_OKLAB_CHROMA_REDUCE_V1: &str = "rawengine.gamut.srgb-oklab-chroma-reduce.v1";
+pub(crate) const SRGB_OKLAB_CHROMA_REDUCE_V2: &str = "rawengine.gamut.srgb-oklab-chroma-reduce.v2";
+pub(crate) const ACTIVE_SRGB_OKLAB_CHROMA_REDUCE: &str = SRGB_OKLAB_CHROMA_REDUCE_V2;
 
 const EPSILON: f32 = 1.0e-6;
 
+#[cfg(test)]
 pub(crate) fn map_srgb_oklab_chroma_reduce_v1(rgb: [f32; 3]) -> [f32; 3] {
     if rgb
         .iter()
@@ -41,14 +45,69 @@ pub(crate) fn map_srgb_oklab_chroma_reduce_v1(rgb: [f32; 3]) -> [f32; 3] {
     clamp_rgb(best)
 }
 
+pub(crate) fn map_srgb_oklab_chroma_reduce_v2(rgb: [f32; 3]) -> [f32; 3] {
+    if rgb
+        .iter()
+        .all(|component| component.is_finite() && (0.0..=1.0).contains(component))
+    {
+        return rgb;
+    }
+
+    let safe_rgb = [
+        finite_or_zero(rgb[0]),
+        finite_or_zero(rgb[1]),
+        finite_or_zero(rgb[2]),
+    ];
+    let oklab = linear_srgb_to_oklab(safe_rgb);
+    let fitted_lightness = fit_oklab_lightness_to_srgb_neutral(oklab[0]);
+    let neutral = oklab_to_linear_srgb([fitted_lightness, 0.0, 0.0]);
+
+    if !is_in_srgb_gamut(neutral) {
+        return clamp_rgb(neutral);
+    }
+
+    let mut low = 0.0_f32;
+    let mut high = 1.0_f32;
+    let mut best = neutral;
+
+    for _ in 0..28 {
+        let mid = (low + high) * 0.5;
+        let candidate = oklab_to_linear_srgb([fitted_lightness, oklab[1] * mid, oklab[2] * mid]);
+
+        if is_in_srgb_gamut(candidate) {
+            best = candidate;
+            low = mid;
+        } else {
+            high = mid;
+        }
+    }
+
+    clamp_rgb(best)
+}
+
 pub(crate) fn map_srgb_oklab_chroma_reduce_rgb16_pixels(pixels: &[f32]) -> Vec<u16> {
     pixels
         .chunks_exact(3)
         .flat_map(|pixel| {
-            let mapped = map_srgb_oklab_chroma_reduce_v1([pixel[0], pixel[1], pixel[2]]);
+            let mapped = map_srgb_oklab_chroma_reduce_v2([pixel[0], pixel[1], pixel[2]]);
             mapped.map(quantize_linear_component_to_u16)
         })
         .collect()
+}
+
+fn fit_oklab_lightness_to_srgb_neutral(lightness: f32) -> f32 {
+    if !lightness.is_finite() {
+        return 0.0;
+    }
+
+    let clamped = lightness.clamp(0.0, 1.0);
+    if is_in_srgb_gamut(oklab_to_linear_srgb([clamped, 0.0, 0.0])) {
+        clamped
+    } else if lightness < 0.0 {
+        0.0
+    } else {
+        1.0
+    }
 }
 
 fn finite_or_zero(value: f32) -> f32 {
@@ -111,7 +170,10 @@ fn cbrt_signed(value: f32) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{SRGB_OKLAB_CHROMA_REDUCE_V1, map_srgb_oklab_chroma_reduce_v1};
+    use super::{
+        ACTIVE_SRGB_OKLAB_CHROMA_REDUCE, SRGB_OKLAB_CHROMA_REDUCE_V1, SRGB_OKLAB_CHROMA_REDUCE_V2,
+        map_srgb_oklab_chroma_reduce_v1, map_srgb_oklab_chroma_reduce_v2,
+    };
 
     fn assert_in_gamut(rgb: [f32; 3]) {
         for component in rgb {
@@ -128,18 +190,23 @@ mod tests {
             SRGB_OKLAB_CHROMA_REDUCE_V1,
             "rawengine.gamut.srgb-oklab-chroma-reduce.v1"
         );
+        assert_eq!(
+            SRGB_OKLAB_CHROMA_REDUCE_V2,
+            "rawengine.gamut.srgb-oklab-chroma-reduce.v2"
+        );
+        assert_eq!(ACTIVE_SRGB_OKLAB_CHROMA_REDUCE, SRGB_OKLAB_CHROMA_REDUCE_V2);
     }
 
     #[test]
     fn mapper_preserves_in_gamut_values_exactly() {
         let rgb = [0.25, 0.5, 0.75];
 
-        assert_eq!(map_srgb_oklab_chroma_reduce_v1(rgb), rgb);
+        assert_eq!(map_srgb_oklab_chroma_reduce_v2(rgb), rgb);
     }
 
     #[test]
     fn mapper_reduces_high_component_without_channel_clip_shape() {
-        let mapped = map_srgb_oklab_chroma_reduce_v1([1.35, 0.05, 0.0]);
+        let mapped = map_srgb_oklab_chroma_reduce_v2([1.35, 0.05, 0.0]);
 
         assert_in_gamut(mapped);
         assert!(
@@ -150,8 +217,24 @@ mod tests {
 
     #[test]
     fn mapper_handles_negative_components() {
-        let mapped = map_srgb_oklab_chroma_reduce_v1([0.1, -0.2, 0.8]);
+        let mapped = map_srgb_oklab_chroma_reduce_v2([0.1, -0.2, 0.8]);
 
         assert_in_gamut(mapped);
+    }
+
+    #[test]
+    fn mapper_v2_fits_hdr_neutral_without_channel_clip_shape() {
+        let mapped = map_srgb_oklab_chroma_reduce_v2([1.8, 1.8, 1.8]);
+
+        assert_in_gamut(mapped);
+        assert!(
+            (mapped[0] - mapped[1]).abs() <= 1.0e-5 && (mapped[1] - mapped[2]).abs() <= 1.0e-5,
+            "v2 should preserve neutral-axis balance while fitting HDR values"
+        );
+    }
+
+    #[test]
+    fn mapper_v1_remains_available_as_historical_id() {
+        assert_in_gamut(map_srgb_oklab_chroma_reduce_v1([1.35, 0.05, 0.0]));
     }
 }

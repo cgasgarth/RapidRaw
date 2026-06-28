@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::gamut_mapping::{
-    SRGB_OKLAB_CHROMA_REDUCE_V1, map_srgb_oklab_chroma_reduce_rgb16_pixels,
+    ACTIVE_SRGB_OKLAB_CHROMA_REDUCE, map_srgb_oklab_chroma_reduce_rgb16_pixels,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
@@ -707,7 +707,7 @@ pub(crate) fn export_color_transform_receipt_label(
     rendering_intent: &ExportRenderingIntent,
 ) -> String {
     if should_apply_srgb_perceptual_gamut_mapping(color_profile, rendering_intent) {
-        return format!("{SRGB_OKLAB_CHROMA_REDUCE_V1}; ICC embedded");
+        return format!("{ACTIVE_SRGB_OKLAB_CHROMA_REDUCE}; ICC embedded");
     }
 
     if !export_color_profile_requires_transform(color_profile) {
