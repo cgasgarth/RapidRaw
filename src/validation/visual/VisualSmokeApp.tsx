@@ -2596,6 +2596,14 @@ function FocusStackVisualSmoke() {
         </div>
         <FocusStackModal
           isOpen
+          lastApplyCommand={{
+            acceptedDryRunPlanHash: outputReview.editableHandoff.artifactHash,
+            acceptedDryRunPlanId: 'focus_stack_plan_6',
+            commandType: 'computationalMerge.createFocusStack',
+            dryRun: false,
+            sources: 6,
+            toolName: getComputationalMergeAppServerRoutePairSummary('focus_stack').applyToolName,
+          }}
           lastDryRunCommand={{
             commandType: 'computationalMerge.createFocusStack',
             dryRun: true,
@@ -2604,6 +2612,7 @@ function FocusStackVisualSmoke() {
             toolName: getComputationalMergeAppServerRoutePairSummary('focus_stack').dryRunToolName,
           }}
           loadingImageUrl={panoramaPreviewUrl}
+          onApplyPlan={() => {}}
           onClose={() => {}}
           onPreviewPlan={() => {}}
           onSettingsChange={setSettings}
@@ -3049,6 +3058,7 @@ function FocusPrivateRawModalReviewSmoke() {
       <FocusStackModal
         isOpen
         loadingImageUrl={proof.previewDataUrl}
+        onApplyPlan={() => {}}
         onClose={() => {}}
         onPreviewPlan={() => {
           setPreviewRequested(true);

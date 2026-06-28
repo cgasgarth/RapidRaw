@@ -341,6 +341,7 @@ export default function AppModals(props: AppModalsProps) {
       />
       <FocusStackModal
         isOpen={focusStackModalState.isOpen}
+        lastApplyCommand={focusStackModalState.lastApplyCommand}
         lastDryRunCommand={focusStackModalState.lastDryRunCommand}
         loadingImageUrl={
           focusStackModalState.sourcePaths.length > 0
@@ -356,6 +357,36 @@ export default function AppModals(props: AppModalsProps) {
             focusStackModalState: createDefaultFocusStackModalState(state.focusStackModalState.settings),
           }));
         }}
+        onApplyPlan={() => {
+          if (focusStackModalState.outputReview === null) return;
+          const routePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
+          const acceptedDryRunPlanId = `focus_stack_plan_${focusStackModalState.sourcePaths.length}`;
+          const acceptedDryRunPlanHash = focusStackModalState.outputReview.editableHandoff.artifactHash;
+          setUI({
+            focusStackModalState: {
+              ...focusStackModalState,
+              lastApplyCommand: {
+                acceptedDryRunPlanHash,
+                acceptedDryRunPlanId,
+                commandType: 'computationalMerge.createFocusStack' as const,
+                dryRun: false as const,
+                sources: focusStackModalState.sourcePaths.length,
+                toolName: routePair.applyToolName,
+              },
+              outputReview: {
+                ...focusStackModalState.outputReview,
+                editableHandoff: {
+                  ...focusStackModalState.outputReview.editableHandoff,
+                  status: 'ready',
+                },
+                haloReview: {
+                  ...focusStackModalState.outputReview.haloReview,
+                  reviewStatus: 'apply_ready',
+                },
+              },
+            },
+          });
+        }}
         onPreviewPlan={() => {
           const lastDryRunCommand = {
             commandType: 'computationalMerge.createFocusStack' as const,
@@ -364,9 +395,10 @@ export default function AppModals(props: AppModalsProps) {
             sources: focusStackModalState.sourcePaths.length,
             toolName: getComputationalMergeAppServerRoutePairSummary('focus_stack').dryRunToolName,
           };
+          const { lastApplyCommand: _lastApplyCommand, ...nextFocusStackModalState } = focusStackModalState;
           setUI({
             focusStackModalState: {
-              ...focusStackModalState,
+              ...nextFocusStackModalState,
               lastDryRunCommand,
               outputReview: buildFocusStackOutputReviewWorkflow({
                 artifactPath: `/tmp/rawengine-focus-stack-preview-plan-${focusStackModalState.sourcePaths.length}.tif`,
@@ -378,7 +410,11 @@ export default function AppModals(props: AppModalsProps) {
         }}
         onSettingsChange={(settings) => {
           setUI((state) => {
-            const { lastDryRunCommand: _lastDryRunCommand, ...focusStackModalState } = state.focusStackModalState;
+            const {
+              lastApplyCommand: _lastApplyCommand,
+              lastDryRunCommand: _lastDryRunCommand,
+              ...focusStackModalState
+            } = state.focusStackModalState;
             return {
               focusStackModalState: {
                 ...focusStackModalState,

@@ -17,6 +17,16 @@ const actionMetadataSchema = z
     toolName: z.literal(getComputationalMergeAppServerRoutePairSummary('focus_stack').dryRunToolName),
   })
   .strict();
+const applyActionMetadataSchema = z
+  .object({
+    acceptedDryRunPlanHash: z.string().trim().min(1),
+    acceptedDryRunPlanId: z.string().trim().min(1),
+    commandType: z.literal('computationalMerge.createFocusStack'),
+    dryRun: z.literal(false),
+    sources: z.number().int().min(2),
+    toolName: z.literal(getComputationalMergeAppServerRoutePairSummary('focus_stack').applyToolName),
+  })
+  .strict();
 
 const sourcePaths = [
   '/private-fixtures/focus-stack/alaska-plane-v1/_DSC7509.ARW',
@@ -61,6 +71,14 @@ const actionMetadata = actionMetadataSchema.parse({
   haloSuppressionStrengthPercent: packageCommand.parameters.haloSuppressionStrengthPercent,
   sources: packageCommand.parameters.sources.length,
   toolName: routePair.dryRunToolName,
+});
+const applyActionMetadata = applyActionMetadataSchema.parse({
+  acceptedDryRunPlanHash: 'sha256:focus-stack-preview-plan',
+  acceptedDryRunPlanId: 'focus_stack_plan_3',
+  commandType: packageCommand.commandType,
+  dryRun: false,
+  sources: packageCommand.parameters.sources.length,
+  toolName: routePair.applyToolName,
 });
 const [modalSource, appModalsSource] = await Promise.all([
   readFile('src/components/modals/FocusStackModal.tsx', 'utf8'),
@@ -107,8 +125,38 @@ if (!modalSource.includes('const isPreviewPlanReady = isSourceCountValid && !isS
 if (!modalSource.includes('data-testid="focus-dry-run-command-state"')) {
   failures.push('Focus stack modal must render dry-run command state.');
 }
+if (!modalSource.includes('onApplyPlan')) {
+  failures.push('Focus stack modal must expose an apply-plan action callback.');
+}
+if (!modalSource.includes('disabled={!isApplyPlanReady}')) {
+  failures.push('Focus stack apply-plan action must stay preview/preflight gated.');
+}
+if (!modalSource.includes("outputReview.decision !== 'preview_only'")) {
+  failures.push('Focus stack apply-plan readiness must reject preview-only decisions.');
+}
+if (!modalSource.includes('data-testid="focus-apply-command-state"')) {
+  failures.push('Focus stack modal must render apply command state.');
+}
+if (!modalSource.includes('data-accepted-dry-run-plan-hash={lastApplyCommand.acceptedDryRunPlanHash}')) {
+  failures.push('Focus stack apply command state must expose accepted dry-run hash.');
+}
 if (!modalSource.includes('data-tool-name={lastDryRunCommand.toolName}')) {
   failures.push('Focus stack modal must expose the dry-run tool name.');
+}
+if (!appModalsSource.includes('routePair.applyToolName')) {
+  failures.push('Focus stack apply-plan action must store the typed app-server apply route.');
+}
+if (!appModalsSource.includes('lastApplyCommand')) {
+  failures.push('Focus stack apply-plan action must persist apply command metadata.');
+}
+if (!appModalsSource.includes('lastApplyCommand={focusStackModalState.lastApplyCommand}')) {
+  failures.push('AppModals must pass focus-stack apply command metadata into FocusStackModal.');
+}
+if (!appModalsSource.includes("reviewStatus: 'apply_ready'")) {
+  failures.push('Focus stack apply-plan action must update review status to apply_ready.');
+}
+if (!appModalsSource.includes("status: 'ready'")) {
+  failures.push('Focus stack apply-plan action must update editable handoff status to ready.');
 }
 if (!appModalsSource.includes('outputReview: buildFocusStackOutputReviewWorkflow')) {
   failures.push('Focus stack preview-plan action must update outputReview instead of leaving the UI unchanged.');
@@ -123,14 +171,23 @@ if (
 if (actionMetadata.toolName !== routePair.dryRunToolName) {
   failures.push('Focus stack UI action command must use the typed app-server dry-run route.');
 }
+if (applyActionMetadata.toolName !== routePair.applyToolName) {
+  failures.push('Focus stack UI action command must use the typed app-server apply route.');
+}
 if (actionMetadata.commandType !== packageCommand.commandType) {
   failures.push('Focus stack UI action command type must match package command builder.');
 }
 if (actionMetadata.dryRun !== true || packageCommand.dryRun !== true) {
   failures.push('Focus stack UI action command must be dry-run only.');
 }
+if (applyActionMetadata.dryRun !== false) {
+  failures.push('Focus stack apply command metadata must be mutating.');
+}
 if (actionMetadata.sources !== packageCommand.parameters.sources.length) {
   failures.push('Focus stack UI action source count must match package command builder.');
+}
+if (applyActionMetadata.sources !== packageCommand.parameters.sources.length) {
+  failures.push('Focus stack apply command source count must match package command builder.');
 }
 if (packageCommand.parameters.sources.some((source) => source.role !== 'focus_slice')) {
   failures.push('Package focus stack UI command sources must use focus_slice roles.');
