@@ -2291,11 +2291,15 @@
       "previewBudgetValue": "{{value}} px",
       "previewMemoryValue": "",
       "previewPlan": "Preview plan",
+      "previewPlanPending": "",
+      "previewPlanReady": "",
+      "previewPlanStatus": "",
       "previewWorkloadValue": "",
       "qualityBalanced": "Balanced",
       "qualityBest": "Best",
       "qualityLabel": "Quality",
       "qualityPreview": "Preview",
+      "refreshPreviewPlan": "",
       "retouchLabel": "Retouch layer",
       "retouchPolicy": {
         "generate_retouch_layer": {

@@ -684,6 +684,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                 setUI({
                   focusStackModalState: {
                     isOpen: true,
+                    outputReview: null,
                     settings: DEFAULT_FOCUS_STACK_UI_SETTINGS,
                     sourcePaths: finalSelection,
                   },

@@ -74,11 +74,20 @@ if (!modalSource.includes('onPreviewPlan')) {
 if (!modalSource.includes('disabled={!isSourceCountValid}')) {
   failures.push('Focus stack preview-plan action must stay source-count gated.');
 }
+if (!modalSource.includes('previewPlanStatusLabel')) {
+  failures.push('Focus stack modal must show explicit preview-plan state.');
+}
+if (!modalSource.includes("t('modals.focusStack.refreshPreviewPlan')")) {
+  failures.push('Focus stack modal must change Preview plan to Refresh plan after review state exists.');
+}
 if (!appModalsSource.includes("getComputationalMergeAppServerRoutePairSummary('focus_stack').dryRunToolName")) {
   failures.push('Focus stack preview-plan action must store the typed app-server dry-run route.');
 }
 if (!appModalsSource.includes('lastDryRunCommand')) {
   failures.push('Focus stack preview-plan action must persist dry-run command metadata.');
+}
+if (!appModalsSource.includes('outputReview: buildFocusStackOutputReviewWorkflow')) {
+  failures.push('Focus stack preview-plan action must update outputReview instead of leaving the UI unchanged.');
 }
 if (
   !appModalsSource.includes(

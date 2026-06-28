@@ -30,6 +30,7 @@ import {
   useUIStore,
 } from '../../store/useUIStore';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
+import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
 import { handleNegativeConversionEditorHandoff } from '../../utils/negativeLabEditorHandoff';
 import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
 
@@ -326,16 +327,22 @@ export default function AppModals(props: AppModalsProps) {
           }));
         }}
         onPreviewPlan={() => {
+          const lastDryRunCommand = {
+            commandType: 'computationalMerge.createFocusStack' as const,
+            dryRun: true as const,
+            haloSuppressionStrengthPercent: focusStackModalState.settings.haloSuppressionStrengthPercent,
+            sources: focusStackModalState.sourcePaths.length,
+            toolName: getComputationalMergeAppServerRoutePairSummary('focus_stack').dryRunToolName,
+          };
           setUI({
             focusStackModalState: {
               ...focusStackModalState,
-              lastDryRunCommand: {
-                commandType: 'computationalMerge.createFocusStack',
-                dryRun: true,
-                haloSuppressionStrengthPercent: focusStackModalState.settings.haloSuppressionStrengthPercent,
-                sources: focusStackModalState.sourcePaths.length,
-                toolName: getComputationalMergeAppServerRoutePairSummary('focus_stack').dryRunToolName,
-              },
+              lastDryRunCommand,
+              outputReview: buildFocusStackOutputReviewWorkflow({
+                artifactPath: `/tmp/rawengine-focus-stack-preview-plan-${focusStackModalState.sourcePaths.length}.tif`,
+                settings: focusStackModalState.settings,
+                sourceCount: focusStackModalState.sourcePaths.length,
+              }),
             },
           });
         }}
@@ -343,10 +350,12 @@ export default function AppModals(props: AppModalsProps) {
           setUI((state) => ({
             focusStackModalState: {
               ...state.focusStackModalState,
+              outputReview: null,
               settings,
             },
           }));
         }}
+        outputReview={focusStackModalState.outputReview}
         settings={focusStackModalState.settings}
         sourceCount={focusStackModalState.sourcePaths.length}
       />
