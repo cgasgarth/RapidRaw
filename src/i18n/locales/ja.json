@@ -549,6 +549,7 @@
         "composer": {
           "apply": "",
           "applying": "",
+          "detailPreview": "",
           "dryRun": "",
           "inspectState": "",
           "label": "",
