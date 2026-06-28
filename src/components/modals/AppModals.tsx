@@ -198,6 +198,7 @@ export default function AppModals(props: AppModalsProps) {
         imageCount={panoramaModalState.stitchingSourcePaths.length}
         isOpen={panoramaModalState.isOpen}
         isProcessing={panoramaModalState.isProcessing}
+        lastDryRunCommand={panoramaModalState.lastDryRunCommand}
         loadingImageUrl={
           panoramaModalState.stitchingSourcePaths.length > 0
             ? thumbnails[

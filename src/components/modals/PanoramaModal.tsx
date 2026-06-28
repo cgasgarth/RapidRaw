@@ -21,6 +21,7 @@ import type {
   PanoramaUiQualityPreference,
   PanoramaUiSettings,
 } from '../../schemas/panoramaUiSchemas';
+import type { PanoramaModalState } from '../../store/useUIStore';
 
 interface PanoramaModalProps {
   error: string | null;
@@ -28,6 +29,7 @@ interface PanoramaModalProps {
   imageCount?: number;
   isOpen: boolean;
   isProcessing: boolean;
+  lastDryRunCommand: PanoramaModalState['lastDryRunCommand'];
   loadingImageUrl?: string | null;
   onClose: () => void;
   onOpenFile: (path: string) => void;
@@ -46,6 +48,7 @@ export default function PanoramaModal({
   imageCount,
   isOpen,
   isProcessing,
+  lastDryRunCommand,
   loadingImageUrl,
   onClose,
   onOpenFile,
@@ -331,7 +334,42 @@ export default function PanoramaModal({
           sourcePreviewAlt={t('modals.common.sourcePreviewAlt')}
           speedNotice={t('modals.panorama.speedNotice')}
           title={t('modals.panorama.stitchingProgress')}
-        />
+        >
+          {lastDryRunCommand && (
+            <section
+              className="mt-4 grid grid-cols-3 gap-2 rounded-md border border-border-color bg-bg-secondary/70 p-3 text-xs"
+              data-command-type={lastDryRunCommand.commandType}
+              data-dry-run={String(lastDryRunCommand.dryRun)}
+              data-source-count={lastDryRunCommand.sourceCount}
+              data-testid="panorama-dry-run-command-state"
+              data-tool-name={lastDryRunCommand.appServerToolName}
+            >
+              {[
+                {
+                  label: t('modals.panorama.dryRunCommandTool'),
+                  value: lastDryRunCommand.appServerToolName,
+                },
+                {
+                  label: t('modals.panorama.dryRunCommandSources'),
+                  value: t('modals.panorama.summarySourceCount', { count: lastDryRunCommand.sourceCount }),
+                },
+                {
+                  label: t('modals.panorama.dryRunCommandMode'),
+                  value: t('modals.panorama.dryRunCommandModeValue'),
+                },
+              ].map((item) => (
+                <div className="rounded border border-border-color bg-bg-primary px-2 py-1.5" key={item.label}>
+                  <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                    {item.label}
+                  </UiText>
+                  <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                    {item.value}
+                  </UiText>
+                </div>
+              ))}
+            </section>
+          )}
+        </MergeProcessingState>
       );
     }
 
