@@ -1,4 +1,7 @@
-use image::{DynamicImage, GrayImage, ImageFormat};
+#[cfg(any(target_os = "macos", test))]
+use image::ImageFormat;
+use image::{DynamicImage, GrayImage};
+#[cfg(target_os = "macos")]
 use std::io::Cursor;
 
 #[cfg(target_os = "macos")]
