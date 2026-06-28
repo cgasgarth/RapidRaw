@@ -152,6 +152,22 @@ if (!productivityActionsSource.includes('lastDryRunCommand: dryRunCommand')) {
 if (!appModalsSource.includes('lastDryRunCommand={hdrModalState.lastDryRunCommand}')) {
   failures.push('AppModals must pass HDR dry-run command metadata into the modal.');
 }
+const hdrSettingsHandlerMatch = appModalsSource.match(
+  /<HdrModal[\s\S]*?onSettingsChange=\{\(settings\) => \{(?<handler>[\s\S]*?)\}\}\s*progressMessage=/u,
+);
+const hdrSettingsHandler = hdrSettingsHandlerMatch?.groups?.handler ?? '';
+if (!hdrSettingsHandler.includes('error: null')) {
+  failures.push('HDR settings changes must clear stale error state.');
+}
+if (!hdrSettingsHandler.includes('finalImageBase64: null')) {
+  failures.push('HDR settings changes must clear stale rendered output previews.');
+}
+if (!hdrSettingsHandler.includes('lastDryRunCommand: _lastDryRunCommand')) {
+  failures.push('HDR settings changes must clear stale dry-run command metadata.');
+}
+if (!hdrSettingsHandler.includes('progressMessage: null')) {
+  failures.push('HDR settings changes must clear stale progress text.');
+}
 if (!hdrModalSource.includes('data-testid="hdr-dry-run-command-state"')) {
   failures.push('HDR processing view must render the dry-run command state.');
 }
