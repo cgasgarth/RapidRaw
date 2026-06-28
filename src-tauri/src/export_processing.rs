@@ -1339,7 +1339,7 @@ mod tests {
     };
     use crate::export_encoders::encode_image_with_applied_policy;
     use crate::export_postprocess::OutputSharpeningTarget;
-    use crate::gamut_mapping::SRGB_OKLAB_CHROMA_REDUCE_V1;
+    use crate::gamut_mapping::ACTIVE_SRGB_OKLAB_CHROMA_REDUCE;
     use crate::raw_processing::{RawCameraProfileReport, RawDemosaicPath, RawDevelopmentReport};
     use moxcms::ColorProfile;
     use sha2::{Digest, Sha256};
@@ -1711,7 +1711,7 @@ mod tests {
         assert_eq!(metadata.rendering_intent, "Perceptual");
         assert_eq!(
             metadata.color_managed_transform,
-            format!("{SRGB_OKLAB_CHROMA_REDUCE_V1}; ICC embedded")
+            format!("{ACTIVE_SRGB_OKLAB_CHROMA_REDUCE}; ICC embedded")
         );
         assert!(metadata.transform_applied);
     }

@@ -212,7 +212,7 @@ for (const runReport of reportCollection.reports) {
   }
   if (
     request.editCommand.colorPipeline.renderTarget.intent === 'perceptual' &&
-    colorManagement.observedColorPipeline.gamutMapping !== 'rawengine.gamut.srgb-oklab-chroma-reduce.v1'
+    colorManagement.observedColorPipeline.gamutMapping !== 'rawengine.gamut.srgb-oklab-chroma-reduce.v2'
   ) {
     failures.push(`${runReport.fixtureId}: perceptual sRGB proof must report the active gamut mapper.`);
   }

@@ -19,7 +19,7 @@ use crate::export_processing::{
     process_image_for_export_pipeline_with_tonemapper_override, save_image_with_metadata,
 };
 use crate::formats::is_raw_file;
-use crate::gamut_mapping::{SRGB_OKLAB_CHROMA_REDUCE_V1, map_srgb_oklab_chroma_reduce_v1};
+use crate::gamut_mapping::{ACTIVE_SRGB_OKLAB_CHROMA_REDUCE, map_srgb_oklab_chroma_reduce_v2};
 use crate::image_loader::load_base_image_from_bytes;
 use crate::image_processing::{
     GpuContext, ImageMetadata, get_or_init_gpu_context, resolve_tonemapper_override,
@@ -909,9 +909,9 @@ fn color_management_proof(
     let output_encoding = format!("{output_profile}_rgb16_tiff");
     let gamut_mapping = if color_receipt
         .color_managed_transform
-        .contains(SRGB_OKLAB_CHROMA_REDUCE_V1)
+        .contains(ACTIVE_SRGB_OKLAB_CHROMA_REDUCE)
     {
-        SRGB_OKLAB_CHROMA_REDUCE_V1.to_string()
+        ACTIVE_SRGB_OKLAB_CHROMA_REDUCE.to_string()
     } else {
         "not_proven".to_string()
     };
@@ -1272,7 +1272,7 @@ fn gamut_mapping_coverage_metrics(
         }
 
         let mapped = if mapper_expected {
-            map_srgb_oklab_chroma_reduce_v1(rgb)
+            map_srgb_oklab_chroma_reduce_v2(rgb)
         } else {
             rgb.map(|component| component.clamp(0.0, 1.0))
         };

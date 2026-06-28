@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { parseRawOpenEditExportRunReportCollection } from '../../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
 
 const REPORT_PATH = 'docs/validation/gamut-mapping-real-raw-comparison-2026-06-26.json';
-const PRIVATE_ROOT = '/tmp/rawengine-gamut-mapping-real-raw-proof';
+const PRIVATE_ROOT = '/tmp/rawengine-gamut-mapping-v2-real-raw-proof';
 const PERCEPTUAL_REPORT_PATH = `${PRIVATE_ROOT}/raw-open-edit-export-run-reports.json`;
 const RELATIVE_REPORT_PATH = `${PRIVATE_ROOT}/raw-open-edit-export-relative-run-reports.json`;
 const PERCEPTUAL_FIXTURE_ID = 'validation.raw-open-edit-export.professional-color.v1';
@@ -63,6 +63,9 @@ const reportSchema = z
     issue: z.literal(3238),
     metrics: z
       .object({
+        affectedDeltaE00VsRelativeClip: metricSetSchema,
+        affectedHueAngleDriftDegVsRelativeClip: metricSetSchema,
+        affectedPixelCount: z.number().int().positive(),
         changedPixelRatio: z.number().min(0).max(1),
         deltaE00VsRelativeClip: metricSetSchema,
         hueAngleDriftDegVsRelativeClip: metricSetSchema,
@@ -78,7 +81,7 @@ const reportSchema = z
     perceptualRun: z
       .object({
         fixtureId: z.literal(PERCEPTUAL_FIXTURE_ID),
-        gamutMapping: z.literal('rawengine.gamut.srgb-oklab-chroma-reduce.v1'),
+        gamutMapping: z.literal('rawengine.gamut.srgb-oklab-chroma-reduce.v2'),
         reportPath: z.string().trim().min(1),
         softProofHash: hashSchema,
         softProofPath: z.string().trim().min(1),
@@ -107,6 +110,9 @@ const reportSchema = z
     }
     if (report.metrics.changedPixelRatio <= 0) {
       context.addIssue({ code: 'custom', message: 'changedPixelRatio must prove visible output changed.' });
+    }
+    if (report.metrics.affectedPixelCount <= 0) {
+      context.addIssue({ code: 'custom', message: 'affectedPixelCount must prove visible output changed.' });
     }
     if (report.metrics.maxAbsRgb8Delta <= 0) {
       context.addIssue({ code: 'custom', message: 'maxAbsRgb8Delta must prove visible output changed.' });
@@ -159,7 +165,9 @@ async function buildReport() {
   }
 
   const deltas: Array<number> = [];
+  const affectedDeltas: Array<number> = [];
   const hueDeltas: Array<number> = [];
+  const affectedHueDeltas: Array<number> = [];
   const neutralDrifts: Array<number> = [];
   let changed = 0;
   let maxAbs = 0;
@@ -187,11 +195,17 @@ async function buildReport() {
 
     const perceptualLab = rgb8ToLab(perceptualRgb);
     const relativeLab = rgb8ToLab(relativeRgb);
-    deltas.push(Color.deltaE(perceptualLab, relativeLab, '2000'));
+    const deltaE00 = Color.deltaE(perceptualLab, relativeLab, '2000');
+    deltas.push(deltaE00);
 
     const perceptualOklch = perceptualLab.to('oklch').coords;
     const relativeOklch = relativeLab.to('oklch').coords;
-    hueDeltas.push(hueAngleDeltaDeg(perceptualOklch[2], relativeOklch[2]));
+    const hueDelta = hueAngleDeltaDeg(perceptualOklch[2], relativeOklch[2]);
+    hueDeltas.push(hueDelta);
+    if (pixelChanged) {
+      affectedDeltas.push(deltaE00);
+      affectedHueDeltas.push(hueDelta);
+    }
     if ((relativeOklch[1] ?? 0) <= 0.02) {
       neutralDrifts.push(Math.max(...channelDeltas));
     }
@@ -226,6 +240,9 @@ async function buildReport() {
     generatedAt: new Date().toISOString(),
     issue: 3238,
     metrics: {
+      affectedDeltaE00VsRelativeClip: metricSet(affectedDeltas),
+      affectedHueAngleDriftDegVsRelativeClip: metricSet(affectedHueDeltas),
+      affectedPixelCount: changed,
       changedPixelRatio: round(changed / pixelCount),
       deltaE00VsRelativeClip: metricSet(deltas),
       hueAngleDriftDegVsRelativeClip: metricSet(hueDeltas),
