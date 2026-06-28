@@ -34,6 +34,9 @@ const artifactSchema = z
       'hair_aware_mask_alpha_private',
       'refined_preview_private',
       'refined_export_private',
+      'range_mask_alpha_private',
+      'range_preview_private',
+      'range_export_private',
       'workflow_report_private',
     ]),
     path: privatePathSchema,
@@ -54,6 +57,9 @@ const metricSchema = z
       'haloWidthProxyReduction',
       'edgeColorContaminationProxyReduction',
       'previewExportMeanAbsDelta',
+      'rangeMaskCoverageRatio',
+      'rangeMaskChangedPixelRatio',
+      'rangePreviewExportMeanAbsDelta',
       'sourceHashUnchanged',
     ]),
     passed: z.literal(true),
@@ -81,6 +87,8 @@ const proofClaimsSchema = z
         'image_evidence_guided_refinement',
         'hair_detail_chroma_edge_refinement',
         'refined_preview_export_parity',
+        'luminance_and_color_range_mask_generation',
+        'range_mask_preview_export_parity',
       ]),
     ),
   })
@@ -123,8 +131,11 @@ const runtimeProofSchema = z
     macosAppUiE2e: z.literal(false).optional(),
     macosAppUiE2E: z.literal(false).optional(),
     maskPath: z.literal('prepare_export_masks + generate_mask_bitmap'),
-    outputArtifactCount: z.literal(7),
-    previewExportParityMetric: z.literal('previewExportMeanAbsDelta'),
+    outputArtifactCount: z.number().int().min(7),
+    previewExportParityMetric: z.enum([
+      'previewExportMeanAbsDelta',
+      'previewExportMeanAbsDelta + rangePreviewExportMeanAbsDelta',
+    ]),
     rawDecodePath: z.literal('load_base_image_from_bytes'),
     renderPath: z.literal('process_image_for_export_pipeline_with_tonemapper_override'),
   })
@@ -140,11 +151,11 @@ const runtimeProofSchema = z
 
 const reportSchema = z
   .object({
-    artifacts: z.array(artifactSchema).length(9),
+    artifacts: z.array(artifactSchema).min(9),
     fixtureId: z.literal(FIXTURE_ID),
     generatedAt: z.iso.datetime(),
     issue: z.literal(3251),
-    metrics: z.array(metricSchema).length(11),
+    metrics: z.array(metricSchema).min(11),
     proofClaims: proofClaimsSchema,
     reportId: z.literal(REPORT_ID),
     runtimeProof: runtimeProofSchema,
@@ -206,6 +217,21 @@ const reportSchema = z
     }
     if ((metric.get('previewExportMeanAbsDelta')?.value ?? Number.POSITIVE_INFINITY) > 0.015) {
       context.addIssue({ code: 'custom', message: 'preview/export parity exceeded threshold', path: ['metrics'] });
+    }
+    if (report.proofClaims.proves.includes('luminance_and_color_range_mask_generation')) {
+      if ((metric.get('rangeMaskCoverageRatio')?.value ?? 0) <= 0.01) {
+        context.addIssue({ code: 'custom', message: 'range mask coverage must be non-trivial', path: ['metrics'] });
+      }
+      if ((metric.get('rangeMaskChangedPixelRatio')?.value ?? 0) <= 0.01) {
+        context.addIssue({ code: 'custom', message: 'range mask must change rendered RAW pixels', path: ['metrics'] });
+      }
+      if ((metric.get('rangePreviewExportMeanAbsDelta')?.value ?? Number.POSITIVE_INFINITY) > 0.015) {
+        context.addIssue({
+          code: 'custom',
+          message: 'range mask preview/export parity exceeded threshold',
+          path: ['metrics'],
+        });
+      }
     }
   });
 

@@ -2,6 +2,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use chrono::{SecondsFormat, Utc};
 use image::{DynamicImage, GenericImageView, GrayImage, ImageFormat};
@@ -11,7 +12,7 @@ use sha2::{Digest, Sha256};
 use tauri::Manager;
 
 use crate::app_settings::AppSettings;
-use crate::app_state::AppState;
+use crate::app_state::{AppState, LoadedImage};
 use crate::export_processing::{
     prepare_export_masks, process_image_for_export_pipeline_with_tonemapper_override,
 };
@@ -117,11 +118,18 @@ fn run_private_layer_mask_real_raw_proof(
     let context = get_or_init_compute_gpu_context_for_tests(&state)?;
     let is_raw = is_raw_file(&source_path_string);
     let tm_override = resolve_tonemapper_override(&settings, is_raw);
+    *state.original_image.lock().unwrap() = Some(LoadedImage {
+        image: Arc::new(base_image.clone()),
+        is_raw,
+        path: source_path_string.clone(),
+    });
 
     let unmasked_adjustments = json!({});
     let unrefined_adjustments = layer_mask_adjustments(mask_refinement(false, 0.0), &base_image);
     let edge_refined_adjustments = layer_mask_adjustments(mask_refinement(true, 0.0), &base_image);
     let refined_adjustments = layer_mask_adjustments(mask_refinement(true, 1.0), &base_image);
+    let range_adjustments = range_mask_adjustments(&base_image);
+    let _range_warped_image = crate::get_cached_full_warped_image(&state, &range_adjustments)?;
 
     let unmasked_preview = render_with_masks(
         &source_path_string,
@@ -173,11 +181,33 @@ fn run_private_layer_mask_real_raw_proof(
         "layer_mask_real_raw_refined_export",
         tm_override,
     )?;
+    let range_preview = render_with_masks(
+        &source_path_string,
+        &base_image,
+        &range_adjustments,
+        &context,
+        &state,
+        is_raw,
+        "layer_mask_real_raw_range_preview",
+        tm_override,
+    )?;
+    let range_export = render_with_masks(
+        &source_path_string,
+        &base_image,
+        &range_adjustments,
+        &context,
+        &state,
+        is_raw,
+        "layer_mask_real_raw_range_export",
+        tm_override,
+    )?;
 
-    let mask_coverage_ratio = mask_coverage_ratio(&refined_adjustments, &base_image)?;
+    let refined_mask_coverage_ratio = mask_coverage_ratio(&refined_adjustments, &base_image)?;
+    let range_mask_coverage_ratio = mask_coverage_ratio(&range_adjustments, &base_image)?;
     let unrefined_mask = mask_bitmap(&unrefined_adjustments, &base_image)?;
     let edge_refined_mask = mask_bitmap(&edge_refined_adjustments, &base_image)?;
     let refined_mask = mask_bitmap(&refined_adjustments, &base_image)?;
+    let range_mask = mask_bitmap(&range_adjustments, &base_image)?;
     let unrefined_transition_ratio = transition_pixel_ratio(&unrefined_mask);
     let refined_transition_ratio = transition_pixel_ratio(&refined_mask);
     let area_drift_ratio = (mask_alpha_coverage_ratio(&refined_mask)
@@ -196,6 +226,8 @@ fn run_private_layer_mask_real_raw_proof(
     let masked_changed_pixel_ratio = changed_pixel_ratio(&unmasked_preview, &refined_preview);
     let refinement_changed_pixel_ratio = changed_pixel_ratio(&unrefined_preview, &refined_preview);
     let preview_export_mean_abs_delta = mean_abs_delta(&refined_preview, &refined_export);
+    let range_changed_pixel_ratio = changed_pixel_ratio(&unmasked_preview, &range_preview);
+    let range_preview_export_mean_abs_delta = mean_abs_delta(&range_preview, &range_export);
     let source_hash_after = sha256_file(&source_path)?;
 
     let output_dir = private_root.join(ARTIFACT_DIR);
@@ -231,6 +263,20 @@ fn run_private_layer_mask_real_raw_proof(
     write_image(
         &refined_export,
         &output_dir.join(format!("{PROOF_SLUG}-refined-export.tiff")),
+        ImageFormat::Tiff,
+    )?;
+    write_gray_image(
+        &range_mask,
+        &output_dir.join(format!("{PROOF_SLUG}-range-mask-alpha.png")),
+    )?;
+    write_image(
+        &range_preview,
+        &output_dir.join(format!("{PROOF_SLUG}-range-preview.png")),
+        ImageFormat::Png,
+    )?;
+    write_image(
+        &range_export,
+        &output_dir.join(format!("{PROOF_SLUG}-range-export.tiff")),
         ImageFormat::Tiff,
     )?;
 
@@ -271,20 +317,48 @@ fn run_private_layer_mask_real_raw_proof(
             "refined_export_private",
             &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-refined-export.tiff"),
         )?,
+        hashed_artifact(
+            private_root,
+            "range_mask_alpha_private",
+            &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-range-mask-alpha.png"),
+        )?,
+        hashed_artifact(
+            private_root,
+            "range_preview_private",
+            &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-range-preview.png"),
+        )?,
+        hashed_artifact(
+            private_root,
+            "range_export_private",
+            &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-range-export.tiff"),
+        )?,
     ];
+    let output_artifact_count = (artifacts.len() + 1) as u32;
 
     let metrics = vec![
         metric(
             "maskCoverageRatio",
-            mask_coverage_ratio,
+            refined_mask_coverage_ratio,
             0.01,
-            mask_coverage_ratio > 0.01,
+            refined_mask_coverage_ratio > 0.01,
         ),
         metric(
             "maskedChangedPixelRatio",
             masked_changed_pixel_ratio,
             0.01,
             masked_changed_pixel_ratio > 0.01,
+        ),
+        metric(
+            "rangeMaskCoverageRatio",
+            range_mask_coverage_ratio,
+            0.01,
+            range_mask_coverage_ratio > 0.01,
+        ),
+        metric(
+            "rangeMaskChangedPixelRatio",
+            range_changed_pixel_ratio,
+            0.01,
+            range_changed_pixel_ratio > 0.01,
         ),
         metric(
             "refinementChangedPixelRatio",
@@ -335,6 +409,12 @@ fn run_private_layer_mask_real_raw_proof(
             preview_export_mean_abs_delta <= 0.015,
         ),
         metric(
+            "rangePreviewExportMeanAbsDelta",
+            range_preview_export_mean_abs_delta,
+            0.015,
+            range_preview_export_mean_abs_delta <= 0.015,
+        ),
+        metric(
             "sourceHashUnchanged",
             if source_hash_before == source_hash_after {
                 1.0
@@ -358,8 +438,9 @@ fn run_private_layer_mask_real_raw_proof(
             execution: "tauri_test_gpu_pipeline".to_string(),
             macos_app_ui_e2e: false,
             mask_path: "prepare_export_masks + generate_mask_bitmap".to_string(),
-            output_artifact_count: 7,
-            preview_export_parity_metric: "previewExportMeanAbsDelta".to_string(),
+            output_artifact_count,
+            preview_export_parity_metric:
+                "previewExportMeanAbsDelta + rangePreviewExportMeanAbsDelta".to_string(),
             raw_decode_path: "load_base_image_from_bytes".to_string(),
             render_path: "process_image_for_export_pipeline_with_tonemapper_override".to_string(),
         },
@@ -465,6 +546,64 @@ fn layer_mask_adjustments(refinement: Value, base_image: &DynamicImage) -> Value
     })
 }
 
+fn range_mask_adjustments(base_image: &DynamicImage) -> Value {
+    let (image_width, image_height) = base_image.dimensions();
+    json!({
+        "masks": [
+            {
+                "id": "mask.range-warm-local.v1",
+                "name": "Range mask warmth proof",
+                "visible": true,
+                "invert": false,
+                "opacity": 100,
+                "adjustments": {
+                    "exposure": 1.25,
+                    "contrast": 24,
+                    "temperature": 18,
+                    "saturation": 16
+                },
+                "subMasks": [
+                    {
+                        "id": "submask.luminance-range-midtones.v1",
+                        "type": "luminance_range",
+                        "visible": true,
+                        "invert": false,
+                        "opacity": 100,
+                        "mode": "additive",
+                        "parameters": {
+                            "minLuma": 0.14,
+                            "maxLuma": 0.84,
+                            "feather": 0.22
+                        }
+                    },
+                    {
+                        "id": "submask.color-range-warm.v1",
+                        "type": "color_range",
+                        "visible": true,
+                        "invert": false,
+                        "opacity": 100,
+                        "mode": "additive",
+                        "parameters": {
+                            "centerHueDegrees": 32,
+                            "hueToleranceDegrees": 70,
+                            "feather": 0.5,
+                            "minLuma": 0.02,
+                            "maxLuma": 0.98,
+                            "minSaturation": 0.02,
+                            "maxSaturation": 1.0
+                        }
+                    }
+                ],
+                "proofSource": {
+                    "imageWidth": image_width,
+                    "imageHeight": image_height,
+                    "source": "private_alaska_raw_working_rgb"
+                }
+            }
+        ]
+    })
+}
+
 fn mask_refinement(enabled: bool, hair_detail: f64) -> Value {
     if enabled {
         json!({
@@ -503,6 +642,8 @@ fn proof_claims() -> LayerMaskProofClaims {
             "image_evidence_guided_refinement".to_string(),
             "hair_detail_chroma_edge_refinement".to_string(),
             "refined_preview_export_parity".to_string(),
+            "luminance_and_color_range_mask_generation".to_string(),
+            "range_mask_preview_export_parity".to_string(),
         ],
     }
 }
