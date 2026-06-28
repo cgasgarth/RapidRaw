@@ -565,6 +565,9 @@
           "previewDelta": "",
           "refreshPreview": "",
           "rollback": "",
+          "rollbackAvailable": "Rollback target still matches the current image and recipe.",
+          "rollbackInvalidated": "Rollback disabled because the image, graph revision, or recipe changed.",
+          "rollbackReceipt": "Rollback receipt",
           "stalePreviewWarning": "",
           "status": {
             "applied": "",
