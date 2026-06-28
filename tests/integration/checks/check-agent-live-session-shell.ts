@@ -7,6 +7,12 @@ const panelSource = readFileSync('src/components/panel/right/AIPanel.tsx', 'utf8
 
 const requiredShellMarkers = [
   'interface LiveSessionEvent',
+  'initialPromptPreviewContext: AgentInitialPromptPreviewContext | undefined',
+  'initialPromptPreviewContext={transcript.initialPromptPreviewContext}',
+  "toolName: 'rawengine.agent.initial_prompt_preview'",
+  'initialPromptPreviewContext.renderHash',
+  'initialPromptPreviewContext.recipeHash',
+  'initialPromptPreviewContext.graphRevision',
   'liveSessionEvents',
   'data-live-session-event-count',
   'data-live-session-state',
