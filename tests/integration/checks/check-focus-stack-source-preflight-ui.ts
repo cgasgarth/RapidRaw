@@ -45,6 +45,7 @@ const blocked = buildFocusStackSourcePreflight({
 });
 if (blocked.status !== 'blocked') failures.push('expected dimension mismatch to block preflight.');
 if (!blocked.validation?.blockCodes.includes('dimension_mismatch')) failures.push('expected dimension_mismatch block.');
+if (blocked.validation?.accepted !== false) failures.push('expected blocked focus preflight to be rejected.');
 
 const warning = buildFocusStackSourcePreflight({
   sources: [metadata[0], { ...metadata[1], exif: { ...imageRecords[1]?.exif, ISO: '800' } }],
