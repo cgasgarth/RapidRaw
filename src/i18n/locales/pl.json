@@ -640,6 +640,7 @@
             "title": ""
           },
           "previewDelta": "",
+          "refreshPreview": "",
           "rollback": "",
           "status": {
             "applied": "",

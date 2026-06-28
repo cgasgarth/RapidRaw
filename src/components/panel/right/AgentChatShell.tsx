@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, CircleDashed, RotateCcw, Send, Server, Sparkles } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleDashed, Eye, RotateCcw, Send, Server, Sparkles } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -11,6 +11,7 @@ import {
   type AgentMultiTurnAppServerSessionRequest,
   type AgentMultiTurnAppServerSessionResult,
 } from '../../../utils/agentMultiTurnAppServerSession';
+import { AGENT_PREVIEW_RENDER_TOOL_NAME, renderAgentReadOnlyPreview } from '../../../utils/agentReadOnlyAppServerTools';
 import {
   evaluateAgentSafetyPolicy,
   inferAgentSafetyOperationKind,
@@ -479,6 +480,7 @@ function LivePromptComposer({
   const [sessionReview, setSessionReview] = useState<LiveSessionReviewState | null>(null);
   const canRun = isContextReady && result.status !== 'applying';
   const canApply = isContextReady && acceptedPrompt.length > 0 && result.status === 'dry_run_ready';
+  const canRefreshPreview = isContextReady && result.status !== 'applying';
   const canRollback = rollbackSnapshot !== null && result.status === 'applied';
   let statusLabel;
 
@@ -643,6 +645,51 @@ function LivePromptComposer({
     onSessionEvent?.(
       createLiveSessionEvent('assistant', t('editor.ai.agent.composer.policy.approved'), 'approval-granted'),
     );
+  };
+
+  const refreshPreview = () => {
+    if (!canRefreshPreview) return;
+
+    try {
+      const previewResult = renderAgentReadOnlyPreview({
+        expectedRecipeHash: initialPromptPreviewContext?.recipeHash,
+        longEdgePx: initialPromptPreviewContext?.longEdgePx ?? 1536,
+        purpose: 'refresh',
+        quality: initialPromptPreviewContext?.quality ?? 0.86,
+        requestId: `agent-live-preview-refresh-${Date.now()}`,
+      });
+      pushActivityEntry({
+        body: `${previewResult.preview.purpose} ${previewResult.preview.artifactId}`,
+        graphRevision: initialPromptPreviewContext?.graphRevision,
+        kind: 'preview',
+        previewAfterHash: previewResult.preview.renderHash,
+        recipeHash: previewResult.preview.recipeHash,
+        status: previewResult.staleRecipeHash ? 'pending' : 'completed',
+        toolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+      });
+      const nextResult = {
+        ...result,
+        previewAfterHash: previewResult.preview.renderHash,
+        recipeName: previewResult.preview.recipeHash,
+      } satisfies LivePromptResult;
+      setResult(nextResult);
+      onResultChange?.(nextResult);
+      onSessionEvent?.(
+        createLiveSessionEvent(
+          'assistant',
+          `${AGENT_PREVIEW_RENDER_TOOL_NAME}: ${previewResult.preview.artifactId}`,
+          'preview-refresh',
+        ),
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError');
+      pushActivityEntry({
+        body: errorMessage,
+        kind: 'error',
+        status: 'blocked',
+        toolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+      });
+    }
   };
 
   const applyDryRun = async () => {
@@ -849,6 +896,20 @@ function LivePromptComposer({
         >
           <Send size={14} />
           {t('editor.ai.agent.composer.dryRun')}
+        </button>
+        <button
+          className="inline-flex items-center gap-2 rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          data-testid="agent-live-prompt-refresh-preview"
+          disabled={!canRefreshPreview}
+          onMouseDown={(event) => {
+            event.preventDefault();
+            refreshPreview();
+          }}
+          onClick={refreshPreview}
+          type="button"
+        >
+          <Eye size={14} />
+          {t('editor.ai.agent.composer.refreshPreview')}
         </button>
         <button
           className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
