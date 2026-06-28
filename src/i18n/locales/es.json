@@ -1138,6 +1138,8 @@
       },
       "cameraProfile": {
         "algorithm": "Algorithm",
+        "cacheHit": "",
+        "cacheMiss": "",
         "coolWeight": "Cool weight",
         "defaultDemosaic": "Default demosaic",
         "demosaicProvenance": "Demosaic",
@@ -1149,6 +1151,8 @@
         "processingMode": "Processing mode",
         "receipt": "Recibo",
         "receiptSummary": "{{status}} · {{processingProfile}} · {{demosaicPath}}",
+        "runtime": "",
+        "runtimeSummary": "",
         "scratchMemory": "Scratch memory",
         "status": {
           "fallback": "Fallback",

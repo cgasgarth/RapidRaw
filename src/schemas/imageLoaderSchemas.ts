@@ -49,6 +49,20 @@ export const rawDevelopmentReportSchema = z
     demosaicAlgorithmId: z.string().trim().min(1).nullable().optional(),
     demosaicPath: rawDemosaicPathSchema,
     processingProfile: rawProcessingProfileSchema,
+    runtime: z
+      .object({
+        cacheHit: z.boolean(),
+        decodeElapsedMs: z.number().int().nonnegative().nullable().optional(),
+        exportElapsedMs: z.number().int().nonnegative().nullable().optional(),
+        outputDimensions: z
+          .tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])
+          .nullable()
+          .optional(),
+        previewElapsedMs: z.number().int().nonnegative().nullable().optional(),
+      })
+      .strict()
+      .nullable()
+      .optional(),
     xtransHq: z
       .object({
         reconstruction: z
@@ -100,7 +114,12 @@ export const rawCameraProfileProvenanceReceiptSchema = z
     matrixHash: rawCameraProfileReportSchema.shape.matrixHash,
     receiptVersion: z.literal(1),
     processingProfile: rawProcessingProfileSchema,
+    cacheHit: z.boolean().nullable(),
+    decodeElapsedMs: z.number().int().nonnegative().nullable(),
+    exportElapsedMs: z.number().int().nonnegative().nullable(),
     status: rawCameraProfileStatusSchema,
+    outputDimensions: z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()]).nullable(),
+    previewElapsedMs: z.number().int().nonnegative().nullable(),
     scratchMemoryBytes: z.number().int().nonnegative().nullable(),
     warmIlluminant: rawCameraProfileReportSchema.shape.warmIlluminant,
     warningCount: z.number().int().nonnegative(),

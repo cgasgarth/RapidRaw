@@ -7,7 +7,8 @@ use crate::formats::is_raw_file;
 use crate::image_processing::{ImageMetadata, apply_orientation};
 use crate::mask_generation::{MaskDefinition, SubMask, generate_mask_bitmap};
 use crate::raw_processing::{
-    RawDemosaicPath, RawDevelopmentReport, RawProcessingProfile, develop_raw_image_with_report,
+    RawDemosaicPath, RawDevelopmentReport, RawProcessingProfile, RawRuntimeReport,
+    develop_raw_image_with_report,
 };
 use crate::render_caches::RenderCaches;
 use anyhow::{Context, Result, anyhow};
@@ -501,6 +502,27 @@ fn add_raw_development_report_exif(
             profile.warning_codes.join(","),
         );
     }
+    if let Some(runtime) = &report.runtime {
+        exif.insert(
+            "RawEngineRawCacheHit".to_string(),
+            runtime.cache_hit.to_string(),
+        );
+        if let Some(value) = runtime.decode_elapsed_ms {
+            exif.insert("RawEngineRawDecodeElapsedMs".to_string(), value.to_string());
+        }
+        if let Some(value) = runtime.preview_elapsed_ms {
+            exif.insert(
+                "RawEngineRawPreviewElapsedMs".to_string(),
+                value.to_string(),
+            );
+        }
+        if let Some((width, height)) = runtime.output_dimensions {
+            exif.insert(
+                "RawEngineRawOutputDimensions".to_string(),
+                format!("{width}x{height}"),
+            );
+        }
+    }
 }
 
 fn classify_raw_develop_error(path: &str, err: anyhow::Error) -> anyhow::Error {
@@ -785,8 +807,26 @@ pub async fn load_image(
 
     let mut is_offline_smart_preview = false;
 
+    let load_started = Instant::now();
+
     let (pristine_arc, exif_data, raw_development_report) =
         if let Some((cached_img, cached_exif, cached_raw_development_report)) = cached_data {
+            let mut cached_exif = cached_exif;
+            let cached_raw_development_report = cached_raw_development_report.map(|mut report| {
+                let (width, height) = cached_img.dimensions();
+                report.runtime = Some(RawRuntimeReport {
+                    cache_hit: true,
+                    decode_elapsed_ms: report
+                        .runtime
+                        .as_ref()
+                        .and_then(|runtime| runtime.decode_elapsed_ms),
+                    export_elapsed_ms: None,
+                    output_dimensions: Some((width, height)),
+                    preview_elapsed_ms: Some(load_started.elapsed().as_millis()),
+                });
+                add_raw_development_report_exif(&mut cached_exif, &report);
+                report
+            });
             (cached_img, cached_exif, cached_raw_development_report)
         } else if let Some((smart_preview, manifest)) =
             load_offline_smart_preview(&app_handle, &source_path_str)
@@ -812,6 +852,7 @@ pub async fn load_image(
             );
             (Arc::new(smart_preview), exif_data_loaded, None)
         } else {
+            let decode_started = Instant::now();
             let (pristine_img, exif_data_loaded, raw_development_report) =
             tokio::task::spawn_blocking(move || {
                 if generation_tracker.load(Ordering::SeqCst) != my_generation {
@@ -902,6 +943,23 @@ pub async fn load_image(
             })
             .await
             .map_err(|e| e.to_string())??;
+
+            let decode_elapsed_ms = decode_started.elapsed().as_millis();
+            let (loaded_width, loaded_height) = pristine_img.dimensions();
+            let raw_development_report = raw_development_report.map(|mut report| {
+                report.runtime = Some(RawRuntimeReport {
+                    cache_hit: false,
+                    decode_elapsed_ms: Some(decode_elapsed_ms),
+                    export_elapsed_ms: None,
+                    output_dimensions: Some((loaded_width, loaded_height)),
+                    preview_elapsed_ms: Some(load_started.elapsed().as_millis()),
+                });
+                report
+            });
+            let mut exif_data_loaded = exif_data_loaded;
+            if let Some(report) = &raw_development_report {
+                add_raw_development_report_exif(&mut exif_data_loaded, report);
+            }
 
             let arc_img = Arc::new(pristine_img);
 

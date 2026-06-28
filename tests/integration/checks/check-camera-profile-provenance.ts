@@ -23,6 +23,13 @@ const fixture = rawDevelopmentReportSchema.parse({
   },
   demosaicPath: 'bayer_hq',
   processingProfile: 'maximum',
+  runtime: {
+    cacheHit: false,
+    decodeElapsedMs: 321,
+    exportElapsedMs: 654,
+    outputDimensions: [6000, 4000],
+    previewElapsedMs: 432,
+  },
 });
 
 const files = {
@@ -54,7 +61,11 @@ const requiredMarkers: Array<[keyof typeof files, string]> = [
   ['metadataPanel', 'data-testid="metadata-camera-profile-provenance-receipt"'],
   ['metadataPanel', 'data-testid="metadata-raw-processing-mode"'],
   ['metadataPanel', 'data-testid="metadata-raw-demosaic-provenance"'],
+  ['metadataPanel', 'data-testid="metadata-raw-runtime-receipt"'],
   ['metadataPanel', 'data-testid="metadata-raw-scratch-memory"'],
+  ['metadataPanel', "data-decode-elapsed-ms={cameraProfileReceipt.decodeElapsedMs ?? ''}"],
+  ['metadataPanel', "data-preview-elapsed-ms={cameraProfileReceipt.previewElapsedMs ?? ''}"],
+  ['metadataPanel', "t('editor.metadata.cameraProfile.runtimeSummary'"],
   ['metadataPanel', 'data-camera-profile-status={cameraProfileReport.status}'],
   ['metadataPanel', "data-camera-profile-matrix-hash={cameraProfileReport.matrixHash ?? ''}"],
   ['metadataPanel', 'data-demosaic-path={cameraProfileReceipt.demosaicPath}'],
@@ -81,6 +92,11 @@ if (
   receipt.receiptVersion !== 1 ||
   receipt.demosaicPath !== 'bayer_hq' ||
   receipt.processingProfile !== 'maximum' ||
+  receipt.cacheHit !== false ||
+  receipt.decodeElapsedMs !== 321 ||
+  receipt.exportElapsedMs !== 654 ||
+  receipt.outputDimensions?.[0] !== 6000 ||
+  receipt.previewElapsedMs !== 432 ||
   receipt.scratchMemoryBytes !== null ||
   receipt.warningCount !== 0 ||
   receipt.coolWeight !== 0.42
