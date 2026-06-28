@@ -442,9 +442,32 @@ fn primary_mask_bitmap(
 }
 
 fn write_image(image: &DynamicImage, path: &Path, format: ImageFormat) -> Result<(), String> {
+    if format == ImageFormat::Png {
+        return DynamicImage::ImageRgba8(image.to_rgba8())
+            .save_with_format(path, format)
+            .map_err(|error| error.to_string());
+    }
+
     image
         .save_with_format(path, format)
         .map_err(|error| error.to_string())
+}
+
+#[test]
+fn write_image_encodes_rgba32f_png_preview() {
+    let output_path = std::env::temp_dir().join(format!(
+        "rawengine-linear-gradient-rgba32f-png-{}.png",
+        Utc::now().timestamp_nanos_opt().unwrap_or_default()
+    ));
+    let image = DynamicImage::ImageRgba32F(image::ImageBuffer::from_fn(2, 2, |_x, _y| {
+        image::Rgba([0.5, 0.25, 0.75, 1.0])
+    }));
+
+    write_image(&image, &output_path, ImageFormat::Png).expect("encode RGBA32F proof PNG");
+    let decoded = image::open(&output_path).expect("decode proof PNG");
+    assert_eq!(decoded.dimensions(), (2, 2));
+
+    let _ = fs::remove_file(output_path);
 }
 
 fn hashed_artifact(

@@ -15,8 +15,8 @@
   "uiMarkers": [
     "data-testid=\"linear-gradient-mask-controls\"",
     "data-gradient-command-type=\"layerMask.createGradientMask\"",
-    "parameters['startY'] = imgH * 0.12",
-    "parameters['endY'] = imgH * 0.72",
+    "LINEAR_MASK_START_Y_FRACTION = 0.12",
+    "LINEAR_MASK_END_Y_FRACTION = 0.72",
     "buildLinearGradientMaskCommandFromParameters"
   ],
   "validationMode": "linear_gradient_mask_apply_ui_runtime_render_slice"

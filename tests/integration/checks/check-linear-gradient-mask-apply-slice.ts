@@ -47,18 +47,21 @@ const reportSchema = z
   .strict();
 
 const sourcePanel = await readFile('src/components/panel/right/MasksPanel.tsx', 'utf8');
+const sourceSubMaskFactory = await readFile('src/utils/editorSubMaskFactory.ts', 'utf8');
 const uiMarkers = [
   'data-testid="linear-gradient-mask-controls"',
   'data-gradient-command-type="layerMask.createGradientMask"',
-  "parameters['startY'] = imgH * 0.12",
-  "parameters['endY'] = imgH * 0.72",
+  'LINEAR_MASK_START_Y_FRACTION = 0.12',
+  'LINEAR_MASK_END_Y_FRACTION = 0.72',
   'buildLinearGradientMaskCommandFromParameters',
 ];
 for (const marker of uiMarkers) {
   const source =
     marker === 'buildLinearGradientMaskCommandFromParameters'
       ? await readFile('src/utils/linearGradientMaskCommandBridge.ts', 'utf8')
-      : sourcePanel;
+      : marker.startsWith('LINEAR_MASK_')
+        ? sourceSubMaskFactory
+        : sourcePanel;
   if (!source.includes(marker)) throw new Error(`Linear gradient UI marker missing: ${marker}`);
 }
 
