@@ -80,7 +80,17 @@ const appModalsSource = readFileSync('src/components/modals/AppModals.tsx', 'utf
 if (!appModalsSource.includes('runtimePlan={panoramaModalState.runtimePlan}')) {
   failures.push('AppModals must pass panorama runtimePlan into PanoramaModal.');
 }
-if (!appModalsSource.includes('runtimePlan: null, settings')) {
+for (const marker of [
+  'finalImageBase64: null',
+  'lastDryRunCommand: null',
+  'renderedReview: null',
+  'runtimePlan: null',
+]) {
+  if (!appModalsSource.includes(marker)) {
+    failures.push(`Panorama settings changes must clear stale review marker: ${marker}`);
+  }
+}
+if (!appModalsSource.includes('runtimePlan: null')) {
   failures.push('Panorama settings changes must clear stale runtimePlan.');
 }
 

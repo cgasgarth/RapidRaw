@@ -221,7 +221,18 @@ export default function AppModals(props: AppModalsProps) {
           props.handleStartPanorama(panoramaModalState.stitchingSourcePaths);
         }}
         onSettingsChange={(settings) => {
-          setUI((state) => ({ panoramaModalState: { ...state.panoramaModalState, runtimePlan: null, settings } }));
+          setUI((state) => ({
+            panoramaModalState: {
+              ...state.panoramaModalState,
+              error: null,
+              finalImageBase64: null,
+              lastDryRunCommand: null,
+              progressMessage: null,
+              renderedReview: null,
+              runtimePlan: null,
+              settings,
+            },
+          }));
         }}
         progressMessage={panoramaModalState.progressMessage}
         renderedReview={panoramaModalState.renderedReview}
