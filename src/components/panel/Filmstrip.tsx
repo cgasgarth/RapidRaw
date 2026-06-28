@@ -1,5 +1,5 @@
 import cx from 'clsx';
-import { Image as ImageIcon, Star, SlidersHorizontal } from 'lucide-react';
+import { AlertTriangle, Image as ImageIcon, Star, SlidersHorizontal } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback, useMemo, memo, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Grid, useGridCallbackRef, type GridImperativeAPI } from 'react-window';
@@ -8,6 +8,7 @@ import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { type Color, COLOR_LABELS } from '../../utils/adjustments';
+import { buildRawQualityBadges, formatRawQualityBadgeTooltip } from '../../utils/rawQualityBadges';
 import { type ImageFile, type SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
 import UiText from '../ui/Text';
 
@@ -65,6 +66,38 @@ interface FilmstripCellProps extends FilmstripCellData {
   rowIndex: number;
   style: React.CSSProperties;
 }
+
+const FilmstripRawQualityBadges = ({ exif }: { exif: ImageFile['exif'] }) => {
+  const badges = useMemo(() => buildRawQualityBadges(exif), [exif]);
+  if (badges.length === 0) return null;
+
+  return (
+    <div
+      className="absolute bottom-1 left-1 z-10 flex items-center gap-1"
+      data-raw-quality-badge-count={badges.length}
+      data-testid="filmstrip-raw-quality-badges"
+      data-tooltip={formatRawQualityBadgeTooltip(badges)}
+    >
+      {badges.map((badge) => (
+        <span
+          key={badge.code}
+          className={cx(
+            'inline-flex h-5 items-center gap-1 rounded-full border px-1.5 text-[10px] font-semibold shadow-md backdrop-blur',
+            badge.severity === 'warning'
+              ? 'border-amber-300/35 bg-amber-500/20 text-amber-100'
+              : 'border-sky-300/30 bg-sky-500/20 text-sky-100',
+          )}
+          data-raw-quality-badge-code={badge.code}
+          data-raw-quality-badge-detail={badge.detail}
+          data-raw-quality-badge-severity={badge.severity}
+        >
+          {badge.severity === 'warning' ? <AlertTriangle size={11} /> : null}
+          <span>{badge.label}</span>
+        </span>
+      ))}
+    </div>
+  );
+};
 
 const FilmstripThumbnail = memo(
   ({
@@ -323,6 +356,7 @@ const FilmstripThumbnail = memo(
             </div>
           </>
         )}
+        <FilmstripRawQualityBadges exif={imageFile.exif} />
       </div>
     );
   },
