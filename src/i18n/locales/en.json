@@ -2235,6 +2235,9 @@
       "previewBudgetValue": "{{value}} px",
       "previewMemoryValue": "{{value}} MB estimated",
       "previewPlan": "Preview plan",
+      "previewPlanPending": "Not previewed",
+      "previewPlanReady": "Previewed",
+      "previewPlanStatus": "Plan",
       "previewWorkloadValue": "{{value}} MP",
       "qualityBalanced": "Balanced",
       "qualityBest": "Best",
@@ -3202,6 +3205,9 @@
       "previewBudgetValue": "{{value}} px",
       "previewMemoryValue": "{{value}} MB estimated",
       "previewPlan": "Preview plan",
+      "previewPlanPending": "Not previewed",
+      "previewPlanReady": "Previewed",
+      "previewPlanStatus": "Preview state",
       "previewWorkloadValue": "{{value}} MP",
       "qualityBalanced": "Balanced",
       "qualityBest": "Best",
@@ -3218,6 +3224,7 @@
         }
       },
       "reconstructionModeLabel": "Reconstruction",
+      "refreshPreviewPlan": "Refresh plan",
       "review": {
         "acceptanceGate": "Acceptance gate",
         "alignmentConfidence": "Alignment confidence",

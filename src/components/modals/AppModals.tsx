@@ -31,6 +31,7 @@ import {
 } from '../../store/useUIStore';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
 import { handleNegativeConversionEditorHandoff } from '../../utils/negativeLabEditorHandoff';
+import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
 
 import type { CopyPasteSettings } from '../../utils/adjustments';
 import type { AppSettings, AlbumItem } from '../ui/AppProperties';
@@ -276,16 +277,21 @@ export default function AppModals(props: AppModalsProps) {
           }));
         }}
         onPreviewPlan={() => {
+          const lastDryRunCommand = {
+            commandType: 'computationalMerge.createSuperResolution' as const,
+            dryRun: true as const,
+            sources: superResolutionModalState.sourcePaths.length,
+            toolName: getComputationalMergeAppServerRoutePairSummary('super_resolution').dryRunToolName,
+          };
           setUI({
             superResolutionModalState: {
               ...superResolutionModalState,
-              lastDryRunCommand: {
-                commandType: 'computationalMerge.createSuperResolution',
-                dryRun: true,
-                sources: superResolutionModalState.sourcePaths.length,
-                toolName: getComputationalMergeAppServerRoutePairSummary('super_resolution').dryRunToolName,
-              },
-              outputReview: null,
+              lastDryRunCommand,
+              outputReview: buildSuperResolutionOutputReviewWorkflow({
+                artifactPath: `/tmp/rawengine-super-resolution-preview-plan-${superResolutionModalState.sourcePaths.length}.tif`,
+                settings: superResolutionModalState.settings,
+                sourceCount: superResolutionModalState.sourcePaths.length,
+              }),
             },
           });
         }}

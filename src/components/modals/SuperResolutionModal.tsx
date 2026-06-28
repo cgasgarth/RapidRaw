@@ -158,6 +158,9 @@ export default function SuperResolutionModal({
       sourceCount: fallbackOutputReviewSourceCount,
     });
   const hasRuntimeOutputReview = runtimeOutputReview !== null && runtimeOutputReview !== undefined;
+  const previewPlanStatusLabel = hasRuntimeOutputReview
+    ? t('modals.superResolution.previewPlanReady')
+    : t('modals.superResolution.previewPlanPending');
   const outputReviewDecisionLabel = t(`modals.superResolution.review.decision.${outputReview.decision}`);
   const outputReviewEditableGateLabel = t(`modals.superResolution.review.editableGate.${outputReview.editableGate}`);
   const detailGainLabel =
@@ -285,7 +288,9 @@ export default function SuperResolutionModal({
           </button>
           <Button onClick={onPreviewPlan} disabled={!isSourceCountValid}>
             <Layers3 className="w-4 h-4" />
-            {t('modals.superResolution.previewPlan')}
+            {hasRuntimeOutputReview
+              ? t('modals.superResolution.refreshPreviewPlan')
+              : t('modals.superResolution.previewPlan')}
           </Button>
         </>
       }
@@ -345,7 +350,7 @@ export default function SuperResolutionModal({
       </ComputationalSetupOptionSection>
 
       <section
-        className="grid grid-cols-5 gap-2 rounded-md border border-border-color bg-bg-secondary/70 p-2 text-sm"
+        className="grid grid-cols-2 gap-2 rounded-md border border-border-color bg-bg-secondary/70 p-2 text-sm lg:grid-cols-3"
         data-alignment-mode={settings.alignmentMode}
         data-detail-policy={settings.detailPolicy}
         data-reconstruction-mode={settings.reconstructionMode}
@@ -372,6 +377,10 @@ export default function SuperResolutionModal({
         <ComputationalSetupStatusLine
           label={t('modals.superResolution.workflowTitle')}
           value={reconstructionReadinessLabel}
+        />
+        <ComputationalSetupStatusLine
+          label={t('modals.superResolution.previewPlanStatus')}
+          value={previewPlanStatusLabel}
         />
       </section>
 

@@ -3103,6 +3103,9 @@
       "previewBudgetValue": "{{value}} px",
       "previewMemoryValue": "",
       "previewPlan": "Preview plan",
+      "previewPlanPending": "",
+      "previewPlanReady": "",
+      "previewPlanStatus": "",
       "previewWorkloadValue": "",
       "qualityBalanced": "Balanced",
       "qualityBest": "Best",
@@ -3119,6 +3122,7 @@
         }
       },
       "reconstructionModeLabel": "Reconstruction",
+      "refreshPreviewPlan": "",
       "review": {
         "acceptanceGate": "",
         "alignmentConfidence": "Alignment confidence",

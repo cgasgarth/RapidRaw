@@ -72,11 +72,23 @@ if (!modalSource.includes('onPreviewPlan')) {
 if (!modalSource.includes('disabled={!isSourceCountValid}')) {
   failures.push('Super-resolution preview-plan action must stay source-count gated.');
 }
+if (!modalSource.includes('previewPlanStatusLabel')) {
+  failures.push('Super-resolution modal must expose visible preview-plan status.');
+}
+if (!modalSource.includes('modals.superResolution.refreshPreviewPlan')) {
+  failures.push('Super-resolution modal must show a refreshed action label after preview generation.');
+}
 if (!appModalsSource.includes("getComputationalMergeAppServerRoutePairSummary('super_resolution').dryRunToolName")) {
   failures.push('Super-resolution preview-plan action must store the typed app-server dry-run route.');
 }
 if (!appModalsSource.includes('lastDryRunCommand')) {
   failures.push('Super-resolution preview-plan action must persist dry-run command metadata.');
+}
+if (!appModalsSource.includes('buildSuperResolutionOutputReviewWorkflow')) {
+  failures.push('Super-resolution preview-plan action must materialize a visible output review.');
+}
+if (!appModalsSource.includes('outputReview: buildSuperResolutionOutputReviewWorkflow')) {
+  failures.push('Super-resolution preview-plan action must update outputReview instead of leaving the UI unchanged.');
 }
 if (actionMetadata.toolName !== routePair.dryRunToolName) {
   failures.push('Super-resolution UI action command must use the typed app-server dry-run route.');
