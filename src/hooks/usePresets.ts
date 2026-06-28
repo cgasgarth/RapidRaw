@@ -27,6 +27,20 @@ export interface UserPreset {
 
 type PresetAdjustments = Record<string, unknown>;
 
+const USER_COLOR_STYLE_LEGAL_WARNING =
+  'User-created color style preset. RawEngine does not claim manufacturer, film-stock, competitor, official, or exact-emulation status.';
+
+const buildUserColorStyleProvenance = (existing?: Preset['colorStyleProvenance']): Preset['colorStyleProvenance'] => {
+  const now = new Date().toISOString();
+  return {
+    createdAt: existing?.createdAt ?? now,
+    legalNamingStatus: 'user_named',
+    legalWarning: USER_COLOR_STYLE_LEGAL_WARNING,
+    source: 'user_created',
+    updatedAt: now,
+  };
+};
+
 const withoutAdjustmentKeys = (adjustments: PresetAdjustments, keys: ReadonlySet<string>): PresetAdjustments =>
   Object.entries(adjustments).reduce<PresetAdjustments>((filteredAdjustments, [key, value]) => {
     if (!keys.has(key)) {
@@ -117,6 +131,7 @@ export function usePresets(currentAdjustments: Adjustments) {
       includeMasks,
       includeCropTransform,
       presetType,
+      ...(presetType === 'style' ? { colorStyleProvenance: buildUserColorStyleProvenance() } : {}),
     };
 
     let updatedPresets: Array<UserPreset>;
@@ -274,6 +289,8 @@ export function usePresets(currentAdjustments: Adjustments) {
           includeMasks,
           includeCropTransform,
           presetType,
+          colorStyleProvenance:
+            presetType === 'style' ? buildUserColorStyleProvenance(item.preset.colorStyleProvenance) : undefined,
         };
         return { preset: updatedPreset };
       }
@@ -288,6 +305,8 @@ export function usePresets(currentAdjustments: Adjustments) {
             includeMasks,
             includeCropTransform,
             presetType,
+            colorStyleProvenance:
+              presetType === 'style' ? buildUserColorStyleProvenance(child.colorStyleProvenance) : undefined,
           };
           const newChildren = [...item.folder.children];
           newChildren[childIndex] = updatedPreset;
@@ -345,6 +364,8 @@ export function usePresets(currentAdjustments: Adjustments) {
           includeMasks,
           includeCropTransform,
           presetType,
+          colorStyleProvenance:
+            presetType === 'style' ? buildUserColorStyleProvenance(item.preset.colorStyleProvenance) : undefined,
         };
         return { preset: updatedPreset };
       }
@@ -358,6 +379,8 @@ export function usePresets(currentAdjustments: Adjustments) {
             includeMasks,
             includeCropTransform,
             presetType,
+            colorStyleProvenance:
+              presetType === 'style' ? buildUserColorStyleProvenance(child.colorStyleProvenance) : undefined,
           };
           const newChildren = [...item.folder.children];
           newChildren[childIndex] = updatedPreset;

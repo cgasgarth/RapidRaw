@@ -344,6 +344,7 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<Preset, String> {
         id: Uuid::new_v4().to_string(),
         name: preset_name,
         adjustments: Value::Object(adjustments),
+        color_style_provenance: None,
         include_masks: Some(false),
         include_crop_transform: Some(false),
         preset_type: Some("style".to_string()),
