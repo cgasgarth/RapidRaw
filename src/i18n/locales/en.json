@@ -589,6 +589,7 @@
           "changedPixels": "{{count}} preview pixels changed",
           "changedPixels_one": "{{count}} preview pixel changed",
           "changedPixels_other": "{{count}} preview pixels changed",
+          "detailPreview": "Detail preview",
           "dryRun": "Dry-run",
           "inspectState": "Inspect state",
           "label": "Ask the agent",

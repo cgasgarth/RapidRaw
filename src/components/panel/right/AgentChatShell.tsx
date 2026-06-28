@@ -493,6 +493,7 @@ function LivePromptComposer({
   const [sessionReview, setSessionReview] = useState<LiveSessionReviewState | null>(null);
   const canRun = isContextReady && result.status !== 'applying';
   const canApply = isContextReady && acceptedPrompt.length > 0 && result.status === 'dry_run_ready';
+  const canRequestDetailPreview = isContextReady && result.status !== 'applying';
   const canInspectState = isContextReady && result.status !== 'applying';
   const canRefreshPreview = isContextReady && result.status !== 'applying';
   const canRollback = rollbackSnapshot !== null && result.status === 'applied';
@@ -712,7 +713,7 @@ function LivePromptComposer({
 
     try {
       const previewResult = renderAgentReadOnlyPreview({
-        expectedRecipeHash: initialPromptPreviewContext?.recipeHash,
+        expectedRecipeHash: result.recipeName ?? initialPromptPreviewContext?.recipeHash,
         longEdgePx: initialPromptPreviewContext?.longEdgePx ?? 1536,
         purpose: 'refresh',
         quality: initialPromptPreviewContext?.quality ?? 0.86,
@@ -739,6 +740,58 @@ function LivePromptComposer({
           'assistant',
           `${AGENT_PREVIEW_RENDER_TOOL_NAME}: ${previewResult.preview.artifactId}`,
           'preview-refresh',
+        ),
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError');
+      pushActivityEntry({
+        body: errorMessage,
+        kind: 'error',
+        status: 'blocked',
+        toolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+      });
+    }
+  };
+
+  const requestDetailPreview = () => {
+    if (!canRequestDetailPreview) return;
+
+    try {
+      const previewResult = renderAgentReadOnlyPreview({
+        expectedRecipeHash: result.recipeName ?? initialPromptPreviewContext?.recipeHash,
+        longEdgePx: initialPromptPreviewContext?.longEdgePx ?? 1536,
+        purpose: 'detail_review',
+        quality: initialPromptPreviewContext?.quality ?? 0.86,
+        requestId: `agent-live-detail-preview-${Date.now()}`,
+        zoom: {
+          centerX: 0.5,
+          centerY: 0.5,
+          scale: 2,
+        },
+      });
+      pushActivityEntry({
+        body: `${previewResult.preview.purpose} ${previewResult.preview.artifactId}`,
+        graphRevision: initialPromptPreviewContext?.graphRevision,
+        kind: 'preview',
+        previewAfterHash: previewResult.preview.renderHash,
+        previewBeforeHash: result.previewAfterHash,
+        recipeHash: previewResult.preview.recipeHash,
+        status: previewResult.staleRecipeHash ? 'pending' : 'completed',
+        toolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+      });
+      const nextResult = {
+        ...result,
+        previewAfterHash: previewResult.preview.renderHash,
+        recipeName: previewResult.preview.recipeHash,
+      } satisfies LivePromptResult;
+      if (result.previewAfterHash !== undefined) nextResult.previewBeforeHash = result.previewAfterHash;
+      setResult(nextResult);
+      onResultChange?.(nextResult);
+      onSessionEvent?.(
+        createLiveSessionEvent(
+          'assistant',
+          `${AGENT_PREVIEW_RENDER_TOOL_NAME}: ${previewResult.preview.artifactId}`,
+          'detail-preview',
         ),
       );
     } catch (error) {
@@ -970,6 +1023,20 @@ function LivePromptComposer({
         >
           <Server size={14} />
           {t('editor.ai.agent.composer.inspectState')}
+        </button>
+        <button
+          className="inline-flex items-center gap-2 rounded-md border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs font-semibold text-violet-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          data-testid="agent-live-prompt-detail-preview"
+          disabled={!canRequestDetailPreview}
+          onMouseDown={(event) => {
+            event.preventDefault();
+            requestDetailPreview();
+          }}
+          onClick={requestDetailPreview}
+          type="button"
+        >
+          <CircleDashed size={14} />
+          {t('editor.ai.agent.composer.detailPreview')}
         </button>
         <button
           className="inline-flex items-center gap-2 rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
