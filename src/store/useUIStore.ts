@@ -17,6 +17,7 @@ import {
 
 import type { FocusStackOutputReviewWorkflow } from '../schemas/focusStackOutputReviewSchemas';
 import type { SuperResolutionOutputReviewWorkflow } from '../schemas/superResolutionOutputReviewSchemas';
+import type { FocusStackSourcePreflightMetadata } from '../utils/focusStackSourcePreflight';
 import type { HdrBracketPreflightSourceMetadata } from '../utils/hdrBracketPreflight';
 import type { SuperResolutionSourcePreflightMetadata } from '../utils/superResolutionSourcePreflight';
 
@@ -111,6 +112,7 @@ export interface FocusStackModalState {
   };
   outputReview: FocusStackOutputReviewWorkflow | null;
   settings: FocusStackUiSettings;
+  sourcePreflightMetadata: FocusStackSourcePreflightMetadata[];
   sourcePaths: Array<string>;
 }
 
@@ -182,6 +184,7 @@ export const createDefaultFocusStackModalState = (
   isOpen: false,
   outputReview: null,
   settings,
+  sourcePreflightMetadata: [],
   sourcePaths: [],
 });
 

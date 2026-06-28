@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { parseExifInteger, parseExposureEv, readExifString } from './exifPreflightMetadata';
 import {
   validateSuperResolutionSourcesV1,
   type SuperResolutionSourceValidationInputV1,
@@ -98,34 +99,6 @@ const toValidationSource = (
     sourceIndex: source.sourceIndex,
     width: source.width,
   };
-};
-
-const readExifString = (exif: Record<string, string> | null | undefined, keys: string[]): string | undefined => {
-  for (const key of keys) {
-    const value = exif?.[key]?.trim();
-    if (value) return value;
-  }
-  return undefined;
-};
-
-const parseExifInteger = (exif: Record<string, string> | null | undefined, keys: string[]): number | undefined => {
-  const value = readExifString(exif, keys);
-  if (value === undefined) return undefined;
-  const parsed = Number.parseInt(value.replace(/[^\d]/gu, ''), 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-};
-
-const parseExposureEv = (exif: Record<string, string> | null | undefined): number | undefined => {
-  const exposureBias = readExifString(exif, ['ExposureBiasValue']);
-  if (exposureBias === undefined) return undefined;
-  const fraction = /^(-?\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)$/u.exec(exposureBias);
-  if (fraction) {
-    const numerator = Number(fraction[1]);
-    const denominator = Number(fraction[2]);
-    return denominator === 0 ? undefined : numerator / denominator;
-  }
-  const parsed = Number(exposureBias);
-  return Number.isFinite(parsed) ? parsed : undefined;
 };
 
 const parseShift = (imagePath: string, axis: 'x' | 'y'): number | undefined => {
