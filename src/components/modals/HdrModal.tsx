@@ -27,6 +27,7 @@ import type {
   HdrBracketDetectionMethodV1,
   HdrBracketSourceMetadataV1,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import type { HdrModalState } from '../../store/useUIStore';
 
 interface HdrModalProps {
   error: string | null;
@@ -34,6 +35,7 @@ interface HdrModalProps {
   imageCount?: number;
   isOpen: boolean;
   isProcessing: boolean;
+  lastDryRunCommand?: HdrModalState['lastDryRunCommand'];
   loadingImageUrl?: string | null;
   onClose: () => void;
   onOpenFile: (path: string) => void;
@@ -52,6 +54,7 @@ export default function HdrModal({
   imageCount,
   isOpen,
   isProcessing,
+  lastDryRunCommand,
   loadingImageUrl,
   onClose,
   onOpenFile,
@@ -393,7 +396,42 @@ export default function HdrModal({
           sourcePreviewAlt={t('modals.common.sourcePreviewAlt')}
           speedNotice={t('modals.hdr.speedNotice')}
           title={t('modals.hdr.merging')}
-        />
+        >
+          {lastDryRunCommand && (
+            <section
+              className="mt-5 grid w-full max-w-md grid-cols-3 gap-2 rounded-md border border-border-color bg-surface p-3 text-xs"
+              data-command-type={lastDryRunCommand.commandType}
+              data-dry-run={String(lastDryRunCommand.dryRun)}
+              data-source-count={lastDryRunCommand.sources}
+              data-testid="hdr-dry-run-command-state"
+              data-tool-name={lastDryRunCommand.toolName}
+            >
+              {[
+                {
+                  label: t('modals.hdr.dryRunCommandTool'),
+                  value: lastDryRunCommand.toolName,
+                },
+                {
+                  label: t('modals.hdr.dryRunCommandSources'),
+                  value: t('modals.hdr.summarySourceCount', { count: lastDryRunCommand.sources }),
+                },
+                {
+                  label: t('modals.hdr.dryRunCommandMode'),
+                  value: t('modals.hdr.dryRunCommandModeValue'),
+                },
+              ].map((item) => (
+                <div className="min-w-0 rounded border border-border-color bg-bg-primary px-2 py-1.5" key={item.label}>
+                  <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                    {item.label}
+                  </UiText>
+                  <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                    {item.value}
+                  </UiText>
+                </div>
+              ))}
+            </section>
+          )}
+        </MergeProcessingState>
       );
     }
 

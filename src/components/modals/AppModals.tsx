@@ -233,6 +233,7 @@ export default function AppModals(props: AppModalsProps) {
         imageCount={hdrModalState.stitchingSourcePaths.length}
         isOpen={hdrModalState.isOpen}
         isProcessing={hdrModalState.isProcessing}
+        lastDryRunCommand={hdrModalState.lastDryRunCommand}
         loadingImageUrl={
           hdrModalState.stitchingSourcePaths.length > 0
             ? thumbnails[

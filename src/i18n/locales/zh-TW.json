@@ -2191,6 +2191,10 @@
       "descriptionWithCount": "將 {{count}} 張包圍曝光合併為一張高動態範圍影像。",
       "descriptionWithCount_one": "將 {{count}} 張包圍曝光合併為一張高動態範圍影像。",
       "descriptionWithCount_other": "將 {{count}} 張包圍曝光合併為一張高動態範圍影像。",
+      "dryRunCommandMode": "",
+      "dryRunCommandModeValue": "",
+      "dryRunCommandSources": "",
+      "dryRunCommandTool": "",
       "exposureWeighting": {
         "balanced": "",
         "liftShadows": "",

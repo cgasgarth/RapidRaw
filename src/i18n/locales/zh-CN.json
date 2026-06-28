@@ -2353,6 +2353,10 @@
       "descriptionWithCount": "将 {{count}} 张包围曝光合并为一张高动态范围图像。",
       "descriptionWithCount_one": "将 {{count}} 张包围曝光合并为一张高动态范围图像。",
       "descriptionWithCount_other": "将 {{count}} 张包围曝光合并为一张高动态范围图像。",
+      "dryRunCommandMode": "",
+      "dryRunCommandModeValue": "",
+      "dryRunCommandSources": "",
+      "dryRunCommandTool": "",
       "exposureWeighting": {
         "balanced": "",
         "liftShadows": "",

@@ -72,8 +72,10 @@ const actionMetadata = actionMetadataSchema.parse({
   dryRun: packageCommand.dryRun,
   sources: packageCommand.parameters.sources.length,
 });
-const [contextMenuSource, productivityActionsSource] = await Promise.all([
+const [appModalsSource, contextMenuSource, hdrModalSource, productivityActionsSource] = await Promise.all([
+  readFile('src/components/modals/AppModals.tsx', 'utf8'),
   readFile('src/hooks/useAppContextMenus.ts', 'utf8'),
+  readFile('src/components/modals/HdrModal.tsx', 'utf8'),
   readFile('src/hooks/useProductivityActions.ts', 'utf8'),
 ]);
 const failures: string[] = [];
@@ -146,6 +148,15 @@ if (!productivityActionsSource.includes("getComputationalMergeAppServerRoutePair
 }
 if (!productivityActionsSource.includes('lastDryRunCommand: dryRunCommand')) {
   failures.push('HDR start action must persist dry-run command metadata.');
+}
+if (!appModalsSource.includes('lastDryRunCommand={hdrModalState.lastDryRunCommand}')) {
+  failures.push('AppModals must pass HDR dry-run command metadata into the modal.');
+}
+if (!hdrModalSource.includes('data-testid="hdr-dry-run-command-state"')) {
+  failures.push('HDR processing view must render the dry-run command state.');
+}
+if (!hdrModalSource.includes('data-tool-name={lastDryRunCommand.toolName}')) {
+  failures.push('HDR dry-run command state must expose the app-server tool name.');
 }
 if (!contextMenuSource.includes('findHdrAutoStackPaths')) {
   failures.push('Thumbnail context menu must inspect library auto-stacks for HDR source expansion.');
