@@ -2823,6 +2823,9 @@
       "previewBudgetValue": "",
       "previewMemoryValue": "",
       "previewPlan": "",
+      "previewPlanPending": "",
+      "previewPlanReady": "",
+      "previewPlanStatus": "",
       "previewWorkloadValue": "",
       "qualityBalanced": "",
       "qualityBest": "",
@@ -2837,6 +2840,7 @@
         }
       },
       "reconstructionModeLabel": "",
+      "refreshPreviewPlan": "",
       "review": {
         "acceptanceGate": "",
         "alignmentConfidence": "",
