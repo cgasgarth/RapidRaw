@@ -27,6 +27,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
         panoramaModalState: {
           ...state.panoramaModalState,
           isProcessing: true,
+          lastApplyCommand: null,
           lastDryRunCommand: dryRunCommand,
           error: null,
           finalImageBase64: null,

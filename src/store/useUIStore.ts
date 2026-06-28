@@ -48,6 +48,14 @@ export interface PanoramaModalState {
   finalImageBase64: string | null;
   isOpen: boolean;
   isProcessing: boolean;
+  lastApplyCommand: {
+    acceptedDryRunPlanHash: string;
+    acceptedDryRunPlanId: string;
+    commandType: 'computationalMerge.createPanorama';
+    dryRun: false;
+    sourceCount: number;
+    toolName: string;
+  } | null;
   lastDryRunCommand: {
     appServerToolName: string;
     boundaryMode: PanoramaUiSettings['boundaryMode'];
@@ -171,6 +179,7 @@ export const createDefaultPanoramaModalState = (
   finalImageBase64: null,
   isOpen: false,
   isProcessing: false,
+  lastApplyCommand: null,
   lastDryRunCommand: null,
   progressMessage: '',
   renderedReview: null,

@@ -401,6 +401,7 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
             error: null,
             finalImageBase64: null,
             isOpen: true,
+            lastApplyCommand: null,
             lastDryRunCommand: null,
             progressMessage: null,
             renderedReview: null,

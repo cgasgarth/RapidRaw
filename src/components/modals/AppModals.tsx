@@ -198,6 +198,7 @@ export default function AppModals(props: AppModalsProps) {
         imageCount={panoramaModalState.stitchingSourcePaths.length}
         isOpen={panoramaModalState.isOpen}
         isProcessing={panoramaModalState.isProcessing}
+        lastApplyCommand={panoramaModalState.lastApplyCommand}
         lastDryRunCommand={panoramaModalState.lastDryRunCommand}
         loadingImageUrl={
           panoramaModalState.stitchingSourcePaths.length > 0
@@ -226,6 +227,7 @@ export default function AppModals(props: AppModalsProps) {
               ...state.panoramaModalState,
               error: null,
               finalImageBase64: null,
+              lastApplyCommand: null,
               lastDryRunCommand: null,
               progressMessage: null,
               renderedReview: null,
