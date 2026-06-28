@@ -2,11 +2,13 @@
 pub(crate) const SRGB_OKLAB_CHROMA_REDUCE_V1: &str = "rawengine.gamut.srgb-oklab-chroma-reduce.v1";
 #[cfg(test)]
 pub(crate) const SRGB_OKLAB_CHROMA_REDUCE_V2: &str = "rawengine.gamut.srgb-oklab-chroma-reduce.v2";
+#[cfg(test)]
 pub(crate) const SRGB_OKLAB_CHROMA_REDUCE_V3: &str = "rawengine.gamut.srgb-oklab-chroma-reduce.v3";
 pub(crate) const SRGB_OKLAB_CHROMA_REDUCE_V4: &str = "rawengine.gamut.srgb-oklab-chroma-reduce.v4";
 pub(crate) const ACTIVE_SRGB_OKLAB_CHROMA_REDUCE: &str = SRGB_OKLAB_CHROMA_REDUCE_V4;
 
 const EPSILON: f32 = 1.0e-6;
+#[cfg(test)]
 const CHROMA_MONOTONIC_EPSILON: f32 = 1.0e-3;
 const CHROMA_SAFE_CLIP_FALLBACK_RATIO: f32 = 0.8;
 
@@ -90,6 +92,7 @@ pub(crate) fn map_srgb_oklab_chroma_reduce_v2(rgb: [f32; 3]) -> [f32; 3] {
     clamp_rgb(best)
 }
 
+#[cfg(test)]
 pub(crate) fn map_srgb_oklab_chroma_reduce_v3(rgb: [f32; 3]) -> [f32; 3] {
     if rgb
         .iter()
