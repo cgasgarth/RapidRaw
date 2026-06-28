@@ -396,7 +396,13 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
         setUI((state) => ({
           panoramaModalState: {
             ...state.panoramaModalState,
+            error: null,
+            finalImageBase64: null,
             isOpen: true,
+            lastDryRunCommand: null,
+            progressMessage: null,
+            renderedReview: null,
+            runtimePlan: null,
             stitchingSourcePaths:
               selectedCommandPaths.length > 0 ? selectedCommandPaths : state.panoramaModalState.stitchingSourcePaths,
           },
@@ -407,49 +413,62 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
 
     if (command.id === 'hdrMerge') {
       closeAndRun(() => {
-        setUI((state) => ({
-          hdrModalState: {
-            ...state.hdrModalState,
-            isOpen: true,
-            sourceMetadata:
-              selectedCommandPaths.length > 0
-                ? selectedCommandPaths.map((path) => ({ exif: null, path }))
-                : state.hdrModalState.sourceMetadata,
-            stitchingSourcePaths:
-              selectedCommandPaths.length > 0 ? selectedCommandPaths : state.hdrModalState.stitchingSourcePaths,
-          },
-        }));
+        setUI((state) => {
+          const { lastDryRunCommand: _lastDryRunCommand, ...hdrModalState } = state.hdrModalState;
+          return {
+            hdrModalState: {
+              ...hdrModalState,
+              error: null,
+              finalImageBase64: null,
+              isOpen: true,
+              progressMessage: null,
+              sourceMetadata:
+                selectedCommandPaths.length > 0
+                  ? selectedCommandPaths.map((path) => ({ exif: null, path }))
+                  : state.hdrModalState.sourceMetadata,
+              stitchingSourcePaths:
+                selectedCommandPaths.length > 0 ? selectedCommandPaths : state.hdrModalState.stitchingSourcePaths,
+            },
+          };
+        });
       });
       return;
     }
 
     if (command.id === 'focusStack') {
       closeAndRun(() => {
-        setUI((state) => ({
-          focusStackModalState: {
-            ...state.focusStackModalState,
-            isOpen: true,
-            outputReview: null,
-            sourcePaths:
-              selectedCommandPaths.length > 0 ? selectedCommandPaths : state.focusStackModalState.sourcePaths,
-          },
-        }));
+        setUI((state) => {
+          const { lastDryRunCommand: _lastDryRunCommand, ...focusStackModalState } = state.focusStackModalState;
+          return {
+            focusStackModalState: {
+              ...focusStackModalState,
+              isOpen: true,
+              outputReview: null,
+              sourcePaths:
+                selectedCommandPaths.length > 0 ? selectedCommandPaths : state.focusStackModalState.sourcePaths,
+            },
+          };
+        });
       });
       return;
     }
 
     if (command.id === 'superResolution') {
       closeAndRun(() => {
-        setUI((state) => ({
-          superResolutionModalState: {
-            ...state.superResolutionModalState,
-            isOpen: true,
-            outputReview: null,
-            sourcePreflightMetadata: [],
-            sourcePaths:
-              selectedCommandPaths.length > 0 ? selectedCommandPaths : state.superResolutionModalState.sourcePaths,
-          },
-        }));
+        setUI((state) => {
+          const { lastDryRunCommand: _lastDryRunCommand, ...superResolutionModalState } =
+            state.superResolutionModalState;
+          return {
+            superResolutionModalState: {
+              ...superResolutionModalState,
+              isOpen: true,
+              outputReview: null,
+              sourcePreflightMetadata: [],
+              sourcePaths:
+                selectedCommandPaths.length > 0 ? selectedCommandPaths : state.superResolutionModalState.sourcePaths,
+            },
+          };
+        });
       });
       return;
     }
