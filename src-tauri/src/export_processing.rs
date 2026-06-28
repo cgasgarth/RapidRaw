@@ -1432,6 +1432,13 @@ mod tests {
         chunks[0]
     }
 
+    fn normalize_icc_creation_time(mut profile: Vec<u8>) -> Vec<u8> {
+        if profile.len() >= 36 {
+            profile[24..36].fill(0);
+        }
+        profile
+    }
+
     fn tiff_decoder(bytes: &[u8]) -> TiffDecoder<Cursor<&[u8]>> {
         TiffDecoder::new(Cursor::new(bytes)).expect("TIFF decoder should open exported bytes")
     }
@@ -1938,11 +1945,14 @@ mod tests {
             "Enabled via LittleCMS relative colorimetric transform"
         );
         assert_eq!(jpeg_pixels, quantize_rgb16_to_rgb8(&core_pixels));
+        let embedded_profile =
+            &single_icc_payload(&encoded.bytes)[b"ICC_PROFILE\0\x01\x01".len()..];
+        let encoded_profile =
+            encode_icc_profile(&jpeg_profile).expect("Display P3 JPEG output ICC should encode");
         assert_eq!(
-            &single_icc_payload(&encoded.bytes)[b"ICC_PROFILE\0\x01\x01".len()..],
-            encode_icc_profile(&jpeg_profile)
-                .expect("Display P3 JPEG output ICC should encode")
-                .as_slice()
+            normalize_icc_creation_time(embedded_profile.to_vec()),
+            normalize_icc_creation_time(encoded_profile),
+            "Display P3 JPEG ICC should match the output profile apart from encoder timestamp"
         );
     }
 
