@@ -69,6 +69,14 @@ export interface HdrModalState {
   finalImageBase64: string | null;
   isOpen: boolean;
   isProcessing: boolean;
+  lastApplyCommand?: {
+    acceptedDryRunPlanHash: string;
+    acceptedDryRunPlanId: string;
+    commandType: 'computationalMerge.createHdr';
+    dryRun: false;
+    sources: number;
+    toolName: string;
+  };
   lastDryRunCommand?: {
     commandType: 'computationalMerge.createHdr';
     deghosting: HdrMergeUiSettings['deghosting'];

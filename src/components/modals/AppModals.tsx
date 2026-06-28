@@ -245,6 +245,7 @@ export default function AppModals(props: AppModalsProps) {
         imageCount={hdrModalState.stitchingSourcePaths.length}
         isOpen={hdrModalState.isOpen}
         isProcessing={hdrModalState.isProcessing}
+        lastApplyCommand={hdrModalState.lastApplyCommand}
         lastDryRunCommand={hdrModalState.lastDryRunCommand}
         loadingImageUrl={
           hdrModalState.stitchingSourcePaths.length > 0
@@ -267,7 +268,11 @@ export default function AppModals(props: AppModalsProps) {
         }}
         onSettingsChange={(settings) => {
           setUI((state) => {
-            const { lastDryRunCommand: _lastDryRunCommand, ...hdrModalState } = state.hdrModalState;
+            const {
+              lastApplyCommand: _lastApplyCommand,
+              lastDryRunCommand: _lastDryRunCommand,
+              ...hdrModalState
+            } = state.hdrModalState;
             return {
               hdrModalState: {
                 ...hdrModalState,
