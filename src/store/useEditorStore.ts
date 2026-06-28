@@ -123,7 +123,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   histogram: null,
   waveform: null,
   gamutWarningOverlay: null,
-  isGamutWarningOverlayVisible: true,
+  isGamutWarningOverlayVisible: false,
   isExportSoftProofEnabled: false,
   exportSoftProofRecipeId: null,
   exportSoftProofTransform: null,
