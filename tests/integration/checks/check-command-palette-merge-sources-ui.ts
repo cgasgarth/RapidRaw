@@ -19,6 +19,7 @@ const requiredModalSnippets = [
   'sourcePaths:',
   "command.id === 'superResolution'",
   'superResolutionModalState',
+  'createSuperResolutionSourcePreflightMetadata',
 ];
 const failures = requiredModalSnippets
   .filter((snippet) => !modalSource.includes(snippet))
@@ -48,6 +49,12 @@ if (!hdrHandler?.includes('lastDryRunCommand: _lastDryRunCommand')) {
 if (!hdrHandler?.includes('finalImageBase64: null')) {
   failures.push('HDR command palette action must clear stale rendered output');
 }
+if (!hdrHandler?.includes('imageList.find((image) => image.path === path)?.exif ?? null')) {
+  failures.push('HDR command palette action must preserve library EXIF metadata for selected paths');
+}
+if (!hdrHandler?.includes('state.hdrModalState.sourceMetadata')) {
+  failures.push('HDR command palette action must preserve existing source metadata without new paths');
+}
 
 const focusHandler = modalSource.match(/command\.id === 'focusStack'(?<handler>[\s\S]*?)sourcePaths:/u)?.groups
   ?.handler;
@@ -59,6 +66,16 @@ const superResolutionHandler = modalSource.match(/command\.id === 'superResoluti
   ?.groups?.handler;
 if (!superResolutionHandler?.includes('lastDryRunCommand: _lastDryRunCommand')) {
   failures.push('super-resolution command palette action must omit stale dry-run command metadata');
+}
+if (
+  !superResolutionHandler?.includes('createSuperResolutionSourcePreflightMetadata(selectedCommandPaths, imageList)')
+) {
+  failures.push('super-resolution command palette action must preserve source preflight metadata for selected paths');
+}
+if (!superResolutionHandler?.includes('state.superResolutionModalState.sourcePreflightMetadata')) {
+  failures.push(
+    'super-resolution command palette action must preserve existing source preflight metadata without new paths',
+  );
 }
 
 if (!packageJson.includes('"check:command-palette-merge-sources-ui"')) {
