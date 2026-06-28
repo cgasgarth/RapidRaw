@@ -15,8 +15,8 @@ use crate::ai_connector;
 use crate::ai_processing::{
     self, AiDepthMaskParameters, AiForegroundMaskParameters, AiSkyMaskParameters,
     AiSubjectMaskParameters, CachedDepthMap, ImageEmbeddings, generate_image_embeddings,
-    get_or_init_ai_models, run_depth_anything_model, run_sam_decoder, run_sky_seg_model,
-    run_u2netp_model,
+    get_or_init_ai_models, get_or_init_person_part_parser_model, run_depth_anything_model,
+    run_sam_decoder, run_sky_seg_model, run_u2netp_model,
 };
 use crate::app_settings::load_settings_or_default;
 use crate::app_state::AppState;
@@ -201,6 +201,7 @@ pub async fn generate_ai_foreground_mask(
         flip_horizontal: Some(flip_horizontal),
         flip_vertical: Some(flip_vertical),
         orientation_steps: Some(orientation_steps),
+        ..Default::default()
     })
 }
 
@@ -253,9 +254,11 @@ pub async fn generate_ai_whole_person_mask(
         flip_horizontal: Some(flip_horizontal),
         flip_vertical: Some(flip_vertical),
         orientation_steps: Some(orientation_steps),
+        ..Default::default()
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn generate_ai_person_part_mask(
     js_adjustments: serde_json::Value,
@@ -265,16 +268,37 @@ pub async fn generate_ai_person_part_mask(
     flip_vertical: bool,
     orientation_steps: u8,
     state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
 ) -> Result<AiForegroundMaskParameters, String> {
     let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
+    let mut provenance = None;
     let mask_image = match part.as_str() {
         "face" => crate::person_segmentation::generate_face_mask(warped_image.as_ref())?,
         "full_person" => {
             crate::person_segmentation::generate_whole_person_mask(warped_image.as_ref())?
         }
+        "clothing" => {
+            let parser = get_or_init_person_part_parser_model(
+                &app_handle,
+                &state.ai_state,
+                &state.ai_init_lock,
+            )
+            .await
+            .map_err(|error| error.to_string())?;
+            let target = crate::person_part_parser::PersonPartMaskTarget::Clothing;
+            provenance = Some(crate::person_part_parser::person_part_parser_provenance(
+                target,
+            ));
+            crate::person_part_parser::run_person_part_parser_model(
+                warped_image.as_ref(),
+                &parser,
+                target,
+            )
+            .map_err(|error| error.to_string())?
+        }
         unsupported => {
             return Err(format!(
-                "Unsupported person mask part '{unsupported}'. Supported runtime parts: face, full_person"
+                "Unsupported person mask part '{unsupported}'. Supported runtime parts: face, full_person, clothing"
             ));
         }
     };
@@ -282,10 +306,21 @@ pub async fn generate_ai_person_part_mask(
 
     Ok(AiForegroundMaskParameters {
         mask_data_base64: Some(base64_data),
+        class_ids: provenance.as_ref().map(|entry| entry.class_ids.clone()),
         rotation: Some(rotation),
         flip_horizontal: Some(flip_horizontal),
         flip_vertical: Some(flip_vertical),
         orientation_steps: Some(orientation_steps),
+        model_id: provenance.as_ref().map(|entry| entry.model_id.to_string()),
+        model_sha256: provenance
+            .as_ref()
+            .map(|entry| entry.model_sha256.to_string()),
+        provider_id: provenance
+            .as_ref()
+            .map(|_| "deeplabv3p-human-parser".to_string()),
+        target_part: provenance
+            .as_ref()
+            .map(|entry| entry.target_part.to_string()),
     })
 }
 

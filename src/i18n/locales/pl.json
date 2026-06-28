@@ -1943,6 +1943,7 @@
     "types": {
       "all": "Cały obraz",
       "brush": "Pędzel",
+      "clothing": "",
       "color": "Kolor",
       "depth": "Głębia",
       "face": "Face",

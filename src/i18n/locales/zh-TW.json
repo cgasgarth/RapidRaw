@@ -1715,6 +1715,7 @@
     "types": {
       "all": "整個影像",
       "brush": "畫筆",
+      "clothing": "",
       "color": "顏色",
       "depth": "深度",
       "face": "",

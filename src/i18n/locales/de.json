@@ -1835,6 +1835,7 @@
     "types": {
       "all": "Ganzes Bild",
       "brush": "Pinsel",
+      "clothing": "",
       "color": "Farbe",
       "depth": "Tiefe",
       "face": "Face",

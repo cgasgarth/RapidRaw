@@ -75,6 +75,7 @@ mod panorama_opencv_spike;
 mod panorama_real_raw_proof;
 mod panorama_stitching;
 mod panorama_utils;
+mod person_part_parser;
 mod person_segmentation;
 mod preset_converter;
 mod presets;
