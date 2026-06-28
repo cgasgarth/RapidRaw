@@ -23,9 +23,11 @@ import type {
   FocusStackReviewOverlayMode,
   FocusStackUiSettings,
 } from '../../schemas/focusStackUiSchemas';
+import type { FocusStackModalState } from '../../store/useUIStore';
 
 interface FocusStackModalProps {
   isOpen: boolean;
+  lastDryRunCommand?: FocusStackModalState['lastDryRunCommand'];
   loadingImageUrl?: string | null;
   onClose: () => void;
   onPreviewPlan: () => void;
@@ -43,6 +45,7 @@ const reviewArtifactPath = '/tmp/rawengine-focus-stack-smoke.tif';
 
 export default function FocusStackModal({
   isOpen,
+  lastDryRunCommand,
   loadingImageUrl,
   onClose,
   onPreviewPlan,
@@ -224,6 +227,41 @@ export default function FocusStackModal({
         <ComputationalSetupStatusLine label={t('modals.focusStack.workflowTitle')} value={stackReadinessLabel} />
         <ComputationalSetupStatusLine label={t('modals.focusStack.previewPlanStatus')} value={previewPlanStatusLabel} />
       </section>
+
+      {lastDryRunCommand && (
+        <section
+          className="grid grid-cols-3 gap-2 rounded-md border border-border-color bg-bg-secondary/70 p-3 text-xs"
+          data-command-type={lastDryRunCommand.commandType}
+          data-dry-run={String(lastDryRunCommand.dryRun)}
+          data-source-count={lastDryRunCommand.sources}
+          data-testid="focus-dry-run-command-state"
+          data-tool-name={lastDryRunCommand.toolName}
+        >
+          {[
+            {
+              label: t('modals.focusStack.dryRunCommandTool'),
+              value: lastDryRunCommand.toolName,
+            },
+            {
+              label: t('modals.focusStack.dryRunCommandSources'),
+              value: t('modals.focusStack.sourceSummary', { count: lastDryRunCommand.sources }),
+            },
+            {
+              label: t('modals.focusStack.dryRunCommandMode'),
+              value: t('modals.focusStack.dryRunCommandModeValue'),
+            },
+          ].map((item) => (
+            <div className="rounded border border-border-color bg-bg-primary px-2 py-1.5" key={item.label}>
+              <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                {item.label}
+              </UiText>
+              <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                {item.value}
+              </UiText>
+            </div>
+          ))}
+        </section>
+      )}
 
       <section className="grid grid-cols-2 gap-4">
         <div>

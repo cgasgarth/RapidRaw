@@ -315,6 +315,7 @@ export default function AppModals(props: AppModalsProps) {
       />
       <FocusStackModal
         isOpen={focusStackModalState.isOpen}
+        lastDryRunCommand={focusStackModalState.lastDryRunCommand}
         loadingImageUrl={
           focusStackModalState.sourcePaths.length > 0
             ? thumbnails[
@@ -350,13 +351,16 @@ export default function AppModals(props: AppModalsProps) {
           });
         }}
         onSettingsChange={(settings) => {
-          setUI((state) => ({
-            focusStackModalState: {
-              ...state.focusStackModalState,
-              outputReview: null,
-              settings,
-            },
-          }));
+          setUI((state) => {
+            const { lastDryRunCommand: _lastDryRunCommand, ...focusStackModalState } = state.focusStackModalState;
+            return {
+              focusStackModalState: {
+                ...focusStackModalState,
+                outputReview: null,
+                settings,
+              },
+            };
+          });
         }}
         outputReview={focusStackModalState.outputReview}
         settings={focusStackModalState.settings}

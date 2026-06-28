@@ -2596,6 +2596,13 @@ function FocusStackVisualSmoke() {
         </div>
         <FocusStackModal
           isOpen
+          lastDryRunCommand={{
+            commandType: 'computationalMerge.createFocusStack',
+            dryRun: true,
+            haloSuppressionStrengthPercent: settings.haloSuppressionStrengthPercent,
+            sources: 6,
+            toolName: getComputationalMergeAppServerRoutePairSummary('focus_stack').dryRunToolName,
+          }}
           loadingImageUrl={panoramaPreviewUrl}
           onClose={() => {}}
           onPreviewPlan={() => {}}
