@@ -2407,6 +2407,10 @@
       "descriptionWithCount": "Combine {{count}} bracketed exposures into a single High Dynamic Range image.",
       "descriptionWithCount_one": "Combine {{count}} bracketed exposure into a single High Dynamic Range image.",
       "descriptionWithCount_other": "Combine {{count}} bracketed exposures into a single High Dynamic Range image.",
+      "dryRunCommandMode": "Mode",
+      "dryRunCommandModeValue": "Dry-run",
+      "dryRunCommandSources": "Sources",
+      "dryRunCommandTool": "Tool",
       "exposureWeighting": {
         "balanced": "Balanced",
         "liftShadows": "Lift shadows",

@@ -2438,6 +2438,10 @@
       "descriptionWithCount_few": "",
       "descriptionWithCount_many": "",
       "descriptionWithCount_other": "Объединить {{count}} кадров с брекетингом экспозиции в одно изображение HDR.",
+      "dryRunCommandMode": "",
+      "dryRunCommandModeValue": "",
+      "dryRunCommandSources": "",
+      "dryRunCommandTool": "",
       "exposureWeighting": {
         "balanced": "",
         "liftShadows": "",

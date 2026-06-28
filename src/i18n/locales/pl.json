@@ -2512,6 +2512,10 @@
       "descriptionWithCount_few": "Połącz {{count}} ujęcia z bracketingu w jeden obraz High Dynamic Range.",
       "descriptionWithCount_many": "Połącz {{count}} ujęć z bracketingu w jeden obraz High Dynamic Range.",
       "descriptionWithCount_other": "Połącz {{count}} ujęć z bracketingu w jeden obraz High Dynamic Range.",
+      "dryRunCommandMode": "",
+      "dryRunCommandModeValue": "",
+      "dryRunCommandSources": "",
+      "dryRunCommandTool": "",
       "exposureWeighting": {
         "balanced": "",
         "liftShadows": "",

@@ -2371,6 +2371,10 @@
       "descriptionWithCount_one": "Combinez {{count}} exposition bracketée en une seule image High Dynamic Range.",
       "descriptionWithCount_many": "",
       "descriptionWithCount_other": "Combinez {{count}} expositions bracketées en une seule image High Dynamic Range.",
+      "dryRunCommandMode": "",
+      "dryRunCommandModeValue": "",
+      "dryRunCommandSources": "",
+      "dryRunCommandTool": "",
       "exposureWeighting": {
         "balanced": "",
         "liftShadows": "",

@@ -2370,6 +2370,10 @@
       "descriptionWithCount_one": "Combine {{count}} exposição agrupada em uma única imagem de Alta Faixa Dinâmica.",
       "descriptionWithCount_many": "",
       "descriptionWithCount_other": "Combine {{count}} exposições agrupadas em uma única imagem de Alta Faixa Dinâmica.",
+      "dryRunCommandMode": "",
+      "dryRunCommandModeValue": "",
+      "dryRunCommandSources": "",
+      "dryRunCommandTool": "",
       "exposureWeighting": {
         "balanced": "",
         "liftShadows": "",

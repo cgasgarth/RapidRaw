@@ -2370,6 +2370,10 @@
       "descriptionWithCount_one": "Unisci {{count}} esposizione in bracketing in una singola immagine ad Alta Gamma Dinamica (HDR).",
       "descriptionWithCount_many": "",
       "descriptionWithCount_other": "Unisci {{count}} esposizioni in bracketing in una singola immagine ad Alta Gamma Dinamica (HDR).",
+      "dryRunCommandMode": "",
+      "dryRunCommandModeValue": "",
+      "dryRunCommandSources": "",
+      "dryRunCommandTool": "",
       "exposureWeighting": {
         "balanced": "",
         "liftShadows": "",

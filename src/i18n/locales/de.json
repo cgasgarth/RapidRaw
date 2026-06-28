@@ -2374,6 +2374,10 @@
       "descriptionWithCount": "Kombinieren Sie {{count}} Belichtungen zu einem einzigen High Dynamic Range Bild.",
       "descriptionWithCount_one": "Kombinieren Sie {{count}} Belichtung zu einem einzigen High Dynamic Range Bild.",
       "descriptionWithCount_other": "Kombinieren Sie {{count}} Belichtungen zu einem einzigen High Dynamic Range Bild.",
+      "dryRunCommandMode": "",
+      "dryRunCommandModeValue": "",
+      "dryRunCommandSources": "",
+      "dryRunCommandTool": "",
       "exposureWeighting": {
         "balanced": "",
         "liftShadows": "",

@@ -69,10 +69,16 @@ export interface HdrModalState {
   isOpen: boolean;
   isProcessing: boolean;
   lastDryRunCommand?: {
-    toolName: string;
     commandType: 'computationalMerge.createHdr';
+    deghosting: HdrMergeUiSettings['deghosting'];
     dryRun: true;
+    exposureWeightingMode: HdrMergeUiSettings['exposureWeightingMode'];
+    maxPreviewDimensionPx: number;
+    mergeStrategy: HdrMergeUiSettings['mergeStrategy'];
+    selectedSourceIndexes: HdrMergeUiSettings['selectedSourceIndexes'];
     sources: number;
+    toneMappingPreset: HdrMergeUiSettings['toneMappingPreset'];
+    toolName: string;
   };
   progressMessage: string | null;
   settings: HdrMergeUiSettings;

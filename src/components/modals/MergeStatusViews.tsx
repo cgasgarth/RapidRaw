@@ -83,6 +83,7 @@ export function MergeResultPreview({
 }
 
 interface MergeProcessingStateProps {
+  children?: ReactNode;
   initialLabel: string;
   loadingImageUrl?: string | null | undefined;
   progressMessage: string | null;
@@ -92,6 +93,7 @@ interface MergeProcessingStateProps {
 }
 
 export function MergeProcessingState({
+  children,
   initialLabel,
   loadingImageUrl,
   progressMessage,
@@ -142,6 +144,7 @@ export function MergeProcessingState({
           <UiText variant={TextVariants.small} className="mt-6 text-center max-w-xs opacity-60">
             {speedNotice}
           </UiText>
+          {children}
         </motion.div>
       </div>
     </div>

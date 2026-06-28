@@ -2371,6 +2371,10 @@
       "descriptionWithCount_one": "Combina {{count}} exposición en horquilla en una sola imagen de Alto Rango Dinámico.",
       "descriptionWithCount_many": "",
       "descriptionWithCount_other": "Combina {{count}} exposiciones en horquilla en una sola imagen de Alto Rango Dinámico.",
+      "dryRunCommandMode": "",
+      "dryRunCommandModeValue": "",
+      "dryRunCommandSources": "",
+      "dryRunCommandTool": "",
       "exposureWeighting": {
         "balanced": "",
         "liftShadows": "",

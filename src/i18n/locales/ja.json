@@ -2262,6 +2262,10 @@
       "descriptionWithCount": "{{count}} 枚のブラケット露出を1枚のHDR画像に統合します。",
       "descriptionWithCount_one": "{{count}} 枚のブラケット露出を1枚のHDR画像に統合します。",
       "descriptionWithCount_other": "{{count}} 枚のブラケット露出を1枚のHDR画像に統合します。",
+      "dryRunCommandMode": "",
+      "dryRunCommandModeValue": "",
+      "dryRunCommandSources": "",
+      "dryRunCommandTool": "",
       "exposureWeighting": {
         "balanced": "",
         "liftShadows": "",
