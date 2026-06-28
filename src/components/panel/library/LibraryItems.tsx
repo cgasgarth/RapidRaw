@@ -7,6 +7,7 @@ import {
   SlidersHorizontal,
   Images,
   CloudOff,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   memo,
@@ -26,6 +27,7 @@ import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import { COLOR_LABELS, type Color } from '../../../utils/adjustments';
+import { buildRawQualityBadges, formatRawQualityBadgeTooltip } from '../../../utils/rawQualityBadges';
 import { ThumbnailAspectRatio, type ImageFile, ExifOverlay } from '../../ui/AppProperties';
 import UiText from '../../ui/Text';
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
@@ -166,6 +168,38 @@ const AutoStackBadge = ({
       <span>{label}</span>
       <span>{stack.count}</span>
     </button>
+  );
+};
+
+const RawQualityBadgeCluster = ({ exif, compact = false }: { compact?: boolean; exif: ImageFile['exif'] }) => {
+  const badges = useMemo(() => buildRawQualityBadges(exif), [exif]);
+  if (badges.length === 0) return null;
+
+  return (
+    <div
+      className={cx('flex items-center gap-1', compact ? 'justify-start' : 'absolute bottom-1.5 left-1.5 z-20')}
+      data-raw-quality-badge-count={badges.length}
+      data-testid="raw-quality-thumbnail-badges"
+      data-tooltip={formatRawQualityBadgeTooltip(badges)}
+    >
+      {badges.map((badge) => (
+        <span
+          key={badge.code}
+          className={cx(
+            'inline-flex h-5 items-center gap-1 rounded-full border px-1.5 text-[10px] font-semibold shadow-md backdrop-blur',
+            badge.severity === 'warning'
+              ? 'border-amber-300/35 bg-amber-500/20 text-amber-100'
+              : 'border-sky-300/30 bg-sky-500/20 text-sky-100',
+          )}
+          data-raw-quality-badge-code={badge.code}
+          data-raw-quality-badge-detail={badge.detail}
+          data-raw-quality-badge-severity={badge.severity}
+        >
+          {badge.severity === 'warning' ? <AlertTriangle size={11} /> : null}
+          <span>{badge.label}</span>
+        </span>
+      ))}
+    </div>
   );
 };
 
@@ -366,6 +400,7 @@ const ThumbnailComponent = ({
             <CloudOff size={12} />
           </div>
         )}
+        <RawQualityBadgeCluster exif={exif} />
       </div>
 
       <div
@@ -812,6 +847,7 @@ const ListItemComponent = ({
             size={13}
           />
         )}
+        <RawQualityBadgeCluster compact exif={exif} />
       </div>
 
       <div style={{ width: getW('date') }} className="flex items-center px-3 h-full overflow-hidden">
