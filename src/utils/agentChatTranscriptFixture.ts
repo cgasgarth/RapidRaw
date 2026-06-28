@@ -577,6 +577,23 @@ const fixture = {
   toolCalls: [
     {
       approvalState: 'not_required',
+      durationMs: 91,
+      id: 'tool-live-context',
+      mode: 'read',
+      provenance: {
+        requestHash: 'sha256:2f13f1d19b4e0b51',
+        runtime: 'codex_app_server',
+        schema: 'liveAgentCurrentContext.v1',
+        sourceAssetHash: 'sha256:9d0f83a746a7d4e6',
+      },
+      status: 'succeeded',
+      summary: 'Bound DSC_2844.NEF and its editable virtual-copy graph as the live editor context.',
+      timestamp: '14:22:14',
+      title: 'Read live editor context',
+      toolName: 'rawengine.live_context',
+    },
+    {
+      approvalState: 'not_required',
       durationMs: 184,
       id: 'tool-1',
       mode: 'read',

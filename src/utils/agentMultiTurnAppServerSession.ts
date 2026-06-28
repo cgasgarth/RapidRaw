@@ -100,10 +100,14 @@ const sessionMessageSchema = z
 
 export const agentMultiTurnAppServerSessionResultSchema = z
   .object({
+    changedPixelCount: z.number().int().positive(),
+    changedPixelPercent: z.number().min(0).max(100),
     editReview: agentEditQualityReviewSchema,
     finalGraphRevision: z.string().trim().min(1),
     finalRecipeHash: z.string().trim().min(1),
     initialContext: agentInitialPromptContextSchema,
+    maxChannelDelta: z.number().nonnegative(),
+    meanLuminanceDelta: z.number().nonnegative(),
     messages: z.array(sessionMessageSchema).min(5),
     modelId: z.string().trim().min(1),
     previewLineage: z
@@ -123,6 +127,7 @@ export const agentMultiTurnAppServerSessionResultSchema = z
       .min(3),
     previews: z.array(agentPreviewEnvelopeSchema).min(3),
     rollbackGraphRevision: z.string().trim().min(1),
+    sampledPixelCount: z.number().int().positive(),
     sessionId: z.string().trim().min(1),
     toolCalls: z.array(sessionToolCallSchema).min(5),
     turnCount: z.number().int().min(2),
@@ -174,6 +179,11 @@ export const runAgentMultiTurnAppServerSession = async (
   const toolCalls: AgentMultiTurnAppServerSessionResult['toolCalls'] = [];
   let recipeHash = initialContext.preview.recipeHash;
   let finalGraphRevision = initialContext.imageContext.graphRevision;
+  let changedPixelCount = 0;
+  let changedPixelPercent = 0;
+  let maxChannelDelta = 0;
+  let meanLuminanceDelta = 0;
+  let sampledPixelCount = 0;
 
   for (const [index, turn] of parsedRequest.turns.entries()) {
     const turnNumber = index + 1;
@@ -197,6 +207,12 @@ export const runAgentMultiTurnAppServerSession = async (
       }),
     );
     finalGraphRevision = applyResult.appliedGraphRevision;
+    changedPixelCount += applyResult.changedPixelCount;
+    sampledPixelCount += applyResult.sampledPixelCount;
+    maxChannelDelta = Math.max(maxChannelDelta, applyResult.maxChannelDelta);
+    meanLuminanceDelta += applyResult.meanLuminanceDelta;
+    changedPixelPercent =
+      sampledPixelCount === 0 ? 0 : Number(((changedPixelCount / sampledPixelCount) * 100).toFixed(1));
     toolCalls.push({
       id: applyToolCallId,
       name: applyResult.toolName,
@@ -281,15 +297,20 @@ export const runAgentMultiTurnAppServerSession = async (
   messages.push({ content: editReview.finalRationale, role: 'assistant', turn: parsedRequest.turns.length + 1 });
 
   return agentMultiTurnAppServerSessionResultSchema.parse({
+    changedPixelCount,
+    changedPixelPercent,
     editReview,
     finalGraphRevision,
     finalRecipeHash: recipeHash,
     initialContext,
+    maxChannelDelta,
+    meanLuminanceDelta: Number((meanLuminanceDelta / parsedRequest.turns.length).toFixed(4)),
     messages,
     modelId: parsedRequest.modelId,
     previewLineage,
     previews,
     rollbackGraphRevision: checkpoint.graphRevision,
+    sampledPixelCount,
     sessionId: parsedRequest.sessionId,
     toolCalls,
     turnCount: parsedRequest.turns.length,

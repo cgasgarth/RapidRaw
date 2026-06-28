@@ -664,9 +664,14 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
       const nextResult = {
         ...applyingResult,
         appliedGraphRevision: sessionResult.finalGraphRevision,
+        changedPixelCount: sessionResult.changedPixelCount,
+        changedPixelPercent: sessionResult.changedPixelPercent,
+        maxChannelDelta: sessionResult.maxChannelDelta,
+        meanLuminanceDelta: sessionResult.meanLuminanceDelta,
         previewAfterHash: afterPreview.renderHash,
         previewBeforeHash: beforePreview.renderHash,
         recipeName: sessionResult.finalRecipeHash,
+        sampledPixelCount: sessionResult.sampledPixelCount,
         status: 'applied',
       } satisfies LivePromptResult;
       setSessionReview({
