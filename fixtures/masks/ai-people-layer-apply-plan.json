@@ -38,6 +38,30 @@
           "personId": "person-1"
         },
         "visible": true
+      },
+      {
+        "artifactId": "fake.people.person-1.hair.v1",
+        "layerId": "layer.fake.people.person-1.hair.v1",
+        "maskOperationId": "operation.fake.people.person-1.hair.v1",
+        "name": "People Hair person-1",
+        "opacity": 100,
+        "target": {
+          "part": "hair",
+          "personId": "person-1"
+        },
+        "visible": true
+      },
+      {
+        "artifactId": "fake.people.person-1.clothing.v1",
+        "layerId": "layer.fake.people.person-1.clothing.v1",
+        "maskOperationId": "operation.fake.people.person-1.clothing.v1",
+        "name": "People Clothing person-1",
+        "opacity": 100,
+        "target": {
+          "part": "clothing",
+          "personId": "person-1"
+        },
+        "visible": true
       }
     ],
     "providerTier": "fake_provider",

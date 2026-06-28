@@ -44,12 +44,12 @@
             "validationMode": "dry_run"
           },
           {
-            "disabledReason": "Planned runtime target: Hair is high-value but requires dedicated parser validation around edges and wisps.",
+            "disabledReason": null,
             "label": "Hair",
             "part": "hair",
             "recommendedDefault": false,
-            "status": "planned",
-            "validationMode": "dry_run"
+            "status": "supported",
+            "validationMode": "runtime_apply"
           },
           {
             "disabledReason": "Planned runtime target: Eyes need face-detail parsing and should stay out of runtime until quality proof exists.",

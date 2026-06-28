@@ -29,17 +29,9 @@ const options = actualModel.groups.flatMap((group) => group.options);
 const selectableParts = new Set(
   options.filter((option) => option.disabledReason === null).map((option) => option.part),
 );
-for (const expectedSelectablePart of ['background', 'clothing', 'face', 'full_person']) {
+for (const expectedSelectablePart of ['background', 'clothing', 'face', 'full_person', 'hair']) {
   if (!selectableParts.has(expectedSelectablePart)) {
     console.error(`${expectedSelectablePart}: expected selectable runtime people-mask part`);
-    process.exit(1);
-  }
-}
-
-for (const expectedDisabledPart of ['hair']) {
-  const option = options.find((candidate) => candidate.part === expectedDisabledPart);
-  if (option?.disabledReason === null || option === undefined) {
-    console.error(`${expectedDisabledPart}: expected disabled until runtime provider proof lands`);
     process.exit(1);
   }
 }
@@ -83,7 +75,7 @@ if (!maskPanelSource.includes('activeSubMask.type === Mask.AiPerson')) {
 for (const marker of [
   'getAiPeopleMaskPartCapability(part)',
   "part === 'face' || part === 'full_person'",
-  "part === 'face' || part === 'full_person' || part === 'clothing'",
+  "part === 'face' || part === 'full_person' || part === 'clothing' || part === 'hair'",
   "capability.validationMode !== 'runtime_apply'",
 ]) {
   if (!hookSource.includes(marker)) {

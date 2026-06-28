@@ -64,6 +64,28 @@
         "personId": "person-1"
       },
       "width": 8
+    },
+    {
+      "artifactId": "fake.people.person-1.hair.v1",
+      "coverage": 0.015625,
+      "height": 8,
+      "rows": ["........", "........", "..#.....", "........", "........", "........", "........", "........"],
+      "target": {
+        "part": "hair",
+        "personId": "person-1"
+      },
+      "width": 8
+    },
+    {
+      "artifactId": "fake.people.person-1.clothing.v1",
+      "coverage": 0.09375,
+      "height": 8,
+      "rows": ["........", "........", "........", "........", ".##.....", ".##.....", ".##.....", "........"],
+      "target": {
+        "part": "clothing",
+        "personId": "person-1"
+      },
+      "width": 8
     }
   ],
   "issue": 1133,

@@ -36,11 +36,11 @@ export const AI_PEOPLE_MASK_PART_CAPABILITIES: Array<AiPeopleMaskProviderCapabil
       validationMode: 'dry_run',
     },
     {
-      notes: 'Hair is high-value but requires dedicated parser validation around edges and wisps.',
+      notes: 'Hair uses the model-backed human parser hair class with dedicated provenance and edge-risk validation.',
       part: 'hair',
       providerTier: 'person_parser',
-      status: 'planned',
-      validationMode: 'dry_run',
+      status: 'supported',
+      validationMode: 'runtime_apply',
     },
     {
       notes: 'Clothing uses the model-backed human parser by merging top-clothes and bottom-clothes classes.',
