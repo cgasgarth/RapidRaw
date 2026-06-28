@@ -29,8 +29,10 @@ import type { FocusStackSourcePreflightMetadata } from '../../utils/focusStackSo
 
 interface FocusStackModalProps {
   isOpen: boolean;
+  lastApplyCommand?: FocusStackModalState['lastApplyCommand'];
   lastDryRunCommand?: FocusStackModalState['lastDryRunCommand'];
   loadingImageUrl?: string | null;
+  onApplyPlan: () => void;
   onClose: () => void;
   onPreviewPlan: () => void;
   onSettingsChange: (settings: FocusStackUiSettings) => void;
@@ -48,8 +50,10 @@ const reviewArtifactPath = '/tmp/rawengine-focus-stack-smoke.tif';
 
 export default function FocusStackModal({
   isOpen,
+  lastApplyCommand,
   lastDryRunCommand,
   loadingImageUrl,
+  onApplyPlan,
   onClose,
   onPreviewPlan,
   onSettingsChange,
@@ -129,6 +133,11 @@ export default function FocusStackModal({
       sourceCount: fallbackOutputReviewSourceCount,
     });
   const hasRuntimeOutputReview = runtimeOutputReview !== null && runtimeOutputReview !== undefined;
+  const isApplyPlanReady =
+    isPreviewPlanReady &&
+    hasRuntimeOutputReview &&
+    outputReview.decision !== 'preview_only' &&
+    outputReview.editableHandoff.status !== 'blocked';
   const previewPlanStatusLabel = hasRuntimeOutputReview
     ? t('modals.focusStack.previewPlanReady')
     : t('modals.focusStack.previewPlanPending');
@@ -193,6 +202,10 @@ export default function FocusStackModal({
           <Button onClick={onPreviewPlan} disabled={!isPreviewPlanReady}>
             <Layers3 className="w-4 h-4" />
             {hasRuntimeOutputReview ? t('modals.focusStack.refreshPreviewPlan') : t('modals.focusStack.previewPlan')}
+          </Button>
+          <Button onClick={onApplyPlan} disabled={!isApplyPlanReady}>
+            <CheckCircle2 className="w-4 h-4" />
+            {t('modals.transform.apply')}
           </Button>
         </>
       }
@@ -304,6 +317,43 @@ export default function FocusStackModal({
             {
               label: t('modals.focusStack.dryRunCommandMode'),
               value: t('modals.focusStack.dryRunCommandModeValue'),
+            },
+          ].map((item) => (
+            <div className="rounded border border-border-color bg-bg-primary px-2 py-1.5" key={item.label}>
+              <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                {item.label}
+              </UiText>
+              <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                {item.value}
+              </UiText>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {lastApplyCommand && (
+        <section
+          className="grid grid-cols-3 gap-2 rounded-md border border-border-color bg-bg-secondary/70 p-3 text-xs"
+          data-accepted-dry-run-plan-hash={lastApplyCommand.acceptedDryRunPlanHash}
+          data-accepted-dry-run-plan-id={lastApplyCommand.acceptedDryRunPlanId}
+          data-command-type={lastApplyCommand.commandType}
+          data-dry-run={String(lastApplyCommand.dryRun)}
+          data-source-count={lastApplyCommand.sources}
+          data-testid="focus-apply-command-state"
+          data-tool-name={lastApplyCommand.toolName}
+        >
+          {[
+            {
+              label: t('modals.focusStack.dryRunCommandTool'),
+              value: lastApplyCommand.toolName,
+            },
+            {
+              label: t('modals.focusStack.previewPlanStatus'),
+              value: t('modals.focusStack.review.haloReviewStatus.apply_ready'),
+            },
+            {
+              label: t('modals.focusStack.review.editableArtifact'),
+              value: lastApplyCommand.acceptedDryRunPlanId,
             },
           ].map((item) => (
             <div className="rounded border border-border-color bg-bg-primary px-2 py-1.5" key={item.label}>

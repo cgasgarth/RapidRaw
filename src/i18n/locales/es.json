@@ -2253,6 +2253,9 @@
       "review": {
         "editableArtifact": "",
         "exportHandoff": "",
+        "haloReviewStatus": {
+          "apply_ready": ""
+        },
         "haloReviewSummary": "",
         "haloReviewTitle": "",
         "haloRiskCells": "",
