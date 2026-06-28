@@ -3256,6 +3256,14 @@ function SuperResolutionVisualSmoke() {
         </div>
         <SuperResolutionModal
           isOpen
+          lastApplyCommand={{
+            acceptedDryRunPlanHash: outputReview.outputArtifactHash,
+            acceptedDryRunPlanId: 'super_resolution_plan_5',
+            commandType: 'computationalMerge.createSuperResolution',
+            dryRun: false,
+            sources: 5,
+            toolName: getComputationalMergeAppServerRoutePairSummary('super_resolution').applyToolName,
+          }}
           lastDryRunCommand={{
             commandType: 'computationalMerge.createSuperResolution',
             dryRun: true,
@@ -3263,6 +3271,7 @@ function SuperResolutionVisualSmoke() {
             toolName: getComputationalMergeAppServerRoutePairSummary('super_resolution').dryRunToolName,
           }}
           loadingImageUrl={panoramaPreviewUrl}
+          onApplyPlan={() => {}}
           onClose={() => {}}
           onPreviewPlan={() => {}}
           outputReview={outputReview}
@@ -3590,6 +3599,7 @@ function SuperResolutionPrivateRawModalReviewSmoke() {
       <SuperResolutionModal
         isOpen
         loadingImageUrl={proof.previewDataUrl}
+        onApplyPlan={() => {}}
         onClose={() => {}}
         onPreviewPlan={() => {
           setPreviewRequested(true);

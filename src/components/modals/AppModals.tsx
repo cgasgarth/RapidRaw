@@ -286,6 +286,7 @@ export default function AppModals(props: AppModalsProps) {
       />
       <SuperResolutionModal
         isOpen={superResolutionModalState.isOpen}
+        lastApplyCommand={superResolutionModalState.lastApplyCommand}
         lastDryRunCommand={superResolutionModalState.lastDryRunCommand}
         loadingImageUrl={
           superResolutionModalState.sourcePaths.length > 0
@@ -302,6 +303,34 @@ export default function AppModals(props: AppModalsProps) {
             superResolutionModalState: createDefaultSuperResolutionModalState(state.superResolutionModalState.settings),
           }));
         }}
+        onApplyPlan={() => {
+          if (superResolutionModalState.outputReview === null) return;
+          const routePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');
+          const acceptedDryRunPlanId = `super_resolution_plan_${superResolutionModalState.sourcePaths.length}`;
+          const acceptedDryRunPlanHash = superResolutionModalState.outputReview.outputArtifactHash;
+          setUI({
+            superResolutionModalState: {
+              ...superResolutionModalState,
+              lastApplyCommand: {
+                acceptedDryRunPlanHash,
+                acceptedDryRunPlanId,
+                commandType: 'computationalMerge.createSuperResolution' as const,
+                dryRun: false as const,
+                sources: superResolutionModalState.sourcePaths.length,
+                toolName: routePair.applyToolName,
+              },
+              outputReview: {
+                ...superResolutionModalState.outputReview,
+                editableGate: 'ready',
+                humanReviewStatus: 'passed',
+                supportMap: {
+                  ...superResolutionModalState.outputReview.supportMap,
+                  reviewStatus: 'apply_ready',
+                },
+              },
+            },
+          });
+        }}
         onPreviewPlan={() => {
           const lastDryRunCommand = {
             commandType: 'computationalMerge.createSuperResolution' as const,
@@ -309,9 +338,10 @@ export default function AppModals(props: AppModalsProps) {
             sources: superResolutionModalState.sourcePaths.length,
             toolName: getComputationalMergeAppServerRoutePairSummary('super_resolution').dryRunToolName,
           };
+          const { lastApplyCommand: _lastApplyCommand, ...nextSuperResolutionModalState } = superResolutionModalState;
           setUI({
             superResolutionModalState: {
-              ...superResolutionModalState,
+              ...nextSuperResolutionModalState,
               lastDryRunCommand,
               outputReview: buildSuperResolutionOutputReviewWorkflow({
                 artifactPath: `/tmp/rawengine-super-resolution-preview-plan-${superResolutionModalState.sourcePaths.length}.tif`,
@@ -323,8 +353,11 @@ export default function AppModals(props: AppModalsProps) {
         }}
         onSettingsChange={(settings) => {
           setUI((state) => {
-            const { lastDryRunCommand: _lastDryRunCommand, ...superResolutionModalState } =
-              state.superResolutionModalState;
+            const {
+              lastApplyCommand: _lastApplyCommand,
+              lastDryRunCommand: _lastDryRunCommand,
+              ...superResolutionModalState
+            } = state.superResolutionModalState;
             return {
               superResolutionModalState: {
                 ...superResolutionModalState,
