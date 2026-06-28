@@ -429,6 +429,7 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
           focusStackModalState: {
             ...state.focusStackModalState,
             isOpen: true,
+            outputReview: null,
             sourcePaths:
               selectedCommandPaths.length > 0 ? selectedCommandPaths : state.focusStackModalState.sourcePaths,
           },

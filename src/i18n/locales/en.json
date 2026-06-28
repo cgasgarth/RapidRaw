@@ -2237,12 +2237,13 @@
       "previewPlan": "Preview plan",
       "previewPlanPending": "Not previewed",
       "previewPlanReady": "Previewed",
-      "previewPlanStatus": "Plan",
+      "previewPlanStatus": "Preview state",
       "previewWorkloadValue": "{{value}} MP",
       "qualityBalanced": "Balanced",
       "qualityBest": "Best",
       "qualityLabel": "Quality",
       "qualityPreview": "Preview",
+      "refreshPreviewPlan": "Refresh plan",
       "retouchLabel": "Retouch layer",
       "retouchPolicy": {
         "generate_retouch_layer": {

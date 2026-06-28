@@ -99,6 +99,9 @@ export default function FocusStackModal({
       sourceCount: fallbackOutputReviewSourceCount,
     });
   const hasRuntimeOutputReview = runtimeOutputReview !== null && runtimeOutputReview !== undefined;
+  const previewPlanStatusLabel = hasRuntimeOutputReview
+    ? t('modals.focusStack.previewPlanReady')
+    : t('modals.focusStack.previewPlanPending');
   const outputReviewDecisionLabel = t(`modals.focusStack.review.decision.${outputReview.decision}`);
   const outputReviewWarningsLabel = outputReview.warningCodes
     .map((warningCode) => t(`modals.focusStack.review.warning.${warningCode}`))
@@ -159,7 +162,7 @@ export default function FocusStackModal({
           </button>
           <Button onClick={onPreviewPlan} disabled={!isSourceCountValid}>
             <Layers3 className="w-4 h-4" />
-            {t('modals.focusStack.previewPlan')}
+            {hasRuntimeOutputReview ? t('modals.focusStack.refreshPreviewPlan') : t('modals.focusStack.previewPlan')}
           </Button>
         </>
       }
@@ -199,7 +202,7 @@ export default function FocusStackModal({
         />
       </section>
       <section
-        className="grid grid-cols-4 gap-2 rounded-md border border-border-color bg-bg-secondary/70 p-2 text-sm"
+        className="grid grid-cols-2 gap-2 rounded-md border border-border-color bg-bg-secondary/70 p-2 text-sm lg:grid-cols-5"
         data-alignment-mode={settings.alignmentMode}
         data-blend-method={settings.blendMethod}
         data-source-count={sourceCount}
@@ -219,6 +222,7 @@ export default function FocusStackModal({
           value={t(`modals.focusStack.blendMethod.${settings.blendMethod}.label`)}
         />
         <ComputationalSetupStatusLine label={t('modals.focusStack.workflowTitle')} value={stackReadinessLabel} />
+        <ComputationalSetupStatusLine label={t('modals.focusStack.previewPlanStatus')} value={previewPlanStatusLabel} />
       </section>
 
       <section className="grid grid-cols-2 gap-4">
