@@ -100,6 +100,10 @@ import {
   reorderMaskListContainers,
   splitSubMaskToContainer,
 } from '../../../utils/maskClipboard';
+import {
+  nextMaskOverlayHotkeySettings,
+  saveMaskOverlaySettingsPreference,
+} from '../../../utils/maskOverlayPreferences';
 import { getMaskParameterNumber, mergeMaskParameters, toMaskParameterRecord } from '../../../utils/maskParameterAccess';
 import {
   createMaskRefinementCommand,
@@ -1165,10 +1169,40 @@ export function MasksPanel() {
   );
   const setMaskOverlaySettings = useCallback(
     (settings: MaskOverlaySettings) => {
-      setEditor({ maskOverlaySettings: settings });
+      setEditor({ maskOverlaySettings: saveMaskOverlaySettingsPreference(settings) });
     },
     [setEditor],
   );
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      const isEditableTarget =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable);
+
+      if (
+        isEditableTarget ||
+        event.defaultPrevented ||
+        !event.shiftKey ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.code !== 'KeyO'
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      setMaskOverlaySettings(nextMaskOverlayHotkeySettings(useEditorStore.getState().maskOverlaySettings));
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [setMaskOverlaySettings]);
   const onSelectContainer = useCallback(
     (id: string | null) => {
       setEditor({ activeMaskContainerId: id });
@@ -1794,6 +1828,7 @@ export function MasksPanel() {
             settings={maskOverlaySettings}
             onChange={setMaskOverlaySettings}
             onDragStateChange={onDragStateChange}
+            hotkeyHint="Shift+O"
           />
         </div>
 

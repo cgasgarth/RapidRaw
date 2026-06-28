@@ -16,12 +16,18 @@ const MASK_OVERLAY_REVIEW_MODES = [
 ] as const satisfies ReadonlyArray<{ color: string; mode: Exclude<MaskOverlayMode, 'hidden'> }>;
 
 interface MaskOverlayReviewControlsProps {
+  hotkeyHint?: string;
   onChange: (settings: MaskOverlaySettings) => void;
   onDragStateChange: (isDragging: boolean) => void;
   settings: MaskOverlaySettings;
 }
 
-export function MaskOverlayReviewControls({ onChange, onDragStateChange, settings }: MaskOverlayReviewControlsProps) {
+export function MaskOverlayReviewControls({
+  hotkeyHint,
+  onChange,
+  onDragStateChange,
+  settings,
+}: MaskOverlayReviewControlsProps) {
   const { t } = useTranslation();
   const isEnabled = settings.mode !== 'hidden';
   const activeMode = isEnabled ? settings.mode : 'rubylith';
@@ -29,6 +35,10 @@ export function MaskOverlayReviewControls({ onChange, onDragStateChange, setting
   return (
     <div
       className="space-y-3 rounded-md border border-surface bg-card/40 p-3"
+      data-mask-overlay-edge-threshold={settings.edgeThreshold.toFixed(2)}
+      data-mask-overlay-hotkey={hotkeyHint}
+      data-mask-overlay-mode={settings.mode}
+      data-mask-overlay-opacity={settings.opacity.toFixed(2)}
       data-testid="mask-overlay-review-controls"
       onPointerDown={(event) => {
         event.stopPropagation();
@@ -51,6 +61,8 @@ export function MaskOverlayReviewControls({ onChange, onDragStateChange, setting
               type="button"
               aria-label={option.mode}
               aria-pressed={isActive && isEnabled}
+              data-mask-overlay-mode-option={option.mode}
+              data-testid={`mask-overlay-mode-${option.mode}`}
               className={cx(
                 'h-8 rounded-md border transition-colors',
                 isActive && isEnabled ? 'border-accent' : 'border-surface hover:border-text-secondary',
@@ -64,37 +76,41 @@ export function MaskOverlayReviewControls({ onChange, onDragStateChange, setting
         })}
       </div>
 
-      <AdjustmentSlider
-        defaultValue={50}
-        disabled={!isEnabled}
-        fillOrigin="min"
-        label={t('editor.masks.overlay.opacity')}
-        max={100}
-        min={0}
-        onDragStateChange={onDragStateChange}
-        onValueChange={(value) => {
-          onChange({ ...settings, opacity: value / 100 });
-        }}
-        step={1}
-        suffix="%"
-        value={Math.round(settings.opacity * 100)}
-      />
+      <div data-testid="mask-overlay-opacity-control">
+        <AdjustmentSlider
+          defaultValue={50}
+          disabled={!isEnabled}
+          fillOrigin="min"
+          label={t('editor.masks.overlay.opacity')}
+          max={100}
+          min={0}
+          onDragStateChange={onDragStateChange}
+          onValueChange={(value) => {
+            onChange({ ...settings, opacity: value / 100 });
+          }}
+          step={1}
+          suffix="%"
+          value={Math.round(settings.opacity * 100)}
+        />
+      </div>
 
-      <AdjustmentSlider
-        defaultValue={50}
-        disabled={!isEnabled || activeMode !== 'edges'}
-        fillOrigin="min"
-        label={t('editor.masks.overlay.edgeThreshold')}
-        max={100}
-        min={0}
-        onDragStateChange={onDragStateChange}
-        onValueChange={(value) => {
-          onChange({ ...settings, edgeThreshold: value / 100 });
-        }}
-        step={1}
-        suffix="%"
-        value={Math.round(settings.edgeThreshold * 100)}
-      />
+      <div data-testid="mask-overlay-edge-threshold-control">
+        <AdjustmentSlider
+          defaultValue={50}
+          disabled={!isEnabled || activeMode !== 'edges'}
+          fillOrigin="min"
+          label={t('editor.masks.overlay.edgeThreshold')}
+          max={100}
+          min={0}
+          onDragStateChange={onDragStateChange}
+          onValueChange={(value) => {
+            onChange({ ...settings, edgeThreshold: value / 100 });
+          }}
+          step={1}
+          suffix="%"
+          value={Math.round(settings.edgeThreshold * 100)}
+        />
+      </div>
     </div>
   );
 }
