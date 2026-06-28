@@ -296,6 +296,7 @@ function MessageBubble({ message }: { message: AgentChatMessage }) {
 }
 
 interface LivePromptComposerProps {
+  initialPromptPreviewContext: AgentInitialPromptPreviewContext | undefined;
   isContextReady: boolean;
   onResultChange?: (result: LivePromptResult) => void;
   onSessionEvent?: (event: LiveSessionEvent) => void;
@@ -462,7 +463,12 @@ function LiveSessionReviewPanel({ review }: { review: LiveSessionReviewState | n
   );
 }
 
-function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: LivePromptComposerProps) {
+function LivePromptComposer({
+  initialPromptPreviewContext,
+  isContextReady,
+  onResultChange,
+  onSessionEvent,
+}: LivePromptComposerProps) {
   const { t } = useTranslation();
   const promptInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [prompt, setPrompt] = useState('');
@@ -529,6 +535,17 @@ function LivePromptComposer({ isContextReady, onResultChange, onSessionEvent }: 
     if (!isContextReady || requestedPrompt.length === 0) return;
 
     try {
+      if (initialPromptPreviewContext !== undefined) {
+        pushActivityEntry({
+          body: `${initialPromptPreviewContext.purpose} ${initialPromptPreviewContext.artifactId}`,
+          graphRevision: initialPromptPreviewContext.graphRevision,
+          kind: 'preview',
+          previewAfterHash: initialPromptPreviewContext.renderHash,
+          recipeHash: initialPromptPreviewContext.recipeHash,
+          status: 'completed',
+          toolName: 'rawengine.agent.initial_prompt_preview',
+        });
+      }
       pushActivityEntry({
         body: requestedPrompt,
         kind: 'prompt',
@@ -1976,6 +1993,7 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
       </div>
 
       <LivePromptComposer
+        initialPromptPreviewContext={transcript.initialPromptPreviewContext}
         isContextReady={isContextReady}
         onResultChange={setLivePromptResult}
         onSessionEvent={(event) => {
