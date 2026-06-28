@@ -49,6 +49,10 @@ const requiredShellMarkers = [
   "setSessionReview((review) => (review === null ? null : { ...review, rollbackState: 'restored' }))",
   "t('editor.ai.agent.composer.status.dry_run_ready')",
   "t('editor.ai.agent.composer.status.applied')",
+  'data-testid="agent-live-apply-receipt"',
+  "t('editor.ai.agent.composer.applyReceipt')",
+  "t('editor.ai.agent.composer.applyReceiptPixels'",
+  'data-tool-call-count={sessionReview?.toolCallCount.toString()',
   "t('editor.ai.agent.composer.status.rolled_back')",
   'disabled={!isContextReady}',
 ];
