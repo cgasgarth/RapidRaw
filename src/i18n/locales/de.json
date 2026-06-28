@@ -636,6 +636,25 @@
           "read": ""
         },
         "noAppliedEdits": "",
+        "previewLineage": {
+          "meta": {
+            "artifact": "artifact",
+            "recipeHash": "recipe",
+            "renderHash": "render",
+            "tool": "tool"
+          },
+          "purpose": {
+            "detail_review": "detail",
+            "initial_context": "initial",
+            "refresh": "refresh"
+          },
+          "role": {
+            "before": "Before",
+            "detail": "Detail",
+            "final": "Final",
+            "refresh": "Refresh"
+          }
+        },
         "privateRawArtifacts": {
           "artifacts": "",
           "fixture": "",
