@@ -1,4 +1,16 @@
-import { Battery, Camera, CheckCircle2, HardDrive, Images, Pin, RefreshCcw, Usb, AlertTriangle } from 'lucide-react';
+import {
+  AlertTriangle,
+  Battery,
+  Camera,
+  CheckCircle2,
+  Crosshair,
+  Eye,
+  HardDrive,
+  Images,
+  Pin,
+  RefreshCcw,
+  Usb,
+} from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -41,6 +53,7 @@ interface TetherPanelProps {
 }
 
 type TetherReviewMode = 'holdCurrent' | 'newest' | 'pinned';
+type TetherLiveViewStatus = 'off' | 'running';
 
 const capabilityTone: Record<TetherCapability['status'], string> = {
   not_checked: 'border-yellow-500/40 bg-yellow-500/10 text-yellow-200',
@@ -104,6 +117,9 @@ export function TetherPanel({
   const [ingestPresetId, setIngestPresetId] = useState<TetherCaptureRequest['ingestPresetId']>('timestampCamera');
   const [metadataTemplateId, setMetadataTemplateId] = useState<TetherCaptureRequest['metadataTemplateId']>('none');
   const [reviewMode, setReviewMode] = useState<TetherReviewMode>('newest');
+  const [liveViewStatus, setLiveViewStatus] = useState<TetherLiveViewStatus>('off');
+  const [isFocusPeakingEnabled, setIsFocusPeakingEnabled] = useState(true);
+  const [liveViewFrame, setLiveViewFrame] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isCaptureBusy, setIsCaptureBusy] = useState(false);
   const [isSessionBusy, setIsSessionBusy] = useState(false);
@@ -113,6 +129,9 @@ export function TetherPanel({
   const isSessionOpen = session !== null;
   const isSessionCaptureReady = session?.status === 'open';
   const isReconnectRequired = session?.status === 'reconnect_required';
+  const isLiveViewSupported = discovery?.provider.mode === 'fake' && isSessionCaptureReady;
+  const effectiveLiveViewStatus: TetherLiveViewStatus = isLiveViewSupported ? liveViewStatus : 'off';
+  const isLiveViewRunning = effectiveLiveViewStatus === 'running';
   const captureProofReceipt = capture === null ? null : buildTetherIngestProofReceipt(capture);
   const recoveryProofReceipt = session === null ? null : buildTetherRecoveryProofReceipt(session);
 
@@ -167,12 +186,18 @@ export function TetherPanel({
       setSession(response.session);
       setCapture(null);
       setCaptures([]);
+      setLiveViewStatus('off');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsSessionBusy(false);
     }
   }, [closeSession]);
+
+  const toggleLiveView = useCallback(() => {
+    if (!isLiveViewSupported && !isLiveViewRunning) return;
+    setLiveViewStatus((currentStatus) => (currentStatus === 'running' ? 'off' : 'running'));
+  }, [isLiveViewRunning, isLiveViewSupported]);
 
   const triggerCapture = useCallback(async () => {
     setIsCaptureBusy(true);
@@ -286,6 +311,18 @@ export function TetherPanel({
     };
   }, [discover, refreshSession]);
 
+  useEffect(() => {
+    if (!isLiveViewRunning) return undefined;
+
+    const intervalId = window.setInterval(() => {
+      setLiveViewFrame((currentFrame) => (currentFrame + 1) % 10_000);
+    }, 250);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isLiveViewRunning]);
+
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4" data-testid="tether-panel">
       <div className="flex items-start justify-between gap-3">
@@ -345,6 +382,65 @@ export function TetherPanel({
         <Camera size={14} />
         {isCaptureBusy ? t('editor.tether.captureBusy') : t('editor.tether.capture')}
       </Button>
+
+      <section
+        className="rounded-md border border-border-color bg-bg-secondary p-3"
+        data-focus-peaking-enabled={String(isFocusPeakingEnabled)}
+        data-frame-rate="4"
+        data-live-view-supported={String(isLiveViewSupported)}
+        data-live-view-status={effectiveLiveViewStatus}
+        data-testid="tether-live-view"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Eye size={16} className={isLiveViewRunning ? 'text-green-300' : 'text-text-secondary'} />
+            <UiText variant={TextVariants.label}>{t('editor.tether.liveView')}</UiText>
+          </div>
+          <Button
+            className={tetherDisabledControlClassName}
+            data-testid="tether-live-view-toggle"
+            disabled={!isLiveViewSupported}
+            onClick={toggleLiveView}
+            size="sm"
+          >
+            {isLiveViewRunning ? t('editor.tether.stopLiveView') : t('editor.tether.startLiveView')}
+          </Button>
+        </div>
+        <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+          {isLiveViewSupported ? t('editor.tether.liveViewReady') : t('editor.tether.liveViewRequiresSession')}
+        </UiText>
+        <div
+          className="relative mt-3 aspect-video overflow-hidden rounded border border-border-color bg-gradient-to-br from-[#17202a] via-[#30444c] to-[#d7b36a]"
+          data-live-frame={liveViewFrame}
+          data-testid="tether-live-view-preview"
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_58%_44%,rgba(255,255,255,0.22),transparent_18%),linear-gradient(135deg,rgba(0,0,0,0.38),transparent_45%)]" />
+          {isLiveViewRunning && isFocusPeakingEnabled && (
+            <div
+              className="absolute left-[31%] top-[24%] h-[38%] w-[34%] rounded-full border border-lime-300/80 shadow-[0_0_18px_rgba(190,242,100,0.7)]"
+              data-testid="tether-live-view-focus-peaking"
+            />
+          )}
+          <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-1 text-[10px] text-white">
+            {t('editor.tether.liveViewFps', { fps: 4 })}
+          </div>
+        </div>
+        <label className="mt-3 flex items-center justify-between gap-3 rounded border border-border-color bg-bg-primary px-2 py-1.5">
+          <span className="inline-flex items-center gap-2 text-xs text-text-secondary">
+            <Crosshair size={14} />
+            {t('editor.tether.focusPeaking')}
+          </span>
+          <input
+            checked={isFocusPeakingEnabled}
+            className="h-4 w-4"
+            data-testid="tether-focus-peaking-toggle"
+            onChange={(event) => {
+              setIsFocusPeakingEnabled(event.target.checked);
+            }}
+            type="checkbox"
+          />
+        </label>
+      </section>
 
       <section
         className="rounded-md border border-border-color bg-bg-secondary p-3"

@@ -244,6 +244,7 @@ impl TetherProvider for FakeTetherProvider {
                     capability("discovery", "Discovery", "ready"),
                     capability("battery_status", "Battery reported", "ready"),
                     capability("storage_status", "Storage reported", "ready"),
+                    capability("live_view", "Live view simulator", "ready"),
                     capability(
                         "remote_capture",
                         "Remote capture not implemented",
@@ -1399,6 +1400,12 @@ mod tests {
         assert_eq!(response.provider.status, "ready");
         assert_eq!(response.cameras[0].display_name, "Sony ILCE-7M4");
         assert!(response.cameras[0].connection.trusted);
+        assert!(
+            response.cameras[0]
+                .capabilities
+                .iter()
+                .any(|capability| capability.id == "live_view" && capability.status == "ready")
+        );
         assert_eq!(response.cameras[0].controls.len(), 3);
         assert_eq!(response.cameras[0].controls[0].id, "iso");
         assert_eq!(response.cameras[0].controls[0].current_value, "400");

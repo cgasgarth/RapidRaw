@@ -256,6 +256,7 @@ const tetherDiscoveryMockResponse: TetherDiscoveryResponse = {
         { id: 'discovery', label: 'Discovery', status: 'ready' },
         { id: 'battery_status', label: 'Battery reported', status: 'ready' },
         { id: 'storage_status', label: 'Storage reported', status: 'ready' },
+        { id: 'live_view', label: 'Live view simulator', status: 'ready' },
         { id: 'remote_capture', label: 'Remote capture ready', status: 'ready' },
       ],
       connection: {

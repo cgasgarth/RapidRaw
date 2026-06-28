@@ -1248,12 +1248,24 @@ async function prepareScenario(page, mode) {
         timeout: 10_000,
       });
     const readyBadgeCount = await page.locator('[data-capability-status="ready"]').count();
-    if (readyBadgeCount !== 4) {
-      throw new Error(`Expected 4 ready tether capabilities, found ${readyBadgeCount}.`);
+    if (readyBadgeCount !== 5) {
+      throw new Error(`Expected 5 ready tether capabilities, found ${readyBadgeCount}.`);
     }
     await page.locator('[data-testid="tether-session-status"][data-session-status="open"]').waitFor({
       timeout: 10_000,
     });
+    await page
+      .locator('[data-testid="tether-live-view"][data-live-view-supported="true"][data-live-view-status="off"]')
+      .waitFor({
+        timeout: 10_000,
+      });
+    await page.getByTestId('tether-live-view-toggle').click();
+    await page
+      .locator('[data-testid="tether-live-view"][data-live-view-status="running"][data-frame-rate="4"]')
+      .waitFor({
+        timeout: 10_000,
+      });
+    await page.getByTestId('tether-live-view-focus-peaking').waitFor({ timeout: 10_000 });
     await page.getByTestId('tether-open-session').evaluate((button) => {
       if (!(button instanceof HTMLButtonElement) || !button.disabled) {
         throw new Error('Expected restored tether session to disable opening another session.');
