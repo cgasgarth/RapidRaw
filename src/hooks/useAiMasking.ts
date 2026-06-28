@@ -386,7 +386,7 @@ export function useAiMasking() {
     if (!selectedImage?.path) return;
 
     const capability = getAiPeopleMaskPartCapability(part);
-    const isCommandSupported = part === 'face' || part === 'full_person' || part === 'clothing';
+    const isCommandSupported = part === 'face' || part === 'full_person' || part === 'clothing' || part === 'hair';
     if (capability.validationMode !== 'runtime_apply' || !isCommandSupported) {
       toast.error(`AI ${part} Mask unavailable: ${capability.notes}`);
       return;
@@ -410,7 +410,8 @@ export function useAiMasking() {
         .find((sm: SubMask) => sm.id === subMaskId);
       const mergedParameters = mergeMaskParameters(subMask?.parameters, {
         ...newParameters,
-        providerTier: part === 'face' ? 'macos_face' : part === 'clothing' ? 'person_parser' : 'macos_vision',
+        providerTier:
+          part === 'face' ? 'macos_face' : part === 'clothing' || part === 'hair' ? 'person_parser' : 'macos_vision',
         target: { part, personId: null },
       });
       patchesSentToBackend.delete(subMaskId);

@@ -165,6 +165,14 @@ export const MASK_PANEL_CREATION_TYPES: Array<MaskType> = [
   {
     disabled: false,
     icon: User,
+    id: 'person-hair',
+    name: 'Hair',
+    personPart: 'hair',
+    type: Mask.AiPerson,
+  },
+  {
+    disabled: false,
+    icon: User,
     id: 'person-clothing',
     name: 'Clothing',
     personPart: 'clothing',

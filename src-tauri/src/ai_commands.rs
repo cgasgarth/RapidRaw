@@ -277,7 +277,7 @@ pub async fn generate_ai_person_part_mask(
         "full_person" => {
             crate::person_segmentation::generate_whole_person_mask(warped_image.as_ref())?
         }
-        "clothing" => {
+        "clothing" | "hair" => {
             let parser = get_or_init_person_part_parser_model(
                 &app_handle,
                 &state.ai_state,
@@ -285,7 +285,11 @@ pub async fn generate_ai_person_part_mask(
             )
             .await
             .map_err(|error| error.to_string())?;
-            let target = crate::person_part_parser::PersonPartMaskTarget::Clothing;
+            let target = if part == "hair" {
+                crate::person_part_parser::PersonPartMaskTarget::Hair
+            } else {
+                crate::person_part_parser::PersonPartMaskTarget::Clothing
+            };
             provenance = Some(crate::person_part_parser::person_part_parser_provenance(
                 target,
             ));
@@ -298,7 +302,7 @@ pub async fn generate_ai_person_part_mask(
         }
         unsupported => {
             return Err(format!(
-                "Unsupported person mask part '{unsupported}'. Supported runtime parts: face, full_person, clothing"
+                "Unsupported person mask part '{unsupported}'. Supported runtime parts: face, full_person, clothing, hair"
             ));
         }
     };

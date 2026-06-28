@@ -14,7 +14,6 @@ use crate::ai_processing::{
 
 const PERSON_PART_CLASS_COUNT: usize = 20;
 const PERSON_PART_BACKGROUND_CLASS: usize = 0;
-#[cfg(test)]
 const PERSON_PART_HAIR_CLASS: usize = 2;
 const PERSON_PART_TOP_CLOTHES_CLASS: usize = 5;
 const PERSON_PART_BOTTOM_CLOTHES_CLASS: usize = 9;
@@ -22,6 +21,7 @@ const PERSON_PART_BOTTOM_CLOTHES_CLASS: usize = 9;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PersonPartMaskTarget {
     Clothing,
+    Hair,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -170,6 +170,7 @@ impl PersonPartMaskTarget {
     fn as_str(self) -> &'static str {
         match self {
             Self::Clothing => "clothing",
+            Self::Hair => "hair",
         }
     }
 
@@ -179,6 +180,7 @@ impl PersonPartMaskTarget {
                 PERSON_PART_TOP_CLOTHES_CLASS,
                 PERSON_PART_BOTTOM_CLOTHES_CLASS,
             ],
+            Self::Hair => &[PERSON_PART_HAIR_CLASS],
         }
     }
 }
@@ -224,11 +226,39 @@ mod tests {
     }
 
     #[test]
+    fn hair_mask_selects_hair_and_excludes_clothing() {
+        let size = crate::ai_processing::PERSON_PART_PARSER_INPUT_SIZE as usize;
+        let mut classes = vec![PERSON_PART_BACKGROUND_CLASS; size * size];
+        for y in 20..40 {
+            for x in 20..40 {
+                classes[y * size + x] = PERSON_PART_HAIR_CLASS;
+            }
+        }
+        classes[40 * size + 20] = PERSON_PART_TOP_CLOTHES_CLASS;
+        classes[41 * size + 20] = PERSON_PART_BOTTOM_CLOTHES_CLASS;
+
+        let mask = mask_from_class_map(&classes, PersonPartMaskTarget::Hair).unwrap();
+
+        assert_eq!(mask.get_pixel(20, 20)[0], 255);
+        assert_eq!(mask.get_pixel(20, 40)[0], 0);
+        assert_eq!(mask.get_pixel(20, 41)[0], 0);
+    }
+
+    #[test]
     fn clothing_provenance_names_model_and_classes() {
         let provenance = person_part_parser_provenance(PersonPartMaskTarget::Clothing);
 
         assert_eq!(provenance.target_part, "clothing");
         assert_eq!(provenance.model_id, PERSON_PART_PARSER_MODEL_ID);
         assert_eq!(provenance.class_ids, vec![5, 9]);
+    }
+
+    #[test]
+    fn hair_provenance_names_model_and_class() {
+        let provenance = person_part_parser_provenance(PersonPartMaskTarget::Hair);
+
+        assert_eq!(provenance.target_part, "hair");
+        assert_eq!(provenance.model_id, PERSON_PART_PARSER_MODEL_ID);
+        assert_eq!(provenance.class_ids, vec![2]);
     }
 }
