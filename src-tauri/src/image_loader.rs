@@ -75,6 +75,9 @@ enum DemosaicSharpeningPath {
     XTransHq,
 }
 
+const RAW_CACHE_CAMERA_PROFILE_RESOLVER_VERSION: &str = "dual_illuminant_mired_v1";
+const RAW_CACHE_RECONSTRUCTION_VERSION: &str = "raw_reconstruction_v3";
+
 fn normalize_raw_processing_mode(mode: Option<&str>) -> &'static str {
     match mode {
         Some("fast") => "fast",
@@ -244,11 +247,43 @@ pub(crate) fn raw_processing_settings_for_adjustments(
     }
 }
 
+fn raw_cache_f32(value: f32) -> String {
+    format!("{value:.4}")
+}
+
 pub(crate) fn raw_processing_mode_cache_key(source_path: &str, settings: &AppSettings) -> String {
+    let mode = normalize_raw_processing_mode(settings.raw_processing_mode.as_deref());
+    let recipe = raw_processing_mode_recipe(Some(mode));
+    let highlight_compression = settings
+        .raw_highlight_compression
+        .unwrap_or(recipe.raw_highlight_compression);
+    let color_nr = settings
+        .raw_preprocessing_color_nr
+        .unwrap_or(recipe.raw_preprocessing_color_nr);
+    let sharpening = resolve_capture_pre_sharpening_settings(
+        settings,
+        &recipe,
+        match mode {
+            "fast" => DemosaicSharpeningPath::Fast,
+            "maximum" => DemosaicSharpeningPath::BayerHq,
+            _ => DemosaicSharpeningPath::Standard,
+        },
+        (0, 0),
+    );
     format!(
-        "{}::raw-processing-mode={}::camera-profile-resolver=1::raw-reconstruction=2",
+        "{}::raw-processing-mode={}::linear-raw-mode={}::highlight-compression={}::color-nr={}::capture-sharpening={}:{}:{}:{}::camera-profile-resolver={}::raw-reconstruction={}::demosaic-plan={}",
         source_path,
-        normalize_raw_processing_mode(settings.raw_processing_mode.as_deref())
+        mode,
+        settings.linear_raw_mode,
+        raw_cache_f32(highlight_compression),
+        raw_cache_f32(color_nr),
+        raw_cache_f32(sharpening.amount),
+        raw_cache_f32(sharpening.detail),
+        raw_cache_f32(sharpening.edge_masking),
+        raw_cache_f32(sharpening.radius_px),
+        RAW_CACHE_CAMERA_PROFILE_RESOLVER_VERSION,
+        RAW_CACHE_RECONSTRUCTION_VERSION,
+        recipe.provenance
     )
 }
 
@@ -1207,17 +1242,55 @@ mod tests {
         assert_eq!(resolved.raw_processing_mode.as_deref(), Some("maximum"));
         assert_eq!(resolved.raw_preprocessing_color_nr, Some(0.65));
         assert_eq!(resolved.raw_preprocessing_sharpening, Some(0.42));
-        assert_eq!(
-            raw_processing_mode_cache_key("/tmp/image.arw", &resolved),
-            "/tmp/image.arw::raw-processing-mode=maximum::camera-profile-resolver=1::raw-reconstruction=2"
-        );
+        let resolved_cache_key = raw_processing_mode_cache_key("/tmp/image.arw", &resolved);
+        assert!(resolved_cache_key.contains("raw-processing-mode=maximum"));
+        assert!(resolved_cache_key.contains("camera-profile-resolver=dual_illuminant_mired_v1"));
+        assert!(resolved_cache_key.contains("raw-reconstruction=raw_reconstruction_v3"));
+        assert!(resolved_cache_key.contains("highlight-compression=4.0000"));
+        assert!(resolved_cache_key.contains("capture-sharpening=0.4410:0.5940:0.4600:2.3500"));
 
         let inherited =
             raw_processing_settings_for_adjustments(&base_settings, &serde_json::json!({}));
         assert_eq!(inherited.raw_processing_mode.as_deref(), Some("fast"));
-        assert_eq!(
-            raw_processing_mode_cache_key("/tmp/image.arw", &inherited),
-            "/tmp/image.arw::raw-processing-mode=fast::camera-profile-resolver=1::raw-reconstruction=2"
+        let inherited_cache_key = raw_processing_mode_cache_key("/tmp/image.arw", &inherited);
+        assert!(inherited_cache_key.contains("raw-processing-mode=fast"));
+        assert_ne!(resolved_cache_key, inherited_cache_key);
+    }
+
+    #[test]
+    fn raw_cache_key_changes_with_decode_affecting_settings() {
+        let base = AppSettings {
+            raw_processing_mode: Some("balanced".to_string()),
+            ..AppSettings::default()
+        };
+        let highlight_changed = AppSettings {
+            raw_highlight_compression: Some(3.5),
+            ..base.clone()
+        };
+        let linear_mode_changed = AppSettings {
+            linear_raw_mode: "gamma_skip_calib".to_string(),
+            ..base.clone()
+        };
+        let sharpening_changed = AppSettings {
+            raw_preprocessing_sharpening: Some(0.71),
+            raw_preprocessing_sharpening_detail: Some(0.23),
+            raw_preprocessing_sharpening_edge_masking: Some(0.19),
+            raw_preprocessing_sharpening_radius: Some(1.3),
+            ..base.clone()
+        };
+
+        let base_key = raw_processing_mode_cache_key("/tmp/image.arw", &base);
+        assert_ne!(
+            base_key,
+            raw_processing_mode_cache_key("/tmp/image.arw", &highlight_changed)
+        );
+        assert_ne!(
+            base_key,
+            raw_processing_mode_cache_key("/tmp/image.arw", &linear_mode_changed)
+        );
+        assert_ne!(
+            base_key,
+            raw_processing_mode_cache_key("/tmp/image.arw", &sharpening_changed)
         );
     }
 
