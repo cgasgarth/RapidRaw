@@ -383,6 +383,16 @@ interface BaseFogSampleUndoEntry {
   selectedPresetId: string;
 }
 
+interface RollNormalizationApplyReceipt {
+  acceptedDryRunPlanHash: string;
+  acceptedDryRunPlanId: string;
+  appliedFrameCount: number;
+  exposureOverrideCount: number;
+  reviewFrameCount: number;
+  rgbBalanceOverrideCount: number;
+  skippedFrameCount: number;
+}
+
 export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }: NegativeConversionModalProps) {
   const { t } = useTranslation();
   const selectedEditorImage = useEditorStore((state) => state.selectedImage);
@@ -421,6 +431,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [isMeasuringCustomBaseSample, setIsMeasuringCustomBaseSample] = useState(false);
   const [copiedBatchPlanJson, setCopiedBatchPlanJson] = useState<string | null>(null);
   const [acceptedBatchPlanJson, setAcceptedBatchPlanJson] = useState<string | null>(null);
+  const [rollNormalizationApplyReceipt, setRollNormalizationApplyReceipt] =
+    useState<RollNormalizationApplyReceipt | null>(null);
   const [activeBaseFogSampleLabel, setActiveBaseFogSampleLabel] = useState<string | null>(null);
   const [baseFogScope, setBaseFogScope] = useState<'frame' | 'roll'>('frame');
   const [baseFogSampleUndoStack, setBaseFogSampleUndoStack] = useState<BaseFogSampleUndoEntry[]>([]);
@@ -919,6 +931,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     }
     return buildNegativeLabProfileBoundPlanIdentity(batchDryRunSummaryJson, selectedProfileSnapshot);
   }, [batchDryRunPlanJson, batchDryRunSummaryJson, selectedProfileSnapshot]);
+  const visibleRollNormalizationApplyReceipt =
+    rollNormalizationApplyReceipt?.acceptedDryRunPlanHash === acceptedBatchPlanIdentity.acceptedDryRunPlanHash
+      ? rollNormalizationApplyReceipt
+      : null;
   const profileComparisonRows = useMemo(
     () =>
       buildNegativeLabProfileComparisonRows({
@@ -1827,6 +1843,15 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
 
     setFrameExposureOffsetByFrameId(nextExposureOffsets);
     setFrameRgbBalanceOffsetByFrameId(nextRgbOffsetsByFrameId);
+    setRollNormalizationApplyReceipt({
+      acceptedDryRunPlanHash: acceptedBatchPlanIdentity.acceptedDryRunPlanHash,
+      acceptedDryRunPlanId: acceptedBatchPlanIdentity.acceptedDryRunPlanId,
+      appliedFrameCount: rollNormalizationPlan.affectedFrameIds.length,
+      exposureOverrideCount: rollNormalizationPlan.exposureOverrides.overrides.length,
+      reviewFrameCount: batchReviewFrameCount,
+      rgbBalanceOverrideCount: rollNormalizationPlan.rgbBalanceOverrides.overrides.length,
+      skippedFrameCount: batchSkippedFrameCount,
+    });
     setAcceptedBatchPlanJson(null);
     updatePreview(
       buildParamsWithFrameOverrides(
@@ -2487,6 +2512,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         params={params}
         qcDecisionByFrameId={qcDecisionByFrameId}
         rejectedQcFrameIds={rejectedQcFrameIds}
+        rollNormalizationApplyReceipt={visibleRollNormalizationApplyReceipt}
         rollNormalizationPlan={rollNormalizationPlan}
         rollWarningCount={rollWarningCount}
         setFrameHealthFilter={setFrameHealthFilter}

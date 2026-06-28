@@ -3006,6 +3006,7 @@
       "resetPrintEndpoints": "Reset endpoints",
       "resetTooltip": "Resetuj",
       "resetViewTooltip": "Resetuj widok",
+      "rollNormalizationApplyReceipt": "Applied {{applyCount}} frames from {{planId}} · {{skippedCount}} skip / {{reviewCount}} review",
       "sampleCenterPatch": "Center patch",
       "sampleFullFrame": "Full frame",
       "sampleHighlightPatch": "Highlight patch",
