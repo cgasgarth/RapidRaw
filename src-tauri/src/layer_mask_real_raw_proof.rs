@@ -118,12 +118,10 @@ fn run_private_layer_mask_real_raw_proof(
     let is_raw = is_raw_file(&source_path_string);
     let tm_override = resolve_tonemapper_override(&settings, is_raw);
 
-    let (image_width, image_height) = base_image.dimensions();
     let unmasked_adjustments = json!({});
-    let unrefined_adjustments =
-        layer_mask_adjustments(mask_refinement(false), image_width, image_height);
-    let refined_adjustments =
-        layer_mask_adjustments(mask_refinement(true), image_width, image_height);
+    let unrefined_adjustments = layer_mask_adjustments(mask_refinement(false, 0.0), &base_image);
+    let edge_refined_adjustments = layer_mask_adjustments(mask_refinement(true, 0.0), &base_image);
+    let refined_adjustments = layer_mask_adjustments(mask_refinement(true, 1.0), &base_image);
 
     let unmasked_preview = render_with_masks(
         &source_path_string,
@@ -143,6 +141,16 @@ fn run_private_layer_mask_real_raw_proof(
         &state,
         is_raw,
         "layer_mask_real_raw_unrefined_preview",
+        tm_override,
+    )?;
+    let edge_refined_preview = render_with_masks(
+        &source_path_string,
+        &base_image,
+        &edge_refined_adjustments,
+        &context,
+        &state,
+        is_raw,
+        "layer_mask_real_raw_edge_refined_preview",
         tm_override,
     )?;
     let refined_preview = render_with_masks(
@@ -168,14 +176,19 @@ fn run_private_layer_mask_real_raw_proof(
 
     let mask_coverage_ratio = mask_coverage_ratio(&refined_adjustments, &base_image)?;
     let unrefined_mask = mask_bitmap(&unrefined_adjustments, &base_image)?;
+    let edge_refined_mask = mask_bitmap(&edge_refined_adjustments, &base_image)?;
     let refined_mask = mask_bitmap(&refined_adjustments, &base_image)?;
     let unrefined_transition_ratio = transition_pixel_ratio(&unrefined_mask);
     let refined_transition_ratio = transition_pixel_ratio(&refined_mask);
     let area_drift_ratio = (mask_alpha_coverage_ratio(&refined_mask)
-        - mask_alpha_coverage_ratio(&unrefined_mask))
+        - mask_alpha_coverage_ratio(&edge_refined_mask))
     .abs();
-    let boundary_alignment_gain = boundary_edge_alignment_score(&refined_mask, &base_image)
+    let boundary_alignment_gain = boundary_edge_alignment_score(&edge_refined_mask, &base_image)
         - boundary_edge_alignment_score(&unrefined_mask, &base_image);
+    let hair_aware_mask_changed_pixel_ratio =
+        changed_mask_pixel_ratio(&edge_refined_mask, &refined_mask);
+    let hair_detail_alpha_decisiveness_gain =
+        alpha_decisiveness_score(&refined_mask) - alpha_decisiveness_score(&edge_refined_mask);
     let halo_width_proxy_reduction = unrefined_transition_ratio - refined_transition_ratio;
     let edge_color_contamination_proxy_reduction =
         low_gradient_transition_ratio(&unrefined_mask, &base_image)
@@ -196,6 +209,19 @@ fn run_private_layer_mask_real_raw_proof(
         &unrefined_preview,
         &output_dir.join(format!("{PROOF_SLUG}-unrefined-preview.png")),
         ImageFormat::Png,
+    )?;
+    write_image(
+        &edge_refined_preview,
+        &output_dir.join(format!("{PROOF_SLUG}-edge-refined-preview.png")),
+        ImageFormat::Png,
+    )?;
+    write_gray_image(
+        &edge_refined_mask,
+        &output_dir.join(format!("{PROOF_SLUG}-edge-refined-mask-alpha.png")),
+    )?;
+    write_gray_image(
+        &refined_mask,
+        &output_dir.join(format!("{PROOF_SLUG}-hair-aware-mask-alpha.png")),
     )?;
     write_image(
         &refined_preview,
@@ -219,6 +245,21 @@ fn run_private_layer_mask_real_raw_proof(
             private_root,
             "unrefined_preview_private",
             &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-unrefined-preview.png"),
+        )?,
+        hashed_artifact(
+            private_root,
+            "edge_refined_preview_private",
+            &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-edge-refined-preview.png"),
+        )?,
+        hashed_artifact(
+            private_root,
+            "edge_refined_mask_alpha_private",
+            &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-edge-refined-mask-alpha.png"),
+        )?,
+        hashed_artifact(
+            private_root,
+            "hair_aware_mask_alpha_private",
+            &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-hair-aware-mask-alpha.png"),
         )?,
         hashed_artifact(
             private_root,
@@ -252,10 +293,22 @@ fn run_private_layer_mask_real_raw_proof(
             refinement_changed_pixel_ratio > 0.0001,
         ),
         metric(
+            "hairAwareMaskChangedPixelRatio",
+            hair_aware_mask_changed_pixel_ratio,
+            0.000001,
+            hair_aware_mask_changed_pixel_ratio > 0.000001,
+        ),
+        metric(
             "boundaryFProxyImprovement",
             boundary_alignment_gain,
             0.000001,
             boundary_alignment_gain > 0.000001,
+        ),
+        metric(
+            "hairDetailAlphaDecisivenessGain",
+            hair_detail_alpha_decisiveness_gain,
+            0.000001,
+            hair_detail_alpha_decisiveness_gain > 0.000001,
         ),
         metric(
             "areaDriftRatio",
@@ -297,7 +350,7 @@ fn run_private_layer_mask_real_raw_proof(
         artifacts: Vec::new(),
         fixture_id: FIXTURE_ID.to_string(),
         generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
-        issue: 2310,
+        issue: 3251,
         metrics,
         proof_claims: proof_claims(),
         report_id: REPORT_ID.to_string(),
@@ -305,7 +358,7 @@ fn run_private_layer_mask_real_raw_proof(
             execution: "tauri_test_gpu_pipeline".to_string(),
             macos_app_ui_e2e: false,
             mask_path: "prepare_export_masks + generate_mask_bitmap".to_string(),
-            output_artifact_count: 4,
+            output_artifact_count: 7,
             preview_export_parity_metric: "previewExportMeanAbsDelta".to_string(),
             raw_decode_path: "load_base_image_from_bytes".to_string(),
             render_path: "process_image_for_export_pipeline_with_tonemapper_override".to_string(),
@@ -363,11 +416,13 @@ fn render_with_masks(
     )
 }
 
-fn layer_mask_adjustments(refinement: Value, image_width: u32, image_height: u32) -> Value {
-    let center_x = image_width as f64 * 0.5;
-    let center_y = image_height as f64 * 0.5;
-    let radius_x = image_width as f64 * 0.28;
-    let radius_y = image_height as f64 * 0.22;
+fn layer_mask_adjustments(refinement: Value, base_image: &DynamicImage) -> Value {
+    let (image_width, image_height) = base_image.dimensions();
+    let radius_x = image_width as f64 * 0.18;
+    let radius_y = image_height as f64 * 0.16;
+    let (edge_x, edge_y) = strongest_rgb_edge_point(base_image);
+    let center_x = (edge_x as f64 - radius_x).clamp(radius_x, image_width as f64 - radius_x);
+    let center_y = (edge_y as f64).clamp(radius_y, image_height as f64 - radius_y);
     json!({
         "masks": [
             {
@@ -377,9 +432,9 @@ fn layer_mask_adjustments(refinement: Value, image_width: u32, image_height: u32
                 "invert": false,
                 "opacity": 100,
                 "adjustments": {
-                    "exposure": 1.15,
-                    "contrast": 18,
-                    "saturation": 10
+                    "exposure": 1.8,
+                    "contrast": 32,
+                    "saturation": 18
                 },
                 "subMasks": [
                     {
@@ -400,6 +455,7 @@ fn layer_mask_adjustments(refinement: Value, image_width: u32, image_height: u32
                             "edgeContrast": refinement["edgeContrast"],
                             "edgeShiftPx": refinement["edgeShiftPx"],
                             "featherPx": refinement["featherPx"],
+                            "hairDetail": refinement["hairDetail"],
                             "smoothness": refinement["smoothness"]
                         }
                     }
@@ -409,13 +465,14 @@ fn layer_mask_adjustments(refinement: Value, image_width: u32, image_height: u32
     })
 }
 
-fn mask_refinement(enabled: bool) -> Value {
+fn mask_refinement(enabled: bool, hair_detail: f64) -> Value {
     if enabled {
         json!({
             "density": 0.74,
             "edgeContrast": 0.45,
             "edgeShiftPx": 3.0,
             "featherPx": 2.5,
+            "hairDetail": hair_detail,
             "smoothness": 0.6
         })
     } else {
@@ -424,6 +481,7 @@ fn mask_refinement(enabled: bool) -> Value {
             "edgeContrast": 0.0,
             "edgeShiftPx": 0.0,
             "featherPx": 0.0,
+            "hairDetail": 0.0,
             "smoothness": 0.0
         })
     }
@@ -443,6 +501,7 @@ fn proof_claims() -> LayerMaskProofClaims {
             "masked_adjustment_changes_pixels".to_string(),
             "mask_refinement_changes_pixels".to_string(),
             "image_evidence_guided_refinement".to_string(),
+            "hair_detail_chroma_edge_refinement".to_string(),
             "refined_preview_export_parity".to_string(),
         ],
     }
@@ -506,6 +565,19 @@ fn boundary_edge_alignment_score(mask: &GrayImage, image: &DynamicImage) -> f64 
     total / count.max(1) as f64
 }
 
+fn alpha_decisiveness_score(mask: &GrayImage) -> f64 {
+    let mut total = 0.0;
+    let mut count = 0usize;
+    for pixel in mask.pixels() {
+        if (24..=230).contains(&pixel[0]) {
+            let alpha = pixel[0] as f64 / 255.0;
+            total += ((alpha - 0.5).abs() * 2.0).clamp(0.0, 1.0);
+            count += 1;
+        }
+    }
+    total / count.max(1) as f64
+}
+
 fn luma_gradient(image: &DynamicImage, x: u32, y: u32) -> f32 {
     let left = x.saturating_sub(1);
     let right = (x + 1).min(image.width().saturating_sub(1));
@@ -521,6 +593,55 @@ fn luma(image: &DynamicImage, x: u32, y: u32) -> f32 {
     0.299 * pixel[0] as f32 + 0.587 * pixel[1] as f32 + 0.114 * pixel[2] as f32
 }
 
+fn strongest_rgb_edge_point(image: &DynamicImage) -> (u32, u32) {
+    let width = image.width();
+    let height = image.height();
+    if width < 3 || height < 3 {
+        return (width / 2, height / 2);
+    }
+
+    let margin_x = width / 5;
+    let margin_y = height / 5;
+    let step = 12u32;
+    let mut best = (width / 2, height / 2);
+    let mut best_score = 0.0f32;
+    let y_start = margin_y.max(1);
+    let y_end = height.saturating_sub(margin_y).max(y_start + 1);
+    let x_start = margin_x.max(1);
+    let x_end = width.saturating_sub(margin_x).max(x_start + 1);
+    let mut y = y_start;
+    while y < y_end {
+        let mut x = x_start;
+        while x < x_end {
+            let score = rgb_edge_gradient(image, x, y);
+            if score > best_score {
+                best_score = score;
+                best = (x, y);
+            }
+            x = x.saturating_add(step);
+        }
+        y = y.saturating_add(step);
+    }
+    best
+}
+
+fn rgb_edge_gradient(image: &DynamicImage, x: u32, y: u32) -> f32 {
+    let left = x.saturating_sub(1);
+    let right = (x + 1).min(image.width().saturating_sub(1));
+    let top = y.saturating_sub(1);
+    let bottom = (y + 1).min(image.height().saturating_sub(1));
+    rgb_distance(image, left, y, right, y).max(rgb_distance(image, x, top, x, bottom))
+}
+
+fn rgb_distance(image: &DynamicImage, x1: u32, y1: u32, x2: u32, y2: u32) -> f32 {
+    let left = image.get_pixel(x1, y1);
+    let right = image.get_pixel(x2, y2);
+    let r = (left[0] as f32 - right[0] as f32) / 255.0;
+    let g = (left[1] as f32 - right[1] as f32) / 255.0;
+    let b = (left[2] as f32 - right[2] as f32) / 255.0;
+    ((r * r + g * g + b * b) / 3.0).sqrt()
+}
+
 fn mask_pixel_count(mask: &GrayImage) -> usize {
     (mask.width() as usize)
         .checked_mul(mask.height() as usize)
@@ -529,8 +650,20 @@ fn mask_pixel_count(mask: &GrayImage) -> usize {
 }
 
 fn write_image(image: &DynamicImage, path: &Path, format: ImageFormat) -> Result<(), String> {
+    if format == ImageFormat::Png {
+        return DynamicImage::ImageRgba8(image.to_rgba8())
+            .save_with_format(path, format)
+            .map_err(|error| error.to_string());
+    }
+
     image
         .save_with_format(path, format)
+        .map_err(|error| error.to_string())
+}
+
+fn write_gray_image(image: &GrayImage, path: &Path) -> Result<(), String> {
+    image
+        .save_with_format(path, ImageFormat::Png)
         .map_err(|error| error.to_string())
 }
 
@@ -565,6 +698,19 @@ fn changed_pixel_ratio(before: &DynamicImage, after: &DynamicImage) -> f64 {
         .filter(|(left, right)| left.0 != right.0)
         .count();
     changed as f64 / before.len().max(1) as f64 * 4.0
+}
+
+fn changed_mask_pixel_ratio(before: &GrayImage, after: &GrayImage) -> f64 {
+    if before.dimensions() != after.dimensions() {
+        return 1.0;
+    }
+
+    let changed = before
+        .pixels()
+        .zip(after.pixels())
+        .filter(|(left, right)| left[0] != right[0])
+        .count();
+    changed as f64 / mask_pixel_count(before) as f64
 }
 
 fn mean_abs_delta(before: &DynamicImage, after: &DynamicImage) -> f64 {

@@ -7,93 +7,123 @@
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:31b0216b13a960e040b4c386badf82e5a53fe32e6335b649530bf273f8bf7ad6",
+      "hash": "sha256:255ccb0a80c658a8e95b9264e3c407e7391222982cc5ecf1736b15244b047de3",
       "kind": "unmasked_preview_private",
       "path": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-unmasked-preview.png",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:5df6a55ae60a895a9db864b779975afb996ec85ed60657ed759b8a7320b71307",
+      "hash": "sha256:9f24f14f56817d22740743a4456f2ca711d3827b25cc5363749bc9e77cd29af2",
       "kind": "unrefined_preview_private",
       "path": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-unrefined-preview.png",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:8eb0e24739c1a6b1e71219dcca5ae8fba2f281c44b1d33cce97c67f7260b4e60",
+      "hash": "sha256:17406c7280c6192da18535bae7be4ad1bdfd08ba43e32266570e667090dedd9e",
+      "kind": "edge_refined_preview_private",
+      "path": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-edge-refined-preview.png",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:d1bb10803a022ea2ae8ef0c3a39bcec02df6baf092ed7a88f9ffd6100fe25fab",
+      "kind": "edge_refined_mask_alpha_private",
+      "path": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-edge-refined-mask-alpha.png",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:80dc3423c38dac4ccda8bab971803f31210068470a96b5ec4c39bc8c5da7a545",
+      "kind": "hair_aware_mask_alpha_private",
+      "path": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-hair-aware-mask-alpha.png",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:17406c7280c6192da18535bae7be4ad1bdfd08ba43e32266570e667090dedd9e",
       "kind": "refined_preview_private",
       "path": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-refined-preview.png",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:6610f46c1ccb276d4d1543e00e08dc2057528bc7ca2c9935dfd2cd0302f6ee4c",
+      "hash": "sha256:60cbb0da89591377f0902a25ca9833bf8bd57aa38d64266d292f278ed534fb89",
       "kind": "refined_export_private",
       "path": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-refined-export.tiff",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:d35e8c4a115fee85e54a15cd845bf8e5cfcff1b309aef4f17c09eedc760091dc",
+      "hash": "sha256:1c153e45a168bfb3d65b4b1143ecc2492fbf19cda2a9da38a06f6b37c8ec2e33",
       "kind": "workflow_report_private",
       "path": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-report.json",
       "publicRepoAllowed": false
     }
   ],
   "fixtureId": "validation.layer-mask-real-raw.alaska-local-adjustment.v1",
-  "generatedAt": "2026-06-26T19:25:32.832Z",
-  "issue": 2310,
+  "generatedAt": "2026-06-28T01:39:38.244Z",
+  "issue": 3251,
   "metrics": [
     {
       "name": "maskCoverageRatio",
       "passed": true,
       "threshold": 0.01,
-      "value": 0.036920075163398694
+      "value": 0.01767873088235294
     },
     {
       "name": "maskedChangedPixelRatio",
       "passed": true,
       "threshold": 0.01,
-      "value": 0.0827945
+      "value": 0.039553083333333336
     },
     {
       "name": "refinementChangedPixelRatio",
       "passed": true,
       "threshold": 0.0001,
-      "value": 0.17845241666666667
+      "value": 0.08582616666666666
+    },
+    {
+      "name": "hairAwareMaskChangedPixelRatio",
+      "passed": true,
+      "threshold": 0.000001,
+      "value": 0.03328575
     },
     {
       "name": "boundaryFProxyImprovement",
       "passed": true,
-      "threshold": 1e-6,
-      "value": 0.0043929472055276655
+      "threshold": 0.000001,
+      "value": 0.0032488068688039974
+    },
+    {
+      "name": "hairDetailAlphaDecisivenessGain",
+      "passed": true,
+      "threshold": 0.000001,
+      "value": 0.06705591694089985
     },
     {
       "name": "areaDriftRatio",
       "passed": true,
       "threshold": 0.05,
-      "value": 0.027208301143790845
+      "value": 0.0003276393790849659
     },
     {
       "name": "haloWidthProxyReduction",
       "passed": true,
-      "threshold": 1e-6,
-      "value": 0.08193466666666667
+      "threshold": 0.000001,
+      "value": 0.046054791666666664
     },
     {
       "name": "edgeColorContaminationProxyReduction",
       "passed": true,
-      "threshold": 1e-6,
-      "value": 0.07746245833333333
+      "threshold": 0.000001,
+      "value": 0.04086704166666666
     },
     {
       "name": "previewExportMeanAbsDelta",
       "passed": true,
       "threshold": 0.015,
-      "value": 0.0
+      "value": 0
     },
     {
       "name": "sourceHashUnchanged",
       "passed": true,
-      "threshold": 1.0,
-      "value": 1.0
+      "threshold": 1,
+      "value": 1
     }
   ],
   "proofClaims": {
@@ -109,6 +139,7 @@
       "masked_adjustment_changes_pixels",
       "mask_refinement_changes_pixels",
       "image_evidence_guided_refinement",
+      "hair_detail_chroma_edge_refinement",
       "refined_preview_export_parity"
     ]
   },
@@ -117,7 +148,7 @@
     "execution": "tauri_test_gpu_pipeline",
     "macosAppUiE2e": false,
     "maskPath": "prepare_export_masks + generate_mask_bitmap",
-    "outputArtifactCount": 4,
+    "outputArtifactCount": 7,
     "previewExportParityMetric": "previewExportMeanAbsDelta",
     "rawDecodePath": "load_base_image_from_bytes",
     "renderPath": "process_image_for_export_pipeline_with_tonemapper_override"

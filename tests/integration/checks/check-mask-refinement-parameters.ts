@@ -13,6 +13,7 @@ const looseParametersSchema = z
     edgeContrast: z.number().optional(),
     edgeShiftPx: z.number().optional(),
     featherPx: z.number().optional(),
+    hairDetail: z.number().optional(),
     smoothness: z.number().optional(),
   })
   .strict();
@@ -82,6 +83,7 @@ const requiredRustFragments = [
   'fn apply_mask_refinement',
   'edge_shift_px',
   'feather_px',
+  'hair_detail',
   'grayscale_dilate',
   'grayscale_erode',
   'apply_mask_refinement(mask, &sub_mask.parameters, scale, warped_image)',

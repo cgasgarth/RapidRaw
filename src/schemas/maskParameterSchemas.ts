@@ -92,6 +92,7 @@ export const maskRefinementParametersSchema = z
     edgeContrast: z.number().min(0).max(1),
     edgeShiftPx: z.number().min(-512).max(512),
     featherPx: z.number().min(0).max(4096),
+    hairDetail: z.number().min(0).max(1),
     smoothness: z.number().min(0).max(1),
   })
   .strict();

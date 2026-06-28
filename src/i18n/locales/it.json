@@ -1080,6 +1080,7 @@
         "edgeContrast": "Edge Contrast",
         "edgeShiftPx": "Edge Shift",
         "featherPx": "Feather",
+        "hairDetail": "Hair Detail",
         "replayReceipt": "Ricevuta replay: sfuma {{featherPx}} px, bordo {{edgeShiftPx}} px, leviga {{smoothness}}%",
         "reset": "Reset",
         "smoothness": "Smoothness",

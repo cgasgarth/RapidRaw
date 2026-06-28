@@ -29,6 +29,9 @@ const artifactSchema = z
       'source_raw_private',
       'unmasked_preview_private',
       'unrefined_preview_private',
+      'edge_refined_preview_private',
+      'edge_refined_mask_alpha_private',
+      'hair_aware_mask_alpha_private',
       'refined_preview_private',
       'refined_export_private',
       'workflow_report_private',
@@ -44,7 +47,9 @@ const metricSchema = z
       'maskCoverageRatio',
       'maskedChangedPixelRatio',
       'refinementChangedPixelRatio',
+      'hairAwareMaskChangedPixelRatio',
       'boundaryFProxyImprovement',
+      'hairDetailAlphaDecisivenessGain',
       'areaDriftRatio',
       'haloWidthProxyReduction',
       'edgeColorContaminationProxyReduction',
@@ -74,6 +79,7 @@ const proofClaimsSchema = z
         'masked_adjustment_changes_pixels',
         'mask_refinement_changes_pixels',
         'image_evidence_guided_refinement',
+        'hair_detail_chroma_edge_refinement',
         'refined_preview_export_parity',
       ]),
     ),
@@ -86,6 +92,7 @@ const proofClaimsSchema = z
       'masked_adjustment_changes_pixels',
       'mask_refinement_changes_pixels',
       'image_evidence_guided_refinement',
+      'hair_detail_chroma_edge_refinement',
       'refined_preview_export_parity',
     ]);
     for (const proof of requiredProofs) {
@@ -116,7 +123,7 @@ const runtimeProofSchema = z
     macosAppUiE2e: z.literal(false).optional(),
     macosAppUiE2E: z.literal(false).optional(),
     maskPath: z.literal('prepare_export_masks + generate_mask_bitmap'),
-    outputArtifactCount: z.literal(4),
+    outputArtifactCount: z.literal(7),
     previewExportParityMetric: z.literal('previewExportMeanAbsDelta'),
     rawDecodePath: z.literal('load_base_image_from_bytes'),
     renderPath: z.literal('process_image_for_export_pipeline_with_tonemapper_override'),
@@ -133,11 +140,11 @@ const runtimeProofSchema = z
 
 const reportSchema = z
   .object({
-    artifacts: z.array(artifactSchema).length(6),
+    artifacts: z.array(artifactSchema).length(9),
     fixtureId: z.literal(FIXTURE_ID),
     generatedAt: z.iso.datetime(),
-    issue: z.literal(2310),
-    metrics: z.array(metricSchema).length(9),
+    issue: z.literal(3251),
+    metrics: z.array(metricSchema).length(11),
     proofClaims: proofClaimsSchema,
     reportId: z.literal(REPORT_ID),
     runtimeProof: runtimeProofSchema,
@@ -163,8 +170,22 @@ const reportSchema = z
     if ((metric.get('refinementChangedPixelRatio')?.value ?? 0) <= 0.0001) {
       context.addIssue({ code: 'custom', message: 'refinement controls must change output', path: ['metrics'] });
     }
+    if ((metric.get('hairAwareMaskChangedPixelRatio')?.value ?? 0) <= 0.000001) {
+      context.addIssue({
+        code: 'custom',
+        message: 'hair-aware refinement must change mask alpha versus current edge refinement',
+        path: ['metrics'],
+      });
+    }
     if ((metric.get('boundaryFProxyImprovement')?.value ?? 0) <= 0.000001) {
       context.addIssue({ code: 'custom', message: 'image-edge alignment must improve', path: ['metrics'] });
+    }
+    if ((metric.get('hairDetailAlphaDecisivenessGain')?.value ?? 0) <= 0.000001) {
+      context.addIssue({
+        code: 'custom',
+        message: 'hair detail alpha decisiveness must improve',
+        path: ['metrics'],
+      });
     }
     if ((metric.get('areaDriftRatio')?.value ?? Number.POSITIVE_INFINITY) > 0.05) {
       context.addIssue({ code: 'custom', message: 'refined mask area drift is too high', path: ['metrics'] });

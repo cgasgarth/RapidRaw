@@ -1080,6 +1080,7 @@
         "edgeContrast": "Edge Contrast",
         "edgeShiftPx": "Edge Shift",
         "featherPx": "Feather",
+        "hairDetail": "Hair Detail",
         "replayReceipt": "Recibo de replay: pena {{featherPx}} px, borda {{edgeShiftPx}} px, suavizar {{smoothness}}%",
         "reset": "Reset",
         "smoothness": "Smoothness",
