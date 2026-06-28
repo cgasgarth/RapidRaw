@@ -1,12 +1,15 @@
 import { AlertTriangle, CheckCircle2, CircleDashed, Eye, RotateCcw, Send, Server, Sparkles } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useEditorStore } from '../../../store/useEditorStore';
 import { buildAgentAppServerToolReadinessSummary } from '../../../utils/agentAppServerToolReadiness';
 import { runAgentBoundedEditPlannerLoop } from '../../../utils/agentBoundedEditPlannerLoop';
 import { planAgentEditRecipe } from '../../../utils/agentEditRecipePlanner';
-import { agentImageContextSnapshotSchema } from '../../../utils/agentImageContextSnapshot';
+import {
+  agentImageContextSnapshotSchema,
+  buildAgentImageContextSnapshot,
+} from '../../../utils/agentImageContextSnapshot';
 import {
   runAgentMultiTurnAppServerSession,
   type AgentMultiTurnAppServerSessionRequest,
@@ -154,7 +157,7 @@ interface LiveSessionReviewState {
   finalRecipeHash: string;
   previewLineage: AgentMultiTurnAppServerSessionResult['previewLineage'];
   rollbackGraphRevision: string;
-  rollbackState: 'available' | 'restored';
+  rollbackState: 'available' | 'invalidated' | 'restored';
   toolCallCount: number;
 }
 
@@ -196,18 +199,71 @@ type LiveActivityEntryInput = Omit<
 
 const createAgentRollbackSnapshot = () => {
   const state = useEditorStore.getState();
+  const context = buildAgentImageContextSnapshot();
 
   return {
     adjustments: state.adjustments,
+    activeImagePath: context.activeImagePath,
     finalPreviewUrl: state.finalPreviewUrl,
+    graphRevision: context.graphRevision,
     history: state.history,
     historyIndex: state.historyIndex,
     lastBasicToneCommand: state.lastBasicToneCommand,
+    recipeHash: context.initialPreview.recipeHash,
     uncroppedAdjustedPreviewUrl: state.uncroppedAdjustedPreviewUrl,
   };
 };
 
 type AgentRollbackSnapshot = ReturnType<typeof createAgentRollbackSnapshot>;
+type AgentRollbackInvalidationReason =
+  | 'context_unavailable'
+  | 'graph_revision_changed'
+  | 'image_changed'
+  | 'recipe_hash_changed';
+type AgentRollbackValidation =
+  | {
+      currentGraphRevision: string;
+      currentImagePath: string;
+      currentRecipeHash: string;
+      reason: null;
+      state: 'available';
+    }
+  | {
+      currentGraphRevision: string;
+      currentImagePath: string;
+      currentRecipeHash: string;
+      reason: AgentRollbackInvalidationReason;
+      state: 'invalidated';
+    };
+
+const validateAgentRollbackSnapshot = (snapshot: AgentRollbackSnapshot): AgentRollbackValidation => {
+  try {
+    const context = buildAgentImageContextSnapshot();
+    const current = {
+      currentGraphRevision: context.graphRevision,
+      currentImagePath: context.activeImagePath,
+      currentRecipeHash: context.initialPreview.recipeHash,
+    };
+    if (current.currentImagePath !== snapshot.activeImagePath) {
+      return { ...current, reason: 'image_changed', state: 'invalidated' };
+    }
+    if (current.currentGraphRevision !== snapshot.graphRevision) {
+      return { ...current, reason: 'graph_revision_changed', state: 'invalidated' };
+    }
+    if (current.currentRecipeHash !== snapshot.recipeHash) {
+      return { ...current, reason: 'recipe_hash_changed', state: 'invalidated' };
+    }
+    return { ...current, reason: null, state: 'available' };
+  } catch {
+    return {
+      currentGraphRevision: 'unavailable',
+      currentImagePath: 'unavailable',
+      currentRecipeHash: 'unavailable',
+      reason: 'context_unavailable',
+      state: 'invalidated',
+    };
+  }
+};
 
 const formatRouteFamily = (family: string): string => family.replaceAll('_', ' ');
 
@@ -492,12 +548,30 @@ function LivePromptComposer({
   const [result, setResult] = useState<LivePromptResult>({ status: 'idle' });
   const [rollbackSnapshot, setRollbackSnapshot] = useState<AgentRollbackSnapshot | null>(null);
   const [sessionReview, setSessionReview] = useState<LiveSessionReviewState | null>(null);
+  const rollbackValidationKey = useEditorStore((state) =>
+    JSON.stringify({
+      adjustments: state.adjustments,
+      finalPreviewUrl: state.finalPreviewUrl,
+      historyIndex: state.historyIndex,
+      selectedImagePath: state.selectedImage?.path ?? null,
+      uncroppedAdjustedPreviewUrl: state.uncroppedAdjustedPreviewUrl,
+    }),
+  );
+  const rollbackValidation = useMemo(() => {
+    void rollbackValidationKey;
+    return rollbackSnapshot === null ? null : validateAgentRollbackSnapshot(rollbackSnapshot);
+  }, [rollbackSnapshot, rollbackValidationKey]);
+  const effectiveSessionReview =
+    sessionReview !== null && rollbackValidation?.state === 'invalidated' && sessionReview.rollbackState === 'available'
+      ? { ...sessionReview, rollbackState: 'invalidated' as const }
+      : sessionReview;
   const canRun = isContextReady && result.status !== 'applying';
   const canApply = isContextReady && acceptedPrompt.length > 0 && result.status === 'dry_run_ready';
   const canRequestDetailPreview = isContextReady && result.status !== 'applying';
   const canInspectState = isContextReady && result.status !== 'applying';
   const canRefreshPreview = isContextReady && result.status !== 'applying';
-  const canRollback = rollbackSnapshot !== null && result.status === 'applied';
+  const canRollback =
+    rollbackSnapshot !== null && rollbackValidation?.state === 'available' && result.status === 'applied';
   let statusLabel;
 
   switch (result.status) {
@@ -931,6 +1005,19 @@ function LivePromptComposer({
 
   const rollbackApply = () => {
     if (rollbackSnapshot === null) return;
+    const validation = validateAgentRollbackSnapshot(rollbackSnapshot);
+    if (validation.state === 'invalidated') {
+      setSessionReview((review) => (review === null ? null : { ...review, rollbackState: 'invalidated' }));
+      pushActivityEntry({
+        body: t('editor.ai.agent.composer.rollbackInvalidated'),
+        graphRevision: validation.currentGraphRevision,
+        kind: 'rollback',
+        recipeHash: validation.currentRecipeHash,
+        status: 'blocked',
+        toolName: 'rawengine.agent.history.rollback',
+      });
+      return;
+    }
 
     useEditorStore.setState({
       adjustments: rollbackSnapshot.adjustments,
@@ -944,9 +1031,9 @@ function LivePromptComposer({
     setSessionReview((review) => (review === null ? null : { ...review, rollbackState: 'restored' }));
     pushActivityEntry({
       body: t('editor.ai.agent.composer.status.rolled_back'),
-      graphRevision: `history:${rollbackSnapshot.historyIndex}`,
+      graphRevision: rollbackSnapshot.graphRevision,
       kind: 'rollback',
-      recipeHash: result.recipeName,
+      recipeHash: rollbackSnapshot.recipeHash,
       status: 'rolled_back',
       toolName: 'rawengine.agent.history.rollback',
     });
@@ -1102,7 +1189,7 @@ function LivePromptComposer({
       </div>
 
       <LiveActivityTimeline entries={activityEntries} />
-      <LiveSessionReviewPanel review={sessionReview} />
+      <LiveSessionReviewPanel review={effectiveSessionReview} />
 
       <div
         className="rounded border border-white/10 bg-black/15 p-2 text-[11px]"
@@ -1178,6 +1265,30 @@ function LivePromptComposer({
                 sampled: result.sampledPixelCount,
               })}
             </div>
+          </div>
+        ) : null}
+        {rollbackSnapshot !== null && rollbackValidation !== null && result.status === 'applied' ? (
+          <div
+            className="mt-2 rounded border border-amber-500/25 bg-amber-500/10 p-2 text-[10px] text-amber-100"
+            data-current-graph-revision={rollbackValidation.currentGraphRevision}
+            data-current-image-path={rollbackValidation.currentImagePath}
+            data-current-recipe-hash={rollbackValidation.currentRecipeHash}
+            data-invalidated-reason={rollbackValidation.reason ?? ''}
+            data-rollback-graph-revision={rollbackSnapshot.graphRevision}
+            data-rollback-image-path={rollbackSnapshot.activeImagePath}
+            data-rollback-recipe-hash={rollbackSnapshot.recipeHash}
+            data-rollback-state={rollbackValidation.state}
+            data-testid="agent-live-rollback-receipt"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold">{t('editor.ai.agent.composer.rollbackReceipt')}</span>
+              <span className="font-mono">{rollbackValidation.state}</span>
+            </div>
+            <p className="mt-1">
+              {rollbackValidation.state === 'available'
+                ? t('editor.ai.agent.composer.rollbackAvailable')
+                : t('editor.ai.agent.composer.rollbackInvalidated')}
+            </p>
           </div>
         ) : null}
         {result.safetyDecision ? (

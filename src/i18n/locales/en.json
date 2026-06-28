@@ -605,6 +605,9 @@
           "previewDelta": "{{changed}}/{{sampled}} samples changed ({{percent}}%); mean luma delta {{meanLuma}}, max channel delta {{maxDelta}}",
           "refreshPreview": "Refresh preview",
           "rollback": "Rollback",
+          "rollbackAvailable": "Rollback target still matches the current image and recipe.",
+          "rollbackInvalidated": "Rollback disabled because the image, graph revision, or recipe changed.",
+          "rollbackReceipt": "Rollback receipt",
           "stalePreviewWarning": "Preview may be stale; inspect state or rerun before applying.",
           "status": {
             "applied": "Applied through the local app-server bridge",
