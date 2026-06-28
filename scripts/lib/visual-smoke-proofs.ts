@@ -103,15 +103,15 @@ const negativeLabCustomBaseSampleSchema = z.object({
   y: z.literal(0.25),
 });
 const negativeLabShadowPatchSampleSchema = z.object({
-  height: z.literal(0.18),
-  width: z.literal(0.18),
+  height: z.literal(0.12),
+  width: z.literal(0.12),
   x: z.literal(0.18),
-  y: z.literal(0.62),
+  y: z.literal(0.72),
 });
 const negativeLabHighlightPatchSampleSchema = z.object({
-  height: z.literal(0.16),
-  width: z.literal(0.16),
-  x: z.literal(0.66),
+  height: z.literal(0.1),
+  width: z.literal(0.1),
+  x: z.literal(0.68),
   y: z.literal(0.18),
 });
 const negativeLabPickedNeutralPatchSampleSchema = z.object({
@@ -119,6 +119,12 @@ const negativeLabPickedNeutralPatchSampleSchema = z.object({
   width: z.number().min(0.29).max(0.31),
   x: z.number().min(0.19).max(0.21),
   y: z.number().min(0.19).max(0.21),
+});
+const negativeLabCenterPatchSampleSchema = z.object({
+  height: z.literal(0.1),
+  width: z.literal(0.1),
+  x: z.literal(0.45),
+  y: z.literal(0.45),
 });
 const negativeLabOrthoPresetParamsSchema = z
   .object({
@@ -166,6 +172,7 @@ const negativeLabBaseFogEstimateInvokeSchema = z.object({
       z.null(),
       negativeLabLeftEdgeSampleSchema,
       negativeLabCustomBaseSampleSchema,
+      negativeLabCenterPatchSampleSchema,
       negativeLabShadowPatchSampleSchema,
       negativeLabHighlightPatchSampleSchema,
       negativeLabPickedNeutralPatchSampleSchema,
