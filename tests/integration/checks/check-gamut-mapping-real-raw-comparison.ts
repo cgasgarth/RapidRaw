@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { parseRawOpenEditExportRunReportCollection } from '../../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
 
 const REPORT_PATH = 'docs/validation/gamut-mapping-real-raw-comparison-2026-06-26.json';
-const PRIVATE_ROOT = '/tmp/rawengine-gamut-mapping-v2-real-raw-proof';
+const PRIVATE_ROOT = '/tmp/rawengine-gamut-mapping-v4-real-raw-proof';
 const PERCEPTUAL_REPORT_PATH = `${PRIVATE_ROOT}/raw-open-edit-export-run-reports.json`;
 const RELATIVE_REPORT_PATH = `${PRIVATE_ROOT}/raw-open-edit-export-relative-run-reports.json`;
 const PERCEPTUAL_FIXTURE_ID = 'validation.raw-open-edit-export.professional-color.v1';
@@ -81,7 +81,7 @@ const reportSchema = z
     perceptualRun: z
       .object({
         fixtureId: z.literal(PERCEPTUAL_FIXTURE_ID),
-        gamutMapping: z.literal('rawengine.gamut.srgb-oklab-chroma-reduce.v3'),
+        gamutMapping: z.literal('rawengine.gamut.srgb-oklab-chroma-reduce.v4'),
         reportPath: z.string().trim().min(1),
         softProofHash: hashSchema,
         softProofPath: z.string().trim().min(1),

@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { parseRawOpenEditExportRunReportCollection } from '../../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
 
 const REPORT_PATH = 'docs/validation/gamut-mapping-real-raw-private-proof-2026-06-26.json';
-const PRIVATE_ROOT = '/tmp/rawengine-gamut-mapping-v2-real-raw-proof';
+const PRIVATE_ROOT = '/tmp/rawengine-gamut-mapping-v4-real-raw-proof';
 const PRIVATE_SOURCE = '/Users/cgas/Pictures/Capture One/Alaska';
 const RUN_REPORTS_RELATIVE_PATH = 'raw-open-edit-export-run-reports.json';
 const SOURCE_COMMAND = `RAWENGINE_PRIVATE_RAW_SOURCE="${PRIVATE_SOURCE}" bun run check:raw-color-management-srgb-perceptual-private-proof --root ${PRIVATE_ROOT} --output ${PRIVATE_ROOT}/${RUN_REPORTS_RELATIVE_PATH} --require-assets`;
@@ -65,7 +65,7 @@ const committedReportSchema = z
       .object({
         artifactRoot: z.literal('private-artifacts/validation/open-edit-export/srgb-perceptual'),
         command: z.literal(SOURCE_COMMAND),
-        gamutMapping: z.literal('rawengine.gamut.srgb-oklab-chroma-reduce.v3'),
+        gamutMapping: z.literal('rawengine.gamut.srgb-oklab-chroma-reduce.v4'),
         metrics: metricSchema,
         observedExportColorEncoding: z.literal('srgb_rgb16_tiff'),
         observedOutputProfile: z.literal('srgb'),
