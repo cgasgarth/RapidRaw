@@ -87,11 +87,22 @@ impl RawCameraProfileReport {
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct RawRuntimeReport {
+    pub cache_hit: bool,
+    pub decode_elapsed_ms: Option<u128>,
+    pub export_elapsed_ms: Option<u128>,
+    pub output_dimensions: Option<(u32, u32)>,
+    pub preview_elapsed_ms: Option<u128>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct RawDevelopmentReport {
     pub demosaic_path: RawDemosaicPath,
     pub demosaic_algorithm_id: Option<&'static str>,
     pub processing_profile: RawProcessingProfile,
     pub camera_profile: RawCameraProfileReport,
+    pub runtime: Option<RawRuntimeReport>,
     pub xtrans_hq: Option<XTransHqDevelopmentReport>,
 }
 
@@ -1451,6 +1462,7 @@ fn develop_internal_with_options(
             },
             processing_profile: profile,
             camera_profile,
+            runtime: None,
             xtrans_hq: xtrans_hq_report,
         },
     ))

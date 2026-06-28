@@ -5,6 +5,7 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Instant;
 
 use chrono::{SecondsFormat, Utc};
 use image::{
@@ -790,9 +791,11 @@ pub async fn export_images(
                             None,
                             None,
                             None,
+                            None,
                         );
                     }
 
+                    let export_started = Instant::now();
                     let (base_image, raw_development_report) = if is_current_edit {
                         match get_full_image_for_processing(&state) {
                             Ok((orig_data, _)) => {
@@ -895,6 +898,7 @@ pub async fn export_images(
                             "export_job:{:016x}",
                             calculate_full_job_hash(&source_path_str, &js_adjustments)
                         )),
+                        Some(export_started.elapsed().as_millis()),
                     )
                 })();
 
@@ -976,12 +980,19 @@ fn export_receipt_output(
     source_path: &str,
     format: &str,
     metadata: Option<ExportReceiptMetadata>,
-    raw_development_report: Option<RawDevelopmentReport>,
+    mut raw_development_report: Option<RawDevelopmentReport>,
     edit_graph_revision: Option<String>,
+    export_elapsed_ms: Option<u128>,
 ) -> Result<ExportReceiptOutput, String> {
     let byte_size = fs::metadata(output_path)
         .map_err(|error| error.to_string())?
         .len();
+    if let (Some(report), Some(export_elapsed_ms)) =
+        (raw_development_report.as_mut(), export_elapsed_ms)
+        && let Some(runtime) = report.runtime.as_mut()
+    {
+        runtime.export_elapsed_ms = Some(export_elapsed_ms);
+    }
     let raw_provenance_sidecar_path = match raw_development_report.as_ref() {
         Some(report) => Some(write_raw_export_provenance_sidecar(
             output_path,
@@ -1733,6 +1744,7 @@ mod tests {
             demosaic_algorithm_id: None,
             demosaic_path: RawDemosaicPath::BayerHq,
             processing_profile: crate::raw_processing::RawProcessingProfile::Maximum,
+            runtime: None,
             xtrans_hq: None,
         };
 
@@ -1743,6 +1755,7 @@ mod tests {
             Some(metadata),
             Some(raw_development_report),
             Some("export_job:test".to_string()),
+            Some(123),
         )
         .expect("receipt output should serialize RAW development report");
         let sidecar_path = receipt

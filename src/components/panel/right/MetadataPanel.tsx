@@ -93,6 +93,11 @@ function formatBytes(bytes: number) {
   return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unitIndex] ?? 'GB'}`;
 }
 
+function formatElapsedMs(value: number) {
+  if (value < 1000) return `${value} ms`;
+  return `${(value / 1000).toFixed(value >= 10_000 ? 1 : 2)} s`;
+}
+
 function formatRawReceiptToken(value: string) {
   return value
     .split('_')
@@ -866,6 +871,7 @@ export default function MetadataPanel() {
                         data-estimated-cct-kelvin={cameraProfileReceipt.estimatedCctKelvin ?? ''}
                         data-matrix-hash={cameraProfileReceipt.matrixHash ?? ''}
                         data-processing-profile={cameraProfileReceipt.processingProfile}
+                        data-preview-elapsed-ms={cameraProfileReceipt.previewElapsedMs ?? ''}
                         data-receipt-version={cameraProfileReceipt.receiptVersion}
                         data-scratch-memory-bytes={cameraProfileReceipt.scratchMemoryBytes ?? ''}
                         data-status={cameraProfileReceipt.status}
@@ -877,6 +883,38 @@ export default function MetadataPanel() {
                           demosaicPath: formatRawReceiptToken(cameraProfileReceipt.demosaicPath),
                           processingProfile: formatRawReceiptToken(cameraProfileReceipt.processingProfile),
                           status: cameraProfileReceipt.status,
+                        })}
+                      </UiText>
+                    </>
+                  )}
+                  {cameraProfileReceipt !== null && (
+                    <>
+                      <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                        {t('editor.metadata.cameraProfile.runtime')}
+                      </UiText>
+                      <UiText
+                        variant={TextVariants.small}
+                        color={TextColors.primary}
+                        className="truncate text-right"
+                        data-cache-hit={cameraProfileReceipt.cacheHit ?? ''}
+                        data-decode-elapsed-ms={cameraProfileReceipt.decodeElapsedMs ?? ''}
+                        data-export-elapsed-ms={cameraProfileReceipt.exportElapsedMs ?? ''}
+                        data-output-dimensions={cameraProfileReceipt.outputDimensions?.join('x') ?? ''}
+                        data-preview-elapsed-ms={cameraProfileReceipt.previewElapsedMs ?? ''}
+                        data-testid="metadata-raw-runtime-receipt"
+                      >
+                        {t('editor.metadata.cameraProfile.runtimeSummary', {
+                          cache: cameraProfileReceipt.cacheHit
+                            ? t('editor.metadata.cameraProfile.cacheHit')
+                            : t('editor.metadata.cameraProfile.cacheMiss'),
+                          decode:
+                            cameraProfileReceipt.decodeElapsedMs === null
+                              ? t('editor.metadata.cameraProfile.notApplicable')
+                              : formatElapsedMs(cameraProfileReceipt.decodeElapsedMs),
+                          preview:
+                            cameraProfileReceipt.previewElapsedMs === null
+                              ? t('editor.metadata.cameraProfile.notApplicable')
+                              : formatElapsedMs(cameraProfileReceipt.previewElapsedMs),
                         })}
                       </UiText>
                     </>
