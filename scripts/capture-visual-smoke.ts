@@ -1216,6 +1216,25 @@ async function prepareScenario(page, mode) {
     return;
   }
 
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.ObjectPromptUi) {
+    const proof = await page.getByTestId('object-prompt-visual-proof').evaluate((element) => ({ ...element.dataset }));
+    if (
+      proof.boxReady !== 'true' ||
+      proof.hasRaster !== 'true' ||
+      proof.modelId !== 'sam_vit_b_01ec64' ||
+      proof.pointCount !== '3' ||
+      proof.promptKind !== 'box' ||
+      proof.providerStatus !== 'local_sam_proposal_v1'
+    ) {
+      throw new Error(`Object prompt visual proof failed: ${JSON.stringify(proof)}`);
+    }
+    await page.getByTestId('object-prompt-controls').waitFor({ timeout: 10_000 });
+    await page.getByTestId('object-prompt-generate-proposal').waitFor({ timeout: 10_000 });
+    await page.getByTestId('object-prompt-replay-receipt').waitFor({ timeout: 10_000 });
+    await page.getByTestId('object-prompt-proof-box').waitFor({ timeout: 10_000 });
+    return;
+  }
+
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.TetherDiscoveryUi) {
     const panel = page.getByTestId('tether-panel');
     await panel.waitFor({ timeout: 10_000 });

@@ -24,6 +24,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   NegativeLabPublicExportReview: 'negative-lab-public-export-review',
   NegativeLabRealRawPrivateReview: 'negative-lab-real-raw-private-review',
   NegativeLabWorkspace: 'negative-lab-workspace',
+  ObjectPromptUi: 'object-prompt-ui',
   PanoramaPrivateRawUi: 'panorama-private-raw-ui',
   PanoramaSavedReview: 'panorama-saved-review',
   PanoramaUi: 'panorama-ui',
@@ -228,6 +229,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     mode: VISUAL_SMOKE_SCENARIO_IDS.LayerMaskPrivateRawUi,
     outputFile: 'layer-mask-private-raw-ui.png',
     sectionMinimum: 1,
+  },
+  {
+    marker: 'Object prompt visual proof',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.ObjectPromptUi,
+    outputFile: 'object-prompt-ui.png',
+    sectionMinimum: 2,
   },
   {
     marker: 'RAW Mask Overlay Review',
