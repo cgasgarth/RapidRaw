@@ -53,7 +53,6 @@ const Slider = ({
   const [displayValue, setDisplayValue] = useState<number>(value);
   const displayValueRef = useRef<number>(value);
   const [isDragging, setIsDragging] = useState(false);
-  const animationFrameRef = useRef<number | undefined>(undefined);
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState<string>(String(value));
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -70,7 +69,7 @@ const Slider = ({
     startValue: number;
   } | null>(null);
   const suppressTouchChangeRef = useRef(false);
-  const isWheelActivelyChangingRef = useRef(false);
+  const [isWheelActive, setIsWheelActive] = useState(false);
   const wheelTimeoutRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
@@ -81,7 +80,8 @@ const Slider = ({
     };
   }, []);
 
-  const fillPercentage = max !== min ? ((displayValue - min) / (max - min)) * 100 : 0;
+  const rangeValue = isDragging || isWheelActive ? displayValue : value;
+  const fillPercentage = max !== min ? ((rangeValue - min) / (max - min)) * 100 : 0;
   const originPercentage = useMemo(() => {
     if (fillOrigin === 'min') {
       return 0;
@@ -106,11 +106,11 @@ const Slider = ({
   const rangeRef = useRef({ min, max });
 
   useLayoutEffect(() => {
-    displayValueRef.current = displayValue;
+    displayValueRef.current = rangeValue;
     onChangeRef.current = onChange;
     snapToStepRef.current = snapToStep;
     rangeRef.current = { min, max };
-  }, [displayValue, max, min, onChange, snapToStep]);
+  }, [rangeValue, max, min, onChange, snapToStep]);
 
   useEffect(() => {
     onDragStateChange(isDragging);
@@ -133,14 +133,14 @@ const Slider = ({
       const clampedValue = Math.max(min, Math.min(max, roundedNewValue));
 
       if (clampedValue !== value && !isNaN(clampedValue)) {
-        isWheelActivelyChangingRef.current = true;
+        setIsWheelActive(true);
         setDisplayValue(clampedValue);
 
         if (wheelTimeoutRef.current !== undefined) {
           window.clearTimeout(wheelTimeoutRef.current);
         }
         wheelTimeoutRef.current = window.setTimeout(() => {
-          isWheelActivelyChangingRef.current = false;
+          setIsWheelActive(false);
         }, 150);
 
         const syntheticEvent = {
@@ -228,54 +228,6 @@ const Slider = ({
   }, [isDragging]);
 
   useEffect(() => {
-    if (isDragging) {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      return;
-    }
-
-    if (isWheelActivelyChangingRef.current) {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      setDisplayValue(value);
-      return;
-    }
-
-    const startValue = displayValueRef.current;
-    const endValue = value;
-    const duration = 300;
-    let startTime: number | null = null;
-
-    const easeInOut = (t: number) => t * t * (3 - 2 * t);
-
-    const animate = (timestamp: number) => {
-      if (!startTime) {
-        startTime = timestamp;
-      }
-
-      const progress = timestamp - startTime;
-      const linearFraction = Math.min(progress / duration, 1);
-      const easedFraction = easeInOut(linearFraction);
-      const currentValue = startValue + (endValue - startValue) * easedFraction;
-      setDisplayValue(currentValue);
-
-      if (linearFraction < 1) {
-        animationFrameRef.current = requestAnimationFrame(animate);
-      }
-    };
-
-    animationFrameRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [value, isDragging]);
-
-  useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
@@ -349,7 +301,7 @@ const Slider = ({
     if (!inputEl) return;
 
     const rect = inputEl.getBoundingClientRect();
-    const fraction = max !== min ? (displayValue - min) / (max - min) : 0;
+    const fraction = max !== min ? (rangeValue - min) / (max - min) : 0;
     const thumbX = rect.left + Math.max(0, Math.min(1, fraction)) * rect.width;
 
     if (Math.abs(touch.clientX - thumbX) > TOUCH_THUMB_HIT_RADIUS_PX) {
@@ -361,7 +313,7 @@ const Slider = ({
       startX: touch.clientX,
       startY: touch.clientY,
       latestX: touch.clientX,
-      startValue: displayValue,
+      startValue: rangeValue,
     };
   };
 
@@ -599,7 +551,7 @@ const Slider = ({
           onTouchCancel={handleTouchEnd}
           step={String(step)}
           type="range"
-          value={displayValue}
+          value={rangeValue}
         />
       </div>
     </div>
