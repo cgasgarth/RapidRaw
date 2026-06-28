@@ -8,6 +8,7 @@ export const maskRefinementParametersCommandSchema = z
     edgeContrast: z.number().min(0).max(1),
     edgeShiftPx: z.number().min(-512).max(512),
     featherPx: z.number().min(0).max(4096),
+    hairDetail: z.number().min(0).max(1),
     smoothness: z.number().min(0).max(1),
   })
   .strict();
@@ -35,6 +36,7 @@ export const maskRefinementReplayReceiptSchema = z
     edgeContrast: maskRefinementParametersCommandSchema.shape.edgeContrast,
     edgeShiftPx: maskRefinementParametersCommandSchema.shape.edgeShiftPx,
     featherPx: maskRefinementParametersCommandSchema.shape.featherPx,
+    hairDetail: maskRefinementParametersCommandSchema.shape.hairDetail,
     maskId: z.string().trim().min(1),
     receiptVersion: z.literal(1),
     schemaVersion: z.literal(1),
@@ -49,6 +51,7 @@ const DEFAULT_REFINEMENT_PARAMETERS: z.infer<typeof maskRefinementParametersComm
   edgeContrast: 0,
   edgeShiftPx: 0,
   featherPx: 0,
+  hairDetail: 0,
   smoothness: 0,
 };
 
@@ -72,6 +75,7 @@ export function createMaskRefinementCommand(
         edgeContrast: changes.edgeContrast ?? readFiniteNumber(current, 'edgeContrast'),
         edgeShiftPx: changes.edgeShiftPx ?? readFiniteNumber(current, 'edgeShiftPx'),
         featherPx: changes.featherPx ?? readFiniteNumber(current, 'featherPx'),
+        hairDetail: changes.hairDetail ?? readFiniteNumber(current, 'hairDetail'),
         smoothness: changes.smoothness ?? readFiniteNumber(current, 'smoothness'),
       },
     },

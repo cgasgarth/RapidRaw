@@ -1,11 +1,25 @@
 [
   {
     "id": "negative-density",
-    "payload": { "density": -0.1, "edgeContrast": 0, "edgeShiftPx": 0, "featherPx": 0, "smoothness": 0 }
+    "payload": {
+      "density": -0.1,
+      "edgeContrast": 0,
+      "edgeShiftPx": 0,
+      "featherPx": 0,
+      "hairDetail": 0,
+      "smoothness": 0
+    }
   },
   {
     "id": "oversized-feather",
-    "payload": { "density": 1, "edgeContrast": 0, "edgeShiftPx": 0, "featherPx": 5000, "smoothness": 0 }
+    "payload": {
+      "density": 1,
+      "edgeContrast": 0,
+      "edgeShiftPx": 0,
+      "featherPx": 5000,
+      "hairDetail": 0,
+      "smoothness": 0
+    }
   },
   {
     "id": "extra-field",
@@ -14,6 +28,7 @@
       "edgeContrast": 0,
       "edgeShiftPx": 0,
       "featherPx": 0,
+      "hairDetail": 0,
       "refineRadius": 12,
       "smoothness": 0
     }

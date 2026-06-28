@@ -20,6 +20,7 @@ export function normalizeMaskRefinementParameters(
     edgeContrast: clamp(parameters.edgeContrast ?? 0, 0, 1, 0),
     edgeShiftPx: clamp(parameters.edgeShiftPx ?? 0, -512, 512, 0),
     featherPx: clamp(parameters.featherPx ?? 0, 0, 4096, 0),
+    hairDetail: clamp(parameters.hairDetail ?? 0, 0, 1, 0),
     smoothness: clamp(parameters.smoothness ?? 0, 0, 1, 0),
   });
 }

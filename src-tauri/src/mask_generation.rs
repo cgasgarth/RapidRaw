@@ -80,6 +80,8 @@ pub struct MaskRefinementParameters {
     #[serde(default = "default_refinement_zero")]
     pub feather_px: f32,
     #[serde(default = "default_refinement_zero")]
+    pub hair_detail: f32,
+    #[serde(default = "default_refinement_zero")]
     pub smoothness: f32,
 }
 
@@ -90,6 +92,7 @@ impl Default for MaskRefinementParameters {
             edge_contrast: default_refinement_zero(),
             edge_shift_px: default_refinement_zero(),
             feather_px: default_refinement_zero(),
+            hair_detail: default_refinement_zero(),
             smoothness: default_refinement_zero(),
         }
     }
@@ -102,6 +105,7 @@ fn has_refinement_parameters(params_value: &Value) -> bool {
             "edgeContrast",
             "edgeShiftPx",
             "featherPx",
+            "hairDetail",
             "smoothness",
         ]
         .iter()
@@ -128,6 +132,7 @@ fn apply_mask_refinement(
         serde_json::from_value(params_value.clone()).unwrap_or_default();
     let density = params.density.clamp(0.0, 1.0);
     let edge_contrast = params.edge_contrast.clamp(0.0, 1.0);
+    let hair_detail = params.hair_detail.clamp(0.0, 1.0);
     let smoothness = params.smoothness.clamp(0.0, 1.0);
     let edge_shift_px = params.edge_shift_px.clamp(-512.0, 512.0) * scale.max(0.0);
     let feather_px = params.feather_px.clamp(0.0, 4096.0) * scale.max(0.0);
@@ -162,6 +167,7 @@ fn apply_mask_refinement(
 
     if let Some(image) = warped_image {
         apply_local_edge_guided_refinement(mask, image, (edge_contrast + smoothness) * 0.5);
+        apply_hair_aware_edge_refinement(mask, image, hair_detail);
     }
 }
 
@@ -210,6 +216,52 @@ fn apply_local_edge_guided_refinement(mask: &mut GrayImage, image: &DynamicImage
     }
 }
 
+fn apply_hair_aware_edge_refinement(mask: &mut GrayImage, image: &DynamicImage, strength: f32) {
+    let strength = strength.clamp(0.0, 1.0);
+    if strength <= 0.001 || mask.width() == 0 || mask.height() == 0 {
+        return;
+    }
+
+    let source = mask.clone();
+    let image_width = image.width().max(1);
+    let image_height = image.height().max(1);
+    let x_scale = image_width as f32 / mask.width().max(1) as f32;
+    let y_scale = image_height as f32 / mask.height().max(1) as f32;
+
+    for y in 0..mask.height() {
+        for x in 0..mask.width() {
+            let alpha = source.get_pixel(x, y)[0] as f32 / 255.0;
+            if !(0.01..=0.99).contains(&alpha) {
+                continue;
+            }
+
+            let image_x = ((x as f32 + 0.5) * x_scale)
+                .floor()
+                .clamp(0.0, (image_width - 1) as f32) as u32;
+            let image_y = ((y as f32 + 0.5) * y_scale)
+                .floor()
+                .clamp(0.0, (image_height - 1) as f32) as u32;
+            let edge = local_rgb_edge_gradient(image, image_x, image_y);
+            let texture = local_luma_texture(image, image_x, image_y);
+            let detail_weight = smoothstep(edge.max(texture) / 0.08) * strength;
+            if detail_weight <= 0.001 {
+                continue;
+            }
+
+            let tightened = if alpha >= 0.5 {
+                alpha + (1.0 - alpha) * detail_weight
+            } else {
+                alpha * (1.0 - detail_weight)
+            };
+            mask.put_pixel(
+                x,
+                y,
+                Luma([(tightened * 255.0).clamp(0.0, 255.0).round() as u8]),
+            );
+        }
+    }
+}
+
 fn local_luma_gradient(image: &DynamicImage, x: u32, y: u32) -> f32 {
     let left = x.saturating_sub(1);
     let right = (x + 1).min(image.width().saturating_sub(1));
@@ -218,6 +270,34 @@ fn local_luma_gradient(image: &DynamicImage, x: u32, y: u32) -> f32 {
     let dx = (pixel_luma(image, right, y) - pixel_luma(image, left, y)).abs();
     let dy = (pixel_luma(image, x, bottom) - pixel_luma(image, x, top)).abs();
     dx.max(dy) / 255.0
+}
+
+fn local_rgb_edge_gradient(image: &DynamicImage, x: u32, y: u32) -> f32 {
+    let left = x.saturating_sub(1);
+    let right = (x + 1).min(image.width().saturating_sub(1));
+    let top = y.saturating_sub(1);
+    let bottom = (y + 1).min(image.height().saturating_sub(1));
+    let horizontal = rgb_distance(image, left, y, right, y);
+    let vertical = rgb_distance(image, x, top, x, bottom);
+    horizontal.max(vertical)
+}
+
+fn local_luma_texture(image: &DynamicImage, x: u32, y: u32) -> f32 {
+    let center = pixel_luma(image, x, y);
+    let left = pixel_luma(image, x.saturating_sub(1), y);
+    let right = pixel_luma(image, (x + 1).min(image.width().saturating_sub(1)), y);
+    let top = pixel_luma(image, x, y.saturating_sub(1));
+    let bottom = pixel_luma(image, x, (y + 1).min(image.height().saturating_sub(1)));
+    ((center * 4.0 - left - right - top - bottom).abs() / 255.0).clamp(0.0, 1.0)
+}
+
+fn rgb_distance(image: &DynamicImage, x1: u32, y1: u32, x2: u32, y2: u32) -> f32 {
+    let left = image.get_pixel(x1, y1);
+    let right = image.get_pixel(x2, y2);
+    let r = (left[0] as f32 - right[0] as f32) / 255.0;
+    let g = (left[1] as f32 - right[1] as f32) / 255.0;
+    let b = (left[2] as f32 - right[2] as f32) / 255.0;
+    ((r * r + g * g + b * b) / 3.0).sqrt()
 }
 
 fn pixel_luma(image: &DynamicImage, x: u32, y: u32) -> f32 {
@@ -2016,6 +2096,46 @@ mod tests {
         assert!(
             mask.get_pixel(2, 0)[0] > mask.get_pixel(0, 0)[0],
             "image-edge evidence should tighten the transition at the high-contrast boundary"
+        );
+    }
+
+    #[test]
+    fn apply_mask_refinement_uses_hair_detail_for_chroma_edges() {
+        let mut baseline = GrayImage::from_pixel(5, 1, Luma([128]));
+        let mut refined = baseline.clone();
+        let mut edge_image = RgbaImage::new(5, 1);
+        for x in 0..5 {
+            let pixel = if x < 2 {
+                Rgba([200, 20, 20, 255])
+            } else {
+                Rgba([20, 112, 20, 255])
+            };
+            edge_image.put_pixel(x, 0, pixel);
+        }
+        let image = DynamicImage::ImageRgba8(edge_image);
+        let baseline_params = serde_json::json!({
+            "density": 1,
+            "edgeContrast": 0,
+            "edgeShiftPx": 0,
+            "featherPx": 0,
+            "hairDetail": 0,
+            "smoothness": 0
+        });
+        let hair_params = serde_json::json!({
+            "density": 1,
+            "edgeContrast": 0,
+            "edgeShiftPx": 0,
+            "featherPx": 0,
+            "hairDetail": 1,
+            "smoothness": 0
+        });
+
+        apply_mask_refinement(&mut baseline, &baseline_params, 1.0, Some(&image));
+        apply_mask_refinement(&mut refined, &hair_params, 1.0, Some(&image));
+
+        assert!(
+            refined.get_pixel(2, 0)[0] > baseline.get_pixel(2, 0)[0],
+            "hair detail should tighten chroma-only transition edges"
         );
     }
 

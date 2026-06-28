@@ -168,6 +168,7 @@ interface MaskRefinementParameterConfig extends NumericParameterConfig<MaskRefin
     | 'editor.masks.refinement.edgeContrast'
     | 'editor.masks.refinement.edgeShiftPx'
     | 'editor.masks.refinement.featherPx'
+    | 'editor.masks.refinement.hairDetail'
     | 'editor.masks.refinement.smoothness';
 }
 
@@ -224,6 +225,15 @@ const MASK_REFINEMENT_PARAMETERS: Array<MaskRefinementParameterConfig> = [
   {
     key: 'edgeContrast',
     labelKey: 'editor.masks.refinement.edgeContrast',
+    min: 0,
+    max: 100,
+    step: 1,
+    multiplier: 100,
+    defaultValue: 0,
+  },
+  {
+    key: 'hairDetail',
+    labelKey: 'editor.masks.refinement.hairDetail',
     min: 0,
     max: 100,
     step: 1,
@@ -976,6 +986,7 @@ function MaskRefinementControls({
           data-edge-contrast={replayReceipt.edgeContrast}
           data-edge-shift-px={replayReceipt.edgeShiftPx}
           data-feather-px={replayReceipt.featherPx}
+          data-hair-detail={replayReceipt.hairDetail}
           data-mask-id={replayReceipt.maskId}
           data-receipt-version={replayReceipt.receiptVersion}
           data-schema-version={replayReceipt.schemaVersion}
@@ -3051,6 +3062,7 @@ function SettingsPanel({
       edgeContrast: 0,
       edgeShiftPx: 0,
       featherPx: 0,
+      hairDetail: 0,
       smoothness: 0,
     });
     const newParams = mergeMaskParameters(activeSubMask.parameters, dispatchMaskRefinementCommand(command));

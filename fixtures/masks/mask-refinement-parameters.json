@@ -5,6 +5,7 @@
       "edgeContrast": 0,
       "edgeShiftPx": 0,
       "featherPx": 0,
+      "hairDetail": 0,
       "smoothness": 0
     },
     "id": "defaults",
@@ -20,6 +21,7 @@
       "edgeContrast": 0,
       "edgeShiftPx": 0,
       "featherPx": 10,
+      "hairDetail": 0,
       "smoothness": 0
     },
     "id": "feather-and-density",
@@ -35,10 +37,11 @@
       "edgeContrast": 1,
       "edgeShiftPx": 5,
       "featherPx": 10,
+      "hairDetail": 1,
       "smoothness": 1
     },
     "id": "shift-smooth-and-contrast",
-    "input": { "density": 2, "edgeContrast": 2, "edgeShiftPx": 5, "featherPx": 10, "smoothness": 2 },
+    "input": { "density": 2, "edgeContrast": 2, "edgeShiftPx": 5, "featherPx": 10, "hairDetail": 2, "smoothness": 2 },
     "samples": [
       { "baseWeight": 1, "edgeDistancePx": -5, "weight": 0.5 },
       { "baseWeight": 1, "edgeDistancePx": -10, "weight": 0 },

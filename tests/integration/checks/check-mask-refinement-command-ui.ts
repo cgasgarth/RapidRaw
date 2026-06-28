@@ -21,6 +21,7 @@ const requiredBusFragments: string[] = [
   'MASK_REFINEMENT_REPLAY_PARAMETER_KEY',
   'edgeShiftPx: z.number().min(-512).max(512)',
   'featherPx: z.number().min(0).max(4096)',
+  'hairDetail: z.number().min(0).max(1)',
 ];
 
 const requiredPanelFragments: string[] = [
@@ -28,6 +29,7 @@ const requiredPanelFragments: string[] = [
   'dispatchMaskRefinementCommand',
   'handleMaskRefinementParametersChange',
   'data-testid="mask-refinement-replay-receipt"',
+  'data-hair-detail={replayReceipt.hairDetail}',
   "t('editor.masks.refinement.replayReceipt'",
   'onChange={handleMaskRefinementParametersChange}',
 ];
@@ -49,6 +51,7 @@ const command = createMaskRefinementCommand(
     edgeContrast: 0.35,
     edgeShiftPx: 3,
     featherPx: 12,
+    hairDetail: 0.6,
     smoothness: 0.5,
   },
 );
@@ -58,7 +61,7 @@ const replayCommand =
   typeof replay === 'object' && replay !== null && 'command' in replay
     ? (replay as { command: unknown }).command
     : null;
-if (dispatched['edgeContrast'] !== 0.35 || dispatched['featherPx'] !== 12) {
+if (dispatched['edgeContrast'] !== 0.35 || dispatched['featherPx'] !== 12 || dispatched['hairDetail'] !== 0.6) {
   throw new Error('Mask refinement dispatch did not preserve bounded parameter changes.');
 }
 if (!maskRefinementUiCommandSchema.safeParse(replayCommand).success) {
@@ -70,6 +73,7 @@ if (
   receipt.maskId !== 'mask_refine_replay' ||
   receipt.edgeShiftPx !== 3 ||
   receipt.featherPx !== 12 ||
+  receipt.hairDetail !== 0.6 ||
   receipt.schemaVersion !== 1
 ) {
   throw new Error('Mask refinement replay receipt did not expose bounded command values.');
