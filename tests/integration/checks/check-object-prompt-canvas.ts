@@ -3,6 +3,12 @@
 import { readFileSync } from 'node:fs';
 
 import {
+  AI_PANEL_CREATION_TYPES,
+  MASK_PANEL_CREATION_TYPES,
+  Mask,
+  SUB_MASK_COMPONENT_TYPES,
+} from '../../../src/components/panel/right/Masks.tsx';
+import {
   acceptObjectMaskProposal,
   applyObjectPromptClick,
   buildObjectMaskProposalCommandInput,
@@ -95,18 +101,30 @@ if (clearObjectPromptCanvasState(reparsed).pointPrompts.length !== 0) {
 
 const editorSource = readFileSync('src/components/panel/Editor.tsx', 'utf8');
 const maskPanelSource = readFileSync('src/components/panel/right/MasksPanel.tsx', 'utf8');
+const objectPromptControlsSource = readFileSync('src/components/panel/right/ObjectPromptControls.tsx', 'utf8');
 for (const [label, source, needle] of [
   ['canvas overlay', editorSource, 'data-testid="object-prompt-canvas-overlay"'],
   ['box overlay', editorSource, 'data-testid="object-prompt-box"'],
-  ['prompt controls', maskPanelSource, 'data-testid="object-prompt-controls"'],
+  ['prompt controls mount', maskPanelSource, '<ObjectPromptControls'],
+  ['prompt controls test id', objectPromptControlsSource, 'data-testid="object-prompt-controls"'],
   ['proposal action', maskPanelSource, 'GenerateAiObjectMaskProposal'],
   ['accepted proposal persistence', maskPanelSource, 'acceptObjectMaskProposal'],
   ['proposal replay receipt reader', maskPanelSource, 'readObjectMaskProposalReplayReceipt'],
-  ['proposal replay receipt UI', maskPanelSource, 'data-testid="object-prompt-replay-receipt"'],
-  ['proposal replay receipt locale', maskPanelSource, "t('editor.masks.objectPrompt.receipt'"],
-  ['mode buttons', maskPanelSource, 'object-prompt-mode-'],
+  ['proposal replay receipt UI', objectPromptControlsSource, 'data-testid="object-prompt-replay-receipt"'],
+  ['proposal replay receipt locale', objectPromptControlsSource, "t('editor.masks.objectPrompt.receipt'"],
+  ['mode buttons', objectPromptControlsSource, 'object-prompt-mode-'],
 ] as const) {
   if (!source.includes(needle)) throw new Error(`Object prompt UI is missing ${label}.`);
+}
+
+for (const [label, types] of [
+  ['mask panel creation', MASK_PANEL_CREATION_TYPES],
+  ['AI panel creation', AI_PANEL_CREATION_TYPES],
+  ['sub-mask creation', SUB_MASK_COMPONENT_TYPES],
+] as const) {
+  if (!types.some((type) => type.type === Mask.AiObject && !type.disabled)) {
+    throw new Error(`Object prompt UI is missing ${label} discoverability.`);
+  }
 }
 
 console.log('object prompt canvas ok');
