@@ -1251,13 +1251,17 @@ async function prepareScenario(page, mode) {
     if (readyBadgeCount !== 4) {
       throw new Error(`Expected 4 ready tether capabilities, found ${readyBadgeCount}.`);
     }
-    await page.getByTestId('tether-destination-root-path').fill('/tmp/rawengine-tether-captures');
-    await page
-      .locator('[data-testid="tether-destination-root"][data-destination-root="/tmp/rawengine-tether-captures"]')
-      .waitFor({
-        timeout: 10_000,
-      });
-    await page.getByTestId('tether-open-session').click();
+    await page.locator('[data-testid="tether-session-status"][data-session-status="open"]').waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('tether-open-session').evaluate((button) => {
+      if (!(button instanceof HTMLButtonElement) || !button.disabled) {
+        throw new Error('Expected restored tether session to disable opening another session.');
+      }
+    });
+    await page.locator('[data-testid="tether-destination-root"][data-destination-root=""]').waitFor({
+      timeout: 10_000,
+    });
     await page.getByTestId('tether-session-status').getByText('Session open', { exact: true }).waitFor({
       timeout: 10_000,
     });

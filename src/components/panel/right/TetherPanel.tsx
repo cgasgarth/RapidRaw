@@ -34,6 +34,7 @@ interface TetherPanelProps {
   captureFrame?: (request: TetherCaptureRequest) => Promise<TetherCaptureResponse>;
   closeSession?: () => Promise<TetherSessionResponse>;
   discoverCameras?: () => Promise<TetherDiscoveryResponse>;
+  getSession?: () => Promise<TetherSessionResponse>;
   onOpenCapture?: (path: string) => void;
   openSession?: (request: TetherSessionOpenRequest) => Promise<TetherSessionResponse>;
   setCameraControl?: (request: TetherCameraControlWriteRequest) => Promise<TetherCameraControlWriteResponse>;
@@ -70,6 +71,9 @@ const defaultOpenSession = (request: TetherSessionOpenRequest): Promise<TetherSe
 const defaultCloseSession = (): Promise<TetherSessionResponse> =>
   invokeWithSchema(Invokes.CloseTetherSession, {}, tetherSessionResponseSchema);
 
+const defaultGetSession = (): Promise<TetherSessionResponse> =>
+  invokeWithSchema(Invokes.GetTetherSession, {}, tetherSessionResponseSchema);
+
 const defaultCaptureFrame = (request: TetherCaptureRequest): Promise<TetherCaptureResponse> =>
   invokeWithSchema(Invokes.TriggerTetherCapture, { request }, tetherCaptureResponseSchema);
 
@@ -80,6 +84,7 @@ export function TetherPanel({
   captureFrame = defaultCaptureFrame,
   closeSession = defaultCloseSession,
   discoverCameras = defaultDiscoverCameras,
+  getSession = defaultGetSession,
   onOpenCapture,
   openSession = defaultOpenSession,
   setCameraControl = defaultSetCameraControl,
@@ -124,6 +129,15 @@ export function TetherPanel({
       setIsLoading(false);
     }
   }, [discoverCameras]);
+
+  const refreshSession = useCallback(async () => {
+    try {
+      const response = await getSession();
+      setSession(response.session);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [getSession]);
 
   const openCameraSession = useCallback(async () => {
     if (camera === null) return;
@@ -261,12 +275,13 @@ export function TetherPanel({
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       void discover();
+      void refreshSession();
     }, 0);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [discover]);
+  }, [discover, refreshSession]);
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4" data-testid="tether-panel">

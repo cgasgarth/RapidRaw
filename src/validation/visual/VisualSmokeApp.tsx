@@ -703,6 +703,7 @@ function TetherDiscoveryVisualSmoke() {
             captureFrame={() => Promise.resolve(tetherCaptureMockResponse)}
             closeSession={() => Promise.resolve(tetherClosedSessionMockResponse)}
             discoverCameras={() => Promise.resolve(tetherDiscoveryMockResponse)}
+            getSession={() => Promise.resolve(tetherSessionMockResponse)}
             onOpenCapture={setOpenedCapturePath}
             openSession={(request) =>
               Promise.resolve({
