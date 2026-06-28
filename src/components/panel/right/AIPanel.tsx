@@ -40,6 +40,7 @@ import {
   useEffect,
   useRef,
   useCallback,
+  useMemo,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -81,6 +82,10 @@ import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import {
+  buildAgentInitialPromptContext,
+  type AgentInitialPromptContext,
+} from '../../../utils/agentInitialPromptContext';
 import {
   cloneMaskLikeContainerForPaste,
   cloneSubMaskForPaste,
@@ -142,17 +147,45 @@ const getImageLabelFromPath = (path: string): string => {
   return cleanPath.split(/[\\/]/u).pop() || cleanPath || 'selected RAW';
 };
 
-const buildLiveAgentTranscript = (selectedImagePath: string | undefined): AgentChatTranscript => {
+const buildLiveAgentTranscript = (
+  selectedImagePath: string | undefined,
+  initialPromptContext: AgentInitialPromptContext | null,
+): AgentChatTranscript => {
   const targetLabel = selectedImagePath ? getImageLabelFromPath(selectedImagePath) : 'No image selected';
   const targetSummary = selectedImagePath
     ? `Ready to plan a local app-server edit for ${targetLabel}.`
     : 'Select an image before asking the agent to plan or apply edits.';
+  const previewSummary =
+    initialPromptContext === null
+      ? null
+      : `Initial prompt includes ${initialPromptContext.preview.encodedFormat.toUpperCase()} preview ${initialPromptContext.preview.artifactId}.`;
 
   return {
     id: selectedImagePath ? `live-agent-${targetLabel}` : 'live-agent-no-selection',
+    initialPromptPreviewContext:
+      initialPromptContext === null
+        ? undefined
+        : {
+            accessScope: initialPromptContext.preview.accessScope,
+            artifactId: initialPromptContext.preview.artifactId,
+            colorProfile: initialPromptContext.modelInput.initialPreview.colorProfile,
+            encodedFormat: initialPromptContext.preview.encodedFormat,
+            graphRevision: initialPromptContext.modelInput.graphRevision,
+            height: initialPromptContext.modelInput.initialPreview.height,
+            includesOriginalRaw: initialPromptContext.modelInput.initialPreview.includesOriginalRaw,
+            longEdgePx: initialPromptContext.preview.longEdgePx,
+            mediaType: initialPromptContext.preview.mediaType,
+            previewRef: initialPromptContext.preview.previewRef,
+            purpose: initialPromptContext.preview.purpose,
+            quality: initialPromptContext.preview.quality,
+            recipeHash: initialPromptContext.preview.recipeHash,
+            renderHash: initialPromptContext.preview.renderHash,
+            transport: initialPromptContext.modelInput.transport,
+            width: initialPromptContext.modelInput.initialPreview.width,
+          },
     messages: [
       {
-        body: targetSummary,
+        body: previewSummary === null ? targetSummary : `${targetSummary} ${previewSummary}`,
         id: 'live-agent-current-context',
         role: 'system',
         timestamp: 'now',
@@ -176,6 +209,25 @@ const buildLiveAgentTranscript = (selectedImagePath: string | undefined): AgentC
         title: selectedImagePath ? 'Current image context' : 'Waiting for image selection',
         toolName: 'rawengine.live_context',
       },
+      ...(initialPromptContext === null
+        ? []
+        : [
+            {
+              approvalState: 'not_required',
+              id: 'live-agent-initial-preview-context',
+              mode: 'read',
+              provenance: {
+                requestHash: `sha256:${initialPromptContext.preview.renderHash.replace('render:', '').repeat(8)}`,
+                runtime: 'codex_app_server',
+                schema: 'agentInitialPromptContext.v1',
+              },
+              status: 'succeeded',
+              summary: previewSummary ?? targetSummary,
+              timestamp: 'now',
+              title: 'Initial prompt preview',
+              toolName: 'rawengine.agent.initial_prompt_preview',
+            } satisfies AgentChatTranscript['toolCalls'][number],
+          ]),
     ],
   };
 };
@@ -447,6 +499,15 @@ export function AIPanel() {
     isSignedIn: isSignedIn ?? false,
   });
   const isGenerativeAvailable = aiProviderRuntimeState.generativeEditAvailable;
+  const liveAgentInitialPromptContext = useMemo(() => {
+    if (selectedImage === null) return null;
+
+    return buildAgentInitialPromptContext({
+      operationId: `live-agent-initial-context-${selectedImage.path}`,
+      prompt: `Inspect ${getImageLabelFromPath(selectedImage.path)} before planning edits.`,
+      sessionId: `live-agent-${selectedImage.path}`,
+    });
+  }, [selectedImage]);
 
   useEffect(() => {
     if (aiProvider !== AiProviderId.Cloud || !isSignedIn || !isPro) return;
@@ -1252,6 +1313,7 @@ export function AIPanel() {
                   collapsibleState={collapsibleState}
                   setCollapsibleState={setCollapsibleState}
                   isGenerativeAvailable={isGenerativeAvailable}
+                  liveAgentInitialPromptContext={liveAgentInitialPromptContext}
                   selectedImagePath={selectedImage?.path}
                 />
               </motion.div>
@@ -1972,6 +2034,7 @@ interface AiSettingsPanelProps {
   isGeneratingAi: boolean;
   isGeneratingAiMask: boolean;
   isGenerativeAvailable: boolean;
+  liveAgentInitialPromptContext: AgentInitialPromptContext | null;
   aiProvider: AiProviderIdType;
   onGenerativeReplace: (containerId: string, prompt: string, useFastInpaint: boolean) => void | Promise<void>;
   selectedImagePath?: string | undefined;
@@ -1995,6 +2058,7 @@ function SettingsPanel({
   collapsibleState,
   setCollapsibleState,
   isGenerativeAvailable,
+  liveAgentInitialPromptContext,
   aiProvider,
   selectedImagePath,
 }: AiSettingsPanelProps) {
@@ -2089,7 +2153,7 @@ function SettingsPanel({
         e.stopPropagation();
       }}
     >
-      <AgentChatShell transcript={buildLiveAgentTranscript(selectedImagePath)} />
+      <AgentChatShell transcript={buildLiveAgentTranscript(selectedImagePath, liveAgentInitialPromptContext)} />
 
       <CollapsibleSection
         title={t('editor.ai.settings.generativeReplaceTitle')}
