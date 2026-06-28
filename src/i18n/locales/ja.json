@@ -3646,6 +3646,12 @@
         "highlights": "",
         "shadows": ""
       },
+      "scopeStatus": {
+        "pending": "",
+        "ready": "",
+        "transformPath": "",
+        "updating": ""
+      },
       "tooltips": {
         "hideClipping": "白とび・黒つぶれ警告を非表示",
         "histogram": "ヒストグラム",

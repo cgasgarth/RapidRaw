@@ -92,6 +92,7 @@
     "check:color-style-ui-coverage": "bun tests/integration/checks/check-color-style-ui-coverage.ts",
     "check:color-style-presets": "bun tests/integration/checks/check-color-style-presets.ts",
     "check:professional-color-workflow-ui": "bun tests/integration/checks/check-professional-color-workflow-ui.ts",
+    "check:edited-preview-scopes-ui": "bun tests/integration/checks/check-edited-preview-scopes-ui.ts",
     "check:hue-memory-color": "bun tests/integration/checks/check-hue-memory-color-gate.ts",
     "check:selective-color-command-proof": "bun tests/integration/checks/check-selective-color-command-proof.ts",
     "check:selective-color-command-proof:update": "bun tests/integration/checks/check-selective-color-command-proof.ts --update",

@@ -3795,6 +3795,12 @@
         "highlights": "",
         "shadows": ""
       },
+      "scopeStatus": {
+        "pending": "",
+        "ready": "",
+        "transformPath": "",
+        "updating": ""
+      },
       "tooltips": {
         "hideClipping": "Ocultar Avisos de Clipping",
         "histogram": "Histograma",

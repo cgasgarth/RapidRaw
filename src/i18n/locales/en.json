@@ -3935,6 +3935,12 @@
         "highlights": "Highlights {{value}}",
         "shadows": "Shadows {{value}}"
       },
+      "scopeStatus": {
+        "pending": "Scopes pending",
+        "ready": "Scopes ready",
+        "transformPath": "{{working}} to {{display}}",
+        "updating": "Scopes updating"
+      },
       "tooltips": {
         "hideClipping": "Hide Clipping Warnings",
         "histogram": "Histogram",

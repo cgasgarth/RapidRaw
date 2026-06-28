@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { DisplayMode } from '../../../utils/adjustments';
 
+import type { PreviewScopeStatus } from '../../../store/useEditorStore';
 import type { ChannelConfig } from '../../adjustments/Curves';
 import type { WaveformData } from '../../ui/AppProperties';
 
@@ -15,6 +16,7 @@ interface WaveformProps {
   setDisplayMode: (mode: DisplayMode) => void;
   showClipping?: boolean;
   onToggleClipping?: () => void;
+  previewScopeStatus?: PreviewScopeStatus | null;
   theme?: string;
 }
 
@@ -558,6 +560,7 @@ export default function Waveform({
   setDisplayMode,
   showClipping,
   onToggleClipping,
+  previewScopeStatus,
   theme,
 }: WaveformProps) {
   const { t } = useTranslation();
@@ -615,6 +618,21 @@ export default function Waveform({
     DisplayMode.Vectorscope,
     DisplayMode.Histogram,
   ].includes(displayMode);
+  const scopeUpdatedAt = previewScopeStatus?.updatedAt ? new Date(previewScopeStatus.updatedAt) : null;
+  const scopeUpdatedLabel =
+    scopeUpdatedAt && Number.isFinite(scopeUpdatedAt.getTime())
+      ? scopeUpdatedAt.toLocaleTimeString()
+      : t('ui.waveform.scopeStatus.pending');
+  const scopeReadinessLabel =
+    previewScopeStatus && previewScopeStatus.histogramReady && previewScopeStatus.waveformReady
+      ? t('ui.waveform.scopeStatus.ready')
+      : t('ui.waveform.scopeStatus.updating');
+  const transformPathLabel = previewScopeStatus
+    ? t('ui.waveform.scopeStatus.transformPath', {
+        display: previewScopeStatus.displayTransformLabel,
+        working: previewScopeStatus.workingTransformLabel,
+      })
+    : '';
 
   return (
     <div
@@ -748,6 +766,28 @@ export default function Waveform({
           </motion.div>
         )}
       </AnimatePresence>
+      <div
+        className="absolute left-2 top-2 z-20 max-w-[calc(100%-1rem)] rounded bg-black/60 px-2 py-1 text-[10px] text-white/80 backdrop-blur"
+        data-display-transform-label={previewScopeStatus?.displayTransformLabel ?? ''}
+        data-preview-scope-ready={String(
+          Boolean(previewScopeStatus?.histogramReady && previewScopeStatus.waveformReady),
+        )}
+        data-preview-scope-source={previewScopeStatus?.sourceLabel ?? ''}
+        data-preview-scope-updated-at={previewScopeStatus?.updatedAt ?? ''}
+        data-testid="preview-scope-status"
+        data-working-transform-label={previewScopeStatus?.workingTransformLabel ?? ''}
+      >
+        {previewScopeStatus ? (
+          <>
+            <span className="font-semibold">{scopeReadinessLabel}</span>
+            <span>{previewScopeStatus.sourceLabel}</span>
+            <span>{transformPathLabel}</span>
+            <span>{scopeUpdatedLabel}</span>
+          </>
+        ) : (
+          <span>{t('ui.waveform.scopeStatus.pending')}</span>
+        )}
+      </div>
     </div>
   );
 }
