@@ -1394,6 +1394,9 @@ export default function ColorPanel({
           data-inspector-improvement={skinToneInspectorImprovement.toFixed(3)}
           data-inspector-output-hue={skinToneInspectorOutput.hueDegrees.toFixed(1)}
           data-skin-tone-runtime-proof="private-raw-preview-export"
+          data-target-hue={adjustments.skinToneUniformity.targetHueDegrees}
+          data-target-luminance={adjustments.skinToneUniformity.targetLuminance.toFixed(2)}
+          data-target-saturation={adjustments.skinToneUniformity.targetSaturation.toFixed(2)}
           data-testid="skin-tone-uniformity-controls"
         >
           <div className="mb-2 flex items-center justify-between gap-2">
@@ -1436,7 +1439,7 @@ export default function ColorPanel({
           <AdjustmentSlider
             defaultValue={0.42}
             label={t('adjustments.color.skinToneUniformity.hue')}
-            max={1}
+            max={0.75}
             min={0}
             onValueChange={(value) => {
               handleSkinToneUniformityChange('hueUniformity', value);
@@ -1448,7 +1451,7 @@ export default function ColorPanel({
           <AdjustmentSlider
             defaultValue={0.31}
             label={t('adjustments.color.skinToneUniformity.saturation')}
-            max={1}
+            max={0.75}
             min={0}
             onValueChange={(value) => {
               handleSkinToneUniformityChange('saturationUniformity', value);
@@ -1460,7 +1463,7 @@ export default function ColorPanel({
           <AdjustmentSlider
             defaultValue={0.18}
             label={t('adjustments.color.skinToneUniformity.lightness')}
-            max={1}
+            max={0.75}
             min={0}
             onValueChange={(value) => {
               handleSkinToneUniformityChange('luminanceUniformity', value);
@@ -1479,6 +1482,42 @@ export default function ColorPanel({
             }}
             step={1}
             value={adjustments.skinToneUniformity.maxHueShiftDegrees}
+            onDragStateChange={onDragStateChange}
+          />
+          <AdjustmentSlider
+            defaultValue={24}
+            label={t('adjustments.color.skinToneUniformity.targetHue')}
+            max={45}
+            min={10}
+            onValueChange={(value) => {
+              handleSkinToneUniformityChange('targetHueDegrees', value);
+            }}
+            step={1}
+            value={adjustments.skinToneUniformity.targetHueDegrees}
+            onDragStateChange={onDragStateChange}
+          />
+          <AdjustmentSlider
+            defaultValue={0.38}
+            label={t('adjustments.color.skinToneUniformity.targetSaturation')}
+            max={0.65}
+            min={0.15}
+            onValueChange={(value) => {
+              handleSkinToneUniformityChange('targetSaturation', value);
+            }}
+            step={0.01}
+            value={adjustments.skinToneUniformity.targetSaturation}
+            onDragStateChange={onDragStateChange}
+          />
+          <AdjustmentSlider
+            defaultValue={0.56}
+            label={t('adjustments.color.skinToneUniformity.targetLightness')}
+            max={0.75}
+            min={0.35}
+            onValueChange={(value) => {
+              handleSkinToneUniformityChange('targetLuminance', value);
+            }}
+            step={0.01}
+            value={adjustments.skinToneUniformity.targetLuminance}
             onDragStateChange={onDragStateChange}
           />
         </div>

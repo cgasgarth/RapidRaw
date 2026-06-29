@@ -45,6 +45,7 @@
     "expectedGraphRevision": "graph-rev.raw-open-edit-export.skin-tone-uniformity.v1",
     "idempotencyKey": "idem.raw-open-edit-export.skin-tone-uniformity.v1",
     "parameters": {
+      "experimental": true,
       "hueUniformity": 0.42,
       "luminanceUniformity": 0.18,
       "maxHueShiftDegrees": 16,

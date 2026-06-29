@@ -25,6 +25,9 @@ const requiredLocaleKeys = [
   'skinToneUniformity.lightness',
   'skinToneUniformity.preview',
   'skinToneUniformity.saturation',
+  'skinToneUniformity.targetHue',
+  'skinToneUniformity.targetLightness',
+  'skinToneUniformity.targetSaturation',
   'skinToneUniformity.title',
   'skinToneUniformity.warning',
   'workflowRecipes.apply',
@@ -81,6 +84,9 @@ for (const marker of [
   'data-testid="skin-tone-uniformity-toggle"',
   'data-inspector-improvement={skinToneInspectorImprovement.toFixed(3)}',
   'data-skin-tone-runtime-proof="private-raw-preview-export"',
+  'data-target-hue={adjustments.skinToneUniformity.targetHueDegrees}',
+  'data-target-luminance={adjustments.skinToneUniformity.targetLuminance.toFixed(2)}',
+  'data-target-saturation={adjustments.skinToneUniformity.targetSaturation.toFixed(2)}',
   'data-testid={`professional-color-recipe-${recipe.id}`}',
   'data-testid="professional-color-recipe-summary"',
   'aria-pressed={isApplied}',
@@ -104,6 +110,9 @@ for (const marker of [
   "t('adjustments.color.colorGrading')",
   "t('adjustments.color.skinToneUniformity.title')",
   "t('adjustments.color.skinToneUniformity.warning')",
+  "t('adjustments.color.skinToneUniformity.targetHue')",
+  "t('adjustments.color.skinToneUniformity.targetLightness')",
+  "t('adjustments.color.skinToneUniformity.targetSaturation')",
 ]) {
   if (!source.includes(marker)) {
     console.error(`Professional color workflow UI missing marker: ${marker}`);

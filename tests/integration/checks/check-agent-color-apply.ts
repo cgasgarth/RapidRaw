@@ -119,6 +119,28 @@ if (
 ) {
   throw new Error('agent.color.apply accepted invalid selective range falloff.');
 }
+if (
+  agentColorApplyRequestSchema.safeParse({
+    color: {
+      skinToneUniformity: {
+        enabled: true,
+        hueUniformity: 0.9,
+        luminanceUniformity: 0.2,
+        maxHueShiftDegrees: 18,
+        saturationUniformity: 0.2,
+        targetHueDegrees: 28,
+        targetLuminance: 0.58,
+        targetSaturation: 0.42,
+      },
+    },
+    expectedRecipeHash: 'recipe:test',
+    operationId: 'invalid-skin-tone-uniformity',
+    requestId: 'invalid-skin-tone-uniformity',
+    sessionId: 'agent-color-invalid',
+  }).success
+) {
+  throw new Error('agent.color.apply accepted out-of-range skin-tone uniformity.');
+}
 
 const initialSnapshot = buildAgentImageContextSnapshot();
 let staleRejected = false;
