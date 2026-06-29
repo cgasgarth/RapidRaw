@@ -19,6 +19,15 @@ type SuperResolutionArtifactReviewInput = {
   reconstructionMode?: SuperResolutionUiSettings['reconstructionMode'];
   requestedOutputScale: number;
   resolvedAlignmentMode: SuperResolutionUiSettings['alignmentMode'];
+  sourceImageRefs?: Array<{
+    imagePath?: string;
+    sourceIndex: number;
+  }>;
+  sourceState?: Array<{
+    contentHash: string;
+    graphRevision: string;
+    sourceIndex: number;
+  }>;
   staleState: {
     state: SuperResolutionOutputReviewWorkflow['staleState'];
   };
@@ -46,6 +55,7 @@ interface BuildSuperResolutionOutputReviewOptions {
   artifactPath: string;
   settings: SuperResolutionUiSettings;
   sourceCount: number;
+  sourcePaths?: string[];
 }
 
 const reviewCropCount = 4;
@@ -126,6 +136,7 @@ export const buildSuperResolutionOutputReviewFromArtifact = (
     reviewCropCount,
     reviewPacketPath,
     sourceCount: artifactValue.validationSummary.sourceCount,
+    sourceRefs: buildSourceRefsFromArtifact(artifactValue),
     staleState: artifactValue.staleState.state,
     supportMap:
       artifactValue.supportMap === undefined
@@ -154,6 +165,7 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
   artifactPath,
   settings,
   sourceCount,
+  sourcePaths = [],
 }: BuildSuperResolutionOutputReviewOptions): SuperResolutionOutputReviewWorkflow => {
   const decision = settings.detailPolicy === 'aggressive_preview_only' ? 'preview_only' : 'human_review_required';
   const warningCodes: SuperResolutionOutputReviewWorkflow['warningCodes'] =
@@ -198,6 +210,7 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
     reviewCropCount,
     reviewPacketPath,
     sourceCount,
+    sourceRefs: buildSourceRefsFromPaths(sourceCount, sourcePaths),
     staleState: 'unknown',
     supportMap: buildSupportMapReview({
       artifactId: `${artifactPath}:support-map`,
@@ -210,6 +223,41 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
     warningCodes,
   });
 };
+
+const buildSourceRefsFromArtifact = (
+  artifact: SuperResolutionArtifactReviewInput,
+): SuperResolutionOutputReviewWorkflow['sourceRefs'] => {
+  const sourcePathByIndex = new Map<number, string>();
+  for (const source of artifact.sourceImageRefs ?? []) {
+    if (source.imagePath !== undefined) sourcePathByIndex.set(source.sourceIndex, source.imagePath);
+  }
+  if (artifact.sourceState !== undefined && artifact.sourceState.length > 0) {
+    return artifact.sourceState
+      .map((source) => ({
+        contentHash: source.contentHash,
+        graphRevision: source.graphRevision,
+        path: sourcePathByIndex.get(source.sourceIndex),
+        sourceIndex: source.sourceIndex,
+      }))
+      .sort((left, right) => left.sourceIndex - right.sourceIndex);
+  }
+
+  return buildSourceRefsFromPaths(artifact.validationSummary.sourceCount, []);
+};
+
+const buildSourceRefsFromPaths = (
+  sourceCount: number,
+  sourcePaths: string[],
+): SuperResolutionOutputReviewWorkflow['sourceRefs'] =>
+  Array.from({ length: sourceCount }, (_value, sourceIndex) => {
+    const path = sourcePaths[sourceIndex];
+    return {
+      contentHash: hashStableJson({ path: path ?? `sr-source-${sourceIndex}`, sourceIndex }),
+      graphRevision: `sr_source_${sourceIndex}`,
+      ...(path === undefined ? {} : { path }),
+      sourceIndex,
+    };
+  });
 
 const buildDetailReview = ({
   baselineArtifactId,
@@ -343,4 +391,26 @@ const deriveEditableGate = (
   if (artifact.staleState.state !== 'current') return 'blocked_stale';
   if (artifact.validationSummary.humanReviewStatus === 'passed' && artifact.warningCodes.length === 0) return 'ready';
   return 'blocked_review_required';
+};
+
+const hashStableJson = (value: unknown): string => `fnv1a32:${fnv1a32(stableJson(value))}`;
+
+const stableJson = (value: unknown): string => {
+  if (Array.isArray(value)) return `[${value.map((item) => stableJson(item)).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+};
+
+const fnv1a32 = (value: string): string => {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
 };

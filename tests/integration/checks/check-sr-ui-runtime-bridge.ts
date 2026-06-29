@@ -96,6 +96,24 @@ if (outputReview.humanReviewStatus !== 'pending') {
 if (outputReview.outputArtifactHash !== applied.apply.sidecarArtifact.outputArtifact.contentHash) {
   throw new Error('SR output review did not preserve output artifact hash.');
 }
+if (
+  outputReview.sourceRefs.map((source) => source.contentHash).join(',') !==
+  applied.apply.sidecarArtifact.sourceState.map((source) => source.contentHash).join(',')
+) {
+  throw new Error('SR output review did not preserve source content hashes.');
+}
+if (
+  outputReview.sourceRefs.map((source) => source.graphRevision).join(',') !==
+  applied.apply.sidecarArtifact.sourceState.map((source) => source.graphRevision).join(',')
+) {
+  throw new Error('SR output review did not preserve source graph revisions.');
+}
+if (
+  outputReview.sourceRefs.map((source) => source.path ?? '').join(',') !==
+  applied.apply.sidecarArtifact.sourceImageRefs.map((source) => source.imagePath).join(',')
+) {
+  throw new Error('SR output review did not preserve source image paths.');
+}
 if (outputReview.reconstructionMode !== 'optical_flow') {
   throw new Error(`Expected sidecar artifact review reconstruction mode, got ${outputReview.reconstructionMode}.`);
 }

@@ -40,6 +40,7 @@ interface SuperResolutionModalProps {
   loadingImageUrl?: string | null;
   onApplyPlan: () => void;
   onClose: () => void;
+  onOpenOutput?: (path: string) => void;
   onPreviewPlan: () => void;
   reviewArtifactPreviewUrls?: Partial<
     Record<SuperResolutionOutputReviewWorkflow['reviewArtifacts'][number]['kind'], string>
@@ -48,6 +49,7 @@ interface SuperResolutionModalProps {
   outputReview?: SuperResolutionOutputReviewWorkflow | null;
   settings: SuperResolutionUiSettings;
   sourceCount: number;
+  sourcePaths?: string[];
   sourcePreflightMetadata?: SuperResolutionSourcePreflightMetadata[];
 }
 
@@ -64,12 +66,14 @@ export default function SuperResolutionModal({
   loadingImageUrl,
   onApplyPlan,
   onClose,
+  onOpenOutput,
   onPreviewPlan,
   reviewArtifactPreviewUrls = {},
   onSettingsChange,
   outputReview: runtimeOutputReview,
   settings,
   sourceCount,
+  sourcePaths = [],
   sourcePreflightMetadata = [],
 }: SuperResolutionModalProps) {
   const { t } = useTranslation();
@@ -164,6 +168,7 @@ export default function SuperResolutionModal({
       artifactPath: reviewArtifactPath,
       settings,
       sourceCount: fallbackOutputReviewSourceCount,
+      sourcePaths,
     });
   const hasRuntimeOutputReview = runtimeOutputReview !== null && runtimeOutputReview !== undefined;
   const derivedOutputReceipt = buildSuperResolutionDerivedOutputReceipt({ review: outputReview, settings });
@@ -242,6 +247,9 @@ export default function SuperResolutionModal({
   const detailReviewHighlightCountLabel = t('modals.superResolution.review.detailReviewHighlightCountValue', {
     count: outputReview.detailReview.improvementHighlightCount,
   });
+  const sourceContentHashesLabel = outputReview.sourceRefs.map((source) => source.contentHash).join(',');
+  const sourceGraphRevisionsLabel = outputReview.sourceRefs.map((source) => source.graphRevision).join(',');
+  const sourcePathsLabel = outputReview.sourceRefs.map((source) => source.path ?? '').join(',');
   const outputReviewAlignmentConfidenceLabel =
     outputReview.alignmentConfidence === null
       ? t('modals.superResolution.review.notMeasured')
@@ -256,6 +264,8 @@ export default function SuperResolutionModal({
         : `${Math.round(outputReview.cropMetrics.overlapCoverageRatio * 100)}%`,
   });
   const isEditableHandoffReady = outputReview.editableGate === 'ready';
+  const openInEditorPath = derivedOutputReceipt.openInEditorAction.path ?? '';
+  const exportHandoffReady = isEditableHandoffReady && openInEditorPath.length > 0;
   const acceptanceGateStatus = isEditableHandoffReady ? 'ready' : 'review';
   const artifactWarningsStatus = outputReview.warningCodes.length === 0 ? 'ready' : 'pending';
 
@@ -451,7 +461,10 @@ export default function SuperResolutionModal({
           data-accepted-dry-run-plan-id={lastApplyCommand.acceptedDryRunPlanId}
           data-command-type={lastApplyCommand.commandType}
           data-dry-run={String(lastApplyCommand.dryRun)}
+          data-export-handoff-ready={String(exportHandoffReady)}
+          data-open-in-editor-path={openInEditorPath}
           data-source-count={lastApplyCommand.sources}
+          data-source-graph-revisions={sourceGraphRevisionsLabel}
           data-testid="sr-apply-command-state"
           data-tool-name={lastApplyCommand.toolName}
         >
@@ -682,6 +695,7 @@ export default function SuperResolutionModal({
 
       <ComputationalMergeReviewPanel
         derivedOutputReceipt={storedDerivedOutputReceipt}
+        {...(onOpenOutput === undefined ? {} : { onOpenDerivedOutput: onOpenOutput })}
         title={t('modals.superResolution.review.title')}
         proofStatus={t('modals.superResolution.review.proofStatus')}
         limitation={t('modals.superResolution.review.limitation')}
@@ -821,6 +835,10 @@ export default function SuperResolutionModal({
               {
                 label: t('modals.superResolution.review.provenance'),
                 value: outputReview.artifactPath,
+              },
+              {
+                label: t('modals.superResolution.preflight.provenance'),
+                value: sourceGraphRevisionsLabel,
               },
               {
                 label: t('modals.superResolution.review.artifactWarnings'),
@@ -1018,6 +1036,7 @@ export default function SuperResolutionModal({
         data-alignment-confidence={outputReview.alignmentConfidence ?? 'not_measured'}
         data-crop-metrics={`${outputReview.cropMetrics.reviewCropCount}:${outputReview.cropMetrics.overlapCoverageRatio ?? 'not_measured'}`}
         data-editable-handoff-ready={String(isEditableHandoffReady)}
+        data-export-handoff-ready={String(exportHandoffReady)}
         data-false-detail-risk={outputReview.falseDetailRisk}
         data-human-review-status={outputReview.humanReviewStatus}
         data-detail-review-highlight-count={outputReview.detailReview.improvementHighlightCount}
@@ -1027,9 +1046,13 @@ export default function SuperResolutionModal({
         data-mode-policy-version={outputReview.modePolicyVersion}
         data-output-artifact-id={outputReview.outputArtifactId}
         data-output-artifact-hash={outputReview.outputArtifactHash}
+        data-open-in-editor-path={openInEditorPath}
         data-review-artifact-count={outputReview.reviewArtifacts.length}
         data-review-artifact-hashes={outputReview.reviewArtifacts.map((artifact) => artifact.contentHash).join(',')}
         data-review-artifact-paths={outputReview.reviewArtifacts.map((artifact) => artifact.path).join(',')}
+        data-source-content-hashes={sourceContentHashesLabel}
+        data-source-graph-revisions={sourceGraphRevisionsLabel}
+        data-source-paths={sourcePathsLabel}
         data-stale-state={outputReview.staleState}
         data-support-map-artifact-id={outputReview.supportMap.artifactId}
         data-support-map-review-status={outputReview.supportMap.reviewStatus}
