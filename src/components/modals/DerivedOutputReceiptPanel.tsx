@@ -15,9 +15,13 @@ interface DerivedOutputReceiptPanelProps {
 export default function DerivedOutputReceiptPanel({ onOpenOutput, receipt }: DerivedOutputReceiptPanelProps) {
   const { t } = useTranslation();
   const canOpen = receipt.openInEditorAction.state === 'available' && receipt.openInEditorAction.path !== undefined;
+  const isStale = receipt.staleState === 'stale';
+  const staleReasonText =
+    receipt.staleReasons?.map((reason) => t(`modals.derivedOutput.staleReason.${reason}`)).join(', ') ?? '';
 
   const rows = [
     { label: t('modals.derivedOutput.family'), value: t(`modals.derivedOutput.familyValue.${receipt.family}`) },
+    { label: t('modals.derivedOutput.status'), value: t(`modals.derivedOutput.statusValue.${receipt.staleState}`) },
     { label: t('modals.derivedOutput.output'), value: receipt.outputArtifactId },
     { label: t('modals.derivedOutput.outputHash'), value: receipt.outputContentHash },
     { label: t('modals.derivedOutput.settingsHash'), value: receipt.settingsHash },
@@ -36,9 +40,11 @@ export default function DerivedOutputReceiptPanel({ onOpenOutput, receipt }: Der
       className="rounded-md border border-border-color bg-bg-primary p-4"
       data-derived-output-family={receipt.family}
       data-derived-output-open-state={receipt.openInEditorAction.state}
+      data-derived-output-stale-reasons={receipt.staleReasons?.join(',') ?? ''}
       data-output-artifact-id={receipt.outputArtifactId}
       data-output-content-hash={receipt.outputContentHash}
       data-output-path={receipt.outputPath ?? ''}
+      data-recipe-hash={receipt.recipeHash ?? ''}
       data-receipt-id={receipt.receiptId}
       data-settings-hash={receipt.settingsHash}
       data-source-content-hashes={receipt.sourceContentHashes.join(',')}
@@ -55,6 +61,19 @@ export default function DerivedOutputReceiptPanel({ onOpenOutput, receipt }: Der
             {t('modals.derivedOutput.subtitle')}
           </UiText>
         </div>
+        {isStale ? (
+          <div
+            className="rounded border border-yellow-400/40 bg-yellow-400/10 px-3 py-2 text-right"
+            data-testid="derived-output-stale-warning"
+          >
+            <UiText variant={TextVariants.small} className="block font-semibold text-yellow-300">
+              {t('modals.derivedOutput.staleWarningTitle')}
+            </UiText>
+            <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block max-w-64">
+              {t('modals.derivedOutput.staleWarning', { reasons: staleReasonText })}
+            </UiText>
+          </div>
+        ) : null}
         <Button
           className="shrink-0 bg-surface px-3 py-1.5 text-xs"
           data-testid="derived-output-open-in-editor"

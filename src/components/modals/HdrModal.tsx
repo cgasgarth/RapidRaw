@@ -1,5 +1,5 @@
 import { CheckCircle, Images, ShieldCheck, XCircle } from 'lucide-react';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DerivedOutputReceiptPanel from './DerivedOutputReceiptPanel';
@@ -18,7 +18,7 @@ import {
 } from '../../schemas/hdrMergeUiSchemas';
 import { useUIStore, type HdrModalState } from '../../store/useUIStore';
 import { TextColors, TextVariants } from '../../types/typography';
-import { buildHdrDerivedOutputReceipt } from '../../utils/derivedOutputReceipt';
+import { buildHdrDerivedOutputReceipt, deriveDerivedOutputReceiptState } from '../../utils/derivedOutputReceipt';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
 import { buildHdrEditableHandoffSummary } from '../../utils/hdrEditableHandoff';
 import { buildHdrReviewDiagnostics } from '../../utils/hdrReviewDiagnostics';
@@ -238,6 +238,36 @@ export default function HdrModal({
     savedDerivedOutputReceiptId === null ? undefined : state.derivedOutputReceipts[savedDerivedOutputReceiptId],
   );
   const upsertDerivedOutputReceipt = useUIStore((state) => state.upsertDerivedOutputReceipt);
+  const currentDerivedOutputReceipt = useMemo(() => {
+    if (handoffSummary === null) return null;
+    return buildHdrDerivedOutputReceipt({
+      acceptedDryRunPlanHash: lastApplyCommand?.acceptedDryRunPlanHash,
+      acceptedDryRunPlanId: lastApplyCommand?.acceptedDryRunPlanId,
+      handoff: buildHdrEditableHandoffSummary({
+        deghostReviewAccepted: isDeghostReviewApproved,
+        deghostReviewRequired: isDeghostReviewRequired,
+        outputPath: handoffSummary.outputPath,
+        settings,
+        sourcePaths,
+      }),
+      settings,
+    });
+  }, [
+    handoffSummary,
+    isDeghostReviewApproved,
+    isDeghostReviewRequired,
+    lastApplyCommand?.acceptedDryRunPlanHash,
+    lastApplyCommand?.acceptedDryRunPlanId,
+    settings,
+    sourcePaths,
+  ]);
+  const visibleDerivedOutputReceipt =
+    storedDerivedOutputReceipt && currentDerivedOutputReceipt
+      ? deriveDerivedOutputReceiptState({
+          current: currentDerivedOutputReceipt,
+          receipt: storedDerivedOutputReceipt,
+        })
+      : storedDerivedOutputReceipt;
 
   useEffect(() => {
     if (!isOpen) {
@@ -281,7 +311,12 @@ export default function HdrModal({
         settings,
         sourcePaths,
       });
-      const receipt = buildHdrDerivedOutputReceipt({ handoff, settings });
+      const receipt = buildHdrDerivedOutputReceipt({
+        acceptedDryRunPlanHash: lastApplyCommand?.acceptedDryRunPlanHash,
+        acceptedDryRunPlanId: lastApplyCommand?.acceptedDryRunPlanId,
+        handoff,
+        settings,
+      });
       upsertDerivedOutputReceipt(receipt);
       setSavedHandoffSummary(handoff);
       setSavedDerivedOutputReceiptId(receipt.receiptId);
@@ -294,7 +329,7 @@ export default function HdrModal({
   };
 
   const handleOpen = () => {
-    const openPath = storedDerivedOutputReceipt?.openInEditorAction.path ?? savedPath;
+    const openPath = visibleDerivedOutputReceipt?.openInEditorAction.path ?? savedPath;
     if (openPath) {
       onOpenFile(openPath);
       handleClose();
@@ -442,15 +477,15 @@ export default function HdrModal({
               </UiText>
             </section>
           )}
-          {storedDerivedOutputReceipt ? (
+          {visibleDerivedOutputReceipt ? (
             <div
               className="mx-auto mt-4 max-w-2xl text-left"
-              data-derived-output-receipt-id={storedDerivedOutputReceipt.receiptId}
-              data-hdr-derived-source-open-path={storedDerivedOutputReceipt.openInEditorAction.path ?? ''}
-              data-hdr-derived-source-state={storedDerivedOutputReceipt.openInEditorAction.state}
+              data-derived-output-receipt-id={visibleDerivedOutputReceipt.receiptId}
+              data-hdr-derived-source-open-path={visibleDerivedOutputReceipt.openInEditorAction.path ?? ''}
+              data-hdr-derived-source-state={visibleDerivedOutputReceipt.openInEditorAction.state}
               data-testid="hdr-derived-output-receipt-store-entry"
             >
-              <DerivedOutputReceiptPanel receipt={storedDerivedOutputReceipt} onOpenOutput={onOpenFile} />
+              <DerivedOutputReceiptPanel receipt={visibleDerivedOutputReceipt} onOpenOutput={onOpenFile} />
             </div>
           ) : null}
         </MergeResultPreview>

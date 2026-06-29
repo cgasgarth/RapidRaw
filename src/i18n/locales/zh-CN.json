@@ -2248,6 +2248,24 @@
       "settingsHash": "",
       "sourceCount_other": "",
       "sources": "",
+      "staleReason": {
+        "accepted_dry_run_plan_changed": "accepted dry-run plan changed",
+        "output_artifact_changed": "output hash changed",
+        "recipe_hash_changed": "recipe hash changed",
+        "settings_hash_changed": "settings changed",
+        "source_content_hash_changed": "source hash changed",
+        "source_graph_revision_changed": "source graph revision changed",
+        "source_order_changed": "source order changed",
+        "source_set_changed": "source set changed"
+      },
+      "staleWarning": "This existing derived output is stale: {{reasons}}. Regenerate before using it as current output.",
+      "staleWarningTitle": "Stale output",
+      "status": "Status",
+      "statusValue": {
+        "current": "Current",
+        "stale": "Stale",
+        "unknown": "Unknown"
+      },
       "storage": "",
       "subtitle": "",
       "title": ""

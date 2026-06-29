@@ -12,7 +12,7 @@ import {
 } from './ComputationalSetupModalShell';
 import { useUIStore, type FocusStackModalState } from '../../store/useUIStore';
 import { TextColors, TextVariants } from '../../types/typography';
-import { buildFocusStackDerivedOutputReceipt } from '../../utils/derivedOutputReceipt';
+import { buildFocusStackDerivedOutputReceipt, deriveDerivedOutputReceiptState } from '../../utils/derivedOutputReceipt';
 import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
 import { buildFocusStackSourcePreflight } from '../../utils/focusStackSourcePreflight';
 import Button from '../ui/Button';
@@ -137,14 +137,29 @@ export default function FocusStackModal({
       sourcePaths,
     });
   const hasRuntimeOutputReview = runtimeOutputReview !== null && runtimeOutputReview !== undefined;
-  const derivedOutputReceipt = buildFocusStackDerivedOutputReceipt({ review: outputReview, settings });
-  const storedDerivedOutputReceipt =
-    useUIStore((state) => state.derivedOutputReceipts[derivedOutputReceipt.receiptId]) ?? derivedOutputReceipt;
+  const derivedOutputReceipt = buildFocusStackDerivedOutputReceipt({
+    acceptedDryRunPlanHash: lastApplyCommand?.acceptedDryRunPlanHash,
+    acceptedDryRunPlanId: lastApplyCommand?.acceptedDryRunPlanId,
+    review: outputReview,
+    settings,
+  });
+  const matchingStoredDerivedOutputReceipt = useUIStore((state) =>
+    Object.values(state.derivedOutputReceipts).find(
+      (receipt) =>
+        receipt.family === derivedOutputReceipt.family &&
+        receipt.outputArtifactId === derivedOutputReceipt.outputArtifactId,
+    ),
+  );
+  const storedDerivedOutputReceipt = matchingStoredDerivedOutputReceipt ?? derivedOutputReceipt;
+  const visibleDerivedOutputReceipt = deriveDerivedOutputReceiptState({
+    current: derivedOutputReceipt,
+    receipt: storedDerivedOutputReceipt,
+  });
   const upsertDerivedOutputReceipt = useUIStore((state) => state.upsertDerivedOutputReceipt);
 
   useEffect(() => {
-    upsertDerivedOutputReceipt(derivedOutputReceipt);
-  }, [derivedOutputReceipt, upsertDerivedOutputReceipt]);
+    if (matchingStoredDerivedOutputReceipt === undefined) upsertDerivedOutputReceipt(derivedOutputReceipt);
+  }, [derivedOutputReceipt, matchingStoredDerivedOutputReceipt, upsertDerivedOutputReceipt]);
   const isApplyPlanReady =
     isPreviewPlanReady &&
     hasRuntimeOutputReview &&
@@ -670,7 +685,7 @@ export default function FocusStackModal({
       </motion.section>
 
       <ComputationalMergeReviewPanel
-        derivedOutputReceipt={storedDerivedOutputReceipt}
+        derivedOutputReceipt={visibleDerivedOutputReceipt}
         title={t('modals.focusStack.review.title')}
         proofStatus={t('modals.focusStack.review.proofStatus')}
         limitation={t('modals.focusStack.review.limitation')}

@@ -16,7 +16,10 @@ import {
 } from '../../schemas/superResolutionUiSchemas';
 import { useUIStore, type SuperResolutionModalState } from '../../store/useUIStore';
 import { TextColors, TextVariants } from '../../types/typography';
-import { buildSuperResolutionDerivedOutputReceipt } from '../../utils/derivedOutputReceipt';
+import {
+  buildSuperResolutionDerivedOutputReceipt,
+  deriveDerivedOutputReceiptState,
+} from '../../utils/derivedOutputReceipt';
 import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
 import { buildSuperResolutionSourcePreflight } from '../../utils/superResolutionSourcePreflight';
 import Button from '../ui/Button';
@@ -171,14 +174,29 @@ export default function SuperResolutionModal({
       sourcePaths,
     });
   const hasRuntimeOutputReview = runtimeOutputReview !== null && runtimeOutputReview !== undefined;
-  const derivedOutputReceipt = buildSuperResolutionDerivedOutputReceipt({ review: outputReview, settings });
-  const storedDerivedOutputReceipt =
-    useUIStore((state) => state.derivedOutputReceipts[derivedOutputReceipt.receiptId]) ?? derivedOutputReceipt;
+  const derivedOutputReceipt = buildSuperResolutionDerivedOutputReceipt({
+    acceptedDryRunPlanHash: lastApplyCommand?.acceptedDryRunPlanHash,
+    acceptedDryRunPlanId: lastApplyCommand?.acceptedDryRunPlanId,
+    review: outputReview,
+    settings,
+  });
+  const matchingStoredDerivedOutputReceipt = useUIStore((state) =>
+    Object.values(state.derivedOutputReceipts).find(
+      (receipt) =>
+        receipt.family === derivedOutputReceipt.family &&
+        receipt.outputArtifactId === derivedOutputReceipt.outputArtifactId,
+    ),
+  );
+  const storedDerivedOutputReceipt = matchingStoredDerivedOutputReceipt ?? derivedOutputReceipt;
+  const visibleDerivedOutputReceipt = deriveDerivedOutputReceiptState({
+    current: derivedOutputReceipt,
+    receipt: storedDerivedOutputReceipt,
+  });
   const upsertDerivedOutputReceipt = useUIStore((state) => state.upsertDerivedOutputReceipt);
 
   useEffect(() => {
-    upsertDerivedOutputReceipt(derivedOutputReceipt);
-  }, [derivedOutputReceipt, upsertDerivedOutputReceipt]);
+    if (matchingStoredDerivedOutputReceipt === undefined) upsertDerivedOutputReceipt(derivedOutputReceipt);
+  }, [derivedOutputReceipt, matchingStoredDerivedOutputReceipt, upsertDerivedOutputReceipt]);
   const isApplyPlanReady =
     isSourceCountValid &&
     hasRuntimeOutputReview &&
@@ -694,7 +712,7 @@ export default function SuperResolutionModal({
       </motion.section>
 
       <ComputationalMergeReviewPanel
-        derivedOutputReceipt={storedDerivedOutputReceipt}
+        derivedOutputReceipt={visibleDerivedOutputReceipt}
         {...(onOpenOutput === undefined ? {} : { onOpenDerivedOutput: onOpenOutput })}
         title={t('modals.superResolution.review.title')}
         proofStatus={t('modals.superResolution.review.proofStatus')}
