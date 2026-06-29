@@ -133,7 +133,35 @@ const superResolutionReceipt = buildSuperResolutionDerivedOutputReceipt({
     artifactPath: 'artifact_sr_output',
     settings: DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
     sourceCount: 6,
+    sourcePaths: Array.from({ length: 6 }, (_value, index) => `/tmp/sr-${index}.dng`),
   }),
+  settings: DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
+});
+
+const acceptedSuperResolutionReview = {
+  ...buildSuperResolutionOutputReviewWorkflow({
+    artifactPath: '/tmp/rawengine-sr-accepted-output.tif',
+    settings: DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
+    sourceCount: 3,
+    sourcePaths: ['/tmp/sr-accepted-0.dng', '/tmp/sr-accepted-1.dng', '/tmp/sr-accepted-2.dng'],
+  }),
+  editableGate: 'ready',
+  humanReviewStatus: 'passed',
+  staleState: 'current',
+  supportMap: {
+    ...buildSuperResolutionOutputReviewWorkflow({
+      artifactPath: '/tmp/rawengine-sr-accepted-output.tif',
+      settings: DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
+      sourceCount: 3,
+      sourcePaths: ['/tmp/sr-accepted-0.dng', '/tmp/sr-accepted-1.dng', '/tmp/sr-accepted-2.dng'],
+    }).supportMap,
+    reviewStatus: 'apply_ready',
+  },
+  warningCodes: [],
+} satisfies ReturnType<typeof buildSuperResolutionOutputReviewWorkflow>;
+
+const acceptedSuperResolutionReceipt = buildSuperResolutionDerivedOutputReceipt({
+  review: acceptedSuperResolutionReview,
   settings: DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
 });
 
@@ -142,6 +170,7 @@ for (const [label, receipt] of [
   ['panorama', panoramaReceipt],
   ['focus stack', focusReceipt],
   ['super resolution', superResolutionReceipt],
+  ['accepted super resolution', acceptedSuperResolutionReceipt],
 ] as const) {
   assertReceipt(label, receipt);
 }
@@ -157,7 +186,25 @@ expect(
 );
 expect(
   superResolutionReceipt.openInEditorAction.path === undefined,
-  'SR deferred receipt must not fake an output path.',
+  'SR unaccepted receipt must not fake an output path.',
+);
+expect(
+  acceptedSuperResolutionReceipt.openInEditorAction.state === 'available',
+  'Accepted SR receipt must expose available editor handoff.',
+);
+expect(
+  acceptedSuperResolutionReceipt.openInEditorAction.path === acceptedSuperResolutionReview.artifactPath,
+  'Accepted SR receipt must hand off the accepted artifact path.',
+);
+expect(
+  acceptedSuperResolutionReceipt.sourceContentHashes.join(',') ===
+    acceptedSuperResolutionReview.sourceRefs.map((source) => source.contentHash).join(','),
+  'SR receipt must retain review source content hashes.',
+);
+expect(
+  acceptedSuperResolutionReceipt.sourceGraphRevisions.join(',') ===
+    acceptedSuperResolutionReview.sourceRefs.map((source) => source.graphRevision).join(','),
+  'SR receipt must retain review source graph revisions.',
 );
 expect(
   focusReceipt.sourceGraphRevisions.join(',') ===
@@ -258,6 +305,22 @@ expect(
   focusModalSource.includes('data-source-graph-revisions'),
   'Focus stack handoff proof must expose source graph revisions.',
 );
+expect(
+  appModalsSource.includes('sourcePaths: superResolutionModalState.sourcePaths') &&
+    appModalsSource.includes('sourcePaths={superResolutionModalState.sourcePaths}'),
+  'App modal wiring must pass SR source paths into output review and modal receipt builder.',
+);
+
+const srModalSource = readFileSync('src/components/modals/SuperResolutionModal.tsx', 'utf8');
+for (const marker of [
+  'data-open-in-editor-path={openInEditorPath}',
+  'data-export-handoff-ready={String(exportHandoffReady)}',
+  'data-source-content-hashes={sourceContentHashesLabel}',
+  'data-source-graph-revisions={sourceGraphRevisionsLabel}',
+  'onOpenDerivedOutput: onOpenOutput',
+]) {
+  expect(srModalSource.includes(marker), `SR modal missing derived editable-source marker: ${marker}.`);
+}
 
 const reviewPanelSource = readFileSync('src/components/modals/ComputationalMergeReviewPanel.tsx', 'utf8');
 expect(reviewPanelSource.includes('DerivedOutputReceiptPanel'), 'Review panel must render the shared receipt panel.');

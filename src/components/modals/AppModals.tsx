@@ -313,6 +313,9 @@ export default function AppModals(props: AppModalsProps) {
             superResolutionModalState: createDefaultSuperResolutionModalState(state.superResolutionModalState.settings),
           }));
         }}
+        onOpenOutput={(path) => {
+          void props.handleImageSelect(path);
+        }}
         onApplyPlan={() => {
           if (superResolutionModalState.outputReview === null) return;
           const routePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');
@@ -357,6 +360,7 @@ export default function AppModals(props: AppModalsProps) {
                 artifactPath: `/tmp/rawengine-super-resolution-preview-plan-${superResolutionModalState.sourcePaths.length}.tif`,
                 settings: superResolutionModalState.settings,
                 sourceCount: superResolutionModalState.sourcePaths.length,
+                sourcePaths: superResolutionModalState.sourcePaths,
               }),
             },
           });
@@ -380,6 +384,7 @@ export default function AppModals(props: AppModalsProps) {
         outputReview={superResolutionModalState.outputReview}
         settings={superResolutionModalState.settings}
         sourceCount={superResolutionModalState.sourcePaths.length}
+        sourcePaths={superResolutionModalState.sourcePaths}
         sourcePreflightMetadata={superResolutionModalState.sourcePreflightMetadata}
       />
       <FocusStackModal

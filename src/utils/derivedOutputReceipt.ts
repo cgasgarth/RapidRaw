@@ -117,19 +117,16 @@ export const buildSuperResolutionDerivedOutputReceipt = ({
     family: 'super_resolution',
     openInEditorAction: {
       label: 'Open super-resolution output',
-      state: review.editableGate === 'ready' ? 'deferred' : 'unavailable',
+      path: review.editableGate === 'ready' ? review.artifactPath : undefined,
+      state: review.editableGate === 'ready' ? 'available' : 'unavailable',
     },
     outputArtifactId: review.outputArtifactId,
     outputContentHash: review.outputArtifactHash,
+    outputPath: review.editableGate === 'ready' ? review.artifactPath : undefined,
     settings,
-    sourceContentHashes: Array.from({ length: review.sourceCount }, (_value, sourceIndex) =>
-      hashStableJson({ sourceIndex, supportMap: review.supportMap, outputArtifactId: review.outputArtifactId }),
-    ),
+    sourceContentHashes: review.sourceRefs.map((source) => source.contentHash),
     sourceCount: review.sourceCount,
-    sourceGraphRevisions: Array.from(
-      { length: review.sourceCount },
-      (_value, sourceIndex) => `sr_source_${sourceIndex}`,
-    ),
+    sourceGraphRevisions: review.sourceRefs.map((source) => source.graphRevision),
     staleState: review.staleState,
     storagePolicy: 'sidecar_artifact',
   });

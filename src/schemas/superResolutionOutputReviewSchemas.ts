@@ -28,6 +28,15 @@ export const superResolutionOutputReviewEditableGateSchema = z.enum([
 export const superResolutionOutputReviewStaleStateSchema = z.enum(['current', 'stale', 'unknown']);
 export const superResolutionFalseDetailRiskSchema = z.enum(['unknown', 'low', 'medium', 'high']);
 
+export const superResolutionOutputReviewSourceRefSchema = z
+  .object({
+    contentHash: z.string().trim().min(1),
+    graphRevision: z.string().trim().min(1),
+    path: z.string().trim().min(1).optional(),
+    sourceIndex: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export const superResolutionOutputReviewArtifactSchema = z
   .object({
     contentHash: z
@@ -107,6 +116,7 @@ export const superResolutionOutputReviewWorkflowSchema = z
     reviewCropCount: z.number().int().nonnegative(),
     reviewPacketPath: z.string().min(1),
     sourceCount: z.number().int().min(2),
+    sourceRefs: z.array(superResolutionOutputReviewSourceRefSchema).min(2),
     staleState: superResolutionOutputReviewStaleStateSchema,
     supportMap: z
       .object({
@@ -122,6 +132,15 @@ export const superResolutionOutputReviewWorkflowSchema = z
       .strict(),
     warningCodes: z.array(superResolutionOutputReviewWarningSchema),
   })
-  .strict();
+  .strict()
+  .superRefine((review, context) => {
+    if (review.sourceRefs.length !== review.sourceCount) {
+      context.addIssue({
+        code: 'custom',
+        message: 'SR output review sourceRefs length must match sourceCount.',
+        path: ['sourceRefs'],
+      });
+    }
+  });
 
 export type SuperResolutionOutputReviewWorkflow = z.infer<typeof superResolutionOutputReviewWorkflowSchema>;

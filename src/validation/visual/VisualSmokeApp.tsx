@@ -3203,6 +3203,7 @@ function SuperResolutionVisualSmoke() {
     artifactPath: '/tmp/rawengine-super-resolution-preview-plan-5.tif',
     settings,
     sourceCount: 5,
+    sourcePaths: sourcePreflightMetadata.map((source) => source.imagePath),
   });
 
   return (
@@ -3444,6 +3445,8 @@ function SuperResolutionPrivateRawModalReviewSmoke() {
   const detailGainRatio = Number.parseFloat(proof.detailGainRatio);
   const sourceCoverageRatio = Number.parseFloat(proof.sourceCoverageRatio);
   const sourcePaths = proof.sourcePaths.split(',');
+  const sourceHashes = proof.sourceHashes.split(',');
+  const sourceGraphRevision = ['sr_private', proof.fixtureId].join('_');
   const sourceWidths = proof.sourceWidths.split(',').map((width) => Number.parseInt(width, 10));
   const sourceHeights = proof.sourceHeights.split(',').map((height) => Number.parseInt(height, 10));
   const outputReview = {
@@ -3518,6 +3521,12 @@ function SuperResolutionPrivateRawModalReviewSmoke() {
     reviewCropCount: 1,
     reviewPacketPath: proof.privateRunReportPath,
     sourceCount,
+    sourceRefs: sourcePaths.map((path, sourceIndex) => ({
+      contentHash: sourceHashes[sourceIndex] ?? `fnv1a32:sr-private-${sourceIndex}`,
+      graphRevision: sourceGraphRevision,
+      path,
+      sourceIndex,
+    })),
     staleState: 'current',
     supportMap: {
       artifactId: `${proof.reconstructionPath}:support-map`,
