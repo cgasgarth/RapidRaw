@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { negativeLabAutoDensitySuggestionRunSchema } from './negativeLabAutoDensitySuggestionSchemas';
 import { negativeLabFrameExposureOverridePayloadSchema } from './negativeLabFrameExposureOverrideSchemas';
 import { negativeLabFrameRgbBalanceOverridePayloadSchema } from './negativeLabFrameRgbBalanceOverrideSchemas';
 
@@ -15,6 +16,7 @@ export const negativeLabRollNormalizationPlanSchema = z
   .object({
     affectedFrameIds: z.array(z.string().trim().min(1)),
     anchorFrameIds: z.array(z.string().trim().min(1)).min(1),
+    autoDensitySuggestionRun: negativeLabAutoDensitySuggestionRunSchema.nullable(),
     exposureOverrides: negativeLabFrameExposureOverridePayloadSchema,
     mode: negativeLabRollNormalizationModeSchema,
     positiveVariantIds: z.array(z.string().trim().min(1)),
