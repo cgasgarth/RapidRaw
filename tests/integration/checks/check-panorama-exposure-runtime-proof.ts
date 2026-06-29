@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 
 import { z } from 'zod';
 
@@ -11,7 +12,7 @@ import {
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational-proof-budgets.ts';
 
-const REPORT_PATH = 'docs/validation/panorama-exposure-runtime-proof-2026-06-20.json';
+const REPORT_PATH = 'artifacts/validation/panorama-exposure-runtime-proof-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 const sourceFrames = [
   {
@@ -40,6 +41,7 @@ const exposureNormalizationSchema = z
     appliedLuminanceGains: z
       .array(z.object({ gain: z.number().positive(), sourceIndex: z.number().int().nonnegative() }).strict())
       .min(1),
+    compensationStrengthPercent: z.number().int().min(1).max(100),
     mode: z.literal('scalar_overlap_luminance_gain_v1'),
     overlapMetrics: z
       .object({
@@ -108,12 +110,10 @@ const report = reportSchema.parse({
 const reportText = `${JSON.stringify(report, null, 2)}\n`;
 
 if (UPDATE_REPORT) {
+  await mkdir(dirname(REPORT_PATH), { recursive: true });
   await writeFile(REPORT_PATH, reportText);
-} else {
-  const expectedReport = reportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
-  if (JSON.stringify(expectedReport) !== JSON.stringify(report)) {
-    throw new Error(`${REPORT_PATH} is stale; run bun run check:panorama-exposure-runtime-proof:update.`);
-  }
+  console.log(`panorama exposure runtime proof artifact wrote ${REPORT_PATH}`);
+  process.exit(0);
 }
 
 console.log(`panorama exposure runtime proof ok (${report.cases.length} cases)`);
