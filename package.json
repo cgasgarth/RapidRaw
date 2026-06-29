@@ -475,6 +475,7 @@
     "check:negative-lab-base-fog": "bun tests/integration/checks/check-negative-lab-base-fog.ts",
     "check:negative-lab-fixtures": "bun tests/integration/checks/check-negative-lab-fixtures.ts",
     "check:negative-lab-fixtures:update": "bun tests/integration/checks/check-negative-lab-fixtures.ts --update",
+    "check:negative-lab-final-license-hygiene": "bun tests/integration/checks/check-negative-lab-final-license-hygiene.ts",
     "check:negative-lab-real-fixtures": "bun tests/integration/checks/check-negative-lab-real-fixtures.ts",
     "check:negative-lab-frame-health": "bun tests/integration/checks/check-negative-lab-frame-health-report.ts",
     "check:negative-lab-frame-exposure-override": "bun tests/integration/checks/check-negative-lab-frame-exposure-override.ts",

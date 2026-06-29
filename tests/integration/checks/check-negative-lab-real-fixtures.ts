@@ -27,11 +27,28 @@ const args = new Set(process.argv.slice(2));
 const shouldUpdate = args.has('--update');
 
 const requiredSlots = [
-  'negative_lab.real.pending.c41_color_negative_001',
-  'negative_lab.real.pending.bw_silver_negative_001',
-  'negative_lab.real.pending.c41_dense_thin_roll_001',
-  'negative_lab.real.pending.c41_mixed_lighting_001',
+  {
+    expectedRole: 'density_math_reference',
+    fixtureId: 'negative_lab.real.pending.c41_color_negative_001',
+    purpose: 'project-owned color negative with visible border/base-fog regions',
+  },
+  {
+    expectedRole: 'warning_stability',
+    fixtureId: 'negative_lab.real.pending.bw_silver_negative_001',
+    purpose: 'black-and-white silver negative regression',
+  },
+  {
+    expectedRole: 'roll_consistency',
+    fixtureId: 'negative_lab.real.pending.c41_dense_thin_roll_001',
+    purpose: 'dense and thin exposure bracket roll',
+  },
+  {
+    expectedRole: 'warning_stability',
+    fixtureId: 'negative_lab.real.pending.c41_mixed_lighting_001',
+    purpose: 'known cast and mixed-lighting stress frame',
+  },
 ];
+const requiredFixturePackPurposes = ['border', 'dense', 'thin', 'black-and-white', 'mixed-light'];
 
 const publicRenderFixtureId = 'negative_lab.real.public.cc0_110_ericht_negative_001';
 const entriesById = new Map(manifest.entries.map((entry) => [entry.fixtureId, entry]));
@@ -163,10 +180,14 @@ const assertPromotionGate = () => {
   }
 };
 
-for (const fixtureId of requiredSlots) {
+for (const { expectedRole, fixtureId, purpose } of requiredSlots) {
   const entry = entriesById.get(fixtureId);
   if (entry === undefined) {
-    throw new Error(`Missing real Negative Lab fixture slot: ${fixtureId}`);
+    throw new Error(`Missing real Negative Lab fixture slot for ${purpose}: ${fixtureId}`);
+  }
+
+  if (entry.fixtureRole !== expectedRole) {
+    throw new Error(`Real Negative Lab fixture slot ${fixtureId} must use role ${expectedRole}.`);
   }
 
   if (entry.payloadAccess !== 'metadata_only' || entry.contentHash !== undefined) {
@@ -183,6 +204,22 @@ for (const fixtureId of requiredSlots) {
 
   if (!entry.expectedFixtureWarningCodes.includes('fixture_payload_not_public')) {
     throw new Error(`Pending real Negative Lab fixture must declare missing payload warning: ${fixtureId}`);
+  }
+
+  for (const requiredText of ['project-owned', 'payload', 'pending']) {
+    if (!entry.developmentNotes.toLowerCase().includes(requiredText)) {
+      throw new Error(`Pending fixture ${fixtureId} must document ${requiredText} status in development notes.`);
+    }
+  }
+}
+
+const fixturePackText = manifest.entries
+  .map((entry) => `${entry.fixtureId} ${entry.developmentNotes} ${entry.frameFormat} ${entry.lightSource}`)
+  .join('\n')
+  .toLowerCase();
+for (const requiredPurpose of requiredFixturePackPurposes) {
+  if (!fixturePackText.includes(requiredPurpose)) {
+    throw new Error(`Real Negative Lab fixture pack must cover ${requiredPurpose}.`);
   }
 }
 
