@@ -83,9 +83,15 @@ for (const marker of [
   'evaluateAgentSafetyPolicy',
   'inferAgentSafetyOperationKind',
   'status: safetyDecision.blocked',
+  'approvalId: safetyDecision.decisionId',
+  'approvalId: result.safetyDecision?.decisionId',
   'data-testid="agent-live-prompt-approve-policy"',
+  'data-policy-state={result.status}',
+  'data-disabled-reason=',
   'data-testid="agent-live-prompt-safety-policy"',
   "data-safety-decision={result.safetyDecision?.decisionId ?? ''}",
+  'data-policy-severity={result.safetyDecision.severity}',
+  'result.safetyDecision.decisionId',
 ]) {
   if (!source.includes(marker)) throw new Error(`Agent chat shell missing safety marker: ${marker}`);
 }
