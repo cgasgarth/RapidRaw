@@ -875,6 +875,11 @@ export default function MetadataPanel() {
                         color={TextColors.primary}
                         className="truncate text-right"
                         data-candidate-count={cameraProfileReceipt.candidateCount}
+                        data-colorchecker-fallback-reason={cameraProfileReceipt.colorCheckerFallbackReason ?? ''}
+                        data-colorchecker-gate-status={cameraProfileReceipt.colorCheckerGateStatus}
+                        data-colorchecker-mean-delta-e00={cameraProfileReceipt.colorCheckerMeanDeltaE00 ?? ''}
+                        data-colorchecker-p95-delta-e00={cameraProfileReceipt.colorCheckerP95DeltaE00 ?? ''}
+                        data-colorchecker-patch-count={cameraProfileReceipt.colorCheckerPatchCount ?? ''}
                         data-cool-illuminant={cameraProfileReceipt.coolIlluminant ?? ''}
                         data-cool-weight={cameraProfileReceipt.coolWeight ?? ''}
                         data-demosaic-algorithm-id={cameraProfileReceipt.demosaicAlgorithmId ?? ''}
@@ -883,6 +888,7 @@ export default function MetadataPanel() {
                         data-matrix-hash={cameraProfileReceipt.matrixHash ?? ''}
                         data-processing-profile={cameraProfileReceipt.processingProfile}
                         data-preview-elapsed-ms={cameraProfileReceipt.previewElapsedMs ?? ''}
+                        data-profile-confidence-basis={cameraProfileReceipt.profileConfidenceBasis}
                         data-receipt-version={cameraProfileReceipt.receiptVersion}
                         data-scratch-memory-bytes={cameraProfileReceipt.scratchMemoryBytes ?? ''}
                         data-status={cameraProfileReceipt.status}
@@ -894,6 +900,50 @@ export default function MetadataPanel() {
                           demosaicPath: formatRawReceiptToken(cameraProfileReceipt.demosaicPath),
                           processingProfile: formatRawReceiptToken(cameraProfileReceipt.processingProfile),
                           status: cameraProfileReceipt.status,
+                        })}
+                      </UiText>
+                    </>
+                  )}
+                  {cameraProfileReceipt !== null && (
+                    <>
+                      <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                        {t('editor.metadata.cameraProfile.colorCheckerGate')}
+                      </UiText>
+                      <UiText
+                        variant={TextVariants.small}
+                        color={TextColors.primary}
+                        className="truncate text-right"
+                        data-colorchecker-fallback-reason={cameraProfileReceipt.colorCheckerFallbackReason ?? ''}
+                        data-colorchecker-gate-status={cameraProfileReceipt.colorCheckerGateStatus}
+                        data-colorchecker-max-delta-e00={cameraProfileReceipt.colorCheckerMaxDeltaE00 ?? ''}
+                        data-colorchecker-mean-delta-e00={cameraProfileReceipt.colorCheckerMeanDeltaE00 ?? ''}
+                        data-colorchecker-median-delta-e00={cameraProfileReceipt.colorCheckerMedianDeltaE00 ?? ''}
+                        data-colorchecker-p95-delta-e00={cameraProfileReceipt.colorCheckerP95DeltaE00 ?? ''}
+                        data-colorchecker-patch-count={cameraProfileReceipt.colorCheckerPatchCount ?? ''}
+                        data-colorchecker-threshold-mean-delta-e00={
+                          cameraProfileReceipt.colorCheckerThresholdMeanDeltaE00 ?? ''
+                        }
+                        data-colorchecker-threshold-p95-delta-e00={
+                          cameraProfileReceipt.colorCheckerThresholdP95DeltaE00 ?? ''
+                        }
+                        data-profile-confidence-basis={cameraProfileReceipt.profileConfidenceBasis}
+                        data-testid="metadata-camera-profile-colorchecker-gate"
+                      >
+                        {t('editor.metadata.cameraProfile.colorCheckerGateSummary', {
+                          basis: t(
+                            `editor.metadata.cameraProfile.confidenceBasis.${cameraProfileReceipt.profileConfidenceBasis}`,
+                          ),
+                          mean:
+                            cameraProfileReceipt.colorCheckerMeanDeltaE00 === null
+                              ? t('editor.metadata.cameraProfile.notApplicable')
+                              : cameraProfileReceipt.colorCheckerMeanDeltaE00.toFixed(2),
+                          p95:
+                            cameraProfileReceipt.colorCheckerP95DeltaE00 === null
+                              ? t('editor.metadata.cameraProfile.notApplicable')
+                              : cameraProfileReceipt.colorCheckerP95DeltaE00.toFixed(2),
+                          status: t(
+                            `editor.metadata.cameraProfile.colorCheckerGateStatus.${cameraProfileReceipt.colorCheckerGateStatus}`,
+                          ),
                         })}
                       </UiText>
                     </>

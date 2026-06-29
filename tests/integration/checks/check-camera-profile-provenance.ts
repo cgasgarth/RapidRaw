@@ -10,6 +10,16 @@ const fixture = rawDevelopmentReportSchema.parse({
     algorithmId: 'dual_illuminant_mired_v1',
     candidateCount: 2,
     cctClamped: false,
+    colorCheckerGate: {
+      maxDeltaE00: 4.9,
+      meanDeltaE00: 1.3,
+      medianDeltaE00: 1.1,
+      patchCount: 24,
+      p95DeltaE00: 3.2,
+      status: 'gated_pass',
+      thresholdMeanDeltaE00: 2.5,
+      thresholdP95DeltaE00: 5,
+    },
     coolIlluminant: 'D65',
     coolWeight: 0.42,
     estimatedCctKelvin: 5100,
@@ -70,6 +80,10 @@ const requiredMarkers: Array<[keyof typeof files, string]> = [
   ['metadataPanel', "t('editor.metadata.cameraProfile.runtimeSummary'"],
   ['metadataPanel', 'data-camera-profile-status={cameraProfileReport.status}'],
   ['metadataPanel', "data-camera-profile-matrix-hash={cameraProfileReport.matrixHash ?? ''}"],
+  ['metadataPanel', 'data-testid="metadata-camera-profile-colorchecker-gate"'],
+  ['metadataPanel', 'data-colorchecker-gate-status={cameraProfileReceipt.colorCheckerGateStatus}'],
+  ['metadataPanel', 'data-profile-confidence-basis={cameraProfileReceipt.profileConfidenceBasis}'],
+  ['metadataPanel', "t('editor.metadata.cameraProfile.colorCheckerGateSummary'"],
   ['metadataPanel', 'data-demosaic-path={cameraProfileReceipt.demosaicPath}'],
   ['metadataPanel', 'data-processing-profile={cameraProfileReceipt.processingProfile}'],
   ['metadataPanel', "t('editor.metadata.cameraProfile.receiptSummary'"],
@@ -95,6 +109,11 @@ if (
   receipt.demosaicPath !== 'bayer_hq' ||
   receipt.processingProfile !== 'maximum' ||
   receipt.cacheHit !== false ||
+  receipt.colorCheckerGateStatus !== 'gated_pass' ||
+  receipt.colorCheckerMeanDeltaE00 !== 1.3 ||
+  receipt.colorCheckerP95DeltaE00 !== 3.2 ||
+  receipt.colorCheckerPatchCount !== 24 ||
+  receipt.profileConfidenceBasis !== 'colorchecker_gated' ||
   receipt.decodeElapsedMs !== 321 ||
   receipt.exportElapsedMs !== 654 ||
   receipt.outputDimensions?.[0] !== 6000 ||

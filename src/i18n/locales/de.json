@@ -1209,6 +1209,8 @@
         "algorithm": "Algorithm",
         "cacheHit": "Cache hit",
         "cacheMiss": "Cache miss",
+        "colorCheckerGate": "",
+        "colorCheckerGateSummary": "",
         "coolWeight": "Cool weight",
         "defaultDemosaic": "Default demosaic",
         "demosaicProvenance": "Demosaic",
