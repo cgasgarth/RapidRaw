@@ -41,6 +41,7 @@ interface FocusStackModalProps {
   outputReviewArtifactPath?: string;
   settings: FocusStackUiSettings;
   sourceCount: number;
+  sourcePaths?: string[];
   sourcePreflightMetadata?: FocusStackSourcePreflightMetadata[];
 }
 
@@ -62,6 +63,7 @@ export default function FocusStackModal({
   outputReviewArtifactPath = reviewArtifactPath,
   settings,
   sourceCount,
+  sourcePaths = [],
   sourcePreflightMetadata = [],
 }: FocusStackModalProps) {
   const { t } = useTranslation();
@@ -132,6 +134,7 @@ export default function FocusStackModal({
       artifactPath: outputReviewArtifactPath,
       settings,
       sourceCount: fallbackOutputReviewSourceCount,
+      sourcePaths,
     });
   const hasRuntimeOutputReview = runtimeOutputReview !== null && runtimeOutputReview !== undefined;
   const derivedOutputReceipt = buildFocusStackDerivedOutputReceipt({ review: outputReview, settings });
@@ -167,6 +170,8 @@ export default function FocusStackModal({
       }),
     )
     .join(' / ');
+  const focusSourcePaths = outputReview.sourceRefs.map((source) => source.path).join(',');
+  const focusSourceGraphRevisions = outputReview.sourceRefs.map((source) => source.graphRevision).join(',');
   const getSourceContributionWarningLabel = (
     warningState: (typeof outputReview.reviewOverlay.sourceContributionDetails)[number]['warningState'],
   ) => {
@@ -258,7 +263,7 @@ export default function FocusStackModal({
         data-alignment-mode={settings.alignmentMode}
         data-blend-method={settings.blendMethod}
         data-source-count={sourceCount}
-        data-stack-ready={String(isPreviewPlanReady)}
+        data-stack-ready={String(isSourceCountValid)}
         data-testid="focus-stack-readiness-summary"
       >
         <ComputationalSetupStatusLine
@@ -799,6 +804,10 @@ export default function FocusStackModal({
                 label: t('modals.focusStack.review.sourceContribution'),
                 value: sourceContributionLabel,
               },
+              {
+                label: t('modals.focusStack.preflight.sources'),
+                value: focusSourceGraphRevisions,
+              },
             ],
           },
         ]}
@@ -829,6 +838,8 @@ export default function FocusStackModal({
         data-halo-suppression-strength-percent={settings.haloSuppressionStrengthPercent}
         data-low-confidence-cell-ratio={outputReview.lowConfidenceCellRatio}
         data-runtime-output-review={String(hasRuntimeOutputReview)}
+        data-source-graph-revisions={focusSourceGraphRevisions}
+        data-source-paths={focusSourcePaths}
         data-testid="focus-editable-handoff-proof"
       >
         <div className="mb-3 flex items-start justify-between gap-4">

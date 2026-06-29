@@ -99,11 +99,9 @@ export const buildFocusStackDerivedOutputReceipt = ({
     outputArtifactId: review.editableHandoff.artifactId,
     outputContentHash: review.editableHandoff.artifactHash,
     settings,
-    sourceContentHashes: review.reviewOverlay.sourceContributionSummary.map((source) => hashStableJson(source)),
+    sourceContentHashes: review.sourceRefs.map((source) => source.contentHash),
     sourceCount: review.sourceCount,
-    sourceGraphRevisions: review.reviewOverlay.sourceContributionSummary.map(
-      (source) => `focus_stack_source_${source.sourceIndex}`,
-    ),
+    sourceGraphRevisions: review.sourceRefs.map((source) => source.graphRevision),
     staleState: 'unknown',
     storagePolicy: 'sidecar_artifact',
   });

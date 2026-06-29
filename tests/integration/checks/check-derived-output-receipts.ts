@@ -123,6 +123,7 @@ const focusReceipt = buildFocusStackDerivedOutputReceipt({
     artifactPath: 'artifact_focus_stack_output',
     settings: DEFAULT_FOCUS_STACK_UI_SETTINGS,
     sourceCount: 4,
+    sourcePaths: ['/tmp/focus-0.dng', '/tmp/focus-1.dng', '/tmp/focus-2.dng', '/tmp/focus-3.dng'],
   }),
   settings: DEFAULT_FOCUS_STACK_UI_SETTINGS,
 });
@@ -157,6 +158,11 @@ expect(
 expect(
   superResolutionReceipt.openInEditorAction.path === undefined,
   'SR deferred receipt must not fake an output path.',
+);
+expect(
+  focusReceipt.sourceGraphRevisions.join(',') ===
+    'focus_stack_source_0,focus_stack_source_1,focus_stack_source_2,focus_stack_source_3',
+  'Focus receipt must retain source graph revisions.',
 );
 
 useUIStore.getState().clearDerivedOutputReceipts();
@@ -241,6 +247,16 @@ const appModalsSource = readFileSync('src/components/modals/AppModals.tsx', 'utf
 expect(
   appModalsSource.includes('sourcePaths={panoramaModalState.stitchingSourcePaths}'),
   'App modal wiring must pass panorama source paths into saved receipt builder.',
+);
+expect(
+  appModalsSource.includes('sourcePaths: focusStackModalState.sourcePaths'),
+  'App modal wiring must pass focus source paths into preview receipt builder.',
+);
+const focusModalSource = readFileSync('src/components/modals/FocusStackModal.tsx', 'utf8');
+expect(focusModalSource.includes('data-source-paths'), 'Focus stack handoff proof must expose source paths.');
+expect(
+  focusModalSource.includes('data-source-graph-revisions'),
+  'Focus stack handoff proof must expose source graph revisions.',
 );
 
 const reviewPanelSource = readFileSync('src/components/modals/ComputationalMergeReviewPanel.tsx', 'utf8');
