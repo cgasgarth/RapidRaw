@@ -7,6 +7,7 @@ const files = {
   backend: readFileSync('src-tauri/src/negative_conversion.rs', 'utf8'),
   lib: readFileSync('src-tauri/src/lib.rs', 'utf8'),
   modal: readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8'),
+  patchSampler: readFileSync('src/components/modals/NegativeLabPatchSamplerPanel.tsx', 'utf8'),
   schema: readFileSync('src/schemas/negativeLabPresetCatalogSchemas.ts', 'utf8'),
 };
 
@@ -57,7 +58,6 @@ for (const marker of [
   'baseFogSampleUndoStack',
   'baseSampleStudioDecision',
   'customBaseSampleRect',
-  'DENSITOMETER_PATCH_PRESETS',
   'negative-lab-base-sampling-studio',
   'negative-lab-accept-base-sample',
   'negative-lab-reject-base-sample',
@@ -65,7 +65,6 @@ for (const marker of [
   'negative-lab-base-sample-warning-list',
   'negative-lab-density-readout',
   'negative-lab-densitometer-readout',
-  'negative-lab-patch-probe-readout',
   'negative-lab-patch-probe-overlay',
   'negative-lab-custom-base-readout',
   'negative-lab-custom-base-overlay',
@@ -78,6 +77,10 @@ for (const marker of [
   'negative-lab-copy-readout',
 ]) {
   requireMarker(files.modal, marker, 'modal');
+}
+
+for (const marker of ['DENSITOMETER_PATCH_PRESETS', 'negative-lab-patch-probe-readout']) {
+  requireMarker(files.patchSampler, marker, 'patch sampler');
 }
 
 for (const marker of [

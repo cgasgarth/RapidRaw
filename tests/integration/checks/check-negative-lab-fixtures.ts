@@ -6,6 +6,7 @@ import { dirname } from 'node:path';
 
 import { z } from 'zod';
 
+import { getExtension, toRepoPath, walkRepoFiles } from '../../../scripts/lib/repo-files.ts';
 import {
   negativeLabFixtureManifestEntryV1Schema,
   negativeLabFixtureManifestV1Schema,
@@ -33,6 +34,8 @@ const allValidationUses = [
 ];
 
 const rgbSchema = z.tuple([z.number().min(0).max(1), z.number().min(0).max(1), z.number().min(0).max(1)]);
+const densityRgbSchema = z.tuple([z.number().min(0), z.number().min(0), z.number().min(0)]);
+const normalizedRgbSchema = z.tuple([z.number().min(0).max(1), z.number().min(0).max(1), z.number().min(0).max(1)]);
 const syntheticCaseSchema = z
   .object({
     baseFogRgb: rgbSchema.nullable(),
@@ -70,6 +73,36 @@ const syntheticCaseSchema = z
     }
   });
 
+const mathHarnessCaseSchema = z
+  .object({
+    algorithm: z.literal('rawengine_density_log_domain_fixture_v1'),
+    densityRgb: z.array(densityRgbSchema).min(1),
+    fixtureId: z.string().min(1),
+    inputNegativeRgb: z.array(rgbSchema).min(1),
+    normalizedDensityRgb: z.array(normalizedRgbSchema).min(1),
+    roundTripRgb: z.array(rgbSchema).min(1),
+    transformIds: z.array(
+      z.enum([
+        'linear_rgb_to_density_neg_log10_v1',
+        'density_to_linear_rgb_pow10_v1',
+        'base_fog_normalized_density_v1',
+      ]),
+    ),
+  })
+  .strict()
+  .superRefine((fixture, context) => {
+    const expectedLength = fixture.inputNegativeRgb.length;
+    for (const key of ['densityRgb', 'normalizedDensityRgb', 'roundTripRgb'] as const) {
+      if (fixture[key].length !== expectedLength) {
+        context.addIssue({
+          code: 'custom',
+          message: `${key} must match inputNegativeRgb length.`,
+          path: [key],
+        });
+      }
+    }
+  });
+
 const syntheticProofSchema = z
   .object({
     cases: z.array(syntheticCaseSchema).min(1),
@@ -81,6 +114,13 @@ const syntheticProofSchema = z
       })
       .strict(),
     issue: z.literal(1377),
+    mathHarness: z
+      .object({
+        cases: z.array(mathHarnessCaseSchema).min(1),
+        cleanRoomPolicy: z.literal('rawengine_owned_clean_room_v1'),
+        doesNotProve: z.array(z.string().trim().min(1)).min(4),
+      })
+      .strict(),
     schemaVersion: z.literal(1),
   })
   .strict();
@@ -219,6 +259,58 @@ const baseRegion = {
   y: 16,
 };
 
+const cleanRoomProvenance = (sourceArtifactBasis) => ({
+  cleanRoomPolicy: 'rawengine_owned_clean_room_v1',
+  externalConceptReferences: ['NegPy concepts only'],
+  implementationOwner: 'RawEngine project',
+  negPyArtifactUse: 'none',
+  sourceArtifactBasis,
+  thirdPartyCodeCopied: false,
+  thirdPartyConstantsCopied: false,
+  thirdPartyDocsCopied: false,
+  thirdPartyTestVectorsCopied: false,
+});
+
+const clamp01 = (value) => Math.max(0, Math.min(1, value));
+const round6 = (value) => Math.round(value * 1_000_000) / 1_000_000;
+const rgbToDensity = (rgb) => rgb.map((channel) => round6(-Math.log10(Math.max(0.000001, Math.min(1, channel)))));
+const densityToRgb = (densityRgb) => densityRgb.map((density) => round6(clamp01(10 ** -density)));
+
+const normalizeDensity = (densityRows) => {
+  const channelBounds = [0, 1, 2].map((channelIndex) => {
+    const values = densityRows.map((row) => row[channelIndex]);
+    return {
+      max: Math.max(...values),
+      min: Math.min(...values),
+    };
+  });
+
+  return densityRows.map((row) =>
+    row.map((density, channelIndex) => {
+      const { max, min } = channelBounds[channelIndex];
+      return round6(clamp01((density - min) / Math.max(0.0001, max - min)));
+    }),
+  );
+};
+
+const buildMathHarnessCase = (fixture) => {
+  const densityRgb = fixture.negativeRgb.map(rgbToDensity);
+
+  return {
+    algorithm: 'rawengine_density_log_domain_fixture_v1',
+    densityRgb,
+    fixtureId: fixture.fixtureId,
+    inputNegativeRgb: fixture.negativeRgb,
+    normalizedDensityRgb: normalizeDensity(densityRgb),
+    roundTripRgb: densityRgb.map(densityToRgb),
+    transformIds: [
+      'linear_rgb_to_density_neg_log10_v1',
+      'density_to_linear_rgb_pow10_v1',
+      'base_fog_normalized_density_v1',
+    ],
+  };
+};
+
 const buildDisallowedUses = (allowedValidationUses) =>
   allValidationUses.filter((validationUse) => !allowedValidationUses.includes(validationUse));
 
@@ -236,6 +328,7 @@ const buildSyntheticManifestEntry = (fixture) => {
     bitDepth: 16,
     captureProfile:
       fixture.category === 'unknown_acquisition_profile' ? 'unknown_profile_fixture_v1' : 'linear_synthetic_rgb_v1',
+    cleanRoomProvenance: cleanRoomProvenance('rawengine_generated_synthetic_math_fixture'),
     colorProfile: 'linear_rec2020_synthetic',
     contentHash: fixture.contentHash,
     derivativeDistributionAllowed: true,
@@ -293,6 +386,7 @@ const buildPlannedRealScanEntry = ({
   processFamily,
   rollOrSheetIdentifier,
   scanInputMode,
+  sourceArtifactBasis = 'rawengine_local_private_metadata',
 }) => ({
   allowedDistribution: 'none',
   allowedValidationUses: ['schema_roundtrip'],
@@ -301,6 +395,7 @@ const buildPlannedRealScanEntry = ({
   bitDepth,
   captureProfile,
   colorProfile: `${captureProfile}_pending`,
+  cleanRoomProvenance: cleanRoomProvenance(sourceArtifactBasis),
   derivativeDistributionAllowed: false,
   developmentNotes,
   developmentProcessKnown: false,
@@ -444,6 +539,7 @@ const buildMeasuredProfilePromotionFixture = (overrides = {}) => {
       processFamily: 'c41_color_negative',
       rollOrSheetIdentifier: 'project_owned_c41_profile_measurement_roll_001',
       scanInputMode: 'camera_tiff',
+      sourceArtifactBasis: 'rawengine_project_owned_scan_metadata',
     }),
     allowedDistribution: 'private_ci_only',
     allowedValidationUses,
@@ -510,7 +606,24 @@ const assertMeasuredProfilePromotionGate = () => {
 };
 
 const buildSyntheticProof = () =>
-  syntheticProofSchema.parse({ cases: buildSyntheticCases(), generator, issue: 1377, schemaVersion: 1 });
+  syntheticProofSchema.parse({
+    cases: buildSyntheticCases(),
+    generator,
+    issue: 1377,
+    mathHarness: {
+      cases: buildSyntheticCases()
+        .filter((fixture) => fixture.category === 'gray_ramp' || fixture.category === 'color_ramp')
+        .map(buildMathHarnessCase),
+      cleanRoomPolicy: 'rawengine_owned_clean_room_v1',
+      doesNotProve: [
+        'NegPy parity',
+        'named stock emulation accuracy',
+        'scanner profile accuracy',
+        'camera raw decode path',
+      ],
+    },
+    schemaVersion: 1,
+  });
 
 const buildManifest = (proof) =>
   negativeLabFixtureManifestV1Schema.parse({
@@ -534,6 +647,30 @@ const assertProofHashes = (proof) => {
     if (contentHash !== expectedHash) {
       throw new Error(`${fixture.fixtureId} has stale content hash.`);
     }
+  }
+};
+
+const assertMathHarness = (proof) => {
+  const proofById = new Map(proof.cases.map((fixture) => [fixture.fixtureId, fixture]));
+
+  for (const mathCase of proof.mathHarness.cases) {
+    const sourceFixture = proofById.get(mathCase.fixtureId);
+    if (sourceFixture === undefined) {
+      throw new Error(`Math harness references unknown Negative Lab fixture: ${mathCase.fixtureId}.`);
+    }
+
+    const expectedCase = buildMathHarnessCase(sourceFixture);
+    if (JSON.stringify(mathCase) !== JSON.stringify(expectedCase)) {
+      throw new Error(`${mathCase.fixtureId} has stale log-domain math expectations.`);
+    }
+
+    mathCase.inputNegativeRgb.forEach((rgb, pixelIndex) => {
+      const roundTrip = mathCase.roundTripRgb[pixelIndex];
+      const maxDelta = Math.max(...rgb.map((channel, channelIndex) => Math.abs(channel - roundTrip[channelIndex])));
+      if (maxDelta > 0.000005) {
+        throw new Error(`${mathCase.fixtureId} round-trip RGB drift exceeds tolerance at pixel ${pixelIndex}.`);
+      }
+    });
   }
 };
 
@@ -572,11 +709,45 @@ const assertCoverage = (proof, manifest) => {
   }
 };
 
+const assertNoCopiedNegPyArtifacts = async () => {
+  const root = process.cwd();
+  const checkedExtensions = new Set(['.py', '.ts', '.tsx', '.js', '.jsx', '.rs', '.json', '.toml', '.yml', '.yaml']);
+  const files = walkRepoFiles({
+    include: ({ repoPath }) => checkedExtensions.has(getExtension(repoPath)),
+    root,
+  });
+  const copiedArtifactPathPatterns = [
+    /(^|\/)negpy(\/|[-_.])/iu,
+    /(^|\/)marcinz606(\/|[-_.])/iu,
+    /(^|\/)negative[_-]?lab\/.*negpy/iu,
+  ];
+  const copiedSourceMarkers = [
+    /from\s+negpy\s+import/iu,
+    /import\s+negpy/iu,
+    /marcinz606\/NegPy\/(?:raw|blob|tree)\/(?!main\/LICENSE(?:["')#?]|$))/u,
+    /sourceKind["']?\s*:\s*["']negpy/iu,
+  ];
+
+  for (const file of files) {
+    const repoPath = toRepoPath(root, file);
+    if (copiedArtifactPathPatterns.some((pattern) => pattern.test(repoPath))) {
+      throw new Error(`Copied NegPy source artifact path is not allowed in RawEngine clean-room fixtures: ${repoPath}`);
+    }
+
+    const text = await readFile(file, 'utf8');
+    if (copiedSourceMarkers.some((pattern) => pattern.test(text))) {
+      throw new Error(`Copied NegPy source marker is not allowed in RawEngine clean-room fixtures: ${repoPath}`);
+    }
+  }
+};
+
 const proof = buildSyntheticProof();
 const manifest = buildManifest(proof);
 assertProofHashes(proof);
+assertMathHarness(proof);
 assertCoverage(proof, manifest);
 assertMeasuredProfilePromotionGate();
+await assertNoCopiedNegPyArtifacts();
 
 if (updateFixtures) {
   await mkdir(dirname(manifestUrl.pathname), { recursive: true });

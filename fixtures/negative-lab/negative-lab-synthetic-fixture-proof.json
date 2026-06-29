@@ -131,5 +131,86 @@
     "version": 1
   },
   "issue": 1377,
+  "mathHarness": {
+    "cases": [
+      {
+        "algorithm": "rawengine_density_log_domain_fixture_v1",
+        "densityRgb": [
+          [0.037299, 0.135074, 0.199352],
+          [0.07686, 0.19627, 0.286341],
+          [0.120388, 0.267526, 0.395234]
+        ],
+        "fixtureId": "negative_lab.synthetic.gray_ramp_base_fog_001",
+        "inputNegativeRgb": [
+          [0.9177, 0.7327, 0.6319],
+          [0.8378, 0.6364, 0.5172],
+          [0.7579, 0.5401, 0.4025]
+        ],
+        "normalizedDensityRgb": [
+          [0, 0, 0],
+          [0.476128, 0.462024, 0.444089],
+          [1, 1, 1]
+        ],
+        "roundTripRgb": [
+          [0.917701, 0.7327, 0.631899],
+          [0.837799, 0.6364, 0.517201],
+          [0.7579, 0.5401, 0.4025]
+        ],
+        "transformIds": [
+          "linear_rgb_to_density_neg_log10_v1",
+          "density_to_linear_rgb_pow10_v1",
+          "base_fog_normalized_density_v1"
+        ]
+      },
+      {
+        "algorithm": "rawengine_density_log_domain_fixture_v1",
+        "densityRgb": [
+          [0.114978, 0.121076, 0.176917],
+          [0.034046, 0.239427, 0.186352],
+          [0.035175, 0.128019, 0.364114],
+          [0.107961, 0.234928, 0.191182],
+          [0.041102, 0.230401, 0.339609],
+          [0.105186, 0.135133, 0.339609]
+        ],
+        "fixtureId": "negative_lab.synthetic.color_ramp_exposure_offsets_001",
+        "inputNegativeRgb": [
+          [0.7674, 0.7567, 0.6654],
+          [0.9246, 0.5762, 0.6511],
+          [0.9222, 0.7447, 0.4324],
+          [0.7799, 0.5822, 0.6439],
+          [0.9097, 0.5883, 0.4575],
+          [0.7849, 0.7326, 0.4575]
+        ],
+        "normalizedDensityRgb": [
+          [1, 0, 0],
+          [0, 1, 0.050401],
+          [0.01395, 0.058664, 1],
+          [0.913298, 0.961986, 0.076203],
+          [0.087184, 0.923735, 0.869095],
+          [0.87901, 0.118774, 0.869095]
+        ],
+        "roundTripRgb": [
+          [0.7674, 0.7567, 0.6654],
+          [0.9246, 0.5762, 0.6511],
+          [0.9222, 0.744699, 0.4324],
+          [0.7799, 0.5822, 0.643899],
+          [0.9097, 0.5883, 0.4575],
+          [0.784899, 0.7326, 0.4575]
+        ],
+        "transformIds": [
+          "linear_rgb_to_density_neg_log10_v1",
+          "density_to_linear_rgb_pow10_v1",
+          "base_fog_normalized_density_v1"
+        ]
+      }
+    ],
+    "cleanRoomPolicy": "rawengine_owned_clean_room_v1",
+    "doesNotProve": [
+      "NegPy parity",
+      "named stock emulation accuracy",
+      "scanner profile accuracy",
+      "camera raw decode path"
+    ]
+  },
   "schemaVersion": 1
 }
