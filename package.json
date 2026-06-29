@@ -75,7 +75,6 @@
     "check:black-white-mixer": "bun tests/integration/checks/check-black-white-mixer.ts",
     "check:color-balance-rgb": "bun tests/integration/checks/check-color-balance-rgb.ts",
     "check:color-balance-command-proof": "bun tests/integration/checks/check-color-balance-command-proof.ts",
-    "check:color-balance-command-proof:update": "bun tests/integration/checks/check-color-balance-command-proof.ts --update",
     "check:channel-mixer": "bun tests/integration/checks/check-channel-mixer.ts",
     "check:levels-runtime": "bun scripts/run-compact-command.ts --label levels-runtime -- bun test --reporter=dot tests/pure-ts/levels-runtime.test.ts",
     "check:color-grading-presets": "bun tests/integration/checks/check-color-grading-presets.ts",
