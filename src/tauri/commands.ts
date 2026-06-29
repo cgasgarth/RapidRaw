@@ -18,6 +18,7 @@ export enum Invokes {
   ClearSessionCaches = 'clear_session_caches',
   ClearThumbnailCache = 'clear_thumbnail_cache',
   ConvertNegatives = 'convert_negatives',
+  CompareRawReconstructionModes = 'compare_raw_reconstruction_modes',
   CopyFiles = 'copy_files',
   CreateFolder = 'create_folder',
   CreateVirtualCopy = 'create_virtual_copy',

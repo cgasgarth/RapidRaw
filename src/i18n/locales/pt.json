@@ -518,6 +518,15 @@
         "inherit": "",
         "label": ""
       },
+      "rawReconstructionComparison": {
+        "action": "Compare 100% crops",
+        "cropAlt": "{{mode}} 100% RAW reconstruction crop",
+        "cropSizeLabel": "{{size}}px",
+        "decodeMsLabel": "{{ms}}ms",
+        "error": "Failed to compare RAW reconstruction modes: {{error}}",
+        "running": "Comparing crops...",
+        "title": "100% RAW crop comparison"
+      },
       "sections": {
         "basic": "Básico",
         "color": "Cor",

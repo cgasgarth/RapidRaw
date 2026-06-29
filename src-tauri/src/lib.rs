@@ -2177,6 +2177,7 @@ pub fn run() {
             denoising::save_denoised_image,
             display_profile::get_active_display_profile,
             display_profile::get_display_preview_lut_status,
+            image_loader::compare_raw_reconstruction_modes,
             image_loader::load_image,
             image_loader::is_image_cached,
             panorama_stitching::plan_panorama,

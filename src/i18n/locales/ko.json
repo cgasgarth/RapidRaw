@@ -298,6 +298,15 @@
         "autoAdjust": "이미지 자동 조정",
         "resetAdjustments": "조정값 초기화",
         "toggleAnalytics": "분석 표시 전환"
+      },
+      "rawReconstructionComparison": {
+        "action": "Compare 100% crops",
+        "cropAlt": "{{mode}} 100% RAW reconstruction crop",
+        "error": "Failed to compare RAW reconstruction modes: {{error}}",
+        "running": "Comparing crops...",
+        "title": "100% RAW crop comparison",
+        "cropSizeLabel": "{{size}}px",
+        "decodeMsLabel": "{{ms}}ms"
       }
     },
     "ai": {
