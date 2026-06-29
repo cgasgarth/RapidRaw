@@ -19,6 +19,7 @@ import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../src/utils/agentDe
 import { AGENT_GEOMETRY_APPLY_TOOL_NAME } from '../../../src/utils/agentGeometryApplyTool.ts';
 import { AGENT_LENS_PROFILE_APPLY_TOOL_NAME } from '../../../src/utils/agentLensProfileApplyTool.ts';
 import {
+  AGENT_PREVIEW_COMPARE_TOOL_NAME,
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
 } from '../../../src/utils/agentReadOnlyAppServerTools.ts';
@@ -221,6 +222,7 @@ const catalog = buildRawEngineAppServerRouteCatalog();
 for (const [toolName, expectedCheck] of [
   [AGENT_STATE_GET_TOOL_NAME, 'check:agent-readonly-tools'],
   [AGENT_PREVIEW_RENDER_TOOL_NAME, 'check:agent-readonly-tools'],
+  [AGENT_PREVIEW_COMPARE_TOOL_NAME, 'check:agent-preview-compare-loop'],
   [AGENT_ADJUSTMENTS_APPLY_TOOL_NAME, 'check:agent-adjustments-apply'],
   [AGENT_COLOR_APPLY_TOOL_NAME, 'check:agent-color-apply'],
   [AGENT_CURVE_LEVELS_APPLY_TOOL_NAME, 'check:agent-curve-levels-apply'],

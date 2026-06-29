@@ -5,6 +5,7 @@ export const AGENT_MEDIUM_PREVIEW_QUALITY = 0.86;
 export const AGENT_PREVIEW_MAX_PIXEL_COUNT = 4_194_304;
 
 export const agentPreviewPurposeSchema = z.enum(['detail_review', 'initial_context', 'refresh']);
+export const agentPreviewCompareRoleSchema = z.enum(['before', 'current']);
 
 export const agentPreviewEnvelopeSchema = z
   .object({
@@ -68,6 +69,7 @@ export const agentPreviewEnvelopeSchema = z
   });
 
 export type AgentPreviewEnvelope = z.infer<typeof agentPreviewEnvelopeSchema>;
+export type AgentPreviewCompareRole = z.infer<typeof agentPreviewCompareRoleSchema>;
 export type AgentPreviewPurpose = z.infer<typeof agentPreviewPurposeSchema>;
 
 export const stableAgentPreviewHash = (value: string): string => {
@@ -185,3 +187,82 @@ export const isAgentPreviewEnvelopeCurrent = ({
   preview: AgentPreviewEnvelope;
   recipeHash: string;
 }): boolean => preview.recipeHash === recipeHash && !preview.lifecycle.persisted;
+
+export const agentPreviewCompareArtifactSchema = z
+  .object({
+    artifactId: z.string().trim().min(1),
+    contentHash: z.string().regex(/^sha256:[a-f0-9]{16,64}$/u),
+    graphRevision: z.string().trim().min(1),
+    preview: agentPreviewEnvelopeSchema,
+    recipeHash: z.string().trim().min(1),
+    renderHash: z.string().trim().min(1),
+    role: agentPreviewCompareRoleSchema,
+  })
+  .strict()
+  .refine((artifact) => artifact.preview.artifactId === artifact.artifactId, {
+    message: 'Compare artifact id must match preview artifact id.',
+    path: ['artifactId'],
+  })
+  .refine((artifact) => artifact.preview.recipeHash === artifact.recipeHash, {
+    message: 'Compare artifact recipe hash must match preview recipe hash.',
+    path: ['recipeHash'],
+  });
+
+export const agentPreviewCompareScopeSummarySchema = z
+  .object({
+    clipping: z
+      .object({
+        highlightsPercent: z.number().min(0).max(100),
+        shadowsPercent: z.number().min(0).max(100),
+      })
+      .strict(),
+    histogramChannels: z.array(z.string().trim().min(1)).min(1).max(4),
+    metadataKeys: z.array(z.string().trim().min(1)).max(8),
+  })
+  .strict();
+
+export const agentPreviewCompareLineageSchema = z
+  .object({
+    beforeGraphRevision: z.string().trim().min(1),
+    beforeRecipeHash: z.string().trim().min(1),
+    currentGraphRevision: z.string().trim().min(1),
+    currentRecipeHash: z.string().trim().min(1),
+    staleRecipeHash: z.boolean(),
+  })
+  .strict();
+
+export const agentPreviewCompareColorMetadataSchema = z
+  .object({
+    encodedProfile: z.literal('srgb-preview'),
+    outputProfile: z.literal('srgb'),
+    previewTransform: z.literal('editor-preview-to-srgb-jpeg'),
+    workingSpace: z.literal('rawengine-scene-linear'),
+  })
+  .strict();
+
+export const agentPreviewCompareArtifactResultSchema = z
+  .object({
+    artifacts: z.tuple([agentPreviewCompareArtifactSchema, agentPreviewCompareArtifactSchema]),
+    color: agentPreviewCompareColorMetadataSchema,
+    lineage: agentPreviewCompareLineageSchema,
+    mediumPreview: z
+      .object({
+        longEdgePx: z.number().int().min(256).max(2048),
+        maxPixelCount: z.number().int().min(65_536).max(AGENT_PREVIEW_MAX_PIXEL_COUNT),
+        quality: z.number().min(0.5).max(0.95),
+      })
+      .strict(),
+    scopeSummary: agentPreviewCompareScopeSummarySchema,
+  })
+  .strict()
+  .refine((result) => result.artifacts[0].role === 'before' && result.artifacts[1].role === 'current', {
+    message: 'Compare artifacts must be ordered before/current.',
+    path: ['artifacts'],
+  })
+  .refine((result) => result.artifacts[0].preview.cacheKey !== result.artifacts[1].preview.cacheKey, {
+    message: 'Before/current compare previews must use distinct cache keys.',
+    path: ['artifacts'],
+  });
+
+export type AgentPreviewCompareArtifact = z.infer<typeof agentPreviewCompareArtifactSchema>;
+export type AgentPreviewCompareArtifactResult = z.infer<typeof agentPreviewCompareArtifactResultSchema>;
