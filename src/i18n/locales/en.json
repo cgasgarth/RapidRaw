@@ -600,6 +600,9 @@
           "changedPixels_other": "{{count}} preview pixels changed",
           "detailPreview": "Detail preview",
           "dryRun": "Dry-run",
+          "exportProof": "Export proof",
+          "exportProofReceipt": "Export proof receipt",
+          "exportProofWidth": "{{width}} px",
           "inspectState": "Inspect state",
           "label": "Ask the agent",
           "noApplyStep": "The agent plan did not include an apply-capable tone step.",
@@ -708,6 +711,7 @@
           "kind": {
             "approval": "Approval",
             "error": "Error",
+            "export": "Export",
             "preview": "Preview",
             "prompt": "Prompt",
             "rollback": "Rollback",

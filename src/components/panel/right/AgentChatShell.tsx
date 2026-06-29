@@ -1,4 +1,14 @@
-import { AlertTriangle, CheckCircle2, CircleDashed, Eye, RotateCcw, Send, Server, Sparkles } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CircleDashed,
+  Eye,
+  FileCheck2,
+  RotateCcw,
+  Send,
+  Server,
+  Sparkles,
+} from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -8,10 +18,12 @@ import { runAgentBoundedEditPlannerLoop } from '../../../utils/agentBoundedEditP
 import { AGENT_COLOR_APPLY_TOOL_NAME } from '../../../utils/agentColorApplyTool';
 import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../utils/agentDetailEffectsApplyTool';
 import { planAgentEditRecipe } from '../../../utils/agentEditRecipePlanner';
+import { AGENT_EXPORT_PROOF_TOOL_NAME, agentExportProofResponseSchema } from '../../../utils/agentExportProofTool';
 import {
   agentImageContextSnapshotSchema,
   buildAgentImageContextSnapshot,
 } from '../../../utils/agentImageContextSnapshot';
+import { dispatchAgentLiveEditorTool } from '../../../utils/agentLiveToolDispatch';
 import {
   runAgentMultiTurnAppServerSession,
   type AgentMultiTurnAppServerSessionRequest,
@@ -140,6 +152,12 @@ interface LivePromptResult {
   changedPixelCount?: number;
   changedPixelPercent?: number;
   error?: string;
+  exportHash?: string;
+  exportHeight?: number;
+  exportPreviewRef?: string;
+  exportReceiptGraphRevision?: string;
+  exportReceiptPreviewHash?: string;
+  exportWidth?: number;
   maxChannelDelta?: number;
   meanLuminanceDelta?: number;
   previewAfterHash?: string;
@@ -179,7 +197,7 @@ interface LiveAuditArtifactState {
   toolCallCount: number;
 }
 
-type LiveActivityKind = 'approval' | 'error' | 'preview' | 'prompt' | 'rollback' | 'state' | 'tool_call';
+type LiveActivityKind = 'approval' | 'error' | 'export' | 'preview' | 'prompt' | 'rollback' | 'state' | 'tool_call';
 
 interface LiveActivityEntry {
   approvalId?: string;
@@ -738,6 +756,7 @@ function LivePromptComposer({
   const canRequestDetailPreview = isContextReady && result.status !== 'applying';
   const canInspectState = isContextReady && result.status !== 'applying';
   const canRefreshPreview = isContextReady && result.status !== 'applying';
+  const canRequestExportProof = isContextReady && result.status === 'applied' && result.recipeName !== undefined;
   const canRollback =
     rollbackSnapshot !== null && rollbackValidation?.state === 'available' && result.status === 'applied';
   let statusLabel;
@@ -1198,6 +1217,73 @@ function LivePromptComposer({
     }
   };
 
+  const requestExportProof = async () => {
+    if (!canRequestExportProof) return;
+
+    try {
+      const snapshot = buildAgentImageContextSnapshot();
+      const requestId = `agent-live-export-proof-${Date.now()}`;
+      const exportProof = agentExportProofResponseSchema.parse(
+        await dispatchAgentLiveEditorTool({
+          args: {
+            approval: {
+              approvalId: `approval_export_${requestId}`,
+              approvedGraphRevision: snapshot.graphRevision,
+              approvedRecipeHash: snapshot.initialPreview.recipeHash,
+              approvedSelectedImagePath: snapshot.activeImagePath,
+              approvedSessionId: 'agent-chat-shell',
+              status: 'approved',
+            },
+            dryRun: true,
+            expectedRecipeHash: snapshot.initialPreview.recipeHash,
+            operationId: requestId,
+            requestId,
+            sessionId: 'agent-chat-shell',
+          },
+          requestId,
+          runtimeToolName: AGENT_EXPORT_PROOF_TOOL_NAME,
+        }),
+      );
+      pushActivityEntry({
+        body: `${exportProof.output.fileFormat} ${exportProof.output.width}x${exportProof.output.height} ${exportProof.exportHash}`,
+        exportArtifactId: exportProof.output.previewRef,
+        graphRevision: exportProof.receipt.graphRevision,
+        kind: 'export',
+        previewAfterHash: exportProof.receipt.previewRenderHash,
+        recipeHash: exportProof.receipt.recipeHash,
+        status: 'completed',
+        toolName: exportProof.toolName,
+      });
+      const nextResult = {
+        ...result,
+        exportHash: exportProof.exportHash,
+        exportHeight: exportProof.output.height,
+        exportPreviewRef: exportProof.output.previewRef,
+        exportReceiptGraphRevision: exportProof.receipt.graphRevision,
+        exportReceiptPreviewHash: exportProof.receipt.previewRenderHash,
+        exportWidth: exportProof.output.width,
+      } satisfies LivePromptResult;
+      setResult(nextResult);
+      onResultChange?.(nextResult);
+      onSessionEvent?.(
+        createLiveSessionEvent(
+          'assistant',
+          `${AGENT_EXPORT_PROOF_TOOL_NAME}: ${exportProof.exportHash}`,
+          'export-proof',
+        ),
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError');
+      pushActivityEntry({
+        body: errorMessage,
+        kind: 'error',
+        recipeHash: result.recipeName,
+        status: 'blocked',
+        toolName: AGENT_EXPORT_PROOF_TOOL_NAME,
+      });
+    }
+  };
+
   const rollbackApply = () => {
     if (rollbackSnapshot === null) return;
     const validation = validateAgentRollbackSnapshot(rollbackSnapshot);
@@ -1361,6 +1447,22 @@ function LivePromptComposer({
           {result.status === 'applying' ? t('editor.ai.agent.composer.applying') : t('editor.ai.agent.composer.apply')}
         </button>
         <button
+          className="inline-flex items-center gap-2 rounded-md border border-teal-500/30 bg-teal-500/10 px-3 py-2 text-xs font-semibold text-teal-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          data-testid="agent-live-prompt-export-proof"
+          disabled={!canRequestExportProof}
+          onMouseDown={(event) => {
+            event.preventDefault();
+            void requestExportProof();
+          }}
+          onClick={() => {
+            void requestExportProof();
+          }}
+          type="button"
+        >
+          <FileCheck2 size={14} />
+          {t('editor.ai.agent.composer.exportProof')}
+        </button>
+        <button
           className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
           data-policy-state={result.status}
           data-testid="agent-live-prompt-approve-policy"
@@ -1469,6 +1571,27 @@ function LivePromptComposer({
                 sampled: result.sampledPixelCount,
               })}
             </div>
+          </div>
+        ) : null}
+        {result.exportHash ? (
+          <div
+            className="mt-2 grid gap-1.5 rounded border border-teal-500/25 bg-teal-500/10 p-2 text-[10px]"
+            data-export-hash={result.exportHash}
+            data-export-height={result.exportHeight?.toString() ?? ''}
+            data-export-preview-ref={result.exportPreviewRef ?? ''}
+            data-export-receipt-graph-revision={result.exportReceiptGraphRevision ?? ''}
+            data-export-receipt-preview-hash={result.exportReceiptPreviewHash ?? ''}
+            data-export-width={result.exportWidth?.toString() ?? ''}
+            data-testid="agent-live-export-proof-receipt"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-teal-100">{t('editor.ai.agent.composer.exportProofReceipt')}</span>
+              <span className="font-mono text-text-secondary">
+                {t('editor.ai.agent.composer.exportProofWidth', { width: result.exportWidth })}
+              </span>
+            </div>
+            <div className="truncate font-mono text-teal-100">{result.exportHash}</div>
+            <div className="truncate font-mono text-text-secondary">{result.exportPreviewRef}</div>
           </div>
         ) : null}
         {rollbackSnapshot !== null && rollbackValidation !== null && result.status === 'applied' ? (

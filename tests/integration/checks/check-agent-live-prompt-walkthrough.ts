@@ -41,6 +41,11 @@ for (const marker of [
   'data-export-artifact-id={entry.exportArtifactId',
   'data-timeline-review-state={entry.status}',
   'rawengine.agent.preview.render',
+  'AGENT_EXPORT_PROOF_TOOL_NAME',
+  'agentExportProofResponseSchema',
+  'data-testid="agent-live-prompt-export-proof"',
+  'data-testid="agent-live-export-proof-receipt"',
+  'data-export-hash={result.exportHash}',
   'rawengine.live_basic_tone.apply',
   'rawengine.live_context',
   'rawengine.agent.history.rollback',
@@ -83,6 +88,8 @@ const localeSchema = z
           composer: z.object({
             apply: z.string().min(1),
             dryRun: z.string().min(1),
+            exportProof: z.string().min(1),
+            exportProofReceipt: z.string().min(1),
             label: z.string().min(1),
             previewDelta: z.string().min(1),
             rollback: z.string().min(1),
@@ -103,6 +110,7 @@ const localeSchema = z
             kind: z.object({
               approval: z.string().min(1),
               error: z.string().min(1),
+              export: z.string().min(1),
               preview: z.string().min(1),
               prompt: z.string().min(1),
               rollback: z.string().min(1),
