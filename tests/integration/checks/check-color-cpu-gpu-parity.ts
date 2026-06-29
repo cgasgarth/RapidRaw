@@ -298,14 +298,14 @@ if (UPDATE) {
 } else {
   const expectedReport = parityReportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
   if (JSON.stringify(expectedReport) !== JSON.stringify(report)) {
-    failures.push(`${REPORT_PATH} is stale; run bun tests/integration/checks/check-color-cpu-gpu-parity.ts --update`);
+    failures.push(`${REPORT_PATH} is stale; run bun run check:color-preview-export-parity --update`);
   }
 }
 
 if (failures.length > 0) {
-  console.error('Color CPU/GPU parity fixture check failed:');
+  console.error('Color preview/export parity fixture check failed:');
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log(`Validated ${nextManifest.cases.length} color CPU/GPU parity fixture cases.`);
+console.log(`Validated ${nextManifest.cases.length} color preview/export parity fixture cases.`);
