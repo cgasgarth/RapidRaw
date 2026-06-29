@@ -2283,6 +2283,7 @@
       "titleSingle": "Denoise Image"
     },
     "derivedOutput": {
+      "exportAction": "Export output",
       "family": "Family",
       "familyValue": {
         "focus_stack": "Focus stack",
@@ -2290,6 +2291,9 @@
         "panorama": "Panorama",
         "super_resolution": "Super-resolution"
       },
+      "lineage": "Lineage",
+      "lineageSummary_one": "{{count}} source / {{revisions}}",
+      "lineageSummary_other": "{{count}} sources / {{revisions}}",
       "output": "Output",
       "outputHash": "Output hash",
       "settingsHash": "Settings hash",
@@ -2321,7 +2325,15 @@
         "temp_cache": "Temporary cache"
       },
       "subtitle": "Shared output identity, source lineage, and editor handoff state.",
-      "title": "Derived output receipt"
+      "title": "Derived output receipt",
+      "validation": "Validation",
+      "validationValue": {
+        "blocked": "Blocked",
+        "needs_review": "Needs review",
+        "passed": "Passed",
+        "pending": "Pending"
+      },
+      "warnings": "Warnings"
     },
     "focusStack": {
       "alignment": {
