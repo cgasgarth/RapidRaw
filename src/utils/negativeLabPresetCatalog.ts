@@ -37,7 +37,15 @@ const makeNegativeLabPreset = (
     | 'provenanceSummary'
     | 'runtimeStatus'
   > & {
-    params: Omit<NegativeLabPresetParams, 'base_fog_sample' | 'black_point' | 'white_point'>;
+    params: Omit<
+      NegativeLabPresetParams,
+      | 'base_fog_sample'
+      | 'black_point'
+      | 'print_curve_algorithm'
+      | 'print_curve_output_tag'
+      | 'print_curve_v2'
+      | 'white_point'
+    >;
   },
 ): NegativeLabBuiltInUiPreset => ({
   ...GENERIC_NEGATIVE_LAB_PRESET_METADATA,
@@ -46,6 +54,9 @@ const makeNegativeLabPreset = (
     ...preset.params,
     black_point: 0,
     base_fog_sample: null,
+    print_curve_algorithm: 'density_rgb_v1',
+    print_curve_output_tag: 'preview_display',
+    print_curve_v2: null,
     white_point: 1,
   },
 });
