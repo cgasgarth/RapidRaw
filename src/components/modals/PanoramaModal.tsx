@@ -43,6 +43,7 @@ interface PanoramaModalProps {
   renderedReview: PanoramaRenderedReview | null;
   runtimePlan: PanoramaRuntimePlan | null;
   settings: PanoramaUiSettings;
+  sourcePaths?: string[];
 }
 
 export default function PanoramaModal({
@@ -63,6 +64,7 @@ export default function PanoramaModal({
   renderedReview,
   runtimePlan,
   settings,
+  sourcePaths = [],
 }: PanoramaModalProps) {
   const { t } = useTranslation();
   const { isMounted, show } = useModalTransition(isOpen);
@@ -173,6 +175,7 @@ export default function PanoramaModal({
           outputPath: savedPath,
           renderedReview,
           settings,
+          sourcePaths,
         });
   const derivedOutputReceipt =
     savedReviewSummary === null ? null : buildPanoramaDerivedOutputReceipt({ review: savedReviewSummary, settings });
@@ -313,6 +316,10 @@ export default function PanoramaModal({
               data-source-contribution-regions={savedReviewSummary.sourceContribution.regions.length}
               data-source-excluded-count={savedReviewSummary.sourceContribution.excludedSourceCount}
               data-source-count={savedReviewSummary.sourceCount}
+              data-source-graph-revisions={savedReviewSummary.sourceRefs
+                .map((source) => source.graphRevision)
+                .join(',')}
+              data-source-paths={savedReviewSummary.sourceRefs.map((source) => source.path).join(',')}
               data-testid="panorama-saved-review-summary"
               data-warning-codes={savedReviewSummary.warningCodes.join(',')}
             >

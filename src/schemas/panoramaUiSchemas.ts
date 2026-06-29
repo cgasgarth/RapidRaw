@@ -163,6 +163,15 @@ const panoramaExposureNormalizationSummarySchema = z
   })
   .strict();
 
+const panoramaSavedReviewSourceRefSchema = z
+  .object({
+    contentHash: z.string().trim().min(1),
+    graphRevision: z.string().trim().min(1),
+    path: z.string().trim().min(1),
+    sourceIndex: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export const panoramaRenderedReviewSchema = z
   .object({
     boundary: z
@@ -202,9 +211,19 @@ export const panoramaSavedReviewSummarySchema = z
     seamReview: panoramaSeamReviewSchema,
     sourceCount: z.number().int().nonnegative(),
     sourceContribution: panoramaSourceContributionSchema,
+    sourceRefs: z.array(panoramaSavedReviewSourceRefSchema),
     warningCodes: z.array(z.string()),
   })
-  .strict();
+  .strict()
+  .superRefine((summary, context) => {
+    if (summary.sourceRefs.length !== summary.sourceCount) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Panorama saved review sourceRefs length must match sourceCount.',
+        path: ['sourceRefs'],
+      });
+    }
+  });
 
 export type PanoramaSavedReviewSummary = z.infer<typeof panoramaSavedReviewSummarySchema>;
 

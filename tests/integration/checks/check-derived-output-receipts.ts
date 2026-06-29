@@ -90,6 +90,26 @@ const panoramaReview = {
     stitchedSourceCount: 3,
   },
   sourceCount: 3,
+  sourceRefs: [
+    {
+      contentHash: 'fnv1a32:panorama0',
+      graphRevision: 'panorama_source_0',
+      path: '/tmp/panorama-0.dng',
+      sourceIndex: 0,
+    },
+    {
+      contentHash: 'fnv1a32:panorama1',
+      graphRevision: 'panorama_source_1',
+      path: '/tmp/panorama-1.dng',
+      sourceIndex: 1,
+    },
+    {
+      contentHash: 'fnv1a32:panorama2',
+      graphRevision: 'panorama_source_2',
+      path: '/tmp/panorama-2.dng',
+      sourceIndex: 2,
+    },
+  ],
   warningCodes: [],
 } satisfies PanoramaSavedReviewSummary;
 
@@ -151,6 +171,16 @@ expect(
   storedReceipts[panoramaReceipt.receiptId]?.openInEditorAction.path === panoramaReceipt.openInEditorAction.path,
   'Store must retain panorama editor handoff path.',
 );
+expect(
+  panoramaReceipt.sourceContentHashes.join(',') ===
+    panoramaReview.sourceRefs.map((source) => source.contentHash).join(','),
+  'Panorama receipt must retain saved source content hashes.',
+);
+expect(
+  panoramaReceipt.sourceGraphRevisions.join(',') ===
+    panoramaReview.sourceRefs.map((source) => source.graphRevision).join(','),
+  'Panorama receipt must retain saved source graph revisions.',
+);
 
 const invalidOpenAction = derivedOutputReceiptSchema.safeParse({
   ...hdrReceipt,
@@ -200,6 +230,18 @@ for (const marker of [
 ]) {
   expect(hdrModalSource.includes(marker), `HDR modal missing applied derived-output persistence marker: ${marker}.`);
 }
+
+const panoramaModalSource = readFileSync('src/components/modals/PanoramaModal.tsx', 'utf8');
+expect(panoramaModalSource.includes('data-source-paths'), 'Panorama saved review must expose source paths.');
+expect(
+  panoramaModalSource.includes('data-source-graph-revisions'),
+  'Panorama saved review must expose source graph revisions.',
+);
+const appModalsSource = readFileSync('src/components/modals/AppModals.tsx', 'utf8');
+expect(
+  appModalsSource.includes('sourcePaths={panoramaModalState.stitchingSourcePaths}'),
+  'App modal wiring must pass panorama source paths into saved receipt builder.',
+);
 
 const reviewPanelSource = readFileSync('src/components/modals/ComputationalMergeReviewPanel.tsx', 'utf8');
 expect(reviewPanelSource.includes('DerivedOutputReceiptPanel'), 'Review panel must render the shared receipt panel.');

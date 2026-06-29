@@ -76,14 +76,9 @@ export const buildPanoramaDerivedOutputReceipt = ({
     }),
     outputPath: review.outputPath,
     settings,
-    sourceContentHashes: Array.from({ length: review.sourceCount }, (_value, sourceIndex) =>
-      hashStableJson({ outputPath: review.outputPath, sourceIndex, sourceContribution: review.sourceContribution }),
-    ),
+    sourceContentHashes: review.sourceRefs.map((source) => source.contentHash),
     sourceCount: review.sourceCount,
-    sourceGraphRevisions: Array.from(
-      { length: review.sourceCount },
-      (_value, sourceIndex) => `panorama_source_${sourceIndex}`,
-    ),
+    sourceGraphRevisions: review.sourceRefs.map((source) => source.graphRevision),
     staleState: 'current',
     storagePolicy: 'export_path',
   });
