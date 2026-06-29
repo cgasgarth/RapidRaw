@@ -1,10 +1,13 @@
 import { z } from 'zod';
 
+import { getDefaultParametricCurve } from './adjustments';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import { pushEditHistoryEntry } from './editHistory';
+import { TONE_CURVE_PARAMETRIC_PRESETS } from './profileTonePresets';
 import { blackWhiteMixerSettingsSchema } from '../schemas/blackWhiteMixerSchemas';
 import { channelMixerSettingsSchema } from '../schemas/channelMixerSchemas';
 import { colorBalanceRgbSettingsSchema } from '../schemas/colorBalanceRgbSchemas';
+import { cameraProfileIdSchema, toneCurveIdSchema } from '../schemas/profileToneSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 
 import type { Adjustments } from './adjustments';
@@ -110,6 +113,7 @@ const skinToneUniformitySchema = z
 const agentColorPatchSchema = z
   .object({
     blackWhiteMixer: blackWhiteMixerSettingsSchema.optional(),
+    cameraProfile: cameraProfileIdSchema.optional(),
     channelMixer: channelMixerSettingsSchema.optional(),
     colorBalanceRgb: colorBalanceRgbSettingsSchema.optional(),
     colorCalibration: colorCalibrationSchema.optional(),
@@ -120,6 +124,7 @@ const agentColorPatchSchema = z
     skinToneUniformity: skinToneUniformitySchema.optional(),
     temperature: z.number().min(-100).max(100).optional(),
     tint: z.number().min(-100).max(100).optional(),
+    toneCurve: toneCurveIdSchema.optional(),
     vibrance: z.number().min(-100).max(100).optional(),
   })
   .strict()
@@ -165,6 +170,7 @@ type AgentColorPatch = z.infer<typeof agentColorPatchSchema>;
 const SELECTIVE_COLOR_RANGE_KEYS = selectiveColorRangeKeySchema.options;
 const COLOR_PATCH_KEYS = [
   'blackWhiteMixer',
+  'cameraProfile',
   'channelMixer',
   'colorBalanceRgb',
   'colorCalibration',
@@ -175,6 +181,7 @@ const COLOR_PATCH_KEYS = [
   'skinToneUniformity',
   'temperature',
   'tint',
+  'toneCurve',
   'vibrance',
 ] as const satisfies ReadonlyArray<keyof AgentColorPatch>;
 
@@ -184,6 +191,16 @@ const applyColorPatchToAdjustments = (base: Adjustments, patch: AgentColorPatch)
   if (patch.tint !== undefined) next.tint = patch.tint;
   if (patch.vibrance !== undefined) next.vibrance = patch.vibrance;
   if (patch.saturation !== undefined) next.saturation = patch.saturation;
+  if (patch.cameraProfile !== undefined) next.cameraProfile = patch.cameraProfile;
+  if (patch.toneCurve !== undefined) {
+    const parametricCurve = base.parametricCurve ?? getDefaultParametricCurve();
+    next.toneCurve = patch.toneCurve;
+    next.curveMode = 'parametric';
+    next.parametricCurve = {
+      ...parametricCurve,
+      luma: { ...TONE_CURVE_PARAMETRIC_PRESETS[patch.toneCurve] },
+    };
+  }
   if (patch.blackWhiteMixer !== undefined) next.blackWhiteMixer = { ...patch.blackWhiteMixer };
   if (patch.colorBalanceRgb !== undefined) {
     next.colorBalanceRgb = {

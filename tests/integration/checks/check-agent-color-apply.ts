@@ -19,6 +19,7 @@ import {
   buildRawEngineAppServerRouteCatalog,
   handleRawEngineAppServerHostRequestAsync,
 } from '../../../src/utils/rawEngineAppServerHost.ts';
+import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../../src/utils/profileTonePresets.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3167.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 14 : 2));
@@ -122,6 +123,32 @@ if (
 if (
   agentColorApplyRequestSchema.safeParse({
     color: {
+      cameraProfile: 'camera_flat',
+    },
+    expectedRecipeHash: 'recipe:test',
+    operationId: 'invalid-camera-profile',
+    requestId: 'invalid-camera-profile',
+    sessionId: 'agent-color-invalid',
+  }).success
+) {
+  throw new Error('agent.color.apply accepted an invalid camera profile.');
+}
+if (
+  agentColorApplyRequestSchema.safeParse({
+    color: {
+      toneCurve: 'crush_shadows',
+    },
+    expectedRecipeHash: 'recipe:test',
+    operationId: 'invalid-tone-curve',
+    requestId: 'invalid-tone-curve',
+    sessionId: 'agent-color-invalid',
+  }).success
+) {
+  throw new Error('agent.color.apply accepted an invalid tone curve.');
+}
+if (
+  agentColorApplyRequestSchema.safeParse({
+    color: {
       skinToneUniformity: {
         enabled: true,
         hueUniformity: 0.9,
@@ -163,6 +190,7 @@ const result = applyAgentColor({
       enabled: true,
       weights: { aquas: 0, blues: -8, greens: 0, magentas: 0, oranges: 12, purples: 0, reds: 10, yellows: 6 },
     },
+    cameraProfile: 'camera_portrait',
     channelMixer: {
       blue: { red: 0, green: 2, blue: 98, constant: 0 },
       enabled: true,
@@ -214,6 +242,7 @@ const result = applyAgentColor({
     },
     temperature: 8,
     tint: -3,
+    toneCurve: 'soft_contrast',
     vibrance: 14,
   },
   expectedRecipeHash: initialSnapshot.initialPreview.recipeHash,
@@ -234,9 +263,13 @@ if (
   state.adjustments.colorBalanceRgb.highlights.red !== 6 ||
   state.adjustments.channelMixer.red.red !== 104 ||
   state.adjustments.blackWhiteMixer.weights.oranges !== 12 ||
+  state.adjustments.cameraProfile !== 'camera_portrait' ||
   state.adjustments.colorCalibration.redSaturation !== 8 ||
   state.adjustments.skinToneUniformity.hueUniformity !== 0.38 ||
-  state.adjustments.selectiveColorRangeControls.oranges.widthDegrees !== 42
+  state.adjustments.selectiveColorRangeControls.oranges.widthDegrees !== 42 ||
+  state.adjustments.toneCurve !== 'soft_contrast' ||
+  state.adjustments.curveMode !== 'parametric' ||
+  state.adjustments.parametricCurve.luma.highlights !== TONE_CURVE_PARAMETRIC_PRESETS.soft_contrast.highlights
 ) {
   throw new Error('agent.color.apply did not mutate representative color adjustments.');
 }
@@ -251,6 +284,7 @@ if (afterSnapshot.initialPreview.recipeHash === initialSnapshot.initialPreview.r
 }
 for (const field of [
   'blackWhiteMixer',
+  'cameraProfile',
   'channelMixer',
   'colorBalanceRgb',
   'colorCalibration',
@@ -261,6 +295,7 @@ for (const field of [
   'skinToneUniformity',
   'temperature',
   'tint',
+  'toneCurve',
   'vibrance',
 ]) {
   if (!parsedResult.adjustedFields.includes(field)) {
