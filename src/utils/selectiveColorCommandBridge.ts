@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import type { Adjustments, HueSatLum } from './adjustments';
+import type { SelectiveColorRangeControl } from './selectiveColorRanges';
 
 export const SELECTIVE_COLOR_COMMAND_SCHEMA_VERSION = 1;
 
@@ -71,6 +72,14 @@ export const selectiveColorCommandEnvelopeSchema = z
         band: z.enum(TONE_COLOR_HSL_BANDS),
         hueShiftDegrees: z.number().min(-180).max(180),
         luminance: z.number().min(-100).max(100),
+        rangeControl: z
+          .object({
+            centerHueDegrees: z.number().min(0).max(360),
+            falloffSmoothness: z.number().min(0.25).max(4),
+            widthDegrees: z.number().min(10).max(180),
+          })
+          .strict()
+          .optional(),
         saturation: z.number().min(-100).max(100),
       })
       .strict(),
@@ -93,6 +102,14 @@ export const selectiveColorAdjustmentPayloadSchema = z
         saturation: z.number().min(-100).max(100),
       })
       .strict(),
+    rangeControl: z
+      .object({
+        centerHueDegrees: z.number().min(0).max(360),
+        falloffSmoothness: z.number().min(0.25).max(4),
+        widthDegrees: z.number().min(10).max(180),
+      })
+      .strict()
+      .optional(),
     rangeKey: z.enum(SELECTIVE_COLOR_COMMAND_RANGE_KEYS),
   })
   .strict();
@@ -198,6 +215,7 @@ export const buildSelectiveColorCommandEnvelope = (
       band: COMMAND_RANGE_TO_HSL_BAND[parsedPayload.rangeKey],
       hueShiftDegrees: parsedPayload.adjustment.hue,
       luminance: parsedPayload.adjustment.luminance,
+      ...(parsedPayload.rangeControl !== undefined ? { rangeControl: parsedPayload.rangeControl } : {}),
       saturation: parsedPayload.adjustment.saturation,
     },
     schemaVersion: SELECTIVE_COLOR_COMMAND_SCHEMA_VERSION,
@@ -218,6 +236,7 @@ export const parseSelectiveColorCommandEnvelope = (command: unknown): SelectiveC
 export const applySelectiveColorCommandEnvelopeToAdjustments = (base: Adjustments, command: unknown): Adjustments => {
   const parsedCommand = parseSelectiveColorCommandEnvelope(command);
   const rangeKey = HSL_BAND_TO_COMMAND_RANGE[parsedCommand.parameters.band];
+  const rangeControl: SelectiveColorRangeControl | undefined = parsedCommand.parameters.rangeControl;
 
   return {
     ...base,
@@ -229,5 +248,13 @@ export const applySelectiveColorCommandEnvelopeToAdjustments = (base: Adjustment
         saturation: parsedCommand.parameters.saturation,
       },
     },
+    ...(rangeControl !== undefined
+      ? {
+          selectiveColorRangeControls: {
+            ...base.selectiveColorRangeControls,
+            [rangeKey]: rangeControl,
+          },
+        }
+      : {}),
   };
 };

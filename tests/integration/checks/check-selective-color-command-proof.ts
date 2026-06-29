@@ -73,6 +73,13 @@ const reportSchema = z
         workingSpace: z.string().min(1),
       })
       .strict(),
+    rangeControl: z
+      .object({
+        centerHueDegrees: z.literal(32),
+        falloffSmoothness: z.literal(1.2),
+        widthDegrees: z.literal(54),
+      })
+      .strict(),
     targetedRuntime: z.object({
       influence: z.number().min(0).max(1),
       inputRgb: rgbPixelSchema,
@@ -88,6 +95,11 @@ const adjustment = {
   luminance: -11,
   saturation: 22,
 };
+const rangeControl = {
+  centerHueDegrees: 32,
+  falloffSmoothness: 1.2,
+  widthDegrees: 54,
+};
 
 const commandContext = buildSelectiveColorImageCommandContext({
   colorPipeline: sampleRawEngineSceneColorPipelineV1,
@@ -98,7 +110,7 @@ const commandContext = buildSelectiveColorImageCommandContext({
 });
 
 const dryRunCommand = buildSelectiveColorCommandEnvelope(
-  { adjustment, rangeKey: 'oranges' },
+  { adjustment, rangeControl, rangeKey: 'oranges' },
   {
     ...commandContext,
     commandId: 'command_selective_color_orange_preview_001',
@@ -113,7 +125,7 @@ selectiveColorCommandEnvelopeSchema.parse(dryRunCommand);
 rawEngineColorPipelineContextV1Schema.parse(dryRunCommand.colorPipeline);
 
 const applyCommand = buildSelectiveColorCommandEnvelope(
-  { adjustment, rangeKey: 'oranges' },
+  { adjustment, rangeControl, rangeKey: 'oranges' },
   {
     ...commandContext,
     commandId: 'command_selective_color_orange_apply_001',
@@ -177,6 +189,9 @@ const parsedDryRunResult = toneColorDryRunResultV1Schema.parse(dryRunResult.resu
 if (!parsedDryRunResult.parameterDiff.some((diff) => diff.path === '/parameters/orange/saturation')) {
   throw new Error('Selective color dry-run must include an orange saturation diff.');
 }
+if (!parsedDryRunResult.parameterDiff.some((diff) => diff.path === '/parameters/orange/rangeControl/widthDegrees')) {
+  throw new Error('Selective color dry-run must include orange range-control diffs.');
+}
 
 const applyResult = await bridge.dispatch(applyCommand);
 if (!applyResult.ok) throw new Error(`Selective color apply failed after matching dry-run: ${applyResult.message}`);
@@ -186,6 +201,9 @@ const replayedAdjustments = applySelectiveColorCommandEnvelopeToAdjustments(INIT
 if (replayedAdjustments.hsl.oranges.hue !== adjustment.hue) {
   throw new Error('Selective color command replay did not update orange hue.');
 }
+if (replayedAdjustments.selectiveColorRangeControls.oranges.widthDegrees !== rangeControl.widthDegrees) {
+  throw new Error('Selective color command replay did not update orange range controls.');
+}
 
 const sourcePixels: RgbPixel[] = [
   { blue: 0.08, green: 0.26, red: 0.88 },
@@ -194,8 +212,12 @@ const sourcePixels: RgbPixel[] = [
   { blue: 0.8, green: 0.16, red: 0.12 },
 ];
 
-const previewResults = sourcePixels.map((pixel) => applySelectiveColorToRgbPixel(pixel, 'oranges', adjustment));
-const exportResults = sourcePixels.map((pixel) => applySelectiveColorToRgbPixel(pixel, 'oranges', adjustment));
+const previewResults = sourcePixels.map((pixel) =>
+  applySelectiveColorToRgbPixel(pixel, 'oranges', adjustment, { oranges: rangeControl }),
+);
+const exportResults = sourcePixels.map((pixel) =>
+  applySelectiveColorToRgbPixel(pixel, 'oranges', adjustment, { oranges: rangeControl }),
+);
 const previewPixels = previewResults.map((result) => roundRgb(result.outputRgb));
 const exportPixels = exportResults.map((result) => roundRgb(result.outputRgb));
 const previewExportMaxDelta = maxPixelDelta(previewPixels, exportPixels);
@@ -242,6 +264,9 @@ const sidecarPayload = {
     hsl: {
       oranges: adjustment,
     },
+    selectiveColorRangeControls: {
+      oranges: rangeControl,
+    },
   },
   editGraph: sidecarGraph,
   rating: 0,
@@ -283,6 +308,7 @@ const report = reportSchema.parse({
     operationDomain: dryRunCommand.colorPipeline.operationDomain,
     workingSpace: dryRunCommand.colorPipeline.workingSpace,
   },
+  rangeControl,
   targetedRuntime: {
     influence: roundMetric(targetedRuntime.influence),
     inputRgb: sourcePixels[1],

@@ -32,6 +32,14 @@ export function createToneColorSchemasV1(dependencies: ToneColorSchemaDependenci
 
   const toneColorHslBandV1Schema = z.enum(['red', 'orange', 'yellow', 'green', 'aqua', 'blue', 'purple', 'magenta']);
 
+  const toneColorSelectiveColorRangeControlV1Schema = z
+    .object({
+      centerHueDegrees: z.number().min(0).max(360),
+      falloffSmoothness: z.number().min(0.25).max(4),
+      widthDegrees: z.number().min(10).max(180),
+    })
+    .strict();
+
   const toneColorCurvePointV1Schema = z
     .object({
       input: z.number().min(0).max(1),
@@ -175,6 +183,7 @@ export function createToneColorSchemasV1(dependencies: ToneColorSchemaDependenci
               band: toneColorHslBandV1Schema,
               hueShiftDegrees: z.number().min(-180).max(180),
               luminance: z.number().min(-100).max(100),
+              rangeControl: toneColorSelectiveColorRangeControlV1Schema.optional(),
               saturation: z.number().min(-100).max(100),
             })
             .strict(),
