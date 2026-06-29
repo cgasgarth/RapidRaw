@@ -163,6 +163,11 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   milestone. Ask for the full milestone plan: product goal, architecture,
   sequencing, risks, validation strategy, and a PR-sized issue breakdown. Codex
   then creates or updates the GitHub milestone and issues from that plan.
+- For milestone-based GitHub planning, create or confirm the target milestones
+  first, then pass the milestone titles and numbers into consult. Ask consult
+  to create or assign PR-sized GitHub issues directly to those existing
+  milestones when the GitHub connector is available, rather than only drafting
+  issue text for Codex to create later.
 - Consult should plan complete milestone work, not optimize for the smallest
   possible PR. Break consult's milestone plan into individual GitHub issues
   locally, with each issue sized for one realistic PR and grouped under the
