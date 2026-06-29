@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { AlertTriangle, Aperture, CheckCircle2, Eye, Layers3, ShieldCheck } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
@@ -10,7 +10,9 @@ import {
   ComputationalSetupSourceWarning,
   ComputationalSetupStatusLine,
 } from './ComputationalSetupModalShell';
+import { useUIStore, type FocusStackModalState } from '../../store/useUIStore';
 import { TextColors, TextVariants } from '../../types/typography';
+import { buildFocusStackDerivedOutputReceipt } from '../../utils/derivedOutputReceipt';
 import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
 import { buildFocusStackSourcePreflight } from '../../utils/focusStackSourcePreflight';
 import Button from '../ui/Button';
@@ -24,7 +26,6 @@ import type {
   FocusStackReviewOverlayMode,
   FocusStackUiSettings,
 } from '../../schemas/focusStackUiSchemas';
-import type { FocusStackModalState } from '../../store/useUIStore';
 import type { FocusStackSourcePreflightMetadata } from '../../utils/focusStackSourcePreflight';
 
 interface FocusStackModalProps {
@@ -133,6 +134,14 @@ export default function FocusStackModal({
       sourceCount: fallbackOutputReviewSourceCount,
     });
   const hasRuntimeOutputReview = runtimeOutputReview !== null && runtimeOutputReview !== undefined;
+  const derivedOutputReceipt = buildFocusStackDerivedOutputReceipt({ review: outputReview, settings });
+  const storedDerivedOutputReceipt =
+    useUIStore((state) => state.derivedOutputReceipts[derivedOutputReceipt.receiptId]) ?? derivedOutputReceipt;
+  const upsertDerivedOutputReceipt = useUIStore((state) => state.upsertDerivedOutputReceipt);
+
+  useEffect(() => {
+    upsertDerivedOutputReceipt(derivedOutputReceipt);
+  }, [derivedOutputReceipt, upsertDerivedOutputReceipt]);
   const isApplyPlanReady =
     isPreviewPlanReady &&
     hasRuntimeOutputReview &&
@@ -656,6 +665,7 @@ export default function FocusStackModal({
       </motion.section>
 
       <ComputationalMergeReviewPanel
+        derivedOutputReceipt={storedDerivedOutputReceipt}
         title={t('modals.focusStack.review.title')}
         proofStatus={t('modals.focusStack.review.proofStatus')}
         limitation={t('modals.focusStack.review.limitation')}

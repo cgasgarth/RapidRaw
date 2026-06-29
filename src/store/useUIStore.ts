@@ -15,6 +15,7 @@ import {
   type SuperResolutionUiSettings,
 } from '../schemas/superResolutionUiSchemas';
 
+import type { DerivedOutputReceipt } from '../schemas/derivedOutputReceiptSchemas';
 import type { FocusStackOutputReviewWorkflow } from '../schemas/focusStackOutputReviewSchemas';
 import type { SuperResolutionOutputReviewWorkflow } from '../schemas/superResolutionOutputReviewSchemas';
 import type { FocusStackSourcePreflightMetadata } from '../utils/focusStackSourcePreflight';
@@ -286,10 +287,13 @@ interface UIState {
   denoiseModalState: DenoiseModalState;
   cullingModalState: CullingModalState;
   collageModalState: CollageModalState;
+  derivedOutputReceipts: Record<string, DerivedOutputReceipt>;
 
   // Actions
+  clearDerivedOutputReceipts: () => void;
   setUI: (updater: Partial<UIState> | ((state: UIState) => Partial<UIState>)) => void;
   setRightPanel: (panel: Panel | null) => void;
+  upsertDerivedOutputReceipt: (receipt: DerivedOutputReceipt) => void;
   customEscapeHandler: (() => void) | null;
   setCustomEscapeHandler: (handler: (() => void) | null) => void;
 }
@@ -348,6 +352,11 @@ export const useUIStore = create<UIState>((set, get) => ({
   },
   cullingModalState: createDefaultCullingModalState(),
   collageModalState: createDefaultCollageModalState(),
+  derivedOutputReceipts: {},
+
+  clearDerivedOutputReceipts: () => {
+    set({ derivedOutputReceipts: {} });
+  },
 
   setUI: (updater) => {
     set((state) => (typeof updater === 'function' ? updater(state) : updater));
@@ -366,6 +375,21 @@ export const useUIStore = create<UIState>((set, get) => ({
         renderedRightPanel: panelId,
       });
     }
+  },
+
+  upsertDerivedOutputReceipt: (receipt) => {
+    set((state) => {
+      const existing = state.derivedOutputReceipts[receipt.receiptId];
+      if (existing !== undefined && JSON.stringify(existing) === JSON.stringify(receipt)) {
+        return state;
+      }
+      return {
+        derivedOutputReceipts: {
+          ...state.derivedOutputReceipts,
+          [receipt.receiptId]: receipt,
+        },
+      };
+    });
   },
 
   customEscapeHandler: null,

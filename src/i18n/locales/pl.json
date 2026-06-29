@@ -2397,6 +2397,20 @@
       "titleBatch": "Odszum obrazy",
       "titleSingle": "Odszum obraz"
     },
+    "derivedOutput": {
+      "family": "",
+      "output": "",
+      "outputHash": "",
+      "settingsHash": "",
+      "sourceCount_one": "",
+      "sourceCount_few": "",
+      "sourceCount_many": "",
+      "sourceCount_other": "",
+      "sources": "",
+      "storage": "",
+      "subtitle": "",
+      "title": ""
+    },
     "focusStack": {
       "alignment": {
         "auto": "Auto",

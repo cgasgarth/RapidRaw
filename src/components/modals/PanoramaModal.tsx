@@ -3,9 +3,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
+import DerivedOutputReceiptPanel from './DerivedOutputReceiptPanel';
 import { MergeErrorState, MergeFooterActions, MergeProcessingState, MergeResultPreview } from './MergeStatusViews';
 import { useModalTransition } from '../../hooks/useModalTransition';
+import { useUIStore, type PanoramaModalState } from '../../store/useUIStore';
 import { TextColors, TextVariants } from '../../types/typography';
+import { buildPanoramaDerivedOutputReceipt } from '../../utils/derivedOutputReceipt';
 import { buildPanoramaSavedReviewSummary } from '../../utils/panoramaSavedReview';
 import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerBadge';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
@@ -21,7 +24,6 @@ import type {
   PanoramaUiQualityPreference,
   PanoramaUiSettings,
 } from '../../schemas/panoramaUiSchemas';
-import type { PanoramaModalState } from '../../store/useUIStore';
 
 interface PanoramaModalProps {
   error: string | null;
@@ -172,6 +174,18 @@ export default function PanoramaModal({
           renderedReview,
           settings,
         });
+  const derivedOutputReceipt =
+    savedReviewSummary === null ? null : buildPanoramaDerivedOutputReceipt({ review: savedReviewSummary, settings });
+  const derivedOutputReceiptId = derivedOutputReceipt?.receiptId;
+  const storedDerivedOutputReceipt =
+    useUIStore((state) =>
+      derivedOutputReceiptId === undefined ? undefined : state.derivedOutputReceipts[derivedOutputReceiptId],
+    ) ?? derivedOutputReceipt;
+  const upsertDerivedOutputReceipt = useUIStore((state) => state.upsertDerivedOutputReceipt);
+
+  useEffect(() => {
+    if (derivedOutputReceipt !== null) upsertDerivedOutputReceipt(derivedOutputReceipt);
+  }, [derivedOutputReceipt, upsertDerivedOutputReceipt]);
 
   const setSetting = useCallback(
     (patch: Partial<PanoramaUiSettings>) => {
@@ -359,6 +373,11 @@ export default function PanoramaModal({
               </UiText>
             </section>
           )}
+          {storedDerivedOutputReceipt ? (
+            <div className="mx-auto mt-4 max-w-2xl text-left">
+              <DerivedOutputReceiptPanel receipt={storedDerivedOutputReceipt} onOpenOutput={onOpenFile} />
+            </div>
+          ) : null}
         </div>
       );
     }

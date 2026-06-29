@@ -57,6 +57,7 @@
     "check:agent-color-edit-workflow": "bun tests/integration/checks/check-agent-color-edit-workflow.ts",
     "check:tone-color-app-server-routes": "bun tests/integration/checks/check-tone-color-app-server-routes.ts",
     "check:derived-artifact-invalidation": "bun tests/integration/checks/check-derived-artifact-invalidation.ts",
+    "check:derived-output-receipts": "bun tests/integration/checks/check-derived-output-receipts.ts",
     "check:tauri-schema-validation": "bun tests/integration/checks/check-tauri-schema-validation.ts",
     "check:tauri-invoke-boundaries": "bun tests/integration/checks/check-tauri-invoke-boundaries.ts",
     "check:tauri-invoke-boundaries:self-test": "bun tests/integration/checks/check-tauri-invoke-boundaries.ts --self-test",

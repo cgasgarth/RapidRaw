@@ -2,6 +2,7 @@ import { CheckCircle, Images, ShieldCheck, XCircle } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import DerivedOutputReceiptPanel from './DerivedOutputReceiptPanel';
 import { MergeErrorState, MergeFooterActions, MergeProcessingState, MergeResultPreview } from './MergeStatusViews';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import {
@@ -15,7 +16,9 @@ import {
   type HdrMergeUiSettings,
   type HdrToneMappingPreset,
 } from '../../schemas/hdrMergeUiSchemas';
+import { useUIStore, type HdrModalState } from '../../store/useUIStore';
 import { TextColors, TextVariants } from '../../types/typography';
+import { buildHdrDerivedOutputReceipt } from '../../utils/derivedOutputReceipt';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
 import { buildHdrEditableHandoffSummary } from '../../utils/hdrEditableHandoff';
 import { buildHdrReviewDiagnostics } from '../../utils/hdrReviewDiagnostics';
@@ -27,7 +30,6 @@ import type {
   HdrBracketDetectionMethodV1,
   HdrBracketSourceMetadataV1,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import type { HdrModalState } from '../../store/useUIStore';
 
 interface HdrModalProps {
   error: string | null;
@@ -239,6 +241,18 @@ export default function HdrModal({
           sourcePaths,
         })
       : null;
+  const derivedOutputReceipt =
+    handoffSummary === null ? null : buildHdrDerivedOutputReceipt({ handoff: handoffSummary, settings });
+  const derivedOutputReceiptId = derivedOutputReceipt?.receiptId;
+  const storedDerivedOutputReceipt =
+    useUIStore((state) =>
+      derivedOutputReceiptId === undefined ? undefined : state.derivedOutputReceipts[derivedOutputReceiptId],
+    ) ?? derivedOutputReceipt;
+  const upsertDerivedOutputReceipt = useUIStore((state) => state.upsertDerivedOutputReceipt);
+
+  useEffect(() => {
+    if (derivedOutputReceipt !== null) upsertDerivedOutputReceipt(derivedOutputReceipt);
+  }, [derivedOutputReceipt, upsertDerivedOutputReceipt]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -421,6 +435,11 @@ export default function HdrModal({
               </UiText>
             </section>
           )}
+          {storedDerivedOutputReceipt ? (
+            <div className="mx-auto mt-4 max-w-2xl text-left">
+              <DerivedOutputReceiptPanel receipt={storedDerivedOutputReceipt} onOpenOutput={onOpenFile} />
+            </div>
+          ) : null}
         </MergeResultPreview>
       );
     }

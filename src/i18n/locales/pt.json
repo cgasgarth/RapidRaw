@@ -2256,6 +2256,19 @@
       "titleBatch": "Reduzir Ruído de Imagens",
       "titleSingle": "Reduzir Ruído da Imagem"
     },
+    "derivedOutput": {
+      "family": "",
+      "output": "",
+      "outputHash": "",
+      "settingsHash": "",
+      "sourceCount_one": "",
+      "sourceCount_many": "",
+      "sourceCount_other": "",
+      "sources": "",
+      "storage": "",
+      "subtitle": "",
+      "title": ""
+    },
     "focusStack": {
       "alignment": {
         "auto": "Auto",
