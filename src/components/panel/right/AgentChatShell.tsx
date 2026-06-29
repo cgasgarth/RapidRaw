@@ -694,6 +694,7 @@ function LivePromptComposer({
       });
       if (safetyDecision.blocked || safetyDecision.approvalRequired) {
         pushActivityEntry({
+          approvalId: safetyDecision.decisionId,
           body: safetyDecision.reason,
           kind: 'approval',
           recipeHash: safetyDecision.decisionId,
@@ -750,6 +751,7 @@ function LivePromptComposer({
   const approveSafetyGate = () => {
     if (result.status !== 'approval_required') return;
     pushActivityEntry({
+      approvalId: result.safetyDecision?.decisionId,
       body: t('editor.ai.agent.composer.policy.approved'),
       kind: 'approval',
       recipeHash: result.safetyDecision?.decisionId,
@@ -1172,6 +1174,11 @@ function LivePromptComposer({
         </button>
         <button
           className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          data-disabled-reason={
+            result.status === 'blocked' || result.status === 'approval_required'
+              ? (result.safetyDecision?.decisionId ?? result.status)
+              : ''
+          }
           data-testid="agent-live-prompt-apply"
           disabled={!canApply}
           onMouseDown={(event) => {
@@ -1187,6 +1194,7 @@ function LivePromptComposer({
         </button>
         <button
           className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          data-policy-state={result.status}
           data-testid="agent-live-prompt-approve-policy"
           disabled={result.status !== 'approval_required'}
           onMouseDown={(event) => {
@@ -1320,14 +1328,20 @@ function LivePromptComposer({
         ) : null}
         {result.safetyDecision ? (
           <div
-            className="mt-2 rounded border border-amber-500/25 bg-amber-500/10 p-2 text-amber-100"
+            className={`mt-2 rounded border p-2 ${
+              result.safetyDecision.blocked
+                ? 'border-red-500/25 bg-red-500/10 text-red-100'
+                : 'border-amber-500/25 bg-amber-500/10 text-amber-100'
+            }`}
             data-approval-required={result.safetyDecision.approvalRequired ? 'true' : 'false'}
             data-blocked={result.safetyDecision.blocked ? 'true' : 'false'}
             data-policy-id={result.safetyDecision.decisionId}
+            data-policy-severity={result.safetyDecision.severity}
             data-testid="agent-live-prompt-safety-policy"
           >
             <span className="font-semibold">{t('editor.ai.agent.composer.policy.title')}</span>
             <p className="mt-1 leading-4">{result.safetyDecision.reason}</p>
+            <p className="mt-1 font-mono text-[10px] opacity-80">{result.safetyDecision.decisionId}</p>
           </div>
         ) : null}
         {result.previewAfterHash ? (
