@@ -1,9 +1,9 @@
 {
   "generatedAt": "2026-06-18T00:00:00.000Z",
   "issue": 1267,
-  "limitation": "Harness-only report. This does not close #1267 because it does not include two real-derived crops processed by ai_processing::run_ai_denoise / NIND with before, after, diff, and contact-sheet artifacts.",
+  "limitation": "Harness-only report. It now includes a runtime-backed synthetic crop proof, but it still does not close #1267 because it does not include two real-derived crops processed by ai_processing::run_ai_denoise / NIND with before, after, diff, and contact-sheet artifacts.",
   "minEligibleRealRunsRequired": 2,
-  "proofHash": "43bac8e934285635e1822444bf1d0b63317ee4c0fdad54d95b881c712cebe024",
+  "proofHash": "5ffec774e85870a9478e303dd4821c8a57848464482ac2dd8973acc541370e2a",
   "schemaVersion": 1,
   "status": "harness_only",
   "validationCrops": [
@@ -39,8 +39,8 @@
     },
     {
       "artifacts": [],
-      "cropId": "synthetic-control-not-closure-proof",
-      "executionStatus": "dry_run_only",
+      "cropId": "synthetic-runtime-output-proof",
+      "executionStatus": "applied_nind_runtime",
       "fixtureId": "synthetic.detail.high-iso-fine-texture.v0",
       "metrics": {
         "edgeContrastRatio": 0.98,
