@@ -1253,7 +1253,19 @@
       "resetViewTooltip": "보기 초기화",
       "title": "네거티브 변환",
       "zoomInTooltip": "확대",
-      "zoomOutTooltip": "축소"
+      "zoomOutTooltip": "축소",
+      "v2QcReadouts": "",
+      "v2AlgorithmEnabled": "",
+      "v2AlgorithmDisabled": "",
+      "v2CrosstalkStatus": "",
+      "v2AutoSuggestionStatus": "",
+      "v2DensityRangeStatus": "",
+      "v2PreviewExportReady": "",
+      "v2PreviewExportBlocked": "",
+      "v2ContrastGrade": "",
+      "v2ToeStrength": "",
+      "v2ShoulderStrength": "",
+      "v2DensityOffset": ""
     },
     "panorama": {
       "cancel": "취소",

@@ -199,6 +199,16 @@ type BaseSampleDecisionLabelKey =
   | 'modals.negativeConversion.baseSampleDecision.rejected';
 
 const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
+const DEFAULT_NEGATIVE_LAB_PRINT_CURVE_V2_PARAMS = {
+  contrast_grade: 1,
+  density_offset: 0,
+  midtone_shape: 0,
+  schema_version: 1,
+  shoulder_strength: 0.25,
+  target_black_density: 1.65,
+  target_white_density: 0.04,
+  toe_strength: 0.25,
+} satisfies NonNullable<NegativeParams['print_curve_v2']>;
 const DEFAULT_SAVE_OPTIONS = {
   outputFormat: NegativeLabOutputFormatId.Tiff16 as NegativeOutputFormat,
   suffix: 'Positive',
@@ -1405,6 +1415,43 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     updatePreview(buildParamsWithFrameOverrides(newParams));
   };
 
+  const handleSetPrintCurveV2Enabled = (enabled: boolean) => {
+    const newParams: NegativeParams = enabled
+      ? {
+          ...params,
+          print_curve_algorithm: 'negative_density_print_v2',
+          print_curve_output_tag: 'preview_display',
+          print_curve_v2: params.print_curve_v2 ?? DEFAULT_NEGATIVE_LAB_PRINT_CURVE_V2_PARAMS,
+        }
+      : {
+          ...params,
+          print_curve_algorithm: 'density_rgb_v1',
+          print_curve_output_tag: 'preview_display',
+          print_curve_v2: null,
+        };
+    setSelectedPresetId('');
+    setParams(newParams);
+    setAcceptedBatchPlanJson(null);
+    updatePreview(buildParamsWithFrameOverrides(newParams));
+  };
+
+  const handlePrintCurveV2ParamChange = (key: keyof NonNullable<NegativeParams['print_curve_v2']>, value: number) => {
+    const currentV2Params = params.print_curve_v2 ?? DEFAULT_NEGATIVE_LAB_PRINT_CURVE_V2_PARAMS;
+    const newParams: NegativeParams = {
+      ...params,
+      print_curve_algorithm: 'negative_density_print_v2',
+      print_curve_output_tag: 'preview_display',
+      print_curve_v2: {
+        ...currentV2Params,
+        [key]: value,
+      },
+    };
+    setSelectedPresetId('');
+    setParams(newParams);
+    setAcceptedBatchPlanJson(null);
+    updatePreview(buildParamsWithFrameOverrides(newParams));
+  };
+
   const handlePresetSelect = (preset: NegativeLabRuntimeProfileBrowserRow) => {
     if (!preset.isSelectable) return;
 
@@ -2444,94 +2491,215 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     </div>
   );
 
-  const renderBatchReadiness = () => (
-    <div
-      className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
-      data-planned-apply-count={batchDryRunSummary.plannedApplyCount}
-      data-review-count={dustScratchReviewReport.reviewCount}
-      data-roll-normalization-affected-count={rollNormalizationPlan.affectedFrameIds.length}
-      data-roll-normalization-suggestion-count={
-        rollNormalizationPlan.autoDensitySuggestionRun?.frameSuggestions.length ?? 0
-      }
-      data-roll-normalization-suggestion-state={
-        isBatchPlanAccepted && rollNormalizationPlan.autoDensitySuggestionRun !== null
-          ? 'accepted_into_plan'
-          : (rollNormalizationPlan.autoDensitySuggestionRun?.state ?? 'suggested_only')
-      }
-      data-roll-normalization-exposure-delta={rollNormalizationPlan.proposedExposureDeltaEv}
-      data-roll-normalization-mode={rollNormalizationPlan.mode}
-      data-roll-normalization-positive-count={rollNormalizationPlan.positiveVariantIds.length}
-      data-roll-normalization-unaffected-count={rollNormalizationPlan.unaffectedFrameIds.length}
-      data-roll-normalization-white-balance-delta={rollNormalizationPlan.proposedWhiteBalanceDelta}
-      data-skipped-frame-count={batchDryRunSummary.skippedFrameIds.length}
-      data-testid="negative-lab-batch-readiness"
-    >
-      <div className="flex items-center justify-between gap-2">
-        <UiText variant={TextVariants.small} className="font-medium text-text-primary">
-          {t('modals.negativeConversion.batchReadiness')}
-        </UiText>
-        <UiText data-testid="negative-lab-queued-count" variant={TextVariants.small} className="text-text-tertiary">
-          {t('modals.negativeConversion.queuedScans', { queuedCount: pathsToConvert.length })}
-        </UiText>
+  const renderBatchReadiness = () => {
+    const printCurveV2Params = params.print_curve_v2 ?? DEFAULT_NEGATIVE_LAB_PRINT_CURVE_V2_PARAMS;
+    const isPrintCurveV2 = params.print_curve_algorithm === 'negative_density_print_v2';
+    const crosstalkProfile = selectedProfileSnapshot?.crosstalkProfile ?? null;
+    const crosstalkState =
+      selectedProfile?.filmClass === 'black_and_white_silver'
+        ? 'hidden_for_bw'
+        : crosstalkProfile === null
+          ? 'identity'
+          : crosstalkProfile.provenance;
+    const autoSuggestionState =
+      isBatchPlanAccepted && rollNormalizationPlan.autoDensitySuggestionRun !== null
+        ? 'accepted_into_plan'
+        : (rollNormalizationPlan.autoDensitySuggestionRun?.state ?? 'suggested_only');
+
+    return (
+      <div
+        className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+        data-planned-apply-count={batchDryRunSummary.plannedApplyCount}
+        data-review-count={dustScratchReviewReport.reviewCount}
+        data-roll-normalization-affected-count={rollNormalizationPlan.affectedFrameIds.length}
+        data-roll-normalization-suggestion-count={
+          rollNormalizationPlan.autoDensitySuggestionRun?.frameSuggestions.length ?? 0
+        }
+        data-roll-normalization-suggestion-state={
+          isBatchPlanAccepted && rollNormalizationPlan.autoDensitySuggestionRun !== null
+            ? 'accepted_into_plan'
+            : (rollNormalizationPlan.autoDensitySuggestionRun?.state ?? 'suggested_only')
+        }
+        data-roll-normalization-exposure-delta={rollNormalizationPlan.proposedExposureDeltaEv}
+        data-roll-normalization-mode={rollNormalizationPlan.mode}
+        data-roll-normalization-positive-count={rollNormalizationPlan.positiveVariantIds.length}
+        data-roll-normalization-unaffected-count={rollNormalizationPlan.unaffectedFrameIds.length}
+        data-roll-normalization-white-balance-delta={rollNormalizationPlan.proposedWhiteBalanceDelta}
+        data-skipped-frame-count={batchDryRunSummary.skippedFrameIds.length}
+        data-testid="negative-lab-batch-readiness"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <UiText variant={TextVariants.small} className="font-medium text-text-primary">
+            {t('modals.negativeConversion.batchReadiness')}
+          </UiText>
+          <UiText data-testid="negative-lab-queued-count" variant={TextVariants.small} className="text-text-tertiary">
+            {t('modals.negativeConversion.queuedScans', { queuedCount: pathsToConvert.length })}
+          </UiText>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <span
+            className="rounded-sm bg-bg-secondary px-2 py-1 text-text-secondary"
+            data-testid="negative-lab-preview-status"
+          >
+            {previewUrl === null
+              ? t('modals.negativeConversion.previewPending')
+              : t('modals.negativeConversion.previewReady')}
+          </span>
+          <span
+            className="rounded-sm bg-bg-secondary px-2 py-1 text-text-secondary"
+            data-testid="negative-lab-base-status"
+          >
+            {baseFogConfidence === null
+              ? t('modals.negativeConversion.basePending')
+              : t('modals.negativeConversion.baseReady', { confidence: Math.round(baseFogConfidence * 100) })}
+          </span>
+          <span
+            className="rounded-sm bg-bg-secondary px-2 py-1 text-text-secondary"
+            data-testid="negative-lab-included-status"
+          >
+            {t('modals.negativeConversion.includedScans', { includedCount: includedPathSet.size })}
+          </span>
+        </div>
+        <div
+          className="rounded-md border border-surface bg-bg-secondary p-2"
+          data-algorithm={params.print_curve_algorithm}
+          data-auto-suggestion-state={autoSuggestionState}
+          data-crosstalk-state={crosstalkState}
+          data-density-range-state={baseFogConfidence === null ? 'pending_base' : 'ready'}
+          data-preview-export-parity-state={workspaceProof.exportReady ? 'ready_for_receipt' : 'blocked'}
+          data-print-curve-v2={String(isPrintCurveV2)}
+          data-testid="negative-lab-v2-qc-readouts"
+        >
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <UiText variant={TextVariants.small} className="font-medium text-text-primary">
+              {t('modals.negativeConversion.v2QcReadouts')}
+            </UiText>
+            <button
+              aria-pressed={isPrintCurveV2}
+              className={cx(
+                'rounded border px-2 py-1 text-[11px] transition-colors',
+                isPrintCurveV2
+                  ? 'border-accent bg-accent/10 text-text-primary'
+                  : 'border-surface bg-bg-primary text-text-secondary hover:bg-surface',
+              )}
+              data-testid="negative-lab-v2-algorithm-toggle"
+              onClick={() => {
+                handleSetPrintCurveV2Enabled(!isPrintCurveV2);
+              }}
+              type="button"
+            >
+              {isPrintCurveV2
+                ? t('modals.negativeConversion.v2AlgorithmEnabled')
+                : t('modals.negativeConversion.v2AlgorithmDisabled')}
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-[11px] text-text-secondary">
+            <span className="rounded bg-bg-primary px-2 py-1" data-testid="negative-lab-v2-crosstalk-status">
+              {t('modals.negativeConversion.v2CrosstalkStatus', { state: crosstalkState })}
+            </span>
+            <span className="rounded bg-bg-primary px-2 py-1" data-testid="negative-lab-v2-auto-suggestion-status">
+              {t('modals.negativeConversion.v2AutoSuggestionStatus', { state: autoSuggestionState })}
+            </span>
+            <span className="rounded bg-bg-primary px-2 py-1" data-testid="negative-lab-v2-density-range-status">
+              {t('modals.negativeConversion.v2DensityRangeStatus', {
+                confidence: baseFogConfidence === null ? 0 : Math.round(baseFogConfidence * 100),
+              })}
+            </span>
+            <span className="rounded bg-bg-primary px-2 py-1" data-testid="negative-lab-v2-preview-export-status">
+              {workspaceProof.exportReady
+                ? t('modals.negativeConversion.v2PreviewExportReady')
+                : t('modals.negativeConversion.v2PreviewExportBlocked')}
+            </span>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2" data-testid="negative-lab-v2-print-curve-controls">
+            <Slider
+              defaultValue={1}
+              disabled={!isPrintCurveV2 || isSaving}
+              fillOrigin="min"
+              label={t('modals.negativeConversion.v2ContrastGrade')}
+              max={2}
+              min={0.5}
+              onChange={(event) => {
+                handlePrintCurveV2ParamChange('contrast_grade', Number(event.target.value));
+              }}
+              step={0.05}
+              value={printCurveV2Params.contrast_grade}
+            />
+            <Slider
+              defaultValue={0.25}
+              disabled={!isPrintCurveV2 || isSaving}
+              fillOrigin="min"
+              label={t('modals.negativeConversion.v2ToeStrength')}
+              max={1}
+              min={0}
+              onChange={(event) => {
+                handlePrintCurveV2ParamChange('toe_strength', Number(event.target.value));
+              }}
+              step={0.05}
+              value={printCurveV2Params.toe_strength}
+            />
+            <Slider
+              defaultValue={0.25}
+              disabled={!isPrintCurveV2 || isSaving}
+              fillOrigin="min"
+              label={t('modals.negativeConversion.v2ShoulderStrength')}
+              max={1}
+              min={0}
+              onChange={(event) => {
+                handlePrintCurveV2ParamChange('shoulder_strength', Number(event.target.value));
+              }}
+              step={0.05}
+              value={printCurveV2Params.shoulder_strength}
+            />
+            <Slider
+              defaultValue={0}
+              disabled={!isPrintCurveV2 || isSaving}
+              label={t('modals.negativeConversion.v2DensityOffset')}
+              max={0.5}
+              min={-0.5}
+              onChange={(event) => {
+                handlePrintCurveV2ParamChange('density_offset', Number(event.target.value));
+              }}
+              step={0.05}
+              value={printCurveV2Params.density_offset}
+            />
+          </div>
+        </div>
+        <NegativeLabRollHealthPanel
+          approvedQcFrameIds={approvedQcFrameIds}
+          batchApplyFrameCount={batchApplyFrameCount}
+          batchDryRunSummary={batchDryRunSummary}
+          batchReviewFrameCount={batchReviewFrameCount}
+          batchSkippedFrameCount={batchSkippedFrameCount}
+          frameExposureOffsetByFrameId={frameExposureOffsetByFrameId}
+          frameHealthFilter={frameHealthFilter}
+          frameHealthReport={frameHealthReport}
+          frameHealthSort={frameHealthSort}
+          frameRgbBalanceOffsetByFrameId={frameRgbBalanceOffsetByFrameId}
+          handleAcceptBatchPlan={handleAcceptBatchPlan}
+          handleApplyRollNormalizationPlan={handleApplyRollNormalizationPlan}
+          handleCopyBatchPlan={handleCopyBatchPlan}
+          handleSetActiveFrameCropStatus={handleSetActiveFrameCropStatus}
+          handleSetQcDecision={handleSetQcDecision}
+          handleSetVisibleQcDecision={handleSetVisibleQcDecision}
+          isBatchPlanAccepted={isBatchPlanAccepted}
+          isBatchPlanCopied={isBatchPlanCopied}
+          isRollNormalizationPlanAccepted={canApplyRollNormalizationPlan}
+          isSaving={isSaving}
+          params={params}
+          qcDecisionByFrameId={qcDecisionByFrameId}
+          rejectedQcFrameIds={rejectedQcFrameIds}
+          rollNormalizationApplyReceipt={visibleRollNormalizationApplyReceipt}
+          rollNormalizationPlan={rollNormalizationPlan}
+          rollWarningCount={rollWarningCount}
+          setFrameHealthFilter={setFrameHealthFilter}
+          setFrameHealthSort={setFrameHealthSort}
+          t={t}
+          visibleFrameHealthRows={visibleFrameHealthRows}
+        />
       </div>
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <span
-          className="rounded-sm bg-bg-secondary px-2 py-1 text-text-secondary"
-          data-testid="negative-lab-preview-status"
-        >
-          {previewUrl === null
-            ? t('modals.negativeConversion.previewPending')
-            : t('modals.negativeConversion.previewReady')}
-        </span>
-        <span
-          className="rounded-sm bg-bg-secondary px-2 py-1 text-text-secondary"
-          data-testid="negative-lab-base-status"
-        >
-          {baseFogConfidence === null
-            ? t('modals.negativeConversion.basePending')
-            : t('modals.negativeConversion.baseReady', { confidence: Math.round(baseFogConfidence * 100) })}
-        </span>
-        <span
-          className="rounded-sm bg-bg-secondary px-2 py-1 text-text-secondary"
-          data-testid="negative-lab-included-status"
-        >
-          {t('modals.negativeConversion.includedScans', { includedCount: includedPathSet.size })}
-        </span>
-      </div>
-      <NegativeLabRollHealthPanel
-        approvedQcFrameIds={approvedQcFrameIds}
-        batchApplyFrameCount={batchApplyFrameCount}
-        batchDryRunSummary={batchDryRunSummary}
-        batchReviewFrameCount={batchReviewFrameCount}
-        batchSkippedFrameCount={batchSkippedFrameCount}
-        frameExposureOffsetByFrameId={frameExposureOffsetByFrameId}
-        frameHealthFilter={frameHealthFilter}
-        frameHealthReport={frameHealthReport}
-        frameHealthSort={frameHealthSort}
-        frameRgbBalanceOffsetByFrameId={frameRgbBalanceOffsetByFrameId}
-        handleAcceptBatchPlan={handleAcceptBatchPlan}
-        handleApplyRollNormalizationPlan={handleApplyRollNormalizationPlan}
-        handleCopyBatchPlan={handleCopyBatchPlan}
-        handleSetActiveFrameCropStatus={handleSetActiveFrameCropStatus}
-        handleSetQcDecision={handleSetQcDecision}
-        handleSetVisibleQcDecision={handleSetVisibleQcDecision}
-        isBatchPlanAccepted={isBatchPlanAccepted}
-        isBatchPlanCopied={isBatchPlanCopied}
-        isRollNormalizationPlanAccepted={canApplyRollNormalizationPlan}
-        isSaving={isSaving}
-        params={params}
-        qcDecisionByFrameId={qcDecisionByFrameId}
-        rejectedQcFrameIds={rejectedQcFrameIds}
-        rollNormalizationApplyReceipt={visibleRollNormalizationApplyReceipt}
-        rollNormalizationPlan={rollNormalizationPlan}
-        rollWarningCount={rollWarningCount}
-        setFrameHealthFilter={setFrameHealthFilter}
-        setFrameHealthSort={setFrameHealthSort}
-        t={t}
-        visibleFrameHealthRows={visibleFrameHealthRows}
-      />
-    </div>
-  );
+    );
+  };
 
   const renderWalkthroughClosure = () => (
     <div
