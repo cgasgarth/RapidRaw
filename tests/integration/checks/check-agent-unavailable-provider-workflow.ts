@@ -8,6 +8,8 @@ import {
   sampleAiEnhancementApplyCommandEnvelopeV1,
   sampleAiEnhancementCommandEnvelopeV1,
 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+import { RawEngineAppServerResponseStatus } from '../../../src/schemas/agentRuntimeSchemas.ts';
+import { buildRawEngineAppServerToolDispatchResponse } from '../../../src/utils/rawEngineAppServerHost.ts';
 
 const failures: string[] = [];
 const context = {
@@ -95,6 +97,23 @@ const [availableAudit] = availableBridge
   .map((event) => rawEngineLocalAppServerAuditEventV1Schema.parse(event));
 if (availableAudit?.status !== 'completed' || availableAudit.providerFallback !== undefined) {
   failures.push('Available provider dry-run must complete without fallback metadata.');
+}
+
+const unavailableAgentTool = await buildRawEngineAppServerToolDispatchResponse({
+  arguments: {
+    operationId: 'agent_layer_mask_unavailable_tool',
+    requestId: 'request-agent-layer-mask-unavailable-tool',
+    sessionId: 'agent-layer-mask-unavailable-tool',
+  },
+  requestId: 'request-agent-layer-mask-unavailable-tool',
+  runtimeToolName: 'rawengine.agent.layer_mask.unavailable_tool',
+});
+if (
+  unavailableAgentTool.status !== RawEngineAppServerResponseStatus.Ok ||
+  unavailableAgentTool.dispatchStatus !== 'rejected' ||
+  !unavailableAgentTool.message?.includes('not an approved typed agent app-server tool')
+) {
+  failures.push('Unavailable typed agent layer/mask tool must be rejected before dispatch.');
 }
 
 if (failures.length > 0) {

@@ -2,6 +2,9 @@ import {
   AGENT_LAYER_CREATE_INPUT_SCHEMA_NAME,
   AGENT_LAYER_CREATE_OUTPUT_SCHEMA_NAME,
   AGENT_LAYER_CREATE_TOOL_NAME,
+  AGENT_LAYER_SCOPED_ADJUST_INPUT_SCHEMA_NAME,
+  AGENT_LAYER_SCOPED_ADJUST_OUTPUT_SCHEMA_NAME,
+  AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_INPUT_SCHEMA_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_OUTPUT_SCHEMA_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
@@ -27,7 +30,12 @@ export interface AgentLocalLayerCoverageEntry {
   rollbackProof: readonly string[];
   runtimeCheckScript: string;
   status: AgentLocalLayerCoverageStatus;
-  surface: 'brush_mask' | 'layer_create' | 'object_prompt_mask' | 'retouch_clone_heal_remove';
+  surface:
+    | 'brush_mask'
+    | 'layer_create'
+    | 'layer_scoped_adjustment'
+    | 'object_prompt_mask'
+    | 'retouch_clone_heal_remove';
   toolName: string;
 }
 
@@ -44,6 +52,19 @@ export const AGENT_LOCAL_LAYER_COVERAGE_MATRIX = [
     status: 'covered',
     surface: 'layer_create',
     toolName: AGENT_LAYER_CREATE_TOOL_NAME,
+  },
+  {
+    applyPath: 'applyAgentLayerScopedAdjustments',
+    commandTypes: ['layerMask.applyLayerAdjustment'],
+    inputSchemaName: AGENT_LAYER_SCOPED_ADJUST_INPUT_SCHEMA_NAME,
+    outputSchemaName: AGENT_LAYER_SCOPED_ADJUST_OUTPUT_SCHEMA_NAME,
+    previewProof: ['beforePreviewHash', 'afterPreviewHash', 'overlayPreview.artifact', 'overlayPreview.recipeHash'],
+    receiptFields: ['layerId', 'adjustedFields', 'appliedGraphRevision', 'undoGraphRevision'],
+    rollbackProof: ['undoGraphRevision', 'historyIndex increments by one'],
+    runtimeCheckScript: 'check:agent-layer-mask-tools',
+    status: 'covered',
+    surface: 'layer_scoped_adjustment',
+    toolName: AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME,
   },
   {
     applyPath: 'applyAgentBrushMaskCreateOrUpdate',

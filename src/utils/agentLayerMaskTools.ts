@@ -6,6 +6,7 @@ import {
   type MaskContainer,
   type MaskAdjustments,
 } from './adjustments';
+import { agentApprovalStateSchema, assertAgentApprovalGate } from './agentApprovalGate';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import { stableAgentPreviewHash } from './agentPreviewEnvelope';
 import { pushEditHistoryEntry } from './editHistory';
@@ -26,11 +27,14 @@ import { useEditorStore } from '../store/useEditorStore';
 
 export const AGENT_LAYER_CREATE_TOOL_NAME = 'rawengine.agent.layer.create';
 export const AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME = 'rawengine.agent.mask.create_or_update';
+export const AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME = 'rawengine.agent.layer.adjustments.apply';
 export const AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME = 'rawengine.agent.object_selection.apply';
 export const AGENT_LAYER_CREATE_INPUT_SCHEMA_NAME = 'AgentLayerCreateRequestV1';
 export const AGENT_LAYER_CREATE_OUTPUT_SCHEMA_NAME = 'AgentLayerCreateResponseV1';
 export const AGENT_MASK_CREATE_OR_UPDATE_INPUT_SCHEMA_NAME = 'AgentMaskCreateOrUpdateRequestV1';
 export const AGENT_MASK_CREATE_OR_UPDATE_OUTPUT_SCHEMA_NAME = 'AgentMaskCreateOrUpdateResponseV1';
+export const AGENT_LAYER_SCOPED_ADJUST_INPUT_SCHEMA_NAME = 'AgentLayerScopedAdjustRequestV1';
+export const AGENT_LAYER_SCOPED_ADJUST_OUTPUT_SCHEMA_NAME = 'AgentLayerScopedAdjustResponseV1';
 export const AGENT_OBJECT_SELECTION_APPLY_INPUT_SCHEMA_NAME = 'AgentObjectSelectionApplyRequestV1';
 export const AGENT_OBJECT_SELECTION_APPLY_OUTPUT_SCHEMA_NAME = 'AgentObjectSelectionApplyResponseV1';
 
@@ -95,10 +99,33 @@ const agentLayerMaskOverlayPreviewSchema = z
   })
   .strict();
 
+const agentLayerMaskApplyReceiptSchema = z
+  .object({
+    appliedGraphRevision: z.string().trim().min(1),
+    approvalId: z.string().trim().min(1).optional(),
+    commandId: z.string().trim().min(1),
+    commandType: z.string().trim().min(1),
+    dryRunPlanId: z.string().trim().min(1),
+    operationId: z.string().trim().min(1),
+    rollbackGraphRevision: z.string().trim().min(1),
+    sessionId: z.string().trim().min(1),
+  })
+  .strict();
+
+const agentLayerMaskRollbackTargetSchema = z
+  .object({
+    graphRevision: z.string().trim().min(1),
+    historyIndex: z.number().int().min(0),
+    previewUrl: z.string().nullable(),
+  })
+  .strict();
+
 export const agentLayerCreateRequestSchema = z
   .object({
     adjustments: layerScopedToneAdjustmentV1Schema.optional(),
+    approval: agentApprovalStateSchema.optional(),
     blendMode: layerMaskBlendModeV1Schema.default(DEFAULT_LAYER_BLEND_MODE),
+    dryRun: z.boolean(),
     expectedRecipeHash: z.string().trim().min(1),
     layerId: idSegmentSchema.optional(),
     name: z.string().trim().min(1).max(80),
@@ -112,6 +139,8 @@ export const agentLayerCreateRequestSchema = z
 
 export const agentMaskCreateOrUpdateRequestSchema = z
   .object({
+    approval: agentApprovalStateSchema.optional(),
+    dryRun: z.boolean(),
     expectedRecipeHash: z.string().trim().min(1),
     layerId: idSegmentSchema,
     maskId: idSegmentSchema.optional(),
@@ -120,6 +149,19 @@ export const agentMaskCreateOrUpdateRequestSchema = z
     requestId: z.string().trim().min(1),
     sessionId: z.string().trim().min(1),
     strokes: z.array(layerMaskBrushStrokeV1Schema).min(1).max(16),
+  })
+  .strict();
+
+export const agentLayerScopedAdjustRequestSchema = z
+  .object({
+    adjustments: layerScopedToneAdjustmentV1Schema,
+    approval: agentApprovalStateSchema.optional(),
+    dryRun: z.boolean(),
+    expectedRecipeHash: z.string().trim().min(1),
+    layerId: idSegmentSchema,
+    operationId: idSegmentSchema,
+    requestId: z.string().trim().min(1),
+    sessionId: z.string().trim().min(1),
   })
   .strict();
 
@@ -166,8 +208,11 @@ export const agentLayerCreateResponseSchema = z
     beforePreviewHash: z.string().trim().min(1),
     layerId: z.string().trim().min(1),
     layerName: z.string().trim().min(1),
-    requestId: z.string().trim().min(1),
+    mutates: z.boolean(),
     overlayPreview: agentLayerMaskOverlayPreviewSchema,
+    receipt: agentLayerMaskApplyReceiptSchema.optional(),
+    requestId: z.string().trim().min(1),
+    rollbackTarget: agentLayerMaskRollbackTargetSchema.optional(),
     staleRecipeHash: z.literal(false),
     toolName: z.literal(AGENT_LAYER_CREATE_TOOL_NAME),
     undoGraphRevision: z.string().trim().min(1),
@@ -182,10 +227,31 @@ export const agentMaskCreateOrUpdateResponseSchema = z
     layerId: z.string().trim().min(1),
     maskContentHash: z.string().trim().min(1),
     maskId: z.string().trim().min(1),
+    mutates: z.boolean(),
     overlayPreview: agentLayerMaskOverlayPreviewSchema,
+    receipt: agentLayerMaskApplyReceiptSchema.optional(),
     requestId: z.string().trim().min(1),
+    rollbackTarget: agentLayerMaskRollbackTargetSchema.optional(),
     staleRecipeHash: z.literal(false),
     toolName: z.literal(AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME),
+    undoGraphRevision: z.string().trim().min(1),
+  })
+  .strict();
+
+export const agentLayerScopedAdjustResponseSchema = z
+  .object({
+    adjustedFields: z.array(z.string().trim().min(1)).min(1),
+    afterPreviewHash: z.string().trim().min(1),
+    appliedGraphRevision: z.string().trim().min(1),
+    beforePreviewHash: z.string().trim().min(1),
+    layerId: z.string().trim().min(1),
+    mutates: z.boolean(),
+    overlayPreview: agentLayerMaskOverlayPreviewSchema,
+    receipt: agentLayerMaskApplyReceiptSchema.optional(),
+    requestId: z.string().trim().min(1),
+    rollbackTarget: agentLayerMaskRollbackTargetSchema.optional(),
+    staleRecipeHash: z.literal(false),
+    toolName: z.literal(AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME),
     undoGraphRevision: z.string().trim().min(1),
   })
   .strict();
@@ -211,6 +277,8 @@ export type AgentLayerCreateRequest = z.infer<typeof agentLayerCreateRequestSche
 export type AgentLayerCreateResponse = z.infer<typeof agentLayerCreateResponseSchema>;
 export type AgentMaskCreateOrUpdateRequest = z.infer<typeof agentMaskCreateOrUpdateRequestSchema>;
 export type AgentMaskCreateOrUpdateResponse = z.infer<typeof agentMaskCreateOrUpdateResponseSchema>;
+export type AgentLayerScopedAdjustRequest = z.infer<typeof agentLayerScopedAdjustRequestSchema>;
+export type AgentLayerScopedAdjustResponse = z.infer<typeof agentLayerScopedAdjustResponseSchema>;
 export type AgentObjectSelectionApplyRequest = z.infer<typeof agentObjectSelectionApplyRequestSchema>;
 export type AgentObjectSelectionApplyResponse = z.infer<typeof agentObjectSelectionApplyResponseSchema>;
 export type AgentLayerMaskOverlayPreview = z.infer<typeof agentLayerMaskOverlayPreviewSchema>;
@@ -249,6 +317,74 @@ const ensureFreshRecipe = (expectedRecipeHash: string): ReturnType<typeof buildA
   }
   return snapshot;
 };
+
+const assertApprovedLayerMaskApply = ({
+  approval,
+  operation,
+  sessionId,
+  snapshot,
+}: {
+  approval: z.infer<typeof agentApprovalStateSchema> | undefined;
+  operation: string;
+  sessionId: string;
+  snapshot: ReturnType<typeof buildAgentImageContextSnapshot>;
+}): z.infer<typeof agentApprovalStateSchema> => {
+  if (approval === undefined) throw new Error(`Agent ${operation} requires approved backend approval state.`);
+  return assertAgentApprovalGate({
+    approval,
+    expectedGraphRevision: snapshot.graphRevision,
+    expectedRecipeHash: snapshot.initialPreview.recipeHash,
+    expectedSessionId: sessionId,
+    operation,
+    selectedImagePath: snapshot.activeImagePath,
+  });
+};
+
+const buildPredictedPreviewHash = (beforeHash: string, seed: unknown): string =>
+  `agent-preview:${stableAgentPreviewHash(JSON.stringify({ beforeHash, seed }))}`;
+
+const buildDryRunPlanId = (operationId: string, seed: unknown): string =>
+  `dry_run_layer_mask_${operationId}_${stableAgentPreviewHash(JSON.stringify(seed))}`;
+
+const buildApplyReceipt = ({
+  appliedGraphRevision,
+  approvalId,
+  commandId,
+  commandType,
+  dryRunPlanId,
+  operationId,
+  rollbackGraphRevision,
+  sessionId,
+}: {
+  appliedGraphRevision: string;
+  approvalId?: string;
+  commandId: string;
+  commandType: string;
+  dryRunPlanId: string;
+  operationId: string;
+  rollbackGraphRevision: string;
+  sessionId: string;
+}): z.infer<typeof agentLayerMaskApplyReceiptSchema> =>
+  agentLayerMaskApplyReceiptSchema.parse({
+    appliedGraphRevision,
+    ...(approvalId === undefined ? {} : { approvalId }),
+    commandId,
+    commandType,
+    dryRunPlanId,
+    operationId,
+    rollbackGraphRevision,
+    sessionId,
+  });
+
+const buildRollbackTarget = (
+  graphRevision: string,
+  state: ReturnType<typeof useEditorStore.getState>,
+): z.infer<typeof agentLayerMaskRollbackTargetSchema> =>
+  agentLayerMaskRollbackTargetSchema.parse({
+    graphRevision,
+    historyIndex: state.historyIndex,
+    previewUrl: state.finalPreviewUrl,
+  });
 
 const makeLayer = (request: z.infer<typeof agentLayerCreateRequestSchema>): MaskContainer => ({
   adjustments: toMaskAdjustments(request.adjustments),
@@ -338,10 +474,51 @@ export const applyAgentLayerCreate = (request: AgentLayerCreateRequest): AgentLa
   const state = useEditorStore.getState();
   const selectedImage = state.selectedImage;
   if (selectedImage === null) throw new Error('Agent layer create requires a selected image.');
+  const layer = makeLayer(parsedRequest);
+  const undoGraphRevision = beforeSnapshot.graphRevision;
+  const dryRunPlanId = buildDryRunPlanId(parsedRequest.operationId, { layer, toolName: AGENT_LAYER_CREATE_TOOL_NAME });
+  const predictedHash = buildPredictedPreviewHash(beforeSnapshot.initialPreview.renderHash, { dryRunPlanId, layer });
+
+  if (parsedRequest.dryRun) {
+    return agentLayerCreateResponseSchema.parse({
+      afterPreviewHash: predictedHash,
+      appliedGraphRevision: beforeSnapshot.graphRevision,
+      beforePreviewHash: beforeSnapshot.initialPreview.renderHash,
+      layerId: layer.id,
+      layerName: parsedRequest.name,
+      mutates: false,
+      overlayPreview: {
+        artifact: buildOverlayArtifact({
+          contentSeed: { dryRunPlanId, layer, operationId: parsedRequest.operationId },
+          height: beforeSnapshot.initialPreview.height,
+          layerId: layer.id,
+          operationId: parsedRequest.operationId,
+          width: beforeSnapshot.initialPreview.width,
+        }),
+        layerId: layer.id,
+        opacity: layer.opacity,
+        recipeHash: beforeSnapshot.initialPreview.recipeHash,
+        renderHash: predictedHash,
+        visible: layer.visible,
+      },
+      requestId: parsedRequest.requestId,
+      staleRecipeHash: false,
+      toolName: AGENT_LAYER_CREATE_TOOL_NAME,
+      undoGraphRevision,
+    });
+  }
+
+  const approval = assertApprovedLayerMaskApply({
+    approval: parsedRequest.approval,
+    operation: 'layer create',
+    sessionId: parsedRequest.sessionId,
+    snapshot: beforeSnapshot,
+  });
+  const rollbackTarget = buildRollbackTarget(undoGraphRevision, state);
 
   const result = applyLayerStackCommandBridgeOperation(
     state.adjustments.masks,
-    { layer: makeLayer(parsedRequest), type: 'create' },
+    { layer, type: 'create' },
     {
       graphRevision: beforeSnapshot.graphRevision,
       imagePath: selectedImage.path,
@@ -349,7 +526,6 @@ export const applyAgentLayerCreate = (request: AgentLayerCreateRequest): AgentLa
       sessionId: parsedRequest.sessionId,
     },
   );
-  const undoGraphRevision = beforeSnapshot.graphRevision;
   pushMaskHistory(result.masks);
   const layerId = result.commandResult.changedLayerIds[0] ?? result.masks[0]?.id;
   if (layerId === undefined) throw new Error('Agent layer create did not return a layer id.');
@@ -364,13 +540,25 @@ export const applyAgentLayerCreate = (request: AgentLayerCreateRequest): AgentLa
     beforePreviewHash: beforeSnapshot.initialPreview.renderHash,
     layerId,
     layerName: parsedRequest.name,
+    mutates: true,
     overlayPreview: buildOverlayPreview({
       afterSnapshot,
       contentSeed: { layer: overlayLayer, operationId: parsedRequest.operationId },
       layer: overlayLayer,
       operationId: parsedRequest.operationId,
     }),
+    receipt: buildApplyReceipt({
+      appliedGraphRevision: afterSnapshot.graphRevision,
+      approvalId: approval.approvalId,
+      commandId: result.command.commandId,
+      commandType: result.command.commandType,
+      dryRunPlanId,
+      operationId: parsedRequest.operationId,
+      rollbackGraphRevision: undoGraphRevision,
+      sessionId: parsedRequest.sessionId,
+    }),
     requestId: parsedRequest.requestId,
+    rollbackTarget,
     staleRecipeHash: false,
     toolName: AGENT_LAYER_CREATE_TOOL_NAME,
     undoGraphRevision,
@@ -479,14 +667,63 @@ export const applyAgentBrushMaskCreateOrUpdate = (
   const dryRunCommand = buildBrushMaskCommand(parsedRequest, true, beforeSnapshot.graphRevision, selectedImage.path);
   const dryRunResult = runtime.dispatch(dryRunCommand, { height, width });
   if (!dryRunResult.dryRun) throw new Error('Agent mask create/update expected a dry-run result.');
+  const maskId = parsedRequest.maskId ?? `mask_brush_${toIdSegment(parsedRequest.operationId)}`;
+  const maskContentHash = dryRunResult.maskArtifacts[0]?.contentHash;
+  if (maskContentHash === undefined) throw new Error('Agent mask create/update did not return mask artifact proof.');
+  const dryRunPlanId = buildDryRunPlanId(parsedRequest.operationId, {
+    maskContentHash,
+    maskId,
+    strokes: parsedRequest.strokes,
+    toolName: AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
+  });
+  const predictedHash = buildPredictedPreviewHash(beforeSnapshot.initialPreview.renderHash, {
+    dryRunPlanId,
+    maskContentHash,
+  });
+
+  if (parsedRequest.dryRun) {
+    return agentMaskCreateOrUpdateResponseSchema.parse({
+      afterPreviewHash: predictedHash,
+      appliedGraphRevision: beforeSnapshot.graphRevision,
+      beforePreviewHash: beforeSnapshot.initialPreview.renderHash,
+      layerId: parsedRequest.layerId,
+      maskContentHash,
+      maskId,
+      mutates: false,
+      overlayPreview: {
+        artifact: buildOverlayArtifact({
+          contentSeed: { dryRunPlanId, maskContentHash, operationId: parsedRequest.operationId },
+          height: beforeSnapshot.initialPreview.height,
+          layerId: targetLayer.id,
+          maskId,
+          operationId: parsedRequest.operationId,
+          width: beforeSnapshot.initialPreview.width,
+        }),
+        layerId: targetLayer.id,
+        maskId,
+        opacity: targetLayer.opacity,
+        recipeHash: beforeSnapshot.initialPreview.recipeHash,
+        renderHash: predictedHash,
+        visible: targetLayer.visible,
+      },
+      requestId: parsedRequest.requestId,
+      staleRecipeHash: false,
+      toolName: AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
+      undoGraphRevision: beforeSnapshot.graphRevision,
+    });
+  }
+
+  const approval = assertApprovedLayerMaskApply({
+    approval: parsedRequest.approval,
+    operation: 'mask create/update',
+    sessionId: parsedRequest.sessionId,
+    snapshot: beforeSnapshot,
+  });
+  const rollbackTarget = buildRollbackTarget(beforeSnapshot.graphRevision, state);
   const applyCommand = buildBrushMaskCommand(parsedRequest, false, beforeSnapshot.graphRevision, selectedImage.path);
   const mutation = runtime.dispatch(applyCommand, { height, width });
   if (mutation.dryRun) throw new Error('Agent mask create/update expected a mutation result.');
 
-  const maskId =
-    parsedRequest.maskId ?? mutation.changedMaskIds[0] ?? `mask_brush_${toIdSegment(parsedRequest.operationId)}`;
-  const maskContentHash = dryRunResult.maskArtifacts[0]?.contentHash;
-  if (maskContentHash === undefined) throw new Error('Agent mask create/update did not return mask artifact proof.');
   const subMask: SubMask = {
     id: maskId,
     invert: false,
@@ -527,6 +764,7 @@ export const applyAgentBrushMaskCreateOrUpdate = (
     layerId: parsedRequest.layerId,
     maskContentHash,
     maskId,
+    mutates: true,
     overlayPreview: buildOverlayPreview({
       afterSnapshot,
       contentSeed: { maskContentHash, operationId: parsedRequest.operationId, strokes: parsedRequest.strokes },
@@ -534,10 +772,139 @@ export const applyAgentBrushMaskCreateOrUpdate = (
       maskId,
       operationId: parsedRequest.operationId,
     }),
+    receipt: buildApplyReceipt({
+      appliedGraphRevision: afterSnapshot.graphRevision,
+      approvalId: approval.approvalId,
+      commandId: applyCommand.commandId,
+      commandType: applyCommand.commandType,
+      dryRunPlanId,
+      operationId: parsedRequest.operationId,
+      rollbackGraphRevision: undoGraphRevision,
+      sessionId: parsedRequest.sessionId,
+    }),
     requestId: parsedRequest.requestId,
+    rollbackTarget,
     staleRecipeHash: false,
     toolName: AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
     undoGraphRevision,
+  });
+};
+
+const layerScopedAdjustmentFields = (
+  adjustments: z.infer<typeof layerScopedToneAdjustmentV1Schema>,
+): Array<keyof z.infer<typeof layerScopedToneAdjustmentV1Schema>> =>
+  (
+    ['blackPoint', 'clarity', 'contrast', 'exposureEv', 'highlights', 'saturation', 'shadows', 'whitePoint'] as const
+  ).filter((key) => adjustments[key] !== 0);
+
+export const applyAgentLayerScopedAdjustments = (
+  request: AgentLayerScopedAdjustRequest,
+): AgentLayerScopedAdjustResponse => {
+  const parsedRequest = agentLayerScopedAdjustRequestSchema.parse(request);
+  const beforeSnapshot = ensureFreshRecipe(parsedRequest.expectedRecipeHash);
+  const state = useEditorStore.getState();
+  const selectedImage = state.selectedImage;
+  if (selectedImage === null) throw new Error('Agent layer scoped adjustment requires a selected image.');
+  const targetLayer = state.adjustments.masks.find((mask) => mask.id === parsedRequest.layerId);
+  if (targetLayer === undefined)
+    throw new Error(`Agent layer scoped adjustment could not find layer ${parsedRequest.layerId}.`);
+
+  const adjustedFields = layerScopedAdjustmentFields(parsedRequest.adjustments);
+  const previewLayer = { ...targetLayer, adjustments: toMaskAdjustments(parsedRequest.adjustments) };
+  const dryRunPlanId = buildDryRunPlanId(parsedRequest.operationId, {
+    adjustments: parsedRequest.adjustments,
+    layerId: parsedRequest.layerId,
+    toolName: AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME,
+  });
+  const predictedHash = buildPredictedPreviewHash(beforeSnapshot.initialPreview.renderHash, {
+    dryRunPlanId,
+    layer: previewLayer,
+  });
+
+  if (parsedRequest.dryRun) {
+    return agentLayerScopedAdjustResponseSchema.parse({
+      adjustedFields,
+      afterPreviewHash: predictedHash,
+      appliedGraphRevision: beforeSnapshot.graphRevision,
+      beforePreviewHash: beforeSnapshot.initialPreview.renderHash,
+      layerId: parsedRequest.layerId,
+      mutates: false,
+      overlayPreview: {
+        artifact: buildOverlayArtifact({
+          contentSeed: { dryRunPlanId, layer: previewLayer, operationId: parsedRequest.operationId },
+          height: beforeSnapshot.initialPreview.height,
+          layerId: parsedRequest.layerId,
+          operationId: parsedRequest.operationId,
+          width: beforeSnapshot.initialPreview.width,
+        }),
+        layerId: parsedRequest.layerId,
+        opacity: previewLayer.opacity,
+        recipeHash: beforeSnapshot.initialPreview.recipeHash,
+        renderHash: predictedHash,
+        visible: previewLayer.visible,
+      },
+      requestId: parsedRequest.requestId,
+      staleRecipeHash: false,
+      toolName: AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME,
+      undoGraphRevision: beforeSnapshot.graphRevision,
+    });
+  }
+
+  const approval = assertApprovedLayerMaskApply({
+    approval: parsedRequest.approval,
+    operation: 'layer scoped adjustment',
+    sessionId: parsedRequest.sessionId,
+    snapshot: beforeSnapshot,
+  });
+  const rollbackTarget = buildRollbackTarget(beforeSnapshot.graphRevision, state);
+  const result = applyLayerStackCommandBridgeOperation(
+    state.adjustments.masks,
+    {
+      layerId: parsedRequest.layerId,
+      toneColor: parsedRequest.adjustments,
+      type: 'applyToneAdjustment',
+    },
+    {
+      graphRevision: beforeSnapshot.graphRevision,
+      imagePath: selectedImage.path,
+      operationId: parsedRequest.operationId,
+      sessionId: parsedRequest.sessionId,
+    },
+  );
+  pushMaskHistory(result.masks);
+  useEditorStore.setState({ activeMaskContainerId: parsedRequest.layerId });
+  const afterSnapshot = buildAgentImageContextSnapshot();
+  const overlayLayer = result.masks.find((mask) => mask.id === parsedRequest.layerId);
+  if (overlayLayer === undefined) throw new Error('Agent layer scoped adjustment could not build an overlay preview.');
+
+  return agentLayerScopedAdjustResponseSchema.parse({
+    adjustedFields,
+    afterPreviewHash: afterSnapshot.initialPreview.renderHash,
+    appliedGraphRevision: afterSnapshot.graphRevision,
+    beforePreviewHash: beforeSnapshot.initialPreview.renderHash,
+    layerId: parsedRequest.layerId,
+    mutates: true,
+    overlayPreview: buildOverlayPreview({
+      afterSnapshot,
+      contentSeed: { adjustments: parsedRequest.adjustments, operationId: parsedRequest.operationId },
+      layer: overlayLayer,
+      operationId: parsedRequest.operationId,
+    }),
+    receipt: buildApplyReceipt({
+      appliedGraphRevision: afterSnapshot.graphRevision,
+      approvalId: approval.approvalId,
+      commandId: result.command.commandId,
+      commandType: result.command.commandType,
+      dryRunPlanId,
+      operationId: parsedRequest.operationId,
+      rollbackGraphRevision: beforeSnapshot.graphRevision,
+      sessionId: parsedRequest.sessionId,
+    }),
+    requestId: parsedRequest.requestId,
+    rollbackTarget,
+    staleRecipeHash: false,
+    toolName: AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME,
+    undoGraphRevision: beforeSnapshot.graphRevision,
   });
 };
 

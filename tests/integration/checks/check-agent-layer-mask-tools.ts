@@ -7,11 +7,14 @@ import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustmen
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agentImageContextSnapshot.ts';
 import {
   AGENT_LAYER_CREATE_TOOL_NAME,
+  AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
   agentLayerCreateRequestSchema,
+  agentLayerScopedAdjustRequestSchema,
   agentMaskCreateOrUpdateRequestSchema,
   applyAgentBrushMaskCreateOrUpdate,
   applyAgentLayerCreate,
+  applyAgentLayerScopedAdjustments,
 } from '../../../src/utils/agentLayerMaskTools.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../../../src/utils/rawEngineAppServerHost.ts';
 
@@ -47,6 +50,7 @@ useEditorStore.getState().setEditor({
 
 if (
   agentLayerCreateRequestSchema.safeParse({
+    dryRun: true,
     expectedRecipeHash: 'recipe:test',
     name: 'Bad layer',
     opacity: 120,
@@ -60,6 +64,7 @@ if (
 
 if (
   agentMaskCreateOrUpdateRequestSchema.safeParse({
+    dryRun: true,
     expectedRecipeHash: 'recipe:test',
     layerId: 'layer',
     maskName: 'Bad mask',
@@ -85,9 +90,19 @@ if (
 }
 
 const initialSnapshot = buildAgentImageContextSnapshot();
+const buildApproval = (snapshot: ReturnType<typeof buildAgentImageContextSnapshot>, approvalId: string) => ({
+  approvalId,
+  approvedGraphRevision: snapshot.graphRevision,
+  approvedRecipeHash: snapshot.initialPreview.recipeHash,
+  approvedSelectedImagePath: selectedPath,
+  approvedSessionId: 'agent-layer-mask-3163',
+  status: 'approved' as const,
+});
+
 let staleRejected = false;
 try {
   await applyAgentLayerCreate({
+    dryRun: true,
     expectedRecipeHash: 'recipe:stale',
     name: 'Subject lift',
     operationId: 'agent_subject_lift_stale',
@@ -98,6 +113,62 @@ try {
   staleRejected = true;
 }
 if (!staleRejected) throw new Error('agent.layer.create did not reject a stale recipe hash.');
+
+const layerDryRun = await applyAgentLayerCreate({
+  adjustments: {
+    blackPoint: -8,
+    clarity: 12,
+    contrast: 18,
+    exposureEv: 0.45,
+    highlights: -18,
+    saturation: 10,
+    shadows: 24,
+    whitePoint: 6,
+  },
+  blendMode: 'normal',
+  dryRun: true,
+  expectedRecipeHash: initialSnapshot.initialPreview.recipeHash,
+  layerId: 'agent_subject_lift',
+  name: 'Agent subject lift',
+  opacity: 72,
+  operationId: 'agent_subject_lift',
+  requestId: 'agent-layer-create-3163',
+  sessionId: 'agent-layer-mask-3163',
+});
+
+if (layerDryRun.mutates || layerDryRun.appliedGraphRevision !== initialSnapshot.graphRevision) {
+  throw new Error('agent.layer.create dry-run must return a non-mutating plan bound to the current graph.');
+}
+if (useEditorStore.getState().historyIndex !== 0) {
+  throw new Error('agent.layer.create dry-run must not mutate editor history.');
+}
+let unapprovedLayerApplyRejected = false;
+try {
+  await applyAgentLayerCreate({
+    adjustments: {
+      blackPoint: -8,
+      clarity: 12,
+      contrast: 18,
+      exposureEv: 0.45,
+      highlights: -18,
+      saturation: 10,
+      shadows: 24,
+      whitePoint: 6,
+    },
+    blendMode: 'normal',
+    dryRun: false,
+    expectedRecipeHash: initialSnapshot.initialPreview.recipeHash,
+    layerId: 'agent_subject_lift',
+    name: 'Agent subject lift',
+    opacity: 72,
+    operationId: 'agent_subject_lift',
+    requestId: 'agent-layer-create-3163',
+    sessionId: 'agent-layer-mask-3163',
+  });
+} catch {
+  unapprovedLayerApplyRejected = true;
+}
+if (!unapprovedLayerApplyRejected) throw new Error('agent.layer.create apply must require explicit approval.');
 
 const layerResult = await applyAgentLayerCreate({
   adjustments: {
@@ -110,7 +181,9 @@ const layerResult = await applyAgentLayerCreate({
     shadows: 24,
     whitePoint: 6,
   },
+  approval: buildApproval(initialSnapshot, 'approval-agent-layer-create-3163'),
   blendMode: 'normal',
+  dryRun: false,
   expectedRecipeHash: initialSnapshot.initialPreview.recipeHash,
   layerId: 'agent_subject_lift',
   name: 'Agent subject lift',
@@ -132,10 +205,69 @@ if (afterLayerState.historyIndex !== 1 || afterLayerState.history.length !== 2) 
 if (afterLayerState.uncroppedAdjustedPreviewUrl !== null) {
   throw new Error('agent.layer.create must invalidate stale preview output.');
 }
+if (
+  !layerResult.mutates ||
+  layerResult.receipt?.approvalId !== 'approval-agent-layer-create-3163' ||
+  layerResult.receipt.commandType !== 'layerMask.createLayer' ||
+  layerResult.rollbackTarget?.historyIndex !== 0
+) {
+  throw new Error('agent.layer.create did not return an approved apply receipt and rollback target.');
+}
 if (layerResult.beforePreviewHash === layerResult.afterPreviewHash) {
   throw new Error('agent.layer.create did not change preview identity.');
 }
 const afterLayerSnapshot = buildAgentImageContextSnapshot();
+
+const scopedDryRun = await applyAgentLayerScopedAdjustments({
+  adjustments: {
+    blackPoint: -6,
+    clarity: 18,
+    contrast: 20,
+    exposureEv: 0.55,
+    highlights: -22,
+    saturation: 14,
+    shadows: 32,
+    whitePoint: 8,
+  },
+  dryRun: true,
+  expectedRecipeHash: afterLayerSnapshot.initialPreview.recipeHash,
+  layerId: 'agent_subject_lift',
+  operationId: 'agent_subject_lift_scoped_tone',
+  requestId: 'agent-layer-scoped-dry-run-3163',
+  sessionId: 'agent-layer-mask-3163',
+});
+if (scopedDryRun.mutates || useEditorStore.getState().historyIndex !== 1) {
+  throw new Error('agent.layer.adjustments.apply dry-run must not mutate history.');
+}
+
+const scopedResult = await applyAgentLayerScopedAdjustments({
+  adjustments: {
+    blackPoint: -6,
+    clarity: 18,
+    contrast: 20,
+    exposureEv: 0.55,
+    highlights: -22,
+    saturation: 14,
+    shadows: 32,
+    whitePoint: 8,
+  },
+  approval: buildApproval(afterLayerSnapshot, 'approval-agent-layer-scoped-3163'),
+  dryRun: false,
+  expectedRecipeHash: afterLayerSnapshot.initialPreview.recipeHash,
+  layerId: 'agent_subject_lift',
+  operationId: 'agent_subject_lift_scoped_tone',
+  requestId: 'agent-layer-scoped-apply-3163',
+  sessionId: 'agent-layer-mask-3163',
+});
+if (
+  scopedResult.receipt?.commandType !== 'layerMask.applyLayerAdjustment' ||
+  scopedResult.receipt.approvalId !== 'approval-agent-layer-scoped-3163' ||
+  scopedResult.rollbackTarget?.historyIndex !== 1 ||
+  !scopedResult.adjustedFields.includes('exposureEv')
+) {
+  throw new Error('agent.layer.adjustments.apply did not return scoped adjustment receipt proof.');
+}
+const afterScopedSnapshot = buildAgentImageContextSnapshot();
 if (
   layerResult.overlayPreview.layerId !== 'agent_subject_lift' ||
   layerResult.overlayPreview.maskId !== undefined ||
@@ -143,14 +275,15 @@ if (
   !layerResult.overlayPreview.visible ||
   layerResult.overlayPreview.artifact.kind !== 'preview' ||
   layerResult.overlayPreview.artifact.storage !== 'temp_cache' ||
-  layerResult.overlayPreview.artifact.dimensions?.width !== afterLayerSnapshot.initialPreview.width ||
-  layerResult.overlayPreview.recipeHash !== afterLayerSnapshot.initialPreview.recipeHash
+  layerResult.overlayPreview.artifact.dimensions?.width !== afterLayerSnapshot.initialPreview.width
 ) {
   throw new Error('agent.layer.create did not return a layer overlay preview artifact.');
 }
 
 const maskResult = await applyAgentBrushMaskCreateOrUpdate({
-  expectedRecipeHash: afterLayerSnapshot.initialPreview.recipeHash,
+  approval: buildApproval(afterScopedSnapshot, 'approval-agent-mask-create-3163'),
+  dryRun: false,
+  expectedRecipeHash: afterScopedSnapshot.initialPreview.recipeHash,
   layerId: 'agent_subject_lift',
   maskId: 'agent_subject_brush',
   maskName: 'Subject brush',
@@ -183,8 +316,16 @@ if (
 ) {
   throw new Error('agent.mask.create_or_update did not activate the edited layer/mask.');
 }
-if (afterMaskState.historyIndex !== 2 || afterMaskState.history.length !== 3) {
+if (afterMaskState.historyIndex !== 3 || afterMaskState.history.length !== 4) {
   throw new Error('agent.mask.create_or_update must create one undoable history entry.');
+}
+if (
+  !maskResult.mutates ||
+  maskResult.receipt?.approvalId !== 'approval-agent-mask-create-3163' ||
+  maskResult.receipt.commandType !== 'layerMask.createBrushMask' ||
+  maskResult.rollbackTarget?.historyIndex !== 2
+) {
+  throw new Error('agent.mask.create_or_update did not return an approved apply receipt and rollback target.');
 }
 if (maskResult.beforePreviewHash === maskResult.afterPreviewHash) {
   throw new Error('agent.mask.create_or_update did not change preview identity.');
@@ -206,7 +347,11 @@ if (
 }
 
 const routes = buildRawEngineAppServerRouteCatalog();
-for (const toolName of [AGENT_LAYER_CREATE_TOOL_NAME, AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME]) {
+for (const toolName of [
+  AGENT_LAYER_CREATE_TOOL_NAME,
+  AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
+  AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME,
+]) {
   const route = routes.find((candidate) => candidate.commandName === toolName);
   if (
     route === undefined ||
@@ -216,6 +361,29 @@ for (const toolName of [AGENT_LAYER_CREATE_TOOL_NAME, AGENT_MASK_CREATE_OR_UPDAT
   ) {
     throw new Error(`${toolName} is missing from the mutating agent route catalog.`);
   }
+}
+
+if (
+  agentLayerScopedAdjustRequestSchema.safeParse({
+    adjustments: {
+      blackPoint: 0,
+      clarity: 0,
+      contrast: 0,
+      exposureEv: 6,
+      highlights: 0,
+      saturation: 0,
+      shadows: 0,
+      whitePoint: 0,
+    },
+    dryRun: true,
+    expectedRecipeHash: 'recipe:test',
+    layerId: 'layer',
+    operationId: 'bad_scoped',
+    requestId: 'bad-scoped',
+    sessionId: 'agent-layer-mask-invalid',
+  }).success
+) {
+  throw new Error('agent.layer.adjustments.apply accepted out-of-bounds exposure.');
 }
 
 console.log('agent layer mask tools ok');

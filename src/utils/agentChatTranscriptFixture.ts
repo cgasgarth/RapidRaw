@@ -321,7 +321,8 @@ const fixture = {
       summary: 'The dry-run was accepted before apply; the apply step targets only the virtual-copy edit graph.',
     },
     id: 'agent-live-prompt-walkthrough-runtime-2844',
-    planSummary: 'Inspect local tools, build a tone/color dry-run, wait for approval, then apply the accepted plan.',
+    planSummary:
+      'Inspect local tools, build tone/color and layer/mask dry-runs, wait for approval, then apply the accepted plan.',
     prompt:
       'Inspect DSC_2844.NEF, warm the scene, lift shadows, protect highlights, preview it, then apply if approved.',
     stages: [
@@ -342,7 +343,7 @@ const fixture = {
         id: 'dry-run',
         label: 'Stage dry-run',
         state: 'completed',
-        summary: 'A non-mutating tone/color dry-run is prepared with before/after artifacts.',
+        summary: 'Non-mutating tone/color and layer/mask dry-runs are prepared with before/after artifacts.',
         toolCallId: 'tool-2',
       },
       {
@@ -356,7 +357,8 @@ const fixture = {
         id: 'apply',
         label: 'Apply accepted plan',
         state: 'completed',
-        summary: 'The approved command is applied to the virtual-copy edit graph and linked to audit evidence.',
+        summary:
+          'The approved tone/color and layer/mask commands are applied to the virtual-copy edit graph and linked to audit evidence.',
         toolCallId: 'tool-3',
       },
     ],
