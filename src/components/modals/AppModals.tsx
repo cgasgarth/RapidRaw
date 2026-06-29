@@ -240,6 +240,7 @@ export default function AppModals(props: AppModalsProps) {
         renderedReview={panoramaModalState.renderedReview}
         runtimePlan={panoramaModalState.runtimePlan}
         settings={panoramaModalState.settings}
+        sourcePaths={panoramaModalState.stitchingSourcePaths}
       />
       <HdrModal
         error={hdrModalState.error}
