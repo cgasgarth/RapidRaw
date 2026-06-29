@@ -1003,8 +1003,15 @@
       },
       "addNewMask": "新增新遮色片",
       "aiPeopleParts": {
+        "classes": "",
         "description": "",
-        "title": ""
+        "model": "",
+        "notAvailable": "",
+        "provenanceTitle": "",
+        "provider": "",
+        "target": "",
+        "title": "",
+        "unknown": ""
       },
       "brush": {
         "brush": "畫筆",

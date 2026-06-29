@@ -15,6 +15,10 @@ const parserSource = readFileSync(resolve('src-tauri/src/person_part_parser.rs')
 const commandSource = readFileSync(resolve('src-tauri/src/ai_commands.rs'), 'utf8');
 const hookSource = readFileSync(resolve('src/hooks/useAiMasking.ts'), 'utf8');
 const maskPanelSource = readFileSync(resolve('src/components/panel/right/Masks.tsx'), 'utf8');
+const maskSettingsSource = readFileSync(resolve('src/components/panel/right/MasksPanel.tsx'), 'utf8');
+const locale = JSON.parse(readFileSync(resolve('src/i18n/locales/en.json'), 'utf8')) as {
+  editor?: { masks?: { aiPeopleParts?: Record<string, unknown> } };
+};
 
 const failures: string[] = [];
 const expectedParts = ['hair', 'clothing'] as const;
@@ -53,8 +57,17 @@ for (const [label, source, marker] of [
   ['command hair route', commandSource, '"clothing" | "hair"'],
   ['hook runtime guard', hookSource, "part === 'clothing' || part === 'hair'"],
   ['mask panel create entry', maskPanelSource, "personPart: 'hair'"],
+  ['mask provenance card', maskSettingsSource, 'data-testid="ai-person-mask-provenance"'],
+  ['mask provenance model', maskSettingsSource, "data-model-id={modelId ?? ''}"],
+  ['mask provenance classes', maskSettingsSource, "data-class-ids={classIds.join(',')}"],
 ] as const) {
   if (!source.includes(marker)) failures.push(`${label}: missing ${marker}`);
+}
+
+for (const key of ['classes', 'model', 'provider', 'provenanceTitle', 'target']) {
+  if (typeof locale.editor?.masks?.aiPeopleParts?.[key] !== 'string') {
+    failures.push(`Missing AI people provenance locale: editor.masks.aiPeopleParts.${key}`);
+  }
 }
 
 if (failures.length > 0) {

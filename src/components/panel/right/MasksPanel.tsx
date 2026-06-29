@@ -497,6 +497,71 @@ const SUB_MASK_CONFIG: Record<Mask, SubMaskConfig> = {
 const parameterLabelFallback = (key: string) =>
   key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase());
 
+const getMaskParameterString = (parameters: unknown, ...keys: Array<string>): string | null => {
+  const record = toMaskParameterRecord(parameters);
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim().length > 0) return value;
+  }
+  return null;
+};
+
+const getAiPersonTargetPart = (parameters: unknown): string | null => {
+  const record = toMaskParameterRecord(parameters);
+  const target = record['target'];
+  if (target && typeof target === 'object' && 'part' in target) {
+    const part = (target as Record<string, unknown>)['part'];
+    if (typeof part === 'string' && part.trim().length > 0) return part;
+  }
+  return getMaskParameterString(parameters, 'targetPart', 'target_part');
+};
+
+function AiPersonMaskProvenance({ parameters }: { parameters: unknown }) {
+  const { t } = useTranslation();
+  const record = toMaskParameterRecord(parameters);
+  const targetPart = getAiPersonTargetPart(parameters);
+  const providerTier = getMaskParameterString(parameters, 'providerTier', 'providerId', 'provider_id');
+  const modelId = getMaskParameterString(parameters, 'modelId', 'model_id');
+  const modelSha256 = getMaskParameterString(parameters, 'modelSha256', 'model_sha256');
+  const classIds = Array.isArray(record['classIds'])
+    ? record['classIds']
+    : Array.isArray(record['class_ids'])
+      ? record['class_ids']
+      : [];
+  const hasMaskData = typeof record['maskDataBase64'] === 'string' || typeof record['mask_data_base64'] === 'string';
+
+  if (targetPart === null && providerTier === null && modelId === null) return null;
+
+  return (
+    <div
+      className="grid gap-1 rounded-md border border-surface bg-bg-secondary p-2 text-[11px]"
+      data-class-ids={classIds.join(',')}
+      data-has-mask-data={String(hasMaskData)}
+      data-model-id={modelId ?? ''}
+      data-model-sha256={modelSha256 ?? ''}
+      data-provider-tier={providerTier ?? ''}
+      data-target-part={targetPart ?? ''}
+      data-testid="ai-person-mask-provenance"
+    >
+      <UiText variant={TextVariants.small} color={TextColors.secondary} className="font-medium">
+        {t('editor.masks.aiPeopleParts.provenanceTitle')}
+      </UiText>
+      <div className="grid grid-cols-2 gap-1">
+        <span className="truncate text-text-tertiary">{t('editor.masks.aiPeopleParts.target')}</span>
+        <span className="truncate text-text-secondary">{targetPart ?? t('editor.masks.aiPeopleParts.unknown')}</span>
+        <span className="truncate text-text-tertiary">{t('editor.masks.aiPeopleParts.provider')}</span>
+        <span className="truncate text-text-secondary">{providerTier ?? t('editor.masks.aiPeopleParts.unknown')}</span>
+        <span className="truncate text-text-tertiary">{t('editor.masks.aiPeopleParts.model')}</span>
+        <span className="truncate text-text-secondary">{modelId ?? t('editor.masks.aiPeopleParts.notAvailable')}</span>
+        <span className="truncate text-text-tertiary">{t('editor.masks.aiPeopleParts.classes')}</span>
+        <span className="truncate text-text-secondary">
+          {classIds.length > 0 ? classIds.join(', ') : t('editor.masks.aiPeopleParts.notAvailable')}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 const BrushTools = ({
   settings,
   onSettingsChange,
@@ -3436,7 +3501,12 @@ function SettingsPanel({
                 />
               )}
 
-              {activeSubMask.type === Mask.AiPerson && <AiPeoplePartPickerStatus />}
+              {activeSubMask.type === Mask.AiPerson && (
+                <>
+                  <AiPeoplePartPickerStatus />
+                  <AiPersonMaskProvenance parameters={activeSubMask.parameters} />
+                </>
+              )}
 
               {objectPromptState !== null && (
                 <ObjectPromptControls

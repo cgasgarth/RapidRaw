@@ -1083,8 +1083,15 @@
       },
       "addNewMask": "Add New Mask",
       "aiPeopleParts": {
-        "description": "Runtime-backed parts are enabled; planned hair and clothing stay disabled until provider proof lands.",
-        "title": "Person part masks"
+        "classes": "Classes",
+        "description": "Runtime-backed person parts are enabled; planned targets stay disabled until provider proof lands.",
+        "model": "Model",
+        "notAvailable": "n/a",
+        "provenanceTitle": "Generated mask provenance",
+        "provider": "Provider",
+        "target": "Target",
+        "title": "Person part masks",
+        "unknown": "Unknown"
       },
       "brush": {
         "brush": "Brush",
