@@ -1,3 +1,7 @@
+import {
+  NEGATIVE_LAB_IDENTITY_CROSSTALK_PROFILE,
+  buildNegativeLabCrosstalkProfile,
+} from './negativeLabCrosstalkProfile';
 import { buildNegativeLabPlanHash } from './negativeLabPlanIdentity';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from './negativeLabPresetCatalog';
 import negativeLabMeasuredProfileCatalogJson from '../data/negativeLabMeasuredProfileCatalog.json';
@@ -45,6 +49,17 @@ export const NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG = {
     negativeLabRuntimeProfileBrowserRowSchema.parse({
       claimLevel: 'user_profile',
       claimPolicy: 'user_profile_no_stock_claim',
+      crosstalkProfile: buildNegativeLabCrosstalkProfile({
+        matrix: [
+          [0.94, 0.04, 0.02],
+          [0.03, 0.94, 0.03],
+          [0.02, 0.05, 0.93],
+        ],
+        profileId: 'negative_lab.crosstalk.user.local_warm_proof.v1',
+        provenance: 'user_owned',
+        schemaVersion: 1,
+        strength: 0.35,
+      }),
       disabledReason: null,
       displayName: 'User profile: Local C-41 warm proof',
       doesNotProve: ['user_profile_unmeasured', 'no_stock_emulation_claim', 'no_colorimetric_match_claim'],
@@ -85,6 +100,7 @@ export const buildNegativeLabRuntimeProfileBrowserRows = (
     negativeLabRuntimeProfileBrowserRowSchema.parse({
       claimLevel: preset.claimLevel,
       claimPolicy: preset.claimPolicy,
+      crosstalkProfile: preset.filmClass === 'black_and_white_silver' ? null : NEGATIVE_LAB_IDENTITY_CROSSTALK_PROFILE,
       disabledReason: null,
       displayName: preset.displayName,
       doesNotProve: ['no_stock_emulation_claim', 'no_colorimetric_match_claim'],
@@ -108,6 +124,10 @@ export const buildNegativeLabRuntimeProfileBrowserRows = (
     return negativeLabRuntimeProfileBrowserRowSchema.parse({
       claimLevel: profile.claimLevel,
       claimPolicy: profile.claimPolicy,
+      crosstalkProfile:
+        profile.filmClass === 'black_and_white_silver'
+          ? null
+          : (profile.crosstalkProfile ?? NEGATIVE_LAB_IDENTITY_CROSSTALK_PROFILE),
       disabledReason,
       displayName: profile.displayName,
       doesNotProve: profile.doesNotProve,
@@ -140,10 +160,13 @@ export const resolveNegativeLabRuntimeProfile = (
     return negativeLabResolvedRuntimeProfileSchema.parse({
       claimLevel: genericPreset.claimLevel,
       claimPolicy: genericPreset.claimPolicy,
+      crosstalkProfile:
+        genericPreset.filmClass === 'black_and_white_silver' ? null : NEGATIVE_LAB_IDENTITY_CROSSTALK_PROFILE,
       displayName: genericPreset.displayName,
       doesNotProve: ['no_stock_emulation_claim', 'no_colorimetric_match_claim'],
       evidenceDigest: null,
       evidenceFixtureIds: [],
+      filmClass: genericPreset.filmClass,
       measurementProfileId: genericPreset.measurementProfileId,
       params: genericPreset.params,
       presetId: genericPreset.presetId,
@@ -160,10 +183,12 @@ export const resolveNegativeLabRuntimeProfile = (
     return negativeLabResolvedRuntimeProfileSchema.parse({
       claimLevel: userProfile.claimLevel,
       claimPolicy: userProfile.claimPolicy,
+      crosstalkProfile: userProfile.crosstalkProfile,
       displayName: userProfile.displayName,
       doesNotProve: userProfile.doesNotProve,
       evidenceDigest: null,
       evidenceFixtureIds: [],
+      filmClass: userProfile.filmClass,
       measurementProfileId: userProfile.measurementProfileId,
       params: userProfile.params,
       presetId: userProfile.presetId,
@@ -185,10 +210,15 @@ export const resolveNegativeLabRuntimeProfile = (
   return negativeLabResolvedRuntimeProfileSchema.parse({
     claimLevel: measuredProfile.claimLevel,
     claimPolicy: measuredProfile.claimPolicy,
+    crosstalkProfile:
+      measuredProfile.filmClass === 'black_and_white_silver'
+        ? null
+        : (measuredProfile.crosstalkProfile ?? NEGATIVE_LAB_IDENTITY_CROSSTALK_PROFILE),
     displayName: measuredProfile.displayName,
     doesNotProve: measuredProfile.doesNotProve,
     evidenceDigest: measuredProfile.evidenceDigest,
     evidenceFixtureIds: measuredProfile.evidenceFixtureIds,
+    filmClass: measuredProfile.filmClass,
     measurementProfileId: measuredProfile.measurementProfileId,
     params: measuredProfile.params,
     presetId: measuredProfile.profileId,
@@ -212,10 +242,12 @@ export const buildNegativeLabRuntimeProfileProvenanceHash = (
   const provenancePayload = {
     claimLevel: profile.claimLevel,
     claimPolicy: profile.claimPolicy,
+    crosstalkProfile: profile.crosstalkProfile,
     displayName: profile.displayName,
     doesNotProve: profile.doesNotProve,
     evidenceDigest: profile.evidenceDigest,
     evidenceFixtureIds: profile.evidenceFixtureIds,
+    filmClass: profile.filmClass,
     measurementProfileId: profile.measurementProfileId,
     params,
     presetId: profile.presetId,
@@ -234,9 +266,11 @@ export const buildNegativeLabRuntimeSelectedProfileSnapshot = (
   negativeLabSelectedProfileSnapshotAppServerSchema.parse({
     claimLevel: profile.claimLevel,
     claimPolicy: profile.claimPolicy,
+    crosstalkProfile: profile.crosstalkProfile,
     displayName: profile.displayName,
     doesNotProve: profile.doesNotProve,
     evidenceFixtureCount: profile.evidenceFixtureIds.length,
+    filmClass: profile.filmClass,
     measurementProfileId: profile.measurementProfileId,
     params: profile.params,
     presetId: profile.presetId,

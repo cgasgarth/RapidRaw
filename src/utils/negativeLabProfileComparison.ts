@@ -55,9 +55,11 @@ export const buildNegativeLabBrowserProfileProvenanceHash = (
     JSON.stringify({
       claimLevel: profile.claimLevel,
       claimPolicy: profile.claimPolicy,
+      crosstalkProfile: profile.crosstalkProfile,
       displayName: profile.displayName,
       doesNotProve: profile.doesNotProve,
       evidenceFixtureCount: profile.evidenceFixtureCount,
+      filmClass: profile.filmClass,
       measurementProfileId: profile.measurementProfileId,
       params: profile.params,
       presetId: profile.presetId,
@@ -74,9 +76,11 @@ export const buildNegativeLabSelectedProfileSnapshot = (
   negativeLabSelectedProfileSnapshotSchema.parse({
     claimLevel: profile.claimLevel,
     claimPolicy: profile.claimPolicy,
+    crosstalkProfile: profile.crosstalkProfile,
     displayName: profile.displayName,
     doesNotProve: profile.doesNotProve,
     evidenceFixtureCount: profile.evidenceFixtureCount,
+    filmClass: profile.filmClass,
     measurementProfileId: profile.measurementProfileId,
     params: profile.params,
     presetId: profile.presetId,

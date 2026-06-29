@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { negativeLabCrosstalkProfileSchema } from './negativeLabCrosstalkProfileSchemas';
 import {
   negativeLabPresetIdSchema,
   negativeLabPresetParamsSchema,
@@ -122,6 +123,7 @@ export const negativeLabMeasuredProfileSchema = z
     claimLevel: z.literal('measured_profile'),
     claimPolicy: negativeLabMeasuredProfileClaimPolicySchema,
     calibrationMethod: negativeLabMeasuredProfileCalibrationMethodSchema,
+    crosstalkProfile: negativeLabCrosstalkProfileSchema.nullable().default(null),
     displayName: z.string().trim().min(1).max(80),
     doesNotProve: z.array(negativeLabMeasuredProfileRuntimeLimitationSchema).min(1),
     evidenceDigest: negativeLabMeasuredProfileEvidenceDigestSchema,
@@ -170,6 +172,14 @@ export const negativeLabMeasuredProfileSchema = z
         code: 'custom',
         message: 'Measured black-and-white profiles must declare the silver-negative process family.',
         path: ['processFamily'],
+      });
+    }
+
+    if (profile.filmClass === 'black_and_white_silver' && profile.crosstalkProfile !== null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab crosstalk profiles are hidden for black-and-white silver negatives.',
+        path: ['crosstalkProfile'],
       });
     }
 
@@ -282,6 +292,7 @@ export const negativeLabRuntimeProfileBrowserRowSchema = z
       'user_profile_no_stock_claim',
     ]),
     disabledReason: z.enum(['catalog_only', 'license_review_required']).nullable(),
+    crosstalkProfile: negativeLabCrosstalkProfileSchema.nullable(),
     displayName: z.string().trim().min(1).max(80),
     doesNotProve: z.array(negativeLabMeasuredProfileRuntimeLimitationSchema),
     evidenceFixtureCount: z.number().int().nonnegative(),
@@ -337,6 +348,14 @@ export const negativeLabRuntimeProfileBrowserRowSchema = z
         message: 'User-owned Negative Lab profile rows must stay claim-limited and tied to a generic base.',
       });
     }
+
+    if (row.filmClass === 'black_and_white_silver' && row.crosstalkProfile !== null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab crosstalk rows must be hidden for black-and-white profiles.',
+        path: ['crosstalkProfile'],
+      });
+    }
   });
 
 export type NegativeLabRuntimeProfileBrowserRow = z.infer<typeof negativeLabRuntimeProfileBrowserRowSchema>;
@@ -351,10 +370,12 @@ export const negativeLabResolvedRuntimeProfileSchema = z
       'named_stock_profile_requires_license_review',
       'user_profile_no_stock_claim',
     ]),
+    crosstalkProfile: negativeLabCrosstalkProfileSchema.nullable(),
     displayName: z.string().trim().min(1).max(80),
     doesNotProve: z.array(negativeLabMeasuredProfileRuntimeLimitationSchema),
     evidenceDigest: negativeLabMeasuredProfileEvidenceDigestSchema.nullable(),
     evidenceFixtureIds: z.array(z.string().trim().min(1)),
+    filmClass: negativeLabUiPresetFilmClassSchema,
     measurementProfileId: negativeLabMeasuredProfileIdSchema.or(negativeLabUserProfileIdSchema).nullable(),
     params: negativeLabPresetParamsSchema,
     presetId: negativeLabRuntimePresetIdSchema,
@@ -415,6 +436,14 @@ export const negativeLabResolvedRuntimeProfileSchema = z
           message: 'User-owned runtime profiles must remain unmeasured and claim-limited.',
         });
       }
+    }
+
+    if (profile.filmClass === 'black_and_white_silver' && profile.crosstalkProfile !== null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab crosstalk runtime profile must be disabled for black-and-white profiles.',
+        path: ['crosstalkProfile'],
+      });
     }
   });
 

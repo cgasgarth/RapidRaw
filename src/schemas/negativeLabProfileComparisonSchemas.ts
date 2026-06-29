@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { negativeLabProfileProvenanceHashSchema } from './negativeLabAppServerSchemas';
+import { negativeLabCrosstalkProfileSchema } from './negativeLabCrosstalkProfileSchemas';
 import {
   negativeLabMeasuredProfileIdSchema,
   negativeLabMeasuredProfileRuntimeLimitationSchema,
@@ -37,9 +38,11 @@ export const negativeLabSelectedProfileSnapshotSchema = z
       'named_stock_profile_requires_license_review',
       'user_profile_no_stock_claim',
     ]),
+    crosstalkProfile: negativeLabCrosstalkProfileSchema.nullable(),
     displayName: z.string().trim().min(1).max(80),
     doesNotProve: z.array(negativeLabMeasuredProfileRuntimeLimitationSchema),
     evidenceFixtureCount: z.number().int().nonnegative(),
+    filmClass: z.enum(['color_negative', 'black_and_white_silver']),
     measurementProfileId: negativeLabMeasuredProfileIdSchema.or(negativeLabUserProfileIdSchema).nullable(),
     params: negativeLabPresetParamsSchema,
     presetId: negativeLabRuntimePresetIdSchema,

@@ -142,9 +142,13 @@ pub struct NegativeLabFrameRgbBalanceOverride {
 pub struct NegativeLabSelectedProfileSnapshot {
     pub claim_level: String,
     pub claim_policy: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub crosstalk_profile: Option<serde_json::Value>,
     pub display_name: String,
     pub does_not_prove: Vec<String>,
     pub evidence_fixture_count: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub film_class: Option<String>,
     pub measurement_profile_id: Option<String>,
     pub params: NegativeConversionParams,
     pub preset_id: String,
@@ -292,6 +296,19 @@ fn default_white_point() -> f32 {
 
 fn default_write_conversion_bundle() -> bool {
     true
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+fn default_negative_lab_identity_crosstalk_profile() -> serde_json::Value {
+    serde_json::json!({
+        "matrix": [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+        "profileId": "negative_lab.crosstalk.identity.rawengine.v1",
+        "provenance": "rawengine_identity_default",
+        "provenanceHash": "fnv1a32:1882ba5c",
+        "schemaVersion": 1,
+        "strength": 0,
+    })
 }
 
 fn default_negative_lab_acquisition_profile() -> NegativeLabAcquisitionProfileSnapshot {
@@ -2703,12 +2720,14 @@ mod tests {
             selected_profile: Some(NegativeLabSelectedProfileSnapshot {
                 claim_level: "measured_profile".to_string(),
                 claim_policy: "process_family_profile_no_stock_claim".to_string(),
+                crosstalk_profile: Some(default_negative_lab_identity_crosstalk_profile()),
                 display_name: "Measured C-41 Process Family".to_string(),
                 does_not_prove: vec![
                     "no_stock_emulation_claim".to_string(),
                     "no_colorimetric_match_claim".to_string(),
                 ],
                 evidence_fixture_count: 1,
+                film_class: Some("color_negative".to_string()),
                 measurement_profile_id: Some(
                     "negative_lab.measured.c41.process_family.v1".to_string(),
                 ),
@@ -2856,7 +2875,7 @@ mod tests {
             acquisition_warning_codes: vec!["lossy_source_for_negative_lab".to_string()],
             acquisition_source_families: vec!["jpeg_lossy".to_string()],
             selected_acquisition_profile,
-            profile_provenance_hash: Some("fnv1a32:9ed1e301".to_string()),
+            profile_provenance_hash: Some("fnv1a32:e5855424".to_string()),
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
@@ -2886,7 +2905,7 @@ mod tests {
         assert_eq!(bundle["conversion"]["outputFormat"], "jpeg_proof");
         assert_eq!(
             bundle["conversion"]["profileProvenanceHash"],
-            "fnv1a32:9ed1e301"
+            "fnv1a32:e5855424"
         );
         assert_eq!(
             bundle["acquisition"]["warningCodes"][0],
@@ -3371,20 +3390,22 @@ mod tests {
             acquisition_warning_codes: vec!["lossy_source_for_negative_lab".to_string()],
             acquisition_source_families: vec!["jpeg_lossy".to_string()],
             selected_acquisition_profile: default_negative_lab_acquisition_profile(),
-            profile_provenance_hash: Some("fnv1a32:9ed1e301".to_string()),
+            profile_provenance_hash: Some("fnv1a32:e5855424".to_string()),
             selected_profile: Some(NegativeLabSelectedProfileSnapshot {
                 claim_level: "generic_starting_point_only".to_string(),
                 claim_policy: applied_profile_claim_policy.to_string(),
+                crosstalk_profile: Some(default_negative_lab_identity_crosstalk_profile()),
                 display_name: applied_profile_display_name.to_string(),
                 does_not_prove: vec![
                     "no_stock_emulation_claim".to_string(),
                     "no_colorimetric_match_claim".to_string(),
                 ],
                 evidence_fixture_count: 0,
+                film_class: Some("color_negative".to_string()),
                 measurement_profile_id: None,
                 params,
                 preset_id: applied_profile_id.to_string(),
-                profile_provenance_hash: "fnv1a32:9ed1e301".to_string(),
+                profile_provenance_hash: "fnv1a32:e5855424".to_string(),
                 profile_status: "generic_unmeasured".to_string(),
                 provenance_summary: "Generic engineered C-41 portrait starting point.".to_string(),
                 runtime_status: "runtime_parameter_applied".to_string(),
@@ -3485,7 +3506,7 @@ mod tests {
                 },
                 "presetId": applied_profile_id,
                 "processFamily": "c41_color_negative",
-                "profileProvenanceHash": "fnv1a32:9ed1e301",
+                "profileProvenanceHash": "fnv1a32:e5855424",
                 "runtimeStatus": "runtime_parameter_applied",
                 "stockFamilyDescriptor": "Soft portrait color negative"
             },
@@ -3671,20 +3692,22 @@ mod tests {
             acquisition_warning_codes: vec!["raw_source_not_verified_negative_scan".to_string()],
             acquisition_source_families: vec!["camera_raw".to_string()],
             selected_acquisition_profile: default_negative_lab_acquisition_profile(),
-            profile_provenance_hash: Some("fnv1a32:9ed1e301".to_string()),
+            profile_provenance_hash: Some("fnv1a32:e5855424".to_string()),
             selected_profile: Some(NegativeLabSelectedProfileSnapshot {
                 claim_level: "generic_starting_point_only".to_string(),
                 claim_policy: "generic_starting_point_no_stock_claim".to_string(),
+                crosstalk_profile: Some(default_negative_lab_identity_crosstalk_profile()),
                 display_name: "C-41 Portrait".to_string(),
                 does_not_prove: vec![
                     "no_stock_emulation_claim".to_string(),
                     "no_colorimetric_match_claim".to_string(),
                 ],
                 evidence_fixture_count: 0,
+                film_class: Some("color_negative".to_string()),
                 measurement_profile_id: None,
                 params,
                 preset_id: "negative_lab.generic.c41.portrait.v1".to_string(),
-                profile_provenance_hash: "fnv1a32:9ed1e301".to_string(),
+                profile_provenance_hash: "fnv1a32:e5855424".to_string(),
                 profile_status: "generic_unmeasured".to_string(),
                 provenance_summary: "Generic engineered C-41 portrait starting point.".to_string(),
                 runtime_status: "runtime_parameter_applied".to_string(),
