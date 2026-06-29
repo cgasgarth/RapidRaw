@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { createHash } from 'node:crypto';
-import { readFile, writeFile } from 'node:fs/promises';
+import { strict as assert } from 'node:assert';
 
 import { z } from 'zod';
 
@@ -23,9 +23,6 @@ import {
   type RgbPixel,
 } from '../../../src/utils/colorBalanceRgbRuntime.ts';
 
-const REPORT_PATH = 'docs/validation/color-balance-command-proof-2026-06-20.json';
-const UPDATE_REPORT = process.argv.includes('--update');
-
 const rgbPixelSchema = z
   .object({
     blue: z.number().min(0).max(1),
@@ -41,7 +38,7 @@ const rgbOffsetSchema = z
   })
   .strict();
 
-const reportSchema = z
+const runtimeMetricsSchema = z
   .object({
     applyCommandId: z.string().min(1),
     changedPixels: z.number().int().positive(),
@@ -204,7 +201,7 @@ toneColorMutationResultV1Schema.parse({
 });
 
 const midtoneRuntime = pickMidtoneRuntime(previewResults);
-const report = reportSchema.parse({
+const runtimeMetrics = runtimeMetricsSchema.parse({
   applyCommandId: applyCommand.commandId,
   changedPixels,
   commandType: applyCommand.commandType,
@@ -225,17 +222,44 @@ const report = reportSchema.parse({
   validationMode: 'color_balance_rgb_command_preview_export_sidecar_proof',
 });
 
-const reportText = `${JSON.stringify(report, null, 2)}\n`;
-if (UPDATE_REPORT) {
-  await writeFile(REPORT_PATH, reportText);
-} else {
-  const expected = reportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
-  if (JSON.stringify(expected) !== JSON.stringify(report)) {
-    throw new Error(`${REPORT_PATH} is stale; run bun run check:color-balance-command-proof:update.`);
-  }
-}
+assert.deepEqual(runtimeMetrics, {
+  applyCommandId: 'command_color_balance_rgb_midtones_apply_001',
+  changedPixels: 4,
+  commandType: 'toneColor.setColorBalanceRgb',
+  dryRunCommandId: 'command_color_balance_rgb_midtones_preview_001',
+  issue: 2331,
+  midtoneRuntime: {
+    appliedOffset: {
+      blue: -0.017993794944,
+      green: 0.002998965824,
+      red: 0.023991726592,
+    },
+    inputRgb: {
+      blue: 0.34,
+      green: 0.32,
+      red: 0.3,
+    },
+    outputRgb: {
+      blue: 0.316080689192,
+      green: 0.317055181307,
+      red: 0.318029673422,
+    },
+    rangeWeights: {
+      highlights: 0,
+      midtones: 0.599793164812,
+      shadows: 0.400206835188,
+    },
+  },
+  previewExportMaxDelta: 0,
+  previewHash: 'sha256:6c7b7fc6eb2a0d17bcac34b0e8b678bae95cdd5f0ddb075f2d203335d64a738e',
+  schemaVersion: 1,
+  sidecarGraphRevision: 'graph_rev_color_balance_rgb_midtones_001',
+  sidecarSerializedHash: 'sha256:29483f82f94709ce6672177b3a6b3a7ecd9cffc847c3cb079aaa6af9c5e1dd18',
+  sourceHash: 'sha256:fe7507b3f51ff8c1edab97dc05c75a0b90a5ef8a36949c02ce1045c7c96fb678',
+  validationMode: 'color_balance_rgb_command_preview_export_sidecar_proof',
+});
 
-console.log(`color balance command proof ok (${changedPixels} changed pixels)`);
+console.log(`color balance command proof ok (${runtimeMetrics.changedPixels} changed pixels; runtime metrics)`);
 
 function pickMidtoneRuntime(results: ColorBalanceRgbRuntimeResult[]): ColorBalanceRgbRuntimeResult {
   const result = results[1];
