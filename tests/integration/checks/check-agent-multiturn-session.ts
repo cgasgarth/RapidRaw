@@ -64,6 +64,8 @@ const result = await runAgentMultiTurnAppServerSession({
     {
       adjustment: { shadows: 18, contrast: 9 },
       assistantRationale: 'Second pass after preview: open foreground shadows and restore midtone contrast.',
+      color: { hsl: { blues: { hue: -2, luminance: 3, saturation: 8 } } },
+      detailEffects: { clarity: 18, dehaze: 8, sharpness: 12 },
       preview: {
         crop: { height: 0.35, width: 0.3, x: 0.25, y: 0.2 },
         maxPixelCount: 800_000,
@@ -92,14 +94,16 @@ if (
   result.previewLineage.length !== 3 ||
   result.previewLineage[0]?.turn !== 0 ||
   result.previewLineage[1]?.graphRevision !== 'history_1' ||
-  result.previewLineage[2]?.graphRevision !== 'history_2' ||
+  result.previewLineage[2]?.graphRevision !== 'history_4' ||
   result.previewLineage[2]?.artifactId !== result.previews[2]?.artifactId
 ) {
   throw new Error('agent multi-turn session did not bind preview lineage to each turn.');
 }
 if (
   toolNames.filter((name) => name === 'rawengine.agent.adjustments.apply').length !== 2 ||
-  toolNames.filter((name) => name === 'rawengine.agent.state.get').length !== 2 ||
+  toolNames.filter((name) => name === 'rawengine.agent.color.apply').length !== 1 ||
+  toolNames.filter((name) => name === 'rawengine.agent.detail_effects.apply').length !== 1 ||
+  toolNames.filter((name) => name === 'rawengine.agent.state.get').length !== 4 ||
   toolNames.filter((name) => name === 'rawengine.agent.preview.render').length !== 2
 ) {
   throw new Error(`agent multi-turn session did not use expected typed tools: ${toolNames.join(',')}`);
@@ -110,12 +114,19 @@ if (
 ) {
   throw new Error('agent multi-turn session did not preserve follow-up prompt and preview references.');
 }
-if (state.adjustments.exposure !== 0.28 || state.adjustments.shadows !== 18 || state.historyIndex !== 2) {
-  throw new Error('agent multi-turn session did not apply both typed editing turns.');
+if (
+  state.adjustments.exposure !== 0.28 ||
+  state.adjustments.shadows !== 18 ||
+  state.adjustments.hsl.blues.saturation !== 8 ||
+  state.adjustments.clarity !== 18 ||
+  state.adjustments.sharpness !== 12 ||
+  state.historyIndex !== 4
+) {
+  throw new Error('agent multi-turn session did not apply tone, color, and detail typed editing turns.');
 }
 if (
   result.rollbackGraphRevision !== 'history_0' ||
-  result.finalGraphRevision !== 'history_2' ||
+  result.finalGraphRevision !== 'history_4' ||
   result.finalRecipeHash !== result.previews[2]?.recipeHash
 ) {
   throw new Error('agent multi-turn session did not preserve rollback and final recipe identities.');

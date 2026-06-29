@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
 import { AGENT_ADJUSTMENTS_APPLY_TOOL_NAME, agentAdjustmentsApplyResponseSchema } from './agentAdjustmentApplyTool';
+import { AGENT_COLOR_APPLY_TOOL_NAME, agentColorApplyResponseSchema } from './agentColorApplyTool';
+import {
+  AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
+  agentDetailEffectsApplyResponseSchema,
+} from './agentDetailEffectsApplyTool';
 import { agentEditQualityReviewSchema, buildAgentEditQualityReview } from './agentEditQualityReview';
 import { agentInitialPromptContextSchema, buildAgentInitialPromptContext } from './agentInitialPromptContext';
 import { dispatchAgentLiveEditorTool } from './agentLiveToolDispatch';
@@ -59,12 +64,17 @@ const sessionPreviewRequestSchema = z
 
 const sessionTurnRequestSchema = z
   .object({
-    adjustment: sessionAdjustmentPatchSchema,
+    adjustment: sessionAdjustmentPatchSchema.optional(),
     assistantRationale: z.string().trim().min(1),
+    color: z.record(z.string(), z.unknown()).optional(),
+    detailEffects: z.record(z.string(), z.unknown()).optional(),
     preview: sessionPreviewRequestSchema.optional(),
     userFollowUp: z.string().trim().min(1).optional(),
   })
-  .strict();
+  .strict()
+  .refine((turn) => turn.adjustment !== undefined || turn.color !== undefined || turn.detailEffects !== undefined, {
+    message: 'Session turn needs at least one adjustment, color, or detail/effects patch.',
+  });
 
 export const agentMultiTurnAppServerSessionRequestSchema = z
   .object({
@@ -146,6 +156,18 @@ const stateRecipeHashSchema = agentStateGetResponseSchema.safeExtend({
 const getRecipeHash = (stateResult: unknown): string =>
   stateRecipeHashSchema.parse(stateResult).snapshot.initialPreview.recipeHash;
 
+const buildStateToolCallId = (requestId: string, turnNumber: number, suffix: string): string =>
+  `${requestId}-turn-${turnNumber}-${suffix}-state`;
+
+const refreshRecipeHash = async (requestId: string): Promise<string> =>
+  getRecipeHash(
+    await dispatchAgentLiveEditorTool({
+      args: { requestId },
+      requestId,
+      runtimeToolName: AGENT_STATE_GET_TOOL_NAME,
+    }),
+  );
+
 export const runAgentMultiTurnAppServerSession = async (
   request: AgentMultiTurnAppServerSessionRequest,
 ): Promise<AgentMultiTurnAppServerSessionResult> => {
@@ -192,50 +214,118 @@ export const runAgentMultiTurnAppServerSession = async (
     }
     messages.push({ content: turn.assistantRationale, role: 'assistant', turn: turnNumber });
 
-    const applyToolCallId = `${parsedRequest.requestId}-turn-${turnNumber}-apply`;
-    const applyResult = agentAdjustmentsApplyResponseSchema.parse(
-      await dispatchAgentLiveEditorTool({
-        args: {
-          adjustments: turn.adjustment,
-          expectedRecipeHash: recipeHash,
-          operationId: `${parsedRequest.operationId}-${turnNumber}`,
+    if (turn.adjustment !== undefined) {
+      const applyToolCallId = `${parsedRequest.requestId}-turn-${turnNumber}-apply`;
+      const applyResult = agentAdjustmentsApplyResponseSchema.parse(
+        await dispatchAgentLiveEditorTool({
+          args: {
+            adjustments: turn.adjustment,
+            expectedRecipeHash: recipeHash,
+            operationId: `${parsedRequest.operationId}-${turnNumber}`,
+            requestId: applyToolCallId,
+            sessionId: parsedRequest.sessionId,
+          },
           requestId: applyToolCallId,
-          sessionId: parsedRequest.sessionId,
-        },
-        requestId: applyToolCallId,
-        runtimeToolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
-      }),
-    );
-    finalGraphRevision = applyResult.appliedGraphRevision;
-    changedPixelCount += applyResult.changedPixelCount;
-    sampledPixelCount += applyResult.sampledPixelCount;
-    maxChannelDelta = Math.max(maxChannelDelta, applyResult.maxChannelDelta);
-    meanLuminanceDelta += applyResult.meanLuminanceDelta;
+          runtimeToolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+        }),
+      );
+      finalGraphRevision = applyResult.appliedGraphRevision;
+      changedPixelCount += applyResult.changedPixelCount;
+      sampledPixelCount += applyResult.sampledPixelCount;
+      maxChannelDelta = Math.max(maxChannelDelta, applyResult.maxChannelDelta);
+      meanLuminanceDelta += applyResult.meanLuminanceDelta;
+      toolCalls.push({
+        id: applyToolCallId,
+        name: applyResult.toolName,
+        receiptGraphRevision: applyResult.appliedGraphRevision,
+        status: 'succeeded',
+        turn: turnNumber,
+      });
+      messages.push({
+        content: `Applied ${applyResult.adjustedFields.join(', ')} at ${applyResult.appliedGraphRevision}.`,
+        role: 'tool',
+        toolCallId: applyToolCallId,
+        turn: turnNumber,
+      });
+      const stateToolCallId = buildStateToolCallId(parsedRequest.requestId, turnNumber, 'adjustments');
+      recipeHash = await refreshRecipeHash(stateToolCallId);
+      toolCalls.push({ id: stateToolCallId, name: AGENT_STATE_GET_TOOL_NAME, status: 'succeeded', turn: turnNumber });
+    }
+
+    if (turn.color !== undefined) {
+      const colorToolCallId = `${parsedRequest.requestId}-turn-${turnNumber}-color`;
+      const colorResult = agentColorApplyResponseSchema.parse(
+        await dispatchAgentLiveEditorTool({
+          args: {
+            color: turn.color,
+            expectedRecipeHash: recipeHash,
+            operationId: `${parsedRequest.operationId}-${turnNumber}-color`,
+            requestId: colorToolCallId,
+            sessionId: parsedRequest.sessionId,
+          },
+          requestId: colorToolCallId,
+          runtimeToolName: AGENT_COLOR_APPLY_TOOL_NAME,
+        }),
+      );
+      finalGraphRevision = colorResult.appliedGraphRevision;
+      changedPixelCount += colorResult.changedPixelCount;
+      sampledPixelCount += colorResult.changedPixelCount;
+      toolCalls.push({
+        id: colorToolCallId,
+        name: colorResult.toolName,
+        receiptGraphRevision: colorResult.appliedGraphRevision,
+        status: 'succeeded',
+        turn: turnNumber,
+      });
+      messages.push({
+        content: `Applied color ${colorResult.adjustedFields.join(', ')} at ${colorResult.appliedGraphRevision}.`,
+        role: 'tool',
+        toolCallId: colorToolCallId,
+        turn: turnNumber,
+      });
+      const stateToolCallId = buildStateToolCallId(parsedRequest.requestId, turnNumber, 'color');
+      recipeHash = await refreshRecipeHash(stateToolCallId);
+      toolCalls.push({ id: stateToolCallId, name: AGENT_STATE_GET_TOOL_NAME, status: 'succeeded', turn: turnNumber });
+    }
+
+    if (turn.detailEffects !== undefined) {
+      const detailToolCallId = `${parsedRequest.requestId}-turn-${turnNumber}-detail`;
+      const detailResult = agentDetailEffectsApplyResponseSchema.parse(
+        await dispatchAgentLiveEditorTool({
+          args: {
+            detailEffects: turn.detailEffects,
+            expectedRecipeHash: recipeHash,
+            operationId: `${parsedRequest.operationId}-${turnNumber}-detail`,
+            requestId: detailToolCallId,
+            sessionId: parsedRequest.sessionId,
+          },
+          requestId: detailToolCallId,
+          runtimeToolName: AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
+        }),
+      );
+      finalGraphRevision = detailResult.appliedGraphRevision;
+      changedPixelCount += detailResult.changedPixelCount;
+      sampledPixelCount += detailResult.changedPixelCount;
+      toolCalls.push({
+        id: detailToolCallId,
+        name: detailResult.toolName,
+        receiptGraphRevision: detailResult.appliedGraphRevision,
+        status: 'succeeded',
+        turn: turnNumber,
+      });
+      messages.push({
+        content: `Applied detail ${detailResult.adjustedFields.join(', ')} at ${detailResult.appliedGraphRevision}.`,
+        role: 'tool',
+        toolCallId: detailToolCallId,
+        turn: turnNumber,
+      });
+      const stateToolCallId = buildStateToolCallId(parsedRequest.requestId, turnNumber, 'detail');
+      recipeHash = await refreshRecipeHash(stateToolCallId);
+      toolCalls.push({ id: stateToolCallId, name: AGENT_STATE_GET_TOOL_NAME, status: 'succeeded', turn: turnNumber });
+    }
+
     changedPixelPercent =
       sampledPixelCount === 0 ? 0 : Number(((changedPixelCount / sampledPixelCount) * 100).toFixed(1));
-    toolCalls.push({
-      id: applyToolCallId,
-      name: applyResult.toolName,
-      receiptGraphRevision: applyResult.appliedGraphRevision,
-      status: 'succeeded',
-      turn: turnNumber,
-    });
-    messages.push({
-      content: `Applied ${applyResult.adjustedFields.join(', ')} at ${applyResult.appliedGraphRevision}.`,
-      role: 'tool',
-      toolCallId: applyToolCallId,
-      turn: turnNumber,
-    });
-
-    const stateToolCallId = `${parsedRequest.requestId}-turn-${turnNumber}-state`;
-    recipeHash = getRecipeHash(
-      await dispatchAgentLiveEditorTool({
-        args: { requestId: stateToolCallId },
-        requestId: stateToolCallId,
-        runtimeToolName: AGENT_STATE_GET_TOOL_NAME,
-      }),
-    );
-    toolCalls.push({ id: stateToolCallId, name: AGENT_STATE_GET_TOOL_NAME, status: 'succeeded', turn: turnNumber });
 
     const previewToolCallId = `${parsedRequest.requestId}-turn-${turnNumber}-preview`;
     const previewResult = agentPreviewRenderResponseSchema.parse(
