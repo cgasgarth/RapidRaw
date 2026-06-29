@@ -1943,6 +1943,15 @@ pub fn save_metadata_and_update_thumbnail(
         );
     }
 
+    if let Some(adjustments_map) = final_adjustments.as_object_mut()
+        && let Some(raw_engine_artifacts) = adjustments_map.remove("rawEngineArtifacts")
+    {
+        metadata.raw_engine_artifacts = Some(
+            serde_json::from_value::<RawEngineArtifacts>(raw_engine_artifacts)
+                .map_err(|err| format!("Invalid RawEngine artifact envelope: {}", err))?,
+        );
+    }
+
     metadata.adjustments = final_adjustments;
 
     save_metadata_sidecar(&sidecar_path, &metadata)?;

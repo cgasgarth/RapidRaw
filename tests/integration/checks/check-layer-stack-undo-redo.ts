@@ -11,7 +11,14 @@ import {
   pushEditHistoryEntry,
   undoEditHistory,
 } from '../../../src/utils/editHistory.ts';
-import { moveLayer, setLayerOpacity, setLayerVisibility } from '../../../src/utils/layerStack.ts';
+import {
+  createAdjustmentLayer,
+  deleteLayer,
+  moveLayer,
+  setLayerName,
+  setLayerOpacity,
+  setLayerVisibility,
+} from '../../../src/utils/layerStack.ts';
 
 const layerSchema = z
   .object({
@@ -42,6 +49,25 @@ const operationSchema = z.discriminatedUnion('type', [
       direction: z.enum(['down', 'up']),
       layerId: z.string().trim().min(1),
       type: z.literal('move'),
+    })
+    .strict(),
+  z
+    .object({
+      layer: layerSchema,
+      type: z.literal('create'),
+    })
+    .strict(),
+  z
+    .object({
+      layerId: z.string().trim().min(1),
+      type: z.literal('delete'),
+    })
+    .strict(),
+  z
+    .object({
+      layerId: z.string().trim().min(1),
+      name: z.string().trim().min(1),
+      type: z.literal('rename'),
     })
     .strict(),
 ]);
@@ -103,6 +129,12 @@ function applyOperation(layers: Array<MaskContainer>, operation: LayerReplayOper
       return setLayerVisibility(layers, operation.layerId, operation.visible);
     case 'move':
       return moveLayer(layers, operation.layerId, operation.direction);
+    case 'create':
+      return createAdjustmentLayer(layers, toMaskContainer(operation.layer));
+    case 'delete':
+      return deleteLayer(layers, operation.layerId);
+    case 'rename':
+      return setLayerName(layers, operation.layerId, operation.name);
   }
 }
 

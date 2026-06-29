@@ -2,13 +2,17 @@
 
 import { z } from 'zod';
 
-import { INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../src/utils/adjustments.ts';
+import { INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../src/utils/adjustments.ts';
 import {
   applyLayerStackCommandBridgeOperation,
   applyResolvedRemoveSourcesToLayerStack,
   buildLayerStackSidecarFromMasks,
   type LayerStackCommandBridgeContext,
 } from '../../../src/utils/layerStackCommandBridge.ts';
+import {
+  hydrateLayerStackMasksFromMetadata,
+  persistLayerStackSidecarInAdjustments,
+} from '../../../src/utils/layerStackSidecarAdjustments.ts';
 
 const layerSummarySchema = z
   .object({
@@ -341,13 +345,27 @@ if (
 ) {
   throw new Error('Expected fallback remove source metadata to clear persisted source point.');
 }
-run('delete_remove', { layerId: 'layer-remove', type: 'delete' });
+const finalDelete = run('delete_remove', { layerId: 'layer-remove', type: 'delete' });
 
 const actualFinalLayers = layerSummarySchema.array().parse(summarize(masks));
 if (JSON.stringify(actualFinalLayers) !== JSON.stringify(expectedFinalLayers)) {
   console.error('Expected:', JSON.stringify(expectedFinalLayers));
   console.error('Actual:', JSON.stringify(actualFinalLayers));
   process.exit(1);
+}
+
+const persistedAdjustments = persistLayerStackSidecarInAdjustments(
+  { ...structuredClone(INITIAL_ADJUSTMENTS), masks: [] },
+  finalDelete.sidecar,
+);
+const reloadedAdjustments = hydrateLayerStackMasksFromMetadata(
+  { ...structuredClone(INITIAL_ADJUSTMENTS), masks: [] },
+  { rawEngineArtifacts: persistedAdjustments.rawEngineArtifacts },
+  context.imagePath,
+);
+const reloadedFinalLayers = layerSummarySchema.array().parse(summarize(reloadedAdjustments.masks));
+if (JSON.stringify(reloadedFinalLayers) !== JSON.stringify(actualFinalLayers)) {
+  throw new Error('Expected persisted layer stack sidecar to reload into adjustment masks.');
 }
 
 if (!context.graphRevision.includes('delete_clone')) {

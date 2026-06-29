@@ -1,5 +1,5 @@
 {
-  "id": "layer-stack-undo-redo-reorder-opacity-visibility",
+  "id": "layer-stack-undo-redo-panel-command-stack",
   "initialLayers": [
     { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
     { "id": "skin", "name": "Skin Uniformity", "opacity": 65, "visible": true },
@@ -7,31 +7,43 @@
   ],
   "steps": [
     {
+      "label": "create dodge layer",
+      "operation": {
+        "type": "create",
+        "layer": { "id": "dodge", "name": "Dodge Layer", "opacity": 100, "visible": true }
+      }
+    },
+    {
+      "label": "rename skin layer",
+      "operation": { "type": "rename", "layerId": "skin", "name": "Skin Uniformity Refined" }
+    },
+    {
       "label": "hide skin layer",
       "operation": { "type": "setVisibility", "layerId": "skin", "visible": false }
     },
     {
-      "label": "lower sky opacity",
-      "operation": { "type": "setOpacity", "layerId": "sky", "opacity": 42 }
-    },
-    {
       "label": "move sky above skin",
       "operation": { "type": "move", "layerId": "sky", "direction": "up" }
+    },
+    {
+      "label": "delete tone layer",
+      "operation": { "type": "delete", "layerId": "tone" }
     }
   ],
   "expectedFinalLayers": [
-    { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
-    { "id": "sky", "name": "Sky Recover", "opacity": 42, "visible": true },
-    { "id": "skin", "name": "Skin Uniformity", "opacity": 65, "visible": false }
+    { "id": "dodge", "name": "Dodge Layer", "opacity": 100, "visible": true },
+    { "id": "sky", "name": "Sky Recover", "opacity": 80, "visible": true },
+    { "id": "skin", "name": "Skin Uniformity Refined", "opacity": 65, "visible": false }
   ],
   "expectedUndoLayers": [
+    { "id": "dodge", "name": "Dodge Layer", "opacity": 100, "visible": true },
     { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
-    { "id": "skin", "name": "Skin Uniformity", "opacity": 65, "visible": false },
-    { "id": "sky", "name": "Sky Recover", "opacity": 42, "visible": true }
+    { "id": "sky", "name": "Sky Recover", "opacity": 80, "visible": true },
+    { "id": "skin", "name": "Skin Uniformity Refined", "opacity": 65, "visible": false }
   ],
   "expectedRedoLayers": [
-    { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
-    { "id": "sky", "name": "Sky Recover", "opacity": 42, "visible": true },
-    { "id": "skin", "name": "Skin Uniformity", "opacity": 65, "visible": false }
+    { "id": "dodge", "name": "Dodge Layer", "opacity": 100, "visible": true },
+    { "id": "sky", "name": "Sky Recover", "opacity": 80, "visible": true },
+    { "id": "skin", "name": "Skin Uniformity Refined", "opacity": 65, "visible": false }
   ]
 }
