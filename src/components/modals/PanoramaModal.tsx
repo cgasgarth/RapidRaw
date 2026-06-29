@@ -1,5 +1,5 @@
 import { Info, Layers, ShieldCheck, XCircle } from 'lucide-react';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
@@ -8,7 +8,7 @@ import { MergeErrorState, MergeFooterActions, MergeProcessingState, MergeResultP
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { useUIStore, type PanoramaModalState } from '../../store/useUIStore';
 import { TextColors, TextVariants } from '../../types/typography';
-import { buildPanoramaDerivedOutputReceipt } from '../../utils/derivedOutputReceipt';
+import { buildPanoramaDerivedOutputReceipt, deriveDerivedOutputReceiptState } from '../../utils/derivedOutputReceipt';
 import { buildPanoramaSavedReviewSummary } from '../../utils/panoramaSavedReview';
 import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerBadge';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
@@ -17,6 +17,7 @@ import UiText from '../ui/Text';
 import type {
   PanoramaRuntimePlan,
   PanoramaRenderedReview,
+  PanoramaSavedReviewSummary,
   PanoramaUiBlendMode,
   PanoramaUiBoundaryMode,
   PanoramaUiExposureMode,
@@ -70,6 +71,8 @@ export default function PanoramaModal({
   const { isMounted, show } = useModalTransition(isOpen);
   const [isSaving, setIsSaving] = useState(false);
   const [savedPath, setSavedPath] = useState<string | null>(null);
+  const [savedReviewSummary, setSavedReviewSummary] = useState<PanoramaSavedReviewSummary | null>(null);
+  const [savedDerivedOutputReceiptId, setSavedDerivedOutputReceiptId] = useState<string | null>(null);
 
   const mouseDownTarget = useRef<EventTarget | null>(null);
   const isSourceCountValid = (imageCount ?? 0) >= 2;
@@ -168,27 +171,48 @@ export default function PanoramaModal({
     cropCoveragePercent === null
       ? t('modals.panorama.summaryBlocked')
       : t('modals.panorama.review.cropCoveragePercent', { value: cropCoveragePercent });
-  const savedReviewSummary =
-    savedPath === null || renderedReview === null
-      ? null
-      : buildPanoramaSavedReviewSummary({
-          outputPath: savedPath,
-          renderedReview,
-          settings,
-          sourcePaths,
-        });
   const derivedOutputReceipt =
-    savedReviewSummary === null ? null : buildPanoramaDerivedOutputReceipt({ review: savedReviewSummary, settings });
-  const derivedOutputReceiptId = derivedOutputReceipt?.receiptId;
+    savedReviewSummary === null
+      ? null
+      : buildPanoramaDerivedOutputReceipt({
+          acceptedDryRunPlanHash: lastApplyCommand?.acceptedDryRunPlanHash,
+          acceptedDryRunPlanId: lastApplyCommand?.acceptedDryRunPlanId,
+          review: savedReviewSummary,
+          settings,
+        });
   const storedDerivedOutputReceipt =
     useUIStore((state) =>
-      derivedOutputReceiptId === undefined ? undefined : state.derivedOutputReceipts[derivedOutputReceiptId],
+      savedDerivedOutputReceiptId === null ? undefined : state.derivedOutputReceipts[savedDerivedOutputReceiptId],
     ) ?? derivedOutputReceipt;
   const upsertDerivedOutputReceipt = useUIStore((state) => state.upsertDerivedOutputReceipt);
-
-  useEffect(() => {
-    if (derivedOutputReceipt !== null) upsertDerivedOutputReceipt(derivedOutputReceipt);
-  }, [derivedOutputReceipt, upsertDerivedOutputReceipt]);
+  const currentDerivedOutputReceipt = useMemo(() => {
+    if (savedPath === null || renderedReview === null) return null;
+    return buildPanoramaDerivedOutputReceipt({
+      acceptedDryRunPlanHash: lastApplyCommand?.acceptedDryRunPlanHash,
+      acceptedDryRunPlanId: lastApplyCommand?.acceptedDryRunPlanId,
+      review: buildPanoramaSavedReviewSummary({
+        outputPath: savedPath,
+        renderedReview,
+        settings,
+        sourcePaths,
+      }),
+      settings,
+    });
+  }, [
+    lastApplyCommand?.acceptedDryRunPlanHash,
+    lastApplyCommand?.acceptedDryRunPlanId,
+    renderedReview,
+    savedPath,
+    settings,
+    sourcePaths,
+  ]);
+  const visibleDerivedOutputReceipt =
+    storedDerivedOutputReceipt && currentDerivedOutputReceipt
+      ? deriveDerivedOutputReceiptState({
+          current: currentDerivedOutputReceipt,
+          receipt: storedDerivedOutputReceipt,
+        })
+      : storedDerivedOutputReceipt;
 
   const setSetting = useCallback(
     (patch: Partial<PanoramaUiSettings>) => {
@@ -201,6 +225,8 @@ export default function PanoramaModal({
     if (!isOpen) {
       const timer = setTimeout(() => {
         setSavedPath(null);
+        setSavedReviewSummary(null);
+        setSavedDerivedOutputReceiptId(null);
         setIsSaving(false);
       }, 300);
       return () => {
@@ -230,6 +256,23 @@ export default function PanoramaModal({
     setIsSaving(true);
     try {
       const path = await onSave();
+      if (renderedReview !== null) {
+        const review = buildPanoramaSavedReviewSummary({
+          outputPath: path,
+          renderedReview,
+          settings,
+          sourcePaths,
+        });
+        const receipt = buildPanoramaDerivedOutputReceipt({
+          acceptedDryRunPlanHash: lastApplyCommand?.acceptedDryRunPlanHash,
+          acceptedDryRunPlanId: lastApplyCommand?.acceptedDryRunPlanId,
+          review,
+          settings,
+        });
+        upsertDerivedOutputReceipt(receipt);
+        setSavedReviewSummary(review);
+        setSavedDerivedOutputReceiptId(receipt.receiptId);
+      }
       setSavedPath(path);
     } catch (e) {
       console.error(e);
@@ -380,9 +423,9 @@ export default function PanoramaModal({
               </UiText>
             </section>
           )}
-          {storedDerivedOutputReceipt ? (
+          {visibleDerivedOutputReceipt ? (
             <div className="mx-auto mt-4 max-w-2xl text-left">
-              <DerivedOutputReceiptPanel receipt={storedDerivedOutputReceipt} onOpenOutput={onOpenFile} />
+              <DerivedOutputReceiptPanel receipt={visibleDerivedOutputReceipt} onOpenOutput={onOpenFile} />
             </div>
           ) : null}
         </div>

@@ -19,6 +19,7 @@ import {
   buildHdrDerivedOutputReceipt,
   buildPanoramaDerivedOutputReceipt,
   buildSuperResolutionDerivedOutputReceipt,
+  deriveDerivedOutputReceiptState,
 } from '../../../src/utils/derivedOutputReceipt.ts';
 import { buildFocusStackOutputReviewWorkflow } from '../../../src/utils/focusStackOutputReview.ts';
 import { buildHdrEditableHandoffSummary } from '../../../src/utils/hdrEditableHandoff.ts';
@@ -247,12 +248,64 @@ const invalidSourceCount = derivedOutputReceiptSchema.safeParse({
 });
 expect(!invalidSourceCount.success, 'Source hash count mismatch must be rejected.');
 
+const settingsChangedReceipt = deriveDerivedOutputReceiptState({
+  current: buildHdrDerivedOutputReceipt({
+    handoff: buildHdrEditableHandoffSummary({
+      outputPath: '/tmp/rawengine-hdr-output.tif',
+      settings: { ...DEFAULT_HDR_MERGE_UI_SETTINGS, toneMapPreview: !DEFAULT_HDR_MERGE_UI_SETTINGS.toneMapPreview },
+      sourcePaths: ['/tmp/hdr-0.dng', '/tmp/hdr-1.dng', '/tmp/hdr-2.dng'],
+    }),
+    settings: { ...DEFAULT_HDR_MERGE_UI_SETTINGS, toneMapPreview: !DEFAULT_HDR_MERGE_UI_SETTINGS.toneMapPreview },
+  }),
+  receipt: hdrReceipt,
+});
+expect(settingsChangedReceipt.staleState === 'stale', 'Settings hash changes must mark HDR receipts stale.');
+expect(
+  settingsChangedReceipt.staleReasons?.includes('settings_hash_changed') === true,
+  'Settings hash changes must expose a stale reason.',
+);
+
+const reorderedSourceReceipt = deriveDerivedOutputReceiptState({
+  current: buildPanoramaDerivedOutputReceipt({
+    review: {
+      ...panoramaReview,
+      sourceRefs: [...panoramaReview.sourceRefs].reverse().map((source, sourceIndex) => ({
+        ...source,
+        sourceIndex,
+      })),
+    },
+    settings: DEFAULT_PANORAMA_UI_SETTINGS,
+  }),
+  receipt: panoramaReceipt,
+});
+expect(reorderedSourceReceipt.staleState === 'stale', 'Source order changes must mark panorama receipts stale.');
+expect(
+  reorderedSourceReceipt.staleReasons?.includes('source_order_changed') === true,
+  'Source order changes must expose a stale reason.',
+);
+
+const outputHashMismatchReceipt = deriveDerivedOutputReceiptState({
+  current: {
+    ...superResolutionReceipt,
+    outputContentHash: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+    receiptId: `${superResolutionReceipt.receiptId}_changed_output`,
+  },
+  receipt: superResolutionReceipt,
+});
+expect(outputHashMismatchReceipt.staleState === 'stale', 'Output hash mismatches must mark SR receipts stale.');
+expect(
+  outputHashMismatchReceipt.staleReasons?.includes('output_artifact_changed') === true,
+  'Output hash mismatch must expose a stale reason.',
+);
+
 const requiredPanelMarkers = [
   'data-testid="derived-output-receipt"',
   'data-derived-output-family',
   'data-output-content-hash',
   'data-source-content-hashes',
   'data-source-graph-revisions',
+  'data-derived-output-stale-reasons',
+  'data-testid="derived-output-stale-warning"',
   'data-testid="derived-output-open-in-editor"',
 ];
 const panelSource = readFileSync('src/components/modals/DerivedOutputReceiptPanel.tsx', 'utf8');
@@ -275,11 +328,11 @@ for (const [file, builder] of modalWiring) {
 
 const hdrModalSource = readFileSync('src/components/modals/HdrModal.tsx', 'utf8');
 for (const marker of [
-  'const receipt = buildHdrDerivedOutputReceipt({ handoff, settings });',
+  'const receipt = buildHdrDerivedOutputReceipt({',
   'upsertDerivedOutputReceipt(receipt);',
   'setSavedDerivedOutputReceiptId(receipt.receiptId);',
   'data-testid="hdr-derived-output-receipt-store-entry"',
-  "data-hdr-derived-source-open-path={storedDerivedOutputReceipt.openInEditorAction.path ?? ''}",
+  "data-hdr-derived-source-open-path={visibleDerivedOutputReceipt.openInEditorAction.path ?? ''}",
 ]) {
   expect(hdrModalSource.includes(marker), `HDR modal missing applied derived-output persistence marker: ${marker}.`);
 }
