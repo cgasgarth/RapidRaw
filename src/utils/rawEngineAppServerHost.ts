@@ -79,13 +79,18 @@ import {
   AGENT_PREVIEW_RENDER_INPUT_SCHEMA_NAME,
   AGENT_PREVIEW_RENDER_OUTPUT_SCHEMA_NAME,
   AGENT_PREVIEW_RENDER_TOOL_NAME,
+  AGENT_PREVIEW_COMPARE_INPUT_SCHEMA_NAME,
+  AGENT_PREVIEW_COMPARE_OUTPUT_SCHEMA_NAME,
+  AGENT_PREVIEW_COMPARE_TOOL_NAME,
   AGENT_STATE_GET_INPUT_SCHEMA_NAME,
   AGENT_STATE_GET_OUTPUT_SCHEMA_NAME,
   AGENT_STATE_GET_TOOL_NAME,
   agentPreviewRenderRequestSchema,
+  agentPreviewCompareRequestSchema,
   agentStateGetRequestSchema,
   getAgentReadOnlyState,
   renderAgentReadOnlyPreview,
+  renderAgentPreviewCompare,
 } from './agentReadOnlyAppServerTools';
 import {
   AGENT_RETOUCH_APPLY_INPUT_SCHEMA_NAME,
@@ -563,6 +568,15 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       toolNames: [AGENT_PREVIEW_RENDER_TOOL_NAME],
     }),
     buildRouteCatalogEntry({
+      commandName: AGENT_PREVIEW_COMPARE_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_PREVIEW_COMPARE_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.Read],
+      outputSchemaNames: [AGENT_PREVIEW_COMPARE_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-preview-compare-loop'],
+      toolNames: [AGENT_PREVIEW_COMPARE_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
       commandName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
       family: 'agent',
       inputSchemaNames: [AGENT_ADJUSTMENTS_APPLY_INPUT_SCHEMA_NAME],
@@ -904,6 +918,7 @@ const APPROVED_AGENT_APP_SERVER_TOOL_NAMES = new Set<string>([
   AGENT_LENS_PROFILE_APPLY_TOOL_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
   AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME,
+  AGENT_PREVIEW_COMPARE_TOOL_NAME,
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_RETOUCH_APPLY_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
@@ -991,6 +1006,9 @@ const dispatchAgentAppServerTool = async (
       break;
     case AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME:
       result = applyAgentObjectSelection(agentObjectSelectionApplyRequestSchema.parse(request.arguments));
+      break;
+    case AGENT_PREVIEW_COMPARE_TOOL_NAME:
+      result = renderAgentPreviewCompare(agentPreviewCompareRequestSchema.parse(request.arguments));
       break;
     case AGENT_PREVIEW_RENDER_TOOL_NAME:
       result = renderAgentReadOnlyPreview(agentPreviewRenderRequestSchema.parse(request.arguments));

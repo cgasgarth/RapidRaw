@@ -3,16 +3,21 @@ import { z } from 'zod';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import {
   AGENT_PREVIEW_MAX_PIXEL_COUNT,
+  agentPreviewCompareArtifactResultSchema,
   agentPreviewEnvelopeSchema,
   buildAgentPreviewEnvelope,
+  stableAgentPreviewHash,
 } from './agentPreviewEnvelope';
 
 export const AGENT_STATE_GET_TOOL_NAME = 'rawengine.agent.state.get';
 export const AGENT_PREVIEW_RENDER_TOOL_NAME = 'rawengine.agent.preview.render';
+export const AGENT_PREVIEW_COMPARE_TOOL_NAME = 'rawengine.agent.preview.compare';
 export const AGENT_STATE_GET_INPUT_SCHEMA_NAME = 'AgentStateGetRequestV1';
 export const AGENT_STATE_GET_OUTPUT_SCHEMA_NAME = 'AgentStateGetResponseV1';
 export const AGENT_PREVIEW_RENDER_INPUT_SCHEMA_NAME = 'AgentPreviewRenderRequestV1';
 export const AGENT_PREVIEW_RENDER_OUTPUT_SCHEMA_NAME = 'AgentPreviewRenderResponseV1';
+export const AGENT_PREVIEW_COMPARE_INPUT_SCHEMA_NAME = 'AgentPreviewCompareRequestV1';
+export const AGENT_PREVIEW_COMPARE_OUTPUT_SCHEMA_NAME = 'AgentPreviewCompareResponseV1';
 
 export const agentStateGetRequestSchema = z
   .object({
@@ -62,6 +67,23 @@ export const agentPreviewRenderRequestSchema = z
   })
   .strict();
 
+export const agentPreviewCompareRequestSchema = z
+  .object({
+    beforeGraphRevision: z.string().trim().min(1).optional(),
+    beforeRecipeHash: z.string().trim().min(1).optional(),
+    expectedRecipeHash: z.string().trim().min(1).optional(),
+    longEdgePx: z.number().int().min(256).max(2048).default(1536),
+    maxPixelCount: z
+      .number()
+      .int()
+      .min(65_536)
+      .max(AGENT_PREVIEW_MAX_PIXEL_COUNT)
+      .default(AGENT_PREVIEW_MAX_PIXEL_COUNT),
+    quality: z.number().min(0.5).max(0.95).default(0.86),
+    requestId: z.string().trim().min(1),
+  })
+  .strict();
+
 export const agentStateGetResponseSchema = z
   .object({
     requestId: z.string().trim().min(1),
@@ -80,10 +102,21 @@ export const agentPreviewRenderResponseSchema = z
   })
   .strict();
 
+export const agentPreviewCompareResponseSchema = z
+  .object({
+    compare: agentPreviewCompareArtifactResultSchema,
+    requestId: z.string().trim().min(1),
+    staleRecipeHash: z.boolean(),
+    toolName: z.literal(AGENT_PREVIEW_COMPARE_TOOL_NAME),
+  })
+  .strict();
+
 export type AgentStateGetRequest = z.infer<typeof agentStateGetRequestSchema>;
 export type AgentPreviewRenderRequest = z.input<typeof agentPreviewRenderRequestSchema>;
+export type AgentPreviewCompareRequest = z.input<typeof agentPreviewCompareRequestSchema>;
 export type AgentStateGetResponse = z.infer<typeof agentStateGetResponseSchema>;
 export type AgentPreviewRenderResponse = z.infer<typeof agentPreviewRenderResponseSchema>;
+export type AgentPreviewCompareResponse = z.infer<typeof agentPreviewCompareResponseSchema>;
 
 export const getAgentReadOnlyState = (request: AgentStateGetRequest): AgentStateGetResponse => {
   const parsedRequest = agentStateGetRequestSchema.parse(request);
@@ -131,5 +164,132 @@ export const renderAgentReadOnlyPreview = (request: AgentPreviewRenderRequest): 
       parsedRequest.expectedRecipeHash !== undefined &&
       parsedRequest.expectedRecipeHash !== snapshot.initialPreview.recipeHash,
     toolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+  });
+};
+
+const buildCompareArtifact = ({
+  graphRevision,
+  idSeed,
+  previewRef,
+  recipeHash,
+  renderHash,
+  role,
+  snapshot,
+  longEdgePx,
+  maxPixelCount,
+  quality,
+}: {
+  graphRevision: string;
+  idSeed: string;
+  longEdgePx: number;
+  maxPixelCount: number;
+  previewRef: string;
+  quality: number;
+  recipeHash: string;
+  renderHash: string;
+  role: 'before' | 'current';
+  snapshot: ReturnType<typeof buildAgentImageContextSnapshot>;
+}) => {
+  const preview = buildAgentPreviewEnvelope({
+    crop: snapshot.initialPreview.crop,
+    height: snapshot.initialPreview.height,
+    idSeed,
+    longEdgePx,
+    maxPixelCount,
+    previewRef,
+    purpose: role === 'before' ? 'initial_context' : 'refresh',
+    quality,
+    recipeHash,
+    renderHash,
+    width: snapshot.initialPreview.width,
+    zoom: snapshot.initialPreview.zoom,
+  });
+
+  const contentHashSeed = stableAgentPreviewHash(
+    JSON.stringify({
+      graphRevision,
+      previewRef,
+      recipeHash: preview.recipeHash,
+      renderHash: preview.renderHash,
+      role,
+    }),
+  );
+
+  return {
+    artifactId: preview.artifactId,
+    contentHash: `sha256:${contentHashSeed}${stableAgentPreviewHash(`${contentHashSeed}:${role}`)}`,
+    graphRevision,
+    preview,
+    recipeHash: preview.recipeHash,
+    renderHash: preview.renderHash,
+    role,
+  };
+};
+
+export const renderAgentPreviewCompare = (request: AgentPreviewCompareRequest): AgentPreviewCompareResponse => {
+  const parsedRequest = agentPreviewCompareRequestSchema.parse(request);
+  const snapshot = buildAgentImageContextSnapshot();
+  const beforeGraphRevision = parsedRequest.beforeGraphRevision ?? snapshot.graphRevision;
+  const beforeRecipeHash = parsedRequest.beforeRecipeHash ?? snapshot.initialPreview.recipeHash;
+  const currentGraphRevision = snapshot.graphRevision;
+  const currentRecipeHash = snapshot.initialPreview.recipeHash;
+  const staleRecipeHash =
+    parsedRequest.expectedRecipeHash !== undefined && parsedRequest.expectedRecipeHash !== currentRecipeHash;
+
+  const beforeArtifact = buildCompareArtifact({
+    graphRevision: beforeGraphRevision,
+    idSeed: `${snapshot.activeImagePath}:${beforeGraphRevision}:${parsedRequest.requestId}:before`,
+    longEdgePx: parsedRequest.longEdgePx,
+    maxPixelCount: parsedRequest.maxPixelCount,
+    previewRef: `${snapshot.initialPreview.previewRef}#before-${beforeGraphRevision}`,
+    quality: parsedRequest.quality,
+    recipeHash: beforeRecipeHash,
+    renderHash: `render:${stableAgentPreviewHash(`${beforeGraphRevision}:${beforeRecipeHash}`)}`,
+    role: 'before',
+    snapshot,
+  });
+  const currentArtifact = buildCompareArtifact({
+    graphRevision: currentGraphRevision,
+    idSeed: `${snapshot.activeImagePath}:${currentGraphRevision}:${parsedRequest.requestId}:current`,
+    longEdgePx: parsedRequest.longEdgePx,
+    maxPixelCount: parsedRequest.maxPixelCount,
+    previewRef: snapshot.initialPreview.previewRef,
+    quality: parsedRequest.quality,
+    recipeHash: currentRecipeHash,
+    renderHash: snapshot.initialPreview.renderHash,
+    role: 'current',
+    snapshot,
+  });
+
+  return agentPreviewCompareResponseSchema.parse({
+    compare: {
+      artifacts: [beforeArtifact, currentArtifact],
+      color: {
+        encodedProfile: 'srgb-preview',
+        outputProfile: 'srgb',
+        previewTransform: 'editor-preview-to-srgb-jpeg',
+        workingSpace: 'rawengine-scene-linear',
+      },
+      lineage: {
+        beforeGraphRevision,
+        beforeRecipeHash,
+        currentGraphRevision,
+        currentRecipeHash,
+        staleRecipeHash,
+      },
+      mediumPreview: {
+        longEdgePx: parsedRequest.longEdgePx,
+        maxPixelCount: parsedRequest.maxPixelCount,
+        quality: parsedRequest.quality,
+      },
+      scopeSummary: {
+        clipping: snapshot.clipping,
+        histogramChannels: snapshot.histogramSummary.map((entry) => entry.channel),
+        metadataKeys: snapshot.metadataSummary.map((entry) => entry.key),
+      },
+    },
+    requestId: parsedRequest.requestId,
+    staleRecipeHash,
+    toolName: AGENT_PREVIEW_COMPARE_TOOL_NAME,
   });
 };
