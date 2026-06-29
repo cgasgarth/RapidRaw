@@ -1155,6 +1155,25 @@ export const sampleComputationalMergeAppServerToolManifestV1: ComputationalMerge
         toolName: 'computationalmerge.panorama.apply_command',
       },
       {
+        allowedCommandTypes: ['computationalMerge.createPanorama'],
+        approvalClass: ApprovalClass.EditApply,
+        auditEvents: [
+          'computational_merge_derived_source_open_requested',
+          'computational_merge_derived_source_open_completed',
+        ],
+        description:
+          'Open an approved panorama output as an editable derived source after receipt and stale-state validation.',
+        executionMode: 'open_derived_source',
+        inputSchemaName: 'ComputationalMergeDerivedSourceOpenRequestV1',
+        localOnly: true,
+        mutates: true,
+        outputSchemaName: 'ComputationalMergeDerivedSourceOpenResultV1',
+        recordsProvenance: true,
+        requiresDryRunPlan: true,
+        returnsArtifactHandles: true,
+        toolName: 'computationalmerge.panorama.open_derived_source',
+      },
+      {
         allowedCommandTypes: ['computationalMerge.createHdr'],
         approvalClass: ApprovalClass.PreviewOnly,
         auditEvents: ['computational_merge_dry_run_requested', 'computational_merge_dry_run_completed'],
@@ -1184,6 +1203,25 @@ export const sampleComputationalMergeAppServerToolManifestV1: ComputationalMerge
         requiresDryRunPlan: true,
         returnsArtifactHandles: true,
         toolName: 'computationalmerge.hdr.apply_command',
+      },
+      {
+        allowedCommandTypes: ['computationalMerge.createHdr'],
+        approvalClass: ApprovalClass.EditApply,
+        auditEvents: [
+          'computational_merge_derived_source_open_requested',
+          'computational_merge_derived_source_open_completed',
+        ],
+        description:
+          'Open an approved HDR output as an editable derived source after receipt and stale-state validation.',
+        executionMode: 'open_derived_source',
+        inputSchemaName: 'ComputationalMergeDerivedSourceOpenRequestV1',
+        localOnly: true,
+        mutates: true,
+        outputSchemaName: 'ComputationalMergeDerivedSourceOpenResultV1',
+        recordsProvenance: true,
+        requiresDryRunPlan: true,
+        returnsArtifactHandles: true,
+        toolName: 'computationalmerge.hdr.open_derived_source',
       },
       {
         allowedCommandTypes: ['computationalMerge.createFocusStack'],
@@ -1218,6 +1256,25 @@ export const sampleComputationalMergeAppServerToolManifestV1: ComputationalMerge
         toolName: 'computationalmerge.focus_stack.apply_command',
       },
       {
+        allowedCommandTypes: ['computationalMerge.createFocusStack'],
+        approvalClass: ApprovalClass.EditApply,
+        auditEvents: [
+          'computational_merge_derived_source_open_requested',
+          'computational_merge_derived_source_open_completed',
+        ],
+        description:
+          'Open an approved focus stack output as an editable derived source after receipt and stale-state validation.',
+        executionMode: 'open_derived_source',
+        inputSchemaName: 'ComputationalMergeDerivedSourceOpenRequestV1',
+        localOnly: true,
+        mutates: true,
+        outputSchemaName: 'ComputationalMergeDerivedSourceOpenResultV1',
+        recordsProvenance: true,
+        requiresDryRunPlan: true,
+        returnsArtifactHandles: true,
+        toolName: 'computationalmerge.focus_stack.open_derived_source',
+      },
+      {
         allowedCommandTypes: ['computationalMerge.createSuperResolution'],
         approvalClass: ApprovalClass.PreviewOnly,
         auditEvents: ['computational_merge_dry_run_requested', 'computational_merge_dry_run_completed'],
@@ -1248,6 +1305,25 @@ export const sampleComputationalMergeAppServerToolManifestV1: ComputationalMerge
         requiresDryRunPlan: true,
         returnsArtifactHandles: true,
         toolName: 'computationalmerge.super_resolution.apply_command',
+      },
+      {
+        allowedCommandTypes: ['computationalMerge.createSuperResolution'],
+        approvalClass: ApprovalClass.EditApply,
+        auditEvents: [
+          'computational_merge_derived_source_open_requested',
+          'computational_merge_derived_source_open_completed',
+        ],
+        description:
+          'Open an approved super-resolution output as an editable derived source after receipt and stale-state validation.',
+        executionMode: 'open_derived_source',
+        inputSchemaName: 'ComputationalMergeDerivedSourceOpenRequestV1',
+        localOnly: true,
+        mutates: true,
+        outputSchemaName: 'ComputationalMergeDerivedSourceOpenResultV1',
+        recordsProvenance: true,
+        requiresDryRunPlan: true,
+        returnsArtifactHandles: true,
+        toolName: 'computationalmerge.super_resolution.open_derived_source',
       },
     ],
   });

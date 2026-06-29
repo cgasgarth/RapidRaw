@@ -3400,6 +3400,191 @@ export const computationalMergeMutationResultV1Schema = z
   })
   .strict();
 
+export const computationalMergeDerivedSourceReceiptIdentityV1Schema = z
+  .object({
+    acceptedDryRunPlanHash: z.string().trim().min(1),
+    acceptedDryRunPlanId: z.string().trim().min(1),
+    family: computationalMergeFamilyV1Schema,
+    openInEditorAction: z
+      .object({
+        path: z.string().trim().min(1).optional(),
+        state: z.enum(['available', 'deferred', 'unavailable']),
+      })
+      .strict(),
+    outputArtifactId: z.string().trim().min(1),
+    outputContentHash: z.string().trim().min(1),
+    outputPath: z.string().trim().min(1).optional(),
+    provenanceSidecarPath: z.string().trim().min(1).optional(),
+    receiptId: z.string().trim().min(1),
+    settingsHash: z.string().trim().min(1),
+    sourceGraphRevisions: z.array(z.string().trim().min(1)).min(1),
+    staleReasons: z.array(z.string().trim().min(1)).optional(),
+    staleState: z.enum(['current', 'stale', 'unknown']),
+  })
+  .strict()
+  .superRefine((receipt, context) => {
+    if (receipt.openInEditorAction.state === 'available' && receipt.openInEditorAction.path === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Available computational derived-source receipts require an open path.',
+        path: ['openInEditorAction', 'path'],
+      });
+    }
+    if (receipt.staleState === 'stale' && (receipt.staleReasons?.length ?? 0) === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Stale computational derived-source receipts require stale reasons.',
+        path: ['staleReasons'],
+      });
+    }
+  });
+
+const computationalMergeFamilyForCommandType = (
+  commandType: z.infer<typeof computationalMergeCommandTypeV1Schema>,
+): z.infer<typeof computationalMergeFamilyV1Schema> => {
+  switch (commandType) {
+    case 'computationalMerge.createFocusStack':
+      return 'focus_stack';
+    case 'computationalMerge.createHdr':
+      return 'hdr';
+    case 'computationalMerge.createPanorama':
+      return 'panorama';
+    case 'computationalMerge.createSuperResolution':
+      return 'super_resolution';
+  }
+};
+
+export const computationalMergeDerivedSourceOpenRequestV1Schema = z
+  .object({
+    actor: rawEngineActorSchema,
+    approval: approvalRequirementSchema,
+    command: computationalMergeCommandEnvelopeV1Schema,
+    correlationId: z.string().trim().min(1),
+    currentGraphRevision: z.string().trim().min(1),
+    mutationResult: computationalMergeMutationResultV1Schema,
+    receipt: computationalMergeDerivedSourceReceiptIdentityV1Schema,
+    requestId: z.string().trim().min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+  })
+  .strict()
+  .superRefine((request, context) => {
+    if (request.approval.approvalClass !== ApprovalClass.EditApply) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Opening computational derived sources requires edit-apply approval classification.',
+        path: ['approval', 'approvalClass'],
+      });
+    }
+
+    if (request.approval.state !== 'approved') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Opening computational derived sources requires approved user approval.',
+        path: ['approval', 'state'],
+      });
+    }
+
+    if (request.command.dryRun) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Computational derived-source open requests must reference an applied command.',
+        path: ['command', 'dryRun'],
+      });
+    }
+
+    if (request.command.commandType !== request.mutationResult.commandType) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Computational derived-source open requests must match the mutation command type.',
+        path: ['mutationResult', 'commandType'],
+      });
+    }
+
+    const family = computationalMergeFamilyForCommandType(request.command.commandType);
+    if (request.receipt.family !== family) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Computational derived-source receipt family must match the applied command family.',
+        path: ['receipt', 'family'],
+      });
+    }
+
+    if (request.receipt.acceptedDryRunPlanId !== request.command.parameters.acceptedDryRunPlanId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Computational derived-source receipt must identify the approved dry-run plan id.',
+        path: ['receipt', 'acceptedDryRunPlanId'],
+      });
+    }
+
+    if (request.receipt.acceptedDryRunPlanHash !== request.command.parameters.acceptedDryRunPlanHash) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Computational derived-source receipt must identify the approved dry-run plan hash.',
+        path: ['receipt', 'acceptedDryRunPlanHash'],
+      });
+    }
+
+    if (request.receipt.staleState !== 'current') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Computational derived-source receipts must be current before apply/open mutation.',
+        path: ['receipt', 'staleState'],
+      });
+    }
+
+    if (request.currentGraphRevision !== request.mutationResult.appliedGraphRevision) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Computational derived-source open requests require the current graph revision to match apply output.',
+        path: ['currentGraphRevision'],
+      });
+    }
+
+    if (request.receipt.outputArtifactId !== request.mutationResult.derivedAssetId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Computational derived-source receipt output artifact must match the applied derived asset.',
+        path: ['receipt', 'outputArtifactId'],
+      });
+    }
+
+    if (
+      !request.mutationResult.outputArtifacts.some(
+        (artifact) => artifact.contentHash === request.receipt.outputContentHash,
+      )
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Computational derived-source receipt output hash must match an applied output artifact.',
+        path: ['receipt', 'outputContentHash'],
+      });
+    }
+
+    if (request.receipt.openInEditorAction.state !== 'available') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Computational derived-source receipts must expose an available open action.',
+        path: ['receipt', 'openInEditorAction', 'state'],
+      });
+    }
+  });
+
+export const computationalMergeDerivedSourceOpenResultV1Schema = z
+  .object({
+    appliedGraphRevision: z.string().trim().min(1),
+    derivedSourceId: z.string().trim().min(1),
+    family: computationalMergeFamilyV1Schema,
+    mutates: z.literal(true),
+    openPath: z.string().trim().min(1),
+    outputArtifactId: z.string().trim().min(1),
+    provenanceSidecarPath: z.string().trim().min(1).optional(),
+    receiptId: z.string().trim().min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceMutationCommandId: z.string().trim().min(1),
+  })
+  .strict();
+
 export const hdrCapabilityLevelV1Schema = z.enum(['schema_only', 'plan_only', 'dry_run_only', 'runtime_apply_capable']);
 
 export const hdrMergeWarningCodeV1Schema = z.enum([
@@ -9311,13 +9496,19 @@ export const negativeLabAppServerToolManifestV1Schema = z
   })
   .strict();
 
-export const computationalMergeAppServerExecutionModeV1Schema = z.enum(['dry_run_command', 'apply_dry_run_plan']);
+export const computationalMergeAppServerExecutionModeV1Schema = z.enum([
+  'apply_dry_run_plan',
+  'dry_run_command',
+  'open_derived_source',
+]);
 
 export const computationalMergeAppServerAuditEventV1Schema = z.enum([
   'computational_merge_dry_run_requested',
   'computational_merge_dry_run_completed',
   'computational_merge_apply_requested',
   'computational_merge_apply_completed',
+  'computational_merge_derived_source_open_requested',
+  'computational_merge_derived_source_open_completed',
 ]);
 
 export const computationalMergeAppServerToolDefinitionV1Schema = z
@@ -9433,6 +9624,48 @@ export const computationalMergeAppServerToolDefinitionV1Schema = z
       }
     }
 
+    if (tool.executionMode === 'open_derived_source') {
+      if (tool.inputSchemaName !== 'ComputationalMergeDerivedSourceOpenRequestV1') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Computational merge derived-source tools must accept ComputationalMergeDerivedSourceOpenRequestV1.',
+          path: ['inputSchemaName'],
+        });
+      }
+
+      if (tool.outputSchemaName !== 'ComputationalMergeDerivedSourceOpenResultV1') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Computational merge derived-source tools must return ComputationalMergeDerivedSourceOpenResultV1.',
+          path: ['outputSchemaName'],
+        });
+      }
+
+      if (!tool.mutates) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Computational merge derived-source tools must be marked as mutating.',
+          path: ['mutates'],
+        });
+      }
+
+      if (!tool.requiresDryRunPlan) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Computational merge derived-source tools must require the accepted dry-run plan receipt.',
+          path: ['requiresDryRunPlan'],
+        });
+      }
+
+      if (tool.approvalClass !== ApprovalClass.EditApply) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Computational merge derived-source tools require edit-apply approval classification.',
+          path: ['approvalClass'],
+        });
+      }
+    }
+
     if ((tool.mutates || tool.returnsArtifactHandles) && !tool.recordsProvenance) {
       context.addIssue({
         code: 'custom',
@@ -9496,6 +9729,15 @@ export type ComputationalMergeAppServerToolDefinitionV1 = z.infer<
 export type ComputationalMergeAppServerToolManifestV1 = z.infer<typeof computationalMergeAppServerToolManifestV1Schema>;
 export type ComputationalMergeCommandEnvelopeV1 = z.infer<typeof computationalMergeCommandEnvelopeV1Schema>;
 export type ComputationalMergeCommandTypeV1 = z.infer<typeof computationalMergeCommandTypeV1Schema>;
+export type ComputationalMergeDerivedSourceOpenRequestV1 = z.infer<
+  typeof computationalMergeDerivedSourceOpenRequestV1Schema
+>;
+export type ComputationalMergeDerivedSourceOpenResultV1 = z.infer<
+  typeof computationalMergeDerivedSourceOpenResultV1Schema
+>;
+export type ComputationalMergeDerivedSourceReceiptIdentityV1 = z.infer<
+  typeof computationalMergeDerivedSourceReceiptIdentityV1Schema
+>;
 export type ComputationalMergeDryRunResultV1 = z.infer<typeof computationalMergeDryRunResultV1Schema>;
 export type ComputationalMergeEngineCapabilitiesV1 = z.infer<typeof computationalMergeEngineCapabilitiesV1Schema>;
 export type ComputationalMergeExecutionModeV1 = z.infer<typeof computationalMergeExecutionModeV1Schema>;

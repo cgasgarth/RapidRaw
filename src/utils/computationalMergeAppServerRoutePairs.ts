@@ -5,6 +5,7 @@ import type { ComputationalMergeAppServerRouteFamily } from '../schemas/computat
 interface ComputationalMergeAppServerRoutePairSummary {
   applyToolName: string;
   dryRunToolName: string;
+  openDerivedSourceToolName: string;
 }
 
 const buildComputationalMergeAppServerRoutePairSummary = (
@@ -13,6 +14,7 @@ const buildComputationalMergeAppServerRoutePairSummary = (
   return {
     applyToolName: getComputationalMergeAppServerToolName(family, 'apply_command'),
     dryRunToolName: getComputationalMergeAppServerToolName(family, 'dry_run_command'),
+    openDerivedSourceToolName: getComputationalMergeAppServerToolName(family, 'open_derived_source'),
   };
 };
 

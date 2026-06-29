@@ -4,6 +4,7 @@ export * from './brushMaskCommandRuntime.js';
 export * from './focusStackPreflight.js';
 export * from './computationalMergeWarningCodes.js';
 export * from './computationalMergeRuntimeResultBuilders.js';
+export * from './computationalMergeDerivedSourceRuntime.js';
 export * from './focusStackAppServerRuntime.js';
 export * from './focusStackAlignmentRuntime.js';
 export * from './focusStackRuntimePlan.js';

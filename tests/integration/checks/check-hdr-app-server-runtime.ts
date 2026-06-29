@@ -3,6 +3,7 @@
 import { z } from 'zod';
 
 import { HdrAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/hdrAppServerRuntime.ts';
+import { openComputationalMergeDerivedSourceV1 } from '../../../packages/rawengine-schema/src/computationalMergeDerivedSourceRuntime.ts';
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
@@ -169,6 +170,54 @@ if (applied.kind !== 'apply') throw new Error('Expected HDR apply dispatch resul
 if (applied.apply.provenance.alignmentConfidence < 0.99) {
   throw new Error(`Expected alignment confidence >= 0.99, got ${applied.apply.provenance.alignmentConfidence}.`);
 }
+const derivedSourceReceipt = buildDerivedSourceReceiptIdentity(applyCommand, applied.apply.mutationResult);
+const openedDerivedSource = openComputationalMergeDerivedSourceV1({
+  actor: applyCommand.actor,
+  approval: applyCommand.approval,
+  command: applyCommand,
+  correlationId: 'corr_hdr_app_server_runtime_open_derived_source',
+  currentGraphRevision: applied.apply.mutationResult.appliedGraphRevision,
+  mutationResult: applied.apply.mutationResult,
+  receipt: derivedSourceReceipt,
+  requestId: 'request_hdr_app_server_runtime_open_derived_source',
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+});
+if (openedDerivedSource.openPath !== derivedSourceReceipt.openInEditorAction.path) {
+  throw new Error('Expected HDR derived-source open result to use the receipt open path.');
+}
+expectThrows('stale HDR derived-source receipt', () =>
+  openComputationalMergeDerivedSourceV1({
+    actor: applyCommand.actor,
+    approval: applyCommand.approval,
+    command: applyCommand,
+    correlationId: 'corr_hdr_app_server_runtime_open_stale_derived_source',
+    currentGraphRevision: applied.apply.mutationResult.appliedGraphRevision,
+    mutationResult: applied.apply.mutationResult,
+    receipt: {
+      ...derivedSourceReceipt,
+      staleReasons: ['source_graph_revision_changed'],
+      staleState: 'stale',
+    },
+    requestId: 'request_hdr_app_server_runtime_open_stale_derived_source',
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  }),
+);
+expectThrows('mismatched HDR derived-source receipt identity', () =>
+  openComputationalMergeDerivedSourceV1({
+    actor: applyCommand.actor,
+    approval: applyCommand.approval,
+    command: applyCommand,
+    correlationId: 'corr_hdr_app_server_runtime_open_mismatched_receipt',
+    currentGraphRevision: applied.apply.mutationResult.appliedGraphRevision,
+    mutationResult: applied.apply.mutationResult,
+    receipt: {
+      ...derivedSourceReceipt,
+      acceptedDryRunPlanHash: 'sha256:stale-plan-hash',
+    },
+    requestId: 'request_hdr_app_server_runtime_open_mismatched_receipt',
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  }),
+);
 
 expectThrows('unaccepted HDR apply plan', () =>
   new HdrAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1).execute({
@@ -208,6 +257,7 @@ console.log(
     alignmentConfidence: applied.apply.provenance.alignmentConfidence,
     fixture: 'synthetic_hdr_app_server_runtime_v1',
     motionCoverageRatio: applied.apply.provenance.motionCoverageRatio,
+    openedDerivedSourceId: openedDerivedSource.derivedSourceId,
     outputSha256: new Bun.CryptoHasher('sha256')
       .update(new Uint8Array(applied.apply.mergedPixels.buffer))
       .digest('hex'),
@@ -255,6 +305,28 @@ function assertPreviewArtifactHandle(toolResult, artifactId) {
   if (!toolResult.dryRun.dryRunResult.previewArtifacts.some((artifact) => artifact.artifactId === artifactId)) {
     throw new Error(`Expected HDR dry-run preview artifacts to include ${artifactId}.`);
   }
+}
+
+function buildDerivedSourceReceiptIdentity(command, mutationResult) {
+  const outputArtifact = mutationResult.outputArtifacts[0];
+  if (outputArtifact === undefined) throw new Error('Expected HDR apply to return an output artifact.');
+  return {
+    acceptedDryRunPlanHash: command.parameters.acceptedDryRunPlanHash,
+    acceptedDryRunPlanId: command.parameters.acceptedDryRunPlanId,
+    family: 'hdr',
+    openInEditorAction: {
+      path: `/synthetic/hdr/${mutationResult.derivedAssetId}.dng`,
+      state: 'available',
+    },
+    outputArtifactId: mutationResult.derivedAssetId,
+    outputContentHash: outputArtifact.contentHash,
+    outputPath: `/synthetic/hdr/${mutationResult.derivedAssetId}.dng`,
+    provenanceSidecarPath: `/synthetic/hdr/${mutationResult.derivedAssetId}.dng.rrdata`,
+    receiptId: `derived_output_hdr_${mutationResult.derivedAssetId}`,
+    settingsHash: 'fnv1a32:hdr-app-server-runtime-settings',
+    sourceGraphRevisions: command.parameters.sources.map(() => command.expectedGraphRevision),
+    staleState: 'current',
+  };
 }
 
 function createScene(width, height) {

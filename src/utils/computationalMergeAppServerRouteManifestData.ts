@@ -9,6 +9,8 @@ import type {
 const dryRunOutputSchemaName = 'ComputationalMergeDryRunResultV1';
 const applyOutputSchemaName = 'ComputationalMergeMutationResultV1';
 const inputSchemaName = 'ComputationalMergeCommandEnvelopeV1';
+const openDerivedSourceInputSchemaName = 'ComputationalMergeDerivedSourceOpenRequestV1';
+const openDerivedSourceOutputSchemaName = 'ComputationalMergeDerivedSourceOpenResultV1';
 
 export const COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_MANIFEST_DATA = {
   routes: [
@@ -35,6 +37,17 @@ export const COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_MANIFEST_DATA = {
       toolName: getComputationalMergeAppServerToolName('hdr', 'apply_command'),
     },
     {
+      commandType: 'computationalMerge.createHdr',
+      executionMode: 'open_derived_source',
+      family: 'hdr',
+      inputSchemaName: openDerivedSourceInputSchemaName,
+      outputSchemaName: openDerivedSourceOutputSchemaName,
+      reason: 'HDR derived-source open requires an approved apply result plus a current matching receipt.',
+      runtimeCheckScript: 'check:hdr-app-server-runtime',
+      status: 'mapped',
+      toolName: getComputationalMergeAppServerToolName('hdr', 'open_derived_source'),
+    },
+    {
       commandType: 'computationalMerge.createPanorama',
       executionMode: 'dry_run_command',
       family: 'panorama',
@@ -55,6 +68,17 @@ export const COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_MANIFEST_DATA = {
       runtimeCheckScript: 'check:panorama-app-server-runtime',
       status: 'mapped',
       toolName: getComputationalMergeAppServerToolName('panorama', 'apply_command'),
+    },
+    {
+      commandType: 'computationalMerge.createPanorama',
+      executionMode: 'open_derived_source',
+      family: 'panorama',
+      inputSchemaName: openDerivedSourceInputSchemaName,
+      outputSchemaName: openDerivedSourceOutputSchemaName,
+      reason: 'Panorama derived-source open requires an approved apply result plus a current matching receipt.',
+      runtimeCheckScript: 'check:panorama-app-server-runtime',
+      status: 'mapped',
+      toolName: getComputationalMergeAppServerToolName('panorama', 'open_derived_source'),
     },
     {
       commandType: 'computationalMerge.createFocusStack',
@@ -79,6 +103,17 @@ export const COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_MANIFEST_DATA = {
       toolName: getComputationalMergeAppServerToolName('focus_stack', 'apply_command'),
     },
     {
+      commandType: 'computationalMerge.createFocusStack',
+      executionMode: 'open_derived_source',
+      family: 'focus_stack',
+      inputSchemaName: openDerivedSourceInputSchemaName,
+      outputSchemaName: openDerivedSourceOutputSchemaName,
+      reason: 'Focus stack derived-source open requires an approved apply result plus a current matching receipt.',
+      runtimeCheckScript: 'check:focus-app-server-runtime',
+      status: 'mapped',
+      toolName: getComputationalMergeAppServerToolName('focus_stack', 'open_derived_source'),
+    },
+    {
       commandType: 'computationalMerge.createSuperResolution',
       executionMode: 'dry_run_command',
       family: 'super_resolution',
@@ -99,6 +134,17 @@ export const COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_MANIFEST_DATA = {
       runtimeCheckScript: 'check:sr-app-server-runtime',
       status: 'mapped',
       toolName: getComputationalMergeAppServerToolName('super_resolution', 'apply_command'),
+    },
+    {
+      commandType: 'computationalMerge.createSuperResolution',
+      executionMode: 'open_derived_source',
+      family: 'super_resolution',
+      inputSchemaName: openDerivedSourceInputSchemaName,
+      outputSchemaName: openDerivedSourceOutputSchemaName,
+      reason: 'Super-resolution derived-source open requires an approved apply result plus a current matching receipt.',
+      runtimeCheckScript: 'check:sr-app-server-runtime',
+      status: 'mapped',
+      toolName: getComputationalMergeAppServerToolName('super_resolution', 'open_derived_source'),
     },
   ],
   schemaVersion: 1,
