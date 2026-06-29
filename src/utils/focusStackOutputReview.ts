@@ -8,6 +8,7 @@ interface BuildFocusStackOutputReviewOptions {
   artifactPath: string;
   settings: FocusStackUiSettings;
   sourceCount: number;
+  sourcePaths?: string[];
 }
 
 const sharpnessCoverageRatio = 1;
@@ -19,6 +20,7 @@ export const buildFocusStackOutputReviewWorkflow = ({
   artifactPath,
   settings,
   sourceCount,
+  sourcePaths = [],
 }: BuildFocusStackOutputReviewOptions): FocusStackOutputReviewWorkflow => {
   const decision = settings.blendMethod === 'weighted_sharpness' ? 'editable_review_required' : 'preview_only';
   const warningCodes: FocusStackOutputReviewWorkflow['warningCodes'] =
@@ -84,14 +86,25 @@ export const buildFocusStackOutputReviewWorkflow = ({
     },
     sharpnessCoverageRatio,
     sourceCount,
+    sourceRefs: buildSourceRefs(sourceCount, sourcePaths),
     warningCodes,
   });
 };
 
 export const buildFocusStackOutputReviewFromArtifact = (
   artifact: FocusStackArtifactV1,
-): FocusStackOutputReviewWorkflow =>
-  focusStackOutputReviewWorkflowSchema.parse({
+): FocusStackOutputReviewWorkflow => {
+  const sourceRefs = artifact.sourceImageRefs.map((source, sourceIndex) => {
+    const sourceState = artifact.sourceState.find((state) => state.sourceIndex === source.sourceIndex);
+    return {
+      contentHash: sourceState?.contentHash ?? hashStableJson({ path: source.imagePath, sourceIndex }),
+      graphRevision: sourceState?.graphRevision ?? `focus_stack_source_${sourceIndex}`,
+      path: source.imagePath,
+      sourceIndex,
+    };
+  });
+
+  return focusStackOutputReviewWorkflowSchema.parse({
     alignmentMode: artifact.resolvedAlignmentMode,
     artifactPath: artifact.outputArtifact.artifactId,
     blendMethod: artifact.blendMethod,
@@ -129,7 +142,20 @@ export const buildFocusStackOutputReviewFromArtifact = (
     },
     sharpnessCoverageRatio: artifact.validationSummary.focusCoverageRatio,
     sourceCount: artifact.sourceImageRefs.length,
+    sourceRefs,
     warningCodes: ['human_review_required', 'synthetic_runtime_only', 'transition_halo_risk', 'retouch_layer_deferred'],
+  });
+};
+
+const buildSourceRefs = (sourceCount: number, sourcePaths: string[]): FocusStackOutputReviewWorkflow['sourceRefs'] =>
+  Array.from({ length: sourceCount }, (_value, sourceIndex) => {
+    const path = sourcePaths[sourceIndex] ?? `focus-stack-source-${sourceIndex}`;
+    return {
+      contentHash: hashStableJson({ path, sourceIndex }),
+      graphRevision: `focus_stack_source_${sourceIndex}`,
+      path,
+      sourceIndex,
+    };
   });
 
 const buildSourceContributionSummary = (
@@ -171,3 +197,25 @@ const buildDefaultTransitionRiskRegions = (
   }));
 
 const roundRatio = (value: number): number => Number(value.toFixed(6));
+
+const hashStableJson = (value: unknown): string => `fnv1a32:${fnv1a32(stableJson(value))}`;
+
+const stableJson = (value: unknown): string => {
+  if (Array.isArray(value)) return `[${value.map((item) => stableJson(item)).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+};
+
+const fnv1a32 = (value: string): string => {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+};

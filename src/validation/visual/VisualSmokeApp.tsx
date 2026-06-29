@@ -3033,6 +3033,12 @@ function FocusPrivateRawModalReviewSmoke() {
     },
     sharpnessCoverageRatio: 0.91,
     sourceCount,
+    sourceRefs: Array.from({ length: sourceCount }, (_value, sourceIndex) => ({
+      contentHash: `fnv1a32:focus-private-source-${sourceIndex}`,
+      graphRevision: `focus_private_source_${sourceIndex}`,
+      path: `${proof.stackPath}:source-${sourceIndex}`,
+      sourceIndex,
+    })),
     warningCodes: ['human_review_required', 'synthetic_runtime_only', 'transition_halo_risk', 'retouch_layer_deferred'],
   };
 
@@ -3068,6 +3074,7 @@ function FocusPrivateRawModalReviewSmoke() {
         outputReviewArtifactPath={proof.stackPath}
         settings={settings}
         sourceCount={sourceCount}
+        sourcePaths={outputReview.sourceRefs.map((source) => source.path)}
       />
     </main>
   );

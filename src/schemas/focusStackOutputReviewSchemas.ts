@@ -22,6 +22,15 @@ export const focusStackSourceContributionWarningStateSchema = z.enum(['artifact_
 export const focusStackEditableHandoffStatusSchema = z.enum(['blocked', 'ready', 'review_required']);
 export const focusStackHaloReviewStatusSchema = z.enum(['apply_ready', 'blocked', 'review_required']);
 
+const focusStackSourceRefSchema = z
+  .object({
+    contentHash: z.string().trim().min(1),
+    graphRevision: z.string().trim().min(1),
+    path: z.string().trim().min(1),
+    sourceIndex: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export const focusStackOutputReviewWorkflowSchema = z
   .object({
     alignmentMode: focusStackAlignmentModeSchema,
@@ -104,8 +113,18 @@ export const focusStackOutputReviewWorkflowSchema = z
       .strict(),
     sharpnessCoverageRatio: z.number().min(0).max(1),
     sourceCount: z.number().int().min(2),
+    sourceRefs: z.array(focusStackSourceRefSchema).min(2),
     warningCodes: z.array(focusStackOutputReviewWarningSchema).min(1),
   })
-  .strict();
+  .strict()
+  .superRefine((workflow, context) => {
+    if (workflow.sourceRefs.length !== workflow.sourceCount) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Focus stack sourceRefs length must match sourceCount.',
+        path: ['sourceRefs'],
+      });
+    }
+  });
 
 export type FocusStackOutputReviewWorkflow = z.infer<typeof focusStackOutputReviewWorkflowSchema>;
