@@ -769,11 +769,16 @@ export default function Waveform({
       <div
         className="absolute left-2 top-2 z-20 max-w-[calc(100%-1rem)] rounded bg-black/60 px-2 py-1 text-[10px] text-white/80 backdrop-blur"
         data-display-transform-label={previewScopeStatus?.displayTransformLabel ?? ''}
+        data-export-profile-label={previewScopeStatus?.exportProfileLabel ?? ''}
+        data-export-rendering-intent-label={previewScopeStatus?.exportRenderingIntentLabel ?? ''}
         data-preview-scope-ready={String(
           Boolean(previewScopeStatus?.histogramReady && previewScopeStatus.waveformReady),
         )}
+        data-preview-scope-render-basis={previewScopeStatus?.renderBasis ?? ''}
         data-preview-scope-source={previewScopeStatus?.sourceLabel ?? ''}
+        data-preview-scope-soft-proof-transform-applied={String(previewScopeStatus?.softProofTransformApplied ?? '')}
         data-preview-scope-updated-at={previewScopeStatus?.updatedAt ?? ''}
+        data-preview-scope-warning-codes={previewScopeStatus?.warningCodes.join(',') ?? ''}
         data-testid="preview-scope-status"
         data-working-transform-label={previewScopeStatus?.workingTransformLabel ?? ''}
       >

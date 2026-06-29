@@ -40,12 +40,17 @@ export interface ExportSoftProofTransformState {
 
 export interface PreviewScopeStatus {
   displayTransformLabel: string;
+  exportProfileLabel: string | null;
+  exportRenderingIntentLabel: string | null;
   histogramReady: boolean;
   path: string;
+  renderBasis: 'display_referred' | 'editor_preview' | 'export_preview' | 'working_rgb';
+  softProofTransformApplied: boolean;
   sourceLabel: string;
   updatedAt: string;
   waveformReady: boolean;
   workingTransformLabel: string;
+  warningCodes: string[];
 }
 
 interface EditorState {

@@ -395,6 +395,46 @@ export const previewScopeRenderBasisV1Schema = z.enum([
   'export_preview',
 ]);
 
+export const previewScopeSoftProofWarningCodeV1Schema = z.enum([
+  'export_profile_transform_applied',
+  'export_profile_transform_missing',
+  'gamut_warning_available',
+  'render_target_matches_export_recipe',
+]);
+
+export const previewScopeSoftProofMetadataV1Schema = z
+  .object({
+    basis: z.literal('export_preview'),
+    bitDepth: rawEngineRenderBitDepthV1Schema,
+    embedIcc: z.boolean(),
+    outputProfile: rawEngineOutputProfileV1Schema,
+    renderingIntent: rawEngineRenderingIntentV1Schema,
+    transformApplied: z.boolean(),
+    transformPolicyFingerprint: z
+      .string()
+      .trim()
+      .regex(/^sha256:/u),
+    viewTransform: rawEngineSceneToDisplayTransformV1Schema,
+    warningCodes: z.array(previewScopeSoftProofWarningCodeV1Schema),
+  })
+  .strict()
+  .superRefine((metadata, context) => {
+    if (metadata.transformApplied && !metadata.warningCodes.includes('export_profile_transform_applied')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Applied export-preview scope transforms must report export_profile_transform_applied.',
+        path: ['warningCodes'],
+      });
+    }
+    if (!metadata.transformApplied && !metadata.warningCodes.includes('export_profile_transform_missing')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Missing export-preview scope transforms must report export_profile_transform_missing.',
+        path: ['warningCodes'],
+      });
+    }
+  });
+
 export const previewScopeQueryV1Schema = queryEnvelopeV1Schema
   .extend({
     parameters: z
@@ -411,7 +451,16 @@ export const previewScopeQueryV1Schema = queryEnvelopeV1Schema
     queryType: z.literal('preview.scopes.read'),
     target: rawEngineTargetSchema.safeExtend({ kind: z.literal('image') }).strict(),
   })
-  .strict();
+  .strict()
+  .superRefine((query, context) => {
+    if (query.parameters.renderBasis === 'export_preview' && query.parameters.renderTarget === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Export-preview scope queries require an explicit render target.',
+        path: ['parameters', 'renderTarget'],
+      });
+    }
+  });
 
 export const previewHistogramChannelV1Schema = z
   .object({
@@ -482,6 +531,7 @@ export const previewScopeResultV1Schema = z
     renderBasis: previewScopeRenderBasisV1Schema,
     rgbParade: previewRasterScopeV1Schema.optional(),
     schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    softProof: previewScopeSoftProofMetadataV1Schema.optional(),
     sourceArtifactId: z.string().trim().min(1).optional(),
     sourceImagePath: z.string().trim().min(1),
     vectorscope: previewRasterScopeV1Schema.optional(),
@@ -517,6 +567,23 @@ export const previewScopeResultV1Schema = z
         message: 'Vectorscope payloads must use the vectorscope channel.',
         path: ['vectorscope', 'channel'],
       });
+    }
+
+    if (result.renderBasis === 'export_preview') {
+      if (result.softProof === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Export-preview scope results require soft-proof metadata.',
+          path: ['softProof'],
+        });
+      }
+      if (result.colorPipeline.renderTarget === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Export-preview scope results require color pipeline render target metadata.',
+          path: ['colorPipeline', 'renderTarget'],
+        });
+      }
     }
   });
 
