@@ -37,6 +37,12 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 ## Pull Requests
 
 - Max three active open PRs total.
+- Keep two PR-bound workstreams active whenever independent work exists: one PR
+  in CI/review and one separate implementation worktree in progress. A
+  workstream may be an open PR or a clearly scoped subagent-owned worktree that
+  is expected to become a PR.
+- Use subagents and worktrees to maintain those two workstreams when doing so
+  will not create file ownership conflicts or reduce review quality.
 - Before opening a PR, check the open PR queue with `gh` and keep every open
   PR moving toward merge, fix, close, or explicit deferral.
 - Every open PR must have a disposition: merge, fix, close, or explicitly
@@ -212,6 +218,8 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - While CI runs for one PR, use subagents for independent next slices, CI
   failure diagnosis, or PR queue monitoring instead of leaving the main agent
   idle.
+- If fewer than two PR-bound workstreams are active, start the next independent
+  issue in a worktree or delegate it to a subagent before idle polling.
 
 ## Validation And Quality
 
