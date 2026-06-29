@@ -5,6 +5,10 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::app_state::{PendingHdrMergePlan, PendingHdrSourceRef};
+use crate::derived_output_provenance::{
+    DerivedOutputProvenanceInput, DerivedOutputProvenanceSource,
+    build_derived_output_provenance_sidecar, stable_hash,
+};
 use crate::formats::is_raw_file;
 use crate::image_processing::{ImageMetadata, RawEngineArtifacts};
 
@@ -119,6 +123,7 @@ fn upsert_hdr_artifact_metadata(
     output_height: u32,
 ) -> Result<(), String> {
     let artifact_id = format!("artifact_hdr_{}", Uuid::new_v4().simple());
+    let output_artifact_id = format!("{}_output", artifact_id);
     let output_hash = hash_hdr_output_file(output_path)?;
     let reference_index = source_refs.len() / 2;
     let source_image_refs = source_refs
@@ -190,6 +195,35 @@ fn upsert_hdr_artifact_metadata(
         })
         .collect::<Vec<_>>();
 
+    let settings_hash = stable_hash(&serde_json::json!({
+        "deghosting": "off",
+        "engineId": HDR_ENGINE_ID,
+        "mergeStrategy": HDR_MERGE_STRATEGY,
+        "outputEncoding": "display_referred_preview",
+        "previewToneMapped": true,
+        "workingColorSpace": HDR_WORKING_COLOR_SPACE,
+    }));
+    let provenance_sources = source_refs
+        .iter()
+        .map(|source| DerivedOutputProvenanceSource {
+            content_hash: format!("path:{}", source.image_path),
+            graph_revision: HDR_GRAPH_REVISION,
+            path: &source.image_path,
+        })
+        .collect::<Vec<_>>();
+    let derived_output_provenance =
+        build_derived_output_provenance_sidecar(DerivedOutputProvenanceInput {
+            accepted_apply_id: Some(&artifact_id),
+            accepted_dry_run_id: Some(&runtime_plan.accepted_dry_run_plan_id),
+            family: "hdr",
+            output_artifact_id: &output_artifact_id,
+            output_content_hash: &output_hash,
+            output_path,
+            settings_hash,
+            sources: provenance_sources,
+            warnings: vec![HDR_WARNING_TONE_MAPPED_PREVIEW_ONLY],
+        });
+
     let artifact = serde_json::json!({
         "alignment": {
             "alignmentConfidence": 0.7,
@@ -243,7 +277,7 @@ fn upsert_hdr_artifact_metadata(
         },
         "mergeStrategy": HDR_MERGE_STRATEGY,
         "outputArtifact": {
-            "artifactId": format!("{}_output", artifact_id),
+            "artifactId": output_artifact_id,
             "contentHash": output_hash,
             "dimensions": {
                 "height": output_height,
@@ -280,6 +314,9 @@ fn upsert_hdr_artifact_metadata(
         .get_or_insert_with(RawEngineArtifacts::new_v1);
     artifacts.schema_version = 1;
     artifacts.hdr_merge_artifacts.push(artifact);
+    artifacts
+        .derived_output_provenance_sidecars
+        .push(derived_output_provenance);
     artifacts.stale_artifact_ids.retain(|id| !id.is_empty());
     Ok(())
 }

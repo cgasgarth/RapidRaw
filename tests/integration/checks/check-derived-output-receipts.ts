@@ -53,6 +53,36 @@ const assertReceipt = (label: string, receipt: DerivedOutputReceipt): void => {
   if (receipt.openInEditorAction.state === 'available') {
     expect(receipt.openInEditorAction.path !== undefined, `${label}: available open action must include a path.`);
   }
+
+  if (receipt.outputPath !== undefined) {
+    expect(receipt.provenanceSidecar !== undefined, `${label}: exported output must include provenance sidecar.`);
+    expect(
+      receipt.provenanceSidecar?.receipt.receiptId === receipt.receiptId,
+      `${label}: sidecar receipt id must match receipt.`,
+    );
+    expect(
+      receipt.provenanceSidecar?.receipt.family === receipt.family,
+      `${label}: sidecar family must match receipt.`,
+    );
+    expect(
+      receipt.provenanceSidecar?.output.contentHash === receipt.outputContentHash,
+      `${label}: sidecar output hash must match receipt.`,
+    );
+    expect(receipt.provenanceSidecar?.output.path === receipt.outputPath, `${label}: sidecar output path must match.`);
+    expect(
+      receipt.provenanceSidecar?.sidecarPath === `${receipt.outputPath}.rrdata`,
+      `${label}: sidecar path must be colocated with export output.`,
+    );
+    expect(
+      receipt.provenanceSidecar?.sourceState.map((source) => source.order).join(',') ===
+        receipt.sourceContentHashes.map((_hash, index) => String(index)).join(','),
+      `${label}: sidecar must retain source order.`,
+    );
+    expect(
+      receipt.provenanceSidecar?.app.id === 'io.github.CyberTimon.RapidRAW',
+      `${label}: sidecar must include app metadata.`,
+    );
+  }
 };
 
 const hdrReceipt = buildHdrDerivedOutputReceipt({
@@ -129,6 +159,38 @@ const focusReceipt = buildFocusStackDerivedOutputReceipt({
   settings: DEFAULT_FOCUS_STACK_UI_SETTINGS,
 });
 
+const acceptedFocusReview = {
+  ...buildFocusStackOutputReviewWorkflow({
+    artifactPath: '/tmp/rawengine-focus-accepted-output.tif',
+    settings: DEFAULT_FOCUS_STACK_UI_SETTINGS,
+    sourceCount: 3,
+    sourcePaths: ['/tmp/focus-accepted-0.dng', '/tmp/focus-accepted-1.dng', '/tmp/focus-accepted-2.dng'],
+  }),
+  editableHandoff: {
+    ...buildFocusStackOutputReviewWorkflow({
+      artifactPath: '/tmp/rawengine-focus-accepted-output.tif',
+      settings: DEFAULT_FOCUS_STACK_UI_SETTINGS,
+      sourceCount: 3,
+      sourcePaths: ['/tmp/focus-accepted-0.dng', '/tmp/focus-accepted-1.dng', '/tmp/focus-accepted-2.dng'],
+    }).editableHandoff,
+    status: 'ready',
+  },
+  haloReview: {
+    ...buildFocusStackOutputReviewWorkflow({
+      artifactPath: '/tmp/rawengine-focus-accepted-output.tif',
+      settings: DEFAULT_FOCUS_STACK_UI_SETTINGS,
+      sourceCount: 3,
+      sourcePaths: ['/tmp/focus-accepted-0.dng', '/tmp/focus-accepted-1.dng', '/tmp/focus-accepted-2.dng'],
+    }).haloReview,
+    reviewStatus: 'apply_ready',
+  },
+} satisfies ReturnType<typeof buildFocusStackOutputReviewWorkflow>;
+
+const acceptedFocusReceipt = buildFocusStackDerivedOutputReceipt({
+  review: acceptedFocusReview,
+  settings: DEFAULT_FOCUS_STACK_UI_SETTINGS,
+});
+
 const superResolutionReceipt = buildSuperResolutionDerivedOutputReceipt({
   review: buildSuperResolutionOutputReviewWorkflow({
     artifactPath: 'artifact_sr_output',
@@ -170,6 +232,7 @@ for (const [label, receipt] of [
   ['hdr', hdrReceipt],
   ['panorama', panoramaReceipt],
   ['focus stack', focusReceipt],
+  ['accepted focus stack', acceptedFocusReceipt],
   ['super resolution', superResolutionReceipt],
   ['accepted super resolution', acceptedSuperResolutionReceipt],
 ] as const) {
@@ -211,6 +274,18 @@ expect(
   focusReceipt.sourceGraphRevisions.join(',') ===
     'focus_stack_source_0,focus_stack_source_1,focus_stack_source_2,focus_stack_source_3',
   'Focus receipt must retain source graph revisions.',
+);
+expect(
+  acceptedFocusReceipt.provenanceSidecar?.acceptedApplyId === acceptedFocusReview.editableHandoff.artifactId,
+  'Accepted focus receipt must include accepted apply id in sidecar.',
+);
+expect(
+  acceptedSuperResolutionReceipt.provenanceSidecar?.acceptedApplyId === acceptedSuperResolutionReview.outputArtifactId,
+  'Accepted SR receipt must include accepted apply id in sidecar.',
+);
+expect(
+  panoramaReceipt.provenanceSidecar?.warnings.join(',') === panoramaReview.warningCodes.join(','),
+  'Panorama sidecar must retain warning codes.',
 );
 
 useUIStore.getState().clearDerivedOutputReceipts();
@@ -305,6 +380,13 @@ const requiredPanelMarkers = [
   'data-derived-output-family',
   'data-derived-output-validation-status',
   'data-output-content-hash',
+  'data-sidecar-accepted-apply-id',
+  'data-sidecar-accepted-dry-run-id',
+  'data-sidecar-app-build-version',
+  'data-sidecar-output-path',
+  'data-sidecar-path',
+  'data-sidecar-source-order',
+  'data-sidecar-warning-codes',
   'data-source-content-hashes',
   'data-source-graph-revisions',
   'data-source-lineage-summary',
@@ -377,6 +459,15 @@ for (const marker of [
   "data-hdr-derived-source-open-path={visibleDerivedOutputReceipt.openInEditorAction.path ?? ''}",
 ]) {
   expect(hdrModalSource.includes(marker), `HDR modal missing applied derived-output persistence marker: ${marker}.`);
+}
+
+for (const [file, marker] of [
+  ['src-tauri/src/image_processing.rs', 'derived_output_provenance_sidecars'],
+  ['src-tauri/src/derived_output_provenance.rs', 'build_derived_output_provenance_sidecar'],
+  ['src-tauri/src/hdr_artifact_sidecar.rs', 'derived_output_provenance_sidecars'],
+  ['src-tauri/src/panorama_stitching.rs', 'derived_output_provenance_sidecars'],
+] as const) {
+  expect(readFileSync(file, 'utf8').includes(marker), `${file}: missing derived output sidecar marker ${marker}.`);
 }
 
 const panoramaModalSource = readFileSync('src/components/modals/PanoramaModal.tsx', 'utf8');

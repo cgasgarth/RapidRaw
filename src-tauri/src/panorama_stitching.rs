@@ -1,5 +1,9 @@
 use crate::app_settings::{AppSettings, load_settings_or_default};
 use crate::app_state::AppState;
+use crate::derived_output_provenance::{
+    DerivedOutputProvenanceInput, DerivedOutputProvenanceSource,
+    build_derived_output_provenance_sidecar, stable_hash,
+};
 use crate::file_management::parse_virtual_path;
 use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
@@ -1256,6 +1260,34 @@ fn upsert_panorama_artifact_metadata(
         .blend_diagnostics
         .overlap_gain_applications
         .is_empty();
+    let settings_hash = stable_hash(&json!({
+        "boundaryMode": metadata.effective_boundary_mode.as_str(),
+        "crop": crop,
+        "exposureNormalizationApplied": exposure_normalization_applied,
+        "projection": metadata.effective_projection.as_str(),
+        "seamPolicy": "adaptive_dp_feather_v1",
+    }));
+    let provenance_sources = source_refs
+        .iter()
+        .map(|source| DerivedOutputProvenanceSource {
+            content_hash: format!("path:{}", source.image_path),
+            graph_revision: "panorama_runtime_v1",
+            path: &source.image_path,
+        })
+        .collect::<Vec<_>>();
+    let warning_refs = warnings.iter().map(String::as_str).collect::<Vec<_>>();
+    let derived_output_provenance =
+        build_derived_output_provenance_sidecar(DerivedOutputProvenanceInput {
+            accepted_apply_id: Some("command_panorama_create"),
+            accepted_dry_run_id: Some("panorama_runtime_plan"),
+            family: "panorama",
+            output_artifact_id: &output_artifact_id,
+            output_content_hash: &output_hash,
+            output_path,
+            settings_hash,
+            sources: provenance_sources,
+            warnings: warning_refs,
+        });
 
     let artifact = json!({
         "alignment": {
@@ -1382,6 +1414,9 @@ fn upsert_panorama_artifact_metadata(
         .get_or_insert_with(RawEngineArtifacts::new_v1);
     artifacts.schema_version = 1;
     artifacts.panorama_artifacts.push(artifact);
+    artifacts
+        .derived_output_provenance_sidecars
+        .push(derived_output_provenance);
     artifacts.stale_artifact_ids.retain(|id| !id.is_empty());
     Ok(())
 }
