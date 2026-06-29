@@ -26,6 +26,11 @@ import {
   inferAgentSafetyOperationKind,
   type AgentSafetyPolicyDecision,
 } from '../../../utils/agentSafetyPolicy';
+import {
+  appendAgentSessionAuditRecord,
+  type AgentSessionAuditRecord,
+  type AgentSessionAuditStorageAdapter,
+} from '../../../utils/agentSessionAuditStore';
 
 import type {
   AgentArtifactReview,
@@ -158,6 +163,16 @@ interface LiveSessionReviewState {
   previewLineage: AgentMultiTurnAppServerSessionResult['previewLineage'];
   rollbackGraphRevision: string;
   rollbackState: 'available' | 'invalidated' | 'restored';
+  toolCallCount: number;
+}
+
+interface LiveAuditArtifactState {
+  artifactId: string;
+  finalGraphRevision: string;
+  persistedRecordCount: number;
+  previewCount: number;
+  rollbackGraphRevision: string;
+  sessionId: string;
   toolCallCount: number;
 }
 
@@ -387,6 +402,82 @@ const createLiveSessionEvent = (role: AgentChatMessage['role'], body: string, su
   timestamp: 'now',
 });
 
+const LIVE_AGENT_AUDIT_STORE_KEY = 'rawengine.agent.liveSessionAudit.v1';
+
+const createLocalAgentAuditStorageAdapter = (): AgentSessionAuditStorageAdapter | null => {
+  if (typeof globalThis.localStorage === 'undefined') return null;
+
+  return {
+    readText: () => globalThis.localStorage.getItem(LIVE_AGENT_AUDIT_STORE_KEY),
+    writeText: (value) => {
+      globalThis.localStorage.setItem(LIVE_AGENT_AUDIT_STORE_KEY, value);
+    },
+  };
+};
+
+const buildLiveAgentAuditRecord = ({
+  acceptedPrompt,
+  approvalId,
+  sessionResult,
+}: {
+  acceptedPrompt: string;
+  approvalId: string;
+  sessionResult: AgentMultiTurnAppServerSessionResult;
+}): AgentSessionAuditRecord => ({
+  approvalId,
+  artifactLineage: sessionResult.previewLineage.map((preview) => ({
+    artifactId: preview.artifactId,
+    contentHash: `sha256:${preview.renderHash}`,
+    graphRevision: preview.graphRevision,
+    sourceToolCallId: preview.toolCallId,
+  })),
+  finalGraphRevision: sessionResult.finalGraphRevision,
+  initialGraphRevision: sessionResult.initialContext.imageContext.graphRevision,
+  modelId: sessionResult.modelId,
+  planSummary: sessionResult.editReview.finalRationale,
+  prompt: acceptedPrompt,
+  rollbackGraphRevision: sessionResult.rollbackGraphRevision,
+  sessionId: sessionResult.sessionId,
+  toolCalls: sessionResult.toolCalls.map((toolCall) => ({
+    id: toolCall.id,
+    name: toolCall.name,
+    resultSummary: toolCall.receiptGraphRevision ?? toolCall.previewArtifactId ?? `${toolCall.name} succeeded`,
+    status: toolCall.status,
+  })),
+  traceEvents: [
+    {
+      id: `${sessionResult.sessionId}-prompt`,
+      kind: 'prompt',
+      message: acceptedPrompt,
+      timestamp: new Date(0).toISOString(),
+    },
+    ...sessionResult.previewLineage.map((preview, index) => ({
+      graphRevision: preview.graphRevision,
+      id: `${sessionResult.sessionId}-preview-${index}`,
+      kind: 'preview' as const,
+      previewRef: preview.artifactId,
+      recipeHash: preview.recipeHash,
+      renderHash: preview.renderHash,
+      timestamp: new Date(index + 1).toISOString(),
+      toolCallId: preview.toolCallId,
+    })),
+    {
+      approvalId,
+      id: `${sessionResult.sessionId}-approval`,
+      kind: 'approval',
+      message: approvalId,
+      timestamp: new Date(sessionResult.previewLineage.length + 1).toISOString(),
+    },
+    {
+      graphRevision: sessionResult.rollbackGraphRevision,
+      id: `${sessionResult.sessionId}-rollback`,
+      kind: 'rollback',
+      message: 'Rollback checkpoint available.',
+      timestamp: new Date(sessionResult.previewLineage.length + 2).toISOString(),
+    },
+  ],
+});
+
 function LiveActivityTimeline({ entries }: { entries: LiveActivityEntry[] }) {
   const { t } = useTranslation();
 
@@ -561,6 +652,43 @@ function LiveSessionReviewPanel({ review }: { review: LiveSessionReviewState | n
   );
 }
 
+function LiveAuditArtifactPanel({ artifact }: { artifact: LiveAuditArtifactState | null }) {
+  const { t } = useTranslation();
+  if (artifact === null) return null;
+
+  return (
+    <div
+      className="space-y-2 rounded-md border border-sky-500/20 bg-sky-500/5 p-3 text-[11px]"
+      data-artifact-id={artifact.artifactId}
+      data-final-graph-revision={artifact.finalGraphRevision}
+      data-persisted-record-count={artifact.persistedRecordCount}
+      data-preview-count={artifact.previewCount}
+      data-rollback-graph-revision={artifact.rollbackGraphRevision}
+      data-session-id={artifact.sessionId}
+      data-testid="agent-live-session-audit-artifact"
+      data-tool-call-count={artifact.toolCallCount}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-semibold text-text-primary">{t('editor.ai.agent.audit.title')}</span>
+        <span className="rounded border border-white/10 bg-black/20 px-1.5 py-0.5 font-mono text-text-secondary">
+          {artifact.artifactId}
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5">
+        <span className="rounded border border-white/10 bg-black/20 px-1.5 py-1 text-text-secondary">
+          {t('editor.ai.agent.readiness.tools')}: {artifact.toolCallCount}
+        </span>
+        <span className="rounded border border-white/10 bg-black/20 px-1.5 py-1 text-text-secondary">
+          {t('editor.ai.agent.artifacts.title')}: {artifact.previewCount}
+        </span>
+        <span className="rounded border border-white/10 bg-black/20 px-1.5 py-1 text-text-secondary">
+          {t('editor.ai.agent.audit.evidence')}: {artifact.persistedRecordCount}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function LivePromptComposer({
   initialPromptPreviewContext,
   isContextReady,
@@ -572,6 +700,7 @@ function LivePromptComposer({
   const [prompt, setPrompt] = useState('');
   const [acceptedPrompt, setAcceptedPrompt] = useState('');
   const [activityEntries, setActivityEntries] = useState<LiveActivityEntry[]>([]);
+  const [auditArtifact, setAuditArtifact] = useState<LiveAuditArtifactState | null>(null);
   const [result, setResult] = useState<LivePromptResult>({ status: 'idle' });
   const [rollbackSnapshot, setRollbackSnapshot] = useState<AgentRollbackSnapshot | null>(null);
   const [sessionReview, setSessionReview] = useState<LiveSessionReviewState | null>(null);
@@ -968,6 +1097,23 @@ function LivePromptComposer({
         rollbackState: 'available',
         toolCallCount: sessionResult.toolCalls.length,
       });
+      const auditRecord = buildLiveAgentAuditRecord({
+        acceptedPrompt,
+        approvalId: applyingResult.safetyDecision?.decisionId ?? 'agent_policy_not_required',
+        sessionResult,
+      });
+      const auditAdapter = createLocalAgentAuditStorageAdapter();
+      const persistedAuditStore =
+        auditAdapter === null ? null : appendAgentSessionAuditRecord(auditAdapter, auditRecord);
+      setAuditArtifact({
+        artifactId: `agent-live-audit-${sessionResult.sessionId}`,
+        finalGraphRevision: auditRecord.finalGraphRevision,
+        persistedRecordCount: persistedAuditStore?.records.length ?? 1,
+        previewCount: auditRecord.artifactLineage.length,
+        rollbackGraphRevision: auditRecord.rollbackGraphRevision,
+        sessionId: auditRecord.sessionId,
+        toolCallCount: auditRecord.toolCalls.length,
+      });
       pushActivityEntry({
         body: sessionResult.editReview.finalRationale,
         graphRevision: sessionResult.finalGraphRevision,
@@ -996,6 +1142,14 @@ function LivePromptComposer({
         recipeHash: sessionResult.finalRecipeHash,
         status: 'completed',
         toolName: 'rawengine.agent.app_server_session',
+      });
+      pushActivityEntry({
+        body: `Persisted bounded audit transcript ${auditRecord.sessionId}.`,
+        graphRevision: auditRecord.finalGraphRevision,
+        kind: 'tool_call',
+        recipeHash: auditRecord.finalGraphRevision,
+        status: 'completed',
+        toolName: 'rawengine.agent.audit.persist',
       });
       setResult(nextResult);
       onResultChange?.(nextResult);
@@ -1225,6 +1379,7 @@ function LivePromptComposer({
 
       <LiveActivityTimeline entries={activityEntries} />
       <LiveSessionReviewPanel review={effectiveSessionReview} />
+      <LiveAuditArtifactPanel artifact={auditArtifact} />
 
       <div
         className="rounded border border-white/10 bg-black/15 p-2 text-[11px]"
