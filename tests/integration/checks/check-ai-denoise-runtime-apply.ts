@@ -15,8 +15,8 @@ if (firstRun.provenance.inputContentHash === firstRun.provenance.outputContentHa
   failures.push('Local AI denoise adapter must change output content hash.');
 }
 
-if (firstRun.metrics.changedPixelCount < input.pixels.length / 2) {
-  failures.push('Local AI denoise adapter must change most synthetic pixels.');
+if (firstRun.metrics.changedPixelCount !== input.pixels.length) {
+  failures.push('Local AI denoise adapter must change every synthetic pixel.');
 }
 
 if (firstRun.metrics.inputOutputMaxDelta <= 0.001) {
@@ -25,6 +25,10 @@ if (firstRun.metrics.inputOutputMaxDelta <= 0.001) {
 
 if (firstRun.metrics.edgeEnergyRatio < 0.7) {
   failures.push('Local AI denoise adapter synthetic proof destroyed too much edge energy.');
+}
+
+if (!firstRun.warnings.some((warning) => warning.includes('real RAW quality'))) {
+  failures.push('Local AI denoise adapter must warn that real RAW quality remains out of scope.');
 }
 
 if (!firstRun.doesNotProve.includes('real_raw_quality')) {
