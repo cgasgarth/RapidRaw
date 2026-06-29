@@ -6525,6 +6525,35 @@ export const negativeLabFixtureSourceV1Schema = z
     }
   });
 
+export const negativeLabCleanRoomProvenanceV1Schema = z
+  .object({
+    cleanRoomPolicy: z.literal('rawengine_owned_clean_room_v1'),
+    externalConceptReferences: z.array(z.string().trim().min(1)),
+    implementationOwner: z.literal('RawEngine project'),
+    negPyArtifactUse: z.literal('none'),
+    sourceArtifactBasis: z.enum([
+      'rawengine_generated_synthetic_math_fixture',
+      'rawengine_local_private_metadata',
+      'rawengine_project_owned_scan_metadata',
+      'rawengine_registry_metadata',
+      'rawengine_private_ci_metadata',
+    ]),
+    thirdPartyCodeCopied: z.literal(false),
+    thirdPartyConstantsCopied: z.literal(false),
+    thirdPartyDocsCopied: z.literal(false),
+    thirdPartyTestVectorsCopied: z.literal(false),
+  })
+  .strict()
+  .superRefine((provenance, context) => {
+    if (!provenance.externalConceptReferences.includes('NegPy concepts only')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab clean-room provenance must record NegPy as concepts-only inspiration.',
+        path: ['externalConceptReferences'],
+      });
+    }
+  });
+
 export const negativeLabMeasuredProfileEvidenceV1Schema = z
   .object({
     baseFogSampleCount: z.number().int().positive(),
@@ -6575,6 +6604,7 @@ export const negativeLabFixtureManifestEntryV1Schema = z
     captureProfile: z.string().trim().min(1),
     colorProfile: z.string().trim().min(1),
     contentHash: contentHashSchema.optional(),
+    cleanRoomProvenance: negativeLabCleanRoomProvenanceV1Schema,
     derivativeDistributionAllowed: z.boolean(),
     developmentNotes: z.string().trim().min(1),
     developmentProcessKnown: z.boolean(),
@@ -6645,6 +6675,28 @@ export const negativeLabFixtureManifestEntryV1Schema = z
         code: 'custom',
         message: 'Public fixture distribution requires derivative rights and a content hash.',
         path: ['allowedDistribution'],
+      });
+    }
+
+    if (
+      fixture.source.sourceKind === 'generated_synthetic' &&
+      fixture.cleanRoomProvenance.sourceArtifactBasis !== 'rawengine_generated_synthetic_math_fixture'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Generated synthetic Negative Lab fixtures must use RawEngine-owned synthetic math provenance.',
+        path: ['cleanRoomProvenance', 'sourceArtifactBasis'],
+      });
+    }
+
+    if (
+      fixture.source.sourceKind !== 'generated_synthetic' &&
+      fixture.cleanRoomProvenance.sourceArtifactBasis === 'rawengine_generated_synthetic_math_fixture'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Non-synthetic Negative Lab fixtures must not claim synthetic math fixture provenance.',
+        path: ['cleanRoomProvenance', 'sourceArtifactBasis'],
       });
     }
 
@@ -9641,6 +9693,7 @@ export type NegativeLabEstimateBaseFogParametersV1 = z.infer<typeof negativeLabE
 export type NegativeLabDetectedFrameCropV1 = z.infer<typeof negativeLabDetectedFrameCropV1Schema>;
 export type NegativeLabDetectedFrameV1 = z.infer<typeof negativeLabDetectedFrameV1Schema>;
 export type NegativeLabFixtureDistributionV1 = z.infer<typeof negativeLabFixtureDistributionV1Schema>;
+export type NegativeLabCleanRoomProvenanceV1 = z.infer<typeof negativeLabCleanRoomProvenanceV1Schema>;
 export type NegativeLabFixtureManifestEntryV1 = z.infer<typeof negativeLabFixtureManifestEntryV1Schema>;
 export type NegativeLabFixtureManifestV1 = z.infer<typeof negativeLabFixtureManifestV1Schema>;
 export type NegativeLabFixtureRoleV1 = z.infer<typeof negativeLabFixtureRoleV1Schema>;
