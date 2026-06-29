@@ -145,6 +145,10 @@
           "camera_standard": "Standard",
           "linear_raw": "Lineares RAW"
         },
+        "receiptExportParity": "Preview/export parity is checked on export receipts.",
+        "receiptRuntime": "Runtime preview luma {{before}} -> {{after}} (delta {{delta}}).",
+        "receiptSummary": "{{profile}} with {{toneCurve}} is active.",
+        "receiptTitle": "Profile/tone receipt",
         "title": "Profil & Tonwert",
         "toneCurve": "Tonwertkurve",
         "toneCurves": {

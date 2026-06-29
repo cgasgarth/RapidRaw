@@ -139,6 +139,10 @@
           "camera_standard": "",
           "linear_raw": ""
         },
+        "receiptExportParity": "",
+        "receiptRuntime": "",
+        "receiptSummary": "",
+        "receiptTitle": "",
         "title": "",
         "toneCurve": "",
         "toneCurves": {
