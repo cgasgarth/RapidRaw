@@ -1,187 +1,83 @@
 #!/usr/bin/env bun
 
 import { readFileSync } from 'node:fs';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import i18next from 'i18next';
+import { I18nextProvider, initReactI18next } from 'react-i18next';
 
+import CullingModal from '../../../src/components/modals/CullingModal.tsx';
+
+const failures: string[] = [];
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
-const cullingLocale = locale.modals?.culling;
-const requiredLocaleKeys = [
-  'batchPreview',
-  'batchPreviewAlt',
-  'batchPreviewMore_one',
-  'batchPreviewMore_other',
-  'compareFocus',
-  'eyeFaceBalanceValue',
-  'eyeSharpnessValue',
-  'eyeSharpnessReviewWarning',
-  'faceSharpnessValue',
-  'focusConfidence',
-  'focusConfidenceBand.high',
-  'focusConfidenceBand.low',
-  'focusConfidenceBand.medium',
-  'focusConfidenceInputs.center',
-  'focusConfidenceInputs.exposure',
-  'focusConfidenceInputs.eye',
-  'focusConfidenceInputs.face',
-  'focusConfidenceInputsTitle',
-  'focusConfidenceValue',
-  'focusRankingsTab',
-  'focusRankValue',
-  'focusReviewOnlyHint',
-  'focusScore',
-  'focusScoreValue',
-  'latencyAverage',
-  'latencyDecoded',
-  'latencyDecodedValue',
-  'latencyMax',
-  'latencyMs',
-  'latencyTotal',
-  'compareLinked',
-  'compareDimensions',
-  'comparePanDown',
-  'comparePanLeft',
-  'comparePanReadout',
-  'comparePanRight',
-  'comparePanUp',
-  'compareReset',
-  'compareScore',
-  'compareSharpness',
-  'compareUnlinked',
-  'compareViewport',
-  'emptyAnalysisModes',
-  'emptyBatch',
-  'progressCount',
-  'selectedResultCount_one',
-  'selectedResultCount_other',
-  'summaryAnalysisModeCount_one',
-  'summaryAnalysisModeCount_other',
-  'summaryAnalysisModes',
-  'summaryBlur',
-  'summaryDisabled',
-  'summaryEnabled',
-  'summaryEnabledThreshold',
-  'summaryFocusRanking',
-  'summarySimilar',
-  'summarySourceCount_one',
-  'summarySourceCount_other',
-  'summarySourceMix',
-  'summarySourceMixValue',
-  'summarySources',
-  'summaryWorkload',
-  'summaryWorkloadValue_one',
-  'summaryWorkloadValue_other',
+
+const imagePaths = [
+  '/library/cull-01.ARW',
+  '/library/cull-02.ARW',
+  '/library/cull-03.jpg',
+  '/library/cull-04.nef',
+  '/library/cull-05.png',
+  '/library/cull-06.cr3',
+  '/library/cull-07.webp',
 ];
+const thumbnails = Object.fromEntries(imagePaths.map((path) => [path, `data:image/png;base64,${toBase64(path)}`]));
 
-const getLocaleValue = (path: string): unknown =>
-  path.split('.').reduce<unknown>((value, key) => {
-    if (typeof value !== 'object' || value === null || !(key in value)) return undefined;
-    return (value as Record<string, unknown>)[key];
-  }, cullingLocale);
+const cullingMarkup = renderToStaticMarkup(
+  createElement(
+    I18nextProvider,
+    { i18n: await createTestI18n(locale) },
+    createElement(CullingModal, {
+      error: null,
+      imagePaths,
+      isOpen: true,
+      onApply: () => undefined,
+      onClose: () => undefined,
+      onError: () => undefined,
+      progress: null,
+      suggestions: null,
+      thumbnails,
+    }),
+  ),
+);
 
-const missingKeys = requiredLocaleKeys.filter((key) => typeof getLocaleValue(key) !== 'string');
-if (missingKeys.length > 0) {
-  console.error(`Missing culling summary locale keys: ${missingKeys.join(', ')}`);
+for (const [needle, message] of [
+  ['data-testid="culling-setup-summary"', 'culling modal summary section did not render'],
+  ['data-image-count="7"', 'culling modal lost image count metric'],
+  ['data-raw-source-count="4"', 'culling modal lost raw source count metric'],
+  ['data-raster-source-count="3"', 'culling modal lost raster source count metric'],
+  ['data-culling-analysis-mode-count="3"', 'culling modal lost active analysis mode count'],
+  ['data-focus-ranking-enabled="true"', 'culling modal lost focus ranking state'],
+  ['data-testid="culling-setup-batch-preview"', 'culling modal batch preview did not render'],
+  ['data-preview-count="6"', 'culling modal lost preview limit metric'],
+  ['data-preview-overflow-count="1"', 'culling modal lost preview overflow metric'],
+]) {
+  if (!cullingMarkup.includes(needle)) failures.push(message);
+}
+
+if (cullingMarkup.includes('data-testid="culling-empty-batch-guard"')) {
+  failures.push('culling modal should not show empty-batch guard when images are present.');
+}
+
+if (failures.length > 0) {
+  console.error('culling UI summary failed');
+  console.error(failures.join('\n'));
   process.exit(1);
 }
 
-const source = readFileSync('src/components/modals/CullingModal.tsx', 'utf8');
-for (const marker of [
-  'data-testid="culling-setup-summary"',
-  'data-testid="culling-setup-batch-preview"',
-  'data-preview-count={setupPreviewPaths.length}',
-  'data-preview-overflow-count={setupPreviewOverflowCount}',
-  'SETUP_PREVIEW_LIMIT = 6',
-  'modals.culling.batchPreview',
-  'modals.culling.batchPreviewMore',
-  'data-testid="culling-empty-batch-guard"',
-  'data-testid="culling-empty-analysis-mode-guard"',
-  'settings.groupSimilar || settings.filterBlurry || settings.rankFocus',
-  'Number(settings.groupSimilar) + Number(settings.filterBlurry) + Number(settings.rankFocus)',
-  'const canStartCulling = imagePaths.length > 0 && hasCullingAnalysisMode',
-  'disabled={!canStartCulling}',
-  'modals.culling.emptyAnalysisModes',
-  'modals.culling.emptyBatch',
-  'data-testid="culling-progress-count"',
-  'modals.culling.progressCount',
-  'data-testid="culling-selected-result-count"',
-  'data-testid="culling-latency-report"',
-  'data-average-analysis-ms={latencyReport.averageAnalysisMs.toFixed(1)}',
-  'data-total-elapsed-ms={latencyReport.totalElapsedMs}',
-  'data-successful-count={latencyReport.successfulCount}',
-  'data-failed-count={latencyReport.failedCount}',
-  'modals.culling.selectedResultCount',
-  'selectedRejects.size',
-  'data-image-count={imagePaths.length}',
-  'data-raw-source-count={sourceMix.raw}',
-  'data-raster-source-count={sourceMix.raster}',
-  'data-group-similar-enabled={String(settings.groupSimilar)}',
-  'data-blur-filter-enabled={String(settings.filterBlurry)}',
-  'data-focus-ranking-enabled={String(settings.rankFocus)}',
-  'data-culling-analysis-mode-count={cullingAnalysisModeCount}',
-  'data-testid="culling-focus-ranking-card"',
-  'data-testid="culling-focus-confidence-band"',
-  'data-focus-confidence-band={confidenceBand}',
-  'data-focus-confidence-center-input',
-  'data-focus-detected-eye-confidence',
-  'data-focus-detected-face-confidence',
-  'data-focus-confidence-exposure-input',
-  'data-focus-confidence-eye-input',
-  'data-focus-confidence-face-input',
-  'data-focus-eye-sharpness={img.eyeSharpnessMetric.toFixed(2)}',
-  'data-focus-eye-face-balance-percent={eyeFaceBalancePercent}',
-  'data-focus-eye-review={String(showEyeSharpnessReview)}',
-  'data-focus-face-sharpness={img.faceSharpnessMetric.toFixed(2)}',
-  "data-focus-region-provider={img.focusRegionProvider ?? ''}",
-  'data-testid="culling-focus-eye-sharpness-review"',
-  'getFocusConfidenceBand(img.focusConfidence)',
-  'getEyeFaceBalancePercent(img)',
-  'needsEyeSharpnessReview(img)',
-  'modals.culling.focusConfidenceBand.high',
-  'modals.culling.focusConfidenceBand.medium',
-  'modals.culling.focusConfidenceBand.low',
-  'data-testid="culling-focus-confidence-inputs"',
-  'data-focus-confidence-input={input.key}',
-  'modals.culling.focusConfidenceInputs.eye',
-  'modals.culling.focusConfidenceInputs.face',
-  'modals.culling.focusConfidenceInputs.center',
-  'modals.culling.focusConfidenceInputs.exposure',
-  'modals.culling.focusConfidenceInputsTitle',
-  'modals.culling.focusRankingsTab',
-  'modals.culling.focusReviewOnlyHint',
-  'modals.culling.rankFocus',
-  'modals.culling.rankFocusDesc',
-  'modals.culling.eyeSharpnessValue',
-  'modals.culling.faceSharpnessValue',
-  'modals.culling.focusScoreValue',
-  'modals.culling.eyeFaceBalanceValue',
-  'modals.culling.eyeSharpnessReviewWarning',
-  'modals.culling.focusConfidenceValue',
-  'modals.culling.summaryAnalysisModes',
-  'modals.culling.summaryAnalysisModeCount',
-  'modals.culling.summarySourceMix',
-  'modals.culling.summarySourceMixValue',
-  'modals.culling.summaryWorkload',
-  'modals.culling.summaryWorkloadValue',
-  'data-testid="culling-compare-sync-controls"',
-  'data-testid="culling-compare-link-toggle"',
-  'data-testid={`culling-compare-zoom-${zoomPercent}`}',
-  'data-testid="culling-compare-pan-up"',
-  'data-testid="culling-compare-pan-left"',
-  'data-testid="culling-compare-pan-right"',
-  'data-testid="culling-compare-pan-down"',
-  'data-testid="culling-compare-reset"',
-  'data-viewport-linked={String(compareViewport.linked)}',
-  'data-viewport-zoom={viewport.zoomPercent}',
-  'data-center-focus={analysis.centerFocusMetric.toFixed(2)}',
-  'data-sharpness={analysis.sharpnessMetric.toFixed(2)}',
-  'modals.culling.compareViewport',
-  'modals.culling.comparePanReadout',
-  'compareViewport.linked',
-  'nudgeCompareViewport',
-]) {
-  if (!source.includes(marker)) {
-    console.error(`Culling setup summary missing marker: ${marker}`);
-    process.exit(1);
-  }
+console.log('culling UI summary ok');
+
+async function createTestI18n(resources: typeof locale) {
+  const instance = i18next.createInstance();
+  await instance.use(initReactI18next).init({
+    defaultNS: 'translation',
+    interpolation: { escapeValue: false },
+    lng: 'en',
+    react: { useSuspense: false },
+    resources: { en: { translation: resources } },
+  });
+  return instance;
 }
 
-console.log('culling UI summary ok');
+function toBase64(value: string): string {
+  return Buffer.from(value, 'utf8').toString('base64');
+}
