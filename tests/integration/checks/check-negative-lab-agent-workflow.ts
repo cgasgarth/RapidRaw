@@ -93,6 +93,115 @@ if (runtimeApply.apply.dryRunCommandId !== runtimeDryRun.dryRun.commandId) {
 if (runtimeApply.apply.changeSet.artifactHandles.length === 0) {
   throw new Error('Negative Lab runtime bus apply did not emit artifact handles.');
 }
+const runtimeV2Command = {
+  ...sampleNegativeLabCommandEnvelopeV1,
+  commandId: 'command_negative_set_conversion_recipe_v2_app_server_proof',
+  correlationId: 'corr_negative_set_conversion_recipe_v2_app_server_proof',
+  idempotencyKey: 'idem_negative_set_conversion_recipe_v2_app_server_proof',
+  parameters: {
+    ...sampleNegativeLabCommandEnvelopeV1.parameters,
+    conversionModel: {
+      algorithmId: 'negative_density_print_v2',
+      algorithmVersion: 2,
+      densityMax: 4,
+      epsilonPolicyId: 'density_epsilon_v1',
+      negativeDensityTolerance: 0.02,
+    },
+    densityPrintCurve: {
+      contrastGrade: 1.12,
+      densityOffset: 0.03,
+      midtoneShape: -0.08,
+      outputTag: 'export_linear',
+      schemaVersion: 1,
+      shoulderStrength: 0.32,
+      targetBlackDensity: 1.72,
+      targetWhiteDensity: 0.05,
+      toeStrength: 0.28,
+    },
+    frameSelection: {
+      ...sampleNegativeLabCommandEnvelopeV1.parameters.frameSelection,
+      frameIds: ['frame_0001', 'frame_0002'],
+    },
+    previewRequest: {
+      ...sampleNegativeLabCommandEnvelopeV1.parameters.previewRequest,
+      artifactPurposes: [
+        'objective_positive_preview',
+        'density_map',
+        'clipping_overlay',
+        'warning_report',
+        'parameter_diff',
+      ],
+    },
+  },
+};
+const runtimeV2DryRun = runtimeBus.execute({
+  request: runtimeV2Command,
+  toolName: 'negativelab.preview_conversion',
+});
+if (runtimeV2DryRun.kind !== 'dry_run') {
+  throw new Error('Negative Lab runtime bus did not return a v2 dry-run result.');
+}
+const runtimeV2ApplyRequest = negativeLabApplyPlanRequestV1Schema.parse({
+  ...sampleNegativeLabApplyPlanRequestV1,
+  acceptedDryRunPlanHash: runtimeV2DryRun.acceptedDryRunPlanHash,
+  commandId: runtimeV2DryRun.dryRun.commandId,
+  dryRunPlanId: runtimeV2DryRun.dryRun.dryRunPlanId,
+});
+const runtimeV2Apply = runtimeBus.execute({
+  request: runtimeV2ApplyRequest,
+  toolName: 'negativelab.apply_planned_command',
+});
+if (runtimeV2Apply.kind !== 'apply') {
+  throw new Error('Negative Lab runtime bus did not return a v2 apply result.');
+}
+if (
+  runtimeV2DryRun.dryRun.proof?.algorithm.algorithmId !== 'negative_density_print_v2' ||
+  runtimeV2DryRun.dryRun.proof.algorithm.algorithmVersion !== 2 ||
+  runtimeV2DryRun.dryRun.proof.printCurveParams?.outputTag !== 'export_linear' ||
+  runtimeV2DryRun.dryRun.proof.scanMetricsSummary.frameCount !== 2 ||
+  runtimeV2DryRun.dryRun.proof.acceptedSuggestionSummary.state !== 'suggested_only' ||
+  runtimeV2DryRun.dryRun.proof.acceptedSuggestionSummary.acceptedFrameCount !== 0 ||
+  runtimeV2DryRun.dryRun.proof.selectedCrosstalkProvenance.provenance !== 'rawengine_process_profile' ||
+  runtimeV2DryRun.dryRun.proof.previewExportArtifactParity.previewArtifactIds.length !== 1 ||
+  runtimeV2DryRun.dryRun.proof.warningCodes[0] !== 'low_acquisition_confidence'
+) {
+  throw new Error(
+    'Negative Lab v2 dry-run proof did not expose algorithm, metrics, suggestions, crosstalk, and warnings.',
+  );
+}
+if (
+  runtimeV2Apply.apply.proof?.algorithm.algorithmId !== 'negative_density_print_v2' ||
+  runtimeV2Apply.apply.proof.acceptedSuggestionSummary.state !== 'accepted_into_plan' ||
+  runtimeV2Apply.apply.proof.acceptedSuggestionSummary.acceptedFrameCount !== 2 ||
+  runtimeV2Apply.apply.proof.previewExportArtifactParity.exportArtifactIds[0] !==
+    runtimeV2Apply.apply.changeSet.artifactHandles[0]?.artifactId ||
+  !runtimeV2Apply.apply.proof.previewExportArtifactParity.dimensionsMatch ||
+  runtimeV2Apply.apply.changeSet.warningCodes[0] !== 'low_acquisition_confidence'
+) {
+  throw new Error('Negative Lab v2 apply proof did not preserve accepted proof and preview/export parity metadata.');
+}
+for (const rejectedRequest of [
+  {
+    ...runtimeV2ApplyRequest,
+    acceptedDryRunPlanHash: 'sha256:not_the_accepted_v2_plan',
+  },
+  {
+    ...runtimeV2ApplyRequest,
+    commandId: 'command_negative_set_conversion_recipe_stale_v2_app_server_proof',
+  },
+]) {
+  try {
+    runtimeBus.execute({
+      request: rejectedRequest,
+      toolName: 'negativelab.apply_planned_command',
+    });
+    throw new Error('Unaccepted Negative Lab v2 runtime plan was applied.');
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unaccepted Negative Lab v2 runtime plan was applied.') {
+      throw error;
+    }
+  }
+}
 const routeNames = new Set(NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.map((route) => route.commandName));
 const requiredRouteNames = [
   NegativeLabAppServerCommandName.ConversionPlan,

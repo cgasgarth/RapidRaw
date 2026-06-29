@@ -8362,6 +8362,80 @@ export const negativeLabChangeSetV1Schema = z
   })
   .strict();
 
+export const negativeLabRuntimeProofV1Schema = z
+  .object({
+    acceptedSuggestionSummary: z
+      .object({
+        acceptedFrameCount: z.number().int().nonnegative(),
+        confidenceThreshold: z.number().min(0).max(1),
+        exposureOffsetEvRange: z
+          .object({
+            max: z.number(),
+            min: z.number(),
+          })
+          .strict(),
+        source: z.literal('rawengine_runtime_preview_summary_v1'),
+        state: z.enum(['suggested_only', 'accepted_into_plan']),
+        warningCodes: z.array(negativeWarningCodeSchema),
+      })
+      .strict(),
+    algorithm: z
+      .object({
+        algorithmId: z.enum(['density_rgb_v1', 'negative_density_print_v2']),
+        algorithmVersion: z.union([z.literal(1), z.literal(2)]),
+        densityMax: z.number().positive(),
+        epsilonPolicyId: z.literal('density_epsilon_v1'),
+        negativeDensityTolerance: z.number().nonnegative(),
+      })
+      .strict(),
+    previewExportArtifactParity: z
+      .object({
+        dimensionsMatch: z.boolean(),
+        exportArtifactIds: z.array(z.string().trim().min(1)),
+        parityHash: z.string().regex(/^sha256:[A-Za-z0-9:_-]+$/u),
+        previewArtifactIds: z.array(z.string().trim().min(1)),
+        storageTransition: z.literal('temp_cache_to_sidecar_artifact'),
+        warningCodes: z.array(negativeWarningCodeSchema),
+      })
+      .strict(),
+    printCurveParams: z
+      .object({
+        contrastGrade: z.number().min(0.5).max(2),
+        densityOffset: z.number().min(-0.5).max(0.5),
+        midtoneShape: z.number().min(-1).max(1),
+        outputTag: z.enum(['preview_display', 'export_linear']),
+        schemaVersion: z.literal(1),
+        shoulderStrength: z.number().min(0).max(1),
+        targetBlackDensity: z.number().min(1.1).max(2.4),
+        targetWhiteDensity: z.number().min(0).max(0.25),
+        toeStrength: z.number().min(0).max(1),
+      })
+      .strict()
+      .nullable(),
+    scanMetricsSummary: z
+      .object({
+        densityRangeUnclamped: z.number().nonnegative(),
+        frameCount: z.number().int().nonnegative(),
+        p50AnchorDensity: z.number(),
+        sampleCount: z.number().int().nonnegative(),
+        texturalDensityRangeP10P90: z.number().nonnegative(),
+        warningCodes: z.array(negativeWarningCodeSchema),
+      })
+      .strict(),
+    schemaVersion: z.literal(1),
+    selectedCrosstalkProvenance: z
+      .object({
+        applied: z.boolean(),
+        profileId: z.string().trim().min(1),
+        provenance: z.enum(['rawengine_identity', 'rawengine_process_profile']),
+        provenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+        strength: z.number().min(0).max(1),
+      })
+      .strict(),
+    warningCodes: z.array(negativeWarningCodeSchema),
+  })
+  .strict();
+
 export const negativeLabDryRunResultV1Schema = z
   .object({
     changeSet: negativeLabChangeSetV1Schema,
@@ -8370,6 +8444,7 @@ export const negativeLabDryRunResultV1Schema = z
     commandType: negativeLabCommandTypeSchema,
     correlationId: z.string().trim().min(1),
     numericMetrics: z.record(z.string(), z.number()),
+    proof: negativeLabRuntimeProofV1Schema.optional(),
     previewArtifacts: z.array(artifactHandleV1Schema),
     schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
     warnings: z.array(negativeWarningV1Schema),
@@ -8384,6 +8459,7 @@ export const negativeLabApplyResultV1Schema = z
     commandType: negativeLabCommandTypeSchema,
     correlationId: z.string().trim().min(1),
     dryRunCommandId: z.string().trim().min(1).optional(),
+    proof: negativeLabRuntimeProofV1Schema.optional(),
     schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
     sessionId: z.string().trim().min(1),
     warnings: z.array(negativeWarningV1Schema),
@@ -10007,6 +10083,7 @@ export type NegativeLabRejectedFrameCandidateV1 = z.infer<typeof negativeLabReje
 export type NegativeLabLegalNamingStatus = z.infer<typeof negativeLabLegalNamingStatusSchema>;
 export type NegativeLabOperationClass = z.infer<typeof negativeLabOperationClassSchema>;
 export type NegativeLabOperationStage = z.infer<typeof negativeLabOperationStageSchema>;
+export type NegativeLabRuntimeProofV1 = z.infer<typeof negativeLabRuntimeProofV1Schema>;
 export type NegativeLabOutputTransformRefV1 = z.infer<typeof negativeLabOutputTransformRefV1Schema>;
 export type NegativeLabPerChannelInversionCurveSetScopeV1 = z.infer<
   typeof negativeLabPerChannelInversionCurveSetScopeV1Schema
