@@ -151,6 +151,7 @@ pub struct RawOpenEditExportSelectiveColorParameters {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportSkinToneUniformityParameters {
+    pub experimental: bool,
     pub hue_uniformity: f64,
     pub luminance_uniformity: f64,
     pub max_hue_shift_degrees: f64,
@@ -848,6 +849,9 @@ fn selective_color_adjustments(parameters: &Value) -> Result<Value, String> {
 fn skin_tone_uniformity_adjustments(parameters: &Value) -> Result<Value, String> {
     let parameters: RawOpenEditExportSkinToneUniformityParameters =
         serde_json::from_value(parameters.clone()).map_err(|error| error.to_string())?;
+    if !parameters.experimental {
+        return Err("skinToneUniformity.experimental must be true.".to_string());
+    }
     let preview_hue_shift = (parameters.target_hue_degrees - 18.0).clamp(
         -parameters.max_hue_shift_degrees,
         parameters.max_hue_shift_degrees,
@@ -866,6 +870,7 @@ fn skin_tone_uniformity_adjustments(parameters: &Value) -> Result<Value, String>
             }
         },
         "skinToneUniformity": {
+            "experimental": parameters.experimental,
             "hueUniformity": parameters.hue_uniformity,
             "luminanceUniformity": parameters.luminance_uniformity,
             "maxHueShiftDegrees": parameters.max_hue_shift_degrees,
@@ -1509,6 +1514,7 @@ mod tests {
                 .to_string(),
             idempotency_key: Some("idem.raw-open-edit-export.skin-tone-uniformity.v1".to_string()),
             parameters: json!({
+                "experimental": true,
                 "hueUniformity": 0.42,
                 "luminanceUniformity": 0.18,
                 "maxHueShiftDegrees": 16.0,

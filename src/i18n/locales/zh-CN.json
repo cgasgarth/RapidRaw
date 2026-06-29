@@ -177,6 +177,9 @@
         "lightness": "Lightness uniformity",
         "preview": "Render bridge: H {{hue}}, S {{saturation}}, L {{lightness}}",
         "saturation": "Saturation uniformity",
+        "targetHue": "Target hue",
+        "targetLightness": "Target lightness",
+        "targetSaturation": "Target saturation",
         "title": "Skin tone - sampled uniformity (Experimental)",
         "warning": "May affect other orange-range colors; not skin detection or Capture One equivalence."
       },

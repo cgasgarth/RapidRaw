@@ -98,11 +98,11 @@ const colorCalibrationSchema = z
 const skinToneUniformitySchema = z
   .object({
     enabled: z.boolean(),
-    hueUniformity: z.number().min(0).max(1),
-    luminanceUniformity: z.number().min(0).max(1),
-    maxHueShiftDegrees: z.number().min(0).max(180),
-    saturationUniformity: z.number().min(0).max(1),
-    targetHueDegrees: z.number().min(0).max(360),
+    hueUniformity: z.number().min(0).max(0.75),
+    luminanceUniformity: z.number().min(0).max(0.75),
+    maxHueShiftDegrees: z.number().min(0).max(30),
+    saturationUniformity: z.number().min(0).max(0.75),
+    targetHueDegrees: z.number().min(0).lt(360),
     targetLuminance: z.number().min(0).max(1),
     targetSaturation: z.number().min(0).max(1),
   })

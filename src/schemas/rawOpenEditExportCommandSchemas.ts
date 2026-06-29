@@ -247,10 +247,11 @@ export const rawOpenEditExportSkinToneUniformityCommandSchema = z
     idempotencyKey: z.string().trim().min(1).optional(),
     parameters: z
       .object({
-        hueUniformity: z.number().min(0).max(1),
-        luminanceUniformity: z.number().min(0).max(1),
+        experimental: z.literal(true),
+        hueUniformity: z.number().min(0).max(0.75),
+        luminanceUniformity: z.number().min(0).max(0.75),
         maxHueShiftDegrees: z.number().min(0).max(30),
-        saturationUniformity: z.number().min(0).max(1),
+        saturationUniformity: z.number().min(0).max(0.75),
         targetHueDegrees: z.number().min(0).lt(360),
         targetLuminance: z.number().min(0).max(1),
         targetSaturation: z.number().min(0).max(1),
