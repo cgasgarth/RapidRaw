@@ -9,6 +9,7 @@ const mergeStatusSource = readFileSync('src/components/modals/MergeStatusViews.t
 const hdrModalSource = readFileSync('src/components/modals/HdrModal.tsx', 'utf8');
 const appModalsSource = readFileSync('src/components/modals/AppModals.tsx', 'utf8');
 const hdrRuntimeSource = readFileSync('src-tauri/src/lib.rs', 'utf8');
+const hdrRuntimePlanSource = readFileSync('packages/rawengine-schema/src/hdrRuntimePlan.ts', 'utf8');
 const visualSmokeSource = readFileSync('scripts/capture-visual-smoke.ts', 'utf8');
 
 for (const marker of [
@@ -22,7 +23,7 @@ for (const marker of [
 }
 
 for (const marker of [
-  'onOpenFile(savedPath);',
+  'onOpenFile(openPath);',
   'buildHdrEditableHandoffSummary',
   'deghostReviewAccepted: isDeghostReviewApproved',
   'deghostReviewRequired: isDeghostReviewRequired',
@@ -37,6 +38,11 @@ for (const marker of [
   'data-preview-export-parity-status={handoffSummary.previewExportParityStatus}',
   'data-scene-merge-color-state={handoffSummary.sceneMergeColorState}',
   'data-testid="hdr-editable-handoff-provenance"',
+  'data-testid="hdr-derived-output-receipt-store-entry"',
+  "data-hdr-derived-source-open-path={storedDerivedOutputReceipt.openInEditorAction.path ?? ''}",
+  'const receipt = buildHdrDerivedOutputReceipt({ handoff, settings });',
+  'upsertDerivedOutputReceipt(receipt);',
+  'const openPath = storedDerivedOutputReceipt?.openInEditorAction.path ?? savedPath;',
   "openInEditor: t('modals.hdr.openInEditor')",
   'savedPath={savedPath}',
 ]) {
@@ -51,15 +57,19 @@ for (const marker of ['props.handleImageSelect(path);', 'onSave={props.handleSav
   }
 }
 
-for (const marker of [
-  '"editableDerivedAssetId": artifact_id',
-  '"capabilityLevel": "runtime_apply_capable"',
-  '"previewExportParity"',
-  '"sceneMergeColorState": "legacy_display_referred_merge_after_linear_to_srgb"',
-  'write_hdr_output_sidecar_records_editable_artifact_provenance',
-]) {
+for (const marker of ['write_hdr_output_sidecar(']) {
   if (!hdrRuntimeSource.includes(marker)) {
     throw new Error(`HDR runtime editable artifact marker missing: ${marker}`);
+  }
+}
+
+for (const marker of [
+  'editableDerivedAssetId: `derived_${command.commandId}`',
+  "capabilityLevel: 'runtime_apply_capable'",
+  'derivedSourceReview',
+]) {
+  if (!hdrRuntimePlanSource.includes(marker)) {
+    throw new Error(`HDR runtime plan editable artifact marker missing: ${marker}`);
   }
 }
 
