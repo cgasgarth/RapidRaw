@@ -73,7 +73,7 @@ const QUICK_ROUTED = [
   'check:ai-fallbacks',
   'check:color-abi',
   'check:preview-scopes',
-  'check:color-cpu-gpu-parity',
+  'check:color-preview-export-parity',
   'check:color-gpu-readback-probe',
   'check:gamut-mapping',
   'check:working-space-contract',

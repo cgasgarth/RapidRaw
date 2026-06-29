@@ -1,18 +1,18 @@
-# Color CPU/GPU Parity Fixtures
+# Color Preview/Export Parity Fixtures
 
 - Issue: #95 `validation(color): add CPU GPU parity checks for core color operations`
 - Runtime gate slice: #1933 `color(science): CPU GPU parity gate`
-- Scope: WGSL contract hashing plus CPU mirror outputs for core color helpers.
-- Runtime status: CPU mirror plus explicit GPU-unavailable state; no live GPU
-  readback or rendered pixel fixture claim.
+- Scope: WGSL contract hashing plus CPU preview/export outputs for core color helpers.
+- Runtime status: CPU preview/export mirror plus explicit GPU-unavailable state;
+  no live GPU readback or rendered pixel fixture claim.
 
 ## Purpose
 
-RawEngine needs CPU/GPU parity evidence before color-quality claims can be
-trusted across preview and deterministic reference paths. This first parity gate
-keeps the claim narrow: it validates that selected WGPU shader helper functions
-remain stable and that their CPU mirror math produces deterministic fixture
-outputs.
+RawEngine needs preview/export parity evidence before color-quality claims can
+be trusted across preview and deterministic reference paths. This first parity
+gate keeps the claim narrow: it validates that selected WGPU shader helper
+functions remain stable and that their CPU mirror math produces deterministic
+fixture outputs.
 
 ## Covered Operations
 
@@ -41,8 +41,8 @@ The #1933 gate writes a committed validation report at
 
 This keeps the issue from being closed as schema-only while avoiding a false
 claim that CI has performed deterministic WGPU readback. The shader hashes bind
-the fixture cases to the GPU helper functions until a render-readback harness is
-available.
+the fixture cases to the WGSL helper functions until a render-readback harness
+is available.
 
 ## Not Yet Covered
 
@@ -59,12 +59,12 @@ rendered image fixtures for:
 Run:
 
 ```sh
-bun run check:color-cpu-gpu-parity
+bun run check:color-preview-export-parity
 ```
 
 ## Validation Evidence
 
-- `bun run check:color-cpu-gpu-parity`
+- `bun run check:color-preview-export-parity`
 - `bun run check:deltae-fixtures`
 - `bun run check:colorchecker-fixtures`
 - `bun run check:unsafe-casts`

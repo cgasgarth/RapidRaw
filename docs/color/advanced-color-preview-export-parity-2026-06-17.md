@@ -11,9 +11,9 @@ claim the full Capture One-class color workflow complete; that remains #1249.
 | Surface              | Preview/export runtime status                         | Validation                                                                                    |
 | -------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | Curves               | GPU preview/export path                               | `check:color-abi`                                                                             |
-| Levels               | GPU preview/export path                               | `check:levels-runtime`, `check:color-cpu-gpu-parity`                                          |
-| Channel Mixer        | GPU preview/export path                               | `check:channel-mixer`, `check:color-cpu-gpu-parity`                                           |
-| RGB Color Balance    | GPU preview/export path                               | `check:color-balance-rgb`, `check:color-cpu-gpu-parity`                                       |
+| Levels               | GPU preview/export path                               | `check:levels-runtime`, `check:color-preview-export-parity`                                   |
+| Channel Mixer        | GPU preview/export path                               | `check:channel-mixer`, `check:color-preview-export-parity`                                    |
+| RGB Color Balance    | GPU preview/export path                               | `check:color-balance-rgb`, `check:color-preview-export-parity`                                |
 | Black & White Mixer  | TypeScript apply proof with artifact deltas           | `check:black-white-mixer`                                                                     |
 | Selective Color      | Range/falloff/mask proof; not full GPU runtime parity | `check:selective-color-ranges`, `check:selective-color-falloff`, `check:selective-color-mask` |
 | Skin Tone Uniformity | Fixture proof; not full GPU runtime parity            | `check:skin-tone-uniformity`                                                                  |
@@ -50,7 +50,7 @@ This slice adds:
 
 - `bun run check:color-balance-rgb`
 - `bun run check:black-white-mixer`
-- `bun run check:color-cpu-gpu-parity`
+- `bun run check:color-preview-export-parity`
 - `bun run check:color-abi`
 - `bun run check:types`
 - `bun run check:lint -- src/utils/colorCpuGpuParity.ts tests/integration/checks/check-color-adjustment-abi-parity.ts`
