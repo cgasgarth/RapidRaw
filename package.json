@@ -72,6 +72,7 @@
     "check:color-abi": "bun tests/integration/checks/check-color-adjustment-abi-parity.ts",
     "check:color-pipeline-audit": "bun tests/integration/checks/check-color-pipeline-audit.ts",
     "check:preview-scopes": "bun tests/integration/checks/check-preview-scopes.ts",
+    "check:color-soft-proof-scopes": "bun tests/integration/checks/check-color-soft-proof-scopes.ts",
     "check:black-white-mixer": "bun tests/integration/checks/check-black-white-mixer.ts",
     "check:color-balance-rgb": "bun tests/integration/checks/check-color-balance-rgb.ts",
     "check:color-balance-command-proof": "bun tests/integration/checks/check-color-balance-command-proof.ts",

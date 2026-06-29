@@ -85,6 +85,41 @@ interface ImageAnalyticsPayload<TData> {
 const PREVIEW_SCOPE_DISPLAY_TRANSFORM_LABEL = 'Display preview transform';
 const PREVIEW_SCOPE_SOURCE_LABEL = 'Edited preview';
 const PREVIEW_SCOPE_WORKING_TRANSFORM_LABEL = 'Working RGB';
+const PREVIEW_SCOPE_EXPORT_SOURCE_LABEL = 'Export preview';
+
+const buildPreviewScopeStatus = ({
+  histogramReady,
+  path,
+  waveformReady,
+}: {
+  histogramReady: boolean;
+  path: string;
+  waveformReady: boolean;
+}) => {
+  const editor = useEditorStore.getState();
+  const transform = editor.exportSoftProofTransform;
+  const isExportPreview = editor.isExportSoftProofEnabled && transform !== null;
+
+  return {
+    displayTransformLabel: transform?.colorManagedTransform ?? PREVIEW_SCOPE_DISPLAY_TRANSFORM_LABEL,
+    exportProfileLabel: isExportPreview ? transform.effectiveColorProfile : null,
+    exportRenderingIntentLabel: isExportPreview ? transform.effectiveRenderingIntent : null,
+    histogramReady,
+    path,
+    renderBasis: isExportPreview ? ('export_preview' as const) : ('editor_preview' as const),
+    softProofTransformApplied: transform?.transformApplied ?? false,
+    sourceLabel: isExportPreview ? PREVIEW_SCOPE_EXPORT_SOURCE_LABEL : PREVIEW_SCOPE_SOURCE_LABEL,
+    updatedAt: new Date().toISOString(),
+    waveformReady,
+    warningCodes: isExportPreview
+      ? [
+          transform.transformApplied ? 'export_profile_transform_applied' : 'export_profile_transform_missing',
+          'render_target_matches_export_recipe',
+        ]
+      : [],
+    workingTransformLabel: PREVIEW_SCOPE_WORKING_TRANSFORM_LABEL,
+  };
+};
 
 export function useTauriListeners({
   refreshAllFolderTrees,
@@ -160,16 +195,12 @@ export function useTauriListeners({
         if (isEffectActive && event.payload.path === useEditorStore.getState().selectedImage?.path) {
           useEditorStore.getState().setEditor((state) => ({
             histogram: event.payload.data,
-            previewScopeStatus: {
-              displayTransformLabel: PREVIEW_SCOPE_DISPLAY_TRANSFORM_LABEL,
+            previewScopeStatus: buildPreviewScopeStatus({
               histogramReady: true,
               path: event.payload.path,
-              sourceLabel: PREVIEW_SCOPE_SOURCE_LABEL,
-              updatedAt: new Date().toISOString(),
               waveformReady:
                 state.previewScopeStatus?.path === event.payload.path ? state.previewScopeStatus.waveformReady : false,
-              workingTransformLabel: PREVIEW_SCOPE_WORKING_TRANSFORM_LABEL,
-            },
+            }),
           }));
         }
       }),
@@ -187,16 +218,12 @@ export function useTauriListeners({
       listen<ImageAnalyticsPayload<WaveformData>>(WAVEFORM_UPDATE_EVENT, (event) => {
         if (isEffectActive && event.payload.path === useEditorStore.getState().selectedImage?.path) {
           useEditorStore.getState().setEditor((state) => ({
-            previewScopeStatus: {
-              displayTransformLabel: PREVIEW_SCOPE_DISPLAY_TRANSFORM_LABEL,
+            previewScopeStatus: buildPreviewScopeStatus({
               histogramReady:
                 state.previewScopeStatus?.path === event.payload.path ? state.previewScopeStatus.histogramReady : false,
               path: event.payload.path,
-              sourceLabel: PREVIEW_SCOPE_SOURCE_LABEL,
-              updatedAt: new Date().toISOString(),
               waveformReady: true,
-              workingTransformLabel: PREVIEW_SCOPE_WORKING_TRANSFORM_LABEL,
-            },
+            }),
             waveform: event.payload.data,
           }));
         }

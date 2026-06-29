@@ -41,6 +41,15 @@ expectInvalid('empty scope query', previewScopeQueryV1Schema, {
   },
 });
 
+expectInvalid('export-preview query without render target', previewScopeQueryV1Schema, {
+  ...samplePreviewScopeQueryV1,
+  parameters: {
+    ...samplePreviewScopeQueryV1.parameters,
+    renderBasis: 'export_preview',
+    renderTarget: undefined,
+  },
+});
+
 expectInvalid('histogram bin mismatch', previewScopeResultV1Schema, {
   ...samplePreviewScopeResultV1,
   histogram: {
@@ -92,6 +101,12 @@ expectInvalid('mismatched vectorscope channel', previewScopeResultV1Schema, {
     ...samplePreviewScopeResultV1.vectorscope,
     channel: 'rgb',
   },
+});
+
+expectInvalid('export-preview result without soft proof metadata', previewScopeResultV1Schema, {
+  ...samplePreviewScopeResultV1,
+  renderBasis: 'export_preview',
+  softProof: undefined,
 });
 
 if (failures.length > 0) {
