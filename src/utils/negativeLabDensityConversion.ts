@@ -43,7 +43,7 @@ const LOG_EPSILON = 0.000001;
 const MIN_DENSITY_RANGE = 0.0001;
 const DISPLAY_GAMMA_INV = 1 / 2.2;
 const MIN_ENDPOINT_SEPARATION = 0.05;
-const DEFAULT_DENSITY_PRINT_V2_PARAMS: NonNullable<NegativeLabPresetParams['print_curve_v2']> = {
+export const DEFAULT_NEGATIVE_LAB_DENSITY_PRINT_V2_PARAMS: NonNullable<NegativeLabPresetParams['print_curve_v2']> = {
   contrast_grade: 1,
   density_offset: 0,
   midtone_shape: 0,
@@ -171,7 +171,7 @@ const shapeDensityForPrint = ({
   params: NegativeLabPresetParams;
   scanMetrics?: NegativeLabScanMetricsV1 | undefined;
 }): number => {
-  const v2Params = params.print_curve_v2 ?? DEFAULT_DENSITY_PRINT_V2_PARAMS;
+  const v2Params = params.print_curve_v2 ?? DEFAULT_NEGATIVE_LAB_DENSITY_PRINT_V2_PARAMS;
   const metricsCompression =
     scanMetrics === undefined
       ? 1
@@ -192,7 +192,7 @@ const shapeDensityForPrint = ({
 };
 
 const renderPrintDensity = (tone: number, params: NegativeLabPresetParams): number => {
-  const v2Params = params.print_curve_v2 ?? DEFAULT_DENSITY_PRINT_V2_PARAMS;
+  const v2Params = params.print_curve_v2 ?? DEFAULT_NEGATIVE_LAB_DENSITY_PRINT_V2_PARAMS;
   const densitySpan = v2Params.target_black_density - v2Params.target_white_density;
   const targetDensity = v2Params.target_black_density - tone * densitySpan;
   const whiteTransmittance = Math.pow(10, -v2Params.target_white_density);

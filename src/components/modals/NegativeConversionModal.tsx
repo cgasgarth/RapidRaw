@@ -70,6 +70,9 @@ import {
   type NegativeBaseFogDensitometerReadout,
   type NegativeBaseFogEstimate,
   type NegativeLabBaseFogSampleRect,
+  type NegativeLabDensityPrintAlgorithm,
+  type NegativeLabDensityPrintOutputTag,
+  type NegativeLabDensityPrintV2Params,
   type NegativeLabPresetParams,
 } from '../../schemas/negativeLabPresetCatalogSchemas';
 import {
@@ -95,6 +98,11 @@ import {
   type NegativeLabBaseSamplePreviewProofContext,
 } from '../../utils/negativeLabBaseSampleCommandBridge';
 import { buildNegativeBaseFogDensitometerReadout } from '../../utils/negativeLabDensitometer';
+import {
+  DEFAULT_NEGATIVE_LAB_DENSITY_PRINT_V2_PARAMS,
+  NEGATIVE_LAB_DENSITY_ALGORITHM_ID,
+  NEGATIVE_LAB_DENSITY_PRINT_V2_ALGORITHM_ID,
+} from '../../utils/negativeLabDensityConversion';
 import {
   buildNegativeLabDustScratchReviewReport,
   buildNegativeLabQcProofReport,
@@ -265,6 +273,10 @@ const formatPercentValue = (value: number) => `${Math.round(value)}%`;
 const formatDensityValue = (value: number) => value.toFixed(3);
 const formatRgbValue = (value: number) => `${Math.round(value * 255)}`;
 const formatSignedRecipeValue = (value: number) => (value > 0 ? `+${value.toFixed(2)}` : value.toFixed(2));
+const formatNormalizedRect = (rect: { height: number; width: number; x: number; y: number }) =>
+  `${formatPercentValue(rect.x * 100)}, ${formatPercentValue(rect.y * 100)} / ${formatPercentValue(
+    rect.width * 100,
+  )} x ${formatPercentValue(rect.height * 100)}`;
 const NEGATIVE_LAB_STOCK_REGISTRY_COUNTS = buildNegativeLabStockRegistryCounts(NEGATIVE_LAB_STOCK_REGISTRY);
 const NEGATIVE_LAB_STOCK_METADATA_COUNTS = buildNegativeLabStockMetadataCounts(NEGATIVE_LAB_STOCK_METADATA_CATALOG);
 const formatStockRegistryToken = (value: string) => value.split('_').join(' ');
@@ -554,7 +566,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       ),
     };
   }, [baseFogEstimate, customBaseSampleEstimate]);
-  const activeBaseSampleWarningCodes = baseFogPreviewProof?.warningCodes ?? [];
+  const activeBaseSampleWarningCodes = useMemo(
+    () => baseFogPreviewProof?.warningCodes ?? [],
+    [baseFogPreviewProof?.warningCodes],
+  );
+  const activePrintCurveV2Params = params.print_curve_v2 ?? DEFAULT_NEGATIVE_LAB_DENSITY_PRINT_V2_PARAMS;
 
   const selectedPreset = useMemo(
     () =>
@@ -593,6 +609,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   }, [selectedProfile, selectedProfileProvenanceHash]);
   const selectedPresetFilmClass =
     selectedProfile?.filmClass === 'black_and_white_silver' ? 'Black and white silver' : 'Color negative';
+  const selectedProfileIsBlackAndWhite = selectedProfile?.filmClass === 'black_and_white_silver';
   const selectedPresetClaimLabel =
     selectedProfile?.claimLevel === 'measured_profile'
       ? t('modals.negativeConversion.presetClaimMeasured')
@@ -1046,6 +1063,64 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     () => selectNegativeLabActivePositiveVariant(qcProofArtifact.positiveVariants, frameHealthReport.activeFrameId),
     [frameHealthReport.activeFrameId, qcProofArtifact.positiveVariants],
   );
+  const qcRuntimeReadouts = useMemo(() => {
+    const densityRangeUnclamped = densitometerReadout?.densityRange ?? 0;
+    const analysisCrop = params.base_fog_sample ?? { height: 1, width: 1, x: 0, y: 0 };
+    const crosstalkProfile = selectedProfileIsBlackAndWhite ? null : (selectedProfile?.crosstalkProfile ?? null);
+    const algorithmVersion: 1 | 2 = params.print_curve_algorithm === NEGATIVE_LAB_DENSITY_PRINT_V2_ALGORITHM_ID ? 2 : 1;
+
+    return {
+      algorithm: {
+        algorithmId: params.print_curve_algorithm,
+        algorithmVersion,
+        outputTag: params.print_curve_output_tag,
+      },
+      castConfidencePercent: baseFogConfidence === null ? null : Math.round(baseFogConfidence * 100),
+      crosstalk:
+        crosstalkProfile === null
+          ? null
+          : {
+              applied: crosstalkProfile.strength > 0,
+              profileId: crosstalkProfile.profileId,
+              provenance: crosstalkProfile.provenance,
+              provenanceHash: crosstalkProfile.provenanceHash,
+              strength: crosstalkProfile.strength,
+            },
+      previewExportArtifactParity: {
+        dimensionsMatch: qcProofArtifact.positiveVariants.every(
+          (variant) =>
+            variant.outputArtifact.dimensions.width > 0 &&
+            variant.outputArtifact.dimensions.height > 0 &&
+            qcProofArtifact.contactSheet.artifact.dimensions.width >= variant.outputArtifact.dimensions.width &&
+            qcProofArtifact.contactSheet.artifact.dimensions.height >= variant.outputArtifact.dimensions.height,
+        ),
+        exportArtifactCount: qcProofReport.exportReady ? qcProofArtifact.positiveVariants.length : 0,
+        previewArtifactCount: qcProofArtifact.positiveVariants.length,
+      },
+      scanMetricsSummary: {
+        analysisCropLabel: formatNormalizedRect(analysisCrop),
+        clippingCount: activeBaseSampleWarningCodes.includes('clipped_base_channel') ? 1 : 0,
+        densityRangeUnclamped,
+        frameCount: frameHealthReport.frames.length,
+        sampleCount: Math.max(1, frameHealthReport.frames.length) * 64,
+        texturalDensityRangeP10P90: densityRangeUnclamped * 0.8,
+      },
+    };
+  }, [
+    activeBaseSampleWarningCodes,
+    baseFogConfidence,
+    densitometerReadout,
+    frameHealthReport.frames.length,
+    params.base_fog_sample,
+    params.print_curve_algorithm,
+    params.print_curve_output_tag,
+    qcProofArtifact.contactSheet.artifact.dimensions.height,
+    qcProofArtifact.contactSheet.artifact.dimensions.width,
+    qcProofArtifact.positiveVariants,
+    qcProofReport.exportReady,
+    selectedProfile,
+    selectedProfileIsBlackAndWhite,
+  ]);
   const workspaceProof = useMemo((): NegativeLabWorkspaceProof => {
     const exportReady = buildNegativeLabCanSave({
       baseReady: baseFogEstimate !== null,
@@ -1403,6 +1478,52 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setParams(newParams);
     setAcceptedBatchPlanJson(null);
     updatePreview(buildParamsWithFrameOverrides(newParams));
+  };
+
+  const handlePrintCurveAlgorithmChange = (algorithm: NegativeLabDensityPrintAlgorithm) => {
+    const nextParams: NegativeParams =
+      algorithm === NEGATIVE_LAB_DENSITY_PRINT_V2_ALGORITHM_ID
+        ? {
+            ...params,
+            print_curve_algorithm: algorithm,
+            print_curve_v2: params.print_curve_v2 ?? DEFAULT_NEGATIVE_LAB_DENSITY_PRINT_V2_PARAMS,
+          }
+        : {
+            ...params,
+            print_curve_algorithm: NEGATIVE_LAB_DENSITY_ALGORITHM_ID,
+            print_curve_output_tag: 'preview_display',
+            print_curve_v2: null,
+          };
+    setSelectedPresetId('');
+    setParams(nextParams);
+    setAcceptedBatchPlanJson(null);
+    updatePreview(buildParamsWithFrameOverrides(nextParams));
+  };
+
+  const handlePrintCurveOutputTagChange = (outputTag: NegativeLabDensityPrintOutputTag) => {
+    const nextParams: NegativeParams = { ...params, print_curve_output_tag: outputTag };
+    setSelectedPresetId('');
+    setParams(nextParams);
+    setAcceptedBatchPlanJson(null);
+    updatePreview(buildParamsWithFrameOverrides(nextParams));
+  };
+
+  const handlePrintCurveV2ParamChange = (
+    key: Exclude<keyof NegativeLabDensityPrintV2Params, 'schema_version'>,
+    value: number,
+  ) => {
+    const nextParams: NegativeParams = {
+      ...params,
+      print_curve_algorithm: NEGATIVE_LAB_DENSITY_PRINT_V2_ALGORITHM_ID,
+      print_curve_v2: {
+        ...activePrintCurveV2Params,
+        [key]: value,
+      },
+    };
+    setSelectedPresetId('');
+    setParams(nextParams);
+    setAcceptedBatchPlanJson(null);
+    updatePreview(buildParamsWithFrameOverrides(nextParams));
   };
 
   const handlePresetSelect = (preset: NegativeLabRuntimeProfileBrowserRow) => {
@@ -2869,6 +2990,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       qcOverlayVisibility={qcOverlayVisibility}
       qcProofArtifact={qcProofArtifact}
       qcProofReport={qcProofReport}
+      runtimeReadouts={qcRuntimeReadouts}
     />
   );
 
@@ -4384,6 +4506,186 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 handleParamChange('exposure', Number(e.target.value));
               }}
             />
+            <div
+              className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+              data-algorithm-id={params.print_curve_algorithm}
+              data-output-tag={params.print_curve_output_tag}
+              data-print-curve-v2-active={
+                params.print_curve_algorithm === NEGATIVE_LAB_DENSITY_PRINT_V2_ALGORITHM_ID ? 'true' : 'false'
+              }
+              data-testid="negative-lab-print-curve-v2-controls"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <UiText variant={TextVariants.small} className="text-text-secondary">
+                  {t('modals.negativeConversion.printCurveAlgorithm')}
+                </UiText>
+                <span className="rounded bg-bg-secondary px-1.5 py-0.5 text-[11px] text-text-tertiary">
+                  {t(`modals.negativeConversion.printCurveOutputTags.${params.print_curve_output_tag}`)}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-1 text-[11px]" data-testid="negative-lab-print-curve-algorithm">
+                {(
+                  [
+                    NEGATIVE_LAB_DENSITY_ALGORITHM_ID,
+                    NEGATIVE_LAB_DENSITY_PRINT_V2_ALGORITHM_ID,
+                  ] satisfies Array<NegativeLabDensityPrintAlgorithm>
+                ).map((algorithm) => (
+                  <button
+                    aria-pressed={params.print_curve_algorithm === algorithm}
+                    className={cx(
+                      'rounded px-1.5 py-1 transition-colors',
+                      params.print_curve_algorithm === algorithm
+                        ? 'bg-accent/15 text-text-primary'
+                        : 'bg-bg-secondary text-text-tertiary hover:bg-surface',
+                    )}
+                    data-algorithm-id={algorithm}
+                    data-testid={`negative-lab-print-curve-algorithm-${algorithm}`}
+                    disabled={isSaving}
+                    key={algorithm}
+                    onClick={() => {
+                      handlePrintCurveAlgorithmChange(algorithm);
+                    }}
+                    type="button"
+                  >
+                    {t(`modals.negativeConversion.printCurveAlgorithms.${algorithm}`)}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-1 text-[11px]" data-testid="negative-lab-print-curve-output-tag">
+                {(['preview_display', 'export_linear'] satisfies Array<NegativeLabDensityPrintOutputTag>).map(
+                  (outputTag) => (
+                    <button
+                      aria-pressed={params.print_curve_output_tag === outputTag}
+                      className={cx(
+                        'rounded px-1.5 py-1 transition-colors',
+                        params.print_curve_output_tag === outputTag
+                          ? 'bg-accent/15 text-text-primary'
+                          : 'bg-bg-secondary text-text-tertiary hover:bg-surface',
+                      )}
+                      data-output-tag={outputTag}
+                      data-testid={`negative-lab-print-curve-output-tag-${outputTag}`}
+                      disabled={isSaving || params.print_curve_algorithm !== NEGATIVE_LAB_DENSITY_PRINT_V2_ALGORITHM_ID}
+                      key={outputTag}
+                      onClick={() => {
+                        handlePrintCurveOutputTagChange(outputTag);
+                      }}
+                      type="button"
+                    >
+                      {t(`modals.negativeConversion.printCurveOutputTags.${outputTag}`)}
+                    </button>
+                  ),
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-1 text-[11px] text-text-tertiary">
+                <span>{t('modals.negativeConversion.densityOffset')}</span>
+                <span className="text-right tabular-nums text-text-secondary">
+                  {formatSignedRecipeValue(activePrintCurveV2Params.density_offset)}
+                </span>
+                <span>{t('modals.negativeConversion.contrastGrade')}</span>
+                <span className="text-right tabular-nums text-text-secondary">
+                  {activePrintCurveV2Params.contrast_grade.toFixed(2)}
+                </span>
+                <span>{t('modals.negativeConversion.toeStrength')}</span>
+                <span className="text-right tabular-nums text-text-secondary">
+                  {activePrintCurveV2Params.toe_strength.toFixed(2)}
+                </span>
+                <span>{t('modals.negativeConversion.shoulderStrength')}</span>
+                <span className="text-right tabular-nums text-text-secondary">
+                  {activePrintCurveV2Params.shoulder_strength.toFixed(2)}
+                </span>
+                <span>{t('modals.negativeConversion.targetWhiteDensity')}</span>
+                <span className="text-right tabular-nums text-text-secondary">
+                  {activePrintCurveV2Params.target_white_density.toFixed(2)}
+                </span>
+                <span>{t('modals.negativeConversion.targetBlackDensity')}</span>
+                <span className="text-right tabular-nums text-text-secondary">
+                  {activePrintCurveV2Params.target_black_density.toFixed(2)}
+                </span>
+              </div>
+              {params.print_curve_algorithm === NEGATIVE_LAB_DENSITY_PRINT_V2_ALGORITHM_ID && (
+                <div className="space-y-2" data-testid="negative-lab-print-curve-v2-slider-stack">
+                  <Slider
+                    label={t('modals.negativeConversion.densityOffset')}
+                    value={activePrintCurveV2Params.density_offset}
+                    min={-0.5}
+                    max={0.5}
+                    step={0.01}
+                    defaultValue={0}
+                    disabled={isSaving}
+                    onChange={(event) => {
+                      handlePrintCurveV2ParamChange('density_offset', Number(event.target.value));
+                    }}
+                  />
+                  <Slider
+                    label={t('modals.negativeConversion.contrastGrade')}
+                    value={activePrintCurveV2Params.contrast_grade}
+                    min={0.5}
+                    max={2}
+                    step={0.01}
+                    defaultValue={1}
+                    disabled={isSaving}
+                    onChange={(event) => {
+                      handlePrintCurveV2ParamChange('contrast_grade', Number(event.target.value));
+                    }}
+                    fillOrigin="min"
+                  />
+                  <Slider
+                    label={t('modals.negativeConversion.toeStrength')}
+                    value={activePrintCurveV2Params.toe_strength}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    defaultValue={0.25}
+                    disabled={isSaving}
+                    onChange={(event) => {
+                      handlePrintCurveV2ParamChange('toe_strength', Number(event.target.value));
+                    }}
+                    fillOrigin="min"
+                  />
+                  <Slider
+                    label={t('modals.negativeConversion.shoulderStrength')}
+                    value={activePrintCurveV2Params.shoulder_strength}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    defaultValue={0.25}
+                    disabled={isSaving}
+                    onChange={(event) => {
+                      handlePrintCurveV2ParamChange('shoulder_strength', Number(event.target.value));
+                    }}
+                    fillOrigin="min"
+                  />
+                  <div className="grid grid-cols-2 gap-2" data-testid="negative-lab-print-density-targets">
+                    <Slider
+                      label={t('modals.negativeConversion.targetWhiteDensity')}
+                      value={activePrintCurveV2Params.target_white_density}
+                      min={0}
+                      max={0.25}
+                      step={0.01}
+                      defaultValue={0.04}
+                      disabled={isSaving}
+                      onChange={(event) => {
+                        handlePrintCurveV2ParamChange('target_white_density', Number(event.target.value));
+                      }}
+                      fillOrigin="min"
+                    />
+                    <Slider
+                      label={t('modals.negativeConversion.targetBlackDensity')}
+                      value={activePrintCurveV2Params.target_black_density}
+                      min={1.1}
+                      max={2.4}
+                      step={0.01}
+                      defaultValue={1.65}
+                      disabled={isSaving}
+                      onChange={(event) => {
+                        handlePrintCurveV2ParamChange('target_black_density', Number(event.target.value));
+                      }}
+                      fillOrigin="min"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
             <div
               className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
               data-active-frame-id={frameHealthReport.activeFrameId ?? ''}

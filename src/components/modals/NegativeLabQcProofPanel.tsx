@@ -5,6 +5,10 @@ import { TextVariants } from '../../types/typography';
 import UiText from '../ui/Text';
 
 import type { NegativeLabQcDecision } from './NegativeLabRollHealthModel';
+import type {
+  NegativeLabDensityPrintAlgorithm,
+  NegativeLabDensityPrintOutputTag,
+} from '../../schemas/negativeLabPresetCatalogSchemas';
 import type { NegativeLabQcProofReport } from '../../schemas/negativeLabWorkspaceSchemas';
 import type {
   NegativeLabQcContactSheetArtifact,
@@ -12,6 +16,35 @@ import type {
 } from '../../utils/negativeLabQcContactSheetArtifact';
 
 type NegativeLabQcOverlayKey = keyof NegativeLabQcOverlayVisibility;
+
+interface NegativeLabQcRuntimeReadouts {
+  algorithm: {
+    algorithmId: NegativeLabDensityPrintAlgorithm;
+    algorithmVersion: 1 | 2;
+    outputTag: NegativeLabDensityPrintOutputTag;
+  };
+  castConfidencePercent: number | null;
+  crosstalk: {
+    applied: boolean;
+    profileId: string;
+    provenance: string;
+    provenanceHash: string;
+    strength: number;
+  } | null;
+  previewExportArtifactParity: {
+    dimensionsMatch: boolean;
+    exportArtifactCount: number;
+    previewArtifactCount: number;
+  };
+  scanMetricsSummary: {
+    analysisCropLabel: string;
+    clippingCount: number;
+    densityRangeUnclamped: number;
+    frameCount: number;
+    sampleCount: number;
+    texturalDensityRangeP10P90: number;
+  };
+}
 
 const NEGATIVE_LAB_QC_OVERLAY_OPTIONS = [
   {
@@ -41,6 +74,7 @@ interface NegativeLabQcProofPanelProps {
   qcOverlayVisibility: NegativeLabQcOverlayVisibility;
   qcProofArtifact: NegativeLabQcContactSheetArtifact;
   qcProofReport: NegativeLabQcProofReport;
+  runtimeReadouts: NegativeLabQcRuntimeReadouts;
 }
 
 export function NegativeLabQcProofPanel({
@@ -49,6 +83,7 @@ export function NegativeLabQcProofPanel({
   qcOverlayVisibility,
   qcProofArtifact,
   qcProofReport,
+  runtimeReadouts,
 }: NegativeLabQcProofPanelProps) {
   const { t } = useTranslation();
 
@@ -128,6 +163,89 @@ export function NegativeLabQcProofPanel({
             variantCount: qcProofArtifact.positiveVariants.length,
           })}
         </span>
+      </div>
+      <div
+        className="grid grid-cols-2 gap-1 rounded-sm bg-bg-secondary p-2 text-[11px] text-text-tertiary"
+        data-algorithm-id={runtimeReadouts.algorithm.algorithmId}
+        data-algorithm-version={runtimeReadouts.algorithm.algorithmVersion}
+        data-analysis-crop={runtimeReadouts.scanMetricsSummary.analysisCropLabel}
+        data-cast-confidence={runtimeReadouts.castConfidencePercent ?? ''}
+        data-clipping-count={runtimeReadouts.scanMetricsSummary.clippingCount}
+        data-density-range={runtimeReadouts.scanMetricsSummary.densityRangeUnclamped.toFixed(3)}
+        data-dimensions-match={runtimeReadouts.previewExportArtifactParity.dimensionsMatch ? 'true' : 'false'}
+        data-export-artifact-count={runtimeReadouts.previewExportArtifactParity.exportArtifactCount}
+        data-frame-count={runtimeReadouts.scanMetricsSummary.frameCount}
+        data-output-tag={runtimeReadouts.algorithm.outputTag}
+        data-preview-artifact-count={runtimeReadouts.previewExportArtifactParity.previewArtifactCount}
+        data-sample-count={runtimeReadouts.scanMetricsSummary.sampleCount}
+        data-testid="negative-lab-v2-qc-runtime-readouts"
+        data-textural-density-range={runtimeReadouts.scanMetricsSummary.texturalDensityRangeP10P90.toFixed(3)}
+      >
+        <span>{t('modals.negativeConversion.qcRuntimeAlgorithm')}</span>
+        <span className="truncate text-right text-text-secondary" data-testid="negative-lab-v2-qc-algorithm">
+          {t(`modals.negativeConversion.printCurveAlgorithms.${runtimeReadouts.algorithm.algorithmId}`)}
+        </span>
+        <span>{t('modals.negativeConversion.qcRuntimeScanMetrics')}</span>
+        <span className="text-right tabular-nums text-text-secondary" data-testid="negative-lab-v2-qc-scan-metrics">
+          {t('modals.negativeConversion.qcRuntimeScanMetricsValue', {
+            frameCount: runtimeReadouts.scanMetricsSummary.frameCount,
+            sampleCount: runtimeReadouts.scanMetricsSummary.sampleCount,
+          })}
+        </span>
+        <span>{t('modals.negativeConversion.qcRuntimeDensityRange')}</span>
+        <span className="text-right tabular-nums text-text-secondary" data-testid="negative-lab-v2-qc-density-range">
+          {t('modals.negativeConversion.qcRuntimeDensityRangeValue', {
+            range: runtimeReadouts.scanMetricsSummary.densityRangeUnclamped.toFixed(3),
+            texturalRange: runtimeReadouts.scanMetricsSummary.texturalDensityRangeP10P90.toFixed(3),
+          })}
+        </span>
+        <span>{t('modals.negativeConversion.qcRuntimeClippingCrop')}</span>
+        <span className="text-right tabular-nums text-text-secondary" data-testid="negative-lab-v2-qc-clipping-crop">
+          {t('modals.negativeConversion.qcRuntimeClippingCropValue', {
+            clippingCount: runtimeReadouts.scanMetricsSummary.clippingCount,
+            crop: runtimeReadouts.scanMetricsSummary.analysisCropLabel,
+          })}
+        </span>
+        <span>{t('modals.negativeConversion.qcRuntimeCastConfidence')}</span>
+        <span className="text-right tabular-nums text-text-secondary" data-testid="negative-lab-v2-qc-cast-confidence">
+          {runtimeReadouts.castConfidencePercent === null
+            ? t('modals.negativeConversion.qcRuntimeCastConfidencePending')
+            : t('modals.negativeConversion.qcRuntimeCastConfidenceValue', {
+                confidence: runtimeReadouts.castConfidencePercent,
+              })}
+        </span>
+        <span>{t('modals.negativeConversion.qcRuntimePreviewExportParity')}</span>
+        <span className="text-right text-text-secondary" data-testid="negative-lab-v2-qc-preview-export-parity">
+          {runtimeReadouts.previewExportArtifactParity.dimensionsMatch
+            ? t('modals.negativeConversion.qcRuntimePreviewExportParityMatch', {
+                exportCount: runtimeReadouts.previewExportArtifactParity.exportArtifactCount,
+                previewCount: runtimeReadouts.previewExportArtifactParity.previewArtifactCount,
+              })
+            : t('modals.negativeConversion.qcRuntimePreviewExportParityReview', {
+                exportCount: runtimeReadouts.previewExportArtifactParity.exportArtifactCount,
+                previewCount: runtimeReadouts.previewExportArtifactParity.previewArtifactCount,
+              })}
+        </span>
+        {runtimeReadouts.crosstalk !== null && (
+          <>
+            <span>{t('modals.negativeConversion.qcRuntimeCrosstalk')}</span>
+            <span
+              className="truncate text-right text-text-secondary"
+              data-crosstalk-applied={runtimeReadouts.crosstalk.applied ? 'true' : 'false'}
+              data-crosstalk-profile-id={runtimeReadouts.crosstalk.profileId}
+              data-crosstalk-provenance={runtimeReadouts.crosstalk.provenance}
+              data-crosstalk-provenance-hash={runtimeReadouts.crosstalk.provenanceHash}
+              data-crosstalk-strength={runtimeReadouts.crosstalk.strength.toFixed(2)}
+              data-testid="negative-lab-v2-qc-crosstalk"
+              title={runtimeReadouts.crosstalk.profileId}
+            >
+              {t('modals.negativeConversion.qcRuntimeCrosstalkValue', {
+                provenance: runtimeReadouts.crosstalk.provenance,
+                strength: runtimeReadouts.crosstalk.strength.toFixed(2),
+              })}
+            </span>
+          </>
+        )}
       </div>
       <div
         className="grid gap-1"
