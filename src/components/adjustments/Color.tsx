@@ -993,6 +993,12 @@ export default function ColorPanel({
     levels.inputWhite < 1 ? t('adjustments.color.levels.warnings.highlightClipping') : null,
     levels.outputBlack > 0 || levels.outputWhite < 1 ? t('adjustments.color.levels.warnings.outputCompression') : null,
   ].filter((warning): warning is string => warning !== null);
+  const activeExportPreset = appSettings?.exportPresets?.[0] ?? null;
+  const colorWorkspaceWarningChips = [
+    gamutWarningOverlay !== null ? t('adjustments.color.gamutWarning.coverage', { value: gamutWarningCoverage }) : null,
+    ...levelsClippingWarnings,
+    adjustments.skinToneUniformity.enabled ? t('adjustments.color.skinToneUniformity.warning') : null,
+  ].filter((warning): warning is string => warning !== null);
 
   useEffect(() => {
     const normalizedHue = ((effectiveHue % 360) + 360) % 360;
@@ -1347,6 +1353,60 @@ export default function ColorPanel({
     <div className="space-y-4">
       {!isForMask && <ColorRuntimeStatusRail />}
       {!isForMask && <ColorWorkflowReadinessRail />}
+      {!isForMask && (
+        <div
+          className="rounded-md border border-border bg-bg-tertiary p-2"
+          data-active-camera-profile={adjustments.cameraProfile}
+          data-active-tone-curve={adjustments.toneCurve}
+          data-export-transform-label={activeExportPreset?.name ?? ''}
+          data-gamut-warning-count={gamutWarningOverlay?.warning_pixel_count ?? 0}
+          data-histogram-hook="histogram"
+          data-testid="professional-color-workspace-panel"
+          data-vectorscope-hook="vectorscope"
+          data-warning-count={colorWorkspaceWarningChips.length}
+          data-waveform-hook="waveform"
+          data-working-space-label="linear-raw-to-working-rgb"
+        >
+          <div className="mb-2 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <UiText variant={TextVariants.heading}>{t('adjustments.color.colorMixer')}</UiText>
+              <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+                {t('adjustments.color.profileTone.receiptSummary', {
+                  profile: activeCameraProfileLabel,
+                  toneCurve: activeToneCurveLabel,
+                })}
+              </UiText>
+            </div>
+            <span className="shrink-0 rounded bg-bg-secondary px-2 py-1 text-[10px] font-semibold uppercase tracking-normal text-text-secondary">
+              {t(runtimeStatusKey('previewExport'))}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-1 text-[10px] font-medium text-text-secondary">
+            <span className="min-w-0 rounded bg-bg-secondary px-1.5 py-1" data-testid="color-workspace-working-label">
+              {t(runtimeStatusKey('apiLabel'))}: {t('adjustments.color.profileTone.cameraProfiles.linear_raw')}
+            </span>
+            <span className="min-w-0 rounded bg-bg-secondary px-1.5 py-1" data-testid="color-workspace-export-label">
+              {t(runtimeStatusKey('uiLabel'))}: {activeExportPreset?.name ?? t(runtimeStatusKey('previewExport'))}
+            </span>
+            <span className="min-w-0 rounded bg-bg-secondary px-1.5 py-1" data-testid="color-workspace-scope-label">
+              {t(runtimeStatusKey('gpuLabel'))}: {t('ui.waveform.tooltips.vectorscope')}
+            </span>
+          </div>
+          <div
+            className="mt-2 flex flex-wrap gap-1 text-[10px] font-medium text-text-secondary"
+            data-testid="professional-color-workspace-warning-chips"
+          >
+            {(colorWorkspaceWarningChips.length > 0
+              ? colorWorkspaceWarningChips
+              : [t('adjustments.color.gamutWarning.off')]
+            ).map((warning) => (
+              <span className="rounded bg-bg-secondary px-1.5 py-1" key={warning}>
+                {warning}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       {!isForMask && (
         <div
           className="rounded-md border border-border bg-bg-tertiary p-2"
