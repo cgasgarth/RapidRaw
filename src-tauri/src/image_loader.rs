@@ -14,7 +14,7 @@ use crate::render_caches::RenderCaches;
 use anyhow::{Context, Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
 use exif::{Reader as ExifReader, Tag};
-use image::{DynamicImage, GenericImageView, ImageReader, imageops};
+use image::{DynamicImage, GenericImageView, ImageFormat, ImageReader, imageops};
 use rawler::Orientation;
 use rayon::prelude::*;
 use serde::Deserialize;
@@ -39,6 +39,32 @@ pub struct LoadImageResult {
     pub is_raw: bool,
     pub is_offline_smart_preview: bool,
     pub raw_development_report: Option<RawDevelopmentReport>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RawReconstructionComparisonResult {
+    pub crop_size: u32,
+    pub image_path: String,
+    pub modes: Vec<RawReconstructionComparisonModeResult>,
+    pub proof_boundary: &'static str,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RawReconstructionComparisonModeResult {
+    pub camera_profile_status: Option<String>,
+    pub crop_data_url: String,
+    pub crop_hash: String,
+    pub decode_elapsed_ms: u128,
+    pub demosaic_algorithm_id: Option<String>,
+    pub demosaic_path: Option<String>,
+    pub estimated_memory_bytes: u64,
+    pub mode: &'static str,
+    pub output_height: u32,
+    pub output_width: u32,
+    pub provenance: &'static str,
+    pub warning_codes: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -164,6 +190,16 @@ fn demosaic_sharpening_path(demosaic_path: RawDemosaicPath) -> DemosaicSharpenin
         RawDemosaicPath::Fast | RawDemosaicPath::LinearBypass => DemosaicSharpeningPath::Fast,
         RawDemosaicPath::Standard => DemosaicSharpeningPath::Standard,
         RawDemosaicPath::XTransHq => DemosaicSharpeningPath::XTransHq,
+    }
+}
+
+fn raw_demosaic_path_label(demosaic_path: RawDemosaicPath) -> &'static str {
+    match demosaic_path {
+        RawDemosaicPath::BayerHq => "bayer_hq",
+        RawDemosaicPath::Fast => "fast",
+        RawDemosaicPath::LinearBypass => "linear_bypass",
+        RawDemosaicPath::Standard => "standard",
+        RawDemosaicPath::XTransHq => "x_trans_hq",
     }
 }
 
@@ -752,6 +788,108 @@ pub fn is_image_cached(path: String, state: tauri::State<'_, AppState>) -> bool 
         .unwrap()
         .get(&source_path_str)
         .is_some()
+}
+
+#[tauri::command]
+pub async fn compare_raw_reconstruction_modes(
+    path: String,
+    crop_size: Option<u32>,
+) -> Result<RawReconstructionComparisonResult, String> {
+    let source_path = parse_virtual_path(&path).0;
+    let source_path_str = source_path.to_string_lossy().to_string();
+    if !is_raw_file(&source_path_str) {
+        return Err("RAW reconstruction comparison requires a RAW source image.".to_string());
+    }
+
+    let crop_size = crop_size.unwrap_or(256).clamp(128, 512);
+    let source_bytes = read_file_mapped(&source_path).map_err(|error| {
+        format!("Failed to read RAW source for reconstruction comparison: {error}")
+    })?;
+    let mut modes = Vec::new();
+
+    for mode in ["fast", "balanced", "maximum"] {
+        let recipe = raw_processing_mode_recipe(Some(mode));
+        let settings = AppSettings {
+            apply_preprocessing_to_non_raws: Some(false),
+            raw_highlight_compression: Some(recipe.raw_highlight_compression),
+            raw_preprocessing_color_nr: Some(recipe.raw_preprocessing_color_nr),
+            raw_preprocessing_sharpening: Some(recipe.raw_preprocessing_sharpening),
+            raw_preprocessing_sharpening_detail: Some(recipe.raw_preprocessing_sharpening_detail),
+            raw_preprocessing_sharpening_edge_masking: Some(
+                recipe.raw_preprocessing_sharpening_edge_masking,
+            ),
+            raw_preprocessing_sharpening_radius: Some(recipe.raw_preprocessing_sharpening_radius),
+            raw_processing_mode: Some(mode.to_string()),
+            ..AppSettings::default()
+        };
+        let started = Instant::now();
+        let (image, report) = load_base_image_from_bytes_with_report(
+            &source_bytes,
+            &source_path_str,
+            false,
+            &settings,
+            None,
+        )
+        .map_err(|error| {
+            format!("Failed to decode {mode} RAW reconstruction comparison: {error}")
+        })?;
+        let decode_elapsed_ms = started.elapsed().as_millis();
+        let rgba = image.to_rgba8();
+        let (width, height) = rgba.dimensions();
+        let crop_width = crop_size.min(width);
+        let crop_height = crop_size.min(height);
+        let crop_x = width.saturating_sub(crop_width) / 2;
+        let crop_y = height.saturating_sub(crop_height) / 2;
+        let crop = imageops::crop_imm(&rgba, crop_x, crop_y, crop_width, crop_height).to_image();
+        let crop_hash = format!("blake3:{}", blake3::hash(crop.as_raw()).to_hex());
+        let mut png_bytes = Vec::new();
+        DynamicImage::ImageRgba8(crop)
+            .write_to(&mut Cursor::new(&mut png_bytes), ImageFormat::Png)
+            .map_err(|error| format!("Failed to encode {mode} RAW reconstruction crop: {error}"))?;
+        let crop_data_url = format!(
+            "data:image/png;base64,{}",
+            general_purpose::STANDARD.encode(png_bytes)
+        );
+        let estimated_memory_bytes = u64::from(width) * u64::from(height) * 4;
+        let (camera_profile_status, demosaic_algorithm_id, demosaic_path, warning_codes) =
+            if let Some(report) = report {
+                (
+                    Some(report.camera_profile.status.to_string()),
+                    report.demosaic_algorithm_id.map(str::to_string),
+                    Some(raw_demosaic_path_label(report.demosaic_path).to_string()),
+                    report
+                        .camera_profile
+                        .warning_codes
+                        .into_iter()
+                        .map(str::to_string)
+                        .collect(),
+                )
+            } else {
+                (None, None, None, Vec::new())
+            };
+
+        modes.push(RawReconstructionComparisonModeResult {
+            camera_profile_status,
+            crop_data_url,
+            crop_hash,
+            decode_elapsed_ms,
+            demosaic_algorithm_id,
+            demosaic_path,
+            estimated_memory_bytes,
+            mode,
+            output_height: height,
+            output_width: width,
+            provenance: recipe.provenance,
+            warning_codes,
+        });
+    }
+
+    Ok(RawReconstructionComparisonResult {
+        crop_size,
+        image_path: path,
+        modes,
+        proof_boundary: "runtime_raw_reconstruction_mode_crop_comparison",
+    })
 }
 
 fn compute_smart_preview_id(path_str: &str) -> String {

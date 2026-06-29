@@ -1,7 +1,7 @@
 import cx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RotateCcw, Copy, ClipboardPaste, Aperture, ChartArea } from 'lucide-react';
-import { useCallback, useMemo, type MouseEvent, type ReactNode } from 'react';
+import { RotateCcw, Copy, ClipboardPaste, Aperture, ChartArea, ScanSearch } from 'lucide-react';
+import { useCallback, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { useShallow } from 'zustand/react/shallow';
@@ -9,6 +9,10 @@ import { useShallow } from 'zustand/react/shallow';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useWaveformControls } from '../../../hooks/useWaveformControls';
+import {
+  rawReconstructionComparisonResultSchema,
+  type RawReconstructionComparisonResult,
+} from '../../../schemas/rawReconstructionComparisonSchemas';
 import { emptyTauriResponseSchema } from '../../../schemas/tauriResponseSchemas';
 import { type CopiedSectionAdjustments, useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
@@ -55,6 +59,13 @@ const ADJUSTMENT_SECTION_LABEL_FALLBACKS: Record<AdjustmentSectionName, string> 
   details: 'Details',
   effects: 'Effects',
 };
+const RAW_RECONSTRUCTION_COMPARISON_CROP_SIZE = 256;
+
+const formatBytes = (value: number): string => {
+  if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  if (value >= 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${value} B`;
+};
 
 export default function Controls() {
   const { t } = useTranslation();
@@ -62,6 +73,9 @@ export default function Controls() {
   const { isResizingWaveform, onToggleWaveform, setActiveWaveformChannel, handleWaveformResize } =
     useWaveformControls();
   const { setAdjustments, handleAutoAdjustments, handleLutSelect } = useEditorActions();
+  const [rawReconstructionComparison, setRawReconstructionComparison] =
+    useState<RawReconstructionComparisonResult | null>(null);
+  const [isComparingRawReconstruction, setIsComparingRawReconstruction] = useState(false);
 
   const { appSettings, theme } = useSettingsStore(
     useShallow((state) => ({
@@ -187,6 +201,24 @@ export default function Controls() {
     },
     [adjustments, selectedImage, setAdjustments, setEditor, t],
   );
+
+  const handleCompareRawReconstructionModes = useCallback(async () => {
+    if (!selectedImage?.path || !selectedImage.isRaw) return;
+
+    setIsComparingRawReconstruction(true);
+    try {
+      const comparison = await invokeWithSchema(
+        Invokes.CompareRawReconstructionModes,
+        { cropSize: RAW_RECONSTRUCTION_COMPARISON_CROP_SIZE, path: selectedImage.path },
+        rawReconstructionComparisonResultSchema,
+      );
+      setRawReconstructionComparison(comparison);
+    } catch (error) {
+      toast.error(t('editor.adjustments.rawReconstructionComparison.error', { error: formatUnknownError(error) }));
+    } finally {
+      setIsComparingRawReconstruction(false);
+    }
+  }, [selectedImage, t]);
 
   const handleResetAdjustments = () => {
     const resetValues = pickAdjustmentValues(
@@ -407,6 +439,72 @@ export default function Controls() {
               ].provenance
             }
           </UiText>
+          <button
+            className="flex w-full items-center justify-center gap-2 rounded-md bg-surface px-3 py-2 text-sm font-medium hover:bg-card-active disabled:cursor-not-allowed disabled:opacity-60"
+            data-testid="raw-reconstruction-comparison-run"
+            disabled={isComparingRawReconstruction || !selectedImage.isReady}
+            onClick={() => {
+              void handleCompareRawReconstructionModes();
+            }}
+            type="button"
+          >
+            <ScanSearch size={16} />
+            {isComparingRawReconstruction
+              ? t('editor.adjustments.rawReconstructionComparison.running')
+              : t('editor.adjustments.rawReconstructionComparison.action')}
+          </button>
+          {rawReconstructionComparison !== null && (
+            <div
+              className="space-y-2 rounded-md border border-surface bg-background/50 p-2"
+              data-crop-size={rawReconstructionComparison.cropSize}
+              data-testid="raw-reconstruction-comparison-result"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <UiText variant={TextVariants.small} className="font-medium">
+                  {t('editor.adjustments.rawReconstructionComparison.title')}
+                </UiText>
+                <UiText variant={TextVariants.small} className="font-mono text-text-secondary">
+                  {t('editor.adjustments.rawReconstructionComparison.cropSizeLabel', {
+                    size: rawReconstructionComparison.cropSize,
+                  })}
+                </UiText>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {rawReconstructionComparison.modes.map((mode) => (
+                  <div
+                    className="min-w-0 space-y-1"
+                    data-crop-hash={mode.cropHash}
+                    data-decode-ms={mode.decodeElapsedMs}
+                    data-mode={mode.mode}
+                    data-testid={`raw-reconstruction-comparison-mode-${mode.mode}`}
+                    key={mode.mode}
+                  >
+                    <img
+                      alt={t('editor.adjustments.rawReconstructionComparison.cropAlt', {
+                        mode: t(`settings.processing.rawModes.${mode.mode}.label`),
+                      })}
+                      className="aspect-square w-full rounded border border-surface object-cover"
+                      src={mode.cropDataUrl}
+                    />
+                    <UiText as="div" variant={TextVariants.small} className="truncate font-medium">
+                      {t(`settings.processing.rawModes.${mode.mode}.label`)}
+                    </UiText>
+                    <UiText as="div" variant={TextVariants.small} className="font-mono text-text-secondary">
+                      {t('editor.adjustments.rawReconstructionComparison.decodeMsLabel', {
+                        ms: mode.decodeElapsedMs,
+                      })}
+                    </UiText>
+                    <UiText as="div" variant={TextVariants.small} className="truncate font-mono text-text-secondary">
+                      {formatBytes(mode.estimatedMemoryBytes)}
+                    </UiText>
+                  </div>
+                ))}
+              </div>
+              <UiText as="div" variant={TextVariants.small} className="break-all font-mono text-text-secondary">
+                {rawReconstructionComparison.proofBoundary}
+              </UiText>
+            </div>
+          )}
         </div>
       )}
 

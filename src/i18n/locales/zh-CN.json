@@ -523,6 +523,15 @@
         "inherit": "继承（{{mode}}）",
         "label": "RAW 质量"
       },
+      "rawReconstructionComparison": {
+        "action": "Compare 100% crops",
+        "cropAlt": "{{mode}} 100% RAW reconstruction crop",
+        "cropSizeLabel": "{{size}}px",
+        "decodeMsLabel": "{{ms}}ms",
+        "error": "Failed to compare RAW reconstruction modes: {{error}}",
+        "running": "Comparing crops...",
+        "title": "100% RAW crop comparison"
+      },
       "sections": {
         "basic": "基础",
         "color": "颜色",
