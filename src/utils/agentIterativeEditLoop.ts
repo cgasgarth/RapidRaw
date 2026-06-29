@@ -5,8 +5,10 @@ import { agentEditQualityReviewSchema, buildAgentEditQualityReview } from './age
 import { dispatchAgentLiveEditorTool } from './agentLiveToolDispatch';
 import { agentPreviewEnvelopeSchema } from './agentPreviewEnvelope';
 import {
+  AGENT_PREVIEW_COMPARE_TOOL_NAME,
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
+  agentPreviewCompareResponseSchema,
   agentPreviewRenderResponseSchema,
   agentStateGetResponseSchema,
 } from './agentReadOnlyAppServerTools';
@@ -47,7 +49,9 @@ const agentLoopPreviewRequestSchema = z
   .strict();
 
 const agentLoopStepSchema = agentLoopAdjustmentPatchSchema.safeExtend({
+  assistantRationale: z.string().trim().min(1).optional(),
   preview: agentLoopPreviewRequestSchema.optional(),
+  userFollowUp: z.string().trim().min(1).optional(),
 });
 
 export const agentIterativeEditLoopRequestSchema = z
@@ -64,6 +68,14 @@ export const agentIterativeEditLoopRequestSchema = z
 export const agentIterativeEditLoopResultSchema = z
   .object({
     appliedGraphRevision: z.string().trim().min(1),
+    compareReview: z
+      .object({
+        beforeArtifactId: z.string().trim().min(1),
+        currentArtifactId: z.string().trim().min(1),
+        currentRecipeHash: z.string().trim().min(1),
+        toolName: z.literal(AGENT_PREVIEW_COMPARE_TOOL_NAME),
+      })
+      .strict(),
     editCount: z.number().int().min(2),
     editReview: agentEditQualityReviewSchema,
     finalRecipeHash: z.string().trim().min(1),
@@ -84,6 +96,7 @@ export const agentIterativeEditLoopResultSchema = z
       )
       .min(2),
     requestId: z.string().trim().min(1),
+    reviewStatus: z.enum(['max_iterations_reached', 'needs_user_review']),
     stopReason: z.enum(['completed', 'max_iterations']),
     transcript: z
       .array(
@@ -96,6 +109,18 @@ export const agentIterativeEditLoopResultSchema = z
           .strict(),
       )
       .min(5),
+    userFeedbackTurns: z
+      .array(
+        z
+          .object({
+            previewArtifactId: z.string().trim().min(1),
+            recipeHash: z.string().trim().min(1),
+            turn: z.number().int().positive(),
+            userFollowUp: z.string().trim().min(1),
+          })
+          .strict(),
+      )
+      .min(1),
   })
   .strict();
 
@@ -130,6 +155,7 @@ export const runAgentIterativeEditLoop = async (
   const previewRefreshes: AgentIterativeEditLoopResult['previewRefreshes'] = [];
   const previewLineage: AgentIterativeEditLoopResult['previewLineage'] = [];
   const toolReceipts: Array<{ graphRevision: string; summary: string; toolName: string }> = [];
+  const userFeedbackTurns: AgentIterativeEditLoopResult['userFeedbackTurns'] = [];
 
   transcript.push({
     detail: `initial inspect for ${parsedRequest.prompt}`,
@@ -142,11 +168,26 @@ export const runAgentIterativeEditLoop = async (
     if (editCount >= parsedRequest.maxIterations) break;
 
     const { preview: previewRequest, ...adjustments } = step;
+    const { assistantRationale, userFollowUp, ...adjustmentPatch } = adjustments;
+    if (userFollowUp !== undefined) {
+      transcript.push({
+        detail: userFollowUp,
+        toolName: 'rawengine.agent.user_feedback',
+        turn,
+      });
+    }
+    if (assistantRationale !== undefined) {
+      transcript.push({
+        detail: assistantRationale,
+        toolName: 'rawengine.agent.plan.refine',
+        turn,
+      });
+    }
     const applyRequestId = `${parsedRequest.requestId}-apply-${index + 1}`;
     const apply = agentAdjustmentsApplyResponseSchema.parse(
       await dispatchAgentLiveEditorTool({
         args: {
-          adjustments: agentLoopAdjustmentPatchSchema.parse(adjustments),
+          adjustments: agentLoopAdjustmentPatchSchema.parse(adjustmentPatch),
           expectedRecipeHash: recipeHash,
           operationId: `${parsedRequest.operationId}-${index + 1}`,
           requestId: applyRequestId,
@@ -206,6 +247,14 @@ export const runAgentIterativeEditLoop = async (
       sourceToolName: apply.toolName,
       turn,
     });
+    if (userFollowUp !== undefined) {
+      userFeedbackTurns.push({
+        previewArtifactId: preview.preview.artifactId,
+        recipeHash,
+        turn,
+        userFollowUp,
+      });
+    }
     transcript.push({
       detail: `${preview.requestId} ${preview.preview.id} ${preview.staleRecipeHash ? 'stale' : 'fresh'}`,
       toolName: preview.toolName,
@@ -233,9 +282,33 @@ export const runAgentIterativeEditLoop = async (
     toolName: 'rawengine.agent.edit_review',
     turn: editCount + 2,
   });
+  const compareToolCallId = `${parsedRequest.requestId}-compare-final`;
+  const compare = agentPreviewCompareResponseSchema.parse(
+    await dispatchAgentLiveEditorTool({
+      args: {
+        beforeGraphRevision: previewLineage[0]?.appliedGraphRevision ?? appliedGraphRevision,
+        beforeRecipeHash: beforePreview.recipeHash,
+        expectedRecipeHash: recipeHash,
+        requestId: compareToolCallId,
+      },
+      requestId: compareToolCallId,
+      runtimeToolName: AGENT_PREVIEW_COMPARE_TOOL_NAME,
+    }),
+  );
+  transcript.push({
+    detail: `${compare.compare.artifacts[0].artifactId} -> ${compare.compare.artifacts[1].artifactId}`,
+    toolName: compare.toolName,
+    turn: editCount + 2,
+  });
 
   return agentIterativeEditLoopResultSchema.parse({
     appliedGraphRevision,
+    compareReview: {
+      beforeArtifactId: compare.compare.artifacts[0].artifactId,
+      currentArtifactId: compare.compare.artifacts[1].artifactId,
+      currentRecipeHash: compare.compare.lineage.currentRecipeHash,
+      toolName: compare.toolName,
+    },
     editCount,
     editReview,
     finalRecipeHash: recipeHash,
@@ -243,7 +316,9 @@ export const runAgentIterativeEditLoop = async (
     previewRefreshes,
     previewRefreshCount,
     requestId: parsedRequest.requestId,
+    reviewStatus: editCount >= parsedRequest.maxIterations ? 'max_iterations_reached' : 'needs_user_review',
     stopReason: editCount >= parsedRequest.maxIterations ? 'max_iterations' : 'completed',
     transcript,
+    userFeedbackTurns,
   });
 };

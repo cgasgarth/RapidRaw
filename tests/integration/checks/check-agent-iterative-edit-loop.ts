@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 
+import { mkdir } from 'node:fs/promises';
+
 import { ToolType } from '../../../src/components/panel/right/Masks.tsx';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
@@ -61,6 +63,7 @@ const result = await runAgentIterativeEditLoop({
   steps: [
     { exposure: 0.28, highlights: -12 },
     {
+      assistantRationale: 'After preview feedback, lift shadows and inspect a cropped detail preview.',
       exposure: 0.34,
       preview: {
         crop: { height: 0.35, width: 0.3, x: 0.25, y: 0.2 },
@@ -69,6 +72,7 @@ const result = await runAgentIterativeEditLoop({
         zoom: { centerX: 0.5, centerY: 0.55, scale: 2.5 },
       },
       shadows: 18,
+      userFollowUp: 'Foreground still feels dense; inspect the detail area before final review.',
     },
   ],
 });
@@ -78,6 +82,16 @@ const toolNames = result.transcript.map((entry) => entry.toolName);
 
 if (result.stopReason !== 'completed' || result.editCount !== 2 || result.previewRefreshCount !== 2) {
   throw new Error('agent iterative loop did not complete two edit/preview iterations.');
+}
+if (result.reviewStatus !== 'needs_user_review') {
+  throw new Error('agent iterative loop did not stop at a bounded user-review status.');
+}
+if (
+  result.userFeedbackTurns.length !== 1 ||
+  result.userFeedbackTurns[0]?.turn !== 3 ||
+  result.userFeedbackTurns[0]?.previewArtifactId !== result.previewRefreshes[1]?.artifactId
+) {
+  throw new Error('agent iterative loop did not bind user feedback to the next preview artifact.');
 }
 if (
   result.previewRefreshes.length !== 2 ||
@@ -143,6 +157,40 @@ if (
 if (!result.transcript.some((entry) => entry.toolName === 'rawengine.agent.edit_review')) {
   throw new Error('agent iterative loop transcript did not persist the edit review decision.');
 }
+if (
+  result.compareReview.toolName !== 'rawengine.agent.preview.compare' ||
+  result.compareReview.beforeArtifactId.length === 0 ||
+  result.compareReview.currentArtifactId.length === 0 ||
+  result.compareReview.currentRecipeHash !== result.finalRecipeHash
+) {
+  throw new Error('agent iterative loop did not create final before/current compare artifacts.');
+}
+if (
+  !result.transcript.some((entry) => entry.toolName === 'rawengine.agent.user_feedback') ||
+  !result.transcript.some((entry) => entry.toolName === 'rawengine.agent.plan.refine') ||
+  !result.transcript.some((entry) => entry.toolName === 'rawengine.agent.preview.compare')
+) {
+  throw new Error('agent iterative loop transcript did not preserve feedback, plan, and compare tool calls.');
+}
+
+const artifactDir = 'artifacts/validation/agent';
+const artifactPath = `${artifactDir}/agent-feedback-preview-loop.html`;
+await mkdir(artifactDir, { recursive: true });
+await Bun.write(
+  artifactPath,
+  `<!doctype html><meta charset="utf-8"><title>Agent feedback preview loop</title>
+<h1>Agent feedback preview loop</h1>
+<dl>
+<dt>Prompt</dt><dd>${result.transcript[0]?.detail ?? ''}</dd>
+<dt>Status</dt><dd>${result.reviewStatus}</dd>
+<dt>Tool calls</dt><dd>${toolNames.join(', ')}, ${result.compareReview.toolName}</dd>
+<dt>Before artifact</dt><dd>${result.compareReview.beforeArtifactId}</dd>
+<dt>Current artifact</dt><dd>${result.compareReview.currentArtifactId}</dd>
+<dt>Final graph</dt><dd>${result.appliedGraphRevision}</dd>
+<dt>Final recipe</dt><dd>${result.finalRecipeHash}</dd>
+<dt>Feedback</dt><dd>${result.userFeedbackTurns.map((turn) => turn.userFollowUp).join(' | ')}</dd>
+</dl>`,
+);
 
 const detailReview = buildAgentEditQualityReview({
   beforePreview: result.previewRefreshes[0],
@@ -160,4 +208,4 @@ if (
   throw new Error('agent edit review did not request a detail preview for retouch/detail prompts.');
 }
 
-console.log('agent iterative edit loop ok');
+console.log(`agent iterative edit loop ok (${artifactPath})`);
