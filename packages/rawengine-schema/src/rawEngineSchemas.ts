@@ -8042,13 +8042,27 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
       .strict(),
     conversionModel: z
       .object({
-        algorithmId: z.literal('density_rgb_v1'),
-        algorithmVersion: z.literal(1),
+        algorithmId: z.enum(['density_rgb_v1', 'negative_density_print_v2']),
+        algorithmVersion: z.union([z.literal(1), z.literal(2)]),
         densityMax: z.number().positive(),
         epsilonPolicyId: z.literal('density_epsilon_v1'),
         negativeDensityTolerance: z.number().nonnegative(),
       })
       .strict(),
+    densityPrintCurve: z
+      .object({
+        contrastGrade: z.number().min(0.5).max(2),
+        densityOffset: z.number().min(-0.5).max(0.5),
+        midtoneShape: z.number().min(-1).max(1),
+        outputTag: z.enum(['preview_display', 'export_linear']),
+        schemaVersion: z.literal(1),
+        shoulderStrength: z.number().min(0).max(1),
+        targetBlackDensity: z.number().min(1.1).max(2.4),
+        targetWhiteDensity: z.number().min(0).max(0.25),
+        toeStrength: z.number().min(0).max(1),
+      })
+      .strict()
+      .optional(),
     curveModel: z
       .object({
         curveFamily: z.enum(['process_profile_monotonic_v1', 'parametric_monotonic_v1']),
@@ -8089,6 +8103,41 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
   })
   .strict()
   .superRefine((recipe, context) => {
+    if (recipe.conversionModel.algorithmId === 'density_rgb_v1' && recipe.conversionModel.algorithmVersion !== 1) {
+      context.addIssue({
+        code: 'custom',
+        message: 'density_rgb_v1 recipes must declare algorithmVersion 1.',
+        path: ['conversionModel', 'algorithmVersion'],
+      });
+    }
+
+    if (
+      recipe.conversionModel.algorithmId === 'negative_density_print_v2' &&
+      recipe.conversionModel.algorithmVersion !== 2
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'negative_density_print_v2 recipes must declare algorithmVersion 2.',
+        path: ['conversionModel', 'algorithmVersion'],
+      });
+    }
+
+    if (recipe.conversionModel.algorithmId === 'negative_density_print_v2' && recipe.densityPrintCurve === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'negative_density_print_v2 recipes require versioned densityPrintCurve params.',
+        path: ['densityPrintCurve'],
+      });
+    }
+
+    if (recipe.conversionModel.algorithmId === 'density_rgb_v1' && recipe.densityPrintCurve !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'density_rgb_v1 recipes must not carry v2 densityPrintCurve params.',
+        path: ['densityPrintCurve'],
+      });
+    }
+
     const { inversionCurveSet, inversionCurveSetPolicy } = recipe.curveModel;
     if (
       ['use_curve_set_override', 'expert_override'].includes(inversionCurveSetPolicy ?? '') &&

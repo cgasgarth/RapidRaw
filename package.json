@@ -508,6 +508,7 @@
     "check:negative-lab-measured-profiles": "bun tests/integration/checks/check-negative-lab-measured-profiles.ts",
     "check:negative-lab-measured-render-proof": "bun tests/integration/checks/check-negative-lab-measured-render-proof.ts",
     "check:negative-lab-density-cpu": "bun tests/integration/checks/check-negative-lab-density-cpu.ts",
+    "check:negative-lab-density-print-v2": "bun tests/integration/checks/check-negative-lab-density-print-v2.ts",
     "check:negative-lab-black-white-points": "bun tests/integration/checks/check-negative-lab-black-white-points.ts",
     "check:negative-lab-live-preview-sample": "bun tests/integration/checks/check-negative-lab-live-preview-sample.ts",
     "check:negative-lab-live-preview-sample:update": "bun tests/integration/checks/check-negative-lab-live-preview-sample.ts --update",

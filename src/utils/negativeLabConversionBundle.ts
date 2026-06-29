@@ -23,6 +23,9 @@ const paramsNear = (
   numbersNear(left.contrast, right.contrast) &&
   numbersNear(left.exposure, right.exposure) &&
   numbersNear(left.green_weight, right.green_weight) &&
+  left.print_curve_algorithm === right.print_curve_algorithm &&
+  left.print_curve_output_tag === right.print_curve_output_tag &&
+  JSON.stringify(left.print_curve_v2) === JSON.stringify(right.print_curve_v2) &&
   numbersNear(left.red_weight, right.red_weight) &&
   numbersNear(left.white_point, right.white_point) &&
   JSON.stringify(left.base_fog_sample) === JSON.stringify(right.base_fog_sample);

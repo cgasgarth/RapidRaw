@@ -202,6 +202,13 @@ export const resolveNegativeLabRuntimeProfile = (
 export const buildNegativeLabRuntimeProfileProvenanceHash = (
   profile: NegativeLabResolvedRuntimeProfile,
 ): `fnv1a32:${string}` => {
+  const { print_curve_algorithm, print_curve_output_tag, print_curve_v2, ...legacyCompatibleParams } = profile.params;
+  const params =
+    print_curve_algorithm === 'density_rgb_v1' &&
+    print_curve_output_tag === 'preview_display' &&
+    print_curve_v2 === null
+      ? legacyCompatibleParams
+      : profile.params;
   const provenancePayload = {
     claimLevel: profile.claimLevel,
     claimPolicy: profile.claimPolicy,
@@ -210,7 +217,7 @@ export const buildNegativeLabRuntimeProfileProvenanceHash = (
     evidenceDigest: profile.evidenceDigest,
     evidenceFixtureIds: profile.evidenceFixtureIds,
     measurementProfileId: profile.measurementProfileId,
-    params: profile.params,
+    params,
     presetId: profile.presetId,
     profileStatus: profile.profileStatus,
     runtimeStatus: profile.runtimeStatus,
