@@ -2239,6 +2239,17 @@
       "titleBatch": "降噪图像",
       "titleSingle": "降噪图像"
     },
+    "derivedOutput": {
+      "family": "",
+      "output": "",
+      "outputHash": "",
+      "settingsHash": "",
+      "sourceCount_other": "",
+      "sources": "",
+      "storage": "",
+      "subtitle": "",
+      "title": ""
+    },
     "focusStack": {
       "alignment": {
         "auto": "Auto",

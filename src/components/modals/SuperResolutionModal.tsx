@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { AlertTriangle, CheckCircle2, Layers3, ScanSearch, ShieldCheck } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
@@ -14,7 +14,9 @@ import {
   getSuperResolutionDetailPolicyForMode,
   getSuperResolutionModeForDetailPolicy,
 } from '../../schemas/superResolutionUiSchemas';
+import { useUIStore, type SuperResolutionModalState } from '../../store/useUIStore';
 import { TextColors, TextVariants } from '../../types/typography';
+import { buildSuperResolutionDerivedOutputReceipt } from '../../utils/derivedOutputReceipt';
 import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
 import { buildSuperResolutionSourcePreflight } from '../../utils/superResolutionSourcePreflight';
 import Button from '../ui/Button';
@@ -29,7 +31,6 @@ import type {
   SuperResolutionReconstructionMode,
   SuperResolutionUiSettings,
 } from '../../schemas/superResolutionUiSchemas';
-import type { SuperResolutionModalState } from '../../store/useUIStore';
 import type { SuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
 
 interface SuperResolutionModalProps {
@@ -165,6 +166,14 @@ export default function SuperResolutionModal({
       sourceCount: fallbackOutputReviewSourceCount,
     });
   const hasRuntimeOutputReview = runtimeOutputReview !== null && runtimeOutputReview !== undefined;
+  const derivedOutputReceipt = buildSuperResolutionDerivedOutputReceipt({ review: outputReview, settings });
+  const storedDerivedOutputReceipt =
+    useUIStore((state) => state.derivedOutputReceipts[derivedOutputReceipt.receiptId]) ?? derivedOutputReceipt;
+  const upsertDerivedOutputReceipt = useUIStore((state) => state.upsertDerivedOutputReceipt);
+
+  useEffect(() => {
+    upsertDerivedOutputReceipt(derivedOutputReceipt);
+  }, [derivedOutputReceipt, upsertDerivedOutputReceipt]);
   const isApplyPlanReady =
     isSourceCountValid &&
     hasRuntimeOutputReview &&
@@ -672,6 +681,7 @@ export default function SuperResolutionModal({
       </motion.section>
 
       <ComputationalMergeReviewPanel
+        derivedOutputReceipt={storedDerivedOutputReceipt}
         title={t('modals.superResolution.review.title')}
         proofStatus={t('modals.superResolution.review.proofStatus')}
         limitation={t('modals.superResolution.review.limitation')}

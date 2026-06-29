@@ -2148,6 +2148,17 @@
       "titleBatch": "画像を一括ノイズ低減",
       "titleSingle": "画像のノイズ低減"
     },
+    "derivedOutput": {
+      "family": "",
+      "output": "",
+      "outputHash": "",
+      "settingsHash": "",
+      "sourceCount_other": "",
+      "sources": "",
+      "storage": "",
+      "subtitle": "",
+      "title": ""
+    },
     "focusStack": {
       "alignment": {
         "auto": "Auto",

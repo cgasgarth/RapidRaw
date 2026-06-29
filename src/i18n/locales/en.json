@@ -2268,6 +2268,29 @@
       "titleBatch": "Denoise Images",
       "titleSingle": "Denoise Image"
     },
+    "derivedOutput": {
+      "family": "Family",
+      "familyValue": {
+        "focus_stack": "Focus stack",
+        "hdr": "HDR",
+        "panorama": "Panorama",
+        "super_resolution": "Super-resolution"
+      },
+      "output": "Output",
+      "outputHash": "Output hash",
+      "settingsHash": "Settings hash",
+      "sourceCount_one": "{{count}} source",
+      "sourceCount_other": "{{count}} sources",
+      "sources": "Sources",
+      "storage": "Storage",
+      "storageValue": {
+        "export_path": "Export path",
+        "sidecar_artifact": "Sidecar artifact",
+        "temp_cache": "Temporary cache"
+      },
+      "subtitle": "Shared output identity, source lineage, and editor handoff state.",
+      "title": "Derived output receipt"
+    },
     "focusStack": {
       "alignment": {
         "auto": "Auto",
