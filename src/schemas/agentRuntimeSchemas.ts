@@ -340,6 +340,7 @@ export const RawEngineAppServerRouteMode = {
   DryRunCommand: 'dry_run_command',
   HostCommand: 'host_command',
   MappedInvoke: 'mapped_invoke',
+  OpenDerivedSource: 'open_derived_source',
   Read: 'read',
 } as const;
 
@@ -348,6 +349,7 @@ export const rawEngineAppServerRouteModeSchema = z.enum([
   RawEngineAppServerRouteMode.DryRunCommand,
   RawEngineAppServerRouteMode.HostCommand,
   RawEngineAppServerRouteMode.MappedInvoke,
+  RawEngineAppServerRouteMode.OpenDerivedSource,
   RawEngineAppServerRouteMode.Read,
 ]);
 

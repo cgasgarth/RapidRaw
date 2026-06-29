@@ -6,7 +6,11 @@ export const computationalMergeAppServerRouteFamilySchema = z.enum([
   'focus_stack',
   'super_resolution',
 ]);
-export const computationalMergeAppServerRouteExecutionModeSchema = z.enum(['dry_run_command', 'apply_dry_run_plan']);
+export const computationalMergeAppServerRouteExecutionModeSchema = z.enum([
+  'apply_dry_run_plan',
+  'dry_run_command',
+  'open_derived_source',
+]);
 export const computationalMergeAppServerRouteStatusSchema = z.enum(['mapped']);
 
 export const computationalMergeAppServerRouteSchema = z
@@ -19,15 +23,21 @@ export const computationalMergeAppServerRouteSchema = z
     ]),
     executionMode: computationalMergeAppServerRouteExecutionModeSchema,
     family: computationalMergeAppServerRouteFamilySchema,
-    inputSchemaName: z.literal('ComputationalMergeCommandEnvelopeV1'),
-    outputSchemaName: z.enum(['ComputationalMergeDryRunResultV1', 'ComputationalMergeMutationResultV1']),
+    inputSchemaName: z.enum(['ComputationalMergeCommandEnvelopeV1', 'ComputationalMergeDerivedSourceOpenRequestV1']),
+    outputSchemaName: z.enum([
+      'ComputationalMergeDerivedSourceOpenResultV1',
+      'ComputationalMergeDryRunResultV1',
+      'ComputationalMergeMutationResultV1',
+    ]),
     reason: z.string().trim().min(1),
     runtimeCheckScript: z.string().trim().min(1),
     status: computationalMergeAppServerRouteStatusSchema,
     toolName: z
       .string()
       .trim()
-      .regex(/^computationalmerge\.(?:focus_stack|hdr|panorama|super_resolution)\.(?:dry_run_command|apply_command)$/u),
+      .regex(
+        /^computationalmerge\.(?:focus_stack|hdr|panorama|super_resolution)\.(?:dry_run_command|apply_command|open_derived_source)$/u,
+      ),
   })
   .strict()
   .superRefine((route, context) => {
@@ -40,6 +50,17 @@ export const computationalMergeAppServerRouteSchema = z
     }
 
     if (
+      route.executionMode !== 'open_derived_source' &&
+      route.inputSchemaName !== 'ComputationalMergeCommandEnvelopeV1'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Dry-run and apply computational merge routes must accept command envelopes.',
+        path: ['inputSchemaName'],
+      });
+    }
+
+    if (
       route.executionMode === 'apply_dry_run_plan' &&
       route.outputSchemaName !== 'ComputationalMergeMutationResultV1'
     ) {
@@ -48,6 +69,23 @@ export const computationalMergeAppServerRouteSchema = z
         message: 'Apply computational merge routes must return mutation results.',
         path: ['outputSchemaName'],
       });
+    }
+
+    if (route.executionMode === 'open_derived_source') {
+      if (route.inputSchemaName !== 'ComputationalMergeDerivedSourceOpenRequestV1') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Open-derived-source computational merge routes must accept derived-source open requests.',
+          path: ['inputSchemaName'],
+        });
+      }
+      if (route.outputSchemaName !== 'ComputationalMergeDerivedSourceOpenResultV1') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Open-derived-source computational merge routes must return derived-source open results.',
+          path: ['outputSchemaName'],
+        });
+      }
     }
   });
 

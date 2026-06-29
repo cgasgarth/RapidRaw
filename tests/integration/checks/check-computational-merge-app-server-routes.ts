@@ -42,6 +42,17 @@ for (const route of COMPUTATIONAL_MERGE_APP_SERVER_ROUTES) {
   }
 }
 
+for (const family of ['focus_stack', 'hdr', 'panorama', 'super_resolution']) {
+  for (const executionMode of ['apply_dry_run_plan', 'dry_run_command', 'open_derived_source']) {
+    const hasRoute = COMPUTATIONAL_MERGE_APP_SERVER_ROUTES.some(
+      (route) => route.family === family && route.executionMode === executionMode,
+    );
+    if (!hasRoute) {
+      failures.push(`${family} is missing ${executionMode} app-server route coverage.`);
+    }
+  }
+}
+
 for (const marker of [
   'COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_MANIFEST',
   'computationalMergeAppServerRouteManifestSchema',
