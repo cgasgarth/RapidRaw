@@ -1,6 +1,8 @@
 import { deriveArtifactInvalidationReasons } from '../../packages/rawengine-schema/src/derivedArtifactInvalidation';
 import {
+  derivedOutputProvenanceSidecarSchema,
   derivedOutputReceiptSchema,
+  type DerivedOutputProvenanceSidecar,
   type DerivedOutputReceipt,
   type DerivedOutputStaleReason,
 } from '../schemas/derivedOutputReceiptSchemas';
@@ -12,8 +14,14 @@ import type { PanoramaSavedReviewSummary, PanoramaUiSettings } from '../schemas/
 import type { SuperResolutionOutputReviewWorkflow } from '../schemas/superResolutionOutputReviewSchemas';
 import type { SuperResolutionUiSettings } from '../schemas/superResolutionUiSchemas';
 
-type BuildReceiptInput = Omit<DerivedOutputReceipt, 'receiptId' | 'settingsHash'> & {
+type BuildReceiptInput = Omit<DerivedOutputReceipt, 'provenanceSidecar' | 'receiptId' | 'settingsHash'> & {
+  provenanceSidecar?: {
+    acceptedApplyId?: string;
+    acceptedDryRunId?: string;
+    warnings: string[];
+  };
   settings: unknown;
+  sourcePaths?: Array<string | undefined>;
 };
 
 const STALE_REASON_ORDER: ReadonlyArray<DerivedOutputStaleReason> = [
@@ -29,16 +37,41 @@ const STALE_REASON_ORDER: ReadonlyArray<DerivedOutputStaleReason> = [
 
 export const buildDerivedOutputReceipt = (input: BuildReceiptInput): DerivedOutputReceipt => {
   const settingsHash = hashStableJson(input.settings);
-  const { settings: _settings, ...receiptInput } = input;
-  return derivedOutputReceiptSchema.parse({
-    ...receiptInput,
-    receiptId: `derived_output_${input.family}_${hashStableJson({
-      family: input.family,
-      outputArtifactId: input.outputArtifactId,
-      outputContentHash: input.outputContentHash,
-      settingsHash,
-    }).replace(':', '_')}`,
+  const { settings: _settings, sourcePaths: _sourcePaths, ...receiptInput } = input;
+  const receiptId = `derived_output_${input.family}_${hashStableJson({
+    family: input.family,
+    outputArtifactId: input.outputArtifactId,
+    outputContentHash: input.outputContentHash,
     settingsHash,
+  }).replace(':', '_')}`;
+  const baseReceipt = {
+    ...receiptInput,
+    receiptId,
+    settingsHash,
+  };
+  return derivedOutputReceiptSchema.parse({
+    ...baseReceipt,
+    ...(input.outputPath === undefined
+      ? {}
+      : {
+          provenanceSidecar: buildDerivedOutputProvenanceSidecar({
+            family: input.family,
+            outputContentHash: input.outputContentHash,
+            outputPath: input.outputPath,
+            receiptId,
+            settingsHash,
+            sourceContentHashes: input.sourceContentHashes,
+            sourceGraphRevisions: input.sourceGraphRevisions,
+            warnings: input.provenanceSidecar?.warnings ?? [],
+            ...(input.sourcePaths === undefined ? {} : { sourcePaths: input.sourcePaths }),
+            ...(input.provenanceSidecar?.acceptedApplyId === undefined
+              ? {}
+              : { acceptedApplyId: input.provenanceSidecar.acceptedApplyId }),
+            ...(input.provenanceSidecar?.acceptedDryRunId === undefined
+              ? {}
+              : { acceptedDryRunId: input.provenanceSidecar.acceptedDryRunId }),
+          }),
+        }),
   });
 };
 
@@ -94,6 +127,61 @@ const toSourceState = (receipt: DerivedOutputReceipt) =>
     sourceIndex,
   }));
 
+export const buildDerivedOutputProvenanceSidecarPath = (outputPath: string): string => `${outputPath}.rrdata`;
+
+export const buildDerivedOutputProvenanceSidecar = ({
+  acceptedApplyId,
+  acceptedDryRunId,
+  family,
+  outputContentHash,
+  outputPath,
+  receiptId,
+  settingsHash,
+  sourceContentHashes,
+  sourceGraphRevisions,
+  sourcePaths = [],
+  warnings,
+}: {
+  acceptedApplyId?: string;
+  acceptedDryRunId?: string;
+  family: DerivedOutputReceipt['family'];
+  outputContentHash: string;
+  outputPath: string;
+  receiptId: string;
+  settingsHash: string;
+  sourceContentHashes: string[];
+  sourceGraphRevisions: string[];
+  sourcePaths?: Array<string | undefined>;
+  warnings: string[];
+}): DerivedOutputProvenanceSidecar =>
+  derivedOutputProvenanceSidecarSchema.parse({
+    ...(acceptedApplyId === undefined ? {} : { acceptedApplyId }),
+    ...(acceptedDryRunId === undefined ? {} : { acceptedDryRunId }),
+    app: {
+      buildVersion: '1.5.8',
+      id: 'io.github.CyberTimon.RapidRAW',
+      name: 'RapidRAW',
+    },
+    output: {
+      contentHash: outputContentHash,
+      path: outputPath,
+    },
+    receipt: {
+      family,
+      receiptId,
+    },
+    schemaVersion: 1,
+    settingsHash,
+    sidecarPath: buildDerivedOutputProvenanceSidecarPath(outputPath),
+    sourceState: sourceContentHashes.map((contentHash, order) => ({
+      contentHash,
+      graphRevision: sourceGraphRevisions[order] ?? `missing_source_revision_${order}`,
+      order,
+      ...(sourcePaths[order] === undefined || sourcePaths[order] === '' ? {} : { path: sourcePaths[order] }),
+    })),
+    warnings: [...new Set(warnings)].sort(),
+  });
+
 export const buildHdrDerivedOutputReceipt = ({
   acceptedDryRunPlanHash,
   acceptedDryRunPlanId,
@@ -117,7 +205,13 @@ export const buildHdrDerivedOutputReceipt = ({
     outputArtifactId: handoff.editableDerivedAssetId,
     outputContentHash: handoff.previewExportParity.parityProofHash,
     outputPath: handoff.outputPath,
+    provenanceSidecar: {
+      acceptedApplyId: handoff.editableDerivedAssetId,
+      acceptedDryRunId: handoff.previewExportParity.exportReceiptHash,
+      warnings: handoff.warningCodes,
+    },
     settings,
+    sourcePaths: handoff.sourceRefs.map((source) => source.contentState.replace(/^path:/u, '')),
     sourceContentHashes: handoff.sourceRefs.map((source) => hashStableJson(source.contentState)),
     sourceCount: handoff.sourceCount,
     sourceGraphRevisions: handoff.sourceRefs.map((source) => source.graphRevision),
@@ -156,7 +250,13 @@ export const buildPanoramaDerivedOutputReceipt = ({
       seamReview: review.seamReview,
     }),
     outputPath: review.outputPath,
+    provenanceSidecar: {
+      acceptedApplyId: review.outputPath,
+      acceptedDryRunId: review.seamReview.policy,
+      warnings: review.warningCodes,
+    },
     settings,
+    sourcePaths: review.sourceRefs.map((source) => source.path),
     sourceContentHashes: review.sourceRefs.map((source) => source.contentHash),
     sourceCount: review.sourceCount,
     sourceGraphRevisions: review.sourceRefs.map((source) => source.graphRevision),
@@ -186,7 +286,18 @@ export const buildFocusStackDerivedOutputReceipt = ({
     },
     outputArtifactId: review.editableHandoff.artifactId,
     outputContentHash: review.editableHandoff.artifactHash,
+    ...(review.editableHandoff.status === 'ready'
+      ? {
+          outputPath: review.artifactPath,
+          provenanceSidecar: {
+            acceptedApplyId: review.editableHandoff.artifactId,
+            acceptedDryRunId: review.editableHandoff.exportReviewArtifactId,
+            warnings: review.warningCodes,
+          },
+        }
+      : {}),
     settings,
+    sourcePaths: review.sourceRefs.map((source) => source.path),
     sourceContentHashes: review.sourceRefs.map((source) => source.contentHash),
     sourceCount: review.sourceCount,
     sourceGraphRevisions: review.sourceRefs.map((source) => source.graphRevision),
@@ -212,13 +323,23 @@ export const buildSuperResolutionDerivedOutputReceipt = ({
     family: 'super_resolution',
     openInEditorAction: {
       label: 'Open super-resolution output',
-      path: review.editableGate === 'ready' ? review.artifactPath : undefined,
       state: review.editableGate === 'ready' ? 'available' : 'unavailable',
+      ...(review.editableGate === 'ready' ? { path: review.artifactPath } : {}),
     },
     outputArtifactId: review.outputArtifactId,
     outputContentHash: review.outputArtifactHash,
-    outputPath: review.editableGate === 'ready' ? review.artifactPath : undefined,
+    ...(review.editableGate === 'ready'
+      ? {
+          outputPath: review.artifactPath,
+          provenanceSidecar: {
+            acceptedApplyId: review.outputArtifactId,
+            acceptedDryRunId: review.supportMap.artifactId,
+            warnings: review.warningCodes,
+          },
+        }
+      : {}),
     settings,
+    sourcePaths: review.sourceRefs.map((source) => source.path),
     sourceContentHashes: review.sourceRefs.map((source) => source.contentHash),
     sourceCount: review.sourceCount,
     sourceGraphRevisions: review.sourceRefs.map((source) => source.graphRevision),

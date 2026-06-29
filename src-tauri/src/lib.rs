@@ -34,6 +34,7 @@ pub mod denoise_cpu_reference;
 mod denoise_real_raw_proof;
 mod denoise_render;
 mod denoising;
+mod derived_output_provenance;
 mod display_profile;
 mod events;
 mod exif_processing;

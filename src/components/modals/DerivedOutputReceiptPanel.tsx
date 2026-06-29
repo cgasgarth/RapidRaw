@@ -81,6 +81,13 @@ export default function DerivedOutputReceiptPanel({
       data-receipt-id={receipt.receiptId}
       data-settings-hash={receipt.settingsHash}
       data-source-lineage-summary={lineageSummary}
+      data-sidecar-accepted-apply-id={receipt.provenanceSidecar?.acceptedApplyId ?? ''}
+      data-sidecar-accepted-dry-run-id={receipt.provenanceSidecar?.acceptedDryRunId ?? ''}
+      data-sidecar-app-build-version={receipt.provenanceSidecar?.app.buildVersion ?? ''}
+      data-sidecar-output-path={receipt.provenanceSidecar?.output.path ?? ''}
+      data-sidecar-path={receipt.provenanceSidecar?.sidecarPath ?? ''}
+      data-sidecar-source-order={receipt.provenanceSidecar?.sourceState.map((source) => source.order).join(',') ?? ''}
+      data-sidecar-warning-codes={receipt.provenanceSidecar?.warnings.join(',') ?? ''}
       data-source-content-hashes={receipt.sourceContentHashes.join(',')}
       data-source-count={receipt.sourceCount}
       data-source-graph-revisions={receipt.sourceGraphRevisions.join(',')}
