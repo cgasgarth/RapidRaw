@@ -10,11 +10,11 @@
     "preview": "applySelectiveColorToRgbPixel"
   },
   "previewExportMaxDelta": 0,
-  "previewHash": "sha256:49ab44152671a80cc6e57cbd5be11dd99817e7d83e35bfc145139fc22aa8b962",
+  "previewHash": "sha256:9df9918da683bd5913c7b27b3c4d12902569310f928cc426552dfb25dda8fb60",
   "runtimeStatus": "synthetic_shared_pixel_function_preview_export_match",
   "schemaVersion": 1,
   "sidecarGraphRevision": "graph_rev_selective_color_orange_001",
-  "sidecarSerializedHash": "sha256:02e408ee11e7c5ec688db7a8d8408bc1013fc86da6c690ae88cc69dd4193ab7f",
+  "sidecarSerializedHash": "sha256:b5ae8c7d6d6a57fa2839a91945ad850e795c28114d63ca684951bb3c0b94640d",
   "sourceHash": "sha256:01f3c06f1e72445b912d4a6c87f6fd0b86e9ad020ef27a5cf769ee08d5aa847a",
   "renderContext": {
     "canonicalSchema": "rawEngineColorPipelineContextV1Schema",
@@ -22,17 +22,22 @@
     "operationDomain": "acescg_linear_v1",
     "workingSpace": "acescg_linear_v1"
   },
+  "rangeControl": {
+    "centerHueDegrees": 32,
+    "falloffSmoothness": 1.2,
+    "widthDegrees": 54
+  },
   "targetedRuntime": {
-    "influence": 0.914269740994,
+    "influence": 0.773212282811,
     "inputRgb": {
       "blue": 0.12,
       "green": 0.38,
       "red": 0.92
     },
     "outputRgb": {
-      "blue": 0,
-      "green": 0.374889035597,
-      "red": 0.838860656981
+      "blue": 0.010834991412,
+      "green": 0.373955126865,
+      "red": 0.85905830637
     },
     "rangeKey": "oranges"
   },

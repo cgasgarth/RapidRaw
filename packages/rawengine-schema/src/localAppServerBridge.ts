@@ -469,6 +469,19 @@ const HSL_PARAMETER_DIFF_PATHS = [
   readonly [keyof Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.adjustHsl' }>['parameters'], string]
 >;
 
+const HSL_RANGE_CONTROL_DIFF_PATHS = [
+  ['centerHueDegrees', 'centerHueDegrees'],
+  ['widthDegrees', 'widthDegrees'],
+  ['falloffSmoothness', 'falloffSmoothness'],
+] as const satisfies ReadonlyArray<
+  readonly [
+    keyof NonNullable<
+      Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.adjustHsl' }>['parameters']['rangeControl']
+    >,
+    string,
+  ]
+>;
+
 const SUPPORTED_HSL_BANDS = new Set<ToneColorHslBandV1>([
   'red',
   'orange',
@@ -493,12 +506,22 @@ const buildHslDryRunResult = (
     correlationId: command.correlationId,
     dryRun: true,
     mutates: false,
-    parameterDiff: HSL_PARAMETER_DIFF_PATHS.map(([key, path]) => ({
-      module: 'hsl',
-      path: `/parameters/${command.parameters.band}/${path}`,
-      previousValue: 0,
-      value: command.parameters[key],
-    })),
+    parameterDiff: [
+      ...HSL_PARAMETER_DIFF_PATHS.map(([key, path]) => ({
+        module: 'hsl',
+        path: `/parameters/${command.parameters.band}/${path}`,
+        previousValue: 0,
+        value: command.parameters[key],
+      })),
+      ...(command.parameters.rangeControl === undefined
+        ? []
+        : HSL_RANGE_CONTROL_DIFF_PATHS.map(([key, path]) => ({
+            module: 'hsl',
+            path: `/parameters/${command.parameters.band}/rangeControl/${path}`,
+            previousValue: null,
+            value: command.parameters.rangeControl?.[key] ?? null,
+          }))),
+    ],
     predictedGraphRevision: `${command.expectedGraphRevision}:preview:${command.commandId}`,
     previewArtifacts: [],
     schemaVersion: command.schemaVersion,
