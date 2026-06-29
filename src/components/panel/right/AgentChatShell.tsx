@@ -23,6 +23,11 @@ import {
   agentImageContextSnapshotSchema,
   buildAgentImageContextSnapshot,
 } from '../../../utils/agentImageContextSnapshot';
+import {
+  AGENT_LAYER_CREATE_TOOL_NAME,
+  AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME,
+  AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
+} from '../../../utils/agentLayerMaskTools';
 import { dispatchAgentLiveEditorTool } from '../../../utils/agentLiveToolDispatch';
 import {
   runAgentMultiTurnAppServerSession,
@@ -1331,7 +1336,10 @@ function LivePromptComposer({
       className="pointer-events-auto relative z-10 space-y-3 rounded-md border border-sky-500/20 bg-sky-500/5 p-3"
       data-color-tool-name={AGENT_COLOR_APPLY_TOOL_NAME}
       data-detail-tool-name={AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME}
+      data-layer-create-tool-name={AGENT_LAYER_CREATE_TOOL_NAME}
+      data-layer-scoped-adjust-tool-name={AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME}
       data-live-prompt-status={result.status}
+      data-mask-create-or-update-tool-name={AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME}
       data-safety-decision={result.safetyDecision?.decisionId ?? ''}
       data-safety-severity={result.safetyDecision?.severity ?? ''}
       data-session-input-state={isContextReady ? 'ready' : 'blocked'}
@@ -1342,6 +1350,14 @@ function LivePromptComposer({
         void runDryRun();
       }}
     >
+      <div
+        className="sr-only"
+        data-approval-gate="required-before-layer-mask-apply"
+        data-apply-receipt="layer-mask-command-receipt"
+        data-dry-run-required="true"
+        data-rollback-path="rawengine.agent.history.rollback"
+        data-testid="agent-live-layer-mask-operation-proof"
+      />
       <div className="space-y-1">
         <label className="text-xs font-semibold text-text-primary" htmlFor="agent-live-prompt-input">
           {t('editor.ai.agent.composer.label')}

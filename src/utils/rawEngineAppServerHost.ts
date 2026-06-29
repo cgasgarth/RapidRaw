@@ -50,6 +50,9 @@ import {
   AGENT_LAYER_CREATE_INPUT_SCHEMA_NAME,
   AGENT_LAYER_CREATE_OUTPUT_SCHEMA_NAME,
   AGENT_LAYER_CREATE_TOOL_NAME,
+  AGENT_LAYER_SCOPED_ADJUST_INPUT_SCHEMA_NAME,
+  AGENT_LAYER_SCOPED_ADJUST_OUTPUT_SCHEMA_NAME,
+  AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_INPUT_SCHEMA_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_OUTPUT_SCHEMA_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
@@ -57,10 +60,12 @@ import {
   AGENT_OBJECT_SELECTION_APPLY_OUTPUT_SCHEMA_NAME,
   AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME,
   agentLayerCreateRequestSchema,
+  agentLayerScopedAdjustRequestSchema,
   agentMaskCreateOrUpdateRequestSchema,
   agentObjectSelectionApplyRequestSchema,
   applyAgentBrushMaskCreateOrUpdate,
   applyAgentLayerCreate,
+  applyAgentLayerScopedAdjustments,
   applyAgentObjectSelection,
 } from './agentLayerMaskTools';
 import {
@@ -639,6 +644,15 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       toolNames: [AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME],
     }),
     buildRouteCatalogEntry({
+      commandName: AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_LAYER_SCOPED_ADJUST_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.ApplyDryRunPlan],
+      outputSchemaNames: [AGENT_LAYER_SCOPED_ADJUST_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-layer-mask-tools'],
+      toolNames: [AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
       commandName: AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME,
       family: 'agent',
       inputSchemaNames: [AGENT_OBJECT_SELECTION_APPLY_INPUT_SCHEMA_NAME],
@@ -886,6 +900,7 @@ const APPROVED_AGENT_APP_SERVER_TOOL_NAMES = new Set<string>([
   AGENT_GEOMETRY_APPLY_TOOL_NAME,
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
   AGENT_LAYER_CREATE_TOOL_NAME,
+  AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME,
   AGENT_LENS_PROFILE_APPLY_TOOL_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
   AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME,
@@ -967,6 +982,9 @@ const dispatchAgentAppServerTool = async (
       break;
     case AGENT_LAYER_CREATE_TOOL_NAME:
       result = applyAgentLayerCreate(agentLayerCreateRequestSchema.parse(request.arguments));
+      break;
+    case AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME:
+      result = applyAgentLayerScopedAdjustments(agentLayerScopedAdjustRequestSchema.parse(request.arguments));
       break;
     case AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME:
       result = applyAgentBrushMaskCreateOrUpdate(agentMaskCreateOrUpdateRequestSchema.parse(request.arguments));
