@@ -483,6 +483,7 @@
     "check:negative-lab-interactive-patch-picker": "bun tests/integration/checks/check-negative-lab-interactive-patch-picker.ts",
     "check:negative-lab-shadow-patch-black-point": "bun tests/integration/checks/check-negative-lab-shadow-patch-black-point.ts",
     "check:negative-lab-neutral-patch-rgb-suggestion": "bun tests/integration/checks/check-negative-lab-neutral-patch-rgb-suggestion.ts",
+    "check:negative-lab-scan-metrics": "bun tests/integration/checks/check-negative-lab-scan-metrics.ts",
     "check:negative-lab-stock-registry": "bun tests/integration/checks/check-negative-lab-stock-registry.ts",
     "check:negative-lab-stock-metadata-catalog": "bun tests/integration/checks/check-negative-lab-stock-metadata-catalog.ts",
     "check:negative-lab-stock-metadata-coverage": "bun tests/integration/checks/check-negative-lab-stock-metadata-coverage.ts",
