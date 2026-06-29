@@ -1213,6 +1213,20 @@
         "algorithm": "Algorithm",
         "cacheHit": "Cache hit",
         "cacheMiss": "Cache miss",
+        "colorCheckerGate": "ColorChecker gate",
+        "colorCheckerGateStatus": {
+          "gated_fail": "ColorChecker failed",
+          "gated_pass": "ColorChecker passed",
+          "gated_warn": "ColorChecker warning",
+          "not_available": "No ColorChecker chart",
+          "runtime_smoke_only": "Runtime smoke only"
+        },
+        "colorCheckerGateSummary": "{{status}} · {{basis}} · mean {{mean}} · p95 {{p95}}",
+        "confidenceBasis": {
+          "colorchecker_gated": "controlled chart",
+          "metadata_only_fallback": "metadata fallback",
+          "runtime_smoke_only": "runtime smoke"
+        },
         "coolWeight": "Cool weight",
         "defaultDemosaic": "Default demosaic",
         "demosaicProvenance": "Demosaic",

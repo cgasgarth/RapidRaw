@@ -21,11 +21,56 @@ export const rawProcessingProfileSchema = z.enum(['balanced', 'fast', 'maximum']
 
 export const rawCameraProfileStatusSchema = z.enum(['fallback', 'interpolated', 'single_illuminant', 'unavailable']);
 
+export const rawCameraProfileColorCheckerGateStatusSchema = z.enum([
+  'gated_fail',
+  'gated_pass',
+  'gated_warn',
+  'not_available',
+  'runtime_smoke_only',
+]);
+
+export const rawCameraProfileColorCheckerGateSchema = z
+  .object({
+    fallbackReason: z.string().trim().min(1).nullable().optional(),
+    maxDeltaE00: z.number().nonnegative().nullable().optional(),
+    meanDeltaE00: z.number().nonnegative().nullable().optional(),
+    medianDeltaE00: z.number().nonnegative().nullable().optional(),
+    patchCount: z.number().int().nonnegative().nullable().optional(),
+    p95DeltaE00: z.number().nonnegative().nullable().optional(),
+    status: rawCameraProfileColorCheckerGateStatusSchema,
+    thresholdMeanDeltaE00: z.number().positive().nullable().optional(),
+    thresholdP95DeltaE00: z.number().positive().nullable().optional(),
+  })
+  .strict()
+  .superRefine((gate, context) => {
+    if (
+      gate.meanDeltaE00 !== null &&
+      gate.meanDeltaE00 !== undefined &&
+      gate.p95DeltaE00 !== null &&
+      gate.p95DeltaE00 !== undefined
+    ) {
+      if (gate.meanDeltaE00 > gate.p95DeltaE00) {
+        context.addIssue({ code: 'custom', message: 'ColorChecker mean DeltaE00 cannot exceed p95 DeltaE00.' });
+      }
+    }
+    if (
+      gate.p95DeltaE00 !== null &&
+      gate.p95DeltaE00 !== undefined &&
+      gate.maxDeltaE00 !== null &&
+      gate.maxDeltaE00 !== undefined
+    ) {
+      if (gate.p95DeltaE00 > gate.maxDeltaE00) {
+        context.addIssue({ code: 'custom', message: 'ColorChecker p95 DeltaE00 cannot exceed max DeltaE00.' });
+      }
+    }
+  });
+
 export const rawCameraProfileReportSchema = z
   .object({
     algorithmId: z.string().trim().min(1),
     candidateCount: z.number().int().nonnegative(),
     cctClamped: z.boolean().nullable().optional(),
+    colorCheckerGate: rawCameraProfileColorCheckerGateSchema.nullable().optional(),
     coolIlluminant: z.string().trim().min(1).nullable().optional(),
     coolWeight: z.number().min(0).max(1).nullable().optional(),
     estimatedCctKelvin: z.number().positive().nullable().optional(),
@@ -103,6 +148,15 @@ export const rawCameraProfileProvenanceReceiptSchema = z
     algorithmId: rawCameraProfileReportSchema.shape.algorithmId,
     candidateCount: rawCameraProfileReportSchema.shape.candidateCount,
     cctClamped: rawCameraProfileReportSchema.shape.cctClamped,
+    colorCheckerFallbackReason: z.string().trim().min(1).nullable(),
+    colorCheckerGateStatus: rawCameraProfileColorCheckerGateStatusSchema,
+    colorCheckerMaxDeltaE00: z.number().nonnegative().nullable(),
+    colorCheckerMeanDeltaE00: z.number().nonnegative().nullable(),
+    colorCheckerMedianDeltaE00: z.number().nonnegative().nullable(),
+    colorCheckerPatchCount: z.number().int().nonnegative().nullable(),
+    colorCheckerP95DeltaE00: z.number().nonnegative().nullable(),
+    colorCheckerThresholdMeanDeltaE00: z.number().positive().nullable(),
+    colorCheckerThresholdP95DeltaE00: z.number().positive().nullable(),
     coolIlluminant: rawCameraProfileReportSchema.shape.coolIlluminant,
     coolWeight: rawCameraProfileReportSchema.shape.coolWeight,
     demosaicPath: rawDemosaicPathSchema,
@@ -120,6 +174,7 @@ export const rawCameraProfileProvenanceReceiptSchema = z
     status: rawCameraProfileStatusSchema,
     outputDimensions: z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()]).nullable(),
     previewElapsedMs: z.number().int().nonnegative().nullable(),
+    profileConfidenceBasis: z.enum(['colorchecker_gated', 'metadata_only_fallback', 'runtime_smoke_only']),
     scratchMemoryBytes: z.number().int().nonnegative().nullable(),
     warmIlluminant: rawCameraProfileReportSchema.shape.warmIlluminant,
     warningCount: z.number().int().nonnegative(),

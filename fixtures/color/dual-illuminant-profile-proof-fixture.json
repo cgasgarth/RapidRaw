@@ -9,6 +9,16 @@
       "algorithmId": "dual_illuminant_mired_v1",
       "candidateCount": 2,
       "cctClamped": false,
+      "colorCheckerGate": {
+        "maxDeltaE00": 1.05,
+        "meanDeltaE00": 0.78,
+        "medianDeltaE00": 0.72,
+        "patchCount": 3,
+        "p95DeltaE00": 1.02,
+        "status": "gated_pass",
+        "thresholdMeanDeltaE00": 1.25,
+        "thresholdP95DeltaE00": 2
+      },
       "coolIlluminant": "D65",
       "coolWeight": 0.42,
       "estimatedCctKelvin": 5100,
@@ -20,7 +30,8 @@
       "warmIlluminant": "StandardLightA",
       "warningCodes": []
     },
-    "demosaicPath": "bayer_hq"
+    "demosaicPath": "bayer_hq",
+    "processingProfile": "maximum"
   },
   "patches": [
     {
