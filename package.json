@@ -515,6 +515,7 @@
     "check:negative-lab-workspace-smoke": "bun scripts/capture-visual-smoke.ts --scenario negative-lab-workspace",
     "check:negative-lab-batch-color-smoke": "bun scripts/capture-visual-smoke.ts --scenario negative-lab-batch-color-workspace",
     "check:negative-lab-ui-presets": "bun tests/integration/checks/check-negative-lab-ui-presets.ts",
+    "check:negative-lab-v2-ui-qc-readouts": "bun tests/integration/checks/check-negative-lab-v2-ui-qc-readouts.ts",
     "check:negative-lab-app-server-routes": "bun tests/integration/checks/check-negative-lab-app-server-routes.ts",
     "check:negative-lab-agent-workflow": "bun tests/integration/checks/check-negative-lab-agent-workflow.ts",
     "check:computational-private-report-checker-negative-cases": "bun tests/integration/checks/check-computational-private-report-checker-negative-cases.ts",
