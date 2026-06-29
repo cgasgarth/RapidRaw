@@ -74,6 +74,8 @@ export default function HdrModal({
   const { isMounted, show } = useModalTransition(isOpen);
   const [isSaving, setIsSaving] = useState(false);
   const [savedPath, setSavedPath] = useState<string | null>(null);
+  const [savedHandoffSummary, setSavedHandoffSummary] = useState<HdrModalState['savedHandoffSummary']>(null);
+  const [savedDerivedOutputReceiptId, setSavedDerivedOutputReceiptId] = useState<string | null>(null);
 
   const mouseDownTarget = useRef<EventTarget | null>(null);
   const isSourceCountValid = (imageCount ?? 0) >= 2;
@@ -231,33 +233,18 @@ export default function HdrModal({
         : settings.bracketValidation === 'required'
           ? t('modals.hdr.bracketPreflightBlocked')
           : t('modals.hdr.bracketPreflightWarning');
-  const handoffSummary =
-    savedPath !== null
-      ? buildHdrEditableHandoffSummary({
-          deghostReviewAccepted: isDeghostReviewApproved,
-          deghostReviewRequired: isDeghostReviewRequired,
-          outputPath: savedPath,
-          settings,
-          sourcePaths,
-        })
-      : null;
-  const derivedOutputReceipt =
-    handoffSummary === null ? null : buildHdrDerivedOutputReceipt({ handoff: handoffSummary, settings });
-  const derivedOutputReceiptId = derivedOutputReceipt?.receiptId;
-  const storedDerivedOutputReceipt =
-    useUIStore((state) =>
-      derivedOutputReceiptId === undefined ? undefined : state.derivedOutputReceipts[derivedOutputReceiptId],
-    ) ?? derivedOutputReceipt;
+  const handoffSummary = savedHandoffSummary;
+  const storedDerivedOutputReceipt = useUIStore((state) =>
+    savedDerivedOutputReceiptId === null ? undefined : state.derivedOutputReceipts[savedDerivedOutputReceiptId],
+  );
   const upsertDerivedOutputReceipt = useUIStore((state) => state.upsertDerivedOutputReceipt);
-
-  useEffect(() => {
-    if (derivedOutputReceipt !== null) upsertDerivedOutputReceipt(derivedOutputReceipt);
-  }, [derivedOutputReceipt, upsertDerivedOutputReceipt]);
 
   useEffect(() => {
     if (!isOpen) {
       const timer = setTimeout(() => {
         setSavedPath(null);
+        setSavedHandoffSummary(null);
+        setSavedDerivedOutputReceiptId(null);
         setIsSaving(false);
       }, 300);
       return () => {
@@ -287,6 +274,17 @@ export default function HdrModal({
     setIsSaving(true);
     try {
       const path = await onSave();
+      const handoff = buildHdrEditableHandoffSummary({
+        deghostReviewAccepted: isDeghostReviewApproved,
+        deghostReviewRequired: isDeghostReviewRequired,
+        outputPath: path,
+        settings,
+        sourcePaths,
+      });
+      const receipt = buildHdrDerivedOutputReceipt({ handoff, settings });
+      upsertDerivedOutputReceipt(receipt);
+      setSavedHandoffSummary(handoff);
+      setSavedDerivedOutputReceiptId(receipt.receiptId);
       setSavedPath(path);
     } catch (e) {
       console.error(e);
@@ -296,10 +294,18 @@ export default function HdrModal({
   };
 
   const handleOpen = () => {
-    if (savedPath) {
-      onOpenFile(savedPath);
+    const openPath = storedDerivedOutputReceipt?.openInEditorAction.path ?? savedPath;
+    if (openPath) {
+      onOpenFile(openPath);
       handleClose();
     }
+  };
+
+  const handleRun = () => {
+    setSavedPath(null);
+    setSavedHandoffSummary(null);
+    setSavedDerivedOutputReceiptId(null);
+    onMerge();
   };
 
   const renderContent = () => {
@@ -364,6 +370,7 @@ export default function HdrModal({
               data-merge-strategy={handoffSummary.mergeStrategy}
               data-output-color-space={handoffSummary.outputColorSpace}
               data-output-encoding={handoffSummary.outputEncoding}
+              data-output-path={handoffSummary.outputPath}
               data-preview-export-compared-fields={handoffSummary.previewExportParity.comparedFields.join(',')}
               data-preview-export-export-receipt-hash={handoffSummary.previewExportParity.exportReceiptHash}
               data-preview-export-mean-abs-delta={handoffSummary.previewExportMeanAbsDelta}
@@ -436,7 +443,13 @@ export default function HdrModal({
             </section>
           )}
           {storedDerivedOutputReceipt ? (
-            <div className="mx-auto mt-4 max-w-2xl text-left">
+            <div
+              className="mx-auto mt-4 max-w-2xl text-left"
+              data-derived-output-receipt-id={storedDerivedOutputReceipt.receiptId}
+              data-hdr-derived-source-open-path={storedDerivedOutputReceipt.openInEditorAction.path ?? ''}
+              data-hdr-derived-source-state={storedDerivedOutputReceipt.openInEditorAction.state}
+              data-testid="hdr-derived-output-receipt-store-entry"
+            >
               <DerivedOutputReceiptPanel receipt={storedDerivedOutputReceipt} onOpenOutput={onOpenFile} />
             </div>
           ) : null}
@@ -1193,11 +1206,11 @@ export default function HdrModal({
         }}
         onClose={handleClose}
         onOpen={handleOpen}
-        onRun={onMerge}
+        onRun={handleRun}
         onSave={() => {
           void handleSave();
         }}
-        savedPath={savedPath}
+        savedPath={finalImageBase64 === null ? null : savedPath}
         StartIcon={Images}
       />
     );

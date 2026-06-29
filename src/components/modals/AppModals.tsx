@@ -273,6 +273,7 @@ export default function AppModals(props: AppModalsProps) {
             const {
               lastApplyCommand: _lastApplyCommand,
               lastDryRunCommand: _lastDryRunCommand,
+              savedHandoffSummary: _savedHandoffSummary,
               ...hdrModalState
             } = state.hdrModalState;
             return {
@@ -281,6 +282,7 @@ export default function AppModals(props: AppModalsProps) {
                 error: null,
                 finalImageBase64: null,
                 progressMessage: null,
+                savedHandoffSummary: null,
                 settings,
               },
             };

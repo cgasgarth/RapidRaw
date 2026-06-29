@@ -190,6 +190,17 @@ for (const [file, builder] of modalWiring) {
   expect(source.includes('upsertDerivedOutputReceipt'), `${file}: missing shared store upsert path.`);
 }
 
+const hdrModalSource = readFileSync('src/components/modals/HdrModal.tsx', 'utf8');
+for (const marker of [
+  'const receipt = buildHdrDerivedOutputReceipt({ handoff, settings });',
+  'upsertDerivedOutputReceipt(receipt);',
+  'setSavedDerivedOutputReceiptId(receipt.receiptId);',
+  'data-testid="hdr-derived-output-receipt-store-entry"',
+  "data-hdr-derived-source-open-path={storedDerivedOutputReceipt.openInEditorAction.path ?? ''}",
+]) {
+  expect(hdrModalSource.includes(marker), `HDR modal missing applied derived-output persistence marker: ${marker}.`);
+}
+
 const reviewPanelSource = readFileSync('src/components/modals/ComputationalMergeReviewPanel.tsx', 'utf8');
 expect(reviewPanelSource.includes('DerivedOutputReceiptPanel'), 'Review panel must render the shared receipt panel.');
 expect(reviewPanelSource.includes('onOpenDerivedOutput'), 'Review panel must expose editor handoff callback.');
