@@ -1073,8 +1073,15 @@
       },
       "addNewMask": "添加新蒙版",
       "aiPeopleParts": {
-        "description": "Runtime-backed parts are enabled; planned hair and clothing stay disabled until provider proof lands.",
-        "title": "Person part masks"
+        "classes": "",
+        "description": "Runtime-backed person parts are enabled; planned targets stay disabled until provider proof lands.",
+        "model": "",
+        "notAvailable": "",
+        "provenanceTitle": "",
+        "provider": "",
+        "target": "",
+        "title": "Person part masks",
+        "unknown": ""
       },
       "brush": {
         "brush": "画笔",

@@ -1051,8 +1051,15 @@
       },
       "addNewMask": "Ajouter un nouveau masque",
       "aiPeopleParts": {
-        "description": "Les parties prises en charge sont actives; cheveux et vetements restent desactives avant la preuve fournisseur.",
-        "title": "Masques de parties de personne"
+        "classes": "",
+        "description": "Les parties prises en charge sont actives; les cibles planifiees restent desactivees avant la preuve fournisseur.",
+        "model": "",
+        "notAvailable": "",
+        "provenanceTitle": "",
+        "provider": "",
+        "target": "",
+        "title": "Masques de parties de personne",
+        "unknown": ""
       },
       "brush": {
         "brush": "Pinceau",

@@ -1051,8 +1051,15 @@
       },
       "addNewMask": "Aggiungi Nuova Maschera",
       "aiPeopleParts": {
-        "description": "Le parti con runtime sono attive; capelli e vestiti restano disattivati fino alla prova provider.",
-        "title": "Maschere parti persona"
+        "classes": "",
+        "description": "Le parti con runtime sono attive; i target pianificati restano disattivati fino alla prova provider.",
+        "model": "",
+        "notAvailable": "",
+        "provenanceTitle": "",
+        "provider": "",
+        "target": "",
+        "title": "Maschere parti persona",
+        "unknown": ""
       },
       "brush": {
         "brush": "Pennello",

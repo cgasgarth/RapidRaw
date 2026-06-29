@@ -1146,8 +1146,15 @@
       },
       "addNewMask": "Dodaj nową maskę",
       "aiPeopleParts": {
-        "description": "Czesci z runtime sa wlaczone; wlosy i ubranie pozostaja wylaczone do czasu dowodu provider.",
-        "title": "Maski czesci osoby"
+        "classes": "",
+        "description": "Czesci z runtime sa wlaczone; planowane cele pozostaja wylaczone do czasu dowodu provider.",
+        "model": "",
+        "notAvailable": "",
+        "provenanceTitle": "",
+        "provider": "",
+        "target": "",
+        "title": "Maski czesci osoby",
+        "unknown": ""
       },
       "brush": {
         "brush": "Pędzel",
