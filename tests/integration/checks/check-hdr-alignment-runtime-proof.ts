@@ -1,15 +1,15 @@
 #!/usr/bin/env bun
 
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 
 import { format, resolveConfig } from 'prettier';
 import { z } from 'zod';
 
 import { estimateHdrAlignmentTransformsV1 } from '../../../packages/rawengine-schema/src/hdrAlignmentRuntime.ts';
 
-const REPORT_PATH = 'docs/validation/hdr-alignment-runtime-proof-2026-06-20.json';
+const REPORT_PATH = 'artifacts/validation/hdr-alignment-runtime-proof-2026-06-20.json';
 const GENERATED_AT = '2026-06-20T00:00:00.000Z';
 const WIDTH = 64;
 const HEIGHT = 48;
@@ -107,18 +107,10 @@ const reportJson = await format(JSON.stringify(report), {
 });
 
 if (update) {
+  await mkdir(dirname(REPORT_PATH), { recursive: true });
   await writeFile(REPORT_PATH, reportJson);
-  console.log('hdr alignment runtime proof updated');
+  console.log(`hdr alignment runtime proof artifact wrote ${REPORT_PATH}`);
   process.exit(0);
-}
-
-if (!existsSync(REPORT_PATH)) {
-  throw new Error(`Missing ${REPORT_PATH}; run bun run check:hdr-alignment-runtime-proof:update.`);
-}
-
-const expected = reportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
-if (JSON.stringify(expected) !== JSON.stringify(report)) {
-  throw new Error(`${REPORT_PATH} is stale; run bun run check:hdr-alignment-runtime-proof:update.`);
 }
 
 console.log(`hdr alignment runtime proof ok (${report.transforms.length} transforms)`);

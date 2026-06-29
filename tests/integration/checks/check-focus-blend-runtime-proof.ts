@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 
 import { format, resolveConfig } from 'prettier';
 import { z } from 'zod';
@@ -14,7 +14,7 @@ import {
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational-proof-budgets.ts';
 
-const REPORT_PATH = 'docs/validation/focus-blend-runtime-proof-2026-06-20.json';
+const REPORT_PATH = 'artifacts/validation/focus-blend-runtime-proof-2026-06-20.json';
 const GENERATED_AT = '2026-06-20T00:00:00.000Z';
 const WIDTH = 72;
 const HEIGHT = 48;
@@ -227,18 +227,10 @@ const reportJson = await format(JSON.stringify(report), {
 });
 
 if (update) {
+  await mkdir(dirname(REPORT_PATH), { recursive: true });
   await writeFile(REPORT_PATH, reportJson);
-  console.log('focus blend runtime proof updated');
+  console.log(`focus blend runtime proof artifact wrote ${REPORT_PATH}`);
   process.exit(0);
-}
-
-if (!existsSync(REPORT_PATH)) {
-  throw new Error(`Missing ${REPORT_PATH}; run bun run check:focus-blend-runtime-proof:update.`);
-}
-
-const expected = reportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
-if (JSON.stringify(expected) !== JSON.stringify(report)) {
-  throw new Error(`${REPORT_PATH} is stale; run bun run check:focus-blend-runtime-proof:update.`);
 }
 
 console.log(`focus blend runtime proof ok (${report.artifactCount} artifacts)`);

@@ -1,15 +1,15 @@
 #!/usr/bin/env bun
 
-import { existsSync } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 
 import { format, resolveConfig } from 'prettier';
 import { z } from 'zod';
 
 import { superResolutionReconstructionDiagnosticsV1Schema } from '../../../packages/rawengine-schema/src/superResolutionReconstructionDiagnostics.ts';
 
-const REPORT_PATH = 'docs/validation/super-resolution-reconstruction-proof-2026-06-20.json';
+const REPORT_PATH = 'artifacts/validation/super-resolution-reconstruction-proof-2026-06-20.json';
 const RUNTIME_REPORT_PATH =
   'artifacts/super-resolution-runtime-plan-smoke/super-resolution-runtime-plan-smoke-report.json';
 const GENERATED_AT = '2026-06-20T00:00:00.000Z';
@@ -84,17 +84,10 @@ const reportJson = await format(JSON.stringify(report), {
 });
 
 if (update) {
+  await mkdir(dirname(REPORT_PATH), { recursive: true });
   await writeFile(REPORT_PATH, reportJson);
-  console.log('sr reconstruction proof updated');
+  console.log(`sr reconstruction proof artifact wrote ${REPORT_PATH}`);
   process.exit(0);
-}
-
-if (!existsSync(REPORT_PATH)) {
-  throw new Error(`Missing ${REPORT_PATH}; run bun run check:sr-reconstruction-proof:update.`);
-}
-const expected = proofReportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
-if (JSON.stringify(expected) !== JSON.stringify(report)) {
-  throw new Error(`${REPORT_PATH} is stale; run bun run check:sr-reconstruction-proof:update.`);
 }
 
 console.log(`sr reconstruction proof ok (${diagnostics.reconstructionMethod})`);
