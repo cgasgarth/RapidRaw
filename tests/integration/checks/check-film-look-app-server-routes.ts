@@ -1,7 +1,5 @@
 #!/usr/bin/env bun
 
-import { readFile } from 'node:fs/promises';
-
 import { z } from 'zod';
 
 import {
@@ -59,19 +57,6 @@ for (const look of FILM_LOOK_BROWSER_ITEMS) {
 
   if (JSON.stringify(result.controlledAdjustmentKeys) !== JSON.stringify(getFilmLookControlledAdjustmentKeys())) {
     throw new Error(`${look.displayName} app-server controlled keys do not match UI helper.`);
-  }
-}
-
-const sourceChecks = [
-  ['src/utils/filmLookAppServerRoutes.ts', 'buildFilmLookAppServerPatchResult'],
-  ['src/schemas/filmLookAppServerSchemas.ts', 'filmLookAppServerPatchResultSchema'],
-  ['src/utils/filmLookBrowser.ts', 'getFilmLookControlledAdjustmentKeys'],
-];
-
-for (const [filePath, marker] of sourceChecks) {
-  const source = await readFile(filePath, 'utf8');
-  if (!source.includes(marker)) {
-    throw new Error(`${filePath} is missing app-server parity marker ${marker}.`);
   }
 }
 

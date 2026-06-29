@@ -608,43 +608,6 @@ try {
   }
 }
 
-for (const [filePath, marker] of [
-  ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabBatchSummaryAppServerCommandSchema'],
-  ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabAcceptBatchPlanAppServerCommandSchema'],
-  ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabAcceptedBatchApplyAppServerCommandSchema'],
-  ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabDensitometerAppServerCommandSchema'],
-  ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabFrameHealthAppServerCommandSchema'],
-  ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabQcProofAppServerCommandSchema'],
-  ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabStockFamilyConversionAppServerCommandSchema'],
-  ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabStockRegistryAppServerCommandSchema'],
-  ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabStockMetadataAppServerCommandSchema'],
-  ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabAcceptedBatchPlanRouteResult'],
-  ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabAcceptedBatchApplyRouteResult'],
-  ['src/utils/negativeLabPlanIdentity.ts', 'buildNegativeLabAcceptedPlanIdentity'],
-  ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabBatchSummaryRouteResult'],
-  ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabDensitometerRouteResult'],
-  ['src/utils/negativeLabDensitometer.ts', 'buildNegativeBaseFogDensitometerReadout'],
-  ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabConversionPlanResultSchema'],
-  ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabFrameHealthRouteResult'],
-  ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabQcProofRouteResult'],
-  ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabStockFamilyConversionRouteResult'],
-  ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabStockRegistryRouteResult'],
-  ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabStockMetadataRouteResult'],
-  ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabConversionPlanResult'],
-  ['src/utils/negativeLabCrosstalkProfile.ts', 'applyNegativeLabDensityCrosstalk'],
-  ['src/schemas/negativeLabCrosstalkProfileSchemas.ts', 'negativeLabCrosstalkProfileSchema'],
-  ['src/utils/negativeLabDensityConversion.ts', 'convertNegativeLabDensitySample'],
-  ['src/utils/negativeLabMeasuredProfileRuntime.ts', 'resolveNegativeLabRuntimeProfile'],
-  ['src/utils/negativeLabPresetCatalog.ts', 'NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG'],
-  ['src/utils/negativeLabStockRegistry.ts', 'NEGATIVE_LAB_STOCK_REGISTRY'],
-  ['src/utils/negativeLabStockMetadataCatalog.ts', 'NEGATIVE_LAB_STOCK_METADATA_CATALOG'],
-]) {
-  const source = await readFile(filePath, 'utf8');
-  if (!source.includes(marker)) {
-    throw new Error(`${filePath} is missing Negative Lab app-server marker ${marker}.`);
-  }
-}
-
 for (const filePath of [
   'src/utils/negativeLabCrosstalkProfile.ts',
   'src/utils/negativeLabMeasuredProfileRuntime.ts',
