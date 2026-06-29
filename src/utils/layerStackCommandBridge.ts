@@ -12,6 +12,7 @@ import {
   ApprovalClass,
   dispatchLayerStackCommand,
   layerMaskCommandEnvelopeV1Schema,
+  layerStackSidecarV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
   type LayerBlendResolvedRemoveSource,
   type LayerScopedToneAdjustmentV1,
@@ -425,6 +426,14 @@ function materializeMasksFromSidecar(
     }
     return materializedMask;
   });
+}
+
+export function materializeMasksFromLayerStackSidecar(
+  sidecar: LayerStackSidecarV1,
+  previousMasks: ReadonlyArray<MaskContainer> = [],
+): Array<MaskContainer> {
+  const parsedSidecar = layerStackSidecarV1Schema.parse(sidecar);
+  return materializeMasksFromSidecar(parsedSidecar.layers, previousMasks, { type: 'delete', layerId: '__reload__' });
 }
 
 function cloneSourceForOperation(

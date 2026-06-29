@@ -9,6 +9,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { Invokes } from '../tauri/commands';
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { formatUnknownError } from '../utils/errorFormatting';
+import { hydrateLayerStackMasksFromMetadata } from '../utils/layerStackSidecarAdjustments';
 import { consumePendingNegativeConversionDustHealLayers } from '../utils/negativeLabEditorHandoff';
 
 import type { ImageCacheEntry } from '../utils/ImageLRUCache';
@@ -56,8 +57,10 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
             initialAdjusts = { ...INITIAL_ADJUSTMENTS };
           }
 
-          setEditor({ adjustments: initialAdjusts });
-          resetHistory(initialAdjusts);
+          const hydratedAdjustments = hydrateLayerStackMasksFromMetadata(initialAdjusts, metadata, selectedImagePath);
+
+          setEditor({ adjustments: hydratedAdjustments });
+          resetHistory(hydratedAdjustments);
         } catch (err) {
           console.error('Failed to load metadata early:', err);
         }

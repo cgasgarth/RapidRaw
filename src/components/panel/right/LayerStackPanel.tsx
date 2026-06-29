@@ -18,6 +18,7 @@ import { type KeyboardEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Mask, SubMaskMode } from './Masks';
+import { debouncedSave } from '../../../hooks/useEditorActions';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import {
@@ -52,6 +53,7 @@ import {
   applyLayerStackCommandBridgeOperation,
   type LayerStackCommandBridgeOperation,
 } from '../../../utils/layerStackCommandBridge';
+import { persistLayerStackSidecarInAdjustments } from '../../../utils/layerStackSidecarAdjustments';
 import Slider, { type SliderChangeEvent } from '../../ui/Slider';
 import UiText from '../../ui/Text';
 
@@ -350,6 +352,8 @@ export default function LayerStackPanel({
 }: LayerStackPanelProps) {
   const { t } = useTranslation();
   const selectedImage = useEditorStore((state) => state.selectedImage);
+  const setEditor = useEditorStore((state) => state.setEditor);
+  const pushHistory = useEditorStore((state) => state.pushHistory);
   const orientationSteps = useEditorStore((state) => state.adjustments.orientationSteps);
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
   const rows = useMemo(() => getLayerRows(masks, collapsedGroupIds), [collapsedGroupIds, masks]);
@@ -448,16 +452,31 @@ export default function LayerStackPanel({
     nextSelectedLayerId = selectedLayerId,
     materializeMasks: (nextMasks: Array<MaskContainer>) => Array<MaskContainer> = (nextMasks) => nextMasks,
   ) => {
+    const imagePath = selectedImage?.path ?? 'rapidraw://current-image';
     const result = applyLayerStackCommandBridgeOperation(masks, operation, {
       graphRevision: layerGraphRevision,
-      imagePath: 'rapidraw://current-image',
+      imagePath,
       operationId: crypto.randomUUID(),
       sessionId: 'rapidraw-layer-stack-panel',
     });
+    const nextMasks = materializeMasks(result.masks);
+    const currentState = useEditorStore.getState();
+    const nextAdjustments = persistLayerStackSidecarInAdjustments(
+      { ...currentState.adjustments, masks: nextMasks },
+      result.sidecar,
+    );
     setLayerGraphRevision(result.graphRevision);
     setLastCommandType(result.command.commandType);
     setLastChangedLayerCount(result.commandResult.changedLayerIds.length);
-    applyLayerStack(materializeMasks(result.masks), nextSelectedLayerId);
+    setEditor({ adjustments: nextAdjustments });
+    pushHistory(nextAdjustments);
+    if (selectedImage?.path) {
+      debouncedSave(selectedImage.path, nextAdjustments);
+    }
+    setLocalSelectedLayerId(nextSelectedLayerId);
+    onSelectMaskContainer(
+      nextSelectedLayerId === BASE_LAYER_ID || nextSelectedLayerId.startsWith('group:') ? null : nextSelectedLayerId,
+    );
   };
   const updateLayerVisibility = (layerId: string, visible: boolean) => {
     applyLayerStackCommand({ layerId, type: 'setVisibility', visible }, layerId);
