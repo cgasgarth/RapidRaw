@@ -18,6 +18,7 @@ import {
 import { COLOR_GRADING_PRESETS } from '../../utils/colorGradingPresets';
 import { formatGamutWarningCoverage } from '../../utils/gamutWarningDisplay';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../utils/profileTonePresets';
+import { applyProfileToneToRgbPixel } from '../../utils/profileToneRuntime';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../utils/selectiveColorRanges';
 import {
   applySelectiveColorToRgbPixel,
@@ -83,6 +84,11 @@ const skinToneInspectorSample: SkinToneUniformityInput = {
   hueDegrees: 18,
   luminance: 0.5,
   saturation: 0.45,
+};
+const profileTonePreviewPixel: RgbPixel = {
+  blue: 0.46,
+  green: 0.5,
+  red: 0.54,
 };
 
 const skinToneTargetDistance = (
@@ -919,6 +925,14 @@ export default function ColorPanel({
       ] satisfies Array<{ key: ToneCurveId; label: string }>,
     [t],
   );
+  const profileToneReceipt = applyProfileToneToRgbPixel(profileTonePreviewPixel, {
+    cameraProfile: adjustments.cameraProfile,
+    toneCurve: adjustments.toneCurve,
+  });
+  const activeCameraProfileLabel =
+    cameraProfileOptions.find((option) => option.key === adjustments.cameraProfile)?.label ?? adjustments.cameraProfile;
+  const activeToneCurveLabel =
+    toneCurveOptions.find((option) => option.key === adjustments.toneCurve)?.label ?? adjustments.toneCurve;
   const currentHsl = adjustments.hsl[activeColor];
   const blackWhiteMixer = adjustments.blackWhiteMixer;
   const currentBlackWhiteWeight = blackWhiteMixer.weights[activeColor];
@@ -1643,6 +1657,31 @@ export default function ColorPanel({
                 </select>
               </div>
             )}
+            <div
+              className="mt-3 grid gap-1 rounded border border-surface bg-bg-secondary p-2 text-[11px] text-text-secondary"
+              data-camera-profile={adjustments.cameraProfile}
+              data-luminance-after={profileToneReceipt.luminanceAfter.toFixed(4)}
+              data-luminance-before={profileToneReceipt.luminanceBefore.toFixed(4)}
+              data-testid="profile-tone-visible-receipt"
+              data-tone-curve={adjustments.toneCurve}
+              data-tone-delta={profileToneReceipt.toneDelta.toFixed(4)}
+            >
+              <span className="font-medium text-text-primary">{t('adjustments.color.profileTone.receiptTitle')}</span>
+              <span>
+                {t('adjustments.color.profileTone.receiptSummary', {
+                  profile: activeCameraProfileLabel,
+                  toneCurve: activeToneCurveLabel,
+                })}
+              </span>
+              <span>
+                {t('adjustments.color.profileTone.receiptRuntime', {
+                  after: profileToneReceipt.luminanceAfter.toFixed(3),
+                  before: profileToneReceipt.luminanceBefore.toFixed(3),
+                  delta: profileToneReceipt.toneDelta.toFixed(3),
+                })}
+              </span>
+              <span>{t('adjustments.color.profileTone.receiptExportParity')}</span>
+            </div>
           </div>
         )}
 
