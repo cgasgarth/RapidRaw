@@ -2260,7 +2260,12 @@
       "titleSingle": "Reducir ruido de imagen"
     },
     "derivedOutput": {
+      "exportAction": "",
       "family": "",
+      "lineage": "",
+      "lineageSummary_one": "",
+      "lineageSummary_many": "",
+      "lineageSummary_other": "",
       "output": "",
       "outputHash": "",
       "settingsHash": "",
@@ -2288,7 +2293,15 @@
       },
       "storage": "",
       "subtitle": "",
-      "title": ""
+      "title": "",
+      "validation": "",
+      "validationValue": {
+        "blocked": "",
+        "needs_review": "",
+        "passed": "",
+        "pending": ""
+      },
+      "warnings": ""
     },
     "focusStack": {
       "alignment": {

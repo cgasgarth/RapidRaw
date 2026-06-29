@@ -485,7 +485,21 @@ export default function HdrModal({
               data-hdr-derived-source-state={visibleDerivedOutputReceipt.openInEditorAction.state}
               data-testid="hdr-derived-output-receipt-store-entry"
             >
-              <DerivedOutputReceiptPanel receipt={visibleDerivedOutputReceipt} onOpenOutput={onOpenFile} />
+              <DerivedOutputReceiptPanel
+                receipt={visibleDerivedOutputReceipt}
+                onOpenOutput={onOpenFile}
+                onExportOutput={onOpenFile}
+                sourceLineageSummary={`${visibleDerivedOutputReceipt.sourceCount} sources / ${visibleDerivedOutputReceipt.sourceGraphRevisions
+                  .slice(0, 3)
+                  .join(', ')}`}
+                validationStatus={visibleDerivedOutputReceipt.staleState === 'stale' ? 'needs_review' : 'passed'}
+                validationStatusLabel={
+                  visibleDerivedOutputReceipt.staleState === 'stale'
+                    ? t('modals.derivedOutput.validationValue.needs_review')
+                    : t('modals.hdr.handoffPreviewExportMatched')
+                }
+                warnings={handoffSummary?.warningCodes ?? []}
+              />
             </div>
           ) : null}
         </MergeResultPreview>
@@ -1263,7 +1277,7 @@ export default function HdrModal({
       role="presentation"
     >
       <div
-        className={`bg-surface rounded-xl shadow-2xl p-6 w-full max-w-4xl transform transition-all duration-300 ease-out ${
+        className={`bg-surface rounded-xl shadow-2xl p-6 w-full max-w-4xl max-h-[calc(100vh-48px)] transform transition-all duration-300 ease-out ${
           show ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 -translate-y-4'
         }`}
         onClick={(e) => {
@@ -1274,9 +1288,9 @@ export default function HdrModal({
         }}
         role="presentation"
       >
-        <div className="flex flex-col">
-          {renderContent()}
-          <div className={`mt-4 flex justify-end gap-3 ${savedPath ? '' : 'pt-4 border-t border-surface/50'}`}>
+        <div className="flex max-h-[calc(100vh-96px)] min-h-0 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1">{renderContent()}</div>
+          <div className={`mt-4 flex shrink-0 justify-end gap-3 ${savedPath ? '' : 'pt-4 border-t border-surface/50'}`}>
             {renderButtons()}
           </div>
         </div>

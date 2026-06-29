@@ -713,7 +713,9 @@ export default function SuperResolutionModal({
 
       <ComputationalMergeReviewPanel
         derivedOutputReceipt={visibleDerivedOutputReceipt}
-        {...(onOpenOutput === undefined ? {} : { onOpenDerivedOutput: onOpenOutput })}
+        {...(onOpenOutput === undefined
+          ? {}
+          : { onExportDerivedOutput: onOpenOutput, onOpenDerivedOutput: onOpenOutput })}
         title={t('modals.superResolution.review.title')}
         proofStatus={t('modals.superResolution.review.proofStatus')}
         limitation={t('modals.superResolution.review.limitation')}

@@ -23,6 +23,7 @@ interface ComputationalMergeReviewPanelProps {
   items: ComputationalMergeReviewItem[];
   limitation: string;
   onOpenDerivedOutput?: (path: string) => void;
+  onExportDerivedOutput?: (path: string) => void;
   proofStatus: string;
   sections?: ComputationalMergeReviewSection[];
   testId?: string;
@@ -39,12 +40,20 @@ export default function ComputationalMergeReviewPanel({
   derivedOutputReceipt,
   items,
   limitation,
+  onExportDerivedOutput,
   onOpenDerivedOutput,
   proofStatus,
   sections = [],
   testId,
   title,
 }: ComputationalMergeReviewPanelProps) {
+  const validationStatus = items.some((item) => item.status === 'pending')
+    ? 'needs_review'
+    : items.some((item) => item.status === 'review')
+      ? 'pending'
+      : 'passed';
+  const warnings = items.filter((item) => item.status === 'pending').map((item) => `${item.label}: ${item.value}`);
+
   return (
     <div className="grid gap-3" data-testid={testId}>
       <section className="rounded-md border border-border-color bg-bg-primary p-4">
@@ -98,7 +107,17 @@ export default function ComputationalMergeReviewPanel({
         </UiText>
       </section>
       {derivedOutputReceipt ? (
-        <DerivedOutputReceiptPanel receipt={derivedOutputReceipt} onOpenOutput={onOpenDerivedOutput} />
+        <DerivedOutputReceiptPanel
+          receipt={derivedOutputReceipt}
+          onOpenOutput={onOpenDerivedOutput}
+          onExportOutput={onExportDerivedOutput}
+          sourceLineageSummary={`${derivedOutputReceipt.sourceCount} sources / ${derivedOutputReceipt.sourceGraphRevisions
+            .slice(0, 3)
+            .join(', ')}`}
+          validationStatus={validationStatus}
+          validationStatusLabel={proofStatus}
+          warnings={warnings}
+        />
       ) : null}
     </div>
   );

@@ -2264,7 +2264,11 @@
       "titleSingle": "Bild entrauschen"
     },
     "derivedOutput": {
+      "exportAction": "",
       "family": "",
+      "lineage": "",
+      "lineageSummary_one": "",
+      "lineageSummary_other": "",
       "output": "",
       "outputHash": "",
       "settingsHash": "",
@@ -2291,7 +2295,15 @@
       },
       "storage": "",
       "subtitle": "",
-      "title": ""
+      "title": "",
+      "validation": "",
+      "validationValue": {
+        "blocked": "",
+        "needs_review": "",
+        "passed": "",
+        "pending": ""
+      },
+      "warnings": ""
     },
     "focusStack": {
       "alignment": {

@@ -300,13 +300,20 @@ expect(
 
 const requiredPanelMarkers = [
   'data-testid="derived-output-receipt"',
+  'data-derived-output-review-tray="true"',
+  'data-derived-output-review-family',
   'data-derived-output-family',
+  'data-derived-output-validation-status',
   'data-output-content-hash',
   'data-source-content-hashes',
   'data-source-graph-revisions',
+  'data-source-lineage-summary',
   'data-derived-output-stale-reasons',
+  'data-derived-output-warning-count',
+  'data-testid="derived-output-warning-list"',
   'data-testid="derived-output-stale-warning"',
   'data-testid="derived-output-open-in-editor"',
+  'data-testid="derived-output-export-action"',
 ];
 const panelSource = readFileSync('src/components/modals/DerivedOutputReceiptPanel.tsx', 'utf8');
 for (const marker of requiredPanelMarkers) {
@@ -324,6 +331,41 @@ for (const [file, builder] of modalWiring) {
   expect(source.includes(builder), `${file}: missing ${builder} wiring.`);
   expect(source.includes('derivedOutputReceipt'), `${file}: missing derivedOutputReceipt render path.`);
   expect(source.includes('upsertDerivedOutputReceipt'), `${file}: missing shared store upsert path.`);
+}
+
+const familyTrayMarkers = [
+  [
+    'src/components/modals/HdrModal.tsx',
+    ['DerivedOutputReceiptPanel', 'onExportOutput={onOpenFile}', 'validationStatus=', 'warnings='],
+  ],
+  [
+    'src/components/modals/PanoramaModal.tsx',
+    ['DerivedOutputReceiptPanel', 'onExportOutput={onOpenFile}', 'validationStatus=', 'warnings='],
+  ],
+  [
+    'src/components/modals/FocusStackModal.tsx',
+    ['<ComputationalMergeReviewPanel', 'derivedOutputReceipt={visibleDerivedOutputReceipt}'],
+  ],
+  [
+    'src/components/modals/SuperResolutionModal.tsx',
+    ['<ComputationalMergeReviewPanel', 'derivedOutputReceipt={visibleDerivedOutputReceipt}'],
+  ],
+] as const;
+for (const [file, markers] of familyTrayMarkers) {
+  const source = readFileSync(file, 'utf8');
+  for (const marker of markers) {
+    expect(source.includes(marker), `${file}: missing shared derived-output review tray marker: ${marker}.`);
+  }
+}
+
+const reviewPanelSource = readFileSync('src/components/modals/ComputationalMergeReviewPanel.tsx', 'utf8');
+for (const marker of [
+  'validationStatus={validationStatus}',
+  'warnings={warnings}',
+  'sourceLineageSummary=',
+  'onExportOutput={onExportDerivedOutput}',
+]) {
+  expect(reviewPanelSource.includes(marker), `Review panel missing shared tray prop marker: ${marker}.`);
 }
 
 const hdrModalSource = readFileSync('src/components/modals/HdrModal.tsx', 'utf8');
@@ -375,7 +417,6 @@ for (const marker of [
   expect(srModalSource.includes(marker), `SR modal missing derived editable-source marker: ${marker}.`);
 }
 
-const reviewPanelSource = readFileSync('src/components/modals/ComputationalMergeReviewPanel.tsx', 'utf8');
 expect(reviewPanelSource.includes('DerivedOutputReceiptPanel'), 'Review panel must render the shared receipt panel.');
 expect(reviewPanelSource.includes('onOpenDerivedOutput'), 'Review panel must expose editor handoff callback.');
 const uiStoreSource = readFileSync('src/store/useUIStore.ts', 'utf8');
