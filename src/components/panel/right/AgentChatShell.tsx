@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { buildAgentAppServerToolReadinessSummary } from '../../../utils/agentAppServerToolReadiness';
 import { runAgentBoundedEditPlannerLoop } from '../../../utils/agentBoundedEditPlannerLoop';
+import { AGENT_COLOR_APPLY_TOOL_NAME } from '../../../utils/agentColorApplyTool';
+import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../utils/agentDetailEffectsApplyTool';
 import { planAgentEditRecipe } from '../../../utils/agentEditRecipePlanner';
 import {
   agentImageContextSnapshotSchema,
@@ -121,7 +123,8 @@ const longEditProgressStageStyles = {
 } satisfies Record<AgentLongEditProgress['stages'][number]['state'], string>;
 
 type LocalReviewDecision = 'approved' | 'pending' | 'rejected';
-type AgentSessionAdjustmentPatch = AgentMultiTurnAppServerSessionRequest['turns'][number]['adjustment'];
+type AgentSessionTurn = AgentMultiTurnAppServerSessionRequest['turns'][number];
+type AgentSessionAdjustmentPatch = NonNullable<AgentSessionTurn['adjustment']>;
 type LivePromptStatus =
   | 'applied'
   | 'applying'
@@ -297,8 +300,7 @@ const pickSessionAdjustments = (
 ): AgentSessionAdjustmentPatch => {
   const patch: AgentSessionAdjustmentPatch = {};
   for (const key of keys) {
-    const value = source[key];
-    if (value !== undefined) patch[key] = value;
+    patch[key] = source[key];
   }
   return patch;
 };
@@ -318,6 +320,9 @@ const buildLiveMultiTurnSessionRequest = ({
 }): AgentMultiTurnAppServerSessionRequest => {
   const basicToneStep = plan.steps.find((step) => step.kind === 'basic_tone');
   if (basicToneStep?.kind !== 'basic_tone') throw new Error('Agent session needs a basic-tone apply step.');
+  const selectiveColorStep = plan.steps.find((step) => step.kind === 'selective_color');
+  const needsDetailEffects =
+    plan.recipeKind === 'cool_landscape_detail' || /\b(detail|sharp|crisp|texture)\b/iu.test(prompt);
 
   const firstPass = pickSessionAdjustments(basicToneStep.payload, [
     'exposure',
@@ -335,6 +340,18 @@ const buildLiveMultiTurnSessionRequest = ({
     'temperature',
     'tint',
   ]);
+  const secondTurn: AgentSessionTurn = {
+    adjustment: secondPass,
+    assistantRationale: 'Second pass: inspect the preview and refine contrast, color, and shadow balance.',
+    preview: { longEdgePx: 1536, purpose: 'detail_review', quality: 0.86 },
+    userFollowUp: 'Inspect the medium preview and refine the image before final review.',
+  };
+  if (selectiveColorStep?.kind === 'selective_color') {
+    secondTurn.color = { hsl: { [selectiveColorStep.payload.rangeKey]: selectiveColorStep.payload.adjustment } };
+  }
+  if (needsDetailEffects) {
+    secondTurn.detailEffects = { clarity: 18, dehaze: 8, sharpness: 12, structure: 10 };
+  }
 
   return {
     modelId: 'gpt-5.1-codex-app-server',
@@ -348,12 +365,7 @@ const buildLiveMultiTurnSessionRequest = ({
         assistantRationale: 'First pass: establish global exposure and highlight protection.',
         preview: { purpose: 'refresh' },
       },
-      {
-        adjustment: secondPass,
-        assistantRationale: 'Second pass: inspect the preview and refine contrast, color, and shadow balance.',
-        preview: { longEdgePx: 1536, purpose: 'detail_review', quality: 0.86 },
-        userFollowUp: 'Inspect the medium preview and refine the image before final review.',
-      },
+      secondTurn,
     ],
   };
 };
@@ -1231,6 +1243,8 @@ function LivePromptComposer({
   return (
     <form
       className="pointer-events-auto relative z-10 space-y-3 rounded-md border border-sky-500/20 bg-sky-500/5 p-3"
+      data-color-tool-name={AGENT_COLOR_APPLY_TOOL_NAME}
+      data-detail-tool-name={AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME}
       data-live-prompt-status={result.status}
       data-safety-decision={result.safetyDecision?.decisionId ?? ''}
       data-safety-severity={result.safetyDecision?.severity ?? ''}
