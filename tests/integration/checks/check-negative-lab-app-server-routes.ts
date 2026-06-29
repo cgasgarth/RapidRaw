@@ -152,9 +152,17 @@ const conversionPlanResultSchema = z.object({
   paths: z.array(z.string()).min(1),
   presetId: z.string(),
   profile: z.object({
+    crosstalkProfile: z
+      .object({
+        profileId: z.string(),
+        provenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+        strength: z.number().min(0).max(1),
+      })
+      .nullable(),
+    filmClass: z.enum(['color_negative', 'black_and_white_silver']),
     measurementProfileId: z.string().nullable(),
     presetId: z.string(),
-    profileStatus: z.enum(['generic_unmeasured', 'fixture_measured']),
+    profileStatus: z.enum(['generic_unmeasured', 'fixture_measured', 'user_supplied']),
     runtimeStatus: z.enum(['ui_catalog_only', 'runtime_parameter_applied']),
   }),
   profileProvenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
@@ -378,6 +386,11 @@ if (
   acceptedUserProfileApplyResult.selectedProfileSnapshot.presetId !== 'negative_lab.user.c41.local_warm_proof.v1' ||
   acceptedUserProfileApplyResult.selectedProfileSnapshot.profileStatus !== 'user_supplied' ||
   acceptedUserProfileApplyResult.selectedProfileSnapshot.claimPolicy !== 'user_profile_no_stock_claim' ||
+  acceptedUserProfileApplyResult.selectedProfileSnapshot.crosstalkProfile?.provenance !== 'user_owned' ||
+  acceptedUserProfileApplyResult.selectedProfileSnapshot.crosstalkProfile.provenanceHash !==
+    userProfileSnapshot.crosstalkProfile?.provenanceHash ||
+  acceptedUserProfileApplyResult.conversionPlan.profile.crosstalkProfile?.provenanceHash !==
+    userProfileSnapshot.crosstalkProfile?.provenanceHash ||
   acceptedUserProfileApplyResult.apply.options.selectedProfile.profileProvenanceHash !==
     userProfileSnapshot.profileProvenanceHash ||
   !acceptedUserProfileApplyResult.selectedProfileSnapshot.doesNotProve.includes('user_profile_unmeasured') ||
@@ -618,6 +631,8 @@ for (const [filePath, marker] of [
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabStockRegistryRouteResult'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabStockMetadataRouteResult'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabConversionPlanResult'],
+  ['src/utils/negativeLabCrosstalkProfile.ts', 'applyNegativeLabDensityCrosstalk'],
+  ['src/schemas/negativeLabCrosstalkProfileSchemas.ts', 'negativeLabCrosstalkProfileSchema'],
   ['src/utils/negativeLabDensityConversion.ts', 'convertNegativeLabDensitySample'],
   ['src/utils/negativeLabMeasuredProfileRuntime.ts', 'resolveNegativeLabRuntimeProfile'],
   ['src/utils/negativeLabPresetCatalog.ts', 'NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG'],
@@ -627,6 +642,25 @@ for (const [filePath, marker] of [
   const source = await readFile(filePath, 'utf8');
   if (!source.includes(marker)) {
     throw new Error(`${filePath} is missing Negative Lab app-server marker ${marker}.`);
+  }
+}
+
+for (const filePath of [
+  'src/utils/negativeLabCrosstalkProfile.ts',
+  'src/utils/negativeLabMeasuredProfileRuntime.ts',
+  'tests/pure-ts/negative-lab-crosstalk-profile.test.ts',
+]) {
+  const source = await readFile(filePath, 'utf8');
+  const disallowedMarkers = [
+    ['Neg', 'Py'].join(''),
+    ['negative', 'lab', 'pro'].join(' '),
+    ['.', 'toml'].join(''),
+    ['TO', 'ML'].join(''),
+  ];
+  if (
+    disallowedMarkers.some((marker) => source.toLocaleLowerCase('en-US').includes(marker.toLocaleLowerCase('en-US')))
+  ) {
+    throw new Error(`${filePath} contains disallowed external crosstalk profile markers.`);
   }
 }
 

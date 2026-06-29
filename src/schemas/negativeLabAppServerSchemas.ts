@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
 import {
+  negativeLabCrosstalkProfileSchema,
+  type NegativeLabCrosstalkProfile,
+} from './negativeLabCrosstalkProfileSchemas';
+import {
   negativeLabBatchDryRunSummarySchema,
   negativeLabFrameHealthReportSchema,
 } from './negativeLabFrameHealthSchemas';
@@ -90,9 +94,11 @@ export const negativeLabSelectedProfileSnapshotAppServerSchema = z
       'named_stock_profile_requires_license_review',
       'user_profile_no_stock_claim',
     ]),
+    crosstalkProfile: negativeLabCrosstalkProfileSchema.nullable(),
     displayName: z.string().trim().min(1).max(80),
     doesNotProve: z.array(negativeLabMeasuredProfileRuntimeLimitationSchema),
     evidenceFixtureCount: z.number().int().nonnegative(),
+    filmClass: z.enum(['color_negative', 'black_and_white_silver']),
     measurementProfileId: negativeLabMeasuredProfileIdSchema.or(negativeLabUserProfileIdSchema).nullable(),
     params: negativeLabPresetParamsSchema,
     presetId: negativeLabRuntimePresetIdSchema,
@@ -530,6 +536,7 @@ export type NegativeLabPlanRollNormalizationAppServerResult = z.infer<
 export type NegativeLabQcProofAppServerCommand = z.infer<typeof negativeLabQcProofAppServerCommandSchema>;
 export type NegativeLabQcProofAppServerResult = z.infer<typeof negativeLabQcProofAppServerResultSchema>;
 export type NegativeLabProfileProvenanceHash = z.infer<typeof negativeLabProfileProvenanceHashSchema>;
+export type { NegativeLabCrosstalkProfile };
 export type NegativeLabSelectedProfileSnapshotAppServer = z.infer<
   typeof negativeLabSelectedProfileSnapshotAppServerSchema
 >;
