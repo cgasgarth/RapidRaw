@@ -960,6 +960,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   );
   const isBatchPlanCopied = copiedBatchPlanJson === batchDryRunPlanJson;
   const isBatchPlanAccepted = acceptedBatchPlanJson === batchDryRunPlanJson && !batchDryRunSummary.blocked;
+  const canApplyRollNormalizationPlan = isBatchPlanAccepted && rollNormalizationPlan.affectedFrameIds.length > 0;
   const agentDryRunState: NegativeLabAgentDryRunState = batchDryRunSummary.blocked
     ? 'blocked'
     : isBatchPlanAccepted
@@ -1810,7 +1811,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   };
 
   const handleApplyRollNormalizationPlan = () => {
-    if (rollNormalizationPlan.affectedFrameIds.length === 0) return;
+    if (!canApplyRollNormalizationPlan) return;
 
     const exposureOverrideFrameIds = new Set(
       rollNormalizationPlan.exposureOverrides.overrides.map((override) => override.frameId),
@@ -2449,6 +2450,14 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       data-planned-apply-count={batchDryRunSummary.plannedApplyCount}
       data-review-count={dustScratchReviewReport.reviewCount}
       data-roll-normalization-affected-count={rollNormalizationPlan.affectedFrameIds.length}
+      data-roll-normalization-suggestion-count={
+        rollNormalizationPlan.autoDensitySuggestionRun?.frameSuggestions.length ?? 0
+      }
+      data-roll-normalization-suggestion-state={
+        isBatchPlanAccepted && rollNormalizationPlan.autoDensitySuggestionRun !== null
+          ? 'accepted_into_plan'
+          : (rollNormalizationPlan.autoDensitySuggestionRun?.state ?? 'suggested_only')
+      }
       data-roll-normalization-exposure-delta={rollNormalizationPlan.proposedExposureDeltaEv}
       data-roll-normalization-mode={rollNormalizationPlan.mode}
       data-roll-normalization-positive-count={rollNormalizationPlan.positiveVariantIds.length}
@@ -2508,6 +2517,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         handleSetVisibleQcDecision={handleSetVisibleQcDecision}
         isBatchPlanAccepted={isBatchPlanAccepted}
         isBatchPlanCopied={isBatchPlanCopied}
+        isRollNormalizationPlanAccepted={canApplyRollNormalizationPlan}
         isSaving={isSaving}
         params={params}
         qcDecisionByFrameId={qcDecisionByFrameId}

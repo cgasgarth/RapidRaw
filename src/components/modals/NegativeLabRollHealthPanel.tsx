@@ -65,6 +65,7 @@ interface NegativeLabRollHealthPanelProps {
   handleSetVisibleQcDecision: (decision: NegativeLabQcDecision) => void;
   isBatchPlanAccepted: boolean;
   isBatchPlanCopied: boolean;
+  isRollNormalizationPlanAccepted: boolean;
   isSaving: boolean;
   params: NegativeLabPresetParams;
   qcDecisionByFrameId: Record<string, NegativeLabQcDecision>;
@@ -99,6 +100,7 @@ export function NegativeLabRollHealthPanel({
   handleSetVisibleQcDecision,
   isBatchPlanAccepted,
   isBatchPlanCopied,
+  isRollNormalizationPlanAccepted,
   isSaving,
   params,
   qcDecisionByFrameId,
@@ -153,15 +155,20 @@ export function NegativeLabRollHealthPanel({
         </span>
         <span
           className="col-span-3 rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary"
+          data-auto-density-suggestion-count={
+            rollNormalizationPlan.autoDensitySuggestionRun?.frameSuggestions.length ?? 0
+          }
+          data-auto-density-suggestion-state={rollNormalizationPlan.autoDensitySuggestionRun?.state ?? 'suggested_only'}
           data-testid="negative-lab-roll-normalization-plan"
         >
-          {`${rollNormalizationPlan.affectedFrameIds.length} frames ${rollNormalizationPlan.proposedExposureDeltaEv >= 0 ? '+' : ''}${rollNormalizationPlan.proposedExposureDeltaEv.toFixed(2)} EV / WB ${rollNormalizationPlan.proposedWhiteBalanceDelta.toFixed(2)}`}
+          {`${rollNormalizationPlan.affectedFrameIds.length} frames ${rollNormalizationPlan.proposedExposureDeltaEv >= 0 ? '+' : ''}${rollNormalizationPlan.proposedExposureDeltaEv.toFixed(2)} EV / WB ${rollNormalizationPlan.proposedWhiteBalanceDelta.toFixed(2)} / ${rollNormalizationPlan.autoDensitySuggestionRun?.state ?? 'suggested_only'}`}
         </span>
         <button
           type="button"
           className="col-span-3 inline-flex items-center justify-center gap-1 rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+          data-roll-normalization-accepted={String(isRollNormalizationPlanAccepted)}
           data-testid="negative-lab-apply-roll-normalization"
-          disabled={rollNormalizationPlan.affectedFrameIds.length === 0}
+          disabled={!isRollNormalizationPlanAccepted}
           onClick={handleApplyRollNormalizationPlan}
         >
           <WandSparkles size={11} />

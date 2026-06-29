@@ -24,6 +24,7 @@ import {
   negativeLabRollNormalizationModeSchema,
   negativeLabRollNormalizationPlanSchema,
 } from './negativeLabRollNormalizationSchemas';
+import { negativeLabScanMetricsV1Schema } from './negativeLabScanMetricsSchemas';
 import { negativeLabStockMetadataCatalogSchema } from './negativeLabStockMetadataCatalogSchemas';
 import {
   negativeLabStockRegistryEntrySchema,
@@ -123,6 +124,17 @@ export const negativeLabQcProofAppServerCommandSchema = negativeLabFrameHealthAp
 export const negativeLabPlanRollNormalizationAppServerCommandSchema = negativeLabFrameHealthAppServerCommandSchema
   .extend({
     anchorFrameIds: z.array(z.string().trim().min(1)).min(1),
+    frameScanMetrics: z
+      .array(
+        z
+          .object({
+            frameId: z.string().trim().min(1),
+            metrics: negativeLabScanMetricsV1Schema,
+            sourcePath: z.string().trim().min(1),
+          })
+          .strict(),
+      )
+      .optional(),
     mode: negativeLabRollNormalizationModeSchema,
     preserveCreativeAdjustments: z.boolean(),
     selectedFrameIds: z.array(z.string().trim().min(1)).min(1),

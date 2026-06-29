@@ -1,3 +1,7 @@
+import {
+  buildNegativeLabAutoDensitySuggestionRun,
+  type NegativeLabFrameMetricsInput,
+} from './negativeLabAutoDensitySuggestions';
 import { DEFAULT_NEGATIVE_LAB_FRAME_RGB_BALANCE_OFFSET } from './negativeLabFrameRgbBalanceOverrides';
 import {
   parseNegativeLabFrameExposureOverridePayload,
@@ -15,22 +19,30 @@ import {
   type NegativeLabRollNormalizationPlan,
 } from '../schemas/negativeLabRollNormalizationSchemas';
 
+import type { NegativeLabAutoDensitySuggestionRun } from '../schemas/negativeLabAutoDensitySuggestionSchemas';
 import type { NegativeLabFrameHealthReport } from '../schemas/negativeLabFrameHealthSchemas';
+import type { NegativeLabPresetParams } from '../schemas/negativeLabPresetCatalogSchemas';
 
 export interface BuildNegativeLabRollNormalizationPlanParams {
   anchorFrameIds: readonly string[];
   baselineExposure: number;
+  autoDensitySuggestionRun?: NegativeLabAutoDensitySuggestionRun | null;
   frameHealthReport: NegativeLabFrameHealthReport;
+  frameScanMetrics?: readonly NegativeLabFrameMetricsInput[];
   mode: NegativeLabRollNormalizationMode;
+  params?: NegativeLabPresetParams | null;
   preserveCreativeAdjustments: boolean;
   selectedFrameIds: readonly string[];
 }
 
 export const buildNegativeLabRollNormalizationPlan = ({
   anchorFrameIds,
+  autoDensitySuggestionRun,
   baselineExposure,
   frameHealthReport,
+  frameScanMetrics = [],
   mode,
+  params = null,
   preserveCreativeAdjustments,
   selectedFrameIds,
 }: BuildNegativeLabRollNormalizationPlanParams): NegativeLabRollNormalizationPlan => {
@@ -45,18 +57,53 @@ export const buildNegativeLabRollNormalizationPlan = ({
   const unaffectedFrameIds = frameHealthReport.frames
     .filter((frame) => !affectedFrameIds.includes(frame.frameId))
     .map((frame) => frame.frameId);
-  const proposedExposureDeltaEv = mode === 'white_balance_only' ? 0 : 0.15;
-  const proposedWhiteBalanceDelta = mode === 'exposure_only' ? 0 : 0.04;
+  const suggestionRun =
+    autoDensitySuggestionRun ??
+    (frameScanMetrics.length > 0
+      ? buildNegativeLabAutoDensitySuggestionRun({
+          frameMetrics: frameScanMetrics,
+          frameRows: affectedFrames,
+          params,
+          selectedFrameIds: affectedFrameIds,
+        })
+      : null);
+  const suggestedExposureOffsets = new Map(
+    suggestionRun?.frameSuggestions.map((suggestion) => [suggestion.frameId, suggestion.exposureOffsetEv]) ?? [],
+  );
+  const suggestedRgbOffsets = new Map(
+    suggestionRun?.frameSuggestions.flatMap((suggestion) =>
+      suggestion.castBalanceSuggestion === null ? [] : [[suggestion.frameId, suggestion.castBalanceSuggestion]],
+    ) ?? [],
+  );
+  const proposedExposureDeltaEv =
+    mode === 'white_balance_only'
+      ? 0
+      : Number(
+          (
+            affectedFrames.reduce((sum, frame) => sum + (suggestedExposureOffsets.get(frame.frameId) ?? 0), 0) /
+            Math.max(1, affectedFrames.length)
+          ).toFixed(2),
+        );
+  const proposedWhiteBalanceDelta =
+    mode === 'exposure_only'
+      ? 0
+      : Number(
+          (
+            [...suggestedRgbOffsets.values()].reduce(
+              (sum, offset) =>
+                sum + Math.max(Math.abs(offset.blueWeight), Math.abs(offset.greenWeight), Math.abs(offset.redWeight)),
+              0,
+            ) / Math.max(1, suggestedRgbOffsets.size)
+          ).toFixed(2),
+        );
   const exposureOverrides = buildExposureOverrides(
     affectedFrames,
     baselineExposure,
-    mode === 'white_balance_only' ? 0 : proposedExposureDeltaEv,
+    mode === 'white_balance_only' ? new Map() : suggestedExposureOffsets,
   );
   const rgbBalanceOverrides = buildRgbBalanceOverrides(
     affectedFrames,
-    mode === 'exposure_only'
-      ? DEFAULT_NEGATIVE_LAB_FRAME_RGB_BALANCE_OFFSET
-      : buildRgbOffset(proposedWhiteBalanceDelta),
+    mode === 'exposure_only' ? new Map() : suggestedRgbOffsets,
   );
   const warningCodes = [
     ...(affectedFrameIds.length === 0 ? ['no_selected_frames' as const] : []),
@@ -69,6 +116,7 @@ export const buildNegativeLabRollNormalizationPlan = ({
   return parseNegativeLabRollNormalizationPlan({
     affectedFrameIds,
     anchorFrameIds,
+    autoDensitySuggestionRun: suggestionRun,
     exposureOverrides,
     mode,
     positiveVariantIds: affectedFrameIds.map((frameId) => `positive_variant_${frameId}_roll_normalized`),
@@ -86,36 +134,42 @@ export const buildNegativeLabRollNormalizationPlan = ({
 const buildExposureOverrides = (
   affectedFrames: NegativeLabFrameHealthReport['frames'],
   baselineExposure: number,
-  exposureDeltaEv: number,
+  exposureOffsetsByFrameId: ReadonlyMap<string, number>,
 ): NegativeLabFrameExposureOverridePayload =>
   parseNegativeLabFrameExposureOverridePayload({
-    overrides:
-      exposureDeltaEv === 0
-        ? []
-        : affectedFrames.map((frame) => ({
-            effectiveExposure: Number((baselineExposure + exposureDeltaEv).toFixed(2)),
-            exposureOffset: exposureDeltaEv,
-            frameId: frame.frameId,
-            sourcePath: frame.sourcePath,
-          })),
+    overrides: affectedFrames.flatMap((frame) => {
+      const exposureOffset = exposureOffsetsByFrameId.get(frame.frameId) ?? 0;
+      if (exposureOffset === 0) return [];
+      return [
+        {
+          effectiveExposure: Number((baselineExposure + exposureOffset).toFixed(2)),
+          exposureOffset,
+          frameId: frame.frameId,
+          sourcePath: frame.sourcePath,
+        },
+      ];
+    }),
     schemaVersion: 1,
   });
 
 const buildRgbBalanceOverrides = (
   affectedFrames: NegativeLabFrameHealthReport['frames'],
-  rgbBalanceOffset: NegativeLabFrameRgbBalanceOffset,
+  rgbBalanceOffsetsByFrameId: ReadonlyMap<string, NegativeLabFrameRgbBalanceOffset | null>,
 ): NegativeLabFrameRgbBalanceOverridePayload =>
   parseNegativeLabFrameRgbBalanceOverridePayload({
-    overrides: affectedFrames.map((frame) => ({
-      frameId: frame.frameId,
-      rgbBalanceOffset,
-      sourcePath: frame.sourcePath,
-    })),
+    overrides: affectedFrames.flatMap((frame) => {
+      const rgbBalanceOffset =
+        rgbBalanceOffsetsByFrameId.get(frame.frameId) ?? DEFAULT_NEGATIVE_LAB_FRAME_RGB_BALANCE_OFFSET;
+      if (rgbBalanceOffset.blueWeight === 0 && rgbBalanceOffset.greenWeight === 0 && rgbBalanceOffset.redWeight === 0) {
+        return [];
+      }
+      return [
+        {
+          frameId: frame.frameId,
+          rgbBalanceOffset,
+          sourcePath: frame.sourcePath,
+        },
+      ];
+    }),
     schemaVersion: 1,
   });
-
-const buildRgbOffset = (delta: number): NegativeLabFrameRgbBalanceOffset => ({
-  blueWeight: Number((-delta).toFixed(2)),
-  greenWeight: 0,
-  redWeight: Number(delta.toFixed(2)),
-});

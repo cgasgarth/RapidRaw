@@ -21,6 +21,7 @@ import {
   buildNegativeLabConversionPlanResult,
   buildNegativeLabDensitometerRouteResult,
   buildNegativeLabFrameHealthRouteResult,
+  buildNegativeLabPlanRollNormalizationRouteResult,
   buildNegativeLabQcProofRouteResult,
   buildNegativeLabStockMetadataRouteResult,
   buildNegativeLabStockFamilyConversionRouteResult,
@@ -28,6 +29,10 @@ import {
   NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST,
 } from '../../../src/utils/negativeLabAppServerRoutes.ts';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../../../src/utils/negativeLabPresetCatalog.ts';
+import {
+  buildNegativeLabScanMetricsV1,
+  type NegativeLabScanMetricPixel,
+} from '../../../src/utils/negativeLabScanMetrics.ts';
 
 const expectedAcceptBatchPlanCommandName = NegativeLabAppServerCommandName.AcceptBatchPlan;
 const expectedAcceptedBatchApplyCommandName = NegativeLabAppServerCommandName.AcceptedBatchApply;
@@ -35,6 +40,7 @@ const expectedBatchSummaryCommandName = NegativeLabAppServerCommandName.BatchSum
 const expectedCommandName = NegativeLabAppServerCommandName.ConversionPlan;
 const expectedDensitometerCommandName = NegativeLabAppServerCommandName.Densitometer;
 const expectedFrameHealthCommandName = NegativeLabAppServerCommandName.FrameHealth;
+const expectedPlanRollNormalizationCommandName = NegativeLabAppServerCommandName.PlanRollNormalization;
 const expectedQcProofCommandName = NegativeLabAppServerCommandName.QcProof;
 const expectedStockMetadataCommandName = NegativeLabAppServerCommandName.StockMetadata;
 const expectedStockFamilyConversionCommandName = NegativeLabAppServerCommandName.StockFamilyConversion;
@@ -64,6 +70,9 @@ const densitometerRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
 );
 const frameHealthRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
   (candidate) => candidate.commandName === expectedFrameHealthCommandName,
+);
+const planRollNormalizationRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
+  (candidate) => candidate.commandName === expectedPlanRollNormalizationCommandName,
 );
 const qcProofRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
   (candidate) => candidate.commandName === expectedQcProofCommandName,
@@ -96,6 +105,9 @@ if (densitometerRoute === undefined) {
 if (frameHealthRoute === undefined) {
   throw new Error(`Missing Negative Lab app-server route for ${expectedFrameHealthCommandName}.`);
 }
+if (planRollNormalizationRoute === undefined) {
+  throw new Error(`Missing Negative Lab app-server route for ${expectedPlanRollNormalizationCommandName}.`);
+}
 if (qcProofRoute === undefined) {
   throw new Error(`Missing Negative Lab app-server route for ${expectedQcProofCommandName}.`);
 }
@@ -110,6 +122,13 @@ if (stockFamilyConversionRoute === undefined) {
 }
 
 const sampleRect = { height: 0.6, width: 0.12, x: 0.02, y: 0.2 };
+const buildDensityPixels = (p50: number, range: number): NegativeLabScanMetricPixel[] =>
+  Array.from({ length: 20 * 20 }, (_, index): NegativeLabScanMetricPixel => {
+    const x = index % 20;
+    const y = Math.floor(index / 20);
+    const density = Math.max(0.04, p50 + ((x + y) / 38 - 0.5) * range);
+    return { b: Math.pow(10, -density), g: Math.pow(10, -density), r: Math.pow(10, -density) };
+  });
 const densitometerReadoutSchema = z.object({
   densityRange: z.number().min(0),
   dominantChannel: z.enum(['red', 'green', 'blue']),
@@ -184,6 +203,37 @@ const batchSummaryResult = buildNegativeLabBatchSummaryRouteResult({
   baseFogConfidence: 0.82,
   includedPaths: ['/roll/001.CR3', '/roll/002.CR3'],
   previewReady: false,
+  targetPaths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
+});
+const rollNormalizationRouteResult = buildNegativeLabPlanRollNormalizationRouteResult({
+  activePathIndex: 1,
+  anchorFrameIds: ['negative-lab-frame-1'],
+  baseFogConfidence: 0.82,
+  frameScanMetrics: [
+    {
+      frameId: 'negative-lab-frame-1',
+      metrics: buildNegativeLabScanMetricsV1({
+        imageHeight: 20,
+        imageWidth: 20,
+        pixels: buildDensityPixels(0.72, 0.28),
+      }),
+      sourcePath: '/roll/001.CR3',
+    },
+    {
+      frameId: 'negative-lab-frame-2',
+      metrics: buildNegativeLabScanMetricsV1({
+        imageHeight: 20,
+        imageWidth: 20,
+        pixels: buildDensityPixels(0.31, 0.32),
+      }),
+      sourcePath: '/roll/002.CR3',
+    },
+  ],
+  includedPaths: ['/roll/001.CR3', '/roll/002.CR3'],
+  mode: 'density_and_balance',
+  preserveCreativeAdjustments: true,
+  previewReady: false,
+  selectedFrameIds: ['negative-lab-frame-1', 'negative-lab-frame-2'],
   targetPaths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
 });
 const acceptedBatchPlanResult = buildNegativeLabAcceptedBatchPlanRouteResult({
@@ -288,6 +338,16 @@ if (batchSummaryResult.plannedApplyCount !== 2 || batchSummaryResult.skippedFram
 }
 if (!batchSummaryResult.rollWarningCodes.includes('excluded_from_batch')) {
   throw new Error('Negative Lab app-server batch summary route did not roll up warnings.');
+}
+if (
+  rollNormalizationRouteResult.autoDensitySuggestionRun?.frameSuggestions.length !== 2 ||
+  rollNormalizationRouteResult.autoDensitySuggestionRun.state !== 'suggested_only' ||
+  rollNormalizationRouteResult.exposureOverrides.overrides.length !== 2 ||
+  rollNormalizationRouteResult.exposureOverrides.overrides.some((override) => override.exposureOffset === 0)
+) {
+  throw new Error(
+    'Negative Lab app-server roll normalization route did not expose auditable auto density suggestions.',
+  );
 }
 if (
   acceptedBatchPlanResult.commandName !== expectedAcceptBatchPlanCommandName ||

@@ -145,6 +145,7 @@ export const buildNegativeLabPlanRollNormalizationRouteResult = (
       anchorFrameIds: parsedCommand.anchorFrameIds,
       baselineExposure: 0,
       frameHealthReport,
+      frameScanMetrics: parsedCommand.frameScanMetrics ?? [],
       mode: parsedCommand.mode,
       preserveCreativeAdjustments: parsedCommand.preserveCreativeAdjustments,
       selectedFrameIds: parsedCommand.selectedFrameIds,
