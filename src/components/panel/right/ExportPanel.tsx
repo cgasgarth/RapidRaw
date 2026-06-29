@@ -22,6 +22,7 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { buildColorStackPreviewExportParityReceipt } from '../../../utils/colorStackPreviewExportParityReceipt';
 import { formatUnknownError } from '../../../utils/errorFormatting';
 import {
   hasStaleOrOfflineSmartPreview,
@@ -471,6 +472,30 @@ export default function ExportPanel({
         .filter(Boolean)
         .join(' · ')
     : null;
+  const colorStackParityReceipt = useMemo(
+    () =>
+      firstReceiptOutput
+        ? buildColorStackPreviewExportParityReceipt({
+            adjustments,
+            exportOutput: firstReceiptOutput,
+            exportSoftProofTransform,
+            isExportSoftProofEnabled,
+          })
+        : null,
+    [adjustments, exportSoftProofTransform, firstReceiptOutput, isExportSoftProofEnabled],
+  );
+  const colorStackParitySummary =
+    colorStackParityReceipt === null
+      ? null
+      : colorStackParityReceipt.status === 'matched'
+        ? t('export.status.colorStackParityMatched', {
+            hash: colorStackParityReceipt.activeColorStackHash,
+            profile: colorStackParityReceipt.export.effectiveColorProfile ?? t('export.status.parityUnknown'),
+          })
+        : t('export.status.colorStackParityWarning', {
+            count: colorStackParityReceipt.mismatches.length,
+            hash: colorStackParityReceipt.activeColorStackHash,
+          });
   const isExporting = status === Status.Exporting;
   const isLibraryContext = !!onClose;
   const isCurrentExternalVariantStatus = externalVariantStatus.receiptOutputPath === firstReceiptOutput?.outputPath;
@@ -1651,6 +1676,12 @@ export default function ExportPanel({
             data-export-receipt-total={lastReceipt.total}
             data-export-receipt-transform-applied={String(firstReceiptOutput.transformApplied ?? '')}
             data-export-receipt-transform-policy-fingerprint={firstReceiptOutput.transformPolicyFingerprint ?? ''}
+            data-color-stack-parity-hash={colorStackParityReceipt?.activeColorStackHash ?? ''}
+            data-color-stack-parity-mismatches={colorStackParityReceipt?.mismatches.join(',') ?? ''}
+            data-color-stack-parity-profile={colorStackParityReceipt?.export.effectiveColorProfile ?? ''}
+            data-color-stack-parity-range-count={colorStackParityReceipt?.components.selectiveColorRangeCount ?? 0}
+            data-color-stack-parity-status={colorStackParityReceipt?.status ?? ''}
+            data-color-stack-parity-tone-curve={colorStackParityReceipt?.components.toneCurve ?? ''}
             data-testid="export-success-receipt"
           >
             <UiText as="p" color={TextColors.primary} variant={TextVariants.small} weight={TextWeights.semibold}>
@@ -1735,6 +1766,16 @@ export default function ExportPanel({
                     variant={TextVariants.small}
                   >
                     {firstReceiptPolicyText}
+                  </UiText>
+                )}
+                {colorStackParityReceipt && colorStackParitySummary && (
+                  <UiText
+                    className="truncate"
+                    color={colorStackParityReceipt.status === 'matched' ? TextColors.secondary : TextColors.error}
+                    data-testid="export-success-color-stack-parity"
+                    variant={TextVariants.small}
+                  >
+                    {t('export.status.colorStackParityTitle')}: {colorStackParitySummary}
                   </UiText>
                 )}
                 {canOpenReceiptInEditor && (

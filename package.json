@@ -91,6 +91,7 @@
     "check:colorchecker-render-gate:update": "bun tests/integration/checks/check-colorchecker-render-gate.ts --update",
     "check:color-style-ui-coverage": "bun tests/integration/checks/check-color-style-ui-coverage.ts",
     "check:color-style-presets": "bun tests/integration/checks/check-color-style-presets.ts",
+    "check:color-stack-preview-export-parity": "bun tests/integration/checks/check-color-stack-preview-export-parity.ts",
     "check:professional-color-workflow-ui": "bun tests/integration/checks/check-professional-color-workflow-ui.ts",
     "check:edited-preview-scopes-ui": "bun tests/integration/checks/check-edited-preview-scopes-ui.ts",
     "check:hue-memory-color": "bun tests/integration/checks/check-hue-memory-color-gate.ts",
