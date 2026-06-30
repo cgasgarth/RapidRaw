@@ -27,6 +27,16 @@ import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { COLOR_LABELS, type Color } from '../../../utils/adjustments';
 import { buildCameraProfileProvenanceReceipt } from '../../../utils/cameraProfileProvenanceReceipt';
+import {
+  METADATA_CAMERA_GRID_KEYS,
+  METADATA_EDITABLE_FIELDS,
+  buildDefaultXmpConflictDecisions,
+  buildMetadataReadinessSummary,
+  getDisplayPreviewLutLocaleStatus,
+  hasMetadataValue,
+  type MetadataExifData,
+  type MetadataValue,
+} from '../../../utils/metadataPanelContracts';
 import { buildRawWarningChips } from '../../../utils/rawWarningReceipts';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import UiText from '../../ui/Text';
@@ -43,9 +53,6 @@ type CameraSettingKey = 'ExposureTime' | 'FNumber' | 'FocalLengthIn35mmFilm' | '
 
 type CameraSettings = Record<CameraSettingKey, CameraSetting>;
 
-type MetadataValue = string | number | null | undefined;
-
-type ExifData = Record<string, MetadataValue>;
 type ConflictDecisions = Partial<Record<XmpMetadataConflictDecision['field'], XmpMetadataConflictChoice>>;
 type DisplayProfileState =
   | { error: string; loading: false; profile: null }
@@ -211,12 +218,6 @@ function formatDisplayProfileByteCount(profile: ActiveDisplayProfile) {
   return profile.profileByteCount.toLocaleString();
 }
 
-function previewLutStatus(lut: DisplayPreviewLutStatus) {
-  if (lut.status === 'active_display_transform') return 'active';
-  if (lut.status === 'srgb_fallback_transform') return 'fallback';
-  return 'unsupported';
-}
-
 function formatCameraProfileEndpoint(warmIlluminant?: string | null, coolIlluminant?: string | null) {
   if (warmIlluminant && coolIlluminant) return `${warmIlluminant} → ${coolIlluminant}`;
   return warmIlluminant ?? coolIlluminant ?? '-';
@@ -313,14 +314,7 @@ function EditableMetadataItem({ label, value, onSave }: EditableMetadataItemProp
   );
 }
 
-const EDITABLE_FIELDS = [
-  { key: 'ImageDescription', label: 'title' },
-  { key: 'Artist', label: 'author' },
-  { key: 'Copyright', label: 'copyright' },
-  { key: 'UserComment', label: 'comments' },
-] as const;
-
-const EDITABLE_FIELD_LABEL_FALLBACKS: Record<(typeof EDITABLE_FIELDS)[number]['label'], string> = {
+const EDITABLE_FIELD_LABEL_FALLBACKS: Record<(typeof METADATA_EDITABLE_FIELDS)[number]['label'], string> = {
   author: 'Author',
   comments: 'Comments',
   copyright: 'Copyright',
@@ -352,6 +346,19 @@ const KEY_CAMERA_SETTINGS_MAP: CameraSettings = {
     label: 'Lens',
   },
 };
+
+function translateCameraGridLabel(key: (typeof METADATA_CAMERA_GRID_KEYS)[number], t: TFunction) {
+  switch (key) {
+    case 'ExposureTime':
+      return t('editor.metadata.camera.shutterSpeed');
+    case 'FNumber':
+      return t('editor.metadata.camera.aperture');
+    case 'FocalLengthIn35mmFilm':
+      return t('editor.metadata.camera.focalLength');
+    case 'PhotographicSensitivity':
+      return t('editor.metadata.camera.iso');
+  }
+}
 
 export default function MetadataPanel() {
   const { t } = useTranslation();
@@ -393,28 +400,13 @@ export default function MetadataPanel() {
   const targetPaths = multiSelectedPaths.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : [];
 
   const { cameraGridSettings, lensSetting, gpsData, otherExifEntries } = useMemo(() => {
-    const exif = (selectedImage?.exif || {}) as ExifData;
+    const exif = (selectedImage?.exif || {}) as MetadataExifData;
 
-    const cameraGridKeys: CameraSettingKey[] = [
-      'ExposureTime',
-      'FNumber',
-      'PhotographicSensitivity',
-      'FocalLengthIn35mmFilm',
-    ];
-    const cameraGridSettings: CameraGridSetting[] = cameraGridKeys.map((key) => {
+    const cameraGridSettings: CameraGridSetting[] = METADATA_CAMERA_GRID_KEYS.map((key) => {
       const value = exif[key];
-      const hasValue = value !== undefined && value !== null && value !== '';
+      const hasValue = hasMetadataValue(value);
 
-      const translatedLabel =
-        key === 'FNumber'
-          ? t('editor.metadata.camera.aperture')
-          : key === 'ExposureTime'
-            ? t('editor.metadata.camera.shutterSpeed')
-            : key === 'PhotographicSensitivity'
-              ? t('editor.metadata.camera.iso')
-              : key === 'FocalLengthIn35mmFilm'
-                ? t('editor.metadata.camera.focalLength')
-                : '';
+      const translatedLabel = translateCameraGridLabel(key, t);
 
       const cameraSetting = KEY_CAMERA_SETTINGS_MAP[key];
       return {
@@ -425,7 +417,7 @@ export default function MetadataPanel() {
     });
 
     const lensValue = exif['LensModel'];
-    const hasLensValue = lensValue !== undefined && lensValue !== null && lensValue !== '';
+    const hasLensValue = hasMetadataValue(lensValue);
     const lensSetting = {
       key: 'LensModel',
       label: t('editor.metadata.camera.lens'),
@@ -452,7 +444,7 @@ export default function MetadataPanel() {
       }
     }
 
-    const handledKeys = [...cameraGridKeys, 'LensModel', ...EDITABLE_FIELDS.map((f) => f.key)];
+    const handledKeys = [...METADATA_CAMERA_GRID_KEYS, 'LensModel', ...METADATA_EDITABLE_FIELDS.map((f) => f.key)];
     const otherExifEntries = Object.entries(exif)
       .filter(([key]) => !handledKeys.includes(key))
       .sort(([keyA], [keyB]) => keyA.localeCompare(keyB));
@@ -495,8 +487,11 @@ export default function MetadataPanel() {
       ),
     [rawDevelopmentReport, t],
   );
-  const populatedCameraFieldCount = cameraGridSettings.filter((setting) => setting.value !== '-').length;
-  const editableMetadataFieldCount = EDITABLE_FIELDS.length;
+  const metadataReadiness = buildMetadataReadinessSummary({
+    exif: selectedImage?.exif || {},
+    gpsCoordinates,
+    selectionCount: targetPaths.length,
+  });
 
   useEffect(() => {
     let isActive = true;
@@ -561,11 +556,7 @@ export default function MetadataPanel() {
         }
 
         setXmpConflictReport(result);
-        setXmpConflictDecisions(
-          Object.fromEntries(
-            result.fields.map((field) => [field.field, field.field === 'keywords' ? 'merge' : 'external']),
-          ),
-        );
+        setXmpConflictDecisions(buildDefaultXmpConflictDecisions(result));
       } catch (err) {
         if (isActive) {
           console.error('Failed to check XMP conflicts:', err);
@@ -707,10 +698,10 @@ export default function MetadataPanel() {
           <div className="flex flex-col gap-6">
             <section
               className="grid grid-cols-2 gap-2 rounded-md border border-surface bg-bg-secondary/70 p-2 text-xs"
-              data-camera-field-count={populatedCameraFieldCount}
-              data-editable-field-count={editableMetadataFieldCount}
-              data-gps-ready={String(gpsCoordinates !== null)}
-              data-selection-count={targetPaths.length}
+              data-camera-field-count={metadataReadiness.cameraFieldCount}
+              data-editable-field-count={metadataReadiness.editableFieldCount}
+              data-gps-ready={String(metadataReadiness.gpsReady)}
+              data-selection-count={metadataReadiness.selectionCount}
               data-testid="metadata-readiness-summary"
             >
               <UiText
@@ -718,21 +709,21 @@ export default function MetadataPanel() {
                 variant={TextVariants.small}
                 className="rounded bg-bg-primary px-2 py-1 text-text-secondary"
               >
-                {t('editor.metadata.readiness.selectionCount', { count: targetPaths.length })}
+                {t('editor.metadata.readiness.selectionCount', { count: metadataReadiness.selectionCount })}
               </UiText>
               <UiText
                 as="span"
                 variant={TextVariants.small}
                 className="rounded bg-bg-primary px-2 py-1 text-text-secondary"
               >
-                {t('editor.metadata.readiness.cameraFields', { count: populatedCameraFieldCount })}
+                {t('editor.metadata.readiness.cameraFields', { count: metadataReadiness.cameraFieldCount })}
               </UiText>
               <UiText
                 as="span"
                 variant={TextVariants.small}
                 className="rounded bg-bg-primary px-2 py-1 text-text-secondary"
               >
-                {gpsCoordinates === null
+                {!metadataReadiness.gpsReady
                   ? t('editor.metadata.readiness.gpsMissing')
                   : t('editor.metadata.readiness.gpsReady')}
               </UiText>
@@ -741,7 +732,7 @@ export default function MetadataPanel() {
                 variant={TextVariants.small}
                 className="rounded bg-bg-primary px-2 py-1 text-text-secondary"
               >
-                {t('editor.metadata.readiness.editableFields', { count: editableMetadataFieldCount })}
+                {t('editor.metadata.readiness.editableFields', { count: metadataReadiness.editableFieldCount })}
               </UiText>
             </section>
             <section
@@ -815,7 +806,7 @@ export default function MetadataPanel() {
                         ? displayPreviewLutState.loading
                           ? 'loading'
                           : 'error'
-                        : previewLutStatus(displayPreviewLutState.lut)
+                        : getDisplayPreviewLutLocaleStatus(displayPreviewLutState.lut)
                     }
                     data-testid="metadata-display-preview-lut-status"
                   >
@@ -823,7 +814,7 @@ export default function MetadataPanel() {
                       ? t('editor.metadata.displayProfile.loading')
                       : displayPreviewLutState.lut
                         ? t(
-                            `editor.metadata.displayProfile.previewLutStatus.${previewLutStatus(displayPreviewLutState.lut)}`,
+                            `editor.metadata.displayProfile.previewLutStatus.${getDisplayPreviewLutLocaleStatus(displayPreviewLutState.lut)}`,
                           )
                         : t('editor.metadata.displayProfile.status.error')}
                   </UiText>
@@ -1249,7 +1240,7 @@ export default function MetadataPanel() {
                       className="overflow-hidden"
                     >
                       <div className="px-2 pb-3 pt-2 border-t border-surface/50 flex flex-col gap-0.5">
-                        {EDITABLE_FIELDS.map((field) => {
+                        {METADATA_EDITABLE_FIELDS.map((field) => {
                           const rawValue = selectedImage.exif?.[field.key] || '';
                           const cleanValue = rawValue.replace(/^"|"$/g, '').trim();
                           const displayValue = cleanValue.toLowerCase() === 'default' ? '' : cleanValue;
