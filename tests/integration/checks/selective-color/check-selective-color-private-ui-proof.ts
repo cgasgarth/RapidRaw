@@ -4,7 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { rawOpenEditExportProofRequestSchema } from '../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
+import { rawOpenEditExportProofRequestSchema } from '../../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
 
 const RAW_PROOF_REPORT_PATH = 'docs/validation/proofs/color-selective/selective-color-local-raw-proof-2026-06-20.json';
 const REQUEST_PATH = 'fixtures/validation/professional-color-workflow/selective-color-raw-proof-request.json';
@@ -188,7 +188,7 @@ if (update) {
 const committedReport = uiProofReportSchema.parse(JSON.parse(await readFile(UI_PROOF_REPORT_PATH, 'utf8')));
 if (JSON.stringify(committedReport) !== JSON.stringify(expectedReport)) {
   throw new Error(
-    `Selective color private UI proof is stale. Run bun tests/integration/checks/check-selective-color-private-ui-proof.ts --update`,
+    `Selective color private UI proof is stale. Run bun tests/integration/checks/selective-color/check-selective-color-private-ui-proof.ts --update`,
   );
 }
 

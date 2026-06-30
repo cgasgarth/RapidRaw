@@ -10,7 +10,7 @@ import {
   calculateSelectiveColorMaskWeight,
   type RgbPixel,
   renderSelectiveColorMaskPreviewPixel,
-} from '../../../src/utils/selectiveColorRuntime.ts';
+} from '../../../../src/utils/selectiveColorRuntime.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/color-selective/selective-color-range-preview-apply-2026-06-21.json';
 const UPDATE_REPORT = process.argv.includes('--update');

@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { SELECTIVE_COLOR_RANGES } from '../../../src/utils/selectiveColorRanges.ts';
+import { SELECTIVE_COLOR_RANGES } from '../../../../src/utils/selectiveColorRanges.ts';
 
 const FIXTURE_PATH = 'fixtures/color/selective-color/selective-color-ranges.json';
 const SHADER_PATH = 'src-tauri/src/shaders/shader.wgsl';

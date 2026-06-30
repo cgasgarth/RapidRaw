@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { createSelectiveColorMaskSelection } from '../../../src/utils/selectiveColorMask.ts';
+import { createSelectiveColorMaskSelection } from '../../../../src/utils/selectiveColorMask.ts';
 
 const FIXTURE_PATH = 'fixtures/color/selective-color/selective-color-mask-fixtures.json';
 

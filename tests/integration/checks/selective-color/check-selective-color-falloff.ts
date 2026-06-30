@@ -3,8 +3,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
-import { calculateSelectiveColorInfluence } from '../../../src/utils/selectiveColorFalloff.ts';
-import { applySelectiveColorToRgbPixel } from '../../../src/utils/selectiveColorRuntime.ts';
+import { calculateSelectiveColorInfluence } from '../../../../src/utils/selectiveColorFalloff.ts';
+import { applySelectiveColorToRgbPixel } from '../../../../src/utils/selectiveColorRuntime.ts';
 
 const FIXTURE_PATH = 'fixtures/color/selective-color/selective-color-falloff-fixtures.json';
 const REPORT_PATH = 'docs/validation/proofs/color-selective/selective-color-apply-proof-2026-06-18.json';
@@ -173,7 +173,7 @@ if (UPDATE_REPORT) {
   const expectedReport = reportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
   if (JSON.stringify(expectedReport) !== JSON.stringify(report)) {
     failures.push(
-      `${REPORT_PATH} is stale; run bun tests/integration/checks/check-selective-color-falloff.ts --update`,
+      `${REPORT_PATH} is stale; run bun tests/integration/checks/selective-color/check-selective-color-falloff.ts --update`,
     );
   }
 }
