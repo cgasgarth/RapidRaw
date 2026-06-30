@@ -111,6 +111,12 @@ const Slider = ({
   }, [rangeValue, max, min, onChange, snapToStep]);
 
   useEffect(() => {
+    if (!isDragging && !isWheelActive) {
+      setDisplayValue(value);
+    }
+  }, [isDragging, isWheelActive, value]);
+
+  useEffect(() => {
     onDragStateChange(isDragging);
   }, [isDragging, onDragStateChange]);
 
@@ -130,7 +136,7 @@ const Slider = ({
 
       const clampedValue = Math.max(min, Math.min(max, roundedNewValue));
 
-      if (clampedValue !== value && !isNaN(clampedValue)) {
+      if (clampedValue !== value && !Number.isNaN(clampedValue)) {
         setIsWheelActive(true);
         setDisplayValue(clampedValue);
 
@@ -245,7 +251,7 @@ const Slider = ({
     onChange(syntheticEvent);
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRangeValueChange = (e: React.FormEvent<HTMLInputElement>) => {
     if (disabled) {
       return;
     }
@@ -255,8 +261,12 @@ const Slider = ({
     }
 
     if (!isDragging) {
-      setDisplayValue(Number(e.target.value));
-      onChange(e);
+      setDisplayValue(Number(e.currentTarget.value));
+      onChange({
+        target: {
+          value: e.currentTarget.value,
+        },
+      });
     }
   };
 
@@ -377,7 +387,7 @@ const Slider = ({
     setInputValue(textVal);
     const parseableText = textVal.replace(',', '.');
     const parsedValue = parseFloat(parseableText);
-    if (!isNaN(parsedValue)) {
+    if (!Number.isNaN(parsedValue)) {
       const clampedValue = Math.max(min, Math.min(max, parsedValue));
       onChange({
         target: {
@@ -389,7 +399,7 @@ const Slider = ({
 
   const handleInputCommit = () => {
     let newValue = parseFloat(inputValue.replace(',', '.'));
-    if (isNaN(newValue)) {
+    if (Number.isNaN(newValue)) {
       newValue = value;
     } else {
       newValue = Math.max(min, Math.min(max, newValue));
@@ -414,7 +424,7 @@ const Slider = ({
     } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault();
       let currentNum = parseFloat(inputValue.replace(',', '.'));
-      if (isNaN(currentNum)) {
+      if (Number.isNaN(currentNum)) {
         currentNum = value;
       }
       const direction = e.key === 'ArrowUp' ? 1 : -1;
@@ -539,7 +549,7 @@ const Slider = ({
           style={{ margin: 0, touchAction: isDragging ? 'none' : 'pan-y' }}
           max={String(max)}
           min={String(min)}
-          onChange={handleChange}
+          onInput={handleRangeValueChange}
           onDoubleClick={handleReset}
           onKeyDown={handleRangeKeyDown}
           onMouseDown={handleMouseDown}
