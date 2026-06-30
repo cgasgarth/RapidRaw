@@ -55,7 +55,10 @@ import { Invokes } from '../../../../tauri/commands';
 import { TextColors, TextVariants, TextWeights } from '../../../../types/typography';
 import { ADJUSTMENT_GROUPS, type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../utils/adjustments';
 import { createBlobFromUint8Array } from '../../../../utils/blobUtils';
-import { BUILT_IN_COLOR_STYLE_PRESETS, COLOR_STYLE_PRESET_CATALOG } from '../../../../utils/colorStylePresetCatalog';
+import {
+  BUILT_IN_COLOR_STYLE_PRESETS,
+  COLOR_STYLE_PRESET_CATALOG,
+} from '../../../../utils/color/style/colorStylePresetCatalog';
 import ConfigurePresetModal from '../../../modals/library/ConfigurePresetModal';
 import CreateFolderModal from '../../../modals/library/CreateFolderModal';
 import RenameFolderModal from '../../../modals/library/RenameFolderModal';

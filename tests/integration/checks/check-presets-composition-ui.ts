@@ -15,7 +15,10 @@ import { useEditorStore } from '../../../src/store/useEditorStore';
 import { useUIStore } from '../../../src/store/useUIStore';
 import { Invokes } from '../../../src/tauri/commands';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { BUILT_IN_COLOR_STYLE_PRESETS, COLOR_STYLE_PRESET_CATALOG } from '../../../src/utils/colorStylePresetCatalog';
+import {
+  BUILT_IN_COLOR_STYLE_PRESETS,
+  COLOR_STYLE_PRESET_CATALOG,
+} from '../../../src/utils/color/style/colorStylePresetCatalog';
 
 type RenderedPanel = {
   container: HTMLDivElement;
