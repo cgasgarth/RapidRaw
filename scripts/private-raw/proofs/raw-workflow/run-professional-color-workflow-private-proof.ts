@@ -10,7 +10,7 @@ import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../.
 import { resolvePrivateRawRootSource } from '../../../lib/private-raw/root-source.ts';
 
 const FIXTURE_ID = 'validation.raw-open-edit-export.professional-color.v1';
-const REQUEST_PATH = 'fixtures/validation/professional-color-workflow-proof-request.json';
+const REQUEST_PATH = 'fixtures/validation/professional-color-workflow/professional-color-workflow-proof-request.json';
 const SOURCE_RELATIVE_PATH = 'private-fixtures/color/professional-workflow-v1/alaska-dsc7853.arw';
 
 const argsSchema = z

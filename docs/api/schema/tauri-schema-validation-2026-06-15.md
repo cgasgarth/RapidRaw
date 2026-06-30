@@ -7,7 +7,7 @@ Status: partial runtime boundary coverage.
 - Adds a reusable `invokeWithSchema` helper that invokes Tauri with `unknown` response typing, parses with Zod, and throws a bounded diagnostic on failure.
 - Adds a recursive Zod schema for folder tree payloads.
 - Routes `get_folder_children` through the helper before the folder tree state is updated.
-- Adds a Tauri boundary ledger at `fixtures/validation/tauri-boundary-ledger.json`.
+- Adds a Tauri boundary ledger at `fixtures/validation/app-server/tauri-boundary-ledger.json`.
 - Adds positive and negative parse fixtures for `get_folder_children` and
   `get_albums`.
 

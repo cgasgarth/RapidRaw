@@ -17,12 +17,12 @@ const failures: string[] = [];
 assertPipeline('schema sample tone/color command', sampleToneColorCommandEnvelopeV1.colorPipeline);
 
 const headlessRequest = headlessRenderRequestSchema.parse(
-  await readJson('fixtures/validation/headless-render-command-request.json'),
+  await readJson('fixtures/validation/render-requests/headless-render-command-request.json'),
 );
 assertPipeline('headless render command request', headlessRequest.command.colorPipeline);
 
 const rawOpenEditExportRequest = rawOpenEditExportProofRequestSchema.parse(
-  await readJson('fixtures/validation/raw-open-edit-export-proof-request.json'),
+  await readJson('fixtures/validation/raw-open-edit-export/raw-open-edit-export-proof-request.json'),
 );
 assertPipeline('RAW open/edit/export command request', rawOpenEditExportRequest.editCommand.colorPipeline);
 

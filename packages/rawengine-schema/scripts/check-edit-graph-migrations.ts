@@ -23,7 +23,7 @@ const policySchema = z
   .strict();
 
 const policy = policySchema.parse(
-  JSON.parse(await readFile('fixtures/validation/edit-graph-migration-policy.json', 'utf8')),
+  JSON.parse(await readFile('fixtures/validation/compatibility/edit-graph-migration-policy.json', 'utf8')),
 );
 
 const legacyDocument = {

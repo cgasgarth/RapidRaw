@@ -31,7 +31,7 @@ const panoramaRoutePair = getComputationalMergeAppServerRoutePairSummary('panora
 const focusRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
 const superResolutionRoutePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');
 const manifest = parseComputationalMergeE2eProofManifest(
-  JSON.parse(await readFile('fixtures/validation/computational-merge-e2e-proof.json', 'utf8')),
+  JSON.parse(await readFile('fixtures/validation/app-server/computational-merge-e2e-proof.json', 'utf8')),
 );
 const ledger = parsePrivateRawEvidenceLedger(
   JSON.parse(await readFile('fixtures/detail/proofs/private-raw-evidence-ledger.json', 'utf8')),

@@ -13,7 +13,7 @@ const [wrapperSource, commandsSource, rustSource, rustLibSource, proofRequestFix
   readFile('src/tauri/commands.ts', 'utf8'),
   readFile('src-tauri/src/raw_open_edit_export_proof.rs', 'utf8'),
   readFile('src-tauri/src/lib.rs', 'utf8'),
-  readFile('fixtures/validation/raw-open-edit-export-proof-request.json', 'utf8'),
+  readFile('fixtures/validation/raw-open-edit-export/raw-open-edit-export-proof-request.json', 'utf8'),
 ]);
 
 const failures: string[] = [];

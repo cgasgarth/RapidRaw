@@ -34,7 +34,7 @@ const fixtureSchema = z
   .strict();
 
 const fixture = fixtureSchema.parse(
-  JSON.parse(readFileSync('fixtures/validation/basic-tone-command-envelope-compatibility.json', 'utf8')),
+  JSON.parse(readFileSync('fixtures/validation/compatibility/basic-tone-command-envelope-compatibility.json', 'utf8')),
 );
 const command = buildBasicToneCommandEnvelope(
   fixture.legacyAdjustmentPayload,

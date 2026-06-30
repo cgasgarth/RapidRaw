@@ -12,7 +12,7 @@ import {
 } from '../../../src/schemas/computationalMergePrivateRunReportSchemas.ts';
 
 const manifest = parseComputationalMergeE2eProofManifest(
-  await Bun.file('fixtures/validation/computational-merge-e2e-proof.json').json(),
+  await Bun.file('fixtures/validation/app-server/computational-merge-e2e-proof.json').json(),
 );
 const proofCase = manifest.proofCases[0];
 if (proofCase === undefined) throw new Error('Missing computational merge proof case fixture.');
