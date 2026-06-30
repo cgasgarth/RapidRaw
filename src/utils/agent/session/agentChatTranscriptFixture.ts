@@ -1,4 +1,4 @@
-import { type AgentChatTranscript, agentChatTranscriptSchema } from '../schemas/agent/agentChatTranscriptSchemas';
+import { type AgentChatTranscript, agentChatTranscriptSchema } from '../../../schemas/agent/agentChatTranscriptSchemas';
 
 const fixture = {
   artifactReview: {

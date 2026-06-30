@@ -60,7 +60,7 @@ import {
   INITIAL_MASK_ADJUSTMENTS,
   type MaskContainer,
 } from '../../utils/adjustments';
-import { agentChatTranscriptFixture } from '../../utils/agentChatTranscriptFixture';
+import { agentChatTranscriptFixture } from '../../utils/agent/session/agentChatTranscriptFixture';
 import { lookupCameraProfile } from '../../utils/cameraProfileLookup';
 import { applyBlackWhiteMixerToRgbPixel } from '../../utils/color/runtime/blackWhiteMixerRuntime';
 import {

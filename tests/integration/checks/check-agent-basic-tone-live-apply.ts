@@ -4,7 +4,7 @@ import { RawStatus, SortDirection } from '../../../src/components/ui/AppProperti
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { useLibraryStore } from '../../../src/store/useLibraryStore.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-import { applyBasicToneToLiveEditor } from '../../../src/utils/agentLiveBasicTone.ts';
+import { applyBasicToneToLiveEditor } from '../../../src/utils/agent/session/agentLiveBasicTone.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3155.ARW';
 

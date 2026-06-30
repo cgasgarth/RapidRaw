@@ -60,6 +60,13 @@ import {
 } from '../schemas/agent/agentRuntimeSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import {
+  AGENT_HISTORY_ROLLBACK_INPUT_SCHEMA_NAME,
+  AGENT_HISTORY_ROLLBACK_OUTPUT_SCHEMA_NAME,
+  AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+  agentHistoryRollbackRequestSchema,
+  rollbackAgentSessionHistory,
+} from './agent/session/agentSessionHistory';
+import {
   AGENT_ADJUSTMENTS_APPLY_INPUT_SCHEMA_NAME,
   AGENT_ADJUSTMENTS_APPLY_OUTPUT_SCHEMA_NAME,
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
@@ -172,13 +179,6 @@ import {
   agentRetouchApplyRequestSchema,
   applyAgentRetouch,
 } from './agentRetouchApplyTool';
-import {
-  AGENT_HISTORY_ROLLBACK_INPUT_SCHEMA_NAME,
-  AGENT_HISTORY_ROLLBACK_OUTPUT_SCHEMA_NAME,
-  AGENT_HISTORY_ROLLBACK_TOOL_NAME,
-  agentHistoryRollbackRequestSchema,
-  rollbackAgentSessionHistory,
-} from './agentSessionHistory';
 import { AI_APP_SERVER_TOOL_ROUTES } from './ai/aiAppServerToolRoutes';
 import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from './computational-merge/computationalMergeAppServerRoutes';
 import { DETAIL_APP_SERVER_ROUTES } from './detailAppServerRoutes';

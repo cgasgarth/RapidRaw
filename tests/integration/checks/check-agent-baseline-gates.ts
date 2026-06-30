@@ -12,6 +12,7 @@ import {
 } from '../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { AGENT_HISTORY_ROLLBACK_TOOL_NAME } from '../../../src/utils/agent/session/agentSessionHistory.ts';
 import {
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
   AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
@@ -27,7 +28,6 @@ import {
   AGENT_STATE_GET_TOOL_NAME,
 } from '../../../src/utils/agentReadOnlyAppServerTools.ts';
 import { AGENT_RETOUCH_APPLY_TOOL_NAME } from '../../../src/utils/agentRetouchApplyTool.ts';
-import { AGENT_HISTORY_ROLLBACK_TOOL_NAME } from '../../../src/utils/agentSessionHistory.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   createRawEngineAppServerSupervisorState,

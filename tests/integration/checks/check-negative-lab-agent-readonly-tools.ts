@@ -4,7 +4,7 @@ import { ToolType } from '../../../src/components/panel/right/layers/Masks.tsx';
 import { RawEngineAppServerRouteMode } from '../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-import { dispatchAgentLiveEditorTool } from '../../../src/utils/agentLiveToolDispatch.ts';
+import { dispatchAgentLiveEditorTool } from '../../../src/utils/agent/session/agentLiveToolDispatch.ts';
 import {
   NEGATIVE_LAB_AGENT_CONVERSION_PLAN_TOOL_NAME,
   NEGATIVE_LAB_AGENT_INSPECT_TOOL_NAME,

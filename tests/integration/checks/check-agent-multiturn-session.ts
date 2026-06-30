@@ -6,7 +6,7 @@ import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustmen
 import {
   agentMultiTurnAppServerSessionRequestSchema,
   runAgentMultiTurnAppServerSession,
-} from '../../../src/utils/agentMultiTurnAppServerSession.ts';
+} from '../../../src/utils/agent/session/agentMultiTurnAppServerSession.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3164.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 12 : 2));

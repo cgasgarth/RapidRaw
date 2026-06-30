@@ -5,15 +5,15 @@ import { RawEngineAppServerRouteMode } from '../../../../src/schemas/agent/agent
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
 import {
+  AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+  createAgentSessionCheckpoint,
+  rollbackAgentSessionHistory,
+} from '../../../../src/utils/agent/session/agentSessionHistory.ts';
+import {
   applyAgentGlobalAdjustments,
   dryRunAgentGlobalAdjustments,
 } from '../../../../src/utils/agentAdjustmentApplyTool.ts';
 import { buildAgentImageContextSnapshot } from '../../../../src/utils/agentImageContextSnapshot.ts';
-import {
-  AGENT_HISTORY_ROLLBACK_TOOL_NAME,
-  createAgentSessionCheckpoint,
-  rollbackAgentSessionHistory,
-} from '../../../../src/utils/agentSessionHistory.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../../../../src/utils/rawEngineAppServerHost.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3163.ARW';

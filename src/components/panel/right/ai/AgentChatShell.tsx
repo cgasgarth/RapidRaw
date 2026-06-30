@@ -29,6 +29,18 @@ import type {
   AgentSelectedImagePreviewLoopReview,
 } from '../../../../schemas/agent/agentChatTranscriptSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
+import { dispatchAgentLiveEditorTool } from '../../../../utils/agent/session/agentLiveToolDispatch';
+import {
+  type AgentMultiTurnAppServerSessionRequest,
+  type AgentMultiTurnAppServerSessionResult,
+  runAgentMultiTurnAppServerSession,
+} from '../../../../utils/agent/session/agentMultiTurnAppServerSession';
+import {
+  type AgentSessionAuditRecord,
+  type AgentSessionAuditStorageAdapter,
+  appendAgentSessionAuditRecord,
+} from '../../../../utils/agent/session/agentSessionAuditStore';
+import { AGENT_HISTORY_ROLLBACK_TOOL_NAME } from '../../../../utils/agent/session/agentSessionHistory';
 import { buildAgentAppServerToolReadinessSummary } from '../../../../utils/agentAppServerToolReadiness';
 import { runAgentBoundedEditPlannerLoop } from '../../../../utils/agentBoundedEditPlannerLoop';
 import { AGENT_COLOR_APPLY_TOOL_NAME } from '../../../../utils/agentColorApplyTool';
@@ -49,12 +61,6 @@ import {
   AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
 } from '../../../../utils/agentLayerMaskTools';
-import { dispatchAgentLiveEditorTool } from '../../../../utils/agentLiveToolDispatch';
-import {
-  type AgentMultiTurnAppServerSessionRequest,
-  type AgentMultiTurnAppServerSessionResult,
-  runAgentMultiTurnAppServerSession,
-} from '../../../../utils/agentMultiTurnAppServerSession';
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
@@ -66,12 +72,6 @@ import {
   evaluateAgentSafetyPolicy,
   inferAgentSafetyOperationKind,
 } from '../../../../utils/agentSafetyPolicy';
-import {
-  type AgentSessionAuditRecord,
-  type AgentSessionAuditStorageAdapter,
-  appendAgentSessionAuditRecord,
-} from '../../../../utils/agentSessionAuditStore';
-import { AGENT_HISTORY_ROLLBACK_TOOL_NAME } from '../../../../utils/agentSessionHistory';
 
 interface AgentChatShellProps {
   transcript: AgentChatTranscript;

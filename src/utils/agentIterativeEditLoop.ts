@@ -1,5 +1,11 @@
 import { z } from 'zod';
-
+import { dispatchAgentLiveEditorTool } from './agent/session/agentLiveToolDispatch';
+import {
+  AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+  agentHistoryRollbackResponseSchema,
+  createAgentSessionCheckpoint,
+  rollbackAgentSessionHistory,
+} from './agent/session/agentSessionHistory';
 import {
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
   AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
@@ -7,7 +13,6 @@ import {
   agentAdjustmentsDryRunResponseSchema,
 } from './agentAdjustmentApplyTool';
 import { agentEditQualityReviewSchema, buildAgentEditQualityReview } from './agentEditQualityReview';
-import { dispatchAgentLiveEditorTool } from './agentLiveToolDispatch';
 import { agentPreviewEnvelopeSchema } from './agentPreviewEnvelope';
 import {
   AGENT_PREVIEW_COMPARE_TOOL_NAME,
@@ -17,12 +22,6 @@ import {
   agentPreviewRenderResponseSchema,
   agentStateGetResponseSchema,
 } from './agentReadOnlyAppServerTools';
-import {
-  AGENT_HISTORY_ROLLBACK_TOOL_NAME,
-  agentHistoryRollbackResponseSchema,
-  createAgentSessionCheckpoint,
-  rollbackAgentSessionHistory,
-} from './agentSessionHistory';
 
 const agentLoopAdjustmentPatchSchema = z
   .object({
