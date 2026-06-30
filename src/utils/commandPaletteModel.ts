@@ -167,6 +167,7 @@ export const commandPanelMap = {
 
 export type CommandPaletteDisabledReasonKey =
   | 'modals.commandPalette.unavailable.selectImage'
+  | 'modals.commandPalette.unavailable.selectEditorImage'
   | 'modals.commandPalette.unavailable.selectSource';
 
 export interface CommandPaletteUiState {
@@ -214,9 +215,13 @@ export interface CommandPaletteActionContext {
 
 export function getCommandPaletteSelectedPaths(
   multiSelectedPaths: string[],
+  libraryActivePath: string | null,
   selectedImage: SelectedImage | null,
 ): string[] {
-  return multiSelectedPaths.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : [];
+  if (multiSelectedPaths.length > 0) return multiSelectedPaths;
+  if (selectedImage) return [selectedImage.path];
+  if (libraryActivePath) return [libraryActivePath];
+  return [];
 }
 
 export function getCommandPaletteSelectedImages(imageList: ImageFile[], selectedCommandPaths: string[]): ImageFile[] {
@@ -237,7 +242,9 @@ export function getCommandPaletteDisabledReasonKey(
     return 'modals.commandPalette.unavailable.selectSource';
   }
   if (command.requiresEditorImage && !selectedImage) {
-    return 'modals.commandPalette.unavailable.selectImage';
+    return selectedCommandPaths.length > 0
+      ? 'modals.commandPalette.unavailable.selectEditorImage'
+      : 'modals.commandPalette.unavailable.selectImage';
   }
   return null;
 }

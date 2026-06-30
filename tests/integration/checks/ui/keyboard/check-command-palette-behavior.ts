@@ -31,6 +31,7 @@ assertCommandsAreRegistered();
 assertSelectedSourceBehavior();
 assertUnavailableReasons();
 assertWorkflowActionsOpenModalsWithSelectedSources();
+assertLibraryOnlySelectionUsesActivePath();
 assertLensAndTransformActionsOpenCropModals();
 assertMergeActionsResetStaleOutputAndPreserveSources();
 
@@ -46,9 +47,12 @@ function assertCommandsAreRegistered() {
 }
 
 function assertSelectedSourceBehavior() {
-  assert.deepEqual(getCommandPaletteSelectedPaths([], selectedImage), [imageA.path]);
-  assert.deepEqual(getCommandPaletteSelectedPaths([imageB.path], selectedImage), [imageB.path]);
-  assert.deepEqual(getCommandPaletteSelectedPaths([], null), []);
+  assert.deepEqual(getCommandPaletteSelectedPaths([], null, selectedImage), [imageA.path]);
+  assert.deepEqual(getCommandPaletteSelectedPaths([imageB.path], null, selectedImage), [imageB.path]);
+  assert.deepEqual(getCommandPaletteSelectedPaths([], '/photos/library-active.ARW', null), [
+    '/photos/library-active.ARW',
+  ]);
+  assert.deepEqual(getCommandPaletteSelectedPaths([], null, null), []);
 
   const images = Array.from({ length: 12 }, (_, index) => makeImage(`/photos/${index}.ARW`));
   const selectedPaths = images.map((image) => image.path);
@@ -63,10 +67,14 @@ function assertUnavailableReasons() {
   assert.equal(reasonFor('culling', [], [], selectedImage), 'modals.commandPalette.unavailable.selectSource');
   assert.equal(reasonFor('negativeLab', [], [], selectedImage), 'modals.commandPalette.unavailable.selectSource');
   assert.equal(reasonFor('denoise', [], [], selectedImage), 'modals.commandPalette.unavailable.selectSource');
-  assert.equal(reasonFor('denoise', [imageA], [imageA.path], null), 'modals.commandPalette.unavailable.selectImage');
+  assert.equal(reasonFor('lensCorrection', [], [], null), 'modals.commandPalette.unavailable.selectImage');
   assert.equal(
-    reasonFor('lensCorrection', [imageA], [imageA.path], null),
-    'modals.commandPalette.unavailable.selectImage',
+    reasonFor('denoise', [imageA], [], null, [imageA.path]),
+    'modals.commandPalette.unavailable.selectEditorImage',
+  );
+  assert.equal(
+    reasonFor('lensCorrection', [imageA], [], null, [imageA.path]),
+    'modals.commandPalette.unavailable.selectEditorImage',
   );
   assert.equal(reasonFor('negativeLab', [imageA], [imageA.path], null), null);
 }
@@ -92,6 +100,24 @@ function assertWorkflowActionsOpenModalsWithSelectedSources() {
   assert.deepEqual(runCommand('negativeLab').state.negativeModalState, {
     isOpen: true,
     targetPaths: [imageA.path, imageB.path],
+  });
+}
+
+function assertLibraryOnlySelectionUsesActivePath() {
+  const activePath = imageA.path;
+  const collage = runCommand('collage', {
+    libraryActivePath: activePath,
+    selectedImage: null,
+  }).state.collageModalState;
+  assert.deepEqual(collage, { isOpen: true, sourceImages: [imageA] });
+
+  const negativeLab = runCommand('negativeLab', {
+    libraryActivePath: activePath,
+    selectedImage: null,
+  }).state.negativeModalState;
+  assert.deepEqual(negativeLab, {
+    isOpen: true,
+    targetPaths: [activePath],
   });
 }
 
@@ -164,6 +190,7 @@ function assertMergeActionsResetStaleOutputAndPreserveSources() {
 function runCommand(
   commandId: (typeof commandPaletteCommands)[number]['id'],
   overrides: {
+    libraryActivePath?: string | null;
     selectedCommandImages?: ImageFile[];
     selectedCommandPaths?: string[];
     selectedImage?: SelectedImage | null;
@@ -173,14 +200,18 @@ function runCommand(
   const panels: Array<Panel | null> = [];
   const command = commandPaletteCommands.find((candidate) => candidate.id === commandId);
   assert.ok(command, `missing command fixture: ${commandId}`);
+  const selectedCommandPaths =
+    overrides.selectedCommandPaths ??
+    (overrides.libraryActivePath ? [overrides.libraryActivePath] : [imageA.path, imageB.path]);
 
   const action = createCommandPaletteAction(command, {
     imageList: [imageA, imageB],
     onBackToLibrary: () => {
       state.backToLibraryCalled = true;
     },
-    selectedCommandImages: overrides.selectedCommandImages ?? [imageA, imageB],
-    selectedCommandPaths: overrides.selectedCommandPaths ?? [imageA.path, imageB.path],
+    selectedCommandImages:
+      overrides.selectedCommandImages ?? getCommandPaletteSelectedImages([imageA, imageB], selectedCommandPaths),
+    selectedCommandPaths,
     selectedImage: overrides.selectedImage === undefined ? selectedImage : overrides.selectedImage,
     setRightPanel: (panel) => {
       panels.push(panel);
@@ -201,10 +232,20 @@ function reasonFor(
   selectedCommandImages: ImageFile[],
   selectedCommandPaths: string[],
   currentSelectedImage: SelectedImage | null,
+  libraryActivePath: string | null = null,
 ) {
   const command = commandPaletteCommands.find((candidate) => candidate.id === commandId);
   assert.ok(command, `missing command fixture: ${commandId}`);
-  return getCommandPaletteDisabledReasonKey(command, selectedCommandImages, selectedCommandPaths, currentSelectedImage);
+  return getCommandPaletteDisabledReasonKey(
+    command,
+    selectedCommandImages,
+    selectedCommandPaths.length > 0
+      ? selectedCommandPaths
+      : libraryActivePath
+        ? [libraryActivePath]
+        : selectedCommandPaths,
+    currentSelectedImage,
+  );
 }
 
 function makeUiState(): CommandPaletteUiState {
