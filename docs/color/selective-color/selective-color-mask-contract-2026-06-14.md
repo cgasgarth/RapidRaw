@@ -30,6 +30,6 @@ and clamped range-mask conversion cases.
 - `bun run check:types`
 - `bunx eslint src/utils/selectiveColorMask.ts tests/integration/checks/check-selective-color-mask-fixtures.ts --max-warnings 0`
 - `bun run check:unsafe-casts`
-- `bunx prettier --check src/utils/selectiveColorMask.ts tests/integration/checks/check-selective-color-mask-fixtures.ts fixtures/color/selective-color-mask-fixtures.json docs/color/selective-color/selective-color-mask-contract-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
+- `bunx prettier --check src/utils/selectiveColorMask.ts tests/integration/checks/check-selective-color-mask-fixtures.ts fixtures/color/selective-color/selective-color-mask-fixtures.json docs/color/selective-color/selective-color-mask-contract-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
 - `bun tests/integration/checks/check-markdown-links.ts`
 - `git diff --check`

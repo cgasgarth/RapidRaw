@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 import { createSelectiveColorMaskSelection } from '../../../src/utils/selectiveColorMask.ts';
 
-const FIXTURE_PATH = 'fixtures/color/selective-color-mask-fixtures.json';
+const FIXTURE_PATH = 'fixtures/color/selective-color/selective-color-mask-fixtures.json';
 
 const rangeKeySchema = z.enum(['reds', 'oranges', 'yellows', 'greens', 'aquas', 'blues', 'purples', 'magentas']);
 

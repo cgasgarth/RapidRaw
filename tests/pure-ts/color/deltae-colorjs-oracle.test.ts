@@ -12,7 +12,7 @@ type DeltaEFixture = {
   tolerance: number;
 };
 
-const manifest = JSON.parse(readFileSync('fixtures/color/deltae-reference-fixtures.json', 'utf8')) as {
+const manifest = JSON.parse(readFileSync('fixtures/color/reference/deltae-reference-fixtures.json', 'utf8')) as {
   fixtures: DeltaEFixture[];
 };
 

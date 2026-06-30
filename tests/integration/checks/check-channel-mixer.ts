@@ -40,8 +40,8 @@ const fixtureSchema = z
 const fixtures = z
   .array(fixtureSchema)
   .min(1)
-  .parse(await readJson('fixtures/color/channel-mixer.json'));
-const invalidCases = await readJson('fixtures/color/invalid-channel-mixer.json');
+  .parse(await readJson('fixtures/color/adjustments/channel-mixer.json'));
+const invalidCases = await readJson('fixtures/color/adjustments/invalid/invalid-channel-mixer.json');
 const failures = [];
 
 for (const fixture of fixtures) {

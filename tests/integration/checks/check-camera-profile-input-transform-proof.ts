@@ -18,8 +18,8 @@ import {
   lookupCameraProfile,
 } from '../../../src/utils/cameraProfileLookup.ts';
 
-const FIXTURE_PATH = 'fixtures/color/camera-profile-input-transform-proof.json';
-const LOOKUP_FIXTURE_PATH = 'fixtures/color/camera-profile-lookup-fixtures.json';
+const FIXTURE_PATH = 'fixtures/color/proofs/camera-profile-input-transform-proof.json';
+const LOOKUP_FIXTURE_PATH = 'fixtures/color/reference/camera-profile-lookup-fixtures.json';
 const REPORT_PATH = 'docs/validation/proofs/color/camera-profile-input-transform-proof-2026-06-18.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 

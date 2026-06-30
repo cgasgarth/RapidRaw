@@ -27,12 +27,12 @@ const rawOpenEditExportRequest = rawOpenEditExportProofRequestSchema.parse(
 assertPipeline('RAW open/edit/export command request', rawOpenEditExportRequest.editCommand.colorPipeline);
 
 const whiteBalanceToneProof = colorRuntimeProofFixtureSchema.parse(
-  await readJson('fixtures/color/white-balance-tone-runtime-proof.json'),
+  await readJson('fixtures/color/proofs/white-balance-tone-runtime-proof.json'),
 );
 assertPipeline('white balance + tone runtime proof', whiteBalanceToneProof.toneCommand.colorPipeline);
 
 const curvesLevelsProof = curvesLevelsRuntimeProofFixtureSchema.parse(
-  await readJson('fixtures/color/curves-levels-runtime-proof.json'),
+  await readJson('fixtures/color/proofs/curves-levels-runtime-proof.json'),
 );
 assertPipeline(
   'curves runtime proof',

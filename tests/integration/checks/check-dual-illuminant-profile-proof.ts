@@ -9,7 +9,7 @@ import { rawDevelopmentReportSchema } from '../../../src/schemas/imageLoaderSche
 import { buildCameraProfileProvenanceReceipt } from '../../../src/utils/cameraProfileProvenanceReceipt.ts';
 import { calculateDeltaE00, labColorSchema } from '../../../src/utils/deltaE00.ts';
 
-const FIXTURE_PATH = 'fixtures/color/dual-illuminant-profile-proof-fixture.json';
+const FIXTURE_PATH = 'fixtures/color/proofs/dual-illuminant-profile-proof-fixture.json';
 const DEFAULT_REPORT_DIR = 'src-tauri/target/dual-illuminant-profile-proof';
 const RAW_EXTENSIONS = new Set(['.arw', '.cr2', '.cr3', '.dng', '.nef', '.orf', '.raf', '.rw2']);
 

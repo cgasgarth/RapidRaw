@@ -48,7 +48,7 @@ const fixtureSchema = z
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 
-const fixtures = fixtureSchema.parse(await readJson('fixtures/color/white-balance-picker-fixtures.json'));
+const fixtures = fixtureSchema.parse(await readJson('fixtures/color/adjustments/white-balance-picker-fixtures.json'));
 const failures = [];
 
 const assertClose = (name, actual, expected, tolerance) => {

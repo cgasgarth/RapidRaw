@@ -32,10 +32,10 @@ const fixtureSchema = z
     version: z.literal(1),
   })
   .strict();
-const fixture = fixtureSchema.parse(await readJson('fixtures/color/color-grading-presets.json'));
+const fixture = fixtureSchema.parse(await readJson('fixtures/color/adjustments/color-grading-presets.json'));
 const catalog = parseColorGradingPresetCatalog({ presets: fixture.presets, version: fixture.version });
 const sourceCatalog = parseColorGradingPresetCatalog(COLOR_GRADING_PRESET_CATALOG);
-const invalidCases = await readJson('fixtures/color/invalid-color-grading-presets.json');
+const invalidCases = await readJson('fixtures/color/adjustments/invalid/invalid-color-grading-presets.json');
 const colorPanelSource = await readText('src/components/adjustments/Color.tsx');
 const failures = [];
 
