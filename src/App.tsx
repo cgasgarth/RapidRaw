@@ -35,6 +35,7 @@ import { useEditorActions } from './hooks/editor/useEditorActions';
 import { useFileOperations } from './hooks/library/useFileOperations';
 import { useFolderExpansionLoader } from './hooks/library/useFolderExpansionLoader';
 import { useLibraryActions } from './hooks/library/useLibraryActions';
+import { useSelectedFolderRefreshWatcher } from './hooks/library/useSelectedFolderRefreshWatcher';
 import { useSortedLibrary } from './hooks/library/useSortedLibrary';
 import { useThumbnails } from './hooks/library/useThumbnails';
 import { usePanelResize } from './hooks/viewport/usePanelResize';
@@ -85,7 +86,7 @@ export function LibraryExportPanelSlot({
   hasSelectedImage: boolean;
   isLibraryExportPanelVisible: boolean;
 }) {
-  return !hasSelectedImage && isLibraryExportPanelVisible ? <>{children}</> : null;
+  return !hasSelectedImage && isLibraryExportPanelVisible ? children : null;
 }
 
 function App() {
@@ -454,6 +455,12 @@ function App() {
     markGenerated,
   });
 
+  useSelectedFolderRefreshWatcher({
+    libraryViewMode,
+    refreshAllFolderTrees: refreshAllFolderTreesVoid,
+    refreshImageList: handleLibraryRefresh,
+  });
+
   const handleToggleFullScreen = useCallback(() => {
     const { zoom, selectedImage } = useEditorStore.getState();
     const currentlyZoomed = zoom > 1.01;
@@ -710,31 +717,29 @@ function App() {
               hasSelectedImage={selectedImage !== null}
               isLibraryExportPanelVisible={isLibraryExportPanelVisible}
             >
-              <>
-                <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
-                <div
-                  className={cx(
-                    'shrink-0 overflow-hidden',
-                    !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
-                  )}
-                  style={{ width: isFullScreen ? '0px' : `${rightPanelWidth}px` }}
-                >
-                  <ExportPanel
-                    exportState={exportState}
-                    multiSelectedPaths={multiSelectedPaths}
-                    selectedImage={null}
-                    setExportState={setExportState}
-                    appSettings={appSettings}
-                    onSettingsChange={handleSettingsChangeVoid}
-                    rootPaths={rootPaths}
-                    isVisible={isLibraryExportPanelVisible}
-                    onLinkedVariantImported={handleLinkedVariantImported}
-                    onClose={() => {
-                      setUI({ isLibraryExportPanelVisible: false });
-                    }}
-                  />
-                </div>
-              </>
+              <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
+              <div
+                className={cx(
+                  'shrink-0 overflow-hidden',
+                  !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+                )}
+                style={{ width: isFullScreen ? '0px' : `${rightPanelWidth}px` }}
+              >
+                <ExportPanel
+                  exportState={exportState}
+                  multiSelectedPaths={multiSelectedPaths}
+                  selectedImage={null}
+                  setExportState={setExportState}
+                  appSettings={appSettings}
+                  onSettingsChange={handleSettingsChangeVoid}
+                  rootPaths={rootPaths}
+                  isVisible={isLibraryExportPanelVisible}
+                  onLinkedVariantImported={handleLinkedVariantImported}
+                  onClose={() => {
+                    setUI({ isLibraryExportPanelVisible: false });
+                  }}
+                />
+              </div>
             </LibraryExportPanelSlot>
           </div>
         </div>

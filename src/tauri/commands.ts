@@ -56,6 +56,7 @@ export enum Invokes {
   IsOriginalFileAvailable = 'is_original_file_available',
   GetFolderTree = 'get_folder_tree',
   GetFolderChildren = 'get_folder_children',
+  GetFolderRefreshSnapshot = 'get_folder_refresh_snapshot',
   GetExternalEditorFileWatchSnapshot = 'get_external_editor_file_watch_snapshot',
   GetLogFilePath = 'get_log_file_path',
   GetLensDistortionParams = 'get_lens_distortion_params',

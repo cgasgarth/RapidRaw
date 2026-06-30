@@ -187,6 +187,15 @@ pub struct FileWatchSnapshot {
     path: String,
 }
 
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderRefreshSnapshot {
+    fingerprint: String,
+    item_count: usize,
+    path: String,
+    recursive: bool,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportSettings {
@@ -576,6 +585,78 @@ pub fn get_album_images(
         .collect();
 
     Ok(result_list)
+}
+
+fn folder_refresh_entry_key(root_path: &Path, entry_path: &Path) -> Option<String> {
+    let file_name = entry_path.file_name()?.to_string_lossy().into_owned();
+    if !is_supported_image_file(&file_name) && split_rrdata_sidecar_filename(&file_name).is_none() {
+        return None;
+    }
+
+    if let Ok(relative_path) = entry_path.strip_prefix(root_path) {
+        Some(relative_path.to_string_lossy().into_owned())
+    } else {
+        Some(file_name)
+    }
+}
+
+fn collect_folder_refresh_entries(path: &Path, recursive: bool) -> Result<Vec<String>, String> {
+    let mut entries = Vec::new();
+
+    if recursive {
+        for entry in WalkDir::new(path).into_iter().filter_map(Result::ok) {
+            let entry_path = entry.path();
+            if !entry_path.is_file() {
+                continue;
+            }
+
+            if let Some(relative_path) = folder_refresh_entry_key(path, entry_path) {
+                entries.push(relative_path);
+            }
+        }
+    } else {
+        for entry in fs::read_dir(path)
+            .map_err(|e| e.to_string())?
+            .filter_map(Result::ok)
+        {
+            let entry_path = entry.path();
+            if !entry_path.is_file() {
+                continue;
+            }
+
+            if let Some(entry_key) = folder_refresh_entry_key(path, &entry_path) {
+                entries.push(entry_key);
+            }
+        }
+    }
+
+    entries.sort_unstable();
+    Ok(entries)
+}
+
+#[tauri::command]
+pub fn get_folder_refresh_snapshot(
+    path: String,
+    recursive: bool,
+) -> Result<FolderRefreshSnapshot, String> {
+    let root_path = Path::new(&path);
+    if !root_path.exists() {
+        return Err(format!("Folder does not exist: {}", path));
+    }
+
+    let entries = collect_folder_refresh_entries(root_path, recursive)?;
+    let mut hasher = blake3::Hasher::new();
+    for entry in &entries {
+        hasher.update(entry.as_bytes());
+        hasher.update(&[0]);
+    }
+
+    Ok(FolderRefreshSnapshot {
+        fingerprint: hasher.finalize().to_hex().to_string(),
+        item_count: entries.len(),
+        path,
+        recursive,
+    })
 }
 
 #[derive(Serialize, Debug)]
@@ -4017,6 +4098,54 @@ mod tests {
         assert_eq!(snapshot.path, output_path.to_string_lossy());
         assert_eq!(snapshot.byte_size, b"edited tiff".len() as u64);
         assert!(snapshot.modified_ms > 0);
+    }
+
+    #[test]
+    fn folder_refresh_snapshot_changes_when_direct_contents_change() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let folder_path = temp_dir.path();
+        let image_path = folder_path.join("one.jpg");
+        let other_path = folder_path.join("two.png");
+
+        fs::write(&image_path, b"image one").expect("image one");
+
+        let baseline =
+            get_folder_refresh_snapshot(folder_path.to_string_lossy().into_owned(), false)
+                .expect("baseline snapshot");
+        assert_eq!(baseline.item_count, 1);
+
+        fs::write(&other_path, b"image two").expect("image two");
+        let added = get_folder_refresh_snapshot(folder_path.to_string_lossy().into_owned(), false)
+            .expect("added snapshot");
+        assert_eq!(added.item_count, 2);
+        assert_ne!(baseline.fingerprint, added.fingerprint);
+
+        fs::remove_file(&image_path).expect("remove image one");
+        let removed =
+            get_folder_refresh_snapshot(folder_path.to_string_lossy().into_owned(), false)
+                .expect("removed snapshot");
+        assert_eq!(removed.item_count, 1);
+        assert_ne!(added.fingerprint, removed.fingerprint);
+    }
+
+    #[test]
+    fn folder_refresh_snapshot_recursive_includes_nested_files() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let folder_path = temp_dir.path();
+        let nested_dir = folder_path.join("nested");
+        fs::create_dir_all(&nested_dir).expect("nested dir");
+        fs::write(folder_path.join("root.jpg"), b"root image").expect("root image");
+
+        let baseline =
+            get_folder_refresh_snapshot(folder_path.to_string_lossy().into_owned(), true)
+                .expect("baseline recursive snapshot");
+        assert_eq!(baseline.item_count, 1);
+
+        fs::write(nested_dir.join("child.raw"), b"nested image").expect("nested image");
+        let nested = get_folder_refresh_snapshot(folder_path.to_string_lossy().into_owned(), true)
+            .expect("nested recursive snapshot");
+        assert_eq!(nested.item_count, 2);
+        assert_ne!(baseline.fingerprint, nested.fingerprint);
     }
 
     #[test]
