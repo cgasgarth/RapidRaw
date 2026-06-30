@@ -1045,6 +1045,48 @@ async function prepareScenario(page, mode) {
     agentReviewHandoffProofDatasetSchema.parse(await handoff.evaluate((element) => ({ ...element.dataset })));
     const scope = page.getByTestId('agent-selected-frame-scope');
     agentSelectedFrameScopeProofDatasetSchema.parse(await scope.evaluate((element) => ({ ...element.dataset })));
+    const selectedImageLoop = page.getByTestId('agent-selected-image-preview-loop-review');
+    await selectedImageLoop.waitFor({ timeout: 10_000 });
+    const selectedImageLoopDataset = await selectedImageLoop.evaluate((element) => ({ ...element.dataset }));
+    if (
+      selectedImageLoopDataset.beforePreviewUrl !== 'blob:rawengine-selected-loop-before' ||
+      selectedImageLoopDataset.currentPreviewUrl !== 'blob:rawengine-selected-loop-current'
+    ) {
+      throw new Error('Selected-image preview-loop review did not expose before/current preview URLs.');
+    }
+    const selectedImageLoopBefore = page.getByTestId('agent-selected-image-preview-loop-before');
+    const selectedImageLoopCurrent = page.getByTestId('agent-selected-image-preview-loop-current');
+    const selectedImageLoopBeforeDataset = await selectedImageLoopBefore.evaluate((element) => ({
+      ...element.dataset,
+    }));
+    const selectedImageLoopCurrentDataset = await selectedImageLoopCurrent.evaluate((element) => ({
+      ...element.dataset,
+    }));
+    if (
+      selectedImageLoopBeforeDataset.previewUrl !== 'blob:rawengine-selected-loop-before' ||
+      selectedImageLoopBeforeDataset.renderHash !== 'render:agent-selected-loop-before' ||
+      selectedImageLoopCurrentDataset.previewUrl !== 'blob:rawengine-selected-loop-current' ||
+      selectedImageLoopCurrentDataset.renderHash !== 'render:agent-selected-loop-current'
+    ) {
+      throw new Error('Selected-image preview-loop before/current gallery evidence was not rendered.');
+    }
+    const selectedImageLoopMetrics = await page
+      .getByTestId('agent-selected-image-preview-loop-metrics')
+      .evaluate((element) => ({ ...element.dataset }));
+    if (selectedImageLoopMetrics.meanLuminanceDelta !== '6.2' || selectedImageLoopMetrics.maxChannelDelta !== '31') {
+      throw new Error('Selected-image preview-loop delta metrics were not rendered.');
+    }
+    const detailLineageDataset = await page
+      .getByTestId('agent-selected-image-preview-loop-lineage-entry')
+      .nth(1)
+      .evaluate((element) => ({ ...element.dataset }));
+    if (
+      detailLineageDataset.previewUrl !== 'blob:rawengine-selected-loop-detail-crop' ||
+      detailLineageDataset.crop !== 'normalized x=0.22 y=0.21 w=0.32 h=0.34' ||
+      detailLineageDataset.zoom !== '2.4x @ 0.5,0.55'
+    ) {
+      throw new Error('Selected-image preview-loop detail crop lineage was not rendered.');
+    }
     const review = page.getByTestId('agent-dry-run-review');
     agentDryRunReviewProofDatasetSchema.parse(await review.evaluate((element) => ({ ...element.dataset })));
     const privateRawArtifacts = page.getByTestId('agent-private-raw-artifacts');

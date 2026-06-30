@@ -93,14 +93,53 @@ const applyReceiptSchema = z
   })
   .strict();
 
+const previewCropSchema = z
+  .object({
+    height: z.number().positive(),
+    unit: z.enum(['%', 'normalized', 'px']),
+    width: z.number().positive(),
+    x: z.number(),
+    y: z.number(),
+  })
+  .strict()
+  .nullable();
+
+const previewZoomSchema = z
+  .object({
+    centerX: z.number().min(0).max(1),
+    centerY: z.number().min(0).max(1),
+    scale: z.number().min(1).max(8),
+  })
+  .strict()
+  .nullable();
+
 const previewLineageSchema = z
   .object({
     appliedGraphRevision: z.string().trim().min(1),
+    crop: previewCropSchema.optional(),
+    height: z.number().int().positive().optional(),
+    longEdgePx: z.number().int().min(256).max(2048).optional(),
+    maxPixelCount: z.number().int().min(65_536).max(4_194_304).optional(),
     previewArtifactId: z.string().trim().min(1),
     previewPurpose: z.enum(['detail_review', 'refresh']),
+    previewRef: z.string().trim().min(1).optional(),
+    quality: z.number().min(0.5).max(0.95).optional(),
     recipeHash: z.string().trim().min(1),
+    renderHash: z.string().trim().min(1).optional(),
     sourceToolName: z.literal('rawengine.agent.adjustments.apply'),
     turn: z.number().int().positive(),
+    width: z.number().int().positive().optional(),
+    zoom: previewZoomSchema.optional(),
+  })
+  .strict();
+
+const compareArtifactEvidenceSchema = z
+  .object({
+    contentHash: z.string().trim().min(1),
+    graphRevision: z.string().trim().min(1),
+    previewRef: z.string().trim().min(1),
+    recipeHash: z.string().trim().min(1),
+    renderHash: z.string().trim().min(1),
   })
   .strict();
 
@@ -132,7 +171,27 @@ export const agentCurrentImagePreviewLoopResultSchema = z
     compareArtifactIds: z
       .object({
         beforeArtifactId: z.string().trim().min(1),
+        beforeEvidence: compareArtifactEvidenceSchema.optional(),
         currentArtifactId: z.string().trim().min(1),
+        currentEvidence: compareArtifactEvidenceSchema.optional(),
+        lineage: z
+          .object({
+            beforeGraphRevision: z.string().trim().min(1),
+            beforeRecipeHash: z.string().trim().min(1),
+            currentGraphRevision: z.string().trim().min(1),
+            currentRecipeHash: z.string().trim().min(1),
+            staleRecipeHash: z.boolean(),
+          })
+          .strict()
+          .optional(),
+        mediumPreview: z
+          .object({
+            longEdgePx: z.number().int().min(256).max(2048),
+            maxPixelCount: z.number().int().min(65_536).max(4_194_304),
+            quality: z.number().min(0.5).max(0.95),
+          })
+          .strict()
+          .optional(),
       })
       .strict(),
     editCount: z.number().int().min(1),
@@ -217,7 +276,23 @@ export const runAgentCurrentImagePreviewLoop = async (
     })),
     compareArtifactIds: {
       beforeArtifactId: loopResult.compareReview.beforeArtifactId,
+      beforeEvidence: {
+        contentHash: loopResult.compareReview.artifacts[0].contentHash,
+        graphRevision: loopResult.compareReview.artifacts[0].graphRevision,
+        previewRef: loopResult.compareReview.artifacts[0].previewRef,
+        recipeHash: loopResult.compareReview.artifacts[0].recipeHash,
+        renderHash: loopResult.compareReview.artifacts[0].renderHash,
+      },
       currentArtifactId: loopResult.compareReview.currentArtifactId,
+      currentEvidence: {
+        contentHash: loopResult.compareReview.artifacts[1].contentHash,
+        graphRevision: loopResult.compareReview.artifacts[1].graphRevision,
+        previewRef: loopResult.compareReview.artifacts[1].previewRef,
+        recipeHash: loopResult.compareReview.artifacts[1].recipeHash,
+        renderHash: loopResult.compareReview.artifacts[1].renderHash,
+      },
+      lineage: loopResult.compareReview.lineage,
+      mediumPreview: loopResult.compareReview.mediumPreview,
     },
     editCount: loopResult.editCount,
     finalGraphRevision: loopResult.appliedGraphRevision,
