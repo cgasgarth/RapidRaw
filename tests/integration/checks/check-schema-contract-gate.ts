@@ -26,7 +26,7 @@ const CONTRACT_COMMANDS = [
   ['bun', 'tests/integration/checks/ai/check-ai-app-server-tool-routes.ts'],
   ['bun', 'tests/integration/checks/ai/check-ai-denoise-app-server-tool.ts'],
   ['bun', 'tests/integration/checks/check-tone-color-app-server-routes.ts'],
-  ['bun', 'tests/integration/checks/check-rawengine-app-server-host.ts'],
+  ['bun', 'tests/integration/checks/platform/check-rawengine-app-server-host.ts'],
   ['bun', 'tests/integration/checks/computational-merge/check-computational-merge-app-server-routes.ts'],
   ['bun', 'tests/integration/checks/computational-merge/check-computational-merge-ui-route-badges.ts'],
   ['bun', 'tests/integration/checks/deblur/check-deblur-app-server-tool.ts'],
@@ -38,7 +38,7 @@ const CONTRACT_COMMANDS = [
   ['bun', 'tests/integration/checks/panorama/check-panorama-ui-runtime-bridge.ts'],
   ['bun', 'tests/integration/checks/super-resolution/check-sr-ui-api.ts'],
   ['bun', 'tests/integration/checks/super-resolution/check-sr-ui-runtime-bridge.ts'],
-  ['bun', 'tests/integration/checks/check-tauri-schema-validation.ts'],
+  ['bun', 'tests/integration/checks/tauri/check-tauri-schema-validation.ts'],
   ['bun', 'tests/integration/checks/focus/check-focus-app-server-runtime.ts'],
   ['bun', 'tests/integration/checks/hdr/check-hdr-app-server-runtime.ts'],
   ['bun', 'tests/integration/checks/super-resolution/check-super-resolution-app-server-runtime.ts'],
@@ -73,7 +73,8 @@ const RELEVANT_PREFIXES = ['packages/rawengine-schema/', 'src/schemas/', 'src-ta
 const RELEVANT_FILES = new Set([
   '.github/workflows/lint.yml',
   'bun.lock',
-  'tests/integration/checks/check-tauri-schema-validation.ts',
+  'tests/integration/checks/platform/check-rawengine-app-server-host.ts',
+  'tests/integration/checks/tauri/check-tauri-schema-validation.ts',
   'src/App.tsx',
   'src/utils/tauriSchemaInvoke.ts',
 ]);

@@ -2,7 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
-import { sampleToneColorCommandEnvelopeV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+import { sampleToneColorCommandEnvelopeV1 } from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
 import {
   RawEngineAppServerHostToolName,
   RawEngineAppServerLifecyclePhase,
@@ -20,7 +20,7 @@ import {
   rawEngineAppServerLifecycleReplaySchema,
   rawEngineAppServerRouteCatalogReplaySchema,
   rawEngineAppServerSupervisorStateSchema,
-} from '../../../src/schemas/agent/agentRuntimeSchemas.ts';
+} from '../../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import {
   assertRawEngineAppServerLifecycleReady,
   buildRawEngineAppServerCapabilitiesReplay,
@@ -41,7 +41,7 @@ import {
   startRawEngineAppServerSupervisor,
   stopRawEngineAppServerLifecycle,
   stopRawEngineAppServerSupervisor,
-} from '../../../src/utils/rawEngineAppServerHost.ts';
+} from '../../../../src/utils/rawEngineAppServerHost.ts';
 
 const failures = [];
 const manifest = rawEngineAppServerHostManifestSchema.parse(RAW_ENGINE_APP_SERVER_HOST_MANIFEST);
