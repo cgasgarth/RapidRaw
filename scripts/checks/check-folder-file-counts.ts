@@ -30,10 +30,6 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4237',
     reason: 'workflow names are branch-protection sensitive',
   },
-  'fixtures/validation': {
-    issue: '#4223',
-    reason: 'validation fixtures are pending journey grouping',
-  },
   'packages/rawengine-schema/src': {
     issue: '#4214',
     reason: 'schema package source is pending domain grouping',

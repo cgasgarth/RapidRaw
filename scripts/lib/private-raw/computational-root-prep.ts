@@ -680,7 +680,7 @@ function sourceCandidateRequirement(
 
 async function readManifest(): Promise<Manifest> {
   return parseComputationalMergeE2eProofManifest(
-    JSON.parse(await readFile('fixtures/validation/computational-merge-e2e-proof.json', 'utf8')),
+    JSON.parse(await readFile('fixtures/validation/app-server/computational-merge-e2e-proof.json', 'utf8')),
   );
 }
 

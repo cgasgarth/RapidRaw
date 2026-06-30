@@ -13,7 +13,7 @@
   "issue": 3238,
   "localRawRuntime": {
     "artifactRoot": "private-artifacts/validation/open-edit-export/srgb-perceptual",
-    "command": "RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export-srgb-perceptual-proof-request.json --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-run-reports.json --require-assets",
+    "command": "RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export/raw-open-edit-export-srgb-perceptual-proof-request.json --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-run-reports.json --require-assets",
     "gamutMapping": "rawengine.gamut.srgb-oklab-chroma-reduce.v4",
     "metrics": {
       "changedPixelRatio": 0.978165,
@@ -42,8 +42,8 @@
     "sourceFolder": "/Users/cgas/Pictures/Capture One/Alaska"
   },
   "validationCommands": [
-    "RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export-srgb-perceptual-proof-request.json --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-run-reports.json --require-assets",
-    "bun scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export-srgb-perceptual-proof-request.json --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-run-reports.json --require-assets"
+    "RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export/raw-open-edit-export-srgb-perceptual-proof-request.json --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-run-reports.json --require-assets",
+    "bun scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export/raw-open-edit-export-srgb-perceptual-proof-request.json --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-run-reports.json --require-assets"
   ],
   "validationMode": "local_alaska_raw_srgb_perceptual_gamut_mapping_runtime",
   "workflowArtifacts": [

@@ -30,7 +30,7 @@ const args = argsSchema.parse({
   requireAssets: process.argv.includes('--require-assets'),
 });
 
-const REQUEST_PATH = 'fixtures/validation/selective-color-raw-proof-request.json';
+const REQUEST_PATH = 'fixtures/validation/professional-color-workflow/selective-color-raw-proof-request.json';
 
 await runRequired('selective color committed RAW proof summary', [
   'bun',

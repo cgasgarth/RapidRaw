@@ -13,7 +13,7 @@ const PRIVATE_ROOT = '/tmp/rawengine-gamut-mapping-v4-real-raw-proof';
 const PRIVATE_SOURCE = '/Users/cgas/Pictures/Capture One/Alaska';
 const RUN_REPORTS_RELATIVE_PATH = 'raw-open-edit-export-run-reports.json';
 const PERCEPTUAL_RUNNER =
-  'bun scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export-srgb-perceptual-proof-request.json';
+  'bun scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export/raw-open-edit-export-srgb-perceptual-proof-request.json';
 const SOURCE_COMMAND = `RAWENGINE_PRIVATE_RAW_SOURCE="${PRIVATE_SOURCE}" ${PERCEPTUAL_RUNNER} --root ${PRIVATE_ROOT} --output ${PRIVATE_ROOT}/${RUN_REPORTS_RELATIVE_PATH} --require-assets`;
 const ASSET_COMMAND = `${PERCEPTUAL_RUNNER} --root ${PRIVATE_ROOT} --output ${PRIVATE_ROOT}/${RUN_REPORTS_RELATIVE_PATH} --require-assets`;
 const RUN_REPORTS_PATH = valueAfter('--run-reports');

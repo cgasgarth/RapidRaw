@@ -10,7 +10,8 @@ import { parseRawOpenEditExportRunReportCollection } from '../../../../src/schem
 const args = process.argv.slice(2);
 const selfTest = args.includes('--self-test');
 const runReportsPath = valueAfter('--run-reports');
-const manifestPath = valueAfter('--manifest') ?? 'fixtures/validation/raw-open-edit-export-proof.json';
+const manifestPath =
+  valueAfter('--manifest') ?? 'fixtures/validation/raw-open-edit-export/raw-open-edit-export-proof.json';
 const outputPath = valueAfter('--output');
 
 if (selfTest) {
