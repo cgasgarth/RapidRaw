@@ -8,8 +8,12 @@ import {
   type LibraryRelinkPlan,
   libraryRelinkIdentitySchema,
   libraryRelinkPlanSchema,
-} from '../schemas/libraryRelinkSchemas';
-import { type LibrarySession, type LibrarySessionSet, librarySessionSetSchema } from '../schemas/librarySessionSchemas';
+} from '../schemas/library/libraryRelinkSchemas';
+import {
+  type LibrarySession,
+  type LibrarySessionSet,
+  librarySessionSetSchema,
+} from '../schemas/library/librarySessionSchemas';
 
 interface ScoreRule {
   kind: LibraryRelinkEvidenceKind;

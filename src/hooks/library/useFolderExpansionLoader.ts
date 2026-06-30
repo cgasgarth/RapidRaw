@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
 
-import { folderTreeListSchema } from '../../schemas/folderTreeSchemas';
+import { folderTreeListSchema } from '../../schemas/library/folderTreeSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { Invokes } from '../../tauri/commands';
 import { insertChildrenIntoTree } from '../../utils/folderTreeUtils';

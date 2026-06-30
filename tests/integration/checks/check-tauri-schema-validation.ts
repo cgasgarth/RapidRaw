@@ -3,14 +3,13 @@
 import { existsSync, readFileSync } from 'node:fs';
 
 import type { z } from 'zod';
-
-import { albumTreeSchema } from '../../../src/schemas/albumSchemas.ts';
 import {
   fileOperationPathListSchema,
   fileOperationPathSchema,
   fileOperationVoidResponseSchema,
 } from '../../../src/schemas/fileOperationSchemas.ts';
-import { folderTreeListSchema } from '../../../src/schemas/folderTreeSchemas.ts';
+import { albumTreeSchema } from '../../../src/schemas/library/albumSchemas.ts';
+import { folderTreeListSchema } from '../../../src/schemas/library/folderTreeSchemas.ts';
 import { parseTauriBoundaryLedger, type TauriBoundaryLedger } from '../../../src/schemas/tauriBoundaryLedgerSchemas.ts';
 import { emptyTauriResponseSchema } from '../../../src/schemas/tauriResponseSchemas.ts';
 import { parseTauriPayload } from '../../../src/utils/tauriSchemaInvoke.ts';

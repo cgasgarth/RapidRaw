@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { uniqueStringArraySchema } from './zodUniqueHelpers';
+import { uniqueStringArraySchema } from '../zodUniqueHelpers';
 
 export const libraryBackupFileRoleSchema = z.enum([
   'library_session',

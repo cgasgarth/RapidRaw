@@ -256,7 +256,7 @@ function runSelfTest() {
     [{ filename: 'packages/rawengine-schema/src/rawEngineSchemas.ts' }],
     true,
   );
-  assertClassification('frontend schema runs', [{ filename: 'src/schemas/folderTreeSchemas.ts' }], true);
+  assertClassification('frontend schema runs', [{ filename: 'src/schemas/library/folderTreeSchemas.ts' }], true);
   assertClassification('tauri schema helper runs', [{ filename: 'src/utils/tauriSchemaInvoke.ts' }], true);
   assertClassification('package dependency change runs fail-safe', [{ filename: 'package.json' }], true);
   assertClassification(

@@ -2,8 +2,11 @@
 
 import { readFile } from 'node:fs/promises';
 
-import { librarySessionSetSchema, parseLibrarySessionSet } from '../../../../src/schemas/librarySessionSchemas.ts';
-import { buildLibrarySessionWorkflowPlan } from '../../../../src/schemas/librarySessionUiSchemas.ts';
+import {
+  librarySessionSetSchema,
+  parseLibrarySessionSet,
+} from '../../../../src/schemas/library/librarySessionSchemas.ts';
+import { buildLibrarySessionWorkflowPlan } from '../../../../src/schemas/library/librarySessionUiSchemas.ts';
 
 const validSessionSetPath = 'fixtures/library/library-sessions.json';
 const invalidCasesPath = 'fixtures/library/invalid-library-session-cases.json';

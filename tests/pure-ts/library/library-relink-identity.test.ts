@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
-import type { LibraryRelinkIdentity } from '../../../src/schemas/libraryRelinkSchemas.ts';
-import type { LibrarySessionSet } from '../../../src/schemas/librarySessionSchemas.ts';
+import type { LibraryRelinkIdentity } from '../../../src/schemas/library/libraryRelinkSchemas.ts';
+import type { LibrarySessionSet } from '../../../src/schemas/library/librarySessionSchemas.ts';
 import {
   applyLibraryRelinkToRuntimeState,
   applyLibraryRelinkToSessionSet,

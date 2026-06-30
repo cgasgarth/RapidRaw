@@ -59,7 +59,7 @@ const coverageContracts = [
     id: 'library-relink-identity',
     owner: 'library relink schemas/identity',
     behaviorArea: 'library relink identity normalization and schema contracts',
-    sourceFiles: ['src/schemas/libraryRelinkSchemas.ts', 'src/utils/libraryRelinkIdentity.ts'],
+    sourceFiles: ['src/schemas/library/libraryRelinkSchemas.ts', 'src/utils/libraryRelinkIdentity.ts'],
     testFiles: ['tests/pure-ts/library/library-relink-identity.test.ts'],
     minLinePercent: 95,
     minFunctionPercent: 95,

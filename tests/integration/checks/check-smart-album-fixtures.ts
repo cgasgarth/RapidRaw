@@ -7,7 +7,7 @@ import {
   parseSmartAlbumAssets,
   parseSmartAlbumCatalog,
   smartAlbumCatalogSchema,
-} from '../../../src/schemas/smartAlbumFilterSchemas.ts';
+} from '../../../src/schemas/library/smartAlbumFilterSchemas.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 
