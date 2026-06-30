@@ -22,7 +22,7 @@ schema-validated tool calls.
 
 ## Shift-Left Check
 
-`tests/integration/checks/check-agent-approval-boundaries.ts` parses the generated schema sample
+`tests/integration/checks/agent/check-agent-approval-boundaries.ts` parses the generated schema sample
 artifacts with the Zod schemas in `packages/rawengine-schema/`, then validates:
 
 - registry tool definitions in `tool-registry-v1.json`;
