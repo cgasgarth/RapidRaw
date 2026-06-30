@@ -1633,6 +1633,26 @@
       "relativeColorimetric": "Relative colorimetric",
       "saturation": "Saturation"
     },
+    "resize": {
+      "dontEnlarge": "Don't Enlarge",
+      "modes": {
+        "height": "Height",
+        "longEdge": "Long Edge",
+        "shortEdge": "Short Edge",
+        "width": "Width"
+      },
+      "pixels": "pixels",
+      "resizeToFit": "Resize to Fit"
+    },
+    "sections": {
+      "advanced": "Advanced",
+      "fileNaming": "File Naming",
+      "fileSettings": "File Settings",
+      "imageSizing": "Image Sizing",
+      "metadata": "Metadata",
+      "outputSharpening": "Output Sharpening",
+      "watermark": "Watermark"
+    },
     "softProofCompare": {
       "displayP3Title": "Display P3",
       "effective": "Effective {{profile}} / {{intent}}",
@@ -1657,26 +1677,6 @@
       "transformApplied": "transform",
       "unavailable": "One or more proofs could not be generated.",
       "unavailableNoImage": "No ready image is loaded for soft-proof comparison."
-    },
-    "resize": {
-      "dontEnlarge": "Don't Enlarge",
-      "modes": {
-        "height": "Height",
-        "longEdge": "Long Edge",
-        "shortEdge": "Short Edge",
-        "width": "Width"
-      },
-      "pixels": "pixels",
-      "resizeToFit": "Resize to Fit"
-    },
-    "sections": {
-      "advanced": "Advanced",
-      "fileNaming": "File Naming",
-      "fileSettings": "File Settings",
-      "imageSizing": "Image Sizing",
-      "metadata": "Metadata",
-      "outputSharpening": "Output Sharpening",
-      "watermark": "Watermark"
     },
     "softProofWarnings": {
       "gamutClipping": "Gamut warning overlay is active: {{coverage}} of the preview is flagged before export.",
