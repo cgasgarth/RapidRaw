@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import {
   detailPreviewExportParityManifestSchema,
   parseDetailPreviewExportParityManifest,
-} from '../../../src/schemas/detailValidationSchemas.ts';
+} from '../../../../src/schemas/detailValidationSchemas.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 

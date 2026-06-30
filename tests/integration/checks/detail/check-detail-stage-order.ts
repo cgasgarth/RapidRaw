@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import {
   detailStageOrderManifestSchema,
   parseDetailStageOrderManifest,
-} from '../../../src/schemas/detailValidationSchemas.ts';
+} from '../../../../src/schemas/detailValidationSchemas.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 
