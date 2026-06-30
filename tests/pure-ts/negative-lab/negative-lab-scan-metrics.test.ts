@@ -4,7 +4,7 @@ import { negativeLabScanMetricsV1Schema } from '../../../src/schemas/negative-la
 import {
   buildNegativeLabScanMetricsV1,
   type NegativeLabScanMetricPixel,
-} from '../../../src/utils/negativeLabScanMetrics.ts';
+} from '../../../src/utils/negative-lab/negativeLabScanMetrics.ts';
 
 const buildPixels = (width: number, height: number, getPixel: (x: number, y: number) => NegativeLabScanMetricPixel) =>
   Array.from({ length: width * height }, (_, index) => getPixel(index % width, Math.floor(index / width)));

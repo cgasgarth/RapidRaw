@@ -1,11 +1,11 @@
-import type { NegativeLabRuntimeProfileBrowserRow } from '../schemas/negative-lab/negativeLabMeasuredProfileSchemas';
-import type { NegativeLabPresetParams } from '../schemas/negative-lab/negativeLabPresetCatalogSchemas';
+import type { NegativeLabRuntimeProfileBrowserRow } from '../../schemas/negative-lab/negativeLabMeasuredProfileSchemas';
+import type { NegativeLabPresetParams } from '../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
 import {
   type NegativeLabProfileComparisonRow,
   type NegativeLabSelectedProfileSnapshot,
   negativeLabProfileComparisonRowsSchema,
   negativeLabSelectedProfileSnapshotSchema,
-} from '../schemas/negative-lab/negativeLabProfileComparisonSchemas';
+} from '../../schemas/negative-lab/negativeLabProfileComparisonSchemas';
 import { buildNegativeLabPlanHash } from './negativeLabPlanIdentity';
 
 const PROFILE_DELTA_KEYS = [

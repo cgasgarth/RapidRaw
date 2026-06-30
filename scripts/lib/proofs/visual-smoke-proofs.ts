@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
-import { NegativeLabOutputFormatId } from '../../../src/utils/negativeLabOutputFormatIds.ts';
+import { NegativeLabOutputFormatId } from '../../../src/utils/negative-lab/negativeLabOutputFormatIds.ts';
 
 const superResolutionRoutePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');
 

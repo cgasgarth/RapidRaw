@@ -2,7 +2,7 @@ import {
   type NegativeLabCrosstalkProfile,
   type NegativeLabCrosstalkProfileMatrix,
   negativeLabCrosstalkProfileSchema,
-} from '../schemas/negative-lab/negativeLabCrosstalkProfileSchemas';
+} from '../../schemas/negative-lab/negativeLabCrosstalkProfileSchemas';
 import { buildNegativeLabPlanHash } from './negativeLabPlanIdentity';
 
 export const NEGATIVE_LAB_IDENTITY_CROSSTALK_PROFILE = negativeLabCrosstalkProfileSchema.parse({

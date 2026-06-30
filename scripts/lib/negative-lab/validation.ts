@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 
 import { negativeLabFixtureManifestEntryV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../../../src/utils/negativeLabPresetCatalog.ts';
+import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../../../src/utils/negative-lab/negativeLabPresetCatalog.ts';
 
 export const unsafeNegativeLabClaimPattern =
   /\b(?:adobe|capture one|dehancer|ektachrome|ektar|exact|fujifilm|fuji|gold|ilford|kodak|lightroom|mastin|negative lab pro|nlp|official|portra|rni|tri-x|t-max|vsco)\b/iu;

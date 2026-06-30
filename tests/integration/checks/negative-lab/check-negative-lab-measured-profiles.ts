@@ -23,9 +23,9 @@ import {
 import {
   NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
   resolveNegativeLabRuntimeProfile,
-} from '../../../../src/utils/negativeLabMeasuredProfileRuntime.ts';
-import { NegativeLabOutputFormatId } from '../../../../src/utils/negativeLabOutputFormatIds.ts';
-import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../../../../src/utils/negativeLabPresetCatalog.ts';
+} from '../../../../src/utils/negative-lab/negativeLabMeasuredProfileRuntime.ts';
+import { NegativeLabOutputFormatId } from '../../../../src/utils/negative-lab/negativeLabOutputFormatIds.ts';
+import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../../../../src/utils/negative-lab/negativeLabPresetCatalog.ts';
 
 const manifestUrl = new URL('../../../../fixtures/negative-lab/negative-lab-fixture-manifest.json', import.meta.url);
 const measuredCatalogUrl = new URL(

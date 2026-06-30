@@ -17,7 +17,7 @@ import {
   negativeLabQcProofAppServerCommandSchema,
   negativeLabStockFamilyConversionAppServerCommandSchema,
 } from '../../../schemas/negative-lab/negativeLabAppServerSchemas';
-import { buildNegativeLabPlanHash } from '../../negativeLabPlanIdentity';
+import { buildNegativeLabPlanHash } from '../negativeLabPlanIdentity';
 import { NegativeLabAppServerCommandName } from './negativeLabAppServerCommandNames';
 import {
   buildNegativeLabConversionPlanResult,

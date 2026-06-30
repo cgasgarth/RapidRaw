@@ -6,9 +6,9 @@ import {
   type NegativeLabFrameExposureOverride,
   type NegativeLabFrameExposureOverridePayload,
   parseNegativeLabFrameExposureOverridePayload,
-} from '../schemas/negative-lab/negativeLabFrameExposureOverrideSchemas';
+} from '../../schemas/negative-lab/negativeLabFrameExposureOverrideSchemas';
 
-import type { NegativeLabFrameHealthEntry } from '../schemas/negative-lab/negativeLabFrameHealthSchemas';
+import type { NegativeLabFrameHealthEntry } from '../../schemas/negative-lab/negativeLabFrameHealthSchemas';
 
 export const snapNegativeLabFrameExposureOffset = (value: number): number => {
   const finiteValue = Number.isFinite(value) ? value : 0;

@@ -1,8 +1,8 @@
 import {
   type NegativeLabConversionBundle,
   negativeLabConversionBundleSchema,
-} from '../schemas/negative-lab/negativeLabConversionBundleSchemas';
-import { buildNegativeLabConversionPlanResult } from './negative-lab/app-server/negativeLabAppServerRoutes';
+} from '../../schemas/negative-lab/negativeLabConversionBundleSchemas';
+import { buildNegativeLabConversionPlanResult } from './app-server/negativeLabAppServerRoutes';
 
 export interface NegativeLabConversionBundleReplayProof {
   outputCount: number;

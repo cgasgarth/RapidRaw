@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { buildNegativeLabPickedPatchRect } from '../../../src/utils/negativeLabPatchPicker.ts';
+import { buildNegativeLabPickedPatchRect } from '../../../src/utils/negative-lab/negativeLabPatchPicker.ts';
 
 const bounds = { height: 400, left: 100, top: 50, width: 800 };
 

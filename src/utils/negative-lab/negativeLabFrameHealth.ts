@@ -13,7 +13,7 @@ import {
   negativeLabFrameAcquisitionHealthSchema,
   parseNegativeLabBatchDryRunSummary,
   parseNegativeLabFrameHealthReport,
-} from '../schemas/negative-lab/negativeLabFrameHealthSchemas';
+} from '../../schemas/negative-lab/negativeLabFrameHealthSchemas';
 
 export const getNegativeLabScanLabel = (path: string, index: number) => {
   const pathParts = path.split(/[\\/]/u).filter(Boolean);

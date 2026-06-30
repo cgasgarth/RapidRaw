@@ -21,7 +21,7 @@ import {
   resetPanoramaStateForSettingsChange,
 } from '../../utils/computational-merge/computationalMergeModalState';
 import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
-import { handleNegativeConversionEditorHandoff } from '../../utils/negativeLabEditorHandoff';
+import { handleNegativeConversionEditorHandoff } from '../../utils/negative-lab/negativeLabEditorHandoff';
 import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
 import type { AlbumItem, AppSettings } from '../ui/AppProperties';
 import FocusStackModal from './computational-merge/FocusStackModal';

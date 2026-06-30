@@ -46,12 +46,12 @@ import {
   negativeLabStockRegistryAppServerCommandSchema,
   negativeLabStockRegistryAppServerResultSchema,
 } from '../../../schemas/negative-lab/negativeLabAppServerSchemas';
-import { buildNegativeBaseFogDensitometerReadout } from '../../negativeLabDensitometer';
+import { buildNegativeBaseFogDensitometerReadout } from '../negativeLabDensitometer';
 import {
   buildNegativeLabDustScratchReviewReport,
   buildNegativeLabQcProofReport,
-} from '../../negativeLabDustScratchReview';
-import { buildNegativeLabBatchDryRunSummary, buildNegativeLabFrameHealthReport } from '../../negativeLabFrameHealth';
+} from '../negativeLabDustScratchReview';
+import { buildNegativeLabBatchDryRunSummary, buildNegativeLabFrameHealthReport } from '../negativeLabFrameHealth';
 import {
   buildNegativeLabRuntimeProfileApplyProof,
   buildNegativeLabRuntimeProfileProvenanceHash,
@@ -59,15 +59,15 @@ import {
   NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
   type NegativeLabRuntimeProfileCatalog,
   resolveNegativeLabRuntimeProfile,
-} from '../../negativeLabMeasuredProfileRuntime';
-import { buildNegativeLabPlanHash } from '../../negativeLabPlanIdentity';
-import { buildNegativeLabQcContactSheetArtifact } from '../../negativeLabQcContactSheetArtifact';
-import { buildNegativeLabRollNormalizationPlan } from '../../negativeLabRollNormalizationPlan';
+} from '../negativeLabMeasuredProfileRuntime';
+import { buildNegativeLabPlanHash } from '../negativeLabPlanIdentity';
+import { buildNegativeLabQcContactSheetArtifact } from '../negativeLabQcContactSheetArtifact';
+import { buildNegativeLabRollNormalizationPlan } from '../negativeLabRollNormalizationPlan';
 import {
   buildNegativeLabStockMetadataCounts,
   NEGATIVE_LAB_STOCK_METADATA_CATALOG,
-} from '../../negativeLabStockMetadataCatalog';
-import { buildNegativeLabStockRegistryCounts, NEGATIVE_LAB_STOCK_REGISTRY } from '../../negativeLabStockRegistry';
+} from '../negativeLabStockMetadataCatalog';
+import { buildNegativeLabStockRegistryCounts, NEGATIVE_LAB_STOCK_REGISTRY } from '../negativeLabStockRegistry';
 import { NegativeLabAppServerCommandName } from './negativeLabAppServerCommandNames';
 
 export const NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST = negativeLabAppServerRouteManifestSchema.parse({
@@ -108,8 +108,8 @@ export const buildNegativeLabConversionPlanResult = (
     proof: {
       densityAlgorithm: profile.params.print_curve_algorithm,
       deterministic: true,
-      generatedFrom: 'src/utils/negativeLabMeasuredProfileRuntime.ts',
-      runtimeConversionHelper: 'src/utils/negativeLabDensityConversion.ts',
+      generatedFrom: 'src/utils/negative-lab/negativeLabMeasuredProfileRuntime.ts',
+      runtimeConversionHelper: 'src/utils/negative-lab/negativeLabDensityConversion.ts',
     },
     sampleRect: parsedCommand.sampleRect,
     scope: parsedCommand.scope,
@@ -337,7 +337,7 @@ export const buildNegativeLabStockRegistryRouteResult = (
     counts: buildNegativeLabStockRegistryCounts(NEGATIVE_LAB_STOCK_REGISTRY),
     proof: {
       deterministic: true,
-      generatedFrom: 'src/utils/negativeLabStockRegistry.ts',
+      generatedFrom: 'src/utils/negative-lab/negativeLabStockRegistry.ts',
       namedStockClaimsRuntimeGated: true,
     },
     registry: NEGATIVE_LAB_STOCK_REGISTRY,
@@ -355,7 +355,7 @@ export const buildNegativeLabStockMetadataRouteResult = (
     counts: buildNegativeLabStockMetadataCounts(NEGATIVE_LAB_STOCK_METADATA_CATALOG),
     proof: {
       deterministic: true,
-      generatedFrom: 'src/utils/negativeLabStockMetadataCatalog.ts',
+      generatedFrom: 'src/utils/negative-lab/negativeLabStockMetadataCatalog.ts',
       metadataOnlyNotRuntimeApplied: true,
       namedStockClaimsRuntimeGated: true,
     },

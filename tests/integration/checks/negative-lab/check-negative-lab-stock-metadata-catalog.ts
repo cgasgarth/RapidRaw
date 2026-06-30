@@ -4,8 +4,8 @@ import { readFile } from 'node:fs/promises';
 
 import { negativeLabStockMetadataCatalogSchema } from '../../../../src/schemas/negative-lab/negativeLabStockMetadataCatalogSchemas.ts';
 import { FILM_LOOK_BROWSER_ITEMS } from '../../../../src/utils/film-look/filmLookRegistry.ts';
-import { NEGATIVE_LAB_MEASURED_PROFILE_CATALOG } from '../../../../src/utils/negativeLabMeasuredProfileRuntime.ts';
-import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../../../../src/utils/negativeLabPresetCatalog.ts';
+import { NEGATIVE_LAB_MEASURED_PROFILE_CATALOG } from '../../../../src/utils/negative-lab/negativeLabMeasuredProfileRuntime.ts';
+import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../../../../src/utils/negative-lab/negativeLabPresetCatalog.ts';
 
 const sourceUrl = new URL('../../../../src/data/negativeLabStockMetadataCatalog.json', import.meta.url);
 const fixtureUrl = new URL(

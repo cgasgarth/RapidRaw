@@ -5,7 +5,7 @@ import { TextVariants } from '../../../types/typography';
 import type {
   NegativeLabQcContactSheetArtifact,
   NegativeLabQcOverlayVisibility,
-} from '../../../utils/negativeLabQcContactSheetArtifact';
+} from '../../../utils/negative-lab/negativeLabQcContactSheetArtifact';
 import UiText from '../../ui/primitives/Text';
 import type { NegativeLabQcDecision } from './NegativeLabRollHealthModel';
 

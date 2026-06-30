@@ -1,4 +1,4 @@
-import type { NegativeLabBaseFogSampleRect } from '../schemas/negative-lab/negativeLabPresetCatalogSchemas';
+import type { NegativeLabBaseFogSampleRect } from '../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
 
 export interface NegativeLabPatchPickerPoint {
   x: number;

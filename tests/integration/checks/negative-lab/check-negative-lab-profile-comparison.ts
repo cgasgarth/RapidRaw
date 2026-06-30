@@ -7,12 +7,12 @@ import type { NegativeLabMeasuredProfileCatalog } from '../../../../src/schemas/
 import {
   buildNegativeLabRuntimeProfileBrowserRows,
   NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
-} from '../../../../src/utils/negativeLabMeasuredProfileRuntime.ts';
+} from '../../../../src/utils/negative-lab/negativeLabMeasuredProfileRuntime.ts';
 import {
   buildNegativeLabBrowserProfileProvenanceHash,
   buildNegativeLabProfileBoundPlanIdentity,
   buildNegativeLabProfileComparisonRows,
-} from '../../../../src/utils/negativeLabProfileComparison.ts';
+} from '../../../../src/utils/negative-lab/negativeLabProfileComparison.ts';
 
 const measuredCatalog: NegativeLabMeasuredProfileCatalog = {
   ...NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG.measuredCatalog,

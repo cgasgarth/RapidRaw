@@ -3,7 +3,7 @@
 import {
   buildNegativeLabBatchDryRunSummary,
   buildNegativeLabFrameHealthReport,
-} from '../../../../src/utils/negativeLabFrameHealth.ts';
+} from '../../../../src/utils/negative-lab/negativeLabFrameHealth.ts';
 
 const paths = ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'];
 const includedPathSet = new Set([paths[0], paths[1]]);

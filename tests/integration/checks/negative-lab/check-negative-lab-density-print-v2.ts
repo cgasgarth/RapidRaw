@@ -9,7 +9,7 @@ import {
   NEGATIVE_LAB_DENSITY_PRINT_V2_ALGORITHM_ID,
   type NegativeLabDensityBounds,
   type NegativeLabRgbTriplet,
-} from '../../../../src/utils/negativeLabDensityConversion.ts';
+} from '../../../../src/utils/negative-lab/negativeLabDensityConversion.ts';
 
 const EPSILON = 0.0000000001;
 

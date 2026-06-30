@@ -7,11 +7,11 @@ import {
   buildNegativeLabCrosstalkProfileProvenanceHash,
   NEGATIVE_LAB_IDENTITY_CROSSTALK_PROFILE,
   normalizeNegativeLabCrosstalkMatrixRows,
-} from '../../../src/utils/negativeLabCrosstalkProfile.ts';
+} from '../../../src/utils/negative-lab/negativeLabCrosstalkProfile.ts';
 import {
   buildNegativeLabRuntimeProfileProvenanceHash,
   resolveNegativeLabRuntimeProfile,
-} from '../../../src/utils/negativeLabMeasuredProfileRuntime.ts';
+} from '../../../src/utils/negative-lab/negativeLabMeasuredProfileRuntime.ts';
 
 describe('negative lab density crosstalk profiles', () => {
   test('keeps the RawEngine identity profile as a no-op', () => {

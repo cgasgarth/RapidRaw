@@ -79,83 +79,83 @@ import {
   DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID,
   getNegativeLabAcquisitionProfile,
   NEGATIVE_LAB_ACQUISITION_PROFILES,
-} from '../../../utils/negativeLabAcquisitionProfiles';
+} from '../../../utils/negative-lab/negativeLabAcquisitionProfiles';
 import {
   buildNegativeLabBaseSampleDecisionProof,
   buildNegativeLabBaseSamplePreviewProof,
   type NegativeLabBaseSamplePreviewProof,
   type NegativeLabBaseSamplePreviewProofContext,
   type NegativeLabBaseSampleWarningCode,
-} from '../../../utils/negativeLabBaseSampleCommandBridge';
-import { buildNegativeBaseFogDensitometerReadout } from '../../../utils/negativeLabDensitometer';
+} from '../../../utils/negative-lab/negativeLabBaseSampleCommandBridge';
+import { buildNegativeBaseFogDensitometerReadout } from '../../../utils/negative-lab/negativeLabDensitometer';
 import {
   buildNegativeLabDustScratchReviewReport,
   buildNegativeLabQcProofReport,
-} from '../../../utils/negativeLabDustScratchReview';
-import type { NegativeConversionEditorHandoff } from '../../../utils/negativeLabEditorHandoff';
+} from '../../../utils/negative-lab/negativeLabDustScratchReview';
+import type { NegativeConversionEditorHandoff } from '../../../utils/negative-lab/negativeLabEditorHandoff';
 import {
   buildNegativeLabCanSave,
   buildNegativeLabPositiveHandoffReadiness,
   buildNegativeLabSaveBlockedReason,
   buildNegativeLabWorkspaceProof,
   selectNegativeLabActivePositiveVariant,
-} from '../../../utils/negativeLabExportHandoff';
+} from '../../../utils/negative-lab/negativeLabExportHandoff';
 import {
   buildNegativeLabFrameExposureOverridePayload,
   getNegativeLabEffectiveFrameExposure,
   snapNegativeLabFrameExposureOffset,
-} from '../../../utils/negativeLabFrameExposureOverrides';
+} from '../../../utils/negative-lab/negativeLabFrameExposureOverrides';
 import {
   buildNegativeLabBatchDryRunSummary,
   buildNegativeLabFrameHealthReport,
   getNegativeLabScanLabel,
-} from '../../../utils/negativeLabFrameHealth';
+} from '../../../utils/negative-lab/negativeLabFrameHealth';
 import {
   buildNegativeLabFrameRgbBalanceOverridePayload,
   DEFAULT_NEGATIVE_LAB_FRAME_RGB_BALANCE_OFFSET,
   getNegativeLabEffectiveFrameRgbBalance,
   negativeLabFrameRgbBalanceOffsetIsZero,
   snapNegativeLabFrameRgbBalanceOffsets,
-} from '../../../utils/negativeLabFrameRgbBalanceOverrides';
+} from '../../../utils/negative-lab/negativeLabFrameRgbBalanceOverrides';
 import {
   NEGATIVE_LAB_OUTPUT_FORMAT_SELECTOR_IDS,
   NegativeLabOutputFormatId,
   type NegativeLabOutputFormatId as NegativeOutputFormat,
-} from '../../../utils/negativeLabOutputFormatIds';
+} from '../../../utils/negative-lab/negativeLabOutputFormatIds';
 import {
   buildNegativeLabPickedPatchRect,
   type NegativeLabPatchPickerPoint,
-} from '../../../utils/negativeLabPatchPicker';
-import { buildNegativeLabAcceptedPlanIdentity } from '../../../utils/negativeLabPlanIdentity';
+} from '../../../utils/negative-lab/negativeLabPatchPicker';
+import { buildNegativeLabAcceptedPlanIdentity } from '../../../utils/negative-lab/negativeLabPlanIdentity';
 import {
   DEFAULT_NEGATIVE_LAB_UI_PRESET,
   NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG,
-} from '../../../utils/negativeLabPresetCatalog';
+} from '../../../utils/negative-lab/negativeLabPresetCatalog';
 import {
   buildNegativeLabBrowserProfileProvenanceHash,
   buildNegativeLabProfileBoundPlanIdentity,
   buildNegativeLabProfileComparisonRows,
   buildNegativeLabSelectedProfileSnapshot,
-} from '../../../utils/negativeLabProfileComparison';
+} from '../../../utils/negative-lab/negativeLabProfileComparison';
 import {
   buildNegativeLabQcContactSheetArtifact,
   type NegativeLabQcOverlayVisibility,
-} from '../../../utils/negativeLabQcContactSheetArtifact';
+} from '../../../utils/negative-lab/negativeLabQcContactSheetArtifact';
 import {
   applyNegativeLabRollNormalizationPlan,
   type NegativeLabRollNormalizationApplyReceipt,
   type NegativeLabRollNormalizationRestoreReceipt,
   restoreNegativeLabRollNormalizationOverrides,
-} from '../../../utils/negativeLabRollNormalizationApply';
-import { buildNegativeLabRollNormalizationPlan } from '../../../utils/negativeLabRollNormalizationPlan';
+} from '../../../utils/negative-lab/negativeLabRollNormalizationApply';
+import { buildNegativeLabRollNormalizationPlan } from '../../../utils/negative-lab/negativeLabRollNormalizationPlan';
 import {
   buildNegativeLabStockMetadataCounts,
   NEGATIVE_LAB_STOCK_METADATA_CATALOG,
-} from '../../../utils/negativeLabStockMetadataCatalog';
+} from '../../../utils/negative-lab/negativeLabStockMetadataCatalog';
 import {
   buildNegativeLabStockRegistryCounts,
   NEGATIVE_LAB_STOCK_REGISTRY,
-} from '../../../utils/negativeLabStockRegistry';
+} from '../../../utils/negative-lab/negativeLabStockRegistry';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import { throttle } from '../../../utils/timing';
 import Button from '../../ui/primitives/Button';

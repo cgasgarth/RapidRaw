@@ -11,7 +11,7 @@ import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../utils/adj
 import { formatUnknownError } from '../../utils/errorFormatting';
 import type { ImageCacheEntry } from '../../utils/ImageLRUCache';
 import { hydrateLayerStackMasksFromMetadata } from '../../utils/layers/layerStackSidecarAdjustments';
-import { consumePendingNegativeConversionDustHealLayers } from '../../utils/negativeLabEditorHandoff';
+import { consumePendingNegativeConversionDustHealLayers } from '../../utils/negative-lab/negativeLabEditorHandoff';
 
 export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | null>) {
   const selectedImage = useEditorStore((s) => s.selectedImage);

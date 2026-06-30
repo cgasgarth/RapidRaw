@@ -5,12 +5,12 @@ import {
   type NegativeLabAutoDensitySuggestionState,
   type NegativeLabAutoDensityWarningCode,
   parseNegativeLabAutoDensitySuggestionRun,
-} from '../schemas/negative-lab/negativeLabAutoDensitySuggestionSchemas';
+} from '../../schemas/negative-lab/negativeLabAutoDensitySuggestionSchemas';
 
-import type { NegativeLabFrameHealthEntry } from '../schemas/negative-lab/negativeLabFrameHealthSchemas';
-import type { NegativeLabFrameRgbBalanceOffset } from '../schemas/negative-lab/negativeLabFrameRgbBalanceOverrideSchemas';
-import type { NegativeLabPresetParams } from '../schemas/negative-lab/negativeLabPresetCatalogSchemas';
-import type { NegativeLabScanMetricsV1 } from '../schemas/negative-lab/negativeLabScanMetricsSchemas';
+import type { NegativeLabFrameHealthEntry } from '../../schemas/negative-lab/negativeLabFrameHealthSchemas';
+import type { NegativeLabFrameRgbBalanceOffset } from '../../schemas/negative-lab/negativeLabFrameRgbBalanceOverrideSchemas';
+import type { NegativeLabPresetParams } from '../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
+import type { NegativeLabScanMetricsV1 } from '../../schemas/negative-lab/negativeLabScanMetricsSchemas';
 
 export interface NegativeLabFrameMetricsInput {
   frameId: string;
@@ -202,7 +202,7 @@ export const buildNegativeLabAutoDensitySuggestionRun = ({
     acceptedDryRunPlanId,
     confidenceThreshold,
     frameSuggestions,
-    generatedFrom: 'src/utils/negativeLabAutoDensitySuggestions.ts',
+    generatedFrom: 'src/utils/negative-lab/negativeLabAutoDensitySuggestions.ts',
     referenceDensityP50: round(referenceDensityP50, 4),
     referenceTexturalRangeP10P90: round(referenceTexturalRangeP10P90, 4),
     schemaVersion: NEGATIVE_LAB_AUTO_DENSITY_SUGGESTION_SCHEMA_VERSION,

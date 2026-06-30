@@ -10,8 +10,8 @@ import {
 import {
   buildNegativeLabDustScratchReviewReport,
   buildNegativeLabQcProofReport,
-} from '../../../../src/utils/negativeLabDustScratchReview.ts';
-import { buildNegativeLabFrameHealthReport } from '../../../../src/utils/negativeLabFrameHealth.ts';
+} from '../../../../src/utils/negative-lab/negativeLabDustScratchReview.ts';
+import { buildNegativeLabFrameHealthReport } from '../../../../src/utils/negative-lab/negativeLabFrameHealth.ts';
 
 const targetPaths = [
   '/fixtures/negative-lab/synthetic-color-negative-001.tif',

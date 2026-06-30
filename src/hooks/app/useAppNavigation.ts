@@ -16,7 +16,7 @@ import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } fro
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { findAlbumById } from '../../utils/folderTreeUtils';
 import { globalImageCache, type ImageCacheEntry } from '../../utils/ImageLRUCache';
-import { consumePendingNegativeConversionDustHealLayers } from '../../utils/negativeLabEditorHandoff';
+import { consumePendingNegativeConversionDustHealLayers } from '../../utils/negative-lab/negativeLabEditorHandoff';
 import { debouncedSave, debouncedSetHistory } from '../editor/useEditorActions';
 
 interface TransformController {

@@ -2,18 +2,18 @@
 
 import { z } from 'zod';
 import { buildNegativeLabPlanRollNormalizationRouteResult } from '../../../../src/utils/negative-lab/app-server/negativeLabAppServerRoutes.ts';
-import { buildNegativeLabFrameHealthReport } from '../../../../src/utils/negativeLabFrameHealth.ts';
-import { buildNegativeLabAcceptedPlanIdentity } from '../../../../src/utils/negativeLabPlanIdentity.ts';
-import { DEFAULT_NEGATIVE_LAB_UI_PRESET } from '../../../../src/utils/negativeLabPresetCatalog.ts';
+import { buildNegativeLabFrameHealthReport } from '../../../../src/utils/negative-lab/negativeLabFrameHealth.ts';
+import { buildNegativeLabAcceptedPlanIdentity } from '../../../../src/utils/negative-lab/negativeLabPlanIdentity.ts';
+import { DEFAULT_NEGATIVE_LAB_UI_PRESET } from '../../../../src/utils/negative-lab/negativeLabPresetCatalog.ts';
 import {
   applyNegativeLabRollNormalizationPlan,
   restoreNegativeLabRollNormalizationOverrides,
-} from '../../../../src/utils/negativeLabRollNormalizationApply.ts';
-import { buildNegativeLabRollNormalizationPlan } from '../../../../src/utils/negativeLabRollNormalizationPlan.ts';
+} from '../../../../src/utils/negative-lab/negativeLabRollNormalizationApply.ts';
+import { buildNegativeLabRollNormalizationPlan } from '../../../../src/utils/negative-lab/negativeLabRollNormalizationPlan.ts';
 import {
   buildNegativeLabScanMetricsV1,
   type NegativeLabScanMetricPixel,
-} from '../../../../src/utils/negativeLabScanMetrics.ts';
+} from '../../../../src/utils/negative-lab/negativeLabScanMetrics.ts';
 
 const transcriptSchema = z
   .object({

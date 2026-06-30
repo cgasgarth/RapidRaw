@@ -1,4 +1,4 @@
-import type { NegativeLabRuntimeProfileBrowserRow } from '../schemas/negative-lab/negativeLabMeasuredProfileSchemas';
+import type { NegativeLabRuntimeProfileBrowserRow } from '../../schemas/negative-lab/negativeLabMeasuredProfileSchemas';
 import {
   buildNegativeLabRuntimeProfileBrowserRows,
   NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,

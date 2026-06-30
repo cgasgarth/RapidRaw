@@ -12,15 +12,15 @@ import type { NegativeLabFrameRgbBalanceOffset } from '../../../schemas/negative
 import type { NegativeLabPresetParams } from '../../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
 import type { NegativeLabRollNormalizationPlan } from '../../../schemas/negative-lab/negativeLabRollNormalizationSchemas';
 import { TextVariants } from '../../../types/typography';
-import { snapNegativeLabFrameExposureOffset } from '../../../utils/negativeLabFrameExposureOverrides';
+import { snapNegativeLabFrameExposureOffset } from '../../../utils/negative-lab/negativeLabFrameExposureOverrides';
 import {
   negativeLabFrameRgbBalanceOffsetIsZero,
   snapNegativeLabFrameRgbBalanceOffsets,
-} from '../../../utils/negativeLabFrameRgbBalanceOverrides';
+} from '../../../utils/negative-lab/negativeLabFrameRgbBalanceOverrides';
 import type {
   NegativeLabRollNormalizationApplyReceipt,
   NegativeLabRollNormalizationRestoreReceipt,
-} from '../../../utils/negativeLabRollNormalizationApply';
+} from '../../../utils/negative-lab/negativeLabRollNormalizationApply';
 import UiText from '../../ui/primitives/Text';
 import {
   ACQUISITION_SOURCE_FAMILY_LABEL_KEYS,

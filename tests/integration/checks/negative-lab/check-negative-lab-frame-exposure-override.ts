@@ -8,8 +8,8 @@ import {
   buildNegativeLabFrameExposureOverridePayload,
   getNegativeLabEffectiveFrameExposure,
   snapNegativeLabFrameExposureOffset,
-} from '../../../../src/utils/negativeLabFrameExposureOverrides.ts';
-import { buildNegativeLabFrameHealthReport } from '../../../../src/utils/negativeLabFrameHealth.ts';
+} from '../../../../src/utils/negative-lab/negativeLabFrameExposureOverrides.ts';
+import { buildNegativeLabFrameHealthReport } from '../../../../src/utils/negative-lab/negativeLabFrameHealth.ts';
 
 const sourcePaths = ['/roll/frame-001.tif', '/roll/frame-002.tif'];
 const frameHealthReport = buildNegativeLabFrameHealthReport({

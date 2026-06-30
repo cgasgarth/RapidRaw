@@ -1,11 +1,11 @@
-import negativeLabMeasuredProfileCatalogJson from '../data/negativeLabMeasuredProfileCatalog.json';
+import negativeLabMeasuredProfileCatalogJson from '../../data/negativeLabMeasuredProfileCatalog.json';
 import {
   type NegativeLabProfileProvenanceHash,
   type NegativeLabRuntimeProfileApplyProof,
   type NegativeLabSelectedProfileSnapshotAppServer,
   negativeLabRuntimeProfileApplyProofSchema,
   negativeLabSelectedProfileSnapshotAppServerSchema,
-} from '../schemas/negative-lab/negativeLabAppServerSchemas';
+} from '../../schemas/negative-lab/negativeLabAppServerSchemas';
 import {
   type NegativeLabMeasuredProfile,
   type NegativeLabMeasuredProfileCatalog,
@@ -15,12 +15,12 @@ import {
   negativeLabResolvedRuntimeProfileSchema,
   negativeLabRuntimeProfileBrowserRowSchema,
   parseNegativeLabMeasuredProfileCatalog,
-} from '../schemas/negative-lab/negativeLabMeasuredProfileSchemas';
+} from '../../schemas/negative-lab/negativeLabMeasuredProfileSchemas';
 import {
   type NegativeLabBuiltInUiPresetCatalog,
   type NegativeLabPresetParams,
   parseNegativeLabBuiltInUiPresetCatalog,
-} from '../schemas/negative-lab/negativeLabPresetCatalogSchemas';
+} from '../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
 import {
   buildNegativeLabCrosstalkProfile,
   NEGATIVE_LAB_IDENTITY_CROSSTALK_PROFILE,
@@ -382,7 +382,7 @@ export const buildNegativeLabRuntimeProfileApplyProof = ({
   return negativeLabRuntimeProfileApplyProofSchema.parse({
     applyProof: {
       deterministic: true,
-      generatedFrom: 'src/utils/negativeLabMeasuredProfileRuntime.ts',
+      generatedFrom: 'src/utils/negative-lab/negativeLabMeasuredProfileRuntime.ts',
       outputMetricChanged: beforeMetricHash !== afterMetricHash,
       paramsHash: buildNegativeLabRuntimeApplyMetricHash(profile.params),
       previewProofHash: previewHash,

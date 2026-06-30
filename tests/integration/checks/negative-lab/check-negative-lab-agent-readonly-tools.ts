@@ -13,11 +13,11 @@ import {
   NEGATIVE_LAB_AGENT_ROLL_NORMALIZATION_PLAN_TOOL_NAME,
   NEGATIVE_LAB_AGENT_STOCK_FAMILY_PLAN_TOOL_NAME,
 } from '../../../../src/utils/negative-lab/app-server/negativeLabAgentReadOnlyAppServerTools.ts';
-import { NegativeLabOutputFormatId } from '../../../../src/utils/negativeLabOutputFormatIds.ts';
+import { NegativeLabOutputFormatId } from '../../../../src/utils/negative-lab/negativeLabOutputFormatIds.ts';
 import {
   buildNegativeLabScanMetricsV1,
   type NegativeLabScanMetricPixel,
-} from '../../../../src/utils/negativeLabScanMetrics.ts';
+} from '../../../../src/utils/negative-lab/negativeLabScanMetrics.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../../../../src/utils/rawEngineAppServerHost.ts';
 
 const sessionId = 'session_negative_lab_agent_readonly';
