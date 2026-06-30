@@ -1,5 +1,6 @@
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { TransformState } from '../../components/ui/AppProperties';
+import { getImageTransformBounds, type TransformBounds } from '../../utils/editorViewportBounds';
 import type { RenderSize } from './useImageRenderSize';
 
 interface EditorViewportPhysicsOptions {
@@ -8,13 +9,6 @@ interface EditorViewportPhysicsOptions {
   imageContainerRef: RefObject<HTMLDivElement | null>;
   imageRenderSize: RenderSize;
   onZoomed: (state: TransformState) => void;
-}
-
-export interface TransformBounds {
-  maxX: number;
-  maxY: number;
-  minX: number;
-  minY: number;
 }
 
 export function useEditorViewportPhysics({
@@ -73,13 +67,12 @@ export function useEditorViewportPhysics({
 
       const cw = container.clientWidth;
       const ch = container.clientHeight;
-      const scaledW = cw * scale;
-      const scaledH = ch * scale;
-
-      const [minX, maxX] = scaledW <= cw ? [(cw - scaledW) / 2, (cw - scaledW) / 2] : [cw - scaledW, 0];
-      const [minY, maxY] = scaledH <= ch ? [(ch - scaledH) / 2, (ch - scaledH) / 2] : [ch - scaledH, 0];
-
-      return { minX, maxX, minY, maxY };
+      return getImageTransformBounds({
+        containerHeight: ch,
+        containerWidth: cw,
+        renderSize: imageRenderSizeRef.current,
+        scale,
+      });
     },
     [imageContainerRef],
   );
