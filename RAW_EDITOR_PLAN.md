@@ -3994,7 +3994,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Issue: #2329
   - Bridge: `src/utils/selectiveColorCommandBridge.ts`
   - Runtime: `packages/rawengine-schema/src/localAppServerBridge.ts`
-  - Validation: `tests/integration/checks/check-selective-color-command-proof.ts`
+  - Validation: `tests/integration/checks/selective-color/check-selective-color-command-proof.ts`
   - Runtime status: orange selective color is command-buildable, local app-server dry-run/apply capable, and sidecar-proofed with synthetic preview/export parity; real RAW renderer/UI E2E remains tracked separately.
 - `color(skin): add skin tone uniformity controls`
   - Contract: `src/utils/skinToneUniformity.ts`

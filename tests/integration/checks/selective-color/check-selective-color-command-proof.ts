@@ -8,7 +8,7 @@ import { z } from 'zod';
 import {
   createRawEngineLocalAppServerBridge,
   rawEngineLocalAppServerBridgeCapabilities,
-} from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
+} from '../../../../packages/rawengine-schema/src/localAppServerBridge.ts';
 import {
   editGraphSnapshotV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
@@ -16,21 +16,21 @@ import {
   toneColorCommandEnvelopeV1Schema,
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   sampleEditGraphSnapshotV1,
   sampleRawEngineSceneColorPipelineV1,
-} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { proofContractSchema } from '../../../src/schemas/proofLevelSemanticsSchemas.ts';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+} from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
+import { proofContractSchema } from '../../../../src/schemas/proofLevelSemanticsSchemas.ts';
+import { INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
 import {
   applySelectiveColorCommandEnvelopeToAdjustments,
   buildSelectiveColorCommandEnvelope,
   buildSelectiveColorImageCommandContext,
   parseSelectiveColorCommandEnvelope,
   selectiveColorCommandEnvelopeSchema,
-} from '../../../src/utils/selectiveColorCommandBridge.ts';
-import { applySelectiveColorToRgbPixel, type RgbPixel } from '../../../src/utils/selectiveColorRuntime.ts';
+} from '../../../../src/utils/selectiveColorCommandBridge.ts';
+import { applySelectiveColorToRgbPixel, type RgbPixel } from '../../../../src/utils/selectiveColorRuntime.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/color-selective/selective-color-command-proof-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');
