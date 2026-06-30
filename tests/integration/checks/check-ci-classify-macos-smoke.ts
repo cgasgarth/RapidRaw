@@ -181,8 +181,11 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     'check:linear-gradient-mask-command',
     new Set(['bun tests/integration/checks/check-linear-gradient-mask-command.ts']),
   ],
-  ['check:session-import-reload-proof', new Set(['bun tests/integration/checks/check-session-import-reload-proof.ts'])],
-  ['check:library-session-ui', new Set(['bun tests/integration/checks/check-library-session-ui.ts'])],
+  [
+    'check:session-import-reload-proof',
+    new Set(['bun tests/integration/checks/library/check-session-import-reload-proof.ts']),
+  ],
+  ['check:library-session-ui', new Set(['bun tests/integration/checks/library/check-library-session-ui.ts'])],
   ['check:library-workflow-smoke', new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario library-workflow'])],
   ['check:panorama-ui-api', new Set(['bun tests/integration/checks/panorama/check-panorama-ui-api.ts'])],
   [

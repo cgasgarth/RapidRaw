@@ -6,9 +6,12 @@ import { basename, join } from 'node:path';
 
 import { z } from 'zod';
 
-import { type LibraryBackupFileEntry, parseLibraryBackupManifest } from '../../../src/schemas/libraryBackupSchemas.ts';
-import { parseLibrarySessionSet } from '../../../src/schemas/librarySessionSchemas.ts';
-import { buildLibraryBackupManifest, verifyLibraryBackupRestore } from '../../../src/utils/libraryBackupManifest.ts';
+import {
+  type LibraryBackupFileEntry,
+  parseLibraryBackupManifest,
+} from '../../../../src/schemas/libraryBackupSchemas.ts';
+import { parseLibrarySessionSet } from '../../../../src/schemas/librarySessionSchemas.ts';
+import { buildLibraryBackupManifest, verifyLibraryBackupRestore } from '../../../../src/utils/libraryBackupManifest.ts';
 
 const sourceManifestPath = 'fixtures/workflow/session-import-reload-proof.json';
 const backupRoot = 'artifacts/workflow/library-backup-restore-proof';
