@@ -8,7 +8,7 @@ import {
   layerStackSidecarV1Schema,
   readLayerStackSidecarsFromSidecar,
   upsertLayerStackSidecarInSidecar,
-} from '../../../packages/rawengine-schema/src';
+} from '../../../../packages/rawengine-schema/src';
 import {
   aiSidecarProvenanceEntryV1Schema,
   focusStackArtifactV1Schema,
@@ -16,11 +16,11 @@ import {
   negativeLabRollSessionArtifactV1Schema,
   panoramaArtifactV1Schema,
   superResolutionArtifactV1Schema,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   sampleFocusStackArtifactV1,
   sampleSuperResolutionArtifactV1,
-} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+} from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
 
 const ROOT = process.cwd();
 const FIXTURE_DIR = 'fixtures/sidecar-roundtrip';

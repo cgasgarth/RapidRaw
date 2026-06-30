@@ -4,16 +4,16 @@ import { readFileSync } from 'node:fs';
 
 import { z } from 'zod';
 
-import { displayPreviewLutStatusSchema } from '../../../src/schemas/displayProfileSchemas.ts';
+import { displayPreviewLutStatusSchema } from '../../../../src/schemas/displayProfileSchemas.ts';
 import {
   xmpMetadataConflictDecisionSchema,
   xmpMetadataConflictReportSchema,
-} from '../../../src/schemas/xmpMetadataConflictSchemas.ts';
+} from '../../../../src/schemas/xmpMetadataConflictSchemas.ts';
 import {
   buildDefaultXmpConflictDecisions,
   buildMetadataReadinessSummary,
   getDisplayPreviewLutLocaleStatus,
-} from '../../../src/utils/metadataPanelContracts.ts';
+} from '../../../../src/utils/metadataPanelContracts.ts';
 
 const failures: string[] = [];
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
