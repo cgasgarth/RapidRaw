@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import {
   NEGATIVE_LAB_WORKSPACE_SCHEMA_VERSION,
   negativeLabWorkspaceProofSchema,
-} from '../../../src/schemas/negativeLabWorkspaceSchemas.ts';
+} from '../../../src/schemas/negative-lab/negativeLabWorkspaceSchemas.ts';
 import {
   buildDustCandidateHealLayer,
   buildDustHealCorrectionMetrics,

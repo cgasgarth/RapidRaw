@@ -2,7 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 
-import { negativeLabShadowPatchBlackPointSuggestionSchema } from '../../../src/schemas/negativeLabShadowPatchBlackPointSuggestionSchemas.ts';
+import { negativeLabShadowPatchBlackPointSuggestionSchema } from '../../../src/schemas/negative-lab/negativeLabShadowPatchBlackPointSuggestionSchemas.ts';
 
 const suggestion = negativeLabShadowPatchBlackPointSuggestionSchema.parse({
   applicationRisk: 'low',

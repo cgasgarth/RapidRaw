@@ -2,7 +2,7 @@
 
 import { readFile } from 'node:fs/promises';
 
-import { parseNegativeLabConversionBundle } from '../../../src/schemas/negativeLabConversionBundleSchemas.ts';
+import { parseNegativeLabConversionBundle } from '../../../src/schemas/negative-lab/negativeLabConversionBundleSchemas.ts';
 import { validateNegativeLabConversionBundleReplay } from '../../../src/utils/negativeLabConversionBundle.ts';
 
 const bundlePath =

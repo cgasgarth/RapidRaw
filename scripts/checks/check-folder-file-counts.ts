@@ -58,6 +58,10 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4210',
     reason: 'schemas are pending product-domain grouping',
   },
+  'src/schemas/negative-lab': {
+    issue: '#4290',
+    reason: 'negative-lab schemas are grouped under their domain folder',
+  },
   'src/utils': {
     issue: '#4209',
     reason: 'utilities are pending owned-domain split',

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-
+import type { NegativeWarningV1 } from '../../packages/rawengine-schema/src/rawEngineSchemas';
 import type {
   NegativeLabAppServerCommand,
   NegativeLabDensitometerAppServerCommand,
@@ -7,7 +7,7 @@ import type {
   NegativeLabPlanRollNormalizationAppServerCommand,
   NegativeLabQcProofAppServerCommand,
   NegativeLabStockFamilyConversionAppServerCommand,
-} from '../schemas/negativeLabAppServerSchemas';
+} from '../schemas/negative-lab/negativeLabAppServerSchemas';
 import {
   negativeLabAppServerCommandSchema,
   negativeLabAppServerScopeSchema,
@@ -16,7 +16,7 @@ import {
   negativeLabPlanRollNormalizationAppServerCommandSchema,
   negativeLabQcProofAppServerCommandSchema,
   negativeLabStockFamilyConversionAppServerCommandSchema,
-} from '../schemas/negativeLabAppServerSchemas';
+} from '../schemas/negative-lab/negativeLabAppServerSchemas';
 import { NegativeLabAppServerCommandName } from './negativeLabAppServerCommandNames';
 import {
   buildNegativeLabConversionPlanResult,
@@ -300,8 +300,8 @@ export const buildNegativeLabAgentQcProofReadOnly = (request: NegativeLabAgentQc
   const parsedRequest = negativeLabAgentQcProofRequestSchema.parse(request);
   const qcProofBundle = buildNegativeLabQcProofRouteResult(parsedRequest.qc as NegativeLabQcProofAppServerCommand);
   const { artifact, report } = qcProofBundle;
-  const warningCodes = [...new Set(artifact.warnings.flatMap((warning) => warning.code))].sort((left, right) =>
-    left.localeCompare(right),
+  const warningCodes = [...new Set(artifact.warnings.map((warning: NegativeWarningV1) => warning.code))].sort(
+    (left, right) => left.localeCompare(right),
   );
   const responsePayload = {
     contactSheetArtifact: {

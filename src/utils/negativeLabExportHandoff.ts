@@ -2,7 +2,7 @@ import {
   NEGATIVE_LAB_WORKSPACE_SCHEMA_VERSION,
   type NegativeLabDustScratchReviewReport,
   type NegativeLabWorkspaceProof,
-} from '../schemas/negativeLabWorkspaceSchemas';
+} from '../schemas/negative-lab/negativeLabWorkspaceSchemas';
 
 import type { NegativeLabQcContactSheetArtifact } from './negativeLabQcContactSheetArtifact';
 

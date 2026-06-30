@@ -5,7 +5,7 @@ import {
   type NegativeLabScanMetricsV1,
   type NegativeLabScanMetricsWarningCode,
   negativeLabScanMetricsV1Schema,
-} from '../schemas/negativeLabScanMetricsSchemas';
+} from '../schemas/negative-lab/negativeLabScanMetricsSchemas';
 
 export interface NegativeLabScanMetricPixel {
   b: number;

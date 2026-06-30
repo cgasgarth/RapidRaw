@@ -5,7 +5,7 @@ import {
   type NegativeLabSelectedProfileSnapshotAppServer,
   negativeLabRuntimeProfileApplyProofSchema,
   negativeLabSelectedProfileSnapshotAppServerSchema,
-} from '../schemas/negativeLabAppServerSchemas';
+} from '../schemas/negative-lab/negativeLabAppServerSchemas';
 import {
   type NegativeLabMeasuredProfile,
   type NegativeLabMeasuredProfileCatalog,
@@ -15,12 +15,12 @@ import {
   negativeLabResolvedRuntimeProfileSchema,
   negativeLabRuntimeProfileBrowserRowSchema,
   parseNegativeLabMeasuredProfileCatalog,
-} from '../schemas/negativeLabMeasuredProfileSchemas';
+} from '../schemas/negative-lab/negativeLabMeasuredProfileSchemas';
 import {
   type NegativeLabBuiltInUiPresetCatalog,
   type NegativeLabPresetParams,
   parseNegativeLabBuiltInUiPresetCatalog,
-} from '../schemas/negativeLabPresetCatalogSchemas';
+} from '../schemas/negative-lab/negativeLabPresetCatalogSchemas';
 import {
   buildNegativeLabCrosstalkProfile,
   NEGATIVE_LAB_IDENTITY_CROSSTALK_PROFILE,

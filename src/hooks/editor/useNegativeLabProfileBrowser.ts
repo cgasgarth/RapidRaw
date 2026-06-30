@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { NegativeLabRuntimeProfileBrowserRow } from '../../schemas/negativeLabMeasuredProfileSchemas';
+import type { NegativeLabRuntimeProfileBrowserRow } from '../../schemas/negative-lab/negativeLabMeasuredProfileSchemas';
 import { buildNegativeLabProfileBrowserRows } from '../../utils/negativeLabProfileBrowserRows';
 import { listNegativeLabStockMetadataReferencesForPreset } from '../../utils/negativeLabStockMetadataCatalog';
 

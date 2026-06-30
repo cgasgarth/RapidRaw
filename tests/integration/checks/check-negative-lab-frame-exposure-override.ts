@@ -3,7 +3,7 @@
 import {
   NEGATIVE_LAB_FRAME_EXPOSURE_OVERRIDE_SCHEMA_VERSION,
   parseNegativeLabFrameExposureOverridePayload,
-} from '../../../src/schemas/negativeLabFrameExposureOverrideSchemas.ts';
+} from '../../../src/schemas/negative-lab/negativeLabFrameExposureOverrideSchemas.ts';
 import {
   buildNegativeLabFrameExposureOverridePayload,
   getNegativeLabEffectiveFrameExposure,

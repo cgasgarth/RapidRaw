@@ -2,7 +2,7 @@
 
 import { readFile } from 'node:fs/promises';
 
-import { negativeLabPresetParamsSchema } from '../../../src/schemas/negativeLabPresetCatalogSchemas.ts';
+import { negativeLabPresetParamsSchema } from '../../../src/schemas/negative-lab/negativeLabPresetCatalogSchemas.ts';
 import {
   convertNegativeLabDensitySamples,
   type NegativeLabRgbTriplet,

@@ -3,7 +3,7 @@
 import {
   NEGATIVE_LAB_FRAME_RGB_BALANCE_OVERRIDE_SCHEMA_VERSION,
   parseNegativeLabFrameRgbBalanceOverridePayload,
-} from '../../../src/schemas/negativeLabFrameRgbBalanceOverrideSchemas.ts';
+} from '../../../src/schemas/negative-lab/negativeLabFrameRgbBalanceOverrideSchemas.ts';
 import { buildNegativeLabFrameHealthReport } from '../../../src/utils/negativeLabFrameHealth.ts';
 import {
   buildNegativeLabFrameRgbBalanceOverridePayload,

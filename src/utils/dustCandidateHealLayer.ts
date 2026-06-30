@@ -3,7 +3,7 @@ import {
   type NegativeLabDustHealCorrectionMetrics,
   type NegativeLabDustScratchReviewReport,
   parseNegativeLabDustHealCorrectionMetrics,
-} from '../schemas/negativeLabWorkspaceSchemas';
+} from '../schemas/negative-lab/negativeLabWorkspaceSchemas';
 import { DEFAULT_LAYER_BLEND_MODE, INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from './adjustments';
 
 type DustScratchFrame = NegativeLabDustScratchReviewReport['frames'][number];

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { negativeLabRuntimeProfileBrowserRowSchema } from '../../../src/schemas/negativeLabMeasuredProfileSchemas.ts';
+import { negativeLabRuntimeProfileBrowserRowSchema } from '../../../src/schemas/negative-lab/negativeLabMeasuredProfileSchemas.ts';
 import {
   applyNegativeLabDensityCrosstalk,
   buildNegativeLabCrosstalkProfile,

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { NegativeLabPresetParams } from '../../../src/schemas/negativeLabPresetCatalogSchemas.ts';
+import type { NegativeLabPresetParams } from '../../../src/schemas/negative-lab/negativeLabPresetCatalogSchemas.ts';
 import { buildNegativeLabAutoDensitySuggestionRun } from '../../../src/utils/negativeLabAutoDensitySuggestions.ts';
 import { buildNegativeLabFrameHealthReport } from '../../../src/utils/negativeLabFrameHealth.ts';
 import { buildNegativeLabRollNormalizationPlan } from '../../../src/utils/negativeLabRollNormalizationPlan.ts';

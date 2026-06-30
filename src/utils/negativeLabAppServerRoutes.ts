@@ -45,7 +45,7 @@ import {
   negativeLabStockMetadataAppServerResultSchema,
   negativeLabStockRegistryAppServerCommandSchema,
   negativeLabStockRegistryAppServerResultSchema,
-} from '../schemas/negativeLabAppServerSchemas';
+} from '../schemas/negative-lab/negativeLabAppServerSchemas';
 import { NegativeLabAppServerCommandName } from './negativeLabAppServerCommandNames';
 import { buildNegativeBaseFogDensitometerReadout } from './negativeLabDensitometer';
 import { buildNegativeLabDustScratchReviewReport, buildNegativeLabQcProofReport } from './negativeLabDustScratchReview';
