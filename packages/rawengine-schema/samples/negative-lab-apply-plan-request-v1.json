@@ -1,8 +1,13 @@
 {
   "acknowledgedWarningCodes": ["lossy_input", "low_acquisition_confidence"],
   "acceptedDryRunPlanHash": "sha256:dry_run_plan_negative_conversion_sample",
+  "approval": {
+    "approvalClass": "edit_apply",
+    "reason": "Applying Negative Lab conversion requires an accepted dry-run plan and local operator approval.",
+    "state": "approved"
+  },
   "commandId": "command_negative_set_conversion_recipe_sample",
   "dryRunPlanId": "dry_run_plan_negative_conversion_sample",
-  "expectedSessionRevision": "session_rev_negative_7",
+  "expectedSessionRevision": "graph_rev_negative_7",
   "sessionId": "negative_roll_session_sample"
 }
