@@ -375,10 +375,16 @@ const BASE_SAMPLE_DECISION_LABEL_KEYS = {
   candidate: 'modals.negativeConversion.baseSampleDecision.candidate',
   rejected: 'modals.negativeConversion.baseSampleDecision.rejected',
 } satisfies Record<NegativeLabBaseSampleStudioDecision, BaseSampleDecisionLabelKey>;
+const BASE_FOG_LEFT_EDGE_SAMPLE_RECT = {
+  height: 0.6,
+  width: 0.12,
+  x: 0.02,
+  y: 0.2,
+} satisfies NegativeLabBaseFogSampleRect;
 const BASE_FOG_SAMPLE_PRESETS = [
   {
     labelKey: 'modals.negativeConversion.sampleLeftEdge',
-    rect: { height: 0.6, width: 0.12, x: 0.02, y: 0.2 },
+    rect: BASE_FOG_LEFT_EDGE_SAMPLE_RECT,
   },
   {
     labelKey: 'modals.negativeConversion.sampleCenterPatch',
@@ -1022,6 +1028,19 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   };
   const canSave = buildNegativeLabCanSave(exportReadinessInput);
   const saveBlockedReasonKey = buildNegativeLabSaveBlockedReason({ ...exportReadinessInput, canSave });
+  const baseReady = baseFogEstimate !== null;
+  const positivePreviewReady = previewUrl !== null && baseReady;
+  const baseSamplingActionLabelKey =
+    baseFogConfidence === null
+      ? 'modals.negativeConversion.estimateBaseSample'
+      : baseSampleStudioDecision === 'accepted'
+        ? 'modals.negativeConversion.baseSampleAccepted'
+        : 'modals.negativeConversion.acceptBaseSample';
+  const previewReadinessLabel = positivePreviewReady
+    ? t('modals.negativeConversion.previewReady')
+    : previewUrl === null
+      ? t('modals.negativeConversion.previewPending')
+      : t('modals.negativeConversion.baseSampleRequired');
   const qcProofReport = useMemo(() => {
     const exportReady = buildNegativeLabCanSave({
       baseReady: baseFogEstimate !== null,
@@ -1128,7 +1147,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           red: params.red_weight.toFixed(2),
         }),
         id: 'colorTiming',
-        isComplete: true,
+        isComplete: baseReady,
         label: t('modals.negativeConversion.workflowColorTiming'),
       },
       {
@@ -1137,7 +1156,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           retouchCount: dustScratchReviewReport.retouchCount,
         }),
         id: 'inspection',
-        isComplete: previewUrl !== null && dustScratchReviewReport.retouchCount === 0,
+        isComplete: positivePreviewReady && dustScratchReviewReport.retouchCount === 0,
         label: t('modals.negativeConversion.workflowInspection'),
       },
       {
@@ -1163,15 +1182,18 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               queuedCount: pathsToConvert.length,
             }),
         id: 'export',
-        isComplete: !isLoading && previewUrl !== null && pathsToConvert.length > 0,
+        isComplete: canSave,
         label: t('modals.negativeConversion.workflowExport'),
       },
     ],
     [
+      baseReady,
+      canSave,
       isLoading,
       isSaving,
       params,
       pathsToConvert.length,
+      positivePreviewReady,
       previewUrl,
       saveOptions.outputFormat,
       selectedProfile,
@@ -1205,11 +1227,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     },
     {
       id: 'inversion',
-      isReady: workspaceProof.previewReady,
+      isReady: positivePreviewReady,
       label: t('modals.negativeConversion.workflowColorTiming'),
-      value: workspaceProof.previewReady
-        ? t('modals.negativeConversion.previewReady')
-        : t('modals.negativeConversion.previewPending'),
+      value: previewReadinessLabel,
     },
     {
       id: 'qc',
@@ -2366,9 +2386,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                         data-disposition={frame.batchDisposition}
                         data-testid={`negative-lab-roll-frame-runtime-${index}`}
                       >
-                        {framePreviewReady
-                          ? t('modals.negativeConversion.previewReady')
-                          : t('modals.negativeConversion.previewPending')}
+                        {framePreviewReady ? previewReadinessLabel : t('modals.negativeConversion.previewPending')}
                       </span>
                       <span
                         className={cx(
@@ -2591,9 +2609,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             className="rounded-sm bg-bg-secondary px-2 py-1 text-text-secondary"
             data-testid="negative-lab-preview-status"
           >
-            {previewUrl === null
-              ? t('modals.negativeConversion.previewPending')
-              : t('modals.negativeConversion.previewReady')}
+            {previewReadinessLabel}
           </span>
           <span
             className="rounded-sm bg-bg-secondary px-2 py-1 text-text-secondary"
@@ -2660,7 +2676,12 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             <span className="rounded bg-bg-primary px-2 py-1" data-testid="negative-lab-v2-preview-export-status">
               {workspaceProof.exportReady
                 ? t('modals.negativeConversion.v2PreviewExportReady')
-                : t('modals.negativeConversion.v2PreviewExportBlocked')}
+                : t('modals.negativeConversion.saveBlockedByReason', {
+                    reason:
+                      saveBlockedReasonKey === null
+                        ? t('modals.negativeConversion.v2PreviewExportBlocked')
+                        : t(saveBlockedReasonKey),
+                  })}
             </span>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2" data-testid="negative-lab-v2-print-curve-controls">
@@ -2761,6 +2782,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       aria-label={t('modals.negativeConversion.walkthroughClosureTitle')}
       data-export-ready={String(workspaceProof.exportReady)}
       data-handoff-ready={String(activePositiveVariant !== null)}
+      data-positive-preview-ready={String(positivePreviewReady)}
       data-preview-ready={String(workspaceProof.previewReady)}
       data-profile-ready={String(selectedProfile !== null)}
       data-qc-export-ready={String(qcProofReport.exportReady)}
@@ -2811,6 +2833,111 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       </UiText>
     </div>
   );
+
+  const renderBaseSamplingCta = () => {
+    const blockedReasonLabel = saveBlockedReasonKey === null ? null : t(saveBlockedReasonKey);
+    const baseSamplingHint =
+      baseFogConfidence === null
+        ? t('modals.negativeConversion.baseSamplingCtaEstimateHint')
+        : baseSampleStudioDecision === 'accepted'
+          ? t('modals.negativeConversion.baseSamplingCtaReadyHint')
+          : t('modals.negativeConversion.baseSamplingCtaAcceptHint');
+
+    return (
+      <div
+        className={cx(
+          'space-y-2 rounded-md border p-3',
+          canSave ? 'border-accent bg-accent/10' : 'border-surface bg-bg-primary',
+        )}
+        aria-label={t('modals.negativeConversion.baseSamplingCtaTitle')}
+        data-base-ready={String(baseReady)}
+        data-can-save={canSave ? 'true' : 'false'}
+        data-preview-positive-ready={String(positivePreviewReady)}
+        data-sample-decision={baseSampleStudioDecision}
+        data-save-blocked-reason={saveBlockedReasonKey ?? ''}
+        data-testid="negative-lab-base-sampling-cta"
+        role="status"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <UiText variant={TextVariants.small} className="font-semibold text-text-primary">
+              {canSave
+                ? t('modals.negativeConversion.baseSamplingCtaReadyTitle')
+                : t('modals.negativeConversion.baseSamplingCtaTitle')}
+            </UiText>
+            <UiText variant={TextVariants.small} className="mt-1 text-text-secondary">
+              {baseSamplingHint}
+            </UiText>
+          </div>
+          <span
+            className={cx(
+              'shrink-0 rounded px-1.5 py-0.5 text-[11px]',
+              canSave ? 'bg-accent/15 text-text-primary' : 'bg-bg-primary text-text-secondary',
+            )}
+            data-testid="negative-lab-base-sampling-cta-status"
+          >
+            {canSave
+              ? t('modals.negativeConversion.baseSamplingCtaReadyTitle')
+              : (blockedReasonLabel ?? previewReadinessLabel)}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-[11px] text-text-secondary">
+          <span className="rounded bg-bg-primary px-2 py-1" data-testid="negative-lab-base-sampling-cta-preview">
+            {previewReadinessLabel}
+          </span>
+          <span className="rounded bg-bg-primary px-2 py-1" data-testid="negative-lab-base-sampling-cta-export">
+            {canSave
+              ? t('modals.negativeConversion.workflowExportReadyCount', {
+                  format: t(
+                    saveOptions.outputFormat === NegativeLabOutputFormatId.Tiff16
+                      ? 'modals.negativeConversion.outputFormats.tiff16'
+                      : 'modals.negativeConversion.outputFormats.jpeg_proof',
+                  ),
+                  queuedCount: workspaceProof.queuedCount,
+                })
+              : t('modals.negativeConversion.saveBlockedByReason', {
+                  reason: blockedReasonLabel ?? t('modals.negativeConversion.workflowExportBlocked'),
+                })}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            className="inline-flex items-center justify-center gap-1 rounded-md border border-accent bg-accent/10 px-2 py-1.5 text-xs text-text-primary transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-50"
+            data-testid="negative-lab-base-sampling-primary-action"
+            disabled={
+              !selectedImagePath ||
+              isEstimatingBaseFog ||
+              isSaving ||
+              (baseReady && baseSampleStudioDecision === 'accepted')
+            }
+            onClick={() => {
+              if (baseFogConfidence === null) {
+                void handleAutoBaseFog();
+                return;
+              }
+              handleAcceptBaseSample();
+            }}
+          >
+            {isEstimatingBaseFog ? <Loader2 size={13} className="animate-spin" /> : <WandSparkles size={13} />}
+            {t(baseSamplingActionLabelKey)}
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center justify-center gap-1 rounded-md border border-surface bg-bg-primary px-2 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+            data-testid="negative-lab-base-sampling-left-edge-action"
+            disabled={!selectedImagePath || isEstimatingBaseFog || isSaving}
+            onClick={() => {
+              void handleSampleBaseFog('modals.negativeConversion.sampleLeftEdge', BASE_FOG_LEFT_EDGE_SAMPLE_RECT);
+            }}
+          >
+            <CheckCircle2 size={13} />
+            {t('modals.negativeConversion.sampleLeftEdge')}
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   const renderAgentActivityPanel = () => (
     <div
@@ -3385,6 +3512,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             {renderAcquisitionHealth()}
             {renderScanInputGuidance()}
             {renderBatchReadiness()}
+            {renderBaseSamplingCta()}
             {renderWalkthroughClosure()}
             {renderAgentActivityPanel()}
           </div>
@@ -3775,6 +3903,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               <div
                 className="mb-2 grid grid-cols-3 gap-2 rounded-md border border-surface bg-bg-secondary p-2 text-[11px]"
                 data-export-ready={String(workspaceProof.exportReady)}
+                data-positive-preview-ready={String(positivePreviewReady)}
                 data-preview-ready={String(workspaceProof.previewReady)}
                 data-profile-status={selectedProfile.profileStatus}
                 data-runtime-status={selectedProfile.runtimeStatus}
@@ -3796,11 +3925,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                   <span className="block truncate text-text-tertiary">
                     {t('modals.negativeConversion.workflowColorTiming')}
                   </span>
-                  <span className="block truncate text-text-secondary">
-                    {workspaceProof.previewReady
-                      ? t('modals.negativeConversion.previewReady')
-                      : t('modals.negativeConversion.workflowExportBlocked')}
-                  </span>
+                  <span className="block truncate text-text-secondary">{previewReadinessLabel}</span>
                 </div>
                 <div
                   className="min-w-0 rounded bg-bg-primary px-2 py-1"
@@ -4838,6 +4963,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         <div
           className="mt-2 grid grid-cols-3 gap-2 border-t border-white/10 pt-2 text-[11px] text-white/65"
           data-export-ready={String(workspaceProof.exportReady)}
+          data-positive-preview-ready={String(positivePreviewReady)}
           data-preview-ready={String(workspaceProof.previewReady)}
           data-testid="negative-lab-workflow-readiness-strip"
         >
@@ -4845,9 +4971,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             {t('modals.negativeConversion.queuedScans', { queuedCount: workspaceProof.queuedCount })}
           </span>
           <span className="truncate rounded-sm bg-white/5 px-2 py-1" data-testid="negative-lab-workflow-preview">
-            {workspaceProof.previewReady
-              ? t('modals.negativeConversion.previewReady')
-              : t('modals.negativeConversion.previewPending')}
+            {previewReadinessLabel}
           </span>
           <span className="truncate rounded-sm bg-white/5 px-2 py-1" data-testid="negative-lab-workflow-export">
             {workspaceProof.exportReady
@@ -4954,6 +5078,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         className="sr-only"
         data-active-stage={workspaceProof.activeStage}
         data-export-ready={String(workspaceProof.exportReady)}
+        data-positive-preview-ready={String(positivePreviewReady)}
         data-preview-ready={String(workspaceProof.previewReady)}
         data-queued-count={workspaceProof.queuedCount}
         data-review-count={workspaceProof.reviewReport.reviewCount}
