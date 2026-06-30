@@ -19,7 +19,7 @@ import {
   LINEAR_GRADIENT_MASK_COMMAND_COORDINATE_SPACE,
 } from '../../../src/utils/linearGradientMaskCommandBridge.ts';
 
-const REPORT_PATH = 'docs/validation/linear-gradient-mask-apply-slice-2026-06-21.json';
+const REPORT_PATH = 'docs/validation/proofs/layers-masks/linear-gradient-mask-apply-slice-2026-06-21.json';
 const ARTIFACT_PATH = 'artifacts/validation/linear-gradient-mask-apply-slice.svg';
 const update = process.argv.includes('--update');
 

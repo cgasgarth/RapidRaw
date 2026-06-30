@@ -29,7 +29,7 @@ if (closure === undefined) {
 }
 
 const privateProof = privateProofSchema.parse(
-  JSON.parse(readFileSync('docs/validation/agent-real-raw-private-edit-proof-2026-06-22.json', 'utf8')),
+  JSON.parse(readFileSync('docs/validation/proofs/agent/agent-real-raw-private-edit-proof-2026-06-22.json', 'utf8')),
 );
 if (privateProof.changedPixelCount < 4) failures.push('Private RAW proof must show changed output pixels.');
 

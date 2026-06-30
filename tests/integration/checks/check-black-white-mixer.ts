@@ -14,7 +14,7 @@ import {
 import { applyBlackWhiteMixerToRgbPixel } from '../../../src/utils/blackWhiteMixerRuntime.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
-const REPORT_PATH = 'docs/validation/black-white-mixer-apply-proof-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/color/black-white-mixer-apply-proof-2026-06-18.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 
 const rgbPixelSchema = z

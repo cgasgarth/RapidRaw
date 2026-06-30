@@ -13,7 +13,7 @@ import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import { runAgentCoreEditCommandBundle } from '../../../src/utils/agentCoreEditCommandBundle.ts';
 import { planAgentEditRecipe } from '../../../src/utils/agentEditRecipePlanner.ts';
 
-const REPORT_PATH = 'docs/validation/agent-real-raw-private-edit-proof-2026-06-22.json';
+const REPORT_PATH = 'docs/validation/proofs/agent/agent-real-raw-private-edit-proof-2026-06-22.json';
 const PRIVATE_SOURCE = process.env.RAWENGINE_PRIVATE_RAW_SOURCE ?? '/Users/cgas/Pictures/Capture One/Alaska';
 const selectedPathOverride = process.env.RAWENGINE_AGENT_PRIVATE_RAW_PATH;
 const UPDATE_REPORT = process.argv.includes('--update');

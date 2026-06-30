@@ -3,7 +3,7 @@
 import { access, readFile } from 'node:fs/promises';
 import { z } from 'zod';
 
-const STATUS_PATH = 'docs/validation/layer-runtime-parent-status-2026-06-18.json';
+const STATUS_PATH = 'docs/validation/proofs/layers-masks/layer-runtime-parent-status-2026-06-18.json';
 const PACKAGE_PATH = 'package.json';
 
 const runtimeProofSchema = z

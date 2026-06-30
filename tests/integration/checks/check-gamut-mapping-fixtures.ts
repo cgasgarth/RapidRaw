@@ -16,7 +16,7 @@ import {
 } from '../../../src/utils/gamutMappingRuntime.ts';
 
 const FIXTURE_PATH = 'fixtures/color/gamut-mapping-fixtures.json';
-const REPORT_PATH = 'docs/validation/color-gamut-clipping-gate-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/color/color-gamut-clipping-gate-2026-06-18.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 const COMPONENT_BOUNDARY_EPSILON = 1e-12;
 const MIN_OUT_OF_GAMUT_MAGNITUDE = 1e-6;

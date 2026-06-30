@@ -21,8 +21,8 @@ import {
 import { sampleRawEngineSceneColorPipelineV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { agentExpertEditDemoWorkflowSchema } from '../../../src/schemas/agentExpertEditDemoWorkflowSchemas.ts';
 
-const REPORT_PATH = 'docs/validation/agent-expert-edit-demo-workflow-2026-06-21.json';
-const HTML_PATH = 'docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html';
+const REPORT_PATH = 'docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.json';
+const HTML_PATH = 'docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html';
 const UPDATE_REPORT = process.argv.includes('--update');
 
 const context = {

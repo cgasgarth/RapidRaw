@@ -8,7 +8,7 @@ import { z } from 'zod';
 
 import { rawOpenEditExportProofRequestSchema } from '../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
 
-const REPORT_PATH = 'docs/validation/professional-color-workflow-cc-raw-proof-2026-06-20.json';
+const REPORT_PATH = 'docs/validation/proofs/color-selective/professional-color-workflow-cc-raw-proof-2026-06-20.json';
 const REQUEST_PATH = 'fixtures/validation/professional-color-workflow-proof-request.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 const requireAssets = process.argv.includes('--require-assets');

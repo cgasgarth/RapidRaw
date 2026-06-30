@@ -10,12 +10,12 @@ import {
 import { collectProofContractFailures } from '../../../src/schemas/proofLevelSemanticsSchemas.ts';
 
 const proofContractReportPaths = [
-  'docs/validation/command-replay-render-proof-2026-06-20.json',
-  'docs/validation/selective-color-command-proof-2026-06-20.json',
+  'docs/validation/proofs/agent/command-replay-render-proof-2026-06-20.json',
+  'docs/validation/proofs/color-selective/selective-color-command-proof-2026-06-20.json',
   'fixtures/film-simulation/film-look-preview-export-parity.json',
-  'docs/validation/ai-denoise-quality-proof-2026-06-18.json',
+  'docs/validation/proofs/detail-retouch/ai-denoise-quality-proof-2026-06-18.json',
 ] as const;
-const aiDenoiseReportPath = 'docs/validation/ai-denoise-quality-proof-2026-06-18.json';
+const aiDenoiseReportPath = 'docs/validation/proofs/detail-retouch/ai-denoise-quality-proof-2026-06-18.json';
 const failures: string[] = [];
 
 for (const path of proofContractReportPaths) {

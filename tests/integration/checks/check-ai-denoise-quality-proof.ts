@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 
 import { isEligibleRealRun, parseAiDenoiseQualityReport } from '../../../src/schemas/aiDenoiseQualityReportSchemas.ts';
 
-const REPORT_PATH = 'docs/validation/ai-denoise-quality-proof-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/detail-retouch/ai-denoise-quality-proof-2026-06-18.json';
 const requireClosure = process.argv.includes('--require-closure');
 const requireRuntime = process.argv.includes('--require-runtime');
 

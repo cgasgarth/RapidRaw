@@ -64,7 +64,7 @@ const budgetMode = VITE_BUNDLE_BUDGET_POLICY.budgetMode;
 
 const formatBytes = (bytes: number) => `${(bytes / 1024).toFixed(1)} KiB`;
 const reproduceCommand = 'bun run check:bundle';
-const bundleRunbook = 'docs/tooling/vite-bundle-budget-2026-06-11.md';
+const bundleRunbook = 'docs/tooling/frontend/vite-bundle-budget-2026-06-11.md';
 
 if (process.argv.includes('--self-test')) {
   runSelfTest();

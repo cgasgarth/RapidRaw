@@ -16,7 +16,7 @@ items separately.
 For implementation details, see the
 [architecture baseline](../baseline/rapidraw-architecture-baseline-2026-06-11.md),
 [sidecar format baseline](../baseline/rapidraw-sidecar-format-baseline-2026-06-11.md),
-and [known limitations](../release/known-limitations-2026-06-11.md).
+and [known limitations](../release/process/known-limitations-2026-06-11.md).
 
 ## Before You Start
 
@@ -191,7 +191,7 @@ provenance logging, replay validation, and prompt-injection safety checks.
 ## Current Limitations
 
 The most important current limitations are summarized in the
-[known limitations page](../release/known-limitations-2026-06-11.md).
+[known limitations page](../release/process/known-limitations-2026-06-11.md).
 
 In short:
 

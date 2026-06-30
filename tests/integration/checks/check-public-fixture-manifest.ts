@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 import { parsePublicFixtureManifest } from '../../../src/schemas/publicFixtureManifestSchemas.ts';
 
-const manifestPath = 'docs/validation/public-fixture-manifest.json';
+const manifestPath = 'docs/validation/fixtures/public-fixture-manifest.json';
 const manifestJson: unknown = JSON.parse(await readFile(manifestPath, 'utf8'));
 const manifest = parsePublicFixtureManifest(manifestJson);
 const requiredHighIsoFixtureIds = new Set([

@@ -1713,13 +1713,13 @@ Negative lab ADRs:
 
 - `ADR-NEG-001: Negative lab architecture and edit graph integration`
 - `ADR-NEG-002: Density-domain inversion model`
-  ([draft ADR](docs/negative-lab/density-domain-inversion-adr-2026-06-13.md))
+  ([draft ADR](docs/negative-lab/architecture/density-domain-inversion-adr-2026-06-13.md))
 - `ADR-NEG-003: Input profile strategy for camera, flatbed, and lab scans`
-  ([draft ADR](docs/negative-lab/input-profile-strategy-adr-2026-06-13.md))
+  ([draft ADR](docs/negative-lab/architecture/input-profile-strategy-adr-2026-06-13.md))
 - `ADR-NEG-004: Film base sampling and roll-level calibration`
 - `ADR-NEG-005: Roll consistency and batch application semantics`
 - `ADR-NEG-006: Preset naming, trademark, provenance, and legal policy`
-  ([draft ADR](docs/negative-lab/preset-naming-legal-policy-2026-06-13.md))
+  ([draft ADR](docs/negative-lab/presets/preset-naming-legal-policy-2026-06-13.md))
 - `ADR-NEG-007: Built-in preset taxonomy and stock refresh cadence`
 - `ADR-NEG-008: Positive variant/export provenance`
 - `ADR-NEG-009: Negative fixture corpus and validation thresholds`
@@ -1729,7 +1729,7 @@ Negative lab ADRs:
 - `ADR-NEG-013: Synthetic negative generator and numeric quality gates`
 - `ADR-NEG-014: App-server safety model, file scope, dry-run, and rollback`
 - `ADR-NEG-015: Acquisition fixture manifest and provenance contract`
-  ([draft policy](docs/negative-lab/fixture-licensing-provenance-policy-2026-06-13.md))
+  ([draft policy](docs/negative-lab/fixtures/fixture-licensing-provenance-policy-2026-06-13.md))
 - `ADR-NEG-016: Named stock-profile measurement methodology and claims policy`
 - `ADR-NEG-017: Dedicated Negative Lab UI workflow architecture`
 - `ADR-NEG-018: Negative Lab performance budgets and macOS benchmark matrix`
@@ -3787,13 +3787,13 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `tooling(tsconfig): enforce noPropertyAccessFromIndexSignature`
 - `tooling(tsconfig): enable control-flow safety flags`
   - Issue: #1298
-  - Docs: `docs/tooling/ts-control-flow-flags-2026-06-15.md`
+  - Docs: `docs/tooling/typescript/ts-control-flow-flags-2026-06-15.md`
   - Validation: `bun run check:types`, `bun run schema:types`
   - Status: compiler hardening only; no runtime product behavior change.
 - `tooling(types): add generated type drift checks`
 - `tooling(types): add script type coverage baseline guard`
   - Issue: #1295
-  - Docs: `docs/tooling/script-type-coverage-2026-06-15.md`
+  - Docs: `docs/tooling/typescript/script-type-coverage-2026-06-15.md`
   - Validation: `bun run check:script-type-coverage`
   - Status: baseline guard only; full script `@ts-check`/TypeScript migration remains follow-up.
 - `tooling(eslint): audit current config and warning inventory`
@@ -3806,17 +3806,17 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `tooling(eslint): fail CI on warnings`
 - `tooling(eslint): promote unused vars to error`
   - Issue: #1288
-  - Docs: `docs/validation/unused-vars-error-2026-06-15.md`
+  - Docs: `docs/validation/harnesses/unused-vars-error-2026-06-15.md`
   - Validation: `bun run check:lint`, `bun run check:types`
   - Status: rule severity hardening only; no runtime product behavior change.
 - `tooling(eslint): make default lint zero-warning`
   - Issue: #1302
-  - Docs: `docs/tooling/lint-zero-warning-default-2026-06-15.md`
+  - Docs: `docs/tooling/linting/lint-zero-warning-default-2026-06-15.md`
   - Validation: `bun run lint`, `bun run check:lint`
   - Status: local command parity with PR lint only; no runtime product behavior change.
 - `tooling(casts): make unsafe-cast ban AST-backed`
   - Issue: #1299
-  - Docs: `docs/tooling/unsafe-cast-ast-guard-2026-06-15.md`
+  - Docs: `docs/tooling/linting/unsafe-cast-ast-guard-2026-06-15.md`
   - Validation: `bun scripts/check-unsafe-casts.ts --self-test`, `bun run check:unsafe-casts`
   - Status: guard hardening only; no runtime product behavior change.
 - `tooling(eslint): define allowed escape hatches`
@@ -3860,7 +3860,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `audit(ai): document current AI and generative hooks`
 - `validation(sidecar): add sidecar roundtrip tests`
 - `validation(history): add edit history replay tests`
-  - Docs: `docs/validation/edit-history-replay-2026-06-15.md`
+  - Docs: `docs/validation/harnesses/edit-history-replay-2026-06-15.md`
   - Validation: `scripts/check-edit-history-replay.ts`
   - Runtime status: current in-memory editor history push, undo, redo, jump, branch truncation, and 50-entry bound are helper-backed and fixture-validated; graph-native command replay remains future work.
 - `validation(render): add baseline render smoke tests`
@@ -3869,7 +3869,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `validation(render): add golden render command`
 - `validation(render): add image artifact comparison script`
   - Issue: #69
-  - Docs: `docs/validation/render-artifact-comparison-2026-06-15.md`
+  - Docs: `docs/validation/harnesses/render-artifact-comparison-2026-06-15.md`
   - Validation: `scripts/check-render-artifact-comparison.ts`
   - Runtime status: synthetic PPM artifact comparison foundation; renderer-produced RAW artifacts remain follow-up work.
 - `validation(performance): add performance smoke script`
@@ -3878,12 +3878,12 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 
 - `api(commands): add edit command bus`
   - Issue: #78
-  - Docs: `docs/api/edit-command-bus-2026-06-15.md`
+  - Docs: `docs/api/commands/edit-command-bus-2026-06-15.md`
   - Validation: `bun run schema:command-bus`
   - Status: schema-package dispatch foundation only; live UI/store/Tauri routing remains follow-up.
 - `api(commands): route representative UI operations through command bus`
   - Issue: #79
-  - Docs: `docs/api/mask-refinement-command-ui-routing-2026-06-15.md`
+  - Docs: `docs/api/commands/mask-refinement-command-ui-routing-2026-06-15.md`
   - Validation: `bun run check:mask-refine-command-ui`
   - Status: mask refinement UI dispatches typed in-process command; schema-package command bus/runtime replay/Tauri routing remain follow-up.
 
@@ -3932,7 +3932,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `api(export): define export recipe schema`
 - `api(schema): add schema validation`
   - Issue: #76
-  - Docs: `docs/api/tauri-schema-validation-2026-06-15.md`
+  - Docs: `docs/api/schema/tauri-schema-validation-2026-06-15.md`
   - Validation: `bun run check:tauri-schema-validation`
   - Status: first representative Tauri bridge response parses `get_folder_children` through Zod from `unknown`; full bridge/schema parity remains follow-up work.
 - `api(schema): add schema migration mechanism`
@@ -3946,34 +3946,34 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 #### Milestone 5: Color Pipeline Foundation
 
 - `color(audit): audit current RapidRAW color pipeline`
-  - Audit: `docs/color/current-color-pipeline-audit-2026-06-15.md`
+  - Audit: `docs/color/architecture/current-color-pipeline-audit-2026-06-15.md`
   - Validation: `scripts/check-color-pipeline-audit.ts`
   - Runtime status: audit/doc guard only; no pixel-path changes.
 - `color(adr): decide working color space`
-  - ADR: `docs/color/working-color-space-adr-2026-06-14.md`
+  - ADR: `docs/color/architecture/working-color-space-adr-2026-06-14.md`
 - `color(adr): decide scene-to-display transform strategy`
-  - ADR: `docs/color/scene-to-display-transform-adr-2026-06-14.md`
+  - ADR: `docs/color/architecture/scene-to-display-transform-adr-2026-06-14.md`
 - `color(adr): decide camera profile strategy`
-  - ADR: `docs/color/camera-profile-strategy-adr-2026-06-14.md`
+  - ADR: `docs/color/architecture/camera-profile-strategy-adr-2026-06-14.md`
 - `color(docs): add color pipeline design doc`
-  - Design: `docs/color/color-pipeline-design-2026-06-14.md`
+  - Design: `docs/color/architecture/color-pipeline-design-2026-06-14.md`
 - `validation(color): add ColorChecker fixture set`
   - Manifest: `fixtures/color/colorchecker-fixture-manifest.json`
-  - Docs: `docs/color/colorchecker-fixtures-2026-06-14.md`
+  - Docs: `docs/color/fixtures/colorchecker-fixtures-2026-06-14.md`
 - `validation(color): add DeltaE measurement harness`
   - Fixtures: `fixtures/color/deltae-reference-fixtures.json`
-  - Docs: `docs/color/deltae-harness-2026-06-14.md`
+  - Docs: `docs/color/fixtures/deltae-harness-2026-06-14.md`
 - `validation(color): add histogram and scope validation`
 - `validation(color): add CPU GPU parity checks for core color operations`
   - Fixtures: `fixtures/color/cpu-gpu-parity-fixtures.json`
-  - Docs: `docs/color/color-cpu-gpu-parity-2026-06-14.md`
+  - Docs: `docs/color/runtime/color-cpu-gpu-parity-2026-06-14.md`
   - Runtime status: WGSL contract CPU mirror; live GPU readback remains future work.
 - `color(wb): add white balance picker tests`
-  - Validation doc: `docs/color/white-balance-picker-validation-2026-06-14.md`
+  - Validation doc: `docs/color/runtime/white-balance-picker-validation-2026-06-14.md`
 - `color(profile): add camera profile lookup tests`
 - `color(cat): add chromatic adaptation plan`
 - `color(gamut): add gamut mapping plan`
-  - Design: `docs/color/gamut-mapping-plan-2026-06-15.md`
+  - Design: `docs/color/architecture/gamut-mapping-plan-2026-06-15.md`
   - Fixtures: `fixtures/color/gamut-mapping-fixtures.json`
   - Validation: `scripts/check-gamut-mapping-fixtures.ts`
   - Runtime status: schema/fixture contract only; preview/export pixel mapping remains future work.
@@ -3983,12 +3983,12 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `color(selective): add advanced selective color ranges`
   - Contract: `src/utils/selectiveColorRanges.ts`
   - Fixtures: `fixtures/color/selective-color-ranges.json`
-  - Docs: `docs/color/selective-color-ranges-2026-06-14.md`
+  - Docs: `docs/color/selective-color/selective-color-ranges-2026-06-14.md`
   - Runtime status: UI range metadata is shared and validated against WGSL; interactive range-width editing remains future work.
 - `color(selective): add range smoothness and falloff controls`
   - Contract: `src/utils/selectiveColorFalloff.ts`
   - Fixtures: `fixtures/color/selective-color-falloff-fixtures.json`
-  - Docs: `docs/color/selective-color-falloff-2026-06-14.md`
+  - Docs: `docs/color/selective-color/selective-color-falloff-2026-06-14.md`
   - Runtime status: default falloff math is available and validated; user-adjustable smoothness UI remains future work.
 - `color(selective): implement first selective color command`
   - Issue: #2329
@@ -3999,12 +3999,12 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `color(skin): add skin tone uniformity controls`
   - Contract: `src/utils/skinToneUniformity.ts`
   - Fixtures: `fixtures/color/skin-tone-uniformity-fixtures.json`
-  - Docs: `docs/color/skin-tone-uniformity-2026-06-14.md`
+  - Docs: `docs/color/selective-color/skin-tone-uniformity-2026-06-14.md`
   - Runtime status: uniformity math is available and fixture-backed; full UI and renderer integration remain future work.
 - `color(mask): create color masks from selected ranges`
   - Contract: `src/utils/selectiveColorMask.ts`
   - Fixtures: `fixtures/color/selective-color-mask-fixtures.json`
-  - Docs: `docs/color/selective-color-mask-contract-2026-06-14.md`
+  - Docs: `docs/color/selective-color/selective-color-mask-contract-2026-06-14.md`
   - Runtime status: selected-range to color-mask conversion is fixture-backed; full UI command wiring remains future work.
 - `color(grading): refine color grading wheels`
 - `color(balance-rgb): add color balance RGB style module`
@@ -4046,7 +4046,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Status: UI-to-runtime plumbing; real-image quality tuning remains a follow-up.
 - 2026-06-15: Added typed mask refinement command schema and sample payload.
   - Issue: #1258
-  - Docs: `docs/api/mask-refinement-command-2026-06-15.md`
+  - Docs: `docs/api/commands/mask-refinement-command-2026-06-15.md`
   - Validation: `bun run schema:check`
   - Status: schema/sample command surface; live UI command-bus routing remains a follow-up.
   - Runtime status: feather, density, edge shift, smoothness, and edge contrast schemas plus refined weight evaluation are fixture-validated and wired into the Rust mask renderer; user-facing controls remain future work.
@@ -4207,7 +4207,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `validation(panorama): add panorama performance tests`
   - Fixture manifest: `fixtures/panorama/panorama-performance-fixtures.json`
   - Validation: `bun run check:panorama-performance-fixtures`
-  - Doc: `docs/panorama/performance-validation-contract-2026-06-14.md`
+  - Doc: `docs/panorama/validation/performance-validation-contract-2026-06-14.md`
 
 #### Milestone 12: Focus Stacking
 
@@ -4276,7 +4276,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `validation(sr): add performance tests`
   - Doc: `docs/super-resolution/performance-validation-contract-2026-06-14.md`
   - Script: `scripts/check-super-resolution-performance-fixtures.ts`
-  - Fixture manifest: `docs/validation/super-resolution-performance-fixtures.json`
+  - Fixture manifest: `docs/validation/fixtures/super-resolution-performance-fixtures.json`
 - `validation(sr): add visual artifact review checklist`
   - Doc: `docs/super-resolution/visual-artifact-review-checklist-2026-06-14.md`
 
@@ -4592,11 +4592,11 @@ Issues:
 - Replace full PR package builds with a macOS no-bundle smoke path where practical, while keeping full package builds on `main` and release.
 - Wire reusable build `upload-artifacts` input so PRs can skip uploads when artifacts are not useful and main/release can keep evidence.
 - Add release workflow skeleton. Current unsigned artifact dry-run:
-  `docs/release/unsigned-release-artifact-workflow-2026-06-11.md`.
+  `docs/release/process/unsigned-release-artifact-workflow-2026-06-11.md`.
 - Add SBOM/checksum generation. Current release metadata doc:
-  `docs/release/release-metadata-checksums-sbom-2026-06-11.md`.
+  `docs/release/evidence/release-metadata-checksums-sbom-2026-06-11.md`.
 - Add notarization/signing placeholder documentation:
-  `docs/release/macos-signing-notarization-placeholders-2026-06-11.md`.
+  `docs/release/macos/macos-signing-notarization-placeholders-2026-06-11.md`.
 - Add failure artifact uploads. Current failure artifact policy:
   `docs/ci/failure-artifacts-2026-06-11.md`.
 - Merge queue evaluation is captured in
@@ -4718,7 +4718,7 @@ Issues:
 - Add camera profile lookup tests.
 - Add chromatic adaptation module or integration plan.
 - Add gamut mapping plan.
-  - Schema/fixture contract: `docs/color/gamut-mapping-plan-2026-06-15.md`.
+  - Schema/fixture contract: `docs/color/architecture/gamut-mapping-plan-2026-06-15.md`.
   - Runtime proof required later before any preview/export applied claim.
 
 Definition of done:
@@ -5041,7 +5041,7 @@ Goal: produce professional editable panorama outputs.
 Issues:
 
 - Consult on panorama architecture. Review captured in
-  `docs/panorama/panorama-architecture-consult-2026-06-13.md`; follow-up
+  `docs/panorama/architecture/panorama-architecture-consult-2026-06-13.md`; follow-up
   issues added for schema hardening, engine adapter boundary, dry-run
   preflight, durable artifact persistence, and OpenCV backend evaluation.
 - Harden artifact schema support invariants.
@@ -5049,43 +5049,43 @@ Issues:
 - Add dry-run memory and geometry preflight.
 - Persist editable derived panorama sources.
 - Audit existing RapidRAW panorama stitcher. Initial audit captured in
-  `docs/panorama/rapidraw-stitcher-audit-2026-06-13.md`.
+  `docs/panorama/architecture/rapidraw-stitcher-audit-2026-06-13.md`.
 - Define panorama artifact schema. Initial contract captured in
-  `docs/panorama/panorama-artifact-schema-2026-06-13.md`.
+  `docs/panorama/artifact-contracts/panorama-artifact-schema-2026-06-13.md`.
 - Add projection options. Initial contract captured in
-  `docs/panorama/projection-options-2026-06-13.md`.
+  `docs/panorama/projection/projection-options-2026-06-13.md`.
 - Add auto crop/boundary controls. Initial contract captured in
-  `docs/panorama/boundary-controls-2026-06-13.md`.
+  `docs/panorama/projection/boundary-controls-2026-06-13.md`.
 - Add exposure normalization. Initial contract captured in
-  `docs/panorama/exposure-normalization-2026-06-13.md`.
+  `docs/panorama/projection/exposure-normalization-2026-06-13.md`.
 - Add multi-row support audit. Initial audit captured in
-  `docs/panorama/multi-row-support-audit-2026-06-13.md`.
+  `docs/panorama/projection/multi-row-support-audit-2026-06-13.md`.
 - Add large panorama tiling strategy. Initial strategy captured in
-  `docs/panorama/large-panorama-tiling-strategy-2026-06-13.md`.
+  `docs/panorama/architecture/large-panorama-tiling-strategy-2026-06-13.md`.
 - Persist editable derived panorama sources. Initial sidecar preservation
   contract captured in
-  `docs/panorama/panorama-sidecar-artifact-persistence-2026-06-13.md`.
+  `docs/panorama/artifact-contracts/panorama-sidecar-artifact-persistence-2026-06-13.md`.
 - Define backend capability contract. Initial contract captured in
-  `docs/panorama/panorama-backend-capability-contract-2026-06-13.md`.
+  `docs/panorama/architecture/panorama-backend-capability-contract-2026-06-13.md`.
 - Add panorama fixture set.
 - Add panorama UI.
 - Add panorama API tools.
   Initial app-server dry-run/apply tool contracts captured in
   `packages/rawengine-schema/samples/computational-merge-app-server-tool-manifest-v1.json`.
 - Evaluate OpenCV stitching backend. Initial evaluation captured in
-  `docs/panorama/opencv-backend-evaluation-2026-06-13.md`; recommendation is
+  `docs/panorama/opencv/opencv-backend-evaluation-2026-06-13.md`; recommendation is
   optional spike behind the panorama adapter, not a default dependency.
 - Compare OpenCV seam and exposure strategies against the legacy engine.
   Initial comparison captured in
-  `docs/panorama/opencv-seam-exposure-comparison-2026-06-13.md`.
+  `docs/panorama/opencv/opencv-seam-exposure-comparison-2026-06-13.md`.
 - Document OpenCV macOS packaging and codesigning proof before promotion.
   Initial gate captured in
-  `docs/panorama/opencv-macos-packaging-proof-2026-06-13.md`.
+  `docs/panorama/opencv/opencv-macos-packaging-proof-2026-06-13.md`.
 - Decide OpenCV required-CI promotion criteria. Initial policy captured in
-  `docs/panorama/opencv-required-ci-promotion-2026-06-13.md`.
+  `docs/panorama/opencv/opencv-required-ci-promotion-2026-06-13.md`.
 - Add panorama performance tests.
   Initial metadata-only gate captured in
-  `docs/panorama/performance-validation-contract-2026-06-14.md`.
+  `docs/panorama/validation/performance-validation-contract-2026-06-14.md`.
 
 Definition of done:
 
@@ -5219,7 +5219,7 @@ Issues:
 - Add notarization workflow.
 - Add update mechanism research.
 - Add release notes automation. Initial script, workflow job, and validation
-  captured in `docs/release/release-notes-automation-2026-06-13.md`.
+  captured in `docs/release/process/release-notes-automation-2026-06-13.md`.
 - Add documentation site.
 - Add user guide.
 - Add developer API guide.

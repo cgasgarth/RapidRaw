@@ -7,7 +7,7 @@ import { calculateSelectiveColorInfluence } from '../../../src/utils/selectiveCo
 import { applySelectiveColorToRgbPixel } from '../../../src/utils/selectiveColorRuntime.ts';
 
 const FIXTURE_PATH = 'fixtures/color/selective-color-falloff-fixtures.json';
-const REPORT_PATH = 'docs/validation/selective-color-apply-proof-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/color-selective/selective-color-apply-proof-2026-06-18.json';
 const SHADER_PATH = 'src-tauri/src/shaders/shader.wgsl';
 const UPDATE_REPORT = process.argv.includes('--update');
 

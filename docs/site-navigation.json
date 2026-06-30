@@ -15,19 +15,19 @@
         },
         {
           "title": "Known limitations",
-          "path": "docs/release/known-limitations-2026-06-11.md"
+          "path": "docs/release/process/known-limitations-2026-06-11.md"
         },
         {
           "title": "Privacy policy",
-          "path": "docs/release/privacy-policy-2026-06-11.md"
+          "path": "docs/release/policy/privacy-policy-2026-06-11.md"
         },
         {
           "title": "Crash and error reporting strategy",
-          "path": "docs/release/crash-error-reporting-strategy-2026-06-11.md"
+          "path": "docs/release/policy/crash-error-reporting-strategy-2026-06-11.md"
         },
         {
           "title": "Telemetry opt-in decision",
-          "path": "docs/release/telemetry-opt-in-decision-2026-06-11.md"
+          "path": "docs/release/policy/telemetry-opt-in-decision-2026-06-11.md"
         }
       ]
     },
@@ -36,35 +36,35 @@
       "items": [
         {
           "title": "Developer API guide",
-          "path": "docs/api/developer-api-guide-2026-06-11.md"
+          "path": "docs/api/guide/developer-api-guide-2026-06-11.md"
         },
         {
           "title": "Edit command API baseline",
-          "path": "docs/api/edit-command-api-2026-06-11.md"
+          "path": "docs/api/commands/edit-command-api-2026-06-11.md"
         },
         {
           "title": "Tauri schema validation boundary",
-          "path": "docs/api/tauri-schema-validation-2026-06-15.md"
+          "path": "docs/api/schema/tauri-schema-validation-2026-06-15.md"
         },
         {
           "title": "Mask refinement command",
-          "path": "docs/api/mask-refinement-command-2026-06-15.md"
+          "path": "docs/api/commands/mask-refinement-command-2026-06-15.md"
         },
         {
           "title": "Edit command bus",
-          "path": "docs/api/edit-command-bus-2026-06-15.md"
+          "path": "docs/api/commands/edit-command-bus-2026-06-15.md"
         },
         {
           "title": "UI edit surface API coverage",
-          "path": "docs/api/ui-edit-surface-coverage-2026-06-16.md"
+          "path": "docs/api/surface-coverage/ui-edit-surface-coverage-2026-06-16.md"
         },
         {
           "title": "Mask refinement UI command routing",
-          "path": "docs/api/mask-refinement-command-ui-routing-2026-06-15.md"
+          "path": "docs/api/commands/mask-refinement-command-ui-routing-2026-06-15.md"
         },
         {
           "title": "RawEngine schema package",
-          "path": "docs/api/rawengine-schema-package-2026-06-13.md"
+          "path": "docs/api/schema/rawengine-schema-package-2026-06-13.md"
         },
         {
           "title": "Sample agent guide",
@@ -88,47 +88,47 @@
         },
         {
           "title": "Working color space ADR",
-          "path": "docs/color/working-color-space-adr-2026-06-14.md"
+          "path": "docs/color/architecture/working-color-space-adr-2026-06-14.md"
         },
         {
           "title": "Scene-to-display transform ADR",
-          "path": "docs/color/scene-to-display-transform-adr-2026-06-14.md"
+          "path": "docs/color/architecture/scene-to-display-transform-adr-2026-06-14.md"
         },
         {
           "title": "Camera profile strategy ADR",
-          "path": "docs/color/camera-profile-strategy-adr-2026-06-14.md"
+          "path": "docs/color/architecture/camera-profile-strategy-adr-2026-06-14.md"
         },
         {
           "title": "Color pipeline design",
-          "path": "docs/color/color-pipeline-design-2026-06-14.md"
+          "path": "docs/color/architecture/color-pipeline-design-2026-06-14.md"
         },
         {
           "title": "Current color pipeline audit",
-          "path": "docs/color/current-color-pipeline-audit-2026-06-15.md"
+          "path": "docs/color/architecture/current-color-pipeline-audit-2026-06-15.md"
         },
         {
           "title": "White balance picker validation",
-          "path": "docs/color/white-balance-picker-validation-2026-06-14.md"
+          "path": "docs/color/runtime/white-balance-picker-validation-2026-06-14.md"
         },
         {
           "title": "ColorChecker fixture manifest",
-          "path": "docs/color/colorchecker-fixtures-2026-06-14.md"
+          "path": "docs/color/fixtures/colorchecker-fixtures-2026-06-14.md"
         },
         {
           "title": "Selective color ranges",
-          "path": "docs/color/selective-color-ranges-2026-06-14.md"
+          "path": "docs/color/selective-color/selective-color-ranges-2026-06-14.md"
         },
         {
           "title": "Selective color falloff",
-          "path": "docs/color/selective-color-falloff-2026-06-14.md"
+          "path": "docs/color/selective-color/selective-color-falloff-2026-06-14.md"
         },
         {
           "title": "Skin-tone uniformity",
-          "path": "docs/color/skin-tone-uniformity-2026-06-14.md"
+          "path": "docs/color/selective-color/skin-tone-uniformity-2026-06-14.md"
         },
         {
           "title": "Color editor runtime status UI",
-          "path": "docs/color/color-editor-runtime-status-ui-2026-06-18.md"
+          "path": "docs/color/runtime/color-editor-runtime-status-ui-2026-06-18.md"
         },
         {
           "title": "Layer workflow model",
@@ -156,19 +156,19 @@
         },
         {
           "title": "Selective color mask contract",
-          "path": "docs/color/selective-color-mask-contract-2026-06-14.md"
+          "path": "docs/color/selective-color/selective-color-mask-contract-2026-06-14.md"
         },
         {
           "title": "DeltaE harness",
-          "path": "docs/color/deltae-harness-2026-06-14.md"
+          "path": "docs/color/fixtures/deltae-harness-2026-06-14.md"
         },
         {
           "title": "Color preview/export parity fixtures",
-          "path": "docs/color/color-cpu-gpu-parity-2026-06-14.md"
+          "path": "docs/color/runtime/color-cpu-gpu-parity-2026-06-14.md"
         },
         {
           "title": "Gamut mapping plan",
-          "path": "docs/color/gamut-mapping-plan-2026-06-15.md"
+          "path": "docs/color/architecture/gamut-mapping-plan-2026-06-15.md"
         },
         {
           "title": "Film simulation architecture",
@@ -208,139 +208,139 @@
         },
         {
           "title": "Negative Lab architecture overview",
-          "path": "docs/negative-lab/architecture-overview-2026-06-13.md"
+          "path": "docs/negative-lab/architecture/architecture-overview-2026-06-13.md"
         },
         {
           "title": "Negative Lab consult design review",
-          "path": "docs/negative-lab/consult-design-review-2026-06-13.md"
+          "path": "docs/negative-lab/architecture/consult-design-review-2026-06-13.md"
         },
         {
           "title": "Negative Lab density-domain inversion ADR",
-          "path": "docs/negative-lab/density-domain-inversion-adr-2026-06-13.md"
+          "path": "docs/negative-lab/architecture/density-domain-inversion-adr-2026-06-13.md"
         },
         {
           "title": "Negative Lab input profile strategy ADR",
-          "path": "docs/negative-lab/input-profile-strategy-adr-2026-06-13.md"
+          "path": "docs/negative-lab/architecture/input-profile-strategy-adr-2026-06-13.md"
         },
         {
           "title": "Negative Lab API command surface ADR",
-          "path": "docs/negative-lab/api-command-surface-adr-2026-06-13.md"
+          "path": "docs/negative-lab/architecture/api-command-surface-adr-2026-06-13.md"
         },
         {
           "title": "Negative Lab conversion operation schema",
-          "path": "docs/negative-lab/conversion-operation-schema-2026-06-13.md"
+          "path": "docs/negative-lab/validation/conversion-operation-schema-2026-06-13.md"
         },
         {
           "title": "Negative Lab preset naming and legal policy ADR",
-          "path": "docs/negative-lab/preset-naming-legal-policy-2026-06-13.md"
+          "path": "docs/negative-lab/presets/preset-naming-legal-policy-2026-06-13.md"
         },
         {
           "title": "Negative Lab fixture licensing and provenance policy",
-          "path": "docs/negative-lab/fixture-licensing-provenance-policy-2026-06-13.md"
+          "path": "docs/negative-lab/fixtures/fixture-licensing-provenance-policy-2026-06-13.md"
         },
         {
           "title": "Negative Lab scan fixture manifest",
-          "path": "docs/negative-lab/negative-scan-fixture-manifest-2026-06-13.md"
+          "path": "docs/negative-lab/fixtures/negative-scan-fixture-manifest-2026-06-13.md"
         },
         {
           "title": "Negative Lab scanner and camera input profiles",
-          "path": "docs/negative-lab/scanner-camera-input-profiles-2026-06-13.md"
+          "path": "docs/negative-lab/fixtures/scanner-camera-input-profiles-2026-06-13.md"
         },
         {
           "title": "Negative Lab dedicated workspace UI",
-          "path": "docs/negative-lab/dedicated-workspace-ui-2026-06-13.md"
+          "path": "docs/negative-lab/ui-workflows/dedicated-workspace-ui-2026-06-13.md"
         },
         {
           "title": "Negative Lab generic built-in presets",
-          "path": "docs/negative-lab/generic-built-in-presets-2026-06-13.md"
+          "path": "docs/negative-lab/presets/generic-built-in-presets-2026-06-13.md"
         },
         {
           "title": "Negative Lab per-channel inversion curves",
-          "path": "docs/negative-lab/per-channel-inversion-curves-2026-06-13.md"
+          "path": "docs/negative-lab/architecture/per-channel-inversion-curves-2026-06-13.md"
         },
         {
           "title": "Negative Lab base sampling controls",
-          "path": "docs/negative-lab/base-sampling-controls-2026-06-13.md"
+          "path": "docs/negative-lab/ui-workflows/base-sampling-controls-2026-06-13.md"
         },
         {
           "title": "Negative Lab preset metadata policy schema",
-          "path": "docs/negative-lab/preset-metadata-policy-schema-2026-06-13.md"
+          "path": "docs/negative-lab/presets/preset-metadata-policy-schema-2026-06-13.md"
         },
         {
           "title": "Negative Lab roll batch consistency workflow",
-          "path": "docs/negative-lab/roll-batch-consistency-workflow-2026-06-13.md"
+          "path": "docs/negative-lab/ui-workflows/roll-batch-consistency-workflow-2026-06-13.md"
         },
         {
           "title": "Negative Lab roll setup and frame queue UI",
-          "path": "docs/negative-lab/roll-setup-frame-queue-ui-2026-06-13.md"
+          "path": "docs/negative-lab/ui-workflows/roll-setup-frame-queue-ui-2026-06-13.md"
         },
         {
           "title": "Negative Lab QC overlays and sample readouts UI",
-          "path": "docs/negative-lab/qc-overlays-sample-readouts-ui-2026-06-13.md"
+          "path": "docs/negative-lab/ui-workflows/qc-overlays-sample-readouts-ui-2026-06-13.md"
         },
         {
           "title": "Negative Lab measured-profile fixture format",
-          "path": "docs/negative-lab/measured-profile-fixture-format-2026-06-13.md"
+          "path": "docs/negative-lab/fixtures/measured-profile-fixture-format-2026-06-13.md"
         },
         {
           "title": "Negative Lab stock-family research mapping",
-          "path": "docs/negative-lab/stock-family-research-mapping-2026-06-13.md"
+          "path": "docs/negative-lab/fixtures/stock-family-research-mapping-2026-06-13.md"
         },
         {
           "title": "RapidRAW panorama stitcher audit",
-          "path": "docs/panorama/rapidraw-stitcher-audit-2026-06-13.md"
+          "path": "docs/panorama/architecture/rapidraw-stitcher-audit-2026-06-13.md"
         },
         {
           "title": "Panorama architecture consult review",
-          "path": "docs/panorama/panorama-architecture-consult-2026-06-13.md"
+          "path": "docs/panorama/architecture/panorama-architecture-consult-2026-06-13.md"
         },
         {
           "title": "Panorama multi-row support audit",
-          "path": "docs/panorama/multi-row-support-audit-2026-06-13.md"
+          "path": "docs/panorama/projection/multi-row-support-audit-2026-06-13.md"
         },
         {
           "title": "Large panorama tiling strategy",
-          "path": "docs/panorama/large-panorama-tiling-strategy-2026-06-13.md"
+          "path": "docs/panorama/architecture/large-panorama-tiling-strategy-2026-06-13.md"
         },
         {
           "title": "Panorama artifact schema",
-          "path": "docs/panorama/panorama-artifact-schema-2026-06-13.md"
+          "path": "docs/panorama/artifact-contracts/panorama-artifact-schema-2026-06-13.md"
         },
         {
           "title": "Panorama sidecar artifact persistence",
-          "path": "docs/panorama/panorama-sidecar-artifact-persistence-2026-06-13.md"
+          "path": "docs/panorama/artifact-contracts/panorama-sidecar-artifact-persistence-2026-06-13.md"
         },
         {
           "title": "Panorama backend capability contract",
-          "path": "docs/panorama/panorama-backend-capability-contract-2026-06-13.md"
+          "path": "docs/panorama/architecture/panorama-backend-capability-contract-2026-06-13.md"
         },
         {
           "title": "Panorama projection options",
-          "path": "docs/panorama/projection-options-2026-06-13.md"
+          "path": "docs/panorama/projection/projection-options-2026-06-13.md"
         },
         {
           "title": "Panorama boundary controls",
-          "path": "docs/panorama/boundary-controls-2026-06-13.md"
+          "path": "docs/panorama/projection/boundary-controls-2026-06-13.md"
         },
         {
           "title": "Panorama exposure normalization",
-          "path": "docs/panorama/exposure-normalization-2026-06-13.md"
+          "path": "docs/panorama/projection/exposure-normalization-2026-06-13.md"
         },
         {
           "title": "OpenCV panorama backend evaluation",
-          "path": "docs/panorama/opencv-backend-evaluation-2026-06-13.md"
+          "path": "docs/panorama/opencv/opencv-backend-evaluation-2026-06-13.md"
         },
         {
           "title": "OpenCV seam and exposure strategy comparison",
-          "path": "docs/panorama/opencv-seam-exposure-comparison-2026-06-13.md"
+          "path": "docs/panorama/opencv/opencv-seam-exposure-comparison-2026-06-13.md"
         },
         {
           "title": "OpenCV macOS packaging proof",
-          "path": "docs/panorama/opencv-macos-packaging-proof-2026-06-13.md"
+          "path": "docs/panorama/opencv/opencv-macos-packaging-proof-2026-06-13.md"
         },
         {
           "title": "OpenCV required CI promotion criteria",
-          "path": "docs/panorama/opencv-required-ci-promotion-2026-06-13.md"
+          "path": "docs/panorama/opencv/opencv-required-ci-promotion-2026-06-13.md"
         },
         {
           "title": "HDR architecture consult summary",
@@ -449,179 +449,179 @@
         },
         {
           "title": "Render artifact comparison",
-          "path": "docs/validation/render-artifact-comparison-2026-06-15.md"
+          "path": "docs/validation/harnesses/render-artifact-comparison-2026-06-15.md"
         },
         {
           "title": "Runtime proof completion states",
-          "path": "docs/validation/runtime-proof-completion-states-2026-06-17.md"
+          "path": "docs/validation/harnesses/runtime-proof-completion-states-2026-06-17.md"
         },
         {
           "title": "Unused vars severity",
-          "path": "docs/validation/unused-vars-error-2026-06-15.md"
+          "path": "docs/validation/harnesses/unused-vars-error-2026-06-15.md"
         },
         {
           "title": "Local check command contract",
-          "path": "docs/tooling/local-check-command-contract-2026-06-10.md"
+          "path": "docs/tooling/local-checks/local-check-command-contract-2026-06-10.md"
         },
         {
           "title": "Script type coverage",
-          "path": "docs/tooling/script-type-coverage-2026-06-15.md"
+          "path": "docs/tooling/typescript/script-type-coverage-2026-06-15.md"
         },
         {
           "title": "Lint zero-warning default",
-          "path": "docs/tooling/lint-zero-warning-default-2026-06-15.md"
+          "path": "docs/tooling/linting/lint-zero-warning-default-2026-06-15.md"
         },
         {
           "title": "TypeScript control-flow flags",
-          "path": "docs/tooling/ts-control-flow-flags-2026-06-15.md"
+          "path": "docs/tooling/typescript/ts-control-flow-flags-2026-06-15.md"
         },
         {
           "title": "Type-only import rules",
-          "path": "docs/tooling/type-only-import-rules-2026-06-15.md"
+          "path": "docs/tooling/linting/type-only-import-rules-2026-06-15.md"
         },
         {
           "title": "Public API signature rules",
-          "path": "docs/tooling/public-api-signature-rules-2026-06-15.md"
+          "path": "docs/tooling/linting/public-api-signature-rules-2026-06-15.md"
         },
         {
           "title": "TypeScript stylistic rules",
-          "path": "docs/tooling/typescript-stylistic-rules-2026-06-15.md"
+          "path": "docs/tooling/linting/typescript-stylistic-rules-2026-06-15.md"
         },
         {
           "title": "User-visible string lint",
-          "path": "docs/tooling/user-visible-string-lint-2026-06-15.md"
+          "path": "docs/tooling/linting/user-visible-string-lint-2026-06-15.md"
         },
         {
           "title": "Unsafe cast AST guard",
-          "path": "docs/tooling/unsafe-cast-ast-guard-2026-06-15.md"
+          "path": "docs/tooling/linting/unsafe-cast-ast-guard-2026-06-15.md"
         },
         {
           "title": "Assertion narrowing lint",
-          "path": "docs/tooling/assertion-narrowing-lint-2026-06-15.md"
+          "path": "docs/tooling/linting/assertion-narrowing-lint-2026-06-15.md"
         },
         {
           "title": "Strict boolean expressions evaluation",
-          "path": "docs/tooling/strict-boolean-expressions-evaluation-2026-06-15.md"
+          "path": "docs/tooling/typescript/strict-boolean-expressions-evaluation-2026-06-15.md"
         },
         {
           "title": "Tauri invoke boundary ratchet",
-          "path": "docs/tooling/tauri-invoke-boundary-ratchet-2026-06-15.md"
+          "path": "docs/tooling/linting/tauri-invoke-boundary-ratchet-2026-06-15.md"
         },
         {
           "title": "React refresh lint",
-          "path": "docs/tooling/react-refresh-lint-2026-06-15.md"
+          "path": "docs/tooling/linting/react-refresh-lint-2026-06-15.md"
         },
         {
           "title": "Bun CI script migration",
-          "path": "docs/tooling/bun-ci-script-migration-2026-06-10.md"
+          "path": "docs/tooling/bun/bun-ci-script-migration-2026-06-10.md"
         },
         {
           "title": "Bun package manager support",
-          "path": "docs/tooling/bun-package-manager-support-2026-06-10.md"
+          "path": "docs/tooling/bun/bun-package-manager-support-2026-06-10.md"
         },
         {
           "title": "Major dependency migration process",
-          "path": "docs/tooling/major-dependency-migration-process-2026-06-13.md"
+          "path": "docs/tooling/dependencies/major-dependency-migration-process-2026-06-13.md"
         },
         {
           "title": "Dependency version audit",
-          "path": "docs/tooling/dependency-version-audit-2026-06-13.md"
+          "path": "docs/tooling/dependencies/dependency-version-audit-2026-06-13.md"
         },
         {
           "title": "Unused code gate evaluation",
-          "path": "docs/tooling/unused-code-gate-2026-06-15.md"
+          "path": "docs/tooling/local-checks/unused-code-gate-2026-06-15.md"
         },
         {
           "title": "Rust clippy pedantic and nursery evaluation",
-          "path": "docs/tooling/rust-clippy-pedantic-nursery-evaluation-2026-06-15.md"
+          "path": "docs/tooling/rust/rust-clippy-pedantic-nursery-evaluation-2026-06-15.md"
         },
         {
           "title": "Rust unused dependency gate evaluation",
-          "path": "docs/tooling/rust-unused-dependency-gate-2026-06-15.md"
+          "path": "docs/tooling/rust/rust-unused-dependency-gate-2026-06-15.md"
         },
         {
           "title": "Strict type-checked ESLint",
-          "path": "docs/tooling/eslint-strict-type-checked-2026-06-11.md"
+          "path": "docs/tooling/eslint-archive/eslint-strict-type-checked-2026-06-11.md"
         },
         {
           "title": "TypeScript suppression policy",
-          "path": "docs/tooling/typescript-suppression-policy-2026-06-15.md"
+          "path": "docs/tooling/typescript/typescript-suppression-policy-2026-06-15.md"
         },
         {
           "title": "ESLint accessibility rules",
-          "path": "docs/tooling/eslint-accessibility-rules-2026-06-11.md"
+          "path": "docs/tooling/eslint-archive/eslint-accessibility-rules-2026-06-11.md"
         },
         {
           "title": "ESLint async safety rules",
-          "path": "docs/tooling/eslint-async-safety-rules-2026-06-11.md"
+          "path": "docs/tooling/eslint-archive/eslint-async-safety-rules-2026-06-11.md"
         },
         {
           "title": "ESLint import and boundary rules",
-          "path": "docs/tooling/eslint-import-boundary-rules-2026-06-11.md"
+          "path": "docs/tooling/eslint-archive/eslint-import-boundary-rules-2026-06-11.md"
         },
         {
           "title": "ESLint React hooks rules",
-          "path": "docs/tooling/eslint-react-hooks-rules-2026-06-11.md"
+          "path": "docs/tooling/eslint-archive/eslint-react-hooks-rules-2026-06-11.md"
         },
         {
           "title": "ESLint warning inventory",
-          "path": "docs/tooling/eslint-warning-inventory-2026-06-11.md"
+          "path": "docs/tooling/eslint-archive/eslint-warning-inventory-2026-06-11.md"
         },
         {
           "title": "ESLint zero-warning CI",
-          "path": "docs/tooling/eslint-zero-warning-ci-2026-06-11.md"
+          "path": "docs/tooling/eslint-archive/eslint-zero-warning-ci-2026-06-11.md"
         },
         {
           "title": "Schema command bus CI",
-          "path": "docs/tooling/schema-command-bus-ci-2026-06-15.md"
+          "path": "docs/tooling/local-checks/schema-command-bus-ci-2026-06-15.md"
         },
         {
           "title": "Markdown link checks",
-          "path": "docs/tooling/markdown-link-checks-2026-06-11.md"
+          "path": "docs/tooling/local-checks/markdown-link-checks-2026-06-11.md"
         },
         {
           "title": "macOS smoke routing",
-          "path": "docs/tooling/macos-smoke-routing-2026-06-11.md"
+          "path": "docs/tooling/local-checks/macos-smoke-routing-2026-06-11.md"
         },
         {
           "title": "Pre-commit main guard",
-          "path": "docs/tooling/pre-commit-main-guard-2026-06-10.md"
+          "path": "docs/tooling/git-hooks/pre-commit-main-guard-2026-06-10.md"
         },
         {
           "title": "Pre-push main guard",
-          "path": "docs/tooling/pre-push-main-guard-2026-06-11.md"
+          "path": "docs/tooling/git-hooks/pre-push-main-guard-2026-06-11.md"
         },
         {
           "title": "Script entrypoints",
-          "path": "docs/tooling/rapidraw-script-entrypoints-2026-06-10.md"
+          "path": "docs/tooling/local-checks/rapidraw-script-entrypoints-2026-06-10.md"
         },
         {
           "title": "TypeScript compiler options audit",
-          "path": "docs/tooling/typescript-compiler-options-audit-2026-06-10.md"
+          "path": "docs/tooling/typescript/typescript-compiler-options-audit-2026-06-10.md"
         },
         {
           "title": "Skip lib check evaluation",
-          "path": "docs/tooling/skip-lib-check-evaluation-2026-06-15.md"
+          "path": "docs/tooling/typescript/skip-lib-check-evaluation-2026-06-15.md"
         },
         {
           "title": "Vite bundle budget",
-          "path": "docs/tooling/vite-bundle-budget-2026-06-11.md"
+          "path": "docs/tooling/frontend/vite-bundle-budget-2026-06-11.md"
         },
         {
           "title": "Vite bundle regression triage",
-          "path": "docs/tooling/vite-bundle-regression-triage-2026-06-19.md"
+          "path": "docs/tooling/frontend/vite-bundle-regression-triage-2026-06-19.md"
         },
         {
           "title": "Frontend bundle dependency audit",
-          "path": "docs/tooling/frontend-bundle-dependency-audit-2026-06-19.md"
+          "path": "docs/tooling/frontend/frontend-bundle-dependency-audit-2026-06-19.md"
         },
         {
           "title": "Frontend animation boundary audit",
-          "path": "docs/tooling/frontend-animation-boundary-audit-2026-06-19.md"
+          "path": "docs/tooling/frontend/frontend-animation-boundary-audit-2026-06-19.md"
         },
         {
           "title": "Frontend Clerk boundary audit",
-          "path": "docs/tooling/frontend-clerk-boundary-audit-2026-06-19.md"
+          "path": "docs/tooling/frontend/frontend-clerk-boundary-audit-2026-06-19.md"
         },
         {
           "title": "Workflow topology",
@@ -642,31 +642,31 @@
         },
         {
           "title": "Fixture download policy",
-          "path": "docs/validation/fixture-download-policy-2026-06-11.md"
+          "path": "docs/validation/fixtures/fixture-download-policy-2026-06-11.md"
         },
         {
           "title": "Public fixture manifest",
-          "path": "docs/validation/public-fixture-manifest-2026-06-11.md"
+          "path": "docs/validation/fixtures/public-fixture-manifest-2026-06-11.md"
         },
         {
           "title": "Edit history replay validation",
-          "path": "docs/validation/edit-history-replay-2026-06-15.md"
+          "path": "docs/validation/harnesses/edit-history-replay-2026-06-15.md"
         },
         {
           "title": "Agent replay proof gallery",
-          "path": "docs/validation/agent-replay-proof-gallery-2026-06-16.html"
+          "path": "docs/validation/proofs/agent/agent-replay-proof-gallery-2026-06-16.html"
         },
         {
           "title": "Negative Lab agent workflow proof",
-          "path": "docs/validation/negative-lab-agent-workflow-proof-2026-06-16.html"
+          "path": "docs/validation/proofs/negative-lab/negative-lab-agent-workflow-proof-2026-06-16.html"
         },
         {
           "title": "Performance smoke",
-          "path": "docs/validation/performance-smoke-2026-06-13.md"
+          "path": "docs/validation/harnesses/performance-smoke-2026-06-13.md"
         },
         {
           "title": "Goal review page",
-          "path": "docs/validation/goal-review-2026-06-11.html"
+          "path": "docs/validation/reports/goal-review-2026-06-11.html"
         }
       ]
     },
@@ -675,35 +675,35 @@
       "items": [
         {
           "title": "Unsigned release artifact workflow",
-          "path": "docs/release/unsigned-release-artifact-workflow-2026-06-11.md"
+          "path": "docs/release/process/unsigned-release-artifact-workflow-2026-06-11.md"
         },
         {
           "title": "macOS signing and notarization placeholders",
-          "path": "docs/release/macos-signing-notarization-placeholders-2026-06-11.md"
+          "path": "docs/release/macos/macos-signing-notarization-placeholders-2026-06-11.md"
         },
         {
           "title": "Update mechanism research",
-          "path": "docs/release/update-mechanism-research-2026-06-11.md"
+          "path": "docs/release/process/update-mechanism-research-2026-06-11.md"
         },
         {
           "title": "macOS signing plan",
-          "path": "docs/release/macos-signing-plan-2026-06-11.md"
+          "path": "docs/release/macos/macos-signing-plan-2026-06-11.md"
         },
         {
           "title": "macOS notarization workflow",
-          "path": "docs/release/macos-notarization-workflow-2026-06-11.md"
+          "path": "docs/release/macos/macos-notarization-workflow-2026-06-11.md"
         },
         {
           "title": "macOS package and notarization dry-run checklist",
-          "path": "docs/release/macos-package-notarization-dry-run-checklist-2026-06-19.md"
+          "path": "docs/release/macos/macos-package-notarization-dry-run-checklist-2026-06-19.md"
         },
         {
           "title": "Release notes automation",
-          "path": "docs/release/release-notes-automation-2026-06-13.md"
+          "path": "docs/release/process/release-notes-automation-2026-06-13.md"
         },
         {
           "title": "Release metadata, checksums, and SBOM",
-          "path": "docs/release/release-metadata-checksums-sbom-2026-06-11.md"
+          "path": "docs/release/evidence/release-metadata-checksums-sbom-2026-06-11.md"
         }
       ]
     }

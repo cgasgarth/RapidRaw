@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { parseRawOpenEditExportRunReportCollection } from '../../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
 
 const REQUEST_PATH = 'fixtures/validation/raw-open-edit-export-proof-request.json';
-const REPORT_PATH = 'docs/validation/raw-color-management-runtime-proof-2026-06-20.json';
+const REPORT_PATH = 'docs/validation/proofs/color/raw-color-management-runtime-proof-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 const VALIDATE_ONLY = process.argv.includes('--validate-only');
 const RUN_REPORTS_PATH = valueAfter('--run-reports');

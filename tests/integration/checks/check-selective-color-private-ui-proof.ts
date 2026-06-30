@@ -6,9 +6,9 @@ import { z } from 'zod';
 
 import { rawOpenEditExportProofRequestSchema } from '../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
 
-const RAW_PROOF_REPORT_PATH = 'docs/validation/selective-color-local-raw-proof-2026-06-20.json';
+const RAW_PROOF_REPORT_PATH = 'docs/validation/proofs/color-selective/selective-color-local-raw-proof-2026-06-20.json';
 const REQUEST_PATH = 'fixtures/validation/selective-color-raw-proof-request.json';
-const UI_PROOF_REPORT_PATH = 'docs/validation/selective-color-private-ui-proof-2026-06-20.json';
+const UI_PROOF_REPORT_PATH = 'docs/validation/proofs/color-selective/selective-color-private-ui-proof-2026-06-20.json';
 const SCREENSHOT_PATH = 'artifacts/visual-smoke/color-workflow.png';
 const update = process.argv.includes('--update');
 const request = rawOpenEditExportProofRequestSchema.parse(JSON.parse(await readFile(REQUEST_PATH, 'utf8')));

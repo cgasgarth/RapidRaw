@@ -20,7 +20,7 @@ import {
   buildBrushMaskCommandFromParameters,
 } from '../../../src/utils/brushMaskCommandBridge.ts';
 
-const REPORT_PATH = 'docs/validation/brush-mask-command-capture-2026-06-21.json';
+const REPORT_PATH = 'docs/validation/proofs/layers-masks/brush-mask-command-capture-2026-06-21.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 
 const reportSchema = z

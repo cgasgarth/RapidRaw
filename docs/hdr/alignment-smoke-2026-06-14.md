@@ -39,4 +39,4 @@ overlap ratio, RMS error, and alignment confidence.
 Issue #1927 adds `bun run check:hdr-alignment-bracket-proof`, which combines the
 fixture manifest bracket detector with deterministic alignment recovery and a
 duplicate-exposure rejection proof. The generated report lives at
-`docs/validation/hdr-alignment-bracket-proof-2026-06-18.json`.
+`docs/validation/proofs/hdr/hdr-alignment-bracket-proof-2026-06-18.json`.

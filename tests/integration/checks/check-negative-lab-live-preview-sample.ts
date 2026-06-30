@@ -9,7 +9,7 @@ import {
   type NegativeLabBaseSamplePreviewProof,
 } from '../../../src/utils/negativeLabBaseSampleCommandBridge.ts';
 
-const REPORT_PATH = 'docs/validation/negative-lab-live-preview-sample-2026-06-21.json';
+const REPORT_PATH = 'docs/validation/proofs/negative-lab/negative-lab-live-preview-sample-2026-06-21.json';
 const update = process.argv.includes('--update');
 
 const hashSchema = z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u);

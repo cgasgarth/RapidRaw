@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-const REPORT_PATH = 'docs/validation/brush-mask-canvas-ui-proof-2026-06-22.json';
+const REPORT_PATH = 'docs/validation/proofs/layers-masks/brush-mask-canvas-ui-proof-2026-06-22.json';
 const FINAL_SCREENSHOT_PATH = 'artifacts/visual-smoke/brush-mask-canvas-ui.png';
 const PAINT_SCREENSHOT_PATH = 'artifacts/visual-smoke/brush-mask-canvas-paint.png';
 

@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from '
 import { basename, join } from 'node:path';
 import { z } from 'zod';
 
-const PROOF_PATH = 'docs/validation/macos-colorsync-display-proof-2026-06-20.json';
+const PROOF_PATH = 'docs/validation/proofs/export/macos-colorsync-display-proof-2026-06-20.json';
 const RAW_PROOF_REQUEST_PATH = 'fixtures/validation/raw-open-edit-export-proof-request.json';
 const DISPLAY_PROFILE_DIR = '/Library/ColorSync/Profiles/Displays';
 

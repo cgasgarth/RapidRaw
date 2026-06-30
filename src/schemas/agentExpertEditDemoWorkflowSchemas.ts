@@ -66,9 +66,9 @@ export const agentExpertEditDemoWorkflowSchema = z
     }),
     evidence: z
       .object({
-        htmlPath: z.literal('docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html'),
+        htmlPath: z.literal('docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html'),
         reportHash: hashSchema,
-        reportPath: z.literal('docs/validation/agent-expert-edit-demo-workflow-2026-06-21.json'),
+        reportPath: z.literal('docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.json'),
       })
       .strict(),
     inspect: z

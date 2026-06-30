@@ -16,7 +16,7 @@ import {
 } from '../../../src/utils/colorCpuGpuParity.ts';
 
 const FIXTURE_PATH = 'fixtures/color/cpu-gpu-parity-fixtures.json';
-const REPORT_PATH = 'docs/validation/color-cpu-gpu-parity-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/color/color-cpu-gpu-parity-2026-06-18.json';
 const SHADER_PATH = 'src-tauri/src/shaders/shader.wgsl';
 const UPDATE = process.argv.includes('--update');
 const GPU_PATH_STATUS = 'explicitly_unavailable_in_headless_ci';
@@ -25,7 +25,7 @@ const CPU_PREVIEW_EXPORT_STATUS = 'synthetic_cpu_preview_export_match';
 const GPU_UNAVAILABLE_REASON =
   'CI cannot create a deterministic WGPU readback surface for this gate; shader hashes bind the cases to the GPU path until a render-readback harness lands.';
 const GPU_READBACK_PROBE_HASH = 'sha256:be2ed0f28ed5d492dfd4f03c6f6f0ca559819d57f38a474448e57d8da41dc572';
-const GPU_READBACK_RUNTIME_PROOF_PATH = 'docs/validation/color-gpu-readback-runtime-smoke-2026-06-20.json';
+const GPU_READBACK_RUNTIME_PROOF_PATH = 'docs/validation/proofs/color/color-gpu-readback-runtime-smoke-2026-06-20.json';
 const OPERATION_SHADER_FUNCTIONS = {
   channel_mixer: 'apply_channel_mixer',
   color_balance_rgb: 'apply_color_balance_rgb',

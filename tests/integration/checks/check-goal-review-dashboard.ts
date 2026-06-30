@@ -3,7 +3,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
 
-const DASHBOARD_PATH = 'docs/validation/goal-review-2026-06-11.html';
+const DASHBOARD_PATH = 'docs/validation/reports/goal-review-2026-06-11.html';
 const dashboard = readFileSync(DASHBOARD_PATH, 'utf8');
 const dashboardDir = dirname(DASHBOARD_PATH);
 const failures: string[] = [];

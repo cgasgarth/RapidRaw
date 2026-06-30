@@ -12,7 +12,7 @@ import {
 } from '../../../src/utils/layerOpacityOrderRuntime.ts';
 
 const FIXTURE_PATH = 'fixtures/layers/layer-visibility-opacity-proof.json';
-const REPORT_PATH = 'docs/validation/layer-visibility-opacity-proof-2026-06-21.json';
+const REPORT_PATH = 'docs/validation/proofs/layers-masks/layer-visibility-opacity-proof-2026-06-21.json';
 const OUTPUT_DIR = 'artifacts/layers/visibility-opacity-proof';
 const update = process.argv.includes('--update');
 

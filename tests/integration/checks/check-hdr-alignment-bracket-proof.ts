@@ -8,7 +8,7 @@ import { detectHdrBracketV1 } from '../../../packages/rawengine-schema/src/hdrBr
 import { hdrAlignmentSummaryV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const MANIFEST_PATH = 'fixtures/hdr/hdr-synthetic-bracket-fixtures.json';
-const REPORT_PATH = 'docs/validation/hdr-alignment-bracket-proof-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/hdr/hdr-alignment-bracket-proof-2026-06-18.json';
 const GENERATED_AT = '2026-06-18T00:00:00.000Z';
 const SEARCH_RADIUS_PX = 5;
 const MIN_ALIGNMENT_CONFIDENCE = 0.99;

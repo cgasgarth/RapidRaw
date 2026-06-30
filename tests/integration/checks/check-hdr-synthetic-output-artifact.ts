@@ -16,7 +16,7 @@ const HEIGHT = 64;
 const CLIP_THRESHOLD = 0.99;
 const SENSOR_WHITE_RADIANCE = 1;
 const MAX_RECONSTRUCTION_MAE = 0.015;
-const REPORT_PATH = 'docs/validation/hdr-synthetic-output-artifact-proof-2026-06-20.json';
+const REPORT_PATH = 'docs/validation/proofs/hdr/hdr-synthetic-output-artifact-proof-2026-06-20.json';
 const OUTPUT_PATH = 'artifacts/validation/hdr-synthetic-output-artifact/merged-preview.pgm';
 const update = process.argv.includes('--update');
 

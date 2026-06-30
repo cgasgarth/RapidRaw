@@ -7,7 +7,7 @@ import { z } from 'zod';
 
 import { applySelectiveColorToRgbPixel, type RgbPixel } from '../../../src/utils/selectiveColorRuntime.ts';
 
-const REPORT_PATH = 'docs/validation/selective-color-independent-proof-2026-06-20.json';
+const REPORT_PATH = 'docs/validation/proofs/color-selective/selective-color-independent-proof-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 
 const reportSchema = z

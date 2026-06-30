@@ -17,7 +17,7 @@ import { superResolutionSyntheticReviewArtifacts } from '../../../src/utils/supe
 const WIDTH = 48;
 const HEIGHT = 36;
 const SCALE = 2;
-const REPORT_PATH = 'docs/validation/sr-synthetic-output-artifact-proof-2026-06-20.json';
+const REPORT_PATH = 'docs/validation/proofs/super-resolution/sr-synthetic-output-artifact-proof-2026-06-20.json';
 const OUTPUT_PATH = 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-preview.pgm';
 const REVIEW_CROP_PATH = 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-review-crop-center.pgm';
 const BASELINE_CROP_PATH = 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-baseline-crop-center.pgm';

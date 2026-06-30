@@ -22,7 +22,7 @@ import {
   readSuperResolutionArtifactFromSidecar,
 } from '../../../packages/rawengine-schema/src/superResolutionSidecarProvenance.ts';
 
-const REPORT_PATH = 'docs/validation/super-resolution-sidecar-provenance-2026-06-20.json';
+const REPORT_PATH = 'docs/validation/proofs/super-resolution/super-resolution-sidecar-provenance-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 const SCALE = 2;
 const LOW_WIDTH = 12;

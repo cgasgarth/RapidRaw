@@ -16,7 +16,7 @@ import {
   mergeExposureWeightedRadianceV1,
 } from '../../../packages/rawengine-schema/src/hdrMergeWeightingRuntime.ts';
 
-const REPORT_PATH = 'docs/validation/hdr-deghost-tone-artifact-proof-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/hdr/hdr-deghost-tone-artifact-proof-2026-06-18.json';
 const GENERATED_AT = '2026-06-18T00:00:00.000Z';
 const DEGhost_WIDTH = 72;
 const DEGhost_HEIGHT = 48;

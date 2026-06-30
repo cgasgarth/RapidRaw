@@ -8,7 +8,7 @@ import { DETAIL_OUTPUT_COMPARISON_ARTIFACT_ROOT } from '../../../src/utils/detai
 
 const WIDTH = 64;
 const HEIGHT = 48;
-const REPORT_PATH = 'docs/validation/detail-output-comparison-proof-2026-06-22.json';
+const REPORT_PATH = 'docs/validation/proofs/detail-retouch/detail-output-comparison-proof-2026-06-22.json';
 const ORIGINAL_CROP_PATH = `${DETAIL_OUTPUT_COMPARISON_ARTIFACT_ROOT}/high-iso-skin-shadow-v1-original-crop.pgm`;
 const CURRENT_BASELINE_CROP_PATH = `${DETAIL_OUTPUT_COMPARISON_ARTIFACT_ROOT}/high-iso-skin-shadow-v1-current-baseline.pgm`;
 const RECIPE_PREVIEW_CROP_PATH = `${DETAIL_OUTPUT_COMPARISON_ARTIFACT_ROOT}/high-iso-skin-shadow-v1-recipe-preview.pgm`;

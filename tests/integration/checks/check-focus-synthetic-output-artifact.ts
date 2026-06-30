@@ -10,7 +10,7 @@ import { applyWeightedSharpnessFocusStackV1 } from '../../../packages/rawengine-
 
 const WIDTH = 96;
 const HEIGHT = 64;
-const REPORT_PATH = 'docs/validation/focus-synthetic-output-artifact-proof-2026-06-20.json';
+const REPORT_PATH = 'docs/validation/proofs/focus/focus-synthetic-output-artifact-proof-2026-06-20.json';
 const OUTPUT_PATH = 'artifacts/validation/focus-synthetic-output-artifact/focus-stack-preview.pgm';
 const update = process.argv.includes('--update');
 

@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 
 import { z } from 'zod';
 
-const REPORT_PATH = 'docs/validation/denoise-real-raw-private-proof-2026-06-21.json';
+const REPORT_PATH = 'docs/validation/proofs/detail-retouch/denoise-real-raw-private-proof-2026-06-21.json';
 const PRIVATE_REPORT_PATH = 'private-artifacts/validation/detail-denoise-real-raw/alaska-denoise-v1-report.json';
 const PRIVATE_ROOT = '/tmp/rawengine-denoise-alaska-proof';
 const PRIVATE_SOURCE = '/Users/cgas/Pictures/Capture One/Alaska';

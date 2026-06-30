@@ -5,7 +5,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
 
 const FIXTURE_PATH = 'fixtures/panorama/panorama-feature-transform-fixtures.json';
-const REPORT_PATH = 'docs/validation/panorama-feature-transform-proof-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/panorama/panorama-feature-transform-proof-2026-06-18.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 const MINIMUM_INLIERS = 4;
 const INLIER_TOLERANCE_PX = 0.001;

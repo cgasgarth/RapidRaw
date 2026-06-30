@@ -8,7 +8,7 @@ import { z } from 'zod';
 
 import { parseRawOpenEditExportRunReportCollection } from '../../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
 
-const REPORT_PATH = 'docs/validation/gamut-mapping-real-raw-private-proof-2026-06-26.json';
+const REPORT_PATH = 'docs/validation/proofs/color/gamut-mapping-real-raw-private-proof-2026-06-26.json';
 const PRIVATE_ROOT = '/tmp/rawengine-gamut-mapping-v4-real-raw-proof';
 const PRIVATE_SOURCE = '/Users/cgas/Pictures/Capture One/Alaska';
 const RUN_REPORTS_RELATIVE_PATH = 'raw-open-edit-export-run-reports.json';

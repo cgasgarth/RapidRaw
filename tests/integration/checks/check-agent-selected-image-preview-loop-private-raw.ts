@@ -18,7 +18,7 @@ import {
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agentImageContextSnapshot.ts';
 import { runAgentIterativeEditLoop } from '../../../src/utils/agentIterativeEditLoop.ts';
 
-const PUBLIC_REPORT_PATH = 'docs/validation/agent-selected-image-preview-loop-private-raw-2026-06-30.json';
+const PUBLIC_REPORT_PATH = 'docs/validation/proofs/agent/agent-selected-image-preview-loop-private-raw-2026-06-30.json';
 const PRIVATE_ARTIFACT_DIR = 'private-artifacts/validation/agent-preview-loop';
 const DEFAULT_PRIVATE_SOURCE = '/Users/cgas/Pictures/Capture One/Alaska';
 const RAW_EXTENSIONS = new Set(['.arw', '.cr2', '.cr3', '.dng', '.nef', '.orf', '.raf', '.rw2']);

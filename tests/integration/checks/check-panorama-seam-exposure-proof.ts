@@ -4,8 +4,8 @@ import { existsSync } from 'node:fs';
 
 import { z } from 'zod';
 
-const SOURCE_REPORT_PATH = 'docs/validation/panorama-blend-exposure-proof-2026-06-18.json';
-const REPORT_PATH = 'docs/validation/panorama-seam-exposure-proof-2026-06-18.json';
+const SOURCE_REPORT_PATH = 'docs/validation/proofs/panorama/panorama-blend-exposure-proof-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/panorama-extra/panorama-seam-exposure-proof-2026-06-18.json';
 const GENERATED_AT = '2026-06-18T00:00:00.000Z';
 const MIN_CHANGED_PIXELS = 1;
 const MAX_EXPOSURE_MEAN_DELTA = 0.001;

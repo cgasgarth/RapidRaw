@@ -4,7 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-const REPORT_PATH = 'docs/validation/layer-stack-ui-proof-2026-06-20.json';
+const REPORT_PATH = 'docs/validation/proofs/layers-masks/layer-stack-ui-proof-2026-06-20.json';
 const SCREENSHOT_PATH = 'artifacts/visual-smoke/layer-stack-workflow.png';
 const PARITY_REPORT_PATH =
   'artifacts/layers/preview-export-parity/layers.synthetic.preview-export-parity.v1.report.json';

@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 
 import { z } from 'zod';
 
-const REPORT_PATH = 'docs/validation/focus-alignment-sharpness-proof-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/focus/focus-alignment-sharpness-proof-2026-06-18.json';
 const SHARPNESS_ARTIFACT_PATH = 'artifacts/focus-sharpness-map/focus-sharpness-map-report.json';
 const GENERATED_AT = '2026-06-18T00:00:00.000Z';
 const MIN_ALIGNMENT_CONFIDENCE = 0.85;

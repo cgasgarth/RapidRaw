@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 
 import { z } from 'zod';
 
-const REPORT_PATH = 'docs/validation/deblur-real-raw-private-proof-2026-06-21.json';
+const REPORT_PATH = 'docs/validation/proofs/detail-retouch/deblur-real-raw-private-proof-2026-06-21.json';
 const PRIVATE_REPORT_PATH = 'private-artifacts/validation/detail-deblur-real-raw/alaska-deblur-v1-report.json';
 const PRIVATE_ROOT = '/tmp/rawengine-deblur-alaska-proof';
 const PRIVATE_SOURCE = '/Users/cgas/Pictures/Capture One/Alaska';

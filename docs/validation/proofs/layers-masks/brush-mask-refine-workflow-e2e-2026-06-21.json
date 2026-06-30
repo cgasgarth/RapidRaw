@@ -1,0 +1,32 @@
+{
+  "brushCommandType": "layerMask.createBrushMask",
+  "brushRuntime": {
+    "appliedGraphRevision": "graph_rev_brush_refine_e2e:apply:command_brush_mask_refine_e2e_apply",
+    "dryRunMaskHash": "fnv1a32:c451f942",
+    "mutationMaskHash": "fnv1a32:c451f942",
+    "renderedMaskChanged": true
+  },
+  "fixtureId": "validation.layer-mask-real-raw.alaska-local-adjustment.v1",
+  "issue": 2887,
+  "privateRawRuntime": {
+    "metricCount": 11,
+    "provesMaskRefinementChangesPixels": true,
+    "runtimeReportPath": "docs/validation/proofs/layers-masks/layer-mask-real-raw-proof-2026-06-18.json"
+  },
+  "refineCommandType": "layerMask.refineMask",
+  "refinement": {
+    "density": 0.82,
+    "edgeContrast": 0.35,
+    "edgeShiftPx": 3,
+    "featherPx": 8,
+    "smoothness": 0.2
+  },
+  "schemaVersion": 1,
+  "validationBoundary": "runtime_brush_refine_plus_private_raw_ui_smoke_not_manual_macos_session",
+  "visualSmoke": {
+    "brushCommandType": "layerMask.createBrushMask",
+    "refineCommandType": "layerMask.refineMask",
+    "screenshotHash": "sha256:d3cf08a7749b7f8fc49cba7d0e7578d72c2df3a5eae802859b3639e6acdec0ca",
+    "screenshotPath": "artifacts/visual-smoke/layer-mask-private-raw-ui.png"
+  }
+}

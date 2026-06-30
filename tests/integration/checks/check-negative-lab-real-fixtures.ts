@@ -19,7 +19,7 @@ const sampleGridUrl = new URL(
   import.meta.url,
 );
 const renderProofUrl = new URL(
-  '../../../docs/validation/negative-lab-real-render-proof-2026-06-17.json',
+  '../../../docs/validation/proofs/negative-lab/negative-lab-real-render-proof-2026-06-17.json',
   import.meta.url,
 );
 const manifest = negativeLabFixtureManifestV1Schema.parse(JSON.parse(await readFile(manifestUrl, 'utf8')));
@@ -285,7 +285,7 @@ if (shouldUpdate) {
 }
 
 if ((await readFile(renderProofUrl, 'utf8')) !== formattedRenderProof) {
-  throw new Error('docs/validation/negative-lab-real-render-proof-2026-06-17.json is stale.');
+  throw new Error('docs/validation/proofs/negative-lab/negative-lab-real-render-proof-2026-06-17.json is stale.');
 }
 
 const metadataOnlyCount = manifest.entries.filter((entry) => entry.payloadAccess === 'metadata_only').length;

@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 
 const REPORT_PATH = resolve('src-tauri/target/rawengine-negative-lab-density-cpu-report.json');
-const COMMITTED_REPORT_PATH = 'docs/validation/negative-lab-density-cpu-proof-2026-06-19.json';
+const COMMITTED_REPORT_PATH = 'docs/validation/proofs/negative-lab/negative-lab-density-cpu-proof-2026-06-19.json';
 const shouldUpdate = process.argv.includes('--update');
 
 const reportSchema = z
