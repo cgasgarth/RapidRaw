@@ -86,6 +86,10 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4313',
     reason: 'Agent checks are grouped under a dedicated folder for this issue.',
   },
+  'tests/integration/checks/hdr': {
+    issue: '#4323',
+    reason: 'HDR checks are reorganized into a dedicated folder for this issue.',
+  },
   'tests/integration/checks/color': {
     issue: '#4297',
     reason: 'color checks are grouped for dedicated organization in this issue',

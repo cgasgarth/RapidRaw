@@ -5,12 +5,12 @@ import {
   type HdrBracketDetectionOptionsV1,
   type HdrBracketDetectionSourceInputV1,
   hdrBracketDetectionRequestV1Schema,
-} from '../../../packages/rawengine-schema/src/hdr/hdrBracketDetection.ts';
+} from '../../../../packages/rawengine-schema/src/hdr/hdrBracketDetection.ts';
 import type {
   HdrBracketDetectionResultV1,
   HdrMergeBlockCodeV1,
   HdrMergeWarningCodeV1,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const failures: string[] = [];
 

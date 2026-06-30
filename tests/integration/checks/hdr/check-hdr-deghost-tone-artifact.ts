@@ -10,11 +10,11 @@ import {
   measureHdrMotionMaskV1,
   measureHdrMotionRegionMaeV1,
   mergeHdrWithReferenceInMotionRegionsV1,
-} from '../../../packages/rawengine-schema/src/hdr/hdrDeghostRuntime.ts';
+} from '../../../../packages/rawengine-schema/src/hdr/hdrDeghostRuntime.ts';
 import {
   measureHdrMergeWeightingV1,
   mergeExposureWeightedRadianceV1,
-} from '../../../packages/rawengine-schema/src/hdr/hdrMergeWeightingRuntime.ts';
+} from '../../../../packages/rawengine-schema/src/hdr/hdrMergeWeightingRuntime.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/hdr/hdr-deghost-tone-artifact-proof-2026-06-18.json';
 const GENERATED_AT = '2026-06-18T00:00:00.000Z';

@@ -151,15 +151,18 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ],
   ['check:focus-ui-api', new Set(['bun tests/integration/checks/check-focus-ui-api.ts'])],
   ['check:focus-ui-smoke', new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario focus-ui'])],
-  ['check:hdr-alignment-bracket-proof', new Set(['bun tests/integration/checks/check-hdr-alignment-bracket-proof.ts'])],
+  [
+    'check:hdr-alignment-bracket-proof',
+    new Set(['bun tests/integration/checks/hdr/check-hdr-alignment-bracket-proof.ts']),
+  ],
   [
     'check:hdr-alignment-bracket-proof:update',
-    new Set(['bun tests/integration/checks/check-hdr-alignment-bracket-proof.ts --update']),
+    new Set(['bun tests/integration/checks/hdr/check-hdr-alignment-bracket-proof.ts --update']),
   ],
-  ['check:hdr-deghost-tone-artifact', new Set(['bun tests/integration/checks/check-hdr-deghost-tone-artifact.ts'])],
+  ['check:hdr-deghost-tone-artifact', new Set(['bun tests/integration/checks/hdr/check-hdr-deghost-tone-artifact.ts'])],
   [
     'check:hdr-deghost-tone-artifact:update',
-    new Set(['bun tests/integration/checks/check-hdr-deghost-tone-artifact.ts --update']),
+    new Set(['bun tests/integration/checks/hdr/check-hdr-deghost-tone-artifact.ts --update']),
   ],
   ['check:hdr-ui-smoke', new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario hdr-ui'])],
   ['check:hue-memory-color', new Set(['bun tests/integration/checks/check-hue-memory-color-gate.ts'])],

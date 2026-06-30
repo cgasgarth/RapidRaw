@@ -2,8 +2,8 @@
 
 import { readFileSync } from 'node:fs';
 
-import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../../src/schemas/computational-merge/hdrMergeUiSchemas.ts';
-import { buildHdrEditableHandoffSummary } from '../../../src/utils/hdrEditableHandoff.ts';
+import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../../../src/schemas/computational-merge/hdrMergeUiSchemas.ts';
+import { buildHdrEditableHandoffSummary } from '../../../../src/utils/hdrEditableHandoff.ts';
 
 const mergeStatusSource = readFileSync('src/components/modals/computational-merge/MergeStatusViews.tsx', 'utf8');
 const hdrModalSource = readFileSync('src/components/modals/computational-merge/HdrModal.tsx', 'utf8');

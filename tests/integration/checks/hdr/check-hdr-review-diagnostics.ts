@@ -2,9 +2,9 @@
 
 import { readFileSync } from 'node:fs';
 
-import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../../src/schemas/computational-merge/hdrMergeUiSchemas.ts';
-import { buildHdrBracketPreflight } from '../../../src/utils/hdrBracketPreflight.ts';
-import { buildHdrReviewDiagnostics } from '../../../src/utils/hdrReviewDiagnostics.ts';
+import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../../../src/schemas/computational-merge/hdrMergeUiSchemas.ts';
+import { buildHdrBracketPreflight } from '../../../../src/utils/hdrBracketPreflight.ts';
+import { buildHdrReviewDiagnostics } from '../../../../src/utils/hdrReviewDiagnostics.ts';
 
 const acceptedPreflight = buildHdrBracketPreflight([
   { exif: { ExposureTime: '1/250', FNumber: '5.6', ISO: '100' }, path: '/tmp/hdr-under.nef' },

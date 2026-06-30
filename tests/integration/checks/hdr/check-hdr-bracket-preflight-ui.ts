@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { buildHdrBracketPreflight } from '../../../src/utils/hdrBracketPreflight.ts';
+import { buildHdrBracketPreflight } from '../../../../src/utils/hdrBracketPreflight.ts';
 
 const accepted = buildHdrBracketPreflight([
   {

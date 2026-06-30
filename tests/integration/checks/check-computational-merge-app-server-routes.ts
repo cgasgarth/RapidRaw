@@ -8,7 +8,7 @@ const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
 const packageScripts = new Set(Object.keys(packageJson.scripts ?? {}));
 const failures = [];
 const runtimeCheckCommands = new Map<string, [string, ...string[]]>([
-  ['check:hdr-app-server-runtime', ['bun', 'tests/integration/checks/check-hdr-app-server-runtime.ts']],
+  ['check:hdr-app-server-runtime', ['bun', 'tests/integration/checks/hdr/check-hdr-app-server-runtime.ts']],
   ['check:focus-app-server-runtime', ['bun', 'tests/integration/checks/check-focus-app-server-runtime.ts']],
   ['check:panorama-app-server-runtime', ['bun', 'tests/integration/checks/check-panorama-app-server-runtime.ts']],
   ['check:sr-app-server-runtime', ['bun', 'tests/integration/checks/check-super-resolution-app-server-runtime.ts']],
