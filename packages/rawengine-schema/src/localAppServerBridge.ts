@@ -638,10 +638,48 @@ const buildAiToolPlanKey = (
     command.parameters.sourceContentHash,
   ]);
 
+const buildSyntheticAiMaskPreview = (
+  command: RawEngineLocalAppServerAiToolCommandV1,
+): { contentHash: string; coverageRatio: number; rows: string[] } => {
+  const seed = [
+    command.expectedGraphRevision,
+    command.target.imagePath,
+    command.parameters.capability,
+    command.parameters.maskName,
+    command.parameters.modelId,
+    command.parameters.sourceContentHash,
+  ].join('|');
+  const rows = Array.from({ length: 8 }, (_, rowIndex) => {
+    let row = '';
+    for (let columnIndex = 0; columnIndex < 8; columnIndex += 1) {
+      const charCode = seed.charCodeAt((rowIndex * 8 + columnIndex) % seed.length);
+      const on = (charCode + rowIndex * 17 + columnIndex * 31) % 5 !== 0;
+      row += on ? 'f' : '0';
+    }
+    return row;
+  });
+  let enabledPixels = 0;
+  for (const row of rows) {
+    for (const pixel of Array.from(row)) {
+      if (pixel !== '0') enabledPixels += 1;
+    }
+  }
+  if (enabledPixels === 0) {
+    rows[0] = 'f0000000';
+    enabledPixels = 1;
+  }
+  return {
+    contentHash: `sha256:synthetic-ai-mask-${rows.join('')}`,
+    coverageRatio: enabledPixels / 64,
+    rows,
+  };
+};
+
 const buildAiToolDryRunResult = (
   command: RawEngineLocalAppServerAiToolCommandV1,
-): z.infer<typeof aiToolDryRunResultV1Schema> =>
-  aiToolDryRunResultV1Schema.parse({
+): z.infer<typeof aiToolDryRunResultV1Schema> => {
+  const preview = buildSyntheticAiMaskPreview(command);
+  return aiToolDryRunResultV1Schema.parse({
     commandId: command.commandId,
     commandType: 'ai.mask.generateSubject',
     correlationId: command.correlationId,
@@ -650,15 +688,17 @@ const buildAiToolDryRunResult = (
     maskArtifacts: [
       {
         artifactId: `artifact_${command.parameters.capability}_${command.commandId}_mask`,
-        contentHash: command.parameters.sourceContentHash,
+        contentHash: preview.contentHash,
         dimensions: {
-          height: 1080,
-          width: 1620,
+          height: preview.rows.length,
+          width: preview.rows[0]?.length ?? 0,
         },
         kind: 'mask',
         storage: 'temp_cache',
       },
     ],
+    maskCoverageRatio: preview.coverageRatio,
+    maskPreviewRows: preview.rows,
     modelId: command.parameters.modelId,
     modelVersion: command.parameters.modelVersion,
     previewArtifacts: [
@@ -679,6 +719,7 @@ const buildAiToolDryRunResult = (
     sourceContentHash: command.parameters.sourceContentHash,
     warnings: ['Synthetic AI mask app-server proof: no real RAW model inference claim.'],
   });
+};
 
 const buildAiToolMutationResult = (
   command: RawEngineLocalAppServerAiToolCommandV1,
