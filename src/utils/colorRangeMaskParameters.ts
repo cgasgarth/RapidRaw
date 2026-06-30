@@ -1,4 +1,4 @@
-import { type ColorRangeMaskParameters, colorRangeMaskParametersSchema } from '../schemas/maskParameterSchemas';
+import { type ColorRangeMaskParameters, colorRangeMaskParametersSchema } from '../schemas/masks/maskParameterSchemas';
 import { createSelectiveColorMaskSelection, type SelectiveColorMaskOptions } from './selectiveColorMask';
 
 import type { SelectiveColorRangeKey } from './selectiveColorRanges';

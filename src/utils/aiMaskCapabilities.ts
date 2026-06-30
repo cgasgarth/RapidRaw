@@ -3,7 +3,7 @@ import {
   type AiMaskCapabilityAuditEntry,
   aiMaskCapabilityAuditSchema,
   aiMaskCapabilitySchema,
-} from '../schemas/aiMaskingSchemas';
+} from '../schemas/masks/aiMaskingSchemas';
 
 export const AI_MASK_CAPABILITY_AUDIT: Array<AiMaskCapabilityAuditEntry> = aiMaskCapabilityAuditSchema.parse([
   {

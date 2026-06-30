@@ -5,7 +5,7 @@ import {
   type AiPeopleMaskTarget,
   aiPeopleMaskFakeAlphaMaskSchema,
   aiPeopleMaskTargetSchema,
-} from '../schemas/aiMaskingSchemas';
+} from '../schemas/masks/aiMaskingSchemas';
 
 type NormalizedRect = AiPeopleMaskAnalysis['people'][number]['bounds'];
 

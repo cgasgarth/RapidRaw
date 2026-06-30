@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { jsonValueSchema } from './aiMaskingSchemas';
+import { jsonValueSchema } from './masks/aiMaskingSchemas';
 
 const backendParameterBagSchema = z.record(z.string(), z.unknown());
 

@@ -1,6 +1,6 @@
 import type { SubMask } from '../components/panel/right/Masks';
 import type { RenderSize } from '../hooks/viewport/useImageRenderSize';
-import type { MaskOverlaySettings } from '../schemas/maskOverlaySchemas';
+import type { MaskOverlaySettings } from '../schemas/masks/maskOverlaySchemas';
 import type { Adjustments, AiPatch, MaskContainer } from './adjustments';
 import { normalizeMaskOverlaySettings } from './maskOverlayModes';
 import { toMaskParameterRecord } from './maskParameterAccess';

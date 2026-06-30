@@ -4,7 +4,7 @@ import type { OverlayMode } from '../components/panel/right/CropPanel';
 import { ToolType } from '../components/panel/right/Masks';
 import type { BrushSettings, SelectedImage, WaveformData } from '../components/ui/AppProperties';
 import type { BaseRenderSize, ImageDimensions } from '../hooks/viewport/useImageRenderSize';
-import type { MaskOverlaySettings } from '../schemas/maskOverlaySchemas';
+import type { MaskOverlaySettings } from '../schemas/masks/maskOverlaySchemas';
 import type { GamutWarningOverlayPayload } from '../schemas/tauriEventSchemas';
 import { type Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, type MaskContainer } from '../utils/adjustments';
 import type { BasicToneCommandEnvelope } from '../utils/basicToneCommandBridge';

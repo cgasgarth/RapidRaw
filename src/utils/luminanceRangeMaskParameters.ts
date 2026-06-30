@@ -1,4 +1,7 @@
-import { type LuminanceRangeMaskParameters, luminanceRangeMaskParametersSchema } from '../schemas/maskParameterSchemas';
+import {
+  type LuminanceRangeMaskParameters,
+  luminanceRangeMaskParametersSchema,
+} from '../schemas/masks/maskParameterSchemas';
 
 function clamp01(value: number, fallback: number): number {
   if (!Number.isFinite(value)) return fallback;
