@@ -21,7 +21,7 @@ jobs:
           bun-version-file: package.json
 
       - name: Audit JavaScript package versions
-        run: bun scripts/audit-dependency-versions.ts --ecosystem=js --format=markdown >> "$GITHUB_STEP_SUMMARY"
+        run: bun scripts/checks/audit-dependency-versions.ts --ecosystem=js --format=markdown >> "$GITHUB_STEP_SUMMARY"
 
   rust-dependency-versions:
     name: Rust dependency versions
@@ -35,4 +35,4 @@ jobs:
           bun-version-file: package.json
 
       - name: Audit Rust crate versions
-        run: bun scripts/audit-dependency-versions.ts --ecosystem=rust --format=markdown >> "$GITHUB_STEP_SUMMARY"
+        run: bun scripts/checks/audit-dependency-versions.ts --ecosystem=rust --format=markdown >> "$GITHUB_STEP_SUMMARY"

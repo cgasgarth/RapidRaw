@@ -18,5 +18,5 @@ controls. The proof is `bun run check:color-workflow-smoke`.
 
 - `bun run check:color-workflow-smoke`
 - `bun run check:types`
-- `bun run check:lint -- src/components/adjustments/Color.tsx scripts/capture-visual-smoke.ts`
+- `bun run check:lint -- src/components/adjustments/Color.tsx scripts/proofs/capture-visual-smoke.ts`
 - `bun run docs:links`

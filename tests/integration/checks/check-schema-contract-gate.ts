@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 import { z } from 'zod';
 
-import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../scripts/compact-output.ts';
+import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../scripts/lib/compact-output.ts';
 
 const GITHUB_FILE_SCHEMA = z
   .object({
@@ -45,7 +45,7 @@ const CONTRACT_COMMANDS = [
   ['bun', 'tests/integration/checks/check-panorama-app-server-runtime.ts'],
   [
     'bun',
-    'scripts/run-compact-command.ts',
+    'scripts/ci/run-compact-command.ts',
     '--label',
     'schema:types',
     '--',
@@ -275,7 +275,8 @@ function runSelfTest() {
     [
       {
         filename: 'package.json',
-        patch: '@@ -1,3 +1,4 @@\n+    "check:release-notes": "bun scripts/generate-release-notes.ts --self-test",',
+        patch:
+          '@@ -1,3 +1,4 @@\n+    "check:release-notes": "bun scripts/release/generate-release-notes.ts --self-test",',
       },
     ],
     false,

@@ -3,7 +3,7 @@
 - Date: 2026-06-13
 - Issue: #252 `release(notes): add release notes automation`
 - Workflow: `.github/workflows/release.yml`
-- Script: `scripts/generate-release-notes.ts`
+- Script: `scripts/release/generate-release-notes.ts`
 
 ## Purpose
 

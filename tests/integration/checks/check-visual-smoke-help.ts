@@ -4,15 +4,16 @@ import { spawnSync } from 'node:child_process';
 
 const failures: string[] = [];
 
-const help = run(['bun', 'scripts/capture-visual-smoke.ts', '--help']);
+const help = run(['bun', 'scripts/proofs/capture-visual-smoke.ts', '--help']);
 if (help.status !== 0) failures.push(`--help exited ${help.status ?? 'null'}`);
-if (!help.stdout.includes('Usage: bun scripts/capture-visual-smoke.ts')) failures.push('--help missing usage line');
+if (!help.stdout.includes('Usage: bun scripts/proofs/capture-visual-smoke.ts'))
+  failures.push('--help missing usage line');
 if (!help.stdout.includes('--list-scenarios')) failures.push('--help missing list-scenarios guidance');
 if (help.stdout.includes('VITE') || help.stderr.includes('ZodError')) {
   failures.push('--help launched browser/server work or parsed proof reports');
 }
 
-const list = run(['bun', 'scripts/capture-visual-smoke.ts', '--list-scenarios']);
+const list = run(['bun', 'scripts/proofs/capture-visual-smoke.ts', '--list-scenarios']);
 if (list.status !== 0) failures.push(`--list-scenarios exited ${list.status ?? 'null'}`);
 for (const scenario of ['empty-library', 'tether-discovery-ui', 'sr-private-raw-ui']) {
   if (!list.stdout.includes(scenario)) failures.push(`--list-scenarios missing ${scenario}`);

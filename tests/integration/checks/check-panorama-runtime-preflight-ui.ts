@@ -94,7 +94,7 @@ if (!appModalsSource.includes('runtimePlan: null')) {
   failures.push('Panorama settings changes must clear stale runtimePlan.');
 }
 
-const visualSmokeSource = readFileSync('scripts/capture-visual-smoke.ts', 'utf8');
+const visualSmokeSource = readFileSync('scripts/proofs/capture-visual-smoke.ts', 'utf8');
 for (const marker of [
   'panorama-runtime-plan-summary',
   "runtimePlanProof.planScope !== 'geometry_memory_only'",

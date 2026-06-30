@@ -19,7 +19,7 @@ const RELATIVE_FIXTURE_ID = 'validation.raw-open-edit-export.professional-color-
 const DELTA_HEATMAP_PATH = 'private-artifacts/validation/open-edit-export/gamut-mapping-delta-heatmap.png';
 const PRIVATE_SOURCE = '/Users/cgas/Pictures/Capture One/Alaska';
 const PERCEPTUAL_COMMAND = `RAWENGINE_PRIVATE_RAW_SOURCE="${PRIVATE_SOURCE}" bun run check:raw-color-management-srgb-perceptual-private-proof --root ${PRIVATE_ROOT} --output ${PERCEPTUAL_REPORT_PATH} --require-assets`;
-const RELATIVE_COMMAND = `RAWENGINE_PRIVATE_RAW_SOURCE="${PRIVATE_SOURCE}" bun scripts/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export-srgb-relative-proof-request.json --root ${PRIVATE_ROOT} --output ${RELATIVE_REPORT_PATH} --require-assets`;
+const RELATIVE_COMMAND = `RAWENGINE_PRIVATE_RAW_SOURCE="${PRIVATE_SOURCE}" bun scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export-srgb-relative-proof-request.json --root ${PRIVATE_ROOT} --output ${RELATIVE_REPORT_PATH} --require-assets`;
 const UPDATE_REPORT = process.argv.includes('--update');
 const requireAssets = process.argv.includes('--require-assets');
 const allowFreshHashes = process.argv.includes('--allow-fresh-hashes');

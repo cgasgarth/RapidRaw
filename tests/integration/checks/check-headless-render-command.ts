@@ -13,7 +13,7 @@ try {
   const success = Bun.spawnSync({
     cmd: [
       'bun',
-      'scripts/rawengine-headless-render.ts',
+      'scripts/dev/rawengine-headless-render.ts',
       '--request',
       'fixtures/validation/headless-render-command-request.json',
       '--output',
@@ -32,11 +32,11 @@ try {
   }
 
   const failure = Bun.spawnSync({
-    cmd: ['bun', 'scripts/rawengine-headless-render.ts'],
+    cmd: ['bun', 'scripts/dev/rawengine-headless-render.ts'],
     stderr: 'pipe',
     stdout: 'pipe',
   });
-  if (failure.success || !failure.stderr.toString().includes('usage: bun scripts/rawengine-headless-render.ts')) {
+  if (failure.success || !failure.stderr.toString().includes('usage: bun scripts/dev/rawengine-headless-render.ts')) {
     throw new Error('Expected bounded usage failure for missing request.');
   }
 

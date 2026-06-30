@@ -83,7 +83,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   [
     'check:actions',
     new Set([
-      'bun scripts/run-compact-command.ts --label actionlint -- go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml',
+      'bun scripts/ci/run-compact-command.ts --label actionlint -- go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml',
     ]),
   ],
   [
@@ -110,7 +110,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ],
   [
     'check:command-palette-workflows',
-    new Set(['bun scripts/capture-visual-smoke.ts --scenario command-palette-workflows']),
+    new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario command-palette-workflows']),
   ],
   ['check:colorchecker-fixtures', new Set(['bun tests/integration/checks/check-colorchecker-fixtures.ts'])],
   [
@@ -123,13 +123,19 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:compare-survey', new Set(['bun tests/integration/checks/check-compare-survey-fixtures.ts'])],
   ['check:defringe', new Set(['bun tests/integration/checks/check-defringe-fixtures.ts'])],
   ['check:detail-artifacts', new Set(['bun tests/integration/checks/check-detail-artifacts.ts'])],
-  ['check:detail-workspace-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario detail-workspace'])],
+  ['check:detail-workspace-smoke', new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario detail-workspace'])],
   ['check:dust-spot-visualization', new Set(['bun tests/integration/checks/check-dust-spot-visualization.ts'])],
-  ['check:dust-spot-visualization-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario detail-dust-spot'])],
+  [
+    'check:dust-spot-visualization-smoke',
+    new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario detail-dust-spot']),
+  ],
   ['check:export-batch-proof', new Set(['bun tests/integration/checks/check-export-batch-proof.ts'])],
   ['check:export-batch-proof:update', new Set(['bun tests/integration/checks/check-export-batch-proof.ts --update'])],
   ['check:export-recipes-ui', new Set(['bun tests/integration/checks/check-export-recipes-ui.ts'])],
-  ['check:film-look-browser-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario film-look-browser'])],
+  [
+    'check:film-look-browser-smoke',
+    new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario film-look-browser']),
+  ],
   [
     'check:focus-alignment-sharpness-proof',
     new Set(['bun tests/integration/checks/check-focus-alignment-sharpness-proof.ts']),
@@ -144,7 +150,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     new Set(['bun tests/integration/checks/check-focus-blend-halo-proof.ts --update']),
   ],
   ['check:focus-ui-api', new Set(['bun tests/integration/checks/check-focus-ui-api.ts'])],
-  ['check:focus-ui-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario focus-ui'])],
+  ['check:focus-ui-smoke', new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario focus-ui'])],
   ['check:hdr-alignment-bracket-proof', new Set(['bun tests/integration/checks/check-hdr-alignment-bracket-proof.ts'])],
   [
     'check:hdr-alignment-bracket-proof:update',
@@ -155,7 +161,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     'check:hdr-deghost-tone-artifact:update',
     new Set(['bun tests/integration/checks/check-hdr-deghost-tone-artifact.ts --update']),
   ],
-  ['check:hdr-ui-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario hdr-ui'])],
+  ['check:hdr-ui-smoke', new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario hdr-ui'])],
   ['check:hue-memory-color', new Set(['bun tests/integration/checks/check-hue-memory-color-gate.ts'])],
   ['check:import-presets', new Set(['bun tests/integration/checks/check-import-preset-fixtures.ts'])],
   ['check:keyboard-shortcut-conflicts', new Set(['bun tests/integration/checks/check-keyboard-shortcut-conflicts.ts'])],
@@ -168,7 +174,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ],
   ['check:session-import-reload-proof', new Set(['bun tests/integration/checks/check-session-import-reload-proof.ts'])],
   ['check:library-session-ui', new Set(['bun tests/integration/checks/check-library-session-ui.ts'])],
-  ['check:library-workflow-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario library-workflow'])],
+  ['check:library-workflow-smoke', new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario library-workflow'])],
   ['check:panorama-ui-api', new Set(['bun tests/integration/checks/check-panorama-ui-api.ts'])],
   ['check:panorama-feature-transform', new Set(['bun tests/integration/checks/check-panorama-feature-transform.ts'])],
   ['check:panorama-blend-exposure', new Set(['bun tests/integration/checks/check-panorama-blend-exposure.ts'])],
@@ -189,7 +195,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     'check:panorama-projection-memory-proof:update',
     new Set(['bun tests/integration/checks/check-panorama-projection-memory-proof.ts --update']),
   ],
-  ['check:panorama-ui-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario panorama-ui'])],
+  ['check:panorama-ui-smoke', new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario panorama-ui'])],
   [
     'check:sr-alignment-detail-proof',
     new Set(['bun tests/integration/checks/check-super-resolution-alignment-detail-proof.ts']),
@@ -207,7 +213,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     new Set(['bun tests/integration/checks/check-super-resolution-artifact-performance-proof.ts --update']),
   ],
   ['check:sr-ui-api', new Set(['bun tests/integration/checks/check-sr-ui-api.ts'])],
-  ['check:sr-ui-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario sr-ui'])],
+  ['check:sr-ui-smoke', new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario sr-ui'])],
   ['check:negative-lab-fixtures', new Set(['bun tests/integration/checks/check-negative-lab-fixtures.ts'])],
   [
     'check:negative-lab-fixtures:update',
@@ -240,26 +246,28 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ],
   [
     'check:raw-open-edit-export-private-report-collector',
-    new Set(['bun scripts/collect-raw-open-edit-export-private-run-reports.ts --self-test']),
+    new Set([
+      'bun scripts/private-raw/proofs/raw-workflow/collect-raw-open-edit-export-private-run-reports.ts --self-test',
+    ]),
   ],
   [
     'check:raw-open-edit-export-private-proof-acceptance',
-    new Set(['bun scripts/accept-raw-open-edit-export-private-proof.ts --self-test']),
+    new Set(['bun scripts/private-raw/proofs/raw-workflow/accept-raw-open-edit-export-private-proof.ts --self-test']),
   ],
   ['check:reference-images', new Set(['bun tests/integration/checks/check-reference-image-fixtures.ts'])],
   [
     'check:negative-lab-workspace-smoke',
-    new Set(['bun scripts/capture-visual-smoke.ts --scenario negative-lab-workspace']),
+    new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario negative-lab-workspace']),
   ],
   ['check:performance-smoke', new Set(['bun tests/integration/checks/check-performance-smoke.ts'])],
   [
     'check:pure-ts-tests',
-    new Set(['bun scripts/run-compact-command.ts --label pure-ts-tests -- bun test --reporter=dot tests/pure-ts']),
+    new Set(['bun scripts/ci/run-compact-command.ts --label pure-ts-tests -- bun test --reporter=dot tests/pure-ts']),
   ],
   ['check:pure-ts-coverage', new Set(['bun tests/integration/checks/check-pure-ts-coverage.ts'])],
-  ['check:release-notes', new Set(['bun scripts/generate-release-notes.ts --self-test'])],
-  ['deps:audit:check', new Set(['bun scripts/audit-dependency-versions.ts --fail-on-missing-major-issues'])],
-  ['release:notes', new Set(['bun scripts/generate-release-notes.ts'])],
+  ['check:release-notes', new Set(['bun scripts/release/generate-release-notes.ts --self-test'])],
+  ['deps:audit:check', new Set(['bun scripts/checks/audit-dependency-versions.ts --fail-on-missing-major-issues'])],
+  ['release:notes', new Set(['bun scripts/release/generate-release-notes.ts'])],
   [
     'schema:check',
     new Set([
@@ -642,7 +650,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -17,7 +17,7 @@\n-    "check:quick": "bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures",\n+    "check:quick": "bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures && bun run check:release-notes",\n+    "release:notes": "bun scripts/generate-release-notes.ts",\n+    "check:release-notes": "bun scripts/generate-release-notes.ts --self-test",',
+          '@@ -17,7 +17,7 @@\n-    "check:quick": "bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures",\n+    "check:quick": "bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures && bun run check:release-notes",\n+    "release:notes": "bun scripts/release/generate-release-notes.ts",\n+    "check:release-notes": "bun scripts/release/generate-release-notes.ts --self-test",',
       },
     ],
     SMOKE_MODES.NONE,
@@ -653,7 +661,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -40,6 +40,7 @@\n+    "deps:audit:check": "bun scripts/audit-dependency-versions.ts --fail-on-missing-major-issues",',
+          '@@ -40,6 +40,7 @@\n+    "deps:audit:check": "bun scripts/checks/audit-dependency-versions.ts --fail-on-missing-major-issues",',
       },
     ],
     SMOKE_MODES.NONE,
@@ -675,7 +683,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -120,6 +120,7 @@\n+    "check:film-look-browser-smoke": "bun scripts/capture-visual-smoke.ts --scenario film-look-browser",',
+          '@@ -120,6 +120,7 @@\n+    "check:film-look-browser-smoke": "bun scripts/proofs/capture-visual-smoke.ts --scenario film-look-browser",',
       },
     ],
     SMOKE_MODES.NONE,
@@ -686,7 +694,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -120,6 +120,7 @@\n+    "check:command-palette-workflows": "bun scripts/capture-visual-smoke.ts --scenario command-palette-workflows",',
+          '@@ -120,6 +120,7 @@\n+    "check:command-palette-workflows": "bun scripts/proofs/capture-visual-smoke.ts --scenario command-palette-workflows",',
       },
     ],
     SMOKE_MODES.NONE,
@@ -708,7 +716,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -120,6 +120,7 @@\n+    "check:focus-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario focus-ui",',
+          '@@ -120,6 +120,7 @@\n+    "check:focus-ui-smoke": "bun scripts/proofs/capture-visual-smoke.ts --scenario focus-ui",',
       },
     ],
     SMOKE_MODES.NONE,
@@ -719,7 +727,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -120,6 +120,7 @@\n+    "check:hdr-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario hdr-ui",',
+          '@@ -120,6 +120,7 @@\n+    "check:hdr-ui-smoke": "bun scripts/proofs/capture-visual-smoke.ts --scenario hdr-ui",',
       },
     ],
     SMOKE_MODES.NONE,
@@ -730,7 +738,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -120,6 +120,7 @@\n+    "check:panorama-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario panorama-ui",',
+          '@@ -120,6 +120,7 @@\n+    "check:panorama-ui-smoke": "bun scripts/proofs/capture-visual-smoke.ts --scenario panorama-ui",',
       },
     ],
     SMOKE_MODES.NONE,
@@ -740,7 +748,8 @@ function runSelfTest() {
     [
       {
         filename: 'package.json',
-        patch: '@@ -120,6 +120,7 @@\n+    "check:sr-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario sr-ui",',
+        patch:
+          '@@ -120,6 +120,7 @@\n+    "check:sr-ui-smoke": "bun scripts/proofs/capture-visual-smoke.ts --scenario sr-ui",',
       },
     ],
     SMOKE_MODES.NONE,
@@ -762,7 +771,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -125,6 +125,7 @@\n+    "check:negative-lab-workspace-smoke": "bun scripts/capture-visual-smoke.ts --scenario negative-lab-workspace",',
+          '@@ -125,6 +125,7 @@\n+    "check:negative-lab-workspace-smoke": "bun scripts/proofs/capture-visual-smoke.ts --scenario negative-lab-workspace",',
       },
     ],
     SMOKE_MODES.NONE,
@@ -828,7 +837,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -110,6 +110,7 @@\n+    "check:raw-open-edit-export-private-report-collector": "bun scripts/collect-raw-open-edit-export-private-run-reports.ts --self-test",',
+          '@@ -110,6 +110,7 @@\n+    "check:raw-open-edit-export-private-report-collector": "bun scripts/private-raw/proofs/raw-workflow/collect-raw-open-edit-export-private-run-reports.ts --self-test",',
       },
     ],
     SMOKE_MODES.NONE,
@@ -839,7 +848,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -110,6 +110,7 @@\n+    "check:raw-open-edit-export-private-proof-acceptance": "bun scripts/accept-raw-open-edit-export-private-proof.ts --self-test",',
+          '@@ -110,6 +110,7 @@\n+    "check:raw-open-edit-export-private-proof-acceptance": "bun scripts/private-raw/proofs/raw-workflow/accept-raw-open-edit-export-private-proof.ts --self-test",',
       },
     ],
     SMOKE_MODES.NONE,
@@ -850,7 +859,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -29,6 +29,7 @@\n+    "check:pure-ts-tests": "bun scripts/run-compact-command.ts --label pure-ts-tests -- bun test --reporter=dot tests/pure-ts",',
+          '@@ -29,6 +29,7 @@\n+    "check:pure-ts-tests": "bun scripts/ci/run-compact-command.ts --label pure-ts-tests -- bun test --reporter=dot tests/pure-ts",',
       },
     ],
     SMOKE_MODES.NONE,

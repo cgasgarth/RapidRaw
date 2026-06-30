@@ -20,7 +20,7 @@ bun run deps:audit
 Render the full Markdown report:
 
 ```sh
-bun scripts/audit-dependency-versions.ts --format=markdown
+bun scripts/checks/audit-dependency-versions.ts --format=markdown
 ```
 
 Run ecosystem-specific reports:
@@ -85,7 +85,7 @@ Refreshed on June 18, 2026 with:
 
 ```sh
 bun run deps:audit:check
-bun scripts/audit-dependency-versions.ts --format=markdown
+bun scripts/checks/audit-dependency-versions.ts --format=markdown
 ```
 
 Result:
@@ -108,7 +108,7 @@ bun run deps:audit:check
 bun run deps:audit:js
 bun run deps:audit:rust
 bun run check:unsafe-casts
-bun run check:lint -- scripts/audit-dependency-versions.ts
+bun run check:lint -- scripts/checks/audit-dependency-versions.ts
 bun run docs:check
 git diff --check
 ```

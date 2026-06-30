@@ -2,7 +2,7 @@
 
 Issue: #81
 
-`bun scripts/rawengine-headless-render.ts --request <request.json> --output <artifact.json>` replays one approved basic tone command into a deterministic synthetic render artifact.
+`bun scripts/dev/rawengine-headless-render.ts --request <request.json> --output <artifact.json>` replays one approved basic tone command into a deterministic synthetic render artifact.
 
 Inputs:
 

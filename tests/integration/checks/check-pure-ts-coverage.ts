@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';
 import process from 'node:process';
 
-import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../scripts/compact-output.ts';
+import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../scripts/lib/compact-output.ts';
 
 type CoverageMetric = {
   found: number;
