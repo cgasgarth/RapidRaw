@@ -3,8 +3,8 @@
 import { access, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import { parsePrivateRawEvidenceLedger } from '../../../src/schemas/privateRawEvidenceSchemas.ts';
-import { parseRawOpenEditExportProofManifest } from '../../../src/schemas/rawOpenEditExportProofSchemas.ts';
+import { parsePrivateRawEvidenceLedger } from '../../../../src/schemas/privateRawEvidenceSchemas.ts';
+import { parseRawOpenEditExportProofManifest } from '../../../../src/schemas/rawOpenEditExportProofSchemas.ts';
 
 const requireAssets = process.argv.includes('--require-assets');
 const root = process.env.RAWENGINE_PRIVATE_RAW_ROOT;

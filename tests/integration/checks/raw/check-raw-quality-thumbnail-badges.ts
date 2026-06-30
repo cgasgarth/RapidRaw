@@ -2,7 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 
-import { buildRawQualityBadges, formatRawQualityBadgeTooltip } from '../../../src/utils/rawQualityBadges.ts';
+import { buildRawQualityBadges, formatRawQualityBadgeTooltip } from '../../../../src/utils/rawQualityBadges.ts';
 
 const fixtureBadges = buildRawQualityBadges({
   RawEngineCameraProfileFallbackReason: 'missing_dual_illuminant_profile',

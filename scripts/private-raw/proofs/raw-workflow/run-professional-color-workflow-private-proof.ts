@@ -124,7 +124,7 @@ try {
     'professional color private report validation',
     [
       'bun',
-      'tests/integration/checks/check-raw-open-edit-export-run-reports.ts',
+      'tests/integration/checks/raw/check-raw-open-edit-export-run-reports.ts',
       '--input',
       reportOutputPath,
       '--allow-fresh-hashes',
