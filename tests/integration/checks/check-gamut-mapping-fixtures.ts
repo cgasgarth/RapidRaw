@@ -6,14 +6,14 @@ import { resolve } from 'node:path';
 import Color from 'colorjs.io';
 
 import { rawEngineGamutMappingFixtureManifestV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { calculateDeltaE00, type LabColor } from '../../../src/utils/deltaE00.ts';
 import {
   applyPerceptualOklchChromaReduceReference,
   applyRelativeColorimetricClipFallback,
   classifyLinearRgbGamut,
   type GamutClassification,
   type GamutMappingDestination,
-} from '../../../src/utils/gamutMappingRuntime.ts';
+} from '../../../src/utils/color/runtime/gamutMappingRuntime.ts';
+import { calculateDeltaE00, type LabColor } from '../../../src/utils/deltaE00.ts';
 
 const FIXTURE_PATH = 'fixtures/color/proofs/gamut-mapping-fixtures.json';
 const REPORT_PATH = 'docs/validation/proofs/color/color-gamut-clipping-gate-2026-06-18.json';

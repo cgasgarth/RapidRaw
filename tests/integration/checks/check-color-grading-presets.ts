@@ -5,8 +5,8 @@ import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 
 import { parseColorGradingPresetCatalog } from '../../../src/schemas/colorGradingPresetSchemas.ts';
+import { applyColorGradingPresetToRgbPixel } from '../../../src/utils/color/runtime/colorGradingRuntime.ts';
 import { COLOR_GRADING_PRESET_CATALOG } from '../../../src/utils/colorGradingPresets.ts';
-import { applyColorGradingPresetToRgbPixel } from '../../../src/utils/colorGradingRuntime.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 const readText = async (path) => readFile(path, 'utf8');

@@ -61,13 +61,13 @@ import {
   type MaskContainer,
 } from '../../utils/adjustments';
 import { agentChatTranscriptFixture } from '../../utils/agentChatTranscriptFixture';
-import { applyBlackWhiteMixerToRgbPixel } from '../../utils/blackWhiteMixerRuntime';
+import { lookupCameraProfile } from '../../utils/cameraProfileLookup';
+import { applyBlackWhiteMixerToRgbPixel } from '../../utils/color/runtime/blackWhiteMixerRuntime';
 import {
   applyCameraProfileInputTransform,
   type CameraProfileMatrix3x3,
-} from '../../utils/cameraProfileInputTransformRuntime';
-import { lookupCameraProfile } from '../../utils/cameraProfileLookup';
-import { applyColorBalanceRgbToPixel } from '../../utils/colorBalanceRgbRuntime';
+} from '../../utils/color/runtime/cameraProfileInputTransformRuntime';
+import { applyColorBalanceRgbToPixel } from '../../utils/color/runtime/colorBalanceRgbRuntime';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computational-merge/computationalMergeAppServerRoutePairs';
 import { DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF } from '../../utils/detailOutputComparisonProof';
 import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';

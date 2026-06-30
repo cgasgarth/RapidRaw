@@ -35,6 +35,10 @@ import { useProcessStore } from '../../../../store/useProcessStore';
 import { Invokes } from '../../../../tauri/commands';
 import { TextColors, TextVariants, TextWeights } from '../../../../types/typography';
 import type { Adjustments } from '../../../../utils/adjustments';
+import {
+  formatGamutWarningCoverage,
+  isCurrentExportSoftProofGamutWarningOverlay,
+} from '../../../../utils/color/runtime/gamutWarningDisplay';
 import { buildColorStackPreviewExportParityReceipt } from '../../../../utils/colorStackPreviewExportParityReceipt';
 import { formatUnknownError } from '../../../../utils/errorFormatting';
 import {
@@ -60,10 +64,6 @@ import {
   exportSoftProofTransformResponseSchema,
   getSoftProofProfileCompareStatus,
 } from '../../../../utils/export/exportSoftProofProfileCompare';
-import {
-  formatGamutWarningCoverage,
-  isCurrentExportSoftProofGamutWarningOverlay,
-} from '../../../../utils/gamutWarningDisplay';
 import { buildRawWarningChips } from '../../../../utils/rawWarningReceipts';
 import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
 import { debounce } from '../../../../utils/timing';

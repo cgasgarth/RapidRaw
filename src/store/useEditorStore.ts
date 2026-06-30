@@ -8,8 +8,8 @@ import type { MaskOverlaySettings } from '../schemas/masks/maskOverlaySchemas';
 import type { GamutWarningOverlayPayload } from '../schemas/tauriEventSchemas';
 import { type Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, type MaskContainer } from '../utils/adjustments';
 import type { BasicToneCommandEnvelope } from '../utils/basicToneCommandBridge';
+import { isPendingExportSoftProofGamutWarningOverlay } from '../utils/color/runtime/gamutWarningDisplay';
 import { goToEditHistoryIndex, pushEditHistoryEntry, redoEditHistory, undoEditHistory } from '../utils/editHistory';
-import { isPendingExportSoftProofGamutWarningOverlay } from '../utils/gamutWarningDisplay';
 import { loadMaskOverlaySettingsPreference } from '../utils/maskOverlayPreferences';
 
 export interface InteractivePatch {

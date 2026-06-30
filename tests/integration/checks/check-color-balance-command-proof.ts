@@ -21,7 +21,7 @@ import {
   applyColorBalanceRgbToPixel,
   type ColorBalanceRgbRuntimeResult,
   type RgbPixel,
-} from '../../../src/utils/colorBalanceRgbRuntime.ts';
+} from '../../../src/utils/color/runtime/colorBalanceRgbRuntime.ts';
 
 const rgbPixelSchema = z
   .object({
