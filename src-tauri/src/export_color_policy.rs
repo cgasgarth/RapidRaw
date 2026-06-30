@@ -324,7 +324,9 @@ fn transform_rgb16_with_lcms(
     Ok(transformed.into_iter().flatten().collect())
 }
 
-fn output_color_profile(color_profile: &ExportColorProfile) -> Result<ColorProfile, String> {
+pub(crate) fn output_color_profile(
+    color_profile: &ExportColorProfile,
+) -> Result<ColorProfile, String> {
     match color_profile {
         ExportColorProfile::AdobeRgb1998 => Ok(ColorProfile::new_adobe_rgb()),
         ExportColorProfile::DisplayP3 => Ok(ColorProfile::new_display_p3()),

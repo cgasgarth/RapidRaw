@@ -26,6 +26,7 @@ use crate::exif_processing;
 pub(crate) use crate::export_encoders::{
     EmbeddedSourceIccProfile, encode_image_to_bytes,
     encode_image_with_applied_policy_and_source_profile,
+    validate_export_file_readback_color_policy,
 };
 use crate::export_output_targets::{ExportOutputTargetRequest, resolve_export_output_target};
 pub use crate::export_postprocess::{OutputSharpeningSettings, ResizeOptions, WatermarkSettings};
@@ -337,6 +338,15 @@ pub(crate) fn save_image_with_metadata(
         &extension,
         export_settings.keep_metadata,
         export_settings.strip_gps,
+    )?;
+    validate_export_file_readback_color_policy(
+        &image_bytes,
+        &extension,
+        encoded_image.color_policy.as_ref(),
+        &export_settings.color_profile,
+        &export_settings.rendering_intent,
+        export_settings.black_point_compensation,
+        source_embedded_icc.as_ref(),
     )?;
 
     #[cfg(target_os = "android")]
@@ -1422,8 +1432,11 @@ mod tests {
         quantize_rgb16_to_rgb8, resolve_export_color_capabilities,
         resolve_export_color_transform_plan, should_apply_srgb_perceptual_gamut_mapping,
     };
-    use crate::export_encoders::encode_image_with_applied_policy;
+    use crate::export_encoders::{
+        encode_image_with_applied_policy, validate_export_file_readback_color_policy,
+    };
     use crate::export_postprocess::OutputSharpeningTarget;
+    use crate::export_processing::save_image_with_metadata;
     use crate::gamut_mapping::ACTIVE_SRGB_OKLAB_CHROMA_REDUCE;
     use crate::raw_processing::{RawCameraProfileReport, RawDemosaicPath, RawDevelopmentReport};
     use moxcms::ColorProfile;
@@ -2499,6 +2512,180 @@ mod tests {
                 )
             );
         }
+    }
+
+    #[test]
+    fn export_icc_receipt_parity_reads_back_jpeg_and_tiff_profiles() {
+        let image = DynamicImage::ImageRgb16(ImageBuffer::from_fn(3, 2, |x, y| {
+            Rgb([((x + 1) * 10_000) as u16, ((y + 1) * 16_000) as u16, 42_000])
+        }));
+
+        for format in ["jpg", "tiff"] {
+            for profile in [
+                ExportColorProfile::Srgb,
+                ExportColorProfile::DisplayP3,
+                ExportColorProfile::ProPhotoRgb,
+            ] {
+                let encoded = encode_image_with_applied_policy(
+                    &image,
+                    format,
+                    91,
+                    &profile,
+                    &ExportRenderingIntent::RelativeColorimetric,
+                    false,
+                )
+                .expect("synthetic managed export should encode");
+                let metadata = encoded
+                    .color_policy
+                    .as_ref()
+                    .expect("JPEG/TIFF export should emit receipt metadata");
+
+                assert!(metadata.icc_embedded);
+                assert_eq!(
+                    metadata.effective_color_profile,
+                    export_color_profile_receipt_label(&profile)
+                );
+                assert_eq!(metadata.policy_status, "applied");
+                assert_eq!(metadata.policy_version, "rawengine-export-color-policy-v2");
+                assert!(metadata.transform_policy_fingerprint.starts_with("sha256:"));
+                validate_export_file_readback_color_policy(
+                    &encoded.bytes,
+                    format,
+                    Some(metadata),
+                    &profile,
+                    &ExportRenderingIntent::RelativeColorimetric,
+                    false,
+                    None,
+                )
+                .expect("file ICC readback should match receipt metadata");
+            }
+        }
+    }
+
+    #[test]
+    fn export_icc_receipt_parity_fails_on_receipt_field_mismatch() {
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(1, 1, Rgb([128, 64, 32])));
+        let encoded = encode_image_with_applied_policy(
+            &image,
+            "jpg",
+            90,
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+            false,
+        )
+        .expect("Display P3 JPEG should encode");
+        let mut metadata = encoded
+            .color_policy
+            .clone()
+            .expect("Display P3 JPEG should emit receipt metadata");
+        metadata.effective_color_profile = "sRGB".to_string();
+
+        let error = validate_export_file_readback_color_policy(
+            &encoded.bytes,
+            "jpg",
+            Some(&metadata),
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+            false,
+            None,
+        )
+        .expect_err("receipt/file mismatch must fail the parity gate");
+
+        assert!(
+            error.contains("effectiveColorProfile"),
+            "unexpected parity error: {error}"
+        );
+    }
+
+    #[test]
+    fn export_icc_receipt_parity_fails_on_source_embedded_hash_mismatch() {
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(1, 1, Rgb([128, 64, 32])));
+        let source_icc =
+            encode_icc_profile(&ColorProfile::new_adobe_rgb()).expect("source ICC should encode");
+        let source_profile = EmbeddedSourceIccProfile {
+            sha256: format!("sha256:{}", hex::encode(Sha256::digest(&source_icc))),
+            bytes: source_icc,
+        };
+        let encoded = encode_image_with_applied_policy_and_source_profile(
+            &image,
+            "tiff",
+            90,
+            &ExportColorProfile::SourceEmbedded,
+            &ExportRenderingIntent::RelativeColorimetric,
+            false,
+            Some(&source_profile),
+        )
+        .expect("SourceEmbedded TIFF should encode");
+        let mut metadata = encoded
+            .color_policy
+            .clone()
+            .expect("SourceEmbedded TIFF should emit receipt metadata");
+        metadata.source_icc_profile_hash = Some(
+            "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+        );
+
+        let error = validate_export_file_readback_color_policy(
+            &encoded.bytes,
+            "tiff",
+            Some(&metadata),
+            &ExportColorProfile::SourceEmbedded,
+            &ExportRenderingIntent::RelativeColorimetric,
+            false,
+            Some(&source_profile),
+        )
+        .expect_err("SourceEmbedded receipt hash mismatch must fail");
+
+        assert!(
+            error.contains("sourceIccProfileHash")
+                || error.contains("transformPolicyFingerprint")
+                || error.contains("SourceEmbedded receipt hash"),
+            "unexpected parity error: {error}"
+        );
+    }
+
+    #[test]
+    fn export_icc_receipt_parity_validates_final_saved_file_bytes() {
+        let image = DynamicImage::ImageRgb16(ImageBuffer::from_pixel(
+            2,
+            2,
+            Rgb([u16::MAX, 24_000, 8_000]),
+        ));
+        let output_path = std::env::temp_dir().join(format!(
+            "rawengine-export-icc-receipt-parity-{}.tiff",
+            std::process::id()
+        ));
+        let source_path = std::env::temp_dir().join(format!(
+            "rawengine-export-icc-receipt-parity-source-{}.jpg",
+            std::process::id()
+        ));
+        fs::write(&source_path, [1u8, 2, 3, 4]).expect("write placeholder source");
+        let mut settings = base_export_settings(None);
+        settings.color_profile = ExportColorProfile::DisplayP3;
+        settings.rendering_intent = ExportRenderingIntent::RelativeColorimetric;
+
+        let metadata = save_image_with_metadata(
+            &image,
+            &output_path,
+            &source_path.to_string_lossy(),
+            &settings,
+        )
+        .expect("final export save should pass ICC/readback parity")
+        .expect("TIFF export should return receipt metadata");
+        let bytes = fs::read(&output_path).expect("read saved export bytes");
+
+        validate_export_file_readback_color_policy(
+            &bytes,
+            "tiff",
+            Some(&metadata),
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+            false,
+            None,
+        )
+        .expect("saved file readback should match receipt metadata");
+
+        fs::remove_file(output_path).ok();
+        fs::remove_file(source_path).ok();
     }
 
     #[test]
