@@ -9,14 +9,14 @@
     "icc_colorimetric_accuracy"
   ],
   "fixtureId": "validation.raw-open-edit-export.professional-color.v1",
-  "generatedAt": "2026-06-28T08:28:06.300Z",
+  "generatedAt": "2026-06-30T08:08:20.104Z",
   "issue": 3238,
   "localRawRuntime": {
     "artifactRoot": "private-artifacts/validation/open-edit-export/srgb-perceptual",
-    "command": "RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun run check:raw-color-management-srgb-perceptual-private-proof --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-run-reports.json --require-assets",
+    "command": "RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export-srgb-perceptual-proof-request.json --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-run-reports.json --require-assets",
     "gamutMapping": "rawengine.gamut.srgb-oklab-chroma-reduce.v4",
     "metrics": {
-      "changedPixelRatio": 0.9781435,
+      "changedPixelRatio": 0.978165,
       "finalFileBitDepth": 16,
       "finalFileIccProfileEmbedded": 1,
       "finalFileReopenSucceeded": 1,
@@ -42,8 +42,8 @@
     "sourceFolder": "/Users/cgas/Pictures/Capture One/Alaska"
   },
   "validationCommands": [
-    "RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun run check:raw-color-management-srgb-perceptual-private-proof --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-run-reports.json --require-assets",
-    "bun run check:raw-color-management-srgb-perceptual-private-proof --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-run-reports.json --require-assets"
+    "RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export-srgb-perceptual-proof-request.json --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-run-reports.json --require-assets",
+    "bun scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export-srgb-perceptual-proof-request.json --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-run-reports.json --require-assets"
   ],
   "validationMode": "local_alaska_raw_srgb_perceptual_gamut_mapping_runtime",
   "workflowArtifacts": [
@@ -54,25 +54,25 @@
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:e4d32bbfc7d9ca52f905f960e2461466326057ae9698db51c2a738e8819f24b7",
+      "hash": "sha256:4fc9e8c9f47481ecc30ac130fd12e7a6780b7af8c731b0ea44a3c12553b1db51",
       "kind": "preview_before_private",
       "path": "private-artifacts/validation/open-edit-export/srgb-perceptual/professional-color-v1-preview-before.png",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:390f0501d8e6988a5e8c91f48c25e74ec9a110ab36f1c6c0686f290a67cc2082",
+      "hash": "sha256:60730582481e7b24f2f8d71c94647aced58fa01a1b50539931a91b30856092f3",
       "kind": "preview_after_private",
       "path": "private-artifacts/validation/open-edit-export/srgb-perceptual/professional-color-v1-preview-after.png",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:23871ea03b07eb09573dffe7f7198367ca8f0c89dd9d29144e86d51eb432fd01",
+      "hash": "sha256:243e735542212b679f2c3e0c1dce7555445f27add1d42772c8573ec048976460",
       "kind": "export_after_private",
       "path": "private-artifacts/validation/open-edit-export/srgb-perceptual/professional-color-v1-export-after.tiff",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:97109af91c25401f49a3ebd0be6a0642603f16d480dfd5db3997fa16e3247398",
+      "hash": "sha256:4486cc29f9ea2d450ad5c4066c7eea6374433d065e718ddd62c23e9d948235e2",
       "kind": "soft_proof_after_private",
       "path": "private-artifacts/validation/open-edit-export/srgb-perceptual/professional-color-v1-soft-proof-after.png",
       "publicRepoAllowed": false
@@ -84,7 +84,7 @@
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:25a92c4b78ce61b84b9c6ae410df6032126128ad340beefc6959d74833029149",
+      "hash": "sha256:312fa99be9dc07da52751fb6d0ffa67ebefcfbed89db24a2b0653072420734ad",
       "kind": "workflow_report_private",
       "path": "private-artifacts/validation/open-edit-export/srgb-perceptual/professional-color-v1-workflow-report.json",
       "publicRepoAllowed": false

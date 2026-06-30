@@ -1,7 +1,7 @@
 {
   "artifacts": {
     "deltaHeatmap": {
-      "hash": "sha256:ae4523f654a5b0cfe6667fa56f421d874b9ca289e1a6687fc73c40113b44d66e",
+      "hash": "sha256:9f7203711a4a60f68723dd4fccf9dab1e108097a0882ef228c85f0ffd43de840",
       "kind": "changed_pixel_heatmap_private",
       "path": "private-artifacts/validation/open-edit-export/gamut-mapping-delta-heatmap.png",
       "publicRepoAllowed": false
@@ -15,11 +15,11 @@
     "This report does not prove Capture One-class visual quality, display-device matching, camera-profile accuracy, or final mapper tuning."
   ],
   "comparisonBasis": "soft_proof_rgb8_perceptual_vs_relative_colorimetric",
-  "generatedAt": "2026-06-28T08:26:41.162Z",
+  "generatedAt": "2026-06-30T08:09:58.187Z",
   "issue": 3238,
   "metrics": {
     "affectedDeltaE00VsRelativeClip": {
-      "max": 8.628958,
+      "max": 6.532673,
       "p50": 0.631365,
       "p95": 1.200163
     },
@@ -28,10 +28,10 @@
       "p50": 0,
       "p95": 53.085624
     },
-    "affectedPixelCount": 6188,
-    "changedPixelRatio": 0.000258,
+    "affectedPixelCount": 6259,
+    "changedPixelRatio": 0.000261,
     "deltaE00VsRelativeClip": {
-      "max": 8.628958,
+      "max": 6.532673,
       "p50": 0,
       "p95": 0
     },
@@ -40,39 +40,39 @@
       "p50": 0,
       "p95": 0
     },
-    "maxAbsRgb8Delta": 17,
-    "meanAbsRgb8Delta": 0.000121,
+    "maxAbsRgb8Delta": 15,
+    "meanAbsRgb8Delta": 0.00012,
     "neutralAxisDriftP95": 0,
     "perceptualDeltaE00VsUnmappedDestinationLab": null,
     "perceptualMapperCoverage": {
-      "changedPixelRatio": 0.027322,
+      "changedPixelRatio": 0.027185,
       "inputPixelRatio": 1,
       "postMapOutOfGamutPixelRatio": 0,
-      "preMapMaxLinearRgb": 0.981934,
+      "preMapMaxLinearRgb": 0.984375,
       "preMapMinLinearRgb": -0.001961,
-      "preMapOutOfGamutChannelRatio": 0.009844,
-      "preMapOutOfGamutPixelRatio": 0.027325
+      "preMapOutOfGamutChannelRatio": 0.009804,
+      "preMapOutOfGamutPixelRatio": 0.027188
     },
     "pixelCount": 24000000,
-    "saturationMonotonicViolationCount": 18
+    "saturationMonotonicViolationCount": 27
   },
   "perceptualRun": {
     "fixtureId": "validation.raw-open-edit-export.professional-color.v1",
     "gamutMapping": "rawengine.gamut.srgb-oklab-chroma-reduce.v4",
     "reportPath": "/tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-run-reports.json",
-    "softProofHash": "sha256:97109af91c25401f49a3ebd0be6a0642603f16d480dfd5db3997fa16e3247398",
+    "softProofHash": "sha256:4486cc29f9ea2d450ad5c4066c7eea6374433d065e718ddd62c23e9d948235e2",
     "softProofPath": "private-artifacts/validation/open-edit-export/srgb-perceptual/professional-color-v1-soft-proof-after.png"
   },
   "relativeRun": {
     "fixtureId": "validation.raw-open-edit-export.professional-color-relative.v1",
     "gamutMapping": "not_proven",
     "reportPath": "/tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-relative-run-reports.json",
-    "softProofHash": "sha256:2799b12554a5db4e1be711d9582648e7f6be2241631dca1fa64bdbb2634a2971",
+    "softProofHash": "sha256:ad95403ba8371da0fcb6555a2392eddf45be0264bc0cdf431c6b83373628c794",
     "softProofPath": "private-artifacts/validation/open-edit-export/srgb-relative/professional-color-relative-v1-soft-proof-after.png"
   },
   "schemaVersion": 1,
   "validationCommands": [
-    "RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun run check:raw-color-management-srgb-perceptual-private-proof --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-run-reports.json --require-assets",
+    "RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export-srgb-perceptual-proof-request.json --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-run-reports.json --require-assets",
     "RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export-srgb-relative-proof-request.json --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-relative-run-reports.json --require-assets"
   ],
   "validationMode": "local_alaska_raw_srgb_perceptual_vs_relative_comparison"
