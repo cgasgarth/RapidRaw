@@ -5,15 +5,15 @@ import { resolve } from 'node:path';
 
 import Color from 'colorjs.io';
 
-import { rawEngineGamutMappingFixtureManifestV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { rawEngineGamutMappingFixtureManifestV1Schema } from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   applyPerceptualOklchChromaReduceReference,
   applyRelativeColorimetricClipFallback,
   classifyLinearRgbGamut,
   type GamutClassification,
   type GamutMappingDestination,
-} from '../../../src/utils/color/runtime/gamutMappingRuntime.ts';
-import { calculateDeltaE00, type LabColor } from '../../../src/utils/deltaE00.ts';
+} from '../../../../src/utils/color/runtime/gamutMappingRuntime.ts';
+import { calculateDeltaE00, type LabColor } from '../../../../src/utils/deltaE00.ts';
 
 const FIXTURE_PATH = 'fixtures/color/proofs/gamut-mapping-fixtures.json';
 const REPORT_PATH = 'docs/validation/proofs/color/color-gamut-clipping-gate-2026-06-18.json';
@@ -272,7 +272,9 @@ if (UPDATE_REPORT) {
 } else {
   const expectedReport = JSON.parse(await readFile(REPORT_PATH, 'utf8'));
   if (JSON.stringify(expectedReport) !== JSON.stringify(report)) {
-    failures.push(`${REPORT_PATH} is stale; run bun tests/integration/checks/check-gamut-mapping-fixtures.ts --update`);
+    failures.push(
+      `${REPORT_PATH} is stale; run bun tests/integration/checks/color/check-gamut-mapping-fixtures.ts --update`,
+    );
   }
 }
 

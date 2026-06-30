@@ -4,17 +4,20 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { createRawEngineLocalAppServerBridge } from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
+import { createRawEngineLocalAppServerBridge } from '../../../../packages/rawengine-schema/src/localAppServerBridge.ts';
 import {
   toneColorCommandEnvelopeV1Schema,
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   sampleToneColorApplyCommandEnvelopeV1,
   sampleToneColorCommandEnvelopeV1,
-} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { applySkinToneUniformity, applySkinToneUniformityToRgbPixel } from '../../../src/utils/skinToneUniformity.ts';
+} from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
+import {
+  applySkinToneUniformity,
+  applySkinToneUniformityToRgbPixel,
+} from '../../../../src/utils/skinToneUniformity.ts';
 
 const FIXTURE_PATH = 'fixtures/color/selective-color/skin-tone-uniformity-fixtures.json';
 const REPORT_PATH = 'docs/validation/proofs/color-selective/skin-tone-uniformity-runtime-ui-proof-2026-06-18.json';
@@ -247,7 +250,9 @@ if (UPDATE_REPORT) {
 } else {
   const expectedReport = reportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
   if (JSON.stringify(expectedReport) !== JSON.stringify(report)) {
-    failures.push(`${REPORT_PATH} is stale; run bun tests/integration/checks/check-skin-tone-uniformity.ts --update`);
+    failures.push(
+      `${REPORT_PATH} is stale; run bun tests/integration/checks/color/check-skin-tone-uniformity.ts --update`,
+    );
   }
 }
 

@@ -8,18 +8,18 @@ import i18next from 'i18next';
 import { act, createElement, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
-import { type AppSettings, type SelectedImage, Theme } from '../../../src/components/ui/AppProperties';
+import { type AppSettings, type SelectedImage, Theme } from '../../../../src/components/ui/AppProperties';
 import {
   ExportColorProfile,
   type ExportPreset,
   ExportRenderingIntent,
   WatermarkAnchor,
-} from '../../../src/components/ui/ExportImportProperties';
-import type { GamutWarningOverlayPayload } from '../../../src/schemas/tauriEventSchemas';
-import { useEditorStore } from '../../../src/store/useEditorStore';
-import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { applyProfileToneToRgbPixel } from '../../../src/utils/color/profile/profileToneRuntime';
-import { formatGamutWarningCoverage } from '../../../src/utils/color/runtime/gamutWarningDisplay.ts';
+} from '../../../../src/components/ui/ExportImportProperties';
+import type { GamutWarningOverlayPayload } from '../../../../src/schemas/tauriEventSchemas';
+import { useEditorStore } from '../../../../src/store/useEditorStore';
+import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments';
+import { applyProfileToneToRgbPixel } from '../../../../src/utils/color/profile/profileToneRuntime';
+import { formatGamutWarningCoverage } from '../../../../src/utils/color/runtime/gamutWarningDisplay.ts';
 
 type RenderedPanel = {
   container: HTMLDivElement;
@@ -108,7 +108,7 @@ const appSettingsFixture = {
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 installDom();
 
-const { default: ColorPanel } = await import('../../../src/components/adjustments/Color');
+const { default: ColorPanel } = await import('../../../../src/components/adjustments/Color');
 
 await validateLocaleContract();
 const rendered = await renderColorPanel();

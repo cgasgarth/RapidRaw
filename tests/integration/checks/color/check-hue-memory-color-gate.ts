@@ -4,7 +4,10 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { applySkinToneUniformity, applySkinToneUniformityToRgbPixel } from '../../../src/utils/skinToneUniformity.ts';
+import {
+  applySkinToneUniformity,
+  applySkinToneUniformityToRgbPixel,
+} from '../../../../src/utils/skinToneUniformity.ts';
 
 const FIXTURE_PATH = 'fixtures/color/proofs/hue-memory-color-gate.json';
 const REPORT_PATH = 'docs/validation/proofs/color/color-hue-memory-gate-2026-06-18.json';
@@ -129,7 +132,9 @@ if (UPDATE_REPORT) {
 } else {
   const expectedReport = JSON.parse(await readFile(REPORT_PATH, 'utf8'));
   if (JSON.stringify(expectedReport) !== JSON.stringify(report)) {
-    failures.push(`${REPORT_PATH} is stale; run bun tests/integration/checks/check-hue-memory-color-gate.ts --update`);
+    failures.push(
+      `${REPORT_PATH} is stale; run bun tests/integration/checks/color/check-hue-memory-color-gate.ts --update`,
+    );
   }
 }
 

@@ -168,7 +168,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     new Set(['bun tests/integration/checks/hdr/check-hdr-deghost-tone-artifact.ts --update']),
   ],
   ['check:hdr-ui-smoke', new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario hdr-ui'])],
-  ['check:hue-memory-color', new Set(['bun tests/integration/checks/check-hue-memory-color-gate.ts'])],
+  ['check:hue-memory-color', new Set(['bun tests/integration/checks/color/check-hue-memory-color-gate.ts'])],
   ['check:import-presets', new Set(['bun tests/integration/checks/check-import-preset-fixtures.ts'])],
   ['check:keyboard-shortcut-conflicts', new Set(['bun tests/integration/checks/check-keyboard-shortcut-conflicts.ts'])],
   ['check:keyboard-shortcuts', new Set(['bun tests/integration/checks/check-keyboard-shortcuts.ts'])],

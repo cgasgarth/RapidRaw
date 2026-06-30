@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { rawOpenEditExportProofRequestSchema } from '../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
+import { rawOpenEditExportProofRequestSchema } from '../../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/color-selective/skin-tone-uniformity-local-raw-proof-2026-06-21.json';
 const REQUEST_PATH = 'fixtures/validation/professional-color-workflow/skin-tone-uniformity-raw-proof-request.json';
