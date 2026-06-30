@@ -1,3 +1,6 @@
+pub mod candidates;
+pub mod hierarchy;
+
 use anyhow::Result;
 use futures::stream::{self, StreamExt};
 use image::{DynamicImage, imageops::FilterType};
@@ -14,11 +17,12 @@ use tokenizers::Tokenizer;
 use tokio::task::JoinHandle;
 use walkdir::WalkDir;
 
+use self::candidates::TAG_CANDIDATES;
+use self::hierarchy::TAG_HIERARCHY;
+use crate::AppState;
 use crate::file_management::{self, parse_virtual_path};
 use crate::formats::is_supported_image_file;
-use crate::hierarchy::TAG_HIERARCHY;
 use crate::image_processing::ImageMetadata;
-use crate::{AppState, candidates::TAG_CANDIDATES};
 
 pub const COLOR_TAG_PREFIX: &str = "color:";
 pub const USER_TAG_PREFIX: &str = "user:";
