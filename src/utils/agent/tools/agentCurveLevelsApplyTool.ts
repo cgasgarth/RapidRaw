@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { levelsSettingsSchema } from '../../../schemas/levelsSchemas';
+import { levelsSettingsSchema } from '../../../schemas/color/levelsSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments, Coord, Curves, ParametricCurve, ParametricCurveSettings } from '../../adjustments';
 import { ActiveChannel, getDefaultParametricCurve } from '../../adjustments';

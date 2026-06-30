@@ -1,4 +1,4 @@
-import type { ColorGradingPresetCatalog } from '../schemas/colorGradingPresetSchemas';
+import type { ColorGradingPresetCatalog } from '../schemas/color/colorGradingPresetSchemas';
 
 export const COLOR_GRADING_PRESET_CATALOG = {
   version: 1,

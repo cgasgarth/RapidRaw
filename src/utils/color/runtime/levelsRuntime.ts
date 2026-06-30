@@ -1,4 +1,4 @@
-import { parseLevelsSettings } from '../../../schemas/levelsSchemas';
+import { parseLevelsSettings } from '../../../schemas/color/levelsSchemas';
 
 export interface RgbPixel {
   blue: number;

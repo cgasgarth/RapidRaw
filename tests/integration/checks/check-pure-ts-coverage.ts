@@ -50,7 +50,7 @@ const coverageContracts = [
     id: 'levels-runtime',
     owner: 'levels schemas/runtime',
     behaviorArea: 'levels payload validation and channel remapping runtime behavior',
-    sourceFiles: ['src/schemas/levelsSchemas.ts', 'src/utils/color/runtime/levelsRuntime.ts'],
+    sourceFiles: ['src/schemas/color/levelsSchemas.ts', 'src/utils/color/runtime/levelsRuntime.ts'],
     testFiles: ['tests/pure-ts/adjustments/levels-runtime.test.ts'],
     minLinePercent: 95,
     minFunctionPercent: 95,

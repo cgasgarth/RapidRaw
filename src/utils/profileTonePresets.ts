@@ -1,4 +1,4 @@
-import type { ToneCurveId } from '../schemas/profileToneSchemas';
+import type { ToneCurveId } from '../schemas/color/profileToneSchemas';
 import type { ParametricCurveSettings } from './adjustments';
 
 const BASE_PARAMETRIC_CURVE: ParametricCurveSettings = {

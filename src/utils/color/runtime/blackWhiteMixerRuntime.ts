@@ -1,4 +1,4 @@
-import { parseBlackWhiteMixerSettings } from '../../../schemas/blackWhiteMixerSchemas';
+import { parseBlackWhiteMixerSettings } from '../../../schemas/color/blackWhiteMixerSchemas';
 import { SELECTIVE_COLOR_RANGES } from '../../../utils/selectiveColorRanges';
 
 export interface RgbPixel {

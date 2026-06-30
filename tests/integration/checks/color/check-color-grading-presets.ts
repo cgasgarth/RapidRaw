@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { parseColorGradingPresetCatalog } from '../../../../src/schemas/colorGradingPresetSchemas.ts';
+import { parseColorGradingPresetCatalog } from '../../../../src/schemas/color/colorGradingPresetSchemas.ts';
 import { applyColorGradingPresetToRgbPixel } from '../../../../src/utils/color/runtime/colorGradingRuntime.ts';
 import { COLOR_GRADING_PRESET_CATALOG } from '../../../../src/utils/colorGradingPresets.ts';
 

@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { blackWhiteMixerSettingsSchema } from '../../../schemas/blackWhiteMixerSchemas';
-import { channelMixerSettingsSchema } from '../../../schemas/channelMixerSchemas';
-import { colorBalanceRgbSettingsSchema } from '../../../schemas/colorBalanceRgbSchemas';
-import { cameraProfileIdSchema, toneCurveIdSchema } from '../../../schemas/profileToneSchemas';
+import { blackWhiteMixerSettingsSchema } from '../../../schemas/color/blackWhiteMixerSchemas';
+import { channelMixerSettingsSchema } from '../../../schemas/color/channelMixerSchemas';
+import { colorBalanceRgbSettingsSchema } from '../../../schemas/color/colorBalanceRgbSchemas';
+import { cameraProfileIdSchema, toneCurveIdSchema } from '../../../schemas/color/profileToneSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
 import { getDefaultParametricCurve } from '../../adjustments';

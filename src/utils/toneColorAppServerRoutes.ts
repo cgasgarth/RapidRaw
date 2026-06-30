@@ -1,4 +1,4 @@
-import { toneColorAppServerRouteManifestSchema } from '../schemas/toneColorAppServerSchemas';
+import { toneColorAppServerRouteManifestSchema } from '../schemas/color/toneColorAppServerSchemas';
 import {
   type ToneColorAppServerCommandType,
   ToneColorAppServerExecutionMode,

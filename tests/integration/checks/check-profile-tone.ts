@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { parseProfileToneSettings } from '../../../src/schemas/profileToneSchemas.ts';
+import { parseProfileToneSettings } from '../../../src/schemas/color/profileToneSchemas.ts';
 import {
   ADJUSTMENT_GROUPS,
   ADJUSTMENT_SECTIONS,

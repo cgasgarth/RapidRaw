@@ -2,10 +2,10 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Pipette, RotateCcw, Sliders } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { BlackWhiteMixerChannel } from '../../schemas/blackWhiteMixerSchemas';
-import type { ChannelMixerOutput, ChannelMixerSource } from '../../schemas/channelMixerSchemas';
-import type { ColorBalanceRgbChannel, ColorBalanceRgbRange } from '../../schemas/colorBalanceRgbSchemas';
-import type { CameraProfileId, ToneCurveId } from '../../schemas/profileToneSchemas';
+import type { BlackWhiteMixerChannel } from '../../schemas/color/blackWhiteMixerSchemas';
+import type { ChannelMixerOutput, ChannelMixerSource } from '../../schemas/color/channelMixerSchemas';
+import type { ColorBalanceRgbChannel, ColorBalanceRgbRange } from '../../schemas/color/colorBalanceRgbSchemas';
+import type { CameraProfileId, ToneCurveId } from '../../schemas/color/profileToneSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import {

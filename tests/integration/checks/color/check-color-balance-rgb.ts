@@ -4,7 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { parseColorBalanceRgbSettings } from '../../../../src/schemas/colorBalanceRgbSchemas.ts';
+import { parseColorBalanceRgbSettings } from '../../../../src/schemas/color/colorBalanceRgbSchemas.ts';
 import {
   ADJUSTMENT_GROUPS,
   ADJUSTMENT_SECTIONS,
