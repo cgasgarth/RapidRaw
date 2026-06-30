@@ -6,7 +6,7 @@ import {
   calculateSelectiveColorMaskWeight,
   type RgbPixel,
   renderSelectiveColorMaskPreviewPixel,
-} from '../../../../src/utils/selectiveColorRuntime.ts';
+} from '../../../../src/utils/color/selective/selectiveColorRuntime.ts';
 
 const orangePixel: RgbPixel = { blue: 0.08, green: 0.38, red: 0.92 };
 const yellowPixel: RgbPixel = { blue: 0.08, green: 0.78, red: 0.92 };

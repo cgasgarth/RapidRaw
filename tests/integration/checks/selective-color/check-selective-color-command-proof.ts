@@ -24,13 +24,16 @@ import {
 import { proofContractSchema } from '../../../../src/schemas/proofLevelSemanticsSchemas.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
 import {
+  applySelectiveColorToRgbPixel,
+  type RgbPixel,
+} from '../../../../src/utils/color/selective/selectiveColorRuntime.ts';
+import {
   applySelectiveColorCommandEnvelopeToAdjustments,
   buildSelectiveColorCommandEnvelope,
   buildSelectiveColorImageCommandContext,
   parseSelectiveColorCommandEnvelope,
   selectiveColorCommandEnvelopeSchema,
 } from '../../../../src/utils/selectiveColorCommandBridge.ts';
-import { applySelectiveColorToRgbPixel, type RgbPixel } from '../../../../src/utils/selectiveColorRuntime.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/color-selective/selective-color-command-proof-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');
