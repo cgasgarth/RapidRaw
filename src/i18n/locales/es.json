@@ -2053,6 +2053,7 @@
       "searchPlaceholder": "",
       "title": "",
       "unavailable": {
+        "selectEditorImage": "Select an image in the editor to use this command",
         "selectImage": "",
         "selectSource": ""
       }
