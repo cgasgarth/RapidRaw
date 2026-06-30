@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 
 import { toneColorCommandEnvelopeV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { applyLumaLevelsToRgbPixel, type RgbPixel } from '../../../src/utils/levelsRuntime.ts';
+import { applyLumaLevelsToRgbPixel, type RgbPixel } from '../../../src/utils/color/runtime/levelsRuntime.ts';
 
 const hashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 const CHANNEL_KEYS = ['red', 'green', 'blue'] as const;

@@ -38,7 +38,7 @@ import {
 import {
   formatGamutWarningCoverage,
   isCurrentExportSoftProofGamutWarningOverlay,
-} from '../../../utils/gamutWarningDisplay';
+} from '../../../utils/color/runtime/gamutWarningDisplay';
 import {
   normalizeLinearGradientParameters,
   normalizeRadialGradientParameters,

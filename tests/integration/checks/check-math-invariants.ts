@@ -5,7 +5,7 @@ import {
   applyColorParityLinearExposure,
   applyColorParityLumaLevels,
   type ColorParityVec3,
-} from '../../../src/utils/colorCpuGpuParity';
+} from '../../../src/utils/color/runtime/colorCpuGpuParity.ts';
 import { calculateDeltaE00, type LabColor } from '../../../src/utils/deltaE00';
 import {
   type LayerBlendMode,

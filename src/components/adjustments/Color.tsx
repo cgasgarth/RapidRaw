@@ -17,11 +17,11 @@ import {
   type HueSatLum,
   INITIAL_ADJUSTMENTS,
 } from '../../utils/adjustments';
-import { COLOR_GRADING_PRESETS } from '../../utils/colorGradingPresets';
 import {
   formatGamutWarningCoverage,
   isCurrentExportSoftProofGamutWarningOverlay,
-} from '../../utils/gamutWarningDisplay';
+} from '../../utils/color/runtime/gamutWarningDisplay';
+import { COLOR_GRADING_PRESETS } from '../../utils/colorGradingPresets';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../utils/profileTonePresets';
 import { applyProfileToneToRgbPixel } from '../../utils/profileToneRuntime';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../utils/selectiveColorRanges';

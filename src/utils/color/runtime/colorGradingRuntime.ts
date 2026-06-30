@@ -1,4 +1,4 @@
-import { colorGradingPresetSchema } from '../schemas/colorGradingPresetSchemas';
+import { colorGradingPresetSchema } from '../../../schemas/colorGradingPresetSchemas';
 
 export interface RgbPixel {
   blue: number;

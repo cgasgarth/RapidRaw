@@ -4,12 +4,6 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 import {
-  applyCameraProfileInputTransform,
-  type CameraProfileRgbPixel,
-  cameraProfileMatrix3x3Schema,
-  cameraProfileRgbPixelSchema,
-} from '../../../src/utils/cameraProfileInputTransformRuntime.ts';
-import {
   cameraProfileEntrySchema,
   cameraProfileFallbackSchema,
   cameraProfileLookupCatalogSchema,
@@ -17,6 +11,12 @@ import {
   cameraProfileWarningSchema,
   lookupCameraProfile,
 } from '../../../src/utils/cameraProfileLookup.ts';
+import {
+  applyCameraProfileInputTransform,
+  type CameraProfileRgbPixel,
+  cameraProfileMatrix3x3Schema,
+  cameraProfileRgbPixelSchema,
+} from '../../../src/utils/color/runtime/cameraProfileInputTransformRuntime.ts';
 
 const FIXTURE_PATH = 'fixtures/color/proofs/camera-profile-input-transform-proof.json';
 const LOOKUP_FIXTURE_PATH = 'fixtures/color/reference/camera-profile-lookup-fixtures.json';

@@ -1,4 +1,4 @@
-import type { GamutWarningOverlayPayload } from '../schemas/tauriEventSchemas';
+import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
 
 interface ExportSoftProofTransformForGamutWarning {
   blackPointCompensation: string | null;

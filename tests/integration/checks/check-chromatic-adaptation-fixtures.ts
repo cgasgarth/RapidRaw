@@ -9,7 +9,7 @@ import {
   adaptXyzBradford,
   chromaticAdaptationInputSchema,
   xyzColorSchema,
-} from '../../../src/utils/chromaticAdaptation.ts';
+} from '../../../src/utils/color/runtime/chromaticAdaptation.ts';
 
 const linearRgbSchema = z
   .object({

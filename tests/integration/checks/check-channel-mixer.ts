@@ -11,7 +11,7 @@ import {
   ColorAdjustment,
   INITIAL_ADJUSTMENTS,
 } from '../../../src/utils/adjustments.ts';
-import { applyChannelMixerToRgbPixel } from '../../../src/utils/channelMixerRuntime.ts';
+import { applyChannelMixerToRgbPixel } from '../../../src/utils/color/runtime/channelMixerRuntime.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 const identityRows = {

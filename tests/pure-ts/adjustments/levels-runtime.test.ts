@@ -9,7 +9,7 @@ import {
   ColorAdjustment,
   INITIAL_ADJUSTMENTS,
 } from '../../../src/utils/adjustments.ts';
-import { applyLumaLevelsToRgbPixel } from '../../../src/utils/levelsRuntime.ts';
+import { applyLumaLevelsToRgbPixel } from '../../../src/utils/color/runtime/levelsRuntime.ts';
 
 const readJson = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'));
 

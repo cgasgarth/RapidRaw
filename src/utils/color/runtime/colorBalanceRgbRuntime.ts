@@ -1,4 +1,4 @@
-import { parseColorBalanceRgbSettings } from '../schemas/colorBalanceRgbSchemas';
+import { parseColorBalanceRgbSettings } from '../../../schemas/colorBalanceRgbSchemas';
 
 export interface RgbPixel {
   blue: number;

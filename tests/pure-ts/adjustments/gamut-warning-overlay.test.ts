@@ -8,7 +8,7 @@ import { useEditorStore } from '../../../src/store/useEditorStore';
 import {
   formatGamutWarningCoverage,
   isCurrentExportSoftProofGamutWarningOverlay,
-} from '../../../src/utils/gamutWarningDisplay';
+} from '../../../src/utils/color/runtime/gamutWarningDisplay.ts';
 
 const imagePath = '/validation/current-export-soft-proof.ARW';
 const recipeId = 'display-p3-jpeg';
