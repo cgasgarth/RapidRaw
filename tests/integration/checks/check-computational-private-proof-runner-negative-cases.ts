@@ -73,7 +73,7 @@ async function writeTempRunnerScript(): Promise<string> {
   await writeFile(
     scriptPath,
     `
-      import { runComputationalPrivateProof } from '${process.cwd()}/scripts/lib/computational-private-proof-runner.ts';
+      import { runComputationalPrivateProof } from '${process.cwd()}/scripts/lib/private-raw/computational-proof-runner.ts';
       await runComputationalPrivateProof({
         featureLabel: 'hdr',
         fixtureId: '${FIXTURE_ID}',

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { getComputationalPrivateProofConfig } from '../../../lib/computational-private-proof-registry.ts';
-import { runComputationalPrivateProof } from '../../../lib/computational-private-proof-runner.ts';
+import { getComputationalPrivateProofConfig } from '../../../lib/private-raw/computational-proof-registry.ts';
+import { runComputationalPrivateProof } from '../../../lib/private-raw/computational-proof-runner.ts';
 
 await runComputationalPrivateProof(getComputationalPrivateProofConfig('hdr'));

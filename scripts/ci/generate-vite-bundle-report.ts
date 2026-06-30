@@ -6,7 +6,7 @@ import { basename, extname, join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { z } from 'zod';
 
-import { VITE_BUNDLE_BUDGET_POLICY } from '../lib/vite-bundle-policy.ts';
+import { VITE_BUNDLE_BUDGET_POLICY } from '../lib/ci/vite-bundle-policy.ts';
 
 type BundleAsset = {
   extension: string;

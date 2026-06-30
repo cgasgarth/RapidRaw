@@ -13,7 +13,7 @@ import {
 } from '../../../packages/rawengine-schema/src/panoramaHomographyDiagnostics.ts';
 import { buildPanoramaRuntimeDryRunV1 } from '../../../packages/rawengine-schema/src/panoramaRuntimePlan.ts';
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational-proof-budgets.ts';
+import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational/proof-budgets.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/panorama/panorama-homography-diagnostics-proof-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');

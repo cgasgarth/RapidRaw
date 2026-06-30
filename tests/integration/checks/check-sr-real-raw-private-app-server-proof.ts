@@ -11,7 +11,7 @@ import {
   buildSuperResolutionUiApplyCommandV1,
   buildSuperResolutionUiDryRunCommandV1,
 } from '../../../packages/rawengine-schema/src/superResolutionUiControls.ts';
-import { privateRawReportMetric } from '../../../scripts/lib/computational-private-report-fixtures.ts';
+import { privateRawReportMetric } from '../../../scripts/lib/private-raw/computational-report-fixtures.ts';
 import {
   type ComputationalMergePrivateRunReportCollection,
   parseComputationalMergePrivateRunReportCollection,

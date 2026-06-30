@@ -73,7 +73,7 @@ import {
   superResolutionPrivateRawReviewProofSchema,
   superResolutionReviewWorkspaceProofSchema,
   superResolutionUiSettingsProofSchema,
-} from '../lib/visual-smoke-proofs.ts';
+} from '../lib/proofs/visual-smoke-proofs.ts';
 
 const host = '127.0.0.1';
 const port = 1420;

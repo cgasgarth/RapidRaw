@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // @ts-check
 
-import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../lib/compact-output.ts';
+import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../lib/ci/compact-output.ts';
 
 const args = process.argv.slice(2);
 let label = 'command';

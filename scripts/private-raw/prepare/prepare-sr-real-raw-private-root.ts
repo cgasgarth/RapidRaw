@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { runComputationalPrivateRootPrep } from '../../lib/computational-private-root-prep.ts';
+import { runComputationalPrivateRootPrep } from '../../lib/private-raw/computational-root-prep.ts';
 
 await runComputationalPrivateRootPrep({
   expectedExtension: '.arw',

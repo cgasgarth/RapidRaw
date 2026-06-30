@@ -7,7 +7,7 @@ import {
   expectInvalidCases,
   finishFixtureCheck,
   readJson,
-} from '../../../scripts/lib/fixture-checks.ts';
+} from '../../../scripts/lib/fixtures/fixture-checks.ts';
 import { defringeFixtureSchema, parseDefringeFixtures } from '../../../src/schemas/defringeSchemas.ts';
 
 const fixtures = parseDefringeFixtures(await readJson('fixtures/detail/defringe-fixtures.json'));

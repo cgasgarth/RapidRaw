@@ -2,7 +2,7 @@
 
 import { mkdir, readFile, rm } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { writeBoundedOutput } from '../../../scripts/lib/compact-output.ts';
+import { writeBoundedOutput } from '../../../scripts/lib/ci/compact-output.ts';
 import { parseDeblurFixtureManifest } from '../../../src/schemas/deblurFixtureSchemas.ts';
 
 const REPORT_PATH = resolve('src-tauri/target/rawengine-deblur-cpu-reference-report.json');
