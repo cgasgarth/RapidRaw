@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextVariants, TextWeights } from '../../types/typography';
+import { inspectorSectionTokens } from './inspectorTokens';
 import UiText from './primitives/Text';
 
 interface CollapsibleSectionProps {
@@ -97,9 +98,9 @@ export default function CollapsibleSection({
   };
 
   return (
-    <div className="bg-surface rounded-lg overflow-hidden shrink-0" onContextMenu={onContextMenu}>
+    <div className={inspectorSectionTokens.shell} onContextMenu={onContextMenu}>
       <div
-        className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-card-active transition-colors duration-200"
+        className={inspectorSectionTokens.header}
         aria-expanded={isOpen}
         onClick={onToggle}
         onKeyDown={handleHeaderKeyDown}
@@ -108,15 +109,15 @@ export default function CollapsibleSection({
         role="button"
         tabIndex={0}
       >
-        <div className="flex items-center gap-2">
-          <UiText variant={TextVariants.title} weight={TextWeights.normal}>
+        <div className={inspectorSectionTokens.titleRow}>
+          <UiText variant={TextVariants.label} weight={TextWeights.medium} className={inspectorSectionTokens.title}>
             {title}
           </UiText>
           {canToggleVisibility && (
-            <div className="w-6 h-6 flex items-center justify-center">
+            <div className={inspectorSectionTokens.visibilitySlot}>
               <button
                 className={cx(
-                  'p-1 rounded-full text-text-secondary hover:bg-bg-primary z-10 transition-opacity duration-300',
+                  inspectorSectionTokens.visibilityButton,
                   isHovering || !isContentVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
                 )}
                 onClick={handleVisibilityClick}
@@ -131,17 +132,11 @@ export default function CollapsibleSection({
             </div>
           )}
         </div>
-        <ChevronDown
-          className={cx('text-accent transition-transform duration-300', { 'rotate-180': isOpen })}
-          size={20}
-        />
+        <ChevronDown className={cx(inspectorSectionTokens.chevron, { 'rotate-180': isOpen })} size={16} />
       </div>
       <div ref={wrapperRef} className="overflow-hidden transition-all duration-300 ease-in-out">
         <div
-          className={cx(
-            'px-4 pb-4 transition-opacity duration-300',
-            !isContentVisible && 'opacity-30 pointer-events-none',
-          )}
+          className={cx(inspectorSectionTokens.body, !isContentVisible && 'opacity-30 pointer-events-none')}
           ref={contentRef}
         >
           {children}
