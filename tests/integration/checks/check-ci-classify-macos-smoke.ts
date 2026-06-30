@@ -122,7 +122,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:capture-sharpening', new Set(['bun tests/integration/checks/check-capture-sharpening-fixtures.ts'])],
   ['check:compare-survey', new Set(['bun tests/integration/checks/check-compare-survey-fixtures.ts'])],
   ['check:defringe', new Set(['bun tests/integration/checks/check-defringe-fixtures.ts'])],
-  ['check:detail-artifacts', new Set(['bun tests/integration/checks/check-detail-artifacts.ts'])],
+  ['check:detail-artifacts', new Set(['bun tests/integration/checks/detail/check-detail-artifacts.ts'])],
   ['check:detail-workspace-smoke', new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario detail-workspace'])],
   ['check:dust-spot-visualization', new Set(['bun tests/integration/checks/check-dust-spot-visualization.ts'])],
   [

@@ -7,7 +7,7 @@ import { z } from 'zod';
 import {
   detailArtifactManifestSchema,
   parseDetailArtifactManifest,
-} from '../../../src/schemas/detailValidationSchemas.ts';
+} from '../../../../src/schemas/detailValidationSchemas.ts';
 
 const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(path, 'utf8'));
 
