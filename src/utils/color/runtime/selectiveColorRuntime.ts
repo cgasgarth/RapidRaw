@@ -1,10 +1,10 @@
-import { calculateDefaultSelectiveColorInfluence, calculateSelectiveColorInfluence } from './selectiveColorFalloff';
+import { calculateDefaultSelectiveColorInfluence, calculateSelectiveColorInfluence } from '../../selectiveColorFalloff';
 import {
   getSelectiveColorRange,
   normalizeSelectiveColorRangeControl,
   type SelectiveColorRangeControl,
   type SelectiveColorRangeKey,
-} from './selectiveColorRanges';
+} from '../../selectiveColorRanges';
 
 export interface RgbPixel {
   blue: number;

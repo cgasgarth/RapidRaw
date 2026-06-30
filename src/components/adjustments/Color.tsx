@@ -21,15 +21,15 @@ import {
   formatGamutWarningCoverage,
   isCurrentExportSoftProofGamutWarningOverlay,
 } from '../../utils/color/runtime/gamutWarningDisplay';
-import { COLOR_GRADING_PRESETS } from '../../utils/colorGradingPresets';
-import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../utils/profileTonePresets';
-import { applyProfileToneToRgbPixel } from '../../utils/profileToneRuntime';
-import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../utils/selectiveColorRanges';
+import { applyProfileToneToRgbPixel } from '../../utils/color/runtime/profileToneRuntime';
 import {
   applySelectiveColorToRgbPixel,
   type RgbPixel,
   renderSelectiveColorMaskPreviewPixel,
-} from '../../utils/selectiveColorRuntime';
+} from '../../utils/color/runtime/selectiveColorRuntime';
+import { COLOR_GRADING_PRESETS } from '../../utils/colorGradingPresets';
+import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../utils/profileTonePresets';
+import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../utils/selectiveColorRanges';
 import { applySkinToneUniformity, type SkinToneUniformityInput } from '../../utils/skinToneUniformity';
 import type { AppSettings } from '../ui/AppProperties';
 import UiText from '../ui/primitives/Text';

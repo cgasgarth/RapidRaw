@@ -19,7 +19,7 @@ import type { GamutWarningOverlayPayload } from '../../../src/schemas/tauriEvent
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { formatGamutWarningCoverage } from '../../../src/utils/color/runtime/gamutWarningDisplay.ts';
-import { applyProfileToneToRgbPixel } from '../../../src/utils/profileToneRuntime';
+import { applyProfileToneToRgbPixel } from '../../../src/utils/color/runtime/profileToneRuntime';
 
 type RenderedPanel = {
   container: HTMLDivElement;
