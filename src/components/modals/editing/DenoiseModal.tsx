@@ -4,15 +4,15 @@ import { CheckCircle, Grip, Loader2, Move, RefreshCw, Save, XCircle, ZoomIn, Zoo
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useModalTransition } from '../../hooks/ui/useModalTransition';
-import { usePreviewViewport } from '../../hooks/viewport/usePreviewViewport';
-import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
-import { TextColors, TextVariants, TextWeights } from '../../types/typography';
-import { getDisplayFileName } from '../../utils/displayFilePath';
-import Button from '../ui/Button';
-import Dropdown from '../ui/Dropdown';
-import Slider from '../ui/Slider';
-import UiText from '../ui/Text';
+import { useModalTransition } from '../../../hooks/ui/useModalTransition';
+import { usePreviewViewport } from '../../../hooks/viewport/usePreviewViewport';
+import { parsePathProgressPayload } from '../../../schemas/tauriEventSchemas';
+import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { getDisplayFileName } from '../../../utils/displayFilePath';
+import Button from '../../ui/Button';
+import Dropdown from '../../ui/Dropdown';
+import Slider from '../../ui/Slider';
+import UiText from '../../ui/Text';
 
 interface DenoiseModalProps {
   isOpen: boolean;

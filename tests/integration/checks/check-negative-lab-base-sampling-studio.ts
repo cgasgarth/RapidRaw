@@ -9,7 +9,7 @@ import {
   type NegativeLabBaseSamplePreviewProofContext,
 } from '../../../src/utils/negativeLabBaseSampleCommandBridge.ts';
 
-const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
+const modalSource = readFileSync('src/components/modals/negative-lab/NegativeConversionModal.tsx', 'utf8');
 
 const estimate = {
   baseDensity: [0.12, 0.24, 0.37],

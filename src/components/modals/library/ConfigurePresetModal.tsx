@@ -3,13 +3,13 @@ import { motion } from 'framer-motion';
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useManagedFocus } from '../../hooks/ui/useManagedFocus';
-import { useModalTransition } from '../../hooks/ui/useModalTransition';
-import { TextVariants } from '../../types/typography';
-import { ADJUSTMENT_GROUPS } from '../../utils/adjustments';
-import type { Preset } from '../ui/AppProperties';
-import Switch from '../ui/Switch';
-import UiText from '../ui/Text';
+import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
+import { useModalTransition } from '../../../hooks/ui/useModalTransition';
+import { TextVariants } from '../../../types/typography';
+import { ADJUSTMENT_GROUPS } from '../../../utils/adjustments';
+import type { Preset } from '../../ui/AppProperties';
+import Switch from '../../ui/Switch';
+import UiText from '../../ui/Text';
 
 interface ConfigurePresetModalProps {
   isOpen: boolean;

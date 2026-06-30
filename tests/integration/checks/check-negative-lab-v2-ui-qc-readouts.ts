@@ -2,7 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 
-const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
+const modalSource = readFileSync('src/components/modals/negative-lab/NegativeConversionModal.tsx', 'utf8');
 const enLocale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
 const messages = enLocale.modals?.negativeConversion ?? {};
 

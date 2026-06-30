@@ -5,10 +5,10 @@ import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_PAIRS } from '../../../src/utils/c
 import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from '../../../src/utils/computationalMergeAppServerRoutes.ts';
 
 const modalCoverage = [
-  { family: 'hdr', file: 'src/components/modals/HdrModal.tsx' },
-  { family: 'panorama', file: 'src/components/modals/PanoramaModal.tsx' },
-  { family: 'focus_stack', file: 'src/components/modals/FocusStackModal.tsx' },
-  { family: 'super_resolution', file: 'src/components/modals/SuperResolutionModal.tsx' },
+  { family: 'hdr', file: 'src/components/modals/computational-merge/HdrModal.tsx' },
+  { family: 'panorama', file: 'src/components/modals/computational-merge/PanoramaModal.tsx' },
+  { family: 'focus_stack', file: 'src/components/modals/computational-merge/FocusStackModal.tsx' },
+  { family: 'super_resolution', file: 'src/components/modals/computational-merge/SuperResolutionModal.tsx' },
 ];
 
 const failures = [];

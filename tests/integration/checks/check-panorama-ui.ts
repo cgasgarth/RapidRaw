@@ -115,7 +115,7 @@ if (invalidManualCrop.success) {
   process.exit(1);
 }
 
-const source = readFileSync('src/components/modals/PanoramaModal.tsx', 'utf8');
+const source = readFileSync('src/components/modals/computational-merge/PanoramaModal.tsx', 'utf8');
 for (const marker of [
   'panorama-setup-summary',
   'panorama-setup-summary-chip',

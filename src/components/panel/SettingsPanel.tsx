@@ -68,7 +68,7 @@ import {
 } from '../../utils/rawProcessingModes';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { THEMES, type ThemeProps } from '../../utils/themes';
-import ConfirmModal from '../modals/ConfirmModal';
+import ConfirmModal from '../modals/navigation/ConfirmModal';
 import type { AppSettings, Theme } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';

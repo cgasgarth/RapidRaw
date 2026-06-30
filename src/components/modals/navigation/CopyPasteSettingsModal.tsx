@@ -3,17 +3,17 @@ import { motion } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useModalTransition } from '../../hooks/ui/useModalTransition';
-import { TextVariants } from '../../types/typography';
+import { useModalTransition } from '../../../hooks/ui/useModalTransition';
+import { TextVariants } from '../../../types/typography';
 import {
   ADJUSTMENT_GROUPS,
   COPYABLE_ADJUSTMENT_KEYS,
   type CopyPasteSettings,
   PasteMode,
-} from '../../utils/adjustments';
-import Button from '../ui/Button';
-import Switch from '../ui/Switch';
-import UiText from '../ui/Text';
+} from '../../../utils/adjustments';
+import Button from '../../ui/Button';
+import Switch from '../../ui/Switch';
+import UiText from '../../ui/Text';
 
 interface CopyPasteSettingsModalProps {
   isOpen: boolean;

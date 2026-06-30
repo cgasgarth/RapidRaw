@@ -56,9 +56,9 @@ import { TextColors, TextVariants, TextWeights } from '../../../types/typography
 import { ADJUSTMENT_GROUPS, type Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import { createBlobFromUint8Array } from '../../../utils/blobUtils';
 import { BUILT_IN_COLOR_STYLE_PRESETS, COLOR_STYLE_PRESET_CATALOG } from '../../../utils/colorStylePresetCatalog';
-import ConfigurePresetModal from '../../modals/ConfigurePresetModal';
-import CreateFolderModal from '../../modals/CreateFolderModal';
-import RenameFolderModal from '../../modals/RenameFolderModal';
+import ConfigurePresetModal from '../../modals/library/ConfigurePresetModal';
+import CreateFolderModal from '../../modals/library/CreateFolderModal';
+import RenameFolderModal from '../../modals/library/RenameFolderModal';
 import { type Folder, OPTION_SEPARATOR, type Option, Panel, type Preset } from '../../ui/AppProperties';
 import Button from '../../ui/Button';
 import UiText from '../../ui/Text';

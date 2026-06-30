@@ -17,18 +17,18 @@ import {
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useModalTransition } from '../../hooks/ui/useModalTransition';
-import { Invokes } from '../../tauri/commands';
-import { TextColors, TextVariants } from '../../types/typography';
-import type { Adjustments } from '../../utils/adjustments';
-import { createBlobFromUint8Array } from '../../utils/blobUtils';
-import { LAYOUTS, type Layout, type LayoutDefinition } from '../../utils/CollageVariants';
-import { getDisplayFileName } from '../../utils/displayFilePath';
-import type { ImageFile } from '../ui/AppProperties';
-import Button from '../ui/Button';
-import Slider from '../ui/Slider';
-import Switch from '../ui/Switch';
-import UiText from '../ui/Text';
+import { useModalTransition } from '../../../hooks/ui/useModalTransition';
+import { Invokes } from '../../../tauri/commands';
+import { TextColors, TextVariants } from '../../../types/typography';
+import type { Adjustments } from '../../../utils/adjustments';
+import { createBlobFromUint8Array } from '../../../utils/blobUtils';
+import { LAYOUTS, type Layout, type LayoutDefinition } from '../../../utils/CollageVariants';
+import { getDisplayFileName } from '../../../utils/displayFilePath';
+import type { ImageFile } from '../../ui/AppProperties';
+import Button from '../../ui/Button';
+import Slider from '../../ui/Slider';
+import Switch from '../../ui/Switch';
+import UiText from '../../ui/Text';
 
 interface CollageModalProps {
   isOpen: boolean;

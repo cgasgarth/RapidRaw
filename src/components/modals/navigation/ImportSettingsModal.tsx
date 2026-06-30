@@ -1,12 +1,12 @@
 import { type ChangeEvent, type KeyboardEvent, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useManagedFocus } from '../../hooks/ui/useManagedFocus';
-import { useModalTransition } from '../../hooks/ui/useModalTransition';
-import { TextVariants } from '../../types/typography';
-import { FILENAME_VARIABLES } from '../ui/ExportImportProperties';
-import Switch from '../ui/Switch';
-import UiText from '../ui/Text';
+import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
+import { useModalTransition } from '../../../hooks/ui/useModalTransition';
+import { TextVariants } from '../../../types/typography';
+import { FILENAME_VARIABLES } from '../../ui/ExportImportProperties';
+import Switch from '../../ui/Switch';
+import UiText from '../../ui/Text';
 
 interface ImportSettings {
   dateFolderFormat: string;

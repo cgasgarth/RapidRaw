@@ -81,7 +81,7 @@ const applyActionMetadata = applyActionMetadataSchema.parse({
   toolName: routePair.applyToolName,
 });
 const [modalSource, appModalsSource] = await Promise.all([
-  readFile('src/components/modals/FocusStackModal.tsx', 'utf8'),
+  readFile('src/components/modals/computational-merge/FocusStackModal.tsx', 'utf8'),
   readFile('src/components/modals/AppModals.tsx', 'utf8'),
 ]);
 const failures: string[] = [];

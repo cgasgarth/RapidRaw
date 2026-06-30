@@ -5,15 +5,15 @@ import { Check, Eye, EyeOff, Grid3X3, Info, LineChart, Maximize, RotateCcw, Zoom
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useModalTransition } from '../../hooks/ui/useModalTransition';
-import { usePreviewViewport } from '../../hooks/viewport/usePreviewViewport';
-import { Invokes } from '../../tauri/commands';
-import { TextColors, TextVariants } from '../../types/typography';
-import type { Adjustments } from '../../utils/adjustments';
-import { throttle } from '../../utils/timing';
-import Button from '../ui/Button';
-import Slider from '../ui/Slider';
-import UiText from '../ui/Text';
+import { useModalTransition } from '../../../hooks/ui/useModalTransition';
+import { usePreviewViewport } from '../../../hooks/viewport/usePreviewViewport';
+import { Invokes } from '../../../tauri/commands';
+import { TextColors, TextVariants } from '../../../types/typography';
+import type { Adjustments } from '../../../utils/adjustments';
+import { throttle } from '../../../utils/timing';
+import Button from '../../ui/Button';
+import Slider from '../../ui/Slider';
+import UiText from '../../ui/Text';
 
 interface GeometryParams {
   distortion: number;

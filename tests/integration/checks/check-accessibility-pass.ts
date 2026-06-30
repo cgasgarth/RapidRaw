@@ -8,10 +8,10 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { z } from 'zod';
 
 import { LibraryExportPanelSlot } from '../../../src/App.tsx';
-import CommandPaletteModal from '../../../src/components/modals/CommandPaletteModal.tsx';
-import ConfirmModal from '../../../src/components/modals/ConfirmModal.tsx';
-import FocusStackModal from '../../../src/components/modals/FocusStackModal.tsx';
-import SuperResolutionModal from '../../../src/components/modals/SuperResolutionModal.tsx';
+import FocusStackModal from '../../../src/components/modals/computational-merge/FocusStackModal.tsx';
+import SuperResolutionModal from '../../../src/components/modals/computational-merge/SuperResolutionModal.tsx';
+import CommandPaletteModal from '../../../src/components/modals/navigation/CommandPaletteModal.tsx';
+import ConfirmModal from '../../../src/components/modals/navigation/ConfirmModal.tsx';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../../src/schemas/focus-stack/focusStackUiSchemas.ts';
 import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../../../src/schemas/superResolutionUiSchemas.ts';
 

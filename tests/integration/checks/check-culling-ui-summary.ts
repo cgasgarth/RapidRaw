@@ -6,7 +6,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
-import CullingModal from '../../../src/components/modals/CullingModal.tsx';
+import CullingModal from '../../../src/components/modals/editing/CullingModal.tsx';
 
 const failures: string[] = [];
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));

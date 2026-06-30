@@ -22,7 +22,7 @@ mock.module('react-i18next', () => ({
   }),
 }));
 
-const PanoramaModal = (await import('../../../src/components/modals/PanoramaModal.tsx')).default;
+const PanoramaModal = (await import('../../../src/components/modals/computational-merge/PanoramaModal.tsx')).default;
 
 const failures: string[] = [];
 const routePair = getComputationalMergeAppServerRoutePairSummary('panorama');

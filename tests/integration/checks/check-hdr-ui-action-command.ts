@@ -24,7 +24,7 @@ mock.module('react-i18next', () => ({
   }),
 }));
 
-const HdrModal = (await import('../../../src/components/modals/HdrModal.tsx')).default;
+const HdrModal = (await import('../../../src/components/modals/computational-merge/HdrModal.tsx')).default;
 
 const failures: string[] = [];
 const routePair = getComputationalMergeAppServerRoutePairSummary('hdr');

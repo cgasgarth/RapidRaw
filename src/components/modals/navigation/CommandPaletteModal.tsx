@@ -16,11 +16,11 @@ import {
 } from 'lucide-react';
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { CommandPaletteCommand } from '../../schemas/commandPaletteSchemas';
-import { useEditorStore } from '../../store/useEditorStore';
-import { useLibraryStore } from '../../store/useLibraryStore';
-import { useUIStore } from '../../store/useUIStore';
-import { TextColors, TextVariants } from '../../types/typography';
+import type { CommandPaletteCommand } from '../../../schemas/commandPaletteSchemas';
+import { useEditorStore } from '../../../store/useEditorStore';
+import { useLibraryStore } from '../../../store/useLibraryStore';
+import { useUIStore } from '../../../store/useUIStore';
+import { TextColors, TextVariants } from '../../../types/typography';
 import {
   commandCategoryKeys,
   commandLabelKeys,
@@ -29,10 +29,10 @@ import {
   getCommandPaletteDisabledReasonKey,
   getCommandPaletteSelectedImages,
   getCommandPaletteSelectedPaths,
-} from '../../utils/commandPaletteModel';
-import Button from '../ui/Button';
-import Input from '../ui/Input';
-import UiText from '../ui/Text';
+} from '../../../utils/commandPaletteModel';
+import Button from '../../ui/Button';
+import Input from '../../ui/Input';
+import UiText from '../../ui/Text';
 
 interface CommandPaletteModalProps {
   isOpen: boolean;

@@ -144,7 +144,7 @@ if (invalidPreset.success) {
   process.exit(1);
 }
 
-const source = readFileSync('src/components/modals/HdrModal.tsx', 'utf8');
+const source = readFileSync('src/components/modals/computational-merge/HdrModal.tsx', 'utf8');
 for (const marker of [
   'hdr-setup-summary',
   'hdr-setup-summary-chip',

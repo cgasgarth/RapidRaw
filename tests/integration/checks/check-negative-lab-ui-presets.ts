@@ -451,12 +451,12 @@ const stockMetadataLocaleKeys = [
   'stockMetadataSummary',
   'stockMetadataUseSuggestedPreset',
 ];
-const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
+const modalSource = readFileSync('src/components/modals/negative-lab/NegativeConversionModal.tsx', 'utf8');
 const extractedUiSource = [
-  'src/components/modals/NegativeLabPatchSamplerPanel.tsx',
-  'src/components/modals/NegativeLabQcProofPanel.tsx',
-  'src/components/modals/NegativeLabRollHealthPanel.tsx',
-  'src/components/modals/NegativeLabRollHealthModel.ts',
+  'src/components/modals/negative-lab/NegativeLabPatchSamplerPanel.tsx',
+  'src/components/modals/negative-lab/NegativeLabQcProofPanel.tsx',
+  'src/components/modals/negative-lab/NegativeLabRollHealthPanel.tsx',
+  'src/components/modals/negative-lab/NegativeLabRollHealthModel.ts',
   'src/hooks/editor/useNegativeLabProfileBrowser.ts',
 ]
   .map((path) => readFileSync(path, 'utf8'))

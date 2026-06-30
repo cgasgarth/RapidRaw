@@ -48,7 +48,7 @@ if (missingCommonKeys.length > 0) {
   process.exit(1);
 }
 
-const source = readFileSync('src/components/modals/DenoiseModal.tsx', 'utf8');
+const source = readFileSync('src/components/modals/editing/DenoiseModal.tsx', 'utf8');
 for (const marker of [
   'data-testid="denoise-setup-summary"',
   'modals.denoise.summaryMethod',
