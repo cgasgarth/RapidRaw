@@ -28,6 +28,26 @@ export const negativeLabProfileComparisonDeltaSchema = z
   })
   .strict();
 
+export const negativeLabProfileComparisonRenderEvidenceSchema = z
+  .object({
+    baseSampleReference: z.string().trim().min(1),
+    densityAlgorithm: z.enum(['density_rgb_v1', 'negative_density_print_v2']),
+    metricHash: negativeLabProfileProvenanceHashSchema,
+    metrics: z
+      .object({
+        contrastDeltaAbs: z.number().min(0),
+        exposureDeltaAbs: z.number().min(0),
+        rgbBalanceDeltaAbs: z.number().min(0),
+      })
+      .strict(),
+    outputTag: z.enum(['preview_display', 'export_linear']),
+    previewHash: negativeLabProfileProvenanceHashSchema,
+    printCurveVersion: z.enum(['density_print_v2', 'legacy_density_rgb_v1']),
+    renderHash: negativeLabProfileProvenanceHashSchema,
+    warningCodes: z.array(z.string().trim().min(1)).min(1),
+  })
+  .strict();
+
 export const negativeLabSelectedProfileSnapshotSchema = z
   .object({
     claimLevel: z.enum(['generic_starting_point_only', 'measured_profile', 'user_profile']),
@@ -84,7 +104,15 @@ export const negativeLabProfileComparisonRowSchema = z
       })
       .strict(),
     profile: negativeLabRuntimeProfileBrowserRowSchema,
+    renderEvidence: negativeLabProfileComparisonRenderEvidenceSchema,
     selectedProfileSnapshot: negativeLabSelectedProfileSnapshotSchema,
+    mutationSafety: z
+      .object({
+        browsingMutatesEditGraph: z.literal(false),
+        requiresAcceptedPlanForApply: z.literal(true),
+        selectableForRuntimeApply: z.boolean(),
+      })
+      .strict(),
   })
   .strict();
 

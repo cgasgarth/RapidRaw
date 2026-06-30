@@ -36,6 +36,7 @@
     "check:negative-lab-agent-workflow": "bun tests/integration/checks/check-negative-lab-agent-workflow.ts",
     "check:agent-selected-image-preview-loop-private-raw": "bun tests/integration/checks/check-agent-selected-image-preview-loop-private-raw.ts",
     "check:negative-lab-measured-render-proof": "bun tests/integration/checks/check-negative-lab-measured-render-proof.ts",
+    "check:negative-lab-profile-comparison": "bun tests/integration/checks/check-negative-lab-profile-comparison.ts",
     "lint": "bun scripts/check-folder-file-counts.ts && bun scripts/run-compact-command.ts --label lint -- biome ci --formatter-enabled=false --assist-enabled=false .",
     "lint:fix": "bun scripts/run-compact-command.ts --label lint:fix -- biome check --write .",
     "format": "bun scripts/run-compact-command.ts --label format -- biome format --write .",

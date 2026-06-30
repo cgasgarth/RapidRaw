@@ -611,7 +611,7 @@ try {
 for (const filePath of [
   'src/utils/negativeLabCrosstalkProfile.ts',
   'src/utils/negativeLabMeasuredProfileRuntime.ts',
-  'tests/pure-ts/negative-lab-crosstalk-profile.test.ts',
+  'tests/pure-ts/negative-lab/negative-lab-crosstalk-profile.test.ts',
 ]) {
   const source = await readFile(filePath, 'utf8');
   const disallowedMarkers = [
