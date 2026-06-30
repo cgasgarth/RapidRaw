@@ -508,10 +508,6 @@
           "path": "docs/tooling/tauri-invoke-boundary-ratchet-2026-06-15.md"
         },
         {
-          "title": "Compact quality command policy",
-          "path": "docs/tooling/compact-quality-command-policy-2026-06-15.md"
-        },
-        {
           "title": "React refresh lint",
           "path": "docs/tooling/react-refresh-lint-2026-06-15.md"
         },
@@ -534,14 +530,6 @@
         {
           "title": "Unused code gate evaluation",
           "path": "docs/tooling/unused-code-gate-2026-06-15.md"
-        },
-        {
-          "title": "Rust required feature policy",
-          "path": "docs/tooling/rust-required-feature-policy-2026-06-13.md"
-        },
-        {
-          "title": "Rust feature matrix",
-          "path": "docs/tooling/rust-feature-matrix-2026-06-15.md"
         },
         {
           "title": "Rust clippy pedantic and nursery evaluation",
@@ -708,10 +696,6 @@
         {
           "title": "macOS package and notarization dry-run checklist",
           "path": "docs/release/macos-package-notarization-dry-run-checklist-2026-06-19.md"
-        },
-        {
-          "title": "Raw editor frontend release build contract",
-          "path": "docs/release/raw-editor-frontend-release-build-contract-2026-06-19.md"
         },
         {
           "title": "Release notes automation",

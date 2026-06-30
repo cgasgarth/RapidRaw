@@ -32,7 +32,6 @@ validation whenever their scope is relevant.
 | `bun run check:rust:clippy`         | Rust clippy warnings-as-errors, tracked by #287 if it regresses.                                                                                |
 | `bun run check:rust:test`           | Rust test gate, mirrors current CI for Rust-affecting PRs.                                                                                      |
 | `bun run check:rust`                | Blocking Rust local bundle for Rust-affecting PRs.                                                                                              |
-| `bun run check:rust-feature-policy` | Ensures required Rust scripts and workflow jobs use the explicit `required-ci` feature set instead of broad `--all-features`.                   |
 | `bun run check:security`            | Dependency vulnerability checks for JS and Rust.                                                                                                |
 | `bun run check:sidecar-roundtrip`   | Fixture-oriented validation for documented `.rrdata` sidecar shape, virtual-copy naming, tag conventions, and missing/invalid default behavior. |
 

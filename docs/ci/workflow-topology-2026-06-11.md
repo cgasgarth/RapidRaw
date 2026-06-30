@@ -73,11 +73,9 @@ without waiting for, canceling, or being grouped with an older main run. Hosted
 runner capacity can still queue jobs, but RawEngine should not add GitHub
 Actions configuration that serializes main heads.
 
-`tests/integration/checks/check-github-workflow-policy.ts` enforces this by rejecting any
-workflow that runs on push to `main` and defines `concurrency`. Its self-test
-covers block, inline, and scalar `main` branch declarations so a shorthand YAML
-edit cannot bypass the policy. Keep that guard in the required
-`github actions: actionlint` lane whenever workflow topology is changed.
+Use native workflow validation with `actionlint` for YAML correctness. Review
+workflow topology changes directly when editing `main` push behavior; do not
+add broad custom policy tests for workflow string patterns.
 
 `main` pushes should not enqueue macOS work that duplicates already-passed PR
 coverage. Baseline validation keeps Ubuntu checks on every main push, but macOS

@@ -70,6 +70,23 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - When something starts looking like slop, clean it up proactively instead of
   building more work on top of it.
 
+## Testing Discipline
+
+- Tests should prove product logic or user journeys. Use native test runners:
+  Bun test for non-UI TypeScript logic, Playwright or native app automation for
+  UI/e2e journeys, and Cargo test for Rust.
+- Do not create tests whose main value is checking package script text, hook
+  wiring, workflow policy strings, generated inventories, command names, or
+  other agent/process metadata.
+- Do not wrap repo-policy probes, schema-only checks, inventory scans, or
+  config assertions in `.test.ts` files to make them look like product tests.
+- If a repo-policy check is genuinely needed, keep it as a focused validation
+  command with a clear product-quality reason. Delete low-value policy checks
+  instead of migrating them to another test harness.
+- Prefer deleting or simplifying stale `tests/integration/checks/check-*.ts`
+  files that do not validate runtime behavior, source logic, or a real user
+  workflow. Do not build more checks on top of weak checks.
+
 ## Startup Preflight
 
 - Before implementation in a new turn or worktree, do one compact preflight

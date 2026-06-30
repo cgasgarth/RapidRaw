@@ -19,7 +19,6 @@ Why not blocking yet:
 
 Useful findings:
 
-- `js-yaml` is directly imported by workflow-policy scripts and should be declared.
 - `react-draggable` appears unused and should be removed only after UI verification.
 - Several schema exports may become real cleanup targets after API/runtime integrations land.
 

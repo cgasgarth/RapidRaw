@@ -57,8 +57,7 @@ This command builds the minified production frontend and then runs
 `tests/integration/checks/check-vite-bundle-budget.ts` against `dist/index.html` and
 `dist/assets`.
 
-Release packaging uses the same frontend contract. See
-[Raw editor frontend release build contract](../release/raw-editor-frontend-release-build-contract-2026-06-19.md).
+Release packaging uses the same `bun run build` output and budget check.
 
 It also writes a review artifact under `artifacts/bundle-report/`:
 

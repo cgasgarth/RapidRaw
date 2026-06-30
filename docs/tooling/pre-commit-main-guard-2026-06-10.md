@@ -20,7 +20,7 @@ bun run hooks:install
   detached checkouts.
 - The hook runs `bun run lint:fix`, stages autofixes with `git add -u`, then
   runs the standard local lint, format, typecheck, test, Rust, bundle, i18n,
-  unused dependency, docs, schema, and schema-routing gates in parallel.
+  unused dependency, docs, and schema gates in parallel.
 
 The hook error is:
 
