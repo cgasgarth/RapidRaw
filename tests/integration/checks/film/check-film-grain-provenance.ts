@@ -15,8 +15,8 @@ import {
   markFilmGrainProvenanceStaleState,
   readFilmGrainProvenanceFromSidecar,
   readFilmGrainSidecarReloadState,
-} from '../../../packages/rawengine-schema/src/filmGrainProvenance.ts';
-import { sampleFilmGrainModelV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+} from '../../../../packages/rawengine-schema/src/filmGrainProvenance.ts';
+import { sampleFilmGrainModelV1 } from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/detail-retouch/film-grain-provenance-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');

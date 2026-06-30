@@ -40,6 +40,6 @@
     "kind": "synthetic-film-grain-preview-export-parity",
     "scene": "shadow-midtone-highlight-ramp-with-color-chips"
   },
-  "generatedFrom": "tests/integration/checks/check-film-grain-preview-export-parity.ts",
+  "generatedFrom": "tests/integration/checks/film/check-film-grain-preview-export-parity.ts",
   "version": 1
 }

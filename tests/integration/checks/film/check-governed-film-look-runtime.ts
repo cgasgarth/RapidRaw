@@ -4,12 +4,12 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 import { z } from 'zod';
-import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/film-look/filmLookRegistry.ts';
+import { FILM_LOOK_BROWSER_ITEMS } from '../../../../src/utils/film-look/filmLookRegistry.ts';
 import {
   applyGovernedFilmLookRuntime,
   buildGovernedFilmLookCommand,
   type GovernedFilmLookPixel,
-} from '../../../src/utils/governedFilmLookRuntime.ts';
+} from '../../../../src/utils/governedFilmLookRuntime.ts';
 
 const FIXTURE_PATH = resolve('fixtures/film-simulation/governed-film-look-runtime.json');
 const updateFixture = process.argv.includes('--update');
@@ -59,7 +59,7 @@ const proofSchema = z
         scene: z.literal('ramp-color-chips-highlight-edge-specular'),
       })
       .strict(),
-    generatedFrom: z.literal('tests/integration/checks/check-governed-film-look-runtime.ts'),
+    generatedFrom: z.literal('tests/integration/checks/film/check-governed-film-look-runtime.ts'),
     proofId: z.literal('film.look.governed.runtime.synthetic.v1'),
     result: resultSummarySchema,
     schemaVersion: z.literal(1),
@@ -111,7 +111,7 @@ const proof = proofSchema.parse({
     kind: 'synthetic-governed-film-look-runtime-proof',
     scene: 'ramp-color-chips-highlight-edge-specular',
   },
-  generatedFrom: 'tests/integration/checks/check-governed-film-look-runtime.ts',
+  generatedFrom: 'tests/integration/checks/film/check-governed-film-look-runtime.ts',
   proofId: 'film.look.governed.runtime.synthetic.v1',
   result: resultSummary,
   schemaVersion: 1,

@@ -9,12 +9,12 @@ import { z } from 'zod';
 import {
   applyFilmGrainRuntime,
   type FilmGrainRuntimePixelV1,
-} from '../../../packages/rawengine-schema/src/filmGrainRuntime.ts';
+} from '../../../../packages/rawengine-schema/src/filmGrainRuntime.ts';
 import {
   type FilmGrainModelV1,
   filmGrainModelV1Schema,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { sampleFilmGrainModelV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { sampleFilmGrainModelV1 } from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
 
 const MANIFEST_PATH = resolve('fixtures/film-simulation/film-grain-preview-export-parity.json');
 const updateFixture = process.argv.includes('--update');
@@ -54,7 +54,7 @@ const manifestSchema = z
         scene: z.literal('shadow-midtone-highlight-ramp-with-color-chips'),
       })
       .strict(),
-    generatedFrom: z.literal('tests/integration/checks/check-film-grain-preview-export-parity.ts'),
+    generatedFrom: z.literal('tests/integration/checks/film/check-film-grain-preview-export-parity.ts'),
     version: z.literal(1),
   })
   .strict();
@@ -132,7 +132,7 @@ const expectedManifest = manifestSchema.parse({
     kind: 'synthetic-film-grain-preview-export-parity',
     scene: 'shadow-midtone-highlight-ramp-with-color-chips',
   },
-  generatedFrom: 'tests/integration/checks/check-film-grain-preview-export-parity.ts',
+  generatedFrom: 'tests/integration/checks/film/check-film-grain-preview-export-parity.ts',
   version: 1,
 });
 const expectedJson = `${JSON.stringify(expectedManifest, null, 2)}\n`;

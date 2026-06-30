@@ -2,14 +2,14 @@
 
 import { z } from 'zod';
 
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
 import {
   applyFilmLookAbCommandToAdjustments,
   buildFilmLookAbCommand,
   type FilmLookColorPipelinePixel,
   filmLookAbCommandSchema,
-} from '../../../src/utils/film-look/filmLookColorPipelineCommand.ts';
-import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/film-look/filmLookRegistry.ts';
+} from '../../../../src/utils/film-look/filmLookColorPipelineCommand.ts';
+import { FILM_LOOK_BROWSER_ITEMS } from '../../../../src/utils/film-look/filmLookRegistry.ts';
 
 const proofSchema = z
   .object({

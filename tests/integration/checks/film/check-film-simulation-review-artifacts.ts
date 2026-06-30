@@ -94,7 +94,7 @@ const reviewArtifactSchema = z
         .strict(),
     ),
     doesNotProve: z.array(z.string().trim().min(1)).nonempty(),
-    generatedFrom: z.literal('tests/integration/checks/check-film-simulation-review-artifacts.ts'),
+    generatedFrom: z.literal('tests/integration/checks/film/check-film-simulation-review-artifacts.ts'),
     proofId: z.literal('film.simulation.review-artifacts.synthetic.v1'),
     schemaVersion: z.literal(1),
   })
@@ -167,7 +167,7 @@ const reviewArtifact = reviewArtifactSchema.parse({
     };
   }),
   doesNotProve: ['real_raw_quality', 'measured_film_stock_emulation', 'photochemical_density_domain'],
-  generatedFrom: 'tests/integration/checks/check-film-simulation-review-artifacts.ts',
+  generatedFrom: 'tests/integration/checks/film/check-film-simulation-review-artifacts.ts',
   proofId: 'film.simulation.review-artifacts.synthetic.v1',
   schemaVersion: 1,
 });

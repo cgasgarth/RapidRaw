@@ -8,8 +8,8 @@ import { z } from 'zod';
 import {
   applyFilmGrainRuntime,
   type FilmGrainRuntimePixelV1,
-} from '../../../packages/rawengine-schema/src/filmGrainRuntime.ts';
-import { sampleFilmGrainModelV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+} from '../../../../packages/rawengine-schema/src/filmGrainRuntime.ts';
+import { sampleFilmGrainModelV1 } from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
 
 const FIXTURE_PATH = resolve('fixtures/film-simulation/film-grain-runtime-proof.json');
 const updateFixture = process.argv.includes('--update');
@@ -53,7 +53,7 @@ const proofSchema = z
         scene: z.literal('shadow-midtone-highlight-ramp'),
       })
       .strict(),
-    generatedFrom: z.literal('tests/integration/checks/check-film-grain-runtime-proof.ts'),
+    generatedFrom: z.literal('tests/integration/checks/film/check-film-grain-runtime-proof.ts'),
     proofId: z.literal('film.grain.runtime.cpu-reference.synthetic.v1'),
     result: resultSummarySchema,
     schemaVersion: z.literal(1),
@@ -107,7 +107,7 @@ const expectedProof = proofSchema.parse({
     kind: 'synthetic-film-grain-runtime-proof',
     scene: 'shadow-midtone-highlight-ramp',
   },
-  generatedFrom: 'tests/integration/checks/check-film-grain-runtime-proof.ts',
+  generatedFrom: 'tests/integration/checks/film/check-film-grain-runtime-proof.ts',
   proofId: 'film.grain.runtime.cpu-reference.synthetic.v1',
   result: runtimeResultSummary,
   schemaVersion: 1,

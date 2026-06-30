@@ -37,7 +37,7 @@ const proofArtifactSchema = z
         scene: z.literal('shadow-neutral-highlight-ramp'),
       })
       .strict(),
-    generatedFrom: z.literal('tests/integration/checks/check-film-look-render-apply-proof.ts'),
+    generatedFrom: z.literal('tests/integration/checks/film/check-film-look-render-apply-proof.ts'),
     lookId: z.literal(proofLookId),
     outputPixels: z.array(rgbPixelSchema).min(1),
     previewExportStatus: z.literal('covered_by_check:film-look-preview-export-parity'),
@@ -164,7 +164,7 @@ async function buildProofArtifact(): Promise<ProofArtifact> {
       kind: 'synthetic-film-look-render-apply-proof',
       scene: 'shadow-neutral-highlight-ramp',
     },
-    generatedFrom: 'tests/integration/checks/check-film-look-render-apply-proof.ts',
+    generatedFrom: 'tests/integration/checks/film/check-film-look-render-apply-proof.ts',
     lookId: look.id,
     outputPixels,
     previewExportStatus: 'covered_by_check:film-look-preview-export-parity',
