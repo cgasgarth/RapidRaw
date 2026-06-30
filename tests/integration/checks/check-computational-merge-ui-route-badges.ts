@@ -26,7 +26,10 @@ for (const { family, file } of modalCoverage) {
   if (source.includes('apiPending')) failures.push(`${file} still renders a pending API badge.`);
 }
 
-const badgeSource = readFileSync('src/components/ui/ComputationalMergeAppServerBadge.tsx', 'utf8');
+const badgeSource = readFileSync(
+  'src/components/modals/computational-merge/ComputationalMergeAppServerBadge.tsx',
+  'utf8',
+);
 for (const marker of ['getComputationalMergeAppServerRoutePairSummary', 'statusLabel', 'dryRunToolName']) {
   if (!badgeSource.includes(marker)) failures.push(`Route badge is missing ${marker}.`);
 }
