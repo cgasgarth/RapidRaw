@@ -241,7 +241,7 @@ export const createDefaultCollageModalState = (): CollageModalState => ({
   sourceImages: [],
 });
 
-interface UIState {
+export interface UIState {
   // View & Layout
   activeView: string;
   isFullScreen: boolean;
