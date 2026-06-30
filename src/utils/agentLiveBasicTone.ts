@@ -17,6 +17,9 @@ import { useEditorStore } from '../store/useEditorStore';
 export type AgentLiveBasicTonePixel = readonly [number, number, number];
 
 export interface AgentLiveBasicToneApplyOptions {
+  acceptedPlanHash: string;
+  acceptedPlanId: string;
+  expectedGraphRevision: string;
   operationId: string;
   requestedAdjustments: LegacyBasicToneAdjustmentPayload;
   sessionId: string;
@@ -124,6 +127,9 @@ export const hashBasicTonePreviewPixels = (pixels: readonly AgentLiveBasicTonePi
     .toString(16);
 
 export const applyBasicToneToLiveEditor = async ({
+  acceptedPlanHash,
+  acceptedPlanId,
+  expectedGraphRevision,
   operationId,
   requestedAdjustments,
   sessionId,
@@ -132,7 +138,6 @@ export const applyBasicToneToLiveEditor = async ({
   const imagePath = initialState.selectedImage?.path;
   if (imagePath === undefined) throw new Error('Cannot apply agent basic tone without a selected image.');
 
-  const expectedGraphRevision = `history_${initialState.historyIndex}`;
   const context = buildBasicToneImageCommandContext({ expectedGraphRevision, imagePath, operationId, sessionId });
   const dryRunCommand = buildBasicToneCommandEnvelope(requestedAdjustments, context, { dryRun: true });
   const bridge = createLiveEditorAppServerBridge();
@@ -143,10 +148,13 @@ export const applyBasicToneToLiveEditor = async ({
   if (dryRunResult.dryRunPlanHash === undefined || dryRunResult.dryRunPlanId === undefined) {
     throw new Error('Agent basic-tone dry-run did not return an accepted plan identity.');
   }
+  if (dryRunResult.dryRunPlanHash !== acceptedPlanHash || dryRunResult.dryRunPlanId !== acceptedPlanId) {
+    throw new Error('Agent basic-tone apply rejected a plan identity that does not match the dry-run receipt.');
+  }
 
   const applyCommand = buildBasicToneCommandEnvelope(requestedAdjustments, context, {
-    acceptedDryRunPlanHash: dryRunResult.dryRunPlanHash,
-    acceptedDryRunPlanId: dryRunResult.dryRunPlanId,
+    acceptedDryRunPlanHash: acceptedPlanHash,
+    acceptedDryRunPlanId: acceptedPlanId,
     dryRun: false,
   });
   const apply = await bridge.dispatch(applyCommand);

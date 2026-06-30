@@ -2,8 +2,13 @@ import {
   AGENT_ADJUSTMENTS_APPLY_INPUT_SCHEMA_NAME,
   AGENT_ADJUSTMENTS_APPLY_OUTPUT_SCHEMA_NAME,
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+  AGENT_ADJUSTMENTS_DRY_RUN_INPUT_SCHEMA_NAME,
+  AGENT_ADJUSTMENTS_DRY_RUN_OUTPUT_SCHEMA_NAME,
+  AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
   agentAdjustmentsApplyRequestSchema,
   applyAgentGlobalAdjustments,
+  agentAdjustmentsDryRunRequestSchema,
+  dryRunAgentGlobalAdjustments,
 } from './agentAdjustmentApplyTool';
 import {
   AGENT_COLOR_APPLY_INPUT_SCHEMA_NAME,
@@ -577,6 +582,15 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       toolNames: [AGENT_PREVIEW_COMPARE_TOOL_NAME],
     }),
     buildRouteCatalogEntry({
+      commandName: AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_ADJUSTMENTS_DRY_RUN_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.DryRunCommand],
+      outputSchemaNames: [AGENT_ADJUSTMENTS_DRY_RUN_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-adjustments-apply'],
+      toolNames: [AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
       commandName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
       family: 'agent',
       inputSchemaNames: [AGENT_ADJUSTMENTS_APPLY_INPUT_SCHEMA_NAME],
@@ -907,6 +921,7 @@ const rejectToolDispatch = ({
 
 const APPROVED_AGENT_APP_SERVER_TOOL_NAMES = new Set<string>([
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+  AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
   AGENT_COLOR_APPLY_TOOL_NAME,
   AGENT_CURVE_LEVELS_APPLY_TOOL_NAME,
   AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
@@ -968,6 +983,9 @@ const dispatchAgentAppServerTool = async (
   let result: unknown;
 
   switch (request.runtimeToolName) {
+    case AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME:
+      result = await dryRunAgentGlobalAdjustments(agentAdjustmentsDryRunRequestSchema.parse(request.arguments));
+      break;
     case AGENT_ADJUSTMENTS_APPLY_TOOL_NAME:
       result = await applyAgentGlobalAdjustments(agentAdjustmentsApplyRequestSchema.parse(request.arguments));
       break;

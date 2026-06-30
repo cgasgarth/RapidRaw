@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
-import { AGENT_ADJUSTMENTS_APPLY_TOOL_NAME, agentAdjustmentsApplyResponseSchema } from './agentAdjustmentApplyTool';
+import {
+  AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+  AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
+  agentAdjustmentsApplyResponseSchema,
+  agentAdjustmentsDryRunResponseSchema,
+} from './agentAdjustmentApplyTool';
 import { AGENT_COLOR_APPLY_TOOL_NAME, agentColorApplyResponseSchema } from './agentColorApplyTool';
 import {
   AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
@@ -215,11 +220,36 @@ export const runAgentMultiTurnAppServerSession = async (
     messages.push({ content: turn.assistantRationale, role: 'assistant', turn: turnNumber });
 
     if (turn.adjustment !== undefined) {
+      const dryRunToolCallId = `${parsedRequest.requestId}-turn-${turnNumber}-dry-run`;
+      const dryRunResult = agentAdjustmentsDryRunResponseSchema.parse(
+        await dispatchAgentLiveEditorTool({
+          args: {
+            adjustments: turn.adjustment,
+            expectedGraphRevision: finalGraphRevision,
+            expectedRecipeHash: recipeHash,
+            operationId: `${parsedRequest.operationId}-${turnNumber}`,
+            requestId: dryRunToolCallId,
+            sessionId: parsedRequest.sessionId,
+          },
+          requestId: dryRunToolCallId,
+          runtimeToolName: AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
+        }),
+      );
+      toolCalls.push({
+        id: dryRunToolCallId,
+        name: dryRunResult.toolName,
+        receiptGraphRevision: dryRunResult.sourceGraphRevision,
+        status: 'succeeded',
+        turn: turnNumber,
+      });
       const applyToolCallId = `${parsedRequest.requestId}-turn-${turnNumber}-apply`;
       const applyResult = agentAdjustmentsApplyResponseSchema.parse(
         await dispatchAgentLiveEditorTool({
           args: {
+            acceptedPlanHash: dryRunResult.dryRunPlanHash,
+            acceptedPlanId: dryRunResult.dryRunPlanId,
             adjustments: turn.adjustment,
+            expectedGraphRevision: dryRunResult.sourceGraphRevision,
             expectedRecipeHash: recipeHash,
             operationId: `${parsedRequest.operationId}-${turnNumber}`,
             requestId: applyToolCallId,

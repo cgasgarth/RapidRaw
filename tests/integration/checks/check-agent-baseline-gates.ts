@@ -12,7 +12,10 @@ import {
 } from '../../../src/schemas/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-import { AGENT_ADJUSTMENTS_APPLY_TOOL_NAME } from '../../../src/utils/agentAdjustmentApplyTool.ts';
+import {
+  AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+  AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
+} from '../../../src/utils/agentAdjustmentApplyTool.ts';
 import { AGENT_COLOR_APPLY_TOOL_NAME } from '../../../src/utils/agentColorApplyTool.ts';
 import { AGENT_CURVE_LEVELS_APPLY_TOOL_NAME } from '../../../src/utils/agentCurveLevelsApplyTool.ts';
 import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../src/utils/agentDetailEffectsApplyTool.ts';
@@ -81,6 +84,14 @@ const previewResultSchema = z
       })
       .passthrough(),
     staleRecipeHash: z.boolean(),
+  })
+  .passthrough();
+const dryRunResultSchema = z
+  .object({
+    dryRunPlanHash: z.string().min(1),
+    dryRunPlanId: z.string().min(1),
+    sourceGraphRevision: z.string().min(1),
+    toolName: z.literal(AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME),
   })
   .passthrough();
 
@@ -190,10 +201,27 @@ assertRejected(
   'not an approved typed agent app-server tool',
 );
 
+const dryRun = await dispatch(
+  AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
+  {
+    adjustments: { exposure: 0.4 },
+    expectedGraphRevision: statePayload.snapshot.graphRevision,
+    expectedRecipeHash: statePayload.snapshot.initialPreview.recipeHash,
+    operationId: 'agent_baseline_apply',
+    requestId: 'agent-baseline-dry-run',
+    sessionId: 'agent-baseline',
+  },
+  'baseline-dry-run',
+);
+if (dryRun.dispatchStatus !== 'completed') throw new Error('agent baseline dry-run dispatch failed.');
+const dryRunPayload = dryRunResultSchema.parse(dryRun.result);
 const apply = await dispatch(
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
   {
+    acceptedPlanHash: dryRunPayload.dryRunPlanHash,
+    acceptedPlanId: dryRunPayload.dryRunPlanId,
     adjustments: { exposure: 0.4 },
+    expectedGraphRevision: dryRunPayload.sourceGraphRevision,
     expectedRecipeHash: statePayload.snapshot.initialPreview.recipeHash,
     operationId: 'agent_baseline_apply',
     requestId: 'agent-baseline-apply',
@@ -206,7 +234,10 @@ assertRejected(
   await dispatch(
     AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
     {
+      acceptedPlanHash: dryRunPayload.dryRunPlanHash,
+      acceptedPlanId: dryRunPayload.dryRunPlanId,
       adjustments: { exposure: 0.5 },
+      expectedGraphRevision: dryRunPayload.sourceGraphRevision,
       expectedRecipeHash: statePayload.snapshot.initialPreview.recipeHash,
       operationId: 'agent_baseline_stale_apply',
       requestId: 'agent-baseline-stale-apply',
@@ -223,6 +254,7 @@ for (const [toolName, expectedCheck] of [
   [AGENT_STATE_GET_TOOL_NAME, 'check:agent-readonly-tools'],
   [AGENT_PREVIEW_RENDER_TOOL_NAME, 'check:agent-readonly-tools'],
   [AGENT_PREVIEW_COMPARE_TOOL_NAME, 'check:agent-preview-compare-loop'],
+  [AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME, 'check:agent-adjustments-apply'],
   [AGENT_ADJUSTMENTS_APPLY_TOOL_NAME, 'check:agent-adjustments-apply'],
   [AGENT_COLOR_APPLY_TOOL_NAME, 'check:agent-color-apply'],
   [AGENT_CURVE_LEVELS_APPLY_TOOL_NAME, 'check:agent-curve-levels-apply'],

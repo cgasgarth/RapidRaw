@@ -5,7 +5,12 @@ import { mkdir } from 'node:fs/promises';
 import { ToolType } from '../../../src/components/panel/right/Masks.tsx';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import {
+  applyAgentGlobalAdjustments,
+  dryRunAgentGlobalAdjustments,
+} from '../../../src/utils/agentAdjustmentApplyTool.ts';
 import { buildAgentEditQualityReview } from '../../../src/utils/agentEditQualityReview.ts';
+import { buildAgentImageContextSnapshot } from '../../../src/utils/agentImageContextSnapshot.ts';
 import {
   agentIterativeEditLoopRequestSchema,
   runAgentIterativeEditLoop,
@@ -14,51 +19,41 @@ import {
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3162.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 14 : 2));
 
-useEditorStore.getState().setEditor({
-  adjustments: INITIAL_ADJUSTMENTS,
-  brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
-  finalPreviewUrl: 'blob:rawengine-agent-loop-before',
-  hasRenderedFirstFrame: true,
-  histogram: {
-    [ActiveChannel.Blue]: { color: '#4D96FF', data: bins },
-    [ActiveChannel.Green]: { color: '#6BCB77', data: bins },
-    [ActiveChannel.Luma]: { color: '#FFFFFF', data: bins },
-    [ActiveChannel.Red]: { color: '#FF6B6B', data: bins },
-  },
-  history: [INITIAL_ADJUSTMENTS],
-  historyIndex: 0,
-  lastBasicToneCommand: null,
-  selectedImage: {
-    exif: { ISO: '250', LensModel: 'FE 24-70mm F2.8 GM II' },
-    height: 4000,
-    isRaw: true,
-    isReady: true,
-    originalUrl: 'blob:rawengine-original-3162',
-    path: selectedPath,
-    thumbnailUrl: 'blob:rawengine-thumb-3162',
-    width: 6000,
-  },
-  uncroppedAdjustedPreviewUrl: null,
-});
+const seedEditor = () => {
+  useEditorStore.getState().setEditor({
+    adjustments: INITIAL_ADJUSTMENTS,
+    brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
+    finalPreviewUrl: 'blob:rawengine-agent-loop-before',
+    hasRenderedFirstFrame: true,
+    histogram: {
+      [ActiveChannel.Blue]: { color: '#4D96FF', data: bins },
+      [ActiveChannel.Green]: { color: '#6BCB77', data: bins },
+      [ActiveChannel.Luma]: { color: '#FFFFFF', data: bins },
+      [ActiveChannel.Red]: { color: '#FF6B6B', data: bins },
+    },
+    history: [INITIAL_ADJUSTMENTS],
+    historyIndex: 0,
+    lastBasicToneCommand: null,
+    selectedImage: {
+      exif: { ISO: '250', LensModel: 'FE 24-70mm F2.8 GM II' },
+      height: 4000,
+      isRaw: true,
+      isReady: true,
+      originalUrl: 'blob:rawengine-original-3162',
+      path: selectedPath,
+      thumbnailUrl: 'blob:rawengine-thumb-3162',
+      width: 6000,
+    },
+    uncroppedAdjustedPreviewUrl: null,
+  });
+};
 
-if (
-  agentIterativeEditLoopRequestSchema.safeParse({
-    maxIterations: 1,
-    operationId: 'invalid',
-    prompt: 'too short',
-    requestId: 'invalid',
-    sessionId: 'invalid',
-    steps: [{ exposure: 0.2 }],
-  }).success
-) {
-  throw new Error('agent iterative loop accepted too few iterations and steps.');
-}
-
-const result = await runAgentIterativeEditLoop({
+const baseLoopRequest = {
   maxIterations: 4,
   operationId: 'agent_loop_3162',
   prompt: 'Brighten the exposure, inspect the preview, then lift shadows if the foreground still feels dense.',
   requestId: 'agent-loop-3162',
+  rollbackAfterReview: true,
   sessionId: 'agent-loop-3162',
   steps: [
     { exposure: 0.28, highlights: -12 },
@@ -75,6 +70,109 @@ const result = await runAgentIterativeEditLoop({
       userFollowUp: 'Foreground still feels dense; inspect the detail area before final review.',
     },
   ],
+} as const;
+
+const buildAcceptedDryRunApprovals = async () => {
+  const approvals: Array<{
+    acceptedPlanHash: string;
+    acceptedPlanId: string;
+    approvalState: 'approved';
+    expectedGraphRevision: string;
+    turn: number;
+  }> = [];
+
+  for (const [index, step] of baseLoopRequest.steps.entries()) {
+    const {
+      assistantRationale: _assistantRationale,
+      preview: _preview,
+      userFollowUp: _userFollowUp,
+      ...adjustments
+    } = step;
+    const snapshot = buildAgentImageContextSnapshot();
+    const operationId = `${baseLoopRequest.operationId}-${index + 1}`;
+    const dryRun = await dryRunAgentGlobalAdjustments({
+      adjustments,
+      expectedGraphRevision: snapshot.graphRevision,
+      expectedRecipeHash: snapshot.initialPreview.recipeHash,
+      operationId,
+      requestId: `${baseLoopRequest.requestId}-approval-dry-run-${index + 1}`,
+      sessionId: baseLoopRequest.sessionId,
+    });
+    approvals.push({
+      acceptedPlanHash: dryRun.dryRunPlanHash,
+      acceptedPlanId: dryRun.dryRunPlanId,
+      approvalState: 'approved',
+      expectedGraphRevision: dryRun.sourceGraphRevision,
+      turn: index + 2,
+    });
+    await applyAgentGlobalAdjustments({
+      acceptedPlanHash: dryRun.dryRunPlanHash,
+      acceptedPlanId: dryRun.dryRunPlanId,
+      adjustments,
+      expectedGraphRevision: dryRun.sourceGraphRevision,
+      expectedRecipeHash: snapshot.initialPreview.recipeHash,
+      operationId,
+      requestId: `${baseLoopRequest.requestId}-approval-apply-${index + 1}`,
+      sessionId: baseLoopRequest.sessionId,
+    });
+  }
+
+  return approvals;
+};
+
+seedEditor();
+const acceptedApprovals = await buildAcceptedDryRunApprovals();
+seedEditor();
+
+if (
+  agentIterativeEditLoopRequestSchema.safeParse({
+    dryRunApprovals: [{ ...acceptedApprovals[0], acceptedPlanHash: '' }],
+    maxIterations: 1,
+    operationId: 'invalid',
+    prompt: 'too short',
+    requestId: 'invalid',
+    rollbackAfterReview: true,
+    sessionId: 'invalid',
+    steps: [{ exposure: 0.2 }],
+  }).success
+) {
+  throw new Error('agent iterative loop accepted too few iterations and steps.');
+}
+
+await expectRejectsAsync(
+  () =>
+    runAgentIterativeEditLoop({
+      ...baseLoopRequest,
+      dryRunApprovals: [],
+      requestId: 'agent-loop-missing-approval',
+    }),
+  'missing dry-run approval',
+);
+seedEditor();
+await expectRejectsAsync(
+  () =>
+    runAgentIterativeEditLoop({
+      ...baseLoopRequest,
+      dryRunApprovals: [{ ...acceptedApprovals[0], acceptedPlanHash: 'dryrun_stale' }],
+      requestId: 'agent-loop-stale-approval',
+    }),
+  'stale plan hash',
+);
+seedEditor();
+await expectRejectsAsync(
+  () =>
+    runAgentIterativeEditLoop({
+      ...baseLoopRequest,
+      dryRunApprovals: [{ ...acceptedApprovals[0], expectedGraphRevision: 'history_99' }],
+      requestId: 'agent-loop-revision-mismatch',
+    }),
+  'stale graph revision',
+);
+seedEditor();
+
+const result = await runAgentIterativeEditLoop({
+  ...baseLoopRequest,
+  dryRunApprovals: acceptedApprovals,
 });
 
 const state = useEditorStore.getState();
@@ -120,15 +218,27 @@ if (
 ) {
   throw new Error('agent iterative loop did not bind preview refreshes to apply receipt lineage.');
 }
-if (state.adjustments.exposure !== 0.34 || state.adjustments.shadows !== 18 || state.historyIndex !== 2) {
-  throw new Error('agent iterative loop did not apply both editing turns into history.');
+if (result.acceptedDryRunPlanCount !== 2) {
+  throw new Error('agent iterative loop did not require accepted dry-run plans before apply.');
 }
-if (state.history.length !== 3 || state.uncroppedAdjustedPreviewUrl !== null) {
-  throw new Error('agent iterative loop did not maintain undo history and preview invalidation.');
+if (
+  result.rollbackCheckpoint.graphRevision !== 'history_0' ||
+  result.rollbackCheckpoint.previewRecipeHash.length === 0 ||
+  result.rollbackReceipt?.toolName !== 'rawengine.agent.history.rollback' ||
+  result.rollbackReceipt.graphRevision !== 'history_0'
+) {
+  throw new Error('agent iterative loop did not preserve and expose rollback checkpoint/receipt.');
+}
+if (state.adjustments.exposure !== INITIAL_ADJUSTMENTS.exposure || state.historyIndex !== 0) {
+  throw new Error('agent iterative loop did not rollback to the session checkpoint after review.');
+}
+if (state.history.length !== 1 || state.uncroppedAdjustedPreviewUrl !== null) {
+  throw new Error('agent iterative loop rollback did not maintain history and preview invalidation.');
 }
 if (
   toolNames.filter((name) => name === 'rawengine.agent.adjustments.apply').length !== 2 ||
   toolNames.filter((name) => name === 'rawengine.agent.preview.render').length !== 2 ||
+  toolNames.filter((name) => name === 'rawengine.agent.adjustments.dry_run').length !== 2 ||
   toolNames[0] !== 'rawengine.agent.state.get'
 ) {
   throw new Error(`agent iterative loop transcript has wrong tool order: ${toolNames.join(',')}`);
@@ -172,6 +282,27 @@ if (
 ) {
   throw new Error('agent iterative loop transcript did not preserve feedback, plan, and compare tool calls.');
 }
+const auditTypes = result.auditEvents.map((event) => event.type);
+if (
+  auditTypes.filter((type) => type === 'dry_run').length !== 2 ||
+  auditTypes.filter((type) => type === 'apply').length !== 2 ||
+  auditTypes.filter((type) => type === 'preview_render').length !== 2 ||
+  auditTypes.at(-1) !== 'rollback'
+) {
+  throw new Error(
+    `agent iterative loop audit did not preserve dry-run/apply/preview/rollback order: ${auditTypes.join(',')}`,
+  );
+}
+if (
+  result.auditEvents.some(
+    (event) =>
+      event.type === 'apply' &&
+      (event.dryRunPlanHash === undefined ||
+        (event.rollbackGraphRevision !== 'history_0' && event.rollbackGraphRevision !== 'history_1')),
+  )
+) {
+  throw new Error('agent iterative loop apply audit did not link accepted dry-run plan and rollback lineage.');
+}
 
 const artifactDir = 'artifacts/validation/agent';
 const artifactPath = `${artifactDir}/agent-feedback-preview-loop.html`;
@@ -188,6 +319,9 @@ await Bun.write(
 <dt>Current artifact</dt><dd>${result.compareReview.currentArtifactId}</dd>
 <dt>Final graph</dt><dd>${result.appliedGraphRevision}</dd>
 <dt>Final recipe</dt><dd>${result.finalRecipeHash}</dd>
+<dt>Accepted dry-run plans</dt><dd>${result.acceptedDryRunPlanCount}</dd>
+<dt>Audit events</dt><dd>${auditTypes.join(' -> ')}</dd>
+<dt>Rollback</dt><dd>${result.rollbackReceipt?.toolName ?? 'not-run'} ${result.rollbackReceipt?.graphRevision ?? ''}</dd>
 <dt>Feedback</dt><dd>${result.userFeedbackTurns.map((turn) => turn.userFollowUp).join(' | ')}</dd>
 </dl>`,
 );
@@ -209,3 +343,12 @@ if (
 }
 
 console.log(`agent iterative edit loop ok (${artifactPath})`);
+
+async function expectRejectsAsync(action: () => Promise<unknown>, label: string) {
+  try {
+    await action();
+  } catch {
+    return;
+  }
+  throw new Error(`Expected rejection for ${label}.`);
+}
