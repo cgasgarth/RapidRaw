@@ -194,7 +194,7 @@ const samplePathsMatching = (predicate) =>
 
 const failures = [];
 
-const registryPath = `${SAMPLES_DIR}/tool-registry-v1.json`;
+const registryPath = `${SAMPLES_DIR}/core/tool-registry-v1.json`;
 const registry = rawEngineToolRegistryV1Schema.parse(readJson(registryPath));
 for (const tool of registry.tools) {
   validateRegisteredTool(tool, registryPath, failures);
