@@ -4,8 +4,8 @@ import { type MouseEvent, type ReactNode, useCallback, useRef } from 'react';
 import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import type { ComputationalMergeAppServerRouteFamily } from '../../../schemas/computationalMergeAppServerSchemas';
 import { TextColors, TextVariants } from '../../../types/typography';
-import ComputationalMergeAppServerBadge from '../../ui/ComputationalMergeAppServerBadge';
 import UiText from '../../ui/primitives/Text';
+import ComputationalMergeAppServerBadge from './ComputationalMergeAppServerBadge';
 
 interface ComputationalSetupModalShellProps {
   appServerFamily: ComputationalMergeAppServerRouteFamily;

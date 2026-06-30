@@ -6,8 +6,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextColors, TextVariants } from '../../types/typography';
 import type { HueSatLum } from '../../utils/adjustments';
-import Slider, { type SliderChangeEvent } from './primitives/Slider';
-import UiText from './primitives/Text';
+import Slider, { type SliderChangeEvent } from '../ui/primitives/Slider';
+import UiText from '../ui/primitives/Text';
 
 interface ColorWheelProps {
   defaultValue: HueSatLum;

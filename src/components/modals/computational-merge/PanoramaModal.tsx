@@ -20,9 +20,9 @@ import {
   deriveDerivedOutputReceiptState,
 } from '../../../utils/derivedOutputReceipt';
 import { buildPanoramaSavedReviewSummary } from '../../../utils/panoramaSavedReview';
-import ComputationalMergeAppServerBadge from '../../ui/ComputationalMergeAppServerBadge';
 import Dropdown, { type OptionItem } from '../../ui/primitives/Dropdown';
 import UiText from '../../ui/primitives/Text';
+import ComputationalMergeAppServerBadge from './ComputationalMergeAppServerBadge';
 import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
 import DerivedOutputReceiptPanel from './DerivedOutputReceiptPanel';
 import { MergeErrorState, MergeFooterActions, MergeProcessingState, MergeResultPreview } from './MergeStatusViews';

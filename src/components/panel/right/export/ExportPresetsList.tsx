@@ -1,14 +1,14 @@
 import { Check, CheckCircle, Plus, Save, Trash2, TriangleAlert, X } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useManagedFocus } from '../../hooks/ui/useManagedFocus';
-import { EXPORT_LAST_USED_PRESET_ID } from '../../schemas/exportRecipeIds';
-import { buildExportRecipeUiRows } from '../../schemas/exportRecipeUiSchemas';
-import { TextVariants } from '../../types/typography';
-import type { AppSettings } from './AppProperties';
-import type { ExportPreset } from './ExportImportProperties';
-import Dropdown from './primitives/Dropdown';
-import UiText from './primitives/Text';
+import { useManagedFocus } from '../../../../hooks/ui/useManagedFocus';
+import { EXPORT_LAST_USED_PRESET_ID } from '../../../../schemas/exportRecipeIds';
+import { buildExportRecipeUiRows } from '../../../../schemas/exportRecipeUiSchemas';
+import { TextVariants } from '../../../../types/typography';
+import type { AppSettings } from '../../../ui/AppProperties';
+import type { ExportPreset } from '../../../ui/ExportImportProperties';
+import Dropdown from '../../../ui/primitives/Dropdown';
+import UiText from '../../../ui/primitives/Text';
 
 interface ExportPresetsListProps {
   appSettings: AppSettings | null;

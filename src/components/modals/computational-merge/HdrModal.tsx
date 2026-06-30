@@ -23,9 +23,9 @@ import { buildHdrDerivedOutputReceipt, deriveDerivedOutputReceiptState } from '.
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../../utils/hdrBracketPreflight';
 import { buildHdrEditableHandoffSummary } from '../../../utils/hdrEditableHandoff';
 import { buildHdrReviewDiagnostics } from '../../../utils/hdrReviewDiagnostics';
-import ComputationalMergeAppServerBadge from '../../ui/ComputationalMergeAppServerBadge';
 import Dropdown, { type OptionItem } from '../../ui/primitives/Dropdown';
 import UiText from '../../ui/primitives/Text';
+import ComputationalMergeAppServerBadge from './ComputationalMergeAppServerBadge';
 import DerivedOutputReceiptPanel from './DerivedOutputReceiptPanel';
 import { MergeErrorState, MergeFooterActions, MergeProcessingState, MergeResultPreview } from './MergeStatusViews';
 
