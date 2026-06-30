@@ -4,13 +4,13 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 
-import { INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../src/utils/adjustments.ts';
+import { INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../../src/utils/adjustments.ts';
 import {
   type EditHistoryState,
   pushEditHistoryEntry,
   redoEditHistory,
   undoEditHistory,
-} from '../../../src/utils/editHistory.ts';
+} from '../../../../src/utils/editHistory.ts';
 import {
   createAdjustmentLayer,
   deleteLayer,
@@ -18,7 +18,7 @@ import {
   setLayerName,
   setLayerOpacity,
   setLayerVisibility,
-} from '../../../src/utils/layers/layerStack.ts';
+} from '../../../../src/utils/layers/layerStack.ts';
 
 const layerSchema = z
   .object({

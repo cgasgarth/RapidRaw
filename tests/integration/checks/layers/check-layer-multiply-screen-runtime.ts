@@ -4,10 +4,10 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 
-import { renderLayerBlendStack } from '../../../src/utils/layers/layerPreviewExportParity.ts';
+import { renderLayerBlendStack } from '../../../../src/utils/layers/layerPreviewExportParity.ts';
 
-const FIXTURE_PATH = 'fixtures/layers/layer-overlay-soft-light-runtime.json';
-const OUTPUT_DIR = 'artifacts/layers/overlay-soft-light-runtime';
+const FIXTURE_PATH = 'fixtures/layers/layer-multiply-screen-runtime.json';
+const OUTPUT_DIR = 'artifacts/layers/multiply-screen-runtime';
 
 const pixelSchema = z
   .object({
@@ -20,13 +20,13 @@ const pixelSchema = z
 const caseSchema = z
   .object({
     basePixels: z.array(pixelSchema).min(1),
-    expectedContrastDelta: z.number().positive(),
+    expectedLumaDirection: z.enum(['darker', 'lighter']),
     expectedPixels: z.array(pixelSchema).min(1),
     height: z.number().int().positive(),
     id: z.string().trim().min(1),
     layer: z
       .object({
-        blendMode: z.enum(['overlay', 'soft_light']),
+        blendMode: z.enum(['multiply', 'screen']),
         id: z.string().trim().min(1),
         name: z.string().trim().min(1),
         opacity: z.number().min(0).max(1),
@@ -39,21 +39,20 @@ const caseSchema = z
   .strict()
   .superRefine((fixture, context) => {
     const pixelCount = fixture.width * fixture.height;
-    for (const [path, pixels] of [
-      ['basePixels', fixture.basePixels],
-      ['layer.pixels', fixture.layer.pixels],
-      ['expectedPixels', fixture.expectedPixels],
-    ] as const) {
-      if (pixels.length !== pixelCount) {
-        context.addIssue({ code: 'custom', message: `${path} must match dimensions.`, path: [path] });
-      }
+    if (fixture.basePixels.length !== pixelCount) {
+      context.addIssue({ code: 'custom', message: 'basePixels must match dimensions.', path: ['basePixels'] });
+    }
+    if (fixture.layer.pixels.length !== pixelCount) {
+      context.addIssue({ code: 'custom', message: 'layer pixels must match dimensions.', path: ['layer', 'pixels'] });
+    }
+    if (fixture.expectedPixels.length !== pixelCount) {
+      context.addIssue({ code: 'custom', message: 'expectedPixels must match dimensions.', path: ['expectedPixels'] });
     }
   });
 
 const manifestSchema = z
   .object({
     cases: z.array(caseSchema).length(2),
-    colorAssumptions: z.array(z.string().trim().min(1)).min(1),
     version: z.literal(1),
   })
   .strict();
@@ -64,11 +63,6 @@ const manifest = manifestSchema.parse(JSON.parse(await readFile(FIXTURE_PATH, 'u
 
 const averageLuma = (pixels: ReadonlyArray<LayerPixel>): number =>
   pixels.reduce((sum, pixel) => sum + (pixel.r + pixel.g + pixel.b) / 3, 0) / pixels.length;
-
-const contrastDelta = (pixels: ReadonlyArray<LayerPixel>): number => {
-  const lumaValues = pixels.map((pixel) => (pixel.r + pixel.g + pixel.b) / 3);
-  return Math.max(...lumaValues) - Math.min(...lumaValues);
-};
 
 const writePpm = async (
   path: string,
@@ -108,30 +102,30 @@ for (const fixture of manifest.cases) {
     throw new Error(`${fixture.id}: blend pixels do not match expected output.`);
   }
 
-  const actualContrastDelta = Number(contrastDelta(rendered.pixels).toFixed(2));
-  if (actualContrastDelta !== fixture.expectedContrastDelta) {
-    throw new Error(`${fixture.id}: contrast delta ${actualContrastDelta} != ${fixture.expectedContrastDelta}.`);
+  const baseLuma = averageLuma(fixture.basePixels);
+  const renderedLuma = averageLuma(rendered.pixels);
+  const validDirection = fixture.expectedLumaDirection === 'darker' ? renderedLuma < baseLuma : renderedLuma > baseLuma;
+  if (!validDirection) {
+    throw new Error(`${fixture.id}: expected ${fixture.expectedLumaDirection} luma direction.`);
   }
 
   await writePpm(resolve(OUTPUT_DIR, `${fixture.id}.before.ppm`), fixture.width, fixture.height, fixture.basePixels);
   await writePpm(resolve(OUTPUT_DIR, `${fixture.id}.after.ppm`), fixture.width, fixture.height, rendered.pixels);
   reportRows.push({
-    baseLuma: averageLuma(fixture.basePixels),
+    baseLuma,
     blendMode: fixture.layer.blendMode,
-    colorAssumptions: manifest.colorAssumptions,
     id: fixture.id,
-    renderedContrastDelta: actualContrastDelta,
-    renderedLuma: averageLuma(rendered.pixels),
+    renderedLuma,
   });
 }
 
-if (!modes.has('overlay') || !modes.has('soft_light')) {
-  throw new Error('Overlay/soft-light runtime fixture must cover both blend modes.');
+if (!modes.has('multiply') || !modes.has('screen')) {
+  throw new Error('Multiply/screen runtime fixture must cover both blend modes.');
 }
 
 await writeFile(
-  resolve(OUTPUT_DIR, `layer-overlay-soft-light-runtime.report.json`),
+  resolve(OUTPUT_DIR, `layer-multiply-screen-runtime.report.json`),
   `${JSON.stringify(reportRows, null, 2)}\n`,
 );
 
-console.log(`layer overlay/soft-light runtime ok (${manifest.cases.length} cases)`);
+console.log(`layer multiply/screen runtime ok (${manifest.cases.length} cases)`);

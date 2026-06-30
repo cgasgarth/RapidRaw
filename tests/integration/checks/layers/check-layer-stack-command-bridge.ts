@@ -2,17 +2,21 @@
 
 import { z } from 'zod';
 
-import { INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../src/utils/adjustments.ts';
+import {
+  INITIAL_ADJUSTMENTS,
+  INITIAL_MASK_ADJUSTMENTS,
+  type MaskContainer,
+} from '../../../../src/utils/adjustments.ts';
 import {
   applyLayerStackCommandBridgeOperation,
   applyResolvedRemoveSourcesToLayerStack,
   buildLayerStackSidecarFromMasks,
   type LayerStackCommandBridgeContext,
-} from '../../../src/utils/layers/layerStackCommandBridge.ts';
+} from '../../../../src/utils/layers/layerStackCommandBridge.ts';
 import {
   hydrateLayerStackMasksFromMetadata,
   persistLayerStackSidecarInAdjustments,
-} from '../../../src/utils/layers/layerStackSidecarAdjustments.ts';
+} from '../../../../src/utils/layers/layerStackSidecarAdjustments.ts';
 
 const layerSummarySchema = z
   .object({

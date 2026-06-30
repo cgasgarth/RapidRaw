@@ -6,13 +6,13 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
-import { renderLayerPreviewStack as renderPackageLayerPreviewStack } from '../../../packages/rawengine-schema/src/layerBlendRuntime.ts';
-import { layerMaskBlendModeV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { renderLayerPreviewStack as renderPackageLayerPreviewStack } from '../../../../packages/rawengine-schema/src/layerBlendRuntime.ts';
+import { layerMaskBlendModeV1Schema } from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   renderLayerExportStack,
   renderLayerHeadlessStack,
   renderLayerPreviewStack,
-} from '../../../src/utils/layers/layerPreviewExportParity.ts';
+} from '../../../../src/utils/layers/layerPreviewExportParity.ts';
 
 const FIXTURE_PATH = 'fixtures/layers/layer-preview-export-parity.json';
 const OUTPUT_DIR = 'artifacts/layers/preview-export-parity';
