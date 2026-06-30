@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { EXPORT_QUEUE_FILE_FORMAT_IDS } from '../utils/export/exportFormatIds';
+import { EXPORT_QUEUE_FILE_FORMAT_IDS } from '../../utils/export/exportFormatIds';
 
 export const exportQueueJobStatusSchema = z.enum(['queued', 'running', 'succeeded', 'failed', 'cancelled']);
 export const exportQueuePrioritySchema = z.enum(['normal', 'high']);
