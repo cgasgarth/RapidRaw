@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 
-import { maskRefinementParametersSchema } from '../../../../src/schemas/maskParameterSchemas.ts';
+import { maskRefinementParametersSchema } from '../../../../src/schemas/masks/maskParameterSchemas.ts';
 import {
   evaluateMaskRefinementWeight,
   normalizeMaskRefinementParameters,

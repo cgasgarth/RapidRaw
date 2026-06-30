@@ -23,7 +23,7 @@ server design.
 | App state/settings            | `src-tauri/src/app_state.rs`, `src-tauri/src/app_settings.rs`, `src/store/useEditorStore.ts`, `src/store/useProcessStore.ts` |
 | Frontend AI UI/hooks          | `src/hooks/useAiMasking.ts`, `src/components/panel/right/AIPanel.tsx`, `src/components/panel/right/Masks.tsx`                |
 | Settings/auth touchpoints     | `src/App.tsx`, `src/components/panel/SettingsPanel.tsx`, `src/store/useSettingsStore.ts`                                     |
-| Payload schemas               | `src/schemas/adjustmentPayloadSchemas.ts`, `src/schemas/aiMaskingSchemas.ts`, `src/schemas/tauriEventSchemas.ts`             |
+| Payload schemas               | `src/schemas/adjustmentPayloadSchemas.ts`, `src/schemas/masks/aiMaskingSchemas.ts`, `src/schemas/tauriEventSchemas.ts`             |
 
 ## Built-In AI Feature Inventory
 

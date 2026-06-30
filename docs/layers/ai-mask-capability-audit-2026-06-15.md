@@ -21,7 +21,7 @@
 
 `fixtures/masks/ai/ai-mask-capabilities.json` is the committed source fixture.
 `src/utils/ai/aiMaskCapabilities.ts` exposes the runtime audit table after parsing
-through `src/schemas/aiMaskingSchemas.ts`.
+through `src/schemas/masks/aiMaskingSchemas.ts`.
 
 `tests/integration/checks/ai/check-ai-mask-capabilities.ts` verifies:
 

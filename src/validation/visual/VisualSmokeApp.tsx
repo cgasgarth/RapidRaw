@@ -45,7 +45,7 @@ import {
   DEFAULT_FOCUS_STACK_UI_SETTINGS,
   type FocusStackUiSettings,
 } from '../../schemas/focus-stack/focusStackUiSchemas';
-import type { MaskOverlaySettings } from '../../schemas/maskOverlaySchemas';
+import type { MaskOverlaySettings } from '../../schemas/masks/maskOverlaySchemas';
 import type {
   TetherCaptureResponse,
   TetherDiscoveryResponse,

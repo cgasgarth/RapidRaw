@@ -3,7 +3,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { aiPeopleMaskContractFixtureSchema, aiPeopleMaskPartSchema } from '../../../../src/schemas/aiMaskingSchemas.ts';
+import {
+  aiPeopleMaskContractFixtureSchema,
+  aiPeopleMaskPartSchema,
+} from '../../../../src/schemas/masks/aiMaskingSchemas.ts';
 import {
   AI_PEOPLE_MASK_PART_CAPABILITIES,
   getAiPeopleMaskPartCapability,

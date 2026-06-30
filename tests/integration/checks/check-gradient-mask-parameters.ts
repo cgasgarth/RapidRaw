@@ -7,7 +7,7 @@ import { z } from 'zod';
 import {
   linearGradientMaskParametersSchema,
   radialGradientMaskParametersSchema,
-} from '../../../src/schemas/maskParameterSchemas.ts';
+} from '../../../src/schemas/masks/maskParameterSchemas.ts';
 import {
   normalizeLinearGradientParameters,
   normalizeRadialGradientParameters,
