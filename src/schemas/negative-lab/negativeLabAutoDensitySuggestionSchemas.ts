@@ -69,7 +69,7 @@ export const negativeLabAutoDensitySuggestionRunSchema = z
       .nullable(),
     confidenceThreshold: z.number().min(0).max(1),
     frameSuggestions: z.array(negativeLabAutoDensityFrameSuggestionSchema),
-    generatedFrom: z.literal('src/utils/negativeLabAutoDensitySuggestions.ts'),
+    generatedFrom: z.literal('src/utils/negative-lab/negativeLabAutoDensitySuggestions.ts'),
     referenceDensityP50: finiteNumberSchema.nullable(),
     referenceTexturalRangeP10P90: finiteNumberSchema.nullable(),
     schemaVersion: z.literal(NEGATIVE_LAB_AUTO_DENSITY_SUGGESTION_SCHEMA_VERSION),

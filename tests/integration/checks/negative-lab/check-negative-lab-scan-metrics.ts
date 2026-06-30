@@ -1,5 +1,5 @@
 import { negativeLabScanMetricsV1Schema } from '../../../../src/schemas/negative-lab/negativeLabScanMetricsSchemas.ts';
-import { buildNegativeLabScanMetricsV1 } from '../../../../src/utils/negativeLabScanMetrics.ts';
+import { buildNegativeLabScanMetricsV1 } from '../../../../src/utils/negative-lab/negativeLabScanMetrics.ts';
 
 const pixels = Array.from({ length: 30 * 30 }, (_, index) => {
   const x = index % 30;

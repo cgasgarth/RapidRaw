@@ -19,20 +19,20 @@ import {
   buildNegativeLabStockRegistryRouteResult,
   NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST,
 } from '../../../../src/utils/negative-lab/app-server/negativeLabAppServerRoutes.ts';
-import { NEGATIVE_LAB_DENSITY_ALGORITHM_ID } from '../../../../src/utils/negativeLabDensityConversion.ts';
+import { NEGATIVE_LAB_DENSITY_ALGORITHM_ID } from '../../../../src/utils/negative-lab/negativeLabDensityConversion.ts';
 import {
   buildNegativeLabRuntimeSelectedProfileSnapshot,
   resolveNegativeLabRuntimeProfile,
-} from '../../../../src/utils/negativeLabMeasuredProfileRuntime.ts';
+} from '../../../../src/utils/negative-lab/negativeLabMeasuredProfileRuntime.ts';
 import {
   NEGATIVE_LAB_OUTPUT_FORMAT_IDS,
   NegativeLabOutputFormatId,
-} from '../../../../src/utils/negativeLabOutputFormatIds.ts';
-import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../../../../src/utils/negativeLabPresetCatalog.ts';
+} from '../../../../src/utils/negative-lab/negativeLabOutputFormatIds.ts';
+import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../../../../src/utils/negative-lab/negativeLabPresetCatalog.ts';
 import {
   buildNegativeLabScanMetricsV1,
   type NegativeLabScanMetricPixel,
-} from '../../../../src/utils/negativeLabScanMetrics.ts';
+} from '../../../../src/utils/negative-lab/negativeLabScanMetrics.ts';
 
 const expectedAcceptBatchPlanCommandName = NegativeLabAppServerCommandName.AcceptBatchPlan;
 const expectedAcceptedBatchApplyCommandName = NegativeLabAppServerCommandName.AcceptedBatchApply;
@@ -214,8 +214,8 @@ const conversionPlanResultSchema = z.object({
   proof: z.object({
     densityAlgorithm: z.literal(NEGATIVE_LAB_DENSITY_ALGORITHM_ID),
     deterministic: z.literal(true),
-    generatedFrom: z.literal('src/utils/negativeLabMeasuredProfileRuntime.ts'),
-    runtimeConversionHelper: z.literal('src/utils/negativeLabDensityConversion.ts'),
+    generatedFrom: z.literal('src/utils/negative-lab/negativeLabMeasuredProfileRuntime.ts'),
+    runtimeConversionHelper: z.literal('src/utils/negative-lab/negativeLabDensityConversion.ts'),
   }),
   sampleRect: z.union([z.null(), z.object({ height: z.number(), width: z.number(), x: z.number(), y: z.number() })]),
   scope: z.enum(['active', 'all']),
@@ -707,8 +707,8 @@ try {
 }
 
 for (const filePath of [
-  'src/utils/negativeLabCrosstalkProfile.ts',
-  'src/utils/negativeLabMeasuredProfileRuntime.ts',
+  'src/utils/negative-lab/negativeLabCrosstalkProfile.ts',
+  'src/utils/negative-lab/negativeLabMeasuredProfileRuntime.ts',
   'tests/pure-ts/negative-lab/negative-lab-crosstalk-profile.test.ts',
 ]) {
   const source = await readFile(filePath, 'utf8');

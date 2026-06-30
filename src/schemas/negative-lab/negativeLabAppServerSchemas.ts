@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { negativeLabQcProofArtifactV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { NegativeLabAppServerCommandName } from '../../utils/negative-lab/app-server/negativeLabAppServerCommandNames';
-import { NEGATIVE_LAB_OUTPUT_FORMAT_IDS } from '../../utils/negativeLabOutputFormatIds';
+import { NEGATIVE_LAB_OUTPUT_FORMAT_IDS } from '../../utils/negative-lab/negativeLabOutputFormatIds';
 import {
   type NegativeLabCrosstalkProfile,
   negativeLabCrosstalkProfileSchema,
@@ -115,7 +115,7 @@ export const negativeLabRuntimeProfileApplyProofSchema = z
     applyProof: z
       .object({
         deterministic: z.literal(true),
-        generatedFrom: z.literal('src/utils/negativeLabMeasuredProfileRuntime.ts'),
+        generatedFrom: z.literal('src/utils/negative-lab/negativeLabMeasuredProfileRuntime.ts'),
         outputMetricChanged: z.boolean(),
         paramsHash: negativeLabProfileProvenanceHashSchema,
         previewProofHash: negativeLabProfileProvenanceHashSchema,
@@ -419,8 +419,8 @@ export const negativeLabConversionPlanResultSchema = z
       .object({
         densityAlgorithm: negativeLabDensityPrintAlgorithmSchema,
         deterministic: z.literal(true),
-        generatedFrom: z.literal('src/utils/negativeLabMeasuredProfileRuntime.ts'),
-        runtimeConversionHelper: z.literal('src/utils/negativeLabDensityConversion.ts'),
+        generatedFrom: z.literal('src/utils/negative-lab/negativeLabMeasuredProfileRuntime.ts'),
+        runtimeConversionHelper: z.literal('src/utils/negative-lab/negativeLabDensityConversion.ts'),
       })
       .strict(),
     sampleRect: negativeLabBaseFogSampleRectSchema.nullable(),
@@ -599,7 +599,7 @@ export const negativeLabStockRegistryAppServerResultSchema = z
     proof: z
       .object({
         deterministic: z.literal(true),
-        generatedFrom: z.literal('src/utils/negativeLabStockRegistry.ts'),
+        generatedFrom: z.literal('src/utils/negative-lab/negativeLabStockRegistry.ts'),
         namedStockClaimsRuntimeGated: z.literal(true),
       })
       .strict(),
@@ -627,7 +627,7 @@ export const negativeLabStockMetadataAppServerResultSchema = z
     proof: z
       .object({
         deterministic: z.literal(true),
-        generatedFrom: z.literal('src/utils/negativeLabStockMetadataCatalog.ts'),
+        generatedFrom: z.literal('src/utils/negative-lab/negativeLabStockMetadataCatalog.ts'),
         metadataOnlyNotRuntimeApplied: z.literal(true),
         namedStockClaimsRuntimeGated: z.literal(true),
       })

@@ -1,4 +1,4 @@
-import type { NegativeLabFrameHealthEntry } from '../schemas/negative-lab/negativeLabFrameHealthSchemas';
+import type { NegativeLabFrameHealthEntry } from '../../schemas/negative-lab/negativeLabFrameHealthSchemas';
 import {
   NEGATIVE_LAB_FRAME_RGB_BALANCE_MAX_WEIGHT,
   NEGATIVE_LAB_FRAME_RGB_BALANCE_MIN_WEIGHT,
@@ -9,8 +9,8 @@ import {
   type NegativeLabFrameRgbBalanceOverride,
   type NegativeLabFrameRgbBalanceOverridePayload,
   parseNegativeLabFrameRgbBalanceOverridePayload,
-} from '../schemas/negative-lab/negativeLabFrameRgbBalanceOverrideSchemas';
-import type { NegativeLabPresetParams } from '../schemas/negative-lab/negativeLabPresetCatalogSchemas';
+} from '../../schemas/negative-lab/negativeLabFrameRgbBalanceOverrideSchemas';
+import type { NegativeLabPresetParams } from '../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
 
 export const DEFAULT_NEGATIVE_LAB_FRAME_RGB_BALANCE_OFFSET: NegativeLabFrameRgbBalanceOffset = {
   blueWeight: 0,

@@ -13,8 +13,8 @@ import {
   buildNegativeLabBaseSampleWarningCodes,
   classifyNegativeLabBaseSampleConfidence,
   type NegativeLabBaseSamplePreviewProofContext,
-} from '../../../../src/utils/negativeLabBaseSampleCommandBridge.ts';
-import { buildNegativeBaseFogDensitometerReadout } from '../../../../src/utils/negativeLabDensitometer.ts';
+} from '../../../../src/utils/negative-lab/negativeLabBaseSampleCommandBridge.ts';
+import { buildNegativeBaseFogDensitometerReadout } from '../../../../src/utils/negative-lab/negativeLabDensitometer.ts';
 
 const proofPath = new URL(
   '../../../../fixtures/negative-lab/negative-lab-synthetic-fixture-proof.json',

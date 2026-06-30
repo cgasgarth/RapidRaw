@@ -81,7 +81,10 @@ const coverageContracts = [
     id: 'negative-lab-scan-metrics',
     owner: 'Negative Lab scan metrics schemas/runtime',
     behaviorArea: 'scan metric parsing, ranges, and warning derivation',
-    sourceFiles: ['src/schemas/negative-lab/negativeLabScanMetricsSchemas.ts', 'src/utils/negativeLabScanMetrics.ts'],
+    sourceFiles: [
+      'src/schemas/negative-lab/negativeLabScanMetricsSchemas.ts',
+      'src/utils/negative-lab/negativeLabScanMetrics.ts',
+    ],
     testFiles: ['tests/pure-ts/negative-lab/negative-lab-scan-metrics.test.ts'],
     minLinePercent: 90,
     minFunctionPercent: 80,
@@ -92,7 +95,7 @@ const coverageContracts = [
     behaviorArea: 'crosstalk profile validation and coefficient normalization',
     sourceFiles: [
       'src/schemas/negative-lab/negativeLabCrosstalkProfileSchemas.ts',
-      'src/utils/negativeLabCrosstalkProfile.ts',
+      'src/utils/negative-lab/negativeLabCrosstalkProfile.ts',
     ],
     testFiles: ['tests/pure-ts/negative-lab/negative-lab-crosstalk-profile.test.ts'],
     minLinePercent: 90,
@@ -104,7 +107,7 @@ const coverageContracts = [
     behaviorArea: 'auto-density suggestion ranking and schema validation',
     sourceFiles: [
       'src/schemas/negative-lab/negativeLabAutoDensitySuggestionSchemas.ts',
-      'src/utils/negativeLabAutoDensitySuggestions.ts',
+      'src/utils/negative-lab/negativeLabAutoDensitySuggestions.ts',
     ],
     testFiles: ['tests/pure-ts/negative-lab/negative-lab-auto-density-suggestions.test.ts'],
     minLinePercent: 85,
@@ -114,7 +117,7 @@ const coverageContracts = [
     id: 'negative-lab-patch-picker',
     owner: 'Negative Lab patch picker',
     behaviorArea: 'neutral patch candidate scoring and picker state transitions',
-    sourceFiles: ['src/utils/negativeLabPatchPicker.ts'],
+    sourceFiles: ['src/utils/negative-lab/negativeLabPatchPicker.ts'],
     testFiles: ['tests/pure-ts/negative-lab/negative-lab-patch-picker.test.ts'],
     minLinePercent: 95,
     minFunctionPercent: 95,

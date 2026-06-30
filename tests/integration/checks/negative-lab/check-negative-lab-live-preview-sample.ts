@@ -7,7 +7,7 @@ import { negativeLabUpdateBaseSamplesCommandV1Schema } from '../../../../package
 import {
   buildNegativeLabBaseSamplePreviewProof,
   type NegativeLabBaseSamplePreviewProof,
-} from '../../../../src/utils/negativeLabBaseSampleCommandBridge.ts';
+} from '../../../../src/utils/negative-lab/negativeLabBaseSampleCommandBridge.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/negative-lab/negative-lab-live-preview-sample-2026-06-21.json';
 const update = process.argv.includes('--update');

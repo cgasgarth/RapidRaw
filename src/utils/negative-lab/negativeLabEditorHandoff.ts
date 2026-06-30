@@ -1,6 +1,6 @@
-import { useEditorStore } from '../store/useEditorStore';
-import type { MaskContainer } from './adjustments';
-import { pushEditHistoryEntry } from './editHistory';
+import { useEditorStore } from '../../store/useEditorStore';
+import type { MaskContainer } from '../adjustments';
+import { pushEditHistoryEntry } from '../editHistory';
 
 export interface NegativeConversionEditorHandoff {
   acceptedDustHealLayers?: Array<MaskContainer>;

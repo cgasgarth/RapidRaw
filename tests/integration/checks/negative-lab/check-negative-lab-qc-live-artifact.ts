@@ -4,9 +4,9 @@ import { negativeLabQcProofArtifactV1Schema } from '../../../../packages/rawengi
 import {
   buildNegativeLabDustScratchReviewReport,
   buildNegativeLabQcProofReport,
-} from '../../../../src/utils/negativeLabDustScratchReview.ts';
-import { buildNegativeLabFrameHealthReport } from '../../../../src/utils/negativeLabFrameHealth.ts';
-import { buildNegativeLabQcContactSheetArtifact } from '../../../../src/utils/negativeLabQcContactSheetArtifact.ts';
+} from '../../../../src/utils/negative-lab/negativeLabDustScratchReview.ts';
+import { buildNegativeLabFrameHealthReport } from '../../../../src/utils/negative-lab/negativeLabFrameHealth.ts';
+import { buildNegativeLabQcContactSheetArtifact } from '../../../../src/utils/negative-lab/negativeLabQcContactSheetArtifact.ts';
 
 const sourcePaths = ['/roll/frame-01.tif', '/roll/frame-02.tif', '/roll/frame-03.tif'];
 const includedPathSet = new Set(sourcePaths.slice(0, 2));

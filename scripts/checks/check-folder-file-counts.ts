@@ -66,6 +66,10 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4317',
     reason: 'mask utilities are consolidated under a dedicated domain folder',
   },
+  'src/utils/negative-lab': {
+    issue: '#4345',
+    reason: 'negative-lab utilities are consolidated under their domain folder',
+  },
   'src/utils': {
     issue: '#4209',
     reason: 'utilities are pending owned-domain split',

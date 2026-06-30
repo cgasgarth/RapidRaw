@@ -1,21 +1,21 @@
-import type { NegativeLabAutoDensitySuggestionRun } from '../schemas/negative-lab/negativeLabAutoDensitySuggestionSchemas';
+import type { NegativeLabAutoDensitySuggestionRun } from '../../schemas/negative-lab/negativeLabAutoDensitySuggestionSchemas';
 import {
   type NegativeLabFrameExposureOverridePayload,
   parseNegativeLabFrameExposureOverridePayload,
-} from '../schemas/negative-lab/negativeLabFrameExposureOverrideSchemas';
-import type { NegativeLabFrameHealthReport } from '../schemas/negative-lab/negativeLabFrameHealthSchemas';
+} from '../../schemas/negative-lab/negativeLabFrameExposureOverrideSchemas';
+import type { NegativeLabFrameHealthReport } from '../../schemas/negative-lab/negativeLabFrameHealthSchemas';
 import {
   type NegativeLabFrameRgbBalanceOffset,
   type NegativeLabFrameRgbBalanceOverridePayload,
   parseNegativeLabFrameRgbBalanceOverridePayload,
-} from '../schemas/negative-lab/negativeLabFrameRgbBalanceOverrideSchemas';
-import type { NegativeLabPresetParams } from '../schemas/negative-lab/negativeLabPresetCatalogSchemas';
+} from '../../schemas/negative-lab/negativeLabFrameRgbBalanceOverrideSchemas';
+import type { NegativeLabPresetParams } from '../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
 import {
   NEGATIVE_LAB_ROLL_NORMALIZATION_SCHEMA_VERSION,
   type NegativeLabRollNormalizationMode,
   type NegativeLabRollNormalizationPlan,
   parseNegativeLabRollNormalizationPlan,
-} from '../schemas/negative-lab/negativeLabRollNormalizationSchemas';
+} from '../../schemas/negative-lab/negativeLabRollNormalizationSchemas';
 import {
   buildNegativeLabAutoDensitySuggestionRun,
   type NegativeLabFrameMetricsInput,

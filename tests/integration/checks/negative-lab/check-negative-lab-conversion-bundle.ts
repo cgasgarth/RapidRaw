@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 
 import { parseNegativeLabConversionBundle } from '../../../../src/schemas/negative-lab/negativeLabConversionBundleSchemas.ts';
-import { validateNegativeLabConversionBundleReplay } from '../../../../src/utils/negativeLabConversionBundle.ts';
+import { validateNegativeLabConversionBundleReplay } from '../../../../src/utils/negative-lab/negativeLabConversionBundle.ts';
 
 const bundlePath =
   'src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg.conversion-bundle.json';

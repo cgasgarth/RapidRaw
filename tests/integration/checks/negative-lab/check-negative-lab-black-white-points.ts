@@ -6,7 +6,7 @@ import { negativeLabPresetParamsSchema } from '../../../../src/schemas/negative-
 import {
   convertNegativeLabDensitySamples,
   type NegativeLabRgbTriplet,
-} from '../../../../src/utils/negativeLabDensityConversion.ts';
+} from '../../../../src/utils/negative-lab/negativeLabDensityConversion.ts';
 
 const baseParams = negativeLabPresetParamsSchema.parse({
   base_fog_sample: null,

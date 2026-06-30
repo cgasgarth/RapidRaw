@@ -7,7 +7,7 @@ import {
   buildNegativeLabBaseSampleDecisionProof,
   buildNegativeLabBaseSamplePreviewProof,
   type NegativeLabBaseSamplePreviewProofContext,
-} from '../../../../src/utils/negativeLabBaseSampleCommandBridge.ts';
+} from '../../../../src/utils/negative-lab/negativeLabBaseSampleCommandBridge.ts';
 
 const modalSource = readFileSync('src/components/modals/negative-lab/NegativeConversionModal.tsx', 'utf8');
 

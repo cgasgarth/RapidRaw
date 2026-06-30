@@ -1,4 +1,4 @@
-import type { NegativeLabBuiltInUiPresetCatalog } from '../schemas/negative-lab/negativeLabPresetCatalogSchemas';
+import type { NegativeLabBuiltInUiPresetCatalog } from '../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
 
 type NegativeLabBuiltInUiPreset = NegativeLabBuiltInUiPresetCatalog['presets'][number];
 type NegativeLabPresetParams = NegativeLabBuiltInUiPreset['params'];

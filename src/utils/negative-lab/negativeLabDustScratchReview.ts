@@ -1,11 +1,11 @@
-import type { NegativeLabFrameHealthReport } from '../schemas/negative-lab/negativeLabFrameHealthSchemas';
+import type { NegativeLabFrameHealthReport } from '../../schemas/negative-lab/negativeLabFrameHealthSchemas';
 import {
   NEGATIVE_LAB_WORKSPACE_SCHEMA_VERSION,
   type NegativeLabDustScratchReviewReport,
   type NegativeLabQcProofReport,
   parseNegativeLabDustScratchReviewReport,
   parseNegativeLabQcProofReport,
-} from '../schemas/negative-lab/negativeLabWorkspaceSchemas';
+} from '../../schemas/negative-lab/negativeLabWorkspaceSchemas';
 
 type NegativeLabDustScratchCandidate = NegativeLabDustScratchReviewReport['frames'][number]['candidates'][number];
 

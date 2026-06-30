@@ -2,7 +2,7 @@ import type {
   NegativeBaseFogDensitometerReadout,
   NegativeBaseFogEstimate,
   NegativeLabBaseFogSampleRect,
-} from '../schemas/negative-lab/negativeLabPresetCatalogSchemas';
+} from '../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
 
 export type NegativeLabBaseSampleSource = 'auto_full_frame' | 'custom_rect' | 'preset_rect';
 export type NegativeLabBaseSampleConfidence = 'blocked' | 'high' | 'low' | 'medium';

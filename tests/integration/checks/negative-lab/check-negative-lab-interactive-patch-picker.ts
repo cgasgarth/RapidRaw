@@ -10,7 +10,7 @@ const patchSamplerPanelSource = readFileSync(
 );
 const smokeSource = readFileSync('scripts/proofs/capture-visual-smoke.ts', 'utf8');
 const proofSource = readFileSync('scripts/lib/proofs/visual-smoke-proofs.ts', 'utf8');
-const helperSource = readFileSync('src/utils/negativeLabPatchPicker.ts', 'utf8');
+const helperSource = readFileSync('src/utils/negative-lab/negativeLabPatchPicker.ts', 'utf8');
 
 for (const marker of [
   'buildNegativeLabPickedPatchRect',

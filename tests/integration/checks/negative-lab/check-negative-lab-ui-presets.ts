@@ -11,16 +11,16 @@ import {
   DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID,
   getNegativeLabAcquisitionProfile,
   NEGATIVE_LAB_ACQUISITION_PROFILES,
-} from '../../../../src/utils/negativeLabAcquisitionProfiles.ts';
-import { buildNegativeLabRuntimeProfileBrowserRows } from '../../../../src/utils/negativeLabMeasuredProfileRuntime.ts';
-import { NEGATIVE_LAB_OUTPUT_FORMAT_IDS } from '../../../../src/utils/negativeLabOutputFormatIds.ts';
-import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../../../../src/utils/negativeLabPresetCatalog.ts';
+} from '../../../../src/utils/negative-lab/negativeLabAcquisitionProfiles.ts';
+import { buildNegativeLabRuntimeProfileBrowserRows } from '../../../../src/utils/negative-lab/negativeLabMeasuredProfileRuntime.ts';
+import { NEGATIVE_LAB_OUTPUT_FORMAT_IDS } from '../../../../src/utils/negative-lab/negativeLabOutputFormatIds.ts';
+import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../../../../src/utils/negative-lab/negativeLabPresetCatalog.ts';
 import {
   buildNegativeLabBrowserProfileProvenanceHash,
   buildNegativeLabProfileBoundPlanIdentity,
   buildNegativeLabProfileComparisonRows,
-} from '../../../../src/utils/negativeLabProfileComparison.ts';
-import { listNegativeLabStockMetadataReferencesForPreset } from '../../../../src/utils/negativeLabStockMetadataCatalog.ts';
+} from '../../../../src/utils/negative-lab/negativeLabProfileComparison.ts';
+import { listNegativeLabStockMetadataReferencesForPreset } from '../../../../src/utils/negative-lab/negativeLabStockMetadataCatalog.ts';
 
 const failures = [];
 const ids = new Set();

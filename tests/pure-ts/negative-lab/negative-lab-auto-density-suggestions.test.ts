@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import type { NegativeLabPresetParams } from '../../../src/schemas/negative-lab/negativeLabPresetCatalogSchemas.ts';
-import { buildNegativeLabAutoDensitySuggestionRun } from '../../../src/utils/negativeLabAutoDensitySuggestions.ts';
-import { buildNegativeLabFrameHealthReport } from '../../../src/utils/negativeLabFrameHealth.ts';
-import { buildNegativeLabRollNormalizationPlan } from '../../../src/utils/negativeLabRollNormalizationPlan.ts';
+import { buildNegativeLabAutoDensitySuggestionRun } from '../../../src/utils/negative-lab/negativeLabAutoDensitySuggestions.ts';
+import { buildNegativeLabFrameHealthReport } from '../../../src/utils/negative-lab/negativeLabFrameHealth.ts';
+import { buildNegativeLabRollNormalizationPlan } from '../../../src/utils/negative-lab/negativeLabRollNormalizationPlan.ts';
 import {
   buildNegativeLabScanMetricsV1,
   type NegativeLabScanMetricPixel,
-} from '../../../src/utils/negativeLabScanMetrics.ts';
+} from '../../../src/utils/negative-lab/negativeLabScanMetrics.ts';
 
 const params: NegativeLabPresetParams = {
   base_fog_strength: 0.72,

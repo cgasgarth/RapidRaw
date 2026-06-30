@@ -8,7 +8,7 @@ const files = {
     readFileSync('src/components/modals/negative-lab/NegativeConversionModal.tsx', 'utf8') +
     readFileSync('src/components/modals/negative-lab/NegativeLabRollHealthPanel.tsx', 'utf8'),
   smoke: readFileSync('scripts/proofs/capture-visual-smoke.ts', 'utf8'),
-  util: readFileSync('src/utils/negativeLabFrameHealth.ts', 'utf8'),
+  util: readFileSync('src/utils/negative-lab/negativeLabFrameHealth.ts', 'utf8'),
 };
 
 const failures = [];

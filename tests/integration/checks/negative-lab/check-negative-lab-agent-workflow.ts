@@ -27,7 +27,7 @@ import {
   buildNegativeLabStockFamilyConversionRouteResult,
   NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST,
 } from '../../../../src/utils/negative-lab/app-server/negativeLabAppServerRoutes.ts';
-import { NegativeLabOutputFormatId } from '../../../../src/utils/negativeLabOutputFormatIds.ts';
+import { NegativeLabOutputFormatId } from '../../../../src/utils/negative-lab/negativeLabOutputFormatIds.ts';
 
 const OUTPUT_PATH = 'docs/validation/proofs/negative-lab/negative-lab-agent-workflow-proof-2026-06-16.html';
 const args = new Set(process.argv.slice(2));

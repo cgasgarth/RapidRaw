@@ -4,15 +4,15 @@
 import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
-import type { NegativeLabRgbTriplet } from '../../../../src/utils/negativeLabDensityConversion.ts';
+import type { NegativeLabRgbTriplet } from '../../../../src/utils/negative-lab/negativeLabDensityConversion.ts';
 import {
   convertNegativeLabDensitySamples,
   NEGATIVE_LAB_DENSITY_ALGORITHM_ID,
-} from '../../../../src/utils/negativeLabDensityConversion.ts';
+} from '../../../../src/utils/negative-lab/negativeLabDensityConversion.ts';
 import {
   buildNegativeLabRuntimeProfileProvenanceHash,
   resolveNegativeLabRuntimeProfile,
-} from '../../../../src/utils/negativeLabMeasuredProfileRuntime.ts';
+} from '../../../../src/utils/negative-lab/negativeLabMeasuredProfileRuntime.ts';
 
 const rgbTripletSchema = z.tuple([z.number().min(0).max(1), z.number().min(0).max(1), z.number().min(0).max(1)]);
 const syntheticProofSchema = z
