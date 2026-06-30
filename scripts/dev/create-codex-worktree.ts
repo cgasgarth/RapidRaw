@@ -215,14 +215,11 @@ const ensureWorktreeDependencies = (worktreePath: string): void => {
 };
 
 const updateMain = (source: WorktreeSource): void => {
+  run(['git', 'fetch', 'origin', 'main'], { cwd: source.root });
   if (source.hasMainWorktree) {
     ensureMainReady(source.root);
-    run(['git', 'fetch', 'origin', 'main'], { cwd: source.root });
-    run(['git', 'pull', '--ff-only', 'origin', 'main'], { cwd: source.root });
-    return;
+    run(['git', 'merge', '--ff-only', 'origin/main'], { cwd: source.root });
   }
-
-  run(['git', 'fetch', 'origin', 'main'], { cwd: source.root });
 };
 
 const ensureWorktreeBase = (worktreePath: string): void => {
