@@ -37,22 +37,22 @@ import {
 } from '../../../hooks/editor/useNegativeLabProfileBrowser';
 import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import { usePreviewViewport } from '../../../hooks/viewport/usePreviewViewport';
-import type { NegativeLabAcquisitionProfileId } from '../../../schemas/negativeLabAcquisitionProfileSchemas';
-import { negativeLabAcquisitionProfileIdSchema } from '../../../schemas/negativeLabAcquisitionProfileSchemas';
+import type { NegativeLabAcquisitionProfileId } from '../../../schemas/negative-lab/negativeLabAcquisitionProfileSchemas';
+import { negativeLabAcquisitionProfileIdSchema } from '../../../schemas/negative-lab/negativeLabAcquisitionProfileSchemas';
 import type {
   NegativeLabAcquisitionHealthReport,
   NegativeLabFrameCropStatus,
-} from '../../../schemas/negativeLabFrameHealthSchemas';
-import type { NegativeLabFrameRgbBalanceOffset } from '../../../schemas/negativeLabFrameRgbBalanceOverrideSchemas';
+} from '../../../schemas/negative-lab/negativeLabFrameHealthSchemas';
+import type { NegativeLabFrameRgbBalanceOffset } from '../../../schemas/negative-lab/negativeLabFrameRgbBalanceOverrideSchemas';
 import {
   type NegativeLabHighlightPatchExposureSuggestion,
   negativeLabHighlightPatchExposureSuggestionSchema,
-} from '../../../schemas/negativeLabHighlightPatchExposureSuggestionSchemas';
-import type { NegativeLabRuntimeProfileBrowserRow } from '../../../schemas/negativeLabMeasuredProfileSchemas';
+} from '../../../schemas/negative-lab/negativeLabHighlightPatchExposureSuggestionSchemas';
+import type { NegativeLabRuntimeProfileBrowserRow } from '../../../schemas/negative-lab/negativeLabMeasuredProfileSchemas';
 import {
   type NegativeLabNeutralPatchSuggestion,
   negativeLabNeutralPatchSuggestionSchema,
-} from '../../../schemas/negativeLabNeutralPatchSuggestionSchemas';
+} from '../../../schemas/negative-lab/negativeLabNeutralPatchSuggestionSchemas';
 import {
   type NegativeBaseFogDensitometerReadout,
   type NegativeBaseFogEstimate,
@@ -61,13 +61,13 @@ import {
   negativeBaseFogEstimateSchema,
   negativeBaseFogSampleReadoutSchema,
   negativeConversionSavedPathsSchema,
-} from '../../../schemas/negativeLabPresetCatalogSchemas';
-import type { NegativeLabSelectedProfileSnapshot } from '../../../schemas/negativeLabProfileComparisonSchemas';
+} from '../../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
+import type { NegativeLabSelectedProfileSnapshot } from '../../../schemas/negative-lab/negativeLabProfileComparisonSchemas';
 import {
   type NegativeLabShadowPatchBlackPointSuggestion,
   negativeLabShadowPatchBlackPointSuggestionSchema,
-} from '../../../schemas/negativeLabShadowPatchBlackPointSuggestionSchemas';
-import type { NegativeLabWorkspaceProof } from '../../../schemas/negativeLabWorkspaceSchemas';
+} from '../../../schemas/negative-lab/negativeLabShadowPatchBlackPointSuggestionSchemas';
+import type { NegativeLabWorkspaceProof } from '../../../schemas/negative-lab/negativeLabWorkspaceSchemas';
 import { parsePathProgressPayload } from '../../../schemas/tauriEventSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { Invokes } from '../../../tauri/commands';

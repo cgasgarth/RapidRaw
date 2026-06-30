@@ -3,7 +3,7 @@ import type {
   NegativeLabAcquisitionWarningCode,
   NegativeLabFrameHealthEntry,
   NegativeLabFrameWarningSeverity,
-} from '../../../schemas/negativeLabFrameHealthSchemas';
+} from '../../../schemas/negative-lab/negativeLabFrameHealthSchemas';
 
 export type NegativeLabFrameHealthFilter = 'all' | NegativeLabFrameWarningSeverity;
 export type NegativeLabFrameHealthSort = 'roll_order' | 'warning_severity';

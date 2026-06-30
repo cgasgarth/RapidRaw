@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { negativeLabScanMetricsV1Schema } from '../../../src/schemas/negativeLabScanMetricsSchemas.ts';
+import { negativeLabScanMetricsV1Schema } from '../../../src/schemas/negative-lab/negativeLabScanMetricsSchemas.ts';
 import {
   buildNegativeLabScanMetricsV1,
   type NegativeLabScanMetricPixel,

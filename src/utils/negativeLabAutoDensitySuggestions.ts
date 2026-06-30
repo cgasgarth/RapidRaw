@@ -5,12 +5,12 @@ import {
   type NegativeLabAutoDensitySuggestionState,
   type NegativeLabAutoDensityWarningCode,
   parseNegativeLabAutoDensitySuggestionRun,
-} from '../schemas/negativeLabAutoDensitySuggestionSchemas';
+} from '../schemas/negative-lab/negativeLabAutoDensitySuggestionSchemas';
 
-import type { NegativeLabFrameHealthEntry } from '../schemas/negativeLabFrameHealthSchemas';
-import type { NegativeLabFrameRgbBalanceOffset } from '../schemas/negativeLabFrameRgbBalanceOverrideSchemas';
-import type { NegativeLabPresetParams } from '../schemas/negativeLabPresetCatalogSchemas';
-import type { NegativeLabScanMetricsV1 } from '../schemas/negativeLabScanMetricsSchemas';
+import type { NegativeLabFrameHealthEntry } from '../schemas/negative-lab/negativeLabFrameHealthSchemas';
+import type { NegativeLabFrameRgbBalanceOffset } from '../schemas/negative-lab/negativeLabFrameRgbBalanceOverrideSchemas';
+import type { NegativeLabPresetParams } from '../schemas/negative-lab/negativeLabPresetCatalogSchemas';
+import type { NegativeLabScanMetricsV1 } from '../schemas/negative-lab/negativeLabScanMetricsSchemas';
 
 export interface NegativeLabFrameMetricsInput {
   frameId: string;

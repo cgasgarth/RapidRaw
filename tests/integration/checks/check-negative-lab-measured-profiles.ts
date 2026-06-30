@@ -14,7 +14,7 @@ import {
   negativeLabMeasuredProfileCatalogSchema,
   negativeLabMeasuredProfileSchema,
   negativeLabMeasurementReportSchema,
-} from '../../../src/schemas/negativeLabMeasuredProfileSchemas.ts';
+} from '../../../src/schemas/negative-lab/negativeLabMeasuredProfileSchemas.ts';
 import {
   buildNegativeLabAcceptedBatchApplyRouteResult,
   buildNegativeLabAcceptedBatchPlanRouteResult,

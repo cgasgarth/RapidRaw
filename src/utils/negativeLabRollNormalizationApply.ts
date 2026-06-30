@@ -1,6 +1,6 @@
-import type { NegativeLabFrameRgbBalanceOffset } from '../schemas/negativeLabFrameRgbBalanceOverrideSchemas';
-import type { NegativeLabPresetParams } from '../schemas/negativeLabPresetCatalogSchemas';
-import type { NegativeLabRollNormalizationPlan } from '../schemas/negativeLabRollNormalizationSchemas';
+import type { NegativeLabFrameRgbBalanceOffset } from '../schemas/negative-lab/negativeLabFrameRgbBalanceOverrideSchemas';
+import type { NegativeLabPresetParams } from '../schemas/negative-lab/negativeLabPresetCatalogSchemas';
+import type { NegativeLabRollNormalizationPlan } from '../schemas/negative-lab/negativeLabRollNormalizationSchemas';
 import { snapNegativeLabFrameExposureOffset } from './negativeLabFrameExposureOverrides';
 import {
   negativeLabFrameRgbBalanceOffsetIsZero,

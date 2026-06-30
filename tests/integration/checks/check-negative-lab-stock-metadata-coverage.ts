@@ -4,7 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { negativeLabStockMetadataCatalogSchema } from '../../../src/schemas/negativeLabStockMetadataCatalogSchemas.ts';
+import { negativeLabStockMetadataCatalogSchema } from '../../../src/schemas/negative-lab/negativeLabStockMetadataCatalogSchemas.ts';
 
 const sourceUrl = new URL('../../../src/data/negativeLabStockMetadataCatalog.json', import.meta.url);
 const coverageUrl = new URL(

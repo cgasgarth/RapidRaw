@@ -1,8 +1,8 @@
 import cx from 'clsx';
 import { useTranslation } from 'react-i18next';
 
-import type { NegativeLabRuntimeProfileBrowserRow } from '../../../schemas/negativeLabMeasuredProfileSchemas';
-import type { NegativeLabProfileComparisonRow } from '../../../schemas/negativeLabProfileComparisonSchemas';
+import type { NegativeLabRuntimeProfileBrowserRow } from '../../../schemas/negative-lab/negativeLabMeasuredProfileSchemas';
+import type { NegativeLabProfileComparisonRow } from '../../../schemas/negative-lab/negativeLabProfileComparisonSchemas';
 import { TextVariants } from '../../../types/typography';
 import UiText from '../../ui/primitives/Text';
 

@@ -2,7 +2,7 @@ import {
   type NegativeLabAcquisitionProfile,
   type NegativeLabAcquisitionProfileId,
   negativeLabAcquisitionProfilesSchema,
-} from '../schemas/negativeLabAcquisitionProfileSchemas';
+} from '../schemas/negative-lab/negativeLabAcquisitionProfileSchemas';
 
 export const NEGATIVE_LAB_ACQUISITION_PROFILES = negativeLabAcquisitionProfilesSchema.parse([
   {

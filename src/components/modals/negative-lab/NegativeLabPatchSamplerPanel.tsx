@@ -1,15 +1,15 @@
 import cx from 'clsx';
 import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { NegativeLabHighlightPatchExposureSuggestion } from '../../../schemas/negativeLabHighlightPatchExposureSuggestionSchemas';
-import type { NegativeLabNeutralPatchSuggestion } from '../../../schemas/negativeLabNeutralPatchSuggestionSchemas';
+import type { NegativeLabHighlightPatchExposureSuggestion } from '../../../schemas/negative-lab/negativeLabHighlightPatchExposureSuggestionSchemas';
+import type { NegativeLabNeutralPatchSuggestion } from '../../../schemas/negative-lab/negativeLabNeutralPatchSuggestionSchemas';
 import type {
   NegativeBaseFogDensitometerReadout,
   NegativeBaseFogEstimate,
   NegativeBaseFogSampleReadout,
   NegativeLabBaseFogSampleRect,
-} from '../../../schemas/negativeLabPresetCatalogSchemas';
-import type { NegativeLabShadowPatchBlackPointSuggestion } from '../../../schemas/negativeLabShadowPatchBlackPointSuggestionSchemas';
+} from '../../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
+import type { NegativeLabShadowPatchBlackPointSuggestion } from '../../../schemas/negative-lab/negativeLabShadowPatchBlackPointSuggestionSchemas';
 import { TextVariants } from '../../../types/typography';
 import UiText from '../../ui/primitives/Text';
 

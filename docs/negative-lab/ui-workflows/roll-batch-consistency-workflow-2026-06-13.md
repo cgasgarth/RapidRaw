@@ -56,7 +56,7 @@ choices, batch dry-run readiness, consistency warnings, and QC proof status.
 
 ## Frame Health Dry-Run Summary
 
-`src/schemas/negativeLabFrameHealthSchemas.ts` now defines a frame health report
+`src/schemas/negative-lab/negativeLabFrameHealthSchemas.ts` now defines a frame health report
 and batch dry-run summary for the workspace. The summary records affected frame
 IDs, skipped frame IDs, planned apply count, and rolled-up warning codes before a
 batch conversion mutates files. The public checker

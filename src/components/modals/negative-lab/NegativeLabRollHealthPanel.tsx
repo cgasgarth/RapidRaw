@@ -7,10 +7,10 @@ import type {
   NegativeLabFrameCropStatus,
   NegativeLabFrameHealthEntry,
   NegativeLabFrameHealthReport,
-} from '../../../schemas/negativeLabFrameHealthSchemas';
-import type { NegativeLabFrameRgbBalanceOffset } from '../../../schemas/negativeLabFrameRgbBalanceOverrideSchemas';
-import type { NegativeLabPresetParams } from '../../../schemas/negativeLabPresetCatalogSchemas';
-import type { NegativeLabRollNormalizationPlan } from '../../../schemas/negativeLabRollNormalizationSchemas';
+} from '../../../schemas/negative-lab/negativeLabFrameHealthSchemas';
+import type { NegativeLabFrameRgbBalanceOffset } from '../../../schemas/negative-lab/negativeLabFrameRgbBalanceOverrideSchemas';
+import type { NegativeLabPresetParams } from '../../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
+import type { NegativeLabRollNormalizationPlan } from '../../../schemas/negative-lab/negativeLabRollNormalizationSchemas';
 import { TextVariants } from '../../../types/typography';
 import { snapNegativeLabFrameExposureOffset } from '../../../utils/negativeLabFrameExposureOverrides';
 import {

@@ -2,7 +2,7 @@
 
 import { readFile } from 'node:fs/promises';
 
-import { negativeLabStockRegistrySchema } from '../../../src/schemas/negativeLabStockRegistrySchemas.ts';
+import { negativeLabStockRegistrySchema } from '../../../src/schemas/negative-lab/negativeLabStockRegistrySchemas.ts';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../../../src/utils/negativeLabPresetCatalog.ts';
 
 const registryUrl = new URL('../../../fixtures/negative-lab/negative-lab-stock-registry.json', import.meta.url);

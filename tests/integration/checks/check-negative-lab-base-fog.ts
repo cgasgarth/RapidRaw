@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 
 import { negativeLabUpdateBaseSamplesCommandV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { negativeBaseFogEstimateSchema } from '../../../src/schemas/negativeLabPresetCatalogSchemas.ts';
+import { negativeBaseFogEstimateSchema } from '../../../src/schemas/negative-lab/negativeLabPresetCatalogSchemas.ts';
 import { buildNegativeLabDensitometerRouteResult } from '../../../src/utils/negativeLabAppServerRoutes.ts';
 import {
   buildNegativeLabBaseSamplePreviewProof,

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-import type { NegativeLabMeasuredProfileCatalog } from '../../../src/schemas/negativeLabMeasuredProfileSchemas.ts';
+import type { NegativeLabMeasuredProfileCatalog } from '../../../src/schemas/negative-lab/negativeLabMeasuredProfileSchemas.ts';
 import {
   buildNegativeLabRuntimeProfileBrowserRows,
   NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,

@@ -2,7 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 
-import { negativeLabHighlightPatchExposureSuggestionSchema } from '../../../src/schemas/negativeLabHighlightPatchExposureSuggestionSchemas.ts';
+import { negativeLabHighlightPatchExposureSuggestionSchema } from '../../../src/schemas/negative-lab/negativeLabHighlightPatchExposureSuggestionSchemas.ts';
 
 const suggestion = negativeLabHighlightPatchExposureSuggestionSchema.parse({
   applicationRisk: 'low',

@@ -1,6 +1,6 @@
 import cx from 'clsx';
 import { useTranslation } from 'react-i18next';
-import type { NegativeLabQcProofReport } from '../../../schemas/negativeLabWorkspaceSchemas';
+import type { NegativeLabQcProofReport } from '../../../schemas/negative-lab/negativeLabWorkspaceSchemas';
 import { TextVariants } from '../../../types/typography';
 import type {
   NegativeLabQcContactSheetArtifact,

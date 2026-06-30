@@ -2,7 +2,7 @@ import negativeLabStockMetadataCatalogJson from '../data/negativeLabStockMetadat
 import {
   type NegativeLabStockMetadataCatalog,
   negativeLabStockMetadataCatalogSchema,
-} from '../schemas/negativeLabStockMetadataCatalogSchemas';
+} from '../schemas/negative-lab/negativeLabStockMetadataCatalogSchemas';
 
 export const NEGATIVE_LAB_STOCK_METADATA_CATALOG = negativeLabStockMetadataCatalogSchema.parse(
   negativeLabStockMetadataCatalogJson,

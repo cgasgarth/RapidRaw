@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import { negativeLabPresetParamsSchema } from '../../../src/schemas/negativeLabPresetCatalogSchemas.ts';
-import type { NegativeLabScanMetricsV1 } from '../../../src/schemas/negativeLabScanMetricsSchemas.ts';
+import { negativeLabPresetParamsSchema } from '../../../src/schemas/negative-lab/negativeLabPresetCatalogSchemas.ts';
+import type { NegativeLabScanMetricsV1 } from '../../../src/schemas/negative-lab/negativeLabScanMetricsSchemas.ts';
 import {
   buildNegativeLabDensityBoundsFromScanMetrics,
   convertNegativeLabDensityPrintV2Sample,

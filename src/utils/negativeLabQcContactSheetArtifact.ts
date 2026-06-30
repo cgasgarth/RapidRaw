@@ -1,4 +1,4 @@
-import type { NegativeLabQcProofReport } from '../schemas/negativeLabWorkspaceSchemas';
+import type { NegativeLabQcProofReport } from '../schemas/negative-lab/negativeLabWorkspaceSchemas';
 
 const CONTACT_SHEET_TILE_WIDTH = 600;
 const CONTACT_SHEET_TILE_HEIGHT = 400;

@@ -1,5 +1,5 @@
-import type { NegativeLabPresetParams } from '../schemas/negativeLabPresetCatalogSchemas';
-import type { NegativeLabScanMetricsV1 } from '../schemas/negativeLabScanMetricsSchemas';
+import type { NegativeLabPresetParams } from '../schemas/negative-lab/negativeLabPresetCatalogSchemas';
+import type { NegativeLabScanMetricsV1 } from '../schemas/negative-lab/negativeLabScanMetricsSchemas';
 
 export type NegativeLabRgbTriplet = readonly [number, number, number];
 
