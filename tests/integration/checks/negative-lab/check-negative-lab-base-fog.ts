@@ -7,7 +7,7 @@ import { z } from 'zod';
 
 import { negativeLabUpdateBaseSamplesCommandV1Schema } from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { negativeBaseFogEstimateSchema } from '../../../../src/schemas/negative-lab/negativeLabPresetCatalogSchemas.ts';
-import { buildNegativeLabDensitometerRouteResult } from '../../../../src/utils/negativeLabAppServerRoutes.ts';
+import { buildNegativeLabDensitometerRouteResult } from '../../../../src/utils/negative-lab/app-server/negativeLabAppServerRoutes.ts';
 import {
   buildNegativeLabBaseSamplePreviewProof,
   buildNegativeLabBaseSampleWarningCodes,

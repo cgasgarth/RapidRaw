@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { negativeLabQcProofArtifactV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas';
-import { NegativeLabAppServerCommandName } from '../../utils/negativeLabAppServerCommandNames';
+import { NegativeLabAppServerCommandName } from '../../utils/negative-lab/app-server/negativeLabAppServerCommandNames';
 import { NEGATIVE_LAB_OUTPUT_FORMAT_IDS } from '../../utils/negativeLabOutputFormatIds';
 import {
   type NegativeLabCrosstalkProfile,
@@ -454,7 +454,7 @@ export const negativeLabAcceptedBatchPlanSchema = z
     proof: z
       .object({
         deterministic: z.literal(true),
-        generatedFrom: z.literal('src/utils/negativeLabAppServerRoutes.ts'),
+        generatedFrom: z.literal('src/utils/negative-lab/app-server/negativeLabAppServerRoutes.ts'),
         selectedProfileBound: z.literal(true),
       })
       .strict(),
@@ -494,7 +494,7 @@ export const negativeLabAcceptedBatchApplyPlanSchema = z
     proof: z
       .object({
         dryRunRequired: z.literal(true),
-        generatedFrom: z.literal('src/utils/negativeLabAppServerRoutes.ts'),
+        generatedFrom: z.literal('src/utils/negative-lab/app-server/negativeLabAppServerRoutes.ts'),
         identityMatched: z.literal(true),
         selectedProfileBound: z.literal(true),
       })
@@ -646,7 +646,7 @@ export const negativeLabStockFamilyConversionResultSchema = z
     proof: z
       .object({
         deterministic: z.literal(true),
-        generatedFrom: z.literal('src/utils/negativeLabAppServerRoutes.ts'),
+        generatedFrom: z.literal('src/utils/negative-lab/app-server/negativeLabAppServerRoutes.ts'),
         registryMappedPreset: z.literal(true),
       })
       .strict(),

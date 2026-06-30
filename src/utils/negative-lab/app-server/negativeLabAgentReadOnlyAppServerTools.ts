@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { NegativeWarningV1 } from '../../packages/rawengine-schema/src/rawEngineSchemas';
+import type { NegativeWarningV1 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import type {
   NegativeLabAppServerCommand,
   NegativeLabDensitometerAppServerCommand,
@@ -7,7 +7,7 @@ import type {
   NegativeLabPlanRollNormalizationAppServerCommand,
   NegativeLabQcProofAppServerCommand,
   NegativeLabStockFamilyConversionAppServerCommand,
-} from '../schemas/negative-lab/negativeLabAppServerSchemas';
+} from '../../../schemas/negative-lab/negativeLabAppServerSchemas';
 import {
   negativeLabAppServerCommandSchema,
   negativeLabAppServerScopeSchema,
@@ -16,7 +16,8 @@ import {
   negativeLabPlanRollNormalizationAppServerCommandSchema,
   negativeLabQcProofAppServerCommandSchema,
   negativeLabStockFamilyConversionAppServerCommandSchema,
-} from '../schemas/negative-lab/negativeLabAppServerSchemas';
+} from '../../../schemas/negative-lab/negativeLabAppServerSchemas';
+import { buildNegativeLabPlanHash } from '../../negativeLabPlanIdentity';
 import { NegativeLabAppServerCommandName } from './negativeLabAppServerCommandNames';
 import {
   buildNegativeLabConversionPlanResult,
@@ -26,7 +27,6 @@ import {
   buildNegativeLabQcProofRouteResult,
   buildNegativeLabStockFamilyConversionRouteResult,
 } from './negativeLabAppServerRoutes';
-import { buildNegativeLabPlanHash } from './negativeLabPlanIdentity';
 
 export const NEGATIVE_LAB_AGENT_INSPECT_TOOL_NAME = 'negativelab.inspect_readonly';
 export const NEGATIVE_LAB_AGENT_CONVERSION_PLAN_TOOL_NAME = 'negativelab.plan_conversion_readonly';
@@ -85,7 +85,7 @@ export const negativeLabAgentStockFamilyPlanRequestSchema = requestBaseSchema
 const readOnlyProofSchema = z
   .object({
     deterministic: z.literal(true),
-    generatedFrom: z.literal('src/utils/negativeLabAgentReadOnlyAppServerTools.ts'),
+    generatedFrom: z.literal('src/utils/negative-lab/app-server/negativeLabAgentReadOnlyAppServerTools.ts'),
     mutates: z.literal(false),
     readOnly: z.literal(true),
     stateMutationProhibited: z.literal(true),
@@ -182,7 +182,7 @@ const stableReadOnlyHash = (payload: unknown): string => `fnv1a32:${buildNegativ
 const readOnlyProof = (underlyingCommandNames: string[]) =>
   readOnlyProofSchema.parse({
     deterministic: true,
-    generatedFrom: 'src/utils/negativeLabAgentReadOnlyAppServerTools.ts',
+    generatedFrom: 'src/utils/negative-lab/app-server/negativeLabAgentReadOnlyAppServerTools.ts',
     mutates: false,
     readOnly: true,
     stateMutationProhibited: true,

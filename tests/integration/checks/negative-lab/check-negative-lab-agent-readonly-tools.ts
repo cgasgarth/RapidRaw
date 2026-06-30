@@ -12,7 +12,7 @@ import {
   NEGATIVE_LAB_AGENT_READ_ONLY_TOOL_NAMES,
   NEGATIVE_LAB_AGENT_ROLL_NORMALIZATION_PLAN_TOOL_NAME,
   NEGATIVE_LAB_AGENT_STOCK_FAMILY_PLAN_TOOL_NAME,
-} from '../../../../src/utils/negativeLabAgentReadOnlyAppServerTools.ts';
+} from '../../../../src/utils/negative-lab/app-server/negativeLabAgentReadOnlyAppServerTools.ts';
 import { NegativeLabOutputFormatId } from '../../../../src/utils/negativeLabOutputFormatIds.ts';
 import {
   buildNegativeLabScanMetricsV1,

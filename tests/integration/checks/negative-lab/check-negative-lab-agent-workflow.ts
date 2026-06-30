@@ -15,7 +15,7 @@ import {
   sampleNegativeLabCommandEnvelopeV1,
   sampleToolRegistryV1,
 } from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { NegativeLabAppServerCommandName } from '../../../../src/utils/negativeLabAppServerCommandNames.ts';
+import { NegativeLabAppServerCommandName } from '../../../../src/utils/negative-lab/app-server/negativeLabAppServerCommandNames.ts';
 import {
   buildNegativeLabAcceptedBatchApplyRouteResult,
   buildNegativeLabAcceptedBatchPlanRouteResult,
@@ -26,7 +26,7 @@ import {
   buildNegativeLabQcProofRouteResult,
   buildNegativeLabStockFamilyConversionRouteResult,
   NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST,
-} from '../../../../src/utils/negativeLabAppServerRoutes.ts';
+} from '../../../../src/utils/negative-lab/app-server/negativeLabAppServerRoutes.ts';
 import { NegativeLabOutputFormatId } from '../../../../src/utils/negativeLabOutputFormatIds.ts';
 
 const OUTPUT_PATH = 'docs/validation/proofs/negative-lab/negative-lab-agent-workflow-proof-2026-06-16.html';

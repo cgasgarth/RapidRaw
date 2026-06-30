@@ -1,12 +1,12 @@
 import {
   NegativeLabAppServerRuntimeToolBusV1,
   type NegativeLabAppServerRuntimeToolResultV1,
-} from '../../packages/rawengine-schema/src/negativeLabAppServerRuntime';
+} from '../../../../packages/rawengine-schema/src/negativeLabAppServerRuntime';
 import {
   ApprovalClass,
   type NegativeLabAppServerToolManifestV1,
   RAW_ENGINE_SCHEMA_VERSION,
-} from '../../packages/rawengine-schema/src/rawEngineSchemas';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 
 export const NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME = 'negativelab.preview_conversion';
 export const NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME = 'negativelab.apply_planned_command';

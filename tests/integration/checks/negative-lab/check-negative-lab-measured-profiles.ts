@@ -19,7 +19,7 @@ import {
   buildNegativeLabAcceptedBatchApplyRouteResult,
   buildNegativeLabAcceptedBatchPlanRouteResult,
   buildNegativeLabConversionPlanResult,
-} from '../../../../src/utils/negativeLabAppServerRoutes.ts';
+} from '../../../../src/utils/negative-lab/app-server/negativeLabAppServerRoutes.ts';
 import {
   NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
   resolveNegativeLabRuntimeProfile,

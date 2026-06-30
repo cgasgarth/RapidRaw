@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { NegativeLabAppServerCommandName } from '../../../../src/utils/negativeLabAppServerCommandNames.ts';
+import { NegativeLabAppServerCommandName } from '../../../../src/utils/negative-lab/app-server/negativeLabAppServerCommandNames.ts';
 import {
   buildNegativeLabAcceptedBatchApplyRouteResult,
   buildNegativeLabAcceptedBatchPlanRouteResult,
@@ -18,7 +18,7 @@ import {
   buildNegativeLabStockMetadataRouteResult,
   buildNegativeLabStockRegistryRouteResult,
   NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST,
-} from '../../../../src/utils/negativeLabAppServerRoutes.ts';
+} from '../../../../src/utils/negative-lab/app-server/negativeLabAppServerRoutes.ts';
 import { NEGATIVE_LAB_DENSITY_ALGORITHM_ID } from '../../../../src/utils/negativeLabDensityConversion.ts';
 import {
   buildNegativeLabRuntimeSelectedProfileSnapshot,

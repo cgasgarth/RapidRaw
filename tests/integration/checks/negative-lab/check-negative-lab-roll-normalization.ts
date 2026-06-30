@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { z } from 'zod';
-import { buildNegativeLabPlanRollNormalizationRouteResult } from '../../../../src/utils/negativeLabAppServerRoutes.ts';
+import { buildNegativeLabPlanRollNormalizationRouteResult } from '../../../../src/utils/negative-lab/app-server/negativeLabAppServerRoutes.ts';
 import { buildNegativeLabFrameHealthReport } from '../../../../src/utils/negativeLabFrameHealth.ts';
 import { buildNegativeLabAcceptedPlanIdentity } from '../../../../src/utils/negativeLabPlanIdentity.ts';
 import { DEFAULT_NEGATIVE_LAB_UI_PRESET } from '../../../../src/utils/negativeLabPresetCatalog.ts';

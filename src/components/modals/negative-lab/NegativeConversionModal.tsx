@@ -74,12 +74,12 @@ import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants } from '../../../types/typography';
 import { buildDustCandidateHealLayer, buildDustHealCorrectionMetrics } from '../../../utils/dustCandidateHealLayer';
 import { buildLayerStackSidecarFromMasks } from '../../../utils/layerStackCommandBridge';
+import { NegativeLabAppServerCommandName } from '../../../utils/negative-lab/app-server/negativeLabAppServerCommandNames';
 import {
   DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID,
   getNegativeLabAcquisitionProfile,
   NEGATIVE_LAB_ACQUISITION_PROFILES,
 } from '../../../utils/negativeLabAcquisitionProfiles';
-import { NegativeLabAppServerCommandName } from '../../../utils/negativeLabAppServerCommandNames';
 import {
   buildNegativeLabBaseSampleDecisionProof,
   buildNegativeLabBaseSamplePreviewProof,
