@@ -1,6 +1,6 @@
 import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Aperture, ChartArea, ClipboardPaste, Copy, Info, RotateCcw, ScanSearch } from 'lucide-react';
+import { Aperture, ChartArea, ChevronDown, ClipboardPaste, Copy, Info, RotateCcw, ScanSearch } from 'lucide-react';
 import { type MouseEvent, type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
@@ -61,6 +61,9 @@ const ADJUSTMENT_SECTION_LABEL_FALLBACKS: Record<AdjustmentSectionName, string> 
   effects: 'Effects',
 };
 const RAW_RECONSTRUCTION_COMPARISON_CROP_SIZE = 256;
+const PANEL_ACTION_BUTTON_CLASS =
+  'inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50';
+const PANEL_ACTION_ICON_SIZE = 15;
 
 const formatBytes = (value: number): string => {
   if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
@@ -78,6 +81,7 @@ export default function Controls() {
     useState<RawReconstructionComparisonResult | null>(null);
   const [isComparingRawReconstruction, setIsComparingRawReconstruction] = useState(false);
   const [isRawProcessingModeProvenanceVisible, setIsRawProcessingModeProvenanceVisible] = useState(false);
+  const [isRawProcessingControlsOpen, setIsRawProcessingControlsOpen] = useState(true);
 
   const { appSettings, theme } = useSettingsStore(
     useShallow((state) => ({
@@ -384,155 +388,181 @@ export default function Controls() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-        <UiText variant={TextVariants.title}>{t('editor.adjustments.title')}</UiText>
+      <div className="flex min-h-11 shrink-0 items-center justify-between border-b border-surface px-3 py-2">
+        <UiText as="h2" variant={TextVariants.heading} className="truncate">
+          {t('editor.adjustments.title')}
+        </UiText>
         <div className="flex items-center gap-1">
           <button
-            className="p-2 rounded-full hover:bg-surface disabled:cursor-not-allowed transition-colors"
+            className={cx(PANEL_ACTION_BUTTON_CLASS, 'hover:bg-surface')}
             disabled={!selectedImage?.isReady}
             onClick={() => {
               void handleAutoAdjustments();
             }}
             data-tooltip={t('editor.adjustments.tooltips.autoAdjust')}
+            type="button"
           >
-            <Aperture size={18} />
+            <Aperture size={PANEL_ACTION_ICON_SIZE} />
           </button>
           <button
             className={cx(
-              'p-2 rounded-full transition-colors',
+              PANEL_ACTION_BUTTON_CLASS,
               isWaveformVisible ? 'bg-surface hover:bg-card-active' : 'hover:bg-surface',
             )}
             onClick={onToggleWaveform}
             data-tooltip={t('editor.adjustments.tooltips.toggleAnalytics')}
+            type="button"
           >
-            <ChartArea size={18} />
+            <ChartArea size={PANEL_ACTION_ICON_SIZE} />
           </button>
           <button
-            className="p-2 rounded-full hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className={cx(PANEL_ACTION_BUTTON_CLASS, 'hover:bg-surface')}
             disabled={!selectedImage}
             onClick={() => {
               handleResetAdjustments();
             }}
             data-tooltip={t('editor.adjustments.tooltips.resetAdjustments')}
+            type="button"
           >
-            <RotateCcw size={18} />
+            <RotateCcw size={PANEL_ACTION_ICON_SIZE} />
           </button>
         </div>
       </div>
 
       {selectedImage?.isRaw && (
-        <div
-          className="shrink-0 border-b border-surface px-4 py-3 space-y-2"
-          data-testid="raw-processing-mode-override-control"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <UiText as="div" variant={TextVariants.small} className="font-medium">
-                {t('editor.adjustments.rawProcessingModeOverride.label')}
-              </UiText>
-              <UiText as="div" variant={TextVariants.small} className="text-text-secondary">
-                {t('editor.adjustments.rawProcessingModeOverride.description')}
-              </UiText>
-            </div>
-            <Dropdown
-              className="w-44 shrink-0"
-              onChange={(mode) => {
-                void handleRawProcessingModeOverrideChange(mode);
-              }}
-              options={rawProcessingModeOverrideOptions}
-              value={adjustments.rawProcessingModeOverride ?? 'inherit'}
-            />
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <UiText as="div" variant={TextVariants.small} className="text-text-secondary">
-              {t('editor.adjustments.rawProcessingModeOverride.currentValue', {
-                mode: rawProcessingModeDisplay,
-              })}
-            </UiText>
-            <button
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-text-secondary transition-colors hover:text-text-primary"
-              onClick={() => {
-                setIsRawProcessingModeProvenanceVisible((previous) => !previous);
-              }}
-              type="button"
-            >
-              <Info size={12} />
-              {isRawProcessingModeProvenanceVisible
-                ? t('editor.adjustments.rawProcessingModeOverride.hideRecipeId')
-                : t('editor.adjustments.rawProcessingModeOverride.showRecipeId')}
-            </button>
-          </div>
-          {isRawProcessingModeProvenanceVisible ? (
-            <UiText as="div" variant={TextVariants.small} className="font-mono text-text-secondary">
-              {getRawProcessingModeProvenance(
-                adjustments.rawProcessingModeOverride ?? normalizeRawProcessingMode(appSettings?.rawProcessingMode),
-              )}
-            </UiText>
-          ) : null}
+        <div className="shrink-0 border-b border-surface px-3 py-2" data-testid="raw-processing-mode-override-control">
           <button
-            className="flex w-full items-center justify-center gap-2 rounded-md bg-surface px-3 py-2 text-sm font-medium hover:bg-card-active disabled:cursor-not-allowed disabled:opacity-60"
-            data-testid="raw-reconstruction-comparison-run"
-            disabled={isComparingRawReconstruction || !selectedImage.isReady}
+            aria-expanded={isRawProcessingControlsOpen}
+            className="flex min-h-8 w-full items-center justify-between gap-3 rounded-sm text-left transition-colors hover:text-text-primary"
             onClick={() => {
-              void handleCompareRawReconstructionModes();
+              setIsRawProcessingControlsOpen((previous) => !previous);
             }}
             type="button"
           >
-            <ScanSearch size={16} />
-            {isComparingRawReconstruction
-              ? t('editor.adjustments.rawReconstructionComparison.running')
-              : t('editor.adjustments.rawReconstructionComparison.action')}
+            <span className="min-w-0">
+              <UiText as="span" variant={TextVariants.small} className="block font-medium text-text-primary">
+                {t('editor.adjustments.rawProcessingModeOverride.label')}
+              </UiText>
+              <UiText as="span" variant={TextVariants.small} className="block truncate text-[11px] text-text-secondary">
+                {t('editor.adjustments.rawProcessingModeOverride.currentValue', {
+                  mode: rawProcessingModeDisplay,
+                })}
+              </UiText>
+            </span>
+            <ChevronDown
+              className={cx('shrink-0 text-accent/90 transition-transform duration-200', {
+                'rotate-180': isRawProcessingControlsOpen,
+              })}
+              size={16}
+            />
           </button>
-          {rawReconstructionComparison !== null && (
-            <div
-              className="space-y-2 rounded-md border border-surface bg-background/50 p-2"
-              data-crop-size={rawReconstructionComparison.cropSize}
-              data-testid="raw-reconstruction-comparison-result"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <UiText variant={TextVariants.small} className="font-medium">
-                  {t('editor.adjustments.rawReconstructionComparison.title')}
+
+          {isRawProcessingControlsOpen && (
+            <div className="space-y-2 pt-2">
+              <div className="flex items-start justify-between gap-2">
+                <UiText as="div" variant={TextVariants.small} className="min-w-0 text-[11px] text-text-secondary">
+                  {t('editor.adjustments.rawProcessingModeOverride.description')}
                 </UiText>
-                <UiText variant={TextVariants.small} className="font-mono text-text-secondary">
-                  {t('editor.adjustments.rawReconstructionComparison.cropSizeLabel', {
-                    size: rawReconstructionComparison.cropSize,
-                  })}
-                </UiText>
+                <Dropdown
+                  className="w-40 shrink-0"
+                  onChange={(mode) => {
+                    void handleRawProcessingModeOverrideChange(mode);
+                  }}
+                  options={rawProcessingModeOverrideOptions}
+                  value={adjustments.rawProcessingModeOverride ?? 'inherit'}
+                />
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                {rawReconstructionComparison.modes.map((mode) => (
-                  <div
-                    className="min-w-0 space-y-1"
-                    data-crop-hash={mode.cropHash}
-                    data-decode-ms={mode.decodeElapsedMs}
-                    data-mode={mode.mode}
-                    data-testid={`raw-reconstruction-comparison-mode-${mode.mode}`}
-                    key={mode.mode}
-                  >
-                    <img
-                      alt={t('editor.adjustments.rawReconstructionComparison.cropAlt', {
-                        mode: t(`settings.processing.rawModes.${mode.mode}.label`),
-                      })}
-                      className="aspect-square w-full rounded border border-surface object-cover"
-                      src={mode.cropDataUrl}
-                    />
-                    <UiText as="div" variant={TextVariants.small} className="truncate font-medium">
-                      {t(`settings.processing.rawModes.${mode.mode}.label`)}
+              <div className="flex items-center justify-end">
+                <button
+                  className="inline-flex items-center gap-1.5 text-[11px] font-medium text-text-secondary transition-colors hover:text-text-primary"
+                  onClick={() => {
+                    setIsRawProcessingModeProvenanceVisible((previous) => !previous);
+                  }}
+                  type="button"
+                >
+                  <Info size={12} />
+                  {isRawProcessingModeProvenanceVisible
+                    ? t('editor.adjustments.rawProcessingModeOverride.hideRecipeId')
+                    : t('editor.adjustments.rawProcessingModeOverride.showRecipeId')}
+                </button>
+              </div>
+              {isRawProcessingModeProvenanceVisible ? (
+                <UiText as="div" variant={TextVariants.small} className="font-mono text-[11px] text-text-secondary">
+                  {getRawProcessingModeProvenance(
+                    adjustments.rawProcessingModeOverride ?? normalizeRawProcessingMode(appSettings?.rawProcessingMode),
+                  )}
+                </UiText>
+              ) : null}
+              <button
+                className="flex min-h-8 w-full items-center justify-center gap-2 rounded-md bg-surface px-2.5 py-1.5 text-xs font-medium hover:bg-card-active disabled:cursor-not-allowed disabled:opacity-60"
+                data-testid="raw-reconstruction-comparison-run"
+                disabled={isComparingRawReconstruction || !selectedImage.isReady}
+                onClick={() => {
+                  void handleCompareRawReconstructionModes();
+                }}
+                type="button"
+              >
+                <ScanSearch size={14} />
+                {isComparingRawReconstruction
+                  ? t('editor.adjustments.rawReconstructionComparison.running')
+                  : t('editor.adjustments.rawReconstructionComparison.action')}
+              </button>
+              {rawReconstructionComparison !== null && (
+                <div
+                  className="space-y-2 rounded-md border border-surface bg-background/50 p-2"
+                  data-crop-size={rawReconstructionComparison.cropSize}
+                  data-testid="raw-reconstruction-comparison-result"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <UiText variant={TextVariants.small} className="font-medium">
+                      {t('editor.adjustments.rawReconstructionComparison.title')}
                     </UiText>
-                    <UiText as="div" variant={TextVariants.small} className="font-mono text-text-secondary">
-                      {t('editor.adjustments.rawReconstructionComparison.decodeMsLabel', {
-                        ms: mode.decodeElapsedMs,
+                    <UiText variant={TextVariants.small} className="font-mono text-text-secondary">
+                      {t('editor.adjustments.rawReconstructionComparison.cropSizeLabel', {
+                        size: rawReconstructionComparison.cropSize,
                       })}
-                    </UiText>
-                    <UiText as="div" variant={TextVariants.small} className="truncate font-mono text-text-secondary">
-                      {formatBytes(mode.estimatedMemoryBytes)}
                     </UiText>
                   </div>
-                ))}
-              </div>
-              <UiText as="div" variant={TextVariants.small} className="break-all font-mono text-text-secondary">
-                {rawReconstructionComparison.proofBoundary}
-              </UiText>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {rawReconstructionComparison.modes.map((mode) => (
+                      <div
+                        className="min-w-0 space-y-1"
+                        data-crop-hash={mode.cropHash}
+                        data-decode-ms={mode.decodeElapsedMs}
+                        data-mode={mode.mode}
+                        data-testid={`raw-reconstruction-comparison-mode-${mode.mode}`}
+                        key={mode.mode}
+                      >
+                        <img
+                          alt={t('editor.adjustments.rawReconstructionComparison.cropAlt', {
+                            mode: t(`settings.processing.rawModes.${mode.mode}.label`),
+                          })}
+                          className="aspect-square w-full rounded border border-surface object-cover"
+                          src={mode.cropDataUrl}
+                        />
+                        <UiText as="div" variant={TextVariants.small} className="truncate font-medium">
+                          {t(`settings.processing.rawModes.${mode.mode}.label`)}
+                        </UiText>
+                        <UiText as="div" variant={TextVariants.small} className="font-mono text-text-secondary">
+                          {t('editor.adjustments.rawReconstructionComparison.decodeMsLabel', {
+                            ms: mode.decodeElapsedMs,
+                          })}
+                        </UiText>
+                        <UiText
+                          as="div"
+                          variant={TextVariants.small}
+                          className="truncate font-mono text-text-secondary"
+                        >
+                          {formatBytes(mode.estimatedMemoryBytes)}
+                        </UiText>
+                      </div>
+                    ))}
+                  </div>
+                  <UiText as="div" variant={TextVariants.small} className="break-all font-mono text-text-secondary">
+                    {rawReconstructionComparison.proofBoundary}
+                  </UiText>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -547,7 +577,7 @@ export default function Controls() {
             transition={{ duration: isResizingWaveform ? 0 : 0.2, ease: 'easeOut' }}
             className="shrink-0 flex flex-col relative border-b border-surface overflow-hidden"
           >
-            <div className="grow w-full h-full p-4 pb-2 min-h-0">
+            <div className="grow w-full h-full px-3 pb-1.5 pt-2 min-h-0">
               <Waveform
                 waveformData={waveform || null}
                 histogram={histogram}
@@ -569,7 +599,7 @@ export default function Controls() {
         )}
       </AnimatePresence>
 
-      <div className="grow overflow-y-auto p-4 flex flex-col gap-2">
+      <div className="grow overflow-y-auto px-3 py-2 flex flex-col gap-1.5">
         {ADJUSTMENT_SECTION_NAMES.map((sectionName) => {
           const title = t(`editor.adjustments.sections.${sectionName}`, {
             defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS[sectionName],
