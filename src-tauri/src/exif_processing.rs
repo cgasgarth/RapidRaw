@@ -94,6 +94,76 @@ fn fmt_date_str(s: String) -> String {
     clean_creation_datetime_str(&s).to_string()
 }
 
+fn format_positive_ratio(num: u32, denom: u32) -> Option<String> {
+    if denom == 0 {
+        return None;
+    }
+
+    let parsed = num as f32 / denom as f32;
+    (parsed > 0.0).then(|| parsed.to_string())
+}
+
+fn merge_numeric_exif_value(map: &mut HashMap<String, String>, key: &str, value: Option<String>) {
+    if let Some(value) = value {
+        map.entry(key.to_string()).or_insert(value);
+    }
+}
+
+fn parse_positive_metadata_number(value: &str) -> Option<f32> {
+    let cleaned = value
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .replace(" mm", "")
+        .replace(" s", "")
+        .replace(" EV", "")
+        .replace("f/", "");
+
+    let parsed = cleaned.parse::<f32>().ok()?;
+    (parsed > 0.0).then_some(parsed)
+}
+
+fn is_positive_camera_field_value(key: &str, value: &str) -> bool {
+    match key {
+        "FNumber" | "ApertureValue" => parse_positive_metadata_number(value).is_some(),
+        "FocalLength" | "FocalLengthIn35mmFilm" => parse_positive_metadata_number(value).is_some(),
+        _ => true,
+    }
+}
+
+fn repair_raw_camera_metadata(
+    mut metadata: HashMap<String, String>,
+    extracted: &HashMap<String, String>,
+) -> (HashMap<String, String>, bool) {
+    let mut changed = false;
+
+    for key in [
+        "FNumber",
+        "ApertureValue",
+        "FocalLength",
+        "FocalLengthIn35mmFilm",
+    ] {
+        let keep_existing = metadata
+            .get(key)
+            .is_some_and(|value| is_positive_camera_field_value(key, value));
+        if keep_existing {
+            continue;
+        }
+
+        if let Some(extracted_value) = extracted
+            .get(key)
+            .filter(|value| is_positive_camera_field_value(key, value))
+        {
+            metadata.insert(key.to_string(), extracted_value.clone());
+            changed = true;
+        } else if metadata.remove(key).is_some() {
+            changed = true;
+        }
+    }
+
+    (metadata, changed)
+}
+
 fn normalize_creation_datetime(s: &str) -> Option<String> {
     let normalized = s.replace('T', " ");
     let (date, time) = normalized.split_once(' ')?;
@@ -286,25 +356,33 @@ pub fn extract_metadata(file_bytes: &[u8]) -> Option<HashMap<String, String>> {
                     if let exif::Value::Rational(ref v) = field.value
                         && !v.is_empty()
                     {
-                        let val = v[0].num as f32 / v[0].denom as f32;
-                        map.insert("FNumber".to_string(), format!("f/{}", val));
+                        merge_numeric_exif_value(
+                            &mut map,
+                            "FNumber",
+                            format_positive_ratio(v[0].num, v[0].denom)
+                                .map(|val| format!("f/{}", val)),
+                        );
                     }
                 }
                 exif::Tag::ApertureValue => {
                     if let exif::Value::Rational(ref v) = field.value
                         && !v.is_empty()
                     {
-                        let val = v[0].num as f32 / v[0].denom as f32;
-                        map.insert("ApertureValue".to_string(), format!("f/{}", val));
+                        merge_numeric_exif_value(
+                            &mut map,
+                            "ApertureValue",
+                            format_positive_ratio(v[0].num, v[0].denom)
+                                .map(|val| format!("f/{}", val)),
+                        );
                     }
                 }
                 exif::Tag::FocalLength => {
                     if let exif::Value::Rational(ref v) = field.value
                         && !v.is_empty()
+                        && let Some(val) = format_positive_ratio(v[0].num, v[0].denom)
                     {
-                        let val = v[0].num as f32 / v[0].denom as f32;
-                        map.insert("FocalLength".to_string(), val.to_string());
-                        map.insert("FocalLengthIn35mmFilm".to_string(), val.to_string());
+                        map.insert("FocalLength".to_string(), val.clone());
+                        map.insert("FocalLengthIn35mmFilm".to_string(), val);
                     }
                 }
                 exif::Tag::PhotographicSensitivity | exif::Tag::ISOSpeed => {
@@ -343,6 +421,51 @@ pub fn extract_metadata(file_bytes: &[u8]) -> Option<HashMap<String, String>> {
     }
 
     if !map.is_empty() {
+        if let Some(metadata) = read_raw_metadata(file_bytes) {
+            let exif = metadata.exif;
+            let make = metadata.make;
+            let model = metadata.model;
+
+            if !make.trim().is_empty() {
+                map.entry("Make".to_string()).or_insert(make);
+            }
+            if !model.trim().is_empty() {
+                map.entry("Model".to_string()).or_insert(model);
+            }
+            if map
+                .get("LensModel")
+                .is_none_or(|v| v.trim().is_empty() || v.trim() == "----")
+                && let Some(lens_desc) = &metadata.lens
+            {
+                map.insert("LensModel".to_string(), lens_desc.lens_model.clone());
+                map.entry("LensMake".to_string())
+                    .or_insert(lens_desc.lens_make.clone());
+            }
+
+            if !map.contains_key("FNumber")
+                && let Some(r) = exif.fnumber.as_ref().or(exif.aperture_value.as_ref())
+                && let Some(val) = format_positive_ratio(r.n, r.d)
+            {
+                map.insert("FNumber".to_string(), format!("f/{}", val));
+            }
+            if !map.contains_key("ApertureValue")
+                && let Some(r) = exif
+                    .aperture_value
+                    .as_ref()
+                    .or(exif.max_aperture_value.as_ref())
+                && let Some(val) = format_positive_ratio(r.n, r.d)
+            {
+                map.insert("ApertureValue".to_string(), format!("f/{}", val));
+            }
+            if !map.contains_key("FocalLength")
+                && let Some(r) = exif.focal_length.as_ref()
+                && let Some(val) = format_positive_ratio(r.n, r.d)
+            {
+                map.insert("FocalLength".to_string(), val.clone());
+                map.insert("FocalLengthIn35mmFilm".to_string(), val);
+            }
+        }
+
         return Some(map);
     }
 
@@ -444,18 +567,22 @@ pub fn extract_metadata(file_bytes: &[u8]) -> Option<HashMap<String, String>> {
         insert_if_present("Orientation", v.to_string());
     }
 
-    if let Some(r) = exif.fnumber {
-        let val = fmt_rat(&r);
+    if let Some(r) = exif.fnumber
+        && let Some(val) = format_positive_ratio(r.n, r.d)
+    {
         insert_if_present("FNumber", format!("f/{}", val));
     }
 
-    if let Some(r) = exif.aperture_value {
-        let val = fmt_rat(&r);
+    if let Some(r) = exif.aperture_value
+        && let Some(val) = format_positive_ratio(r.n, r.d)
+    {
         insert_if_present("ApertureValue", format!("f/{}", val));
     }
 
-    if let Some(r) = exif.max_aperture_value {
-        insert_if_present("MaxApertureValue", fmt_rat(&r).to_string());
+    if let Some(r) = exif.max_aperture_value
+        && let Some(val) = format_positive_ratio(r.n, r.d)
+    {
+        insert_if_present("MaxApertureValue", val);
     }
 
     if let Some(r) = exif.exposure_time {
@@ -490,10 +617,11 @@ pub fn extract_metadata(file_bytes: &[u8]) -> Option<HashMap<String, String>> {
         insert_if_present("SensitivityType", v.to_string());
     }
 
-    if let Some(r) = exif.focal_length {
-        let val = fmt_rat(&r);
-        insert_if_present("FocalLength", val.to_string());
-        insert_if_present("FocalLengthIn35mmFilm", val.to_string());
+    if let Some(r) = exif.focal_length
+        && let Some(val) = format_positive_ratio(r.n, r.d)
+    {
+        insert_if_present("FocalLength", val.clone());
+        insert_if_present("FocalLengthIn35mmFilm", val);
     }
 
     if let Some(r) = exif.exposure_bias {
@@ -1166,7 +1294,19 @@ pub fn read_exif_data_from_bytes(path: &str, file_bytes: &[u8]) -> HashMap<Strin
 pub fn read_exif_data(path: &str, file_bytes: &[u8]) -> HashMap<String, String> {
     let source_path = Path::new(path);
     if let Some(sidecar_exif) = read_rrexif_sidecar(source_path) {
-        return sidecar_exif;
+        if is_raw_file(path) {
+            let extracted_exif = read_exif_data_from_bytes(path, file_bytes);
+            let (repaired_exif, changed) =
+                repair_raw_camera_metadata(sidecar_exif, &extracted_exif);
+            if changed {
+                let mut metadata = load_primary_metadata(source_path);
+                metadata.exif = Some(repaired_exif.clone());
+                let _ = save_primary_metadata(source_path, &metadata);
+            }
+            return repaired_exif;
+        } else {
+            return sidecar_exif;
+        }
     }
 
     let exif_map = read_exif_data_from_bytes(path, file_bytes);
@@ -1236,6 +1376,7 @@ pub fn write_rrexif_sidecar(source_path_str: &str, target_image_path: &Path) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     #[test]
     fn save_sidecar_metadata_atomic_roundtrips_json() {
@@ -1280,5 +1421,47 @@ mod tests {
 
         assert!(err.contains("Failed to write"));
         assert!(directory_path.is_dir());
+    }
+
+    #[test]
+    fn alaska_sony_arw_metadata_omits_zero_placeholders() {
+        let path = Path::new("/Users/cgas/Pictures/Capture One/Alaska/_DSC7513.ARW");
+        if !path.exists() {
+            eprintln!(
+                "skipping Alaska Sony ARW metadata regression: missing {}",
+                path.display()
+            );
+            return;
+        }
+
+        let bytes = fs::read(path).expect("read private Alaska ARW");
+        let metadata = read_exif_data(path.to_string_lossy().as_ref(), &bytes);
+
+        assert_ne!(metadata.get("FNumber").map(String::as_str), Some("f/0"));
+        assert_ne!(metadata.get("FocalLength").map(String::as_str), Some("0"));
+        assert_ne!(
+            metadata.get("FocalLengthIn35mmFilm").map(String::as_str),
+            Some("unknown mm")
+        );
+
+        if let Some(f_number) = metadata.get("FNumber") {
+            let parsed_f_number = f_number
+                .trim_start_matches("f/")
+                .parse::<f32>()
+                .expect("FNumber should parse as a positive number");
+            assert!(parsed_f_number > 0.0);
+        }
+        if let Some(focal_length) = metadata.get("FocalLength") {
+            let parsed_focal_length = focal_length
+                .parse::<f32>()
+                .expect("FocalLength should parse as a positive number");
+            assert!(parsed_focal_length > 0.0);
+        }
+        if let Some(focal_length_35mm) = metadata.get("FocalLengthIn35mmFilm") {
+            let parsed_focal_length_35mm = focal_length_35mm
+                .parse::<f32>()
+                .expect("FocalLengthIn35mmFilm should parse as a positive number");
+            assert!(parsed_focal_length_35mm > 0.0);
+        }
     }
 }
