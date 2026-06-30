@@ -9,6 +9,7 @@
     "export": "applySelectiveColorToRgbPixel",
     "preview": "applySelectiveColorToRgbPixel"
   },
+  "proofLevel": "synthetic_shared_preview_export_match",
   "previewExportMaxDelta": 0,
   "previewHash": "sha256:9df9918da683bd5913c7b27b3c4d12902569310f928cc426552dfb25dda8fb60",
   "runtimeStatus": "synthetic_shared_pixel_function_preview_export_match",

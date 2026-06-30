@@ -12,6 +12,7 @@ import {
   type BasicToneCommandEnvelope,
 } from '../../../src/utils/basicToneCommandBridge.ts';
 import { pushEditHistoryEntry } from '../../../src/utils/editHistory.ts';
+import { proofContractSchema } from '../../../src/schemas/proofLevelSemanticsSchemas.ts';
 
 const pixelSchema = z.tuple([z.number().min(0).max(1), z.number().min(0).max(1), z.number().min(0).max(1)]);
 const REPORT_PATH = 'docs/validation/command-replay-render-proof-2026-06-20.json';
@@ -33,6 +34,7 @@ const renderReportSchema = z
         preview: z.literal('renderBasicTone'),
       })
       .strict(),
+    proofLevel: z.literal('synthetic_shared_preview_export_match'),
     previewExportMaxDelta: z.literal(0),
     schemaVersion: z.literal(1),
     runtimeStatus: z.literal('synthetic_shared_renderer_preview_export_match'),
@@ -143,11 +145,13 @@ const report = renderReportSchema.parse({
     export: 'renderBasicTone',
     preview: 'renderBasicTone',
   },
+  proofLevel: 'synthetic_shared_preview_export_match',
   previewExportMaxDelta,
   schemaVersion: 1,
   runtimeStatus: 'synthetic_shared_renderer_preview_export_match',
   validationMode: 'typed_command_replay_golden_render',
 });
+proofContractSchema.parse(report);
 
 const reportText = `${JSON.stringify(report, null, 2)}\n`;
 if (UPDATE_REPORT) {

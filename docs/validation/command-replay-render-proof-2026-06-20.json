@@ -10,6 +10,7 @@
     "export": "renderBasicTone",
     "preview": "renderBasicTone"
   },
+  "proofLevel": "synthetic_shared_preview_export_match",
   "previewExportMaxDelta": 0,
   "schemaVersion": 1,
   "runtimeStatus": "synthetic_shared_renderer_preview_export_match",

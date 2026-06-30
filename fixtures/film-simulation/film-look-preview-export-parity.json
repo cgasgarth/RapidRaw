@@ -50,6 +50,7 @@
     "export": "applySyntheticFilmLook",
     "preview": "applySyntheticFilmLook"
   },
+  "proofLevel": "synthetic_shared_preview_export_match",
   "runtimeStatus": "synthetic_shared_renderer_preview_export_match",
   "generatedFrom": "tests/integration/checks/check-film-look-preview-export-parity.ts",
   "version": 1

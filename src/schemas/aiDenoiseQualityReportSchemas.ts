@@ -1,11 +1,20 @@
 import { z } from 'zod';
 
+import { proofContractSchema } from './proofLevelSemanticsSchemas.ts';
+
 const hashSchema = z.string().regex(/^[a-f0-9]{64}$/u);
 const namespacedHashSchema = z.string().regex(/^(fnv1a32|sha256):[a-f0-9]+$/u);
 const artifactKindSchema = z.enum(['before_crop', 'after_crop', 'diff_heatmap', 'contact_sheet', 'metric_report']);
 const sourceKindSchema = z.enum(['public_raw', 'public_real_derived_crop', 'private_raw', 'synthetic_control']);
 const executionStatusSchema = z.enum(['applied_nind_runtime', 'unavailable_provider', 'dry_run_only', 'schema_only']);
 const closureStatusSchema = z.enum(['harness_only', 'eligible_real_run']);
+const doesNotProveSchema = z.enum([
+  'full_quality_closure',
+  'independent_preview_export_paths',
+  'provider_availability',
+  'real_raw_quality',
+  'two_real_derived_nind_runs',
+]);
 
 const metricSchema = z
   .object({
@@ -59,17 +68,53 @@ const cropSchema = z
 
 export const aiDenoiseQualityReportSchema = z
   .object({
+    doesNotProve: z.array(doesNotProveSchema).min(5),
     generatedAt: z.iso.datetime({ offset: true }),
     issue: z.literal(1267),
     limitation: z.string().trim().min(1),
     minEligibleRealRunsRequired: z.literal(2),
+    proofEntrypoints: z
+      .object({
+        report: z.literal('check-ai-denoise-quality-proof'),
+        runtime: z.literal('ai_processing::run_ai_denoise'),
+      })
+      .strict(),
     proofHash: hashSchema,
+    proofLevel: z.literal('runtime_quality_harness'),
+    runtimeStatus: z.literal('synthetic_runtime_harness_only'),
     schemaVersion: z.literal(1),
     status: closureStatusSchema,
     validationCrops: z.array(cropSchema).min(1),
   })
   .strict()
   .superRefine((report, context) => {
+    const contract = proofContractSchema.safeParse(report);
+    if (!contract.success) {
+      for (const issue of contract.error.issues) {
+        context.addIssue({
+          code: 'custom',
+          message: issue.message,
+          path: issue.path,
+        });
+      }
+    }
+
+    for (const nonClaim of [
+      'full_quality_closure',
+      'independent_preview_export_paths',
+      'provider_availability',
+      'real_raw_quality',
+      'two_real_derived_nind_runs',
+    ] as const) {
+      if (!report.doesNotProve.includes(nonClaim)) {
+        context.addIssue({
+          code: 'custom',
+          message: `AI denoise quality report must explicitly avoid claiming ${nonClaim}.`,
+          path: ['doesNotProve'],
+        });
+      }
+    }
+
     const eligibleRuns = report.validationCrops.filter(isEligibleRealRun);
     if (report.status === 'eligible_real_run' && eligibleRuns.length < report.minEligibleRealRunsRequired) {
       context.addIssue({

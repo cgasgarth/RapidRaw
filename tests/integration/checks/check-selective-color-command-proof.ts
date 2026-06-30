@@ -30,6 +30,7 @@ import {
   selectiveColorCommandEnvelopeSchema,
 } from '../../../src/utils/selectiveColorCommandBridge.ts';
 import { applySelectiveColorToRgbPixel, type RgbPixel } from '../../../src/utils/selectiveColorRuntime.ts';
+import { proofContractSchema } from '../../../src/schemas/proofLevelSemanticsSchemas.ts';
 
 const REPORT_PATH = 'docs/validation/selective-color-command-proof-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');
@@ -58,6 +59,7 @@ const reportSchema = z
         preview: z.literal('applySelectiveColorToRgbPixel'),
       })
       .strict(),
+    proofLevel: z.literal('synthetic_shared_preview_export_match'),
     previewExportMaxDelta: z.literal(0),
     previewHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
     runtimeStatus: z.literal('synthetic_shared_pixel_function_preview_export_match'),
@@ -295,6 +297,7 @@ const report = reportSchema.parse({
     export: 'applySelectiveColorToRgbPixel',
     preview: 'applySelectiveColorToRgbPixel',
   },
+  proofLevel: 'synthetic_shared_preview_export_match',
   previewExportMaxDelta,
   previewHash: hashJson(previewPixels),
   runtimeStatus: 'synthetic_shared_pixel_function_preview_export_match',
@@ -317,6 +320,7 @@ const report = reportSchema.parse({
   },
   validationMode: 'selective_color_command_preview_export_sidecar_synthetic_proof',
 });
+proofContractSchema.parse(report);
 
 const reportText = `${JSON.stringify(report, null, 2)}\n`;
 if (UPDATE_REPORT) {
