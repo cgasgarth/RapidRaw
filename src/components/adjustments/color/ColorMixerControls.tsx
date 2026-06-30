@@ -374,15 +374,17 @@ export const ColorMixerControls = ({
                 : t('adjustments.color.blackWhiteMixer.disabled')}
             </button>
           </div>
-          <div className="mb-3 flex justify-between px-1">
+          <div className="mb-2 grid grid-cols-6 gap-1 px-1">
             {HSL_COLORS.map(({ name, color, label }) => (
               <ColorSwatch
                 ariaLabel={t('adjustments.color.blackWhiteMixer.ariaSelectChannel', { name: label })}
                 color={color}
                 isActive={activeColor === name}
                 key={name}
+                label={label}
                 name={name}
                 onClick={setActiveColor}
+                size="sm"
               />
             ))}
           </div>
@@ -558,29 +560,44 @@ export const ColorMixerControls = ({
         <UiText variant={TextVariants.heading} className="mb-3">
           {t('adjustments.color.colorMixer')}
         </UiText>
+        <div className="mb-2 grid grid-cols-6 gap-1 px-1">
+          {HSL_COLORS.map(({ name, color, label }) => (
+            <ColorSwatch
+              color={color}
+              isActive={activeColor === name}
+              key={name}
+              label={label}
+              name={name}
+              onClick={setActiveColor}
+              size="sm"
+              testId={`selective-color-range-${name}`}
+              ariaLabel={t('adjustments.color.ariaSelectColor', { name: label })}
+            />
+          ))}
+        </div>
         <div
-          className="mb-3 grid grid-cols-[1fr_auto] items-center gap-2 rounded-md border border-surface bg-bg-primary px-2 py-1.5 text-xs"
+          className="mb-2 grid grid-cols-[1fr_auto] items-center gap-2 rounded-md border border-surface bg-bg-primary px-2 py-1.5 text-xs"
           data-testid="selective-color-range-summary"
         >
-          <span className="truncate font-medium text-text-primary" data-testid="selective-color-range-summary-label">
+          <span className="truncate font-semibold text-text-primary" data-testid="selective-color-range-summary-label">
             {activeSelectiveColorRangeLabel}
           </span>
-          <span className="flex items-center gap-2 text-text-tertiary">
-            <span>{t('adjustments.color.hue')}</span>
+          <span className="flex items-center justify-end gap-2 text-text-tertiary">
             <span className="tabular-nums text-text-secondary" data-testid="selective-color-range-summary-center">
               {activeSelectiveColorRangeCenter}
             </span>
+            <span aria-hidden="true">/</span>
             <span className="tabular-nums text-text-secondary" data-testid="selective-color-range-summary-width">
               {activeSelectiveColorRangeWidth}
             </span>
           </span>
-          <span className="text-text-tertiary">{t('adjustments.color.activeRangeAdjustedHue')}</span>
-          <span className="text-right tabular-nums text-text-secondary" data-testid="selective-color-adjusted-hue">
-            {activeSelectiveColorAdjustedHue}
-          </span>
           <span className="text-text-tertiary">{t('adjustments.color.activeRangeDeltas')}</span>
           <span className="text-right tabular-nums text-text-secondary" data-testid="selective-color-hsl-deltas">
             {activeSelectiveColorDeltaSummary}
+          </span>
+          <span className="text-text-tertiary">{t('adjustments.color.activeRangeAdjustedHue')}</span>
+          <span className="text-right tabular-nums text-text-secondary" data-testid="selective-color-adjusted-hue">
+            {activeSelectiveColorAdjustedHue}
           </span>
           <span className="text-text-tertiary">{t('adjustments.color.previewMode')}</span>
           <span className="text-right tabular-nums text-text-secondary" data-testid="selective-color-preview-mode">
@@ -595,7 +612,7 @@ export const ColorMixerControls = ({
           </span>
           <button
             aria-pressed={selectiveColorPreviewMode === 'mask'}
-            className={`col-span-2 inline-flex h-7 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors ${
+            className={`inline-flex h-7 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors ${
               selectiveColorPreviewMode === 'mask'
                 ? 'border-accent bg-accent/10 text-text-primary'
                 : 'border-surface bg-bg-secondary text-text-secondary hover:border-accent hover:text-text-primary'
@@ -608,7 +625,7 @@ export const ColorMixerControls = ({
           </button>
           <button
             aria-label={t('adjustments.color.resetActiveRange')}
-            className="col-span-2 inline-flex h-7 items-center justify-center gap-1 rounded-md border border-surface bg-bg-secondary px-2 text-xs font-medium text-text-secondary transition-colors hover:border-accent hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-surface bg-bg-secondary px-2 text-xs font-medium text-text-secondary transition-colors hover:border-accent hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
             data-testid="selective-color-reset-active-range"
             disabled={!isActiveSelectiveColorAdjusted}
             onClick={resetActiveSelectiveColorRange}
@@ -618,85 +635,77 @@ export const ColorMixerControls = ({
             <span>{t('adjustments.color.resetActiveRange')}</span>
           </button>
         </div>
-        <div
-          className="mb-3 grid gap-2 rounded-md border border-surface bg-bg-primary p-2"
-          data-testid="selective-color-range-shape-controls"
-        >
-          <AdjustmentSlider
-            defaultValue={Math.round(activeSelectiveColorRange.centerHueDegrees)}
-            label={t('adjustments.color.rangeCenter')}
-            max={359}
-            min={0}
-            onDragStateChange={onDragStateChange}
-            onValueChange={(value) => {
-              handleSelectiveColorRangeControlChange('centerHueDegrees', value);
-            }}
-            step={1}
-            suffix="°"
-            value={Math.round(activeSelectiveColorRangeControl.centerHueDegrees)}
-          />
-          <AdjustmentSlider
-            defaultValue={Math.round(activeSelectiveColorRange.widthDegrees)}
-            label={t('adjustments.color.rangeWidth')}
-            max={180}
-            min={10}
-            onDragStateChange={onDragStateChange}
-            onValueChange={(value) => {
-              handleSelectiveColorRangeControlChange('widthDegrees', value);
-            }}
-            step={1}
-            suffix="°"
-            value={Math.round(activeSelectiveColorRangeControl.widthDegrees)}
-          />
-          <AdjustmentSlider
-            defaultValue={15}
-            label={t('adjustments.color.falloffSmoothness')}
-            max={40}
-            min={3}
-            onDragStateChange={onDragStateChange}
-            onValueChange={(value) => {
-              handleSelectiveColorRangeControlChange('falloffSmoothness', value / 10);
-            }}
-            step={1}
-            value={Math.round(activeSelectiveColorRangeControl.falloffSmoothness * 10)}
-          />
-        </div>
-        <div className="mb-3 grid grid-cols-3 gap-2 rounded-md border border-surface bg-bg-primary p-2 text-[11px]">
-          <div className="grid gap-1" data-testid="selective-color-source-swatch">
-            <span className="text-text-tertiary">{activeSelectiveColorRangeLabel}</span>
-            <span
-              className="h-8 rounded border border-surface"
-              style={{ backgroundColor: rgbPixelToCssColor(activeSelectiveColorSamplePixel) }}
+        <details className="mb-2 rounded-md border border-surface bg-bg-primary text-xs">
+          <summary className="flex cursor-pointer items-center justify-between gap-2 px-2 py-1.5 font-medium text-text-secondary">
+            <span>{t('adjustments.color.rangeCenter')}</span>
+            <span className="tabular-nums text-text-tertiary">
+              {activeSelectiveColorRangeCenter} / {activeSelectiveColorRangeWidth}
+            </span>
+          </summary>
+          <div className="grid gap-2 border-t border-surface p-2" data-testid="selective-color-range-shape-controls">
+            <AdjustmentSlider
+              defaultValue={Math.round(activeSelectiveColorRange.centerHueDegrees)}
+              label={t('adjustments.color.rangeCenter')}
+              max={359}
+              min={0}
+              onDragStateChange={onDragStateChange}
+              onValueChange={(value) => {
+                handleSelectiveColorRangeControlChange('centerHueDegrees', value);
+              }}
+              step={1}
+              suffix="°"
+              value={Math.round(activeSelectiveColorRangeControl.centerHueDegrees)}
+            />
+            <AdjustmentSlider
+              defaultValue={Math.round(activeSelectiveColorRange.widthDegrees)}
+              label={t('adjustments.color.rangeWidth')}
+              max={180}
+              min={10}
+              onDragStateChange={onDragStateChange}
+              onValueChange={(value) => {
+                handleSelectiveColorRangeControlChange('widthDegrees', value);
+              }}
+              step={1}
+              suffix="°"
+              value={Math.round(activeSelectiveColorRangeControl.widthDegrees)}
+            />
+            <AdjustmentSlider
+              defaultValue={15}
+              label={t('adjustments.color.falloffSmoothness')}
+              max={40}
+              min={3}
+              onDragStateChange={onDragStateChange}
+              onValueChange={(value) => {
+                handleSelectiveColorRangeControlChange('falloffSmoothness', value / 10);
+              }}
+              step={1}
+              value={Math.round(activeSelectiveColorRangeControl.falloffSmoothness * 10)}
             />
           </div>
-          <div className="grid gap-1" data-testid="selective-color-mask-swatch">
-            <span className="text-text-tertiary">{t('adjustments.color.maskPreviewEnabled')}</span>
-            <span
-              className="h-8 rounded border border-surface"
-              style={{ backgroundColor: rgbPixelToCssColor(activeSelectiveColorMaskPreview) }}
-            />
+          <div className="grid grid-cols-3 gap-2 border-t border-surface p-2 text-[10px]">
+            <div className="grid gap-1" data-testid="selective-color-source-swatch">
+              <span className="truncate text-text-tertiary">{activeSelectiveColorRangeLabel}</span>
+              <span
+                className="h-5 rounded border border-surface"
+                style={{ backgroundColor: rgbPixelToCssColor(activeSelectiveColorSamplePixel) }}
+              />
+            </div>
+            <div className="grid gap-1" data-testid="selective-color-mask-swatch">
+              <span className="truncate text-text-tertiary">{t('adjustments.color.maskPreviewEnabled')}</span>
+              <span
+                className="h-5 rounded border border-surface"
+                style={{ backgroundColor: rgbPixelToCssColor(activeSelectiveColorMaskPreview) }}
+              />
+            </div>
+            <div className="grid gap-1" data-testid="selective-color-apply-swatch">
+              <span className="truncate text-text-tertiary">{t('adjustments.color.adjustedPreviewEnabled')}</span>
+              <span
+                className="h-5 rounded border border-surface"
+                style={{ backgroundColor: rgbPixelToCssColor(activeSelectiveColorAppliedPreview.outputRgb) }}
+              />
+            </div>
           </div>
-          <div className="grid gap-1" data-testid="selective-color-apply-swatch">
-            <span className="text-text-tertiary">{t('adjustments.color.adjustedPreviewEnabled')}</span>
-            <span
-              className="h-8 rounded border border-surface"
-              style={{ backgroundColor: rgbPixelToCssColor(activeSelectiveColorAppliedPreview.outputRgb) }}
-            />
-          </div>
-        </div>
-        <div className="flex justify-between mb-4 px-1">
-          {HSL_COLORS.map(({ name, color, label }) => (
-            <ColorSwatch
-              color={color}
-              isActive={activeColor === name}
-              key={name}
-              name={name}
-              onClick={setActiveColor}
-              testId={`selective-color-range-${name}`}
-              ariaLabel={t('adjustments.color.ariaSelectColor', { name: label })}
-            />
-          ))}
-        </div>
+        </details>
         <AdjustmentSlider
           label={t('adjustments.color.hue')}
           max={100}
