@@ -3,8 +3,8 @@
 import { access, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import { parseDeblurRealRawQualityManifest } from '../../../src/schemas/deblurRealRawQualitySchemas.ts';
-import { parsePrivateRawEvidenceLedger } from '../../../src/schemas/privateRawEvidenceSchemas.ts';
+import { parseDeblurRealRawQualityManifest } from '../../../../src/schemas/deblurRealRawQualitySchemas.ts';
+import { parsePrivateRawEvidenceLedger } from '../../../../src/schemas/privateRawEvidenceSchemas.ts';
 
 const manifest = parseDeblurRealRawQualityManifest(
   JSON.parse(await readFile('fixtures/detail/deblur/deblur-real-raw-quality.json', 'utf8')),

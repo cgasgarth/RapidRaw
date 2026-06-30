@@ -29,7 +29,7 @@ const CONTRACT_COMMANDS = [
   ['bun', 'tests/integration/checks/check-rawengine-app-server-host.ts'],
   ['bun', 'tests/integration/checks/computational-merge/check-computational-merge-app-server-routes.ts'],
   ['bun', 'tests/integration/checks/computational-merge/check-computational-merge-ui-route-badges.ts'],
-  ['bun', 'tests/integration/checks/check-deblur-app-server-tool.ts'],
+  ['bun', 'tests/integration/checks/deblur/check-deblur-app-server-tool.ts'],
   ['bun', 'tests/integration/checks/focus/check-focus-ui-api.ts'],
   ['bun', 'tests/integration/checks/focus/check-focus-ui-runtime-bridge.ts'],
   ['bun', 'tests/integration/checks/hdr/check-hdr-ui-api.ts'],

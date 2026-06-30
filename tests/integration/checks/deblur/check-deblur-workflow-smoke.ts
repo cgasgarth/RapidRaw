@@ -11,10 +11,10 @@ import {
   detailDeblurUiControlsV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
   toDetailDeblurControlsV1,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { readBoundedStream, writeBoundedOutput } from '../../../scripts/lib/ci/compact-output.ts';
-import { parseDeblurWorkflowReport } from '../../../src/schemas/deblurWorkflowSchemas.ts';
-import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../../src/utils/adjustments.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { readBoundedStream, writeBoundedOutput } from '../../../../scripts/lib/ci/compact-output.ts';
+import { parseDeblurWorkflowReport } from '../../../../src/schemas/deblurWorkflowSchemas.ts';
+import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../../../src/utils/adjustments.ts';
 
 const REPORT_PATH = resolve('src-tauri/target/rawengine-deblur-workflow-report.json');
 const ARTIFACT_PATH = resolve('src-tauri/target/rawengine-deblur-workflow-preview.png');

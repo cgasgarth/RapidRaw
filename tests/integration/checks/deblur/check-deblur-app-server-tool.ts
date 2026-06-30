@@ -6,15 +6,15 @@ import {
   detailDeblurDryRunResultV1Schema,
   detailDeblurRuntimeStateV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   DetailAppServerCommandType,
   DetailAppServerExecutionMode,
   DetailAppServerRouteStatus,
   DetailAppServerToolName,
-} from '../../../src/utils/detailAppServerRouteIds.ts';
-import { DETAIL_APP_SERVER_ROUTES } from '../../../src/utils/detailAppServerRoutes.ts';
-import { buildRawEngineAppServerRouteCatalog } from '../../../src/utils/rawEngineAppServerHost.ts';
+} from '../../../../src/utils/detailAppServerRouteIds.ts';
+import { DETAIL_APP_SERVER_ROUTES } from '../../../../src/utils/detailAppServerRoutes.ts';
+import { buildRawEngineAppServerRouteCatalog } from '../../../../src/utils/rawEngineAppServerHost.ts';
 
 const failures: string[] = [];
 const routesByToolName = new Map(DETAIL_APP_SERVER_ROUTES.map((route) => [route.toolName, route]));
