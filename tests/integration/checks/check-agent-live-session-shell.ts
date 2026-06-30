@@ -12,7 +12,7 @@ import { ToolType } from '../../../src/components/panel/right/layers/Masks.tsx';
 import {
   type AgentChatTranscript,
   agentChatTranscriptSchema,
-} from '../../../src/schemas/agentChatTranscriptSchemas.ts';
+} from '../../../src/schemas/agent/agentChatTranscriptSchemas.ts';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import { agentChatTranscriptFixture } from '../../../src/utils/agentChatTranscriptFixture.ts';

@@ -27,7 +27,7 @@ import type {
   AgentReviewHandoff,
   AgentSelectedFrameScope,
   AgentSelectedImagePreviewLoopReview,
-} from '../../../../schemas/agentChatTranscriptSchemas';
+} from '../../../../schemas/agent/agentChatTranscriptSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { buildAgentAppServerToolReadinessSummary } from '../../../../utils/agentAppServerToolReadiness';
 import { runAgentBoundedEditPlannerLoop } from '../../../../utils/agentBoundedEditPlannerLoop';

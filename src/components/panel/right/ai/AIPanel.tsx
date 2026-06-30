@@ -47,7 +47,7 @@ import { useContextMenu } from '../../../../context/ContextMenuContext';
 import { useAiMasking } from '../../../../hooks/ai/useAiMasking';
 import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
 import { useManagedFocus } from '../../../../hooks/ui/useManagedFocus';
-import type { AgentChatTranscript } from '../../../../schemas/agentChatTranscriptSchemas';
+import type { AgentChatTranscript } from '../../../../schemas/agent/agentChatTranscriptSchemas';
 import {
   AiProviderId,
   type AiProviderId as AiProviderIdType,

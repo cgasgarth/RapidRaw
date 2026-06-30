@@ -20,7 +20,7 @@ import {
   rawEngineAppServerLifecycleReplaySchema,
   rawEngineAppServerRouteCatalogReplaySchema,
   rawEngineAppServerSupervisorStateSchema,
-} from '../../../src/schemas/agentRuntimeSchemas.ts';
+} from '../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import {
   assertRawEngineAppServerLifecycleReady,
   buildRawEngineAppServerCapabilitiesReplay,
@@ -530,7 +530,7 @@ if (
 
 const source = [
   'src/utils/rawEngineAppServerHost.ts',
-  'src/schemas/agentRuntimeSchemas.ts',
+  'src/schemas/agent/agentRuntimeSchemas.ts',
   'docs/agent/app-server-host-skeleton-2026-06-17.md',
 ]
   .map((file) => readFileSync(file, 'utf8'))

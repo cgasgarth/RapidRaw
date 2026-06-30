@@ -9,7 +9,7 @@ import {
   RawEngineAppServerSupervisorEventKind,
   RawEngineAppServerSupervisorPhase,
   rawEngineAppServerSupervisorStateSchema,
-} from '../../../src/schemas/agentRuntimeSchemas.ts';
+} from '../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import {

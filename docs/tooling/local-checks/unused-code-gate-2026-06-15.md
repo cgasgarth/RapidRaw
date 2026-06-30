@@ -45,7 +45,7 @@ Remaining cleanup candidates after the split:
 - App runtime files that may need entrypoint modeling or removal:
   - `src/validation/visual/main.tsx`
   - `src/validation/visual/VisualSmokeApp.tsx`
-  - `src/schemas/agentRuntimeSchemas.ts`
+  - `src/schemas/agent/agentRuntimeSchemas.ts`
 - Tooling scripts/configs that may need explicit entry modeling:
   - `i18next.config.ts`
   - `tests/integration/checks/check-agent-approval-boundaries.ts`

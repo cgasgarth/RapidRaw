@@ -3,7 +3,7 @@
 import { z } from 'zod';
 
 import { ToolType } from '../../../src/components/panel/right/layers/Masks.tsx';
-import { RawEngineAppServerHostToolName } from '../../../src/schemas/agentRuntimeSchemas.ts';
+import { RawEngineAppServerHostToolName } from '../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import {
