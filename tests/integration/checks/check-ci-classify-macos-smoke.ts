@@ -331,7 +331,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     'check:sr-synthetic-smoke',
     new Set(['bun tests/integration/checks/super-resolution/check-super-resolution-synthetic-smoke.ts']),
   ],
-  ['check:tauri-schema-validation', new Set(['bun tests/integration/checks/check-tauri-schema-validation.ts'])],
+  ['check:tauri-schema-validation', new Set(['bun tests/integration/checks/tauri/check-tauri-schema-validation.ts'])],
   ['check:wavelet-detail', new Set(['bun tests/integration/checks/check-wavelet-detail-fixtures.ts'])],
   ['check:workspace-layouts', new Set(['bun tests/integration/checks/check-workspace-layout-fixtures.ts'])],
 ]);

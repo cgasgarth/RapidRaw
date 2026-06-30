@@ -9,7 +9,7 @@ import {
   rawEngineLocalAppServerImageMetadataResultV1Schema,
   rawEngineLocalAppServerProjectMetadataResultV1Schema,
   rawEngineLocalAppServerSelectedImagesResultV1Schema,
-} from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
+} from '../../../../packages/rawengine-schema/src/localAppServerBridge.ts';
 import {
   aiEnhancementApplyResultV1Schema,
   aiEnhancementCommandEnvelopeV1Schema,
@@ -17,18 +17,18 @@ import {
   rawEngineToolRegistryV1Schema,
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   sampleAiEnhancementApplyCommandEnvelopeV1,
   sampleAiEnhancementCommandEnvelopeV1,
   sampleRawEngineSceneColorPipelineV1,
   sampleToneColorApplyCommandEnvelopeV1,
   sampleToneColorCommandEnvelopeV1,
-} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+} from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
 import {
   buildSelectiveColorCommandEnvelope,
   buildSelectiveColorImageCommandContext,
-} from '../../../src/utils/selectiveColorCommandBridge.ts';
+} from '../../../../src/utils/selectiveColorCommandBridge.ts';
 
 const failures: string[] = [];
 const bridge = createRawEngineLocalAppServerBridge();
