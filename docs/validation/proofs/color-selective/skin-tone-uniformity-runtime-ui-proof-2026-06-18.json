@@ -65,7 +65,7 @@
       "Experimental skin-tone uniformity command: bounded runtime proof with private RAW preview/export coverage; no Capture One equivalence or measured portrait accuracy claim."
     ]
   },
-  "fixturePath": "fixtures/color/skin-tone-uniformity-fixtures.json",
+  "fixturePath": "fixtures/color/selective-color/skin-tone-uniformity-fixtures.json",
   "issue": 1263,
   "schemaVersion": 1,
   "validationMode": "skin_tone_uniformity_runtime_and_ui_artifact",

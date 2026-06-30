@@ -61,7 +61,7 @@
       "uiStatus": "existing_control_surface_not_retested"
     }
   ],
-  "fixturePath": "fixtures/color/color-balance-rgb.json",
+  "fixturePath": "fixtures/color/adjustments/color-balance-rgb.json",
   "issue": 1877,
   "previewExportParityStatus": "covered_by_existing_gpu_path_not_retested_here",
   "schemaVersion": 1,

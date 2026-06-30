@@ -41,7 +41,7 @@
       "targetDistanceBefore": 0.393333333333
     }
   ],
-  "fixturePath": "fixtures/color/hue-memory-color-gate.json",
+  "fixturePath": "fixtures/color/proofs/hue-memory-color-gate.json",
   "generatedFromSnapshotDate": "2026-06-18",
   "issue": 1932,
   "schemaVersion": 1,

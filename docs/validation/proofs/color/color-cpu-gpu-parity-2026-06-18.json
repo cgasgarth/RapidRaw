@@ -194,7 +194,7 @@
     "raw_file_color_management_parity",
     "full_gpu_shader_preview_export_parity"
   ],
-  "fixturePath": "fixtures/color/cpu-gpu-parity-fixtures.json",
+  "fixturePath": "fixtures/color/proofs/cpu-gpu-parity-fixtures.json",
   "generatedFromSnapshotDate": "2026-06-14",
   "gpuReadback": {
     "reason": "CI cannot create a deterministic WGPU readback surface for this gate; shader hashes bind the cases to the GPU path until a render-readback harness lands.",
