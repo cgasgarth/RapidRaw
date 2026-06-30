@@ -665,6 +665,7 @@ const EditorToolbar = memo(
                 e.preventDefault();
                 setIsHistoryVisible((prev) => !prev);
               }}
+              aria-label={t('editor.toolbar.tooltips.undo')}
               data-tooltip={t('editor.toolbar.tooltips.undo')}
             >
               <Undo size={20} />
@@ -678,6 +679,7 @@ const EditorToolbar = memo(
                 e.preventDefault();
                 setIsHistoryVisible((prev) => !prev);
               }}
+              aria-label={t('editor.toolbar.tooltips.redo')}
               data-tooltip={t('editor.toolbar.tooltips.redo')}
             >
               <Redo size={20} />
