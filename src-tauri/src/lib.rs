@@ -8,9 +8,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 mod adjustment_fields;
 mod adjustment_utils;
 mod adjustments;
-mod ai_commands;
-mod ai_connector;
-mod ai_processing;
+mod ai;
 mod album_management;
 mod android_integration;
 mod app_settings;
@@ -72,8 +70,6 @@ mod panorama_opencv_spike;
 mod panorama_real_raw_proof;
 mod panorama_stitching;
 mod panorama_utils;
-mod person_part_parser;
-mod person_segmentation;
 mod preset_converter;
 mod presets;
 mod preview_worker;
@@ -2206,17 +2202,17 @@ pub fn run() {
             cache_utils::clear_image_caches,
             app_settings::load_settings,
             app_settings::save_settings,
-            ai_commands::generate_ai_subject_mask,
-            ai_commands::generate_ai_object_mask_proposal,
-            ai_commands::precompute_ai_subject_mask,
-            ai_commands::generate_ai_foreground_mask,
-            ai_commands::generate_ai_sky_mask,
-            ai_commands::generate_ai_depth_mask,
-            ai_commands::generate_ai_whole_person_mask,
-            ai_commands::generate_ai_person_part_mask,
-            ai_commands::check_ai_connector_status,
-            ai_commands::test_ai_connector_connection,
-            ai_commands::invoke_generative_replace_with_mask_def,
+            ai::ai_commands::generate_ai_subject_mask,
+            ai::ai_commands::generate_ai_object_mask_proposal,
+            ai::ai_commands::precompute_ai_subject_mask,
+            ai::ai_commands::generate_ai_foreground_mask,
+            ai::ai_commands::generate_ai_sky_mask,
+            ai::ai_commands::generate_ai_depth_mask,
+            ai::ai_commands::generate_ai_whole_person_mask,
+            ai::ai_commands::generate_ai_person_part_mask,
+            ai::ai_commands::check_ai_connector_status,
+            ai::ai_commands::test_ai_connector_connection,
+            ai::ai_commands::invoke_generative_replace_with_mask_def,
             denoise_api::dry_run_denoise_controls,
             denoising::apply_denoising,
             denoising::batch_denoise_images,

@@ -268,7 +268,7 @@ pub async fn start_background_indexing(
     let custom_ai_tags = settings.custom_ai_tags.clone();
     let ai_tag_count = settings.ai_tag_count.unwrap_or(10) as usize;
 
-    let clip_models = crate::ai_processing::get_or_init_clip_models(
+    let clip_models = crate::ai::ai_processing::get_or_init_clip_models(
         &app_handle,
         &state.ai_state,
         &state.ai_init_lock,

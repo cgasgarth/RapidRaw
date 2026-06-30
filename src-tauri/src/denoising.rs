@@ -61,7 +61,7 @@ pub async fn apply_denoising(
 
     let mut ai_session = None;
     if method == "ai" {
-        let session = crate::ai_processing::get_or_init_denoise_model(
+        let session = crate::ai::ai_processing::get_or_init_denoise_model(
             &app_handle,
             &state.ai_state,
             &state.ai_init_lock,
@@ -97,7 +97,7 @@ pub async fn batch_denoise_images(
 ) -> Result<Vec<String>, String> {
     let mut ai_session = None;
     if method == "ai" {
-        let session = crate::ai_processing::get_or_init_denoise_model(
+        let session = crate::ai::ai_processing::get_or_init_denoise_model(
             &app_handle,
             &state.ai_state,
             &state.ai_init_lock,
@@ -325,7 +325,7 @@ fn denoise_image(
 
     let out_dynamic = if method == "ai" {
         let session_arc = ai_session.ok_or_else(|| "AI Session not provided".to_string())?;
-        crate::ai_processing::run_ai_denoise(
+        crate::ai::ai_processing::run_ai_denoise(
             &rgb_img_for_denoiser,
             intensity,
             &session_arc,

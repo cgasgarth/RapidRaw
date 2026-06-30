@@ -8,7 +8,7 @@ use ort::session::Session;
 use ort::value::Tensor;
 use serde::Serialize;
 
-use crate::ai_processing::{
+use crate::ai::ai_processing::{
     PERSON_PART_PARSER_INPUT_SIZE, PERSON_PART_PARSER_MODEL_ID, PERSON_PART_PARSER_SHA256,
 };
 
@@ -192,11 +192,11 @@ mod tests {
         PERSON_PART_TOP_CLOTHES_CLASS, PersonPartMaskTarget, mask_from_class_map,
         person_part_parser_provenance,
     };
-    use crate::ai_processing::PERSON_PART_PARSER_MODEL_ID;
+    use crate::ai::ai_processing::PERSON_PART_PARSER_MODEL_ID;
 
     #[test]
     fn clothing_mask_merges_top_and_bottom_clothes_only() {
-        let size = crate::ai_processing::PERSON_PART_PARSER_INPUT_SIZE as usize;
+        let size = crate::ai::ai_processing::PERSON_PART_PARSER_INPUT_SIZE as usize;
         let mut classes = vec![PERSON_PART_BACKGROUND_CLASS; size * size];
         for y in 20..40 {
             for x in 20..40 {
@@ -219,7 +219,7 @@ mod tests {
 
     #[test]
     fn empty_clothing_mask_fails_closed() {
-        let size = crate::ai_processing::PERSON_PART_PARSER_INPUT_SIZE as usize;
+        let size = crate::ai::ai_processing::PERSON_PART_PARSER_INPUT_SIZE as usize;
         let classes = vec![PERSON_PART_BACKGROUND_CLASS; size * size];
 
         assert!(mask_from_class_map(&classes, PersonPartMaskTarget::Clothing).is_err());
@@ -227,7 +227,7 @@ mod tests {
 
     #[test]
     fn hair_mask_selects_hair_and_excludes_clothing() {
-        let size = crate::ai_processing::PERSON_PART_PARSER_INPUT_SIZE as usize;
+        let size = crate::ai::ai_processing::PERSON_PART_PARSER_INPUT_SIZE as usize;
         let mut classes = vec![PERSON_PART_BACKGROUND_CLASS; size * size];
         for y in 20..40 {
             for x in 20..40 {

@@ -10,9 +10,9 @@ use image::{
 };
 use serde_json::Value;
 
+use super::ai_connector;
 use crate::adjustment_fields::GEOMETRY_KEYS;
-use crate::ai_connector;
-use crate::ai_processing::{
+use crate::ai::ai_processing::{
     self, AiDepthMaskParameters, AiForegroundMaskParameters, AiSkyMaskParameters,
     AiSubjectMaskParameters, CachedDepthMap, ImageEmbeddings, generate_image_embeddings,
     get_or_init_ai_models, get_or_init_person_part_parser_model, run_depth_anything_model,
@@ -245,7 +245,7 @@ pub async fn generate_ai_whole_person_mask(
 ) -> Result<AiForegroundMaskParameters, String> {
     let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
     let full_mask_image =
-        crate::person_segmentation::generate_whole_person_mask(warped_image.as_ref())?;
+        crate::ai::person_segmentation::generate_whole_person_mask(warped_image.as_ref())?;
     let base64_data = encode_to_base64_png(&full_mask_image)?;
 
     Ok(AiForegroundMaskParameters {
@@ -273,9 +273,9 @@ pub async fn generate_ai_person_part_mask(
     let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
     let mut provenance = None;
     let mask_image = match part.as_str() {
-        "face" => crate::person_segmentation::generate_face_mask(warped_image.as_ref())?,
+        "face" => crate::ai::person_segmentation::generate_face_mask(warped_image.as_ref())?,
         "full_person" => {
-            crate::person_segmentation::generate_whole_person_mask(warped_image.as_ref())?
+            crate::ai::person_segmentation::generate_whole_person_mask(warped_image.as_ref())?
         }
         "clothing" | "hair" => {
             let parser = get_or_init_person_part_parser_model(
@@ -286,14 +286,12 @@ pub async fn generate_ai_person_part_mask(
             .await
             .map_err(|error| error.to_string())?;
             let target = if part == "hair" {
-                crate::person_part_parser::PersonPartMaskTarget::Hair
+                crate::ai::person_part_parser::PersonPartMaskTarget::Hair
             } else {
-                crate::person_part_parser::PersonPartMaskTarget::Clothing
+                crate::ai::person_part_parser::PersonPartMaskTarget::Clothing
             };
-            provenance = Some(crate::person_part_parser::person_part_parser_provenance(
-                target,
-            ));
-            crate::person_part_parser::run_person_part_parser_model(
+            provenance = Some(crate::ai::person_part_parser::person_part_parser_provenance(target));
+            crate::ai::person_part_parser::run_person_part_parser_model(
                 warped_image.as_ref(),
                 &parser,
                 target,
