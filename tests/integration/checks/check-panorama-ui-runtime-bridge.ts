@@ -6,7 +6,7 @@ import {
   buildPanoramaUiDryRunCommandV1,
 } from '../../../packages/rawengine-schema/src/panoramaUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational-proof-budgets.ts';
+import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational/proof-budgets.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
 
 const panoramaRoutePair = getComputationalMergeAppServerRoutePairSummary('panorama');

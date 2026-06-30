@@ -5,8 +5,8 @@ import { extname, join, resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../lib/compact-output.ts';
-import { resolvePrivateRawRootSource } from '../../../lib/private-raw-root-source.ts';
+import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../lib/ci/compact-output.ts';
+import { resolvePrivateRawRootSource } from '../../../lib/private-raw/root-source.ts';
 
 const SOURCE_RELATIVE_PATH = 'private-fixtures/detail/alaska-denoise-v1.arw';
 const RAW_EXTENSIONS = new Set(['.arw', '.cr2', '.cr3', '.dng', '.nef', '.raf', '.rw2']);

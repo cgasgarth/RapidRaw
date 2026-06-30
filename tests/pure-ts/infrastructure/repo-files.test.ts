@@ -3,7 +3,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { toRepoPath, walkRepoFiles } from '../../../scripts/lib/repo-files';
+import { toRepoPath, walkRepoFiles } from '../../../scripts/lib/ci/repo-files';
 
 const roots: string[] = [];
 

@@ -6,8 +6,8 @@ import { join } from 'node:path';
 
 import { z } from 'zod';
 
-import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../lib/compact-output.ts';
-import { resolvePrivateRawRootSource } from '../../../lib/private-raw-root-source.ts';
+import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../lib/ci/compact-output.ts';
+import { resolvePrivateRawRootSource } from '../../../lib/private-raw/root-source.ts';
 
 const FIXTURE_ID = 'validation.raw-open-edit-export.professional-color.v1';
 const REQUEST_PATH = 'fixtures/validation/professional-color-workflow-proof-request.json';

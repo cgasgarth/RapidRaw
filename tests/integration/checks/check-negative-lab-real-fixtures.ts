@@ -11,7 +11,7 @@ import { negativeLabFixtureManifestV1Schema } from '../../../packages/rawengine-
 import {
   assertRenderEligibleRealFixture,
   buildPromotedRealFixture,
-} from '../../../scripts/lib/negative-lab-validation.ts';
+} from '../../../scripts/lib/negative-lab/validation.ts';
 
 const manifestUrl = new URL('../../../fixtures/negative-lab/negative-lab-real-fixture-manifest.json', import.meta.url);
 const sampleGridUrl = new URL(

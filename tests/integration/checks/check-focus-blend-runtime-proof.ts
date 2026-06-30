@@ -12,7 +12,7 @@ import {
   buildFocusStackRuntimeDryRunV1,
 } from '../../../packages/rawengine-schema/src/focusStackRuntimePlan.ts';
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational-proof-budgets.ts';
+import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational/proof-budgets.ts';
 
 const REPORT_PATH = 'artifacts/validation/focus-blend-runtime-proof-2026-06-20.json';
 const GENERATED_AT = '2026-06-20T00:00:00.000Z';

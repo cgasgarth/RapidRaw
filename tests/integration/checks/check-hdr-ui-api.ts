@@ -4,7 +4,7 @@ import {
   buildHdrMergeUiApplyCommandV1,
   buildHdrMergeUiDryRunCommandV1,
 } from '../../../packages/rawengine-schema/src/hdrMergeUiControls.ts';
-import { runComputationalUiApiSmoke } from '../../../scripts/lib/computational-ui-api-smoke.ts';
+import { runComputationalUiApiSmoke } from '../../../scripts/lib/computational/ui-api-smoke.ts';
 
 const hdrSources = [
   { exposureEv: -2, imagePath: '/photos/hdr/IMG_1001.CR3', sourceIndex: 0 },

@@ -9,7 +9,7 @@ import {
   genericNegativeLabPresetById,
   isNegativeLabProfileEligibleFixture,
   readJson,
-} from '../../../scripts/lib/negative-lab-validation.ts';
+} from '../../../scripts/lib/negative-lab/validation.ts';
 import {
   negativeLabMeasuredProfileCatalogSchema,
   negativeLabMeasuredProfileSchema,

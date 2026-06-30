@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { runQuiet, runText } from '../../../scripts/lib/process.ts';
+import { runQuiet, runText } from '../../../scripts/lib/ci/process.ts';
 
 const EXPECTED_REPOSITORY = 'cgasgarth/RapidRaw';
 const EXPECTED_ORIGIN = 'https://github.com/cgasgarth/RapidRaw.git';

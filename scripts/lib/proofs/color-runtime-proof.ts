@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 
 import { z } from 'zod';
 
-import { rawOpenEditExportBasicToneCommandSchema } from '../../src/schemas/rawOpenEditExportCommandSchemas.ts';
-import { applyWhiteBalanceToRgbPixel, type RgbPixel } from '../../src/utils/whiteBalancePicker.ts';
+import { rawOpenEditExportBasicToneCommandSchema } from '../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
+import { applyWhiteBalanceToRgbPixel, type RgbPixel } from '../../../src/utils/whiteBalancePicker.ts';
 
 const hashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 

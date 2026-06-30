@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 
 import ts from 'typescript';
 
-import { getExtension, toRepoPath, walkRepoFiles } from '../../../scripts/lib/repo-files.ts';
+import { getExtension, toRepoPath, walkRepoFiles } from '../../../scripts/lib/ci/repo-files.ts';
 
 const CHECKED_EXTENSIONS = new Set(['.ts', '.tsx']);
 const SCHEMA_WRAPPER_PATH = 'src/utils/tauriSchemaInvoke.ts';

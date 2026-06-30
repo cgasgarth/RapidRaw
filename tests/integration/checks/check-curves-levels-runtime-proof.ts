@@ -7,7 +7,7 @@ import {
   collectCurvesLevelsRuntimeProofFailures,
   curvesLevelsRuntimeProofFixtureSchema,
   renderCurvesLevelsRuntimeProof,
-} from '../../../scripts/lib/curves-levels-runtime-proof.ts';
+} from '../../../scripts/lib/proofs/curves-levels-runtime-proof.ts';
 
 const fixturePath = valueAfter('--fixture') ?? 'fixtures/color/curves-levels-runtime-proof.json';
 const outputPath = valueAfter('--output');

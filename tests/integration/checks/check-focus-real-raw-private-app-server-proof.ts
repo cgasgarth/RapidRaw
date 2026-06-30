@@ -12,8 +12,8 @@ import {
   buildFocusStackUiDryRunCommandV1,
 } from '../../../packages/rawengine-schema/src/focusStackUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { privateRawReportMetric } from '../../../scripts/lib/computational-private-report-fixtures.ts';
-import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational-proof-budgets.ts';
+import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational/proof-budgets.ts';
+import { privateRawReportMetric } from '../../../scripts/lib/private-raw/computational-report-fixtures.ts';
 import {
   type ComputationalMergePrivateRunReportCollection,
   parseComputationalMergePrivateRunReportCollection,

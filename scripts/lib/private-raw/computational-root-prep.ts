@@ -4,8 +4,8 @@ import { basename, dirname, extname, isAbsolute, relative, resolve } from 'node:
 
 import { z } from 'zod';
 
-import { parseComputationalMergeE2eProofManifest } from '../../src/schemas/computationalMergeE2eProofSchemas.ts';
-import { parsePrivateRawEvidenceLedger } from '../../src/schemas/privateRawEvidenceSchemas.ts';
+import { parseComputationalMergeE2eProofManifest } from '../../../src/schemas/computationalMergeE2eProofSchemas.ts';
+import { parsePrivateRawEvidenceLedger } from '../../../src/schemas/privateRawEvidenceSchemas.ts';
 
 const argsSchema = z
   .object({

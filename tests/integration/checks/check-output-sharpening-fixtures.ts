@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 
-import { expectInvalidCases, finishFixtureCheck, readJson } from '../../../scripts/lib/fixture-checks.ts';
+import { expectInvalidCases, finishFixtureCheck, readJson } from '../../../scripts/lib/fixtures/fixture-checks.ts';
 import {
   estimateOutputSharpeningPasses,
   outputSharpeningRecipeSchema,

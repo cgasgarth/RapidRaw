@@ -14,7 +14,7 @@ import {
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { privateRawReportMetric } from '../../../scripts/lib/computational-private-report-fixtures.ts';
+import { privateRawReportMetric } from '../../../scripts/lib/private-raw/computational-report-fixtures.ts';
 import {
   type ComputationalMergePrivateRunReportCollection,
   parseComputationalMergePrivateRunReportCollection,

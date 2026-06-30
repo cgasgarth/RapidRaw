@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { expectInvalidCases, finishFixtureCheck, readJson } from '../../../scripts/lib/fixture-checks.ts';
+import { expectInvalidCases, finishFixtureCheck, readJson } from '../../../scripts/lib/fixtures/fixture-checks.ts';
 import { deblurFixtureManifestSchema, parseDeblurFixtureManifest } from '../../../src/schemas/deblurFixtureSchemas.ts';
 
 const MANIFEST_PATH = 'fixtures/detail/deblur-fixtures.json';

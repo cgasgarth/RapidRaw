@@ -7,8 +7,8 @@ import {
   toneColorCommandEnvelopeV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { sampleToneColorCommandEnvelopeV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { colorRuntimeProofFixtureSchema } from '../../../scripts/lib/color-runtime-proof.ts';
-import { curvesLevelsRuntimeProofFixtureSchema } from '../../../scripts/lib/curves-levels-runtime-proof.ts';
+import { colorRuntimeProofFixtureSchema } from '../../../scripts/lib/proofs/color-runtime-proof.ts';
+import { curvesLevelsRuntimeProofFixtureSchema } from '../../../scripts/lib/proofs/curves-levels-runtime-proof.ts';
 import { headlessRenderRequestSchema } from '../../../src/schemas/headlessRenderCommandSchemas.ts';
 import { rawOpenEditExportProofRequestSchema } from '../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
 

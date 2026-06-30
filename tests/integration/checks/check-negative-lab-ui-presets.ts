@@ -4,7 +4,7 @@
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { unsafeNegativeLabClaimPattern } from '../../../scripts/lib/negative-lab-validation.ts';
+import { unsafeNegativeLabClaimPattern } from '../../../scripts/lib/negative-lab/validation.ts';
 import { negativeLabMeasuredProfileCatalogSchema } from '../../../src/schemas/negativeLabMeasuredProfileSchemas.ts';
 import { parseNegativeLabBuiltInUiPresetCatalog } from '../../../src/schemas/negativeLabPresetCatalogSchemas.ts';
 import {
