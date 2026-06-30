@@ -1298,6 +1298,14 @@ async function prepareScenario(page, mode) {
     await page.locator('[data-testid="tether-recovery-status"][data-recovery-status="quarantined"]').waitFor({
       timeout: 10_000,
     });
+    await page
+      .locator(
+        '[data-testid="tether-recovery-proof-receipt"][data-receipt-version="1"][data-recovery-status="quarantined"][data-quarantined-file-count="1"]',
+      )
+      .waitFor({
+        state: 'attached',
+        timeout: 10_000,
+      });
     await page.locator('[data-testid="tether-exposure-controls"][data-control-count="3"]').waitFor({
       timeout: 10_000,
     });
@@ -1351,6 +1359,14 @@ async function prepareScenario(page, mode) {
     await page.locator('[data-testid="tether-capture-result"][data-backup-status="verified"]').waitFor({
       timeout: 10_000,
     });
+    await page
+      .locator(
+        '[data-testid="tether-ingest-proof-receipt"][data-receipt-version="1"][data-receipt-status="captured"][data-receipt-ingest-preset-id="wedding-copy-ingest"][data-receipt-metadata-template-id="studioSession"][data-receipt-backup-status="verified"][data-camera-control-count="3"][data-duplicate-suppressed="false"]',
+      )
+      .waitFor({
+        state: 'attached',
+        timeout: 10_000,
+      });
     await page.getByTestId('tether-incoming-capture-strip').waitFor({ timeout: 10_000 });
     await page.getByTestId('tether-incoming-capture-item').getByText('alaska-dsc7853.ARW', { exact: true }).waitFor({
       timeout: 10_000,
