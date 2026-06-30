@@ -2,13 +2,13 @@
 
 import { readFile } from 'node:fs/promises';
 
-import { parseLibrarySessionSet } from '../../../src/schemas/librarySessionSchemas.ts';
+import { parseLibrarySessionSet } from '../../../../src/schemas/librarySessionSchemas.ts';
 import {
   buildLibrarySessionUiCard,
   buildLibrarySessionUiSummary,
   buildLibrarySessionWorkflowPlan,
   librarySessionUiCardSchema,
-} from '../../../src/schemas/librarySessionUiSchemas.ts';
+} from '../../../../src/schemas/librarySessionUiSchemas.ts';
 
 const sessionSetJson: unknown = JSON.parse(await readFile('fixtures/library/library-sessions.json', 'utf8'));
 const sessionSet = parseLibrarySessionSet(sessionSetJson);

@@ -17,9 +17,9 @@ const [
   { buildLibraryHeaderStatusItems },
   { EditedStatus, LibraryViewMode, RawStatus, SortDirection },
 ] = await Promise.all([
-  import('../../../src/components/panel/library/LibraryHeaderStatusStrip.tsx'),
-  import('../../../src/components/panel/library/libraryHeaderStatus.ts'),
-  import('../../../src/components/ui/AppProperties.tsx'),
+  import('../../../../src/components/panel/library/LibraryHeaderStatusStrip.tsx'),
+  import('../../../../src/components/panel/library/libraryHeaderStatus.ts'),
+  import('../../../../src/components/ui/AppProperties.tsx'),
 ]);
 const localeJson = JSON.parse(await readFile('src/i18n/locales/en.json', 'utf8')) as {
   library?: { header?: { status?: Record<string, string> } };
