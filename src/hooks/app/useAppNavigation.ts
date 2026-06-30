@@ -18,6 +18,7 @@ import { findAlbumById } from '../../utils/folderTreeUtils';
 import { globalImageCache, type ImageCacheEntry } from '../../utils/ImageLRUCache';
 import { consumePendingNegativeConversionDustHealLayers } from '../../utils/negative-lab/negativeLabEditorHandoff';
 import { debouncedSave, debouncedSetHistory } from '../editor/useEditorActions';
+import { reconcileSelectedFolderRefresh } from '../library/selectedFolderRefreshReconciliation';
 
 interface TransformController {
   resetTransform(time?: number): void;
@@ -358,7 +359,16 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
       const { handleSettingsChange } = useSettingsStore.getState();
       const appSettings = getNavigationSettings();
       const pinnedFolders = appSettings?.pinnedFolders ?? [];
-      const { setLibrary, sortCriteria, rootPaths, expandedFolders } = useLibraryStore.getState();
+      const {
+        expandedFolders,
+        imageList: previousImageList,
+        libraryActivePath,
+        multiSelectedPaths,
+        rootPaths,
+        selectionAnchorPath,
+        setLibrary,
+        sortCriteria,
+      } = useLibraryStore.getState();
       const { setUI } = useUIStore.getState();
       const { setProcess } = useProcessStore.getState();
       const { selectedImage, resetHistory, setEditor } = useEditorStore.getState();
@@ -435,6 +445,34 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
           files = await invoke<ImageFile[]>(command, { path });
         }
 
+        const refreshReconciliation = preserveEditor
+          ? reconcileSelectedFolderRefresh(previousImageList, files, {
+              libraryActivePath,
+              multiSelectedPaths,
+              selectionAnchorPath,
+            })
+          : null;
+
+        if (refreshReconciliation) {
+          const invalidatedPaths = Array.from(
+            new Set([
+              ...refreshReconciliation.addedPaths,
+              ...refreshReconciliation.changedPaths,
+              ...refreshReconciliation.removedPaths,
+            ]),
+          );
+          useProcessStore.getState().invalidateThumbnails(invalidatedPaths);
+          invalidatedPaths.forEach((pathToInvalidate) => {
+            globalImageCache.delete(pathToInvalidate);
+          });
+          requestThumbnails([...refreshReconciliation.addedPaths, ...refreshReconciliation.changedPaths]);
+          setLibrary({
+            libraryActivePath: refreshReconciliation.nextLibraryActivePath,
+            multiSelectedPaths: refreshReconciliation.nextMultiSelectedPaths,
+            selectionAnchorPath: refreshReconciliation.nextSelectionAnchorPath,
+          });
+        }
+
         const initialRatings: Record<string, number> = {};
         files.forEach((f) => {
           initialRatings[f.path] = f.rating;
@@ -485,7 +523,7 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
         useLibraryStore.getState().setLibrary({ isViewLoading: false });
       }
     },
-    [clearThumbnailQueue],
+    [clearThumbnailQueue, requestThumbnails],
   );
 
   const handleSelectAlbum = useCallback(

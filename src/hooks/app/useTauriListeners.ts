@@ -1,7 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useRef } from 'react';
 import type { ChannelConfig } from '../../components/adjustments/Curves';
-import type { ImageFile, WaveformData } from '../../components/ui/AppProperties';
+import type { WaveformData } from '../../components/ui/AppProperties';
 import { Status } from '../../components/ui/ExportImportProperties';
 import {
   gamutWarningOverlayPayloadSchema,
@@ -68,12 +68,6 @@ import {
 
 interface TauriListenerProps {
   refreshAllFolderTrees: () => void;
-  handleSelectSubfolder: (
-    path: string,
-    isNewRoot?: boolean,
-    preloadedImages?: Array<ImageFile>,
-    expandParents?: boolean,
-  ) => void;
   refreshImageList: () => void;
   markGenerated: (path: string) => void;
 }
@@ -122,16 +116,11 @@ const buildPreviewScopeStatus = ({
   };
 };
 
-export function useTauriListeners({
-  refreshAllFolderTrees,
-  handleSelectSubfolder,
-  refreshImageList,
-  markGenerated,
-}: TauriListenerProps) {
-  const refs = useRef({ refreshAllFolderTrees, handleSelectSubfolder, refreshImageList, markGenerated });
+export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, markGenerated }: TauriListenerProps) {
+  const refs = useRef({ refreshAllFolderTrees, refreshImageList, markGenerated });
 
   useEffect(() => {
-    refs.current = { refreshAllFolderTrees, handleSelectSubfolder, refreshImageList, markGenerated };
+    refs.current = { refreshAllFolderTrees, refreshImageList, markGenerated };
   });
 
   const thumbnailBuffer = useRef<Record<string, string>>({});
@@ -303,11 +292,17 @@ export function useTauriListeners({
           useProcessStore.getState().setExportState({ progress: parseProgressPayload(event.payload) });
       }),
       listen<unknown>(EXPORT_COMPLETE_EVENT, (event) => {
-        if (isEffectActive)
+        if (isEffectActive) {
           useProcessStore.getState().setExportState({
             lastReceipt: parseExportReceiptPayload(event.payload),
             status: Status.Success,
           });
+          const currentPath = useLibraryStore.getState().currentFolderPath;
+          if (currentPath && !currentPath.startsWith('Album: ')) {
+            refs.current.refreshImageList();
+            refs.current.refreshAllFolderTrees();
+          }
+        }
       }),
       listen<unknown>(EXPORT_ERROR_EVENT, (event) => {
         if (isEffectActive)
@@ -343,7 +338,7 @@ export function useTauriListeners({
           refs.current.refreshAllFolderTrees();
           const currentPath = useLibraryStore.getState().currentFolderPath;
           if (currentPath) {
-            refs.current.handleSelectSubfolder(currentPath, false);
+            refs.current.refreshImageList();
           }
         }
       }),
