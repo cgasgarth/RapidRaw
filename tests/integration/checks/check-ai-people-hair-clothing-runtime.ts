@@ -4,9 +4,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { aiPeopleMaskFakeProviderFixtureSchema } from '../../../src/schemas/aiMaskingSchemas.ts';
-import { getAiPeopleMaskPartCapability } from '../../../src/utils/aiPeopleMaskContracts.ts';
-import { renderFakeAiPeopleMask } from '../../../src/utils/aiPeopleMaskFakeProvider.ts';
-import { createAiPeopleMaskLayerApplyPlan } from '../../../src/utils/aiPeopleMaskLayerPlan.ts';
+import { getAiPeopleMaskPartCapability } from '../../../src/utils/ai/aiPeopleMaskContracts.ts';
+import { renderFakeAiPeopleMask } from '../../../src/utils/ai/aiPeopleMaskFakeProvider.ts';
+import { createAiPeopleMaskLayerApplyPlan } from '../../../src/utils/ai/aiPeopleMaskLayerPlan.ts';
 
 const fakeProviderFixture = aiPeopleMaskFakeProviderFixtureSchema.parse(
   JSON.parse(readFileSync(resolve('fixtures/masks/ai/ai-people-fake-provider.json'), 'utf8')),

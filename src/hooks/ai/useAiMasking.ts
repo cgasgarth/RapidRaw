@@ -7,7 +7,7 @@ import { type AiPeopleMaskPart, parseAiPatchDataJson } from '../../schemas/masks
 import { useEditorStore } from '../../store/useEditorStore';
 import { Invokes } from '../../tauri/commands';
 import type { Adjustments, AiPatch, Coord, MaskContainer } from '../../utils/adjustments';
-import { getAiPeopleMaskPartCapability } from '../../utils/aiPeopleMaskContracts';
+import { getAiPeopleMaskPartCapability } from '../../utils/ai/aiPeopleMaskContracts';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { mergeMaskParameters } from '../../utils/maskParameterAccess';
 import { useEditorActions } from '../editor/useEditorActions';

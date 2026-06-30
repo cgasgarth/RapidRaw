@@ -11,9 +11,9 @@ import {
   AiAppServerToolRouteExecutionMode,
   AiAppServerToolRouteSourceKind,
   AiAppServerToolRouteStatus,
-} from '../../../src/utils/aiAppServerToolRouteIds.ts';
-import { AI_APP_SERVER_TOOL_ROUTES } from '../../../src/utils/aiAppServerToolRoutes.ts';
-import { AI_MASK_CAPABILITY_AUDIT } from '../../../src/utils/aiMaskCapabilities.ts';
+} from '../../../src/utils/ai/aiAppServerToolRouteIds.ts';
+import { AI_APP_SERVER_TOOL_ROUTES } from '../../../src/utils/ai/aiAppServerToolRoutes.ts';
+import { AI_MASK_CAPABILITY_AUDIT } from '../../../src/utils/ai/aiMaskCapabilities.ts';
 
 const COMMANDS_PATH = 'src/tauri/commands.ts';
 const commandsSource = readFileSync(COMMANDS_PATH, 'utf8');

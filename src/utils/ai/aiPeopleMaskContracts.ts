@@ -3,7 +3,7 @@ import {
   type AiPeopleMaskProviderCapability,
   aiPeopleMaskPartSchema,
   aiPeopleMaskProviderCapabilitySchema,
-} from '../schemas/masks/aiMaskingSchemas';
+} from '../../schemas/masks/aiMaskingSchemas';
 
 export const AI_PEOPLE_MASK_PART_CAPABILITIES: Array<AiPeopleMaskProviderCapability> =
   aiPeopleMaskProviderCapabilitySchema.array().parse([

@@ -1,4 +1,7 @@
-import { type AiAppServerToolRoute, aiAppServerToolRouteManifestSchema } from '../schemas/aiAppServerToolRouteSchemas';
+import {
+  type AiAppServerToolRoute,
+  aiAppServerToolRouteManifestSchema,
+} from '../../schemas/aiAppServerToolRouteSchemas';
 import {
   AiAppServerToolCapability,
   AiAppServerToolName,

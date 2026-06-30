@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { aiPeopleMaskPickerModelFixtureSchema } from '../../../src/schemas/aiMaskingSchemas.ts';
-import { buildAiPeopleMaskPickerModel } from '../../../src/utils/aiPeopleMaskPickerModel.ts';
+import { buildAiPeopleMaskPickerModel } from '../../../src/utils/ai/aiPeopleMaskPickerModel.ts';
 
 const fixtureJson: unknown = JSON.parse(readFileSync(resolve('fixtures/masks/ai/ai-people-picker-model.json'), 'utf8'));
 const fixture = aiPeopleMaskPickerModelFixtureSchema.parse(fixtureJson);

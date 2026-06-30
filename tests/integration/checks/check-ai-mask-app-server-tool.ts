@@ -16,8 +16,8 @@ import {
   AiAppServerToolName,
   AiAppServerToolRouteExecutionMode,
   AiAppServerToolRouteSourceKind,
-} from '../../../src/utils/aiAppServerToolRouteIds.ts';
-import { AI_APP_SERVER_TOOL_ROUTES } from '../../../src/utils/aiAppServerToolRoutes.ts';
+} from '../../../src/utils/ai/aiAppServerToolRouteIds.ts';
+import { AI_APP_SERVER_TOOL_ROUTES } from '../../../src/utils/ai/aiAppServerToolRoutes.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../../../src/utils/rawEngineAppServerHost.ts';
 
 const failures: string[] = [];

@@ -7,7 +7,7 @@ import {
   AI_APP_SERVER_TOOL_ROUTE_STATUSES,
   AiAppServerToolRouteSourceKind,
   AiAppServerToolRouteStatus,
-} from '../utils/aiAppServerToolRouteIds';
+} from '../utils/ai/aiAppServerToolRouteIds';
 
 export const aiAppServerToolRouteStatusSchema = z.enum(AI_APP_SERVER_TOOL_ROUTE_STATUSES);
 export const aiAppServerToolRouteSourceKindSchema = z.enum(AI_APP_SERVER_TOOL_ROUTE_SOURCE_KINDS);

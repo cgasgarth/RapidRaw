@@ -2,7 +2,7 @@ import cx from 'clsx';
 import { useTranslation } from 'react-i18next';
 
 import { TextColors, TextVariants } from '../../../../types/typography';
-import { buildAiPeopleMaskPickerModel } from '../../../../utils/aiPeopleMaskPickerModel';
+import { buildAiPeopleMaskPickerModel } from '../../../../utils/ai/aiPeopleMaskPickerModel';
 import UiText from '../../../ui/primitives/Text';
 
 export function AiPeoplePartPickerStatus() {
