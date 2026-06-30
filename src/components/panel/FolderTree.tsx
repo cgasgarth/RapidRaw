@@ -37,7 +37,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { albumTreeSchema } from '../../schemas/albumSchemas';
+import { albumTreeSchema } from '../../schemas/library/albumSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { Invokes } from '../../tauri/commands';

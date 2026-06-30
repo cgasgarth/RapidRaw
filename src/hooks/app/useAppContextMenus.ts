@@ -57,7 +57,7 @@ import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../schemas/computational-merge
 import { DEFAULT_PANORAMA_UI_SETTINGS } from '../../schemas/computational-merge/panoramaUiSchemas';
 import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../../schemas/computational-merge/superResolutionUiSchemas';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../schemas/focus-stack/focusStackUiSchemas';
-import { libraryRelinkIdentitySchema } from '../../schemas/libraryRelinkSchemas';
+import { libraryRelinkIdentitySchema } from '../../schemas/library/libraryRelinkSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';

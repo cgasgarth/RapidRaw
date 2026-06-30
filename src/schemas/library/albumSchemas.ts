@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { AlbumItem } from '../components/ui/AppProperties';
+import type { AlbumItem } from '../../components/ui/AppProperties';
 
 const albumSchema: z.ZodType<Extract<AlbumItem, { type: 'album' }>> = z
   .object({

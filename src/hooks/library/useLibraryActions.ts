@@ -3,7 +3,7 @@ import { type MouseEvent, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import type { FolderTree } from '../../components/panel/FolderTree';
 import type { AlbumItem, ImageFile } from '../../components/ui/AppProperties';
-import { albumTreeSchema } from '../../schemas/albumSchemas';
+import { albumTreeSchema } from '../../schemas/library/albumSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';

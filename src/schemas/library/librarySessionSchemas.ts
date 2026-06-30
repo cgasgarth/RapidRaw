@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { uniqueStringArraySchema } from './zodUniqueHelpers';
+import { uniqueStringArraySchema } from '../zodUniqueHelpers';
 
 export const librarySessionKindSchema = z.enum([
   'folder_browse',

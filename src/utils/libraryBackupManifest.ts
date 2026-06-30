@@ -2,8 +2,8 @@ import {
   type LibraryBackupFileEntry,
   type LibraryBackupManifest,
   parseLibraryBackupManifest,
-} from '../schemas/libraryBackupSchemas';
-import { type LibrarySessionSet, librarySessionSetSchema } from '../schemas/librarySessionSchemas';
+} from '../schemas/library/libraryBackupSchemas';
+import { type LibrarySessionSet, librarySessionSetSchema } from '../schemas/library/librarySessionSchemas';
 
 interface BuildLibraryBackupManifestInput {
   backupId: string;

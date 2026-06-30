@@ -21,7 +21,7 @@ import type React from 'react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../schemas/exportRecipeIds';
-import { buildLibrarySessionUiCard } from '../../schemas/librarySessionUiSchemas';
+import { buildLibrarySessionUiCard } from '../../schemas/library/librarySessionUiSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';

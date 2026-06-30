@@ -6,8 +6,8 @@ import { dirname } from 'node:path';
 
 import { z } from 'zod';
 
-import { parseLibrarySessionSet } from '../../../../src/schemas/librarySessionSchemas.ts';
-import { buildLibrarySessionWorkflowPlan } from '../../../../src/schemas/librarySessionUiSchemas.ts';
+import { parseLibrarySessionSet } from '../../../../src/schemas/library/librarySessionSchemas.ts';
+import { buildLibrarySessionWorkflowPlan } from '../../../../src/schemas/library/librarySessionUiSchemas.ts';
 
 const manifestPath = 'fixtures/workflow/session-import-reload-proof.json';
 
