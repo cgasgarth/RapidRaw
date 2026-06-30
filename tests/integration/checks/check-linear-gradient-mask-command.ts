@@ -27,7 +27,7 @@ const fixtureSchema = z
   .strict();
 
 const fixture = fixtureSchema.parse(
-  JSON.parse(readFileSync(resolve('fixtures/masks/linear-gradient-mask-command.json'), 'utf8')),
+  JSON.parse(readFileSync(resolve('fixtures/masks/gradient/linear-gradient-mask-command.json'), 'utf8')),
 );
 const dryRunCommand = layerMaskCommandEnvelopeV1Schema.parse({
   actor: {

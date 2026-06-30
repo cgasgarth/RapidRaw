@@ -60,11 +60,11 @@ const invalidFixtureSchema = z
 const fixtures = z
   .array(fixtureSchema)
   .min(1)
-  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/brush-mask-parameters.json'), 'utf8')));
+  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/brush/brush-mask-parameters.json'), 'utf8')));
 const invalidFixtures = z
   .array(invalidFixtureSchema)
   .min(1)
-  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/invalid-brush-mask-parameters.json'), 'utf8')));
+  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/invalid/invalid-brush-mask-parameters.json'), 'utf8')));
 
 function stableStringify(value) {
   if (Array.isArray(value)) {

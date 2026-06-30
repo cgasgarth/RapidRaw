@@ -953,7 +953,7 @@ function runSelfTest() {
   );
   assertClassification(
     'mask fixture outputs can skip smoke',
-    ['fixtures/masks/linear-gradient-mask-command.json'],
+    ['fixtures/masks/gradient/linear-gradient-mask-command.json'],
     SMOKE_MODES.NONE,
   );
   assertClassification(

@@ -64,11 +64,11 @@ const invalidFixtureSchema = z
 const fixtures = z
   .array(fixtureSchema)
   .min(1)
-  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/color-range-mask-parameters.json'), 'utf8')));
+  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/range/color-range-mask-parameters.json'), 'utf8')));
 const invalidFixtures = z
   .array(invalidFixtureSchema)
   .min(1)
-  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/invalid-color-range-mask-parameters.json'), 'utf8')));
+  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/invalid/invalid-color-range-mask-parameters.json'), 'utf8')));
 
 for (const fixture of fixtures) {
   const actual = createColorRangeMaskParameters(fixture.input.rangeKey, fixture.input.options);

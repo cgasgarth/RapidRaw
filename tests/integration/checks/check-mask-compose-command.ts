@@ -40,7 +40,7 @@ const fixtureSchema = z
   .strict();
 
 const fixture = fixtureSchema.parse(
-  JSON.parse(readFileSync(resolve('fixtures/masks/mask-compose-command.json'), 'utf8')),
+  JSON.parse(readFileSync(resolve('fixtures/masks/compose/mask-compose-command.json'), 'utf8')),
 );
 
 const sourceMasks: Array<MaskAlphaArtifact> = fixture.sources.map((source) => ({

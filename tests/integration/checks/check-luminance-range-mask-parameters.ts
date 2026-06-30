@@ -44,11 +44,13 @@ const invalidFixtureSchema = z
 const fixtures = z
   .array(fixtureSchema)
   .min(1)
-  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/luminance-range-mask-parameters.json'), 'utf8')));
+  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/range/luminance-range-mask-parameters.json'), 'utf8')));
 const invalidFixtures = z
   .array(invalidFixtureSchema)
   .min(1)
-  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/invalid-luminance-range-mask-parameters.json'), 'utf8')));
+  .parse(
+    JSON.parse(readFileSync(resolve('fixtures/masks/invalid/invalid-luminance-range-mask-parameters.json'), 'utf8')),
+  );
 
 for (const fixture of fixtures) {
   const actual = normalizeLuminanceRangeParameters(fixture.input);

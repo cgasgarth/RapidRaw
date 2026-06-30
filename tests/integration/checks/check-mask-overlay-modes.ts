@@ -58,11 +58,11 @@ const invalidFixtureSchema = z
 const fixtures = z
   .array(fixtureSchema)
   .min(1)
-  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/mask-overlay-modes.json'), 'utf8')));
+  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/render/mask-overlay-modes.json'), 'utf8')));
 const invalidFixtures = z
   .array(invalidFixtureSchema)
   .min(1)
-  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/invalid-mask-overlay-modes.json'), 'utf8')));
+  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/invalid/invalid-mask-overlay-modes.json'), 'utf8')));
 const rustMaskGenerationSource = readFileSync(resolve('src-tauri/src/mask_generation.rs'), 'utf8');
 const overlayControlsSource = readFileSync(resolve('src/components/panel/right/MaskOverlayReviewControls.tsx'), 'utf8');
 const masksPanelSource = readFileSync(resolve('src/components/panel/right/MasksPanel.tsx'), 'utf8');
