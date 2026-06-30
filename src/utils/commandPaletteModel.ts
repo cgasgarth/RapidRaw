@@ -7,6 +7,7 @@ import {
 } from '../schemas/commandPaletteSchemas';
 import type { UIState } from '../store/useUIStore';
 import { createFocusStackSourcePreflightMetadata } from './focusStackSourcePreflight';
+import { buildHdrLaunchSourceMetadata, resolveHdrLaunchSourcePaths } from './hdrAutoStackSelection';
 import { createSuperResolutionSourcePreflightMetadata } from './superResolutionSourcePreflight';
 
 export type { CommandPaletteCommand };
@@ -361,6 +362,7 @@ export function createCommandPaletteAction(
     return () => {
       setUI((state) => {
         const { lastDryRunCommand: _lastDryRunCommand, ...hdrModalState } = state.hdrModalState;
+        const hdrLaunchSourcePaths = resolveHdrLaunchSourcePaths(imageList, selectedCommandPaths);
         return {
           hdrModalState: {
             ...hdrModalState,
@@ -370,13 +372,10 @@ export function createCommandPaletteAction(
             progressMessage: null,
             sourceMetadata:
               selectedCommandPaths.length > 0
-                ? selectedCommandPaths.map((path) => ({
-                    exif: imageList.find((image) => image.path === path)?.exif ?? null,
-                    path,
-                  }))
+                ? buildHdrLaunchSourceMetadata(imageList, selectedCommandPaths)
                 : state.hdrModalState.sourceMetadata,
             stitchingSourcePaths:
-              selectedCommandPaths.length > 0 ? selectedCommandPaths : state.hdrModalState.stitchingSourcePaths,
+              selectedCommandPaths.length > 0 ? hdrLaunchSourcePaths : state.hdrModalState.stitchingSourcePaths,
           },
         };
       });
