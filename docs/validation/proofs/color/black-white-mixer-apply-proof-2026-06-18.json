@@ -1,8 +1,33 @@
 {
   "cases": [
     {
+      "case": "disabled no-op",
+      "expectedActiveChannels": [],
+      "influence": {},
+      "inputRgb": {
+        "blue": 0.76,
+        "green": 0.31,
+        "red": 0.42
+      },
+      "maxExpectedDelta": 0,
+      "maxOutputDelta": 0,
+      "outputRgb": {
+        "blue": 0.76,
+        "green": 0.31,
+        "red": 0.42
+      },
+      "runtimeStatus": "apply_runtime_proof",
+      "schemaStatus": "validated_by_zod",
+      "uiStatus": "existing_control_surface_not_retested",
+      "weightedAdjustment": 0
+    },
+    {
       "case": "portrait red lift",
-      "expectedActiveChannels": ["reds", "oranges", "magentas"],
+      "expectedActiveChannels": [
+        "reds",
+        "oranges",
+        "magentas"
+      ],
       "influence": {
         "oranges": 0.6507936507936505
       },
@@ -25,7 +50,11 @@
     },
     {
       "case": "landscape sky control",
-      "expectedActiveChannels": ["oranges", "yellows", "greens"],
+      "expectedActiveChannels": [
+        "oranges",
+        "yellows",
+        "greens"
+      ],
       "influence": {
         "blues": 0.8333333333333334
       },

@@ -43,7 +43,7 @@ export function applyBlackWhiteMixerToRgbPixel(pixel: RgbPixel, value: unknown):
     return {
       influence: {},
       luminance,
-      outputRgb: { blue: luminance, green: luminance, red: luminance },
+      outputRgb: { ...pixel },
       weightedAdjustment: 0,
     };
   }
