@@ -1,4 +1,4 @@
-import type { ComputationalMergeAppServerRouteFamily } from '../schemas/computationalMergeAppServerSchemas';
+import type { ComputationalMergeAppServerRouteFamily } from '../../schemas/computationalMergeAppServerSchemas';
 
 export const getComputationalMergeAppServerToolName = (
   family: ComputationalMergeAppServerRouteFamily,

@@ -1,4 +1,4 @@
-import type { HdrModalState, PanoramaModalState } from '../store/useUIStore';
+import type { HdrModalState, PanoramaModalState } from '../../store/useUIStore';
 import { getComputationalMergeAppServerRoutePairSummary } from './computationalMergeAppServerRoutePairs';
 
 export const buildPanoramaDryRunCommandState = (

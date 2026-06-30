@@ -24,8 +24,8 @@ import {
 import { parseComputationalMergeE2eProofManifest } from '../../../src/schemas/computationalMergeE2eProofSchemas.ts';
 import type { ComputationalMergePrivateSourceSet } from '../../../src/schemas/computationalMergeSourceSetSchemas.ts';
 import { parsePrivateRawEvidenceLedger } from '../../../src/schemas/privateRawEvidenceSchemas.ts';
-import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
-import { buildComputationalMergePrivateSourceSets } from '../../../src/utils/computationalMergeSourceSets.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
+import { buildComputationalMergePrivateSourceSets } from '../../../src/utils/computational-merge/computationalMergeSourceSets.ts';
 
 const panoramaRoutePair = getComputationalMergeAppServerRoutePairSummary('panorama');
 const focusRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');

@@ -7,7 +7,7 @@ import {
 } from '../../../packages/rawengine-schema/src/focus-stack/focusStackUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational/proof-budgets.ts';
-import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
 import { buildFocusStackOutputReviewFromArtifact } from '../../../src/utils/focusStackOutputReview.ts';
 
 const focusRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');

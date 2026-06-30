@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 const failures: string[] = [];
 const modalSource = readFileSync('src/components/modals/computational-merge/PanoramaModal.tsx', 'utf8');
 const panelSource = readFileSync('src/components/modals/computational-merge/ComputationalMergeReviewPanel.tsx', 'utf8');
-const contractSource = readFileSync('src/utils/computationalMergeReviewPanels.ts', 'utf8');
+const contractSource = readFileSync('src/utils/computational-merge/computationalMergeReviewPanels.ts', 'utf8');
 const mergeStatusSource = readFileSync('src/components/modals/computational-merge/MergeStatusViews.tsx', 'utf8');
 
 for (const marker of [

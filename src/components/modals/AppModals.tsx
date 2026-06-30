@@ -15,11 +15,11 @@ import {
   useUIStore,
 } from '../../store/useUIStore';
 import type { CopyPasteSettings } from '../../utils/adjustments';
-import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
+import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computational-merge/computationalMergeAppServerRoutePairs';
 import {
   resetHdrStateForSettingsChange,
   resetPanoramaStateForSettingsChange,
-} from '../../utils/computationalMergeModalState';
+} from '../../utils/computational-merge/computationalMergeModalState';
 import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
 import { handleNegativeConversionEditorHandoff } from '../../utils/negativeLabEditorHandoff';
 import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';

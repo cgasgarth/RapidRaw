@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 import { buildSuperResolutionUiDryRunCommandV1 } from '../../../packages/rawengine-schema/src/superResolutionUiControls.ts';
 import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../../../src/schemas/superResolutionUiSchemas.ts';
-import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
 
 const actionMetadataSchema = z
   .object({

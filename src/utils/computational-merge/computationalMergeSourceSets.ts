@@ -1,9 +1,9 @@
-import type { ComputationalMergeE2eProofManifest } from '../schemas/computationalMergeE2eProofSchemas';
+import type { ComputationalMergeE2eProofManifest } from '../../schemas/computationalMergeE2eProofSchemas';
 import {
   type ComputationalMergePrivateSourceSetCollection,
   computationalMergePrivateSourceSetCollectionSchema,
-} from '../schemas/computationalMergeSourceSetSchemas';
-import type { PrivateRawEvidenceLedger } from '../schemas/privateRawEvidenceSchemas';
+} from '../../schemas/computationalMergeSourceSetSchemas';
+import type { PrivateRawEvidenceLedger } from '../../schemas/privateRawEvidenceSchemas';
 
 const privatePathPrefixes = ['private-fixtures/', 'private-artifacts/'] as const;
 const sourceSetFeatureFamilies = new Set(['focus_stack', 'panorama_stitch', 'super_resolution']);

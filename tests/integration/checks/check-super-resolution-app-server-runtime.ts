@@ -8,7 +8,7 @@ import {
   calculateMeanAbsoluteErrorV1,
   createNearestNeighborBaselineV1,
 } from '../../../packages/rawengine-schema/src/superResolutionPixelShift.ts';
-import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
 
 const superResolutionRoutePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');
 const SCALE = 2;
