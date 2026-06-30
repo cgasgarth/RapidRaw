@@ -3,6 +3,7 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { TFunction } from 'i18next';
 import {
+  AlertTriangle,
   Ban,
   CheckCircle,
   ChevronDown,
@@ -1245,6 +1246,15 @@ export default function ExportPanel({
         : t('export.readiness.metadataOn')
       : t('export.readiness.metadataOff'),
   ];
+  const primaryExportReadinessItems = [
+    exportReadinessItems[0],
+    exportReadinessItems[1],
+    exportReadinessItems[3],
+    exportReadinessItems[6],
+  ].filter((item): item is string => Boolean(item));
+  const secondaryExportReadinessItems = exportReadinessItems.filter(
+    (item) => !primaryExportReadinessItems.includes(item),
+  );
   const softProofWarningItems = useMemo(() => {
     if (fileFormat === FileFormats.Cube || !hasColorManagedTransform) return [];
 
@@ -1315,6 +1325,7 @@ export default function ExportPanel({
   ]);
   const softProofProfileCompareStatus = getSoftProofProfileCompareStatus(softProofProfileCompareState);
   const isSoftProofProfileCompareLoading = softProofProfileCompareStatus === 'loading';
+  const isSoftProofProfileCompareUnavailable = softProofProfileCompareStatus === 'unavailable';
   const softProofProfileCompareSummary =
     softProofProfileCompareStatus === 'ready'
       ? t('export.softProofCompare.ready')
@@ -1928,32 +1939,89 @@ export default function ExportPanel({
       </div>
 
       <div className="p-4 border-t border-surface shrink-0 space-y-2">
-        {canExport && (
-          <>
-            <div className="flex flex-wrap justify-center gap-1.5" data-testid="export-readiness-summary">
-              {exportReadinessItems.map((item) => (
-                <UiText
-                  as="span"
-                  className="rounded bg-surface px-2 py-1"
-                  color={TextColors.secondary}
-                  data-export-readiness-item={item}
-                  key={item}
-                  variant={TextVariants.small}
+        {canExport && !firstReceiptOutput ? (
+          <div className="space-y-2">
+            {isSoftProofProfileCompareUnavailable ? (
+              <div
+                className="flex min-w-0 items-start gap-2 rounded-md border border-yellow-500/40 bg-yellow-500/10 px-3 py-2"
+                data-export-soft-proof-compare-footer-status={softProofProfileCompareStatus}
+                data-testid="export-soft-proof-compare-footer-warning"
+              >
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-400" />
+                <div className="min-w-0 flex-1">
+                  <UiText as="p" className="text-yellow-200" variant={TextVariants.small} weight={TextWeights.semibold}>
+                    {t('export.softProofCompare.footerUnavailableTitle')}
+                  </UiText>
+                  <UiText as="p" className="mt-0.5" color={TextColors.secondary} variant={TextVariants.small}>
+                    {t('export.softProofCompare.footerUnavailableDescription')}
+                  </UiText>
+                </div>
+                <button
+                  className="shrink-0 rounded border border-yellow-500/40 px-2 py-1 text-xs font-medium text-yellow-200 transition-colors hover:bg-card-active disabled:opacity-50"
+                  data-testid="export-soft-proof-compare-footer-action"
+                  disabled={isExporting || isSoftProofProfileCompareLoading}
+                  onClick={() => {
+                    void handleGenerateSoftProofProfileCompare();
+                  }}
+                  type="button"
                 >
-                  {item}
-                </UiText>
-              ))}
+                  {t('export.softProofCompare.footerRetry')}
+                </button>
+              </div>
+            ) : null}
+            <div
+              className="min-w-0 rounded-md border border-surface bg-bg-secondary px-3 py-2.5"
+              data-testid="export-readiness-summary"
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <CheckCircle className="h-4 w-4 shrink-0 text-accent" />
+                <div className="min-w-0">
+                  <UiText
+                    as="p"
+                    className="truncate"
+                    color={TextColors.primary}
+                    variant={TextVariants.small}
+                    weight={TextWeights.semibold}
+                  >
+                    {primaryExportReadinessItems.map((item, index) => (
+                      <span data-export-readiness-item={item} key={item}>
+                        {index > 0 ? ' · ' : ''}
+                        {item}
+                      </span>
+                    ))}
+                  </UiText>
+                  {secondaryExportReadinessItems.length > 0 ? (
+                    <div className="mt-1 flex min-w-0 flex-wrap gap-1.5">
+                      {secondaryExportReadinessItems.map((item) => (
+                        <UiText
+                          as="span"
+                          className="rounded bg-surface px-1.5 py-0.5"
+                          color={TextColors.secondary}
+                          data-export-readiness-item={item}
+                          key={item}
+                          variant={TextVariants.small}
+                        >
+                          {item}
+                        </UiText>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
             </div>
             {softProofWarningItems.length > 0 ? (
               <div
-                className="rounded border border-yellow-500/40 bg-yellow-500/10 px-3 py-2"
+                className="rounded-md border border-yellow-500/40 bg-yellow-500/10 px-3 py-2"
                 data-export-soft-proof-warning-codes={softProofWarningItems.map((item) => item.code).join(',')}
                 data-export-soft-proof-warning-count={softProofWarningItems.length}
                 data-testid="export-soft-proof-warnings"
               >
-                <UiText variant={TextVariants.small} weight={TextWeights.medium}>
-                  {t('export.softProofWarnings.title')}
-                </UiText>
+                <div className="flex items-center gap-1.5">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-400" />
+                  <UiText className="text-yellow-200" variant={TextVariants.small} weight={TextWeights.medium}>
+                    {t('export.softProofWarnings.title')}
+                  </UiText>
+                </div>
                 <ul className="mt-1 space-y-1">
                   {softProofWarningItems.map((item) => (
                     <li data-export-soft-proof-warning-code={item.code} key={item.code}>
@@ -1965,21 +2033,8 @@ export default function ExportPanel({
                 </ul>
               </div>
             ) : null}
-          </>
-        )}
-        <UiText as="div" variant={TextVariants.small} color={TextColors.primary} className="text-center">
-          {isEstimating ? (
-            <span className="italic">{t('export.status.estimatingSize')}</span>
-          ) : estimatedSize !== null ? (
-            <span>
-              {numImages > 1
-                ? t('export.status.estimatedTotalSize', { size: formatBytes(estimatedSize, t) }) ||
-                  t('export.status.estimatedSize', { size: formatBytes(estimatedSize, t) })
-                : t('export.status.estimatedSize', { size: formatBytes(estimatedSize, t) })}
-              {numImages > 1 && ` (~${formatBytes(estimatedSize / numImages, t)})`}
-            </span>
-          ) : null}
-        </UiText>
+          </div>
+        ) : null}
         {firstReceiptOutput && (
           <div
             className="rounded-md border border-surface bg-surface/60 p-2"
@@ -2182,16 +2237,61 @@ export default function ExportPanel({
             </div>
           </div>
         )}
+        {canExport ? (
+          <UiText as="div" variant={TextVariants.small} color={TextColors.secondary} className="truncate px-0.5">
+            {isEstimating ? (
+              <span>{t('export.status.estimatingSize')}</span>
+            ) : estimatedSize !== null ? (
+              <span>
+                {numImages > 1
+                  ? t('export.status.estimatedTotalSize', { size: formatBytes(estimatedSize, t) })
+                  : t('export.status.estimatedSize', { size: formatBytes(estimatedSize, t) })}
+                {numImages > 1
+                  ? t('export.status.estimatedAverageSize', { size: formatBytes(estimatedSize / numImages, t) })
+                  : ''}
+              </span>
+            ) : (
+              <span>{t('export.status.estimatePending')}</span>
+            )}
+          </UiText>
+        ) : (
+          <div
+            className="rounded-md border border-red-500/40 bg-red-500/20 px-3 py-2"
+            data-testid="export-blocked-alert"
+          >
+            <UiText as="p" className="text-red-400" variant={TextVariants.small} weight={TextWeights.semibold}>
+              {isLibrarySmartPreviewResolving
+                ? t('export.status.resolvingOriginalFile')
+                : isSmartPreviewExportBlocked
+                  ? t('export.status.offlineSmartPreviewBlocked')
+                  : isLibraryContext
+                    ? t('export.status.noImagesSelected')
+                    : t('export.status.noImageSelected')}
+            </UiText>
+          </div>
+        )}
+        {status === Status.Error && errorMessage ? (
+          <div className="rounded-md border border-red-500/40 bg-red-500/20 px-3 py-2" data-testid="export-error-alert">
+            <UiText
+              as="p"
+              className="break-words text-red-400"
+              variant={TextVariants.small}
+              weight={TextWeights.medium}
+            >
+              {errorMessage}
+            </UiText>
+          </div>
+        ) : null}
         <Button
-          className={`group rounded-md h-11 w-full flex items-center text-md font-bold! justify-center ${
+          className={`group h-11 w-full rounded-lg text-sm font-semibold! shadow-none transition-colors ${
             status === Status.Exporting
-              ? 'bg-red-600/80 hover:bg-red-600 text-white'
+              ? 'bg-accent text-button-text hover:bg-red-600 hover:text-white'
               : status === Status.Success
-                ? 'bg-green-500/70 text-white shadow-none'
+                ? 'bg-green-500/75 text-white'
                 : status === Status.Error
-                  ? 'bg-red-500/20 text-red-400 shadow-none'
+                  ? 'bg-red-500/15 text-red-200'
                   : status === Status.Cancelled
-                    ? 'bg-yellow-500/20 text-yellow-400 shadow-none'
+                    ? 'bg-yellow-500/15 text-yellow-200'
                     : ''
           }`}
           disabled={status === Status.Exporting ? false : !canExport}
@@ -2207,31 +2307,31 @@ export default function ExportPanel({
           {status === Status.Exporting ? (
             <>
               <span className="flex items-center group-hover:hidden">
-                <Loader size={18} className="animate-spin mr-2" />
+                <Loader size={16} className="animate-spin mr-2" />
                 {progress.total > 1
                   ? t('export.status.exportingProgress', { current: progress.current, total: progress.total })
                   : t('export.status.exporting')}
               </span>
               <span className="hidden items-center group-hover:flex">
-                <Ban size={18} className="mr-2" />
+                <Ban size={16} className="mr-2" />
                 {t('export.status.cancelExport')}
               </span>
             </>
           ) : status === Status.Success ? (
             <>
-              <CheckCircle size={18} className="mr-2" /> {t('export.status.success')}
+              <CheckCircle size={16} className="mr-2" /> {t('export.status.success')}
             </>
           ) : status === Status.Error ? (
             <>
-              <XCircle size={18} className="mr-2" /> {errorMessage || t('export.status.failed')}
+              <XCircle size={16} className="mr-2" /> {t('export.status.failed')}
             </>
           ) : status === Status.Cancelled ? (
             <>
-              <Ban size={18} className="mr-2" /> {t('export.status.cancelled')}
+              <Ban size={16} className="mr-2" /> {t('export.status.cancelled')}
             </>
           ) : (
             <>
-              <FileInput size={18} className="mr-2" />{' '}
+              <FileInput size={16} className="mr-2" />{' '}
               {numImages > 1
                 ? t('export.status.exportMultiple', { count: numImages, label: itemLabelPlural })
                 : t('export.status.exportSingle', { label: itemLabel })}
