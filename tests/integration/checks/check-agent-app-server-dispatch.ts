@@ -6,7 +6,10 @@ import { ToolType } from '../../../src/components/panel/right/Masks.tsx';
 import { RawEngineAppServerHostToolName } from '../../../src/schemas/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-import { AGENT_ADJUSTMENTS_APPLY_TOOL_NAME } from '../../../src/utils/agentAdjustmentApplyTool.ts';
+import {
+  AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+  AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
+} from '../../../src/utils/agentAdjustmentApplyTool.ts';
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
@@ -58,6 +61,15 @@ const applyResultSchema = z
     appliedGraphRevision: z.string().min(1),
     staleRecipeHash: z.literal(false),
     toolName: z.literal(AGENT_ADJUSTMENTS_APPLY_TOOL_NAME),
+  })
+  .passthrough();
+const dryRunResultSchema = z
+  .object({
+    dryRunPlanHash: z.string().min(1),
+    dryRunPlanId: z.string().min(1),
+    sourceGraphRevision: z.string().min(1),
+    staleRecipeHash: z.literal(false),
+    toolName: z.literal(AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME),
   })
   .passthrough();
 
@@ -135,10 +147,33 @@ if (previewResultSchema.parse(initialPreview.result).preview.purpose !== 'initia
   throw new Error('agent.preview.render dispatch did not preserve preview purpose.');
 }
 
+const dryRun = await dispatch(
+  AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
+  {
+    adjustments: { exposure: 0.32, shadows: 18 },
+    expectedGraphRevision: initialState.snapshot.graphRevision,
+    expectedRecipeHash: initialRecipeHash,
+    operationId: 'agent_dispatch_apply_3163',
+    requestId: 'agent-dispatch-dry-run-1',
+    sessionId: 'agent-dispatch-3163',
+  },
+  'dispatch-dry-run-1',
+);
+const dryRunPayload = dryRunResultSchema.parse(dryRun.result);
+if (
+  dryRun.dispatchStatus !== 'completed' ||
+  dryRunPayload.sourceGraphRevision !== initialState.snapshot.graphRevision
+) {
+  throw new Error('agent.adjustments.dry_run dispatch did not produce a bound receipt.');
+}
+
 const apply = await dispatch(
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
   {
+    acceptedPlanHash: dryRunPayload.dryRunPlanHash,
+    acceptedPlanId: dryRunPayload.dryRunPlanId,
     adjustments: { exposure: 0.32, shadows: 18 },
+    expectedGraphRevision: dryRunPayload.sourceGraphRevision,
     expectedRecipeHash: initialRecipeHash,
     operationId: 'agent_dispatch_apply_3163',
     requestId: 'agent-dispatch-apply-1',
@@ -168,10 +203,30 @@ const draftSession = {
   sessionId: 'agent-dispatch-3163',
   status: 'active' as const,
 };
+const draftDryRun = await dispatchWithDraftSession(
+  AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
+  {
+    adjustments: { contrast: 9 },
+    expectedGraphRevision: refreshedStatePayload.snapshot.graphRevision,
+    expectedRecipeHash: draftSession.parentRecipeHash,
+    operationId: 'agent_dispatch_draft_apply_3163',
+    requestId: 'agent-dispatch-draft-dry-run-1',
+    sessionId: draftSession.sessionId,
+  },
+  'dispatch-draft-dry-run-1',
+  draftSession,
+);
+const draftDryRunPayload = dryRunResultSchema.parse(draftDryRun.result);
+if (draftDryRun.dispatchStatus !== 'completed') {
+  throw new Error('agent draft session did not allow current active typed dry-run.');
+}
 const draftApply = await dispatchWithDraftSession(
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
   {
+    acceptedPlanHash: draftDryRunPayload.dryRunPlanHash,
+    acceptedPlanId: draftDryRunPayload.dryRunPlanId,
     adjustments: { contrast: 9 },
+    expectedGraphRevision: draftDryRunPayload.sourceGraphRevision,
     expectedRecipeHash: draftSession.parentRecipeHash,
     operationId: 'agent_dispatch_draft_apply_3163',
     requestId: 'agent-dispatch-draft-apply-1',
@@ -228,7 +283,10 @@ for (const { expectedMessage, session } of draftRejectCases) {
   const rejected = await dispatchWithDraftSession(
     AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
     {
+      acceptedPlanHash: draftDryRunPayload.dryRunPlanHash,
+      acceptedPlanId: draftDryRunPayload.dryRunPlanId,
       adjustments: { contrast: 12 },
+      expectedGraphRevision: postDraftStatePayload.snapshot.graphRevision,
       expectedRecipeHash: postDraftStatePayload.snapshot.initialPreview.recipeHash,
       operationId: `agent_dispatch_reject_${expectedMessage}`,
       requestId: `agent-dispatch-reject-${expectedMessage}`,
@@ -264,7 +322,10 @@ if (
 const staleApply = await dispatch(
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
   {
+    acceptedPlanHash: dryRunPayload.dryRunPlanHash,
+    acceptedPlanId: dryRunPayload.dryRunPlanId,
     adjustments: { exposure: 0.5 },
+    expectedGraphRevision: dryRunPayload.sourceGraphRevision,
     expectedRecipeHash: initialRecipeHash,
     operationId: 'agent_dispatch_stale_3163',
     requestId: 'agent-dispatch-stale-1',

@@ -4,7 +4,10 @@ import { ToolType } from '../../../src/components/panel/right/Masks.tsx';
 import { RawEngineAppServerRouteMode } from '../../../src/schemas/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-import { applyAgentGlobalAdjustments } from '../../../src/utils/agentAdjustmentApplyTool.ts';
+import {
+  applyAgentGlobalAdjustments,
+  dryRunAgentGlobalAdjustments,
+} from '../../../src/utils/agentAdjustmentApplyTool.ts';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agentImageContextSnapshot.ts';
 import {
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
@@ -45,9 +48,20 @@ useEditorStore.getState().setEditor({
 const checkpoint = createAgentSessionCheckpoint('agent-history-3163');
 const beforeRecipeHash = checkpoint.previewRecipeHash;
 const beforePreviewRef = checkpoint.previewRef;
+const dryRun = await dryRunAgentGlobalAdjustments({
+  adjustments: { exposure: 0.35, shadows: 20 },
+  expectedGraphRevision: checkpoint.graphRevision,
+  expectedRecipeHash: beforeRecipeHash,
+  operationId: 'agent_history_apply_3163',
+  requestId: 'agent-history-dry-run-3163',
+  sessionId: 'agent-history-3163',
+});
 
 await applyAgentGlobalAdjustments({
+  acceptedPlanHash: dryRun.dryRunPlanHash,
+  acceptedPlanId: dryRun.dryRunPlanId,
   adjustments: { exposure: 0.35, shadows: 20 },
+  expectedGraphRevision: dryRun.sourceGraphRevision,
   expectedRecipeHash: beforeRecipeHash,
   operationId: 'agent_history_apply_3163',
   requestId: 'agent-history-apply-3163',

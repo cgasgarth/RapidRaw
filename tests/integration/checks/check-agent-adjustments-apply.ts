@@ -6,8 +6,10 @@ import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import {
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+  AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
   agentAdjustmentsApplyRequestSchema,
   applyAgentGlobalAdjustments,
+  dryRunAgentGlobalAdjustments,
 } from '../../../src/utils/agentAdjustmentApplyTool.ts';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agentImageContextSnapshot.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../../../src/utils/rawEngineAppServerHost.ts';
@@ -45,6 +47,9 @@ useEditorStore.getState().setEditor({
 if (
   agentAdjustmentsApplyRequestSchema.safeParse({
     adjustments: { exposure: 4 },
+    acceptedPlanHash: 'sha256:invalid',
+    acceptedPlanId: 'dryrun_invalid',
+    expectedGraphRevision: 'history_0',
     expectedRecipeHash: 'recipe:test',
     operationId: 'invalid-exposure',
     requestId: 'invalid-exposure',
@@ -56,6 +61,9 @@ if (
 if (
   agentAdjustmentsApplyRequestSchema.safeParse({
     adjustments: { unsupportedField: 1 },
+    acceptedPlanHash: 'sha256:invalid',
+    acceptedPlanId: 'dryrun_invalid',
+    expectedGraphRevision: 'history_0',
     expectedRecipeHash: 'recipe:test',
     operationId: 'invalid-field',
     requestId: 'invalid-field',
@@ -66,10 +74,23 @@ if (
 }
 
 const initialSnapshot = buildAgentImageContextSnapshot();
+if (
+  agentAdjustmentsApplyRequestSchema.safeParse({
+    adjustments: { exposure: 0.25 },
+    expectedGraphRevision: initialSnapshot.graphRevision,
+    expectedRecipeHash: initialSnapshot.initialPreview.recipeHash,
+    operationId: 'missing-approval',
+    requestId: 'missing-approval',
+    sessionId: 'agent-adjustments-apply-invalid',
+  }).success
+) {
+  throw new Error('agent.adjustments.apply accepted a request without accepted dry-run identity.');
+}
 let staleRejected = false;
 try {
-  await applyAgentGlobalAdjustments({
+  await dryRunAgentGlobalAdjustments({
     adjustments: { exposure: 0.25 },
+    expectedGraphRevision: initialSnapshot.graphRevision,
     expectedRecipeHash: 'recipe:stale',
     operationId: 'agent_adjustments_apply_stale',
     requestId: 'agent-adjustments-apply-stale',
@@ -79,21 +100,42 @@ try {
   staleRejected = true;
 }
 if (!staleRejected) {
-  throw new Error('agent.adjustments.apply did not reject a stale recipe hash.');
+  throw new Error('agent.adjustments.dry_run did not reject a stale recipe hash.');
+}
+
+const adjustments = {
+  clarity: 18,
+  contrast: 24,
+  exposure: 0.42,
+  highlights: -22,
+  saturation: 8,
+  shadows: 16,
+  temperature: 12,
+  tint: -4,
+  vibrance: 10,
+};
+const dryRun = await dryRunAgentGlobalAdjustments({
+  adjustments,
+  expectedGraphRevision: initialSnapshot.graphRevision,
+  expectedRecipeHash: initialSnapshot.initialPreview.recipeHash,
+  operationId: 'agent_adjustments_apply_3161',
+  requestId: 'agent-adjustments-dry-run-3161',
+  sessionId: 'agent-adjustments-apply-3161',
+});
+if (
+  dryRun.toolName !== AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME ||
+  dryRun.sourceGraphRevision !== initialSnapshot.graphRevision ||
+  dryRun.receipt.dryRunPlanHash !== dryRun.dryRunPlanHash ||
+  dryRun.receipt.expectedGraphRevision !== initialSnapshot.graphRevision
+) {
+  throw new Error('agent.adjustments.dry_run did not produce a bound receipt.');
 }
 
 const result = await applyAgentGlobalAdjustments({
-  adjustments: {
-    clarity: 18,
-    contrast: 24,
-    exposure: 0.42,
-    highlights: -22,
-    saturation: 8,
-    shadows: 16,
-    temperature: 12,
-    tint: -4,
-    vibrance: 10,
-  },
+  acceptedPlanHash: dryRun.dryRunPlanHash,
+  acceptedPlanId: dryRun.dryRunPlanId,
+  adjustments,
+  expectedGraphRevision: dryRun.sourceGraphRevision,
   expectedRecipeHash: initialSnapshot.initialPreview.recipeHash,
   operationId: 'agent_adjustments_apply_3161',
   requestId: 'agent-adjustments-apply-3161',
@@ -122,6 +164,8 @@ if (result.beforePreviewHash === result.afterPreviewHash || result.changedPixelC
 if (
   result.receipt.sessionId !== 'agent-adjustments-apply-3161' ||
   result.receipt.operationId !== 'agent_adjustments_apply_3161' ||
+  result.receipt.acceptedPlanHash !== dryRun.dryRunPlanHash ||
+  result.receipt.expectedGraphRevision !== dryRun.sourceGraphRevision ||
   result.receipt.undoGraphRevision !== result.undoGraphRevision ||
   result.receipt.appliedGraphRevision !== result.appliedGraphRevision ||
   result.receipt.beforePreviewHash !== result.beforePreviewHash ||
@@ -141,12 +185,22 @@ for (const field of ['exposure', 'contrast', 'temperature', 'tint', 'vibrance'])
 const route = buildRawEngineAppServerRouteCatalog().find(
   (candidate) => candidate.commandName === AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
 );
+const dryRunRoute = buildRawEngineAppServerRouteCatalog().find(
+  (candidate) => candidate.commandName === AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
+);
 if (
   route === undefined ||
   route.family !== 'agent' ||
   !route.modes.includes(RawEngineAppServerRouteMode.ApplyDryRunPlan)
 ) {
   throw new Error('agent.adjustments.apply is missing from the mutating agent route catalog.');
+}
+if (
+  dryRunRoute === undefined ||
+  dryRunRoute.family !== 'agent' ||
+  !dryRunRoute.modes.includes(RawEngineAppServerRouteMode.DryRunCommand)
+) {
+  throw new Error('agent.adjustments.dry_run is missing from the agent route catalog.');
 }
 
 console.log('agent adjustments apply ok');
