@@ -1,7 +1,9 @@
+import cx from 'clsx';
 import type React from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GLOBAL_KEYS } from '../AppProperties';
+import { inspectorSliderTokens } from '../inspectorTokens';
 
 export type SliderChangeEvent =
   | React.ChangeEvent<HTMLInputElement>
@@ -455,18 +457,17 @@ const Slider = ({
     <>
       <span
         aria-hidden={isLabelHovered && typeof label === 'string'}
-        className={`col-start-1 row-start-1 text-sm font-medium text-text-secondary select-none transition-opacity duration-200 ease-in-out ${
-          isLabelHovered && typeof label === 'string' ? 'opacity-0' : 'opacity-100'
-        }`}
+        className={cx(
+          inspectorSliderTokens.label,
+          isLabelHovered && typeof label === 'string' ? 'opacity-0' : 'opacity-100',
+        )}
       >
         {label}
       </span>
       {typeof label === 'string' && (
         <span
           aria-hidden={!isLabelHovered}
-          className={`col-start-1 row-start-1 text-sm font-medium text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none ${
-            isLabelHovered ? 'opacity-100' : 'opacity-0'
-          }`}
+          className={cx(inspectorSliderTokens.resetLabel, isLabelHovered ? 'opacity-100' : 'opacity-0')}
         >
           {t('ui.slider.reset')}
         </span>
@@ -475,11 +476,11 @@ const Slider = ({
   );
 
   return (
-    <div className="mb-2 group" ref={containerRef}>
-      <div className="flex justify-between items-center mb-1">
+    <div className={inspectorSliderTokens.root} ref={containerRef}>
+      <div className={inspectorSliderTokens.header}>
         {canResetFromLabel ? (
           <button
-            className="grid border-0 bg-transparent p-0 text-left cursor-pointer"
+            className={inspectorSliderTokens.labelButton}
             onClick={handleReset}
             onDoubleClick={handleReset}
             onMouseEnter={() => {
@@ -493,12 +494,12 @@ const Slider = ({
             {labelContent}
           </button>
         ) : (
-          <div className="grid border-0 bg-transparent p-0 text-left cursor-default">{labelContent}</div>
+          <div className={inspectorSliderTokens.labelStatic}>{labelContent}</div>
         )}
-        <div className="w-12 text-right">
+        <div className={inspectorSliderTokens.valueSlot}>
           {isEditing ? (
             <input
-              className="w-full text-sm text-right bg-card-active border border-gray-500 rounded-sm px-1 py-0 outline-none focus:ring-1 focus:ring-blue-500 text-text-primary"
+              className={inspectorSliderTokens.valueInput}
               disabled={disabled}
               max={max}
               min={min}
@@ -512,7 +513,7 @@ const Slider = ({
             />
           ) : (
             <button
-              className={`border-0 bg-transparent p-0 text-sm text-text-primary w-full text-right select-none ${disabled ? '' : 'cursor-text'}`}
+              className={cx(inspectorSliderTokens.valueButton, !disabled && 'cursor-text')}
               disabled={disabled}
               onClick={handleValueClick}
               onDoubleClick={handleReset}
@@ -520,20 +521,16 @@ const Slider = ({
               type="button"
             >
               {decimalPlaces > 0 && numericValue === 0 ? '0' : numericValue.toFixed(decimalPlaces)}
-              {suffix && <span className="text-[10px] align-top inline-block mt-0.5 ml-0.5">{suffix}</span>}
+              {suffix && <span className={inspectorSliderTokens.suffix}>{suffix}</span>}
             </button>
           )}
         </div>
       </div>
 
-      <div className="relative w-full h-5">
+      <div className={inspectorSliderTokens.trackWrap}>
+        <div className={cx(inspectorSliderTokens.track, trackClassName || 'bg-card-active')} />
         <div
-          className={`absolute top-1/2 left-0 w-full h-1.5 -translate-y-1/4 rounded-full pointer-events-none ${
-            trackClassName || 'bg-card-active'
-          }`}
-        />
-        <div
-          className="absolute top-1/2 h-1.5 -translate-y-1/4 rounded-full pointer-events-none bg-accent/25"
+          className={inspectorSliderTokens.fill}
           style={{
             left: formatPercent(Math.min(fillPercentage, originPercentage)),
             width: formatPercent(Math.abs(fillPercentage - originPercentage)),
@@ -542,9 +539,11 @@ const Slider = ({
         <input
           ref={rangeInputRef}
           aria-label={typeof label === 'string' ? label : undefined}
-          className={`absolute top-1/2 left-0 w-full h-1.5 appearance-none bg-transparent m-0 p-0 slider-input z-10 ${
-            disabled ? 'cursor-not-allowed' : 'cursor-pointer'
-          } ${isDragging ? 'slider-thumb-active' : ''}`}
+          className={cx(
+            inspectorSliderTokens.input,
+            disabled ? 'cursor-not-allowed' : 'cursor-pointer',
+            isDragging && 'slider-thumb-active',
+          )}
           disabled={disabled}
           style={{ margin: 0, touchAction: isDragging ? 'none' : 'pan-y' }}
           max={String(max)}
