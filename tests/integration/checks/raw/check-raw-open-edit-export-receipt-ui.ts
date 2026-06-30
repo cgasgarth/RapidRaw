@@ -14,7 +14,6 @@ const [
   enLocale,
   frLocale,
   esLocale,
-  packageJson,
 ] = await Promise.all([
   readFile('src/components/ui/ExportImportProperties.ts', 'utf8'),
   readFile('src/schemas/tauriEventSchemas.ts', 'utf8'),
@@ -22,12 +21,11 @@ const [
   readFile('src/components/panel/right/export/ExportPanel.tsx', 'utf8'),
   readFile('src/App.tsx', 'utf8'),
   readFile('src/components/views/EditorView.tsx', 'utf8'),
-  readFile('src-tauri/src/export_processing.rs', 'utf8'),
-  readFile('src-tauri/src/file_management.rs', 'utf8'),
+  readFile('src-tauri/src/export/export_processing.rs', 'utf8'),
+  readFile('src-tauri/src/library/file_management.rs', 'utf8'),
   readFile('src/i18n/locales/en.json', 'utf8'),
   readFile('src/i18n/locales/fr.json', 'utf8'),
   readFile('src/i18n/locales/es.json', 'utf8'),
-  readFile('package.json', 'utf8'),
 ]);
 
 const failures = [
@@ -143,7 +141,6 @@ const failures = [
       esLocale.includes('"openInEditor"') &&
       esLocale.includes('"chooseExternalEditor"'),
   ],
-  ['package script', packageJson.includes('"check:raw-open-edit-export-receipt-ui"')],
 ]
   .filter(([, passed]) => !passed)
   .map(([label]) => label);

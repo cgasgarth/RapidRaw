@@ -12,7 +12,7 @@
 for mask refinement parameters. `src/utils/mask/maskRefinement.ts` normalizes partial
 settings and evaluates fixture weights for deterministic validation.
 
-`src-tauri/src/mask_generation.rs` mirrors the contract with
+`src-tauri/src/render/mask_generation.rs` mirrors the contract with
 `MaskRefinementParameters` and applies refinement after each visible submask
 bitmap is generated:
 

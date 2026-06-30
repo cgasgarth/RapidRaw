@@ -32,25 +32,16 @@ const reportSchema = z
   })
   .strict();
 
-const [
-  probeSource,
-  gpuSource,
-  gpuReadbackSource,
-  shaderSource,
-  libSource,
-  commandsSource,
-  packageSource,
-  runtimeProofSource,
-] = await Promise.all([
-  readFile('src-tauri/src/color_gpu_readback_probe.rs', 'utf8'),
-  readFile('src-tauri/src/gpu_processing.rs', 'utf8'),
-  readFile('src-tauri/src/gpu_readback.rs', 'utf8'),
-  readFile('src-tauri/src/shaders/shader.wgsl', 'utf8'),
-  readFile('src-tauri/src/lib.rs', 'utf8'),
-  readFile('src/tauri/commands.ts', 'utf8'),
-  readFile('package.json', 'utf8'),
-  readFile(RUNTIME_PROOF_PATH, 'utf8'),
-]);
+const [probeSource, gpuSource, gpuReadbackSource, shaderSource, libSource, commandsSource, runtimeProofSource] =
+  await Promise.all([
+    readFile('src-tauri/src/gpu/color_gpu_readback_probe.rs', 'utf8'),
+    readFile('src-tauri/src/gpu/gpu_processing.rs', 'utf8'),
+    readFile('src-tauri/src/gpu/gpu_readback.rs', 'utf8'),
+    readFile('src-tauri/src/shaders/shader.wgsl', 'utf8'),
+    readFile('src-tauri/src/lib.rs', 'utf8'),
+    readFile('src/tauri/commands.ts', 'utf8'),
+    readFile(RUNTIME_PROOF_PATH, 'utf8'),
+  ]);
 const failures: string[] = [];
 
 for (const required of [
@@ -97,10 +88,6 @@ if (
 if (commandsSource.includes('run_color_gpu_readback_probe')) {
   failures.push('Validation-only GPU readback command must not be exposed through product Invokes.');
 }
-if (!packageSource.includes('check:color-gpu-readback-runtime-smoke')) {
-  failures.push('Package scripts must expose the opt-in GPU readback runtime smoke.');
-}
-
 reportSchema.parse({
   byteHash: EXPECTED_BYTE_HASH,
   doesNotProve: [

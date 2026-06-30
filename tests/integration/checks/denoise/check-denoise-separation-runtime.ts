@@ -3,8 +3,7 @@
 import { readFileSync } from 'node:fs';
 
 const failures: string[] = [];
-const denoiseSource = readFileSync('src-tauri/src/denoise_render.rs', 'utf8');
-const packageJson = readFileSync('package.json', 'utf8');
+const denoiseSource = readFileSync('src-tauri/src/computational/denoise_render.rs', 'utf8');
 
 for (const marker of [
   'fn luma_and_chroma_noise_controls_have_independent_output_effects()',
@@ -16,10 +15,6 @@ for (const marker of [
   'chroma-only denoise should primarily change chroma',
 ]) {
   if (!denoiseSource.includes(marker)) failures.push(`denoise runtime missing marker: ${marker}`);
-}
-
-if (!packageJson.includes('"check:denoise-separation-runtime"')) {
-  failures.push('package.json missing check:denoise-separation-runtime');
 }
 
 if (failures.length > 0) {

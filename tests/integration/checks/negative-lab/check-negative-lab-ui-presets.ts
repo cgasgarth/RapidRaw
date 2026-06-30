@@ -471,7 +471,7 @@ const extractedUiSource = [
   .map((path) => readFileSync(path, 'utf8'))
   .join('\n');
 const negativeLabUiSource = `${modalSource}\n${extractedUiSource}`;
-const backendSource = readFileSync('src-tauri/src/negative_conversion.rs', 'utf8');
+const backendSource = readFileSync('src-tauri/src/raw/negative_conversion.rs', 'utf8');
 
 for (const marker of [
   'NegativeLabWorkflowStage',

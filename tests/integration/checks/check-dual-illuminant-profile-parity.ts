@@ -47,16 +47,16 @@ const failures = [
   receipt.outputs[0]?.rawProvenanceSidecarPath?.endsWith('.rawengine-provenance.json')
     ? null
     : 'export receipt lost RAW provenance sidecar path',
-  hasMarker('src-tauri/src/image_loader.rs', 'load_and_composite_with_report')
+  hasMarker('src-tauri/src/io/image_loader.rs', 'load_and_composite_with_report')
     ? null
     : 'image loader must expose report-preserving composite helper',
-  hasMarker('src-tauri/src/export_processing.rs', 'raw_development_report: Option<RawDevelopmentReport>')
+  hasMarker('src-tauri/src/export/export_processing.rs', 'raw_development_report: Option<RawDevelopmentReport>')
     ? null
     : 'export receipt output must carry RAW development report',
-  hasMarker('src-tauri/src/export_processing.rs', 'write_raw_export_provenance_sidecar')
+  hasMarker('src-tauri/src/export/export_processing.rs', 'write_raw_export_provenance_sidecar')
     ? null
     : 'export path must write RAW development provenance sidecar',
-  hasMarker('src-tauri/src/export_processing.rs', 'load_and_composite_with_report')
+  hasMarker('src-tauri/src/export/export_processing.rs', 'load_and_composite_with_report')
     ? null
     : 'export path must call report-preserving composite helper',
   hasMarker('src/components/ui/ExportImportProperties.ts', 'rawDevelopmentReport?: RawDevelopmentReport')

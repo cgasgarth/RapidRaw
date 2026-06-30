@@ -464,10 +464,10 @@ for (const marker of [
 }
 
 for (const [file, marker] of [
-  ['src-tauri/src/image_processing.rs', 'derived_output_provenance_sidecars'],
-  ['src-tauri/src/derived_output_provenance.rs', 'build_derived_output_provenance_sidecar'],
-  ['src-tauri/src/hdr_artifact_sidecar.rs', 'derived_output_provenance_sidecars'],
-  ['src-tauri/src/panorama_stitching.rs', 'derived_output_provenance_sidecars'],
+  ['src-tauri/src/render/image_processing.rs', 'derived_output_provenance_sidecars'],
+  ['src-tauri/src/merge/derived_output_provenance.rs', 'build_derived_output_provenance_sidecar'],
+  ['src-tauri/src/merge/hdr_artifact_sidecar.rs', 'derived_output_provenance_sidecars'],
+  ['src-tauri/src/merge/panorama_stitching.rs', 'derived_output_provenance_sidecars'],
 ] as const) {
   expect(readFileSync(file, 'utf8').includes(marker), `${file}: missing derived output sidecar marker ${marker}.`);
 }

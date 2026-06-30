@@ -27,7 +27,7 @@ name the transform domain explicitly:
 
 RapidRAW already has a usable baseline:
 
-- `src-tauri/src/image_processing.rs` stores `tonemapper_mode` and AgX matrices
+- `src-tauri/src/render/image_processing.rs` stores `tonemapper_mode` and AgX matrices
   in `GlobalAdjustments`.
 - `resolve_tonemapper_override` defaults RAW images to AgX and non-RAW images
   to basic when the override is enabled.

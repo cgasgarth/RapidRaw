@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 const controlsPanel = await readFile('src/components/panel/right/color/ControlsPanel.tsx', 'utf8');
 const commands = await readFile('src/tauri/commands.ts', 'utf8');
-const imageLoader = await readFile('src-tauri/src/image_loader.rs', 'utf8');
+const imageLoader = await readFile('src-tauri/src/io/image_loader.rs', 'utf8');
 const lib = await readFile('src-tauri/src/lib.rs', 'utf8');
 const schema = await readFile('src/schemas/rawReconstructionComparisonSchemas.ts', 'utf8');
 const en = JSON.parse(await readFile('src/i18n/locales/en.json', 'utf8'));

@@ -52,10 +52,11 @@ for (const invalidSuggestion of [
 }
 
 const modalSource = readFileSync('src/components/modals/negative-lab/NegativeConversionModal.tsx', 'utf8');
+const patchSamplerSource = readFileSync('src/components/modals/negative-lab/NegativeLabPatchSamplerPanel.tsx', 'utf8');
 const visualSource = readFileSync('src/validation/visual/main.tsx', 'utf8');
 const smokeSource = readFileSync('scripts/proofs/capture-visual-smoke.ts', 'utf8');
 const proofSource = readFileSync('scripts/lib/proofs/visual-smoke-proofs.ts', 'utf8');
-const rustSource = readFileSync('src-tauri/src/negative_conversion.rs', 'utf8');
+const rustSource = readFileSync('src-tauri/src/raw/negative_conversion.rs', 'utf8');
 const libSource = readFileSync('src-tauri/src/lib.rs', 'utf8');
 
 for (const marker of [
@@ -67,7 +68,7 @@ for (const marker of [
   'handleApplyShadowPatchBlackPointSuggestion',
   'negativeLabShadowPatchBlackPointSuggestionSchema',
 ]) {
-  if (!modalSource.includes(marker) && !visualSource.includes(marker)) {
+  if (!modalSource.includes(marker) && !patchSamplerSource.includes(marker) && !visualSource.includes(marker)) {
     throw new Error(`Negative Lab shadow black-point UI marker missing: ${marker}`);
   }
 }

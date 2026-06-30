@@ -53,7 +53,7 @@ const invalidFixtures = z
   .array(invalidFixtureSchema)
   .min(1)
   .parse(JSON.parse(readFileSync(resolve('fixtures/masks/invalid/invalid-mask-refinement-parameters.json'), 'utf8')));
-const rustMaskGenerationSource = readFileSync(resolve('src-tauri/src/mask_generation.rs'), 'utf8');
+const rustMaskGenerationSource = readFileSync(resolve('src-tauri/src/render/mask_generation.rs'), 'utf8');
 
 for (const fixture of fixtures) {
   const actual = normalizeMaskRefinementParameters(fixture.input);

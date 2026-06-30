@@ -44,8 +44,8 @@ const fixture = rawDevelopmentReportSchema.parse({
 
 const files = {
   appProperties: readFileSync('src/components/ui/AppProperties.tsx', 'utf8'),
-  cacheUtils: readFileSync('src-tauri/src/cache_utils.rs', 'utf8'),
-  imageLoader: readFileSync('src-tauri/src/image_loader.rs', 'utf8'),
+  cacheUtils: readFileSync('src-tauri/src/io/cache_utils.rs', 'utf8'),
+  imageLoader: readFileSync('src-tauri/src/io/image_loader.rs', 'utf8'),
   receipt: readFileSync('src/utils/cameraProfileProvenanceReceipt.ts', 'utf8'),
   metadataPanel: readFileSync('src/components/panel/right/metadata/MetadataPanel.tsx', 'utf8'),
   schemas: readFileSync('src/schemas/imageLoaderSchemas.ts', 'utf8'),

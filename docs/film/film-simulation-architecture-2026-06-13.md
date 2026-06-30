@@ -30,7 +30,7 @@ governed rather than discarded:
   `glowAmount`, `halationAmount`, and `flareAmount`;
 - `src-tauri/src/lut_processing.rs` parses LUT files and can generate/export
   cube LUT data;
-- `src-tauri/src/gpu_processing.rs` uploads LUTs as 3D textures and samples
+- `src-tauri/src/gpu/gpu_processing.rs` uploads LUTs as 3D textures and samples
   them in the shader;
 - `src-tauri/src/shaders/shader.wgsl` already contains LUT sampling, grain,
   glow, and halation shader parameters;

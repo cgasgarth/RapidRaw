@@ -55,7 +55,7 @@ Backend entry points:
   Tauri commands.
 - `src-tauri/src/app_state.rs` stores the latest stitched output in
   `panorama_result`.
-- `src-tauri/src/panorama_stitching.rs` owns the command flow, image loading,
+- `src-tauri/src/merge/panorama_stitching.rs` owns the command flow, image loading,
   feature matching, homography graph, stitch ordering, preview creation, and
   save path.
 - `src-tauri/src/panorama_utils/processing.rs` owns feature detection, BRIEF
