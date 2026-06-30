@@ -52,26 +52,25 @@ export function useEditorActions() {
 
   const setAdjustments = useCallback(
     (value: Partial<Adjustments> | ((prev: Adjustments) => Adjustments)) => {
-      setEditor((state) => {
-        const prev = state.adjustments;
-        const newAdjustments = typeof value === 'function' ? value(prev) : { ...prev, ...value };
-        const lastBasicToneCommand =
-          state.selectedImage?.path && hasBasicToneAdjustmentChange(prev, newAdjustments)
-            ? buildBasicToneCommandEnvelope(
-                newAdjustments,
-                buildBasicToneImageCommandContext({
-                  expectedGraphRevision: `history_${state.historyIndex}`,
-                  imagePath: state.selectedImage.path,
-                  operationId: createOperationId(),
-                  sessionId: BASIC_TONE_SESSION_ID,
-                }),
-                { dryRun: true },
-              )
-            : state.lastBasicToneCommand;
+      const state = useEditorStore.getState();
+      const prev = state.adjustments;
+      const newAdjustments = typeof value === 'function' ? value(prev) : { ...prev, ...value };
+      const lastBasicToneCommand =
+        state.selectedImage?.path && hasBasicToneAdjustmentChange(prev, newAdjustments)
+          ? buildBasicToneCommandEnvelope(
+              newAdjustments,
+              buildBasicToneImageCommandContext({
+                expectedGraphRevision: `history_${state.historyIndex + 1}`,
+                imagePath: state.selectedImage.path,
+                operationId: createOperationId(),
+                sessionId: BASIC_TONE_SESSION_ID,
+              }),
+              { dryRun: true },
+            )
+          : state.lastBasicToneCommand;
 
-        debouncedSetHistory(newAdjustments);
-        return { adjustments: newAdjustments, lastBasicToneCommand };
-      });
+      setEditor({ adjustments: newAdjustments, lastBasicToneCommand });
+      useEditorStore.getState().pushHistory(newAdjustments);
     },
     [setEditor],
   );
@@ -84,7 +83,7 @@ export function useEditorActions() {
         adjustments.aspectRatio && adjustments.aspectRatio !== 0 ? 1 / adjustments.aspectRatio : null;
       const newOrientationSteps = ((adjustments.orientationSteps || 0) + increment) % 4;
       const newCrop =
-        selectedImage && selectedImage.width && selectedImage.height
+        selectedImage?.width && selectedImage.height
           ? calculateCenteredCrop(selectedImage.width, selectedImage.height, newOrientationSteps, newAspectRatio)
           : null;
 
