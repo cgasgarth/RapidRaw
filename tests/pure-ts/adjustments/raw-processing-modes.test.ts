@@ -9,6 +9,8 @@ import {
   RAW_PROCESSING_MODE_RECIPES,
 } from '../../../src/utils/rawProcessingModes';
 
+type Translate = Parameters<typeof getRawProcessingModeDisplayCopy>[1];
+
 test('RAW processing mode recipes map to distinct runtime behavior', () => {
   const fast = buildRawProcessingModePatch('fast');
   const balanced = buildRawProcessingModePatch('balanced');
@@ -32,14 +34,14 @@ test('RAW processing mode normalization falls back to balanced', () => {
 });
 
 test('RAW processing mode display copy stays localized while provenance remains available', () => {
-  const translate = ((key: string) => {
+  const translate: Translate = (key: string) => {
     const labels: Record<string, string> = {
       'settings.processing.rawModes.balanced.label': 'Balanced',
       'settings.processing.rawModes.fast.label': 'Fast',
       'settings.processing.rawModes.maximum.label': 'Maximum',
     };
     return labels[key] ?? key;
-  }) as unknown as Parameters<typeof getRawProcessingModeDisplayCopy>[1];
+  };
 
   expect(getRawProcessingModeDisplayCopy('balanced', translate)).toBe('Balanced');
   expect(getRawProcessingModeProvenance('balanced')).toBe('default_quality_capture_preprocessing_v1');
