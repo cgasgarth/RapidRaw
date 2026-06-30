@@ -154,6 +154,7 @@ import {
   type NegativeLabPatchRole,
   NegativeLabPatchSamplerPanel,
 } from './NegativeLabPatchSamplerPanel';
+import { NegativeLabProfileComparisonGrid } from './NegativeLabProfileComparisonGrid';
 import { NegativeLabQcProofPanel } from './NegativeLabQcProofPanel';
 import {
   ACQUISITION_SOURCE_FAMILY_LABEL_KEYS,
@@ -457,6 +458,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [profileSearchQuery, setProfileSearchQuery] = useState('');
   const [profileFilter, setProfileFilter] = useState<NegativeLabProfileFilter>('all');
   const [profileSort, setProfileSort] = useState<NegativeLabProfileSort>('catalog');
+  const [browsedComparisonProfileId, setBrowsedComparisonProfileId] = useState<string | null>(null);
   const [frameHealthFilter, setFrameHealthFilter] = useState<NegativeLabFrameHealthFilter>('all');
   const [frameHealthSort, setFrameHealthSort] = useState<NegativeLabFrameHealthSort>('roll_order');
   const [qcOverlayVisibility, setQcOverlayVisibility] = useState<NegativeLabQcOverlayVisibility>(
@@ -1336,6 +1338,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setCustomBaseSampleRect(CUSTOM_BASE_SAMPLE_DEFAULT);
       setCustomBaseSampleEstimate(null);
       setActivePathIndex(0);
+      setBrowsedComparisonProfileId(null);
       setIsLoading(true);
       setProgress(null);
       setSaveOptions(DEFAULT_SAVE_OPTIONS);
@@ -3483,114 +3486,15 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               </UiText>
             </div>
           </div>
-          <div
-            className="mb-3 rounded-md border border-surface bg-bg-primary p-3"
-            data-active-frame={profileComparisonRows[0]?.frameScope.activeFrameLabel ?? ''}
-            data-candidate-count={profileComparisonRows.length}
-            data-queued-count={profileComparisonRows[0]?.frameScope.queuedCount ?? 0}
-            data-selected-profile-id={selectedProfile?.presetId ?? ''}
-            data-selected-profile-provenance-hash={selectedProfileProvenanceHash ?? ''}
-            data-testid="negative-lab-profile-comparison-matrix"
-          >
-            <div className="mb-2 flex items-start justify-between gap-3">
-              <div>
-                <UiText variant={TextVariants.small} className="font-semibold text-text-primary">
-                  {t('modals.negativeConversion.workflowPreset')}
-                </UiText>
-                <UiText variant={TextVariants.small} className="text-text-tertiary">
-                  {t('modals.negativeConversion.profileResultCount', {
-                    totalCount: NEGATIVE_LAB_PROFILE_BROWSER_ROWS.length,
-                    visibleCount: profileComparisonRows.length,
-                  })}
-                </UiText>
-              </div>
-              <span
-                className="rounded border border-surface bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary"
-                data-testid="negative-lab-profile-comparison-active-frame"
-              >
-                {profileComparisonRows[0]?.frameScope.activeFrameLabel ?? ''}
-              </span>
-            </div>
-            <div className="grid grid-cols-1 gap-2">
-              {profileComparisonRows.map((candidate) => {
-                const profile = candidate.profile;
-                const isSelected = selectedPresetId === profile.presetId;
-
-                return (
-                  <button
-                    aria-pressed={isSelected}
-                    className={cx(
-                      'rounded-md border p-2 text-left transition-colors',
-                      isSelected
-                        ? 'border-accent bg-accent/10 text-text-primary'
-                        : 'border-surface bg-bg-secondary text-text-secondary hover:bg-surface',
-                    )}
-                    data-claim-policy={profile.claimPolicy}
-                    data-comparison-preview={candidate.previewSwatch.deltaCss}
-                    data-delta-summary={candidate.deltaSummary}
-                    data-evidence-fixture-count={profile.evidenceFixtureCount}
-                    data-profile-provenance-hash={candidate.selectedProfileSnapshot.profileProvenanceHash}
-                    data-profile-status={profile.profileStatus}
-                    data-runtime-status={profile.runtimeStatus}
-                    data-selected={String(isSelected)}
-                    data-testid={`negative-lab-profile-comparison-row-${profile.presetId}`}
-                    key={profile.presetId}
-                    onClick={() => {
-                      handlePresetSelect(profile);
-                    }}
-                    type="button"
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="min-w-0 truncate text-xs font-semibold">{profile.displayName}</span>
-                      <span
-                        className="shrink-0 rounded border border-surface bg-bg-primary px-2 py-0.5 text-[10px]"
-                        data-testid={`negative-lab-profile-comparison-claim-${profile.presetId}`}
-                      >
-                        {profile.claimLevel === 'measured_profile'
-                          ? t('modals.negativeConversion.presetClaimMeasured')
-                          : profile.claimLevel === 'user_profile'
-                            ? t('modals.negativeConversion.presetClaimUser')
-                            : t('modals.negativeConversion.presetClaimGeneric')}
-                      </span>
-                    </span>
-                    <span
-                      aria-hidden="true"
-                      className="mt-2 block h-6 rounded border border-surface"
-                      data-preview-candidate-color={candidate.previewSwatch.candidateCss}
-                      data-preview-current-color={candidate.previewSwatch.currentCss}
-                      data-preview-tone-bias={candidate.previewSwatch.toneBias}
-                      data-testid={`negative-lab-profile-comparison-preview-${profile.presetId}`}
-                      style={{ background: candidate.previewSwatch.deltaCss }}
-                    />
-                    <span className="mt-1 flex flex-wrap gap-1.5 text-[10px] text-text-tertiary">
-                      <span data-testid={`negative-lab-profile-comparison-runtime-${profile.presetId}`}>
-                        {profile.runtimeStatus === 'runtime_parameter_applied'
-                          ? t('modals.negativeConversion.presetRuntimeApplied')
-                          : t('modals.negativeConversion.presetRuntimeCatalogOnly')}
-                      </span>
-                      <span data-testid={`negative-lab-profile-comparison-evidence-${profile.presetId}`}>
-                        {t('modals.negativeConversion.profileEvidenceCount', {
-                          fixtureCount: profile.evidenceFixtureCount,
-                        })}
-                      </span>
-                    </span>
-                    <span
-                      className="mt-1 block truncate text-[10px] text-text-tertiary"
-                      data-testid={`negative-lab-profile-comparison-delta-${profile.presetId}`}
-                    >
-                      {candidate.deltaSummary}
-                    </span>
-                    <span
-                      className="mt-1 block truncate text-[10px] text-text-tertiary"
-                      data-testid={`negative-lab-profile-comparison-nonclaim-${profile.presetId}`}
-                    >
-                      {profile.doesNotProve.join(', ')}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <NegativeLabProfileComparisonGrid
+            browsedProfileId={browsedComparisonProfileId}
+            onBrowseProfile={setBrowsedComparisonProfileId}
+            onUseProfile={handlePresetSelect}
+            rows={profileComparisonRows}
+            selectedPresetId={selectedPresetId}
+            selectedProfileProvenanceHash={selectedProfileProvenanceHash}
+            totalProfileCount={NEGATIVE_LAB_PROFILE_BROWSER_ROWS.length}
+          />
           <div className="relative mb-3">
             <input
               aria-label={t('modals.negativeConversion.profileSearch')}
