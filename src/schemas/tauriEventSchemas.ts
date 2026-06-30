@@ -79,12 +79,27 @@ export const base64PayloadSchema = z
 
 export const gamutWarningOverlayPayloadSchema = z
   .object({
+    black_point_compensation: z.string().trim().min(1),
+    color_managed_transform: z.string().trim().min(1),
     coverage_ratio: z.number().min(0).max(1),
+    effective_color_profile: z.string().trim().min(1),
+    effective_rendering_intent: z.string().trim().min(1),
+    export_soft_proof_recipe_id: z.string().trim().min(1),
     height: z.number().int().positive(),
     mask_data_url: z.string().startsWith('data:image/png;base64,'),
     max_channel_value: z.number().int().min(0).max(255),
     min_channel_value: z.number().int().min(0).max(255),
     pixel_count: z.number().int().nonnegative(),
+    policy_status: z.string().trim().min(1),
+    policy_version: z.string().trim().min(1),
+    preview_basis: z.literal('export_preview'),
+    source_image_path: z.string().trim().min(1),
+    source_precision_path: z.string().trim().min(1),
+    transform_applied: z.boolean(),
+    transform_policy_fingerprint: z
+      .string()
+      .trim()
+      .regex(/^sha256:/u),
     warning_pixel_count: z.number().int().nonnegative(),
     width: z.number().int().positive(),
   })

@@ -18,7 +18,10 @@ import {
   INITIAL_ADJUSTMENTS,
 } from '../../utils/adjustments';
 import { COLOR_GRADING_PRESETS } from '../../utils/colorGradingPresets';
-import { formatGamutWarningCoverage } from '../../utils/gamutWarningDisplay';
+import {
+  formatGamutWarningCoverage,
+  isCurrentExportSoftProofGamutWarningOverlay,
+} from '../../utils/gamutWarningDisplay';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../utils/profileTonePresets';
 import { applyProfileToneToRgbPixel } from '../../utils/profileToneRuntime';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../utils/selectiveColorRanges';
@@ -848,11 +851,22 @@ export default function ColorPanel({
   const [activeChannelMixerOutput, setActiveChannelMixerOutput] = useState<ChannelMixerOutput>('red');
   const [selectiveColorPreviewMode, setSelectiveColorPreviewMode] = useState<SelectiveColorPreviewMode>('adjusted');
   const gamutWarningOverlay = useEditorStore((state) => state.gamutWarningOverlay);
+  const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
+  const exportSoftProofRecipeId = useEditorStore((state) => state.exportSoftProofRecipeId);
+  const exportSoftProofTransform = useEditorStore((state) => state.exportSoftProofTransform);
+  const isExportSoftProofEnabled = useEditorStore((state) => state.isExportSoftProofEnabled);
   const isGamutWarningOverlayVisible = useEditorStore((state) => state.isGamutWarningOverlayVisible);
   const setEditor = useEditorStore((state) => state.setEditor);
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
   const isWgpuEnabled = appSettings?.useWgpuRenderer !== false;
-  const gamutWarningCoverage = formatGamutWarningCoverage(gamutWarningOverlay);
+  const isCurrentGamutWarningOverlay = isCurrentExportSoftProofGamutWarningOverlay(gamutWarningOverlay, {
+    exportSoftProofRecipeId,
+    exportSoftProofTransform,
+    isExportSoftProofEnabled,
+    selectedImagePath,
+  });
+  const currentGamutWarningOverlay = isCurrentGamutWarningOverlay ? gamutWarningOverlay : null;
+  const gamutWarningCoverage = formatGamutWarningCoverage(currentGamutWarningOverlay);
 
   const HSL_COLORS = useMemo<Array<ColorProps>>(
     () =>
@@ -1357,7 +1371,7 @@ export default function ColorPanel({
           data-active-camera-profile={adjustments.cameraProfile}
           data-active-tone-curve={adjustments.toneCurve}
           data-export-transform-label={activeExportPreset?.name ?? ''}
-          data-gamut-warning-count={gamutWarningOverlay?.warning_pixel_count ?? 0}
+          data-gamut-warning-count={currentGamutWarningOverlay?.warning_pixel_count ?? 0}
           data-histogram-hook="histogram"
           data-testid="professional-color-workspace-panel"
           data-vectorscope-hook="vectorscope"
@@ -1408,11 +1422,17 @@ export default function ColorPanel({
       {!isForMask && (
         <div
           className="rounded-md border border-border bg-bg-tertiary p-2"
-          data-coverage-ratio={(gamutWarningOverlay?.coverage_ratio ?? 0).toFixed(6)}
-          data-proof-mask-height={gamutWarningOverlay?.height ?? 0}
-          data-proof-mask-width={gamutWarningOverlay?.width ?? 0}
-          data-proof-ready={String(gamutWarningOverlay !== null)}
-          data-warning-pixel-count={gamutWarningOverlay?.warning_pixel_count ?? 0}
+          data-coverage-ratio={(currentGamutWarningOverlay?.coverage_ratio ?? 0).toFixed(6)}
+          data-effective-color-profile={currentGamutWarningOverlay?.effective_color_profile ?? ''}
+          data-effective-rendering-intent={currentGamutWarningOverlay?.effective_rendering_intent ?? ''}
+          data-export-soft-proof-recipe-id={currentGamutWarningOverlay?.export_soft_proof_recipe_id ?? ''}
+          data-preview-basis={currentGamutWarningOverlay?.preview_basis ?? ''}
+          data-proof-mask-height={currentGamutWarningOverlay?.height ?? 0}
+          data-proof-mask-width={currentGamutWarningOverlay?.width ?? 0}
+          data-proof-ready={String(currentGamutWarningOverlay !== null)}
+          data-source-image-path={currentGamutWarningOverlay?.source_image_path ?? ''}
+          data-transform-policy-fingerprint={currentGamutWarningOverlay?.transform_policy_fingerprint ?? ''}
+          data-warning-pixel-count={currentGamutWarningOverlay?.warning_pixel_count ?? 0}
           data-testid="gamut-warning-controls"
           data-visible={String(isGamutWarningOverlayVisible)}
         >
@@ -1429,9 +1449,9 @@ export default function ColorPanel({
                 data-testid="gamut-warning-proof-details"
               >
                 {t('adjustments.color.gamutWarning.proofDetails', {
-                  height: gamutWarningOverlay?.height ?? 0,
-                  pixels: gamutWarningOverlay?.warning_pixel_count ?? 0,
-                  width: gamutWarningOverlay?.width ?? 0,
+                  height: currentGamutWarningOverlay?.height ?? 0,
+                  pixels: currentGamutWarningOverlay?.warning_pixel_count ?? 0,
+                  width: currentGamutWarningOverlay?.width ?? 0,
                 })}
               </UiText>
             </div>

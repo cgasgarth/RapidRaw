@@ -190,6 +190,7 @@ export function useImageProcessing(
           ? {
               blackPointCompensation: selectedProofRecipe.blackPointCompensation ?? false,
               colorProfile: selectedProofRecipe.colorProfile ?? 'srgb',
+              exportSoftProofRecipeId: selectedProofRecipe.id,
               jsAdjustments: payload,
               renderingIntent: selectedProofRecipe.renderingIntent ?? 'relativeColorimetric',
               targetResolution: targetRes || null,
@@ -198,7 +199,11 @@ export function useImageProcessing(
         const proofResult =
           !dragging && proofRequest
             ? await Promise.all([
-                invokeWithSchema(Invokes.GenerateExportSoftProofPreview, proofRequest, previewBufferResponseSchema),
+                invokeWithSchema(
+                  Invokes.GenerateExportSoftProofPreview,
+                  { request: proofRequest },
+                  previewBufferResponseSchema,
+                ),
                 invokeWithSchema(
                   Invokes.ResolveExportSoftProofTransformMetadata,
                   proofRequest,

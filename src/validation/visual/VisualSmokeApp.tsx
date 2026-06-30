@@ -540,6 +540,8 @@ function BrushMaskCanvasVisualSmoke() {
                 brushSettings={brushSettings}
                 crop={null}
                 cursorStyle="crosshair"
+                exportSoftProofRecipeId={null}
+                exportSoftProofTransform={null}
                 finalPreviewUrl={brushMaskCanvasImageDataUrl}
                 gamutWarningOverlay={null}
                 handleCropComplete={() => {}}
@@ -553,6 +555,7 @@ function BrushMaskCanvasVisualSmoke() {
                 }}
                 isAiEditing={false}
                 isCropping={false}
+                isExportSoftProofEnabled={false}
                 isMaskControlHovered={false}
                 isMasking
                 isMaxZoom={false}

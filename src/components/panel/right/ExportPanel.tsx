@@ -60,7 +60,10 @@ import {
   exportSoftProofTransformResponseSchema,
   getSoftProofProfileCompareStatus,
 } from '../../../utils/exportSoftProofProfileCompare';
-import { formatGamutWarningCoverage } from '../../../utils/gamutWarningDisplay';
+import {
+  formatGamutWarningCoverage,
+  isCurrentExportSoftProofGamutWarningOverlay,
+} from '../../../utils/gamutWarningDisplay';
 import { buildRawWarningChips } from '../../../utils/rawWarningReceipts';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import { debounce } from '../../../utils/timing';
@@ -353,16 +356,20 @@ export default function ExportPanel({
   const {
     adjustments,
     exportSoftProofTransform,
+    exportSoftProofRecipeId,
     gamutWarningOverlay,
     isExportSoftProofEnabled,
     isGamutWarningOverlayVisible,
+    selectedImagePath,
   } = useEditorStore(
     useShallow((state) => ({
       adjustments: state.adjustments,
       exportSoftProofTransform: state.exportSoftProofTransform,
+      exportSoftProofRecipeId: state.exportSoftProofRecipeId,
       gamutWarningOverlay: state.gamutWarningOverlay,
       isExportSoftProofEnabled: state.isExportSoftProofEnabled,
       isGamutWarningOverlayVisible: state.isGamutWarningOverlayVisible,
+      selectedImagePath: state.selectedImage?.path ?? null,
     })),
   );
   const thumbnailSmartPreviews = useProcessStore((state) => state.thumbnailSmartPreviews);
@@ -1241,7 +1248,14 @@ export default function ExportPanel({
     const warnings: Array<{ code: string; message: string }> = [];
     const transformProfile = exportSoftProofTransform?.effectiveColorProfile;
     const transformIntent = exportSoftProofTransform?.effectiveRenderingIntent;
-    const gamutCoverage = gamutWarningOverlay?.coverage_ratio ?? 0;
+    const isCurrentVisibleGamutOverlay =
+      isGamutWarningOverlayVisible &&
+      isCurrentExportSoftProofGamutWarningOverlay(gamutWarningOverlay, {
+        exportSoftProofRecipeId,
+        exportSoftProofTransform,
+        isExportSoftProofEnabled,
+        selectedImagePath,
+      });
 
     if (!isExportSoftProofEnabled || exportSoftProofTransform === null) {
       warnings.push({
@@ -1273,7 +1287,7 @@ export default function ExportPanel({
       });
     }
 
-    if (isGamutWarningOverlayVisible && gamutCoverage > 0) {
+    if (isCurrentVisibleGamutOverlay) {
       warnings.push({
         code: 'gamut-clipping-visible',
         message: t('export.softProofWarnings.gamutClipping', {
@@ -1285,12 +1299,14 @@ export default function ExportPanel({
     return warnings;
   }, [
     exportSoftProofTransform,
+    exportSoftProofRecipeId,
     fileFormat,
     gamutWarningOverlay,
     hasColorManagedTransform,
     isExportSoftProofEnabled,
     isGamutWarningOverlayVisible,
     selectedColorProfileLabel,
+    selectedImagePath,
     selectedRenderingIntentLabel,
     t,
   ]);

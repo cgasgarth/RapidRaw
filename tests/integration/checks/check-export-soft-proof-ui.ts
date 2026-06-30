@@ -49,6 +49,7 @@ for (const marker of [
   'selectedProofRecipe',
   'blackPointCompensation: selectedProofRecipe.blackPointCompensation ?? false',
   "colorProfile: selectedProofRecipe.colorProfile ?? 'srgb'",
+  'exportSoftProofRecipeId: selectedProofRecipe.id',
   "renderingIntent: selectedProofRecipe.renderingIntent ?? 'relativeColorimetric'",
   'exportSoftProofTransformResponseSchema',
 ]) {
@@ -115,6 +116,7 @@ for (const marker of [
   'soft-proof-profile-mismatch',
   'soft-proof-intent-mismatch',
   'gamut-clipping-visible',
+  'isCurrentExportSoftProofGamutWarningOverlay(gamutWarningOverlay',
   'formatGamutWarningCoverage(gamutWarningOverlay)',
   'export.status.colorManagedTransform',
 ]) {
@@ -130,6 +132,46 @@ if (
   !storeSource.includes('ExportSoftProofTransformState')
 ) {
   failures.push('Editor store missing non-mutating soft-proof defaults.');
+}
+
+for (const marker of [
+  'preview_basis: z.literal',
+  'export_soft_proof_recipe_id',
+  'source_image_path',
+  'transform_policy_fingerprint',
+]) {
+  if (!tauriEventSchemasSource.includes(marker)) {
+    failures.push(`Gamut warning overlay schema missing provenance marker: ${marker}`);
+  }
+}
+
+for (const marker of [
+  'isPendingExportSoftProofGamutWarningOverlay',
+  'gamutWarningOverlay: null',
+  'exportSoftProofRecipeId',
+  'exportSoftProofTransform',
+]) {
+  if (!storeSource.includes(marker)) failures.push(`Editor store missing overlay stale-state marker: ${marker}`);
+}
+
+for (const marker of [
+  'isCurrentExportSoftProofGamutWarningOverlay(gamutWarningOverlay',
+  'data-preview-basis={gamutWarningOverlay.preview_basis}',
+  'data-transform-policy-fingerprint={gamutWarningOverlay.transform_policy_fingerprint}',
+  'data-export-soft-proof-recipe-id={gamutWarningOverlay.export_soft_proof_recipe_id}',
+]) {
+  if (!read('src/components/panel/editor/ImageCanvas.tsx').includes(marker)) {
+    failures.push(`ImageCanvas missing current-proof overlay marker: ${marker}`);
+  }
+}
+
+for (const marker of [
+  'export_soft_proof_recipe_id: Option<String>',
+  'calculate_gamut_warning_overlay_from_image',
+  '"preview_basis": "export_preview"',
+  '"transform_policy_fingerprint": proof_metadata.transform_policy_fingerprint',
+]) {
+  if (!rustLibSource.includes(marker)) failures.push(`Rust soft-proof overlay event missing ${marker}`);
 }
 
 if (typeof locale.editor?.toolbar?.tooltips?.exportSoftProof !== 'string') {
