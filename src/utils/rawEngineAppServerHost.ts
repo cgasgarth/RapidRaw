@@ -188,6 +188,24 @@ import {
   NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME,
   NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME,
 } from './negativeLabAgentAppServerToolDispatch';
+import {
+  buildNegativeLabAgentQcProofReadOnly,
+  inspectNegativeLabAgentReadOnly,
+  NEGATIVE_LAB_AGENT_CONVERSION_PLAN_TOOL_NAME,
+  NEGATIVE_LAB_AGENT_INSPECT_TOOL_NAME,
+  NEGATIVE_LAB_AGENT_QC_PROOF_TOOL_NAME,
+  NEGATIVE_LAB_AGENT_READ_ONLY_TOOL_NAMES,
+  NEGATIVE_LAB_AGENT_ROLL_NORMALIZATION_PLAN_TOOL_NAME,
+  NEGATIVE_LAB_AGENT_STOCK_FAMILY_PLAN_TOOL_NAME,
+  negativeLabAgentConversionPlanRequestSchema,
+  negativeLabAgentInspectRequestSchema,
+  negativeLabAgentQcProofRequestSchema,
+  negativeLabAgentRollNormalizationPlanRequestSchema,
+  negativeLabAgentStockFamilyPlanRequestSchema,
+  planNegativeLabAgentConversionReadOnly,
+  planNegativeLabAgentRollNormalizationReadOnly,
+  planNegativeLabAgentStockFamilyReadOnly,
+} from './negativeLabAgentReadOnlyAppServerTools';
 import { NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST } from './negativeLabAppServerRoutes';
 import { ToneColorAppServerRouteStatus } from './toneColorAppServerRouteIds';
 import { TONE_COLOR_APP_SERVER_ROUTES } from './toneColorAppServerRoutes';
@@ -675,6 +693,66 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       toolNames: [NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME],
     }),
     buildRouteCatalogEntry({
+      commandName: NEGATIVE_LAB_AGENT_INSPECT_TOOL_NAME,
+      family: 'negative_lab',
+      inputSchemaNames: ['NegativeLabAgentInspectRequestV1'],
+      modes: [RawEngineAppServerRouteMode.Read],
+      outputSchemaNames: ['NegativeLabAgentInspectResponseV1'],
+      runtimeCheckScripts: [
+        'bun tests/integration/checks/check-negative-lab-agent-readonly-tools.ts',
+        'check:negative-lab-app-server-routes',
+      ],
+      toolNames: [NEGATIVE_LAB_AGENT_INSPECT_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
+      commandName: NEGATIVE_LAB_AGENT_CONVERSION_PLAN_TOOL_NAME,
+      family: 'negative_lab',
+      inputSchemaNames: ['NegativeLabAgentConversionPlanRequestV1'],
+      modes: [RawEngineAppServerRouteMode.Read],
+      outputSchemaNames: ['NegativeLabAgentConversionPlanResponseV1'],
+      runtimeCheckScripts: [
+        'bun tests/integration/checks/check-negative-lab-agent-readonly-tools.ts',
+        'check:negative-lab-app-server-routes',
+      ],
+      toolNames: [NEGATIVE_LAB_AGENT_CONVERSION_PLAN_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
+      commandName: NEGATIVE_LAB_AGENT_ROLL_NORMALIZATION_PLAN_TOOL_NAME,
+      family: 'negative_lab',
+      inputSchemaNames: ['NegativeLabAgentRollNormalizationPlanRequestV1'],
+      modes: [RawEngineAppServerRouteMode.Read],
+      outputSchemaNames: ['NegativeLabAgentRollNormalizationPlanResponseV1'],
+      runtimeCheckScripts: [
+        'bun tests/integration/checks/check-negative-lab-agent-readonly-tools.ts',
+        'check:negative-lab-app-server-routes',
+      ],
+      toolNames: [NEGATIVE_LAB_AGENT_ROLL_NORMALIZATION_PLAN_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
+      commandName: NEGATIVE_LAB_AGENT_QC_PROOF_TOOL_NAME,
+      family: 'negative_lab',
+      inputSchemaNames: ['NegativeLabAgentQcProofRequestV1'],
+      modes: [RawEngineAppServerRouteMode.Read],
+      outputSchemaNames: ['NegativeLabAgentQcProofResponseV1'],
+      runtimeCheckScripts: [
+        'bun tests/integration/checks/check-negative-lab-agent-readonly-tools.ts',
+        'check:negative-lab-app-server-routes',
+      ],
+      toolNames: [NEGATIVE_LAB_AGENT_QC_PROOF_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
+      commandName: NEGATIVE_LAB_AGENT_STOCK_FAMILY_PLAN_TOOL_NAME,
+      family: 'negative_lab',
+      inputSchemaNames: ['NegativeLabAgentStockFamilyPlanRequestV1'],
+      modes: [RawEngineAppServerRouteMode.Read],
+      outputSchemaNames: ['NegativeLabAgentStockFamilyPlanResponseV1'],
+      runtimeCheckScripts: [
+        'bun tests/integration/checks/check-negative-lab-agent-readonly-tools.ts',
+        'check:negative-lab-app-server-routes',
+      ],
+      toolNames: [NEGATIVE_LAB_AGENT_STOCK_FAMILY_PLAN_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
       commandName: AGENT_GEOMETRY_APPLY_TOOL_NAME,
       family: 'agent',
       inputSchemaNames: [AGENT_GEOMETRY_APPLY_INPUT_SCHEMA_NAME],
@@ -978,6 +1056,7 @@ const APPROVED_AGENT_APP_SERVER_TOOL_NAMES = new Set<string>([
   AGENT_RETOUCH_APPLY_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
   NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME,
+  ...NEGATIVE_LAB_AGENT_READ_ONLY_TOOL_NAMES,
   NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME,
 ]);
 
@@ -1057,6 +1136,27 @@ const dispatchAgentAppServerTool = async (
     case NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME:
     case NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME:
       result = dispatchNegativeLabAgentAppServerTool(request);
+      break;
+    case NEGATIVE_LAB_AGENT_INSPECT_TOOL_NAME:
+      result = inspectNegativeLabAgentReadOnly(negativeLabAgentInspectRequestSchema.parse(request.arguments));
+      break;
+    case NEGATIVE_LAB_AGENT_CONVERSION_PLAN_TOOL_NAME:
+      result = planNegativeLabAgentConversionReadOnly(
+        negativeLabAgentConversionPlanRequestSchema.parse(request.arguments),
+      );
+      break;
+    case NEGATIVE_LAB_AGENT_ROLL_NORMALIZATION_PLAN_TOOL_NAME:
+      result = planNegativeLabAgentRollNormalizationReadOnly(
+        negativeLabAgentRollNormalizationPlanRequestSchema.parse(request.arguments),
+      );
+      break;
+    case NEGATIVE_LAB_AGENT_QC_PROOF_TOOL_NAME:
+      result = buildNegativeLabAgentQcProofReadOnly(negativeLabAgentQcProofRequestSchema.parse(request.arguments));
+      break;
+    case NEGATIVE_LAB_AGENT_STOCK_FAMILY_PLAN_TOOL_NAME:
+      result = planNegativeLabAgentStockFamilyReadOnly(
+        negativeLabAgentStockFamilyPlanRequestSchema.parse(request.arguments),
+      );
       break;
     case AGENT_GEOMETRY_APPLY_TOOL_NAME:
       result = applyAgentGeometry(agentGeometryApplyRequestSchema.parse(request.arguments));
