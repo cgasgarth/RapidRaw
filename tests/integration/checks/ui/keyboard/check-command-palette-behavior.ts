@@ -25,6 +25,11 @@ const requiredCommandIds = [
 
 const imageA = makeImage('/photos/a.ARW', { ISO: '100' });
 const imageB = makeImage('/photos/b.ARW', { ISO: '200' });
+const alaskaHdrStack = [
+  makeImage('/photos/alaska/_DSC7527.ARW', { DateTimeOriginal: '2026:01:01 00:00:00', ExposureTime: '1/1000' }, 0),
+  makeImage('/photos/alaska/_DSC7528.ARW', { DateTimeOriginal: '2026:01:01 00:00:01', ExposureTime: '1/250' }, 1),
+  makeImage('/photos/alaska/_DSC7529.ARW', { DateTimeOriginal: '2026:01:01 00:00:02', ExposureTime: '1/60' }, 2),
+];
 const selectedImage = makeSelectedImage(imageA.path, true);
 
 assertCommandsAreRegistered();
@@ -157,6 +162,20 @@ function assertMergeActionsResetStaleOutputAndPreserveSources() {
   assert.deepEqual(hdrWithoutSelection.stitchingSourcePaths, ['/stale/hdr.ARW']);
   assert.deepEqual(hdrWithoutSelection.sourceMetadata, [{ exif: { ISO: '50' }, path: '/stale/hdr.ARW' }]);
 
+  const hdrFromSelectedStackMember = runCommand('hdrMerge', {
+    imageList: alaskaHdrStack,
+    selectedCommandPaths: ['/photos/alaska/_DSC7528.ARW'],
+  }).state.hdrModalState;
+  assert.deepEqual(
+    hdrFromSelectedStackMember.stitchingSourcePaths,
+    alaskaHdrStack.map((image) => image.path),
+  );
+  assert.deepEqual(
+    hdrFromSelectedStackMember.sourceMetadata,
+    alaskaHdrStack.map((image) => ({ exif: image.exif, path: image.path })),
+  );
+  assert.equal(hdrFromSelectedStackMember.sourceMetadata.length, 3);
+
   const focusStack = runCommand('focusStack').state.focusStackModalState;
   assert.equal(focusStack.isOpen, true);
   assert.equal(focusStack.outputReview, null);
@@ -190,6 +209,7 @@ function assertMergeActionsResetStaleOutputAndPreserveSources() {
 function runCommand(
   commandId: (typeof commandPaletteCommands)[number]['id'],
   overrides: {
+    imageList?: ImageFile[];
     libraryActivePath?: string | null;
     selectedCommandImages?: ImageFile[];
     selectedCommandPaths?: string[];
@@ -203,14 +223,15 @@ function runCommand(
   const selectedCommandPaths =
     overrides.selectedCommandPaths ??
     (overrides.libraryActivePath ? [overrides.libraryActivePath] : [imageA.path, imageB.path]);
+  const imageList = overrides.imageList ?? [imageA, imageB];
 
   const action = createCommandPaletteAction(command, {
-    imageList: [imageA, imageB],
+    imageList,
     onBackToLibrary: () => {
       state.backToLibraryCalled = true;
     },
     selectedCommandImages:
-      overrides.selectedCommandImages ?? getCommandPaletteSelectedImages([imageA, imageB], selectedCommandPaths),
+      overrides.selectedCommandImages ?? getCommandPaletteSelectedImages(imageList, selectedCommandPaths),
     selectedCommandPaths,
     selectedImage: overrides.selectedImage === undefined ? selectedImage : overrides.selectedImage,
     setRightPanel: (panel) => {
@@ -304,12 +325,23 @@ function makeUiState(): CommandPaletteUiState {
   };
 }
 
-function makeImage(path: string, exif: Record<string, string> | null = null): ImageFile {
+function makeImage(path: string, exif: Record<string, string> | null = null, modified = 0): ImageFile {
   return {
-    exif,
+    exif:
+      exif === null
+        ? null
+        : {
+            FNumber: '8',
+            FocalLength: '35',
+            ISO: '100',
+            LensModel: 'Test 35mm',
+            Make: 'Sony',
+            Model: 'ILCE-7M4',
+            ...exif,
+          },
     is_edited: false,
     is_virtual_copy: false,
-    modified: 0,
+    modified,
     path,
     rating: 0,
     tags: null,
