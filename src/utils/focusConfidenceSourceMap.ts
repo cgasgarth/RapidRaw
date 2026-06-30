@@ -1,9 +1,9 @@
 import {
   type FocusConfidenceSourceMapReport,
   focusConfidenceSourceMapReportSchema,
-} from '../schemas/focusConfidenceSourceMapSchemas';
+} from '../schemas/focus-stack/focusConfidenceSourceMapSchemas';
 
-import type { FocusSharpnessMapReport } from '../schemas/focusSharpnessMapSchemas';
+import type { FocusSharpnessMapReport } from '../schemas/focus-stack/focusSharpnessMapSchemas';
 
 export const buildFocusConfidenceSourceMapReport = (
   sharpnessReport: FocusSharpnessMapReport,

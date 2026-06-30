@@ -53,7 +53,7 @@ import {
   Panel,
 } from '../../components/ui/AppProperties';
 import { useContextMenu } from '../../context/ContextMenuContext';
-import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../schemas/focusStackUiSchemas';
+import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../schemas/focus-stack/focusStackUiSchemas';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../schemas/hdrMergeUiSchemas';
 import { libraryRelinkIdentitySchema } from '../../schemas/libraryRelinkSchemas';
 import { DEFAULT_PANORAMA_UI_SETTINGS } from '../../schemas/panoramaUiSchemas';
