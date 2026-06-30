@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 
 use crate::app_settings::{AppSettings, load_settings_or_default};
 use crate::app_state::AppState;
-use crate::export_processing::{
+use crate::export::export_processing::{
     ExportColorProfile, ExportReceiptMetadata, ExportRenderingIntent, ExportSettings,
     export_jpeg_rgb_pixels_and_profile, export_soft_proof_rgb_pixels_and_profile_with_policy,
     process_image_for_export_pipeline_with_tonemapper_override, save_image_with_metadata,
@@ -703,7 +703,7 @@ fn run_raw_open_edit_export_proof_with_context(
 fn inspect_final_tiff_export(
     output_path: &Path,
     color_profile: &ExportColorProfile,
-    color_receipt: &crate::export_processing::ExportReceiptMetadata,
+    color_receipt: &crate::export::export_processing::ExportReceiptMetadata,
     expected_rgb8: &[u8],
     expected_width: u32,
     expected_height: u32,

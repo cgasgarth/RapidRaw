@@ -23,14 +23,18 @@ use tauri::Manager;
 
 use crate::AppState;
 use crate::exif_processing;
-pub(crate) use crate::export_encoders::{
+pub(crate) use crate::export::export_encoders::{
     EmbeddedSourceIccProfile, encode_image_to_bytes,
     encode_image_with_applied_policy_and_source_profile,
     validate_export_file_readback_color_policy,
 };
-use crate::export_output_targets::{ExportOutputTargetRequest, resolve_export_output_target};
-pub use crate::export_postprocess::{OutputSharpeningSettings, ResizeOptions, WatermarkSettings};
-use crate::export_postprocess::{apply_export_postprocess, calculate_resize_target};
+use crate::export::export_output_targets::{
+    ExportOutputTargetRequest, resolve_export_output_target,
+};
+pub use crate::export::export_postprocess::{
+    OutputSharpeningSettings, ResizeOptions, WatermarkSettings,
+};
+use crate::export::export_postprocess::{apply_export_postprocess, calculate_resize_target};
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
 use crate::image_loader::{
@@ -48,17 +52,17 @@ use crate::raw_processing::RawDevelopmentReport;
 
 use crate::cache_utils::{calculate_full_job_hash, calculate_transform_hash};
 #[cfg(test)]
-pub(crate) use crate::export_color_policy::{
+pub(crate) use crate::export::export_color_policy::{
     ExportBlackPointCompensationStatus, ExportColorEngineId, applied_export_color_policy,
     export_color_profile_receipt_label, export_rgb_pixels_and_profile,
     export_rgb16_pixels_with_shared_conversion_core, export_transform_options,
     mox_rendering_intent, resolve_export_color_transform_plan,
     should_apply_srgb_perceptual_gamut_mapping,
 };
-pub use crate::export_color_policy::{
+pub use crate::export::export_color_policy::{
     ExportColorCapabilityCatalog, ExportColorProfile, ExportRenderingIntent,
 };
-pub(crate) use crate::export_color_policy::{
+pub(crate) use crate::export::export_color_policy::{
     ExportReceiptMetadata, encode_icc_profile, export_jpeg_rgb_pixels_and_profile,
     export_receipt_metadata, export_rgb16_pixels_and_profile,
     export_soft_proof_rgb_pixels_and_profile_with_policy, export_soft_proof_transform_metadata,
@@ -1432,11 +1436,11 @@ mod tests {
         quantize_rgb16_to_rgb8, resolve_export_color_capabilities,
         resolve_export_color_transform_plan, should_apply_srgb_perceptual_gamut_mapping,
     };
-    use crate::export_encoders::{
+    use crate::export::export_encoders::{
         encode_image_with_applied_policy, validate_export_file_readback_color_policy,
     };
-    use crate::export_postprocess::OutputSharpeningTarget;
-    use crate::export_processing::save_image_with_metadata;
+    use crate::export::export_postprocess::OutputSharpeningTarget;
+    use crate::export::export_processing::save_image_with_metadata;
     use crate::gamut_mapping::ACTIVE_SRGB_OKLAB_CHROMA_REDUCE;
     use crate::raw_processing::{RawCameraProfileReport, RawDemosaicPath, RawDevelopmentReport};
     use moxcms::ColorProfile;

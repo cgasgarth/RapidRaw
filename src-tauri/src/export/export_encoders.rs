@@ -11,8 +11,8 @@ use jxl_encoder::{LosslessConfig, LossyConfig, PixelLayout};
 use mozjpeg_rs::{Encoder as MozJpegEncoder, Preset};
 use sha2::{Digest, Sha256};
 
-use crate::export_color_policy::output_color_profile;
-use crate::export_processing::{
+use crate::export::export_color_policy::output_color_profile;
+use crate::export::export_processing::{
     ExportColorProfile, ExportReceiptMetadata, ExportRenderingIntent, encode_icc_profile,
     export_jpeg_rgb_pixels_and_profile, export_receipt_metadata, export_rgb16_pixels_and_profile,
     export_source_precision_receipt_label, export_source_rgb16_pixels, quantize_rgb16_to_rgb8,
