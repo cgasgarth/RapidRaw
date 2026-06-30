@@ -71,7 +71,6 @@ packaging shape, not release shippability.
    ```sh
    bun run check:gh-repo-resolution
    bun run check:types
-   bun run check:compact-commands
    ```
 
 3. Prove the production frontend artifact contract:

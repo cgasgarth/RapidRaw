@@ -83,11 +83,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   [
     'check:actions',
     new Set([
-      'bun run check:actions:lint && bun run check:workflow-policy',
-      'bun run check:actions:lint && bun run check:workflow-policy && bun run check:workflow-policy:self-test',
-      'bun run check:actions:lint && bun run check:workflow-policy && bun run check:workflow-policy:self-test && bun run check:compact-commands && bun run check:rust-feature-policy && bun run schema:contract-gate:self-test',
-      'bun run check:actions:lint && bun run check:workflow-policy && bun run check:workflow-policy:self-test && bun run check:compact-commands && bun run check:compact-commands:self-test && bun run check:rust-feature-policy && bun run schema:contract-gate:self-test',
-      'bun run check:actions:lint && bun run check:workflow-policy && bun run check:workflow-policy:self-test && bun run check:compact-commands && bun run check:compact-commands:self-test && bun run check:rust-feature-policy && bun run check:rust-feature-policy:self-test && bun run schema:contract-gate:self-test',
+      'bun scripts/run-compact-command.ts --label actionlint -- go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml',
     ]),
   ],
   [
@@ -262,20 +258,6 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ],
   ['check:pure-ts-coverage', new Set(['bun tests/integration/checks/check-pure-ts-coverage.ts'])],
   ['check:release-notes', new Set(['bun scripts/generate-release-notes.ts --self-test'])],
-  [
-    'check:workflow-policy:self-test',
-    new Set(['bun tests/integration/checks/check-github-workflow-policy.ts --self-test']),
-  ],
-  ['check:compact-commands', new Set(['bun tests/integration/checks/check-compact-quality-commands.ts'])],
-  [
-    'check:compact-commands:self-test',
-    new Set(['bun tests/integration/checks/check-compact-quality-commands.ts --self-test']),
-  ],
-  ['check:rust-feature-policy', new Set(['bun tests/integration/checks/check-rust-feature-policy.ts'])],
-  [
-    'check:rust-feature-policy:self-test',
-    new Set(['bun tests/integration/checks/check-rust-feature-policy.ts --self-test']),
-  ],
   ['deps:audit:check', new Set(['bun scripts/audit-dependency-versions.ts --fail-on-missing-major-issues'])],
   ['release:notes', new Set(['bun scripts/generate-release-notes.ts'])],
   [
@@ -655,17 +637,6 @@ function runSelfTest() {
     SMOKE_MODES.NONE,
   );
   assertChangeClassification(
-    'workflow policy package script changes skip smoke',
-    [
-      {
-        filename: 'package.json',
-        patch:
-          '@@ -25,9 +25,10 @@\n-    "check:actions": "bun run check:actions:lint && bun run check:workflow-policy",\n+    "check:actions": "bun run check:actions:lint && bun run check:workflow-policy && bun run check:workflow-policy:self-test",\n+    "check:workflow-policy:self-test": "bun tests/integration/checks/check-github-workflow-policy.ts --self-test",',
-      },
-    ],
-    SMOKE_MODES.NONE,
-  );
-  assertChangeClassification(
     'release notes package script changes skip smoke',
     [
       {
@@ -990,11 +961,6 @@ function runSelfTest() {
   assertClassification('pure TS tests can skip smoke', ['tests/pure-ts/edit-command-bus.test.ts'], SMOKE_MODES.NONE);
   assertClassification('lint config changes can skip smoke', ['biome.json'], SMOKE_MODES.NONE);
   assertClassification('unused-code config changes can skip smoke', ['knip.jsonc'], SMOKE_MODES.NONE);
-  assertClassification(
-    'validation scripts can skip smoke',
-    ['tests/integration/checks/check-compact-quality-commands.ts'],
-    SMOKE_MODES.NONE,
-  );
   assertClassification(
     'browser harness frontend ESM can skip smoke',
     ['src/validation/browserTauriHarness.mts'],

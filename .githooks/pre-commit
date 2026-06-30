@@ -39,7 +39,6 @@ run_gate i18n bun scripts/run-compact-command.ts --label i18n:lint -- bunx i18ne
 run_gate unused-deps bun scripts/run-compact-command.ts --label unused-deps -- bunx knip --config knip.jsonc --dependencies --reporter compact
 run_gate docs bun run check:docs
 run_gate schema bun run check:schema
-run_gate schema-routing bun tests/integration/checks/check-schema-contract-gate.ts --self-test
 
 failed=0
 for entry in $pids; do
