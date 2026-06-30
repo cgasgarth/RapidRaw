@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 
-import { maskOverlayModeSchema, maskOverlaySettingsSchema } from '../../../../src/schemas/maskOverlaySchemas.ts';
+import { maskOverlayModeSchema, maskOverlaySettingsSchema } from '../../../../src/schemas/masks/maskOverlaySchemas.ts';
 import { evaluateMaskOverlayColor, normalizeMaskOverlaySettings } from '../../../../src/utils/mask/maskOverlayModes.ts';
 import {
   loadMaskOverlaySettingsPreference,

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 
-import { brushMaskParametersSchema } from '../../../../src/schemas/maskParameterSchemas.ts';
+import { brushMaskParametersSchema } from '../../../../src/schemas/masks/maskParameterSchemas.ts';
 import { appendBrushStroke, setFlowBrushFlow } from '../../../../src/utils/mask/brushMaskParameters.ts';
 
 const strokeSchema = z

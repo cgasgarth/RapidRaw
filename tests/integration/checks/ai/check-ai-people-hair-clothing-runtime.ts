@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { aiPeopleMaskFakeProviderFixtureSchema } from '../../../../src/schemas/aiMaskingSchemas.ts';
+import { aiPeopleMaskFakeProviderFixtureSchema } from '../../../../src/schemas/masks/aiMaskingSchemas.ts';
 import { getAiPeopleMaskPartCapability } from '../../../../src/utils/ai/aiPeopleMaskContracts.ts';
 import { renderFakeAiPeopleMask } from '../../../../src/utils/ai/aiPeopleMaskFakeProvider.ts';
 import { createAiPeopleMaskLayerApplyPlan } from '../../../../src/utils/ai/aiPeopleMaskLayerPlan.ts';

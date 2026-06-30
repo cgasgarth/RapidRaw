@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { estimateMaskRenderTileCount, parseMaskRenderScene } from '../../../../src/schemas/maskRenderSchemas.ts';
+import { estimateMaskRenderTileCount, parseMaskRenderScene } from '../../../../src/schemas/masks/maskRenderSchemas.ts';
 import { renderFakeAiPeopleMask } from '../../../../src/utils/ai/aiPeopleMaskFakeProvider.ts';
 
 const scenes = JSON.parse(readFileSync(resolve('fixtures/masks/ai/ai-people-render-scenes.json'), 'utf8'));
