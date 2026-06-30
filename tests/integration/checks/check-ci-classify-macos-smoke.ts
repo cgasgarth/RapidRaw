@@ -932,12 +932,12 @@ function runSelfTest() {
   );
   assertClassification(
     'validation fixture contracts can skip smoke',
-    ['fixtures/validation/raw-open-edit-export-proof.json'],
+    ['fixtures/validation/raw-open-edit-export/raw-open-edit-export-proof.json'],
     SMOKE_MODES.NONE,
   );
   assertClassification(
     'validation proof request fixtures can skip smoke',
-    ['fixtures/validation/raw-open-edit-export-proof-request.json'],
+    ['fixtures/validation/raw-open-edit-export/raw-open-edit-export-proof-request.json'],
     SMOKE_MODES.NONE,
   );
   assertClassification(

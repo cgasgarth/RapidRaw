@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../lib/ci/compact-output.ts';
 
-const REQUEST_PATH = 'fixtures/validation/skin-tone-uniformity-raw-proof-request.json';
+const REQUEST_PATH = 'fixtures/validation/professional-color-workflow/skin-tone-uniformity-raw-proof-request.json';
 
 const argsSchema = z
   .object({

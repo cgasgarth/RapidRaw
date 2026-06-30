@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { rawOpenEditExportProofRequestSchema } from '../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/color-selective/skin-tone-uniformity-local-raw-proof-2026-06-21.json';
-const REQUEST_PATH = 'fixtures/validation/skin-tone-uniformity-raw-proof-request.json';
+const REQUEST_PATH = 'fixtures/validation/professional-color-workflow/skin-tone-uniformity-raw-proof-request.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 const requireAssets = process.argv.includes('--require-assets');
 const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT;

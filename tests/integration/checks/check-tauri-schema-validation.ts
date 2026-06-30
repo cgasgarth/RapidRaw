@@ -28,7 +28,7 @@ const schemaByName = {
   folderTreeListSchema,
 } satisfies Record<TauriBoundaryEntry['zodSchema'], z.ZodType<unknown>>;
 
-const ledger = parseTauriBoundaryLedger(readJson('fixtures/validation/tauri-boundary-ledger.json'));
+const ledger = parseTauriBoundaryLedger(readJson('fixtures/validation/app-server/tauri-boundary-ledger.json'));
 const commandsSource = readFileSync('src/tauri/commands.ts', 'utf8');
 const failures: string[] = [];
 

@@ -11,8 +11,10 @@ import { parseRawOpenEditExportProofManifest } from '../../../src/schemas/rawOpe
 const args = new Set(process.argv.slice(2));
 const copyMode = args.has('--copy');
 const requireAssets = args.has('--require-assets');
-const manifestPath = valueAfter('--manifest') ?? 'fixtures/validation/raw-open-edit-export-proof.json';
-const requestPath = valueAfter('--request') ?? 'fixtures/validation/raw-open-edit-export-proof-request.json';
+const manifestPath =
+  valueAfter('--manifest') ?? 'fixtures/validation/raw-open-edit-export/raw-open-edit-export-proof.json';
+const requestPath =
+  valueAfter('--request') ?? 'fixtures/validation/raw-open-edit-export/raw-open-edit-export-proof-request.json';
 const sourceOverridePath = valueAfter('--source') ?? process.env.RAWENGINE_PRIVATE_RAW_SOURCE;
 
 const requestJson: unknown = JSON.parse(await readFile(requestPath, 'utf8'));

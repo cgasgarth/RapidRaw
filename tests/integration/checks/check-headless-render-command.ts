@@ -15,7 +15,7 @@ try {
       'bun',
       'scripts/dev/rawengine-headless-render.ts',
       '--request',
-      'fixtures/validation/headless-render-command-request.json',
+      'fixtures/validation/render-requests/headless-render-command-request.json',
       '--output',
       outputPath,
     ],

@@ -7,7 +7,7 @@ at a project-owned source folder. The preparer hashes RAW candidates in that
 folder and links the file that matches the private evidence ledger entry:
 
 ```sh
-RAWENGINE_PRIVATE_RAW_ROOT="$(pwd)" RAWENGINE_PRIVATE_RAW_SOURCE="/absolute/path/to/raw-folder" bun run prepare:raw-open-edit-export-private-root -- --request fixtures/validation/selective-color-raw-proof-request.json --require-assets
+RAWENGINE_PRIVATE_RAW_ROOT="$(pwd)" RAWENGINE_PRIVATE_RAW_SOURCE="/absolute/path/to/raw-folder" bun run prepare:raw-open-edit-export-private-root -- --request fixtures/validation/professional-color-workflow/selective-color-raw-proof-request.json --require-assets
 ```
 
 For HDR fixture prep, point the existing private root preparer at a local source folder:

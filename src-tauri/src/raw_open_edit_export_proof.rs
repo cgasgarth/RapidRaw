@@ -1931,7 +1931,7 @@ mod tests {
 
         let request_path = std::env::var("RAWENGINE_RAW_OPEN_EDIT_EXPORT_PROOF_REQUEST")
             .unwrap_or_else(|_| {
-                "../fixtures/validation/raw-open-edit-export-proof-request.json".to_string()
+                "../fixtures/validation/raw-open-edit-export/raw-open-edit-export-proof-request.json".to_string()
             });
         let mut request: RawOpenEditExportProofRequest = serde_json::from_str(
             &fs::read_to_string(request_path).expect("proof request fixture reads"),
@@ -1989,7 +1989,7 @@ mod tests {
         }
 
         let mut request: RawOpenEditExportProofRequest = serde_json::from_str(
-            &fs::read_to_string("../fixtures/validation/selective-color-raw-proof-request.json")
+            &fs::read_to_string("../fixtures/validation/professional-color-workflow/selective-color-raw-proof-request.json")
                 .expect("selective color proof request fixture reads"),
         )
         .expect("selective color proof request fixture parses");
@@ -2067,7 +2067,7 @@ mod tests {
 
         let mut request: RawOpenEditExportProofRequest = serde_json::from_str(
             &fs::read_to_string(
-                "../fixtures/validation/professional-color-workflow-proof-request.json",
+                "../fixtures/validation/professional-color-workflow/professional-color-workflow-proof-request.json",
             )
             .expect("professional color proof request fixture reads"),
         )
@@ -2132,7 +2132,7 @@ mod tests {
 
         let mut request: RawOpenEditExportProofRequest = serde_json::from_str(
             &fs::read_to_string(
-                "../fixtures/validation/skin-tone-uniformity-raw-proof-request.json",
+                "../fixtures/validation/professional-color-workflow/skin-tone-uniformity-raw-proof-request.json",
             )
             .expect("skin-tone uniformity proof request fixture reads"),
         )

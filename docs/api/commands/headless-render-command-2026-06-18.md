@@ -7,7 +7,7 @@ Issue: #81
 Inputs:
 
 - `HeadlessRenderRequest` in `src/schemas/headlessRenderCommandSchemas.ts`.
-- Current public fixture: `fixtures/validation/headless-render-command-request.json`.
+- Current public fixture: `fixtures/validation/render-requests/headless-render-command-request.json`.
 
 Outputs:
 
