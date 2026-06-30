@@ -55,8 +55,10 @@ import {
   isResolvingStaleSmartPreviewExport,
 } from '../../../../utils/export/exportSmartPreviewReadiness';
 import {
+  buildSoftProofProfileCompareInvokeRequest,
   buildSoftProofProfileCompareProof,
   buildSoftProofProfileCompareRequests,
+  buildSoftProofProfileCompareUnavailableState,
   createInitialSoftProofProfileCompareState,
   EXPORT_SOFT_PROOF_PROFILE_COMPARE_TARGET_RESOLUTION,
   type ExportSoftProofProfileCompareSideId,
@@ -864,20 +866,18 @@ export default function ExportPanel({
 
     if (!selectedImage?.isReady) {
       setSoftProofProfileCompareState({
-        displayP3: {
+        displayP3: buildSoftProofProfileCompareUnavailableState({
           error: t('export.softProofCompare.unavailableNoImage'),
           requestedColorProfile: ExportColorProfile.DisplayP3,
           requestedRenderingIntent: renderingIntent,
           side: 'displayP3',
-          status: 'unavailable',
-        },
-        srgb: {
+        }),
+        srgb: buildSoftProofProfileCompareUnavailableState({
           error: t('export.softProofCompare.unavailableNoImage'),
           requestedColorProfile: ExportColorProfile.Srgb,
           requestedRenderingIntent: renderingIntent,
           side: 'srgb',
-          status: 'unavailable',
-        },
+        }),
       });
       return;
     }
@@ -904,7 +904,11 @@ export default function ExportPanel({
       compareRequests.map(async ({ label, request, side }) => {
         try {
           const [buffer, metadata] = await Promise.all([
-            invokeWithSchema(Invokes.GenerateExportSoftProofPreview, request, previewBufferResponseSchema),
+            invokeWithSchema(
+              Invokes.GenerateExportSoftProofPreview,
+              buildSoftProofProfileCompareInvokeRequest(request),
+              previewBufferResponseSchema,
+            ),
             invokeWithSchema(
               Invokes.ResolveExportSoftProofTransformMetadata,
               request,
@@ -937,13 +941,12 @@ export default function ExportPanel({
         } catch (error) {
           return [
             side,
-            {
+            buildSoftProofProfileCompareUnavailableState({
               error: formatUnknownError(error),
               requestedColorProfile: request.colorProfile,
               requestedRenderingIntent: request.renderingIntent,
               side,
-              status: 'unavailable',
-            } satisfies ExportSoftProofProfileCompareSideState,
+            }),
           ] as const;
         }
       }),
