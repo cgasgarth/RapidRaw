@@ -1,20 +1,20 @@
 #!/usr/bin/env bun
 
-import { ToolType } from '../../../src/components/panel/right/layers/Masks.tsx';
-import { RawEngineAppServerRouteMode } from '../../../src/schemas/agentRuntimeSchemas.ts';
-import { useEditorStore } from '../../../src/store/useEditorStore.ts';
-import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { ToolType } from '../../../../src/components/panel/right/layers/Masks.tsx';
+import { RawEngineAppServerRouteMode } from '../../../../src/schemas/agentRuntimeSchemas.ts';
+import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
+import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
 import {
   applyAgentGlobalAdjustments,
   dryRunAgentGlobalAdjustments,
-} from '../../../src/utils/agentAdjustmentApplyTool.ts';
-import { buildAgentImageContextSnapshot } from '../../../src/utils/agentImageContextSnapshot.ts';
+} from '../../../../src/utils/agentAdjustmentApplyTool.ts';
+import { buildAgentImageContextSnapshot } from '../../../../src/utils/agentImageContextSnapshot.ts';
 import {
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
   createAgentSessionCheckpoint,
   rollbackAgentSessionHistory,
-} from '../../../src/utils/agentSessionHistory.ts';
-import { buildRawEngineAppServerRouteCatalog } from '../../../src/utils/rawEngineAppServerHost.ts';
+} from '../../../../src/utils/agentSessionHistory.ts';
+import { buildRawEngineAppServerRouteCatalog } from '../../../../src/utils/rawEngineAppServerHost.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3163.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 18 : 2));

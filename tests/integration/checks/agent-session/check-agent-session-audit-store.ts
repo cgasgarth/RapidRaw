@@ -10,7 +10,7 @@ import {
   readAgentSessionAuditStore,
   verifyAgentSessionArtifactLineage,
   verifyAgentSessionTraceReferences,
-} from '../../../src/utils/agentSessionAuditStore.ts';
+} from '../../../../src/utils/agentSessionAuditStore.ts';
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'rawengine-agent-audit-'));
 const storePath = join(tempRoot, 'agent-sessions.json');

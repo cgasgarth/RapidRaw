@@ -21,7 +21,7 @@ const CONTRACT_COMMANDS = [
   ['bun', 'tests/integration/checks/check-agent-detail-effects-apply.ts'],
   ['bun', 'tests/integration/checks/check-agent-geometry-apply.ts'],
   ['bun', 'tests/integration/checks/check-agent-lens-profile-apply.ts'],
-  ['bun', 'tests/integration/checks/check-agent-rollback-proof.ts'],
+  ['bun', 'tests/integration/checks/agent-session/check-agent-rollback-proof.ts'],
   ['bun', 'tests/integration/checks/check-ui-api-coverage.ts'],
   ['bun', 'tests/integration/checks/check-ai-app-server-tool-routes.ts'],
   ['bun', 'tests/integration/checks/check-ai-denoise-app-server-tool.ts'],

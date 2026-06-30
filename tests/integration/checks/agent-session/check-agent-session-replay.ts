@@ -3,8 +3,8 @@
 import {
   type AgentSessionAuditStorageAdapter,
   appendAgentSessionAuditRecord,
-} from '../../../src/utils/agentSessionAuditStore.ts';
-import { replayPersistedAgentSessions } from '../../../src/utils/agentSessionReplay.ts';
+} from '../../../../src/utils/agentSessionAuditStore.ts';
+import { replayPersistedAgentSessions } from '../../../../src/utils/agentSessionReplay.ts';
 
 let storedText: string | null = null;
 const adapter: AgentSessionAuditStorageAdapter = {
