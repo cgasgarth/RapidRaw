@@ -1,5 +1,5 @@
 import type { Adjustments } from '../../adjustments';
-import { stableAgentPreviewHash } from '../../agentPreviewEnvelope';
+import { stableAgentPreviewHash } from '../context/agentPreviewEnvelope';
 
 export const buildAgentCurveLevelsRecipeHashInput = (adjustments: Adjustments) => ({
   curveMode: adjustments.curveMode,

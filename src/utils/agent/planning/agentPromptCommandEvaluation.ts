@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { useEditorStore } from '../store/useEditorStore';
+import { useEditorStore } from '../../../store/useEditorStore';
 import { runAgentCoreEditCommandBundle } from './agentCoreEditCommandBundle';
 import { agentEditRecipeKindSchema, planAgentEditRecipe } from './agentEditRecipePlanner';
 

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { AgentPreviewEnvelope } from './agentPreviewEnvelope';
+import type { AgentPreviewEnvelope } from '../context/agentPreviewEnvelope';
 
 export const agentEditReviewRubricAreaSchema = z.enum([
   'color_white_balance',

@@ -9,12 +9,12 @@ import {
 } from '../../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
+import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
 import {
   AGENT_COLOR_APPLY_TOOL_NAME,
   agentColorApplyRequestSchema,
   applyAgentColor,
 } from '../../../../src/utils/agent/tools/agentColorApplyTool.ts';
-import { buildAgentImageContextSnapshot } from '../../../../src/utils/agentImageContextSnapshot.ts';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../../../src/utils/profileTonePresets.ts';
 import {
   buildRawEngineAppServerRouteCatalog,

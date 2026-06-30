@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { useEditorStore } from '../store/useEditorStore';
+import { useEditorStore } from '../../../store/useEditorStore';
 
 import type { AgentCoreEditCommandBundleStep } from './agentCoreEditCommandBundle';
 

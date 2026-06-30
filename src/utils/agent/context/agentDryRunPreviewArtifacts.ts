@@ -4,26 +4,26 @@ import {
   artifactHandleV1Schema,
   type ToneColorDryRunResultV1,
   toneColorDryRunResultV1Schema,
-} from '../../packages/rawengine-schema/src/rawEngineSchemas';
-import { useEditorStore } from '../store/useEditorStore';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
+import { useEditorStore } from '../../../store/useEditorStore';
+import {
+  type BasicToneCommandEnvelope,
+  buildBasicToneCommandEnvelope,
+  buildBasicToneImageCommandContext,
+  type LegacyBasicToneAdjustmentPayload,
+} from '../../basicToneCommandBridge';
 import {
   type AgentLiveBasicTonePixel,
   hashBasicTonePreviewPixels,
   renderBasicTonePreviewPixels,
-} from './agent/session/agentLiveBasicTone';
-import { createLiveEditorAppServerBridge } from './agent/session/agentLiveEditorState';
+} from '../session/agentLiveBasicTone';
+import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
 import {
   type AgentPreviewEnvelope,
   agentPreviewEnvelopeSchema,
   buildAgentPreviewEnvelope,
   stableAgentPreviewHash,
 } from './agentPreviewEnvelope';
-import {
-  type BasicToneCommandEnvelope,
-  buildBasicToneCommandEnvelope,
-  buildBasicToneImageCommandContext,
-  type LegacyBasicToneAdjustmentPayload,
-} from './basicToneCommandBridge';
 
 export interface AgentBasicToneDryRunPreviewOptions {
   operationId: string;

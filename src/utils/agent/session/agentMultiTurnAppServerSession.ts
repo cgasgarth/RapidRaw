@@ -1,25 +1,24 @@
 import { z } from 'zod';
-
-import {
-  AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
-  AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
-  agentAdjustmentsApplyResponseSchema,
-  agentAdjustmentsDryRunResponseSchema,
-} from '../../agent/tools/agentAdjustmentApplyTool';
-import { AGENT_COLOR_APPLY_TOOL_NAME, agentColorApplyResponseSchema } from '../../agent/tools/agentColorApplyTool';
-import {
-  AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
-  agentDetailEffectsApplyResponseSchema,
-} from '../../agent/tools/agentDetailEffectsApplyTool';
-import { agentEditQualityReviewSchema, buildAgentEditQualityReview } from '../../agentEditQualityReview';
-import { agentInitialPromptContextSchema, buildAgentInitialPromptContext } from '../../agentInitialPromptContext';
-import { agentPreviewEnvelopeSchema } from '../../agentPreviewEnvelope';
+import { agentInitialPromptContextSchema, buildAgentInitialPromptContext } from '../context/agentInitialPromptContext';
+import { agentPreviewEnvelopeSchema } from '../context/agentPreviewEnvelope';
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
   agentPreviewRenderResponseSchema,
   agentStateGetResponseSchema,
-} from '../../agentReadOnlyAppServerTools';
+} from '../context/agentReadOnlyAppServerTools';
+import { agentEditQualityReviewSchema, buildAgentEditQualityReview } from '../planning/agentEditQualityReview';
+import {
+  AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+  AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
+  agentAdjustmentsApplyResponseSchema,
+  agentAdjustmentsDryRunResponseSchema,
+} from '../tools/agentAdjustmentApplyTool';
+import { AGENT_COLOR_APPLY_TOOL_NAME, agentColorApplyResponseSchema } from '../tools/agentColorApplyTool';
+import {
+  AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
+  agentDetailEffectsApplyResponseSchema,
+} from '../tools/agentDetailEffectsApplyTool';
 import { dispatchAgentLiveEditorTool } from './agentLiveToolDispatch';
 import { createAgentSessionCheckpoint } from './agentSessionHistory';
 

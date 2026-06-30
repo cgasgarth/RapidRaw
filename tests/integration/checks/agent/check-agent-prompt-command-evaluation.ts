@@ -7,7 +7,7 @@ import { INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
 import {
   agentPromptCommandFixtures,
   evaluateAgentPromptCommandFixture,
-} from '../../../../src/utils/agentPromptCommandEvaluation.ts';
+} from '../../../../src/utils/agent/planning/agentPromptCommandEvaluation.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3123.ARW';
 

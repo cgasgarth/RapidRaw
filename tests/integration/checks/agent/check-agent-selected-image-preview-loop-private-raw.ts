@@ -11,12 +11,12 @@ import { RawStatus, SortDirection } from '../../../../src/components/ui/AppPrope
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { useLibraryStore } from '../../../../src/store/useLibraryStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
+import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
+import { runAgentIterativeEditLoop } from '../../../../src/utils/agent/planning/agentIterativeEditLoop.ts';
 import {
   applyAgentGlobalAdjustments,
   dryRunAgentGlobalAdjustments,
 } from '../../../../src/utils/agent/tools/agentAdjustmentApplyTool.ts';
-import { buildAgentImageContextSnapshot } from '../../../../src/utils/agentImageContextSnapshot.ts';
-import { runAgentIterativeEditLoop } from '../../../../src/utils/agentIterativeEditLoop.ts';
 
 const PUBLIC_REPORT_PATH = 'docs/validation/proofs/agent/agent-selected-image-preview-loop-private-raw-2026-06-30.json';
 const PRIVATE_ARTIFACT_DIR = 'private-artifacts/validation/agent-preview-loop';

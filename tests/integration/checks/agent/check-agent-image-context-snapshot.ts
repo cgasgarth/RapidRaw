@@ -3,7 +3,7 @@
 import { ToolType } from '../../../../src/components/panel/right/layers/Masks.tsx';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
-import { buildAgentImageContextSnapshot } from '../../../../src/utils/agentImageContextSnapshot.ts';
+import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3156.ARW';
 const histogramBins = Array.from({ length: 256 }, (_, index) => (index === 0 ? 24 : index === 255 ? 18 : 2));

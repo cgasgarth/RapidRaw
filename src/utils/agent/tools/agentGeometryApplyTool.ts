@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
-import { buildAgentImageContextSnapshot } from '../../agentImageContextSnapshot';
 import { pushEditHistoryEntry } from '../../editHistory';
+import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 
 export const AGENT_GEOMETRY_APPLY_TOOL_NAME = 'rawengine.agent.geometry.apply';
 export const AGENT_GEOMETRY_APPLY_INPUT_SCHEMA_NAME = 'AgentGeometryApplyRequestV1';

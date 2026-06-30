@@ -12,6 +12,11 @@ import {
 } from '../../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
+import {
+  AGENT_PREVIEW_COMPARE_TOOL_NAME,
+  AGENT_PREVIEW_RENDER_TOOL_NAME,
+  AGENT_STATE_GET_TOOL_NAME,
+} from '../../../../src/utils/agent/context/agentReadOnlyAppServerTools.ts';
 import { AGENT_HISTORY_ROLLBACK_TOOL_NAME } from '../../../../src/utils/agent/session/agentSessionHistory.ts';
 import {
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
@@ -23,11 +28,6 @@ import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../../src/utils/agen
 import { AGENT_GEOMETRY_APPLY_TOOL_NAME } from '../../../../src/utils/agent/tools/agentGeometryApplyTool.ts';
 import { AGENT_LENS_PROFILE_APPLY_TOOL_NAME } from '../../../../src/utils/agent/tools/agentLensProfileApplyTool.ts';
 import { AGENT_RETOUCH_APPLY_TOOL_NAME } from '../../../../src/utils/agent/tools/agentRetouchApplyTool.ts';
-import {
-  AGENT_PREVIEW_COMPARE_TOOL_NAME,
-  AGENT_PREVIEW_RENDER_TOOL_NAME,
-  AGENT_STATE_GET_TOOL_NAME,
-} from '../../../../src/utils/agentReadOnlyAppServerTools.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   createRawEngineAppServerSupervisorState,

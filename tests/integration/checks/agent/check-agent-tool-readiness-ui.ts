@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 
-import { buildAgentAppServerToolReadinessSummary } from '../../../../src/utils/agentAppServerToolReadiness.ts';
+import { buildAgentAppServerToolReadinessSummary } from '../../../../src/utils/agent/context/agentAppServerToolReadiness.ts';
 
 const failures: Array<string> = [];
 const summary = buildAgentAppServerToolReadinessSummary();

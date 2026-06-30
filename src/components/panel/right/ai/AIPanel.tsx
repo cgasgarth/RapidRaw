@@ -65,7 +65,7 @@ import type { Adjustments, AiPatch } from '../../../../utils/adjustments';
 import {
   type AgentInitialPromptContext,
   buildAgentInitialPromptContext,
-} from '../../../../utils/agentInitialPromptContext';
+} from '../../../../utils/agent/context/agentInitialPromptContext';
 import {
   cloneMaskLikeContainerForPaste,
   cloneSubMaskForPaste,

@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
-import { buildAgentImageContextSnapshot } from '../../agentImageContextSnapshot';
 import { pushEditHistoryEntry } from '../../editHistory';
+import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 
 export const AGENT_LENS_PROFILE_APPLY_TOOL_NAME = 'rawengine.agent.lens_profile.apply';
 export const AGENT_LENS_PROFILE_APPLY_INPUT_SCHEMA_NAME = 'AgentLensProfileApplyRequestV1';

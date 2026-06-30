@@ -10,20 +10,20 @@ import {
   layerMaskCommandEnvelopeV1Schema,
   layerScopedToneAdjustmentV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from '../../packages/rawengine-schema/src';
-import { Mask, type SubMask, SubMaskMode } from '../components/panel/right/layers/Masks';
-import { useEditorStore } from '../store/useEditorStore';
+} from '../../../../packages/rawengine-schema/src/index';
+import { Mask, type SubMask, SubMaskMode } from '../../../components/panel/right/layers/Masks';
+import { useEditorStore } from '../../../store/useEditorStore';
 import {
   DEFAULT_LAYER_BLEND_MODE,
   INITIAL_MASK_ADJUSTMENTS,
   type MaskAdjustments,
   type MaskContainer,
-} from './adjustments';
-import { agentApprovalStateSchema, assertAgentApprovalGate } from './agentApprovalGate';
-import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
-import { stableAgentPreviewHash } from './agentPreviewEnvelope';
-import { pushEditHistoryEntry } from './editHistory';
-import { applyLayerStackCommandBridgeOperation } from './layers/layerStackCommandBridge';
+} from '../../adjustments';
+import { pushEditHistoryEntry } from '../../editHistory';
+import { applyLayerStackCommandBridgeOperation } from '../../layers/layerStackCommandBridge';
+import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
+import { stableAgentPreviewHash } from '../context/agentPreviewEnvelope';
+import { agentApprovalStateSchema, assertAgentApprovalGate } from '../safety/agentApprovalGate';
 
 export const AGENT_LAYER_CREATE_TOOL_NAME = 'rawengine.agent.layer.create';
 export const AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME = 'rawengine.agent.mask.create_or_update';

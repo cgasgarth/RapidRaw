@@ -60,6 +60,65 @@ import {
 } from '../schemas/agent/agentRuntimeSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import {
+  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_INPUT_SCHEMA_NAME,
+  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_OUTPUT_SCHEMA_NAME,
+  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
+  agentCurrentImagePreviewLoopRequestSchema,
+  runAgentCurrentImagePreviewLoop,
+} from './agent/context/agentCurrentImagePreviewLoop';
+import { buildAgentImageContextSnapshot } from './agent/context/agentImageContextSnapshot';
+import {
+  AGENT_PREVIEW_COMPARE_INPUT_SCHEMA_NAME,
+  AGENT_PREVIEW_COMPARE_OUTPUT_SCHEMA_NAME,
+  AGENT_PREVIEW_COMPARE_TOOL_NAME,
+  AGENT_PREVIEW_RENDER_INPUT_SCHEMA_NAME,
+  AGENT_PREVIEW_RENDER_OUTPUT_SCHEMA_NAME,
+  AGENT_PREVIEW_RENDER_TOOL_NAME,
+  AGENT_STATE_GET_INPUT_SCHEMA_NAME,
+  AGENT_STATE_GET_OUTPUT_SCHEMA_NAME,
+  AGENT_STATE_GET_TOOL_NAME,
+  agentPreviewCompareRequestSchema,
+  agentPreviewRenderRequestSchema,
+  agentStateGetRequestSchema,
+  getAgentReadOnlyState,
+  renderAgentPreviewCompare,
+  renderAgentReadOnlyPreview,
+} from './agent/context/agentReadOnlyAppServerTools';
+import {
+  AGENT_LAYER_CREATE_INPUT_SCHEMA_NAME,
+  AGENT_LAYER_CREATE_OUTPUT_SCHEMA_NAME,
+  AGENT_LAYER_CREATE_TOOL_NAME,
+  AGENT_LAYER_SCOPED_ADJUST_INPUT_SCHEMA_NAME,
+  AGENT_LAYER_SCOPED_ADJUST_OUTPUT_SCHEMA_NAME,
+  AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME,
+  AGENT_MASK_CREATE_OR_UPDATE_INPUT_SCHEMA_NAME,
+  AGENT_MASK_CREATE_OR_UPDATE_OUTPUT_SCHEMA_NAME,
+  AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
+  AGENT_OBJECT_SELECTION_APPLY_INPUT_SCHEMA_NAME,
+  AGENT_OBJECT_SELECTION_APPLY_OUTPUT_SCHEMA_NAME,
+  AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME,
+  agentLayerCreateRequestSchema,
+  agentLayerScopedAdjustRequestSchema,
+  agentMaskCreateOrUpdateRequestSchema,
+  agentObjectSelectionApplyRequestSchema,
+  applyAgentBrushMaskCreateOrUpdate,
+  applyAgentLayerCreate,
+  applyAgentLayerScopedAdjustments,
+  applyAgentObjectSelection,
+} from './agent/layers/agentLayerMaskTools';
+import {
+  AGENT_EXPORT_PROOF_INPUT_SCHEMA_NAME,
+  AGENT_EXPORT_PROOF_OUTPUT_SCHEMA_NAME,
+  AGENT_EXPORT_PROOF_TOOL_NAME,
+  AGENT_FINAL_EXPORT_INPUT_SCHEMA_NAME,
+  AGENT_FINAL_EXPORT_OUTPUT_SCHEMA_NAME,
+  AGENT_FINAL_EXPORT_TOOL_NAME,
+  agentExportProofRequestSchema,
+  agentFinalExportRequestSchema,
+  buildAgentExportProof,
+  buildAgentFinalExport,
+} from './agent/safety/agentExportProofTool';
+import {
   AGENT_HISTORY_ROLLBACK_INPUT_SCHEMA_NAME,
   AGENT_HISTORY_ROLLBACK_OUTPUT_SCHEMA_NAME,
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
@@ -120,65 +179,6 @@ import {
   agentRetouchApplyRequestSchema,
   applyAgentRetouch,
 } from './agent/tools/agentRetouchApplyTool';
-import {
-  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_INPUT_SCHEMA_NAME,
-  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_OUTPUT_SCHEMA_NAME,
-  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
-  agentCurrentImagePreviewLoopRequestSchema,
-  runAgentCurrentImagePreviewLoop,
-} from './agentCurrentImagePreviewLoop';
-import {
-  AGENT_EXPORT_PROOF_INPUT_SCHEMA_NAME,
-  AGENT_EXPORT_PROOF_OUTPUT_SCHEMA_NAME,
-  AGENT_EXPORT_PROOF_TOOL_NAME,
-  AGENT_FINAL_EXPORT_INPUT_SCHEMA_NAME,
-  AGENT_FINAL_EXPORT_OUTPUT_SCHEMA_NAME,
-  AGENT_FINAL_EXPORT_TOOL_NAME,
-  agentExportProofRequestSchema,
-  agentFinalExportRequestSchema,
-  buildAgentExportProof,
-  buildAgentFinalExport,
-} from './agentExportProofTool';
-import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
-import {
-  AGENT_LAYER_CREATE_INPUT_SCHEMA_NAME,
-  AGENT_LAYER_CREATE_OUTPUT_SCHEMA_NAME,
-  AGENT_LAYER_CREATE_TOOL_NAME,
-  AGENT_LAYER_SCOPED_ADJUST_INPUT_SCHEMA_NAME,
-  AGENT_LAYER_SCOPED_ADJUST_OUTPUT_SCHEMA_NAME,
-  AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME,
-  AGENT_MASK_CREATE_OR_UPDATE_INPUT_SCHEMA_NAME,
-  AGENT_MASK_CREATE_OR_UPDATE_OUTPUT_SCHEMA_NAME,
-  AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
-  AGENT_OBJECT_SELECTION_APPLY_INPUT_SCHEMA_NAME,
-  AGENT_OBJECT_SELECTION_APPLY_OUTPUT_SCHEMA_NAME,
-  AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME,
-  agentLayerCreateRequestSchema,
-  agentLayerScopedAdjustRequestSchema,
-  agentMaskCreateOrUpdateRequestSchema,
-  agentObjectSelectionApplyRequestSchema,
-  applyAgentBrushMaskCreateOrUpdate,
-  applyAgentLayerCreate,
-  applyAgentLayerScopedAdjustments,
-  applyAgentObjectSelection,
-} from './agentLayerMaskTools';
-import {
-  AGENT_PREVIEW_COMPARE_INPUT_SCHEMA_NAME,
-  AGENT_PREVIEW_COMPARE_OUTPUT_SCHEMA_NAME,
-  AGENT_PREVIEW_COMPARE_TOOL_NAME,
-  AGENT_PREVIEW_RENDER_INPUT_SCHEMA_NAME,
-  AGENT_PREVIEW_RENDER_OUTPUT_SCHEMA_NAME,
-  AGENT_PREVIEW_RENDER_TOOL_NAME,
-  AGENT_STATE_GET_INPUT_SCHEMA_NAME,
-  AGENT_STATE_GET_OUTPUT_SCHEMA_NAME,
-  AGENT_STATE_GET_TOOL_NAME,
-  agentPreviewCompareRequestSchema,
-  agentPreviewRenderRequestSchema,
-  agentStateGetRequestSchema,
-  getAgentReadOnlyState,
-  renderAgentPreviewCompare,
-  renderAgentReadOnlyPreview,
-} from './agentReadOnlyAppServerTools';
 import { AI_APP_SERVER_TOOL_ROUTES } from './ai/aiAppServerToolRoutes';
 import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from './computational-merge/computationalMergeAppServerRoutes';
 import { DETAIL_APP_SERVER_ROUTES } from './detailAppServerRoutes';

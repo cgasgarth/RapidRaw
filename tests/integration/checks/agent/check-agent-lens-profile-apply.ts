@@ -9,12 +9,12 @@ import {
 } from '../../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
+import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
 import {
   AGENT_LENS_PROFILE_APPLY_TOOL_NAME,
   agentLensProfileApplyRequestSchema,
   applyAgentLensProfile,
 } from '../../../../src/utils/agent/tools/agentLensProfileApplyTool.ts';
-import { buildAgentImageContextSnapshot } from '../../../../src/utils/agentImageContextSnapshot.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   handleRawEngineAppServerHostRequestAsync,

@@ -5,8 +5,8 @@ import {
   RawEngineAppServerRouteMode,
   type RawEngineAppServerRouteMode as RawEngineAppServerRouteModeValue,
   rawEngineAppServerRouteFamilySchema,
-} from '../schemas/agent/agentRuntimeSchemas';
-import { buildRawEngineAppServerRouteCatalog } from './rawEngineAppServerHost';
+} from '../../../schemas/agent/agentRuntimeSchemas';
+import { buildRawEngineAppServerRouteCatalog } from '../../rawEngineAppServerHost';
 
 export const agentAppServerToolReadinessFamilySchema = z
   .object({

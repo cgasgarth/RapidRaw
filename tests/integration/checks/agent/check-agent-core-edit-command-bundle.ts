@@ -4,7 +4,7 @@ import { RawStatus, SortDirection } from '../../../../src/components/ui/AppPrope
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { useLibraryStore } from '../../../../src/store/useLibraryStore.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
-import { runAgentCoreEditCommandBundle } from '../../../../src/utils/agentCoreEditCommandBundle.ts';
+import { runAgentCoreEditCommandBundle } from '../../../../src/utils/agent/planning/agentCoreEditCommandBundle.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3158.ARW';
 

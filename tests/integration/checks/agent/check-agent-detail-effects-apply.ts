@@ -9,12 +9,12 @@ import {
 } from '../../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
+import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
 import {
   AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
   agentDetailEffectsApplyRequestSchema,
   applyAgentDetailEffects,
 } from '../../../../src/utils/agent/tools/agentDetailEffectsApplyTool.ts';
-import { buildAgentImageContextSnapshot } from '../../../../src/utils/agentImageContextSnapshot.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   handleRawEngineAppServerHostRequestAsync,
