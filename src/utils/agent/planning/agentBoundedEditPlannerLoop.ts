@@ -4,6 +4,7 @@ import { buildAgentBasicToneDryRunPreviewArtifacts } from '../context/agentDryRu
 import type { AgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { type AgentInitialPromptContext, buildAgentInitialPromptContext } from '../context/agentInitialPromptContext';
 import type { AgentCoreEditCommandBundleStep } from './agentCoreEditCommandBundle';
+import { classifyAgentEditIntent } from './agentEditIntentClassifier';
 
 export type AgentPlannerLoopStopState = 'approval_ready' | 'blocked' | 'max_steps_reached';
 export type AgentPlannerLoopStage = 'inspect' | 'plan' | 'dry_run' | 'apply' | 'observe';
@@ -42,32 +43,36 @@ const agentPlannerLoopResultProofSchema = z
   .strict();
 
 const classifyPrompt = (prompt: string): readonly AgentCoreEditCommandBundleStep[] => {
-  const normalized = prompt.toLowerCase();
-  const warm = normalized.includes('warm') || normalized.includes('skin') || normalized.includes('orange');
-  const contrast = normalized.includes('contrast') || normalized.includes('pop') || normalized.includes('flat');
-  const exposure = normalized.includes('bright') || normalized.includes('exposure') || normalized.includes('dark');
+  const intent = classifyAgentEditIntent(prompt);
+  const landscape = intent.recipeKind === 'cool_landscape_detail';
 
   return [
     {
       kind: 'basic_tone',
       payload: {
         ...useEditorStore.getState().adjustments,
-        blacks: contrast ? -6 : -3,
+        blacks: landscape ? -8 : intent.contrastIntent ? -6 : -3,
         brightness: useEditorStore.getState().adjustments.brightness,
-        clarity: contrast ? 12 : 6,
-        contrast: contrast ? 20 : 10,
-        exposure: exposure ? 0.32 : 0.12,
-        highlights: exposure ? -14 : -8,
-        saturation: warm ? 8 : 4,
-        shadows: exposure ? 10 : 5,
-        whites: contrast ? 5 : 2,
+        clarity: landscape ? 18 : intent.contrastIntent ? 12 : 6,
+        contrast: intent.contrastIntent ? 20 : 10,
+        exposure: intent.brightenIntent ? 0.32 : 0.12,
+        highlights: intent.brightenIntent ? -14 : -8,
+        saturation: intent.warmToneIntent ? 8 : 4,
+        shadows: intent.brightenIntent ? 10 : 5,
+        whites: intent.contrastIntent ? 5 : 2,
       },
     },
     {
       kind: 'selective_color',
       payload: {
-        adjustment: { hue: warm ? -4 : 0, luminance: warm ? 5 : 2, saturation: warm ? 12 : 4 },
-        rangeKey: warm ? 'oranges' : 'blues',
+        adjustment: landscape
+          ? { hue: -2, luminance: 4, saturation: 10 }
+          : {
+              hue: intent.warmToneIntent ? -4 : 0,
+              luminance: intent.warmToneIntent ? 5 : 2,
+              saturation: intent.warmToneIntent ? 12 : 4,
+            },
+        rangeKey: landscape ? 'blues' : intent.warmToneIntent ? 'oranges' : 'blues',
       },
     },
   ];
