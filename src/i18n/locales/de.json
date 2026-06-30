@@ -708,6 +708,15 @@
         },
         "runtimeApplyDemo": "",
         "runtimeApplyProof": "",
+        "selectedImageLoop": {
+          "audit": "Audit summary",
+          "before": "Before",
+          "changedPixels": "Changed pixels",
+          "current": "Current",
+          "graphRevision": "Graph revision",
+          "recipeHash": "Recipe hash",
+          "rollback": "Rollback receipt"
+        },
         "timeline": {
           "control": {
             "approval": "",
