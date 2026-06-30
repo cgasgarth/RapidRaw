@@ -3,8 +3,8 @@
 import {
   buildSuperResolutionUiApplyCommandV1,
   buildSuperResolutionUiDryRunCommandV1,
-} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionUiControls.ts';
-import { runComputationalUiApiSmoke } from '../../../scripts/lib/computational/ui-api-smoke.ts';
+} from '../../../../packages/rawengine-schema/src/super-resolution/superResolutionUiControls.ts';
+import { runComputationalUiApiSmoke } from '../../../../scripts/lib/computational/ui-api-smoke.ts';
 
 runComputationalUiApiSmoke({
   buildApplyCommand: buildSuperResolutionUiApplyCommandV1,

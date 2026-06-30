@@ -3,7 +3,7 @@
 import {
   buildSuperResolutionSourcePreflight,
   createSuperResolutionSourcePreflightMetadata,
-} from '../../../src/utils/superResolutionSourcePreflight.ts';
+} from '../../../../src/utils/superResolutionSourcePreflight.ts';
 
 const failures: string[] = [];
 

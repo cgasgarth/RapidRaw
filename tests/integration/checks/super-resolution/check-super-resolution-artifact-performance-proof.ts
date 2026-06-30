@@ -67,11 +67,11 @@ const reportSchema = z
   .strict();
 
 const update = process.argv.includes('--update');
-run(['bun', 'tests/integration/checks/check-super-resolution-performance-fixtures.ts']);
+run(['bun', 'tests/integration/checks/super-resolution/check-super-resolution-performance-fixtures.ts']);
 const started = performance.now();
 const runtimeOutput = run([
   'bun',
-  'tests/integration/checks/check-super-resolution-runtime-plan-smoke.ts',
+  'tests/integration/checks/super-resolution/check-super-resolution-runtime-plan-smoke.ts',
   '--verbose',
 ]);
 const measuredRuntimeMs = round3(performance.now() - started);

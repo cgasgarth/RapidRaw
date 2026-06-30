@@ -6,7 +6,7 @@ import {
   type SuperResolutionSourceValidationInputV1,
   type SuperResolutionSourceValidationWarningCodeV1,
   validateSuperResolutionSourcesV1,
-} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionSourceValidation.ts';
+} from '../../../../packages/rawengine-schema/src/super-resolution/superResolutionSourceValidation.ts';
 
 const failures: string[] = [];
 

@@ -110,8 +110,8 @@ const reportSchema = z
   .strict();
 
 const update = process.argv.includes('--update');
-run(['bun', 'tests/integration/checks/check-super-resolution-synthetic-smoke.ts']);
-run(['bun', 'tests/integration/checks/check-super-resolution-runtime-plan-smoke.ts']);
+run(['bun', 'tests/integration/checks/super-resolution/check-super-resolution-synthetic-smoke.ts']);
+run(['bun', 'tests/integration/checks/super-resolution/check-super-resolution-runtime-plan-smoke.ts']);
 const smokeReportText = await Bun.file(SMOKE_REPORT_PATH).text();
 const smokeReport = smokeReportSchema.parse(JSON.parse(smokeReportText));
 const runtimeReportText = await Bun.file(RUNTIME_REPORT_PATH).text();

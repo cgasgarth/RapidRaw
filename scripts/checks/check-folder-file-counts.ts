@@ -78,6 +78,10 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4208',
     reason: 'integration checks are pending domain/native-runner cleanup',
   },
+  'tests/integration/checks/super-resolution': {
+    issue: '#4325',
+    reason: 'super-resolution checks are grouped under a dedicated folder for this issue',
+  },
   'tests/integration/checks/ai': {
     issue: '#4295',
     reason: 'AI checks are being reorganized into a dedicated subfolder.',

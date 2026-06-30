@@ -7,7 +7,7 @@ import { dirname } from 'node:path';
 import { format, resolveConfig } from 'prettier';
 import { z } from 'zod';
 
-import { superResolutionReconstructionDiagnosticsV1Schema } from '../../../packages/rawengine-schema/src/super-resolution/superResolutionReconstructionDiagnostics.ts';
+import { superResolutionReconstructionDiagnosticsV1Schema } from '../../../../packages/rawengine-schema/src/super-resolution/superResolutionReconstructionDiagnostics.ts';
 
 const REPORT_PATH = 'artifacts/validation/super-resolution-reconstruction-proof-2026-06-20.json';
 const RUNTIME_REPORT_PATH =
@@ -54,7 +54,7 @@ const proofReportSchema = z
   .strict();
 
 const update = process.argv.includes('--update');
-run(['bun', 'tests/integration/checks/check-super-resolution-runtime-plan-smoke.ts']);
+run(['bun', 'tests/integration/checks/super-resolution/check-super-resolution-runtime-plan-smoke.ts']);
 const runtimeReport = runtimeReportSchema.parse(JSON.parse(await readFile(RUNTIME_REPORT_PATH, 'utf8')));
 const diagnostics = runtimeReport.quality.reconstructionDiagnostics;
 if (diagnostics.outputPixelCount !== runtimeReport.outputSize.width * runtimeReport.outputSize.height) {

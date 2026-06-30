@@ -210,21 +210,25 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:panorama-ui-smoke', new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario panorama-ui'])],
   [
     'check:sr-alignment-detail-proof',
-    new Set(['bun tests/integration/checks/check-super-resolution-alignment-detail-proof.ts']),
+    new Set(['bun tests/integration/checks/super-resolution/check-super-resolution-alignment-detail-proof.ts']),
   ],
   [
     'check:sr-alignment-detail-proof:update',
-    new Set(['bun tests/integration/checks/check-super-resolution-alignment-detail-proof.ts --update']),
+    new Set([
+      'bun tests/integration/checks/super-resolution/check-super-resolution-alignment-detail-proof.ts --update',
+    ]),
   ],
   [
     'check:sr-artifact-performance-proof',
-    new Set(['bun tests/integration/checks/check-super-resolution-artifact-performance-proof.ts']),
+    new Set(['bun tests/integration/checks/super-resolution/check-super-resolution-artifact-performance-proof.ts']),
   ],
   [
     'check:sr-artifact-performance-proof:update',
-    new Set(['bun tests/integration/checks/check-super-resolution-artifact-performance-proof.ts --update']),
+    new Set([
+      'bun tests/integration/checks/super-resolution/check-super-resolution-artifact-performance-proof.ts --update',
+    ]),
   ],
-  ['check:sr-ui-api', new Set(['bun tests/integration/checks/check-sr-ui-api.ts'])],
+  ['check:sr-ui-api', new Set(['bun tests/integration/checks/super-resolution/check-sr-ui-api.ts'])],
   ['check:sr-ui-smoke', new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario sr-ui'])],
   [
     'check:negative-lab-fixtures',
@@ -308,7 +312,10 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     'schema:panorama-app-server',
     new Set(['bun packages/rawengine-schema/scripts/check-panorama-app-server-command-bus.ts']),
   ],
-  ['check:sr-synthetic-smoke', new Set(['bun tests/integration/checks/check-super-resolution-synthetic-smoke.ts'])],
+  [
+    'check:sr-synthetic-smoke',
+    new Set(['bun tests/integration/checks/super-resolution/check-super-resolution-synthetic-smoke.ts']),
+  ],
   ['check:tauri-schema-validation', new Set(['bun tests/integration/checks/check-tauri-schema-validation.ts'])],
   ['check:wavelet-detail', new Set(['bun tests/integration/checks/check-wavelet-detail-fixtures.ts'])],
   ['check:workspace-layouts', new Set(['bun tests/integration/checks/check-workspace-layout-fixtures.ts'])],

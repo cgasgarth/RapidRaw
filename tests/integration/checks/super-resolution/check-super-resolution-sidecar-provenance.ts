@@ -9,18 +9,18 @@ import {
   ApprovalClass,
   computationalMergeCommandEnvelopeV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   applySuperResolutionRuntimePlanV1,
   buildSuperResolutionRuntimeDryRunV1,
-} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionRuntimePlan.ts';
+} from '../../../../packages/rawengine-schema/src/super-resolution/superResolutionRuntimePlan.ts';
 import {
   applySuperResolutionArtifactToSidecar,
   buildSuperResolutionArtifactSidecarRecordV1,
   classifySuperResolutionArtifactStaleState,
   markSuperResolutionArtifactStaleState,
   readSuperResolutionArtifactFromSidecar,
-} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionSidecarProvenance.ts';
+} from '../../../../packages/rawengine-schema/src/super-resolution/superResolutionSidecarProvenance.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/super-resolution/super-resolution-sidecar-provenance-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');

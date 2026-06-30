@@ -10,9 +10,9 @@ import {
   applyPixelShiftSuperResolutionV1,
   calculateMeanAbsoluteErrorV1,
   createNearestNeighborBaselineV1,
-} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionPixelShift.ts';
-import { superResolutionReconstructionDiagnosticsV1Schema } from '../../../packages/rawengine-schema/src/super-resolution/superResolutionReconstructionDiagnostics.ts';
-import { superResolutionSyntheticReviewArtifacts } from '../../../src/utils/superResolutionOutputReview.ts';
+} from '../../../../packages/rawengine-schema/src/super-resolution/superResolutionPixelShift.ts';
+import { superResolutionReconstructionDiagnosticsV1Schema } from '../../../../packages/rawengine-schema/src/super-resolution/superResolutionReconstructionDiagnostics.ts';
+import { superResolutionSyntheticReviewArtifacts } from '../../../../src/utils/superResolutionOutputReview.ts';
 
 const WIDTH = 48;
 const HEIGHT = 36;
@@ -257,7 +257,7 @@ if (update) {
 const committedReport = reportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
 if (JSON.stringify(committedReport) !== JSON.stringify(report)) {
   throw new Error(
-    'SR synthetic output artifact proof is stale. Run bun tests/integration/checks/check-sr-synthetic-output-artifact.ts --update',
+    'SR synthetic output artifact proof is stale. Run bun tests/integration/checks/super-resolution/check-sr-synthetic-output-artifact.ts --update',
   );
 }
 const expectedReviewArtifacts = [
