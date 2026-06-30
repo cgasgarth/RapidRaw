@@ -42,7 +42,7 @@ import {
   AiProviderId,
   type AiProviderId as AiProviderIdType,
   normalizeAiProviderId,
-} from '../../schemas/aiProviderSchemas';
+} from '../../schemas/ai/aiProviderSchemas';
 import { type CloudUsage, cloudUsageSchema } from '../../schemas/cloudUsageSchemas';
 import { normalizeKeyboardShortcutMap, parseKeyboardShortcutCombo } from '../../schemas/keyboardShortcutSchemas';
 import { Invokes } from '../../tauri/commands';
