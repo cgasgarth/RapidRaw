@@ -12,7 +12,7 @@ import type {
   PanoramaUiProjection,
   PanoramaUiQualityPreference,
   PanoramaUiSettings,
-} from '../../../schemas/panoramaUiSchemas';
+} from '../../../schemas/computational-merge/panoramaUiSchemas';
 import { type PanoramaModalState, useUIStore } from '../../../store/useUIStore';
 import { TextColors, TextVariants } from '../../../types/typography';
 import {

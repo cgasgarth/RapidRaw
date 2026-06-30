@@ -1,4 +1,4 @@
-import type { DerivedOutputReceipt } from '../../../schemas/derivedOutputReceiptSchemas';
+import type { DerivedOutputReceipt } from '../../../schemas/computational-merge/derivedOutputReceiptSchemas';
 import { TextColors, TextVariants } from '../../../types/typography';
 import UiText from '../../ui/primitives/Text';
 import DerivedOutputReceiptPanel from './DerivedOutputReceiptPanel';

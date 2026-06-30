@@ -21,8 +21,8 @@ import {
   buildSuperResolutionUiApplyCommandV1,
   buildSuperResolutionUiDryRunCommandV1,
 } from '../../../packages/rawengine-schema/src/superResolutionUiControls.ts';
-import { parseComputationalMergeE2eProofManifest } from '../../../src/schemas/computationalMergeE2eProofSchemas.ts';
-import type { ComputationalMergePrivateSourceSet } from '../../../src/schemas/computationalMergeSourceSetSchemas.ts';
+import { parseComputationalMergeE2eProofManifest } from '../../../src/schemas/computational-merge/computationalMergeE2eProofSchemas.ts';
+import type { ComputationalMergePrivateSourceSet } from '../../../src/schemas/computational-merge/computationalMergeSourceSetSchemas.ts';
 import { parsePrivateRawEvidenceLedger } from '../../../src/schemas/privateRawEvidenceSchemas.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
 import { buildComputationalMergePrivateSourceSets } from '../../../src/utils/computational-merge/computationalMergeSourceSets.ts';

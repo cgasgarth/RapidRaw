@@ -1,4 +1,4 @@
-import type { ComputationalMergeAppServerRouteFamily } from '../../schemas/computationalMergeAppServerSchemas';
+import type { ComputationalMergeAppServerRouteFamily } from '../../schemas/computational-merge/computationalMergeAppServerSchemas';
 import { getComputationalMergeAppServerToolName } from './computationalMergeAppServerToolNames';
 
 interface ComputationalMergeAppServerRoutePairSummary {

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { privateRawFormatSchema } from './privateRawFormatSchemas';
+import { privateRawFormatSchema } from '../privateRawFormatSchemas';
 
 export const computationalMergeSourceSetFamilySchema = z.enum(['panorama_stitch', 'focus_stack', 'super_resolution']);
 

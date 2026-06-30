@@ -2,18 +2,18 @@ import { motion } from 'framer-motion';
 import { AlertTriangle, CheckCircle2, Layers3, ScanSearch, ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { SuperResolutionOutputReviewWorkflow } from '../../../schemas/superResolutionOutputReviewSchemas';
+import type { SuperResolutionOutputReviewWorkflow } from '../../../schemas/computational-merge/superResolutionOutputReviewSchemas';
 import type {
   SuperResolutionAlignmentMode,
   SuperResolutionMode,
   SuperResolutionQualityPreference,
   SuperResolutionReconstructionMode,
   SuperResolutionUiSettings,
-} from '../../../schemas/superResolutionUiSchemas';
+} from '../../../schemas/computational-merge/superResolutionUiSchemas';
 import {
   getSuperResolutionDetailPolicyForMode,
   getSuperResolutionModeForDetailPolicy,
-} from '../../../schemas/superResolutionUiSchemas';
+} from '../../../schemas/computational-merge/superResolutionUiSchemas';
 import { type SuperResolutionModalState, useUIStore } from '../../../store/useUIStore';
 import { TextColors, TextVariants } from '../../../types/typography';
 import {

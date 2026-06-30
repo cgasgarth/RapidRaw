@@ -1,5 +1,5 @@
 import { CheckCircle2 } from 'lucide-react';
-import type { ComputationalMergeAppServerRouteFamily } from '../../../schemas/computationalMergeAppServerSchemas';
+import type { ComputationalMergeAppServerRouteFamily } from '../../../schemas/computational-merge/computationalMergeAppServerSchemas';
 import { TextColors, TextVariants } from '../../../types/typography';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../utils/computational-merge/computationalMergeAppServerRoutePairs';
 import UiText from '../../ui/primitives/Text';

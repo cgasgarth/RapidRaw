@@ -3,7 +3,7 @@ import {
   type PanoramaSavedReviewSummary,
   type PanoramaUiSettings,
   panoramaSavedReviewSummarySchema,
-} from '../schemas/panoramaUiSchemas';
+} from '../schemas/computational-merge/panoramaUiSchemas';
 
 export const buildPanoramaSavedReviewSummary = ({
   outputPath,

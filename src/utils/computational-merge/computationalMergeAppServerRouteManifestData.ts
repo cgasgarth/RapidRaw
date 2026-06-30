@@ -2,7 +2,7 @@ import type {
   ComputationalMergeAppServerRoute,
   ComputationalMergeAppServerRouteFamily,
   ComputationalMergeAppServerRouteManifest,
-} from '../../schemas/computationalMergeAppServerSchemas';
+} from '../../schemas/computational-merge/computationalMergeAppServerSchemas';
 import { getComputationalMergeAppServerToolName } from './computationalMergeAppServerToolNames';
 
 const dryRunOutputSchemaName = 'ComputationalMergeDryRunResultV1';

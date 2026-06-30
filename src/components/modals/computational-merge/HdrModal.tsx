@@ -16,7 +16,7 @@ import {
   type HdrMergeStrategy,
   type HdrMergeUiSettings,
   type HdrToneMappingPreset,
-} from '../../../schemas/hdrMergeUiSchemas';
+} from '../../../schemas/computational-merge/hdrMergeUiSchemas';
 import { type HdrModalState, useUIStore } from '../../../store/useUIStore';
 import { TextColors, TextVariants } from '../../../types/typography';
 import { buildHdrDerivedOutputReceipt, deriveDerivedOutputReceiptState } from '../../../utils/derivedOutputReceipt';
