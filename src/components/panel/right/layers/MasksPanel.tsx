@@ -64,6 +64,7 @@ import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../..
 import {
   ADJUSTMENT_SECTIONS,
   type Adjustments,
+  hasAdjustmentValueChanges,
   INITIAL_ADJUSTMENTS,
   INITIAL_MASK_ADJUSTMENTS,
   INITIAL_MASK_CONTAINER,
@@ -3609,6 +3610,11 @@ function SettingsPanel({
               title={title}
               isOpen={collapsibleState[sectionName] ?? false}
               isContentVisible={sectionVisibility[sectionName] ?? true}
+              isDirty={hasAdjustmentValueChanges(
+                ADJUSTMENT_SECTIONS[sectionName] ?? [],
+                displayAdjustments,
+                INITIAL_MASK_ADJUSTMENTS,
+              )}
               onToggle={() => {
                 handleToggleSection(sectionName);
               }}

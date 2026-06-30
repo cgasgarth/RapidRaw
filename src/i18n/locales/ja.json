@@ -3762,6 +3762,8 @@
       "zoomLabelReset": "ズームをリセット"
     },
     "collapsibleSection": {
+      "dirtyBadge": "編集済み",
+      "disabledBadge": "オフ",
       "disableSection": "セクションを無効化",
       "enableSection": "セクションを有効化"
     },

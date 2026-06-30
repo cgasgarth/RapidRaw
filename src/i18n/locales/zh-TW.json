@@ -3603,6 +3603,8 @@
       "zoomLabelReset": "重置縮放"
     },
     "collapsibleSection": {
+      "dirtyBadge": "已編輯",
+      "disabledBadge": "關閉",
       "disableSection": "停用部分",
       "enableSection": "啟用部分"
     },

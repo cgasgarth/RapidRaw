@@ -4145,6 +4145,8 @@
       "zoomLabelReset": "Zresetuj powiększenie"
     },
     "collapsibleSection": {
+      "dirtyBadge": "Edytowano",
+      "disabledBadge": "Wył.",
       "disableSection": "Wyłącz sekcję",
       "enableSection": "Włącz sekcję"
     },
