@@ -9,7 +9,7 @@ import { layerMaskBlendModeV1Schema } from '../../../packages/rawengine-schema/s
 import {
   type LayerOpacityOrderRuntimeOperation,
   renderLayerOpacityOrderRuntime,
-} from '../../../src/utils/layerOpacityOrderRuntime.ts';
+} from '../../../src/utils/layers/layerOpacityOrderRuntime.ts';
 
 const OUTPUT_DIR = 'artifacts/layers/opacity-order-runtime';
 

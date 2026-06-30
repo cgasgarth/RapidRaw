@@ -9,7 +9,7 @@ import {
   LAYER_ADJUSTMENT_KEYS,
   setLayerAdjustment,
   setLayerAdjustments,
-} from '../../../src/utils/layerAdjustments.ts';
+} from '../../../src/utils/layers/layerAdjustments.ts';
 
 const adjustmentKeySchema = z.enum(LAYER_ADJUSTMENT_KEYS);
 const adjustmentPatchSchema = z.partialRecord(adjustmentKeySchema, z.number());

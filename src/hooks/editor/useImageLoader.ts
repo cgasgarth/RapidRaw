@@ -10,7 +10,7 @@ import { Invokes } from '../../tauri/commands';
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../utils/adjustments';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import type { ImageCacheEntry } from '../../utils/ImageLRUCache';
-import { hydrateLayerStackMasksFromMetadata } from '../../utils/layerStackSidecarAdjustments';
+import { hydrateLayerStackMasksFromMetadata } from '../../utils/layers/layerStackSidecarAdjustments';
 import { consumePendingNegativeConversionDustHealLayers } from '../../utils/negativeLabEditorHandoff';
 
 export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | null>) {

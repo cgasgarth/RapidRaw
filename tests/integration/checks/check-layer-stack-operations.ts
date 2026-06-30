@@ -25,7 +25,7 @@ import {
   soloLayer,
   soloLayerGroup,
   ungroupLayerGroup,
-} from '../../../src/utils/layerStack.ts';
+} from '../../../src/utils/layers/layerStack.ts';
 
 const layerFixtureSchema = z
   .object({

@@ -14,7 +14,7 @@ import {
   renderLayerExportStack,
   renderLayerHeadlessStack,
   renderLayerPreviewStack,
-} from '../../../src/utils/layerPreviewExportParity';
+} from '../../../src/utils/layers/layerPreviewExportParity';
 
 const failureLimit = 20;
 const failures: string[] = [];

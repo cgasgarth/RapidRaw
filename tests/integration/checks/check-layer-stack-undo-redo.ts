@@ -18,7 +18,7 @@ import {
   setLayerName,
   setLayerOpacity,
   setLayerVisibility,
-} from '../../../src/utils/layerStack.ts';
+} from '../../../src/utils/layers/layerStack.ts';
 
 const layerSchema = z
   .object({

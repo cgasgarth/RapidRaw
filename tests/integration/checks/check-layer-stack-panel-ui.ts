@@ -6,7 +6,11 @@ import {
   INITIAL_MASK_ADJUSTMENTS,
   type MaskContainer,
 } from '../../../src/utils/adjustments.ts';
-import { buildLayerGroupWorkflowProof, groupLayerWithNext, ungroupLayerGroup } from '../../../src/utils/layerStack.ts';
+import {
+  buildLayerGroupWorkflowProof,
+  groupLayerWithNext,
+  ungroupLayerGroup,
+} from '../../../src/utils/layers/layerStack.ts';
 
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
 const layerLocale = locale.editor?.layers;

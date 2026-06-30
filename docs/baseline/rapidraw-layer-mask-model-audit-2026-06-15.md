@@ -38,8 +38,8 @@ containers as layers. It includes a base RAW row and supports visibility,
 opacity, move up/down, duplicate, delete, and selection. The blend mode menu is
 presentational only today: current `MaskContainer` does not persist blend mode.
 
-`src/utils/layerStack.ts` contains pure helpers for visibility, opacity,
-delete, duplicate, and reorder. `src/utils/layerAdjustments.ts` contains pure
+`src/utils/layers/layerStack.ts` contains pure helpers for visibility, opacity,
+delete, duplicate, and reorder. `src/utils/layers/layerAdjustments.ts` contains pure
 helpers for clamped per-layer scalar adjustments.
 
 ## Current Renderer Model

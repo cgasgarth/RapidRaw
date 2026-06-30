@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 
 import { INITIAL_MASK_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-import { copyLayerMasksToLayer } from '../../../src/utils/layerStack.ts';
+import { copyLayerMasksToLayer } from '../../../src/utils/layers/layerStack.ts';
 import {
   cloneMaskContainerForPaste,
   cloneSubMaskForPaste,

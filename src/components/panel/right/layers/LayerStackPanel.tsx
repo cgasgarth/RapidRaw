@@ -46,12 +46,12 @@ import {
   soloLayer,
   soloLayerGroup,
   ungroupLayerGroup,
-} from '../../../../utils/layerStack';
+} from '../../../../utils/layers/layerStack';
 import {
   applyLayerStackCommandBridgeOperation,
   type LayerStackCommandBridgeOperation,
-} from '../../../../utils/layerStackCommandBridge';
-import { persistLayerStackSidecarInAdjustments } from '../../../../utils/layerStackSidecarAdjustments';
+} from '../../../../utils/layers/layerStackCommandBridge';
+import { persistLayerStackSidecarInAdjustments } from '../../../../utils/layers/layerStackSidecarAdjustments';
 import Slider, { type SliderChangeEvent } from '../../../ui/primitives/Slider';
 import UiText from '../../../ui/primitives/Text';
 import { Mask, SubMaskMode } from './Masks';

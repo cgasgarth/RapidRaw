@@ -9,7 +9,7 @@ import { z } from 'zod';
 import {
   type LayerOpacityOrderRuntimeOperation,
   renderLayerOpacityOrderRuntime,
-} from '../../../src/utils/layerOpacityOrderRuntime.ts';
+} from '../../../src/utils/layers/layerOpacityOrderRuntime.ts';
 
 const FIXTURE_PATH = 'fixtures/layers/layer-visibility-opacity-proof.json';
 const REPORT_PATH = 'docs/validation/proofs/layers-masks/layer-visibility-opacity-proof-2026-06-21.json';

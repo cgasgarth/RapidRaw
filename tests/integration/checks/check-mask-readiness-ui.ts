@@ -26,7 +26,7 @@ import {
   evaluateColorRangeMaskWeight,
 } from '../../../src/utils/colorRangeMaskParameters.ts';
 import { createEditorSubMaskForImage } from '../../../src/utils/editorSubMaskFactory.ts';
-import { buildLayerExportReadinessSummary } from '../../../src/utils/layerStack.ts';
+import { buildLayerExportReadinessSummary } from '../../../src/utils/layers/layerStack.ts';
 import { buildLinearGradientMaskCommandFromParameters } from '../../../src/utils/linearGradientMaskCommandBridge.ts';
 
 const IMAGE_SIZE = { height: 12, width: 16 };
