@@ -15,6 +15,29 @@ const f32Literal = (expected: number) =>
   z.number().refine((actual) => Math.abs(actual - expected) < 0.000001, {
     message: `Expected approximately ${expected}.`,
   });
+const baseFogSampleRectSchema = z
+  .object({
+    height: z.number().positive().max(1),
+    width: z.number().positive().max(1),
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1),
+  })
+  .strict();
+const baseFogCandidateSchema = z
+  .object({
+    baseDensity: z.array(z.number().nonnegative()).length(3),
+    baseRgb: z.array(z.number().min(0).max(1)).length(3),
+    blueWeight: z.number().min(0.5).max(2),
+    channelCastRatio: z.number().min(1).max(1.5),
+    confidence: z.number().min(0.01).max(1),
+    greenWeight: z.number().min(0.5).max(2),
+    redWeight: z.number().min(0.5).max(2),
+    sampleRect: baseFogSampleRectSchema,
+    score: z.number(),
+    source: z.enum(['left_edge_border', 'right_edge_border', 'top_edge_border', 'bottom_edge_border']),
+    warnings: z.array(z.enum(['low_base_estimate_confidence', 'strong_channel_cast_candidate'])),
+  })
+  .strict();
 const appliedProfileSchema = z
   .object({
     claimLevel: z.literal('generic_starting_point_only'),
@@ -31,20 +54,13 @@ const appliedProfileSchema = z
       .length(3),
     params: z
       .object({
-        base_fog_sample: z
-          .object({
-            height: z.literal(0.35),
-            width: z.literal(0.35),
-            x: z.literal(0),
-            y: z.literal(0),
-          })
-          .strict(),
+        base_fog_sample: baseFogSampleRectSchema,
         base_fog_strength: f32Literal(1),
-        blue_weight: f32Literal(0.98),
+        blue_weight: z.number().min(0.5).max(2),
         contrast: f32Literal(0.95),
         exposure: f32Literal(0.05),
-        green_weight: f32Literal(1),
-        red_weight: f32Literal(1.03),
+        green_weight: z.number().min(0.5).max(2),
+        red_weight: z.number().min(0.5).max(2),
       })
       .strict(),
     presetId: z.literal('negative_lab.generic.c41.portrait.v1'),
@@ -77,24 +93,17 @@ const reportSchema = z
       .object({
         baseFog: z
           .object({
-            sampleRect: z
-              .object({
-                height: z.literal(0.35),
-                width: z.literal(0.35),
-                x: z.literal(0),
-                y: z.literal(0),
-              })
-              .strict(),
+            sampleRect: baseFogSampleRectSchema,
             strength: f32Literal(1),
           })
           .strict(),
         density: z
           .object({
-            blueWeight: f32Literal(0.98),
+            blueWeight: z.number().min(0.5).max(2),
             contrast: f32Literal(0.95),
             exposure: f32Literal(0.05),
-            greenWeight: f32Literal(1),
-            redWeight: f32Literal(1.03),
+            greenWeight: z.number().min(0.5).max(2),
+            redWeight: z.number().min(0.5).max(2),
           })
           .strict(),
         export: z
@@ -118,13 +127,46 @@ const reportSchema = z
       })
       .strict(),
     inputToOutputMeanAbsDelta: z.number().gt(0.01),
-    issue: z.literal(2311),
+    issue: z.literal(4398),
     metrics: z
       .object({
+        autoBaseConfidence: z.number().gt(0.01).max(1),
+        baseFogSampleSource: z.enum(['left_edge_border', 'right_edge_border', 'top_edge_border', 'bottom_edge_border']),
+        channelCastRatio: z.number().min(1).max(1.5),
         changedPixelRatio: z.number().gt(0.05),
         inputToOutputMeanAbsDelta: z.number().gt(0.01),
+        meanInputOutputDelta: z.number().gt(0.01),
+        previewAfterHash: fnvHashSchema,
+        previewBeforeHash: fnvHashSchema,
+        previewChanged: z.literal(true),
+        rankedBaseFogCandidates: z.array(baseFogCandidateSchema).min(4),
+        sampleRect: baseFogSampleRectSchema,
+        sampleSource: z.enum(['left_edge_border', 'right_edge_border', 'top_edge_border', 'bottom_edge_border']),
+        savedOutputExists: z.literal(true),
+        savedOutputPath: z.literal(
+          'src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg',
+        ),
+        warnings: z.array(z.enum(['low_base_estimate_confidence', 'strong_channel_cast_candidate'])),
       })
-      .strict(),
+      .strict()
+      .superRefine((metrics, context) => {
+        if (metrics.previewBeforeHash === metrics.previewAfterHash) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Preview hash must change after auto base estimation.',
+          });
+        }
+        if (metrics.baseFogSampleSource !== metrics.sampleSource) {
+          context.addIssue({ code: z.ZodIssueCode.custom, message: 'Base fog sample source aliases must match.' });
+        }
+        const selected = metrics.rankedBaseFogCandidates[0];
+        if (selected.source !== metrics.sampleSource) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Top ranked base fog candidate must be the saved sample source.',
+          });
+        }
+      }),
     output: z
       .object({
         contentHash: fnvHashSchema,

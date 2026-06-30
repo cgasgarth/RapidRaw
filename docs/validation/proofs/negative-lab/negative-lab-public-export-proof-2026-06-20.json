@@ -11,21 +11,21 @@
     ],
     "params": {
       "base_fog_sample": {
-        "height": 0.35,
-        "width": 0.35,
+        "height": 1,
+        "width": 0.18000000715255737,
         "x": 0,
         "y": 0
       },
       "base_fog_strength": 1,
-      "blue_weight": 0.9800000190734863,
+      "blue_weight": 1,
       "contrast": 0.949999988079071,
       "exposure": 0.05000000074505806,
       "green_weight": 1,
-      "red_weight": 1.0299999713897705
+      "red_weight": 1
     },
     "presetId": "negative_lab.generic.c41.portrait.v1",
     "processFamily": "c41_color_negative",
-    "profileProvenanceHash": "fnv1a32:9ed1e301",
+    "profileProvenanceHash": "fnv1a32:e5855424",
     "runtimeStatus": "runtime_parameter_applied",
     "stockFamilyDescriptor": "Soft portrait color negative"
   },
@@ -42,26 +42,26 @@
   "controlSurface": {
     "baseFog": {
       "sampleRect": {
-        "height": 0.35,
-        "width": 0.35,
+        "height": 1,
+        "width": 0.18000000715255737,
         "x": 0,
         "y": 0
       },
       "strength": 1
     },
     "density": {
-      "blueWeight": 0.9800000190734863,
+      "blueWeight": 1,
       "contrast": 0.949999988079071,
       "exposure": 0.05000000074505806,
       "greenWeight": 1,
-      "redWeight": 1.0299999713897705
+      "redWeight": 1
     },
     "export": {
       "acceptedDryRunPlanHash": "fnv1a32:2f4a91bc",
       "acceptedDryRunPlanId": "negative_lab_batch_plan_2f4a91bc",
       "conversionBundle": true,
       "outputFormat": "jpeg_proof",
-      "profileProvenanceHash": "fnv1a32:9ed1e301",
+      "profileProvenanceHash": "fnv1a32:e5855424",
       "suffix": "Positive"
     },
     "preset": {
@@ -71,14 +71,137 @@
       "processFamily": "c41_color_negative"
     }
   },
-  "inputToOutputMeanAbsDelta": 0.4844345450401306,
-  "issue": 2311,
+  "inputToOutputMeanAbsDelta": 0.3934115767478943,
+  "issue": 4398,
   "metrics": {
+    "autoBaseConfidence": 1,
+    "baseFogSampleSource": "left_edge_border",
+    "channelCastRatio": 1,
     "changedPixelRatio": 1,
-    "inputToOutputMeanAbsDelta": 0.4844345450401306
+    "inputToOutputMeanAbsDelta": 0.3934115767478943,
+    "meanInputOutputDelta": 0.3934115767478943,
+    "previewAfterHash": "fnv1a64:0566cd12630c64e2",
+    "previewBeforeHash": "fnv1a64:2ecd279e073996b9",
+    "previewChanged": true,
+    "rankedBaseFogCandidates": [
+      {
+        "baseDensity": [
+          0.0010000000474974513,
+          0.0010000000474974513,
+          0.0010000000474974513
+        ],
+        "baseRgb": [
+          0.997700035572052,
+          0.997700035572052,
+          0.997700035572052
+        ],
+        "blueWeight": 1,
+        "channelCastRatio": 1,
+        "confidence": 1,
+        "greenWeight": 1,
+        "redWeight": 1,
+        "sampleRect": {
+          "height": 1,
+          "width": 0.18000000715255737,
+          "x": 0,
+          "y": 0
+        },
+        "score": 1,
+        "source": "left_edge_border",
+        "warnings": []
+      },
+      {
+        "baseDensity": [
+          0.0010000000474974513,
+          0.0010000000474974513,
+          0.0010000000474974513
+        ],
+        "baseRgb": [
+          0.997700035572052,
+          0.997700035572052,
+          0.997700035572052
+        ],
+        "blueWeight": 1,
+        "channelCastRatio": 1,
+        "confidence": 1,
+        "greenWeight": 1,
+        "redWeight": 1,
+        "sampleRect": {
+          "height": 1,
+          "width": 0.18000000715255737,
+          "x": 0.8199999928474426,
+          "y": 0
+        },
+        "score": 1,
+        "source": "right_edge_border",
+        "warnings": []
+      },
+      {
+        "baseDensity": [
+          0.0010000000474974513,
+          0.0010000000474974513,
+          0.0010000000474974513
+        ],
+        "baseRgb": [
+          0.997700035572052,
+          0.997700035572052,
+          0.997700035572052
+        ],
+        "blueWeight": 1,
+        "channelCastRatio": 1,
+        "confidence": 1,
+        "greenWeight": 1,
+        "redWeight": 1,
+        "sampleRect": {
+          "height": 0.18000000715255737,
+          "width": 1,
+          "x": 0,
+          "y": 0.8199999928474426
+        },
+        "score": 1,
+        "source": "bottom_edge_border",
+        "warnings": []
+      },
+      {
+        "baseDensity": [
+          0.0010000000474974513,
+          0.0010000000474974513,
+          0.0010000000474974513
+        ],
+        "baseRgb": [
+          0.997700035572052,
+          0.997700035572052,
+          0.997700035572052
+        ],
+        "blueWeight": 1,
+        "channelCastRatio": 1,
+        "confidence": 0.9082804322242737,
+        "greenWeight": 1,
+        "redWeight": 1,
+        "sampleRect": {
+          "height": 0.18000000715255737,
+          "width": 1,
+          "x": 0,
+          "y": 0
+        },
+        "score": 0.9082804322242737,
+        "source": "top_edge_border",
+        "warnings": []
+      }
+    ],
+    "sampleRect": {
+      "height": 1,
+      "width": 0.18000000715255737,
+      "x": 0,
+      "y": 0
+    },
+    "sampleSource": "left_edge_border",
+    "savedOutputExists": true,
+    "savedOutputPath": "src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg",
+    "warnings": []
   },
   "output": {
-    "contentHash": "fnv1a64:20cf2ca592bd20fc",
+    "contentHash": "fnv1a64:61fcbfe314129111",
     "dimensions": {
       "height": 183,
       "width": 330
@@ -89,7 +212,7 @@
   "runtimeStatus": "public_negative_scan_positive_export_rendered",
   "schemaVersion": 1,
   "conversionBundle": {
-    "contentHash": "fnv1a64:526beb890c46e9f2",
+    "contentHash": "fnv1a64:f2119d5dfb4bc753",
     "path": "src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg.conversion-bundle.json",
     "schemaVersion": 1
   },
