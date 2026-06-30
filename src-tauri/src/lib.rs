@@ -38,11 +38,7 @@ mod derived_output_provenance;
 mod display_profile;
 mod events;
 mod exif_processing;
-mod export_color_policy;
-mod export_encoders;
-mod export_output_targets;
-mod export_postprocess;
-mod export_processing;
+mod export;
 mod file_management;
 #[cfg(all(test, feature = "tauri-test"))]
 mod focus_real_raw_proof;
@@ -488,10 +484,10 @@ async fn apply_adjustments(
 #[serde(rename_all = "camelCase")]
 struct ExportSoftProofPreviewRequest {
     black_point_compensation: bool,
-    color_profile: export_processing::ExportColorProfile,
+    color_profile: export::export_processing::ExportColorProfile,
     export_soft_proof_recipe_id: Option<String>,
     js_adjustments: serde_json::Value,
-    rendering_intent: export_processing::ExportRenderingIntent,
+    rendering_intent: export::export_processing::ExportRenderingIntent,
     target_resolution: Option<u32>,
 }
 
@@ -520,13 +516,13 @@ fn generate_export_soft_proof_preview(
         preview_dim,
     )?;
     let (proof_pixels, width, height, _) =
-        export_processing::export_soft_proof_rgb_pixels_and_profile_with_policy(
+        export::export_processing::export_soft_proof_rgb_pixels_and_profile_with_policy(
             &preview_image,
             &request.color_profile,
             &request.rendering_intent,
             request.black_point_compensation,
         )?;
-    let proof_metadata = export_processing::export_soft_proof_transform_metadata(
+    let proof_metadata = export::export_processing::export_soft_proof_transform_metadata(
         &preview_image,
         &request.color_profile,
         &request.rendering_intent,
@@ -580,13 +576,13 @@ fn generate_export_soft_proof_preview(
 #[tauri::command]
 fn resolve_export_soft_proof_transform_metadata(
     js_adjustments: serde_json::Value,
-    color_profile: export_processing::ExportColorProfile,
-    rendering_intent: export_processing::ExportRenderingIntent,
+    color_profile: export::export_processing::ExportColorProfile,
+    rendering_intent: export::export_processing::ExportRenderingIntent,
     black_point_compensation: bool,
     target_resolution: Option<u32>,
     state: tauri::State<AppState>,
     app_handle: tauri::AppHandle,
-) -> Result<export_processing::ExportReceiptMetadata, String> {
+) -> Result<export::export_processing::ExportReceiptMetadata, String> {
     let mut adjustments_clone = js_adjustments;
     hydrate_adjustments(&state, &mut adjustments_clone);
 
@@ -606,7 +602,7 @@ fn resolve_export_soft_proof_transform_metadata(
         preview_dim,
     )?;
 
-    export_processing::export_soft_proof_transform_metadata(
+    export::export_processing::export_soft_proof_transform_metadata(
         &preview_image,
         &color_profile,
         &rendering_intent,
@@ -2233,10 +2229,10 @@ pub fn run() {
             panorama_stitching::plan_panorama,
             panorama_stitching::stitch_panorama,
             panorama_stitching::save_panorama,
-            export_processing::get_export_color_capabilities,
-            export_processing::export_images,
-            export_processing::cancel_export,
-            export_processing::estimate_export_sizes,
+            export::export_processing::get_export_color_capabilities,
+            export::export_processing::export_images,
+            export::export_processing::cancel_export,
+            export::export_processing::estimate_export_sizes,
             auto_adjust::calculate_auto_adjustments,
             mask_generation::generate_mask_overlay,
             file_management::update_exif_fields,

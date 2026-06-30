@@ -12,7 +12,7 @@ use tauri::Manager;
 
 use crate::app_settings::AppSettings;
 use crate::app_state::AppState;
-use crate::export_processing::{
+use crate::export::export_processing::{
     prepare_export_masks, process_image_for_export_pipeline_with_tonemapper_override,
 };
 use crate::formats::is_raw_file;
