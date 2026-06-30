@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../lib/compact-output.ts';
+import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../lib/ci/compact-output.ts';
 
 const argsSchema = z
   .object({

@@ -8,7 +8,7 @@ import { dirname, extname, join, resolve } from 'node:path';
 import { z } from 'zod';
 
 import { parseRawOpenEditExportRunReportCollection } from '../../../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
-import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../lib/compact-output.ts';
+import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../lib/ci/compact-output.ts';
 
 const FIXTURE_ID = 'validation.raw-open-edit-export.high-iso-skin-shadow.v1';
 const SOURCE_RELATIVE_PATH = 'private-fixtures/detail/high-iso-skin-shadow-v1.arw';

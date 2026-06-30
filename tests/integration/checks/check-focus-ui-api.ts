@@ -4,7 +4,7 @@ import {
   buildFocusStackUiApplyCommandV1,
   buildFocusStackUiDryRunCommandV1,
 } from '../../../packages/rawengine-schema/src/focusStackUiControls.ts';
-import { runComputationalUiApiSmoke } from '../../../scripts/lib/computational-ui-api-smoke.ts';
+import { runComputationalUiApiSmoke } from '../../../scripts/lib/computational/ui-api-smoke.ts';
 
 runComputationalUiApiSmoke({
   buildApplyCommand: buildFocusStackUiApplyCommandV1,

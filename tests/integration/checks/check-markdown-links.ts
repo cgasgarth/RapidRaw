@@ -3,7 +3,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 
-import { getExtension, walkRepoFiles } from '../../../scripts/lib/repo-files.ts';
+import { getExtension, walkRepoFiles } from '../../../scripts/lib/ci/repo-files.ts';
 
 const ROOT = process.cwd();
 const MARKDOWN_EXTENSION = '.md';

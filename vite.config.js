@@ -1,7 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
-import { getViteChunkSizeWarningLimitKb } from './scripts/lib/vite-bundle-policy.ts';
+import { getViteChunkSizeWarningLimitKb } from './scripts/lib/ci/vite-bundle-policy.ts';
 
 const host = process.env.TAURI_DEV_HOST;
 

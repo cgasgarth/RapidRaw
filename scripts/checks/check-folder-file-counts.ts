@@ -54,10 +54,6 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4214',
     reason: 'schema package source is pending domain grouping',
   },
-  'scripts/lib': {
-    issue: '#4217',
-    reason: 'script helpers are pending owner-based grouping',
-  },
   'src-tauri/icons': {
     issue: '#4230',
     reason: 'Tauri icon names may be platform/tooling required',

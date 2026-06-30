@@ -12,7 +12,7 @@ import {
   RAW_ENGINE_SCHEMA_VERSION,
   toDetailDeblurControlsV1,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { readBoundedStream, writeBoundedOutput } from '../../../scripts/lib/compact-output.ts';
+import { readBoundedStream, writeBoundedOutput } from '../../../scripts/lib/ci/compact-output.ts';
 import { parseDeblurWorkflowReport } from '../../../src/schemas/deblurWorkflowSchemas.ts';
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../../src/utils/adjustments.ts';
 

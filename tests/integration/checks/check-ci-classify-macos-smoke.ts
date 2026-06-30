@@ -1021,7 +1021,7 @@ function runSelfTest() {
   );
   assertClassification(
     'typed validation script helpers can skip smoke',
-    ['scripts/lib/computational-ui-api-smoke.ts'],
+    ['scripts/lib/computational/ui-api-smoke.ts'],
     SMOKE_MODES.NONE,
   );
   assertClassification('script policy metadata can skip smoke', ['scripts/tsconfig.json'], SMOKE_MODES.NONE);

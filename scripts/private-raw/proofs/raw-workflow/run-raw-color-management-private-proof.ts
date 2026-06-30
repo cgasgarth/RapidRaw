@@ -7,7 +7,7 @@ import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 
 import { parseRawOpenEditExportRunReportCollection } from '../../../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
-import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../lib/compact-output.ts';
+import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../lib/ci/compact-output.ts';
 
 const DEFAULT_REQUEST_PATH = 'fixtures/validation/raw-open-edit-export-proof-request.json';
 

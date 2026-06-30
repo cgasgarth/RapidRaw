@@ -9,7 +9,7 @@ import {
   negativeLabFixtureManifestEntryV1Schema,
   negativeLabFixtureManifestV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { getExtension, toRepoPath, walkRepoFiles } from '../../../scripts/lib/repo-files.ts';
+import { getExtension, toRepoPath, walkRepoFiles } from '../../../scripts/lib/ci/repo-files.ts';
 
 const manifestUrl = new URL('../../../fixtures/negative-lab/negative-lab-fixture-manifest.json', import.meta.url);
 const proofUrl = new URL('../../../fixtures/negative-lab/negative-lab-synthetic-fixture-proof.json', import.meta.url);

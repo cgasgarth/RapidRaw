@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 import { z } from 'zod';
 
-import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../scripts/lib/compact-output.ts';
+import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../scripts/lib/ci/compact-output.ts';
 
 const GITHUB_FILE_SCHEMA = z
   .object({

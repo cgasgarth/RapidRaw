@@ -7,7 +7,7 @@ import {
   collectColorRuntimeProofFailures,
   colorRuntimeProofFixtureSchema,
   renderColorRuntimeProof,
-} from '../../../scripts/lib/color-runtime-proof.ts';
+} from '../../../scripts/lib/proofs/color-runtime-proof.ts';
 
 const fixturePath = valueAfter('--fixture') ?? 'fixtures/color/white-balance-tone-runtime-proof.json';
 const outputPath = valueAfter('--output');
