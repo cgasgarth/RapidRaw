@@ -2092,12 +2092,14 @@ mod tests {
         .unwrap();
         let duplicate = trigger_tether_capture_for_state(
             Some(TetherCaptureRequest {
-                backup_destination_root: None,
-                camera_control_values: BTreeMap::new(),
+                backup_destination_root: Some(
+                    root.join("duplicate-backup").to_string_lossy().to_string(),
+                ),
+                camera_control_values: BTreeMap::from([("iso".to_string(), "1600".to_string())]),
                 destination_root: None,
                 fake_source_path: Some(source_path.to_string_lossy().to_string()),
-                ingest_preset_id: Some("sourceSequence".to_string()),
-                metadata_template_id: None,
+                ingest_preset_id: Some("wedding-copy-ingest".to_string()),
+                metadata_template_id: Some("reviewSelect".to_string()),
             }),
             &state,
         )
@@ -2108,8 +2110,19 @@ mod tests {
         assert_eq!(duplicate.imported_path, first.imported_path);
         assert_eq!(duplicate.checksum, first.checksum);
         assert_eq!(duplicate.ingest.file_name, first.ingest.file_name);
+        assert_eq!(duplicate.ingest.preset_id, first.ingest.preset_id);
+        assert_eq!(duplicate.metadata.template_id, first.metadata.template_id);
+        assert_eq!(
+            duplicate
+                .camera_control_values
+                .get("iso")
+                .map(String::as_str),
+            Some("1600"),
+            "duplicate responses still report the latest camera control request"
+        );
         assert_eq!(duplicate.backup.status, "disabled");
         assert_eq!(duplicate.backup.destination_path, None);
+        assert!(!root.join("duplicate-backup").exists());
         assert_eq!(
             state
                 .tether_session

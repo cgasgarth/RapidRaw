@@ -154,6 +154,24 @@ assertRejectsContract(
   'recovery receipt requires recovery status',
 );
 
+const reconnectSession = tetherSessionResponseSchema.parse({
+  ...session,
+  session: {
+    ...requireSession(session),
+    recovery: {
+      message: 'Sony ILCE-7M4 disconnected. Refresh tether discovery and reopen the session before the next capture.',
+      partialFilesFound: 0,
+      quarantinedFiles: [],
+      status: 'reconnect_required',
+    },
+    status: 'reconnect_required',
+  },
+});
+const reconnectReceipt = buildTetherRecoveryProofReceipt(requireSession(reconnectSession));
+tetherRecoveryProofReceiptSchema.parse(reconnectReceipt);
+assertEqual(reconnectReceipt.reconnectRequired, true, 'recovery receipt flags reconnect-required sessions');
+assertEqual(reconnectReceipt.sessionStatus, 'reconnect_required', 'recovery receipt preserves reconnect status');
+
 const controlRequest = tetherCameraControlWriteRequestSchema.parse({
   cameraId: openSessionRequest.cameraId,
   controlId: 'iso',
@@ -263,11 +281,12 @@ const duplicateCapture = tetherCaptureResponseSchema.parse({
   status: 'duplicate',
 });
 const duplicateReceipt = buildTetherIngestProofReceipt(duplicateCapture);
+tetherIngestProofReceiptSchema.parse(duplicateReceipt);
 assertEqual(duplicateReceipt.duplicateSuppressed, true, 'duplicate capture receipt reports suppression');
 assertEqual(duplicateReceipt.backupEnabled, false, 'duplicate capture receipt keeps backup disabled');
 
 console.log(
-  `tether contracts ok (commands=${Object.keys(expectedCommands).length}, controls=${discovery.cameras[0]?.controls.length}, receipts=2)`,
+  `tether contracts ok (commands=${Object.keys(expectedCommands).length}, controls=${discovery.cameras[0]?.controls.length}, receipts=3)`,
 );
 
 function requireSession(response: TetherSessionResponse): NonNullable<TetherSessionResponse['session']> {
