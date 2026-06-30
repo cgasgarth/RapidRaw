@@ -9,7 +9,7 @@ if (rootValue === undefined || rootValue.trim().length === 0) {
 if (process.argv.includes('--download')) {
   runStep('prepare focus public fixtures', [
     'bun',
-    'scripts/prepare-public-raw-fixture-root.ts',
+    'scripts/private-raw/prepare/prepare-public-raw-fixture-root.ts',
     '--family',
     'focus_stack',
     '--download',

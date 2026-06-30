@@ -19,7 +19,7 @@
   ],
   "ignore": ["dist/**", "node_modules/**", "src-tauri/**"],
   "ignoreBinaries": [
-    "scripts/run-compact-command.ts",
+    "scripts/ci/run-compact-command.ts",
     "sips",
     "tests/integration/checks/check-production-payload.ts",
     "tests/integration/checks/check-vite-minification.ts"

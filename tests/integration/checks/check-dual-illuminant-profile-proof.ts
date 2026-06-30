@@ -4,7 +4,7 @@ import { mkdir, readdir, readFile, stat } from 'node:fs/promises';
 import { extname, join, resolve } from 'node:path';
 
 import { z } from 'zod';
-import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../scripts/compact-output.ts';
+import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../scripts/lib/compact-output.ts';
 import { rawDevelopmentReportSchema } from '../../../src/schemas/imageLoaderSchemas.ts';
 import { buildCameraProfileProvenanceReceipt } from '../../../src/utils/cameraProfileProvenanceReceipt.ts';
 import { calculateDeltaE00, labColorSchema } from '../../../src/utils/deltaE00.ts';

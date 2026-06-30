@@ -17,7 +17,7 @@ const modalSource = readFileSync('src/components/modals/NegativeConversionModal.
 const handoffSource = readFileSync('src/utils/negativeLabEditorHandoff.ts', 'utf8');
 const imageLoaderSource = readFileSync('src/hooks/editor/useImageLoader.ts', 'utf8');
 const visualSmokeSource = readFileSync('src/validation/visual/VisualSmokeApp.tsx', 'utf8');
-const visualSmokeCaptureSource = readFileSync('scripts/capture-visual-smoke.ts', 'utf8');
+const visualSmokeCaptureSource = readFileSync('scripts/proofs/capture-visual-smoke.ts', 'utf8');
 
 const negativeLabArtifactSchema = z
   .object({

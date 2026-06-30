@@ -73,7 +73,7 @@
   "schemaVersion": 1,
   "validationCommands": [
     "RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun run check:raw-color-management-srgb-perceptual-private-proof --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-run-reports.json --require-assets",
-    "RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun scripts/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export-srgb-relative-proof-request.json --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-relative-run-reports.json --require-assets"
+    "RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export-srgb-relative-proof-request.json --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-relative-run-reports.json --require-assets"
   ],
   "validationMode": "local_alaska_raw_srgb_perceptual_vs_relative_comparison"
 }

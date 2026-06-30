@@ -13,7 +13,7 @@ RAWENGINE_PRIVATE_RAW_ROOT="$(pwd)" RAWENGINE_PRIVATE_RAW_SOURCE="/absolute/path
 For HDR fixture prep, point the existing private root preparer at a local source folder:
 
 ```sh
-RAWENGINE_PRIVATE_RAW_ROOT="$(pwd)" bun scripts/prepare-hdr-real-raw-private-root.ts --source "/absolute/path/to/raw-folder" --materialize symlink
+RAWENGINE_PRIVATE_RAW_ROOT="$(pwd)" bun scripts/private-raw/prepare/prepare-hdr-real-raw-private-root.ts --source "/absolute/path/to/raw-folder" --materialize symlink
 ```
 
 The command scans real RAW files, uses ExifTool metadata to find a three-frame HDR bracket candidate, and writes the selected sources into the ignored private fixture layout:
@@ -29,7 +29,7 @@ It also writes an ignored local ingest report under `private-artifacts/validatio
 For panorama fixture prep, use the same pattern:
 
 ```sh
-RAWENGINE_PRIVATE_RAW_ROOT="$(pwd)" bun scripts/prepare-panorama-real-raw-private-root.ts --source "/absolute/path/to/raw-folder" --materialize symlink
+RAWENGINE_PRIVATE_RAW_ROOT="$(pwd)" bun scripts/private-raw/prepare/prepare-panorama-real-raw-private-root.ts --source "/absolute/path/to/raw-folder" --materialize symlink
 ```
 
 The panorama selector looks for an ordered project-owned RAW sequence with matching camera, lens, focal length, aperture, ISO, and shutter speed. This proves local fixture materialization only; panorama runtime proof still requires the dedicated private proof runner.
@@ -37,7 +37,7 @@ The panorama selector looks for an ordered project-owned RAW sequence with match
 For super-resolution fixture prep, use:
 
 ```sh
-RAWENGINE_PRIVATE_RAW_ROOT="$(pwd)" bun scripts/prepare-sr-real-raw-private-root.ts --source "/absolute/path/to/raw-folder" --materialize symlink
+RAWENGINE_PRIVATE_RAW_ROOT="$(pwd)" bun scripts/private-raw/prepare/prepare-sr-real-raw-private-root.ts --source "/absolute/path/to/raw-folder" --materialize symlink
 ```
 
 The SR selector uses the same ordered burst requirements as panorama and writes four project-owned RAW sources into `private-fixtures/super-resolution/alaska-burst-v1/`.

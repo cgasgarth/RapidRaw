@@ -33,7 +33,7 @@
   "schemaVersion": 1,
   "validationCommands": [
     "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root bun run check:selective-color-local-raw-proof -- --require-assets",
-    "bun scripts/capture-visual-smoke.ts --scenario color-workflow",
+    "bun scripts/proofs/capture-visual-smoke.ts --scenario color-workflow",
     "bun run check:selective-color-private-ui-proof"
   ],
   "visualReview": {

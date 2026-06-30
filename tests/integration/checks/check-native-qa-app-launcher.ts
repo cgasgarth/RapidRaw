@@ -2,14 +2,14 @@
 
 import { readFileSync } from 'node:fs';
 
-const source = readFileSync('scripts/start-native-qa-app.ts', 'utf8');
+const source = readFileSync('scripts/dev/start-native-qa-app.ts', 'utf8');
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as {
   scripts?: Record<string, string>;
 };
 
 const failures: string[] = [];
 
-if (packageJson.scripts?.['start:native-qa'] !== 'bun scripts/start-native-qa-app.ts') {
+if (packageJson.scripts?.['start:native-qa'] !== 'bun scripts/dev/start-native-qa-app.ts') {
   failures.push('package.json must expose start:native-qa for Computer Use sweeps.');
 }
 

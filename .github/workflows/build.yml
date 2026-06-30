@@ -215,7 +215,7 @@ jobs:
             metadata_prefix="${metadata_prefix}_${{ inputs.mobile }}"
           fi
 
-          bun scripts/generate-release-metadata.ts \
+          bun scripts/release/generate-release-metadata.ts \
             --output-dir "$metadata_dir" \
             --prefix "$metadata_prefix" \
             --root src-tauri/target \

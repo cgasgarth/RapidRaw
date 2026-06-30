@@ -17,8 +17,8 @@ Each reusable build job writes release metadata under
 
 | File                      | Producer                               | Scope                                                                   |
 | ------------------------- | -------------------------------------- | ----------------------------------------------------------------------- |
-| `*_checksums.sha256`      | `scripts/generate-release-metadata.ts` | SHA-256 hashes for matched release artifact files in that platform row. |
-| `*_release-metadata.json` | `scripts/generate-release-metadata.ts` | Machine-readable list of matched files and their SHA-256 hashes.        |
+| `*_checksums.sha256`      | `scripts/release/generate-release-metadata.ts` | SHA-256 hashes for matched release artifact files in that platform row. |
+| `*_release-metadata.json` | `scripts/release/generate-release-metadata.ts` | Machine-readable list of matched files and their SHA-256 hashes.        |
 | `source_sbom.spdx.json`   | GitHub dependency graph SBOM API       | Source dependency SBOM generated once from the Apple Silicon macOS row. |
 
 ## Upload Behavior

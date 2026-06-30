@@ -91,7 +91,7 @@ const uiProofReportSchema = z
       .array(
         z.enum([
           'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root bun run check:selective-color-local-raw-proof -- --require-assets',
-          'bun scripts/capture-visual-smoke.ts --scenario color-workflow',
+          'bun scripts/proofs/capture-visual-smoke.ts --scenario color-workflow',
           'bun run check:selective-color-private-ui-proof',
         ]),
       )
@@ -139,7 +139,7 @@ if (privateRoot === undefined) {
     RAWENGINE_PRIVATE_RAW_ROOT: privateRoot,
   });
 }
-runCommand(['bun', 'scripts/capture-visual-smoke.ts', '--scenario', 'color-workflow']);
+runCommand(['bun', 'scripts/proofs/capture-visual-smoke.ts', '--scenario', 'color-workflow']);
 
 const rawProofReport = rawProofReportSchema.parse(JSON.parse(await readFile(RAW_PROOF_REPORT_PATH, 'utf8')));
 const screenshotDimensions = await readPngDimensions(SCREENSHOT_PATH);
@@ -167,7 +167,7 @@ const expectedReport = uiProofReportSchema.parse({
   schemaVersion: 1,
   validationCommands: [
     'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root bun run check:selective-color-local-raw-proof -- --require-assets',
-    'bun scripts/capture-visual-smoke.ts --scenario color-workflow',
+    'bun scripts/proofs/capture-visual-smoke.ts --scenario color-workflow',
     'bun run check:selective-color-private-ui-proof',
   ],
   visualReview: {

@@ -7,7 +7,7 @@ const files = {
   modal:
     readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8') +
     readFileSync('src/components/modals/NegativeLabRollHealthPanel.tsx', 'utf8'),
-  smoke: readFileSync('scripts/capture-visual-smoke.ts', 'utf8'),
+  smoke: readFileSync('scripts/proofs/capture-visual-smoke.ts', 'utf8'),
   util: readFileSync('src/utils/negativeLabFrameHealth.ts', 'utf8'),
 };
 

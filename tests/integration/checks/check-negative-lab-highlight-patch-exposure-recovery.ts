@@ -58,7 +58,7 @@ for (const invalidSuggestion of [
 
 const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
 const visualSource = readFileSync('src/validation/visual/main.tsx', 'utf8');
-const smokeSource = readFileSync('scripts/capture-visual-smoke.ts', 'utf8');
+const smokeSource = readFileSync('scripts/proofs/capture-visual-smoke.ts', 'utf8');
 const proofSource = readFileSync('scripts/lib/visual-smoke-proofs.ts', 'utf8');
 const rustSource = readFileSync('src-tauri/src/negative_conversion.rs', 'utf8');
 const libSource = readFileSync('src-tauri/src/lib.rs', 'utf8');

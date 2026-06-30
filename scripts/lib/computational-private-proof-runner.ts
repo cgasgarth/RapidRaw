@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 
 import { parseComputationalMergePrivateRunReportCollection } from '../../src/schemas/computationalMergePrivateRunReportSchemas.ts';
-import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../compact-output.ts';
+import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from './compact-output.ts';
 
 const argsSchema = z
   .object({
@@ -91,7 +91,7 @@ export async function runComputationalPrivateProof(config: ComputationalPrivateP
     await runCompact('computational merge private report collection', {
       command: [
         'bun',
-        'scripts/collect-computational-merge-private-run-reports.ts',
+        'scripts/private-raw/proofs/computational/collect-computational-merge-private-run-reports.ts',
         '--root',
         privateRoot,
         '--output',

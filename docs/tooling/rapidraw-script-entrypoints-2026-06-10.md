@@ -33,7 +33,7 @@ Tauri build behavior changes.
 | `build`           | `vite build`                         | Frontend production build and Tauri `beforeBuild`.                                                                       | Passing.        |
 | `tauri`           | `tauri`                              | Generic Tauri CLI passthrough.                                                                                           | Not gated.      |
 | `start`           | `tauri dev`                          | Local desktop dev app entrypoint.                                                                                        | Not gated.      |
-| `start:native-qa` | `bun scripts/start-native-qa-app.ts` | Builds and opens a uniquely named `RawEngine QA Current.app` bundle that Computer Use can attach to for native macOS QA. | Manual QA.      |
+| `start:native-qa` | `bun scripts/dev/start-native-qa-app.ts` | Builds and opens a uniquely named `RawEngine QA Current.app` bundle that Computer Use can attach to for native macOS QA. | Manual QA.      |
 | `typecheck`       | `tsc --noEmit`                       | TypeScript validation.                                                                                                   | Failing, #283.  |
 | `lint`            | `eslint .`                           | ESLint validation.                                                                                                       | Failing, #286.  |
 | `lint:fix`        | `eslint . --fix`                     | Local lint autofix.                                                                                                      | Not gated.      |

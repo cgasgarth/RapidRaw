@@ -2,7 +2,7 @@
 
 import { mkdir, readFile, stat } from 'node:fs/promises';
 import { basename, dirname, resolve } from 'node:path';
-import { readBoundedStream, writeBoundedOutput } from '../../../scripts/compact-output.ts';
+import { readBoundedStream, writeBoundedOutput } from '../../../scripts/lib/compact-output.ts';
 import { parseDenoiseWorkflowReport } from '../../../src/schemas/denoiseWorkflowSchemas.ts';
 
 const REPORT_PATH = resolve('src-tauri/target/rawengine-denoise-workflow-report.json');
