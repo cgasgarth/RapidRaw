@@ -18,12 +18,14 @@ const PERCEPTUAL_FIXTURE_ID = 'validation.raw-open-edit-export.professional-colo
 const RELATIVE_FIXTURE_ID = 'validation.raw-open-edit-export.professional-color-relative.v1';
 const DELTA_HEATMAP_PATH = 'private-artifacts/validation/open-edit-export/gamut-mapping-delta-heatmap.png';
 const PRIVATE_SOURCE = '/Users/cgas/Pictures/Capture One/Alaska';
-const PERCEPTUAL_COMMAND = `RAWENGINE_PRIVATE_RAW_SOURCE="${PRIVATE_SOURCE}" bun run check:raw-color-management-srgb-perceptual-private-proof --root ${PRIVATE_ROOT} --output ${PERCEPTUAL_REPORT_PATH} --require-assets`;
+const PERCEPTUAL_COMMAND = `RAWENGINE_PRIVATE_RAW_SOURCE="${PRIVATE_SOURCE}" bun scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export-srgb-perceptual-proof-request.json --root ${PRIVATE_ROOT} --output ${PERCEPTUAL_REPORT_PATH} --require-assets`;
 const RELATIVE_COMMAND = `RAWENGINE_PRIVATE_RAW_SOURCE="${PRIVATE_SOURCE}" bun scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request fixtures/validation/raw-open-edit-export-srgb-relative-proof-request.json --root ${PRIVATE_ROOT} --output ${RELATIVE_REPORT_PATH} --require-assets`;
 const UPDATE_REPORT = process.argv.includes('--update');
 const requireAssets = process.argv.includes('--require-assets');
 const allowFreshHashes = process.argv.includes('--allow-fresh-hashes');
 const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT ?? PRIVATE_ROOT;
+const hasExplicitRunReports =
+  process.argv.includes('--perceptual-run-reports') || process.argv.includes('--relative-run-reports');
 const perceptualRunReportsPath = valueAfter('--perceptual-run-reports') ?? PERCEPTUAL_REPORT_PATH;
 const relativeRunReportsPath = valueAfter('--relative-run-reports') ?? RELATIVE_REPORT_PATH;
 
@@ -134,9 +136,11 @@ const reportSchema = z
 const failures: Array<string> = [];
 let report: z.infer<typeof reportSchema>;
 
-if (UPDATE_REPORT) {
+if (UPDATE_REPORT || (allowFreshHashes && hasExplicitRunReports)) {
   report = reportSchema.parse(await buildReport());
-  await writeFile(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`);
+  if (UPDATE_REPORT) {
+    await writeFile(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`);
+  }
 } else {
   report = reportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
 }
