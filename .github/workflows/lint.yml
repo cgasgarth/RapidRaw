@@ -324,10 +324,18 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
         with:
-          cache: true
+          cache: false
           components: clippy
           rustflags: ''
           rust-src-dir: src-tauri
+
+      - name: Rust cache
+        if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: src-tauri
+          key: v1-${{ runner.os }}-${{ runner.arch }}-rust-pr-clippy
+          cache-on-failure: true
 
       - name: Clippy when Rust/Tauri changed
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
