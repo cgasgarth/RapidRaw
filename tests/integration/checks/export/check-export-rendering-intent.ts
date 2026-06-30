@@ -2,6 +2,10 @@
 
 import { readFileSync } from 'node:fs';
 import {
+  exportColorCapabilityCatalogV1Schema,
+  MOXCMS_EXPORT_COLOR_CAPABILITIES_V1,
+} from '../../../../packages/rawengine-schema/src/exportColorCapabilities.ts';
+import {
   ExportColorProfile,
   ExportRenderingIntent,
   FileFormats,
@@ -16,10 +20,6 @@ import {
   isSupportedColorProfileForFormat,
   supportsColorManagedOutput,
 } from '../../../../src/utils/export/exportColorCapabilityContracts.ts';
-import {
-  exportColorCapabilityCatalogV1Schema,
-  MOXCMS_EXPORT_COLOR_CAPABILITIES_V1,
-} from '../../../packages/rawengine-schema/src/exportColorCapabilities.ts';
 
 const failures: string[] = [];
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));

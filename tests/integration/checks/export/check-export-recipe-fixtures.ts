@@ -7,7 +7,7 @@ import {
   exportRecipeV1Schema,
   parseExportRecipesV1,
   upsertExportRecipeV1,
-} from '../../../packages/rawengine-schema/src/exportRecipeSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/exportRecipeSchemas.ts';
 
 const validFixturePath = 'fixtures/export/export-recipes.json';
 const invalidFixturePath = 'fixtures/export/invalid-export-recipes.json';

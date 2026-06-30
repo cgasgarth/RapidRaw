@@ -26,7 +26,7 @@ const exportPresetLocale = z
     validRecipeCount_other: z.string(),
   })
   .safeParse(localeRoot.success ? localeRoot.data.ui.exportPresets : undefined);
-const componentSource = await readFile('src/components/ui/ExportPresetsList.tsx', 'utf8');
+const componentSource = await readFile('src/components/panel/right/export/ExportPresetsList.tsx', 'utf8');
 
 if (rows.length !== recipes.length) {
   failures.push(`Expected ${recipes.length} UI rows, got ${rows.length}.`);
