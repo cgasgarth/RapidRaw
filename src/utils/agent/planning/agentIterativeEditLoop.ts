@@ -121,9 +121,49 @@ export const agentIterativeEditLoopResultSchema = z
     appliedGraphRevision: z.string().trim().min(1),
     compareReview: z
       .object({
+        artifacts: z.tuple([
+          z
+            .object({
+              artifactId: z.string().trim().min(1),
+              contentHash: z.string().trim().min(1),
+              graphRevision: z.string().trim().min(1),
+              previewRef: z.string().trim().min(1),
+              recipeHash: z.string().trim().min(1),
+              renderHash: z.string().trim().min(1),
+              role: z.literal('before'),
+            })
+            .strict(),
+          z
+            .object({
+              artifactId: z.string().trim().min(1),
+              contentHash: z.string().trim().min(1),
+              graphRevision: z.string().trim().min(1),
+              previewRef: z.string().trim().min(1),
+              recipeHash: z.string().trim().min(1),
+              renderHash: z.string().trim().min(1),
+              role: z.literal('current'),
+            })
+            .strict(),
+        ]),
         beforeArtifactId: z.string().trim().min(1),
         currentArtifactId: z.string().trim().min(1),
         currentRecipeHash: z.string().trim().min(1),
+        lineage: z
+          .object({
+            beforeGraphRevision: z.string().trim().min(1),
+            beforeRecipeHash: z.string().trim().min(1),
+            currentGraphRevision: z.string().trim().min(1),
+            currentRecipeHash: z.string().trim().min(1),
+            staleRecipeHash: z.boolean(),
+          })
+          .strict(),
+        mediumPreview: z
+          .object({
+            longEdgePx: z.number().int().min(256).max(2048),
+            maxPixelCount: z.number().int().min(65_536).max(4_194_304),
+            quality: z.number().min(0.5).max(0.95),
+          })
+          .strict(),
         toolName: z.literal(AGENT_PREVIEW_COMPARE_TOOL_NAME),
       })
       .strict(),
@@ -159,11 +199,36 @@ export const agentIterativeEditLoopResultSchema = z
         z
           .object({
             appliedGraphRevision: z.string().trim().min(1),
+            crop: z
+              .object({
+                height: z.number().positive(),
+                unit: z.enum(['%', 'normalized', 'px']),
+                width: z.number().positive(),
+                x: z.number(),
+                y: z.number(),
+              })
+              .strict()
+              .nullable(),
+            height: z.number().int().positive(),
+            longEdgePx: z.number().int().min(256).max(2048),
+            maxPixelCount: z.number().int().min(65_536).max(4_194_304),
             previewArtifactId: z.string().trim().min(1),
             previewPurpose: z.enum(['detail_review', 'refresh']),
+            previewRef: z.string().trim().min(1),
+            quality: z.number().min(0.5).max(0.95),
             recipeHash: z.string().trim().min(1),
+            renderHash: z.string().trim().min(1),
             sourceToolName: z.literal('rawengine.agent.adjustments.apply'),
             turn: z.number().int().positive(),
+            width: z.number().int().positive(),
+            zoom: z
+              .object({
+                centerX: z.number().min(0).max(1),
+                centerY: z.number().min(0).max(1),
+                scale: z.number().min(1).max(8),
+              })
+              .strict()
+              .nullable(),
           })
           .strict(),
       )
@@ -449,11 +514,20 @@ export const runAgentIterativeEditLoop = async (
     const previewPurpose = z.enum(['detail_review', 'refresh']).parse(preview.preview.purpose);
     previewLineage.push({
       appliedGraphRevision: apply.appliedGraphRevision,
+      crop: preview.preview.crop,
+      height: preview.preview.height,
+      longEdgePx: preview.preview.longEdgePx,
+      maxPixelCount: preview.preview.maxPixelCount,
       previewArtifactId: preview.preview.artifactId,
       previewPurpose,
+      previewRef: preview.preview.previewRef,
+      quality: preview.preview.quality,
       recipeHash,
+      renderHash: preview.preview.renderHash,
       sourceToolName: apply.toolName,
       turn,
+      width: preview.preview.width,
+      zoom: preview.preview.zoom,
     });
     if (userFollowUp !== undefined) {
       userFeedbackTurns.push({
@@ -564,9 +638,31 @@ export const runAgentIterativeEditLoop = async (
     applyReceipts,
     auditEvents,
     compareReview: {
+      artifacts: [
+        {
+          artifactId: compare.compare.artifacts[0].artifactId,
+          contentHash: compare.compare.artifacts[0].contentHash,
+          graphRevision: compare.compare.artifacts[0].graphRevision,
+          previewRef: compare.compare.artifacts[0].preview.previewRef,
+          recipeHash: compare.compare.artifacts[0].recipeHash,
+          renderHash: compare.compare.artifacts[0].renderHash,
+          role: 'before',
+        },
+        {
+          artifactId: compare.compare.artifacts[1].artifactId,
+          contentHash: compare.compare.artifacts[1].contentHash,
+          graphRevision: compare.compare.artifacts[1].graphRevision,
+          previewRef: compare.compare.artifacts[1].preview.previewRef,
+          recipeHash: compare.compare.artifacts[1].recipeHash,
+          renderHash: compare.compare.artifacts[1].renderHash,
+          role: 'current',
+        },
+      ],
       beforeArtifactId: compare.compare.artifacts[0].artifactId,
       currentArtifactId: compare.compare.artifacts[1].artifactId,
       currentRecipeHash: compare.compare.lineage.currentRecipeHash,
+      lineage: compare.compare.lineage,
+      mediumPreview: compare.compare.mediumPreview,
       toolName: compare.toolName,
     },
     editCount,

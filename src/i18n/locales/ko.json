@@ -350,11 +350,19 @@
           "audit": "Audit summary",
           "before": "Before",
           "changedPixels": "Changed pixels",
+          "changedPixelSummary": "{{percent}}% / {{sampled}}",
           "current": "Current",
           "graphRevision": "Graph revision",
           "recipeHash": "Recipe hash",
           "rollback": "Rollback receipt",
-          "run": "Selected-image loop"
+          "run": "Selected-image loop",
+          "luminanceChannel": "Luminance / channel",
+          "deltaHelp": "mean delta / max delta",
+          "compareLineage": "Compare lineage",
+          "compareRecipes": "Compare recipes",
+          "previewRender": "Preview render",
+          "previewRenderValue": "{{longEdge}}px / {{quality}}",
+          "maxPixelCountValue": "{{pixelCount}} px max"
         }
       },
       "brush": {

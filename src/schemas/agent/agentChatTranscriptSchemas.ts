@@ -483,7 +483,45 @@ export const agentSelectedImagePreviewLoopReviewSchema = z
     compareArtifacts: z
       .object({
         beforeArtifactId: z.string().min(1),
+        beforeEvidence: z
+          .object({
+            contentHash: z.string().min(1),
+            graphRevision: z.string().min(1),
+            previewRef: z.string().min(1),
+            recipeHash: z.string().min(1),
+            renderHash: z.string().min(1),
+          })
+          .strict()
+          .optional(),
         currentArtifactId: z.string().min(1),
+        currentEvidence: z
+          .object({
+            contentHash: z.string().min(1),
+            graphRevision: z.string().min(1),
+            previewRef: z.string().min(1),
+            recipeHash: z.string().min(1),
+            renderHash: z.string().min(1),
+          })
+          .strict()
+          .optional(),
+        lineage: z
+          .object({
+            beforeGraphRevision: z.string().min(1),
+            beforeRecipeHash: z.string().min(1),
+            currentGraphRevision: z.string().min(1),
+            currentRecipeHash: z.string().min(1),
+            staleRecipeHash: z.boolean(),
+          })
+          .strict()
+          .optional(),
+        mediumPreview: z
+          .object({
+            longEdgePx: z.number().int().min(256).max(2048),
+            maxPixelCount: z.number().int().min(65_536).max(4_194_304),
+            quality: z.number().min(0.5).max(0.95),
+          })
+          .strict()
+          .optional(),
       })
       .strict(),
     controls: z
@@ -529,11 +567,38 @@ export const agentSelectedImagePreviewLoopReviewSchema = z
         z
           .object({
             appliedGraphRevision: z.string().min(1),
+            crop: z
+              .object({
+                height: z.number().positive(),
+                unit: z.enum(['%', 'normalized', 'px']),
+                width: z.number().positive(),
+                x: z.number(),
+                y: z.number(),
+              })
+              .strict()
+              .nullable()
+              .optional(),
+            height: z.number().int().positive().optional(),
+            longEdgePx: z.number().int().min(256).max(2048).optional(),
+            maxPixelCount: z.number().int().min(65_536).max(4_194_304).optional(),
             previewArtifactId: z.string().min(1),
             previewPurpose: z.enum(['detail_review', 'refresh']),
+            previewRef: z.string().min(1).optional(),
+            quality: z.number().min(0.5).max(0.95).optional(),
             recipeHash: z.string().min(1),
+            renderHash: z.string().min(1).optional(),
             sourceToolName: z.literal('rawengine.agent.adjustments.apply'),
             turn: z.number().int().positive(),
+            width: z.number().int().positive().optional(),
+            zoom: z
+              .object({
+                centerX: z.number().min(0).max(1),
+                centerY: z.number().min(0).max(1),
+                scale: z.number().min(1).max(8),
+              })
+              .strict()
+              .nullable()
+              .optional(),
           })
           .strict(),
       )

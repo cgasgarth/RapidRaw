@@ -496,6 +496,18 @@ async function validateRenderedReviewStates(baseTranscript: AgentChatTranscript)
     'artifact_agent_selected_loop_current_3162',
     'selected-image current artifact id was not exposed.',
   );
+  assertData(
+    selectedLoop,
+    'beforePreviewUrl',
+    'blob:rawengine-selected-loop-before',
+    'selected-image before preview URL was not exposed.',
+  );
+  assertData(
+    selectedLoop,
+    'currentPreviewUrl',
+    'blob:rawengine-selected-loop-current',
+    'selected-image current preview URL was not exposed.',
+  );
   assertData(selectedLoop, 'initialGraphRevision', 'history_0', 'selected-image initial graph was not exposed.');
   assertData(selectedLoop, 'finalGraphRevision', 'history_2', 'selected-image final graph was not exposed.');
   assertData(
@@ -519,6 +531,18 @@ async function validateRenderedReviewStates(baseTranscript: AgentChatTranscript)
     'artifact_agent_selected_loop_before_3162',
     'selected-image before artifact card was not bound.',
   );
+  assertData(
+    before,
+    'previewUrl',
+    'blob:rawengine-selected-loop-before',
+    'selected-image before artifact preview URL was not bound.',
+  );
+  assertData(
+    before,
+    'renderHash',
+    'render:agent-selected-loop-before',
+    'selected-image before artifact render hash was not bound.',
+  );
   const current = getByTestId(
     review.container,
     'agent-selected-image-preview-loop-current',
@@ -530,6 +554,36 @@ async function validateRenderedReviewStates(baseTranscript: AgentChatTranscript)
     'artifact_agent_selected_loop_current_3162',
     'selected-image current artifact card was not bound.',
   );
+  assertData(
+    current,
+    'previewUrl',
+    'blob:rawengine-selected-loop-current',
+    'selected-image current artifact preview URL was not bound.',
+  );
+  assertData(
+    current,
+    'renderHash',
+    'render:agent-selected-loop-current',
+    'selected-image current artifact render hash was not bound.',
+  );
+
+  const metrics = getByTestId(
+    review.container,
+    'agent-selected-image-preview-loop-metrics',
+    'selected-image preview-loop metrics did not render.',
+  );
+  assertData(metrics, 'meanLuminanceDelta', '6.2', 'selected-image mean luminance delta was not exposed.');
+  assertData(metrics, 'maxChannelDelta', '31', 'selected-image max channel delta was not exposed.');
+
+  const compareLineage = getByTestId(
+    review.container,
+    'agent-selected-image-preview-loop-compare-lineage',
+    'selected-image compare lineage did not render.',
+  );
+  assertData(compareLineage, 'beforeGraphRevision', 'history_0', 'selected-image compare before graph missing.');
+  assertData(compareLineage, 'currentGraphRevision', 'history_2', 'selected-image compare current graph missing.');
+  assertData(compareLineage, 'longEdgePx', '1536', 'selected-image compare render long edge missing.');
+  assertData(compareLineage, 'quality', '0.86', 'selected-image compare render quality missing.');
 
   const selectedLoopLineage = review.container.querySelectorAll(
     '[data-testid="agent-selected-image-preview-loop-lineage-entry"]',
@@ -540,6 +594,21 @@ async function validateRenderedReviewStates(baseTranscript: AgentChatTranscript)
   const selectedLoopPurposes = Array.from(selectedLoopLineage).map((entry) => (entry as HTMLElement).dataset.purpose);
   if (selectedLoopPurposes.join(',') !== 'refresh,detail_review') {
     failures.push(`selected-image preview lineage order was wrong: ${selectedLoopPurposes.join(',')}.`);
+  }
+  const detailLineage = selectedLoopLineage[1] as HTMLElement | undefined;
+  if (detailLineage === undefined) {
+    failures.push('selected-image detail preview lineage did not render.');
+  } else {
+    assertData(
+      detailLineage,
+      'previewUrl',
+      'blob:rawengine-selected-loop-detail-crop',
+      'selected-image detail lineage preview URL missing.',
+    );
+    assertData(detailLineage, 'renderHash', 'render:agent-selected-loop-detail', 'detail render hash missing.');
+    assertData(detailLineage, 'longEdgePx', '1536', 'detail long-edge metadata missing.');
+    assertData(detailLineage, 'crop', 'normalized x=0.22 y=0.21 w=0.32 h=0.34', 'detail crop metadata missing.');
+    assertData(detailLineage, 'zoom', '2.4x @ 0.5,0.55', 'detail zoom metadata missing.');
   }
 
   const selectedLoopControls = getByTestId(
