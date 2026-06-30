@@ -66,6 +66,10 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4209',
     reason: 'utilities are pending owned-domain split',
   },
+  'src/utils/agent/tools': {
+    issue: '#4293',
+    reason: 'agent apply tools are grouped under their domain folder',
+  },
   'tests/integration/checks': {
     issue: '#4208',
     reason: 'integration checks are pending domain/native-runner cleanup',

@@ -41,15 +41,15 @@ import {
   appendAgentSessionAuditRecord,
 } from '../../../../utils/agent/session/agentSessionAuditStore';
 import { AGENT_HISTORY_ROLLBACK_TOOL_NAME } from '../../../../utils/agent/session/agentSessionHistory';
+import { AGENT_COLOR_APPLY_TOOL_NAME } from '../../../../utils/agent/tools/agentColorApplyTool';
+import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../../utils/agent/tools/agentDetailEffectsApplyTool';
 import { buildAgentAppServerToolReadinessSummary } from '../../../../utils/agentAppServerToolReadiness';
 import { runAgentBoundedEditPlannerLoop } from '../../../../utils/agentBoundedEditPlannerLoop';
-import { AGENT_COLOR_APPLY_TOOL_NAME } from '../../../../utils/agentColorApplyTool';
 import {
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
   type AgentCurrentImagePreviewLoopResult,
   agentCurrentImagePreviewLoopResultSchema,
 } from '../../../../utils/agentCurrentImagePreviewLoop';
-import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../../utils/agentDetailEffectsApplyTool';
 import { planAgentEditRecipe } from '../../../../utils/agentEditRecipePlanner';
 import { AGENT_EXPORT_PROOF_TOOL_NAME, agentExportProofResponseSchema } from '../../../../utils/agentExportProofTool';
 import {

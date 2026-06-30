@@ -1,17 +1,17 @@
 import { z } from 'zod';
-import { toneColorDryRunResultV1Schema } from '../../packages/rawengine-schema/src/rawEngineSchemas';
-import { useEditorStore } from '../store/useEditorStore';
-import type { Adjustments } from './adjustments';
-import { applyBasicToneToLiveEditor } from './agent/session/agentLiveBasicTone';
-import { createLiveEditorAppServerBridge } from './agent/session/agentLiveEditorState';
-import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
+import { toneColorDryRunResultV1Schema } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
+import { useEditorStore } from '../../../store/useEditorStore';
+import type { Adjustments } from '../../adjustments';
+import { buildAgentImageContextSnapshot } from '../../agentImageContextSnapshot';
 import {
   BASIC_TONE_ADJUSTMENT_KEYS,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
   type LegacyBasicToneAdjustmentPayload,
-} from './basicToneCommandBridge';
-import { pushEditHistoryEntry } from './editHistory';
+} from '../../basicToneCommandBridge';
+import { pushEditHistoryEntry } from '../../editHistory';
+import { applyBasicToneToLiveEditor } from '../session/agentLiveBasicTone';
+import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
 
 export const AGENT_ADJUSTMENTS_APPLY_TOOL_NAME = 'rawengine.agent.adjustments.apply';
 export const AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME = 'rawengine.agent.adjustments.dry_run';

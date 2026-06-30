@@ -9,7 +9,7 @@ import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustmen
 import {
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
   AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
-} from '../../../src/utils/agentAdjustmentApplyTool.ts';
+} from '../../../src/utils/agent/tools/agentAdjustmentApplyTool.ts';
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,

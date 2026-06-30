@@ -13,7 +13,7 @@ import {
   AGENT_CURVE_LEVELS_APPLY_TOOL_NAME,
   agentCurveLevelsApplyRequestSchema,
   applyAgentCurveLevels,
-} from '../../../src/utils/agentCurveLevelsApplyTool.ts';
+} from '../../../src/utils/agent/tools/agentCurveLevelsApplyTool.ts';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agentImageContextSnapshot.ts';
 import {
   buildRawEngineAppServerRouteCatalog,

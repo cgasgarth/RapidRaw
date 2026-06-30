@@ -13,7 +13,7 @@ import {
   AGENT_COLOR_APPLY_TOOL_NAME,
   agentColorApplyRequestSchema,
   applyAgentColor,
-} from '../../../src/utils/agentColorApplyTool.ts';
+} from '../../../src/utils/agent/tools/agentColorApplyTool.ts';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agentImageContextSnapshot.ts';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../../src/utils/profileTonePresets.ts';
 import {

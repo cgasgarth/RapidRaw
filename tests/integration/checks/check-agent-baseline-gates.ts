@@ -16,18 +16,18 @@ import { AGENT_HISTORY_ROLLBACK_TOOL_NAME } from '../../../src/utils/agent/sessi
 import {
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
   AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
-} from '../../../src/utils/agentAdjustmentApplyTool.ts';
-import { AGENT_COLOR_APPLY_TOOL_NAME } from '../../../src/utils/agentColorApplyTool.ts';
-import { AGENT_CURVE_LEVELS_APPLY_TOOL_NAME } from '../../../src/utils/agentCurveLevelsApplyTool.ts';
-import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../src/utils/agentDetailEffectsApplyTool.ts';
-import { AGENT_GEOMETRY_APPLY_TOOL_NAME } from '../../../src/utils/agentGeometryApplyTool.ts';
-import { AGENT_LENS_PROFILE_APPLY_TOOL_NAME } from '../../../src/utils/agentLensProfileApplyTool.ts';
+} from '../../../src/utils/agent/tools/agentAdjustmentApplyTool.ts';
+import { AGENT_COLOR_APPLY_TOOL_NAME } from '../../../src/utils/agent/tools/agentColorApplyTool.ts';
+import { AGENT_CURVE_LEVELS_APPLY_TOOL_NAME } from '../../../src/utils/agent/tools/agentCurveLevelsApplyTool.ts';
+import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../src/utils/agent/tools/agentDetailEffectsApplyTool.ts';
+import { AGENT_GEOMETRY_APPLY_TOOL_NAME } from '../../../src/utils/agent/tools/agentGeometryApplyTool.ts';
+import { AGENT_LENS_PROFILE_APPLY_TOOL_NAME } from '../../../src/utils/agent/tools/agentLensProfileApplyTool.ts';
+import { AGENT_RETOUCH_APPLY_TOOL_NAME } from '../../../src/utils/agent/tools/agentRetouchApplyTool.ts';
 import {
   AGENT_PREVIEW_COMPARE_TOOL_NAME,
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
 } from '../../../src/utils/agentReadOnlyAppServerTools.ts';
-import { AGENT_RETOUCH_APPLY_TOOL_NAME } from '../../../src/utils/agentRetouchApplyTool.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   createRawEngineAppServerSupervisorState,

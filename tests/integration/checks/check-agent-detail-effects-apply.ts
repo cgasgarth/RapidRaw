@@ -13,7 +13,7 @@ import {
   AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
   agentDetailEffectsApplyRequestSchema,
   applyAgentDetailEffects,
-} from '../../../src/utils/agentDetailEffectsApplyTool.ts';
+} from '../../../src/utils/agent/tools/agentDetailEffectsApplyTool.ts';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agentImageContextSnapshot.ts';
 import {
   buildRawEngineAppServerRouteCatalog,

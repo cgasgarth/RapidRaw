@@ -77,14 +77,49 @@ import {
   agentAdjustmentsDryRunRequestSchema,
   applyAgentGlobalAdjustments,
   dryRunAgentGlobalAdjustments,
-} from './agentAdjustmentApplyTool';
+} from './agent/tools/agentAdjustmentApplyTool';
 import {
   AGENT_COLOR_APPLY_INPUT_SCHEMA_NAME,
   AGENT_COLOR_APPLY_OUTPUT_SCHEMA_NAME,
   AGENT_COLOR_APPLY_TOOL_NAME,
   agentColorApplyRequestSchema,
   applyAgentColor,
-} from './agentColorApplyTool';
+} from './agent/tools/agentColorApplyTool';
+import {
+  AGENT_CURVE_LEVELS_APPLY_INPUT_SCHEMA_NAME,
+  AGENT_CURVE_LEVELS_APPLY_OUTPUT_SCHEMA_NAME,
+  AGENT_CURVE_LEVELS_APPLY_TOOL_NAME,
+  agentCurveLevelsApplyRequestSchema,
+  applyAgentCurveLevels,
+} from './agent/tools/agentCurveLevelsApplyTool';
+import {
+  AGENT_DETAIL_EFFECTS_APPLY_INPUT_SCHEMA_NAME,
+  AGENT_DETAIL_EFFECTS_APPLY_OUTPUT_SCHEMA_NAME,
+  AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
+  agentDetailEffectsApplyRequestSchema,
+  applyAgentDetailEffects,
+} from './agent/tools/agentDetailEffectsApplyTool';
+import {
+  AGENT_GEOMETRY_APPLY_INPUT_SCHEMA_NAME,
+  AGENT_GEOMETRY_APPLY_OUTPUT_SCHEMA_NAME,
+  AGENT_GEOMETRY_APPLY_TOOL_NAME,
+  agentGeometryApplyRequestSchema,
+  applyAgentGeometry,
+} from './agent/tools/agentGeometryApplyTool';
+import {
+  AGENT_LENS_PROFILE_APPLY_INPUT_SCHEMA_NAME,
+  AGENT_LENS_PROFILE_APPLY_OUTPUT_SCHEMA_NAME,
+  AGENT_LENS_PROFILE_APPLY_TOOL_NAME,
+  agentLensProfileApplyRequestSchema,
+  applyAgentLensProfile,
+} from './agent/tools/agentLensProfileApplyTool';
+import {
+  AGENT_RETOUCH_APPLY_INPUT_SCHEMA_NAME,
+  AGENT_RETOUCH_APPLY_OUTPUT_SCHEMA_NAME,
+  AGENT_RETOUCH_APPLY_TOOL_NAME,
+  agentRetouchApplyRequestSchema,
+  applyAgentRetouch,
+} from './agent/tools/agentRetouchApplyTool';
 import {
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_INPUT_SCHEMA_NAME,
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_OUTPUT_SCHEMA_NAME,
@@ -92,20 +127,6 @@ import {
   agentCurrentImagePreviewLoopRequestSchema,
   runAgentCurrentImagePreviewLoop,
 } from './agentCurrentImagePreviewLoop';
-import {
-  AGENT_CURVE_LEVELS_APPLY_INPUT_SCHEMA_NAME,
-  AGENT_CURVE_LEVELS_APPLY_OUTPUT_SCHEMA_NAME,
-  AGENT_CURVE_LEVELS_APPLY_TOOL_NAME,
-  agentCurveLevelsApplyRequestSchema,
-  applyAgentCurveLevels,
-} from './agentCurveLevelsApplyTool';
-import {
-  AGENT_DETAIL_EFFECTS_APPLY_INPUT_SCHEMA_NAME,
-  AGENT_DETAIL_EFFECTS_APPLY_OUTPUT_SCHEMA_NAME,
-  AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
-  agentDetailEffectsApplyRequestSchema,
-  applyAgentDetailEffects,
-} from './agentDetailEffectsApplyTool';
 import {
   AGENT_EXPORT_PROOF_INPUT_SCHEMA_NAME,
   AGENT_EXPORT_PROOF_OUTPUT_SCHEMA_NAME,
@@ -118,13 +139,6 @@ import {
   buildAgentExportProof,
   buildAgentFinalExport,
 } from './agentExportProofTool';
-import {
-  AGENT_GEOMETRY_APPLY_INPUT_SCHEMA_NAME,
-  AGENT_GEOMETRY_APPLY_OUTPUT_SCHEMA_NAME,
-  AGENT_GEOMETRY_APPLY_TOOL_NAME,
-  agentGeometryApplyRequestSchema,
-  applyAgentGeometry,
-} from './agentGeometryApplyTool';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import {
   AGENT_LAYER_CREATE_INPUT_SCHEMA_NAME,
@@ -149,13 +163,6 @@ import {
   applyAgentObjectSelection,
 } from './agentLayerMaskTools';
 import {
-  AGENT_LENS_PROFILE_APPLY_INPUT_SCHEMA_NAME,
-  AGENT_LENS_PROFILE_APPLY_OUTPUT_SCHEMA_NAME,
-  AGENT_LENS_PROFILE_APPLY_TOOL_NAME,
-  agentLensProfileApplyRequestSchema,
-  applyAgentLensProfile,
-} from './agentLensProfileApplyTool';
-import {
   AGENT_PREVIEW_COMPARE_INPUT_SCHEMA_NAME,
   AGENT_PREVIEW_COMPARE_OUTPUT_SCHEMA_NAME,
   AGENT_PREVIEW_COMPARE_TOOL_NAME,
@@ -172,13 +179,6 @@ import {
   renderAgentPreviewCompare,
   renderAgentReadOnlyPreview,
 } from './agentReadOnlyAppServerTools';
-import {
-  AGENT_RETOUCH_APPLY_INPUT_SCHEMA_NAME,
-  AGENT_RETOUCH_APPLY_OUTPUT_SCHEMA_NAME,
-  AGENT_RETOUCH_APPLY_TOOL_NAME,
-  agentRetouchApplyRequestSchema,
-  applyAgentRetouch,
-} from './agentRetouchApplyTool';
 import { AI_APP_SERVER_TOOL_ROUTES } from './ai/aiAppServerToolRoutes';
 import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from './computational-merge/computationalMergeAppServerRoutes';
 import { DETAIL_APP_SERVER_ROUTES } from './detailAppServerRoutes';

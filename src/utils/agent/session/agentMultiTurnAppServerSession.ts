@@ -5,12 +5,12 @@ import {
   AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
   agentAdjustmentsApplyResponseSchema,
   agentAdjustmentsDryRunResponseSchema,
-} from '../../agentAdjustmentApplyTool';
-import { AGENT_COLOR_APPLY_TOOL_NAME, agentColorApplyResponseSchema } from '../../agentColorApplyTool';
+} from '../../agent/tools/agentAdjustmentApplyTool';
+import { AGENT_COLOR_APPLY_TOOL_NAME, agentColorApplyResponseSchema } from '../../agent/tools/agentColorApplyTool';
 import {
   AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
   agentDetailEffectsApplyResponseSchema,
-} from '../../agentDetailEffectsApplyTool';
+} from '../../agent/tools/agentDetailEffectsApplyTool';
 import { agentEditQualityReviewSchema, buildAgentEditQualityReview } from '../../agentEditQualityReview';
 import { agentInitialPromptContextSchema, buildAgentInitialPromptContext } from '../../agentInitialPromptContext';
 import { agentPreviewEnvelopeSchema } from '../../agentPreviewEnvelope';

@@ -2,11 +2,11 @@ import { z } from 'zod';
 import { useEditorStore } from '../store/useEditorStore';
 import type { Adjustments } from './adjustments';
 import { ActiveChannel } from './adjustments';
-import { buildAgentColorRecipeHashInput } from './agentColorRecipe';
-import { buildAgentCurveLevelsRecipeHashInput } from './agentCurveLevelsRecipe';
-import { buildAgentDetailEffectsRecipeHashInput } from './agentDetailEffectsRecipe';
-import { buildAgentGeometryRecipeHashInput } from './agentGeometryRecipe';
-import { buildAgentLensProfileRecipeHashInput } from './agentLensProfileRecipe';
+import { buildAgentColorRecipeHashInput } from './agent/tools/agentColorRecipe';
+import { buildAgentCurveLevelsRecipeHashInput } from './agent/tools/agentCurveLevelsRecipe';
+import { buildAgentDetailEffectsRecipeHashInput } from './agent/tools/agentDetailEffectsRecipe';
+import { buildAgentGeometryRecipeHashInput } from './agent/tools/agentGeometryRecipe';
+import { buildAgentLensProfileRecipeHashInput } from './agent/tools/agentLensProfileRecipe';
 import {
   AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX,
   AGENT_MEDIUM_PREVIEW_QUALITY,

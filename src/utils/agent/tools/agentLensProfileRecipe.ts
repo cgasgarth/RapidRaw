@@ -1,4 +1,4 @@
-import type { Adjustments } from './adjustments';
+import type { Adjustments } from '../../adjustments';
 
 export const buildAgentLensProfileRecipeHashInput = (adjustments: Adjustments) => ({
   lensCorrectionMode: adjustments.lensCorrectionMode,
