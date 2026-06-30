@@ -116,6 +116,23 @@ impl Default for ColorBalanceRgbSettings {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
+#[repr(C)]
+pub struct BlackWhiteMixerSettings {
+    pub reds: f32,
+    pub oranges: f32,
+    pub yellows: f32,
+    pub greens: f32,
+    pub aquas: f32,
+    pub blues: f32,
+    pub purples: f32,
+    pub magentas: f32,
+    pub enabled: u32,
+    pub(crate) _pad1: u32,
+    pub(crate) _pad2: u32,
+    pub(crate) _pad3: u32,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct GpuMat3 {
@@ -198,6 +215,7 @@ pub struct GlobalAdjustments {
     pub color_calibration: ColorCalibrationSettings,
     pub color_balance_rgb: ColorBalanceRgbSettings,
     pub channel_mixer: ChannelMixerSettings,
+    pub black_white_mixer: BlackWhiteMixerSettings,
     pub levels: LevelsSettings,
     pub hsl: [HslColor; 8],
     pub luma_curve: [Point; 16],

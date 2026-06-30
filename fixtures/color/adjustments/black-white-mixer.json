@@ -1,5 +1,35 @@
 [
   {
+    "case": "disabled no-op",
+    "input": {
+      "enabled": false,
+      "weights": {
+        "reds": 0,
+        "oranges": 0,
+        "yellows": 0,
+        "greens": 0,
+        "aquas": 0,
+        "blues": 0,
+        "purples": 0,
+        "magentas": 0
+      }
+    },
+    "expectedActiveChannels": [],
+    "runtimeExpectation": {
+      "inputRgb": {
+        "red": 0.42,
+        "green": 0.31,
+        "blue": 0.76
+      },
+      "expectedRgb": {
+        "red": 0.42,
+        "green": 0.31,
+        "blue": 0.76
+      },
+      "tolerance": 1e-12
+    }
+  },
+  {
     "case": "portrait red lift",
     "input": {
       "enabled": true,
