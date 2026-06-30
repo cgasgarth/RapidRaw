@@ -1,6 +1,6 @@
 import cx from 'clsx';
 import type { TFunction } from 'i18next';
-import { Copy, WandSparkles } from 'lucide-react';
+import { Copy, RotateCcw, WandSparkles } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 import type {
   NegativeLabBatchDryRunSummary,
@@ -17,6 +17,10 @@ import {
   negativeLabFrameRgbBalanceOffsetIsZero,
   snapNegativeLabFrameRgbBalanceOffsets,
 } from '../../utils/negativeLabFrameRgbBalanceOverrides';
+import type {
+  NegativeLabRollNormalizationApplyReceipt,
+  NegativeLabRollNormalizationRestoreReceipt,
+} from '../../utils/negativeLabRollNormalizationApply';
 import UiText from '../ui/Text';
 import {
   ACQUISITION_SOURCE_FAMILY_LABEL_KEYS,
@@ -34,16 +38,6 @@ import {
   QC_DECISION_LABEL_KEYS,
 } from './NegativeLabRollHealthModel';
 
-export interface NegativeLabRollNormalizationApplyReceipt {
-  acceptedDryRunPlanHash: string;
-  acceptedDryRunPlanId: string;
-  appliedFrameCount: number;
-  exposureOverrideCount: number;
-  reviewFrameCount: number;
-  rgbBalanceOverrideCount: number;
-  skippedFrameCount: number;
-}
-
 interface NegativeLabRollHealthPanelProps {
   approvedQcFrameIds: readonly string[];
   batchApplyFrameCount: number;
@@ -58,6 +52,7 @@ interface NegativeLabRollHealthPanelProps {
   handleAcceptBatchPlan: () => void;
   handleApplyRollNormalizationPlan: () => void;
   handleCopyBatchPlan: () => void | Promise<void>;
+  handleRestoreRollNormalizationPlan: () => void;
   handleSetActiveFrameCropStatus: (status: NegativeLabFrameCropStatus) => void;
   handleSetQcDecision: (frameId: string, decision: NegativeLabQcDecision) => void;
   handleSetVisibleQcDecision: (decision: NegativeLabQcDecision) => void;
@@ -70,6 +65,7 @@ interface NegativeLabRollHealthPanelProps {
   rejectedQcFrameIds: readonly string[];
   rollNormalizationApplyReceipt: NegativeLabRollNormalizationApplyReceipt | null;
   rollNormalizationPlan: NegativeLabRollNormalizationPlan;
+  rollNormalizationRestoreReceipt: NegativeLabRollNormalizationRestoreReceipt | null;
   rollWarningCount: number;
   setFrameHealthFilter: Dispatch<SetStateAction<NegativeLabFrameHealthFilter>>;
   setFrameHealthSort: Dispatch<SetStateAction<NegativeLabFrameHealthSort>>;
@@ -93,6 +89,7 @@ export function NegativeLabRollHealthPanel({
   handleAcceptBatchPlan,
   handleApplyRollNormalizationPlan,
   handleCopyBatchPlan,
+  handleRestoreRollNormalizationPlan,
   handleSetActiveFrameCropStatus,
   handleSetQcDecision,
   handleSetVisibleQcDecision,
@@ -105,6 +102,7 @@ export function NegativeLabRollHealthPanel({
   rejectedQcFrameIds,
   rollNormalizationApplyReceipt,
   rollNormalizationPlan,
+  rollNormalizationRestoreReceipt,
   rollWarningCount,
   setFrameHealthFilter,
   setFrameHealthSort,
@@ -157,6 +155,8 @@ export function NegativeLabRollHealthPanel({
             rollNormalizationPlan.autoDensitySuggestionRun?.frameSuggestions.length ?? 0
           }
           data-auto-density-suggestion-state={rollNormalizationPlan.autoDensitySuggestionRun?.state ?? 'suggested_only'}
+          data-roll-normalization-anchor-frame-ids={rollNormalizationPlan.anchorFrameIds.join(',')}
+          data-roll-normalization-warning-codes={rollNormalizationPlan.warningCodes.join(',')}
           data-testid="negative-lab-roll-normalization-plan"
         >
           {`${rollNormalizationPlan.affectedFrameIds.length} frames ${rollNormalizationPlan.proposedExposureDeltaEv >= 0 ? '+' : ''}${rollNormalizationPlan.proposedExposureDeltaEv.toFixed(2)} EV / WB ${rollNormalizationPlan.proposedWhiteBalanceDelta.toFixed(2)} / ${rollNormalizationPlan.autoDensitySuggestionRun?.state ?? 'suggested_only'}`}
@@ -179,7 +179,14 @@ export function NegativeLabRollHealthPanel({
             data-accepted-dry-run-plan-id={rollNormalizationApplyReceipt.acceptedDryRunPlanId}
             data-applied-frame-count={rollNormalizationApplyReceipt.appliedFrameCount}
             data-exposure-override-count={rollNormalizationApplyReceipt.exposureOverrideCount}
+            data-manual-exposure-preserved-frame-ids={rollNormalizationApplyReceipt.manualExposurePreservedFrameIds.join(
+              ',',
+            )}
+            data-manual-rgb-preserved-frame-ids={rollNormalizationApplyReceipt.manualRgbPreservedFrameIds.join(',')}
             data-review-frame-count={rollNormalizationApplyReceipt.reviewFrameCount}
+            data-restore-available={String(!rollNormalizationApplyReceipt.restored)}
+            data-restore-revision={rollNormalizationApplyReceipt.restoreRevision}
+            data-restored={String(rollNormalizationApplyReceipt.restored)}
             data-rgb-balance-override-count={rollNormalizationApplyReceipt.rgbBalanceOverrideCount}
             data-skipped-frame-count={rollNormalizationApplyReceipt.skippedFrameCount}
             data-testid="negative-lab-roll-normalization-apply-receipt"
@@ -189,6 +196,37 @@ export function NegativeLabRollHealthPanel({
               planId: rollNormalizationApplyReceipt.acceptedDryRunPlanId,
               reviewCount: rollNormalizationApplyReceipt.reviewFrameCount,
               skippedCount: rollNormalizationApplyReceipt.skippedFrameCount,
+            })}
+          </span>
+        )}
+        <button
+          type="button"
+          className="col-span-3 inline-flex items-center justify-center gap-1 rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+          data-restore-available={String(
+            rollNormalizationApplyReceipt !== null && !rollNormalizationApplyReceipt.restored,
+          )}
+          data-testid="negative-lab-restore-roll-normalization"
+          disabled={rollNormalizationApplyReceipt === null || rollNormalizationApplyReceipt.restored}
+          onClick={handleRestoreRollNormalizationPlan}
+        >
+          <RotateCcw size={11} />
+          {t('modals.negativeConversion.restoreRollNormalizationPlan')}
+        </button>
+        {rollNormalizationRestoreReceipt !== null && (
+          <span
+            className="col-span-3 rounded border border-blue-400/30 bg-blue-500/10 px-1.5 py-0.5 text-text-secondary"
+            data-accepted-dry-run-plan-hash={rollNormalizationRestoreReceipt.acceptedDryRunPlanHash}
+            data-accepted-dry-run-plan-id={rollNormalizationRestoreReceipt.acceptedDryRunPlanId}
+            data-restored-exposure-override-count={rollNormalizationRestoreReceipt.restoredExposureOverrideCount}
+            data-restored-frame-count={rollNormalizationRestoreReceipt.restoredFrameCount}
+            data-restored-revision={rollNormalizationRestoreReceipt.restoredRevision}
+            data-restored-rgb-balance-override-count={rollNormalizationRestoreReceipt.restoredRgbBalanceOverrideCount}
+            data-testid="negative-lab-roll-normalization-restore-receipt"
+          >
+            {t('modals.negativeConversion.rollNormalizationRestoreReceipt', {
+              frameCount: rollNormalizationRestoreReceipt.restoredFrameCount,
+              planId: rollNormalizationRestoreReceipt.acceptedDryRunPlanId,
+              revision: rollNormalizationRestoreReceipt.restoredRevision,
             })}
           </span>
         )}

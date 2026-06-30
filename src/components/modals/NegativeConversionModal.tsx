@@ -138,6 +138,12 @@ import {
   buildNegativeLabQcContactSheetArtifact,
   type NegativeLabQcOverlayVisibility,
 } from '../../utils/negativeLabQcContactSheetArtifact';
+import {
+  applyNegativeLabRollNormalizationPlan,
+  type NegativeLabRollNormalizationApplyReceipt,
+  type NegativeLabRollNormalizationRestoreReceipt,
+  restoreNegativeLabRollNormalizationOverrides,
+} from '../../utils/negativeLabRollNormalizationApply';
 import { buildNegativeLabRollNormalizationPlan } from '../../utils/negativeLabRollNormalizationPlan';
 import {
   buildNegativeLabStockMetadataCounts,
@@ -393,16 +399,6 @@ interface BaseFogSampleUndoEntry {
   selectedPresetId: string;
 }
 
-interface RollNormalizationApplyReceipt {
-  acceptedDryRunPlanHash: string;
-  acceptedDryRunPlanId: string;
-  appliedFrameCount: number;
-  exposureOverrideCount: number;
-  reviewFrameCount: number;
-  rgbBalanceOverrideCount: number;
-  skippedFrameCount: number;
-}
-
 export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }: NegativeConversionModalProps) {
   const { t } = useTranslation();
   const selectedEditorImage = useEditorStore((state) => state.selectedImage);
@@ -442,7 +438,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [copiedBatchPlanJson, setCopiedBatchPlanJson] = useState<string | null>(null);
   const [acceptedBatchPlanJson, setAcceptedBatchPlanJson] = useState<string | null>(null);
   const [rollNormalizationApplyReceipt, setRollNormalizationApplyReceipt] =
-    useState<RollNormalizationApplyReceipt | null>(null);
+    useState<NegativeLabRollNormalizationApplyReceipt | null>(null);
+  const [rollNormalizationRestoreReceipt, setRollNormalizationRestoreReceipt] =
+    useState<NegativeLabRollNormalizationRestoreReceipt | null>(null);
+  const [rollNormalizationRestoreRevision, setRollNormalizationRestoreRevision] = useState(0);
   const [activeBaseFogSampleLabel, setActiveBaseFogSampleLabel] = useState<string | null>(null);
   const [baseFogScope, setBaseFogScope] = useState<'frame' | 'roll'>('frame');
   const [baseFogSampleUndoStack, setBaseFogSampleUndoStack] = useState<BaseFogSampleUndoEntry[]>([]);
@@ -945,6 +944,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const visibleRollNormalizationApplyReceipt =
     rollNormalizationApplyReceipt?.acceptedDryRunPlanHash === acceptedBatchPlanIdentity.acceptedDryRunPlanHash
       ? rollNormalizationApplyReceipt
+      : null;
+  const visibleRollNormalizationRestoreReceipt =
+    rollNormalizationRestoreReceipt?.acceptedDryRunPlanHash === acceptedBatchPlanIdentity.acceptedDryRunPlanHash
+      ? rollNormalizationRestoreReceipt
       : null;
   const profileComparisonRows = useMemo(
     () =>
@@ -1873,53 +1876,52 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const handleApplyRollNormalizationPlan = () => {
     if (!canApplyRollNormalizationPlan) return;
 
-    const exposureOverrideFrameIds = new Set(
-      rollNormalizationPlan.exposureOverrides.overrides.map((override) => override.frameId),
-    );
-    const nextExposureOffsets = Object.fromEntries(
-      Object.entries(frameExposureOffsetByFrameId).filter(([frameId]) => !exposureOverrideFrameIds.has(frameId)),
-    );
-    for (const override of rollNormalizationPlan.exposureOverrides.overrides) {
-      const snappedOffset = snapNegativeLabFrameExposureOffset(override.exposureOffset);
-      if (snappedOffset !== 0) {
-        nextExposureOffsets[override.frameId] = snappedOffset;
-      }
-    }
-
-    const rgbOverrideFrameIds = new Set(
-      rollNormalizationPlan.rgbBalanceOverrides.overrides.map((override) => override.frameId),
-    );
-    const nextRgbOffsetsByFrameId = Object.fromEntries(
-      Object.entries(frameRgbBalanceOffsetByFrameId).filter(([frameId]) => !rgbOverrideFrameIds.has(frameId)),
-    );
-    for (const override of rollNormalizationPlan.rgbBalanceOverrides.overrides) {
-      const snappedOffset = snapNegativeLabFrameRgbBalanceOffsets({
-        baselineParams: params,
-        offsets: override.rgbBalanceOffset,
-      });
-      if (!negativeLabFrameRgbBalanceOffsetIsZero(snappedOffset)) {
-        nextRgbOffsetsByFrameId[override.frameId] = snappedOffset;
-      }
-    }
-
-    setFrameExposureOffsetByFrameId(nextExposureOffsets);
-    setFrameRgbBalanceOffsetByFrameId(nextRgbOffsetsByFrameId);
-    setRollNormalizationApplyReceipt({
-      acceptedDryRunPlanHash: acceptedBatchPlanIdentity.acceptedDryRunPlanHash,
-      acceptedDryRunPlanId: acceptedBatchPlanIdentity.acceptedDryRunPlanId,
-      appliedFrameCount: rollNormalizationPlan.affectedFrameIds.length,
-      exposureOverrideCount: rollNormalizationPlan.exposureOverrides.overrides.length,
+    const { nextState, receipt } = applyNegativeLabRollNormalizationPlan({
+      acceptedPlanIdentity: acceptedBatchPlanIdentity,
+      baselineParams: params,
+      currentState: {
+        frameExposureOffsetByFrameId,
+        frameRgbBalanceOffsetByFrameId,
+      },
+      plan: rollNormalizationPlan,
+      restoreRevision: rollNormalizationRestoreRevision + 1,
       reviewFrameCount: batchReviewFrameCount,
-      rgbBalanceOverrideCount: rollNormalizationPlan.rgbBalanceOverrides.overrides.length,
       skippedFrameCount: batchSkippedFrameCount,
     });
+    setFrameExposureOffsetByFrameId(nextState.frameExposureOffsetByFrameId);
+    setFrameRgbBalanceOffsetByFrameId(nextState.frameRgbBalanceOffsetByFrameId);
+    setRollNormalizationApplyReceipt(receipt);
+    setRollNormalizationRestoreReceipt(null);
+    setRollNormalizationRestoreRevision(receipt.restoreRevision);
     setAcceptedBatchPlanJson(null);
     updatePreview(
       buildParamsWithFrameOverrides(
         params,
         frameHealthReport.activeFrameId,
-        nextExposureOffsets,
-        nextRgbOffsetsByFrameId,
+        nextState.frameExposureOffsetByFrameId,
+        nextState.frameRgbBalanceOffsetByFrameId,
+      ),
+    );
+  };
+
+  const handleRestoreRollNormalizationPlan = () => {
+    if (visibleRollNormalizationApplyReceipt === null || visibleRollNormalizationApplyReceipt.restored) return;
+
+    const { nextState, receipt } = restoreNegativeLabRollNormalizationOverrides(visibleRollNormalizationApplyReceipt);
+    setFrameExposureOffsetByFrameId(nextState.frameExposureOffsetByFrameId);
+    setFrameRgbBalanceOffsetByFrameId(nextState.frameRgbBalanceOffsetByFrameId);
+    setRollNormalizationApplyReceipt({
+      ...visibleRollNormalizationApplyReceipt,
+      restored: true,
+    });
+    setRollNormalizationRestoreReceipt(receipt);
+    setAcceptedBatchPlanJson(null);
+    updatePreview(
+      buildParamsWithFrameOverrides(
+        params,
+        frameHealthReport.activeFrameId,
+        nextState.frameExposureOffsetByFrameId,
+        nextState.frameRgbBalanceOffsetByFrameId,
       ),
     );
   };
@@ -2692,6 +2694,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           handleAcceptBatchPlan={handleAcceptBatchPlan}
           handleApplyRollNormalizationPlan={handleApplyRollNormalizationPlan}
           handleCopyBatchPlan={handleCopyBatchPlan}
+          handleRestoreRollNormalizationPlan={handleRestoreRollNormalizationPlan}
           handleSetActiveFrameCropStatus={handleSetActiveFrameCropStatus}
           handleSetQcDecision={handleSetQcDecision}
           handleSetVisibleQcDecision={handleSetVisibleQcDecision}
@@ -2704,6 +2707,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           rejectedQcFrameIds={rejectedQcFrameIds}
           rollNormalizationApplyReceipt={visibleRollNormalizationApplyReceipt}
           rollNormalizationPlan={rollNormalizationPlan}
+          rollNormalizationRestoreReceipt={visibleRollNormalizationRestoreReceipt}
           rollWarningCount={rollWarningCount}
           setFrameHealthFilter={setFrameHealthFilter}
           setFrameHealthSort={setFrameHealthSort}

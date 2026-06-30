@@ -350,6 +350,10 @@ if (!batchSummaryResult.rollWarningCodes.includes('excluded_from_batch')) {
 if (
   rollNormalizationRouteResult.autoDensitySuggestionRun?.frameSuggestions.length !== 2 ||
   rollNormalizationRouteResult.autoDensitySuggestionRun.state !== 'suggested_only' ||
+  rollNormalizationRouteResult.anchorFrameIds.join('|') !== 'negative-lab-frame-1' ||
+  rollNormalizationRouteResult.affectedFrameIds.join('|') !== 'negative-lab-frame-1|negative-lab-frame-2' ||
+  !rollNormalizationRouteResult.unaffectedFrameIds.includes('negative-lab-frame-3') ||
+  !rollNormalizationRouteResult.warningCodes.includes('normalization_preview_only') ||
   rollNormalizationRouteResult.exposureOverrides.overrides.length !== 2 ||
   rollNormalizationRouteResult.exposureOverrides.overrides.some((override) => override.exposureOffset === 0)
 ) {
