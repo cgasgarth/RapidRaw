@@ -225,6 +225,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - When an issue is refined enough for one PR, subagents should own the
   implementation or validation PR end-to-end, including branch creation,
   commits, push, PR description, and initial CI follow-up.
+- Subagent PRs should be ready for review by default; use draft PRs only for a
+  concrete blocker or intentionally incomplete patch, and state that blocker
+  clearly.
 - For straightforward implementation tasks, clear CI/pipeline failures, issue
   refinement, backlog cleanup, log polling, or repeated status checks, prefer a
   smaller/faster subagent model such as 5.4 mini when available.
