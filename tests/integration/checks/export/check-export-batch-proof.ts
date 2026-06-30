@@ -3,8 +3,8 @@
 import { existsSync } from 'node:fs';
 
 import { z } from 'zod';
-import { buildExportQueueExecutionPlan, parseExportQueue } from '../../../src/schemas/exportQueueSchemas.ts';
-import { parseExportRecipes } from '../../../src/schemas/exportRecipeSchemas.ts';
+import { buildExportQueueExecutionPlan, parseExportQueue } from '../../../../src/schemas/exportQueueSchemas.ts';
+import { parseExportRecipes } from '../../../../src/schemas/exportRecipeSchemas.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/export/export-batch-proof-2026-06-18.json';
 const GENERATED_AT = '2026-06-18T00:00:00.000Z';
@@ -46,9 +46,9 @@ const reportSchema = z
 
 const update = process.argv.includes('--update');
 for (const command of [
-  ['bun', 'tests/integration/checks/check-export-recipe-fixtures.ts'],
-  ['bun', 'tests/integration/checks/check-export-queue-fixtures.ts'],
-  ['bun', 'tests/integration/checks/check-export-recipes-ui.ts'],
+  ['bun', 'tests/integration/checks/export/check-export-recipe-fixtures.ts'],
+  ['bun', 'tests/integration/checks/export/check-export-queue-fixtures.ts'],
+  ['bun', 'tests/integration/checks/export/check-export-recipes-ui.ts'],
 ]) {
   run(command);
 }

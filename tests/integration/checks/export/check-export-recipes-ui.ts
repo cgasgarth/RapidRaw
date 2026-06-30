@@ -4,8 +4,8 @@ import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { CLIENT_PROOF_TIFF_EXPORT_RECIPE_ID } from '../../../src/schemas/exportRecipeIds.ts';
-import { buildExportRecipeUiRows, exportRecipeUiRowSchema } from '../../../src/schemas/exportRecipeUiSchemas.ts';
+import { CLIENT_PROOF_TIFF_EXPORT_RECIPE_ID } from '../../../../src/schemas/exportRecipeIds.ts';
+import { buildExportRecipeUiRows, exportRecipeUiRowSchema } from '../../../../src/schemas/exportRecipeUiSchemas.ts';
 
 const recipesJson: unknown = JSON.parse(await readFile('fixtures/export/export-recipes.json', 'utf8'));
 const recipes = z.array(z.unknown()).parse(recipesJson);

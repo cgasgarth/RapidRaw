@@ -2,14 +2,14 @@
 
 import { readFileSync } from 'node:fs';
 
-import { ExportColorProfile, ExportRenderingIntent } from '../../../src/components/ui/ExportImportProperties.ts';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { ExportColorProfile, ExportRenderingIntent } from '../../../../src/components/ui/ExportImportProperties.ts';
+import { INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
 import {
   buildSoftProofProfileCompareProof,
   buildSoftProofProfileCompareRequests,
   describeSoftProofProfileRole,
   getSoftProofProfileCompareStatus,
-} from '../../../src/utils/export/exportSoftProofProfileCompare.ts';
+} from '../../../../src/utils/export/exportSoftProofProfileCompare.ts';
 
 const read = (path: string) => readFileSync(path, 'utf8');
 const failures: string[] = [];

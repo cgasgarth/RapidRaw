@@ -129,9 +129,12 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     'check:dust-spot-visualization-smoke',
     new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario detail-dust-spot']),
   ],
-  ['check:export-batch-proof', new Set(['bun tests/integration/checks/check-export-batch-proof.ts'])],
-  ['check:export-batch-proof:update', new Set(['bun tests/integration/checks/check-export-batch-proof.ts --update'])],
-  ['check:export-recipes-ui', new Set(['bun tests/integration/checks/check-export-recipes-ui.ts'])],
+  ['check:export-batch-proof', new Set(['bun tests/integration/checks/export/check-export-batch-proof.ts'])],
+  [
+    'check:export-batch-proof:update',
+    new Set(['bun tests/integration/checks/export/check-export-batch-proof.ts --update']),
+  ],
+  ['check:export-recipes-ui', new Set(['bun tests/integration/checks/export/check-export-recipes-ui.ts'])],
   [
     'check:film-look-browser-smoke',
     new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario film-look-browser']),
