@@ -12,8 +12,8 @@ import {
   DetailAppServerExecutionMode,
   DetailAppServerRouteStatus,
   DetailAppServerToolName,
-} from '../../../../src/utils/detailAppServerRouteIds.ts';
-import { DETAIL_APP_SERVER_ROUTES } from '../../../../src/utils/detailAppServerRoutes.ts';
+} from '../../../../src/utils/detail/detailAppServerRouteIds.ts';
+import { DETAIL_APP_SERVER_ROUTES } from '../../../../src/utils/detail/detailAppServerRoutes.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../../../../src/utils/rawEngineAppServerHost.ts';
 
 const failures: string[] = [];

@@ -5,7 +5,7 @@ import { z } from 'zod';
 import {
   applyDetailOutputComparisonCommand,
   detailOutputComparisonCommandV1Schema,
-} from '../../../../src/utils/detailOutputComparisonCommand.ts';
+} from '../../../../src/utils/detail/detailOutputComparisonCommand.ts';
 
 const width = 12;
 const height = 8;

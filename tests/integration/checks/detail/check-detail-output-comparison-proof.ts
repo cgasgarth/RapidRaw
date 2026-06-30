@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { parseDetailOutputComparisonProofReport } from '../../../../src/schemas/detailValidationSchemas.ts';
-import { DETAIL_OUTPUT_COMPARISON_ARTIFACT_ROOT } from '../../../../src/utils/detailOutputComparisonProof.ts';
+import { DETAIL_OUTPUT_COMPARISON_ARTIFACT_ROOT } from '../../../../src/utils/detail/detailOutputComparisonProof.ts';
 
 const WIDTH = 64;
 const HEIGHT = 48;

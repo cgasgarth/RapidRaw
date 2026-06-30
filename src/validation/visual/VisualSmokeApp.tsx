@@ -69,7 +69,7 @@ import {
 } from '../../utils/color/runtime/cameraProfileInputTransformRuntime';
 import { applyColorBalanceRgbToPixel } from '../../utils/color/runtime/colorBalanceRgbRuntime';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computational-merge/computationalMergeAppServerRoutePairs';
-import { DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF } from '../../utils/detailOutputComparisonProof';
+import { DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF } from '../../utils/detail/detailOutputComparisonProof';
 import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
 import { applyLayerStackCommandBridgeOperation } from '../../utils/layers/layerStackCommandBridge';

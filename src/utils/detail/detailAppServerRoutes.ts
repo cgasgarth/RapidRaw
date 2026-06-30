@@ -1,4 +1,4 @@
-import { detailAppServerRouteManifestSchema } from '../schemas/detailAppServerSchemas';
+import { detailAppServerRouteManifestSchema } from '../../schemas/detailAppServerSchemas';
 import {
   DetailAppServerCommandType,
   DetailAppServerExecutionMode,
