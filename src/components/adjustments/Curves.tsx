@@ -894,10 +894,10 @@ export default function CurveGraph({
 
   return (
     <div className="select-none touch-none" ref={containerRef}>
-      <div className="flex items-center justify-between gap-2 mb-2 mt-2">
-        <div className="flex items-center gap-1 p-1 rounded-lg bg-surface-secondary shrink-0">
+      <div className="mb-1.5 mt-1 flex items-center justify-between gap-2">
+        <div className="flex shrink-0 items-center gap-0.5 rounded-md bg-surface-secondary p-0.5">
           <button
-            className={`w-8 h-8 rounded-md flex items-center justify-center transition-all ${
+            className={`flex h-7 w-7 items-center justify-center rounded transition-all ${
               !isParametricMode ? 'bg-surface text-text-primary' : 'text-text-secondary hover:text-text-primary'
             }`}
             onClick={() => {
@@ -906,10 +906,10 @@ export default function CurveGraph({
             data-tooltip={t('adjustments.curves.pointCurve')}
             type="button"
           >
-            <Spline size={16} />
+            <Spline size={15} />
           </button>
           <button
-            className={`w-8 h-8 rounded-md flex items-center justify-center transition-all ${
+            className={`flex h-7 w-7 items-center justify-center rounded transition-all ${
               isParametricMode ? 'bg-surface text-text-primary' : 'text-text-secondary hover:text-text-primary'
             }`}
             onClick={() => {
@@ -918,11 +918,11 @@ export default function CurveGraph({
             data-tooltip={t('adjustments.curves.parametricCurve')}
             type="button"
           >
-            <Settings2 size={16} />
+            <Settings2 size={15} />
           </button>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex shrink-0 items-center gap-1">
           {CURVE_CHANNELS.map((channel) => {
             const selected = activeChannel === channel;
             const channelLabel = t(`adjustments.curves.channels.${channel}`, {
@@ -931,7 +931,7 @@ export default function CurveGraph({
             return (
               <button
                 key={channel}
-                className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                className={`flex h-6 w-6 items-center justify-center rounded-full transition-all ${
                   selected ? 'ring-2 ring-offset-2 ring-offset-surface ring-accent' : 'bg-surface-secondary'
                 } ${channel === ActiveChannel.Luma ? 'text-text-primary' : ''}`}
                 onClick={() => {
@@ -955,7 +955,7 @@ export default function CurveGraph({
 
       <div className="relative">
         <div
-          className="w-full aspect-square bg-surface-secondary p-1 rounded-md relative touch-none"
+          className="relative aspect-square w-full touch-none rounded-md bg-surface-secondary p-1"
           role="presentation"
           onMouseDown={handleContainerStart}
           onTouchStart={handleContainerStart}
@@ -1065,10 +1065,10 @@ export default function CurveGraph({
             transition={{ duration: 0.3, ease: 'easeInOut' }}
             className="overflow-hidden origin-top"
           >
-            <div className="pt-4 pb-1 flex flex-col gap-5" onContextMenu={handleContextMenu}>
+            <div className="flex flex-col gap-2 pb-1 pt-2" onContextMenu={handleContextMenu}>
               <div className="px-1">
                 <div className="relative" ref={splitterContainerRef}>
-                  <div className="h-7 rounded-md bg-surface overflow-hidden relative">
+                  <div className="relative h-6 overflow-hidden rounded-md bg-surface">
                     <div
                       className="absolute inset-0"
                       style={{
@@ -1078,7 +1078,7 @@ export default function CurveGraph({
                     {splitPositions.map(({ key, value }) => (
                       <button
                         key={key}
-                        className="absolute top-0 bottom-0 w-3 -translate-x-1/2 cursor-ew-resize group"
+                        className="group absolute top-0 bottom-0 w-3 -translate-x-1/2 cursor-ew-resize"
                         onMouseDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -1099,16 +1099,17 @@ export default function CurveGraph({
                         style={{ left: formatPercent(value) }}
                         type="button"
                       >
-                        <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-white/70 group-hover:bg-white" />
-                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-4 rounded-sm bg-white/80 border border-white/60 group-hover:bg-white group-hover:border-white" />
+                        <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/70 group-hover:bg-white" />
+                        <div className="absolute left-1/2 top-1/2 h-3.5 w-2 -translate-x-1/2 -translate-y-1/2 rounded-sm border border-white/60 bg-white/80 group-hover:border-white group-hover:bg-white" />
                       </button>
                     ))}
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-0.5">
                 <AdjustmentSlider
+                  density="compact"
                   label={t('adjustments.curves.params.whiteLevel')}
                   min={-100}
                   max={0}
@@ -1121,6 +1122,7 @@ export default function CurveGraph({
                   onDragStateChange={onDragStateChange}
                 />
                 <AdjustmentSlider
+                  density="compact"
                   label={t('adjustments.curves.params.highlights')}
                   min={-100}
                   max={100}
@@ -1133,6 +1135,7 @@ export default function CurveGraph({
                   onDragStateChange={onDragStateChange}
                 />
                 <AdjustmentSlider
+                  density="compact"
                   label={t('adjustments.curves.params.lights')}
                   min={-100}
                   max={100}
@@ -1145,6 +1148,7 @@ export default function CurveGraph({
                   onDragStateChange={onDragStateChange}
                 />
                 <AdjustmentSlider
+                  density="compact"
                   label={t('adjustments.curves.params.darks')}
                   min={-100}
                   max={100}
@@ -1157,6 +1161,7 @@ export default function CurveGraph({
                   onDragStateChange={onDragStateChange}
                 />
                 <AdjustmentSlider
+                  density="compact"
                   label={t('adjustments.curves.params.shadows')}
                   min={-100}
                   max={100}
@@ -1169,6 +1174,7 @@ export default function CurveGraph({
                   onDragStateChange={onDragStateChange}
                 />
                 <AdjustmentSlider
+                  density="compact"
                   label={t('adjustments.curves.params.blackLevel')}
                   min={0}
                   max={100}

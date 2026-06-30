@@ -3,7 +3,7 @@ import type React from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GLOBAL_KEYS } from '../AppProperties';
-import { inspectorSliderTokens } from '../inspectorTokens';
+import { compactInspectorSliderTokens, inspectorSliderTokens } from '../inspectorTokens';
 
 export type SliderChangeEvent =
   | React.ChangeEvent<HTMLInputElement>
@@ -26,6 +26,7 @@ interface SliderProps {
   trackClassName?: string;
   fillOrigin?: 'min' | 'default';
   suffix?: string;
+  density?: 'default' | 'compact';
 }
 
 const DOUBLE_CLICK_THRESHOLD_MS = 300;
@@ -48,6 +49,7 @@ const Slider = ({
   trackClassName,
   fillOrigin = 'default',
   suffix = '',
+  density = 'default',
 }: SliderProps) => {
   const { t } = useTranslation();
   const [displayValue, setDisplayValue] = useState<number>(value);
@@ -453,21 +455,19 @@ const Slider = ({
 
   const numericValue = Number.isNaN(value) ? 0 : value;
   const canResetFromLabel = typeof label === 'string' && !disabled;
+  const tokens = density === 'compact' ? compactInspectorSliderTokens : inspectorSliderTokens;
   const labelContent = (
     <>
       <span
         aria-hidden={isLabelHovered && typeof label === 'string'}
-        className={cx(
-          inspectorSliderTokens.label,
-          isLabelHovered && typeof label === 'string' ? 'opacity-0' : 'opacity-100',
-        )}
+        className={cx(tokens.label, isLabelHovered && typeof label === 'string' ? 'opacity-0' : 'opacity-100')}
       >
         {label}
       </span>
       {typeof label === 'string' && (
         <span
           aria-hidden={!isLabelHovered}
-          className={cx(inspectorSliderTokens.resetLabel, isLabelHovered ? 'opacity-100' : 'opacity-0')}
+          className={cx(tokens.resetLabel, isLabelHovered ? 'opacity-100' : 'opacity-0')}
         >
           {t('ui.slider.reset')}
         </span>
@@ -475,92 +475,112 @@ const Slider = ({
     </>
   );
 
-  return (
-    <div className={inspectorSliderTokens.root} ref={containerRef}>
-      <div className={inspectorSliderTokens.header}>
-        {canResetFromLabel ? (
-          <button
-            className={inspectorSliderTokens.labelButton}
-            onClick={handleReset}
-            onDoubleClick={handleReset}
-            onMouseEnter={() => {
-              setIsLabelHovered(true);
-            }}
-            onMouseLeave={() => {
-              setIsLabelHovered(false);
-            }}
-            type="button"
-          >
-            {labelContent}
-          </button>
-        ) : (
-          <div className={inspectorSliderTokens.labelStatic}>{labelContent}</div>
+  const labelControl = canResetFromLabel ? (
+    <button
+      className={tokens.labelButton}
+      onClick={handleReset}
+      onDoubleClick={handleReset}
+      onMouseEnter={() => {
+        setIsLabelHovered(true);
+      }}
+      onMouseLeave={() => {
+        setIsLabelHovered(false);
+      }}
+      type="button"
+    >
+      {labelContent}
+    </button>
+  ) : (
+    <div className={tokens.labelStatic}>{labelContent}</div>
+  );
+
+  const valueControl = (
+    <div className={tokens.valueSlot}>
+      {isEditing ? (
+        <input
+          className={tokens.valueInput}
+          disabled={disabled}
+          max={max}
+          min={min}
+          onBlur={handleInputCommit}
+          onChange={handleInputChange}
+          onKeyDown={handleInputKeyDown}
+          ref={inputRef}
+          step={step}
+          type="text"
+          value={inputValue}
+        />
+      ) : (
+        <button
+          className={cx(tokens.valueButton, !disabled && 'cursor-text')}
+          disabled={disabled}
+          onClick={handleValueClick}
+          onDoubleClick={handleReset}
+          data-tooltip={t('ui.slider.clickToEdit')}
+          type="button"
+        >
+          {decimalPlaces > 0 && numericValue === 0 ? '0' : numericValue.toFixed(decimalPlaces)}
+          {suffix && <span className={tokens.suffix}>{suffix}</span>}
+        </button>
+      )}
+    </div>
+  );
+
+  const trackControl = (
+    <div className={tokens.trackWrap}>
+      <div className={cx(tokens.track, trackClassName || 'bg-card-active')} />
+      <div
+        className={tokens.fill}
+        style={{
+          left: formatPercent(Math.min(fillPercentage, originPercentage)),
+          width: formatPercent(Math.abs(fillPercentage - originPercentage)),
+        }}
+      />
+      <input
+        ref={rangeInputRef}
+        aria-label={typeof label === 'string' ? label : undefined}
+        className={cx(
+          tokens.input,
+          disabled ? 'cursor-not-allowed' : 'cursor-pointer',
+          isDragging && 'slider-thumb-active',
         )}
-        <div className={inspectorSliderTokens.valueSlot}>
-          {isEditing ? (
-            <input
-              className={inspectorSliderTokens.valueInput}
-              disabled={disabled}
-              max={max}
-              min={min}
-              onBlur={handleInputCommit}
-              onChange={handleInputChange}
-              onKeyDown={handleInputKeyDown}
-              ref={inputRef}
-              step={step}
-              type="text"
-              value={inputValue}
-            />
-          ) : (
-            <button
-              className={cx(inspectorSliderTokens.valueButton, !disabled && 'cursor-text')}
-              disabled={disabled}
-              onClick={handleValueClick}
-              onDoubleClick={handleReset}
-              data-tooltip={t('ui.slider.clickToEdit')}
-              type="button"
-            >
-              {decimalPlaces > 0 && numericValue === 0 ? '0' : numericValue.toFixed(decimalPlaces)}
-              {suffix && <span className={inspectorSliderTokens.suffix}>{suffix}</span>}
-            </button>
-          )}
-        </div>
+        disabled={disabled}
+        style={{ margin: 0, touchAction: isDragging ? 'none' : 'pan-y' }}
+        max={String(max)}
+        min={String(min)}
+        onInput={handleRangeValueChange}
+        onDoubleClick={handleReset}
+        onKeyDown={handleRangeKeyDown}
+        onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        step={String(step)}
+        type="range"
+        value={rangeValue}
+      />
+    </div>
+  );
+
+  if (density === 'compact') {
+    return (
+      <div className={tokens.root} ref={containerRef}>
+        {labelControl}
+        {trackControl}
+        {valueControl}
+      </div>
+    );
+  }
+
+  return (
+    <div className={tokens.root} ref={containerRef}>
+      <div className={inspectorSliderTokens.header}>
+        {labelControl}
+        {valueControl}
       </div>
 
-      <div className={inspectorSliderTokens.trackWrap}>
-        <div className={cx(inspectorSliderTokens.track, trackClassName || 'bg-card-active')} />
-        <div
-          className={inspectorSliderTokens.fill}
-          style={{
-            left: formatPercent(Math.min(fillPercentage, originPercentage)),
-            width: formatPercent(Math.abs(fillPercentage - originPercentage)),
-          }}
-        />
-        <input
-          ref={rangeInputRef}
-          aria-label={typeof label === 'string' ? label : undefined}
-          className={cx(
-            inspectorSliderTokens.input,
-            disabled ? 'cursor-not-allowed' : 'cursor-pointer',
-            isDragging && 'slider-thumb-active',
-          )}
-          disabled={disabled}
-          style={{ margin: 0, touchAction: isDragging ? 'none' : 'pan-y' }}
-          max={String(max)}
-          min={String(min)}
-          onInput={handleRangeValueChange}
-          onDoubleClick={handleReset}
-          onKeyDown={handleRangeKeyDown}
-          onMouseDown={handleMouseDown}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          onTouchCancel={handleTouchEnd}
-          step={String(step)}
-          type="range"
-          value={rangeValue}
-        />
-      </div>
+      {trackControl}
     </div>
   );
 };

@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import { TextVariants } from '../../types/typography';
 import { type Adjustments, DetailsAdjustment } from '../../utils/adjustments';
 import type { AppSettings } from '../ui/AppProperties';
-import Slider, { type SliderChangeEvent } from '../ui/primitives/Slider';
 import Switch from '../ui/primitives/Switch';
 import UiText from '../ui/primitives/Text';
 import AdjustmentSlider from './AdjustmentSlider';
@@ -41,10 +40,10 @@ export default function DetailsPanel({
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {!isForMask && adjustmentVisibility['deblur'] !== false && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <UiText variant={TextVariants.heading} className="mb-2">
+        <div className="rounded-md bg-bg-tertiary p-1.5">
+          <UiText variant={TextVariants.heading} className="mb-1">
             {t('adjustments.details.deblur')}
           </UiText>
           <Switch
@@ -55,6 +54,7 @@ export default function DetailsPanel({
             }}
           />
           <AdjustmentSlider
+            density="compact"
             label={t('adjustments.details.amount')}
             max={100}
             min={0}
@@ -68,6 +68,7 @@ export default function DetailsPanel({
             fillOrigin="min"
           />
           <AdjustmentSlider
+            density="compact"
             label={t('adjustments.details.blurRadius')}
             max={1.35}
             min={0.45}
@@ -81,15 +82,15 @@ export default function DetailsPanel({
             defaultValue={0.8}
             suffix=" px"
           />
-          <UiText variant={TextVariants.small} className="mt-2 text-text-secondary">
+          <UiText variant={TextVariants.small} className="mt-1 text-text-secondary">
             {t('adjustments.details.deblurStatus')}
           </UiText>
         </div>
       )}
 
       {!isForMask && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <UiText variant={TextVariants.heading} className="mb-2">
+        <div className="rounded-md bg-bg-tertiary p-1.5">
+          <UiText variant={TextVariants.heading} className="mb-1">
             {t('adjustments.details.dustSpotVisualization')}
           </UiText>
           <Switch
@@ -99,8 +100,8 @@ export default function DetailsPanel({
               handleBooleanAdjustmentChange(DetailsAdjustment.DustSpotOverlayEnabled, checked);
             }}
           />
-          <div className="mt-3 rounded-md border border-border-color bg-bg-primary p-3">
-            <div className="relative h-24 overflow-hidden rounded bg-linear-to-br from-[#20242a] via-[#34313a] to-[#15171b]">
+          <div className="mt-2 rounded-md border border-border-color bg-bg-primary p-2">
+            <div className="relative h-16 overflow-hidden rounded bg-linear-to-br from-[#20242a] via-[#34313a] to-[#15171b]">
               {[18, 31, 46, 59, 77].map((left, index) => (
                 <span
                   aria-hidden="true"
@@ -119,16 +120,17 @@ export default function DetailsPanel({
                 />
               ))}
             </div>
-            <UiText variant={TextVariants.small} className="mt-2 text-text-secondary">
+            <UiText variant={TextVariants.small} className="mt-1 text-text-secondary">
               {t('adjustments.details.dustOverlayStatus')}
             </UiText>
           </div>
-          <Slider
+          <AdjustmentSlider
+            density="compact"
             label={t('adjustments.details.sensitivity')}
             max={100}
             min={0}
-            onChange={(e: SliderChangeEvent) => {
-              handleAdjustmentChange(DetailsAdjustment.DustSpotSensitivity, Number(e.target.value));
+            onValueChange={(value) => {
+              handleAdjustmentChange(DetailsAdjustment.DustSpotSensitivity, value);
             }}
             step={1}
             value={adjustments.dustSpotSensitivity}
@@ -136,12 +138,13 @@ export default function DetailsPanel({
             disabled={!adjustments.dustSpotOverlayEnabled}
             fillOrigin="min"
           />
-          <Slider
+          <AdjustmentSlider
+            density="compact"
             label={t('adjustments.details.minSpotRadius')}
             max={12}
             min={1}
-            onChange={(e: SliderChangeEvent) => {
-              handleAdjustmentChange(DetailsAdjustment.DustSpotMinRadiusPx, Number(e.target.value));
+            onValueChange={(value) => {
+              handleAdjustmentChange(DetailsAdjustment.DustSpotMinRadiusPx, value);
             }}
             step={1}
             value={adjustments.dustSpotMinRadiusPx}
@@ -153,11 +156,12 @@ export default function DetailsPanel({
       )}
 
       {adjustmentVisibility['sharpening'] !== false && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <UiText variant={TextVariants.heading} className="mb-2">
+        <div className="rounded-md bg-bg-tertiary p-1.5">
+          <UiText variant={TextVariants.heading} className="mb-1">
             {t('adjustments.details.sharpening')}
           </UiText>
           <AdjustmentSlider
+            density="compact"
             label={t('adjustments.details.sharpness')}
             max={100}
             min={-100}
@@ -169,6 +173,7 @@ export default function DetailsPanel({
             onDragStateChange={onDragStateChange}
           />
           <AdjustmentSlider
+            density="compact"
             label={t('adjustments.details.threshold')}
             max={80}
             min={0}
@@ -185,11 +190,12 @@ export default function DetailsPanel({
       )}
 
       {adjustmentVisibility['presence'] !== false && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <UiText variant={TextVariants.heading} className="mb-2">
+        <div className="rounded-md bg-bg-tertiary p-1.5">
+          <UiText variant={TextVariants.heading} className="mb-1">
             {t('adjustments.details.presence')}
           </UiText>
           <AdjustmentSlider
+            density="compact"
             label={t('adjustments.details.clarity')}
             max={100}
             min={-100}
@@ -201,6 +207,7 @@ export default function DetailsPanel({
             onDragStateChange={onDragStateChange}
           />
           <AdjustmentSlider
+            density="compact"
             label={t('adjustments.details.dehaze')}
             max={100}
             min={-100}
@@ -212,6 +219,7 @@ export default function DetailsPanel({
             onDragStateChange={onDragStateChange}
           />
           <AdjustmentSlider
+            density="compact"
             label={t('adjustments.details.structure')}
             max={100}
             min={-100}
@@ -225,6 +233,7 @@ export default function DetailsPanel({
           {!isForMask && (
             <>
               <AdjustmentSlider
+                density="compact"
                 label={t('adjustments.details.localContrastRadius')}
                 max={96}
                 min={4}
@@ -238,6 +247,7 @@ export default function DetailsPanel({
                 suffix=" px"
               />
               <AdjustmentSlider
+                density="compact"
                 label={t('adjustments.details.haloGuard')}
                 max={100}
                 min={0}
@@ -251,6 +261,7 @@ export default function DetailsPanel({
                 fillOrigin="min"
               />
               <AdjustmentSlider
+                density="compact"
                 label={t('adjustments.details.midtoneMask')}
                 max={100}
                 min={0}
@@ -263,13 +274,14 @@ export default function DetailsPanel({
                 defaultValue={50}
                 fillOrigin="min"
               />
-              <UiText variant={TextVariants.small} className="mt-2 text-text-secondary">
+              <UiText variant={TextVariants.small} className="mt-1 text-text-secondary">
                 {t('adjustments.details.localContrastStatus')}
               </UiText>
             </>
           )}
           {!isForMask && (
             <AdjustmentSlider
+              density="compact"
               label={t('adjustments.details.centre')}
               max={100}
               min={-100}
@@ -285,11 +297,12 @@ export default function DetailsPanel({
       )}
 
       {adjustmentVisibility['noiseReduction'] !== false && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <UiText variant={TextVariants.heading} className="mb-2">
+        <div className="rounded-md bg-bg-tertiary p-1.5">
+          <UiText variant={TextVariants.heading} className="mb-1">
             {t('adjustments.details.noiseReduction')}
           </UiText>
           <AdjustmentSlider
+            density="compact"
             label={t('adjustments.details.luminance')}
             max={100}
             min={isForMask ? -100 : 0}
@@ -301,6 +314,7 @@ export default function DetailsPanel({
             onDragStateChange={onDragStateChange}
           />
           <AdjustmentSlider
+            density="compact"
             label={t('adjustments.details.color')}
             max={100}
             min={isForMask ? -100 : 0}
@@ -315,11 +329,12 @@ export default function DetailsPanel({
       )}
 
       {!isForMask && adjustmentVisibility['chromaticAberration'] !== false && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <UiText variant={TextVariants.heading} className="mb-2">
+        <div className="rounded-md bg-bg-tertiary p-1.5">
+          <UiText variant={TextVariants.heading} className="mb-1">
             {t('adjustments.details.chromaticAberration')}
           </UiText>
           <AdjustmentSlider
+            density="compact"
             label={t('adjustments.details.redCyan')}
             max={100}
             min={-100}
@@ -331,6 +346,7 @@ export default function DetailsPanel({
             onDragStateChange={onDragStateChange}
           />
           <AdjustmentSlider
+            density="compact"
             label={t('adjustments.details.blueYellow')}
             max={100}
             min={-100}
