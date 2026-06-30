@@ -314,6 +314,7 @@ function App() {
     handleContinueSession,
   } = useAppNavigation({
     clearThumbnailQueue,
+    requestThumbnails,
     refs: navigationRefs,
   });
   const handleImageSelectVoid = useCallback(

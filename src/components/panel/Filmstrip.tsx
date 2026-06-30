@@ -35,6 +35,7 @@ interface ItemData {
   imageRatings: ImageRatings;
   selectedPath: string | undefined;
   multiSelectedPaths: string[];
+  selectedImageThumbnailUrl?: string | undefined;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   onRequestThumbnails?: ((paths: string[]) => void) | undefined;
   onContextMenu?: ((event: ThumbnailMouseEvent, path: string) => void) | undefined;
@@ -51,6 +52,7 @@ interface FilmstripThumbnailProps {
   isSelected: boolean;
   onContextMenu?: ((event: ThumbnailMouseEvent, path: string) => void) | undefined;
   onImageSelect?: ((path: string, event: ThumbnailSelectEvent) => void) | undefined;
+  selectedImageThumbnailUrl?: string | undefined;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   itemHeight: number;
   index: number;
@@ -58,6 +60,12 @@ interface FilmstripThumbnailProps {
 }
 
 type FilmstripCellData = ItemData;
+
+export const resolveFilmstripThumbnailUrl = (
+  thumbnailUrl: string | undefined,
+  selectedImageThumbnailUrl: string | undefined,
+  isActive: boolean,
+) => thumbnailUrl ?? (isActive ? selectedImageThumbnailUrl : undefined);
 
 interface FilmstripCellProps extends FilmstripCellData {
   columnIndex: number;
@@ -105,6 +113,7 @@ const FilmstripThumbnail = memo(
     isSelected,
     onContextMenu,
     onImageSelect,
+    selectedImageThumbnailUrl,
     thumbnailAspectRatio,
     itemHeight: _itemHeight,
     index,
@@ -112,19 +121,20 @@ const FilmstripThumbnail = memo(
   }: FilmstripThumbnailProps) => {
     const { t } = useTranslation();
     const thumbData = useProcessStore((s) => s.thumbnails[imageFile.path]);
+    const displayThumbnailUrl = resolveFilmstripThumbnailUrl(thumbData, selectedImageThumbnailUrl, isActive);
 
     const [layers, setLayers] = useState<ImageLayer[]>([]);
 
     const pathRef = useRef(imageFile.path);
-    const hadDataOnPathChange = useRef(!!thumbData);
+    const hadDataOnPathChange = useRef(!!displayThumbnailUrl);
 
     useLayoutEffect(() => {
       if (pathRef.current !== imageFile.path) {
         pathRef.current = imageFile.path;
-        hadDataOnPathChange.current = !!thumbData;
+        hadDataOnPathChange.current = !!displayThumbnailUrl;
         setLayers([]);
       }
-    }, [imageFile.path, thumbData]);
+    }, [displayThumbnailUrl, imageFile.path]);
 
     const isInitialLoad = useRef(true);
 
@@ -148,7 +158,7 @@ const FilmstripThumbnail = memo(
       filename.length > 40 ? filename.substring(0, 20) + '...' + filename.substring(filename.length - 17) : filename;
 
     useEffect(() => {
-      if (thumbnailAspectRatio === ThumbnailAspectRatio.Contain && thumbData) {
+      if (thumbnailAspectRatio === ThumbnailAspectRatio.Contain && displayThumbnailUrl) {
         const img = new Image();
         img.onload = () => {
           const ratio = img.naturalWidth / img.naturalHeight;
@@ -160,12 +170,12 @@ const FilmstripThumbnail = memo(
             }, 50);
           }
         };
-        img.src = thumbData;
+        img.src = displayThumbnailUrl;
       }
-    }, [thumbData, thumbnailAspectRatio, index, setRatio]);
+    }, [displayThumbnailUrl, thumbnailAspectRatio, index, setRatio]);
 
     useEffect(() => {
-      if (!thumbData) {
+      if (!displayThumbnailUrl) {
         const frame = requestAnimationFrame(() => {
           setLayers([]);
         });
@@ -175,20 +185,20 @@ const FilmstripThumbnail = memo(
       }
 
       setLayers((prev) => {
-        if (prev.some((l) => l.id === thumbData)) return prev;
+        if (prev.some((l) => l.id === displayThumbnailUrl)) return prev;
 
         if (prev.length === 0) {
           if (hadDataOnPathChange.current) {
-            return [{ id: thumbData, url: thumbData, opacity: 1 }];
+            return [{ id: displayThumbnailUrl, url: displayThumbnailUrl, opacity: 1 }];
           } else {
-            return [{ id: thumbData, url: thumbData, opacity: 0 }];
+            return [{ id: displayThumbnailUrl, url: displayThumbnailUrl, opacity: 0 }];
           }
         }
 
-        return [...prev, { id: thumbData, url: thumbData, opacity: 0 }];
+        return [...prev, { id: displayThumbnailUrl, url: displayThumbnailUrl, opacity: 0 }];
       });
       return undefined;
-    }, [thumbData, imageFile.path]);
+    }, [displayThumbnailUrl, imageFile.path]);
 
     useEffect(() => {
       const layerToFadeIn = layers.find((l) => l.opacity === 0);
@@ -369,6 +379,7 @@ const FilmstripCell = ({
   imageRatings,
   selectedPath,
   multiSelectedPaths,
+  selectedImageThumbnailUrl,
   thumbnailAspectRatio,
   onContextMenu,
   onImageSelect,
@@ -402,6 +413,7 @@ const FilmstripCell = ({
           isSelected={multiSelectedPaths.includes(imageFile.path)}
           onContextMenu={onContextMenu}
           onImageSelect={onImageSelect}
+          selectedImageThumbnailUrl={selectedImageThumbnailUrl}
           thumbnailAspectRatio={thumbnailAspectRatio}
           itemHeight={itemHeight}
           index={columnIndex}
@@ -693,6 +705,7 @@ interface FilmStripProps {
   onImageSelect?: ((path: string, event: ThumbnailSelectEvent) => void) | undefined;
   onRequestThumbnails?: ((paths: string[]) => void) | undefined;
   selectedImage?: SelectedImage | undefined;
+  selectedImageThumbnailUrl?: string | undefined;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   totalImages?: number;
 }
@@ -707,6 +720,7 @@ export default function Filmstrip({
   onImageSelect,
   onRequestThumbnails,
   selectedImage,
+  selectedImageThumbnailUrl,
   thumbnailAspectRatio,
 }: FilmStripProps) {
   const clickTriggeredScroll = useRef(false);
@@ -758,6 +772,7 @@ export default function Filmstrip({
             onRequestThumbnails,
             onImageSelect: handleImageSelect,
             consumeClickTriggeredScroll,
+            selectedImageThumbnailUrl,
           }}
         />
       )}

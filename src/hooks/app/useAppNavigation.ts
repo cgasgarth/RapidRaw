@@ -58,6 +58,7 @@ interface NavigationSettings extends AppSettings {
 
 export interface AppNavigationProps {
   clearThumbnailQueue: () => void;
+  requestThumbnails: (paths: string[]) => void;
   refs: {
     transformWrapperRef: RefObject<TransformController | null>;
     preloadedDataRef: RefObject<PreloadedNavigationData>;
@@ -82,7 +83,7 @@ const resolveRestoredFolderPath = (trees: FolderTree[], preferredPath: string | 
   return folderTreeContainsPath(trees, fallbackPath) ? fallbackPath : (trees[0]?.path ?? fallbackPath);
 };
 
-export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationProps) {
+export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs }: AppNavigationProps) {
   const {
     transformWrapperRef,
     preloadedDataRef,
@@ -192,6 +193,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       }
 
       selectedImagePathRef.current = path;
+      requestThumbnails([path]);
       setLibrary({ multiSelectedPaths: [path], libraryActivePath: null, selectionAnchorPath: path });
 
       setEditor({
@@ -340,6 +342,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       latestRenderedJobIdRef,
       prevAdjustmentsRef,
       previewJobIdRef,
+      requestThumbnails,
       selectedImagePathRef,
     ],
   );

@@ -277,6 +277,7 @@ export default function BottomBar({
               onImageSelect={onImageSelect}
               onRequestThumbnails={onRequestThumbnails}
               selectedImage={selectedImage}
+              selectedImageThumbnailUrl={selectedImage?.thumbnailUrl}
               thumbnailAspectRatio={thumbnailAspectRatio}
             />
           </div>
