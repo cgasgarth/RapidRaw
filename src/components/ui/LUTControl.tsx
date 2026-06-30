@@ -3,7 +3,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
-import { useOsPlatform } from '../../hooks/useOsPlatform';
+import { useOsPlatform } from '../../hooks/ui/useOsPlatform';
 import { Invokes } from '../../tauri/commands';
 import Slider from './Slider';
 

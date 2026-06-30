@@ -17,7 +17,7 @@ import {
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useModalTransition } from '../../hooks/useModalTransition';
+import { useModalTransition } from '../../hooks/ui/useModalTransition';
 import { Invokes } from '../../tauri/commands';
 import { TextColors, TextVariants } from '../../types/typography';
 import type { Adjustments } from '../../utils/adjustments';

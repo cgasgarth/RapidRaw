@@ -12,10 +12,10 @@ import { INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../src/utils
 import { applyLayerStackCommandBridgeOperation } from '../../../src/utils/layerStackCommandBridge.ts';
 
 const appModalsSource = readFileSync('src/components/modals/AppModals.tsx', 'utf8');
-const appNavigationSource = readFileSync('src/hooks/useAppNavigation.ts', 'utf8');
+const appNavigationSource = readFileSync('src/hooks/app/useAppNavigation.ts', 'utf8');
 const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
 const handoffSource = readFileSync('src/utils/negativeLabEditorHandoff.ts', 'utf8');
-const imageLoaderSource = readFileSync('src/hooks/useImageLoader.ts', 'utf8');
+const imageLoaderSource = readFileSync('src/hooks/editor/useImageLoader.ts', 'utf8');
 const visualSmokeSource = readFileSync('src/validation/visual/VisualSmokeApp.tsx', 'utf8');
 const visualSmokeCaptureSource = readFileSync('scripts/capture-visual-smoke.ts', 'utf8');
 

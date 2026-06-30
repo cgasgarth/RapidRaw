@@ -1,5 +1,5 @@
 import type { TransformState } from '../components/ui/AppProperties';
-import type { RenderSize } from '../hooks/useImageRenderSize';
+import type { RenderSize } from '../hooks/viewport/useImageRenderSize';
 
 export type RgbaColor = [number, number, number, number];
 

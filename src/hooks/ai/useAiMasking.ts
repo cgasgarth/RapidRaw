@@ -2,15 +2,15 @@ import { useAuth } from '@clerk/react';
 import { invoke } from '@tauri-apps/api/core';
 import { useCallback, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { Mask, type SubMask } from '../components/panel/right/Masks';
-import { type AiPeopleMaskPart, parseAiPatchDataJson } from '../schemas/aiMaskingSchemas';
-import { useEditorStore } from '../store/useEditorStore';
-import { Invokes } from '../tauri/commands';
-import type { Adjustments, AiPatch, Coord, MaskContainer } from '../utils/adjustments';
-import { getAiPeopleMaskPartCapability } from '../utils/aiPeopleMaskContracts';
-import { formatUnknownError } from '../utils/errorFormatting';
-import { mergeMaskParameters } from '../utils/maskParameterAccess';
-import { useEditorActions } from './useEditorActions';
+import { Mask, type SubMask } from '../../components/panel/right/Masks';
+import { type AiPeopleMaskPart, parseAiPatchDataJson } from '../../schemas/aiMaskingSchemas';
+import { useEditorStore } from '../../store/useEditorStore';
+import { Invokes } from '../../tauri/commands';
+import type { Adjustments, AiPatch, Coord, MaskContainer } from '../../utils/adjustments';
+import { getAiPeopleMaskPartCapability } from '../../utils/aiPeopleMaskContracts';
+import { formatUnknownError } from '../../utils/errorFormatting';
+import { mergeMaskParameters } from '../../utils/maskParameterAccess';
+import { useEditorActions } from '../editor/useEditorActions';
 
 type SubMaskParameters = Record<string, unknown>;
 

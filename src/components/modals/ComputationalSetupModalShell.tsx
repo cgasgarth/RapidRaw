@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import { XCircle } from 'lucide-react';
 import { type MouseEvent, type ReactNode, useCallback, useRef } from 'react';
-import { useModalTransition } from '../../hooks/useModalTransition';
+import { useModalTransition } from '../../hooks/ui/useModalTransition';
 import type { ComputationalMergeAppServerRouteFamily } from '../../schemas/computationalMergeAppServerSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerBadge';

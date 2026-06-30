@@ -45,11 +45,11 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import { useAiMasking } from '../../../hooks/useAiMasking';
-import { useEditorActions } from '../../../hooks/useEditorActions';
-import { useManagedFocus } from '../../../hooks/useManagedFocus';
-import { type UserPreset, usePresets } from '../../../hooks/usePresets';
-import { useWaveformControls } from '../../../hooks/useWaveformControls';
+import { useAiMasking } from '../../../hooks/ai/useAiMasking';
+import { useEditorActions } from '../../../hooks/editor/useEditorActions';
+import { type UserPreset, usePresets } from '../../../hooks/editor/usePresets';
+import { useWaveformControls } from '../../../hooks/editor/useWaveformControls';
+import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
 import type { MaskOverlaySettings } from '../../../schemas/maskOverlaySchemas';
 import { aiDepthMaskParametersSchema, type MaskRefinementParameters } from '../../../schemas/maskParameterSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';

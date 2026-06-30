@@ -9,7 +9,7 @@
       "positiveFixturePath": "fixtures/validation/tauri-folder-tree-valid.json",
       "rustParityState": "manual-rust-command-shape",
       "status": "runtime-parse-tested",
-      "tsCallSites": ["src/hooks/useFolderExpansionLoader.ts"],
+      "tsCallSites": ["src/hooks/library/useFolderExpansionLoader.ts"],
       "zodSchema": "folderTreeListSchema"
     },
     {
@@ -20,7 +20,7 @@
       "positiveFixturePath": "fixtures/validation/tauri-album-tree-valid.json",
       "rustParityState": "manual-rust-command-shape",
       "status": "runtime-parse-tested",
-      "tsCallSites": ["src/components/panel/FolderTree.tsx", "src/hooks/useLibraryActions.ts"],
+      "tsCallSites": ["src/components/panel/FolderTree.tsx", "src/hooks/library/useLibraryActions.ts"],
       "zodSchema": "albumTreeSchema"
     },
     {

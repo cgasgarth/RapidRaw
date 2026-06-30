@@ -45,7 +45,7 @@ const catalog = parseColorStylePresetCatalog({
 });
 const invalidCases = await readJson('fixtures/color/invalid-color-style-presets.json');
 const presetsPanelSource = await readFile('src/components/panel/right/PresetsPanel.tsx', 'utf8');
-const usePresetsSource = await readFile('src/hooks/usePresets.ts', 'utf8');
+const usePresetsSource = await readFile('src/hooks/editor/usePresets.ts', 'utf8');
 const appPropertiesSource = await readFile('src/components/ui/AppProperties.tsx', 'utf8');
 const rustPresetsSource = await readFile('src-tauri/src/presets.rs', 'utf8');
 const locale = await readJson('src/i18n/locales/en.json');

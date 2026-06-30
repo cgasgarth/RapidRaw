@@ -1,10 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useCallback } from 'react';
 
-import { panoramaRuntimePlanSchema } from '../schemas/panoramaUiSchemas';
-import { useUIStore } from '../store/useUIStore';
-import { Invokes } from '../tauri/commands';
-import { buildHdrDryRunActionState, buildPanoramaDryRunCommandState } from '../utils/computationalMergeModalState';
+import { panoramaRuntimePlanSchema } from '../../schemas/panoramaUiSchemas';
+import { useUIStore } from '../../store/useUIStore';
+import { Invokes } from '../../tauri/commands';
+import { buildHdrDryRunActionState, buildPanoramaDryRunCommandState } from '../../utils/computationalMergeModalState';
 
 export function useProductivityActions(refreshImageList: () => Promise<void>) {
   const setUI = useUIStore((state) => state.setUI);

@@ -7,7 +7,7 @@ const failures: string[] = [];
 
 const toolbarSource = read('src/components/panel/editor/EditorToolbar.tsx');
 const exportPanelSource = read('src/components/panel/right/ExportPanel.tsx');
-const hookSource = read('src/hooks/useImageProcessing.ts');
+const hookSource = read('src/hooks/editor/useImageProcessing.ts');
 const storeSource = read('src/store/useEditorStore.ts');
 const commandsSource = read('src/tauri/commands.ts');
 const rustLibSource = read('src-tauri/src/lib.rs');

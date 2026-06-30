@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { SubMask } from '../components/panel/right/Masks';
-import type { RenderSize } from '../hooks/useImageRenderSize';
+import type { RenderSize } from '../hooks/viewport/useImageRenderSize';
 import { type MaskParameterRecord, toMaskParameterRecord } from './maskParameterAccess';
 
 export const objectPromptModeSchema = z.enum(['foreground_point', 'background_point', 'box']);

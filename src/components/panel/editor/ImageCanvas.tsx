@@ -20,7 +20,7 @@ import {
   Tag,
   Transformer,
 } from 'react-konva';
-import type { RenderSize } from '../../../hooks/useImageRenderSize';
+import type { RenderSize } from '../../../hooks/viewport/useImageRenderSize';
 import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
 import type {
   Adjustments,

@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { useImageProcessing } from '../../hooks/useImageProcessing';
+import { useImageProcessing } from '../../hooks/editor/useImageProcessing';
 import type { Adjustments } from '../../utils/adjustments';
 
 interface Props {

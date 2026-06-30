@@ -46,8 +46,8 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import { useEditorActions } from '../../../hooks/useEditorActions';
-import { PresetListType, type UserPreset, usePresets } from '../../../hooks/usePresets';
+import { useEditorActions } from '../../../hooks/editor/useEditorActions';
+import { PresetListType, type UserPreset, usePresets } from '../../../hooks/editor/usePresets';
 import type { ColorStylePreset } from '../../../schemas/colorStylePresetSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';

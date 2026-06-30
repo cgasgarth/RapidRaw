@@ -23,7 +23,6 @@ import { type PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import type { LayerStackSidecarLayerV1 } from '../../../packages/rawengine-schema/src';
-import { useModalTransition } from '../../hooks/useModalTransition';
 import {
   isNegativeLabProfileSort,
   NEGATIVE_LAB_PROFILE_BROWSER_ROW_BY_ID,
@@ -35,8 +34,9 @@ import {
   type NegativeLabProfileFilter,
   type NegativeLabProfileSort,
   useNegativeLabProfileBrowser,
-} from '../../hooks/useNegativeLabProfileBrowser';
-import { usePreviewViewport } from '../../hooks/usePreviewViewport';
+} from '../../hooks/editor/useNegativeLabProfileBrowser';
+import { useModalTransition } from '../../hooks/ui/useModalTransition';
+import { usePreviewViewport } from '../../hooks/viewport/usePreviewViewport';
 import type { NegativeLabAcquisitionProfileId } from '../../schemas/negativeLabAcquisitionProfileSchemas';
 import { negativeLabAcquisitionProfileIdSchema } from '../../schemas/negativeLabAcquisitionProfileSchemas';
 import type {

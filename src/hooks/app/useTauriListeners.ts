@@ -1,8 +1,8 @@
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useRef } from 'react';
-import type { ChannelConfig } from '../components/adjustments/Curves';
-import type { ImageFile, WaveformData } from '../components/ui/AppProperties';
-import { Status } from '../components/ui/ExportImportProperties';
+import type { ChannelConfig } from '../../components/adjustments/Curves';
+import type { ImageFile, WaveformData } from '../../components/ui/AppProperties';
+import { Status } from '../../components/ui/ExportImportProperties';
 import {
   parseBase64Payload,
   parseCountPayload,
@@ -18,13 +18,13 @@ import {
   parseRenderPathPayload,
   parseStringPayload,
   parseThumbnailGeneratedPayload,
-} from '../schemas/tauriEventSchemas';
-import { useEditorStore } from '../store/useEditorStore';
-import { useLibraryStore } from '../store/useLibraryStore';
-import type { ThumbnailSmartPreviewState } from '../store/useProcessStore';
-import { useProcessStore } from '../store/useProcessStore';
-import { useUIStore } from '../store/useUIStore';
-import { buildHdrApplyCommandState, buildPanoramaApplyCommandState } from '../utils/computationalMergeModalState';
+} from '../../schemas/tauriEventSchemas';
+import { useEditorStore } from '../../store/useEditorStore';
+import { useLibraryStore } from '../../store/useLibraryStore';
+import type { ThumbnailSmartPreviewState } from '../../store/useProcessStore';
+import { useProcessStore } from '../../store/useProcessStore';
+import { useUIStore } from '../../store/useUIStore';
+import { buildHdrApplyCommandState, buildPanoramaApplyCommandState } from '../../utils/computationalMergeModalState';
 import {
   AI_MODEL_DOWNLOAD_FINISH_EVENT,
   AI_MODEL_DOWNLOAD_START_EVENT,
@@ -61,7 +61,7 @@ import {
   THUMBNAIL_PROGRESS_EVENT,
   WAVEFORM_UPDATE_EVENT,
   WGPU_FRAME_READY_EVENT,
-} from '../utils/tauriEventNames';
+} from '../../utils/tauriEventNames';
 
 interface TauriListenerProps {
   refreshAllFolderTrees: () => void;

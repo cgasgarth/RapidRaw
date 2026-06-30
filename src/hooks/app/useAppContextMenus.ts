@@ -51,32 +51,34 @@ import {
   OPTION_SEPARATOR,
   type Option,
   Panel,
-} from '../components/ui/AppProperties';
-import { useContextMenu } from '../context/ContextMenuContext';
-import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../schemas/focusStackUiSchemas';
-import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../schemas/hdrMergeUiSchemas';
-import { libraryRelinkIdentitySchema } from '../schemas/libraryRelinkSchemas';
-import { DEFAULT_PANORAMA_UI_SETTINGS } from '../schemas/panoramaUiSchemas';
-import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../schemas/superResolutionUiSchemas';
-import { useEditorStore } from '../store/useEditorStore';
-import { useLibraryStore } from '../store/useLibraryStore';
-import { useProcessStore } from '../store/useProcessStore';
-import { useSettingsStore } from '../store/useSettingsStore';
-import { useUIStore } from '../store/useUIStore';
-import { Invokes } from '../tauri/commands';
-import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
-import { createFocusStackSourcePreflightMetadata } from '../utils/focusStackSourcePreflight';
-import { findAlbumById } from '../utils/folderTreeUtils';
-import { findHdrAutoStackPaths } from '../utils/hdrAutoStackSelection';
-import { globalImageCache } from '../utils/ImageLRUCache';
+} from '../../components/ui/AppProperties';
+import { useContextMenu } from '../../context/ContextMenuContext';
+import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../schemas/focusStackUiSchemas';
+import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../schemas/hdrMergeUiSchemas';
+import { libraryRelinkIdentitySchema } from '../../schemas/libraryRelinkSchemas';
+import { DEFAULT_PANORAMA_UI_SETTINGS } from '../../schemas/panoramaUiSchemas';
+import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../../schemas/superResolutionUiSchemas';
+import { useEditorStore } from '../../store/useEditorStore';
+import { useLibraryStore } from '../../store/useLibraryStore';
+import { useProcessStore } from '../../store/useProcessStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
+import { useUIStore } from '../../store/useUIStore';
+import { Invokes } from '../../tauri/commands';
+import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../utils/adjustments';
+import { createFocusStackSourcePreflightMetadata } from '../../utils/focusStackSourcePreflight';
+import { findAlbumById } from '../../utils/folderTreeUtils';
+import { findHdrAutoStackPaths } from '../../utils/hdrAutoStackSelection';
+import { globalImageCache } from '../../utils/ImageLRUCache';
 import {
   applyLibraryRelinkToRuntimeState,
   planLibraryFolderRelink,
   planLibraryRelink,
   rewriteLibraryRelinkPath,
-} from '../utils/libraryRelinkIdentity';
-import { createSuperResolutionSourcePreflightMetadata } from '../utils/superResolutionSourcePreflight';
-import { invokeWithSchema } from '../utils/tauriSchemaInvoke';
+} from '../../utils/libraryRelinkIdentity';
+import { createSuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
+import { useEditorActions } from '../editor/useEditorActions';
+import { useLibraryActions } from '../library/useLibraryActions';
 import {
   buildColorLabelMenu,
   buildDestructiveConfirmSubmenu,
@@ -84,8 +86,6 @@ import {
   buildTaggingMenu,
   type CommonTag,
 } from './contextMenuOptionBuilders';
-import { useEditorActions } from './useEditorActions';
-import { useLibraryActions } from './useLibraryActions';
 
 export interface UseAppContextMenusProps {
   handleImageSelect: (path: string) => void;

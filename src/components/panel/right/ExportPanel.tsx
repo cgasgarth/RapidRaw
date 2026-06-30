@@ -24,8 +24,8 @@ import {
   exportColorCapabilityCatalogV1Schema,
   MOXCMS_EXPORT_COLOR_CAPABILITIES_V1,
 } from '../../../../packages/rawengine-schema/src/exportColorCapabilities';
-import { useExportSettings } from '../../../hooks/useExportSettings';
-import { useOsPlatform } from '../../../hooks/useOsPlatform';
+import { useExportSettings } from '../../../hooks/export/useExportSettings';
+import { useOsPlatform } from '../../../hooks/ui/useOsPlatform';
 import { prepareAdjustmentPayloadForBackend } from '../../../schemas/adjustmentPayloadSchemas';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../../schemas/exportRecipeIds';
 import { outputSharpeningSettingsSchema } from '../../../schemas/outputSharpeningSchemas';

@@ -14,15 +14,15 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Crop, PercentCrop } from 'react-image-crop';
-import { useAiMasking } from '../../hooks/useAiMasking';
-import { useEditorViewportPhysics } from '../../hooks/useEditorViewportPhysics';
+import { useAiMasking } from '../../hooks/ai/useAiMasking';
+import { useWgpuTransformSync } from '../../hooks/editor/useWgpuTransformSync';
+import { useEditorViewportPhysics } from '../../hooks/viewport/useEditorViewportPhysics';
 import {
   type BaseRenderSize,
   type ImageDimensions,
   type RenderSize,
   useImageRenderSize,
-} from '../../hooks/useImageRenderSize';
-import { useWgpuTransformSync } from '../../hooks/useWgpuTransformSync';
+} from '../../hooks/viewport/useImageRenderSize';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';

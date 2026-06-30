@@ -7,8 +7,8 @@ import { toast } from 'react-toastify';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import { useEditorActions } from '../../../hooks/useEditorActions';
-import { useWaveformControls } from '../../../hooks/useWaveformControls';
+import { useEditorActions } from '../../../hooks/editor/useEditorActions';
+import { useWaveformControls } from '../../../hooks/editor/useWaveformControls';
 import {
   type RawReconstructionComparisonResult,
   rawReconstructionComparisonResultSchema,

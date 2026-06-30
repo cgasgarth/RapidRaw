@@ -10,7 +10,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { Panel, type Preset } from '../../../src/components/ui/AppProperties';
 import { ContextMenuProvider } from '../../../src/context/ContextMenuContext';
-import type { UserPreset } from '../../../src/hooks/usePresets';
+import type { UserPreset } from '../../../src/hooks/editor/usePresets';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { useUIStore } from '../../../src/store/useUIStore';
 import { Invokes } from '../../../src/tauri/commands';

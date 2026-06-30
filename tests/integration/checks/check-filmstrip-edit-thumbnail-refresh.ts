@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 
 import { readFileSync } from 'node:fs';
-import { shouldQueueThumbnailPath } from '../../../src/hooks/useThumbnails.ts';
+import { shouldQueueThumbnailPath } from '../../../src/hooks/library/useThumbnails.ts';
 import { useProcessStore } from '../../../src/store/useProcessStore.ts';
 
-const imageProcessingSource = readFileSync('src/hooks/useImageProcessing.ts', 'utf8');
+const imageProcessingSource = readFileSync('src/hooks/editor/useImageProcessing.ts', 'utf8');
 
 const requiredMarkers = [
   'useProcessStore.getState().invalidateThumbnails([selectedImage.path])',

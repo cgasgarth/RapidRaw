@@ -9,7 +9,7 @@ import {
   FileFormats,
   WatermarkAnchor,
 } from '../../../src/components/ui/ExportImportProperties';
-import { useExportSettings } from '../../../src/hooks/useExportSettings';
+import { useExportSettings } from '../../../src/hooks/export/useExportSettings';
 import { parseExportRecipe } from '../../../src/schemas/exportRecipeSchemas';
 import type { OutputSharpeningSettings } from '../../../src/schemas/outputSharpeningSchemas';
 

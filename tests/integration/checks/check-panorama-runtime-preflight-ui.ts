@@ -45,7 +45,7 @@ if (samplePlan.preflight.memory_components.total_estimated_peak_bytes !== 952_33
   failures.push('Panorama runtime plan schema did not preserve memory estimate.');
 }
 
-const actionSource = readFileSync('src/hooks/useProductivityActions.ts', 'utf8');
+const actionSource = readFileSync('src/hooks/app/useProductivityActions.ts', 'utf8');
 for (const marker of [
   'Invokes.PlanPanorama',
   'panoramaRuntimePlanSchema.parse',

@@ -1,19 +1,19 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { z } from 'zod';
-import { Panel } from '../components/ui/AppProperties';
-import { prepareAdjustmentPayloadForBackend } from '../schemas/adjustmentPayloadSchemas';
-import { emptyTauriResponseSchema } from '../schemas/tauriResponseSchemas';
-import { type ExportSoftProofTransformState, useEditorStore } from '../store/useEditorStore';
-import { useLibraryStore } from '../store/useLibraryStore';
-import { useProcessStore } from '../store/useProcessStore';
-import { useSettingsStore } from '../store/useSettingsStore';
-import { useUIStore } from '../store/useUIStore';
-import { Invokes } from '../tauri/commands';
-import { type Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../utils/adjustments';
-import { globalImageCache } from '../utils/ImageLRUCache';
-import { invokeWithSchema } from '../utils/tauriSchemaInvoke';
-import { debounce } from '../utils/timing';
+import { Panel } from '../../components/ui/AppProperties';
+import { prepareAdjustmentPayloadForBackend } from '../../schemas/adjustmentPayloadSchemas';
+import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
+import { type ExportSoftProofTransformState, useEditorStore } from '../../store/useEditorStore';
+import { useLibraryStore } from '../../store/useLibraryStore';
+import { useProcessStore } from '../../store/useProcessStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
+import { useUIStore } from '../../store/useUIStore';
+import { Invokes } from '../../tauri/commands';
+import { type Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../../utils/adjustments';
+import { globalImageCache } from '../../utils/ImageLRUCache';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
+import { debounce } from '../../utils/timing';
 import { debouncedSave } from './useEditorActions';
 
 interface PreviousAdjustments {

@@ -8,7 +8,7 @@ import {
   FileFormats,
   type OutputSharpeningSettings,
   WatermarkAnchor,
-} from '../components/ui/ExportImportProperties';
+} from '../../components/ui/ExportImportProperties';
 
 const FILE_FORMAT_IDS = new Set<string>(FILE_FORMATS.map((format) => format.id));
 const WATERMARK_ANCHORS = new Set<string>(Object.values(WatermarkAnchor));

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 import { useProcessStore } from '../../../src/store/useProcessStore';
 
-const editorActionsSource = readFileSync('src/hooks/useEditorActions.ts', 'utf8');
+const editorActionsSource = readFileSync('src/hooks/editor/useEditorActions.ts', 'utf8');
 const filmstripSource = readFileSync('src/components/panel/Filmstrip.tsx', 'utf8');
 const processStoreSource = readFileSync('src/store/useProcessStore.ts', 'utf8');
 

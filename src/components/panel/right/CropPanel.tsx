@@ -16,7 +16,7 @@ import {
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useEditorActions } from '../../../hooks/useEditorActions';
+import { useEditorActions } from '../../../hooks/editor/useEditorActions';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';

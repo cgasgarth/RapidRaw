@@ -28,7 +28,7 @@ const runtimeCheckCommands = new Map<string, [string, ...string[]]>([
   ['check:channel-mixer', ['bun', 'tests/integration/checks/check-channel-mixer.ts']],
   ['check:color-balance-rgb', ['bun', 'tests/integration/checks/check-color-balance-rgb.ts']],
   ['check:color-grading-presets', ['bun', 'tests/integration/checks/check-color-grading-presets.ts']],
-  ['check:levels-runtime', ['bun', 'test', '--reporter=dot', 'tests/pure-ts/levels-runtime.test.ts']],
+  ['check:levels-runtime', ['bun', 'test', '--reporter=dot', 'tests/pure-ts/adjustments/levels-runtime.test.ts']],
   ['check:profile-tone', ['bun', 'tests/integration/checks/check-profile-tone.ts']],
   ['check:selective-color-ranges', ['bun', 'tests/integration/checks/check-selective-color-ranges.ts']],
   ['check:skin-tone-uniformity', ['bun', 'tests/integration/checks/check-skin-tone-uniformity.ts']],

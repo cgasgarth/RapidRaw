@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useModalTransition } from '../../hooks/useModalTransition';
+import { useModalTransition } from '../../hooks/ui/useModalTransition';
 import { TextVariants } from '../../types/typography';
 import {
   ADJUSTMENT_GROUPS,

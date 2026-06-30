@@ -8,9 +8,9 @@ import {
   type SortCriteria,
   SortDirection,
   type SupportedTypes,
-} from '../components/ui/AppProperties';
-import { type SearchCriteria, useLibraryStore } from '../store/useLibraryStore';
-import { useSettingsStore } from '../store/useSettingsStore';
+} from '../../components/ui/AppProperties';
+import { type SearchCriteria, useLibraryStore } from '../../store/useLibraryStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
 
 export const ADVANCED_QUERY_REGEX =
   /^(iso|aperture|f|shutter|s|focal|mm|rating|color|camera|make|model|lens)\s*(?::)?\s*(>=|<=|>|<|=)?\s*(.+)$/i;

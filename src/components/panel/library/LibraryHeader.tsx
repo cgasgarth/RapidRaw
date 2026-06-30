@@ -14,7 +14,7 @@ import type React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-import { ADVANCED_QUERY_REGEX } from '../../../hooks/useSortedLibrary';
+import { ADVANCED_QUERY_REGEX } from '../../../hooks/library/useSortedLibrary';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';

@@ -1,5 +1,5 @@
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { TransformState } from '../components/ui/AppProperties';
+import type { TransformState } from '../../components/ui/AppProperties';
 import type { RenderSize } from './useImageRenderSize';
 
 interface EditorViewportPhysicsOptions {
