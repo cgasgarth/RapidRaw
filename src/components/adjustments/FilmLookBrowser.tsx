@@ -11,8 +11,8 @@ import {
   type FilmLookSortMode,
   getFilmLookAdjustmentSummaries,
   sortFilmLookBrowserItems,
-} from '../../utils/filmLookBrowser';
-import { getFilmLookBrowserGroups } from '../../utils/filmLookRegistry';
+} from '../../utils/film-look/filmLookBrowser';
+import { getFilmLookBrowserGroups } from '../../utils/film-look/filmLookRegistry';
 import UiText from '../ui/primitives/Text';
 
 interface FilmLookBrowserProps {

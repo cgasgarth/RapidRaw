@@ -4,7 +4,7 @@ import {
   FilmLookAppServerCommandName,
   FilmLookAppServerRouteStatus,
   FilmLookAppServerSchemaName,
-} from '../utils/filmLookAppServerRouteIds';
+} from '../utils/film-look/filmLookAppServerRouteIds';
 
 export const filmLookAppServerCommandNameSchema = z.literal(FilmLookAppServerCommandName.BuildAdjustmentPatch);
 
@@ -50,7 +50,7 @@ export const filmLookAppServerPatchResultSchema = z
     proof: z
       .object({
         deterministic: z.literal(true),
-        generatedFrom: z.literal('src/utils/filmLookBrowser.ts'),
+        generatedFrom: z.literal('src/utils/film-look/filmLookBrowser.ts'),
       })
       .strict(),
     strength: z.number().int().min(0).max(100),

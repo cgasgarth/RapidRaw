@@ -4,8 +4,8 @@ import {
   type FilmLookSortMode,
   getFilmLookAdjustmentSummaries,
   sortFilmLookBrowserItems,
-} from '../../../src/utils/filmLookBrowser.ts';
-import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/filmLookRegistry.ts';
+} from '../../../src/utils/film-look/filmLookBrowser.ts';
+import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/film-look/filmLookRegistry.ts';
 
 const assertOrder = (sortMode: FilmLookSortMode, expectedIds: Array<string>) => {
   const sortedIds = sortFilmLookBrowserItems(FILM_LOOK_BROWSER_ITEMS, sortMode)

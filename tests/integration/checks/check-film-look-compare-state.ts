@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../../src/utils/adjustments.ts';
-import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/filmLookRegistry.ts';
+import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/film-look/filmLookRegistry.ts';
 
 const filmLookStateSchema = z.object({
   filmLookId: z.string().min(1).nullable(),

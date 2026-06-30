@@ -4,8 +4,8 @@ import { dirname, resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { buildFilmLookAppliedAdjustmentPatch } from '../../../src/utils/filmLookBrowser.ts';
-import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/filmLookRegistry.ts';
+import { buildFilmLookAppliedAdjustmentPatch } from '../../../src/utils/film-look/filmLookBrowser.ts';
+import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/film-look/filmLookRegistry.ts';
 
 const manifestPath = resolve('fixtures/film-simulation/film-look-measured-fixture-manifest.json');
 const outputPath = resolve('fixtures/film-simulation/film-look-measured-fixture-outputs.json');

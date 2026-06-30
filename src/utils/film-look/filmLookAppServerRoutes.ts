@@ -4,7 +4,7 @@ import {
   filmLookAppServerCommandSchema,
   filmLookAppServerPatchResultSchema,
   filmLookAppServerRouteManifestSchema,
-} from '../schemas/filmLookAppServerSchemas';
+} from '../../schemas/filmLookAppServerSchemas';
 import {
   FilmLookAppServerCommandName,
   FilmLookAppServerRouteStatus,
@@ -47,7 +47,7 @@ export const buildFilmLookAppServerPatchResult = (command: FilmLookAppServerComm
     presetDraft: buildFilmLookPresetDraft(look, parsedCommand.strength),
     proof: {
       deterministic: true,
-      generatedFrom: 'src/utils/filmLookBrowser.ts',
+      generatedFrom: 'src/utils/film-look/filmLookBrowser.ts',
     },
     strength: parsedCommand.strength,
   });

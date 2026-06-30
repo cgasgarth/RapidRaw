@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 
 import { sampleFilmLookCatalogV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/filmLookRegistry.ts';
+import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/film-look/filmLookRegistry.ts';
 
 const prohibitedClaimPattern =
   /\b(?:adobe|capture one|dehancer|exact|identical|lightroom|mastin|manufacturer[ -]?approved|negative lab pro|nlp|official|rni|vsco)\b/iu;

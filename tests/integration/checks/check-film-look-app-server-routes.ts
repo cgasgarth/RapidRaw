@@ -1,17 +1,17 @@
 #!/usr/bin/env bun
 
 import { z } from 'zod';
-import { FilmLookAppServerCommandName } from '../../../src/utils/filmLookAppServerRouteIds.ts';
+import { FilmLookAppServerCommandName } from '../../../src/utils/film-look/filmLookAppServerRouteIds.ts';
 import {
   buildFilmLookAppServerPatchResult,
   FILM_LOOK_APP_SERVER_ROUTE_MANIFEST,
-} from '../../../src/utils/filmLookAppServerRoutes.ts';
+} from '../../../src/utils/film-look/filmLookAppServerRoutes.ts';
 import {
   buildFilmLookAppliedAdjustmentPatch,
   buildFilmLookPresetDraft,
   getFilmLookControlledAdjustmentKeys,
-} from '../../../src/utils/filmLookBrowser.ts';
-import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/filmLookRegistry.ts';
+} from '../../../src/utils/film-look/filmLookBrowser.ts';
+import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/film-look/filmLookRegistry.ts';
 
 const expectedCommandName = FilmLookAppServerCommandName.BuildAdjustmentPatch;
 const runtimeCheckScripts = ['check:film-look-render-apply-proof', 'check:film-look-preview-export-parity'];
@@ -38,7 +38,7 @@ const resultSchema = z.object({
   }),
   proof: z.object({
     deterministic: z.literal(true),
-    generatedFrom: z.literal('src/utils/filmLookBrowser.ts'),
+    generatedFrom: z.literal('src/utils/film-look/filmLookBrowser.ts'),
   }),
   strength: z.literal(100),
 });

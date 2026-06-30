@@ -4,8 +4,8 @@ import { dirname, resolve } from 'node:path';
 
 import { z } from 'zod';
 import { proofContractSchema } from '../../../src/schemas/proofLevelSemanticsSchemas.ts';
-import { buildFilmLookAppliedAdjustmentPatch } from '../../../src/utils/filmLookBrowser.ts';
-import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/filmLookRegistry.ts';
+import { buildFilmLookAppliedAdjustmentPatch } from '../../../src/utils/film-look/filmLookBrowser.ts';
+import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/film-look/filmLookRegistry.ts';
 
 const MANIFEST_PATH = resolve('fixtures/film-simulation/film-look-preview-export-parity.json');
 const updateFixture = process.argv.includes('--update');
