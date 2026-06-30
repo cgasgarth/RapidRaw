@@ -328,6 +328,7 @@ async function validateRenderedReviewStates(baseTranscript: AgentChatTranscript)
       ),
     },
     reviewHandoff: agentChatTranscriptFixture.reviewHandoff,
+    selectedImagePreviewLoopReview: agentChatTranscriptFixture.selectedImagePreviewLoopReview,
   });
   const review = await renderShell(reviewTranscript);
 
@@ -367,6 +368,137 @@ async function validateRenderedReviewStates(baseTranscript: AgentChatTranscript)
     rollbackRestore.click();
   });
   assertData(handoff, 'rollbackRestoreState', 'restored', 'rollback restore action did not update rendered state.');
+
+  const selectedLoop = getByTestId(
+    review.container,
+    'agent-selected-image-preview-loop-review',
+    'selected-image preview-loop review did not render.',
+  );
+  assertData(
+    selectedLoop,
+    'toolName',
+    'rawengine.agent.selected_image.preview_loop',
+    'selected-image preview-loop tool name was not exposed.',
+  );
+  assertData(selectedLoop, 'reviewStatus', 'needs_user_review', 'selected-image review status was not rendered.');
+  assertData(selectedLoop, 'previewLineageCount', '2', 'selected-image preview lineage count was not rendered.');
+  assertData(selectedLoop, 'applyReceiptCount', '2', 'selected-image apply receipt count was not rendered.');
+  assertData(selectedLoop, 'auditEventCount', '5', 'selected-image audit event count was not rendered.');
+  assertData(
+    selectedLoop,
+    'beforeArtifactId',
+    'artifact_agent_selected_loop_before_3162',
+    'selected-image before artifact id was not exposed.',
+  );
+  assertData(
+    selectedLoop,
+    'currentArtifactId',
+    'artifact_agent_selected_loop_current_3162',
+    'selected-image current artifact id was not exposed.',
+  );
+  assertData(selectedLoop, 'initialGraphRevision', 'history_0', 'selected-image initial graph was not exposed.');
+  assertData(selectedLoop, 'finalGraphRevision', 'history_2', 'selected-image final graph was not exposed.');
+  assertData(
+    selectedLoop,
+    'rollbackReceiptGraphRevision',
+    'history_0',
+    'selected-image rollback receipt was not exposed.',
+  );
+  if (!selectedLoop.dataset.blockers?.includes('private_raw_proof_unavailable')) {
+    failures.push('selected-image private RAW proof blocker was not rendered.');
+  }
+
+  const before = getByTestId(
+    review.container,
+    'agent-selected-image-preview-loop-before',
+    'selected-image before artifact card did not render.',
+  );
+  assertData(
+    before,
+    'artifactId',
+    'artifact_agent_selected_loop_before_3162',
+    'selected-image before artifact card was not bound.',
+  );
+  const current = getByTestId(
+    review.container,
+    'agent-selected-image-preview-loop-current',
+    'selected-image current artifact card did not render.',
+  );
+  assertData(
+    current,
+    'artifactId',
+    'artifact_agent_selected_loop_current_3162',
+    'selected-image current artifact card was not bound.',
+  );
+
+  const selectedLoopLineage = review.container.querySelectorAll(
+    '[data-testid="agent-selected-image-preview-loop-lineage-entry"]',
+  );
+  if (selectedLoopLineage.length !== 2) {
+    failures.push(`expected two selected-image preview lineage entries, got ${selectedLoopLineage.length}.`);
+  }
+  const selectedLoopPurposes = Array.from(selectedLoopLineage).map((entry) => (entry as HTMLElement).dataset.purpose);
+  if (selectedLoopPurposes.join(',') !== 'refresh,detail_review') {
+    failures.push(`selected-image preview lineage order was wrong: ${selectedLoopPurposes.join(',')}.`);
+  }
+
+  const selectedLoopControls = getByTestId(
+    review.container,
+    'agent-selected-image-preview-loop-controls',
+    'selected-image preview-loop controls did not render.',
+  );
+  assertData(
+    selectedLoopControls,
+    'disabledReason',
+    'private_raw_proof_unavailable',
+    'selected-image disabled/error reason was not exposed.',
+  );
+  const acceptApply = getByTestId<HTMLButtonElement>(
+    review.container,
+    'agent-selected-image-preview-loop-accept-apply',
+    'selected-image accept apply control did not render.',
+  );
+  assertData(
+    acceptApply,
+    'dispatchPath',
+    'rawengine.agent.selected_image.preview_loop',
+    'selected-image accept apply did not bind to typed command dispatch.',
+  );
+  const revise = getByTestId<HTMLButtonElement>(
+    review.container,
+    'agent-selected-image-preview-loop-revise',
+    'selected-image revise control did not render.',
+  );
+  assertData(
+    revise,
+    'dispatchPath',
+    'rawengine.agent.selected_image.preview_loop',
+    'selected-image revise control did not bind to typed command dispatch.',
+  );
+  if (!revise.dataset.feedback?.includes('Foreground still needs separation')) {
+    failures.push('selected-image revise feedback turn was not rendered.');
+  }
+  const selectedRollback = getByTestId<HTMLButtonElement>(
+    review.container,
+    'agent-selected-image-preview-loop-rollback',
+    'selected-image rollback control did not render.',
+  );
+  assertData(
+    selectedRollback,
+    'dispatchPath',
+    'rawengine.agent.history.rollback',
+    'selected-image rollback did not bind to typed rollback dispatch.',
+  );
+  getByTestId(
+    review.container,
+    'agent-selected-image-preview-loop-audit-summary',
+    'selected-image audit summary did not render.',
+  );
+  getByTestId(
+    review.container,
+    'agent-selected-image-preview-loop-rollback-receipt',
+    'selected-image rollback receipt did not render.',
+  );
 
   review.unmount();
 }
