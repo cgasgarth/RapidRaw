@@ -31,6 +31,7 @@ import {
 const LIVE_AGENT_AUDIT_STORE_KEY = 'rawengine.agent.liveSessionAudit.v1';
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3164.ARW';
 const prompt = 'Brighten the RAW, inspect a medium preview, then refine shadows and detail.';
+const embeddedPreviewDataUrl = `data:image/jpeg;base64,${'A'.repeat(256)}`;
 const failures: string[] = [];
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -121,7 +122,7 @@ function seedEditorStore() {
   useEditorStore.getState().setEditor({
     adjustments: INITIAL_ADJUSTMENTS,
     brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
-    finalPreviewUrl: 'blob:rawengine-agent-live-shell-before',
+    finalPreviewUrl: null,
     hasRenderedFirstFrame: true,
     histogram: {
       [ActiveChannel.Blue]: { color: '#4D96FF', data: bins },
@@ -139,7 +140,7 @@ function seedEditorStore() {
       isReady: true,
       originalUrl: 'blob:rawengine-original-live-shell',
       path: selectedPath,
-      thumbnailUrl: 'blob:rawengine-thumb-live-shell',
+      thumbnailUrl: embeddedPreviewDataUrl,
       width: 6000,
     },
     uncroppedAdjustedPreviewUrl: null,
@@ -165,6 +166,20 @@ async function validateRenderedShellBehavior(
   );
   assertVisibleText(rendered.container, 'Runtime apply proof', 'runtime status label was not visible.');
   assertVisibleText(rendered.container, context.preview.artifactId, 'initial preview artifact id was not visible.');
+  assertVisibleText(
+    rendered.container,
+    `JPEG ${context.modelInput.initialPreview.width}x${context.modelInput.initialPreview.height} preview`,
+    'initial preview dimensions were not visible.',
+  );
+  assertVisibleText(
+    rendered.container,
+    `${context.preview.longEdgePx}px long edge`,
+    'initial preview long-edge summary was not visible.',
+  );
+  if (rendered.container.querySelector('[data-testid="agent-initial-prompt-preview-context"] img') === null) {
+    failures.push('initial preview thumbnail was not rendered.');
+  }
+  assertNoBase64PreviewPayload(rendered.container);
   assertVisibleText(
     rendered.container,
     'Ready to plan a local app-server edit',
@@ -600,6 +615,26 @@ function assertData(element: HTMLElement, key: string, expected: string, message
 
 function assertVisibleText(container: Element, text: string, message: string) {
   if (!normalizeText(container.textContent).includes(text)) failures.push(message);
+}
+
+function assertNoBase64PreviewPayload(container: Element) {
+  const visibleText = normalizeText(container.textContent);
+  if (visibleText.includes('data:image/jpeg;base64,')) {
+    failures.push('rendered agent preview exposed a raw JPEG data URL in visible text.');
+  }
+
+  const accessibleValues = Array.from(
+    container.querySelectorAll<HTMLElement>('[aria-label],[aria-labelledby],[aria-describedby],[title],[alt]'),
+  ).flatMap((element) => [
+    element.getAttribute('aria-label'),
+    element.getAttribute('aria-labelledby'),
+    element.getAttribute('aria-describedby'),
+    element.getAttribute('title'),
+    element.getAttribute('alt'),
+  ]);
+  if (accessibleValues.some((value) => (value ?? '').includes('data:image/jpeg;base64,'))) {
+    failures.push('rendered agent preview exposed a raw JPEG data URL in accessibility-visible content.');
+  }
 }
 
 function normalizeText(value: string | null | undefined) {
