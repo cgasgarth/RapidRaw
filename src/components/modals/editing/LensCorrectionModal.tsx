@@ -18,18 +18,18 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
-import { useModalTransition } from '../../hooks/ui/useModalTransition';
-import { usePreviewViewport } from '../../hooks/viewport/usePreviewViewport';
-import { Invokes } from '../../tauri/commands';
-import { TextColors, TextVariants } from '../../types/typography';
-import type { Adjustments } from '../../utils/adjustments';
-import { throttle } from '../../utils/timing';
-import type { SelectedImage } from '../ui/AppProperties';
-import Button from '../ui/Button';
-import Dropdown from '../ui/Dropdown';
-import Slider from '../ui/Slider';
-import Switch from '../ui/Switch';
-import UiText from '../ui/Text';
+import { useModalTransition } from '../../../hooks/ui/useModalTransition';
+import { usePreviewViewport } from '../../../hooks/viewport/usePreviewViewport';
+import { Invokes } from '../../../tauri/commands';
+import { TextColors, TextVariants } from '../../../types/typography';
+import type { Adjustments } from '../../../utils/adjustments';
+import { throttle } from '../../../utils/timing';
+import type { SelectedImage } from '../../ui/AppProperties';
+import Button from '../../ui/Button';
+import Dropdown from '../../ui/Dropdown';
+import Slider from '../../ui/Slider';
+import Switch from '../../ui/Switch';
+import UiText from '../../ui/Text';
 
 interface GeometryParams {
   distortion: number;

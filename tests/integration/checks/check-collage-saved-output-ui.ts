@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 import { getDisplayFileName } from '../../../src/utils/displayFilePath.ts';
 
-const source = readFileSync('src/components/modals/CollageModal.tsx', 'utf8');
+const source = readFileSync('src/components/modals/editing/CollageModal.tsx', 'utf8');
 const packageJson = readFileSync('package.json', 'utf8');
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
 

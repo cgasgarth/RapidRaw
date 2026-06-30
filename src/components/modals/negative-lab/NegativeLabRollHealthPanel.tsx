@@ -7,21 +7,21 @@ import type {
   NegativeLabFrameCropStatus,
   NegativeLabFrameHealthEntry,
   NegativeLabFrameHealthReport,
-} from '../../schemas/negativeLabFrameHealthSchemas';
-import type { NegativeLabFrameRgbBalanceOffset } from '../../schemas/negativeLabFrameRgbBalanceOverrideSchemas';
-import type { NegativeLabPresetParams } from '../../schemas/negativeLabPresetCatalogSchemas';
-import type { NegativeLabRollNormalizationPlan } from '../../schemas/negativeLabRollNormalizationSchemas';
-import { TextVariants } from '../../types/typography';
-import { snapNegativeLabFrameExposureOffset } from '../../utils/negativeLabFrameExposureOverrides';
+} from '../../../schemas/negativeLabFrameHealthSchemas';
+import type { NegativeLabFrameRgbBalanceOffset } from '../../../schemas/negativeLabFrameRgbBalanceOverrideSchemas';
+import type { NegativeLabPresetParams } from '../../../schemas/negativeLabPresetCatalogSchemas';
+import type { NegativeLabRollNormalizationPlan } from '../../../schemas/negativeLabRollNormalizationSchemas';
+import { TextVariants } from '../../../types/typography';
+import { snapNegativeLabFrameExposureOffset } from '../../../utils/negativeLabFrameExposureOverrides';
 import {
   negativeLabFrameRgbBalanceOffsetIsZero,
   snapNegativeLabFrameRgbBalanceOffsets,
-} from '../../utils/negativeLabFrameRgbBalanceOverrides';
+} from '../../../utils/negativeLabFrameRgbBalanceOverrides';
 import type {
   NegativeLabRollNormalizationApplyReceipt,
   NegativeLabRollNormalizationRestoreReceipt,
-} from '../../utils/negativeLabRollNormalizationApply';
-import UiText from '../ui/Text';
+} from '../../../utils/negativeLabRollNormalizationApply';
+import UiText from '../../ui/Text';
 import {
   ACQUISITION_SOURCE_FAMILY_LABEL_KEYS,
   ACQUISITION_WARNING_LABEL_KEYS,

@@ -54,11 +54,14 @@ const proof = negativeLabWorkspaceProofSchema.parse({
   schemaVersion: NEGATIVE_LAB_WORKSPACE_SCHEMA_VERSION,
   targetCount: targetPaths.length,
 });
-const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
-const patchSamplerPanelSource = readFileSync('src/components/modals/NegativeLabPatchSamplerPanel.tsx', 'utf8');
-const qcProofPanelSource = readFileSync('src/components/modals/NegativeLabQcProofPanel.tsx', 'utf8');
-const rollHealthPanelSource = readFileSync('src/components/modals/NegativeLabRollHealthPanel.tsx', 'utf8');
-const rollHealthModelSource = readFileSync('src/components/modals/NegativeLabRollHealthModel.ts', 'utf8');
+const modalSource = readFileSync('src/components/modals/negative-lab/NegativeConversionModal.tsx', 'utf8');
+const patchSamplerPanelSource = readFileSync(
+  'src/components/modals/negative-lab/NegativeLabPatchSamplerPanel.tsx',
+  'utf8',
+);
+const qcProofPanelSource = readFileSync('src/components/modals/negative-lab/NegativeLabQcProofPanel.tsx', 'utf8');
+const rollHealthPanelSource = readFileSync('src/components/modals/negative-lab/NegativeLabRollHealthPanel.tsx', 'utf8');
+const rollHealthModelSource = readFileSync('src/components/modals/negative-lab/NegativeLabRollHealthModel.ts', 'utf8');
 const workspaceUiSource = `${modalSource}\n${patchSamplerPanelSource}\n${qcProofPanelSource}\n${rollHealthPanelSource}\n${rollHealthModelSource}`;
 const firstReviewFrame = mixedReviewReport.frames.find((frame) =>
   frame.candidates.some((candidate) => candidate.kind === 'dust_spot'),

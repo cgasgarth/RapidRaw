@@ -1,12 +1,13 @@
 import { type ChangeEvent, type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useManagedFocus } from '../../hooks/ui/useManagedFocus';
-import { useModalTransition } from '../../hooks/ui/useModalTransition';
-import { TextVariants } from '../../types/typography';
-import UiText from '../ui/Text';
+import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
+import { useModalTransition } from '../../../hooks/ui/useModalTransition';
+import { TextVariants } from '../../../types/typography';
+import UiText from '../../ui/Text';
 
-interface FolderModalProps {
+interface RenameFolderModalProps {
+  currentName: string;
   isOpen: boolean;
   onClose: () => void;
   onSave: (name: string) => void;
@@ -15,39 +16,47 @@ interface FolderModalProps {
   buttonText?: string;
 }
 
-export default function CreateFolderModal({
+export default function RenameFolderModal({
+  currentName,
   isOpen,
   onClose,
   onSave,
   title,
   placeholder,
   buttonText,
-}: FolderModalProps) {
+}: RenameFolderModalProps) {
   const { t } = useTranslation();
   const [name, setName] = useState('');
   const { isMounted, show } = useModalTransition(isOpen);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  useManagedFocus(nameInputRef, show);
+  useManagedFocus(nameInputRef, show, { selectText: true });
 
   useEffect(() => {
-    if (!isOpen) {
-      const timer = setTimeout(() => {
-        setName('');
-      }, 300);
+    if (isOpen) {
+      const timer = window.setTimeout(() => {
+        setName(currentName || '');
+      }, 0);
       return () => {
-        clearTimeout(timer);
+        window.clearTimeout(timer);
       };
     }
-    return undefined;
-  }, [isOpen]);
+
+    const timer = window.setTimeout(() => {
+      setName('');
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [isOpen, currentName]);
 
   const handleSave = useCallback(() => {
-    if (name.trim()) {
+    if (name.trim() && name.trim() !== currentName) {
       onSave(name.trim());
+    } else {
+      onClose();
     }
-    onClose();
-  }, [name, onSave, onClose]);
+  }, [name, currentName, onSave, onClose]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
@@ -89,7 +98,7 @@ export default function CreateFolderModal({
         role="dialog"
       >
         <UiText variant={TextVariants.title} className="mb-4">
-          {title || t('modals.createFolder.title')}
+          {title || t('modals.renameFolder.title')}
         </UiText>
         <input
           className="w-full bg-bg-primary text-text-primary border border-border rounded-md px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-accent"
@@ -97,7 +106,10 @@ export default function CreateFolderModal({
             setName(e.target.value);
           }}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder || t('modals.createFolder.placeholder')}
+          onFocus={(e) => {
+            e.target.select();
+          }}
+          placeholder={placeholder || t('modals.renameFolder.placeholder')}
           ref={nameInputRef}
           type="text"
           value={name}
@@ -107,14 +119,14 @@ export default function CreateFolderModal({
             className="px-4 py-2 rounded-md text-text-secondary hover:bg-surface transition-colors"
             onClick={onClose}
           >
-            {t('modals.createFolder.cancel')}
+            {t('modals.renameFolder.cancel')}
           </button>
           <button
             className="px-4 py-2 rounded-md bg-accent text-button-text font-semibold hover:bg-accent-hover disabled:bg-gray-500 disabled:text-white disabled:cursor-not-allowed transition-colors"
-            disabled={!name.trim()}
+            disabled={!name.trim() || name.trim() === currentName}
             onClick={handleSave}
           >
-            {buttonText || t('modals.createFolder.create')}
+            {buttonText || t('modals.renameFolder.save')}
           </button>
         </div>
       </div>

@@ -71,7 +71,7 @@ if (channelDelta(baseline, reset) !== 0) {
   throw new Error('Negative Lab endpoint reset did not preserve default CPU conversion identity.');
 }
 
-const modalSource = await readFile('src/components/modals/NegativeConversionModal.tsx', 'utf8');
+const modalSource = await readFile('src/components/modals/negative-lab/NegativeConversionModal.tsx', 'utf8');
 for (const marker of [
   'negative-lab-black-point-control',
   'negative-lab-white-point-control',

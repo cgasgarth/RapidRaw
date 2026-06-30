@@ -5,8 +5,8 @@ import { readFileSync } from 'node:fs';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../../src/schemas/hdrMergeUiSchemas.ts';
 import { buildHdrEditableHandoffSummary } from '../../../src/utils/hdrEditableHandoff.ts';
 
-const mergeStatusSource = readFileSync('src/components/modals/MergeStatusViews.tsx', 'utf8');
-const hdrModalSource = readFileSync('src/components/modals/HdrModal.tsx', 'utf8');
+const mergeStatusSource = readFileSync('src/components/modals/computational-merge/MergeStatusViews.tsx', 'utf8');
+const hdrModalSource = readFileSync('src/components/modals/computational-merge/HdrModal.tsx', 'utf8');
 const appModalsSource = readFileSync('src/components/modals/AppModals.tsx', 'utf8');
 const hdrRuntimeSource = readFileSync('src-tauri/src/lib.rs', 'utf8');
 const hdrRuntimePlanSource = readFileSync('packages/rawengine-schema/src/hdrRuntimePlan.ts', 'utf8');

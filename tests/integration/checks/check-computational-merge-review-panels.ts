@@ -3,10 +3,10 @@
 import { readdirSync, readFileSync } from 'node:fs';
 
 const requiredFiles = [
-  'src/components/modals/ComputationalMergeReviewPanel.tsx',
-  'src/components/modals/PanoramaModal.tsx',
-  'src/components/modals/FocusStackModal.tsx',
-  'src/components/modals/SuperResolutionModal.tsx',
+  'src/components/modals/computational-merge/ComputationalMergeReviewPanel.tsx',
+  'src/components/modals/computational-merge/PanoramaModal.tsx',
+  'src/components/modals/computational-merge/FocusStackModal.tsx',
+  'src/components/modals/computational-merge/SuperResolutionModal.tsx',
 ];
 
 const failures: string[] = [];
@@ -33,7 +33,7 @@ for (const file of readdirSync('src/i18n/locales').filter((name) => name.endsWit
   }
 }
 
-const panelSource = readFileSync('src/components/modals/ComputationalMergeReviewPanel.tsx', 'utf8');
+const panelSource = readFileSync('src/components/modals/computational-merge/ComputationalMergeReviewPanel.tsx', 'utf8');
 for (const marker of ['ready', 'review', 'pending']) {
   if (!panelSource.includes(marker)) {
     failures.push(`review panel must render ${marker} status.`);

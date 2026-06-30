@@ -49,7 +49,7 @@ for (const invalidSuggestion of [
   }
 }
 
-const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
+const modalSource = readFileSync('src/components/modals/negative-lab/NegativeConversionModal.tsx', 'utf8');
 const visualSource = readFileSync('src/validation/visual/main.tsx', 'utf8');
 const rustSource = readFileSync('src-tauri/src/negative_conversion.rs', 'utf8');
 

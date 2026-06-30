@@ -36,7 +36,7 @@ if (rejected.reviewDecision !== 'rejected') throw new Error('Expected rejected d
 if (rejected.warningSeverity !== 'blocked') throw new Error('Expected blocked diagnostics severity.');
 if (rejected.deghost.status !== 'review') throw new Error('Expected deghost review status.');
 
-const modalSource = readFileSync('src/components/modals/HdrModal.tsx', 'utf8');
+const modalSource = readFileSync('src/components/modals/computational-merge/HdrModal.tsx', 'utf8');
 for (const marker of [
   'hdr-review-diagnostics-panel',
   'hdr-review-diagnostic-row',

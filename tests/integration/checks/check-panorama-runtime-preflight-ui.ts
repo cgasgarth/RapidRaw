@@ -59,7 +59,7 @@ for (const marker of [
   }
 }
 
-const modalSource = readFileSync('src/components/modals/PanoramaModal.tsx', 'utf8');
+const modalSource = readFileSync('src/components/modals/computational-merge/PanoramaModal.tsx', 'utf8');
 for (const marker of [
   'runtimePlan: PanoramaRuntimePlan | null',
   'panorama-runtime-plan-summary',

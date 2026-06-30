@@ -24,23 +24,23 @@ import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutpu
 import { handleNegativeConversionEditorHandoff } from '../../utils/negativeLabEditorHandoff';
 import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
 import type { AlbumItem, AppSettings } from '../ui/AppProperties';
-import CollageModal from './CollageModal';
-import CommandPaletteModal from './CommandPaletteModal';
-import ConfirmModal from './ConfirmModal';
-import CopyPasteSettingsModal from './CopyPasteSettingsModal';
-import CreateFolderModal from './CreateFolderModal';
-import CullingModal from './CullingModal';
-import DenoiseModal from './DenoiseModal';
-import FocusStackModal from './FocusStackModal';
-import HdrModal from './HdrModal';
-import ImportSettingsModal from './ImportSettingsModal';
-import PanoramaModal from './PanoramaModal';
-import RenameFileModal from './RenameFileModal';
-import RenameFolderModal from './RenameFolderModal';
-import SuperResolutionModal from './SuperResolutionModal';
+import FocusStackModal from './computational-merge/FocusStackModal';
+import HdrModal from './computational-merge/HdrModal';
+import PanoramaModal from './computational-merge/PanoramaModal';
+import SuperResolutionModal from './computational-merge/SuperResolutionModal';
+import CollageModal from './editing/CollageModal';
+import CullingModal from './editing/CullingModal';
+import DenoiseModal from './editing/DenoiseModal';
+import CreateFolderModal from './library/CreateFolderModal';
+import RenameFileModal from './library/RenameFileModal';
+import RenameFolderModal from './library/RenameFolderModal';
+import CommandPaletteModal from './navigation/CommandPaletteModal';
+import ConfirmModal from './navigation/ConfirmModal';
+import CopyPasteSettingsModal from './navigation/CopyPasteSettingsModal';
+import ImportSettingsModal from './navigation/ImportSettingsModal';
 
 const NegativeConversionModal = lazy(() =>
-  import('./NegativeConversionModal.js').then((module) => ({ default: module.NegativeConversionModal })),
+  import('./negative-lab/NegativeConversionModal.js').then((module) => ({ default: module.NegativeConversionModal })),
 );
 
 interface DeleteOptions {

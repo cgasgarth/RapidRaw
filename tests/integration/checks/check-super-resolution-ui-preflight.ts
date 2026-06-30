@@ -32,7 +32,7 @@ if (missingKeys.length > 0) {
   process.exit(1);
 }
 
-const source = readFileSync('src/components/modals/SuperResolutionModal.tsx', 'utf8');
+const source = readFileSync('src/components/modals/computational-merge/SuperResolutionModal.tsx', 'utf8');
 for (const marker of [
   'modals.superResolution.qualityLabel',
   'settings.qualityPreference',

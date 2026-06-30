@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import type {
   HdrBracketDetectionMethodV1,
   HdrBracketSourceMetadataV1,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { useModalTransition } from '../../hooks/ui/useModalTransition';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import {
   applyHdrToneMappingPreset,
   HDR_TONE_MAPPING_PRESETS,
@@ -16,16 +16,16 @@ import {
   type HdrMergeStrategy,
   type HdrMergeUiSettings,
   type HdrToneMappingPreset,
-} from '../../schemas/hdrMergeUiSchemas';
-import { type HdrModalState, useUIStore } from '../../store/useUIStore';
-import { TextColors, TextVariants } from '../../types/typography';
-import { buildHdrDerivedOutputReceipt, deriveDerivedOutputReceiptState } from '../../utils/derivedOutputReceipt';
-import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
-import { buildHdrEditableHandoffSummary } from '../../utils/hdrEditableHandoff';
-import { buildHdrReviewDiagnostics } from '../../utils/hdrReviewDiagnostics';
-import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerBadge';
-import Dropdown, { type OptionItem } from '../ui/Dropdown';
-import UiText from '../ui/Text';
+} from '../../../schemas/hdrMergeUiSchemas';
+import { type HdrModalState, useUIStore } from '../../../store/useUIStore';
+import { TextColors, TextVariants } from '../../../types/typography';
+import { buildHdrDerivedOutputReceipt, deriveDerivedOutputReceiptState } from '../../../utils/derivedOutputReceipt';
+import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../../utils/hdrBracketPreflight';
+import { buildHdrEditableHandoffSummary } from '../../../utils/hdrEditableHandoff';
+import { buildHdrReviewDiagnostics } from '../../../utils/hdrReviewDiagnostics';
+import ComputationalMergeAppServerBadge from '../../ui/ComputationalMergeAppServerBadge';
+import Dropdown, { type OptionItem } from '../../ui/Dropdown';
+import UiText from '../../ui/Text';
 import DerivedOutputReceiptPanel from './DerivedOutputReceiptPanel';
 import { MergeErrorState, MergeFooterActions, MergeProcessingState, MergeResultPreview } from './MergeStatusViews';
 

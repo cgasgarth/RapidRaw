@@ -1,7 +1,7 @@
 import { Info, Layers, ShieldCheck, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useModalTransition } from '../../hooks/ui/useModalTransition';
+import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import type {
   PanoramaRenderedReview,
   PanoramaRuntimePlan,
@@ -12,14 +12,17 @@ import type {
   PanoramaUiProjection,
   PanoramaUiQualityPreference,
   PanoramaUiSettings,
-} from '../../schemas/panoramaUiSchemas';
-import { type PanoramaModalState, useUIStore } from '../../store/useUIStore';
-import { TextColors, TextVariants } from '../../types/typography';
-import { buildPanoramaDerivedOutputReceipt, deriveDerivedOutputReceiptState } from '../../utils/derivedOutputReceipt';
-import { buildPanoramaSavedReviewSummary } from '../../utils/panoramaSavedReview';
-import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerBadge';
-import Dropdown, { type OptionItem } from '../ui/Dropdown';
-import UiText from '../ui/Text';
+} from '../../../schemas/panoramaUiSchemas';
+import { type PanoramaModalState, useUIStore } from '../../../store/useUIStore';
+import { TextColors, TextVariants } from '../../../types/typography';
+import {
+  buildPanoramaDerivedOutputReceipt,
+  deriveDerivedOutputReceiptState,
+} from '../../../utils/derivedOutputReceipt';
+import { buildPanoramaSavedReviewSummary } from '../../../utils/panoramaSavedReview';
+import ComputationalMergeAppServerBadge from '../../ui/ComputationalMergeAppServerBadge';
+import Dropdown, { type OptionItem } from '../../ui/Dropdown';
+import UiText from '../../ui/Text';
 import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
 import DerivedOutputReceiptPanel from './DerivedOutputReceiptPanel';
 import { MergeErrorState, MergeFooterActions, MergeProcessingState, MergeResultPreview } from './MergeStatusViews';

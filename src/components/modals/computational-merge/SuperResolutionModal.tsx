@@ -2,30 +2,30 @@ import { motion } from 'framer-motion';
 import { AlertTriangle, CheckCircle2, Layers3, ScanSearch, ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { SuperResolutionOutputReviewWorkflow } from '../../schemas/superResolutionOutputReviewSchemas';
+import type { SuperResolutionOutputReviewWorkflow } from '../../../schemas/superResolutionOutputReviewSchemas';
 import type {
   SuperResolutionAlignmentMode,
   SuperResolutionMode,
   SuperResolutionQualityPreference,
   SuperResolutionReconstructionMode,
   SuperResolutionUiSettings,
-} from '../../schemas/superResolutionUiSchemas';
+} from '../../../schemas/superResolutionUiSchemas';
 import {
   getSuperResolutionDetailPolicyForMode,
   getSuperResolutionModeForDetailPolicy,
-} from '../../schemas/superResolutionUiSchemas';
-import { type SuperResolutionModalState, useUIStore } from '../../store/useUIStore';
-import { TextColors, TextVariants } from '../../types/typography';
+} from '../../../schemas/superResolutionUiSchemas';
+import { type SuperResolutionModalState, useUIStore } from '../../../store/useUIStore';
+import { TextColors, TextVariants } from '../../../types/typography';
 import {
   buildSuperResolutionDerivedOutputReceipt,
   deriveDerivedOutputReceiptState,
-} from '../../utils/derivedOutputReceipt';
-import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
-import type { SuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
-import { buildSuperResolutionSourcePreflight } from '../../utils/superResolutionSourcePreflight';
-import Button from '../ui/Button';
-import Dropdown, { type OptionItem } from '../ui/Dropdown';
-import UiText from '../ui/Text';
+} from '../../../utils/derivedOutputReceipt';
+import { buildSuperResolutionOutputReviewWorkflow } from '../../../utils/superResolutionOutputReview';
+import type { SuperResolutionSourcePreflightMetadata } from '../../../utils/superResolutionSourcePreflight';
+import { buildSuperResolutionSourcePreflight } from '../../../utils/superResolutionSourcePreflight';
+import Button from '../../ui/Button';
+import Dropdown, { type OptionItem } from '../../ui/Dropdown';
+import UiText from '../../ui/Text';
 import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
 import {
   ComputationalSetupModalShell,

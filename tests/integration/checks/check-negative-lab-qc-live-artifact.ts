@@ -96,8 +96,8 @@ if (artifact.contactSheet.artifact.contentHash !== repeated.contactSheet.artifac
   throw new Error('Negative Lab live QC artifact hash is not deterministic.');
 }
 
-const modalSource = await Bun.file('src/components/modals/NegativeConversionModal.tsx').text();
-const panelSource = await Bun.file('src/components/modals/NegativeLabQcProofPanel.tsx').text();
+const modalSource = await Bun.file('src/components/modals/negative-lab/NegativeConversionModal.tsx').text();
+const panelSource = await Bun.file('src/components/modals/negative-lab/NegativeLabQcProofPanel.tsx').text();
 const qcSource = `${modalSource}\n${panelSource}`;
 for (const marker of [
   'buildNegativeLabQcContactSheetArtifact',

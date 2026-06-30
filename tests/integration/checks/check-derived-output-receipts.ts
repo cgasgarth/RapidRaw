@@ -396,16 +396,16 @@ const requiredPanelMarkers = [
   'data-testid="derived-output-open-in-editor"',
   'data-testid="derived-output-export-action"',
 ];
-const panelSource = readFileSync('src/components/modals/DerivedOutputReceiptPanel.tsx', 'utf8');
+const panelSource = readFileSync('src/components/modals/computational-merge/DerivedOutputReceiptPanel.tsx', 'utf8');
 for (const marker of requiredPanelMarkers) {
   expect(panelSource.includes(marker), `Derived output receipt panel missing ${marker}.`);
 }
 
 const modalWiring = [
-  ['src/components/modals/HdrModal.tsx', 'buildHdrDerivedOutputReceipt'],
-  ['src/components/modals/PanoramaModal.tsx', 'buildPanoramaDerivedOutputReceipt'],
-  ['src/components/modals/FocusStackModal.tsx', 'buildFocusStackDerivedOutputReceipt'],
-  ['src/components/modals/SuperResolutionModal.tsx', 'buildSuperResolutionDerivedOutputReceipt'],
+  ['src/components/modals/computational-merge/HdrModal.tsx', 'buildHdrDerivedOutputReceipt'],
+  ['src/components/modals/computational-merge/PanoramaModal.tsx', 'buildPanoramaDerivedOutputReceipt'],
+  ['src/components/modals/computational-merge/FocusStackModal.tsx', 'buildFocusStackDerivedOutputReceipt'],
+  ['src/components/modals/computational-merge/SuperResolutionModal.tsx', 'buildSuperResolutionDerivedOutputReceipt'],
 ] as const;
 for (const [file, builder] of modalWiring) {
   const source = readFileSync(file, 'utf8');
@@ -416,19 +416,19 @@ for (const [file, builder] of modalWiring) {
 
 const familyTrayMarkers = [
   [
-    'src/components/modals/HdrModal.tsx',
+    'src/components/modals/computational-merge/HdrModal.tsx',
     ['DerivedOutputReceiptPanel', 'onExportOutput={onOpenFile}', 'validationStatus=', 'warnings='],
   ],
   [
-    'src/components/modals/PanoramaModal.tsx',
+    'src/components/modals/computational-merge/PanoramaModal.tsx',
     ['DerivedOutputReceiptPanel', 'onExportOutput={onOpenFile}', 'validationStatus=', 'warnings='],
   ],
   [
-    'src/components/modals/FocusStackModal.tsx',
+    'src/components/modals/computational-merge/FocusStackModal.tsx',
     ['<ComputationalMergeReviewPanel', 'derivedOutputReceipt={visibleDerivedOutputReceipt}'],
   ],
   [
-    'src/components/modals/SuperResolutionModal.tsx',
+    'src/components/modals/computational-merge/SuperResolutionModal.tsx',
     ['<ComputationalMergeReviewPanel', 'derivedOutputReceipt={visibleDerivedOutputReceipt}'],
   ],
 ] as const;
@@ -439,7 +439,10 @@ for (const [file, markers] of familyTrayMarkers) {
   }
 }
 
-const reviewPanelSource = readFileSync('src/components/modals/ComputationalMergeReviewPanel.tsx', 'utf8');
+const reviewPanelSource = readFileSync(
+  'src/components/modals/computational-merge/ComputationalMergeReviewPanel.tsx',
+  'utf8',
+);
 for (const marker of [
   'validationStatus={validationStatus}',
   'warnings={warnings}',
@@ -449,7 +452,7 @@ for (const marker of [
   expect(reviewPanelSource.includes(marker), `Review panel missing shared tray prop marker: ${marker}.`);
 }
 
-const hdrModalSource = readFileSync('src/components/modals/HdrModal.tsx', 'utf8');
+const hdrModalSource = readFileSync('src/components/modals/computational-merge/HdrModal.tsx', 'utf8');
 for (const marker of [
   'const receipt = buildHdrDerivedOutputReceipt({',
   'upsertDerivedOutputReceipt(receipt);',
@@ -469,7 +472,7 @@ for (const [file, marker] of [
   expect(readFileSync(file, 'utf8').includes(marker), `${file}: missing derived output sidecar marker ${marker}.`);
 }
 
-const panoramaModalSource = readFileSync('src/components/modals/PanoramaModal.tsx', 'utf8');
+const panoramaModalSource = readFileSync('src/components/modals/computational-merge/PanoramaModal.tsx', 'utf8');
 expect(panoramaModalSource.includes('data-source-paths'), 'Panorama saved review must expose source paths.');
 expect(
   panoramaModalSource.includes('data-source-graph-revisions'),
@@ -484,7 +487,7 @@ expect(
   appModalsSource.includes('sourcePaths: focusStackModalState.sourcePaths'),
   'App modal wiring must pass focus source paths into preview receipt builder.',
 );
-const focusModalSource = readFileSync('src/components/modals/FocusStackModal.tsx', 'utf8');
+const focusModalSource = readFileSync('src/components/modals/computational-merge/FocusStackModal.tsx', 'utf8');
 expect(focusModalSource.includes('data-source-paths'), 'Focus stack handoff proof must expose source paths.');
 expect(
   focusModalSource.includes('data-source-graph-revisions'),
@@ -496,7 +499,7 @@ expect(
   'App modal wiring must pass SR source paths into output review and modal receipt builder.',
 );
 
-const srModalSource = readFileSync('src/components/modals/SuperResolutionModal.tsx', 'utf8');
+const srModalSource = readFileSync('src/components/modals/computational-merge/SuperResolutionModal.tsx', 'utf8');
 for (const marker of [
   'data-open-in-editor-path={openInEditorPath}',
   'data-export-handoff-ready={String(exportHandoffReady)}',

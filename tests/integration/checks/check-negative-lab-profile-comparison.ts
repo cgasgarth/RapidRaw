@@ -111,8 +111,8 @@ assert.deepEqual(
   'browsing comparison rows must not mutate graph, frame override, or export state',
 );
 
-const modalSource = await readFile('src/components/modals/NegativeConversionModal.tsx', 'utf8');
-const gridSource = await readFile('src/components/modals/NegativeLabProfileComparisonGrid.tsx', 'utf8');
+const modalSource = await readFile('src/components/modals/negative-lab/NegativeConversionModal.tsx', 'utf8');
+const gridSource = await readFile('src/components/modals/negative-lab/NegativeLabProfileComparisonGrid.tsx', 'utf8');
 const requiredModalMarkers = [
   '<NegativeLabProfileComparisonGrid',
   'onBrowseProfile={setBrowsedComparisonProfileId}',

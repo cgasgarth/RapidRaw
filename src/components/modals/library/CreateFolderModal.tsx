@@ -1,13 +1,12 @@
 import { type ChangeEvent, type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useManagedFocus } from '../../hooks/ui/useManagedFocus';
-import { useModalTransition } from '../../hooks/ui/useModalTransition';
-import { TextVariants } from '../../types/typography';
-import UiText from '../ui/Text';
+import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
+import { useModalTransition } from '../../../hooks/ui/useModalTransition';
+import { TextVariants } from '../../../types/typography';
+import UiText from '../../ui/Text';
 
-interface RenameFolderModalProps {
-  currentName: string;
+interface FolderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (name: string) => void;
@@ -16,47 +15,39 @@ interface RenameFolderModalProps {
   buttonText?: string;
 }
 
-export default function RenameFolderModal({
-  currentName,
+export default function CreateFolderModal({
   isOpen,
   onClose,
   onSave,
   title,
   placeholder,
   buttonText,
-}: RenameFolderModalProps) {
+}: FolderModalProps) {
   const { t } = useTranslation();
   const [name, setName] = useState('');
   const { isMounted, show } = useModalTransition(isOpen);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  useManagedFocus(nameInputRef, show, { selectText: true });
+  useManagedFocus(nameInputRef, show);
 
   useEffect(() => {
-    if (isOpen) {
-      const timer = window.setTimeout(() => {
-        setName(currentName || '');
-      }, 0);
+    if (!isOpen) {
+      const timer = setTimeout(() => {
+        setName('');
+      }, 300);
       return () => {
-        window.clearTimeout(timer);
+        clearTimeout(timer);
       };
     }
-
-    const timer = window.setTimeout(() => {
-      setName('');
-    }, 300);
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [isOpen, currentName]);
+    return undefined;
+  }, [isOpen]);
 
   const handleSave = useCallback(() => {
-    if (name.trim() && name.trim() !== currentName) {
+    if (name.trim()) {
       onSave(name.trim());
-    } else {
-      onClose();
     }
-  }, [name, currentName, onSave, onClose]);
+    onClose();
+  }, [name, onSave, onClose]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
@@ -98,7 +89,7 @@ export default function RenameFolderModal({
         role="dialog"
       >
         <UiText variant={TextVariants.title} className="mb-4">
-          {title || t('modals.renameFolder.title')}
+          {title || t('modals.createFolder.title')}
         </UiText>
         <input
           className="w-full bg-bg-primary text-text-primary border border-border rounded-md px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-accent"
@@ -106,10 +97,7 @@ export default function RenameFolderModal({
             setName(e.target.value);
           }}
           onKeyDown={handleKeyDown}
-          onFocus={(e) => {
-            e.target.select();
-          }}
-          placeholder={placeholder || t('modals.renameFolder.placeholder')}
+          placeholder={placeholder || t('modals.createFolder.placeholder')}
           ref={nameInputRef}
           type="text"
           value={name}
@@ -119,14 +107,14 @@ export default function RenameFolderModal({
             className="px-4 py-2 rounded-md text-text-secondary hover:bg-surface transition-colors"
             onClick={onClose}
           >
-            {t('modals.renameFolder.cancel')}
+            {t('modals.createFolder.cancel')}
           </button>
           <button
             className="px-4 py-2 rounded-md bg-accent text-button-text font-semibold hover:bg-accent-hover disabled:bg-gray-500 disabled:text-white disabled:cursor-not-allowed transition-colors"
-            disabled={!name.trim() || name.trim() === currentName}
+            disabled={!name.trim()}
             onClick={handleSave}
           >
-            {buttonText || t('modals.renameFolder.save')}
+            {buttonText || t('modals.createFolder.create')}
           </button>
         </div>
       </div>

@@ -3,10 +3,10 @@ import type { LucideIcon } from 'lucide-react';
 import { CheckCircle, Loader2, RefreshCw, Save, XCircle } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TextColors, TextVariants } from '../../types/typography';
-import { getDisplayFileName } from '../../utils/displayFilePath';
-import Button from '../ui/Button';
-import UiText from '../ui/Text';
+import { TextColors, TextVariants } from '../../../types/typography';
+import { getDisplayFileName } from '../../../utils/displayFilePath';
+import Button from '../../ui/Button';
+import UiText from '../../ui/Text';
 
 interface MergeErrorStateProps {
   error: string;

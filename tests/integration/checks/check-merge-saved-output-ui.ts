@@ -37,7 +37,7 @@ for (const localePath of localePaths) {
   }
 }
 
-const mergeStatusSource = readFileSync('src/components/modals/MergeStatusViews.tsx', 'utf8');
+const mergeStatusSource = readFileSync('src/components/modals/computational-merge/MergeStatusViews.tsx', 'utf8');
 for (const marker of [
   'getDisplayFileName(savedPath)',
   'data-testid="merge-saved-output-detail"',
@@ -54,8 +54,8 @@ for (const marker of [
   }
 }
 
-const hdrSource = readFileSync('src/components/modals/HdrModal.tsx', 'utf8');
-const panoramaSource = readFileSync('src/components/modals/PanoramaModal.tsx', 'utf8');
+const hdrSource = readFileSync('src/components/modals/computational-merge/HdrModal.tsx', 'utf8');
+const panoramaSource = readFileSync('src/components/modals/computational-merge/PanoramaModal.tsx', 'utf8');
 for (const [label, source, successMarker] of [
   ['HDR', hdrSource, "savedSuccessLabel={t('modals.hdr.savedSuccess')}"],
   ['panorama', panoramaSource, "savedSuccessLabel={t('modals.panorama.savedSuccess')}"],

@@ -3,8 +3,11 @@
 import { readFileSync } from 'node:fs';
 import { $ } from 'bun';
 
-const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
-const patchSamplerPanelSource = readFileSync('src/components/modals/NegativeLabPatchSamplerPanel.tsx', 'utf8');
+const modalSource = readFileSync('src/components/modals/negative-lab/NegativeConversionModal.tsx', 'utf8');
+const patchSamplerPanelSource = readFileSync(
+  'src/components/modals/negative-lab/NegativeLabPatchSamplerPanel.tsx',
+  'utf8',
+);
 const smokeSource = readFileSync('scripts/proofs/capture-visual-smoke.ts', 'utf8');
 const proofSource = readFileSync('scripts/lib/proofs/visual-smoke-proofs.ts', 'utf8');
 const helperSource = readFileSync('src/utils/negativeLabPatchPicker.ts', 'utf8');

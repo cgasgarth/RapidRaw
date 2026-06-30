@@ -13,7 +13,7 @@ import { applyLayerStackCommandBridgeOperation } from '../../../src/utils/layerS
 
 const appModalsSource = readFileSync('src/components/modals/AppModals.tsx', 'utf8');
 const appNavigationSource = readFileSync('src/hooks/app/useAppNavigation.ts', 'utf8');
-const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
+const modalSource = readFileSync('src/components/modals/negative-lab/NegativeConversionModal.tsx', 'utf8');
 const handoffSource = readFileSync('src/utils/negativeLabEditorHandoff.ts', 'utf8');
 const imageLoaderSource = readFileSync('src/hooks/editor/useImageLoader.ts', 'utf8');
 const visualSmokeSource = readFileSync('src/validation/visual/VisualSmokeApp.tsx', 'utf8');
