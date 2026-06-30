@@ -216,6 +216,10 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   user-visible UI or workflow claims. Run the app locally when practical,
   inspect the actual UI, verify it is good-looking, intuitive, and functional,
   and fix or track anything that fails.
+- For Computer Use verification of RapidRAW itself, prefer
+  `bun run install:computer-use` so the tool attaches to the installed
+  optimized `/Applications/RapidRAW.app` bundle instead of the raw `tauri dev`
+  executable.
 - For science/math-heavy image features, iterate rather than claiming maturity
   in one PR: consult first, define the math and rejected alternatives, add
   fixtures/metrics, implement runtime behavior, verify preview/export parity,
