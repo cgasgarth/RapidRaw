@@ -1,0 +1,196 @@
+#!/usr/bin/env bun
+
+import { readdir } from 'node:fs/promises';
+import path from 'node:path';
+
+const MAX_FILES_PER_FOLDER = 10;
+
+const IGNORED_DIRECTORIES = new Set(['.git', '.turbo', 'dist', 'node_modules', 'target']);
+
+type FolderAllowance = {
+  issue: string;
+  reason: string;
+};
+
+const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
+  '.': {
+    issue: '#4227',
+    reason: 'repository root keeps canonical project files until cleanup lands',
+  },
+  '.github/workflows': {
+    issue: '#4237',
+    reason: 'workflow names are branch-protection sensitive',
+  },
+  'docs/api': {
+    issue: '#4236',
+    reason: 'API docs are being audited into grouped contracts',
+  },
+  'docs/color': {
+    issue: '#4232',
+    reason: 'color workflow docs are pending domain grouping',
+  },
+  'docs/negative-lab': {
+    issue: '#4229',
+    reason: 'negative lab docs are pending spec/evidence grouping',
+  },
+  'docs/panorama': {
+    issue: '#4233',
+    reason: 'panorama docs are pending algorithm/validation grouping',
+  },
+  'docs/release': {
+    issue: '#4235',
+    reason: 'release docs are pending process/evidence grouping',
+  },
+  'docs/tooling': {
+    issue: '#4215',
+    reason: 'tooling notes are pending pruning after lint/test migrations',
+  },
+  'docs/validation': {
+    issue: '#4211',
+    reason: 'validation artifacts are pending generated-vs-human review split',
+  },
+  'fixtures/color': {
+    issue: '#4220',
+    reason: 'color fixtures are pending workflow grouping',
+  },
+  'fixtures/detail': {
+    issue: '#4221',
+    reason: 'detail fixtures are pending feature grouping',
+  },
+  'fixtures/masks': {
+    issue: '#4222',
+    reason: 'mask fixtures are pending mask-type grouping',
+  },
+  'fixtures/validation': {
+    issue: '#4223',
+    reason: 'validation fixtures are pending journey grouping',
+  },
+  'packages/rawengine-schema/samples': {
+    issue: '#4212',
+    reason: 'schema samples are pending schema-family grouping',
+  },
+  'packages/rawengine-schema/src': {
+    issue: '#4214',
+    reason: 'schema package source is pending domain grouping',
+  },
+  scripts: {
+    issue: '#4216',
+    reason: 'script entrypoints are pending product-proof vs maintenance split',
+  },
+  'scripts/lib': {
+    issue: '#4217',
+    reason: 'script helpers are pending owner-based grouping',
+  },
+  'src-tauri/icons': {
+    issue: '#4230',
+    reason: 'Tauri icon names may be platform/tooling required',
+  },
+  'src-tauri/icons/ios': {
+    issue: '#4231',
+    reason: 'iOS icon names may be platform/tooling required',
+  },
+  'src-tauri/lensfun_db': {
+    issue: '#4228',
+    reason: 'Lensfun database layout may be vendor/tooling required',
+  },
+  'src-tauri/src': {
+    issue: '#4213',
+    reason: 'Rust modules are pending domain grouping where practical',
+  },
+  'src/components/modals': {
+    issue: '#4224',
+    reason: 'modal components are pending workflow grouping',
+  },
+  'src/components/panel/right': {
+    issue: '#4225',
+    reason: 'right-panel components are pending editor-surface grouping',
+  },
+  'src/components/ui': {
+    issue: '#4226',
+    reason: 'shared UI components are pending primitive/widget split',
+  },
+  'src/hooks': {
+    issue: '#4218',
+    reason: 'hooks are pending product-area grouping',
+  },
+  'src/i18n/locales': {
+    issue: '#4234',
+    reason: 'locale files may intentionally stay flat by locale code',
+  },
+  'src/schemas': {
+    issue: '#4210',
+    reason: 'schemas are pending product-domain grouping',
+  },
+  'src/utils': {
+    issue: '#4209',
+    reason: 'utilities are pending owned-domain split',
+  },
+  'tests/integration/checks': {
+    issue: '#4208',
+    reason: 'integration checks are pending domain/native-runner cleanup',
+  },
+};
+
+type FolderCount = {
+  count: number;
+  folder: string;
+};
+
+const repoRoot = process.cwd();
+const counts: FolderCount[] = [];
+
+async function collectFolderCounts(relativeFolder: string): Promise<void> {
+  const absoluteFolder = path.join(repoRoot, relativeFolder);
+  const entries = await readdir(absoluteFolder, { withFileTypes: true });
+  const fileCount = entries.filter((entry) => entry.isFile()).length;
+  const normalizedFolder = relativeFolder === '' ? '.' : relativeFolder;
+
+  if (fileCount > MAX_FILES_PER_FOLDER) {
+    counts.push({ count: fileCount, folder: normalizedFolder });
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || IGNORED_DIRECTORIES.has(entry.name)) {
+      continue;
+    }
+
+    const childFolder = relativeFolder === '' ? entry.name : `${relativeFolder}/${entry.name}`;
+    if (childFolder === 'src-tauri/target') {
+      continue;
+    }
+
+    await collectFolderCounts(childFolder);
+  }
+}
+
+await collectFolderCounts('');
+
+const oversizedWithoutAllowance = counts
+  .filter(({ folder }) => ALLOWED_LARGE_FOLDERS[folder] === undefined)
+  .sort((left, right) => right.count - left.count || left.folder.localeCompare(right.folder));
+
+const staleAllowances = Object.keys(ALLOWED_LARGE_FOLDERS)
+  .filter((folder) => counts.every((count) => count.folder !== folder))
+  .sort();
+
+if (oversizedWithoutAllowance.length === 0 && staleAllowances.length === 0) {
+  console.log('folder-count ok');
+  process.exit(0);
+}
+
+if (oversizedWithoutAllowance.length > 0) {
+  console.error(`Folders with more than ${MAX_FILES_PER_FOLDER} files need cleanup issue or allowlist:`);
+  for (const { count, folder } of oversizedWithoutAllowance.slice(0, 20)) {
+    console.error(`- ${folder}: ${count} files`);
+  }
+}
+
+if (staleAllowances.length > 0) {
+  console.error('Remove stale folder-count allowlist entries:');
+  for (const folder of staleAllowances.slice(0, 20)) {
+    const allowance = ALLOWED_LARGE_FOLDERS[folder];
+    console.error(`- ${folder}: ${allowance.issue} ${allowance.reason}`);
+  }
+}
+
+process.exit(1);
