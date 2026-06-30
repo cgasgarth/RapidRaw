@@ -7,8 +7,8 @@ import {
   derivedOutputReceiptSchema,
 } from '../schemas/derivedOutputReceiptSchemas';
 
-import type { FocusStackOutputReviewWorkflow } from '../schemas/focusStackOutputReviewSchemas';
-import type { FocusStackUiSettings } from '../schemas/focusStackUiSchemas';
+import type { FocusStackOutputReviewWorkflow } from '../schemas/focus-stack/focusStackOutputReviewSchemas';
+import type { FocusStackUiSettings } from '../schemas/focus-stack/focusStackUiSchemas';
 import type { HdrEditableHandoffSummary, HdrMergeUiSettings } from '../schemas/hdrMergeUiSchemas';
 import type { PanoramaSavedReviewSummary, PanoramaUiSettings } from '../schemas/panoramaUiSchemas';
 import type { SuperResolutionOutputReviewWorkflow } from '../schemas/superResolutionOutputReviewSchemas';

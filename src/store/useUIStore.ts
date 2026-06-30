@@ -3,8 +3,8 @@ import { create } from 'zustand';
 import { RIGHT_PANEL_ORDER } from '../components/panel/right/rightPanelRegistry';
 import { type CullingSuggestions, type ImageFile, Panel, type UiVisibility } from '../components/ui/AppProperties';
 import type { DerivedOutputReceipt } from '../schemas/derivedOutputReceiptSchemas';
-import type { FocusStackOutputReviewWorkflow } from '../schemas/focusStackOutputReviewSchemas';
-import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../schemas/focusStackUiSchemas';
+import type { FocusStackOutputReviewWorkflow } from '../schemas/focus-stack/focusStackOutputReviewSchemas';
+import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../schemas/focus-stack/focusStackUiSchemas';
 import {
   DEFAULT_HDR_MERGE_UI_SETTINGS,
   type HdrEditableHandoffSummary,

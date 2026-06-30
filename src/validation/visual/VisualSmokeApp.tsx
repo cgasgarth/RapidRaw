@@ -25,8 +25,11 @@ import {
   type SelectedImage,
   SortDirection,
 } from '../../components/ui/AppProperties';
-import type { FocusStackOutputReviewWorkflow } from '../../schemas/focusStackOutputReviewSchemas';
-import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../../schemas/focusStackUiSchemas';
+import type { FocusStackOutputReviewWorkflow } from '../../schemas/focus-stack/focusStackOutputReviewSchemas';
+import {
+  DEFAULT_FOCUS_STACK_UI_SETTINGS,
+  type FocusStackUiSettings,
+} from '../../schemas/focus-stack/focusStackUiSchemas';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS, type HdrMergeUiSettings } from '../../schemas/hdrMergeUiSchemas';
 import type { MaskOverlaySettings } from '../../schemas/maskOverlaySchemas';
 import {

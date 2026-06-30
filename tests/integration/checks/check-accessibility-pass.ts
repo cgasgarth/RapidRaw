@@ -12,7 +12,7 @@ import CommandPaletteModal from '../../../src/components/modals/CommandPaletteMo
 import ConfirmModal from '../../../src/components/modals/ConfirmModal.tsx';
 import FocusStackModal from '../../../src/components/modals/FocusStackModal.tsx';
 import SuperResolutionModal from '../../../src/components/modals/SuperResolutionModal.tsx';
-import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../../src/schemas/focusStackUiSchemas.ts';
+import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../../src/schemas/focus-stack/focusStackUiSchemas.ts';
 import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../../../src/schemas/superResolutionUiSchemas.ts';
 
 const DialogTargetSchema = z

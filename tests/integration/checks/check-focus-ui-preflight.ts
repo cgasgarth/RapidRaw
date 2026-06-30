@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import FocusStackModal from '../../../src/components/modals/FocusStackModal.tsx';
-import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../../src/schemas/focusStackUiSchemas.ts';
+import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../../src/schemas/focus-stack/focusStackUiSchemas.ts';
 import { buildFocusStackSourcePreflight } from '../../../src/utils/focusStackSourcePreflight.ts';
 
 const failures: string[] = [];

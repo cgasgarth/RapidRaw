@@ -2,13 +2,13 @@ import { motion } from 'framer-motion';
 import { AlertTriangle, Aperture, CheckCircle2, Eye, Layers3, ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { FocusStackOutputReviewWorkflow } from '../../schemas/focusStackOutputReviewSchemas';
+import type { FocusStackOutputReviewWorkflow } from '../../schemas/focus-stack/focusStackOutputReviewSchemas';
 import type {
   FocusStackAlignmentMode,
   FocusStackQualityPreference,
   FocusStackReviewOverlayMode,
   FocusStackUiSettings,
-} from '../../schemas/focusStackUiSchemas';
+} from '../../schemas/focus-stack/focusStackUiSchemas';
 import { type FocusStackModalState, useUIStore } from '../../store/useUIStore';
 import { TextColors, TextVariants } from '../../types/typography';
 import { buildFocusStackDerivedOutputReceipt, deriveDerivedOutputReceiptState } from '../../utils/derivedOutputReceipt';
