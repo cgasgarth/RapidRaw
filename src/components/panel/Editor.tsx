@@ -110,6 +110,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const interactivePatch = useEditorStore((s) => s.interactivePatch);
   const gamutWarningOverlay = useEditorStore((s) => s.gamutWarningOverlay);
   const isGamutWarningOverlayVisible = useEditorStore((s) => s.isGamutWarningOverlayVisible);
+  const isExportSoftProofEnabled = useEditorStore((s) => s.isExportSoftProofEnabled);
+  const exportSoftProofRecipeId = useEditorStore((s) => s.exportSoftProofRecipeId);
+  const exportSoftProofTransform = useEditorStore((s) => s.exportSoftProofTransform);
   const showOriginal = useEditorStore((s) => s.showOriginal);
   const isSliderDragging = useEditorStore((s) => s.isSliderDragging);
   const targetZoom = useEditorStore((s) => s.zoom);
@@ -1532,6 +1535,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
               adjustments={adjustments}
               brushSettings={brushSettings}
               crop={crop}
+              exportSoftProofRecipeId={exportSoftProofRecipeId}
+              exportSoftProofTransform={exportSoftProofTransform}
               finalPreviewUrl={finalPreviewUrl}
               gamutWarningOverlay={gamutWarningOverlay}
               handleCropComplete={handleCropComplete}
@@ -1542,6 +1547,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
               isMaskControlHovered={isMaskControlHovered}
               isMasking={isMasking}
               isStraightenActive={isStraightenActive}
+              isExportSoftProofEnabled={isExportSoftProofEnabled}
               isRotationActive={isRotationActive}
               isSliderDragging={isSliderDragging}
               isGamutWarningOverlayVisible={isGamutWarningOverlayVisible}

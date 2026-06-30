@@ -9,6 +9,7 @@ import type { GamutWarningOverlayPayload } from '../schemas/tauriEventSchemas';
 import { type Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, type MaskContainer } from '../utils/adjustments';
 import type { BasicToneCommandEnvelope } from '../utils/basicToneCommandBridge';
 import { goToEditHistoryIndex, pushEditHistoryEntry, redoEditHistory, undoEditHistory } from '../utils/editHistory';
+import { isPendingExportSoftProofGamutWarningOverlay } from '../utils/gamutWarningDisplay';
 import { loadMaskOverlaySettingsPreference } from '../utils/maskOverlayPreferences';
 
 export interface InteractivePatch {
@@ -125,6 +126,13 @@ interface EditorState {
   goToHistoryIndex: (index: number) => void;
 }
 
+const shouldRevalidateGamutWarningOverlay = (update: Partial<EditorState>): boolean =>
+  'selectedImage' in update ||
+  'gamutWarningOverlay' in update ||
+  'isExportSoftProofEnabled' in update ||
+  'exportSoftProofRecipeId' in update ||
+  'exportSoftProofTransform' in update;
+
 export const useEditorStore = create<EditorState>((set) => ({
   selectedImage: null,
   adjustments: INITIAL_ADJUSTMENTS,
@@ -182,7 +190,27 @@ export const useEditorStore = create<EditorState>((set) => ({
   patchesSentToBackend: new Set<string>(),
 
   setEditor: (updater) => {
-    set((state) => (typeof updater === 'function' ? updater(state) : updater));
+    set((state) => {
+      const update = typeof updater === 'function' ? updater(state) : updater;
+      if (!shouldRevalidateGamutWarningOverlay(update)) return update;
+
+      const nextState = { ...state, ...update };
+      const nextOverlay = 'gamutWarningOverlay' in update ? update.gamutWarningOverlay : state.gamutWarningOverlay;
+
+      if (
+        nextOverlay &&
+        isPendingExportSoftProofGamutWarningOverlay(nextOverlay, {
+          exportSoftProofRecipeId: nextState.exportSoftProofRecipeId,
+          exportSoftProofTransform: nextState.exportSoftProofTransform,
+          isExportSoftProofEnabled: nextState.isExportSoftProofEnabled,
+          selectedImagePath: nextState.selectedImage?.path ?? null,
+        })
+      ) {
+        return update;
+      }
+
+      return { ...update, gamutWarningOverlay: null };
+    });
   },
 
   pushHistory: (newAdj) => {

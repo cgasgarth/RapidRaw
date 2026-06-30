@@ -484,17 +484,24 @@ async fn apply_adjustments(
     }
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportSoftProofPreviewRequest {
+    black_point_compensation: bool,
+    color_profile: export_processing::ExportColorProfile,
+    export_soft_proof_recipe_id: Option<String>,
+    js_adjustments: serde_json::Value,
+    rendering_intent: export_processing::ExportRenderingIntent,
+    target_resolution: Option<u32>,
+}
+
 #[tauri::command]
 fn generate_export_soft_proof_preview(
-    js_adjustments: serde_json::Value,
-    color_profile: export_processing::ExportColorProfile,
-    rendering_intent: export_processing::ExportRenderingIntent,
-    black_point_compensation: bool,
-    target_resolution: Option<u32>,
+    request: ExportSoftProofPreviewRequest,
     state: tauri::State<AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<Response, String> {
-    let mut adjustments_clone = js_adjustments;
+    let mut adjustments_clone = request.js_adjustments;
     hydrate_adjustments(&state, &mut adjustments_clone);
 
     let loaded_image = state
@@ -504,7 +511,7 @@ fn generate_export_soft_proof_preview(
         .clone()
         .ok_or("No original image loaded")?;
 
-    let preview_dim = target_resolution.unwrap_or(1920).clamp(512, 8192);
+    let preview_dim = request.target_resolution.unwrap_or(1920).clamp(512, 8192);
     let preview_image = render_processed_export_soft_proof_preview(
         &state,
         &app_handle,
@@ -515,10 +522,53 @@ fn generate_export_soft_proof_preview(
     let (proof_pixels, width, height, _) =
         export_processing::export_soft_proof_rgb_pixels_and_profile_with_policy(
             &preview_image,
-            &color_profile,
-            &rendering_intent,
-            black_point_compensation,
+            &request.color_profile,
+            &request.rendering_intent,
+            request.black_point_compensation,
         )?;
+    let proof_metadata = export_processing::export_soft_proof_transform_metadata(
+        &preview_image,
+        &request.color_profile,
+        &request.rendering_intent,
+        request.black_point_compensation,
+    )?;
+
+    if let Some(recipe_id) = request.export_soft_proof_recipe_id
+        && let Some(proof_image) = RgbImage::from_raw(width, height, proof_pixels.clone())
+        && let Ok(gamut_warning_data) = image_analytics::calculate_gamut_warning_overlay_from_image(
+            &DynamicImage::ImageRgb8(proof_image),
+        )
+    {
+        let source_image_path = &loaded_image.path;
+        let _ = app_handle.emit(
+            crate::events::GAMUT_WARNING_UPDATE,
+            serde_json::json!({
+                "path": source_image_path,
+                "data": {
+                    "black_point_compensation": proof_metadata.black_point_compensation,
+                    "color_managed_transform": proof_metadata.color_managed_transform,
+                    "coverage_ratio": gamut_warning_data.coverage_ratio,
+                    "effective_color_profile": proof_metadata.effective_color_profile,
+                    "effective_rendering_intent": proof_metadata.effective_rendering_intent,
+                    "export_soft_proof_recipe_id": recipe_id,
+                    "height": gamut_warning_data.height,
+                    "mask_data_url": gamut_warning_data.mask_data_url,
+                    "max_channel_value": gamut_warning_data.max_channel_value,
+                    "min_channel_value": gamut_warning_data.min_channel_value,
+                    "pixel_count": gamut_warning_data.pixel_count,
+                    "policy_status": proof_metadata.policy_status,
+                    "policy_version": proof_metadata.policy_version,
+                    "preview_basis": "export_preview",
+                    "source_image_path": source_image_path,
+                    "source_precision_path": proof_metadata.source_precision_path,
+                    "transform_applied": proof_metadata.transform_applied,
+                    "transform_policy_fingerprint": proof_metadata.transform_policy_fingerprint,
+                    "warning_pixel_count": gamut_warning_data.warning_pixel_count,
+                    "width": gamut_warning_data.width,
+                }
+            }),
+        );
+    }
 
     Encoder::new(Preset::BaselineFastest)
         .quality(86)

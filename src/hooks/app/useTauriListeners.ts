@@ -4,13 +4,13 @@ import type { ChannelConfig } from '../../components/adjustments/Curves';
 import type { ImageFile, WaveformData } from '../../components/ui/AppProperties';
 import { Status } from '../../components/ui/ExportImportProperties';
 import {
+  gamutWarningOverlayPayloadSchema,
   parseBase64Payload,
   parseCountPayload,
   parseCullingProgressPayload,
   parseCullingSuggestionsPayload,
   parseDenoiseCompletePayload,
   parseExportReceiptPayload,
-  parseGamutWarningOverlayPayload,
   parseImportProgressPayload,
   parseImportStartPayload,
   parsePanoramaCompletePayload,
@@ -203,10 +203,10 @@ export function useTauriListeners({
         }
       }),
       listen<ImageAnalyticsPayload<unknown>>(GAMUT_WARNING_UPDATE_EVENT, (event) => {
-        if (isEffectActive && event.payload.path === useEditorStore.getState().selectedImage?.path) {
-          useEditorStore
-            .getState()
-            .setEditor({ gamutWarningOverlay: parseGamutWarningOverlayPayload(event.payload.data) });
+        const editor = useEditorStore.getState();
+        if (isEffectActive && event.payload.path === editor.selectedImage?.path) {
+          const parsed = gamutWarningOverlayPayloadSchema.safeParse(event.payload.data);
+          useEditorStore.getState().setEditor({ gamutWarningOverlay: parsed.success ? parsed.data : null });
         }
       }),
       listen<unknown>(OPEN_WITH_FILE_EVENT, (event) => {

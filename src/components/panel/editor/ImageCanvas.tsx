@@ -22,6 +22,7 @@ import {
 } from 'react-konva';
 import type { RenderSize } from '../../../hooks/viewport/useImageRenderSize';
 import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
+import type { ExportSoftProofTransformState } from '../../../store/useEditorStore';
 import type {
   Adjustments,
   AiPatch,
@@ -34,7 +35,10 @@ import {
   BRUSH_MASK_COMMAND_COORDINATE_SPACE,
   buildBrushMaskCommandFromParameters,
 } from '../../../utils/brushMaskCommandBridge';
-import { formatGamutWarningCoverage } from '../../../utils/gamutWarningDisplay';
+import {
+  formatGamutWarningCoverage,
+  isCurrentExportSoftProofGamutWarningOverlay,
+} from '../../../utils/gamutWarningDisplay';
 import {
   normalizeLinearGradientParameters,
   normalizeRadialGradientParameters,
@@ -189,6 +193,8 @@ interface ImageCanvasProps {
   adjustments: Adjustments;
   brushSettings: BrushSettings | null;
   crop: Crop | null;
+  exportSoftProofRecipeId: string | null;
+  exportSoftProofTransform: ExportSoftProofTransformState | null;
   finalPreviewUrl: string | null;
   gamutWarningOverlay: GamutWarningOverlayPayload | null;
   handleCropComplete: (c: Crop, cp: PercentCrop) => void;
@@ -198,6 +204,7 @@ interface ImageCanvasProps {
   isMaskControlHovered: boolean;
   isMasking: boolean;
   isSliderDragging: boolean;
+  isExportSoftProofEnabled: boolean;
   isGamutWarningOverlayVisible: boolean;
   isStraightenActive: boolean;
   isRotationActive?: boolean;
@@ -1144,6 +1151,8 @@ const ImageCanvas = memo(
     adjustments,
     brushSettings,
     crop,
+    exportSoftProofRecipeId,
+    exportSoftProofTransform,
     finalPreviewUrl,
     gamutWarningOverlay,
     handleCropComplete,
@@ -1154,6 +1163,7 @@ const ImageCanvas = memo(
     isMaskControlHovered,
     isMasking,
     isSliderDragging,
+    isExportSoftProofEnabled,
     isGamutWarningOverlayVisible,
     isStraightenActive,
     isRotationActive,
@@ -2556,11 +2566,14 @@ const ImageCanvas = memo(
     const originalSrc = transformedOriginalUrl;
     const isShowingOriginal = showOriginal && !!originalSrc;
     const gamutCoverage = formatGamutWarningCoverage(gamutWarningOverlay);
+    const isCurrentGamutWarningOverlay = isCurrentExportSoftProofGamutWarningOverlay(gamutWarningOverlay, {
+      exportSoftProofRecipeId,
+      exportSoftProofTransform,
+      isExportSoftProofEnabled,
+      selectedImagePath: selectedImage.path,
+    });
     const showGamutWarningOverlay =
-      isGamutWarningOverlayVisible &&
-      !isShowingOriginal &&
-      !isCropping &&
-      (gamutWarningOverlay?.warning_pixel_count ?? 0) > 0;
+      isGamutWarningOverlayVisible && !isShowingOriginal && !isCropping && isCurrentGamutWarningOverlay;
 
     useEffect(() => {
       if (!originalSrc) {
@@ -2811,7 +2824,15 @@ const ImageCanvas = memo(
                   aria-label={t('editor.canvas.gamutWarningOverlay')}
                   className="pointer-events-none absolute"
                   data-coverage-ratio={gamutWarningOverlay.coverage_ratio.toFixed(6)}
+                  data-effective-color-profile={gamutWarningOverlay.effective_color_profile}
+                  data-effective-rendering-intent={gamutWarningOverlay.effective_rendering_intent}
+                  data-export-soft-proof-recipe-id={gamutWarningOverlay.export_soft_proof_recipe_id}
                   data-proof-ready="true"
+                  data-preview-basis={gamutWarningOverlay.preview_basis}
+                  data-source-image-path={gamutWarningOverlay.source_image_path}
+                  data-source-precision-path={gamutWarningOverlay.source_precision_path}
+                  data-transform-applied={String(gamutWarningOverlay.transform_applied)}
+                  data-transform-policy-fingerprint={gamutWarningOverlay.transform_policy_fingerprint}
                   data-mask-height={gamutWarningOverlay.height}
                   data-mask-width={gamutWarningOverlay.width}
                   data-testid="gamut-warning-overlay"

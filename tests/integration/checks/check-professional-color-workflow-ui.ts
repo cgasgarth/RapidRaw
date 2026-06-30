@@ -8,7 +8,7 @@ import i18next from 'i18next';
 import { act, createElement, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
-import { type AppSettings, Theme } from '../../../src/components/ui/AppProperties';
+import { type AppSettings, type SelectedImage, Theme } from '../../../src/components/ui/AppProperties';
 import {
   ExportColorProfile,
   type ExportPreset,
@@ -30,16 +30,52 @@ type RenderedPanel = {
 type AdjustmentUpdate = Partial<Adjustments> | ((previous: Adjustments) => Adjustments);
 
 const failures: string[] = [];
+const professionalImagePath = '/validation/professional-color-workflow.ARW';
+const professionalTransform = {
+  blackPointCompensation: 'Unsupported',
+  colorManagedTransform: 'moxcms Display P3 Relative Colorimetric 8-bit',
+  effectiveColorProfile: 'Display P3',
+  effectiveRenderingIntent: 'Relative Colorimetric',
+  policyStatus: 'color_managed',
+  policyVersion: 'rawengine.export-color-policy.v1',
+  sourcePrecisionPath: 'float16-preview',
+  transformApplied: true,
+  transformPolicyFingerprint: 'sha256:professional-color-workflow',
+};
 const professionalOverlayFixture = {
+  black_point_compensation: professionalTransform.blackPointCompensation,
+  color_managed_transform: professionalTransform.colorManagedTransform,
   coverage_ratio: 0.125,
+  effective_color_profile: professionalTransform.effectiveColorProfile,
+  effective_rendering_intent: professionalTransform.effectiveRenderingIntent,
+  export_soft_proof_recipe_id: 'professional-display-p3-jpeg',
   height: 180,
   mask_data_url: 'data:image/png;base64,AAAA',
   max_channel_value: 255,
   min_channel_value: 0,
   pixel_count: 360,
+  policy_status: professionalTransform.policyStatus,
+  policy_version: professionalTransform.policyVersion,
+  preview_basis: 'export_preview',
+  source_image_path: professionalImagePath,
+  source_precision_path: professionalTransform.sourcePrecisionPath,
+  transform_applied: professionalTransform.transformApplied,
+  transform_policy_fingerprint: professionalTransform.transformPolicyFingerprint,
   warning_pixel_count: 45,
   width: 240,
 } satisfies GamutWarningOverlayPayload;
+const professionalSelectedImageFixture: SelectedImage = {
+  exif: null,
+  height: 3000,
+  isRaw: true,
+  isReady: true,
+  metadata: null,
+  originalUrl: null,
+  path: professionalImagePath,
+  rawDevelopmentReport: null,
+  thumbnailUrl: 'data:image/jpeg;base64,AAAA',
+  width: 4000,
+};
 const exportPresetFixture = {
   colorProfile: ExportColorProfile.DisplayP3,
   dontEnlarge: true,
@@ -145,8 +181,12 @@ async function validateLocaleContract() {
 
 async function renderColorPanel(): Promise<RenderedPanel> {
   useEditorStore.getState().setEditor({
+    exportSoftProofRecipeId: 'professional-display-p3-jpeg',
+    exportSoftProofTransform: professionalTransform,
     gamutWarningOverlay: professionalOverlayFixture,
+    isExportSoftProofEnabled: true,
     isGamutWarningOverlayVisible: false,
+    selectedImage: professionalSelectedImageFixture,
   });
 
   const container = document.createElement('div');
@@ -224,6 +264,13 @@ async function validateGamutWarningCoverage(container: Element) {
   assertData(controls, 'proofMaskWidth', '240', 'gamut controls did not expose proof mask width.');
   assertData(controls, 'proofMaskHeight', '180', 'gamut controls did not expose proof mask height.');
   assertData(controls, 'proofReady', 'true', 'gamut controls did not expose proof readiness.');
+  assertData(controls, 'previewBasis', 'export_preview', 'gamut controls did not expose export-preview basis.');
+  assertData(
+    controls,
+    'transformPolicyFingerprint',
+    'sha256:professional-color-workflow',
+    'gamut controls did not expose transform fingerprint.',
+  );
   assertData(controls, 'visible', 'false', 'gamut overlay should start hidden.');
   assertVisibleText(
     controls,

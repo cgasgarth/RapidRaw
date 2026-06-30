@@ -1,7 +1,9 @@
 import negativeLabMeasuredProfileCatalogJson from '../data/negativeLabMeasuredProfileCatalog.json';
 import {
   type NegativeLabProfileProvenanceHash,
+  type NegativeLabRuntimeProfileApplyProof,
   type NegativeLabSelectedProfileSnapshotAppServer,
+  negativeLabRuntimeProfileApplyProofSchema,
   negativeLabSelectedProfileSnapshotAppServerSchema,
 } from '../schemas/negativeLabAppServerSchemas';
 import {
@@ -16,6 +18,7 @@ import {
 } from '../schemas/negativeLabMeasuredProfileSchemas';
 import {
   type NegativeLabBuiltInUiPresetCatalog,
+  type NegativeLabPresetParams,
   parseNegativeLabBuiltInUiPresetCatalog,
 } from '../schemas/negativeLabPresetCatalogSchemas';
 import {
@@ -257,6 +260,154 @@ export const buildNegativeLabRuntimeProfileProvenanceHash = (
   };
 
   return `fnv1a32:${buildNegativeLabPlanHash(JSON.stringify(provenancePayload))}`;
+};
+
+const NEGATIVE_LAB_RUNTIME_APPLY_DIFF_KEYS = [
+  'base_fog_strength',
+  'black_point',
+  'blue_weight',
+  'contrast',
+  'exposure',
+  'green_weight',
+  'print_curve_algorithm',
+  'print_curve_output_tag',
+  'red_weight',
+  'white_point',
+] as const satisfies Array<keyof NegativeLabPresetParams>;
+
+const NEGATIVE_LAB_RUNTIME_APPLIED_GROUPS = ['base_fog', 'print_curve', 'rgb_balance', 'tone_curve'] as const;
+
+const getNegativeLabRuntimeApplyParameterGroup = (
+  key: (typeof NEGATIVE_LAB_RUNTIME_APPLY_DIFF_KEYS)[number],
+): NegativeLabRuntimeProfileApplyProof['parameterDiffs'][number]['group'] => {
+  if (key === 'base_fog_strength') return 'base_fog';
+  if (key === 'blue_weight' || key === 'green_weight' || key === 'red_weight') return 'rgb_balance';
+  if (key === 'print_curve_algorithm' || key === 'print_curve_output_tag') return 'print_curve';
+  return 'tone_curve';
+};
+
+const formatNegativeLabRuntimeApplyValue = (value: unknown): string => {
+  if (typeof value === 'number') return String(Math.round(value * 10000) / 10000);
+  if (typeof value === 'string') return value;
+  if (value === null) return 'null';
+  return JSON.stringify(value);
+};
+
+const buildNegativeLabRuntimeApplyMetricHash = (payload: unknown): NegativeLabProfileProvenanceHash =>
+  `fnv1a32:${buildNegativeLabPlanHash(JSON.stringify(payload))}`;
+
+const resolveNegativeLabRuntimeBaselineParams = (
+  profile: NegativeLabResolvedRuntimeProfile,
+  catalog: NegativeLabRuntimeProfileCatalog,
+): NegativeLabPresetParams => {
+  const baselinePresetId = profile.sourceGenericPresetId ?? catalog.genericCatalog.defaultPresetId;
+  const baselinePreset =
+    catalog.genericCatalog.presets.find((preset) => preset.presetId === baselinePresetId) ??
+    catalog.genericCatalog.presets.find((preset) => preset.presetId === catalog.genericCatalog.defaultPresetId);
+
+  if (baselinePreset === undefined) {
+    throw new Error('Negative Lab runtime profile apply proof requires a generic baseline preset.');
+  }
+
+  return baselinePreset.params;
+};
+
+const buildNegativeLabRuntimeProfileWarningCodes = (profile: NegativeLabResolvedRuntimeProfile) => {
+  const warningCodes = new Set<string>(profile.doesNotProve);
+
+  if (profile.profileStatus === 'generic_unmeasured') warningCodes.add('generic_starting_point_only');
+  if (profile.profileStatus === 'fixture_measured') warningCodes.add('measured_process_family_only');
+  if (profile.profileStatus === 'user_supplied') warningCodes.add('user_supplied_profile');
+  if (profile.params.base_fog_sample === null) warningCodes.add('base_sample_reference_pending');
+
+  return [...warningCodes].sort();
+};
+
+export const buildNegativeLabRuntimeProfileApplyProof = ({
+  catalog = NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
+  frameIds = [],
+  paths,
+  profile,
+  profileProvenanceHash = buildNegativeLabRuntimeProfileProvenanceHash(profile),
+  scope,
+}: {
+  catalog?: NegativeLabRuntimeProfileCatalog;
+  frameIds?: string[];
+  paths: string[];
+  profile: NegativeLabResolvedRuntimeProfile;
+  profileProvenanceHash?: NegativeLabProfileProvenanceHash;
+  scope: 'active' | 'all';
+}): NegativeLabRuntimeProfileApplyProof => {
+  const baselineParams = resolveNegativeLabRuntimeBaselineParams(profile, catalog);
+  const selectedProfileSnapshot = buildNegativeLabRuntimeSelectedProfileSnapshot(profile, profileProvenanceHash);
+  const parameterDiffs = NEGATIVE_LAB_RUNTIME_APPLY_DIFF_KEYS.flatMap((key) => {
+    const before = baselineParams[key];
+    const after = profile.params[key];
+    if (JSON.stringify(before) === JSON.stringify(after)) return [];
+
+    return [
+      {
+        after: formatNegativeLabRuntimeApplyValue(after),
+        before: formatNegativeLabRuntimeApplyValue(before),
+        group: getNegativeLabRuntimeApplyParameterGroup(key),
+        key,
+      },
+    ];
+  });
+  const touchedParameterGroups = new Set<NegativeLabRuntimeProfileApplyProof['touchedParameterGroups'][number]>(
+    NEGATIVE_LAB_RUNTIME_APPLIED_GROUPS,
+  );
+
+  if (profile.crosstalkProfile !== null) touchedParameterGroups.add('crosstalk');
+
+  const warningCodes = buildNegativeLabRuntimeProfileWarningCodes(profile);
+  const beforeMetricHash = buildNegativeLabRuntimeApplyMetricHash({
+    baselineParams,
+    stage: 'negative_lab_profile_apply_before',
+  });
+  const afterMetricHash = buildNegativeLabRuntimeApplyMetricHash({
+    parameterDiffs,
+    profileProvenanceHash,
+    profileStatus: profile.profileStatus,
+    stage: 'negative_lab_profile_apply_after',
+    warningCodes,
+  });
+  const previewHash = buildNegativeLabRuntimeApplyMetricHash({
+    afterMetricHash,
+    beforeMetricHash,
+    selectedFrameScope: { frameIds, scope, sourcePathCount: paths.length },
+    stage: 'negative_lab_profile_apply_preview',
+  });
+
+  return negativeLabRuntimeProfileApplyProofSchema.parse({
+    applyProof: {
+      deterministic: true,
+      generatedFrom: 'src/utils/negativeLabMeasuredProfileRuntime.ts',
+      outputMetricChanged: beforeMetricHash !== afterMetricHash,
+      paramsHash: buildNegativeLabRuntimeApplyMetricHash(profile.params),
+      previewProofHash: previewHash,
+    },
+    claimLevel: profile.claimLevel,
+    claimPolicy: profile.claimPolicy,
+    doesNotProve: profile.doesNotProve,
+    parameterDiffs,
+    previewProof: {
+      afterMetricHash,
+      beforeMetricHash,
+      metricChanged: beforeMetricHash !== afterMetricHash,
+      previewHash,
+    },
+    profileProvenanceHash,
+    profileStatus: profile.profileStatus,
+    selectedFrameScope: {
+      frameIds,
+      scope,
+      sourcePathCount: paths.length,
+    },
+    selectedProfileSnapshot,
+    touchedParameterGroups: [...touchedParameterGroups].sort(),
+    warningCodes,
+  });
 };
 
 export const buildNegativeLabRuntimeSelectedProfileSnapshot = (
