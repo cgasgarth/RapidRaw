@@ -11,6 +11,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { type Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../../utils/adjustments';
+import { areAdjustmentsEqual } from '../../utils/adjustmentsSnapshot';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { debounce } from '../../utils/timing';
@@ -103,7 +104,8 @@ export function useImageProcessing(
   const inFlightCountRef = useRef(0);
   const pendingApplyRef = useRef<{ adjustments: Adjustments; targetRes?: number | undefined } | null>(null);
   const currentOriginalResRef = useRef<number>(0);
-  const dragIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const persistIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeWaveformChannelRef = useRef(activeWaveformChannel);
   activeWaveformChannelRef.current = activeWaveformChannel;
 
@@ -240,7 +242,7 @@ export function useImageProcessing(
           const prefix = textDecoder.decode(buffer.slice(0, 11));
           if (prefix === 'WGPU_RENDER') {
             setEditor((state) => {
-              if (state.interactivePatch && state.interactivePatch.url) URL.revokeObjectURL(state.interactivePatch.url);
+              if (state.interactivePatch?.url) URL.revokeObjectURL(state.interactivePatch.url);
               return { interactivePatch: null };
             });
             return;
@@ -286,7 +288,7 @@ export function useImageProcessing(
 
             setEditor((state) => {
               const prevUrl = state.finalPreviewUrl;
-              if (prevUrl && prevUrl.startsWith('blob:') && !globalImageCache.isProtected(prevUrl)) {
+              if (prevUrl?.startsWith('blob:') && !globalImageCache.isProtected(prevUrl)) {
                 setTimeout(() => {
                   if (!globalImageCache.isProtected(prevUrl)) {
                     URL.revokeObjectURL(prevUrl);
@@ -313,7 +315,7 @@ export function useImageProcessing(
         }
         if (!dragging) {
           setEditor((state) => {
-            if (state.interactivePatch && state.interactivePatch.url) URL.revokeObjectURL(state.interactivePatch.url);
+            if (state.interactivePatch?.url) URL.revokeObjectURL(state.interactivePatch.url);
             return { interactivePatch: null };
           });
         }
@@ -489,7 +491,7 @@ export function useImageProcessing(
   useEffect(() => {
     if (!selectedImage?.isReady) return;
 
-    if (dragIdleTimer.current) clearTimeout(dragIdleTimer.current);
+    if (previewIdleTimer.current) clearTimeout(previewIdleTimer.current);
 
     const targetRes = calculateTargetRes();
 
@@ -497,50 +499,18 @@ export function useImageProcessing(
       if (appSettings?.enableLivePreviews !== false) {
         applyAdjustments(adjustments, true, targetRes);
       }
-    } else {
-      dragIdleTimer.current = setTimeout(() => {
-        currentResRef.current = targetRes;
-
-        applyAdjustments(adjustments, false, targetRes);
-        debouncedSave(selectedImage.path, adjustments);
-        useProcessStore.getState().invalidateThumbnails([selectedImage.path]);
-
-        const otherPaths = multiSelectedPaths.filter((p) => p !== selectedImage.path);
-        if (otherPaths.length > 0) {
-          const prev = prevAdjustmentsRef.current;
-          if (prev && prev.path === selectedImage.path) {
-            const delta: Record<string, unknown> = {};
-            const includedKeys = appSettings?.copyPasteSettings?.includedAdjustments || COPYABLE_ADJUSTMENT_KEYS;
-            for (const key of Object.keys(adjustments) as Array<keyof Adjustments>) {
-              if (includedKeys.includes(key as string)) {
-                const adjustmentValue: unknown = adjustments[key];
-                const previousAdjustmentValue: unknown = prev.adjustments[key];
-                if (JSON.stringify(adjustmentValue) !== JSON.stringify(previousAdjustmentValue)) {
-                  delta[key] = adjustmentValue;
-                }
-              }
-            }
-            if (Object.keys(delta).length > 0) {
-              otherPaths.forEach((p) => {
-                globalImageCache.delete(p);
-              });
-              useProcessStore.getState().invalidateThumbnails(otherPaths);
-              invokeWithSchema(
-                Invokes.ApplyAdjustmentsToPaths,
-                { paths: otherPaths, adjustments: delta },
-                emptyTauriResponseSchema,
-              ).catch((err: unknown) => {
-                console.error('Failed to apply adjustments to multi-selection:', err);
-              });
-            }
-          }
-        }
-        prevAdjustmentsRef.current = { path: selectedImage.path, adjustments };
-      }, 50);
+      return () => {
+        if (previewIdleTimer.current) clearTimeout(previewIdleTimer.current);
+      };
     }
 
+    previewIdleTimer.current = setTimeout(() => {
+      currentResRef.current = targetRes;
+      applyAdjustments(adjustments, false, targetRes);
+    }, 50);
+
     return () => {
-      if (dragIdleTimer.current) clearTimeout(dragIdleTimer.current);
+      if (previewIdleTimer.current) clearTimeout(previewIdleTimer.current);
     };
   }, [
     adjustments,
@@ -550,9 +520,69 @@ export function useImageProcessing(
     applyAdjustments,
     calculateTargetRes,
     currentResRef,
+    appSettings?.enableLivePreviews,
+  ]);
+
+  useEffect(() => {
+    if (!selectedImage?.isReady) return;
+    const previous = prevAdjustmentsRef.current;
+    if (previous?.path === selectedImage.path && areAdjustmentsEqual(previous.adjustments, adjustments)) {
+      return;
+    }
+
+    if (persistIdleTimer.current) clearTimeout(persistIdleTimer.current);
+
+    if (isSliderDragging) {
+      return;
+    }
+
+    persistIdleTimer.current = setTimeout(() => {
+      debouncedSave(selectedImage.path, adjustments);
+      useProcessStore.getState().invalidateThumbnails([selectedImage.path]);
+
+      const otherPaths = multiSelectedPaths.filter((p) => p !== selectedImage.path);
+      if (otherPaths.length > 0) {
+        const prev = prevAdjustmentsRef.current;
+        if (prev && prev.path === selectedImage.path) {
+          const delta: Record<string, unknown> = {};
+          const includedKeys = appSettings?.copyPasteSettings?.includedAdjustments || COPYABLE_ADJUSTMENT_KEYS;
+          for (const key of Object.keys(adjustments) as Array<keyof Adjustments>) {
+            if (includedKeys.includes(key as string)) {
+              const adjustmentValue: unknown = adjustments[key];
+              const previousAdjustmentValue: unknown = prev.adjustments[key];
+              if (JSON.stringify(adjustmentValue) !== JSON.stringify(previousAdjustmentValue)) {
+                delta[key] = adjustmentValue;
+              }
+            }
+          }
+          if (Object.keys(delta).length > 0) {
+            otherPaths.forEach((p) => {
+              globalImageCache.delete(p);
+            });
+            useProcessStore.getState().invalidateThumbnails(otherPaths);
+            invokeWithSchema(
+              Invokes.ApplyAdjustmentsToPaths,
+              { paths: otherPaths, adjustments: delta },
+              emptyTauriResponseSchema,
+            ).catch((err: unknown) => {
+              console.error('Failed to apply adjustments to multi-selection:', err);
+            });
+          }
+        }
+      }
+      prevAdjustmentsRef.current = { path: selectedImage.path, adjustments };
+    }, 50);
+
+    return () => {
+      if (persistIdleTimer.current) clearTimeout(persistIdleTimer.current);
+    };
+  }, [
+    adjustments,
+    selectedImage?.path,
+    selectedImage?.isReady,
+    isSliderDragging,
     multiSelectedPaths,
     prevAdjustmentsRef,
-    appSettings?.enableLivePreviews,
     appSettings?.copyPasteSettings?.includedAdjustments,
   ]);
 
