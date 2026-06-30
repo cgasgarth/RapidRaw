@@ -43,7 +43,7 @@ jobs:
           if-no-files-found: error
 
       - name: Check translation extraction
-        run: bun scripts/run-compact-command.ts --label i18n -- i18next-cli extract --ci --dry-run
+        run: bun scripts/run-compact-command.ts --label i18n -- bunx i18next-cli extract --ci --dry-run
 
   frontend-typecheck:
     name: 'frontend: typecheck baseline'

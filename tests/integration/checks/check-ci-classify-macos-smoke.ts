@@ -385,6 +385,14 @@ function classifyPathChange(change) {
     };
   }
 
+  if (path === 'eslint.config.js' && change.status === 'removed') {
+    return {
+      decision: SMOKE_DECISIONS.NONE,
+      mode: SMOKE_MODES.NONE,
+      reason: 'removed stale ESLint config after Biome migration',
+    };
+  }
+
   if (path === 'package.json' && isSafePackageJsonScriptPatch(change.patch)) {
     return {
       decision: SMOKE_DECISIONS.NONE,
@@ -620,6 +628,11 @@ function runSelfTest() {
   assertChangeClassification(
     'removed npm lockfile skips smoke',
     [{ filename: 'package-lock.json', status: 'removed' }],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'removed ESLint config skips smoke',
+    [{ filename: 'eslint.config.js', status: 'removed' }],
     SMOKE_MODES.NONE,
   );
   assertChangeClassification(
