@@ -4,8 +4,8 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-const EXPORT_REPORT_PATH = 'docs/validation/negative-lab-public-export-proof-2026-06-20.json';
-const UI_PROOF_REPORT_PATH = 'docs/validation/negative-lab-public-export-ui-proof-2026-06-20.json';
+const EXPORT_REPORT_PATH = 'docs/validation/proofs/negative-lab/negative-lab-public-export-proof-2026-06-20.json';
+const UI_PROOF_REPORT_PATH = 'docs/validation/proofs/negative-lab/negative-lab-public-export-ui-proof-2026-06-20.json';
 const SCREENSHOT_PATH = 'artifacts/visual-smoke/negative-lab-public-export-review.png';
 const update = process.argv.includes('--update');
 

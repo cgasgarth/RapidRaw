@@ -13,8 +13,9 @@ import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../.
 const FIXTURE_ID = 'validation.raw-open-edit-export.high-iso-skin-shadow.v1';
 const SOURCE_RELATIVE_PATH = 'private-fixtures/detail/high-iso-skin-shadow-v1.arw';
 const ARTIFACT_DIR_RELATIVE = 'private-artifacts/validation/open-edit-export';
-const AGENT_REPORT_PATH = 'docs/validation/agent-real-raw-private-edit-proof-2026-06-22.json';
-const AGENT_APP_SERVER_REPORT_PATH = 'docs/validation/agent-app-server-private-raw-artifacts-2026-06-20.json';
+const AGENT_REPORT_PATH = 'docs/validation/proofs/agent/agent-real-raw-private-edit-proof-2026-06-22.json';
+const AGENT_APP_SERVER_REPORT_PATH =
+  'docs/validation/proofs/agent/agent-app-server-private-raw-artifacts-2026-06-20.json';
 const SUMMARY_RELATIVE_PATH =
   'private-artifacts/validation/agent-real-raw-workflow/agent-real-raw-workflow-summary.json';
 const RAW_EXTENSIONS = new Set(['.arw', '.cr2', '.cr3', '.dng', '.nef', '.orf', '.raf', '.rw2']);

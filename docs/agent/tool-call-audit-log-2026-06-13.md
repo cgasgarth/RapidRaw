@@ -6,7 +6,7 @@
 - Related docs:
   - [App-server agent architecture](app-server-architecture-2026-06-12.md)
   - [Sample agent guide](sample-agent-guide-2026-06-11.md)
-  - [Edit command API baseline](../api/edit-command-api-2026-06-11.md)
+  - [Edit command API baseline](../api/commands/edit-command-api-2026-06-11.md)
 
 ## Purpose
 

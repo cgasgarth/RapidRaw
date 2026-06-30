@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { buildExportQueueExecutionPlan, parseExportQueue } from '../../../src/schemas/exportQueueSchemas.ts';
 import { parseExportRecipes } from '../../../src/schemas/exportRecipeSchemas.ts';
 
-const REPORT_PATH = 'docs/validation/export-batch-proof-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/export/export-batch-proof-2026-06-18.json';
 const GENERATED_AT = '2026-06-18T00:00:00.000Z';
 
 const hashSchema = z.string().regex(/^[a-f0-9]{64}$/);

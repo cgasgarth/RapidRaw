@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 
 const GENERATED_REPORT_PATH = resolve('src-tauri/target/rawengine-negative-lab-public-export-report.json');
-const COMMITTED_REPORT_PATH = 'docs/validation/negative-lab-public-export-proof-2026-06-20.json';
+const COMMITTED_REPORT_PATH = 'docs/validation/proofs/negative-lab/negative-lab-public-export-proof-2026-06-20.json';
 const update = process.argv.includes('--update');
 
 const fnvHashSchema = z.string().regex(/^fnv1a64:[a-f0-9]{16}$/u);

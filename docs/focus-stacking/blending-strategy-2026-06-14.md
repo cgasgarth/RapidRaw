@@ -148,7 +148,7 @@ Visual review:
 
 Issue #1939 adds `bun run check:focus-blend-halo-proof`, which records blend
 output hashes, region MAE, halo risk, and preview/export parity status at
-`docs/validation/focus-blend-halo-proof-2026-06-18.json`.
+`docs/validation/proofs/focus/focus-blend-halo-proof-2026-06-18.json`.
 
 ## Out Of Scope
 

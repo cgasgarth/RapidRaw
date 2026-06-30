@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 
 import { z } from 'zod';
 
-const REPORT_PATH = 'docs/validation/focus-blend-halo-proof-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/focus/focus-blend-halo-proof-2026-06-18.json';
 const BLEND_ARTIFACT_PATH = 'artifacts/focus-preview-blend/focus-preview-blend-report.json';
 const GENERATED_AT = '2026-06-18T00:00:00.000Z';
 const MAX_REGION_MAE = 0.08;

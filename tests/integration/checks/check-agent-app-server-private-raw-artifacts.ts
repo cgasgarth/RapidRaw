@@ -6,10 +6,10 @@ import { resolve } from 'node:path';
 
 import { z } from 'zod';
 
-const AGENT_REPORT_PATH = 'docs/validation/agent-app-server-raw-edit-proof-2026-06-20.json';
+const AGENT_REPORT_PATH = 'docs/validation/proofs/agent/agent-app-server-raw-edit-proof-2026-06-20.json';
 const RAW_WORKFLOW_REPORT_PATH =
   'private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-workflow-report.json';
-const REPORT_PATH = 'docs/validation/agent-app-server-private-raw-artifacts-2026-06-20.json';
+const REPORT_PATH = 'docs/validation/proofs/agent/agent-app-server-private-raw-artifacts-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 const requireAssets = process.argv.includes('--require-assets');
 const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT;

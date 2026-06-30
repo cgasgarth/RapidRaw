@@ -533,7 +533,9 @@ export const superResolutionReviewWorkspaceProofSchema = z.object({
   outputScale: z.literal('4'),
   proofLevel: z.literal('synthetic_runtime'),
   reconstructionMode: z.literal('optical_flow'),
-  reviewPacketPath: z.literal('docs/validation/sr-synthetic-output-artifact-proof-2026-06-20.json'),
+  reviewPacketPath: z.literal(
+    'docs/validation/proofs/super-resolution/sr-synthetic-output-artifact-proof-2026-06-20.json',
+  ),
   runtimeStatus: z.literal('dry_run_preview'),
   reviewCropCount: z.literal('4'),
   sourcePreflightEffectiveScale: z.literal('2'),

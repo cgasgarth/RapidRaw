@@ -20,7 +20,7 @@ const cli = CliSchema.parse({
   root: readOption('--root') ?? 'dist',
 });
 
-const policyDoc = 'docs/tooling/vite-bundle-budget-2026-06-11.md';
+const policyDoc = 'docs/tooling/frontend/vite-bundle-budget-2026-06-11.md';
 const forbiddenNamePatterns = [
   { pattern: /\.map$/iu, reason: 'source map artifact in production dist' },
   {

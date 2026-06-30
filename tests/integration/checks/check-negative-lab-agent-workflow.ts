@@ -29,7 +29,7 @@ import {
 } from '../../../src/utils/negativeLabAppServerRoutes.ts';
 import { NegativeLabOutputFormatId } from '../../../src/utils/negativeLabOutputFormatIds.ts';
 
-const OUTPUT_PATH = 'docs/validation/negative-lab-agent-workflow-proof-2026-06-16.html';
+const OUTPUT_PATH = 'docs/validation/proofs/negative-lab/negative-lab-agent-workflow-proof-2026-06-16.html';
 const args = new Set(process.argv.slice(2));
 const shouldUpdate = args.has('--update');
 const escapeHtml = (value) =>

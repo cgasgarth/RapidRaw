@@ -15,7 +15,7 @@ import {
 import { pushEditHistoryEntry } from '../../../src/utils/editHistory.ts';
 
 const pixelSchema = z.tuple([z.number().min(0).max(1), z.number().min(0).max(1), z.number().min(0).max(1)]);
-const REPORT_PATH = 'docs/validation/command-replay-render-proof-2026-06-20.json';
+const REPORT_PATH = 'docs/validation/proofs/agent/command-replay-render-proof-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 const renderReportSchema = z
   .object({

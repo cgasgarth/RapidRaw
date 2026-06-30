@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 
 import { z } from 'zod';
 
-const REPORT_PATH = 'docs/validation/layer-mask-real-raw-proof-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/layers-masks/layer-mask-real-raw-proof-2026-06-18.json';
 const PRIVATE_REPORT_PATH = 'private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-report.json';
 const FIXTURE_ID = 'validation.layer-mask-real-raw.alaska-local-adjustment.v1';
 const REPORT_ID = 'layer-mask-real-raw.alaska-local-adjustment.v1';

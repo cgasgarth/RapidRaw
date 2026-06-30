@@ -6,7 +6,7 @@ const fixture = {
       {
         artifactId: 'artifact_agent_expert_edit_demo_preview_dry_run_2844',
         id: 'audit-preview-artifact',
-        replayLink: 'docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html',
+        replayLink: 'docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html',
         stage: 'dry_run',
         summary: 'Dry-run preview is linked to the accepted runtime demo workflow.',
         toolCallId: 'tool-2',
@@ -14,7 +14,7 @@ const fixture = {
       {
         artifactId: 'artifact_agent_expert_edit_demo_before_raw_2844',
         id: 'audit-before-artifact',
-        replayLink: 'docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html',
+        replayLink: 'docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html',
         stage: 'preview',
         summary: 'Before RAW preview artifact is captured for comparison.',
         toolCallId: 'tool-2',
@@ -22,7 +22,7 @@ const fixture = {
       {
         artifactId: 'artifact_agent_expert_edit_demo_after_virtual_copy_2844',
         id: 'audit-after-artifact',
-        replayLink: 'docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html',
+        replayLink: 'docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html',
         stage: 'preview',
         summary: 'After virtual-copy preview artifact is captured after approved apply.',
         toolCallId: 'tool-3',
@@ -66,7 +66,7 @@ const fixture = {
     replayGallery: [
       {
         artifactId: 'artifact_agent_expert_edit_demo_before_raw_2844',
-        href: 'docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html',
+        href: 'docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html',
         id: 'gallery-source',
         label: 'Source RAW',
         role: 'source',
@@ -74,7 +74,7 @@ const fixture = {
       },
       {
         artifactId: 'artifact_agent_expert_edit_demo_preview_dry_run_2844',
-        href: 'docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html',
+        href: 'docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html',
         id: 'gallery-dry-run',
         label: 'Dry-run preview',
         role: 'dry_run',
@@ -82,7 +82,7 @@ const fixture = {
       },
       {
         artifactId: 'artifact_agent_expert_edit_demo_after_virtual_copy_2844',
-        href: 'docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html',
+        href: 'docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html',
         id: 'gallery-output',
         label: 'Applied output',
         role: 'output',
@@ -90,7 +90,7 @@ const fixture = {
       },
       {
         artifactId: 'graph_rev_agent_expert_edit_demo_initial_2844',
-        href: 'docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html',
+        href: 'docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html',
         id: 'gallery-rollback',
         label: 'Rollback target',
         role: 'rollback',
@@ -120,12 +120,12 @@ const fixture = {
       {
         artifactLinks: [
           {
-            href: 'docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html',
+            href: 'docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html',
             id: 'artifact_agent_expert_edit_demo_preview_dry_run_2844',
             label: 'Tone/color preview',
           },
           {
-            href: 'docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html',
+            href: 'docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html',
             id: 'artifact_agent_expert_edit_demo_before_raw_2844',
             label: 'Before RAW preview',
           },
@@ -145,7 +145,7 @@ const fixture = {
       {
         artifactLinks: [
           {
-            href: 'docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html',
+            href: 'docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html',
             id: 'artifact_agent_expert_edit_demo_after_virtual_copy_2844',
             label: 'After virtual-copy preview',
           },
@@ -177,7 +177,7 @@ const fixture = {
         warnings: ['AI provider missing-local-connector is unavailable; no pixels were sent and no edit was applied.'],
       },
     ],
-    replayRoot: 'docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html',
+    replayRoot: 'docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html',
     schemaVersion: 1,
     targetLabel: 'DSC_2844.NEF',
   },
@@ -246,7 +246,7 @@ const fixture = {
   },
   e2eClosure: {
     id: 'agent-e2e-closure-runtime-2844',
-    proofHref: 'docs/validation/agent-real-raw-private-edit-proof-2026-06-22.json',
+    proofHref: 'docs/validation/proofs/agent/agent-real-raw-private-edit-proof-2026-06-22.json',
     proofLabel: 'Private RAW runtime proof',
     steps: [
       {
@@ -442,7 +442,7 @@ const fixture = {
     artifactCount: 5,
     fixtureId: 'validation.raw-open-edit-export.high-iso-skin-shadow.v1',
     issue: 3033,
-    reportPath: 'docs/validation/agent-app-server-private-raw-artifacts-2026-06-20.json',
+    reportPath: 'docs/validation/proofs/agent/agent-app-server-private-raw-artifacts-2026-06-20.json',
     sourceHashUnchanged: true,
     status: 'partial_agent_apply_plus_private_raw_artifacts',
     title: 'Private RAW artifact lane',
@@ -492,7 +492,7 @@ const fixture = {
     nextAction: 'Open the proof gallery, compare before/after, or rollback the virtual-copy revision.',
     outputProof: {
       contentHash: 'sha256:5a42f8c0e73d912b',
-      href: 'docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html',
+      href: 'docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html',
       label: 'Runtime proof gallery',
       status: 'runtime_apply_verified',
     },
@@ -554,7 +554,7 @@ const fixture = {
         state: 'review_required',
       },
     ],
-    proofHref: 'docs/validation/agent-expert-edit-demo-workflow-2026-06-21.html',
+    proofHref: 'docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html',
     proofLabel: 'Dry-run proof',
     selectedAssets: [
       {

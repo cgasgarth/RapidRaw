@@ -20,7 +20,7 @@ Related current-state baselines:
 
 - [RapidRAW architecture baseline](../baseline/rapidraw-architecture-baseline-2026-06-11.md)
 - [RapidRAW sidecar format baseline](../baseline/rapidraw-sidecar-format-baseline-2026-06-11.md)
-- [Known limitations](../release/known-limitations-2026-06-11.md)
+- [Known limitations](../release/process/known-limitations-2026-06-11.md)
 
 ## Target Agent Shape
 

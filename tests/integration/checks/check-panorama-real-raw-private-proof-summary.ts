@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-const REPORT_PATH = 'docs/validation/panorama-real-raw-private-proof-2026-06-20.json';
+const REPORT_PATH = 'docs/validation/proofs/panorama/panorama-real-raw-private-proof-2026-06-20.json';
 
 const sha256Schema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 const privateArtifactSchema = z

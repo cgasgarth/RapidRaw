@@ -8,7 +8,7 @@ import { negativeLabStockMetadataCatalogSchema } from '../../../src/schemas/nega
 
 const sourceUrl = new URL('../../../src/data/negativeLabStockMetadataCatalog.json', import.meta.url);
 const coverageUrl = new URL(
-  '../../../docs/validation/negative-lab-stock-metadata-coverage-2026-06-19.json',
+  '../../../docs/validation/proofs/negative-lab/negative-lab-stock-metadata-coverage-2026-06-19.json',
   import.meta.url,
 );
 const updateCoverage = process.argv.includes('--update');

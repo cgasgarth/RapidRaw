@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 
 import { z } from 'zod';
 
-const REPORT_PATH = 'docs/validation/negative-lab-real-raw-private-proof-2026-06-22.json';
+const REPORT_PATH = 'docs/validation/proofs/negative-lab/negative-lab-real-raw-private-proof-2026-06-22.json';
 const PRIVATE_REPORT_PATH = 'private-artifacts/validation/negative-lab-real-raw/alaska-negative-lab-v1-report.json';
 const PRIVATE_ROOT = '/tmp/rawengine-negative-lab-alaska-proof';
 const PRIVATE_SOURCE = '/Users/cgas/Pictures/Capture One/Alaska';

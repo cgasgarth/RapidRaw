@@ -2,7 +2,7 @@
 
 import { access, readFile } from 'node:fs/promises';
 
-const DOC_PATH = 'docs/color/current-color-pipeline-audit-2026-06-15.md';
+const DOC_PATH = 'docs/color/architecture/current-color-pipeline-audit-2026-06-15.md';
 
 const REQUIRED_SOURCE_PATHS = [
   'src-tauri/src/raw_processing.rs',

@@ -3232,7 +3232,7 @@ function SuperResolutionVisualSmoke() {
           data-quality-preference={settings.qualityPreference}
           data-reconstruction-mode={settings.reconstructionMode}
           data-review-crop-count="4"
-          data-review-packet-path="docs/validation/sr-synthetic-output-artifact-proof-2026-06-20.json"
+          data-review-packet-path="docs/validation/proofs/super-resolution/sr-synthetic-output-artifact-proof-2026-06-20.json"
           data-runtime-status="dry_run_preview"
           data-source-preflight-effective-scale="2"
           data-source-preflight-status="ready"

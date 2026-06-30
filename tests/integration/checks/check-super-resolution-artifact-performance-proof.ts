@@ -4,8 +4,9 @@ import { existsSync } from 'node:fs';
 
 import { z } from 'zod';
 
-const REPORT_PATH = 'docs/validation/super-resolution-artifact-performance-proof-2026-06-18.json';
-const PERFORMANCE_FIXTURES_PATH = 'docs/validation/super-resolution-performance-fixtures.json';
+const REPORT_PATH =
+  'docs/validation/proofs/super-resolution/super-resolution-artifact-performance-proof-2026-06-18.json';
+const PERFORMANCE_FIXTURES_PATH = 'docs/validation/fixtures/super-resolution-performance-fixtures.json';
 const GENERATED_AT = '2026-06-18T00:00:00.000Z';
 const BYTES_PER_LINEAR_RGBA16_PIXEL = 8;
 const MIN_IMPROVEMENT_RATIO = 0.65;

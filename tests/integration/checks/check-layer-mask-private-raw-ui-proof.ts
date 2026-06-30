@@ -5,8 +5,8 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-const REPORT_PATH = 'docs/validation/layer-mask-private-raw-ui-proof-2026-06-20.json';
-const RUNTIME_REPORT_PATH = 'docs/validation/layer-mask-real-raw-proof-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/layers-masks/layer-mask-private-raw-ui-proof-2026-06-20.json';
+const RUNTIME_REPORT_PATH = 'docs/validation/proofs/layers-masks/layer-mask-real-raw-proof-2026-06-18.json';
 const SCREENSHOT_PATH = 'artifacts/visual-smoke/layer-mask-private-raw-ui.png';
 const FIXTURE_ID = 'validation.layer-mask-real-raw.alaska-local-adjustment.v1';
 const update = process.argv.includes('--update');

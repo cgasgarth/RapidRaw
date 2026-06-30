@@ -6,8 +6,8 @@
 - Repository: `cgasgarth/RapidRaw`
 - Related docs:
   - [Sample agent guide](sample-agent-guide-2026-06-11.md)
-  - [Developer API guide](../api/developer-api-guide-2026-06-11.md)
-  - [Edit command API baseline](../api/edit-command-api-2026-06-11.md)
+  - [Developer API guide](../api/guide/developer-api-guide-2026-06-11.md)
+  - [Edit command API baseline](../api/commands/edit-command-api-2026-06-11.md)
   - [AI hooks baseline](../baseline/rapidraw-ai-hooks-baseline-2026-06-11.md)
   - [AI provider abstraction](../api/ai-provider-abstraction-2026-06-12.md)
 

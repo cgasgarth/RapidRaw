@@ -7,8 +7,8 @@ import { format, resolveConfig } from 'prettier';
 import { negativeLabQcProofArtifactV1Schema } from '../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { sampleNegativeLabQcProofArtifactV1 } from '../../packages/rawengine-schema/src/samplePayloads.ts';
 
-const OUTPUT_HTML_PATH = 'docs/validation/negative-lab-qc-contact-sheet-proof-2026-06-16.html';
-const OUTPUT_SVG_PATH = 'docs/validation/negative-lab-qc-contact-sheet-proof-2026-06-16.svg';
+const OUTPUT_HTML_PATH = 'docs/validation/proofs/negative-lab/negative-lab-qc-contact-sheet-proof-2026-06-16.html';
+const OUTPUT_SVG_PATH = 'docs/validation/proofs/negative-lab/negative-lab-qc-contact-sheet-proof-2026-06-16.svg';
 const args = new Set(process.argv.slice(2));
 const shouldUpdate = args.has('--update');
 const proof = negativeLabQcProofArtifactV1Schema.parse(sampleNegativeLabQcProofArtifactV1);

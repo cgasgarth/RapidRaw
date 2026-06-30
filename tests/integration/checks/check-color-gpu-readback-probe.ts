@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 
 const EXPECTED_BYTE_HASH = 'sha256:be2ed0f28ed5d492dfd4f03c6f6f0ca559819d57f38a474448e57d8da41dc572';
-const RUNTIME_PROOF_PATH = 'docs/validation/color-gpu-readback-runtime-smoke-2026-06-20.json';
+const RUNTIME_PROOF_PATH = 'docs/validation/proofs/color/color-gpu-readback-runtime-smoke-2026-06-20.json';
 
 const reportSchema = z
   .object({

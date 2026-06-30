@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 
 import { z } from 'zod';
 
-const REPORT_PATH = 'docs/validation/super-resolution-alignment-detail-proof-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/super-resolution/super-resolution-alignment-detail-proof-2026-06-18.json';
 const SMOKE_REPORT_PATH = 'artifacts/super-resolution-synthetic-smoke/super-resolution-synthetic-smoke-report.json';
 const RUNTIME_REPORT_PATH =
   'artifacts/super-resolution-runtime-plan-smoke/super-resolution-runtime-plan-smoke-report.json';

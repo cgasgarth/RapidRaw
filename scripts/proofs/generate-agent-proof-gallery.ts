@@ -13,7 +13,7 @@ import {
   sampleRawEngineAgentReplayFixtureV1,
 } from '../../packages/rawengine-schema/src/samplePayloads.ts';
 
-const OUTPUT_PATH = 'docs/validation/agent-replay-proof-gallery-2026-06-16.html';
+const OUTPUT_PATH = 'docs/validation/proofs/agent/agent-replay-proof-gallery-2026-06-16.html';
 const args = new Set(process.argv.slice(2));
 const shouldUpdate = args.has('--update');
 

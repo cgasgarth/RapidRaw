@@ -14,7 +14,7 @@ import {
 import { applyColorBalanceRgbToPixel } from '../../../src/utils/colorBalanceRgbRuntime.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
-const REPORT_PATH = 'docs/validation/color-balance-rgb-apply-proof-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/color/color-balance-rgb-apply-proof-2026-06-18.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 const ranges = ['shadows', 'midtones', 'highlights'];
 const rgbPixelSchema = z

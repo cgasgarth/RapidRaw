@@ -58,7 +58,7 @@ interface BuildSuperResolutionOutputReviewOptions {
 }
 
 const reviewCropCount = 4;
-const reviewPacketPath = 'docs/validation/sr-synthetic-output-artifact-proof-2026-06-20.json';
+const reviewPacketPath = 'docs/validation/proofs/super-resolution/sr-synthetic-output-artifact-proof-2026-06-20.json';
 export const superResolutionSyntheticReviewArtifacts: SuperResolutionOutputReviewWorkflow['reviewArtifacts'] = [
   {
     contentHash: 'sha256:8ae4f09c9c12e8cccd3731f8a04a0fc75ec8ae0aab8bf999f79f2f3855053a74',

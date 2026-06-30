@@ -4,8 +4,8 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-const ALIGNMENT_REPORT_PATH = 'docs/validation/panorama-feature-transform-proof-2026-06-18.json';
-const REPORT_PATH = 'docs/validation/panorama-projection-crop-proof-2026-06-18.json';
+const ALIGNMENT_REPORT_PATH = 'docs/validation/proofs/panorama/panorama-feature-transform-proof-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/panorama/panorama-projection-crop-proof-2026-06-18.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 const ALGORITHM_ID = 'synthetic_projection_crop_v1';
 const RUNTIME_STATUS = 'projection_crop_metadata_proof';

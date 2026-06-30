@@ -1,0 +1,37 @@
+{
+  "doesNotProve": ["full_macos_app_manual_session", "manual_layer_panel_interaction"],
+  "e2eIssue": 2310,
+  "issue": 2310,
+  "proofBoundary": "private_raw_tauri_runtime_plus_visual_smoke_not_manual_layer_panel_e2e",
+  "proofStatus": "private_raw_layer_mask_runtime_with_ui_smoke",
+  "privateRawRuntime": {
+    "artifactCount": 6,
+    "fixtureId": "validation.layer-mask-real-raw.alaska-local-adjustment.v1",
+    "metricCount": 5,
+    "proves": [
+      "private_real_raw_decode",
+      "layer_mask_generation",
+      "masked_adjustment_changes_pixels",
+      "mask_refinement_changes_pixels",
+      "refined_preview_export_parity"
+    ],
+    "runtimeReportPath": "docs/validation/proofs/layers-masks/layer-mask-real-raw-proof-2026-06-18.json",
+    "validationMode": "private_raw_tauri_runtime_proof"
+  },
+  "schemaVersion": 1,
+  "validationCommands": [
+    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root bun run check:layer-mask-real-raw-proof -- --require-assets",
+    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root bun run check:layer-mask-private-raw-ui-smoke",
+    "bun run check:layer-mask-private-raw-ui-proof"
+  ],
+  "visualReview": {
+    "dimensions": {
+      "height": 960,
+      "width": 1440
+    },
+    "scenario": "layer-mask-private-raw-ui",
+    "screenshotHash": "sha256:523bdbd5bdd6b343d8aeb25421ab8ca11f08f3b5932913a3331e0d648322a381",
+    "screenshotPath": "artifacts/visual-smoke/layer-mask-private-raw-ui.png",
+    "workflowControlsExercised": true
+  }
+}

@@ -5,7 +5,7 @@ import { parseFocusConfidenceSourceMapReport } from '../../../src/schemas/focusC
 import { parseFocusSharpnessMapReport } from '../../../src/schemas/focusSharpnessMapSchemas.ts';
 import { buildFocusConfidenceSourceMapReport } from '../../../src/utils/focusConfidenceSourceMap.ts';
 
-const REPORT_PATH = 'docs/validation/focus-confidence-source-map-2026-06-20.json';
+const REPORT_PATH = 'docs/validation/proofs/focus/focus-confidence-source-map-2026-06-20.json';
 const SHARPNESS_REPORT_PATH = 'artifacts/focus-sharpness-map/focus-sharpness-map-report.json';
 const update = process.argv.includes('--update');
 

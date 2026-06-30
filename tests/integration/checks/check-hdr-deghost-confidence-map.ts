@@ -13,7 +13,7 @@ import {
 import { buildHdrRuntimeDryRunV1 } from '../../../packages/rawengine-schema/src/hdrRuntimePlan.ts';
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
-const REPORT_PATH = 'docs/validation/hdr-deghost-confidence-map-2026-06-20.json';
+const REPORT_PATH = 'docs/validation/proofs/hdr/hdr-deghost-confidence-map-2026-06-20.json';
 const GENERATED_AT = '2026-06-20T00:00:00.000Z';
 const WIDTH = 64;
 const HEIGHT = 40;

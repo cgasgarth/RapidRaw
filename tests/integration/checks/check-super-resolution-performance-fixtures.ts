@@ -44,7 +44,7 @@ const SrPerformanceManifestSchema = z
 
 const formatBytes = (bytes) => `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
 
-const manifestPath = resolve('docs/validation/super-resolution-performance-fixtures.json');
+const manifestPath = resolve('docs/validation/fixtures/super-resolution-performance-fixtures.json');
 const manifest = SrPerformanceManifestSchema.parse(JSON.parse(await readFile(manifestPath, 'utf8')));
 const fixtureIds = new Set();
 const failures = [];

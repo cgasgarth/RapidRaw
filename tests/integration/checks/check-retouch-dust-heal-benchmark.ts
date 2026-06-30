@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 import { z } from 'zod';
 
-const reportPath = 'docs/validation/retouch-dust-heal-benchmark-2026-06-26.json';
+const reportPath = 'docs/validation/proofs/detail-retouch/retouch-dust-heal-benchmark-2026-06-26.json';
 
 const sha256Schema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 const metricSchema = z.object({

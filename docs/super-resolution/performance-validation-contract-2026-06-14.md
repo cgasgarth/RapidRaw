@@ -131,4 +131,4 @@ PRs must satisfy as soon as image-processing code lands.
 Issue #1941 adds `bun run check:sr-artifact-performance-proof`, which combines
 the runtime output artifact hash with performance fixture budgets, proxy peak
 memory, measured runtime, and preview/export parity status at
-`docs/validation/super-resolution-artifact-performance-proof-2026-06-18.json`.
+`docs/validation/proofs/super-resolution/super-resolution-artifact-performance-proof-2026-06-18.json`.

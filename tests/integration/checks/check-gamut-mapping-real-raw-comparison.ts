@@ -10,7 +10,7 @@ import { z } from 'zod';
 
 import { parseRawOpenEditExportRunReportCollection } from '../../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
 
-const REPORT_PATH = 'docs/validation/gamut-mapping-real-raw-comparison-2026-06-26.json';
+const REPORT_PATH = 'docs/validation/proofs/color/gamut-mapping-real-raw-comparison-2026-06-26.json';
 const PRIVATE_ROOT = '/tmp/rawengine-gamut-mapping-v4-real-raw-proof';
 const PERCEPTUAL_REPORT_PATH = `${PRIVATE_ROOT}/raw-open-edit-export-run-reports.json`;
 const RELATIVE_REPORT_PATH = `${PRIVATE_ROOT}/raw-open-edit-export-relative-run-reports.json`;

@@ -32,7 +32,7 @@ import {
 } from '../../../src/utils/selectiveColorCommandBridge.ts';
 import { applySelectiveColorToRgbPixel, type RgbPixel } from '../../../src/utils/selectiveColorRuntime.ts';
 
-const REPORT_PATH = 'docs/validation/selective-color-command-proof-2026-06-20.json';
+const REPORT_PATH = 'docs/validation/proofs/color-selective/selective-color-command-proof-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 
 const rgbPixelSchema = z

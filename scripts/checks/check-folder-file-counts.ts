@@ -21,34 +21,6 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4237',
     reason: 'workflow names are branch-protection sensitive',
   },
-  'docs/api': {
-    issue: '#4236',
-    reason: 'API docs are being audited into grouped contracts',
-  },
-  'docs/color': {
-    issue: '#4232',
-    reason: 'color workflow docs are pending domain grouping',
-  },
-  'docs/negative-lab': {
-    issue: '#4229',
-    reason: 'negative lab docs are pending spec/evidence grouping',
-  },
-  'docs/panorama': {
-    issue: '#4233',
-    reason: 'panorama docs are pending algorithm/validation grouping',
-  },
-  'docs/release': {
-    issue: '#4235',
-    reason: 'release docs are pending process/evidence grouping',
-  },
-  'docs/tooling': {
-    issue: '#4215',
-    reason: 'tooling notes are pending pruning after lint/test migrations',
-  },
-  'docs/validation': {
-    issue: '#4211',
-    reason: 'validation artifacts are pending generated-vs-human review split',
-  },
   'fixtures/color': {
     issue: '#4220',
     reason: 'color fixtures are pending workflow grouping',

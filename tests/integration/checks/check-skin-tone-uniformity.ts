@@ -17,7 +17,7 @@ import {
 import { applySkinToneUniformity, applySkinToneUniformityToRgbPixel } from '../../../src/utils/skinToneUniformity.ts';
 
 const FIXTURE_PATH = 'fixtures/color/skin-tone-uniformity-fixtures.json';
-const REPORT_PATH = 'docs/validation/skin-tone-uniformity-runtime-ui-proof-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/color-selective/skin-tone-uniformity-runtime-ui-proof-2026-06-18.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 
 const skinPatchSchema = z

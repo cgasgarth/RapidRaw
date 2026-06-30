@@ -416,7 +416,7 @@ async function readLayerMaskPreviewDataUrl(path) {
   }
 }
 
-const brushMaskCanvasReportPath = 'docs/validation/brush-mask-canvas-ui-proof-2026-06-22.json';
+const brushMaskCanvasReportPath = 'docs/validation/proofs/layers-masks/brush-mask-canvas-ui-proof-2026-06-22.json';
 const brushMaskCanvasPaintReportPath = 'artifacts/visual-smoke/brush-mask-canvas-paint.png';
 const brushMaskCanvasFinalReportPath = 'artifacts/visual-smoke/brush-mask-canvas-ui.png';
 const brushMaskCanvasPaintPath = resolve(brushMaskCanvasPaintReportPath);
@@ -894,7 +894,9 @@ async function loadNegativeLabPublicExportProof(): Promise<NegativeLabPublicExpo
   const outputPath =
     'src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg';
   const report = negativeLabPublicExportReportSchema.parse(
-    JSON.parse(await readFile('docs/validation/negative-lab-public-export-proof-2026-06-20.json', 'utf8')),
+    JSON.parse(
+      await readFile('docs/validation/proofs/negative-lab/negative-lab-public-export-proof-2026-06-20.json', 'utf8'),
+    ),
   );
   return {
     appliedProfileClaimPolicy: report.appliedProfile.claimPolicy,
@@ -954,7 +956,14 @@ async function loadNegativeLabRealRawPrivateProof(): Promise<NegativeLabRealRawP
         )
         .length(4),
     })
-    .parse(JSON.parse(await readFile('docs/validation/negative-lab-real-raw-private-proof-2026-06-22.json', 'utf8')));
+    .parse(
+      JSON.parse(
+        await readFile(
+          'docs/validation/proofs/negative-lab/negative-lab-real-raw-private-proof-2026-06-22.json',
+          'utf8',
+        ),
+      ),
+    );
   const outputArtifact = report.workflowArtifacts.find((artifact) => artifact.kind === 'positive_jpeg_private');
   if (outputArtifact === undefined) throw new Error('Negative Lab private RAW output artifact missing.');
   return {
@@ -1827,7 +1836,9 @@ async function prepareScenario(page, mode) {
       timeout: 1_000,
     });
     await page
-      .getByText('docs/validation/sr-synthetic-output-artifact-proof-2026-06-20.json', { exact: true })
+      .getByText('docs/validation/proofs/super-resolution/sr-synthetic-output-artifact-proof-2026-06-20.json', {
+        exact: true,
+      })
       .waitFor({
         state: 'detached',
         timeout: 1_000,

@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { applySkinToneUniformity, applySkinToneUniformityToRgbPixel } from '../../../src/utils/skinToneUniformity.ts';
 
 const FIXTURE_PATH = 'fixtures/color/hue-memory-color-gate.json';
-const REPORT_PATH = 'docs/validation/color-hue-memory-gate-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/color/color-hue-memory-gate-2026-06-18.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 const MAX_NEUTRAL_RGB_DRIFT = 1e-12;
 

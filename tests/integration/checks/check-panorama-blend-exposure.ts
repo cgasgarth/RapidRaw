@@ -4,8 +4,8 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-const PROJECTION_REPORT_PATH = 'docs/validation/panorama-projection-crop-proof-2026-06-18.json';
-const REPORT_PATH = 'docs/validation/panorama-blend-exposure-proof-2026-06-18.json';
+const PROJECTION_REPORT_PATH = 'docs/validation/proofs/panorama/panorama-projection-crop-proof-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/panorama/panorama-blend-exposure-proof-2026-06-18.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 const ALGORITHM_ID = 'synthetic_feather_gain_blend_v1';
 const RUNTIME_STATUS = 'blend_exposure_pixel_proof';

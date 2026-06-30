@@ -4,9 +4,9 @@ import { existsSync } from 'node:fs';
 
 import { z } from 'zod';
 
-const PROJECTION_REPORT_PATH = 'docs/validation/panorama-projection-crop-proof-2026-06-18.json';
+const PROJECTION_REPORT_PATH = 'docs/validation/proofs/panorama/panorama-projection-crop-proof-2026-06-18.json';
 const PERFORMANCE_FIXTURES_PATH = 'fixtures/panorama/panorama-performance-fixtures.json';
-const REPORT_PATH = 'docs/validation/panorama-projection-memory-proof-2026-06-18.json';
+const REPORT_PATH = 'docs/validation/proofs/panorama/panorama-projection-memory-proof-2026-06-18.json';
 const GENERATED_AT = '2026-06-18T00:00:00.000Z';
 const BYTES_PER_RGBA16_PIXEL = 8;
 

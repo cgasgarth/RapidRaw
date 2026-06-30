@@ -24,7 +24,7 @@ import {
   sampleToolRegistryV1,
 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 
-const REPORT_PATH = 'docs/validation/agent-app-server-raw-edit-proof-2026-06-20.json';
+const REPORT_PATH = 'docs/validation/proofs/agent/agent-app-server-raw-edit-proof-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 const ISSUE_NUMBER = 2315;
 
