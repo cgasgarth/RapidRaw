@@ -1,0 +1,23 @@
+{
+  "acceptanceCriteria": [
+    "Selects one private Alaska RAW in the editor and library stores before agent dispatch.",
+    "Runs the existing iterative loop through dispatchAgentLiveEditorTool and rawEngineAppServerHost.",
+    "Requires approved dry-run plan hashes before both mutating apply turns.",
+    "Renders two distinct selected-image preview envelopes, including a second detail-review crop.",
+    "Rolls the live editor history back to the session-start checkpoint after review.",
+    "Hashes the private source RAW before and after the loop and requires no overwrite."
+  ],
+  "doesNotProve": [
+    "Does not commit or publish private Alaska image pixels, RAW hashes, or per-file metadata.",
+    "Does not prove a separate #4149 outer selected-image preview-loop command because this branch only exposes selected-image state and approved inner agent dispatch tools.",
+    "Does not prove Capture One or Lightroom quality equivalence.",
+    "Does not prove GPU/native decoder parity beyond the selected-image preview loop path exercised here."
+  ],
+  "fixtureId": "agent.selected-image-preview-loop.private-alaska.v1",
+  "privateArtifactDir": "private-artifacts/validation/agent-preview-loop",
+  "privateSourceDefault": "/Users/cgas/Pictures/Capture One/Alaska",
+  "proofStatus": "public_contract_private_runtime_required",
+  "schemaVersion": 1,
+  "validationCommand": "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-agent-preview-loop-proof RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun run check:agent-selected-image-preview-loop-private-raw -- --require-assets",
+  "validationMode": "agent_selected_image_preview_loop_private_raw"
+}
