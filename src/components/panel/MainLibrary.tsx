@@ -44,6 +44,7 @@ import UiText from '../ui/primitives/Text';
 import LibraryGrid from './library/LibraryGrid';
 import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
 import LibraryHeaderStatusStrip from './library/LibraryHeaderStatusStrip';
+import { LibraryRawOnlyEmptyState, shouldShowRawOnlyEmptyState } from './library/libraryEmptyState';
 import { buildLibraryHeaderStatusItems } from './library/libraryHeaderStatus';
 
 const SettingsPanel = lazy(() => import('./SettingsPanel.js').then((module) => ({ default: module.SettingsPanel })));
@@ -120,6 +121,8 @@ export default function MainLibrary(props: MainLibraryProps) {
 
   const searchCriteria = useLibraryStore((state) => state.searchCriteria);
   const filterCriteria = useLibraryStore((state) => state.filterCriteria);
+  const libraryImageList = useLibraryStore((state) => state.imageList);
+  const setFilterCriteria = useLibraryStore((state) => state.setFilterCriteria);
   const sortCriteria = useLibraryStore((state) => state.sortCriteria);
   const thumbnails = useProcessStore((state) => state.thumbnails);
   const { onRequestThumbnails } = props;
@@ -201,6 +204,12 @@ export default function MainLibrary(props: MainLibraryProps) {
       }),
     [filterCriteria, props.libraryViewMode, searchCriteria, sortCriteria, t, translatedSortOptions],
   );
+  const isRawOnlyEmptyState = shouldShowRawOnlyEmptyState({
+    filterCriteria,
+    searchCriteria,
+    sourceImageCount: libraryImageList.length,
+    visibleImageCount: props.imageList.length,
+  });
 
   const isBusy =
     props.isLoading ||
@@ -352,7 +361,7 @@ export default function MainLibrary(props: MainLibraryProps) {
               <AnimatePresence>
                 {splashImage && (
                   <motion.img
-                    key={splashImage + '-ambient'}
+                    key={`${splashImage}-ambient`}
                     src={splashImage}
                     className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-50 pointer-events-none"
                     aria-hidden="true"
@@ -598,15 +607,13 @@ export default function MainLibrary(props: MainLibraryProps) {
             sortOptions={translatedSortOptions}
           />
           {!props.isAndroid && (
-            <>
-              <Button
-                className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
-                onClick={props.onNavigateToCommunity}
-                data-tooltip={t('library.tooltips.communityPresets')}
-              >
-                <Users className="w-8 h-8" />
-              </Button>
-            </>
+            <Button
+              className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
+              onClick={props.onNavigateToCommunity}
+              data-tooltip={t('library.tooltips.communityPresets')}
+            >
+              <Users className="w-8 h-8" />
+            </Button>
           )}
           <Button
             className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
@@ -720,6 +727,14 @@ export default function MainLibrary(props: MainLibraryProps) {
                   : t('library.status.processing')}
           </UiText>
           <UiText className="mt-2">{t('library.status.moment')}</UiText>
+        </div>
+      ) : isRawOnlyEmptyState ? (
+        <div className="flex-1 flex flex-col items-center justify-center" onContextMenu={props.onEmptyAreaContextMenu}>
+          <LibraryRawOnlyEmptyState
+            onResetRawFilter={() => {
+              setFilterCriteria((prev) => ({ ...prev, rawStatus: RawStatus.All }));
+            }}
+          />
         </div>
       ) : searchCriteria.tags.length > 0 || searchCriteria.text ? (
         <div
