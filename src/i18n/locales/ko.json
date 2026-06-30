@@ -30,7 +30,8 @@
         "saturation": "채도",
         "shadows": "섀도우",
         "tint": "틴트",
-        "title": "색상 보정"
+        "title": "색상 보정",
+        "disclosureSummary": "Primary calibration and shadows tint."
       },
       "colorGrading": "컬러 그레이딩",
       "colorMixer": "컬러 믹서",
@@ -63,7 +64,16 @@
       "vibrance": "생동감",
       "wbPickerTooltip": "화이트 밸런스 피커",
       "wbPickerWgpuDisabled": "WB 피커: 설정에서 WGPU를 비활성화하세요.",
-      "whiteBalance": "화이트 밸런스"
+      "whiteBalance": "화이트 밸런스",
+      "collapsed": "Collapsed",
+      "proofingDiagnostics": {
+        "summary": "{{warningCount}} warning/status item(s) · {{coverage}} gamut coverage",
+        "title": "Proofing / Diagnostics"
+      },
+      "advanced": {
+        "title": "Advanced Color",
+        "summary": "Levels, primary calibration, and shadows tint."
+      }
     },
     "curves": {
       "channelTitle": "{{channel}} 채널",

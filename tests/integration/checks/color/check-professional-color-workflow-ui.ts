@@ -113,6 +113,8 @@ const { default: ColorPanel } = await import('../../../../src/components/adjustm
 await validateLocaleContract();
 const rendered = await renderColorPanel();
 await validateFoundationalColorControlOrder(rendered.container);
+await validatePresentationGrouping(rendered.container);
+await openDisclosure(rendered.container, 'color-proofing-diagnostics-disclosure');
 await validateRenderedWorkspaceCoverage(rendered.container);
 await validateGamutWarningCoverage(rendered.container);
 await validateProfileToneAndReadiness(rendered.container);
@@ -138,6 +140,10 @@ async function validateLocaleContract() {
     'colorBalanceRgb.title',
     'colorGrading',
     'colorMixer',
+    'collapsed',
+    'advanced.summary',
+    'advanced.title',
+    'calibration.disclosureSummary',
     'gamutWarning.coverage',
     'gamutWarning.off',
     'gamutWarning.on',
@@ -161,6 +167,8 @@ async function validateLocaleContract() {
     'skinToneUniformity.targetSaturation',
     'skinToneUniformity.title',
     'skinToneUniformity.warning',
+    'proofingDiagnostics.summary',
+    'proofingDiagnostics.title',
     'workflowRecipes.apply',
     'workflowRecipes.cleanPortrait',
     'workflowRecipes.cleanPortraitDescription',
@@ -178,6 +186,46 @@ async function validateLocaleContract() {
   const missing = requiredLocaleKeys.filter((key) => typeof getValue(colorLocale, key) !== 'string');
 
   failures.push(...missing.map((key) => `missing professional color workflow locale key: ${key}`));
+}
+
+async function validatePresentationGrouping(container: Element) {
+  assertClosedDisclosure(
+    getByTestId<HTMLDetailsElement>(container, 'professional-color-recipes-disclosure'),
+    'workflow recipes disclosure should start collapsed.',
+  );
+  assertClosedDisclosure(
+    getByTestId<HTMLDetailsElement>(container, 'color-proofing-diagnostics-disclosure'),
+    'proofing diagnostics disclosure should start collapsed.',
+  );
+  assertClosedDisclosure(
+    getByTestId<HTMLDetailsElement>(container, 'advanced-color-disclosure'),
+    'advanced color disclosure should start collapsed.',
+  );
+
+  const quickWhiteBalance = getByTestId(container, 'color-quick-white-balance');
+  const quickPresence = getByTestId(container, 'color-quick-presence');
+  const profileTone = getByTestId(container, 'profile-tone-visible-receipt');
+  const proofing = getByTestId(container, 'color-proofing-diagnostics-disclosure');
+  const advanced = getByTestId(container, 'advanced-color-disclosure');
+  assertPrecedes(
+    quickWhiteBalance,
+    profileTone,
+    'white-balance controls should render before profile/proofing groups.',
+  );
+  assertPrecedes(quickPresence, proofing, 'presence controls should render before proofing diagnostics.');
+  assertPrecedes(proofing, advanced, 'proofing diagnostics should render before advanced color calibration.');
+
+  const proofingSummary = getByTestId(container, 'color-proofing-warning-summary');
+  assertVisibleText(
+    proofingSummary,
+    'sRGB gamut · 12.5%',
+    'proofing warning summary did not keep gamut status visible.',
+  );
+  assertVisibleText(
+    proofingSummary,
+    'May affect other orange-range colors; not skin detection or Capture One equivalence.',
+    'proofing warning summary did not keep skin-tone status visible.',
+  );
 }
 
 async function renderColorPanel(): Promise<RenderedPanel> {
@@ -367,13 +415,15 @@ async function validateProfileToneAndReadiness(container: Element) {
 }
 
 async function validateRecipeApplication(container: Element) {
-  const recipes = getByTestId(container, 'professional-color-recipes');
-  assertVisibleText(recipes, 'Workflow Recipes', 'workflow recipe title was not rendered.');
+  await openDisclosure(container, 'professional-color-recipes-disclosure');
+  const recipesDisclosure = getByTestId(container, 'professional-color-recipes-disclosure');
+  assertVisibleText(recipesDisclosure, 'Workflow Recipes', 'workflow recipe title was not rendered.');
   assertVisibleText(
-    recipes,
+    recipesDisclosure,
     'Apply coordinated profile, tone, balance, mixer, selective color, and grading settings.',
     'workflow recipe description was not rendered.',
   );
+  const recipes = getByTestId(container, 'professional-color-recipes');
   const cleanPortrait = getByTestId<HTMLButtonElement>(container, 'professional-color-recipe-cleanPortrait');
   assertData(cleanPortrait, 'cameraProfile', 'camera_portrait', 'clean portrait recipe did not expose profile.');
   assertData(cleanPortrait, 'toneCurve', 'soft_contrast', 'clean portrait recipe did not expose tone curve.');
@@ -496,6 +546,7 @@ function installDom() {
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: window.navigator });
   Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: window.HTMLElement });
   Object.defineProperty(globalThis, 'HTMLButtonElement', { configurable: true, value: window.HTMLButtonElement });
+  Object.defineProperty(globalThis, 'HTMLDetailsElement', { configurable: true, value: window.HTMLDetailsElement });
   Object.defineProperty(globalThis, 'HTMLInputElement', { configurable: true, value: window.HTMLInputElement });
   Object.defineProperty(globalThis, 'HTMLSelectElement', { configurable: true, value: window.HTMLSelectElement });
   Object.defineProperty(globalThis, 'Event', { configurable: true, value: window.Event });
@@ -517,6 +568,26 @@ function getByTestId<T extends HTMLElement = HTMLElement>(container: Element, te
   const element = container.querySelector(`[data-testid="${testId}"]`);
   assert.ok(element, `missing test id: ${testId}`);
   return element as T;
+}
+
+async function openDisclosure(container: Element, testId: string) {
+  const disclosure = getByTestId<HTMLDetailsElement>(container, testId);
+  if (disclosure.open) return;
+  const summary = disclosure.querySelector('summary');
+  assert.ok(summary, `missing summary for disclosure: ${testId}`);
+  await act(async () => {
+    summary.click();
+    await flushPromises();
+  });
+  if (!disclosure.open) failures.push(`disclosure did not open: ${testId}`);
+}
+
+function assertClosedDisclosure(disclosure: HTMLDetailsElement, message: string) {
+  if (disclosure.open || disclosure.hasAttribute('open')) failures.push(message);
+}
+
+function assertPrecedes(first: Element, second: Element, message: string) {
+  if ((first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING) === 0) failures.push(message);
 }
 
 function getRangeByLabel(container: Element, label: string): HTMLInputElement | null {
