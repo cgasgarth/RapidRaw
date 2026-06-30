@@ -47,6 +47,7 @@ const initialContext = buildAgentInitialPromptContext({
 const transcript = agentChatTranscriptSchema.parse(buildTranscript(initialContext));
 
 await validateRenderedShellBehavior(transcript, initialContext);
+await validateRenderedSelectedImageLoopFromPanel(transcript);
 await validateRenderedStaleState(transcript);
 await validateRenderedReviewStates(transcript);
 globalThis.localStorage.removeItem(LIVE_AGENT_AUDIT_STORE_KEY);
@@ -315,6 +316,90 @@ async function validateRenderedStaleState(renderedTranscript: AgentChatTranscrip
     'stale recipe warning did not render after graph recipe changed.',
   );
   assertData(staleWarning, 'stateStaleRecipeHash', 'true', 'stale state recipe hash was not exposed.');
+
+  rendered.unmount();
+  seedEditorStore();
+}
+
+async function validateRenderedSelectedImageLoopFromPanel(renderedTranscript: AgentChatTranscript) {
+  seedEditorStore();
+  const rendered = await renderShell(renderedTranscript);
+  const runButton = getButtonByName(rendered.container, 'Dry-run', 'selected-loop dry-run button did not render.');
+  const promptInput = getByTestId<HTMLTextAreaElement>(
+    rendered.container,
+    'agent-live-prompt-input',
+    'selected-loop prompt input did not render.',
+  );
+
+  await act(async () => {
+    promptInput.value = prompt;
+    promptInput.dispatchEvent(new Event('input', { bubbles: true }));
+    runButton.click();
+  });
+  await waitForCondition('selected-loop dry-run did not reach review-ready state.', () => {
+    return (
+      getByTestId(rendered.container, 'agent-live-prompt-composer', 'selected-loop composer did not render.').dataset
+        .livePromptStatus === 'dry_run_ready'
+    );
+  });
+
+  const loopButton = getByTestId<HTMLButtonElement>(
+    rendered.container,
+    'agent-live-selected-image-preview-loop',
+    'live selected-image preview-loop control did not render.',
+  );
+  if (loopButton.disabled) failures.push('live selected-image preview-loop control should enable after dry-run.');
+  assertData(
+    loopButton,
+    'dispatchPath',
+    'rawengine.agent.selected_image.preview_loop',
+    'live selected-image preview-loop control did not bind the typed dispatch path.',
+  );
+  await act(async () => {
+    loopButton.click();
+  });
+  await waitForCondition('selected-image loop did not render a runtime review from the AI panel.', () => {
+    return rendered.container.querySelector('[data-testid="agent-selected-image-preview-loop-review"]') !== null;
+  });
+
+  const selectedLoop = getByTestId(
+    rendered.container,
+    'agent-selected-image-preview-loop-review',
+    'selected-image preview-loop review did not render after panel dispatch.',
+  );
+  assertData(
+    selectedLoop,
+    'toolName',
+    'rawengine.agent.selected_image.preview_loop',
+    'panel selected-image loop review did not expose the selected-image tool.',
+  );
+  assertData(selectedLoop, 'selectedImagePath', selectedPath, 'panel selected-image loop used the wrong image path.');
+  assertData(selectedLoop, 'runtimeState', 'idle', 'panel selected-image loop review should render completed output.');
+  assertData(selectedLoop, 'acceptedDryRunPlanCount', '2', 'panel selected-image loop did not accept two dry-runs.');
+  assertData(selectedLoop, 'applyReceiptCount', '2', 'panel selected-image loop did not render two apply receipts.');
+  assertData(selectedLoop, 'previewLineageCount', '2', 'panel selected-image loop did not render preview lineage.');
+  assertData(
+    selectedLoop,
+    'rollbackReceiptGraphRevision',
+    'history_0',
+    'panel selected-image loop did not expose rollback-after-review receipt.',
+  );
+  const acceptApply = getByTestId<HTMLButtonElement>(
+    rendered.container,
+    'agent-selected-image-preview-loop-accept-apply',
+    'panel selected-image accept/apply state did not render.',
+  );
+  assertData(acceptApply, 'controlState', 'dispatched', 'panel selected-image apply state did not show dispatch.');
+  const changedPixels = Number(
+    getByTestId(
+      rendered.container,
+      'agent-selected-image-preview-loop-changed-pixels',
+      'panel selected-image changed-pixel metric did not render.',
+    ).textContent,
+  );
+  if (!Number.isFinite(changedPixels) || changedPixels <= 0) {
+    failures.push(`panel selected-image changed-pixel metric was not positive: ${changedPixels}.`);
+  }
 
   rendered.unmount();
   seedEditorStore();

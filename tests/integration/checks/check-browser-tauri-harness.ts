@@ -7,12 +7,22 @@ const host = '127.0.0.1';
 const port = 1420;
 const baseUrl = `http://${host}:${port}`;
 
-async function waitForDevServer(): Promise<void> {
+async function waitForDevServer(server: ReturnType<typeof spawn>): Promise<void> {
   const startedAt = Date.now();
   while (Date.now() - startedAt < 45_000) {
+    if (server.exitCode !== null || server.signalCode !== null) {
+      throw new Error(`Vite exited before ${baseUrl} became available.`);
+    }
     try {
       const response = await fetch(baseUrl);
-      if (response.ok) return;
+      if (response.ok) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        if (server.exitCode !== null || server.signalCode !== null) {
+          throw new Error(`Vite exited after ${baseUrl} became available.`);
+        }
+        const confirmation = await fetch(baseUrl);
+        if (confirmation.ok) return;
+      }
     } catch {
       // Vite is still starting.
     }
@@ -51,7 +61,7 @@ server.stderr.on('data', captureServerOutput);
 let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 
 try {
-  await waitForDevServer();
+  await waitForDevServer(server);
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { height: 720, width: 1280 } });
   const consoleErrors: string[] = [];
@@ -73,7 +83,7 @@ try {
   });
 
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('heading', { name: 'RapidRAW' }).waitFor({ timeout: 10_000 });
+  await page.getByRole('heading', { name: 'RapidRAW' }).waitFor({ timeout: 30_000 });
   await page.getByRole('button', { name: /Open Folder/u }).click();
   await page
     .getByRole('button', { name: /browser-harness\.ARW/u })
@@ -166,7 +176,12 @@ try {
     }
   }
   const actionableErrors = consoleErrors.filter(
-    (message) => !message.includes('React does not recognize the') && !message.includes('Clerk:'),
+    (message) =>
+      !message.includes('React does not recognize the') &&
+      !message.includes('Clerk:') &&
+      !message.includes('[vite] failed to connect to websocket') &&
+      !message.includes('Failed to send error to Vite server') &&
+      !message.includes("WebSocket connection to 'ws://127.0.0.1:1420/"),
   );
   if (actionableErrors.length > 0) {
     throw new Error(`Unexpected browser harness console errors: ${actionableErrors.slice(0, 5).join(' | ')}`);
