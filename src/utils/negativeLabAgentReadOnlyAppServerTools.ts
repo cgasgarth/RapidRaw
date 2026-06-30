@@ -27,7 +27,6 @@ import {
   buildNegativeLabStockFamilyConversionRouteResult,
 } from './negativeLabAppServerRoutes';
 import { buildNegativeLabPlanHash } from './negativeLabPlanIdentity';
-import { buildNegativeLabQcContactSheetArtifact } from './negativeLabQcContactSheetArtifact';
 
 export const NEGATIVE_LAB_AGENT_INSPECT_TOOL_NAME = 'negativelab.inspect_readonly';
 export const NEGATIVE_LAB_AGENT_CONVERSION_PLAN_TOOL_NAME = 'negativelab.plan_conversion_readonly';
@@ -153,6 +152,7 @@ export const negativeLabAgentQcProofResponseSchema = agentReadOnlyResponseBaseSc
         proofId: z.string().trim().min(1),
       })
       .strict(),
+    qcProofBundle: z.unknown(),
     report: z.unknown(),
     toolName: z.literal(NEGATIVE_LAB_AGENT_QC_PROOF_TOOL_NAME),
     warningCodes: z.array(z.string().trim().min(1)),
@@ -298,31 +298,25 @@ export const planNegativeLabAgentRollNormalizationReadOnly = (
 
 export const buildNegativeLabAgentQcProofReadOnly = (request: NegativeLabAgentQcProofRequest) => {
   const parsedRequest = negativeLabAgentQcProofRequestSchema.parse(request);
-  const report = buildNegativeLabQcProofRouteResult(parsedRequest.qc as NegativeLabQcProofAppServerCommand);
-  const sourcePathsByFrameId = new Map(
-    buildNegativeLabFrameHealthRouteResult(parsedRequest.qc).frames.map((frame) => [frame.frameId, frame.sourcePath]),
-  );
-  const contactSheet = buildNegativeLabQcContactSheetArtifact({
-    report,
-    sessionId: parsedRequest.sessionId ?? `negative_lab_agent_qc_${parsedRequest.requestId}`,
-    sourcePathsByFrameId,
-  });
-  const warningCodes = [...new Set(contactSheet.warnings.flatMap((warning) => warning.code))].sort((left, right) =>
+  const qcProofBundle = buildNegativeLabQcProofRouteResult(parsedRequest.qc as NegativeLabQcProofAppServerCommand);
+  const { artifact, report } = qcProofBundle;
+  const warningCodes = [...new Set(artifact.warnings.flatMap((warning) => warning.code))].sort((left, right) =>
     left.localeCompare(right),
   );
   const responsePayload = {
     contactSheetArtifact: {
-      artifactId: contactSheet.contactSheet.artifact.artifactId,
-      contentHash: contactSheet.contactSheet.artifact.contentHash,
-      proofId: contactSheet.proofId,
+      artifactId: artifact.contactSheet.artifact.artifactId,
+      contentHash: artifact.contactSheet.artifact.contentHash,
+      proofId: artifact.proofId,
     },
     warningCodes,
   };
 
   return negativeLabAgentQcProofResponseSchema.parse({
     ...responsePayload,
-    deterministicHash: stableReadOnlyHash({ ...responsePayload, report }),
+    deterministicHash: stableReadOnlyHash({ ...responsePayload, qcProofBundle }),
     proof: readOnlyProof([NegativeLabAppServerCommandName.QcProof]),
+    qcProofBundle,
     report,
     requestId: parsedRequest.requestId,
     selectedScope: parsedRequest.selectedScope,
