@@ -17,10 +17,7 @@ import { applyProfileToneToRgbPixel } from '../../../utils/color/profile/profile
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../../utils/profileTonePresets';
 import { getSelectiveColorRange } from '../../../utils/selectiveColorRanges';
 import UiText from '../../ui/primitives/Text';
-import AdjustmentSlider from '../AdjustmentSlider';
 import type { ColorPanelGroupProps } from './types';
-
-type LevelsNumericKey = Exclude<keyof Adjustments['levels'], 'enabled'>;
 
 const CAMERA_PROFILE_IDS = [
   'camera_standard',
@@ -220,7 +217,6 @@ const isProfessionalColorRecipeApplied = (adjustments: Adjustments, recipe: Prof
 
 interface ColorProfileToneControlsProps extends ColorPanelGroupProps {
   adjustmentVisibility: Record<string, boolean>;
-  levelsClippingWarnings: Array<string>;
   setActiveChannelMixerOutput: (output: ChannelMixerOutput) => void;
   setActiveColor: (color: BlackWhiteMixerChannel) => void;
   setActiveColorBalanceRange: (range: ColorBalanceRgbRange) => void;
@@ -229,19 +225,12 @@ interface ColorProfileToneControlsProps extends ColorPanelGroupProps {
 export const ColorProfileToneControls = ({
   adjustmentVisibility,
   adjustments,
-  levelsClippingWarnings,
-  onDragStateChange,
   setActiveChannelMixerOutput,
   setActiveColor,
   setActiveColorBalanceRange,
   setAdjustments,
 }: ColorProfileToneControlsProps) => {
   const { t } = useTranslation();
-  const levels = adjustments.levels;
-  const inputBlackMax = Math.max(0, Math.min(99, Math.round(levels.inputWhite * 100) - 1));
-  const inputWhiteMin = Math.min(100, Math.max(1, Math.round(levels.inputBlack * 100) + 1));
-  const outputBlackMax = Math.max(0, Math.min(99, Math.round(levels.outputWhite * 100) - 1));
-  const outputWhiteMin = Math.min(100, Math.max(1, Math.round(levels.outputBlack * 100) + 1));
 
   const cameraProfileOptions = useMemo(
     () =>
@@ -352,28 +341,82 @@ export const ColorProfileToneControls = ({
     });
   };
 
-  const handleLevelsToggle = () => {
-    setAdjustments((prev) => ({
-      ...prev,
-      levels: {
-        ...prev.levels,
-        enabled: !prev.levels.enabled,
-      },
-    }));
-  };
-
-  const handleLevelsChange = (key: LevelsNumericKey, value: number) => {
-    setAdjustments((prev) => ({
-      ...prev,
-      levels: {
-        ...prev.levels,
-        [key]: value,
-      },
-    }));
-  };
-
   return (
     <>
+      {(adjustmentVisibility[ColorAdjustment.CameraProfile] !== false ||
+        adjustmentVisibility[ColorAdjustment.ToneCurve] !== false) && (
+        <div className="p-2 bg-bg-tertiary rounded-md" data-testid="profile-tone-controls">
+          <UiText variant={TextVariants.heading} className="mb-3">
+            {t('adjustments.color.profileTone.title')}
+          </UiText>
+          {adjustmentVisibility[ColorAdjustment.CameraProfile] !== false && (
+            <div className="mb-3">
+              <UiText variant={TextVariants.label} color={TextColors.secondary} className="mb-2 block">
+                {t('adjustments.color.profileTone.cameraProfile')}
+              </UiText>
+              <select
+                className="w-full rounded bg-bg-secondary px-2 py-1 text-xs text-text-primary"
+                onChange={(event) => {
+                  handleCameraProfileChange(parseCameraProfileId(event.target.value));
+                }}
+                value={adjustments.cameraProfile}
+              >
+                {cameraProfileOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {adjustmentVisibility[ColorAdjustment.ToneCurve] !== false && (
+            <div>
+              <UiText variant={TextVariants.label} color={TextColors.secondary} className="mb-2 block">
+                {t('adjustments.color.profileTone.toneCurve')}
+              </UiText>
+              <select
+                className="w-full rounded bg-bg-secondary px-2 py-1 text-xs text-text-primary"
+                onChange={(event) => {
+                  handleToneCurveChange(parseToneCurveId(event.target.value));
+                }}
+                value={adjustments.toneCurve}
+              >
+                {toneCurveOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div
+            className="mt-3 grid gap-1 rounded border border-surface bg-bg-secondary p-2 text-[11px] text-text-secondary"
+            data-camera-profile={adjustments.cameraProfile}
+            data-luminance-after={profileToneReceipt.luminanceAfter.toFixed(4)}
+            data-luminance-before={profileToneReceipt.luminanceBefore.toFixed(4)}
+            data-testid="profile-tone-visible-receipt"
+            data-tone-curve={adjustments.toneCurve}
+            data-tone-delta={profileToneReceipt.toneDelta.toFixed(4)}
+          >
+            <span className="font-medium text-text-primary">{t('adjustments.color.profileTone.receiptTitle')}</span>
+            <span>
+              {t('adjustments.color.profileTone.receiptSummary', {
+                profile: activeCameraProfileLabel,
+                toneCurve: activeToneCurveLabel,
+              })}
+            </span>
+            <span>
+              {t('adjustments.color.profileTone.receiptRuntime', {
+                after: profileToneReceipt.luminanceAfter.toFixed(3),
+                before: profileToneReceipt.luminanceBefore.toFixed(3),
+                delta: profileToneReceipt.toneDelta.toFixed(3),
+              })}
+            </span>
+            <span>{t('adjustments.color.profileTone.receiptExportParity')}</span>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-md border border-border bg-bg-tertiary p-2" data-testid="professional-color-recipes">
         <div className="mb-2">
           <UiText variant={TextVariants.heading}>{t('adjustments.color.workflowRecipes.title')}</UiText>
@@ -446,161 +489,6 @@ export const ColorProfileToneControls = ({
           })}
         </div>
       </div>
-
-      {(adjustmentVisibility[ColorAdjustment.CameraProfile] !== false ||
-        adjustmentVisibility[ColorAdjustment.ToneCurve] !== false) && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <UiText variant={TextVariants.heading} className="mb-3">
-            {t('adjustments.color.profileTone.title')}
-          </UiText>
-          {adjustmentVisibility[ColorAdjustment.CameraProfile] !== false && (
-            <div className="mb-3">
-              <UiText variant={TextVariants.label} color={TextColors.secondary} className="mb-2 block">
-                {t('adjustments.color.profileTone.cameraProfile')}
-              </UiText>
-              <select
-                className="w-full rounded bg-bg-secondary px-2 py-1 text-xs text-text-primary"
-                onChange={(event) => {
-                  handleCameraProfileChange(parseCameraProfileId(event.target.value));
-                }}
-                value={adjustments.cameraProfile}
-              >
-                {cameraProfileOptions.map((option) => (
-                  <option key={option.key} value={option.key}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          {adjustmentVisibility[ColorAdjustment.ToneCurve] !== false && (
-            <div>
-              <UiText variant={TextVariants.label} color={TextColors.secondary} className="mb-2 block">
-                {t('adjustments.color.profileTone.toneCurve')}
-              </UiText>
-              <select
-                className="w-full rounded bg-bg-secondary px-2 py-1 text-xs text-text-primary"
-                onChange={(event) => {
-                  handleToneCurveChange(parseToneCurveId(event.target.value));
-                }}
-                value={adjustments.toneCurve}
-              >
-                {toneCurveOptions.map((option) => (
-                  <option key={option.key} value={option.key}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          <div
-            className="mt-3 grid gap-1 rounded border border-surface bg-bg-secondary p-2 text-[11px] text-text-secondary"
-            data-camera-profile={adjustments.cameraProfile}
-            data-luminance-after={profileToneReceipt.luminanceAfter.toFixed(4)}
-            data-luminance-before={profileToneReceipt.luminanceBefore.toFixed(4)}
-            data-testid="profile-tone-visible-receipt"
-            data-tone-curve={adjustments.toneCurve}
-            data-tone-delta={profileToneReceipt.toneDelta.toFixed(4)}
-          >
-            <span className="font-medium text-text-primary">{t('adjustments.color.profileTone.receiptTitle')}</span>
-            <span>
-              {t('adjustments.color.profileTone.receiptSummary', {
-                profile: activeCameraProfileLabel,
-                toneCurve: activeToneCurveLabel,
-              })}
-            </span>
-            <span>
-              {t('adjustments.color.profileTone.receiptRuntime', {
-                after: profileToneReceipt.luminanceAfter.toFixed(3),
-                before: profileToneReceipt.luminanceBefore.toFixed(3),
-                delta: profileToneReceipt.toneDelta.toFixed(3),
-              })}
-            </span>
-            <span>{t('adjustments.color.profileTone.receiptExportParity')}</span>
-          </div>
-        </div>
-      )}
-
-      {adjustmentVisibility[ColorAdjustment.Levels] !== false && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <UiText variant={TextVariants.heading}>{t('adjustments.color.levels.title')}</UiText>
-            <button
-              className={`px-2 py-1 rounded text-xs transition-colors ${
-                levels.enabled ? 'bg-accent text-button-text' : 'bg-bg-secondary text-text-secondary hover:bg-surface'
-              }`}
-              onClick={handleLevelsToggle}
-              type="button"
-            >
-              {levels.enabled ? t('adjustments.color.levels.enabled') : t('adjustments.color.levels.disabled')}
-            </button>
-          </div>
-          <AdjustmentSlider
-            label={t('adjustments.color.levels.inputBlack')}
-            max={inputBlackMax}
-            min={0}
-            onValueChange={(value) => {
-              handleLevelsChange('inputBlack', value / 100);
-            }}
-            step={1}
-            value={Math.round(levels.inputBlack * 100)}
-            onDragStateChange={onDragStateChange}
-          />
-          <AdjustmentSlider
-            label={t('adjustments.color.levels.inputWhite')}
-            max={100}
-            min={inputWhiteMin}
-            onValueChange={(value) => {
-              handleLevelsChange('inputWhite', value / 100);
-            }}
-            step={1}
-            value={Math.round(levels.inputWhite * 100)}
-            onDragStateChange={onDragStateChange}
-          />
-          <AdjustmentSlider
-            label={t('adjustments.color.levels.gamma')}
-            max={300}
-            min={25}
-            onValueChange={(value) => {
-              handleLevelsChange('gamma', value / 100);
-            }}
-            step={1}
-            value={Math.round(levels.gamma * 100)}
-            onDragStateChange={onDragStateChange}
-          />
-          <AdjustmentSlider
-            label={t('adjustments.color.levels.outputBlack')}
-            max={outputBlackMax}
-            min={0}
-            onValueChange={(value) => {
-              handleLevelsChange('outputBlack', value / 100);
-            }}
-            step={1}
-            value={Math.round(levels.outputBlack * 100)}
-            onDragStateChange={onDragStateChange}
-          />
-          <AdjustmentSlider
-            label={t('adjustments.color.levels.outputWhite')}
-            max={100}
-            min={outputWhiteMin}
-            onValueChange={(value) => {
-              handleLevelsChange('outputWhite', value / 100);
-            }}
-            step={1}
-            value={Math.round(levels.outputWhite * 100)}
-            onDragStateChange={onDragStateChange}
-          />
-          {levelsClippingWarnings.length > 0 && (
-            <div className="mt-2 space-y-1">
-              {levelsClippingWarnings.map((warning) => (
-                <UiText key={warning} variant={TextVariants.small} color={TextColors.secondary} className="block">
-                  {warning}
-                </UiText>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </>
   );
 };

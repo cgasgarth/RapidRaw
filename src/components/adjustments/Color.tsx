@@ -4,7 +4,7 @@ import type { BlackWhiteMixerChannel } from '../../schemas/color/blackWhiteMixer
 import type { ChannelMixerOutput } from '../../schemas/color/channelMixerSchemas';
 import type { ColorBalanceRgbRange } from '../../schemas/color/colorBalanceRgbSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
-import type { Adjustments } from '../../utils/adjustments';
+import { type Adjustments, ColorAdjustment } from '../../utils/adjustments';
 import {
   formatGamutWarningCoverage,
   isCurrentExportSoftProofGamutWarningOverlay,
@@ -84,6 +84,7 @@ export default function ColorPanel({
   const setEditor = useEditorStore((state) => state.setEditor);
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
   const isColorCalibrationVisible = (adjustmentVisibility as { colorCalibration?: boolean }).colorCalibration !== false;
+  const isLevelsVisible = adjustmentVisibility[ColorAdjustment.Levels] !== false;
   const isWgpuEnabled = appSettings?.useWgpuRenderer !== false;
   const activeExportPresetName = appSettings?.exportPresets?.[0]?.name ?? null;
   const isCurrentGamutWarningOverlay = isCurrentExportSoftProofGamutWarningOverlay(gamutWarningOverlay, {
@@ -138,6 +139,28 @@ export default function ColorPanel({
 
   return (
     <div className="space-y-4">
+      <ColorQuickControls
+        adjustments={adjustments}
+        appSettings={appSettings}
+        isForMask={isForMask}
+        isWbPickerActive={isWbPickerActive}
+        isWgpuEnabled={isWgpuEnabled}
+        onDragStateChange={onDragStateChange}
+        setAdjustments={setAdjustments}
+        {...(toggleWbPicker ? { toggleWbPicker } : {})}
+      />
+      {!isForMask && (
+        <ColorProfileToneControls
+          adjustmentVisibility={adjustmentVisibility}
+          adjustments={adjustments}
+          appSettings={appSettings}
+          onDragStateChange={onDragStateChange}
+          setActiveChannelMixerOutput={setActiveChannelMixerOutput}
+          setActiveColor={setActiveColor}
+          setActiveColorBalanceRange={setActiveColorBalanceRange}
+          setAdjustments={setAdjustments}
+        />
+      )}
       {!isForMask && (
         <ColorProofingDiagnostics
           activeCameraProfileLabel={activeCameraProfileLabel}
@@ -161,29 +184,6 @@ export default function ColorPanel({
           syncSkinToneUniformity={syncSkinToneUniformity}
         />
       )}
-      {!isForMask && (
-        <ColorProfileToneControls
-          adjustmentVisibility={adjustmentVisibility}
-          adjustments={adjustments}
-          appSettings={appSettings}
-          levelsClippingWarnings={levelsClippingWarnings}
-          onDragStateChange={onDragStateChange}
-          setActiveChannelMixerOutput={setActiveChannelMixerOutput}
-          setActiveColor={setActiveColor}
-          setActiveColorBalanceRange={setActiveColorBalanceRange}
-          setAdjustments={setAdjustments}
-        />
-      )}
-      <ColorQuickControls
-        adjustments={adjustments}
-        appSettings={appSettings}
-        isForMask={isForMask}
-        isWbPickerActive={isWbPickerActive}
-        isWgpuEnabled={isWgpuEnabled}
-        onDragStateChange={onDragStateChange}
-        setAdjustments={setAdjustments}
-        {...(toggleWbPicker ? { toggleWbPicker } : {})}
-      />
       <ColorMixerControls
         activeChannelMixerOutput={activeChannelMixerOutput}
         activeColor={activeColor}
@@ -204,10 +204,13 @@ export default function ColorPanel({
         onDragStateChange={onDragStateChange}
         setAdjustments={setAdjustments}
       />
-      {!isForMask && isColorCalibrationVisible && (
+      {!isForMask && (isLevelsVisible || isColorCalibrationVisible) && (
         <ColorAdvancedControls
+          adjustmentVisibility={adjustmentVisibility}
           adjustments={adjustments}
           appSettings={appSettings}
+          isColorCalibrationVisible={isColorCalibrationVisible}
+          levelsClippingWarnings={levelsClippingWarnings}
           onDragStateChange={onDragStateChange}
           setAdjustments={setAdjustments}
         />

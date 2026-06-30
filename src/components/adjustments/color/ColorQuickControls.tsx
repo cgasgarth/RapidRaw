@@ -29,7 +29,7 @@ export const ColorQuickControls = ({
   };
 
   return (
-    <>
+    <div className="space-y-3" data-testid="quick-color-controls">
       <div className="p-2 bg-bg-tertiary rounded-md">
         <div className="flex justify-between items-center mb-2">
           <UiText variant={TextVariants.heading}>{t('adjustments.color.whiteBalance')}</UiText>
@@ -118,6 +118,6 @@ export const ColorQuickControls = ({
           onDragStateChange={onDragStateChange}
         />
       </div>
-    </>
+    </div>
   );
 };
