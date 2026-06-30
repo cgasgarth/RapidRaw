@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { negativeLabQcProofArtifactV1Schema } from '../../packages/rawengine-schema/src/rawEngineSchemas';
 import { NegativeLabAppServerCommandName } from '../utils/negativeLabAppServerCommandNames';
 import { NEGATIVE_LAB_OUTPUT_FORMAT_IDS } from '../utils/negativeLabOutputFormatIds';
 import {
@@ -125,7 +126,20 @@ export const negativeLabAcceptBatchPlanAppServerCommandSchema = negativeLabFrame
     presetId: negativeLabRuntimePresetIdSchema,
   })
   .strict();
-export const negativeLabQcProofAppServerCommandSchema = negativeLabFrameHealthAppServerCommandSchema;
+export const negativeLabQcOverlayVisibilityAppServerSchema = z
+  .object({
+    densityWarnings: z.boolean(),
+    frameBounds: z.boolean(),
+    rejectedMarkers: z.boolean(),
+  })
+  .strict();
+export const negativeLabQcProofAppServerCommandSchema = negativeLabFrameHealthAppServerCommandSchema
+  .extend({
+    outputIntent: z.enum(['editable_positive', 'export_ready_preview', 'proof_preview']).optional(),
+    overlayVisibility: negativeLabQcOverlayVisibilityAppServerSchema.optional(),
+    qcDecisionByFrameId: z.record(z.string().trim().min(1), z.enum(['approved', 'pending', 'rejected'])).optional(),
+  })
+  .strict();
 export const negativeLabPlanRollNormalizationAppServerCommandSchema = negativeLabFrameHealthAppServerCommandSchema
   .extend({
     anchorFrameIds: z.array(z.string().trim().min(1)).min(1),
@@ -216,8 +230,9 @@ export const negativeLabFrameHealthRouteDescriptor = {
 export const negativeLabQcProofRouteDescriptor = {
   commandName: NegativeLabAppServerCommandName.QcProof,
   inputSchemaName: 'NegativeLabQcProofAppServerCommandV1',
-  outputSchemaName: 'NegativeLabQcProofReportV1',
-  reason: 'Negative Lab app-server calls expose the same contact-sheet QC proof summary used by the workspace UI.',
+  outputSchemaName: 'NegativeLabQcProofBundleV1',
+  reason:
+    'Negative Lab app-server calls expose the same contact-sheet QC proof report and artifact used by the workspace UI.',
 } as const satisfies NegativeLabRouteDescriptor;
 export const negativeLabPlanRollNormalizationRouteDescriptor = {
   commandName: NegativeLabAppServerCommandName.PlanRollNormalization,
@@ -422,7 +437,47 @@ export const negativeLabAcceptedBatchApplyPlanSchema = z
 
 export const negativeLabFrameHealthAppServerResultSchema = negativeLabFrameHealthReportSchema;
 export const negativeLabPlanRollNormalizationAppServerResultSchema = negativeLabRollNormalizationPlanSchema;
-export const negativeLabQcProofAppServerResultSchema = negativeLabQcProofReportSchema;
+export const negativeLabQcProofAppServerResultSchema = z
+  .object({
+    artifact: negativeLabQcProofArtifactV1Schema,
+    commandName: negativeLabQcProofCommandNameSchema,
+    outputPolicy: z
+      .object({
+        allowOverwrite: z.literal(false),
+        storage: z.literal('temp_cache'),
+      })
+      .strict(),
+    report: negativeLabQcProofReportSchema,
+  })
+  .strict()
+  .superRefine((result, context) => {
+    const reportFrameIds = new Set(result.report.frames.map((frame) => frame.frameId));
+    if (result.artifact.frameIds.length !== result.report.frames.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab QC proof artifact frame count must match report frame count.',
+        path: ['artifact', 'frameIds'],
+      });
+    }
+
+    for (const [index, frameId] of result.artifact.frameIds.entries()) {
+      if (!reportFrameIds.has(frameId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Negative Lab QC proof artifact frame ids must match report rows.',
+          path: ['artifact', 'frameIds', index],
+        });
+      }
+    }
+
+    if (result.artifact.contactSheet.columns !== result.report.contactSheetColumnCount) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab QC proof artifact columns must match report contact-sheet columns.',
+        path: ['artifact', 'contactSheet', 'columns'],
+      });
+    }
+  });
 export const negativeLabAcceptedBatchApplyAppServerResultSchema = negativeLabAcceptedBatchApplyPlanSchema;
 export const negativeLabAcceptBatchPlanAppServerResultSchema = negativeLabAcceptedBatchPlanSchema;
 export const negativeLabBatchSummaryAppServerResultSchema = negativeLabBatchDryRunSummarySchema;

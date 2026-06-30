@@ -33,6 +33,16 @@ const NEGATIVE_LAB_QC_OVERLAY_OPTIONS = [
   testId: string;
 }>;
 
+const OBJECTIVE_QC_FINDING_CODES = new Set([
+  'acquisition_review_required',
+  'base_fog_only_review',
+  'excluded_not_reviewed',
+  'preview_required',
+]);
+
+const getQcFindingDomain = (findingCodes: readonly string[]): 'objective' | 'creative' =>
+  findingCodes.some((code) => OBJECTIVE_QC_FINDING_CODES.has(code)) ? 'objective' : 'creative';
+
 interface NegativeLabQcProofPanelProps {
   onToggleQcOverlay: (key: NegativeLabQcOverlayKey) => void;
   qcDecisionByFrameId: Record<string, NegativeLabQcDecision>;
@@ -49,9 +59,27 @@ export function NegativeLabQcProofPanel({
   qcProofReport,
 }: NegativeLabQcProofPanelProps) {
   const { t } = useTranslation();
+  const frameStateByFrameId = new Map(
+    qcProofArtifact.frameStates.map((frameState) => [frameState.frameId, frameState]),
+  );
+  const positiveVariantByFrameId = new Map(
+    qcProofArtifact.positiveVariants.map((variant) => [variant.frameId, variant]),
+  );
+  const rollMetricByFrameId = new Map(
+    qcProofArtifact.rollConsistency.frameMetrics.map((metric) => [metric.frameId, metric]),
+  );
 
   return (
-    <div className="space-y-2 rounded-md border border-surface bg-bg-primary p-2" data-testid="negative-lab-qc-proof">
+    <div
+      className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+      data-contact-sheet-artifact-id={qcProofArtifact.contactSheet.artifact.artifactId}
+      data-contact-sheet-height={qcProofArtifact.contactSheet.artifact.dimensions.height}
+      data-contact-sheet-width={qcProofArtifact.contactSheet.artifact.dimensions.width}
+      data-frame-state-count={qcProofArtifact.frameStates.length}
+      data-output-policy="no-overwrite-temp-cache"
+      data-proof-id={qcProofArtifact.proofId}
+      data-testid="negative-lab-qc-proof"
+    >
       <div className="flex items-center justify-between gap-2">
         <UiText variant={TextVariants.small} className="font-medium text-text-primary">
           {t('modals.negativeConversion.qcProofReport')}
@@ -98,11 +126,19 @@ export function NegativeLabQcProofPanel({
       </div>
       <div
         className="grid grid-cols-2 gap-1 rounded-sm bg-bg-secondary p-2 text-[11px] text-text-tertiary"
+        data-contact-sheet-artifact-id={qcProofArtifact.contactSheet.artifact.artifactId}
         data-contact-sheet-hash={qcProofArtifact.contactSheet.artifact.contentHash}
+        data-contact-sheet-height={qcProofArtifact.contactSheet.artifact.dimensions.height}
+        data-contact-sheet-width={qcProofArtifact.contactSheet.artifact.dimensions.width}
+        data-frame-ids={qcProofArtifact.frameIds.join('|')}
         data-overlay-count={qcProofArtifact.overlays.length}
         data-overlay-density-warnings={qcOverlayVisibility.densityWarnings ? 'true' : 'false'}
         data-overlay-frame-bounds={qcOverlayVisibility.frameBounds ? 'true' : 'false'}
         data-overlay-rejected-markers={qcOverlayVisibility.rejectedMarkers ? 'true' : 'false'}
+        data-positive-variant-count={qcProofArtifact.positiveVariants.length}
+        data-roll-anchor-frame-ids={qcProofArtifact.rollConsistency.anchorFrameIds.join('|')}
+        data-roll-density-delta-tolerance={qcProofArtifact.rollConsistency.densityDeltaTolerance}
+        data-roll-metric-version={qcProofArtifact.rollConsistency.metricVersion}
         data-testid="negative-lab-qc-proof-artifact"
       >
         <span>
@@ -126,48 +162,92 @@ export function NegativeLabQcProofPanel({
             variantCount: qcProofArtifact.positiveVariants.length,
           })}
         </span>
+        <span>
+          {t('modals.negativeConversion.qcProofArtifactDimensions', {
+            height: qcProofArtifact.contactSheet.artifact.dimensions.height,
+            width: qcProofArtifact.contactSheet.artifact.dimensions.width,
+          })}
+        </span>
+        <span>
+          {t('modals.negativeConversion.qcProofArtifactOverlays', {
+            overlayCount: qcProofArtifact.overlays.length,
+          })}
+        </span>
       </div>
       <div
         className="grid gap-1"
         data-contact-sheet-columns={qcProofReport.contactSheetColumnCount}
         data-export-ready={qcProofReport.exportReady ? 'true' : 'false'}
       >
-        {qcProofReport.frames.map((frame) => (
-          <div
-            className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
-            data-blocked={frame.exportBlockedReason === null ? 'false' : 'true'}
-            data-defect-candidate-count={frame.candidates.length}
-            data-density-warning-overlay={
-              qcOverlayVisibility.densityWarnings && frame.needsReview ? 'visible' : 'hidden'
-            }
-            data-frame-boundary-overlay={qcOverlayVisibility.frameBounds ? 'visible' : 'hidden'}
-            data-rejected-marker-overlay={
-              qcOverlayVisibility.rejectedMarkers && qcDecisionByFrameId[frame.frameId] === 'rejected'
-                ? 'visible'
-                : 'hidden'
-            }
-            data-testid={`negative-lab-qc-proof-row-${frame.contactSheetSlot - 1}`}
-            key={frame.frameId}
-          >
-            <span className="rounded bg-bg-primary px-1.5 py-0.5 text-[11px] text-text-tertiary">
-              {frame.contactSheetSlot}
-            </span>
-            <span className="min-w-0 truncate text-text-secondary">{frame.scanLabel}</span>
-            <span
-              className={cx(
-                'rounded px-1.5 py-0.5',
-                frame.needsReview ? 'bg-surface text-text-secondary' : 'bg-accent/15 text-text-primary',
-              )}
+        {qcProofReport.frames.map((frame) => {
+          const frameState = frameStateByFrameId.get(frame.frameId);
+          const positiveVariant = positiveVariantByFrameId.get(frame.frameId);
+          const rollMetric = rollMetricByFrameId.get(frame.frameId);
+          const warningDomain = getQcFindingDomain(frame.findingCodes);
+          const qcDecision = frameState?.qcDecision ?? qcDecisionByFrameId[frame.frameId] ?? 'pending';
+
+          return (
+            <div
+              className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
+              data-blocked={frame.exportBlockedReason === null ? 'false' : 'true'}
+              data-defect-candidate-count={frame.candidates.length}
+              data-density-delta={rollMetric?.densityDelta ?? ''}
+              data-density-warning-overlay={
+                qcOverlayVisibility.densityWarnings && frame.needsReview ? 'visible' : 'hidden'
+              }
+              data-frame-boundary-overlay={qcOverlayVisibility.frameBounds ? 'visible' : 'hidden'}
+              data-frame-id={frame.frameId}
+              data-included={String(frame.included)}
+              data-output-artifact-id={positiveVariant?.outputArtifact.artifactId ?? ''}
+              data-output-intent={positiveVariant?.outputIntent ?? ''}
+              data-proof-state={frameState?.proofState ?? (frame.included ? 'included' : 'excluded')}
+              data-qc-decision={qcDecision}
+              data-rejected-marker-overlay={
+                qcOverlayVisibility.rejectedMarkers && qcDecision === 'rejected' ? 'visible' : 'hidden'
+              }
+              data-roll-within-tolerance={String(rollMetric?.withinTolerance ?? '')}
+              data-source-content-hash={positiveVariant?.sourceContentHash ?? ''}
+              data-source-path={positiveVariant?.sourcePath ?? ''}
+              data-testid={`negative-lab-qc-proof-row-${frame.contactSheetSlot - 1}`}
+              data-variant-warning-count={positiveVariant?.warnings.length ?? 0}
+              data-warning-domain={warningDomain}
+              key={frame.frameId}
             >
-              {frame.needsReview
-                ? t('modals.negativeConversion.dustSeverity.review')
-                : t('modals.negativeConversion.previewReady')}
-            </span>
-            <span className="col-span-3 text-[11px] text-text-tertiary">
-              {frame.exportBlockedReason ?? frame.recommendedAction}
-            </span>
-          </div>
-        ))}
+              <span className="rounded bg-bg-primary px-1.5 py-0.5 text-[11px] text-text-tertiary">
+                {frame.contactSheetSlot}
+              </span>
+              <span className="min-w-0 truncate text-text-secondary">{frame.scanLabel}</span>
+              <span
+                className={cx(
+                  'rounded px-1.5 py-0.5',
+                  frame.needsReview ? 'bg-surface text-text-secondary' : 'bg-accent/15 text-text-primary',
+                )}
+              >
+                {frame.needsReview
+                  ? t('modals.negativeConversion.dustSeverity.review')
+                  : t('modals.negativeConversion.previewReady')}
+              </span>
+              <span
+                className="col-span-3 text-[11px] text-text-tertiary"
+                data-testid={`negative-lab-qc-proof-warning-${frame.contactSheetSlot - 1}`}
+              >
+                {frame.exportBlockedReason ?? frame.recommendedAction}
+              </span>
+              {positiveVariant !== undefined && (
+                <span
+                  className="col-span-3 truncate font-mono text-[11px] text-text-tertiary"
+                  data-testid={`negative-lab-qc-proof-positive-variant-${frame.contactSheetSlot - 1}`}
+                  title={`${positiveVariant.sourcePath} ${positiveVariant.outputArtifact.artifactId}`}
+                >
+                  {t('modals.negativeConversion.qcProofPositiveVariant', {
+                    artifactId: positiveVariant.outputArtifact.artifactId,
+                    intent: positiveVariant.outputIntent,
+                  })}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

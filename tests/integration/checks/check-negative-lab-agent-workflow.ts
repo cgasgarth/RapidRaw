@@ -242,7 +242,8 @@ const densitometerReadout = buildNegativeLabDensitometerRouteResult({
   },
 });
 const frameHealthReport = buildNegativeLabFrameHealthRouteResult(frameHealthCommand);
-const qcProofReport = buildNegativeLabQcProofRouteResult(frameHealthCommand);
+const qcProofBundle = buildNegativeLabQcProofRouteResult(frameHealthCommand);
+const qcProofReport = qcProofBundle.report;
 const batchSummary = buildNegativeLabBatchSummaryRouteResult(frameHealthCommand);
 const acceptedPlan = buildNegativeLabAcceptedBatchPlanRouteResult(dryRunCommand);
 const acceptedApplyPlan = buildNegativeLabAcceptedBatchApplyRouteResult({
@@ -269,9 +270,12 @@ if (frameHealthReport.activeFrameId !== 'negative-lab-frame-2' || batchSummary.p
 }
 
 if (
-  qcProofReport.totalFrameCount !== frameHealthCommand.targetPaths.length ||
-  qcProofReport.includedFrameCount !== frameHealthCommand.includedPaths.length ||
-  qcProofReport.frames[2]?.exportBlockedReason !== 'Frame excluded from batch.'
+  qcProofBundle.report.totalFrameCount !== frameHealthCommand.targetPaths.length ||
+  qcProofBundle.report.includedFrameCount !== frameHealthCommand.includedPaths.length ||
+  qcProofBundle.report.frames[2]?.exportBlockedReason !== 'Frame excluded from batch.' ||
+  qcProofBundle.artifact.frameIds.length !== frameHealthCommand.targetPaths.length ||
+  qcProofBundle.artifact.frameStates[2]?.proofState !== 'excluded' ||
+  qcProofBundle.outputPolicy.allowOverwrite
 ) {
   throw new Error('Negative Lab agent QC route did not expose proof/report evidence.');
 }

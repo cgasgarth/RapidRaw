@@ -49,9 +49,18 @@ if (artifact.contactSheet.columns !== 3 || artifact.contactSheet.rows !== 1) {
 
 if (
   artifact.frameIds.length !== report.totalFrameCount ||
+  artifact.frameStates.length !== report.totalFrameCount ||
   artifact.positiveVariants.length !== report.totalFrameCount
 ) {
-  throw new Error('Negative Lab live QC artifact did not preserve per-frame positive variants.');
+  throw new Error('Negative Lab live QC artifact did not preserve per-frame state and positive variants.');
+}
+
+if (
+  artifact.frameStates[1]?.proofState !== 'rejected' ||
+  artifact.frameStates[1]?.qcDecision !== 'rejected' ||
+  artifact.frameStates[2]?.proofState !== 'excluded'
+) {
+  throw new Error('Negative Lab live QC artifact did not expose included/excluded/rejected frame state.');
 }
 
 if (artifact.warnings.length !== 1 || artifact.warnings[0]?.frameIds?.[0] !== 'negative-lab-frame-3') {
@@ -72,11 +81,24 @@ if (artifact.positiveVariants[0]?.sourcePath !== sourcePaths[0]) {
   throw new Error('Negative Lab live QC artifact did not link source paths to positive variants.');
 }
 
+if (
+  artifact.positiveVariants.some(
+    (variant) =>
+      !variant.sourceContentHash.startsWith('sha256:') ||
+      variant.outputArtifact.contentHash === undefined ||
+      variant.outputIntent !== 'proof_preview',
+  )
+) {
+  throw new Error('Negative Lab live QC artifact did not expose source hashes and positive output handles.');
+}
+
 if (artifact.contactSheet.artifact.contentHash !== repeated.contactSheet.artifact.contentHash) {
   throw new Error('Negative Lab live QC artifact hash is not deterministic.');
 }
 
 const modalSource = await Bun.file('src/components/modals/NegativeConversionModal.tsx').text();
+const panelSource = await Bun.file('src/components/modals/NegativeLabQcProofPanel.tsx').text();
+const qcSource = `${modalSource}\n${panelSource}`;
 for (const marker of [
   'buildNegativeLabQcContactSheetArtifact',
   'negative-lab-qc-proof-artifact',
@@ -84,9 +106,15 @@ for (const marker of [
   'data-overlay-count={qcProofArtifact.overlays.length}',
   'data-defect-candidate-count={frame.candidates.length}',
   'data-contact-sheet-hash={qcProofArtifact.contactSheet.artifact.contentHash}',
+  'data-contact-sheet-artifact-id={qcProofArtifact.contactSheet.artifact.artifactId}',
+  'data-frame-state-count={qcProofArtifact.frameStates.length}',
+  'data-output-policy="no-overwrite-temp-cache"',
+  "data-source-content-hash={positiveVariant?.sourceContentHash ?? ''}",
+  'data-warning-domain={warningDomain}',
   'modals.negativeConversion.qcProofArtifactHash',
+  'modals.negativeConversion.qcProofPositiveVariant',
 ]) {
-  if (!modalSource.includes(marker)) {
+  if (!qcSource.includes(marker)) {
     throw new Error(`Negative Lab live QC UI marker missing: ${marker}`);
   }
 }
