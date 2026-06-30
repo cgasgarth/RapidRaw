@@ -10,7 +10,7 @@ import {
   type FilmHalationPixelV1,
   filmHalationMaskSampleV1Schema,
   filmHalationRuntimeResultV1Schema,
-} from '../../../packages/rawengine-schema/src/filmHalationRuntime.ts';
+} from '../../../../packages/rawengine-schema/src/filmHalationRuntime.ts';
 
 const FIXTURE_PATH = resolve('fixtures/film-simulation/film-halation-runtime-proof.json');
 const updateFixture = process.argv.includes('--update');
@@ -27,7 +27,7 @@ const proofSchema = z
         scene: z.literal('specular-discs-edges-ramps-neutral-control'),
       })
       .strict(),
-    generatedFrom: z.literal('tests/integration/checks/check-film-halation-runtime-proof.ts'),
+    generatedFrom: z.literal('tests/integration/checks/film/check-film-halation-runtime-proof.ts'),
     proofId: z.literal('film.halation.conservative.runtime.synthetic.v1'),
     result: filmHalationRuntimeResultV1Schema.omit({ maskSamples: true, outputPixels: true }).extend({
       representativeMaskSamples: z.array(filmHalationMaskSampleV1Schema).min(8).max(12),
@@ -127,7 +127,7 @@ const expectedProof = proofSchema.parse({
     kind: 'synthetic-film-halation-runtime-proof',
     scene: 'specular-discs-edges-ramps-neutral-control',
   },
-  generatedFrom: 'tests/integration/checks/check-film-halation-runtime-proof.ts',
+  generatedFrom: 'tests/integration/checks/film/check-film-halation-runtime-proof.ts',
   proofId: 'film.halation.conservative.runtime.synthetic.v1',
   result: {
     ...resultSummary,

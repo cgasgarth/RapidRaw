@@ -1,17 +1,17 @@
 #!/usr/bin/env bun
 
 import { z } from 'zod';
-import { FilmLookAppServerCommandName } from '../../../src/utils/film-look/filmLookAppServerRouteIds.ts';
+import { FilmLookAppServerCommandName } from '../../../../src/utils/film-look/filmLookAppServerRouteIds.ts';
 import {
   buildFilmLookAppServerPatchResult,
   FILM_LOOK_APP_SERVER_ROUTE_MANIFEST,
-} from '../../../src/utils/film-look/filmLookAppServerRoutes.ts';
+} from '../../../../src/utils/film-look/filmLookAppServerRoutes.ts';
 import {
   buildFilmLookAppliedAdjustmentPatch,
   buildFilmLookPresetDraft,
   getFilmLookControlledAdjustmentKeys,
-} from '../../../src/utils/film-look/filmLookBrowser.ts';
-import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/film-look/filmLookRegistry.ts';
+} from '../../../../src/utils/film-look/filmLookBrowser.ts';
+import { FILM_LOOK_BROWSER_ITEMS } from '../../../../src/utils/film-look/filmLookRegistry.ts';
 
 const expectedCommandName = FilmLookAppServerCommandName.BuildAdjustmentPatch;
 const runtimeCheckScripts = ['check:film-look-render-apply-proof', 'check:film-look-preview-export-parity'];

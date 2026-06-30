@@ -5,7 +5,7 @@
     "kind": "synthetic-film-grain-runtime-proof",
     "scene": "shadow-midtone-highlight-ramp"
   },
-  "generatedFrom": "tests/integration/checks/check-film-grain-runtime-proof.ts",
+  "generatedFrom": "tests/integration/checks/film/check-film-grain-runtime-proof.ts",
   "proofId": "film.grain.runtime.cpu-reference.synthetic.v1",
   "result": {
     "afterHash": "fnv1a32:002a50e0",

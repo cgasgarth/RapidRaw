@@ -4,8 +4,8 @@ import { dirname, resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { buildFilmLookAppliedAdjustmentPatch } from '../../../src/utils/film-look/filmLookBrowser.ts';
-import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/film-look/filmLookRegistry.ts';
+import { buildFilmLookAppliedAdjustmentPatch } from '../../../../src/utils/film-look/filmLookBrowser.ts';
+import { FILM_LOOK_BROWSER_ITEMS } from '../../../../src/utils/film-look/filmLookRegistry.ts';
 
 const manifestPath = resolve('fixtures/film-simulation/film-look-measured-fixture-manifest.json');
 const outputPath = resolve('fixtures/film-simulation/film-look-measured-fixture-outputs.json');
@@ -95,7 +95,7 @@ const outputSchema = z
       )
       .min(6),
     fixtureManifest: manifestSchema,
-    generatedFrom: z.literal('tests/integration/checks/check-film-look-measured-fixtures.ts'),
+    generatedFrom: z.literal('tests/integration/checks/film/check-film-look-measured-fixtures.ts'),
     version: z.literal(1),
   })
   .strict();
@@ -265,7 +265,7 @@ const expectedOutput = outputSchema.parse({
   cases: manifest.fixtures.flatMap((fixture) => FILM_LOOK_BROWSER_ITEMS.map((look) => buildCase(fixture, look))),
   doesNotProve: requiredOutputNonClaims,
   fixtureManifest: manifest,
-  generatedFrom: 'tests/integration/checks/check-film-look-measured-fixtures.ts',
+  generatedFrom: 'tests/integration/checks/film/check-film-look-measured-fixtures.ts',
   version: 1,
 });
 const expectedText = `${JSON.stringify(expectedOutput, null, 2)}\n`;

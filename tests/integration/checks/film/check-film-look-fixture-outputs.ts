@@ -7,13 +7,13 @@ import {
   buildFilmLookPresetDraft,
   getFilmLookAdjustmentSummaries,
   scaleFilmLookAdjustmentPatch,
-} from '../../../src/utils/film-look/filmLookBrowser.ts';
-import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/film-look/filmLookRegistry.ts';
+} from '../../../../src/utils/film-look/filmLookBrowser.ts';
+import { FILM_LOOK_BROWSER_ITEMS } from '../../../../src/utils/film-look/filmLookRegistry.ts';
 
-const fixtureUrl = new URL('../../../fixtures/film-simulation/film-look-fixture-outputs.json', import.meta.url);
-const browserSourceUrl = new URL('../../../src/components/adjustments/FilmLookBrowser.tsx', import.meta.url);
-const registrySourceUrl = new URL('../../../src/utils/film-look/filmLookRegistry.ts', import.meta.url);
-const utilsSourceUrl = new URL('../../../src/utils/film-look/filmLookBrowser.ts', import.meta.url);
+const fixtureUrl = new URL('../../../../fixtures/film-simulation/film-look-fixture-outputs.json', import.meta.url);
+const browserSourceUrl = new URL('../../../../src/components/adjustments/FilmLookBrowser.tsx', import.meta.url);
+const registrySourceUrl = new URL('../../../../src/utils/film-look/filmLookRegistry.ts', import.meta.url);
+const utilsSourceUrl = new URL('../../../../src/utils/film-look/filmLookBrowser.ts', import.meta.url);
 const updateFixture = process.argv.includes('--update');
 
 const getAdjustmentFingerprint = (adjustmentSummaries) =>
@@ -110,7 +110,7 @@ for (const marker of [
   }
 }
 
-const visualSmokeSourceUrl = new URL('../../../src/validation/visual/VisualSmokeApp.tsx', import.meta.url);
+const visualSmokeSourceUrl = new URL('../../../../src/validation/visual/VisualSmokeApp.tsx', import.meta.url);
 const visualSmokeSource = await readFile(visualSmokeSourceUrl, 'utf8');
 for (const marker of ['FilmLookVisualSmoke', 'film-look-browser', 'film-look-adjustment-proof']) {
   if (!visualSmokeSource.includes(marker)) {
@@ -185,7 +185,7 @@ for (const marker of [
   }
 }
 
-const effectsSourceUrl = new URL('../../../src/components/adjustments/Effects.tsx', import.meta.url);
+const effectsSourceUrl = new URL('../../../../src/components/adjustments/Effects.tsx', import.meta.url);
 const effectsSource = await readFile(effectsSourceUrl, 'utf8');
 for (const marker of [
   'buildFilmLookPresetDraft',

@@ -12,7 +12,7 @@
     "kind": "synthetic-film-halation-runtime-proof",
     "scene": "specular-discs-edges-ramps-neutral-control"
   },
-  "generatedFrom": "tests/integration/checks/check-film-halation-runtime-proof.ts",
+  "generatedFrom": "tests/integration/checks/film/check-film-halation-runtime-proof.ts",
   "proofId": "film.halation.conservative.runtime.synthetic.v1",
   "result": {
     "afterHash": "fnv1a32:5620732d",

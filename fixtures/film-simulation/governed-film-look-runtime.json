@@ -6,7 +6,7 @@
     "kind": "synthetic-governed-film-look-runtime-proof",
     "scene": "ramp-color-chips-highlight-edge-specular"
   },
-  "generatedFrom": "tests/integration/checks/check-governed-film-look-runtime.ts",
+  "generatedFrom": "tests/integration/checks/film/check-governed-film-look-runtime.ts",
   "proofId": "film.look.governed.runtime.synthetic.v1",
   "result": {
     "adjustmentPatch": {

@@ -3,9 +3,9 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 import { z } from 'zod';
-import { proofContractSchema } from '../../../src/schemas/proofLevelSemanticsSchemas.ts';
-import { buildFilmLookAppliedAdjustmentPatch } from '../../../src/utils/film-look/filmLookBrowser.ts';
-import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/film-look/filmLookRegistry.ts';
+import { proofContractSchema } from '../../../../src/schemas/proofLevelSemanticsSchemas.ts';
+import { buildFilmLookAppliedAdjustmentPatch } from '../../../../src/utils/film-look/filmLookBrowser.ts';
+import { FILM_LOOK_BROWSER_ITEMS } from '../../../../src/utils/film-look/filmLookRegistry.ts';
 
 const MANIFEST_PATH = resolve('fixtures/film-simulation/film-look-preview-export-parity.json');
 const updateFixture = process.argv.includes('--update');
@@ -45,7 +45,7 @@ const manifestSchema = z.object({
     .strict(),
   proofLevel: z.literal('synthetic_shared_preview_export_match'),
   runtimeStatus: z.literal('synthetic_shared_renderer_preview_export_match'),
-  generatedFrom: z.literal('tests/integration/checks/check-film-look-preview-export-parity.ts'),
+  generatedFrom: z.literal('tests/integration/checks/film/check-film-look-preview-export-parity.ts'),
   version: z.literal(1),
 });
 
@@ -190,7 +190,7 @@ const buildManifest = () => ({
   },
   proofLevel: 'synthetic_shared_preview_export_match',
   runtimeStatus: 'synthetic_shared_renderer_preview_export_match',
-  generatedFrom: 'tests/integration/checks/check-film-look-preview-export-parity.ts',
+  generatedFrom: 'tests/integration/checks/film/check-film-look-preview-export-parity.ts',
   version: 1,
 });
 

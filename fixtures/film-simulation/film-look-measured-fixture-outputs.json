@@ -189,6 +189,6 @@
     "generatedFrom": "fixtures/film-simulation/film-look-measured-fixture-manifest.json",
     "schemaVersion": 1
   },
-  "generatedFrom": "tests/integration/checks/check-film-look-measured-fixtures.ts",
+  "generatedFrom": "tests/integration/checks/film/check-film-look-measured-fixtures.ts",
   "version": 1
 }

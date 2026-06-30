@@ -4,8 +4,8 @@ import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { filmGrainControlsV1Schema } from '../../../packages/rawengine-schema/src/filmGrainProvenance.ts';
-import { buildFilmGrainPresetAdjustmentPatch, FILM_GRAIN_UI_PRESETS } from '../../../src/utils/filmGrainControls.ts';
+import { filmGrainControlsV1Schema } from '../../../../packages/rawengine-schema/src/filmGrainProvenance.ts';
+import { buildFilmGrainPresetAdjustmentPatch, FILM_GRAIN_UI_PRESETS } from '../../../../src/utils/filmGrainControls.ts';
 
 const prohibitedStockClaimPattern =
   /\b(?:ektachrome|ektar|fujifilm|gold|hp5|ilford|kodak|portra|provia|superia|t-max|tri-x|velvia)\b/iu;
