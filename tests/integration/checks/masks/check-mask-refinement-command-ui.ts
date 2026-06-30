@@ -6,7 +6,7 @@ import {
   MASK_REFINEMENT_REPLAY_PARAMETER_KEY,
   maskRefinementUiCommandSchema,
   readMaskRefinementReplayReceipt,
-} from '../../../src/utils/mask/maskRefinementCommandBus.ts';
+} from '../../../../src/utils/mask/maskRefinementCommandBus.ts';
 
 const busSource = readFileSync('src/utils/mask/maskRefinementCommandBus.ts', 'utf8');
 const panelSource = readFileSync('src/components/panel/right/layers/MasksPanel.tsx', 'utf8');

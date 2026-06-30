@@ -25,7 +25,7 @@ the issue can close without overclaiming API-command or graph-native support.
   containers and sub-masks.
 - `fixtures/masks/compose/mask-copy-paste.json` covers clone/insert, invert/rename, and
   reset-adjustment behavior.
-- `tests/integration/checks/check-mask-copy-paste.ts` validates fixture expectations with Zod.
+- `tests/integration/checks/masks/check-mask-copy-paste.ts` validates fixture expectations with Zod.
 
 ## Remaining Gaps
 

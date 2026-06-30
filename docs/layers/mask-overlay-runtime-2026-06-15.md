@@ -20,7 +20,7 @@ settings preserve the previous rubylith overlay behavior.
 
 ## Validation
 
-`tests/integration/checks/check-mask-overlay-modes.ts` verifies:
+`tests/integration/checks/masks/check-mask-overlay-modes.ts` verifies:
 
 - valid overlay fixture normalization and color output;
 - invalid fixture rejection through the Zod schema;

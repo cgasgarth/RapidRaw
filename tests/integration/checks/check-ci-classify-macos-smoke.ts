@@ -117,7 +117,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     'check:camera-profile-input-transform',
     new Set(['bun tests/integration/checks/check-camera-profile-input-transform-proof.ts']),
   ],
-  ['check:brush-mask-command', new Set(['bun tests/integration/checks/check-brush-mask-command.ts'])],
+  ['check:brush-mask-command', new Set(['bun tests/integration/checks/masks/check-brush-mask-command.ts'])],
   ['check:browser-tauri-harness', new Set(['bun tests/integration/checks/check-browser-tauri-harness.ts'])],
   ['check:capture-sharpening', new Set(['bun tests/integration/checks/check-capture-sharpening-fixtures.ts'])],
   ['check:compare-survey', new Set(['bun tests/integration/checks/check-compare-survey-fixtures.ts'])],
@@ -262,9 +262,9 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ],
   ['check:noise-separation', new Set(['bun tests/integration/checks/check-noise-separation-fixtures.ts'])],
   ['check:output-sharpening', new Set(['bun tests/integration/checks/check-output-sharpening-fixtures.ts'])],
-  ['check:mask-refine-command-ui', new Set(['bun tests/integration/checks/check-mask-refinement-command-ui.ts'])],
-  ['check:mask-refine-controls', new Set(['bun tests/integration/checks/check-mask-refinement-controls.ts'])],
-  ['check:mask-compose-command', new Set(['bun tests/integration/checks/check-mask-compose-command.ts'])],
+  ['check:mask-refine-command-ui', new Set(['bun tests/integration/checks/masks/check-mask-refinement-command-ui.ts'])],
+  ['check:mask-refine-controls', new Set(['bun tests/integration/checks/masks/check-mask-refinement-controls.ts'])],
+  ['check:mask-compose-command', new Set(['bun tests/integration/checks/masks/check-mask-compose-command.ts'])],
   ['check:metadata-templates', new Set(['bun tests/integration/checks/check-metadata-template-fixtures.ts'])],
   ['check:public-fixture-manifest', new Set(['bun tests/integration/checks/check-public-fixture-manifest.ts'])],
   ['check:raw-open-edit-export-proof', new Set(['bun tests/integration/checks/check-raw-open-edit-export-proof.ts'])],
@@ -736,7 +736,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -80,6 +80,7 @@\n+    "check:brush-mask-command": "bun tests/integration/checks/check-brush-mask-command.ts",',
+          '@@ -80,6 +80,7 @@\n+    "check:brush-mask-command": "bun tests/integration/checks/masks/check-brush-mask-command.ts",',
       },
     ],
     SMOKE_MODES.NONE,
@@ -1038,7 +1038,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -80,6 +80,7 @@\n+    "check:mask-compose-command": "bun tests/integration/checks/check-mask-compose-command.ts",',
+          '@@ -80,6 +80,7 @@\n+    "check:mask-compose-command": "bun tests/integration/checks/masks/check-mask-compose-command.ts",',
       },
     ],
     SMOKE_MODES.NONE,

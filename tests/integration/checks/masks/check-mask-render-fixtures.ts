@@ -6,7 +6,7 @@ import {
   estimateMaskRenderTileCount,
   maskRenderSceneSchema,
   parseMaskRenderScene,
-} from '../../../src/schemas/maskRenderSchemas.ts';
+} from '../../../../src/schemas/maskRenderSchemas.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 

@@ -4,14 +4,14 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 
-import { maskOverlayModeSchema, maskOverlaySettingsSchema } from '../../../src/schemas/maskOverlaySchemas.ts';
-import { evaluateMaskOverlayColor, normalizeMaskOverlaySettings } from '../../../src/utils/mask/maskOverlayModes.ts';
+import { maskOverlayModeSchema, maskOverlaySettingsSchema } from '../../../../src/schemas/maskOverlaySchemas.ts';
+import { evaluateMaskOverlayColor, normalizeMaskOverlaySettings } from '../../../../src/utils/mask/maskOverlayModes.ts';
 import {
   loadMaskOverlaySettingsPreference,
   MASK_OVERLAY_HOTKEY_MODES,
   nextMaskOverlayHotkeySettings,
   saveMaskOverlaySettingsPreference,
-} from '../../../src/utils/mask/maskOverlayPreferences.ts';
+} from '../../../../src/utils/mask/maskOverlayPreferences.ts';
 
 const colorSchema = z
   .object({

@@ -6,14 +6,14 @@ import { z } from 'zod';
 import {
   type MaskAlphaArtifact,
   renderComposedMask,
-} from '../../../packages/rawengine-schema/src/maskComposeCommandRuntime.ts';
-import { applyComposedMaskToLayerPixels } from '../../../packages/rawengine-schema/src/maskComposeLayerApplication.ts';
+} from '../../../../packages/rawengine-schema/src/maskComposeCommandRuntime.ts';
+import { applyComposedMaskToLayerPixels } from '../../../../packages/rawengine-schema/src/maskComposeLayerApplication.ts';
 import {
   ActorKind,
   ApprovalClass,
   layerMaskCommandEnvelopeV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const composeModeSchema = z.enum(['add', 'subtract', 'intersect']);
 const fixtureSchema = z

@@ -8,17 +8,17 @@ import { z } from 'zod';
 import {
   BrushMaskCommandRuntime,
   renderBrushMask,
-} from '../../../packages/rawengine-schema/src/brushMaskCommandRuntime.ts';
+} from '../../../../packages/rawengine-schema/src/brushMaskCommandRuntime.ts';
 import {
   layerMaskCommandEnvelopeV1Schema,
   layerMaskDryRunResultV1Schema,
   layerMaskMutationResultV1Schema,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   BRUSH_MASK_COMMAND_COORDINATE_SPACE,
   brushMaskCommandEnvelopeSchema,
   buildBrushMaskCommandFromParameters,
-} from '../../../src/utils/mask/brushMaskCommandBridge.ts';
+} from '../../../../src/utils/mask/brushMaskCommandBridge.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/layers-masks/brush-mask-command-capture-2026-06-21.json';
 const UPDATE_REPORT = process.argv.includes('--update');
