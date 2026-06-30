@@ -125,6 +125,7 @@ function AutoAdjustHarness() {
       selectedImage: selectedImage ?? createSelectedImage(),
       showDateView: false,
       showOriginal: false,
+      osPlatform: 'linux',
     }),
   );
 }

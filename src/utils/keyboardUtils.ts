@@ -296,6 +296,12 @@ const symMap: Record<string, string> = {
   PrintScreen: 'PrtSc',
 };
 
+const macShortcutSymbolMap: Record<string, string> = {
+  alt: '⌥',
+  ctrl: '⌘',
+  shift: '⇧',
+};
+
 export function normalizeCombo(event: KeyboardEvent, osPlatform?: string): string[] {
   const isMacDelete = osPlatform === 'macos' && event.code === 'Backspace' && (event.ctrlKey || event.metaKey);
   const parts: string[] = [];
@@ -340,6 +346,23 @@ export function formatKeyCode(key: string, osPlatform: string): string {
   if (key === 'Delete' && osPlatform === 'macos') return 'Delete / ⌘+⌫';
   const label = codeToDisplayLabel(key);
   return label || key;
+}
+
+export function formatShortcutLabel(combo: string[], osPlatform: string): string {
+  if (combo.length === 0) return '';
+
+  if (osPlatform === 'macos') {
+    const modifiers = combo
+      .slice(0, -1)
+      .filter((part): part is keyof typeof macShortcutSymbolMap => part in macShortcutSymbolMap);
+    const orderedModifiers = ['shift', 'ctrl', 'alt'].filter((part): part is keyof typeof macShortcutSymbolMap =>
+      modifiers.includes(part),
+    );
+    const shortcutKey = codeToDisplayLabel(combo[combo.length - 1] ?? '') ?? combo[combo.length - 1] ?? '';
+    return `${orderedModifiers.map((modifier) => macShortcutSymbolMap[modifier]).join('')}${shortcutKey}`;
+  }
+
+  return combo.map((part) => formatKeyCode(part, osPlatform)).join('+');
 }
 
 export function arraysEqual(a: string[], b: string[]): boolean {

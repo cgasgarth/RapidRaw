@@ -1518,11 +1518,11 @@
         "fullscreen": "Alternar pantalla completa (F)",
         "history": "",
         "iso": "ISO",
-        "redo": "Rehacer (Ctrl+Y) o Historial (Clic derecho)",
+        "redo": "Rehacer ({{shortcut}}) o Historial (Clic derecho)",
         "showEdited": "Mostrar editado (B)",
         "showOriginal": "Mostrar original (B)",
         "shutterSpeed": "Velocidad de obturación",
-        "undo": "Deshacer (Ctrl+Z) o Historial (Clic derecho)"
+        "undo": "Deshacer ({{shortcut}}) o Historial (Clic derecho)"
       },
       "vc": "CV"
     }

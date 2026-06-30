@@ -1518,11 +1518,11 @@
         "fullscreen": "Basculer en plein écran (F)",
         "history": "",
         "iso": "ISO",
-        "redo": "Rétablir (Ctrl+Y) ou Historique (Clic-droit)",
+        "redo": "Rétablir ({{shortcut}}) ou Historique (Clic-droit)",
         "showEdited": "Afficher l'image modifiée (B)",
         "showOriginal": "Afficher l'original (B)",
         "shutterSpeed": "Vitesse d'obturation",
-        "undo": "Annuler (Ctrl+Z) ou Historique (Clic-droit)"
+        "undo": "Annuler ({{shortcut}}) ou Historique (Clic-droit)"
       },
       "vc": "CV"
     }

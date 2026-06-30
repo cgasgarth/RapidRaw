@@ -1449,11 +1449,11 @@
         "fullscreen": "全画面表示切り替え (F)",
         "history": "",
         "iso": "ISO感度",
-        "redo": "やり直し (Ctrl+Y) または履歴 (右クリック)",
+        "redo": "やり直し ({{shortcut}}) または履歴 (右クリック)",
         "showEdited": "編集後を表示 (B)",
         "showOriginal": "オリジナルを表示 (B)",
         "shutterSpeed": "シャッタースピード",
-        "undo": "元に戻す (Ctrl+Z) または履歴 (右クリック)"
+        "undo": "元に戻す ({{shortcut}}) または履歴 (右クリック)"
       },
       "vc": "仮想"
     }

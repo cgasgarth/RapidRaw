@@ -1518,11 +1518,11 @@
         "fullscreen": "Attiva/Disattiva Schermo Intero (F)",
         "history": "",
         "iso": "ISO",
-        "redo": "Ripeti (Ctrl+Y) o Cronologia (Tasto destro)",
+        "redo": "Ripeti ({{shortcut}}) o Cronologia (Tasto destro)",
         "showEdited": "Mostra Modificata (B)",
         "showOriginal": "Mostra Originale (B)",
         "shutterSpeed": "Tempo di Esposizione",
-        "undo": "Annulla (Ctrl+Z) o Cronologia (Tasto destro)"
+        "undo": "Annulla ({{shortcut}}) o Cronologia (Tasto destro)"
       },
       "vc": "CV"
     }

@@ -1518,11 +1518,11 @@
         "fullscreen": "Alternar Tela Cheia (F)",
         "history": "",
         "iso": "ISO",
-        "redo": "Refazer (Ctrl+Y) ou Histórico (Botão Direito)",
+        "redo": "Refazer ({{shortcut}}) ou Histórico (Botão Direito)",
         "showEdited": "Mostrar Editado (B)",
         "showOriginal": "Mostrar Original (B)",
         "shutterSpeed": "Velocidade do Obturador",
-        "undo": "Desfazer (Ctrl+Z) ou Histórico (Botão Direito)"
+        "undo": "Desfazer ({{shortcut}}) ou Histórico (Botão Direito)"
       },
       "vc": "CV"
     }

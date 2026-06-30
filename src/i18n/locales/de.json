@@ -1538,11 +1538,11 @@
         "fullscreen": "Vollbild umschalten (F)",
         "history": "",
         "iso": "ISO",
-        "redo": "Wiederholen (Strg+Y) oder Verlauf (Rechtsklick)",
+        "redo": "Wiederholen ({{shortcut}}) oder Verlauf (Rechtsklick)",
         "showEdited": "Bearbeitet anzeigen (B)",
         "showOriginal": "Original anzeigen (B)",
         "shutterSpeed": "Verschlusszeit",
-        "undo": "Rückgängig (Strg+Z) oder Verlauf (Rechtsklick)"
+        "undo": "Rückgängig ({{shortcut}}) oder Verlauf (Rechtsklick)"
       },
       "vc": "VK"
     }

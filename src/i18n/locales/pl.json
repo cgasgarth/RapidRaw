@@ -1630,11 +1630,11 @@
         "fullscreen": "Przełącz pełny ekran (F)",
         "history": "",
         "iso": "ISO",
-        "redo": "Ponów (Ctrl+Y) lub Historia (Prawy przycisk)",
+        "redo": "Ponów ({{shortcut}}) lub Historia (Prawy przycisk)",
         "showEdited": "Pokaż po edycji (B)",
         "showOriginal": "Pokaż oryginał (B)",
         "shutterSpeed": "Czas otwarcia migawki",
-        "undo": "Cofnij (Ctrl+Z) lub Historia (Prawy przycisk)"
+        "undo": "Cofnij ({{shortcut}}) lub Historia (Prawy przycisk)"
       },
       "vc": "VC"
     }

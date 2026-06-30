@@ -1554,11 +1554,11 @@
         "fullscreen": "Toggle Fullscreen (F)",
         "history": "Show History Stack",
         "iso": "ISO",
-        "redo": "Redo (Ctrl+Y) or History (Right-click)",
+        "redo": "Redo ({{shortcut}}) or History (Right-click)",
         "showEdited": "Show Edited (B)",
         "showOriginal": "Show Original (B)",
         "shutterSpeed": "Shutter Speed",
-        "undo": "Undo (Ctrl+Z) or History (Right-click)"
+        "undo": "Undo ({{shortcut}}) or History (Right-click)"
       },
       "vc": "VC"
     }
