@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-LOCALES_DIR = Path("./locales")
+LOCALES_DIR = Path(__file__).resolve().parent / "locales"
 
 TRANSLATIONS = {
     "de": {
