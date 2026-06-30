@@ -133,7 +133,7 @@ if (UPDATE_REPORT) {
   const expectedReport = reportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
   if (JSON.stringify(expectedReport) !== JSON.stringify(report)) {
     console.error(
-      `${REPORT_PATH} is stale; run bun tests/integration/checks/check-panorama-blend-exposure.ts --update`,
+      `${REPORT_PATH} is stale; run bun tests/integration/checks/panorama/check-panorama-blend-exposure.ts --update`,
     );
     process.exit(1);
   }

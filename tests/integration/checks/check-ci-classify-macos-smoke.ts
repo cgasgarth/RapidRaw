@@ -178,25 +178,34 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:session-import-reload-proof', new Set(['bun tests/integration/checks/check-session-import-reload-proof.ts'])],
   ['check:library-session-ui', new Set(['bun tests/integration/checks/check-library-session-ui.ts'])],
   ['check:library-workflow-smoke', new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario library-workflow'])],
-  ['check:panorama-ui-api', new Set(['bun tests/integration/checks/check-panorama-ui-api.ts'])],
-  ['check:panorama-feature-transform', new Set(['bun tests/integration/checks/check-panorama-feature-transform.ts'])],
-  ['check:panorama-blend-exposure', new Set(['bun tests/integration/checks/check-panorama-blend-exposure.ts'])],
+  ['check:panorama-ui-api', new Set(['bun tests/integration/checks/panorama/check-panorama-ui-api.ts'])],
+  [
+    'check:panorama-feature-transform',
+    new Set(['bun tests/integration/checks/panorama/check-panorama-feature-transform.ts']),
+  ],
+  [
+    'check:panorama-blend-exposure',
+    new Set(['bun tests/integration/checks/panorama/check-panorama-blend-exposure.ts']),
+  ],
   [
     'check:panorama-seam-exposure-proof',
-    new Set(['bun tests/integration/checks/check-panorama-seam-exposure-proof.ts']),
+    new Set(['bun tests/integration/checks/panorama/check-panorama-seam-exposure-proof.ts']),
   ],
   [
     'check:panorama-seam-exposure-proof:update',
-    new Set(['bun tests/integration/checks/check-panorama-seam-exposure-proof.ts --update']),
+    new Set(['bun tests/integration/checks/panorama/check-panorama-seam-exposure-proof.ts --update']),
   ],
-  ['check:panorama-projection-crop', new Set(['bun tests/integration/checks/check-panorama-projection-crop.ts'])],
+  [
+    'check:panorama-projection-crop',
+    new Set(['bun tests/integration/checks/panorama/check-panorama-projection-crop.ts']),
+  ],
   [
     'check:panorama-projection-memory-proof',
-    new Set(['bun tests/integration/checks/check-panorama-projection-memory-proof.ts']),
+    new Set(['bun tests/integration/checks/panorama/check-panorama-projection-memory-proof.ts']),
   ],
   [
     'check:panorama-projection-memory-proof:update',
-    new Set(['bun tests/integration/checks/check-panorama-projection-memory-proof.ts --update']),
+    new Set(['bun tests/integration/checks/panorama/check-panorama-projection-memory-proof.ts --update']),
   ],
   ['check:panorama-ui-smoke', new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario panorama-ui'])],
   [
