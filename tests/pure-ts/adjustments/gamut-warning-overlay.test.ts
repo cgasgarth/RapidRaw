@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import type { SelectedImage } from '../../../src/components/ui/AppProperties.tsx';
 
 import {
   type GamutWarningOverlayPayload,
@@ -8,6 +9,7 @@ import { useEditorStore } from '../../../src/store/useEditorStore';
 import {
   formatGamutWarningCoverage,
   isCurrentExportSoftProofGamutWarningOverlay,
+  resolveGamutWarningProofDimensions,
 } from '../../../src/utils/color/runtime/gamutWarningDisplay.ts';
 
 const imagePath = '/validation/current-export-soft-proof.ARW';
@@ -35,6 +37,25 @@ const selectedImage = {
   thumbnailUrl: 'data:image/jpeg;base64,AAAA',
   width: 4000,
 };
+const loadedRawSelectedImage = {
+  ...selectedImage,
+  rawDevelopmentReport: {
+    cameraProfile: {
+      algorithmId: 'rawengine.camera_profile.v1',
+      candidateCount: 1,
+      illuminantEstimateConfidence: 'high',
+      illuminantEstimateMethod: 'metadata_only_fallback',
+      status: 'fallback',
+      warningCodes: [],
+    },
+    demosaicPath: 'standard',
+    processingProfile: 'balanced',
+    runtime: {
+      cacheHit: false,
+      outputDimensions: [4000, 3000] as const,
+    },
+  },
+} satisfies SelectedImage;
 const currentOverlay: GamutWarningOverlayPayload = {
   black_point_compensation: transform.blackPointCompensation,
   color_managed_transform: transform.colorManagedTransform,
@@ -113,6 +134,13 @@ describe('gamut warning overlay defaults', () => {
       ),
     ).toBe(false);
     expect(formatGamutWarningCoverage(currentOverlay)).toBe('12.5%');
+  });
+
+  test('falls back to loaded RAW proof dimensions when the overlay is not ready yet', () => {
+    expect(resolveGamutWarningProofDimensions(null, loadedRawSelectedImage)).toEqual({
+      height: 3000,
+      width: 4000,
+    });
   });
 
   test('clears stale overlays when proof state or selected image changes', () => {

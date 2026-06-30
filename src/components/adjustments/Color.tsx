@@ -21,6 +21,7 @@ import { applyProfileToneToRgbPixel } from '../../utils/color/profile/profileTon
 import {
   formatGamutWarningCoverage,
   isCurrentExportSoftProofGamutWarningOverlay,
+  resolveGamutWarningProofDimensions,
 } from '../../utils/color/runtime/gamutWarningDisplay';
 import {
   applySelectiveColorToRgbPixel,
@@ -851,6 +852,7 @@ export default function ColorPanel({
   const [activeChannelMixerOutput, setActiveChannelMixerOutput] = useState<ChannelMixerOutput>('red');
   const [selectiveColorPreviewMode, setSelectiveColorPreviewMode] = useState<SelectiveColorPreviewMode>('adjusted');
   const gamutWarningOverlay = useEditorStore((state) => state.gamutWarningOverlay);
+  const selectedImage = useEditorStore((state) => state.selectedImage);
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
   const exportSoftProofRecipeId = useEditorStore((state) => state.exportSoftProofRecipeId);
   const exportSoftProofTransform = useEditorStore((state) => state.exportSoftProofTransform);
@@ -866,6 +868,7 @@ export default function ColorPanel({
     selectedImagePath,
   });
   const currentGamutWarningOverlay = isCurrentGamutWarningOverlay ? gamutWarningOverlay : null;
+  const proofDimensions = resolveGamutWarningProofDimensions(gamutWarningOverlay, selectedImage);
   const gamutWarningCoverage = formatGamutWarningCoverage(currentGamutWarningOverlay);
 
   const HSL_COLORS = useMemo<Array<ColorProps>>(
@@ -1427,8 +1430,8 @@ export default function ColorPanel({
           data-effective-rendering-intent={currentGamutWarningOverlay?.effective_rendering_intent ?? ''}
           data-export-soft-proof-recipe-id={currentGamutWarningOverlay?.export_soft_proof_recipe_id ?? ''}
           data-preview-basis={currentGamutWarningOverlay?.preview_basis ?? ''}
-          data-proof-mask-height={currentGamutWarningOverlay?.height ?? 0}
-          data-proof-mask-width={currentGamutWarningOverlay?.width ?? 0}
+          data-proof-mask-height={proofDimensions.height}
+          data-proof-mask-width={proofDimensions.width}
           data-proof-ready={String(currentGamutWarningOverlay !== null)}
           data-source-image-path={currentGamutWarningOverlay?.source_image_path ?? ''}
           data-transform-policy-fingerprint={currentGamutWarningOverlay?.transform_policy_fingerprint ?? ''}
@@ -1449,9 +1452,9 @@ export default function ColorPanel({
                 data-testid="gamut-warning-proof-details"
               >
                 {t('adjustments.color.gamutWarning.proofDetails', {
-                  height: currentGamutWarningOverlay?.height ?? 0,
+                  height: proofDimensions.height,
                   pixels: currentGamutWarningOverlay?.warning_pixel_count ?? 0,
-                  width: currentGamutWarningOverlay?.width ?? 0,
+                  width: proofDimensions.width,
                 })}
               </UiText>
             </div>
