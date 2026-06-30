@@ -64,7 +64,7 @@ const previewBlendArtifactSchema = z
 const reportSchema = z
   .object({
     artifactReportHash: hashSchema,
-    command: z.literal('bun tests/integration/checks/check-focus-preview-blend-smoke.ts'),
+    command: z.literal('bun tests/integration/checks/focus/check-focus-preview-blend-smoke.ts'),
     generatedAt: z.iso.datetime({ offset: true }),
     issue: z.literal(1939),
     proofHash: hashSchema,
@@ -94,7 +94,7 @@ const reportSchema = z
   .strict();
 
 const update = process.argv.includes('--update');
-run(['bun', 'tests/integration/checks/check-focus-preview-blend-smoke.ts']);
+run(['bun', 'tests/integration/checks/focus/check-focus-preview-blend-smoke.ts']);
 const artifactText = await Bun.file(BLEND_ARTIFACT_PATH).text();
 const artifact = previewBlendArtifactSchema.parse(JSON.parse(artifactText));
 const fixtures = await Promise.all(
@@ -118,7 +118,7 @@ const proofPayload = {
 };
 const report = reportSchema.parse({
   artifactReportHash: proofPayload.artifactReportHash,
-  command: 'bun tests/integration/checks/check-focus-preview-blend-smoke.ts',
+  command: 'bun tests/integration/checks/focus/check-focus-preview-blend-smoke.ts',
   fixtures,
   generatedAt: GENERATED_AT,
   issue: 1939,

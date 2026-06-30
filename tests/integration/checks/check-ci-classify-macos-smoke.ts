@@ -138,18 +138,18 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ],
   [
     'check:focus-alignment-sharpness-proof',
-    new Set(['bun tests/integration/checks/check-focus-alignment-sharpness-proof.ts']),
+    new Set(['bun tests/integration/checks/focus/check-focus-alignment-sharpness-proof.ts']),
   ],
   [
     'check:focus-alignment-sharpness-proof:update',
-    new Set(['bun tests/integration/checks/check-focus-alignment-sharpness-proof.ts --update']),
+    new Set(['bun tests/integration/checks/focus/check-focus-alignment-sharpness-proof.ts --update']),
   ],
-  ['check:focus-blend-halo-proof', new Set(['bun tests/integration/checks/check-focus-blend-halo-proof.ts'])],
+  ['check:focus-blend-halo-proof', new Set(['bun tests/integration/checks/focus/check-focus-blend-halo-proof.ts'])],
   [
     'check:focus-blend-halo-proof:update',
-    new Set(['bun tests/integration/checks/check-focus-blend-halo-proof.ts --update']),
+    new Set(['bun tests/integration/checks/focus/check-focus-blend-halo-proof.ts --update']),
   ],
-  ['check:focus-ui-api', new Set(['bun tests/integration/checks/check-focus-ui-api.ts'])],
+  ['check:focus-ui-api', new Set(['bun tests/integration/checks/focus/check-focus-ui-api.ts'])],
   ['check:focus-ui-smoke', new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario focus-ui'])],
   [
     'check:hdr-alignment-bracket-proof',

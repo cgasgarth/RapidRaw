@@ -5,7 +5,7 @@ import {
   type FocusStackSourceValidationInputV1,
   type FocusStackSourceValidationWarningCodeV1,
   validateFocusStackSourcesV1,
-} from '../../../packages/rawengine-schema/src/focus-stack/focusStackSourceValidation.ts';
+} from '../../../../packages/rawengine-schema/src/focus-stack/focusStackSourceValidation.ts';
 
 const failures: string[] = [];
 

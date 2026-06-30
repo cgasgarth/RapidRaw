@@ -6,9 +6,9 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
-import FocusStackModal from '../../../src/components/modals/computational-merge/FocusStackModal.tsx';
-import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../../src/schemas/focus-stack/focusStackUiSchemas.ts';
-import { buildFocusStackSourcePreflight } from '../../../src/utils/focusStackSourcePreflight.ts';
+import FocusStackModal from '../../../../src/components/modals/computational-merge/FocusStackModal.tsx';
+import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../../../src/schemas/focus-stack/focusStackUiSchemas.ts';
+import { buildFocusStackSourcePreflight } from '../../../../src/utils/focusStackSourcePreflight.ts';
 
 const failures: string[] = [];
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));

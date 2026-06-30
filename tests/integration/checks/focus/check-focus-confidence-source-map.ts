@@ -1,15 +1,15 @@
 #!/usr/bin/env bun
 
 import { existsSync } from 'node:fs';
-import { parseFocusConfidenceSourceMapReport } from '../../../src/schemas/focus-stack/focusConfidenceSourceMapSchemas.ts';
-import { parseFocusSharpnessMapReport } from '../../../src/schemas/focus-stack/focusSharpnessMapSchemas.ts';
-import { buildFocusConfidenceSourceMapReport } from '../../../src/utils/focusConfidenceSourceMap.ts';
+import { parseFocusConfidenceSourceMapReport } from '../../../../src/schemas/focus-stack/focusConfidenceSourceMapSchemas.ts';
+import { parseFocusSharpnessMapReport } from '../../../../src/schemas/focus-stack/focusSharpnessMapSchemas.ts';
+import { buildFocusConfidenceSourceMapReport } from '../../../../src/utils/focusConfidenceSourceMap.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/focus/focus-confidence-source-map-2026-06-20.json';
 const SHARPNESS_REPORT_PATH = 'artifacts/focus-sharpness-map/focus-sharpness-map-report.json';
 const update = process.argv.includes('--update');
 
-run(['bun', 'tests/integration/checks/check-focus-sharpness-map-smoke.ts']);
+run(['bun', 'tests/integration/checks/focus/check-focus-sharpness-map-smoke.ts']);
 
 const sharpnessReport = parseFocusSharpnessMapReport(await Bun.file(SHARPNESS_REPORT_PATH).json());
 const report = buildFocusConfidenceSourceMapReport(sharpnessReport);

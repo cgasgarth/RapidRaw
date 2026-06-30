@@ -106,6 +106,10 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4296',
     reason: 'negative-lab checks are grouped under their domain folder',
   },
+  'tests/integration/checks/focus': {
+    issue: '#4328',
+    reason: 'focus checks are grouped under a dedicated folder for this issue',
+  },
 };
 
 type FolderCount = {
