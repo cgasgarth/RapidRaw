@@ -3323,9 +3323,12 @@ export const sampleNegativeLabApplyPlanRequestV1: NegativeLabApplyPlanRequestV1 
   negativeLabApplyPlanRequestV1Schema.parse({
     acknowledgedWarningCodes: ['lossy_input', 'low_acquisition_confidence'],
     acceptedDryRunPlanHash: `sha256:${sampleNegativeLabDryRunResultV1.dryRunPlanId}`,
+    approval: sampleEditApplyApproval(
+      'Applying Negative Lab conversion requires an accepted dry-run plan and local operator approval.',
+    ),
     commandId: sampleNegativeLabCommandEnvelopeV1.commandId,
     dryRunPlanId: sampleNegativeLabDryRunResultV1.dryRunPlanId,
-    expectedSessionRevision: 'session_rev_negative_7',
+    expectedSessionRevision: sampleNegativeLabCommandEnvelopeV1.expectedGraphRevision,
     sessionId: sampleNegativeRollSessionV1.sessionId,
   });
 
@@ -3336,6 +3339,7 @@ export const sampleNegativeLabApplyResultV1: NegativeLabApplyResultV1 = negative
   commandType: sampleNegativeLabCommandEnvelopeV1.commandType,
   correlationId: sampleNegativeLabCommandEnvelopeV1.correlationId,
   dryRunCommandId: sampleNegativeLabCommandEnvelopeV1.commandId,
+  noOverwritePolicy: 'never_overwrite_original',
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
   sessionId: sampleNegativeRollSessionV1.sessionId,
   warnings: sampleNegativeRollSessionV1.acquisitionWarnings,

@@ -52,7 +52,7 @@ export type NegativeLabAppServerRuntimeToolResultV1 =
   | NegativeLabAppServerRuntimeDryRunToolResultV1;
 
 interface AcceptedNegativeLabDryRunPlanV1 {
-  command: NegativeLabCommandEnvelopeV1;
+  command: NegativeLabSetConversionRecipeCommandV1;
   dryRun: NegativeLabDryRunResultV1;
   hash: string;
 }
@@ -140,6 +140,12 @@ export class NegativeLabAppServerRuntimeToolBusV1 {
       acceptedPlan.command.commandId !== request.commandId
     ) {
       throw new Error(`${tool.toolName} rejected an unaccepted Negative Lab dry-run plan.`);
+    }
+    if (acceptedPlan.command.expectedGraphRevision !== request.expectedSessionRevision) {
+      throw new Error(`${tool.toolName} rejected a stale Negative Lab dry-run session revision.`);
+    }
+    if (acceptedPlan.command.parameters.sessionId !== request.sessionId) {
+      throw new Error(`${tool.toolName} rejected a Negative Lab apply for a different session.`);
     }
 
     return {
@@ -237,6 +243,7 @@ function buildNegativeLabRuntimeApplyV1(
     commandType: acceptedPlan.command.commandType,
     correlationId: acceptedPlan.command.correlationId,
     dryRunCommandId: acceptedPlan.command.commandId,
+    noOverwritePolicy: 'never_overwrite_original',
     proof,
     schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     sessionId: request.sessionId,

@@ -23,6 +23,7 @@
   "commandType": "negativeLab.setConversionRecipe",
   "correlationId": "corr_negative_set_conversion_recipe_sample",
   "dryRunCommandId": "command_negative_set_conversion_recipe_sample",
+  "noOverwritePolicy": "never_overwrite_original",
   "schemaVersion": 1,
   "sessionId": "negative_roll_session_sample",
   "warnings": [

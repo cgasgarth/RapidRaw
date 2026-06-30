@@ -176,6 +176,11 @@ import { AI_APP_SERVER_TOOL_ROUTES } from './aiAppServerToolRoutes';
 import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from './computationalMergeAppServerRoutes';
 import { DETAIL_APP_SERVER_ROUTES } from './detailAppServerRoutes';
 import { FILM_LOOK_APP_SERVER_ROUTE_MANIFEST } from './filmLookAppServerRoutes';
+import {
+  dispatchNegativeLabAgentAppServerTool,
+  NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME,
+  NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME,
+} from './negativeLabAgentAppServerToolDispatch';
 import { NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST } from './negativeLabAppServerRoutes';
 import { ToneColorAppServerRouteStatus } from './toneColorAppServerRouteIds';
 import { TONE_COLOR_APP_SERVER_ROUTES } from './toneColorAppServerRoutes';
@@ -636,6 +641,24 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       toolNames: [AGENT_HISTORY_ROLLBACK_TOOL_NAME],
     }),
     buildRouteCatalogEntry({
+      commandName: NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME,
+      family: 'negative_lab',
+      inputSchemaNames: ['NegativeLabCommandEnvelopeV1'],
+      modes: [RawEngineAppServerRouteMode.DryRunCommand],
+      outputSchemaNames: ['NegativeLabDryRunResultV1'],
+      runtimeCheckScripts: ['check:negative-lab-agent-apply-rollback', 'check:negative-lab-app-server-routes'],
+      toolNames: [NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
+      commandName: NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME,
+      family: 'negative_lab',
+      inputSchemaNames: ['NegativeLabApplyPlanRequestV1'],
+      modes: [RawEngineAppServerRouteMode.ApplyDryRunPlan],
+      outputSchemaNames: ['NegativeLabApplyResultV1'],
+      runtimeCheckScripts: ['check:negative-lab-agent-apply-rollback', 'check:negative-lab-app-server-routes'],
+      toolNames: [NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
       commandName: AGENT_GEOMETRY_APPLY_TOOL_NAME,
       family: 'agent',
       inputSchemaNames: [AGENT_GEOMETRY_APPLY_INPUT_SCHEMA_NAME],
@@ -937,6 +960,8 @@ const APPROVED_AGENT_APP_SERVER_TOOL_NAMES = new Set<string>([
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_RETOUCH_APPLY_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
+  NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME,
+  NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME,
 ]);
 
 const hasAgentSessionIntent = ({
@@ -1006,6 +1031,10 @@ const dispatchAgentAppServerTool = async (
       break;
     case AGENT_HISTORY_ROLLBACK_TOOL_NAME:
       result = rollbackAgentSessionHistory(agentHistoryRollbackRequestSchema.parse(request.arguments));
+      break;
+    case NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME:
+    case NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME:
+      result = dispatchNegativeLabAgentAppServerTool(request);
       break;
     case AGENT_GEOMETRY_APPLY_TOOL_NAME:
       result = applyAgentGeometry(agentGeometryApplyRequestSchema.parse(request.arguments));

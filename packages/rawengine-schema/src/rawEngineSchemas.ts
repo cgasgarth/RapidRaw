@@ -8344,12 +8344,30 @@ export const negativeLabApplyPlanRequestV1Schema = z
   .object({
     acknowledgedWarningCodes: z.array(negativeWarningCodeSchema),
     acceptedDryRunPlanHash: z.string().trim().min(1),
+    approval: approvalRequirementSchema,
     commandId: z.string().trim().min(1),
     dryRunPlanId: z.string().trim().min(1),
     expectedSessionRevision: z.string().trim().min(1),
     sessionId: z.string().trim().min(1),
   })
-  .strict();
+  .strict()
+  .superRefine((request, context) => {
+    if (request.approval.approvalClass !== ApprovalClass.EditApply) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab apply requests require edit-apply approval classification.',
+        path: ['approval', 'approvalClass'],
+      });
+    }
+
+    if (request.approval.state !== 'approved') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab apply requests require approved user approval.',
+        path: ['approval', 'state'],
+      });
+    }
+  });
 
 export const negativeLabCreateSessionCommandV1Schema = commandEnvelopeV1Schema
   .extend({
@@ -8526,6 +8544,7 @@ export const negativeLabApplyResultV1Schema = z
     commandType: negativeLabCommandTypeSchema,
     correlationId: z.string().trim().min(1),
     dryRunCommandId: z.string().trim().min(1).optional(),
+    noOverwritePolicy: z.literal('never_overwrite_original'),
     proof: negativeLabRuntimeProofV1Schema.optional(),
     schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
     sessionId: z.string().trim().min(1),
