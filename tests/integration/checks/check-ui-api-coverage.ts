@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { format, resolveConfig } from 'prettier';
 import { z } from 'zod';
 
-const MANIFEST_PATH = 'docs/api/coverage/ui-edit-surface-coverage-2026-06-16.json';
+const MANIFEST_PATH = 'docs/api/surface-coverage/ui-edit-surface-coverage-2026-06-16.json';
 const args = new Set(process.argv.slice(2));
 const shouldUpdate = args.has('--update');
 
