@@ -2203,9 +2203,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       <div className="absolute bottom-24 left-4 right-4 z-20 pointer-events-none">
         <div
           className="pointer-events-auto rounded-md border border-white/10 bg-black/70 p-2 shadow-xl backdrop-blur-md"
+          aria-label={t('modals.negativeConversion.frameHealth')}
           data-active-frame-id={frameHealthReport.activeFrameId ?? ''}
           data-preview-ready={String(previewUrl !== null)}
           data-testid="negative-lab-roll-frame-navigator"
+          role="region"
         >
           <div
             className="sr-only"
@@ -2223,6 +2225,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           </div>
           <div
             className="mb-2 grid grid-cols-5 gap-1 text-[11px] text-white/70"
+            aria-label={t('modals.negativeConversion.batchReadiness')}
             data-active-frame-id={activeFrame?.frameId ?? ''}
             data-base-scope={baseFogScope}
             data-base-status={activeFrame?.baseStatus ?? 'pending'}
@@ -2232,6 +2235,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             data-review-frame-count={batchDryRunSummary.reviewFrameIds.length}
             data-testid="negative-lab-roll-queue-summary"
             data-warning-count={activeFrame === null ? 0 : getNegativeLabFrameWarningCount(activeFrame)}
+            role="status"
           >
             <span className="truncate rounded bg-white/5 px-2 py-1" data-testid="negative-lab-roll-selected-frame">
               {activeFrame?.scanLabel ?? t('modals.negativeConversion.frameHealth')}
@@ -2288,12 +2292,24 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             >
               <ChevronLeft size={16} />
             </button>
-            <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto" data-testid="negative-lab-roll-frame-strip">
+            <div
+              aria-label={t('modals.negativeConversion.frameHealth')}
+              className="flex min-w-0 flex-1 gap-1 overflow-x-auto"
+              data-testid="negative-lab-roll-frame-strip"
+              role="group"
+            >
               {frameHealthReport.frames.map((frame, index) => {
                 const framePreviewReady = frame.active && previewUrl !== null;
 
                 return (
                   <button
+                    aria-label={`${frame.scanLabel}, ${t(
+                      frame.healthStatus === 'skipped'
+                        ? 'modals.negativeConversion.frameHealthSkipped'
+                        : frame.healthStatus === 'active'
+                          ? 'modals.negativeConversion.frameHealthActive'
+                          : 'modals.negativeConversion.frameHealthQueued',
+                    )}, ${t(BATCH_DISPOSITION_LABEL_KEYS[frame.batchDisposition])}`}
                     aria-current={frame.active ? 'true' : undefined}
                     className={cx(
                       'min-w-32 rounded border px-2 py-1.5 text-left text-xs transition-colors',
@@ -2418,6 +2434,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     return (
       <div
         className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+        aria-label={t('modals.negativeConversion.acquisitionHealth')}
         data-acquisition-severity={acquisitionHealth.severity}
         data-lossy-count={acquisitionHealth.lossyCount}
         data-raw-like-count={acquisitionHealth.rawLikeCount}
@@ -2426,6 +2443,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         data-warning-count={acquisitionHealth.warningCodes.length}
         data-warning-codes={acquisitionHealth.warningCodes.join(',')}
         data-testid="negative-lab-acquisition-health"
+        role="status"
       >
         <div className="flex items-center justify-between gap-2">
           <UiText variant={TextVariants.small} className="font-medium text-text-primary">
@@ -2485,8 +2503,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const renderScanInputGuidance = () => (
     <div
       className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+      aria-label={t('modals.negativeConversion.scanInputGuidanceTitle')}
       data-preflight-basis="path_extension_only"
       data-testid="negative-lab-scan-input-guidance"
+      role="region"
     >
       <UiText variant={TextVariants.small} className="font-medium text-text-primary">
         {t('modals.negativeConversion.scanInputGuidanceTitle')}
@@ -2537,6 +2557,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     return (
       <div
         className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+        aria-label={t('modals.negativeConversion.batchReadiness')}
         data-planned-apply-count={batchDryRunSummary.plannedApplyCount}
         data-review-count={dustScratchReviewReport.reviewCount}
         data-roll-normalization-affected-count={rollNormalizationPlan.affectedFrameIds.length}
@@ -2555,6 +2576,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         data-roll-normalization-white-balance-delta={rollNormalizationPlan.proposedWhiteBalanceDelta}
         data-skipped-frame-count={batchDryRunSummary.skippedFrameIds.length}
         data-testid="negative-lab-batch-readiness"
+        role="status"
       >
         <div className="flex items-center justify-between gap-2">
           <UiText variant={TextVariants.small} className="font-medium text-text-primary">
@@ -2590,6 +2612,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         </div>
         <div
           className="rounded-md border border-surface bg-bg-secondary p-2"
+          aria-label={t('modals.negativeConversion.v2QcReadouts')}
           data-algorithm={params.print_curve_algorithm}
           data-auto-suggestion-state={autoSuggestionState}
           data-crosstalk-state={crosstalkState}
@@ -2597,6 +2620,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           data-preview-export-parity-state={workspaceProof.exportReady ? 'ready_for_receipt' : 'blocked'}
           data-print-curve-v2={String(isPrintCurveV2)}
           data-testid="negative-lab-v2-qc-readouts"
+          role="region"
         >
           <div className="mb-2 flex items-center justify-between gap-2">
             <UiText variant={TextVariants.small} className="font-medium text-text-primary">
@@ -2734,6 +2758,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const renderWalkthroughClosure = () => (
     <div
       className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+      aria-label={t('modals.negativeConversion.walkthroughClosureTitle')}
       data-export-ready={String(workspaceProof.exportReady)}
       data-handoff-ready={String(activePositiveVariant !== null)}
       data-preview-ready={String(workspaceProof.previewReady)}
@@ -2741,6 +2766,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       data-qc-export-ready={String(qcProofReport.exportReady)}
       data-ready={String(walkthroughClosureReady)}
       data-testid="negative-lab-import-export-walkthrough"
+      role="status"
     >
       <div className="flex items-start justify-between gap-2">
         <div>
@@ -2789,6 +2815,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const renderAgentActivityPanel = () => (
     <div
       className="rounded-md border border-surface bg-bg-primary p-2 text-[11px] text-text-tertiary"
+      aria-label={t('modals.negativeConversion.agentActivity')}
       data-agent-command-source={agentCommandSource}
       data-agent-commit-state={agentCommitState}
       data-agent-dry-run-state={agentDryRunState}
@@ -2800,6 +2827,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       data-affected-frame-count={batchDryRunSummary.affectedFrameIds.length}
       data-testid="negative-lab-agent-activity"
       data-warning-count={rollWarningCount}
+      role="status"
     >
       <div className="mb-1 flex items-center justify-between gap-2">
         <span className="font-medium text-text-primary">{t('modals.negativeConversion.agentActivity')}</span>
@@ -2861,7 +2889,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const renderDustScratchReview = () => (
     <div
       className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+      aria-label={t('modals.negativeConversion.dustScratchReview')}
       data-testid="negative-lab-dust-review"
+      role="region"
     >
       <div className="flex items-center justify-between gap-2">
         <UiText variant={TextVariants.small} className="font-medium text-text-primary">
@@ -2925,8 +2955,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       </div>
       <div
         className="flex flex-wrap gap-1 text-[11px]"
+        aria-label={t('modals.negativeConversion.dustScratchReview')}
         data-active-filter={dustCandidateFilter}
         data-testid="negative-lab-dust-candidate-filter"
+        role="group"
       >
         {NEGATIVE_LAB_DUST_CANDIDATE_FILTERS.map((filter) => (
           <button
@@ -3191,8 +3223,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const renderControls = () => (
     <div className="modal-adjustments-pane w-80 shrink-0 bg-bg-secondary flex flex-col border-l border-surface h-full z-10">
       <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-        <UiText variant={TextVariants.title}>{t('modals.negativeConversion.title')}</UiText>
+        <UiText id="negative-lab-dialog-title" variant={TextVariants.title}>
+          {t('modals.negativeConversion.title')}
+        </UiText>
         <button
+          aria-label={t('modals.negativeConversion.resetTooltip')}
           onClick={() => {
             setParams(DEFAULT_PARAMS);
             setSelectedPresetId(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
@@ -3220,7 +3255,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 ? t('modals.negativeConversion.workflowSetupDetailSingle')
                 : t('modals.negativeConversion.workflowSetupDetailMultiple', { scanCount: targetPaths.length })}
             </UiText>
-            <div className="max-h-44 space-y-1 overflow-y-auto pr-1">
+            <div
+              aria-label={t('modals.negativeConversion.workflowSetup')}
+              className="max-h-44 space-y-1 overflow-y-auto pr-1"
+              role="list"
+            >
               {targetPaths.map((path, index) => {
                 const isActiveScan = index === effectiveActivePathIndex;
                 const isIncludedScan = includedPathSet.has(path);
@@ -3235,8 +3274,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                         : 'border-surface bg-bg-secondary text-text-secondary hover:bg-surface',
                     )}
                     key={`${path}-${index}`}
+                    role="listitem"
                   >
                     <button
+                      aria-label={`${scanLabel}${isActiveScan ? `, ${t('modals.negativeConversion.frameHealthActive')}` : ''}`}
                       aria-current={isActiveScan ? 'true' : undefined}
                       className="flex min-w-0 items-center justify-between gap-2 rounded px-1.5 py-1 text-left disabled:cursor-not-allowed disabled:opacity-50"
                       data-testid={`negative-lab-active-scan-${index}`}
@@ -3314,7 +3355,12 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               </UiText>
             </label>
             {hasMultipleScans && (
-              <div className="grid grid-cols-3 gap-2" data-testid="negative-lab-conversion-scope">
+              <div
+                aria-label={t('modals.negativeConversion.exportOptions')}
+                className="grid grid-cols-3 gap-2"
+                data-testid="negative-lab-conversion-scope"
+                role="group"
+              >
                 {(['all', 'ready', 'active'] satisfies Array<NegativeConversionScope>).map((scope) => (
                   <button
                     aria-pressed={conversionScope === scope}
@@ -3377,8 +3423,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                   entry.genericPresetId === null
                     ? null
                     : NEGATIVE_LAB_PROFILE_BROWSER_ROW_BY_ID.get(entry.genericPresetId);
-                const isSelectableFamily =
-                  mappedProfile !== null && mappedProfile !== undefined && mappedProfile.isSelectable;
+                const isSelectableFamily = mappedProfile?.isSelectable === true;
 
                 return (
                   <button
@@ -3448,8 +3493,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                   entry.suggestedGenericPresetId === null
                     ? null
                     : NEGATIVE_LAB_PROFILE_BROWSER_ROW_BY_ID.get(entry.suggestedGenericPresetId);
-                const isSuggestedProfileSelectable =
-                  mappedProfile !== null && mappedProfile !== undefined && mappedProfile.isSelectable;
+                const isSuggestedProfileSelectable = mappedProfile?.isSelectable === true;
 
                 return (
                   <div
@@ -3574,8 +3618,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           </label>
           <div
             className="mb-3 flex gap-2 overflow-x-auto pb-1"
+            aria-label={t('modals.negativeConversion.profileSearch')}
             data-testid="negative-lab-profile-filter-tabs"
-            role="group"
+            role="tablist"
           >
             {NEGATIVE_LAB_PROFILE_FILTERS.map((filter) => {
               const isActive = profileFilter === filter.id;
@@ -3583,6 +3628,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               return (
                 <button
                   aria-pressed={isActive}
+                  aria-selected={isActive}
                   className={cx(
                     'shrink-0 rounded-md border px-3 py-2 text-left text-xs transition-colors',
                     isActive
@@ -3595,6 +3641,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                     setProfileFilter(filter.id);
                   }}
                   type="button"
+                  role="tab"
                 >
                   <span className="block font-medium">{t(filter.labelKey)}</span>
                   <span className="block tabular-nums opacity-70">{profileFilterCounts[filter.id]}</span>
@@ -3622,12 +3669,22 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               </UiText>
             </div>
           )}
-          <div className="grid grid-cols-1 gap-2">
+          <div
+            aria-label={t('modals.negativeConversion.genericPresets')}
+            className="grid grid-cols-1 gap-2"
+            role="group"
+          >
             {visibleProfileRows.map((preset) => {
               const isSelected = selectedPresetId === preset.presetId;
 
               return (
                 <button
+                  aria-label={`${preset.displayName}, ${
+                    preset.runtimeStatus === 'runtime_parameter_applied'
+                      ? t('modals.negativeConversion.presetRuntimeApplied')
+                      : t('modals.negativeConversion.presetRuntimeCatalogOnly')
+                  }`}
+                  aria-current={isSelected ? 'true' : undefined}
                   key={preset.presetId}
                   type="button"
                   onClick={() => {
@@ -3958,7 +4015,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               }}
               fillOrigin="min"
             />
-            <div className="space-y-2 rounded-md border border-surface bg-bg-primary p-2">
+            <div
+              aria-label={t('modals.negativeConversion.baseFogSample')}
+              className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+              role="group"
+            >
               <div className="flex items-center justify-between gap-2">
                 <UiText variant={TextVariants.small} className="text-text-secondary">
                   {t('modals.negativeConversion.baseFogSample')}
@@ -4003,8 +4064,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             </div>
             <div
               className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+              aria-label={t('modals.negativeConversion.baseSamplingStudio')}
               data-decision={baseSampleStudioDecision}
               data-testid="negative-lab-base-sampling-studio"
+              role="group"
             >
               <div className="flex items-center justify-between gap-2">
                 <UiText variant={TextVariants.small} className="text-text-secondary">
@@ -4638,7 +4701,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 )}
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div
+              aria-label={t('modals.negativeConversion.exportOptions')}
+              className="grid grid-cols-2 gap-2"
+              role="group"
+            >
               {NEGATIVE_LAB_OUTPUT_FORMAT_SELECTOR_IDS.map((format) => (
                 <button
                   key={format}
@@ -4668,6 +4735,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 {t('modals.negativeConversion.outputSuffix')}
               </UiText>
               <input
+                aria-label={t('modals.negativeConversion.outputSuffix')}
                 className="w-full rounded-md border border-surface bg-bg-primary px-3 py-2 text-sm text-text-primary outline-none focus:border-accent"
                 maxLength={40}
                 onChange={(event) => {
@@ -4964,6 +5032,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             }}
           >
             <button
+              aria-label={t('modals.negativeConversion.zoomOutTooltip')}
               onClick={zoomOut}
               className="p-2 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors"
               data-tooltip={t('modals.negativeConversion.zoomOutTooltip')}
@@ -4974,6 +5043,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               {Math.round(zoom * 100)}%
             </span>
             <button
+              aria-label={t('modals.negativeConversion.zoomInTooltip')}
               onClick={zoomIn}
               className="p-2 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors"
               data-tooltip={t('modals.negativeConversion.zoomInTooltip')}
@@ -4981,6 +5051,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               <ZoomIn size={18} />
             </button>
             <button
+              aria-label={t('modals.negativeConversion.resetViewTooltip')}
               onClick={handleResetZoom}
               className="p-2 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors"
               data-tooltip={t('modals.negativeConversion.resetViewTooltip')}
@@ -4989,6 +5060,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             </button>
             <div className="w-px h-5 bg-white/20 mx-1"></div>
             <button
+              aria-label={t('modals.negativeConversion.compareTooltip')}
               onMouseDown={() => {
                 setIsCompareActive(true);
               }}
@@ -5033,6 +5105,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             transition={{ duration: 0.2, ease: 'easeOut' }}
             className="bg-surface rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden"
             data-testid="negative-lab-workspace"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="negative-lab-dialog-title"
             onMouseDown={(e) => {
               e.stopPropagation();
             }}
@@ -5052,6 +5127,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 </UiText>
               )}
               <button
+                aria-label={t('modals.negativeConversion.cancel')}
                 disabled={isSaving}
                 onClick={onClose}
                 className="px-4 py-2 rounded-md text-text-secondary hover:bg-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -5059,6 +5135,15 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 {t('modals.negativeConversion.cancel')}
               </button>
               <Button
+                aria-label={
+                  hasMultipleScans && conversionScope === 'all'
+                    ? t('modals.negativeConversion.convertAndSaveAll', { count: targetPaths.length })
+                    : hasMultipleScans && conversionScope === 'ready'
+                      ? t('modals.negativeConversion.convertAndSaveReady', { count: pathsToConvert.length })
+                      : hasMultipleScans
+                        ? t('modals.negativeConversion.convertAndSaveActive')
+                        : t('modals.negativeConversion.convertAndSave')
+                }
                 onClick={() => {
                   void handleSave();
                 }}

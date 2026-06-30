@@ -112,7 +112,12 @@ export function NegativeLabRollHealthPanel({
   if (frameHealthReport.frames.length === 0) return null;
 
   return (
-    <div className="space-y-1" data-testid="negative-lab-frame-health-grid">
+    <div
+      aria-label={t('modals.negativeConversion.frameHealth')}
+      className="space-y-1"
+      data-testid="negative-lab-frame-health-grid"
+      role="region"
+    >
       <div className="flex items-center justify-between gap-2">
         <UiText variant={TextVariants.small} className="text-text-tertiary">
           {t('modals.negativeConversion.frameHealth')}
@@ -126,7 +131,11 @@ export function NegativeLabRollHealthPanel({
           </span>
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-1 text-[11px] text-text-tertiary">
+      <div
+        aria-label={t('modals.negativeConversion.batchReadiness')}
+        className="grid grid-cols-3 gap-1 text-[11px] text-text-tertiary"
+        role="status"
+      >
         <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-planned-apply-count">
           {t('modals.negativeConversion.batchPlanApplyCount', { applyCount: batchApplyFrameCount })}
         </span>
@@ -163,6 +172,7 @@ export function NegativeLabRollHealthPanel({
         </span>
         <button
           type="button"
+          aria-label={t('modals.negativeConversion.applyRollNormalizationPlan')}
           className="col-span-3 inline-flex items-center justify-center gap-1 rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
           data-roll-normalization-accepted={String(isRollNormalizationPlanAccepted)}
           data-testid="negative-lab-apply-roll-normalization"
@@ -201,6 +211,7 @@ export function NegativeLabRollHealthPanel({
         )}
         <button
           type="button"
+          aria-label={t('modals.negativeConversion.restoreRollNormalizationPlan')}
           className="col-span-3 inline-flex items-center justify-center gap-1 rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
           data-restore-available={String(
             rollNormalizationApplyReceipt !== null && !rollNormalizationApplyReceipt.restored,
@@ -232,6 +243,11 @@ export function NegativeLabRollHealthPanel({
         )}
         <button
           type="button"
+          aria-label={
+            isBatchPlanCopied
+              ? t('modals.negativeConversion.batchPlanCopied')
+              : t('modals.negativeConversion.copyBatchPlan')
+          }
           className="col-span-3 inline-flex items-center justify-center gap-1 rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary transition-colors hover:bg-surface"
           data-testid="negative-lab-copy-batch-plan"
           onClick={() => {
@@ -245,6 +261,11 @@ export function NegativeLabRollHealthPanel({
         </button>
         <button
           type="button"
+          aria-label={
+            isBatchPlanAccepted
+              ? t('modals.negativeConversion.batchPlanAccepted')
+              : t('modals.negativeConversion.acceptBatchPlan')
+          }
           className={cx(
             'col-span-3 inline-flex items-center justify-center rounded px-1.5 py-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-50',
             isBatchPlanAccepted
@@ -262,13 +283,16 @@ export function NegativeLabRollHealthPanel({
       </div>
       <div
         className="grid grid-cols-2 gap-2 rounded-sm bg-bg-secondary p-2 text-[11px]"
+        aria-label={t('modals.negativeConversion.frameHealth')}
         data-filter={frameHealthFilter}
         data-sort={frameHealthSort}
         data-testid="negative-lab-frame-health-controls"
+        role="group"
       >
         <label className="space-y-1">
           <span className="block text-text-tertiary">{t('modals.negativeConversion.frameHealthSeverityFilter')}</span>
           <select
+            aria-label={t('modals.negativeConversion.frameHealthSeverityFilter')}
             className="w-full rounded border border-surface bg-bg-primary px-2 py-1 text-text-secondary"
             data-testid="negative-lab-frame-health-filter"
             onChange={(event) => {
@@ -286,6 +310,7 @@ export function NegativeLabRollHealthPanel({
         <label className="space-y-1">
           <span className="block text-text-tertiary">{t('modals.negativeConversion.frameHealthSort')}</span>
           <select
+            aria-label={t('modals.negativeConversion.frameHealthSort')}
             className="w-full rounded border border-surface bg-bg-primary px-2 py-1 text-text-secondary"
             data-testid="negative-lab-frame-health-sort"
             onChange={(event) => {
@@ -308,8 +333,10 @@ export function NegativeLabRollHealthPanel({
         </span>
         <div
           className="col-span-2 grid grid-cols-3 gap-1"
+          aria-label={t('modals.negativeConversion.frameHealth')}
           data-visible-frame-count={visibleFrameHealthRows.length}
           data-testid="negative-lab-qc-visible-actions"
+          role="group"
         >
           {(
             [
@@ -362,6 +389,9 @@ export function NegativeLabRollHealthPanel({
 
           return (
             <div
+              aria-label={`${row.scanLabel}, ${t(`modals.negativeConversion.frameWarningSeverity.${row.warningSeverity}`)}, ${t(
+                BATCH_DISPOSITION_LABEL_KEYS[row.batchDisposition],
+              )}`}
               className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto_auto_auto_auto] items-center gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
               data-acquisition-source={row.acquisitionSourceFamily}
               data-conversion-status={row.conversionStatus}
@@ -372,6 +402,7 @@ export function NegativeLabRollHealthPanel({
               data-warning-count={getNegativeLabFrameWarningCount(row)}
               data-testid={`negative-lab-frame-health-row-${index}`}
               key={row.frameId}
+              role="group"
             >
               <span className="truncate text-text-secondary">{row.scanLabel}</span>
               <span
@@ -431,6 +462,7 @@ export function NegativeLabRollHealthPanel({
                 {row.active && (
                   <span className="inline-flex gap-1" data-testid="negative-lab-active-frame-crop-actions">
                     <button
+                      aria-label={t('modals.negativeConversion.acceptDetectedCrop')}
                       className="rounded bg-bg-primary px-1 py-0.5 transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
                       data-testid="negative-lab-accept-detected-crop"
                       disabled={isSaving}
@@ -442,6 +474,7 @@ export function NegativeLabRollHealthPanel({
                       {t('modals.negativeConversion.acceptDetectedCrop')}
                     </button>
                     <button
+                      aria-label={t('modals.negativeConversion.manualCrop')}
                       className="rounded bg-bg-primary px-1 py-0.5 transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
                       data-testid="negative-lab-set-manual-crop"
                       disabled={isSaving}
@@ -453,6 +486,7 @@ export function NegativeLabRollHealthPanel({
                       {t('modals.negativeConversion.manualCrop')}
                     </button>
                     <button
+                      aria-label={t('modals.negativeConversion.resetFrameCrop')}
                       className="rounded bg-bg-primary px-1 py-0.5 transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
                       data-testid="negative-lab-reset-frame-crop"
                       disabled={isSaving || row.cropStatus === 'active_frame_editable'}
@@ -505,14 +539,17 @@ export function NegativeLabRollHealthPanel({
               </span>
               <span
                 className="col-span-10 flex flex-wrap items-center gap-1 text-[11px]"
+                aria-label={`${row.scanLabel} ${t(QC_DECISION_LABEL_KEYS[qcDecisionByFrameId[row.frameId] ?? 'pending'])}`}
                 data-qc-decision={qcDecisionByFrameId[row.frameId] ?? 'pending'}
                 data-testid={`negative-lab-frame-qc-decision-${index}`}
+                role="group"
               >
                 <span className="mr-1 text-text-tertiary">
                   {t(QC_DECISION_LABEL_KEYS[qcDecisionByFrameId[row.frameId] ?? 'pending'])}
                 </span>
                 {(['approved', 'rejected', 'pending'] satisfies Array<NegativeLabQcDecision>).map((decision) => (
                   <button
+                    aria-label={`${row.scanLabel}: ${t(QC_DECISION_LABEL_KEYS[decision])}`}
                     className={cx(
                       'rounded px-1.5 py-0.5 transition-colors',
                       (qcDecisionByFrameId[row.frameId] ?? 'pending') === decision
