@@ -3,7 +3,7 @@ import {
   type AiPeopleMaskFakeAlphaMask,
   type AiPeopleMaskLayerApplyPlan,
   aiPeopleMaskLayerApplyPlanSchema,
-} from '../schemas/masks/aiMaskingSchemas';
+} from '../../schemas/masks/aiMaskingSchemas';
 
 const titleCasePart = (part: string): string =>
   part

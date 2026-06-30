@@ -7,7 +7,7 @@ import { aiPeopleMaskContractFixtureSchema, aiPeopleMaskPartSchema } from '../..
 import {
   AI_PEOPLE_MASK_PART_CAPABILITIES,
   getAiPeopleMaskPartCapability,
-} from '../../../src/utils/aiPeopleMaskContracts.ts';
+} from '../../../src/utils/ai/aiPeopleMaskContracts.ts';
 
 const fixture = aiPeopleMaskContractFixtureSchema.parse(
   JSON.parse(readFileSync(resolve('fixtures/masks/ai/ai-people-mask-contract.json'), 'utf8')),

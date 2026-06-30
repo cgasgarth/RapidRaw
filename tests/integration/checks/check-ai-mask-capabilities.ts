@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { aiMaskCapabilityAuditSchema } from '../../../src/schemas/aiMaskingSchemas.ts';
-import { AI_MASK_CAPABILITY_AUDIT, getAiMaskCapabilityAudit } from '../../../src/utils/aiMaskCapabilities.ts';
+import { AI_MASK_CAPABILITY_AUDIT, getAiMaskCapabilityAudit } from '../../../src/utils/ai/aiMaskCapabilities.ts';
 
 const fixture = aiMaskCapabilityAuditSchema.parse(
   JSON.parse(readFileSync(resolve('fixtures/masks/ai/ai-mask-capabilities.json'), 'utf8')),
