@@ -2,23 +2,6 @@ import { motion } from 'framer-motion';
 import { AlertTriangle, Aperture, CheckCircle2, Eye, Layers3, ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
-import {
-  ComputationalSetupModalShell,
-  ComputationalSetupOptionSection,
-  ComputationalSetupSourceWarning,
-  ComputationalSetupStatusLine,
-} from './ComputationalSetupModalShell';
-import { useUIStore, type FocusStackModalState } from '../../store/useUIStore';
-import { TextColors, TextVariants } from '../../types/typography';
-import { buildFocusStackDerivedOutputReceipt, deriveDerivedOutputReceiptState } from '../../utils/derivedOutputReceipt';
-import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
-import { buildFocusStackSourcePreflight } from '../../utils/focusStackSourcePreflight';
-import Button from '../ui/Button';
-import Dropdown, { type OptionItem } from '../ui/Dropdown';
-import UiText from '../ui/Text';
-
 import type { FocusStackOutputReviewWorkflow } from '../../schemas/focusStackOutputReviewSchemas';
 import type {
   FocusStackAlignmentMode,
@@ -26,7 +9,22 @@ import type {
   FocusStackReviewOverlayMode,
   FocusStackUiSettings,
 } from '../../schemas/focusStackUiSchemas';
+import { type FocusStackModalState, useUIStore } from '../../store/useUIStore';
+import { TextColors, TextVariants } from '../../types/typography';
+import { buildFocusStackDerivedOutputReceipt, deriveDerivedOutputReceiptState } from '../../utils/derivedOutputReceipt';
+import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
 import type { FocusStackSourcePreflightMetadata } from '../../utils/focusStackSourcePreflight';
+import { buildFocusStackSourcePreflight } from '../../utils/focusStackSourcePreflight';
+import Button from '../ui/Button';
+import Dropdown, { type OptionItem } from '../ui/Dropdown';
+import UiText from '../ui/Text';
+import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
+import {
+  ComputationalSetupModalShell,
+  ComputationalSetupOptionSection,
+  ComputationalSetupSourceWarning,
+  ComputationalSetupStatusLine,
+} from './ComputationalSetupModalShell';
 
 interface FocusStackModalProps {
   isOpen: boolean;

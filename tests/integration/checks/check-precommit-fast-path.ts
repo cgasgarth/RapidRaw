@@ -3,92 +3,38 @@
 import { readFileSync } from 'node:fs';
 
 const hook = readFileSync('.githooks/pre-commit', 'utf8');
-const unconditionalSection =
-  hook.split("if printf '%s\\n' \"$staged_files\" | grep -Eq '^(AGENTS\\.md|docs/|.*\\.md$)'")[0] ?? hook;
+const failures: string[] = [];
 
-if (unconditionalSection.includes('check:external-editor-missing-launcher')) {
-  throw new Error('pre-commit must not run slow Rust cargo tests before staged-file routing.');
+for (const stalePattern of ['lint-staged', 'staged_files=', 'git diff --cached', 'check:eslint-gaps']) {
+  if (hook.includes(stalePattern)) failures.push(`pre-commit must not use stale staged routing: ${stalePattern}`);
 }
 
-for (const slowGate of ['build:frontend', 'check:visual-smoke:pr', 'check:browser-tauri-harness']) {
-  if (hook.includes(slowGate)) {
-    throw new Error(`pre-commit must leave ${slowGate} to CI or explicit local validation.`);
-  }
+for (const required of [
+  'bun run lint:fix',
+  'git add -u',
+  'run_gate lint bun run lint',
+  'run_gate format bun run format:check',
+  'run_gate typecheck bun run typecheck',
+  'run_gate test bun run test',
+  'run_gate rust bun run check:rust',
+  'run_gate bundle bun run check:bundle',
+  'run_gate i18n bun scripts/run-compact-command.ts --label i18n:lint -- bunx i18next-cli lint',
+  'run_gate unused-deps bun scripts/run-compact-command.ts --label unused-deps -- bunx knip --config knip.jsonc --dependencies --reporter compact',
+  'run_gate docs bun run check:docs',
+  'run_gate schema bun run check:schema',
+  'run_gate schema-routing bun tests/integration/checks/check-schema-contract-gate.ts --self-test',
+]) {
+  if (!hook.includes(required)) failures.push(`pre-commit missing full gate: ${required}`);
 }
 
-const schemaRoutingLine = hook.split('\n').find((line) => line.includes('schema:check')) ?? '';
-const schemaRoutingCondition = hook
-  .split('\n')
-  .slice(
-    0,
-    hook.split('\n').findIndex((line) => line === schemaRoutingLine),
-  )
-  .findLast((line) => line.includes("grep -Eq '"));
-if (schemaRoutingCondition?.includes('package\\.json') || schemaRoutingCondition?.includes('tsconfig')) {
-  throw new Error('pre-commit must not route package/tsconfig-only changes into heavy schema gates.');
+if (!hook.includes('Direct commits on main are blocked')) {
+  failures.push('pre-commit must still block direct commits on main.');
 }
 
-const unusedDepsLine = hook.split('\n').find((line) => line.includes('check:unused-deps')) ?? '';
-const unusedDepsCondition = hook
-  .split('\n')
-  .slice(
-    0,
-    hook.split('\n').findIndex((line) => line === unusedDepsLine),
-  )
-  .findLast((line) => line.includes("grep -Eq '"));
-if (unusedDepsCondition && /(src\/|scripts\/|tests\/)/u.test(unusedDepsCondition)) {
-  throw new Error('pre-commit must leave source/test unused-dependency audits to CI.');
+if (failures.length > 0) {
+  console.error('precommit policy failed:');
+  console.error(failures.join('\n'));
+  process.exit(1);
 }
 
-if (
-  !hook.includes("grep -Eq '^(src-tauri/.*\\.rs|src-tauri/Cargo\\.(toml|lock)|\\.cargo/.*|rust-toolchain\\.toml)$'")
-) {
-  throw new Error('pre-commit must keep Rust checks for Rust file changes.');
-}
-
-const rustRoutingLine = hook.split('\n').find((line) => line.includes('check:rust:fmt')) ?? '';
-const rustRoutingStart = hook
-  .split('\n')
-  .slice(
-    0,
-    hook.split('\n').findIndex((line) => line === rustRoutingLine),
-  )
-  .findLastIndex((line) => line.startsWith('if printf'));
-const rustRoutingEnd = hook
-  .split('\n')
-  .slice(hook.split('\n').findIndex((line) => line === rustRoutingLine))
-  .findIndex((line) => line === 'fi');
-const rustRoutingBlock = hook
-  .split('\n')
-  .slice(rustRoutingStart, hook.split('\n').findIndex((line) => line === rustRoutingLine) + rustRoutingEnd + 1)
-  .join('\n');
-
-for (const heavyRustGate of ['check:rust:check', 'check:rust:clippy', 'check:rust:test']) {
-  if (rustRoutingBlock.includes(heavyRustGate)) {
-    throw new Error(`pre-commit must leave ${heavyRustGate} to CI or explicit local validation.`);
-  }
-}
-
-for (const requiredFastGate of ['bun lint-staged --quiet --concurrent false']) {
-  if (!unconditionalSection.includes(requiredFastGate)) {
-    throw new Error(`pre-commit fast path missing required gate: ${requiredFastGate}`);
-  }
-}
-
-if (unconditionalSection.split('\n').some((line) => line.trim() === 'bun run check:lint')) {
-  throw new Error('pre-commit must not run full-repo ESLint unconditionally.');
-}
-
-const fullLintLine = hook.split('\n').find((line) => line.trim() === 'bun run check:lint') ?? '';
-const fullLintCondition = hook
-  .split('\n')
-  .slice(
-    0,
-    hook.split('\n').findIndex((line) => line === fullLintLine),
-  )
-  .findLast((line) => line.includes("grep -Eq '"));
-if (!fullLintCondition?.includes('^eslint\\.config\\.js$')) {
-  throw new Error('pre-commit should reserve full-repo ESLint for ESLint config changes.');
-}
-
-console.log('precommit fast path ok');
+console.log('precommit full gate policy ok');

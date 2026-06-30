@@ -1,19 +1,19 @@
 #!/usr/bin/env bun
 
-import { calculateDeltaE00, type LabColor } from '../../../src/utils/deltaE00';
 import {
   applyColorParityLegacyTonemap,
   applyColorParityLinearExposure,
   applyColorParityLumaLevels,
   type ColorParityVec3,
 } from '../../../src/utils/colorCpuGpuParity';
+import { calculateDeltaE00, type LabColor } from '../../../src/utils/deltaE00';
 import {
+  type LayerBlendMode,
+  type LayerRgbPixel,
   renderLayerBlendStack,
   renderLayerExportStack,
   renderLayerHeadlessStack,
   renderLayerPreviewStack,
-  type LayerBlendMode,
-  type LayerRgbPixel,
 } from '../../../src/utils/layerPreviewExportParity';
 
 const failureLimit = 20;

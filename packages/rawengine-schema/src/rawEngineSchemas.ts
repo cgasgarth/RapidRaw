@@ -5,8 +5,8 @@ import { artifactHandleV1Schema } from './artifactSchemas.js';
 import { panoramaHomographyDltDiagnosticsV1Schema } from './panoramaHomographyDiagnostics.js';
 import { createToneColorSchemasV1 } from './toneColorSchemas.js';
 
-export { artifactHandleV1Schema, negativeLabPositiveArtifactHandleV1Schema } from './artifactSchemas.js';
 export type { ArtifactHandleV1 } from './artifactSchemas.js';
+export { artifactHandleV1Schema, negativeLabPositiveArtifactHandleV1Schema } from './artifactSchemas.js';
 
 export const RAW_ENGINE_SCHEMA_VERSION = 1;
 

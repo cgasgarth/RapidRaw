@@ -1,9 +1,8 @@
 #!/usr/bin/env bun
 
 import { readFileSync } from 'node:fs';
-
-import { useProcessStore } from '../../../src/store/useProcessStore.ts';
 import { shouldQueueThumbnailPath } from '../../../src/hooks/useThumbnails.ts';
+import { useProcessStore } from '../../../src/store/useProcessStore.ts';
 
 const imageProcessingSource = readFileSync('src/hooks/useImageProcessing.ts', 'utf8');
 

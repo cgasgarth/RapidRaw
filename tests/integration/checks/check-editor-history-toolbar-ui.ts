@@ -1,16 +1,16 @@
 #!/usr/bin/env bun
 
 import { readFileSync } from 'node:fs';
+import i18next from 'i18next';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import i18next from 'i18next';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import EditorToolbar from '../../../src/components/panel/editor/EditorToolbar.tsx';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import type { SelectedImage } from '../../../src/components/ui/AppProperties.tsx';
 
 import type { Adjustments } from '../../../src/utils/adjustments.ts';
-import type { SelectedImage } from '../../../src/components/ui/AppProperties.tsx';
+import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 
 const failures: string[] = [];
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));

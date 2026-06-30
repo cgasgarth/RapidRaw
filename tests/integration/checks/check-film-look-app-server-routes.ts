@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { z } from 'zod';
-
+import { FilmLookAppServerCommandName } from '../../../src/utils/filmLookAppServerRouteIds.ts';
 import {
   buildFilmLookAppServerPatchResult,
   FILM_LOOK_APP_SERVER_ROUTE_MANIFEST,
@@ -12,7 +12,6 @@ import {
   getFilmLookControlledAdjustmentKeys,
 } from '../../../src/utils/filmLookBrowser.ts';
 import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/filmLookRegistry.ts';
-import { FilmLookAppServerCommandName } from '../../../src/utils/filmLookAppServerRouteIds.ts';
 
 const expectedCommandName = FilmLookAppServerCommandName.BuildAdjustmentPatch;
 const runtimeCheckScripts = ['check:film-look-render-apply-proof', 'check:film-look-preview-export-parity'];

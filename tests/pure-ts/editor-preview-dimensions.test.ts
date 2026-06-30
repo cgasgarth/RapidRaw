@@ -1,8 +1,6 @@
 import { expect, test } from 'bun:test';
-
-import { getEditorPreviewDimensions } from '../../src/utils/editorPreviewDimensions.ts';
-
 import type { SelectedImage } from '../../src/components/ui/AppProperties.tsx';
+import { getEditorPreviewDimensions } from '../../src/utils/editorPreviewDimensions.ts';
 
 const image = (overrides: Partial<SelectedImage>): SelectedImage => ({
   exif: null,

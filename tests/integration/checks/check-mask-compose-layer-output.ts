@@ -3,12 +3,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-
-import { applyComposedMaskToLayerPixels } from '../../../packages/rawengine-schema/src/maskComposeLayerApplication.ts';
 import {
-  renderComposedMask,
   type MaskAlphaArtifact,
+  renderComposedMask,
 } from '../../../packages/rawengine-schema/src/maskComposeCommandRuntime.ts';
+import { applyComposedMaskToLayerPixels } from '../../../packages/rawengine-schema/src/maskComposeLayerApplication.ts';
 import {
   ActorKind,
   ApprovalClass,

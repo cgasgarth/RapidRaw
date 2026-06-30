@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
-
+import type { LibraryRelinkIdentity } from '../../src/schemas/libraryRelinkSchemas.ts';
+import type { LibrarySessionSet } from '../../src/schemas/librarySessionSchemas.ts';
 import {
   applyLibraryRelinkToRuntimeState,
   applyLibraryRelinkToSessionSet,
@@ -8,9 +9,6 @@ import {
   rewriteLibraryRelinkPath,
   scoreRelinkCandidate,
 } from '../../src/utils/libraryRelinkIdentity.ts';
-
-import type { LibraryRelinkIdentity } from '../../src/schemas/libraryRelinkSchemas.ts';
-import type { LibrarySessionSet } from '../../src/schemas/librarySessionSchemas.ts';
 
 const hash = (suffix: string) => `sha256:${suffix.padStart(64, '0')}`;
 

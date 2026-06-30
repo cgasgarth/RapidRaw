@@ -1,10 +1,10 @@
 import {
   NEGATIVE_LAB_SCAN_METRICS_SCHEMA_VERSION,
-  negativeLabScanMetricsV1Schema,
   type NegativeLabScanMetricsPercentiles,
   type NegativeLabScanMetricsRect,
   type NegativeLabScanMetricsV1,
   type NegativeLabScanMetricsWarningCode,
+  negativeLabScanMetricsV1Schema,
 } from '../schemas/negativeLabScanMetricsSchemas';
 
 export interface NegativeLabScanMetricPixel {

@@ -1,3 +1,4 @@
+import { type AiAppServerToolRoute, aiAppServerToolRouteManifestSchema } from '../schemas/aiAppServerToolRouteSchemas';
 import {
   AiAppServerToolCapability,
   AiAppServerToolName,
@@ -6,7 +7,6 @@ import {
   AiAppServerToolRouteStatus,
   AiAppServerToolSchemaName,
 } from './aiAppServerToolRouteIds';
-import { aiAppServerToolRouteManifestSchema, type AiAppServerToolRoute } from '../schemas/aiAppServerToolRouteSchemas';
 
 const mappedTauriInvoke = {
   sourceKind: AiAppServerToolRouteSourceKind.TauriInvoke,

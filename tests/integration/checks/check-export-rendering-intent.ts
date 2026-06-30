@@ -3,8 +3,8 @@
 import { readFileSync } from 'node:fs';
 
 import {
-  MOXCMS_EXPORT_COLOR_CAPABILITIES_V1,
   exportColorCapabilityCatalogV1Schema,
+  MOXCMS_EXPORT_COLOR_CAPABILITIES_V1,
 } from '../../../packages/rawengine-schema/src/exportColorCapabilities.ts';
 import {
   ExportColorProfile,

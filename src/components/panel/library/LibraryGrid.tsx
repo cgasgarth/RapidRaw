@@ -1,36 +1,35 @@
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
+import type React from 'react';
 import {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  useMemo,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { List, useListCallbackRef } from 'react-window';
-
-import { Row, type LibraryRow, type LibraryRowProps } from './LibraryItems';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
-import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
+import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { buildLibraryAutoStackItems } from '../../../utils/libraryAutoStacks';
 import { debounce } from '../../../utils/timing';
 import {
   ExifOverlay,
-  LibraryViewMode,
-  SortDirection,
-  ThumbnailSize,
   type ImageFile,
+  LibraryViewMode,
   type SortCriteria,
+  SortDirection,
   type ThumbnailAspectRatio,
+  ThumbnailSize,
 } from '../../ui/AppProperties';
 import UiText from '../../ui/Text';
 
 import type { ColumnWidths } from '../MainLibrary';
-import type React from 'react';
+import { type LibraryRow, type LibraryRowProps, Row } from './LibraryItems';
 
 type ColumnWidthKey = keyof ColumnWidths;
 type HeaderSortKey = SortCriteria['key'];

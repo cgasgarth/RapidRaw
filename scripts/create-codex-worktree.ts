@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 
+import { strict as assert } from 'node:assert';
 import { existsSync, lstatSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
-import { strict as assert } from 'node:assert';
 import process from 'node:process';
 
 type RunOptions = {
@@ -194,15 +194,15 @@ const ensurePrimaryDependencies = (root: string): void => {
 
 const ensureDependencyBins = (root: string, install?: () => void): void => {
   const nodeModules = resolve(root, 'node_modules');
-  const eslintBin = resolve(nodeModules, '.bin/eslint');
+  const biomeBin = resolve(nodeModules, '.bin/biome');
   const prettierBin = resolve(nodeModules, '.bin/prettier');
   const i18nBin = resolve(nodeModules, '.bin/i18next-cli');
 
-  if (existsSync(eslintBin) && existsSync(prettierBin) && existsSync(i18nBin)) return;
+  if (existsSync(biomeBin) && existsSync(prettierBin) && existsSync(i18nBin)) return;
 
   install?.();
 
-  if (!existsSync(eslintBin) || !existsSync(prettierBin) || !existsSync(i18nBin)) {
+  if (!existsSync(biomeBin) || !existsSync(prettierBin) || !existsSync(i18nBin)) {
     throw new Error(`Required dependency bins are missing under ${nodeModules}`);
   }
 };

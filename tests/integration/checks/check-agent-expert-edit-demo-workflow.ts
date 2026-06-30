@@ -12,13 +12,13 @@ import {
   createRawEngineLocalAppServerBridge,
   rawEngineLocalAppServerAuditEventV1Schema,
 } from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
-import { sampleRawEngineSceneColorPipelineV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import {
   RAW_ENGINE_SCHEMA_VERSION,
   rawEngineToolRegistryV1Schema,
   toneColorCommandEnvelopeV1Schema,
   toneColorDryRunResultV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { sampleRawEngineSceneColorPipelineV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { agentExpertEditDemoWorkflowSchema } from '../../../src/schemas/agentExpertEditDemoWorkflowSchemas.ts';
 
 const REPORT_PATH = 'docs/validation/agent-expert-edit-demo-workflow-2026-06-21.json';

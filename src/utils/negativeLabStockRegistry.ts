@@ -1,7 +1,7 @@
 import negativeLabStockRegistryJson from '../data/negativeLabStockRegistry.json';
 import {
-  negativeLabStockRegistrySchema,
   type NegativeLabStockRegistry,
+  negativeLabStockRegistrySchema,
 } from '../schemas/negativeLabStockRegistrySchemas';
 
 export const NEGATIVE_LAB_STOCK_REGISTRY: NegativeLabStockRegistry =

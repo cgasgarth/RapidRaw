@@ -1,11 +1,11 @@
 import {
-  aiDenoiseImageBufferSchema,
-  aiDenoiseRuntimeApplyProofSchema,
-  aiDenoiseRuntimeSettingsSchema,
   type AiDenoiseImageBuffer,
   type AiDenoisePixel,
   type AiDenoiseRuntimeApplyProof,
   type AiDenoiseRuntimeSettings,
+  aiDenoiseImageBufferSchema,
+  aiDenoiseRuntimeApplyProofSchema,
+  aiDenoiseRuntimeSettingsSchema,
 } from '../schemas/aiDenoiseRuntimeSchemas';
 
 export const DEFAULT_LOCAL_AI_DENOISE_SETTINGS: AiDenoiseRuntimeSettings = aiDenoiseRuntimeSettingsSchema.parse({

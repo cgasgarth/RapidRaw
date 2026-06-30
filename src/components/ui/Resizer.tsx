@@ -1,8 +1,6 @@
 import cx from 'clsx';
-
-import { Orientation } from './AppProperties';
-
 import type { PointerEventHandler } from 'react';
+import { Orientation } from './AppProperties';
 
 interface ResizerProps {
   direction: Orientation;

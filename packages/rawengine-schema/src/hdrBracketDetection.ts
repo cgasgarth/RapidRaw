@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
 import {
-  hdrBracketDetectionResultV1Schema,
   type HdrBracketDetectionMethodV1,
   type HdrBracketDetectionResultV1,
   type HdrBracketSourceMetadataV1,
   type HdrMergeBlockCodeV1,
   type HdrMergeWarningCodeV1,
+  hdrBracketDetectionResultV1Schema,
 } from './rawEngineSchemas.js';
 
 export const hdrBracketDetectionSourceInputV1Schema = z

@@ -1,9 +1,7 @@
 import { expect, test } from 'bun:test';
-
-import { findAlbumById, insertChildrenIntoTree } from '../../src/utils/folderTreeUtils.ts';
-
 import type { FolderTree } from '../../src/components/panel/FolderTree.tsx';
 import type { AlbumItem } from '../../src/components/ui/AppProperties.tsx';
+import { findAlbumById, insertChildrenIntoTree } from '../../src/utils/folderTreeUtils.ts';
 
 const folderNode = (path: string, children: FolderTree[] = []): FolderTree => ({
   children,

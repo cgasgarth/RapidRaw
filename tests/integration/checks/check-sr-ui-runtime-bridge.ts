@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { SuperResolutionAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/superResolutionAppServerRuntime.ts';
 import {
   calculateMeanAbsoluteErrorV1,
@@ -9,7 +10,6 @@ import {
   buildSuperResolutionUiApplyCommandV1,
   buildSuperResolutionUiDryRunCommandV1,
 } from '../../../packages/rawengine-schema/src/superResolutionUiControls.ts';
-import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
 import { buildSuperResolutionOutputReviewFromArtifact } from '../../../src/utils/superResolutionOutputReview.ts';
 

@@ -63,11 +63,11 @@ function isViteLikeError(value: unknown): value is Record<string, unknown> {
 
   return Boolean(
     getStringField(value, 'message') ||
-    getStringField(value, 'stack') ||
-    getStringField(value, 'frame') ||
-    getStringField(value, 'plugin') ||
-    getStringField(value, 'id') ||
-    isPlainRecord(getRecordField(value, 'loc')),
+      getStringField(value, 'stack') ||
+      getStringField(value, 'frame') ||
+      getStringField(value, 'plugin') ||
+      getStringField(value, 'id') ||
+      isPlainRecord(getRecordField(value, 'loc')),
   );
 }
 

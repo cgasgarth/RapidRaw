@@ -1,10 +1,9 @@
-import { computationalMergeReviewThresholds } from './computationalMergeReviewThresholds';
 import {
-  computationalMergeReviewPanelDiagnosticCollectionSchema,
   type ComputationalMergeReviewPanelDiagnosticCollection,
+  computationalMergeReviewPanelDiagnosticCollectionSchema,
 } from '../schemas/computationalMergeReviewPanelSchemas';
-
 import type { ComputationalMergePrivateSourceSet } from '../schemas/computationalMergeSourceSetSchemas';
+import { computationalMergeReviewThresholds } from './computationalMergeReviewThresholds';
 
 export function buildComputationalMergeReviewPanelDiagnostics(
   sourceSets: ComputationalMergePrivateSourceSet[],

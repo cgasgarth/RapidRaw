@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { layerStackSidecarV1Schema, type LayerStackSidecarV1 } from './layerStackCommandRuntime.js';
+import { type LayerStackSidecarV1, layerStackSidecarV1Schema } from './layerStackCommandRuntime.js';
 import { RAW_ENGINE_SCHEMA_VERSION } from './rawEngineSchemas.js';
 
 const rawEngineArtifactsWithLayerStacksV1Schema = z

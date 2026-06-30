@@ -1,16 +1,15 @@
 import cx from 'clsx';
 import { motion } from 'framer-motion';
-import { useState, useEffect, useCallback, useRef, useMemo, type KeyboardEvent } from 'react';
+import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useManagedFocus } from '../../hooks/useManagedFocus';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { TextVariants } from '../../types/typography';
 import { ADJUSTMENT_GROUPS } from '../../utils/adjustments';
+import type { Preset } from '../ui/AppProperties';
 import Switch from '../ui/Switch';
 import UiText from '../ui/Text';
-
-import type { Preset } from '../ui/AppProperties';
 
 interface ConfigurePresetModalProps {
   isOpen: boolean;

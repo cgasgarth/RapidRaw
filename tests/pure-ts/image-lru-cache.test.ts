@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { ImageLRUCache, type ImageCacheEntry } from '../../src/utils/ImageLRUCache.ts';
+import { type ImageCacheEntry, ImageLRUCache } from '../../src/utils/ImageLRUCache.ts';
 
 const makeEntry = (finalPreviewUrl: string | null, uncroppedPreviewUrl: string | null): ImageCacheEntry => ({
   adjustments: {},

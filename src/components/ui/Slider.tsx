@@ -1,9 +1,7 @@
-import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
-import { useTranslation } from 'react-i18next';
-
-import { GLOBAL_KEYS } from './AppProperties';
-
 import type React from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { GLOBAL_KEYS } from './AppProperties';
 
 export type SliderChangeEvent =
   | React.ChangeEvent<HTMLInputElement>

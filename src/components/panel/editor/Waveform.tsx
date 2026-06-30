@@ -1,11 +1,9 @@
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
 import { AlertOctagon } from 'lucide-react';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { DisplayMode } from '../../../utils/adjustments';
-
 import type { PreviewScopeStatus } from '../../../store/useEditorStore';
+import { DisplayMode } from '../../../utils/adjustments';
 import type { ChannelConfig } from '../../adjustments/Curves';
 import type { WaveformData } from '../../ui/AppProperties';
 
@@ -437,7 +435,7 @@ const FakeWaveformLoader = ({ mode }: { mode: DisplayMode }) => {
               if (isPot) {
                 p.targetY = HEIGHT - Math.random() * 6;
               } else {
-                const randomCurve = Math.pow(Math.random(), 1.2);
+                const randomCurve = Math.random() ** 1.2;
                 p.targetY = HEIGHT - randomCurve * HEIGHT;
               }
 

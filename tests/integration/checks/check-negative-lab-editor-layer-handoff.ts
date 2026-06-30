@@ -3,14 +3,13 @@
 import { readFileSync } from 'node:fs';
 
 import { z } from 'zod';
-
-import { INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../src/utils/adjustments.ts';
-import { applyLayerStackCommandBridgeOperation } from '../../../src/utils/layerStackCommandBridge.ts';
 import {
   layerStackSidecarV1Schema,
   negativeLabPositiveArtifactHandleV1Schema,
   readLayerStackSidecarsFromSidecar,
 } from '../../../packages/rawengine-schema/src';
+import { INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../src/utils/adjustments.ts';
+import { applyLayerStackCommandBridgeOperation } from '../../../src/utils/layerStackCommandBridge.ts';
 
 const appModalsSource = readFileSync('src/components/modals/AppModals.tsx', 'utf8');
 const appNavigationSource = readFileSync('src/hooks/useAppNavigation.ts', 'utf8');

@@ -1,9 +1,8 @@
 #!/usr/bin/env bun
 
 import { z } from 'zod';
-
-import { buildNegativeLabFrameHealthReport } from '../../../src/utils/negativeLabFrameHealth.ts';
 import { buildNegativeLabPlanRollNormalizationRouteResult } from '../../../src/utils/negativeLabAppServerRoutes.ts';
+import { buildNegativeLabFrameHealthReport } from '../../../src/utils/negativeLabFrameHealth.ts';
 import { buildNegativeLabRollNormalizationPlan } from '../../../src/utils/negativeLabRollNormalizationPlan.ts';
 import {
   buildNegativeLabScanMetricsV1,
@@ -29,7 +28,7 @@ const buildPixels = (p50: number, range: number) =>
     const x = index % 24;
     const y = Math.floor(index / 24);
     const density = Math.max(0.04, p50 + ((x + y) / 46 - 0.5) * range);
-    return { b: Math.pow(10, -density), g: Math.pow(10, -density), r: Math.pow(10, -density) };
+    return { b: 10 ** -density, g: 10 ** -density, r: 10 ** -density };
   });
 
 const targetPaths = [

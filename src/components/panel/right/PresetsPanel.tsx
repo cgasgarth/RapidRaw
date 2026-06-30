@@ -1,9 +1,9 @@
 import {
   DndContext,
-  DragOverlay,
-  PointerSensor,
   type DragEndEvent,
+  DragOverlay,
   type DragStartEvent,
+  PointerSensor,
   useDraggable,
   useDroppable,
   useSensor,
@@ -11,58 +11,57 @@ import {
 } from '@dnd-kit/core';
 import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   CopyPlus,
+  Crop,
   Edit,
   FileDown,
   FileUp,
   Folder as FolderIcon,
   FolderOpen,
   FolderPlus,
+  Layers,
   Loader2,
+  Palette,
   Plus,
+  Save,
+  Settings2,
   SortAsc,
   Trash2,
   Users,
-  Layers,
-  Crop,
-  Save,
   Wrench,
-  Palette,
-  Settings2,
 } from 'lucide-react';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
-  useState,
-  useEffect,
   useCallback,
+  useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
-  useLayoutEffect,
+  useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { useEditorActions } from '../../../hooks/useEditorActions';
-import { PresetListType, usePresets, type UserPreset } from '../../../hooks/usePresets';
+import { PresetListType, type UserPreset, usePresets } from '../../../hooks/usePresets';
+import type { ColorStylePreset } from '../../../schemas/colorStylePresetSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { type Adjustments, INITIAL_ADJUSTMENTS, ADJUSTMENT_GROUPS } from '../../../utils/adjustments';
+import { ADJUSTMENT_GROUPS, type Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import { createBlobFromUint8Array } from '../../../utils/blobUtils';
 import { BUILT_IN_COLOR_STYLE_PRESETS, COLOR_STYLE_PRESET_CATALOG } from '../../../utils/colorStylePresetCatalog';
 import ConfigurePresetModal from '../../modals/ConfigurePresetModal';
 import CreateFolderModal from '../../modals/CreateFolderModal';
 import RenameFolderModal from '../../modals/RenameFolderModal';
-import { OPTION_SEPARATOR, Panel, type Folder, type Option, type Preset } from '../../ui/AppProperties';
+import { type Folder, OPTION_SEPARATOR, type Option, Panel, type Preset } from '../../ui/AppProperties';
 import Button from '../../ui/Button';
 import UiText from '../../ui/Text';
-
-import type { ColorStylePreset } from '../../../schemas/colorStylePresetSchemas';
 
 interface DroppableFolderItemProps {
   children: ReactNode;

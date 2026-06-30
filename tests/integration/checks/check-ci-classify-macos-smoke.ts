@@ -55,7 +55,7 @@ const SAFE_ROOT_FILES = new Set(['.gitignore', 'AGENTS.md', 'LICENSE', 'README.m
 
 const SAFE_TOOLING_FILES = new Set([
   '.githooks/pre-commit',
-  'eslint.config.js',
+  'biome.json',
   'i18next.config.ts',
   'knip.jsonc',
   'src/i18n/update_translations.py',
@@ -385,6 +385,14 @@ function classifyPathChange(change) {
     };
   }
 
+  if (path === 'eslint.config.js' && change.status === 'removed') {
+    return {
+      decision: SMOKE_DECISIONS.NONE,
+      mode: SMOKE_MODES.NONE,
+      reason: 'removed stale ESLint config after Biome migration',
+    };
+  }
+
   if (path === 'package.json' && isSafePackageJsonScriptPatch(change.patch)) {
     return {
       decision: SMOKE_DECISIONS.NONE,
@@ -620,6 +628,11 @@ function runSelfTest() {
   assertChangeClassification(
     'removed npm lockfile skips smoke',
     [{ filename: 'package-lock.json', status: 'removed' }],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'removed ESLint config skips smoke',
+    [{ filename: 'eslint.config.js', status: 'removed' }],
     SMOKE_MODES.NONE,
   );
   assertChangeClassification(
@@ -975,11 +988,11 @@ function runSelfTest() {
     SMOKE_MODES.NONE,
   );
   assertClassification('pure TS tests can skip smoke', ['tests/pure-ts/edit-command-bus.test.ts'], SMOKE_MODES.NONE);
-  assertClassification('lint config changes can skip smoke', ['eslint.config.js'], SMOKE_MODES.NONE);
+  assertClassification('lint config changes can skip smoke', ['biome.json'], SMOKE_MODES.NONE);
   assertClassification('unused-code config changes can skip smoke', ['knip.jsonc'], SMOKE_MODES.NONE);
   assertClassification(
     'validation scripts can skip smoke',
-    ['tests/integration/checks/check-eslint-escape-hatches.ts'],
+    ['tests/integration/checks/check-compact-quality-commands.ts'],
     SMOKE_MODES.NONE,
   );
   assertClassification(

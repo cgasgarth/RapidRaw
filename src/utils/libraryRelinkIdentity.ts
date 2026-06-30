@@ -1,16 +1,15 @@
+import type { ImageFile } from '../components/ui/AppProperties';
 import {
-  libraryRelinkIdentitySchema,
-  libraryRelinkPlanSchema,
   type LibraryRelinkCandidateDecision,
   type LibraryRelinkCandidateResult,
   type LibraryRelinkEvidence,
   type LibraryRelinkEvidenceKind,
   type LibraryRelinkIdentity,
   type LibraryRelinkPlan,
+  libraryRelinkIdentitySchema,
+  libraryRelinkPlanSchema,
 } from '../schemas/libraryRelinkSchemas';
-import { librarySessionSetSchema, type LibrarySession, type LibrarySessionSet } from '../schemas/librarySessionSchemas';
-
-import type { ImageFile } from '../components/ui/AppProperties';
+import { type LibrarySession, type LibrarySessionSet, librarySessionSetSchema } from '../schemas/librarySessionSchemas';
 
 interface ScoreRule {
   kind: LibraryRelinkEvidenceKind;

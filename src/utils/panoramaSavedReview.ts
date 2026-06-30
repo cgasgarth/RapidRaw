@@ -1,8 +1,8 @@
 import {
-  panoramaSavedReviewSummarySchema,
   type PanoramaRenderedReview,
   type PanoramaSavedReviewSummary,
   type PanoramaUiSettings,
+  panoramaSavedReviewSummarySchema,
 } from '../schemas/panoramaUiSchemas';
 
 export const buildPanoramaSavedReviewSummary = ({

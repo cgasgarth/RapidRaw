@@ -6,9 +6,9 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 
 import {
+  type MaskAlphaArtifact,
   MaskComposeCommandRuntime,
   renderComposedMask,
-  type MaskAlphaArtifact,
 } from '../../../packages/rawengine-schema/src/maskComposeCommandRuntime.ts';
 import {
   ActorKind,

@@ -1,8 +1,8 @@
-import { EditedStatus, LibraryViewMode, RawStatus, SortDirection } from '../../ui/AppProperties';
+import type { TFunction } from 'i18next';
 
 import type { SearchCriteria } from '../../../store/useLibraryStore';
 import type { FilterCriteria, SortCriteria } from '../../ui/AppProperties';
-import type { TFunction } from 'i18next';
+import { EditedStatus, LibraryViewMode, RawStatus, SortDirection } from '../../ui/AppProperties';
 
 export interface LibraryHeaderStatusItem {
   label: string;

@@ -1,9 +1,8 @@
 #!/usr/bin/env bun
 
 import { readFileSync } from 'node:fs';
-
-import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from '../../../src/utils/computationalMergeAppServerRoutes.ts';
 import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_PAIRS } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
+import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from '../../../src/utils/computationalMergeAppServerRoutes.ts';
 
 const modalCoverage = [
   { family: 'hdr', file: 'src/components/modals/HdrModal.tsx' },

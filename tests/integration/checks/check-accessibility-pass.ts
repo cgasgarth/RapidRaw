@@ -1,11 +1,9 @@
 #!/usr/bin/env bun
 
 import { readFileSync } from 'node:fs';
-
-import { ESLint } from 'eslint';
+import i18next from 'i18next';
 import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import i18next from 'i18next';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { z } from 'zod';
 
@@ -17,12 +15,6 @@ import SuperResolutionModal from '../../../src/components/modals/SuperResolution
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../../src/schemas/focusStackUiSchemas.ts';
 import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../../../src/schemas/superResolutionUiSchemas.ts';
 
-const RequiredRuleSchema = z
-  .object({
-    name: z.string().min(1),
-  })
-  .strict();
-
 const DialogTargetSchema = z
   .object({
     closeLabel: z.string().min(1),
@@ -32,50 +24,9 @@ const DialogTargetSchema = z
   })
   .strict();
 
-const requiredRules = z
-  .array(RequiredRuleSchema)
-  .parse([
-    { name: 'jsx-a11y/no-static-element-interactions' },
-    { name: 'jsx-a11y/click-events-have-key-events' },
-    { name: 'jsx-a11y/no-autofocus' },
-    { name: 'jsx-a11y/no-noninteractive-element-interactions' },
-  ]);
-
-const lintTargets = [
-  'src/components/modals/ConfirmModal.tsx',
-  'src/components/modals/CommandPaletteModal.tsx',
-  'src/components/panel/right/AIPanel.tsx',
-  'src/components/panel/right/MasksPanel.tsx',
-  'src/components/panel/right/PresetsPanel.tsx',
-];
-
-const severityName = (ruleConfig) => {
-  const severity = Array.isArray(ruleConfig) ? ruleConfig[0] : ruleConfig;
-  if (severity === 2 || severity === 'error') return 'error';
-  if (severity === 1 || severity === 'warn') return 'warn';
-  return 'off';
-};
-
-const eslint = new ESLint({ cwd: process.cwd() });
-const config = await eslint.calculateConfigForFile('src/components/modals/ConfirmModal.tsx');
 const failures = [];
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
 const i18n = await createTestI18n(locale);
-
-for (const rule of requiredRules) {
-  if (severityName(config.rules?.[rule.name]) !== 'error') {
-    failures.push(`${rule.name} must be enforced as an error.`);
-  }
-}
-
-const lintResults = await eslint.lintFiles(lintTargets);
-for (const result of lintResults) {
-  for (const message of result.messages) {
-    if (message.severity === 2 && message.ruleId?.startsWith('jsx-a11y/')) {
-      failures.push(`${result.filePath}:${message.line}:${message.column} ${message.ruleId} ${message.message}`);
-    }
-  }
-}
 
 const renderedDialogTargets = z.array(DialogTargetSchema).parse([
   {
@@ -148,9 +99,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(
-  `a11y ok rules=${requiredRules.length} lintTargets=${lintTargets.length} dialogs=${renderedDialogTargets.length}`,
-);
+console.log(`a11y ok dialogs=${renderedDialogTargets.length}`);
 
 function assertLibraryExportPanelSlot(failures: string[]) {
   const marker = 'rendered-library-export-panel';

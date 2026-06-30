@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { filmGrainModelV1Schema, type FilmGrainModelV1 } from './rawEngineSchemas.js';
+import { type FilmGrainModelV1, filmGrainModelV1Schema } from './rawEngineSchemas.js';
 
 const FILM_GRAIN_RUNTIME_SCHEMA_VERSION = 1;
 

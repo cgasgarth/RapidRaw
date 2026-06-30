@@ -11,11 +11,6 @@ import {
   rawEngineLocalAppServerAuditEventV1Schema,
 } from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
 import {
-  sampleRawEngineSceneColorPipelineV1,
-  sampleToneColorCommandEnvelopeV1,
-  sampleToolRegistryV1,
-} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import {
   RAW_ENGINE_SCHEMA_VERSION,
   rawEngineAgentReplayFixtureV1Schema,
   rawEngineToolRegistryV1Schema,
@@ -23,6 +18,11 @@ import {
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import {
+  sampleRawEngineSceneColorPipelineV1,
+  sampleToneColorCommandEnvelopeV1,
+  sampleToolRegistryV1,
+} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 
 const REPORT_PATH = 'docs/validation/agent-app-server-raw-edit-proof-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');

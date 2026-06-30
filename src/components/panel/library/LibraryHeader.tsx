@@ -1,40 +1,38 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Search,
-  Loader2,
-  X,
-  SlidersHorizontal,
   Check,
-  Star as StarIcon,
-  ChevronUp,
   ChevronDown,
+  ChevronUp,
   HelpCircle,
+  Loader2,
+  Search,
+  SlidersHorizontal,
+  Star as StarIcon,
+  X,
 } from 'lucide-react';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import type React from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-
 import { ADVANCED_QUERY_REGEX } from '../../../hooks/useSortedLibrary';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
-import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
+import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { COLOR_LABELS, type Color } from '../../../utils/adjustments';
 import {
-  type FilterCriteria,
-  RawStatus,
   EditedStatus,
+  ExifOverlay,
+  type FilterCriteria,
   LibraryViewMode,
   type Progress,
+  RawStatus,
   type SortCriteria,
   SortDirection,
-  ExifOverlay,
   type ThumbnailAspectRatio,
   type ThumbnailSize,
 } from '../../ui/AppProperties';
 import Button from '../../ui/Button';
 import UiText from '../../ui/Text';
-
-import type React from 'react';
 
 interface DropdownMenuProps {
   buttonContent: React.ReactNode;

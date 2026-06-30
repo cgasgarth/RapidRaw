@@ -1,9 +1,7 @@
 import cx from 'clsx';
-
-import UiText from './Text';
-import { TextVariants } from '../../types/typography';
-
 import type { ChangeEvent } from 'react';
+import { TextVariants } from '../../types/typography';
+import UiText from './Text';
 
 interface SwitchProps {
   checked: boolean;

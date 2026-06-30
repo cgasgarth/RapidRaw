@@ -1,7 +1,29 @@
 import { lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-
+import { useEditorStore } from '../../store/useEditorStore';
+import { useLibraryStore } from '../../store/useLibraryStore';
+import { useProcessStore } from '../../store/useProcessStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
+import {
+  createDefaultCollageModalState,
+  createDefaultCullingModalState,
+  createDefaultFocusStackModalState,
+  createDefaultHdrModalState,
+  createDefaultPanoramaModalState,
+  createDefaultSuperResolutionModalState,
+  useUIStore,
+} from '../../store/useUIStore';
+import type { CopyPasteSettings } from '../../utils/adjustments';
+import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
+import {
+  resetHdrStateForSettingsChange,
+  resetPanoramaStateForSettingsChange,
+} from '../../utils/computationalMergeModalState';
+import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
+import { handleNegativeConversionEditorHandoff } from '../../utils/negativeLabEditorHandoff';
+import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
+import type { AlbumItem, AppSettings } from '../ui/AppProperties';
 import CollageModal from './CollageModal';
 import CommandPaletteModal from './CommandPaletteModal';
 import ConfirmModal from './ConfirmModal';
@@ -16,30 +38,6 @@ import PanoramaModal from './PanoramaModal';
 import RenameFileModal from './RenameFileModal';
 import RenameFolderModal from './RenameFolderModal';
 import SuperResolutionModal from './SuperResolutionModal';
-import { useEditorStore } from '../../store/useEditorStore';
-import { useLibraryStore } from '../../store/useLibraryStore';
-import { useProcessStore } from '../../store/useProcessStore';
-import { useSettingsStore } from '../../store/useSettingsStore';
-import {
-  createDefaultCollageModalState,
-  createDefaultCullingModalState,
-  createDefaultFocusStackModalState,
-  createDefaultHdrModalState,
-  createDefaultPanoramaModalState,
-  createDefaultSuperResolutionModalState,
-  useUIStore,
-} from '../../store/useUIStore';
-import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
-import {
-  resetHdrStateForSettingsChange,
-  resetPanoramaStateForSettingsChange,
-} from '../../utils/computationalMergeModalState';
-import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
-import { handleNegativeConversionEditorHandoff } from '../../utils/negativeLabEditorHandoff';
-import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
-
-import type { CopyPasteSettings } from '../../utils/adjustments';
-import type { AppSettings, AlbumItem } from '../ui/AppProperties';
 
 const NegativeConversionModal = lazy(() =>
   import('./NegativeConversionModal.js').then((module) => ({ default: module.NegativeConversionModal })),

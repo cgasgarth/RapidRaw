@@ -1,11 +1,11 @@
-import { materializeMasksFromLayerStackSidecar } from './layerStackCommandBridge';
+import type { LayerStackSidecarV1 } from '../../packages/rawengine-schema/src';
 import {
   readLayerStackSidecarsFromSidecar,
   upsertLayerStackSidecarInSidecar,
 } from '../../packages/rawengine-schema/src';
 
 import type { Adjustments } from './adjustments';
-import type { LayerStackSidecarV1 } from '../../packages/rawengine-schema/src';
+import { materializeMasksFromLayerStackSidecar } from './layerStackCommandBridge';
 
 type PersistedLayerStackArtifacts = {
   layerStackSidecars?: Array<LayerStackSidecarV1>;

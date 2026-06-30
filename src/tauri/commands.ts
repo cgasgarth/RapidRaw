@@ -72,7 +72,7 @@ export enum Invokes {
   LaunchExternalEditor = 'launch_external_editor',
   InvokeGenerativeReplaceWithMaskDef = 'invoke_generative_replace_with_mask_def',
   /** @deprecated Use InvokeGenerativeReplaceWithMaskDef. */
-  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values -- Backward-compatible typo alias shares the corrected command string.
+  // biome-ignore lint/suspicious/noDuplicateEnumValues: Backward-compatible typo alias shares the corrected command string.
   InvokeGenerativeReplaseWithMaskDef = 'invoke_generative_replace_with_mask_def',
   IsImageCached = 'is_image_cached',
   ListImagesInDir = 'list_images_in_dir',

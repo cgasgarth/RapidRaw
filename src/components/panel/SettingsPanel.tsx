@@ -1,29 +1,30 @@
-import { Show, SignIn, useUser, useAuth, useClerk } from '@clerk/react';
+import { Show, SignIn, useAuth, useClerk, useUser } from '@clerk/react';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { open } from '@tauri-apps/plugin-shell';
 import cx from 'clsx';
-import { motion, AnimatePresence, type Variants } from 'framer-motion';
+import { AnimatePresence, motion, type Variants } from 'framer-motion';
+import type { TFunction } from 'i18next';
 import {
   ArrowLeft,
+  Bookmark,
   Cpu,
   ExternalLink as ExternalLinkIcon,
-  Server,
+  Image as ImageIcon,
   Info,
+  Keyboard,
+  type LucideIcon,
+  Mouse,
+  Plus,
+  Scaling,
+  Server,
+  SlidersHorizontal,
+  Touchpad,
   Trash2,
   Wifi,
   WifiOff,
-  Plus,
   X,
-  SlidersHorizontal,
-  Keyboard,
-  Bookmark,
-  Scaling,
-  Image as ImageIcon,
-  Mouse,
-  Touchpad,
-  type LucideIcon,
 } from 'lucide-react';
 import {
   type ChangeEvent,
@@ -36,14 +37,13 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-
 import { useOsPlatform } from '../../hooks/useOsPlatform';
 import {
   AiProviderId,
-  normalizeAiProviderId,
   type AiProviderId as AiProviderIdType,
+  normalizeAiProviderId,
 } from '../../schemas/aiProviderSchemas';
-import { cloudUsageSchema, type CloudUsage } from '../../schemas/cloudUsageSchemas';
+import { type CloudUsage, cloudUsageSchema } from '../../schemas/cloudUsageSchemas';
 import { normalizeKeyboardShortcutMap, parseKeyboardShortcutCombo } from '../../schemas/keyboardShortcutSchemas';
 import { Invokes } from '../../tauri/commands';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
@@ -54,30 +54,28 @@ import {
 } from '../../utils/captureSharpeningPresets';
 import {
   formatKeyCode,
-  type KeybindDefinition,
   KEYBIND_DEFINITIONS,
   KEYBIND_SECTIONS,
+  type KeybindDefinition,
   normalizeCombo,
 } from '../../utils/keyboardUtils';
 import {
   buildRawProcessingModePatch,
   normalizeRawProcessingMode,
-  RAW_PROCESSING_MODES,
   RAW_PROCESSING_MODE_RECIPES,
+  RAW_PROCESSING_MODES,
   type RawProcessingMode,
 } from '../../utils/rawProcessingModes';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
-import { type ThemeProps, THEMES } from '../../utils/themes';
+import { THEMES, type ThemeProps } from '../../utils/themes';
 import ConfirmModal from '../modals/ConfirmModal';
+import type { AppSettings, Theme } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import Input from '../ui/Input';
 import Slider from '../ui/Slider';
 import Switch from '../ui/Switch';
 import UiText from '../ui/Text';
-
-import type { AppSettings, Theme } from '../ui/AppProperties';
-import type { TFunction } from 'i18next';
 
 interface ConfirmModalState {
   confirmText: string;

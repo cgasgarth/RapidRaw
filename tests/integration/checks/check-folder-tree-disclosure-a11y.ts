@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import { readFileSync } from 'node:fs';
 import { mock } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import { Window } from 'happy-dom';
 import i18next from 'i18next';
 import { act, createElement } from 'react';

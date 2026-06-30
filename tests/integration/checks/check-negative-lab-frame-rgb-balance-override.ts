@@ -4,13 +4,13 @@ import {
   NEGATIVE_LAB_FRAME_RGB_BALANCE_OVERRIDE_SCHEMA_VERSION,
   parseNegativeLabFrameRgbBalanceOverridePayload,
 } from '../../../src/schemas/negativeLabFrameRgbBalanceOverrideSchemas.ts';
+import { buildNegativeLabFrameHealthReport } from '../../../src/utils/negativeLabFrameHealth.ts';
 import {
   buildNegativeLabFrameRgbBalanceOverridePayload,
   getNegativeLabEffectiveFrameRgbBalance,
   negativeLabFrameRgbBalanceOffsetIsZero,
   snapNegativeLabFrameRgbBalanceOffsets,
 } from '../../../src/utils/negativeLabFrameRgbBalanceOverrides.ts';
-import { buildNegativeLabFrameHealthReport } from '../../../src/utils/negativeLabFrameHealth.ts';
 
 const sourcePaths = ['/roll/frame-001.tif', '/roll/frame-002.tif'];
 const frameHealthReport = buildNegativeLabFrameHealthReport({

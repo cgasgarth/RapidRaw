@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 
 import {
-  appendAgentSessionAuditRecord,
   type AgentSessionAuditStorageAdapter,
+  appendAgentSessionAuditRecord,
 } from '../../../src/utils/agentSessionAuditStore.ts';
 import { replayPersistedAgentSessions } from '../../../src/utils/agentSessionReplay.ts';
 

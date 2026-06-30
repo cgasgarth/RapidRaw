@@ -11,8 +11,8 @@ import {
   type FilmGrainRuntimePixelV1,
 } from '../../../packages/rawengine-schema/src/filmGrainRuntime.ts';
 import {
-  filmGrainModelV1Schema,
   type FilmGrainModelV1,
+  filmGrainModelV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { sampleFilmGrainModelV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 

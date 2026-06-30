@@ -1,7 +1,7 @@
 import {
-  negativeBaseFogDensitometerReadoutSchema,
   type NegativeBaseFogDensitometerReadout,
   type NegativeBaseFogEstimate,
+  negativeBaseFogDensitometerReadoutSchema,
 } from '../schemas/negativeLabPresetCatalogSchemas';
 
 export const buildNegativeBaseFogDensitometerReadout = (

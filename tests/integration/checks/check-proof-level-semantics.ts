@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
 
 import {
+  type AiDenoiseQualityCrop,
+  type AiDenoiseQualityReport,
   aiDenoiseQualityReportSchema,
   isEligibleRealRun,
   parseAiDenoiseQualityReport,
-  type AiDenoiseQualityCrop,
-  type AiDenoiseQualityReport,
 } from '../../../src/schemas/aiDenoiseQualityReportSchemas.ts';
 import { collectProofContractFailures } from '../../../src/schemas/proofLevelSemanticsSchemas.ts';
 

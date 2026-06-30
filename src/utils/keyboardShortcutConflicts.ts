@@ -1,7 +1,7 @@
 import {
-  keyboardShortcutMapSchema,
   type KeyboardShortcutCombo,
   type KeyboardShortcutMap,
+  keyboardShortcutMapSchema,
 } from '../schemas/keyboardShortcutSchemas';
 
 export interface KeyboardShortcutConflict {

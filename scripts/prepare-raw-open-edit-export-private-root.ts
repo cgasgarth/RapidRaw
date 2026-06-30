@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { createHash } from 'node:crypto';
-import { access, copyFile, lstat, mkdir, readFile, readdir, rm, symlink } from 'node:fs/promises';
+import { access, copyFile, lstat, mkdir, readdir, readFile, rm, symlink } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 
 import { parsePrivateRawEvidenceLedger } from '../src/schemas/privateRawEvidenceSchemas.ts';

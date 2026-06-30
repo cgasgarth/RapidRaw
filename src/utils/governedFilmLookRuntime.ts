@@ -1,11 +1,4 @@
 import { z } from 'zod';
-
-import {
-  buildFilmLookAppliedAdjustmentPatch,
-  clampFilmLookStrength,
-  type FilmLookBrowserItem,
-} from './filmLookBrowser';
-import { applyFilmLookToColorPipelinePixels, hashFilmLookColorPipelinePixels } from './filmLookColorPipelineCommand';
 import {
   applyFilmGrainProvenanceToSidecar,
   buildFilmGrainSidecarProvenance,
@@ -17,6 +10,12 @@ import {
 } from '../../packages/rawengine-schema/src/filmGrainRuntime';
 import { applyFilmHalationRuntime } from '../../packages/rawengine-schema/src/filmHalationRuntime';
 import { sampleFilmGrainModelV1 } from '../../packages/rawengine-schema/src/samplePayloads';
+import {
+  buildFilmLookAppliedAdjustmentPatch,
+  clampFilmLookStrength,
+  type FilmLookBrowserItem,
+} from './filmLookBrowser';
+import { applyFilmLookToColorPipelinePixels, hashFilmLookColorPipelinePixels } from './filmLookColorPipelineCommand';
 
 export const GOVERNED_FILM_LOOK_RUNTIME_SCHEMA_VERSION = 1;
 

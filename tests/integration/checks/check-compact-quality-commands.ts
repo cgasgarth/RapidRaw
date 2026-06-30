@@ -8,11 +8,10 @@ import * as yaml from 'js-yaml';
 
 const ROOT = process.cwd();
 const WORKFLOW_DIR = '.github/workflows';
-const COMPACT_WRAPPERS = ['scripts/run-compact-command.ts', 'scripts/run-compact-checks.ts'];
+const COMPACT_WRAPPERS = ['scripts/run-compact-command.ts'];
 const QUALITY_COMMAND_PATTERNS = [
-  /\beslint\b/u,
+  /\bbiome\b/u,
   /\btsc\b/u,
-  /\bprettier\b/u,
   /\bbun audit\b/u,
   /\bcargo (audit|check|clippy|deny|fmt|test)\b/u,
   /\bgo run github\.com\/rhysd\/actionlint\/cmd\/actionlint/u,
@@ -143,9 +142,9 @@ const checkRepository = () => {
 
 const runSelfTest = () => {
   const packageViolations = checkPackageScripts({
-    good: 'bun scripts/run-compact-command.ts --label lint -- eslint .',
+    good: 'bun scripts/run-compact-command.ts --label lint -- biome ci .',
     delegated: 'bun run check:lint',
-    bad: 'eslint . --max-warnings 0',
+    bad: 'biome ci .',
   });
   const workflowViolations = checkWorkflowRuns(
     [

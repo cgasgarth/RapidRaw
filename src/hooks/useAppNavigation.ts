@@ -1,11 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
 import { homeDir } from '@tauri-apps/api/path';
 import { open } from '@tauri-apps/plugin-dialog';
-import { useCallback, type RefObject } from 'react';
+import { type RefObject, useCallback } from 'react';
 import { toast } from 'react-toastify';
-
-import { debouncedSave, debouncedSetHistory } from './useEditorActions';
-import { LibraryViewMode, type AlbumItem, type AppSettings, type ImageFile } from '../components/ui/AppProperties';
+import type { FolderTree } from '../components/panel/FolderTree';
+import { type AlbumItem, type AppSettings, type ImageFile, LibraryViewMode } from '../components/ui/AppProperties';
+import type { LoadImageResult } from '../schemas/imageLoaderSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useProcessStore } from '../store/useProcessStore';
@@ -17,9 +17,7 @@ import { formatUnknownError } from '../utils/errorFormatting';
 import { findAlbumById } from '../utils/folderTreeUtils';
 import { globalImageCache, type ImageCacheEntry } from '../utils/ImageLRUCache';
 import { consumePendingNegativeConversionDustHealLayers } from '../utils/negativeLabEditorHandoff';
-
-import type { FolderTree } from '../components/panel/FolderTree';
-import type { LoadImageResult } from '../schemas/imageLoaderSchemas';
+import { debouncedSave, debouncedSetHistory } from './useEditorActions';
 
 interface TransformController {
   resetTransform(time?: number): void;
@@ -633,7 +631,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         setLibrary({ isTreeLoading: false });
       }
 
-      let preloadedImages: ImageFile[] | undefined = undefined;
+      let preloadedImages: ImageFile[] | undefined;
       if (preloadedDataRef.current.currentPath === pathToSelect && preloadedDataRef.current.images) {
         try {
           preloadedImages = await preloadedDataRef.current.images;

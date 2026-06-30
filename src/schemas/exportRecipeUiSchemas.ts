@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { BUILT_IN_EXPORT_RECIPE_IDS, EXPORT_LAST_USED_PRESET_ID } from './exportRecipeIds';
-import { exportRecipeSchema, type ExportRecipe } from './exportRecipeSchemas';
+import { type ExportRecipe, exportRecipeSchema } from './exportRecipeSchemas';
 
 export const exportRecipeUiRowSchema = z
   .object({

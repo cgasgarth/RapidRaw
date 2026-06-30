@@ -2,28 +2,6 @@
 
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
-
-import {
-  RAW_ENGINE_APP_SERVER_HOST_MANIFEST,
-  buildRawEngineAppServerCapabilitiesReplay,
-  buildRawEngineAppServerHealthReplay,
-  buildRawEngineAppServerHostResponseEnvelope,
-  buildRawEngineAppServerHostResponseEnvelopeAsync,
-  buildRawEngineAppServerLifecycleReplay,
-  buildRawEngineAppServerRouteCatalogReplay,
-  cancelRawEngineAppServerSupervisor,
-  createRawEngineAppServerLifecycleState,
-  createRawEngineAppServerSupervisorState,
-  failRawEngineAppServerSupervisor,
-  handleRawEngineAppServerHostRequest,
-  handleRawEngineAppServerHostRequestAsync,
-  initializeRawEngineAppServerLifecycle,
-  assertRawEngineAppServerLifecycleReady,
-  markRawEngineAppServerSupervisorReady,
-  startRawEngineAppServerSupervisor,
-  stopRawEngineAppServerLifecycle,
-  stopRawEngineAppServerSupervisor,
-} from '../../../src/utils/rawEngineAppServerHost.ts';
 import { sampleToneColorCommandEnvelopeV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import {
   RawEngineAppServerHostToolName,
@@ -37,12 +15,33 @@ import {
   RawEngineAppServerTransport,
   rawEngineAppServerCapabilitiesReplaySchema,
   rawEngineAppServerHealthReplaySchema,
-  rawEngineAppServerHostResponseEnvelopeSchema,
   rawEngineAppServerHostManifestSchema,
+  rawEngineAppServerHostResponseEnvelopeSchema,
   rawEngineAppServerLifecycleReplaySchema,
   rawEngineAppServerRouteCatalogReplaySchema,
   rawEngineAppServerSupervisorStateSchema,
 } from '../../../src/schemas/agentRuntimeSchemas.ts';
+import {
+  assertRawEngineAppServerLifecycleReady,
+  buildRawEngineAppServerCapabilitiesReplay,
+  buildRawEngineAppServerHealthReplay,
+  buildRawEngineAppServerHostResponseEnvelope,
+  buildRawEngineAppServerHostResponseEnvelopeAsync,
+  buildRawEngineAppServerLifecycleReplay,
+  buildRawEngineAppServerRouteCatalogReplay,
+  cancelRawEngineAppServerSupervisor,
+  createRawEngineAppServerLifecycleState,
+  createRawEngineAppServerSupervisorState,
+  failRawEngineAppServerSupervisor,
+  handleRawEngineAppServerHostRequest,
+  handleRawEngineAppServerHostRequestAsync,
+  initializeRawEngineAppServerLifecycle,
+  markRawEngineAppServerSupervisorReady,
+  RAW_ENGINE_APP_SERVER_HOST_MANIFEST,
+  startRawEngineAppServerSupervisor,
+  stopRawEngineAppServerLifecycle,
+  stopRawEngineAppServerSupervisor,
+} from '../../../src/utils/rawEngineAppServerHost.ts';
 
 const failures = [];
 const manifest = rawEngineAppServerHostManifestSchema.parse(RAW_ENGINE_APP_SERVER_HOST_MANIFEST);

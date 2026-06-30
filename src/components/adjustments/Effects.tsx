@@ -2,22 +2,20 @@ import { invoke } from '@tauri-apps/api/core';
 import { save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import AdjustmentSlider from './AdjustmentSlider';
 import { Invokes } from '../../tauri/commands';
 import { TextVariants } from '../../types/typography';
-import { type Adjustments, Effect, CreativeAdjustment } from '../../utils/adjustments';
+import { type Adjustments, CreativeAdjustment, Effect } from '../../utils/adjustments';
 import { buildFilmGrainPresetAdjustmentPatch, FILM_GRAIN_UI_PRESETS } from '../../utils/filmGrainControls';
 import {
   buildFilmLookAppliedAdjustmentPatch,
   buildFilmLookPresetDraft,
-  formatFilmLookPresetName,
   type FilmLookBrowserItem,
+  formatFilmLookPresetName,
 } from '../../utils/filmLookBrowser';
+import type { AppSettings, Preset } from '../ui/AppProperties';
 import LUTControl from '../ui/LUTControl';
 import UiText from '../ui/Text';
-
-import type { AppSettings, Preset } from '../ui/AppProperties';
+import AdjustmentSlider from './AdjustmentSlider';
 
 const FilmLookBrowser = lazy(() =>
   import('./FilmLookBrowser.js').then((module) => ({ default: module.FilmLookBrowser })),

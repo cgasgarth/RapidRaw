@@ -3,8 +3,8 @@
 import {
   detectHdrBracketV1,
   type HdrBracketDetectionOptionsV1,
-  hdrBracketDetectionRequestV1Schema,
   type HdrBracketDetectionSourceInputV1,
+  hdrBracketDetectionRequestV1Schema,
 } from '../../../packages/rawengine-schema/src/hdrBracketDetection.ts';
 import type {
   HdrBracketDetectionResultV1,

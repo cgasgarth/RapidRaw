@@ -1,5 +1,5 @@
+import { type CameraProfileId, parseProfileToneSettings } from '../schemas/profileToneSchemas';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from './profileTonePresets';
-import { parseProfileToneSettings, type CameraProfileId } from '../schemas/profileToneSchemas';
 
 export interface RgbPixel {
   blue: number;

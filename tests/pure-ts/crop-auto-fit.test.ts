@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-
+import type { Crop } from 'react-image-crop';
 import {
   didCropGeometryChange,
   isCropChangeMeaningful,
@@ -7,8 +7,6 @@ import {
   percentCropFromPixelCrop,
   resolveNextCropForGeometryChange,
 } from '../../src/utils/cropUtils';
-
-import type { Crop } from 'react-image-crop';
 
 const currentCrop: Crop = {
   unit: 'px',

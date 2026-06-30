@@ -1,9 +1,9 @@
 import {
-  brushMaskParametersSchema,
-  flowBrushMaskParametersSchema,
   type BrushLine,
   type BrushMaskParameters,
+  brushMaskParametersSchema,
   type FlowBrushMaskParameters,
+  flowBrushMaskParametersSchema,
 } from '../schemas/maskParameterSchemas';
 
 export type BrushTool = BrushLine['tool'];

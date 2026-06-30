@@ -1,8 +1,7 @@
+import { Mask, type MaskType, type SubMask, SubMaskMode } from '../components/panel/right/Masks';
+import type { ImageDimensions } from '../hooks/useImageRenderSize';
 import { toMaskParameterRecord } from './maskParameterAccess';
 import { createSubMask } from './maskUtils';
-import { Mask, type MaskType, type SubMask, SubMaskMode } from '../components/panel/right/Masks';
-
-import type { ImageDimensions } from '../hooks/useImageRenderSize';
 
 export interface EditorSubMaskFactoryOptions {
   faceName?: string;

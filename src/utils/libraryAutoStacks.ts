@@ -1,6 +1,5 @@
-import { buildHdrBracketPreflight } from './hdrBracketPreflight.ts';
-
 import type { ImageFile } from '../components/ui/AppProperties.tsx';
+import { buildHdrBracketPreflight } from './hdrBracketPreflight.ts';
 
 export type LibraryAutoStackKind = 'bracket' | 'burst';
 

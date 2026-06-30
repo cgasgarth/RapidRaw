@@ -7,8 +7,8 @@ import { z } from 'zod';
 import { maskOverlayModeSchema, maskOverlaySettingsSchema } from '../../../src/schemas/maskOverlaySchemas.ts';
 import { evaluateMaskOverlayColor, normalizeMaskOverlaySettings } from '../../../src/utils/maskOverlayModes.ts';
 import {
-  MASK_OVERLAY_HOTKEY_MODES,
   loadMaskOverlaySettingsPreference,
+  MASK_OVERLAY_HOTKEY_MODES,
   nextMaskOverlayHotkeySettings,
   saveMaskOverlaySettingsPreference,
 } from '../../../src/utils/maskOverlayPreferences.ts';

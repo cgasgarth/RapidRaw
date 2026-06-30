@@ -28,7 +28,7 @@ jobs:
         run: bunx playwright install chromium
 
       - name: Capture visual smoke screenshot
-        run: bun run check:visual-smoke
+        run: bun scripts/capture-visual-smoke.ts
 
       - name: Upload visual smoke screenshots
         if: ${{ always() }}

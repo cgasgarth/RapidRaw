@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 
 import {
+  type FilmLookSortMode,
   getFilmLookAdjustmentSummaries,
   sortFilmLookBrowserItems,
-  type FilmLookSortMode,
 } from '../../../src/utils/filmLookBrowser.ts';
 import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/filmLookRegistry.ts';
 

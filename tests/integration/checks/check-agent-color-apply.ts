@@ -15,11 +15,11 @@ import {
   applyAgentColor,
 } from '../../../src/utils/agentColorApplyTool.ts';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agentImageContextSnapshot.ts';
+import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../../src/utils/profileTonePresets.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   handleRawEngineAppServerHostRequestAsync,
 } from '../../../src/utils/rawEngineAppServerHost.ts';
-import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../../src/utils/profileTonePresets.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3167.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 14 : 2));

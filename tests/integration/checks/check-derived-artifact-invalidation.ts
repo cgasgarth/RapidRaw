@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { deriveArtifactInvalidationReasons } from '../../../packages/rawengine-schema/src/derivedArtifactInvalidation.ts';
 import {
   focusStackArtifactV1Schema,
   hdrMergeArtifactV1Schema,
@@ -12,7 +13,6 @@ import {
   samplePanoramaArtifactV1,
   sampleSuperResolutionArtifactV1,
 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { deriveArtifactInvalidationReasons } from '../../../packages/rawengine-schema/src/derivedArtifactInvalidation.ts';
 
 const CASES = [
   {

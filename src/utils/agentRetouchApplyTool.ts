@@ -1,5 +1,7 @@
 import { z } from 'zod';
-
+import { type ArtifactHandleV1, artifactHandleV1Schema } from '../../packages/rawengine-schema/src';
+import { Mask, SubMaskMode } from '../components/panel/right/Masks';
+import { useEditorStore } from '../store/useEditorStore';
 import {
   DEFAULT_LAYER_BLEND_MODE,
   INITIAL_MASK_ADJUSTMENTS,
@@ -11,9 +13,6 @@ import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import { stableAgentPreviewHash } from './agentPreviewEnvelope';
 import { pushEditHistoryEntry } from './editHistory';
 import { applyLayerStackCommandBridgeOperation } from './layerStackCommandBridge';
-import { artifactHandleV1Schema, type ArtifactHandleV1 } from '../../packages/rawengine-schema/src';
-import { Mask, SubMaskMode } from '../components/panel/right/Masks';
-import { useEditorStore } from '../store/useEditorStore';
 
 export const AGENT_RETOUCH_APPLY_TOOL_NAME = 'rawengine.agent.retouch.apply';
 export const AGENT_RETOUCH_APPLY_INPUT_SCHEMA_NAME = 'AgentRetouchApplyRequestV1';

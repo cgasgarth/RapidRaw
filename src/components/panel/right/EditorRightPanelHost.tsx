@@ -1,13 +1,11 @@
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
-import { lazy, Suspense, type ReactNode } from 'react';
-
+import { lazy, type ReactNode, Suspense } from 'react';
+import { type AppSettings, Panel, type SelectedImage } from '../../ui/AppProperties';
+import type { ExportState } from '../../ui/ExportImportProperties';
 import Controls from './ControlsPanel';
 import CropPanel from './CropPanel';
 import ExportPanel from './ExportPanel';
 import MetadataPanel from './MetadataPanel';
-import { Panel, type AppSettings, type SelectedImage } from '../../ui/AppProperties';
-
-import type { ExportState } from '../../ui/ExportImportProperties';
 
 const AIPanel = lazy(() => import('./AIPanel.js').then((module) => ({ default: module.AIPanel })));
 const MasksPanel = lazy(() => import('./MasksPanel.js').then((module) => ({ default: module.MasksPanel })));

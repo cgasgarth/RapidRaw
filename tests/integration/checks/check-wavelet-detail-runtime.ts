@@ -2,9 +2,8 @@
 
 import { mkdir, readFile, stat } from 'node:fs/promises';
 import { basename, dirname, resolve } from 'node:path';
-
-import { parseWaveletWorkflowReport } from '../../../src/schemas/waveletWorkflowSchemas.ts';
 import { readBoundedStream, writeBoundedOutput } from '../../../scripts/compact-output.ts';
+import { parseWaveletWorkflowReport } from '../../../src/schemas/waveletWorkflowSchemas.ts';
 
 const REPORT_PATH = resolve('src-tauri/target/rawengine-wavelet-workflow-report.json');
 const ARTIFACT_PATH = resolve('src-tauri/target/rawengine-wavelet-workflow-preview.png');

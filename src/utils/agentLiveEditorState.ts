@@ -1,14 +1,13 @@
 import { createRawEngineLocalAppServerBridge } from '../../packages/rawengine-schema/src/localAppServerBridge.ts';
 import {
-  RAW_ENGINE_SCHEMA_VERSION,
-  projectLibrarySnapshotV1Schema,
   type ProjectLibrarySnapshotV1,
+  projectLibrarySnapshotV1Schema,
+  RAW_ENGINE_SCHEMA_VERSION,
 } from '../../packages/rawengine-schema/src/rawEngineSchemas';
-import { useEditorStore } from '../store/useEditorStore';
-import { useLibraryStore } from '../store/useLibraryStore';
-
 import type { FolderTree } from '../components/panel/FolderTree';
 import type { AlbumItem, ImageFile, RawStatus, SortDirection } from '../components/ui/AppProperties';
+import { useEditorStore } from '../store/useEditorStore';
+import { useLibraryStore } from '../store/useLibraryStore';
 
 const mapFolder = (folder: FolderTree): ProjectLibrarySnapshotV1['folders'][number] => ({
   children: folder.children.map(mapFolder),

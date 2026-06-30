@@ -2,16 +2,15 @@
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-
-import {
-  applySuperResolutionRuntimePlanV1,
-  buildSuperResolutionRuntimeDryRunV1,
-} from '../../../packages/rawengine-schema/src/superResolutionRuntimePlan.ts';
+import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   calculateMeanAbsoluteErrorV1,
   createNearestNeighborBaselineV1,
 } from '../../../packages/rawengine-schema/src/superResolutionPixelShift.ts';
-import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import {
+  applySuperResolutionRuntimePlanV1,
+  buildSuperResolutionRuntimeDryRunV1,
+} from '../../../packages/rawengine-schema/src/superResolutionRuntimePlan.ts';
 
 const SCALE = 2;
 const LOW_WIDTH = 48;

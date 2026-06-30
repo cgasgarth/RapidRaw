@@ -1,6 +1,6 @@
 import cx from 'clsx';
 import { motion } from 'framer-motion';
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useModalTransition } from '../../hooks/useModalTransition';

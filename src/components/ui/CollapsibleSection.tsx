@@ -1,18 +1,17 @@
 import cx from 'clsx';
 import { ChevronDown, Eye, EyeOff } from 'lucide-react';
 import {
-  useRef,
-  useEffect,
-  useState,
   type KeyboardEvent,
   type MouseEvent,
   type MouseEventHandler,
   type ReactNode,
+  useEffect,
+  useRef,
+  useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import UiText from './Text';
 import { TextVariants, TextWeights } from '../../types/typography';
+import UiText from './Text';
 
 interface CollapsibleSectionProps {
   canToggleVisibility?: boolean;

@@ -1,18 +1,19 @@
 import {
   DndContext,
+  type DragEndEvent,
   DragOverlay,
+  type DragStartEvent,
   PointerSensor,
+  pointerWithin,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
-  type DragEndEvent,
-  type DragStartEvent,
-  pointerWithin,
 } from '@dnd-kit/core';
 import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import type { LucideIcon } from 'lucide-react';
 import {
   ChartArea,
   Circle,
@@ -21,59 +22,35 @@ import {
   Eye,
   EyeOff,
   FileEdit,
-  FolderOpen,
   Folder as FolderIcon,
+  FolderOpen,
   Loader2,
   Minus,
   Plus,
   PlusSquare,
   RotateCcw,
-  Trash2,
-  SwatchBook,
   SquaresIntersect,
+  SwatchBook,
+  Trash2,
 } from 'lucide-react';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
   type MouseEvent as ReactMouseEvent,
-  useState,
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
   useEffect,
   useRef,
-  useCallback,
+  useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-
-import { AiPeoplePartPickerStatus } from './AiPeoplePartPickerStatus';
-import LayerStackPanel from './LayerStackPanel';
-import { MaskOverlayReviewControls } from './MaskOverlayReviewControls';
-import {
-  getMaskLikeContainerDropClass,
-  getMaskLikeSubMaskDropClass,
-  isMaskLikeContainerDrag,
-  type MaskLikeDragData,
-  useDelayedHover,
-} from './maskPanelRowHelpers';
-import {
-  Mask,
-  type MaskType,
-  type SubMask,
-  MASK_PANEL_CREATION_TYPES,
-  OTHERS_MASK_TYPES,
-  MASK_ICON_MAP,
-  SubMaskMode,
-  ToolType,
-  formatMaskTypeName,
-  getSubMaskName,
-  getMaskTypeName,
-} from './Masks';
-import { ObjectPromptControls } from './ObjectPromptControls';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { useAiMasking } from '../../../hooks/useAiMasking';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useManagedFocus } from '../../../hooks/useManagedFocus';
-import { usePresets, type UserPreset } from '../../../hooks/usePresets';
+import { type UserPreset, usePresets } from '../../../hooks/usePresets';
 import { useWaveformControls } from '../../../hooks/useWaveformControls';
+import type { MaskOverlaySettings } from '../../../schemas/maskOverlaySchemas';
 import { aiDepthMaskParametersSchema, type MaskRefinementParameters } from '../../../schemas/maskParameterSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useProcessStore } from '../../../store/useProcessStore';
@@ -82,12 +59,12 @@ import { useUIStore } from '../../../store/useUIStore';
 import { Invokes } from '../../../tauri/commands';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import {
+  ADJUSTMENT_SECTIONS,
   type Adjustments,
   INITIAL_ADJUSTMENTS,
   INITIAL_MASK_ADJUSTMENTS,
   INITIAL_MASK_CONTAINER,
   type MaskContainer,
-  ADJUSTMENT_SECTIONS,
 } from '../../../utils/adjustments';
 import { createEditorSubMaskFallback, createEditorSubMaskForImage } from '../../../utils/editorSubMaskFactory';
 import {
@@ -111,15 +88,15 @@ import {
   readMaskRefinementReplayReceipt,
 } from '../../../utils/maskRefinementCommandBus';
 import {
-  clearObjectPromptCanvasState,
+  type AiObjectMaskProposal,
   acceptObjectMaskProposal,
   buildObjectMaskProposalCommandInput,
-  type AiObjectMaskProposal,
+  clearObjectPromptCanvasState,
+  type ObjectPromptMode,
   readObjectMaskProposalReplayReceipt,
   readObjectPromptCanvasState,
   setObjectPromptMode,
   writeObjectPromptCanvasState,
-  type ObjectPromptMode,
 } from '../../../utils/objectMaskPromptCanvas';
 import AdjustmentSlider from '../../adjustments/AdjustmentSlider';
 import BasicAdjustments from '../../adjustments/Basic';
@@ -128,21 +105,42 @@ import CurveGraph, { type ChannelConfig } from '../../adjustments/Curves';
 import DetailsPanel from '../../adjustments/Details';
 import EffectsPanel from '../../adjustments/Effects';
 import {
-  OPTION_SEPARATOR,
-  Orientation,
-  Theme,
   type AppSettings,
   type BrushSettings,
+  OPTION_SEPARATOR,
   type Option,
+  Orientation,
+  Theme,
 } from '../../ui/AppProperties';
 import CollapsibleSection from '../../ui/CollapsibleSection';
 import Resizer from '../../ui/Resizer';
 import Switch from '../../ui/Switch';
 import UiText from '../../ui/Text';
 import Waveform from '../editor/Waveform';
-
-import type { MaskOverlaySettings } from '../../../schemas/maskOverlaySchemas';
-import type { LucideIcon } from 'lucide-react';
+import { AiPeoplePartPickerStatus } from './AiPeoplePartPickerStatus';
+import LayerStackPanel from './LayerStackPanel';
+import { MaskOverlayReviewControls } from './MaskOverlayReviewControls';
+import {
+  formatMaskTypeName,
+  getMaskTypeName,
+  getSubMaskName,
+  MASK_ICON_MAP,
+  MASK_PANEL_CREATION_TYPES,
+  Mask,
+  type MaskType,
+  OTHERS_MASK_TYPES,
+  type SubMask,
+  SubMaskMode,
+  ToolType,
+} from './Masks';
+import {
+  getMaskLikeContainerDropClass,
+  getMaskLikeSubMaskDropClass,
+  isMaskLikeContainerDrag,
+  type MaskLikeDragData,
+  useDelayedHover,
+} from './maskPanelRowHelpers';
+import { ObjectPromptControls } from './ObjectPromptControls';
 
 type NumericMaskParameterPatch<TKey extends string> = Partial<Record<TKey, number>>;
 type SubMaskControlParameterKey = 'feather' | 'flow' | 'grow' | 'tolerance';

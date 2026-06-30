@@ -155,7 +155,7 @@ const buildPositiveChannel = ({
 
   return {
     densitySignal,
-    positive: Math.pow(applyPositiveEndpoints(normalized, params), DISPLAY_GAMMA_INV),
+    positive: applyPositiveEndpoints(normalized, params) ** DISPLAY_GAMMA_INV,
   };
 };
 
@@ -184,8 +184,8 @@ const shapeDensityForPrint = ({
   const midpointShaped = clampNegativeLabUnitValue(exposed + midpointBias);
   const toePower = 1 + v2Params.toe_strength * 1.5;
   const shoulderPower = 1 + v2Params.shoulder_strength * 1.5;
-  const toe = Math.pow(midpointShaped, toePower);
-  const shoulder = 1 - Math.pow(1 - midpointShaped, shoulderPower);
+  const toe = midpointShaped ** toePower;
+  const shoulder = 1 - (1 - midpointShaped) ** shoulderPower;
   const blend = midpointShaped;
 
   return clampNegativeLabUnitValue(toe * (1 - blend) + shoulder * blend);
@@ -195,15 +195,13 @@ const renderPrintDensity = (tone: number, params: NegativeLabPresetParams): numb
   const v2Params = params.print_curve_v2 ?? DEFAULT_DENSITY_PRINT_V2_PARAMS;
   const densitySpan = v2Params.target_black_density - v2Params.target_white_density;
   const targetDensity = v2Params.target_black_density - tone * densitySpan;
-  const whiteTransmittance = Math.pow(10, -v2Params.target_white_density);
-  const blackTransmittance = Math.pow(10, -v2Params.target_black_density);
+  const whiteTransmittance = 10 ** -v2Params.target_white_density;
+  const blackTransmittance = 10 ** -v2Params.target_black_density;
   const linearPositive = clampNegativeLabUnitValue(
-    (Math.pow(10, -targetDensity) - blackTransmittance) / (whiteTransmittance - blackTransmittance),
+    (10 ** -targetDensity - blackTransmittance) / (whiteTransmittance - blackTransmittance),
   );
 
-  return params.print_curve_output_tag === 'export_linear'
-    ? linearPositive
-    : Math.pow(linearPositive, DISPLAY_GAMMA_INV);
+  return params.print_curve_output_tag === 'export_linear' ? linearPositive : linearPositive ** DISPLAY_GAMMA_INV;
 };
 
 const buildDensityPrintV2Channel = ({

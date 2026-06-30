@@ -1,13 +1,11 @@
+import type { LucideIcon } from 'lucide-react';
 import { XCircle } from 'lucide-react';
-import { useCallback, useRef, type MouseEvent, type ReactNode } from 'react';
-
+import { type MouseEvent, type ReactNode, useCallback, useRef } from 'react';
 import { useModalTransition } from '../../hooks/useModalTransition';
+import type { ComputationalMergeAppServerRouteFamily } from '../../schemas/computationalMergeAppServerSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerBadge';
 import UiText from '../ui/Text';
-
-import type { ComputationalMergeAppServerRouteFamily } from '../../schemas/computationalMergeAppServerSchemas';
-import type { LucideIcon } from 'lucide-react';
 
 interface ComputationalSetupModalShellProps {
   appServerFamily: ComputationalMergeAppServerRouteFamily;

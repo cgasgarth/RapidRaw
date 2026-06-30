@@ -1,6 +1,5 @@
-import { findLayerIndex } from './layerStack';
-
 import type { MaskAdjustments, MaskContainer } from './adjustments';
+import { findLayerIndex } from './layerStack';
 
 export const LAYER_ADJUSTMENT_KEYS = [
   'blacks',

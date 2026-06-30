@@ -1,8 +1,6 @@
-import { Camera, Crop, FileInput, Info, Layers, Paintbrush, SlidersHorizontal, SwatchBook } from 'lucide-react';
-
-import { Panel } from '../../ui/AppProperties';
-
 import type { LucideIcon } from 'lucide-react';
+import { Camera, Crop, FileInput, Info, Layers, Paintbrush, SlidersHorizontal, SwatchBook } from 'lucide-react';
+import { Panel } from '../../ui/AppProperties';
 
 export interface RightPanelRegistryEntry {
   fallbackLabel: string;

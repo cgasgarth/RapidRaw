@@ -1,10 +1,9 @@
-import { normalizeMaskOverlaySettings } from './maskOverlayModes';
-import { toMaskParameterRecord } from './maskParameterAccess';
-
-import type { Adjustments, AiPatch, MaskContainer } from './adjustments';
 import type { SubMask } from '../components/panel/right/Masks';
 import type { RenderSize } from '../hooks/useImageRenderSize';
 import type { MaskOverlaySettings } from '../schemas/maskOverlaySchemas';
+import type { Adjustments, AiPatch, MaskContainer } from './adjustments';
+import { normalizeMaskOverlaySettings } from './maskOverlayModes';
+import { toMaskParameterRecord } from './maskParameterAccess';
 
 type SerializableMaskParameters = Record<string, unknown> & {
   mask_data_base64?: string | null | undefined;

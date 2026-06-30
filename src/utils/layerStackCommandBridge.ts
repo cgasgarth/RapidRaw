@@ -1,5 +1,18 @@
 import { z } from 'zod';
-
+import {
+  ActorKind,
+  ApprovalClass,
+  dispatchLayerStackCommand,
+  type LayerBlendResolvedRemoveSource,
+  type LayerMaskCommandEnvelopeV1,
+  type LayerMaskMutationResultV1,
+  type LayerScopedToneAdjustmentV1,
+  type LayerStackSidecarLayerV1,
+  type LayerStackSidecarV1,
+  layerMaskCommandEnvelopeV1Schema,
+  layerStackSidecarV1Schema,
+  RAW_ENGINE_SCHEMA_VERSION,
+} from '../../packages/rawengine-schema/src';
 import {
   DEFAULT_LAYER_BLEND_MODE,
   INITIAL_MASK_ADJUSTMENTS,
@@ -7,20 +20,6 @@ import {
   type RetouchCloneSource,
   type RetouchRemoveSource,
 } from './adjustments';
-import {
-  ActorKind,
-  ApprovalClass,
-  dispatchLayerStackCommand,
-  layerMaskCommandEnvelopeV1Schema,
-  layerStackSidecarV1Schema,
-  RAW_ENGINE_SCHEMA_VERSION,
-  type LayerBlendResolvedRemoveSource,
-  type LayerScopedToneAdjustmentV1,
-  type LayerMaskCommandEnvelopeV1,
-  type LayerMaskMutationResultV1,
-  type LayerStackSidecarLayerV1,
-  type LayerStackSidecarV1,
-} from '../../packages/rawengine-schema/src';
 
 export type LayerStackCommandBridgeOperation =
   | {

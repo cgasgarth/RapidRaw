@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { buildAgentImageContextSnapshot, type AgentImageContextSnapshot } from './agentImageContextSnapshot';
+import { type AgentImageContextSnapshot, buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 
 export const agentInitialPromptContextSchema = z
   .object({

@@ -1,10 +1,9 @@
 import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-
-import UiText from './Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
+import UiText from './Text';
 
 const TOOLTIP_DELAY = 500;
 const OFFSET = 8;

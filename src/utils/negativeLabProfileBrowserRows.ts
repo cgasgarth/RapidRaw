@@ -1,10 +1,9 @@
+import type { NegativeLabRuntimeProfileBrowserRow } from '../schemas/negativeLabMeasuredProfileSchemas';
 import {
-  NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
   buildNegativeLabRuntimeProfileBrowserRows,
+  NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
   type NegativeLabRuntimeProfileCatalog,
 } from './negativeLabMeasuredProfileRuntime';
-
-import type { NegativeLabRuntimeProfileBrowserRow } from '../schemas/negativeLabMeasuredProfileSchemas';
 
 export const buildNegativeLabProfileBrowserRows = (
   catalog: NegativeLabRuntimeProfileCatalog = NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,

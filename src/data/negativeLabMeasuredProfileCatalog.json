@@ -11,9 +11,7 @@
       "evidenceDigest": {
         "fixtureLegalStatus": "project_owned_private_ci",
         "renderProofStatus": "runtime_route_verified",
-        "sourceFixtureContentHashes": [
-          "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-        ]
+        "sourceFixtureContentHashes": ["sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
       },
       "evidenceFixtureIds": ["negative_lab.project_owned.c41_profile_measurement_001"],
       "filmClass": "color_negative",

@@ -1,8 +1,7 @@
 import cx from 'clsx';
+import type { TFunction } from 'i18next';
 import { Loader2 } from 'lucide-react';
-
 import { TextColors, TextVariants } from '../../../types/typography';
-import UiText from '../../ui/Text';
 
 import type {
   ObjectMaskProposalCommandInput,
@@ -10,7 +9,7 @@ import type {
   ObjectPromptCanvasState,
   ObjectPromptMode,
 } from '../../../utils/objectMaskPromptCanvas';
-import type { TFunction } from 'i18next';
+import UiText from '../../ui/Text';
 
 interface ObjectPromptControlsProps {
   commandInput: ObjectMaskProposalCommandInput | null;

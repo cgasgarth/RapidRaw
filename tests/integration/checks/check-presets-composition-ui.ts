@@ -1,24 +1,21 @@
 #!/usr/bin/env bun
 
-import { readFileSync } from 'node:fs';
-import { strict as assert } from 'node:assert';
-
 import { mock } from 'bun:test';
+import { strict as assert } from 'node:assert';
+import { readFileSync } from 'node:fs';
 import { Window } from 'happy-dom';
 import i18next from 'i18next';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
-
-import { ContextMenuProvider } from '../../../src/context/ContextMenuContext';
 import { Panel, type Preset } from '../../../src/components/ui/AppProperties';
+import { ContextMenuProvider } from '../../../src/context/ContextMenuContext';
+import type { UserPreset } from '../../../src/hooks/usePresets';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { useUIStore } from '../../../src/store/useUIStore';
 import { Invokes } from '../../../src/tauri/commands';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { BUILT_IN_COLOR_STYLE_PRESETS, COLOR_STYLE_PRESET_CATALOG } from '../../../src/utils/colorStylePresetCatalog';
-
-import type { UserPreset } from '../../../src/hooks/usePresets';
 
 type RenderedPanel = {
   container: HTMLDivElement;

@@ -1,17 +1,18 @@
 import { invoke } from '@tauri-apps/api/core';
+import type { i18n as I18n } from 'i18next';
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-
+import type { FolderTree } from '../components/panel/FolderTree';
 import {
   type AppSettings,
+  EditedStatus,
   type FilterCriteria,
   LibraryViewMode,
-  EditedStatus,
-  type Theme,
-  ThumbnailSize,
-  type ThumbnailAspectRatio,
   type SupportedTypes,
+  type Theme,
+  type ThumbnailAspectRatio,
+  ThumbnailSize,
 } from '../components/ui/AppProperties';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
@@ -19,10 +20,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 import { Invokes } from '../tauri/commands';
 import { COPYABLE_ADJUSTMENT_KEYS, DisplayMode, PasteMode } from '../utils/adjustments';
-import { THEMES, DEFAULT_THEME_ID, type ThemeProps } from '../utils/themes';
-
-import type { FolderTree } from '../components/panel/FolderTree';
-import type { i18n as I18n } from 'i18next';
+import { DEFAULT_THEME_ID, THEMES, type ThemeProps } from '../utils/themes';
 
 interface PersistedFolderState {
   activeAlbumId?: string | null;

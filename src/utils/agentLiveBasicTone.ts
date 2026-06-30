@@ -1,18 +1,18 @@
+import {
+  type ToneColorMutationResultV1,
+  toneColorDryRunResultV1Schema,
+  toneColorMutationResultV1Schema,
+} from '../../packages/rawengine-schema/src/rawEngineSchemas';
+import { useEditorStore } from '../store/useEditorStore';
 import { createLiveEditorAppServerBridge } from './agentLiveEditorState';
 import {
   applyBasicToneCommandEnvelopeToAdjustments,
+  type BasicToneCommandEnvelope,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
   type LegacyBasicToneAdjustmentPayload,
-  type BasicToneCommandEnvelope,
 } from './basicToneCommandBridge';
 import { pushEditHistoryEntry } from './editHistory';
-import {
-  toneColorDryRunResultV1Schema,
-  toneColorMutationResultV1Schema,
-  type ToneColorMutationResultV1,
-} from '../../packages/rawengine-schema/src/rawEngineSchemas';
-import { useEditorStore } from '../store/useEditorStore';
 
 export type AgentLiveBasicTonePixel = readonly [number, number, number];
 

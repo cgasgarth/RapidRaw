@@ -1,13 +1,13 @@
 #!/usr/bin/env bun
 
 import {
+  type AiObjectMaskProposal,
   acceptObjectMaskProposal,
   aiObjectMaskProposalSchema,
   buildObjectMaskProposalCommandInput,
   readObjectMaskProposalReplayReceipt,
   readObjectPromptCanvasState,
   writeObjectPromptCanvasState,
-  type AiObjectMaskProposal,
 } from '../../../src/utils/objectMaskPromptCanvas.ts';
 
 const makeProposal = (overrides: Partial<AiObjectMaskProposal> = {}): AiObjectMaskProposal =>

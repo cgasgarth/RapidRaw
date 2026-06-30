@@ -1,7 +1,9 @@
 #!/usr/bin/env bun
 
-import { Invokes } from '../../../src/tauri/commands.ts';
 import {
+  type TetherCaptureResponse,
+  type TetherDiscoveryResponse,
+  type TetherSessionResponse,
   tetherCameraControlWriteRequestSchema,
   tetherCameraControlWriteResponseSchema,
   tetherCaptureRequestSchema,
@@ -11,10 +13,8 @@ import {
   tetherRecoveryProofReceiptSchema,
   tetherSessionOpenRequestSchema,
   tetherSessionResponseSchema,
-  type TetherCaptureResponse,
-  type TetherDiscoveryResponse,
-  type TetherSessionResponse,
 } from '../../../src/schemas/tetheringSchemas.ts';
+import { Invokes } from '../../../src/tauri/commands.ts';
 import {
   buildTetherIngestProofReceipt,
   buildTetherRecoveryProofReceipt,

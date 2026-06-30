@@ -34,15 +34,13 @@ validation whenever their scope is relevant.
 | `bun run check:rust`                | Blocking Rust local bundle for Rust-affecting PRs.                                                                                              |
 | `bun run check:rust-feature-policy` | Ensures required Rust scripts and workflow jobs use the explicit `required-ci` feature set instead of broad `--all-features`.                   |
 | `bun run check:security`            | Dependency vulnerability checks for JS and Rust.                                                                                                |
-| `bun run check:licenses`            | Dependency license policy checks for JS and Rust.                                                                                               |
 | `bun run check:sidecar-roundtrip`   | Fixture-oriented validation for documented `.rrdata` sidecar shape, virtual-copy naming, tag conventions, and missing/invalid default behavior. |
 
 ## Known Baseline Gaps
 
 Observed on June 10, 2026:
 
-- `bun run lint` reports inherited ESLint findings, primarily
-  `@typescript-eslint/no-explicit-any`; cleanup is tracked by #286 and #29-#37.
+- `bun run lint` uses Biome for fast whole-repo linting.
 - `bun run format:check` reports 11 inherited formatting findings; cleanup is
   tracked by #289.
 - `bun run i18n:lint` reports 36 inherited hardcoded-string findings; cleanup is

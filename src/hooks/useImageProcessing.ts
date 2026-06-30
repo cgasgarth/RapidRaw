@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useMemo } from 'react';
+import type React from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { z } from 'zod';
-
-import { debouncedSave } from './useEditorActions';
 import { Panel } from '../components/ui/AppProperties';
 import { prepareAdjustmentPayloadForBackend } from '../schemas/adjustmentPayloadSchemas';
 import { emptyTauriResponseSchema } from '../schemas/tauriResponseSchemas';
@@ -15,8 +14,7 @@ import { type Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../utils/adjustments
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { invokeWithSchema } from '../utils/tauriSchemaInvoke';
 import { debounce } from '../utils/timing';
-
-import type React from 'react';
+import { debouncedSave } from './useEditorActions';
 
 interface PreviousAdjustments {
   adjustments: Adjustments;

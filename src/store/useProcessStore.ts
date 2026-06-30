@@ -1,8 +1,6 @@
 import { create } from 'zustand';
-
-import { type ExportState, type ImportState, Status } from '../components/ui/ExportImportProperties';
-
 import type { Progress } from '../components/ui/AppProperties';
+import { type ExportState, type ImportState, Status } from '../components/ui/ExportImportProperties';
 
 export interface ThumbnailSmartPreviewState {
   colorProfile: string;

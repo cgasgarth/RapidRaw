@@ -7,8 +7,8 @@ import { z } from 'zod';
 
 import { layerMaskBlendModeV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
-  renderLayerOpacityOrderRuntime,
   type LayerOpacityOrderRuntimeOperation,
+  renderLayerOpacityOrderRuntime,
 } from '../../../src/utils/layerOpacityOrderRuntime.ts';
 
 const OUTPUT_DIR = 'artifacts/layers/opacity-order-runtime';

@@ -6,8 +6,8 @@ import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import {
   applyFilmLookAbCommandToAdjustments,
   buildFilmLookAbCommand,
-  filmLookAbCommandSchema,
   type FilmLookColorPipelinePixel,
+  filmLookAbCommandSchema,
 } from '../../../src/utils/filmLookColorPipelineCommand.ts';
 import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/filmLookRegistry.ts';
 

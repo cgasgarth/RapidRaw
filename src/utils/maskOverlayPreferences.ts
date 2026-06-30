@@ -1,9 +1,9 @@
-import { normalizeMaskOverlaySettings } from './maskOverlayModes';
 import {
-  maskOverlaySettingsSchema,
   type MaskOverlayMode,
   type MaskOverlaySettings,
+  maskOverlaySettingsSchema,
 } from '../schemas/maskOverlaySchemas';
+import { normalizeMaskOverlaySettings } from './maskOverlayModes';
 
 const MASK_OVERLAY_SETTINGS_STORAGE_KEY = 'rawengine.maskOverlaySettings.v1';
 

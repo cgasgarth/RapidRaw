@@ -1,7 +1,7 @@
 import {
-  rawCameraProfileProvenanceReceiptSchema,
   type RawCameraProfileProvenanceReceipt,
   type RawDevelopmentReport,
+  rawCameraProfileProvenanceReceiptSchema,
 } from '../schemas/imageLoaderSchemas';
 
 export function buildCameraProfileProvenanceReceipt(report: RawDevelopmentReport): RawCameraProfileProvenanceReceipt {

@@ -1,11 +1,6 @@
 import {
-  ComputationalMergeAppServerCommandBusHarness,
-  type ComputationalMergeAppServerCommandBusHarnessOptions,
-  expectThrows,
-} from './appServerCommandBusHarness.js';
-import {
-  computationalMergeCommandEnvelopeV1Schema,
   type ComputationalMergeCommandEnvelopeV1,
+  computationalMergeCommandEnvelopeV1Schema,
 } from '../src/rawEngineSchemas.js';
 import {
   sampleComputationalMergeAppServerToolManifestV1,
@@ -15,6 +10,11 @@ import {
   sampleSuperResolutionArtifactV1,
 } from '../src/samplePayloads.js';
 import { createSuperResolutionPlanOnlyDryRunResultV1 } from '../src/superResolutionPreflight.js';
+import {
+  ComputationalMergeAppServerCommandBusHarness,
+  type ComputationalMergeAppServerCommandBusHarnessOptions,
+  expectThrows,
+} from './appServerCommandBusHarness.js';
 
 const sampleSuperResolutionPreflightSourceStates = sampleSuperResolutionArtifactV1.sourceState.map((sourceState) => ({
   contentHash: sourceState.contentHash,

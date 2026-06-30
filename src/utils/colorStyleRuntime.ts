@@ -1,12 +1,11 @@
 import { z } from 'zod';
-
+import { colorStylePresetSchema } from '../schemas/colorStylePresetSchemas';
 import { calculateDefaultSelectiveColorInfluence } from './selectiveColorFalloff';
 import {
-  SELECTIVE_COLOR_RANGE_KEYS,
   getSelectiveColorRange,
+  SELECTIVE_COLOR_RANGE_KEYS,
   type SelectiveColorRangeKey,
 } from './selectiveColorRanges';
-import { colorStylePresetSchema } from '../schemas/colorStylePresetSchemas';
 
 export interface RgbPixel {
   blue: number;

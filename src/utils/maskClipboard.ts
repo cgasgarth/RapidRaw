@@ -1,6 +1,5 @@
-import { INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from './adjustments';
-
 import type { SubMask } from '../components/panel/right/Masks';
+import { INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from './adjustments';
 
 export type MaskClipboardIdFactory = () => string;
 

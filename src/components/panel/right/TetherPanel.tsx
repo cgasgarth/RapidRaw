@@ -11,10 +11,19 @@ import {
   RefreshCcw,
   Usb,
 } from 'lucide-react';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
+  type TetherCameraControl,
+  type TetherCameraControlWriteRequest,
+  type TetherCameraControlWriteResponse,
+  type TetherCapability,
+  type TetherCaptureRequest,
+  type TetherCaptureResponse,
+  type TetherDiscoveryResponse,
+  type TetherSessionOpenRequest,
+  type TetherSessionResponse,
   tetherCameraControlWriteResponseSchema,
   tetherCaptureResponseSchema,
   tetherDiscoveryResponseSchema,
@@ -22,15 +31,6 @@ import {
   tetherMetadataTemplateIdSchema,
   tetherSessionOpenRequestSchema,
   tetherSessionResponseSchema,
-  type TetherCapability,
-  type TetherCameraControl,
-  type TetherCameraControlWriteRequest,
-  type TetherCameraControlWriteResponse,
-  type TetherCaptureRequest,
-  type TetherCaptureResponse,
-  type TetherDiscoveryResponse,
-  type TetherSessionOpenRequest,
-  type TetherSessionResponse,
 } from '../../../schemas/tetheringSchemas';
 import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants } from '../../../types/typography';

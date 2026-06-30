@@ -1,9 +1,10 @@
 import { CheckCircle, Images, ShieldCheck, XCircle } from 'lucide-react';
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import DerivedOutputReceiptPanel from './DerivedOutputReceiptPanel';
-import { MergeErrorState, MergeFooterActions, MergeProcessingState, MergeResultPreview } from './MergeStatusViews';
+import type {
+  HdrBracketDetectionMethodV1,
+  HdrBracketSourceMetadataV1,
+} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import {
   applyHdrToneMappingPreset,
@@ -16,7 +17,7 @@ import {
   type HdrMergeUiSettings,
   type HdrToneMappingPreset,
 } from '../../schemas/hdrMergeUiSchemas';
-import { useUIStore, type HdrModalState } from '../../store/useUIStore';
+import { type HdrModalState, useUIStore } from '../../store/useUIStore';
 import { TextColors, TextVariants } from '../../types/typography';
 import { buildHdrDerivedOutputReceipt, deriveDerivedOutputReceiptState } from '../../utils/derivedOutputReceipt';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
@@ -25,11 +26,8 @@ import { buildHdrReviewDiagnostics } from '../../utils/hdrReviewDiagnostics';
 import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerBadge';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
-
-import type {
-  HdrBracketDetectionMethodV1,
-  HdrBracketSourceMetadataV1,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import DerivedOutputReceiptPanel from './DerivedOutputReceiptPanel';
+import { MergeErrorState, MergeFooterActions, MergeProcessingState, MergeResultPreview } from './MergeStatusViews';
 
 interface HdrModalProps {
   error: string | null;

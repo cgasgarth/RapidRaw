@@ -1,6 +1,5 @@
-import { readFileSync } from 'node:fs';
-
 import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 
 import { parseLevelsSettings } from '../../src/schemas/levelsSchemas.ts';

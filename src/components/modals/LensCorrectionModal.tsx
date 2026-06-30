@@ -2,35 +2,34 @@ import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  RotateCcw,
+  Activity,
   Check,
-  Info,
-  Loader,
+  CircleDashed,
   Eye,
   EyeOff,
+  Info,
+  Loader,
+  Maximize,
+  RotateCcw,
+  SquareDashed,
   ZoomIn,
   ZoomOut,
-  Maximize,
-  SquareDashed,
-  CircleDashed,
-  Activity,
 } from 'lucide-react';
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { useTranslation, Trans } from 'react-i18next';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { usePreviewViewport } from '../../hooks/usePreviewViewport';
 import { Invokes } from '../../tauri/commands';
 import { TextColors, TextVariants } from '../../types/typography';
+import type { Adjustments } from '../../utils/adjustments';
 import { throttle } from '../../utils/timing';
+import type { SelectedImage } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
 import Slider from '../ui/Slider';
 import Switch from '../ui/Switch';
 import UiText from '../ui/Text';
-
-import type { Adjustments } from '../../utils/adjustments';
-import type { SelectedImage } from '../ui/AppProperties';
 
 interface GeometryParams {
   distortion: number;

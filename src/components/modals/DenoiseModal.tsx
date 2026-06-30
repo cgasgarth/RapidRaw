@@ -1,7 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { motion } from 'framer-motion';
-import { CheckCircle, XCircle, Loader2, Save, RefreshCw, ZoomIn, ZoomOut, Move, Grip } from 'lucide-react';
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { CheckCircle, Grip, Loader2, Move, RefreshCw, Save, XCircle, ZoomIn, ZoomOut } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useModalTransition } from '../../hooks/useModalTransition';

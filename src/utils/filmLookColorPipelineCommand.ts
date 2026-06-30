@@ -1,12 +1,10 @@
 import { z } from 'zod';
-
+import type { Adjustments } from './adjustments';
 import {
   buildFilmLookAppliedAdjustmentPatch,
   clampFilmLookStrength,
   type FilmLookBrowserItem,
 } from './filmLookBrowser';
-
-import type { Adjustments } from './adjustments';
 
 export const FILM_LOOK_COLOR_PIPELINE_COMMAND_SCHEMA_VERSION = 1;
 

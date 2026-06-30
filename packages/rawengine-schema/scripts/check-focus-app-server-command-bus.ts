@@ -1,12 +1,7 @@
-import {
-  ComputationalMergeAppServerCommandBusHarness,
-  type ComputationalMergeAppServerCommandBusHarnessOptions,
-  expectThrows,
-} from './appServerCommandBusHarness.js';
 import { createFocusStackPlanOnlyDryRunResultV1 } from '../src/focusStackPreflight.js';
 import {
-  computationalMergeCommandEnvelopeV1Schema,
   type ComputationalMergeCommandEnvelopeV1,
+  computationalMergeCommandEnvelopeV1Schema,
 } from '../src/rawEngineSchemas.js';
 import {
   sampleComputationalMergeAppServerToolManifestV1,
@@ -15,6 +10,11 @@ import {
   sampleComputationalMergeFocusStackCommandEnvelopeV1,
   sampleFocusStackArtifactV1,
 } from '../src/samplePayloads.js';
+import {
+  ComputationalMergeAppServerCommandBusHarness,
+  type ComputationalMergeAppServerCommandBusHarnessOptions,
+  expectThrows,
+} from './appServerCommandBusHarness.js';
 
 const sampleFocusStackPreflightSourceStates = sampleFocusStackArtifactV1.sourceState.map((sourceState) => ({
   contentHash: sourceState.contentHash,

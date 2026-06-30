@@ -1,8 +1,8 @@
 import {
-  aiPeopleMaskLayerApplyPlanSchema,
   type AiPeopleMaskAnalysis,
   type AiPeopleMaskFakeAlphaMask,
   type AiPeopleMaskLayerApplyPlan,
+  aiPeopleMaskLayerApplyPlanSchema,
 } from '../schemas/aiMaskingSchemas';
 
 const titleCasePart = (part: string): string =>

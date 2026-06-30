@@ -1,29 +1,29 @@
-import { chromium, type Locator } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { chromium, type Locator } from '@playwright/test';
 
 import { format } from 'prettier';
 import { z } from 'zod';
-import { NegativeLabAppServerCommandName } from '../src/utils/negativeLabAppServerCommandNames.ts';
-import { sampleToneColorCommandEnvelopeV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
 import { BrushMaskCommandRuntime, renderBrushMask } from '../packages/rawengine-schema/src/brushMaskCommandRuntime.ts';
 import {
   layerMaskDryRunResultV1Schema,
   layerMaskMutationResultV1Schema,
   toneColorCommandEnvelopeV1Schema,
 } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import {
-  VISUAL_SMOKE_PROOF_TEST_IDS,
-  VISUAL_SMOKE_SCENARIOS,
-  VISUAL_SMOKE_SCENARIO_IDS,
-} from '../src/validation/visual/visualSmokeScenarios.ts';
+import { sampleToneColorCommandEnvelopeV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
 import {
   BRUSH_MASK_COMMAND_COORDINATE_SPACE,
   buildBrushMaskCommandFromParameters,
 } from '../src/utils/brushMaskCommandBridge.ts';
+import { NegativeLabAppServerCommandName } from '../src/utils/negativeLabAppServerCommandNames.ts';
+import {
+  VISUAL_SMOKE_PROOF_TEST_IDS,
+  VISUAL_SMOKE_SCENARIO_IDS,
+  VISUAL_SMOKE_SCENARIOS,
+} from '../src/validation/visual/visualSmokeScenarios.ts';
 import {
   agentArtifactReviewProofDatasetSchema,
   agentAuditTranscriptViewerProofDatasetSchema,
@@ -34,37 +34,37 @@ import {
   agentPrivateRawArtifactsProofDatasetSchema,
   agentReviewHandoffProofDatasetSchema,
   agentSelectedFrameScopeProofDatasetSchema,
-  cameraProfileInputTransformPreviewProofSchema,
-  colorBalanceCompareProofDatasetSchema,
   assertFilmLookExportProof,
   assertNegativeLabBaseFogPreviewExportProof,
   assertNegativeLabBatchColorInvokeProof,
   assertNegativeLabInvokeProof,
   blackWhiteMixerParityProofDatasetSchema,
+  cameraProfileInputTransformPreviewProofSchema,
+  colorBalanceCompareProofDatasetSchema,
   commandPaletteWorkflowProofSchema,
   detailDustSpotProofSchema,
   detailWorkspaceProofSchema,
-  focusReviewWorkspaceProofSchema,
   focusPrivateRawReviewProofSchema,
+  focusReviewWorkspaceProofSchema,
   focusUiSettingsProofSchema,
   hdrBracketSourceRolesProofSchema,
   hdrDeghostReviewGateProofSchema,
   hdrPrivateRawReviewProofSchema,
   hdrReviewWorkspaceProofSchema,
   hdrUiSettingsProofSchema,
-  libraryWorkflowProofSchema,
   layerMaskPrivateRawReviewProofSchema,
   layerStackExportParityProofSchema,
   layerStackWorkflowProofSchema,
+  libraryWorkflowProofSchema,
   maskOverlayRawProofSchema,
-  panoramaPrivateRawReviewProofSchema,
-  panoramaQualityDiagnosticsProofSchema,
-  panoramaSavedReviewProofSchema,
-  negativeLabWorkspaceProofDatasetSchema,
   negativeLabPublicExportReviewProofSchema,
   negativeLabRealRawPrivateReviewProofSchema,
   negativeLabRollQueueSummaryProofSchema,
+  negativeLabWorkspaceProofDatasetSchema,
+  panoramaPrivateRawReviewProofSchema,
+  panoramaQualityDiagnosticsProofSchema,
   panoramaReviewWorkspaceProofSchema,
+  panoramaSavedReviewProofSchema,
   panoramaUiSettingsProofSchema,
   selectiveColorUiProofDatasetSchema,
   superResolutionPrivateRawReviewProofSchema,

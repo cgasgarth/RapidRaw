@@ -1,14 +1,12 @@
 import { describe, expect, test } from 'bun:test';
-
-import { buildNegativeLabFrameHealthReport } from '../../src/utils/negativeLabFrameHealth.ts';
+import type { NegativeLabPresetParams } from '../../src/schemas/negativeLabPresetCatalogSchemas.ts';
 import { buildNegativeLabAutoDensitySuggestionRun } from '../../src/utils/negativeLabAutoDensitySuggestions.ts';
+import { buildNegativeLabFrameHealthReport } from '../../src/utils/negativeLabFrameHealth.ts';
 import { buildNegativeLabRollNormalizationPlan } from '../../src/utils/negativeLabRollNormalizationPlan.ts';
 import {
   buildNegativeLabScanMetricsV1,
   type NegativeLabScanMetricPixel,
 } from '../../src/utils/negativeLabScanMetrics.ts';
-
-import type { NegativeLabPresetParams } from '../../src/schemas/negativeLabPresetCatalogSchemas.ts';
 
 const params: NegativeLabPresetParams = {
   base_fog_strength: 0.72,
@@ -50,9 +48,9 @@ const buildPixels = (p50: number, range: number, cast: { b: number; g: number; r
     const centeredRamp = (x + y) / 54 - 0.5;
     const lumaDensity = Math.max(0.03, p50 + centeredRamp * range);
     return {
-      b: Math.pow(10, -(lumaDensity + cast.b)),
-      g: Math.pow(10, -(lumaDensity + cast.g)),
-      r: Math.pow(10, -(lumaDensity + cast.r)),
+      b: 10 ** -(lumaDensity + cast.b),
+      g: 10 ** -(lumaDensity + cast.g),
+      r: 10 ** -(lumaDensity + cast.r),
     };
   });
 

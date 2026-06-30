@@ -3,12 +3,11 @@
 import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
-
+import { negativeLabUpdateBaseSamplesCommandV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   buildNegativeLabBaseSamplePreviewProof,
   type NegativeLabBaseSamplePreviewProof,
 } from '../../../src/utils/negativeLabBaseSampleCommandBridge.ts';
-import { negativeLabUpdateBaseSamplesCommandV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const REPORT_PATH = 'docs/validation/negative-lab-live-preview-sample-2026-06-21.json';
 const update = process.argv.includes('--update');

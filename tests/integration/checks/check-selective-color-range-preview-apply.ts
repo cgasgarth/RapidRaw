@@ -8,8 +8,8 @@ import { z } from 'zod';
 import {
   applySelectiveColorToRgbPixel,
   calculateSelectiveColorMaskWeight,
-  renderSelectiveColorMaskPreviewPixel,
   type RgbPixel,
+  renderSelectiveColorMaskPreviewPixel,
 } from '../../../src/utils/selectiveColorRuntime.ts';
 
 const REPORT_PATH = 'docs/validation/selective-color-range-preview-apply-2026-06-21.json';

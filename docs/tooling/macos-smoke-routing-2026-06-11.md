@@ -21,7 +21,7 @@ smoke run on `main` pushes and manual `workflow_dispatch`, not as PR blockers:
 These paths are covered by faster validation gates and do not need the app smoke
 by themselves:
 
-- `eslint.config.js`
+- `biome.json`
 - `i18next.config.ts`
 - `scripts/*.ts`
 

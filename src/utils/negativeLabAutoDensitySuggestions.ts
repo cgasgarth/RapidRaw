@@ -1,10 +1,10 @@
 import {
   NEGATIVE_LAB_AUTO_DENSITY_SUGGESTION_SCHEMA_VERSION,
-  parseNegativeLabAutoDensitySuggestionRun,
   type NegativeLabAutoDensityFrameSuggestion,
   type NegativeLabAutoDensitySuggestionRun,
   type NegativeLabAutoDensitySuggestionState,
   type NegativeLabAutoDensityWarningCode,
+  parseNegativeLabAutoDensitySuggestionRun,
 } from '../schemas/negativeLabAutoDensitySuggestionSchemas';
 
 import type { NegativeLabFrameHealthEntry } from '../schemas/negativeLabFrameHealthSchemas';

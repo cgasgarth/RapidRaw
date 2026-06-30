@@ -9,17 +9,17 @@ import {
   aiToolApplyResultV1Schema,
   aiToolCommandEnvelopeV1Schema,
   aiToolDryRunResultV1Schema,
+  type ProjectLibrarySnapshotV1,
   projectLibrarySnapshotV1Schema,
+  type RawEngineToolRegistryV1,
   rawEngineToolRegistryV1Schema,
+  type ToneColorCommandEnvelopeV1,
+  type ToneColorDryRunResultV1,
+  type ToneColorHslBandV1,
+  type ToneColorMutationResultV1,
   toneColorCommandEnvelopeV1Schema,
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
-  type ProjectLibrarySnapshotV1,
-  type RawEngineToolRegistryV1,
-  type ToneColorHslBandV1,
-  type ToneColorCommandEnvelopeV1,
-  type ToneColorDryRunResultV1,
-  type ToneColorMutationResultV1,
 } from './rawEngineSchemas.js';
 import { rawEngineDefaultToolRegistryV1 } from './toolRegistry.js';
 
@@ -1246,10 +1246,7 @@ export class RawEngineLocalAppServerBridge {
 }
 
 export const createRawEngineLocalAppServerBridge = (
-  options: {
-    availableAiProviderIds?: readonly string[];
-    projectLibrarySnapshot?: ProjectLibrarySnapshotV1;
-  } = {},
+  options: { availableAiProviderIds?: readonly string[]; projectLibrarySnapshot?: ProjectLibrarySnapshotV1 } = {},
 ): RawEngineLocalAppServerBridge => new RawEngineLocalAppServerBridge(options);
 
 export const buildRawEngineLocalAppServerBridgeCapabilities = (

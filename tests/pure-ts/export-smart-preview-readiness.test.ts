@@ -1,11 +1,10 @@
 import { expect, test } from 'bun:test';
-
+import type { ThumbnailSmartPreviewState } from '../../src/store/useProcessStore';
 import {
   hasStaleOrOfflineSmartPreview,
   isResolvingStaleSmartPreviewExport,
   isStaleOrOfflineSmartPreview,
 } from '../../src/utils/exportSmartPreviewReadiness';
-import type { ThumbnailSmartPreviewState } from '../../src/store/useProcessStore';
 
 const smartPreviewState = (overrides: Partial<ThumbnailSmartPreviewState> = {}): ThumbnailSmartPreviewState => ({
   colorProfile: 'srgb',

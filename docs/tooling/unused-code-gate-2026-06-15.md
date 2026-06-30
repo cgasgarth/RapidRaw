@@ -53,7 +53,6 @@ Remaining cleanup candidates after the split:
   - `tests/integration/checks/check-markdown-links.ts`
 - Wrapped binary dependencies modeled in `ignoreDependencies`:
   - `i18next-cli`
-  - `license-checker-rseidelsohn`
 - App-level unused exports remain report-only until each candidate is verified against runtime usage, dynamic imports, and intended public API use.
 
 ## Dependency-Only Gate
@@ -64,8 +63,8 @@ Decision: add `bun run check:unused-deps` as a blocking dependency-only Knip gat
 
 Why:
 
-- Dependency findings are now reliable enough to block after removing unused ESLint/Prettier integration packages.
-- `i18next-cli` and `license-checker-rseidelsohn` are intentionally kept because repo-owned package scripts invoke their binaries through compact wrappers or direct `.bin` execution.
+- Dependency findings are now reliable enough to block after removing unused lint and integration packages.
+- `i18next-cli` is intentionally kept because repo-owned validation invokes its binary through compact wrappers or direct execution.
 - Full unused files/exports remain report-only until dynamic entrypoints and public API surfaces are modeled.
 
 Validation:
