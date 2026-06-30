@@ -6,11 +6,11 @@ import {
   editGraphDryRunResultV1Schema,
   editGraphMutationResultV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   sampleEditGraphCommandEnvelopeV1,
   sampleEditGraphSnapshotV1,
-} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+} from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
 
 const failures = [];
 

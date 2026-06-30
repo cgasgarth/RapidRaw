@@ -4,15 +4,15 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
 
-import { toneColorCommandEnvelopeV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { proofContractSchema } from '../../../src/schemas/proofLevelSemanticsSchemas.ts';
-import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { toneColorCommandEnvelopeV1Schema } from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { proofContractSchema } from '../../../../src/schemas/proofLevelSemanticsSchemas.ts';
+import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
 import {
   type BasicToneCommandEnvelope,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
-} from '../../../src/utils/basicToneCommandBridge.ts';
-import { pushEditHistoryEntry } from '../../../src/utils/editHistory.ts';
+} from '../../../../src/utils/basicToneCommandBridge.ts';
+import { pushEditHistoryEntry } from '../../../../src/utils/editHistory.ts';
 
 const pixelSchema = z.tuple([z.number().min(0).max(1), z.number().min(0).max(1), z.number().min(0).max(1)]);
 const REPORT_PATH = 'docs/validation/proofs/agent/command-replay-render-proof-2026-06-20.json';
@@ -160,7 +160,7 @@ if (UPDATE_REPORT) {
   const expected = renderReportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
   if (JSON.stringify(expected) !== JSON.stringify(report)) {
     throw new Error(
-      `${REPORT_PATH} is stale; run bun tests/integration/checks/check-command-replay-render-proof.ts --update`,
+      `${REPORT_PATH} is stale; run bun tests/integration/checks/edit-history/check-command-replay-render-proof.ts --update`,
     );
   }
 }
