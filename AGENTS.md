@@ -37,10 +37,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 ## Pull Requests
 
 - Max three active open PRs total.
-- Keep two PR-bound workstreams active whenever independent work exists: one PR
-  in CI/review and one separate implementation worktree in progress. A
-  workstream may be an open PR or a clearly scoped subagent-owned worktree that
-  is expected to become a PR.
+- Keep at least two PR-bound workstreams active whenever independent work
+  exists: PRs in CI/review and/or clearly scoped subagent-owned implementation
+  or validation worktrees that are expected to become PRs.
 - Use subagents and worktrees to maintain those two workstreams when doing so
   will not create file ownership conflicts or reduce review quality.
 - Before opening a PR, check the open PR queue with `gh` and keep every open
@@ -94,6 +93,10 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 - Every new GitHub issue should be refined enough for one small or medium PR
   where practical.
+- Treat GitHub issues as delegation packets for subagents: capture the product
+  intent, expected ownership, constraints, and validation evidence needed for a
+  subagent to branch, implement, validate, commit, push, and open a PR without
+  rediscovering the problem.
 - Use milestones to group larger themes instead of making one issue represent
   several PRs.
 - After feature PR batches, run backlog refinement: review the active goal and
@@ -111,6 +114,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   into PR-sized work, close obsolete/meta-only issues, update stale issues with
   current context, and move related work into milestones instead of keeping
   oversized catch-all issues open.
+- Keep the backlog healthy enough to feed parallel workstreams: when fewer than
+  two useful PR/subagent streams are active, refine, split, or create the next
+  issue before idle polling.
 - Audit the open backlog periodically for broad, stale, duplicate, or meta-only
   issues. Close or rewrite them so each remaining issue maps cleanly to one
   realistic PR.
@@ -208,17 +214,27 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 ## Subagent Usage
 
+- Treat the main agent as engineering manager/coordinator: own task selection,
+  design judgment, review, integration, and merge decisions.
+- Keep at least two PRs/subagents working toward the goal whenever feasible and
+  useful, without creating ownership conflicts or review debt.
 - Use subagents to parallelize independent, clearly scoped work when it will not
   confuse branch ownership or degrade review quality.
+- Delegate implementation patches, validation patches, CI diagnosis, and issue
+  refinement to subagents when the scope is clear.
+- When an issue is refined enough for one PR, subagents should own the
+  implementation or validation PR end-to-end, including branch creation,
+  commits, push, PR description, and initial CI follow-up.
 - For straightforward implementation tasks, clear CI/pipeline failures, issue
   refinement, backlog cleanup, log polling, or repeated status checks, prefer a
   smaller/faster subagent model such as 5.4 mini when available.
-- Keep the main agent responsible for final design judgment, integration
-  review, validation evidence, PR creation, and merge decisions.
+- Keep the main agent responsible for coordination, review, integration
+  judgment, final validation evidence, and accepting or rejecting subagent
+  output before merge.
 - Delegate only work that has a clear expected output: patch, diagnosis, issue
   list, validation summary, or recommended next action.
-- Do not let subagents open broad PRs, create meta-tooling churn, or mark
-  feature work complete without runtime/product proof.
+- Do not let subagents open broad or under-refined PRs, create meta-tooling
+  churn, or mark feature work complete without runtime/product proof.
 - Use worktrees for subagent implementation when changes are independent.
 - While CI runs for one PR, use subagents for independent next slices, CI
   failure diagnosis, or PR queue monitoring instead of leaving the main agent
