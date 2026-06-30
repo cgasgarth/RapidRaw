@@ -9,7 +9,7 @@ import { z } from 'zod';
 import {
   measureHdrMergeWeightingV1,
   mergeExposureWeightedRadianceV1,
-} from '../../../packages/rawengine-schema/src/hdr/hdrMergeWeightingRuntime.ts';
+} from '../../../../packages/rawengine-schema/src/hdr/hdrMergeWeightingRuntime.ts';
 
 const WIDTH = 96;
 const HEIGHT = 64;
@@ -135,7 +135,7 @@ if (update) {
 const committedReport = reportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
 if (JSON.stringify(committedReport) !== JSON.stringify(report)) {
   throw new Error(
-    'HDR synthetic output artifact proof is stale. Run bun tests/integration/checks/check-hdr-synthetic-output-artifact.ts --update',
+    'HDR synthetic output artifact proof is stale. Run bun tests/integration/checks/hdr/check-hdr-synthetic-output-artifact.ts --update',
   );
 }
 

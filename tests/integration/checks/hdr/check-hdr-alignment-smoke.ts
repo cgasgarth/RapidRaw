@@ -5,7 +5,7 @@ const MAX_ALLOWED_TRANSLATION_ERROR_PX = 0;
 const MAX_ALLOWED_RMS_ERROR = 0.000001;
 const MIN_OVERLAP_RATIO = 0.75;
 
-import { estimateHdrAlignmentTransformsV1 } from '../../../packages/rawengine-schema/src/hdr/hdrAlignmentRuntime.ts';
+import { estimateHdrAlignmentTransformsV1 } from '../../../../packages/rawengine-schema/src/hdr/hdrAlignmentRuntime.ts';
 
 const baseImage = createSyntheticHdrReference(WIDTH, HEIGHT);
 const fixtures = [

@@ -7,7 +7,7 @@ import { performance } from 'node:perf_hooks';
 
 import { z } from 'zod';
 
-import { parseHdrPerformanceReport } from '../../../src/schemas/computational-merge/hdr/hdrPerformanceSchemas.ts';
+import { parseHdrPerformanceReport } from '../../../../src/schemas/computational-merge/hdr/hdrPerformanceSchemas.ts';
 
 const CHECKS = z
   .array(

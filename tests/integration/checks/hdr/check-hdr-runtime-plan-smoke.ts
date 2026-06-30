@@ -1,11 +1,14 @@
 #!/usr/bin/env bun
 
-import { deriveArtifactInvalidationReasons } from '../../../packages/rawengine-schema/src/derivedArtifactInvalidation.ts';
+import { deriveArtifactInvalidationReasons } from '../../../../packages/rawengine-schema/src/derivedArtifactInvalidation.ts';
 import {
   applyHdrRuntimePlanV1,
   buildHdrRuntimeDryRunV1,
-} from '../../../packages/rawengine-schema/src/hdr/hdrRuntimePlan.ts';
-import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/hdr/hdrRuntimePlan.ts';
+import {
+  ApprovalClass,
+  RAW_ENGINE_SCHEMA_VERSION,
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const WIDTH = 64;
 const HEIGHT = 48;

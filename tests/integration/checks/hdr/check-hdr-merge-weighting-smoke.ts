@@ -14,7 +14,7 @@ const MAX_RECONSTRUCTION_MAE = 0.015;
 import {
   measureHdrMergeWeightingV1,
   mergeExposureWeightedRadianceV1,
-} from '../../../packages/rawengine-schema/src/hdr/hdrMergeWeightingRuntime.ts';
+} from '../../../../packages/rawengine-schema/src/hdr/hdrMergeWeightingRuntime.ts';
 
 const scene = createSyntheticRadianceScene(WIDTH, HEIGHT);
 const captures = BRACKETS.map((bracket) => ({

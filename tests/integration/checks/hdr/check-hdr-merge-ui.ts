@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import {
   DEFAULT_HDR_MERGE_UI_SETTINGS,
   hdrMergeUiSettingsSchema,
-} from '../../../src/schemas/computational-merge/hdrMergeUiSchemas.ts';
+} from '../../../../src/schemas/computational-merge/hdrMergeUiSchemas.ts';
 
 const requiredLocaleKeys = [
   'alignment.auto',
