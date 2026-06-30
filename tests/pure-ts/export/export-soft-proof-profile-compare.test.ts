@@ -1,13 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 
-import { ExportColorProfile, ExportRenderingIntent } from '../../src/components/ui/ExportImportProperties';
-import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
+import { ExportColorProfile, ExportRenderingIntent } from '../../../src/components/ui/ExportImportProperties';
+import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   buildSoftProofProfileCompareProof,
   buildSoftProofProfileCompareRequests,
   describeSoftProofProfileRole,
   getSoftProofProfileCompareStatus,
-} from '../../src/utils/exportSoftProofProfileCompare';
+} from '../../../src/utils/exportSoftProofProfileCompare';
 
 const metadata = {
   blackPointCompensation: 'disabled',
