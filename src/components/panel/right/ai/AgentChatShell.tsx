@@ -905,13 +905,22 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
     runtimeState.status === 'accepted' || runtimeState.status === 'revised'
       ? agentCurrentImagePreviewLoopResultSchema.safeParse(runtimeState.result).data
       : undefined;
+  const compareArtifacts = latestResult?.compareArtifactIds ?? review.compareArtifacts;
+  const previewLineage = latestResult?.previewLineage ?? review.previewLineage;
   const latestApplyReceipt = latestResult?.applyReceipts.at(-1);
   const baseReceipt = review.applyReceipts.at(-1);
+  const displayedReceipt = latestApplyReceipt ?? baseReceipt;
   const changedFields = Array.from(new Set(review.applyReceipts.flatMap((receipt) => receipt.adjustedFields)));
   const disabledReason = review.blockers[0] ?? '';
   const acceptEnabled = review.controls.acceptApply.state === 'available' && runtimeState.status !== 'pending';
   const reviseEnabled = review.controls.reviseWithFeedback.state === 'available' && runtimeState.status !== 'pending';
   const rollbackEnabled = review.controls.rollback.state === 'available' && runtimeState.status !== 'pending';
+  const formatCrop = (crop: (typeof previewLineage)[number]['crop']) =>
+    crop === undefined || crop === null
+      ? 'full-frame'
+      : `${crop.unit} x=${crop.x} y=${crop.y} w=${crop.width} h=${crop.height}`;
+  const formatZoom = (zoom: (typeof previewLineage)[number]['zoom']) =>
+    zoom === undefined || zoom === null ? 'none' : `${zoom.scale}x @ ${zoom.centerX},${zoom.centerY}`;
 
   const dispatchLoop = async (
     control: AgentSelectedImagePreviewLoopReview['controls']['acceptApply'],
@@ -964,18 +973,18 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
       data-audit-event-count={review.auditEventSummary.length}
       data-blockers={review.blockers.join(',')}
       data-before-artifact-id={review.compareArtifacts.beforeArtifactId}
+      data-before-preview-url={compareArtifacts.beforeEvidence?.previewRef ?? ''}
       data-changed-field-count={changedFields.length}
       data-command-request-id={review.command.requestId}
-      data-current-artifact-id={
-        latestResult?.compareArtifactIds.currentArtifactId ?? review.compareArtifacts.currentArtifactId
-      }
+      data-current-artifact-id={compareArtifacts.currentArtifactId}
+      data-current-preview-url={compareArtifacts.currentEvidence?.previewRef ?? ''}
       data-final-graph-revision={latestResult?.finalGraphRevision ?? review.finalGraphRevision}
       data-final-recipe-hash={latestResult?.finalRecipeHash ?? review.finalRecipeHash}
       data-initial-graph-revision={review.initialGraphRevision}
       data-initial-preview-artifact-id={review.initialPreviewArtifactId}
       data-initial-recipe-hash={review.initialRecipeHash}
       data-preview-identity={review.previewIdentity ?? ''}
-      data-preview-lineage-count={latestResult?.previewLineage.length ?? review.previewLineage.length}
+      data-preview-lineage-count={previewLineage.length}
       data-review-status={latestResult?.reviewStatus ?? review.reviewStatus}
       data-rollback-checkpoint-graph-revision={review.rollbackCheckpoint.graphRevision}
       data-rollback-receipt-graph-revision={review.rollbackReceipt?.graphRevision ?? ''}
@@ -1000,38 +1009,79 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
 
       <div className="grid grid-cols-2 gap-2" data-testid="agent-selected-image-preview-loop-compare">
         <div
-          className="min-h-28 rounded border border-white/10 bg-gradient-to-br from-[#27313a] via-[#53606a] to-[#bea36f] p-2"
+          className="min-h-32 rounded border border-white/10 bg-[#16212b] p-2"
           data-artifact-id={review.compareArtifacts.beforeArtifactId}
-          data-graph-revision={review.initialGraphRevision}
-          data-recipe-hash={review.initialRecipeHash}
+          data-content-hash={compareArtifacts.beforeEvidence?.contentHash ?? ''}
+          data-graph-revision={compareArtifacts.beforeEvidence?.graphRevision ?? review.initialGraphRevision}
+          data-preview-url={compareArtifacts.beforeEvidence?.previewRef ?? ''}
+          data-recipe-hash={compareArtifacts.beforeEvidence?.recipeHash ?? review.initialRecipeHash}
+          data-render-hash={compareArtifacts.beforeEvidence?.renderHash ?? ''}
           data-testid="agent-selected-image-preview-loop-before"
         >
           <span className="rounded bg-black/35 px-1.5 py-0.5 text-[10px] uppercase text-text-primary">
             {t('editor.ai.agent.selectedImageLoop.before')}
           </span>
-          <div className="mt-12 truncate font-mono text-[10px] text-text-primary">
+          <div className="mt-4 truncate font-mono text-[10px] text-text-primary">
             {review.compareArtifacts.beforeArtifactId}
+          </div>
+          <div className="mt-1 truncate font-mono text-[10px] text-sky-100">
+            {compareArtifacts.beforeEvidence?.previewRef ?? review.previewIdentity ?? 'preview unavailable'}
+          </div>
+          <div className="mt-2 grid gap-1 font-mono text-[10px] text-text-secondary">
+            <span className="truncate">
+              {compareArtifacts.beforeEvidence?.graphRevision ?? review.initialGraphRevision}
+            </span>
+            <span className="truncate">{compareArtifacts.beforeEvidence?.recipeHash ?? review.initialRecipeHash}</span>
+            <span className="truncate">{compareArtifacts.beforeEvidence?.renderHash ?? 'render hash unavailable'}</span>
           </div>
         </div>
         <div
-          className="min-h-28 rounded border border-sky-500/25 bg-gradient-to-br from-[#334d56] via-[#6f746b] to-[#e6c472] p-2"
-          data-artifact-id={
-            latestResult?.compareArtifactIds.currentArtifactId ?? review.compareArtifacts.currentArtifactId
+          className="min-h-32 rounded border border-sky-500/25 bg-[#1f2d25] p-2"
+          data-artifact-id={compareArtifacts.currentArtifactId}
+          data-content-hash={compareArtifacts.currentEvidence?.contentHash ?? ''}
+          data-graph-revision={
+            compareArtifacts.currentEvidence?.graphRevision ??
+            latestResult?.finalGraphRevision ??
+            review.finalGraphRevision
           }
-          data-graph-revision={latestResult?.finalGraphRevision ?? review.finalGraphRevision}
-          data-recipe-hash={latestResult?.finalRecipeHash ?? review.finalRecipeHash}
+          data-preview-url={compareArtifacts.currentEvidence?.previewRef ?? ''}
+          data-recipe-hash={
+            compareArtifacts.currentEvidence?.recipeHash ?? latestResult?.finalRecipeHash ?? review.finalRecipeHash
+          }
+          data-render-hash={compareArtifacts.currentEvidence?.renderHash ?? ''}
           data-testid="agent-selected-image-preview-loop-current"
         >
           <span className="rounded bg-black/35 px-1.5 py-0.5 text-[10px] uppercase text-text-primary">
             {t('editor.ai.agent.selectedImageLoop.current')}
           </span>
-          <div className="mt-12 truncate font-mono text-[10px] text-text-primary">
-            {latestResult?.compareArtifactIds.currentArtifactId ?? review.compareArtifacts.currentArtifactId}
+          <div className="mt-4 truncate font-mono text-[10px] text-text-primary">
+            {compareArtifacts.currentArtifactId}
+          </div>
+          <div className="mt-1 truncate font-mono text-[10px] text-emerald-100">
+            {compareArtifacts.currentEvidence?.previewRef ?? 'preview unavailable'}
+          </div>
+          <div className="mt-2 grid gap-1 font-mono text-[10px] text-text-secondary">
+            <span className="truncate">
+              {compareArtifacts.currentEvidence?.graphRevision ??
+                latestResult?.finalGraphRevision ??
+                review.finalGraphRevision}
+            </span>
+            <span className="truncate">
+              {compareArtifacts.currentEvidence?.recipeHash ?? latestResult?.finalRecipeHash ?? review.finalRecipeHash}
+            </span>
+            <span className="truncate">
+              {compareArtifacts.currentEvidence?.renderHash ?? 'render hash unavailable'}
+            </span>
           </div>
         </div>
       </div>
 
-      <div className="grid gap-2 text-[11px] md:grid-cols-3" data-testid="agent-selected-image-preview-loop-metrics">
+      <div
+        className="grid gap-2 text-[11px] md:grid-cols-4"
+        data-max-channel-delta={displayedReceipt?.maxChannelDelta ?? ''}
+        data-mean-luminance-delta={displayedReceipt?.meanLuminanceDelta ?? ''}
+        data-testid="agent-selected-image-preview-loop-metrics"
+      >
         <div className="rounded border border-white/10 bg-black/15 p-2">
           <div className="text-[10px] uppercase text-text-secondary">
             {t('editor.ai.agent.selectedImageLoop.changedPixels')}
@@ -1040,10 +1090,24 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
             className="mt-1 font-mono text-emerald-100"
             data-testid="agent-selected-image-preview-loop-changed-pixels"
           >
-            {latestApplyReceipt?.changedPixelCount ?? baseReceipt?.changedPixelCount}
+            {displayedReceipt?.changedPixelCount}
           </div>
           <div className="font-mono text-[10px] text-text-secondary">
-            {latestApplyReceipt?.changedPixelPercent ?? baseReceipt?.changedPixelPercent}%
+            {t('editor.ai.agent.selectedImageLoop.changedPixelSummary', {
+              percent: displayedReceipt?.changedPixelPercent ?? 'n/a',
+              sampled: displayedReceipt?.sampledPixelCount ?? 'n/a',
+            })}
+          </div>
+        </div>
+        <div className="rounded border border-white/10 bg-black/15 p-2">
+          <div className="text-[10px] uppercase text-text-secondary">
+            {t('editor.ai.agent.selectedImageLoop.luminanceChannel')}
+          </div>
+          <div className="mt-1 font-mono text-text-primary" data-testid="agent-selected-image-preview-loop-deltas">
+            {displayedReceipt?.meanLuminanceDelta ?? 'n/a'} / {displayedReceipt?.maxChannelDelta ?? 'n/a'}
+          </div>
+          <div className="font-mono text-[10px] text-text-secondary">
+            {t('editor.ai.agent.selectedImageLoop.deltaHelp')}
           </div>
         </div>
         <div className="rounded border border-white/10 bg-black/15 p-2">
@@ -1066,22 +1130,88 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
         </div>
       </div>
 
+      <div
+        className="grid gap-2 rounded border border-white/10 bg-black/15 p-2 text-[11px] md:grid-cols-3"
+        data-before-graph-revision={compareArtifacts.lineage?.beforeGraphRevision ?? ''}
+        data-current-graph-revision={compareArtifacts.lineage?.currentGraphRevision ?? ''}
+        data-long-edge-px={compareArtifacts.mediumPreview?.longEdgePx ?? ''}
+        data-max-pixel-count={compareArtifacts.mediumPreview?.maxPixelCount ?? ''}
+        data-quality={compareArtifacts.mediumPreview?.quality ?? ''}
+        data-stale-recipe-hash={compareArtifacts.lineage?.staleRecipeHash ?? ''}
+        data-testid="agent-selected-image-preview-loop-compare-lineage"
+      >
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase text-text-secondary">
+            {t('editor.ai.agent.selectedImageLoop.compareLineage')}
+          </div>
+          <div className="mt-1 truncate font-mono text-text-primary">
+            {compareArtifacts.lineage?.beforeGraphRevision ?? review.initialGraphRevision}
+          </div>
+          <div className="truncate font-mono text-text-secondary">
+            {compareArtifacts.lineage?.currentGraphRevision ??
+              latestResult?.finalGraphRevision ??
+              review.finalGraphRevision}
+          </div>
+        </div>
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase text-text-secondary">
+            {t('editor.ai.agent.selectedImageLoop.compareRecipes')}
+          </div>
+          <div className="mt-1 truncate font-mono text-text-primary">
+            {compareArtifacts.lineage?.beforeRecipeHash ?? review.initialRecipeHash}
+          </div>
+          <div className="truncate font-mono text-text-secondary">
+            {compareArtifacts.lineage?.currentRecipeHash ?? latestResult?.finalRecipeHash ?? review.finalRecipeHash}
+          </div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase text-text-secondary">
+            {t('editor.ai.agent.selectedImageLoop.previewRender')}
+          </div>
+          <div className="mt-1 font-mono text-text-primary">
+            {t('editor.ai.agent.selectedImageLoop.previewRenderValue', {
+              longEdge: compareArtifacts.mediumPreview?.longEdgePx ?? 'n/a',
+              quality: compareArtifacts.mediumPreview?.quality ?? 'n/a',
+            })}
+          </div>
+          <div className="font-mono text-text-secondary">
+            {t('editor.ai.agent.selectedImageLoop.maxPixelCountValue', {
+              pixelCount: compareArtifacts.mediumPreview?.maxPixelCount ?? 'n/a',
+            })}
+          </div>
+        </div>
+      </div>
+
       <div className="space-y-1" data-testid="agent-selected-image-preview-loop-lineage">
-        {review.previewLineage.map((lineage) => (
+        {previewLineage.map((lineage) => (
           <div
             className="grid gap-2 rounded border border-white/10 bg-white/[0.03] p-2 text-[11px] md:grid-cols-[1fr_auto]"
             data-applied-graph-revision={lineage.appliedGraphRevision}
             data-artifact-id={lineage.previewArtifactId}
+            data-crop={formatCrop(lineage.crop)}
+            data-height={lineage.height ?? ''}
+            data-long-edge-px={lineage.longEdgePx ?? ''}
+            data-preview-url={lineage.previewRef ?? ''}
             data-purpose={lineage.previewPurpose}
+            data-quality={lineage.quality ?? ''}
             data-recipe-hash={lineage.recipeHash}
+            data-render-hash={lineage.renderHash ?? ''}
             data-testid="agent-selected-image-preview-loop-lineage-entry"
             data-tool-name={lineage.sourceToolName}
             data-turn={lineage.turn}
+            data-width={lineage.width ?? ''}
+            data-zoom={formatZoom(lineage.zoom)}
             key={`${lineage.turn}-${lineage.previewArtifactId}`}
           >
             <div className="min-w-0">
               <div className="truncate font-mono text-text-primary">{lineage.previewArtifactId}</div>
               <div className="mt-1 truncate font-mono text-text-secondary">{lineage.recipeHash}</div>
+              <div className="mt-1 truncate font-mono text-text-secondary">
+                {lineage.previewRef ?? 'preview ref unavailable'}
+              </div>
+              <div className="mt-1 truncate font-mono text-text-secondary">
+                {formatCrop(lineage.crop)} / {formatZoom(lineage.zoom)}
+              </div>
             </div>
             <span className="rounded border border-white/10 bg-black/20 px-1.5 py-0.5 text-text-secondary">
               {lineage.previewPurpose}
