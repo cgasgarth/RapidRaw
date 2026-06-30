@@ -7,8 +7,8 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
-import AgentChatShell from '../../../src/components/panel/right/AgentChatShell.tsx';
-import { ToolType } from '../../../src/components/panel/right/Masks.tsx';
+import AgentChatShell from '../../../src/components/panel/right/ai/AgentChatShell.tsx';
+import { ToolType } from '../../../src/components/panel/right/layers/Masks.tsx';
 import {
   type AgentChatTranscript,
   agentChatTranscriptSchema,

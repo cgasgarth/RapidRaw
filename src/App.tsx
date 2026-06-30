@@ -8,7 +8,7 @@ import ImageLoaderManager from './components/managers/ImageLoaderManager';
 import ImageProcessingManager from './components/managers/ImageProcessingManager';
 import AppModals from './components/modals/AppModals';
 import FolderTreePanel from './components/panel/FolderTree';
-import ExportPanel from './components/panel/right/ExportPanel';
+import ExportPanel from './components/panel/right/export/ExportPanel';
 import {
   type ImageFile,
   LibraryViewMode,

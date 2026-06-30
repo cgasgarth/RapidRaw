@@ -6,7 +6,7 @@ import { basename, extname, join, resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { ToolType } from '../../../src/components/panel/right/Masks.tsx';
+import { ToolType } from '../../../src/components/panel/right/layers/Masks.tsx';
 import { RawStatus, SortDirection } from '../../../src/components/ui/AppProperties.tsx';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { useLibraryStore } from '../../../src/store/useLibraryStore.ts';

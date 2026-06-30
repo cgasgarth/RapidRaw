@@ -14,7 +14,7 @@ import {
 const read = (path: string) => readFileSync(path, 'utf8');
 const failures: string[] = [];
 
-const exportPanelSource = read('src/components/panel/right/ExportPanel.tsx');
+const exportPanelSource = read('src/components/panel/right/export/ExportPanel.tsx');
 const compareSource = read('src/utils/exportSoftProofProfileCompare.ts');
 const commandsSource = read('src/tauri/commands.ts');
 const rustLibSource = read('src-tauri/src/lib.rs');

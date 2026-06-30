@@ -31,16 +31,16 @@ import {
   tetherMetadataTemplateIdSchema,
   tetherSessionOpenRequestSchema,
   tetherSessionResponseSchema,
-} from '../../../schemas/tetheringSchemas';
-import { Invokes } from '../../../tauri/commands';
-import { TextColors, TextVariants } from '../../../types/typography';
-import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
+} from '../../../../schemas/tetheringSchemas';
+import { Invokes } from '../../../../tauri/commands';
+import { TextColors, TextVariants } from '../../../../types/typography';
+import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
 import {
   buildTetherIngestProofReceipt,
   buildTetherRecoveryProofReceipt,
-} from '../../../utils/tetherIngestProofReceipt';
-import Button from '../../ui/Button';
-import UiText from '../../ui/Text';
+} from '../../../../utils/tetherIngestProofReceipt';
+import Button from '../../../ui/Button';
+import UiText from '../../../ui/Text';
 
 interface TetherPanelProps {
   captureFrame?: (request: TetherCaptureRequest) => Promise<TetherCaptureResponse>;

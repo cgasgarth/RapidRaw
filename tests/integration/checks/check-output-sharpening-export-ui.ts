@@ -46,7 +46,7 @@ mock.module('@tauri-apps/plugin-os', () => ({
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 installDom();
 
-const { default: ExportPanel } = await import('../../../src/components/panel/right/ExportPanel.tsx');
+const { default: ExportPanel } = await import('../../../src/components/panel/right/export/ExportPanel.tsx');
 
 await validateLocaleContract();
 await validateRenderedOutputSharpeningBehavior();

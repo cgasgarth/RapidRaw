@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 
-import { ToolType } from '../../../src/components/panel/right/Masks.tsx';
+import { ToolType } from '../../../src/components/panel/right/layers/Masks.tsx';
 import {
   RawEngineAppServerHostToolName,
   RawEngineAppServerRouteMode,

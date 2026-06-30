@@ -11,12 +11,12 @@ import CullingModal from '../../components/modals/editing/CullingModal';
 import CommandPaletteModal from '../../components/modals/navigation/CommandPaletteModal';
 import { NegativeConversionModal } from '../../components/modals/negative-lab/NegativeConversionModal';
 import ImageCanvas from '../../components/panel/editor/ImageCanvas';
-import AgentChatShell from '../../components/panel/right/AgentChatShell';
-import { MaskOverlayReviewControls } from '../../components/panel/right/MaskOverlayReviewControls';
-import { Mask, type SubMask, SubMaskMode, ToolType } from '../../components/panel/right/Masks';
-import { ObjectPromptControls } from '../../components/panel/right/ObjectPromptControls';
+import AgentChatShell from '../../components/panel/right/ai/AgentChatShell';
+import { TetherPanel } from '../../components/panel/right/capture/TetherPanel';
+import { MaskOverlayReviewControls } from '../../components/panel/right/layers/MaskOverlayReviewControls';
+import { Mask, type SubMask, SubMaskMode, ToolType } from '../../components/panel/right/layers/Masks';
+import { ObjectPromptControls } from '../../components/panel/right/layers/ObjectPromptControls';
 import RightPanelSwitcher from '../../components/panel/right/RightPanelSwitcher';
-import { TetherPanel } from '../../components/panel/right/TetherPanel';
 import {
   type BrushSettings,
   type CullingSuggestions,

@@ -16,9 +16,9 @@ import {
 } from 'lucide-react';
 import { type KeyboardEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { debouncedSave } from '../../../hooks/editor/useEditorActions';
-import { useEditorStore } from '../../../store/useEditorStore';
-import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { debouncedSave } from '../../../../hooks/editor/useEditorActions';
+import { useEditorStore } from '../../../../store/useEditorStore';
+import { TextColors, TextVariants, TextWeights } from '../../../../types/typography';
 import {
   DEFAULT_LAYER_BLEND_MODE,
   INITIAL_MASK_ADJUSTMENTS,
@@ -28,7 +28,7 @@ import {
   type RetouchCandidateProvenance,
   type RetouchCloneSource,
   type RetouchRemoveSource,
-} from '../../../utils/adjustments';
+} from '../../../../utils/adjustments';
 import {
   buildLayerExportReadinessSummary,
   buildLayerGroupSummaries,
@@ -46,14 +46,14 @@ import {
   soloLayer,
   soloLayerGroup,
   ungroupLayerGroup,
-} from '../../../utils/layerStack';
+} from '../../../../utils/layerStack';
 import {
   applyLayerStackCommandBridgeOperation,
   type LayerStackCommandBridgeOperation,
-} from '../../../utils/layerStackCommandBridge';
-import { persistLayerStackSidecarInAdjustments } from '../../../utils/layerStackSidecarAdjustments';
-import Slider, { type SliderChangeEvent } from '../../ui/Slider';
-import UiText from '../../ui/Text';
+} from '../../../../utils/layerStackCommandBridge';
+import { persistLayerStackSidecarInAdjustments } from '../../../../utils/layerStackSidecarAdjustments';
+import Slider, { type SliderChangeEvent } from '../../../ui/Slider';
+import UiText from '../../../ui/Text';
 import { Mask, SubMaskMode } from './Masks';
 
 interface LayerStackPanelProps {

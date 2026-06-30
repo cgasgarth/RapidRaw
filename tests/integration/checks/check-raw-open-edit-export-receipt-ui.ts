@@ -19,7 +19,7 @@ const [
   readFile('src/components/ui/ExportImportProperties.ts', 'utf8'),
   readFile('src/schemas/tauriEventSchemas.ts', 'utf8'),
   readFile('src/hooks/app/useTauriListeners.ts', 'utf8'),
-  readFile('src/components/panel/right/ExportPanel.tsx', 'utf8'),
+  readFile('src/components/panel/right/export/ExportPanel.tsx', 'utf8'),
   readFile('src/App.tsx', 'utf8'),
   readFile('src/components/views/EditorView.tsx', 'utf8'),
   readFile('src-tauri/src/export_processing.rs', 'utf8'),

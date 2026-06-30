@@ -16,16 +16,16 @@ import {
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useEditorActions } from '../../../hooks/editor/useEditorActions';
-import { useEditorStore } from '../../../store/useEditorStore';
-import { useUIStore } from '../../../store/useUIStore';
-import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
-import LensCorrectionModal from '../../modals/editing/LensCorrectionModal';
-import TransformModal from '../../modals/editing/TransformModal';
-import { Orientation } from '../../ui/AppProperties';
-import Slider from '../../ui/Slider';
-import UiText from '../../ui/Text';
+import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
+import { useEditorStore } from '../../../../store/useEditorStore';
+import { useUIStore } from '../../../../store/useUIStore';
+import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../../types/typography';
+import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../utils/adjustments';
+import LensCorrectionModal from '../../../modals/editing/LensCorrectionModal';
+import TransformModal from '../../../modals/editing/TransformModal';
+import { Orientation } from '../../../ui/AppProperties';
+import Slider from '../../../ui/Slider';
+import UiText from '../../../ui/Text';
 
 const BASE_RATIO = 1.618;
 const ORIGINAL_RATIO = 0;

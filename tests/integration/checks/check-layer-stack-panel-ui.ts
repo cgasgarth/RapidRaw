@@ -156,7 +156,7 @@ if (missingOperationReadinessKeys.length > 0) {
   process.exit(1);
 }
 
-const source = readFileSync('src/components/panel/right/LayerStackPanel.tsx', 'utf8');
+const source = readFileSync('src/components/panel/right/layers/LayerStackPanel.tsx', 'utf8');
 for (const marker of [
   'data-testid="layer-stack-composition-summary"',
   'data-testid="layer-stack-count-summary"',

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { ChannelConfig } from '../components/adjustments/Curves';
-import type { OverlayMode } from '../components/panel/right/CropPanel';
-import { ToolType } from '../components/panel/right/Masks';
+import type { OverlayMode } from '../components/panel/right/color/CropPanel';
+import { ToolType } from '../components/panel/right/layers/Masks';
 import type { BrushSettings, SelectedImage, WaveformData } from '../components/ui/AppProperties';
 import type { BaseRenderSize, ImageDimensions } from '../hooks/viewport/useImageRenderSize';
 import type { MaskOverlaySettings } from '../schemas/masks/maskOverlaySchemas';

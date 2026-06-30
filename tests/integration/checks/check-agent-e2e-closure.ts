@@ -33,7 +33,7 @@ const privateProof = privateProofSchema.parse(
 );
 if (privateProof.changedPixelCount < 4) failures.push('Private RAW proof must show changed output pixels.');
 
-const shellSource = readFileSync('src/components/panel/right/AgentChatShell.tsx', 'utf8');
+const shellSource = readFileSync('src/components/panel/right/ai/AgentChatShell.tsx', 'utf8');
 for (const marker of ['data-testid="agent-e2e-closure"', 'data-testid="agent-e2e-closure-steps"']) {
   if (!shellSource.includes(marker)) failures.push(`Agent chat shell missing marker: ${marker}`);
 }

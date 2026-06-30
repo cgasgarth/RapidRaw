@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { SubMask } from '../components/panel/right/Masks';
+import type { SubMask } from '../components/panel/right/layers/Masks';
 import type { RenderSize } from '../hooks/viewport/useImageRenderSize';
 import { type MaskParameterRecord, toMaskParameterRecord } from './maskParameterAccess';
 

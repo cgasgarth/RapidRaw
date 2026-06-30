@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { ToolType } from '../../../src/components/panel/right/Masks.tsx';
+import { ToolType } from '../../../src/components/panel/right/layers/Masks.tsx';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agentImageContextSnapshot.ts';

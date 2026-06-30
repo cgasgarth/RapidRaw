@@ -4,29 +4,29 @@ import type { TFunction } from 'i18next';
 import { AlertTriangle, Check, ChevronDown, ChevronRight, GitMerge, Plus, Star, Tag, User, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLibraryActions } from '../../../hooks/library/useLibraryActions';
-import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
+import { useLibraryActions } from '../../../../hooks/library/useLibraryActions';
+import { useManagedFocus } from '../../../../hooks/ui/useManagedFocus';
 import {
   type ActiveDisplayProfile,
   activeDisplayProfileSchema,
   type DisplayPreviewLutStatus,
   displayPreviewLutStatusSchema,
-} from '../../../schemas/displayProfileSchemas';
-import { emptyTauriResponseSchema } from '../../../schemas/tauriResponseSchemas';
+} from '../../../../schemas/displayProfileSchemas';
+import { emptyTauriResponseSchema } from '../../../../schemas/tauriResponseSchemas';
 import {
   type XmpMetadataConflictChoice,
   type XmpMetadataConflictDecision,
   type XmpMetadataConflictReport,
   xmpMetadataConflictReportSchema,
-} from '../../../schemas/xmpMetadataConflictSchemas';
-import { useEditorStore } from '../../../store/useEditorStore';
-import { useLibraryStore } from '../../../store/useLibraryStore';
-import { useProcessStore } from '../../../store/useProcessStore';
-import { useSettingsStore } from '../../../store/useSettingsStore';
-import { Invokes } from '../../../tauri/commands';
-import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { COLOR_LABELS, type Color } from '../../../utils/adjustments';
-import { buildCameraProfileProvenanceReceipt } from '../../../utils/cameraProfileProvenanceReceipt';
+} from '../../../../schemas/xmpMetadataConflictSchemas';
+import { useEditorStore } from '../../../../store/useEditorStore';
+import { useLibraryStore } from '../../../../store/useLibraryStore';
+import { useProcessStore } from '../../../../store/useProcessStore';
+import { useSettingsStore } from '../../../../store/useSettingsStore';
+import { Invokes } from '../../../../tauri/commands';
+import { TextColors, TextVariants, TextWeights } from '../../../../types/typography';
+import { COLOR_LABELS, type Color } from '../../../../utils/adjustments';
+import { buildCameraProfileProvenanceReceipt } from '../../../../utils/cameraProfileProvenanceReceipt';
 import {
   buildDefaultXmpConflictDecisions,
   buildMetadataReadinessSummary,
@@ -36,11 +36,11 @@ import {
   METADATA_EDITABLE_FIELDS,
   type MetadataExifData,
   type MetadataValue,
-} from '../../../utils/metadataPanelContracts';
-import { buildRawWarningChips } from '../../../utils/rawWarningReceipts';
-import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
-import UiText from '../../ui/Text';
-import { IconAperture, IconFocalLength, IconIso, IconLens, IconShutter } from '../editor/ExifIcons';
+} from '../../../../utils/metadataPanelContracts';
+import { buildRawWarningChips } from '../../../../utils/rawWarningReceipts';
+import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
+import UiText from '../../../ui/Text';
+import { IconAperture, IconFocalLength, IconIso, IconLens, IconShutter } from '../../editor/ExifIcons';
 
 interface CameraSetting {
   format?(value: MetadataValue): string | number;

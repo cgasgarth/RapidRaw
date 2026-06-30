@@ -7,7 +7,7 @@ import {
   MASK_PANEL_CREATION_TYPES,
   Mask,
   SUB_MASK_COMPONENT_TYPES,
-} from '../../../src/components/panel/right/Masks.tsx';
+} from '../../../src/components/panel/right/layers/Masks.tsx';
 import {
   acceptObjectMaskProposal,
   applyObjectPromptClick,
@@ -100,8 +100,8 @@ if (clearObjectPromptCanvasState(reparsed).pointPrompts.length !== 0) {
 }
 
 const editorSource = readFileSync('src/components/panel/Editor.tsx', 'utf8');
-const maskPanelSource = readFileSync('src/components/panel/right/MasksPanel.tsx', 'utf8');
-const objectPromptControlsSource = readFileSync('src/components/panel/right/ObjectPromptControls.tsx', 'utf8');
+const maskPanelSource = readFileSync('src/components/panel/right/layers/MasksPanel.tsx', 'utf8');
+const objectPromptControlsSource = readFileSync('src/components/panel/right/layers/ObjectPromptControls.tsx', 'utf8');
 for (const [label, source, needle] of [
   ['canvas overlay', editorSource, 'data-testid="object-prompt-canvas-overlay"'],
   ['box overlay', editorSource, 'data-testid="object-prompt-box"'],

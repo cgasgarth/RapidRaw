@@ -44,7 +44,7 @@ const catalog = parseColorStylePresetCatalog({
   version: fixture.version,
 });
 const invalidCases = await readJson('fixtures/color/adjustments/invalid/invalid-color-style-presets.json');
-const presetsPanelSource = await readFile('src/components/panel/right/PresetsPanel.tsx', 'utf8');
+const presetsPanelSource = await readFile('src/components/panel/right/color/PresetsPanel.tsx', 'utf8');
 const usePresetsSource = await readFile('src/hooks/editor/usePresets.ts', 'utf8');
 const appPropertiesSource = await readFile('src/components/ui/AppProperties.tsx', 'utf8');
 const rustPresetsSource = await readFile('src-tauri/src/presets.rs', 'utf8');

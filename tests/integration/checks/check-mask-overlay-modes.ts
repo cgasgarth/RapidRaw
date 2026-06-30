@@ -64,8 +64,11 @@ const invalidFixtures = z
   .min(1)
   .parse(JSON.parse(readFileSync(resolve('fixtures/masks/invalid/invalid-mask-overlay-modes.json'), 'utf8')));
 const rustMaskGenerationSource = readFileSync(resolve('src-tauri/src/mask_generation.rs'), 'utf8');
-const overlayControlsSource = readFileSync(resolve('src/components/panel/right/MaskOverlayReviewControls.tsx'), 'utf8');
-const masksPanelSource = readFileSync(resolve('src/components/panel/right/MasksPanel.tsx'), 'utf8');
+const overlayControlsSource = readFileSync(
+  resolve('src/components/panel/right/layers/MaskOverlayReviewControls.tsx'),
+  'utf8',
+);
+const masksPanelSource = readFileSync(resolve('src/components/panel/right/layers/MasksPanel.tsx'), 'utf8');
 const editorStoreSource = readFileSync(resolve('src/store/useEditorStore.ts'), 'utf8');
 
 for (const fixture of fixtures) {

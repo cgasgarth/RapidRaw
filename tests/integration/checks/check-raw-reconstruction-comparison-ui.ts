@@ -2,7 +2,7 @@
 
 import { readFile } from 'node:fs/promises';
 
-const controlsPanel = await readFile('src/components/panel/right/ControlsPanel.tsx', 'utf8');
+const controlsPanel = await readFile('src/components/panel/right/color/ControlsPanel.tsx', 'utf8');
 const commands = await readFile('src/tauri/commands.ts', 'utf8');
 const imageLoader = await readFile('src-tauri/src/image_loader.rs', 'utf8');
 const lib = await readFile('src-tauri/src/lib.rs', 'utf8');

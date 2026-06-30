@@ -66,7 +66,7 @@ import { debounce } from '../../utils/timing';
 import { Panel } from '../ui/AppProperties';
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
-import { Mask, type SubMask } from './right/Masks';
+import { Mask, type SubMask } from './right/layers/Masks';
 
 interface TransformController {
   resetTransform(time?: number): void;

@@ -41,7 +41,7 @@ mock.module('@tauri-apps/plugin-dialog', () => ({
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 installDom();
 
-const { PresetsPanel } = await import('../../../src/components/panel/right/PresetsPanel');
+const { PresetsPanel } = await import('../../../src/components/panel/right/color/PresetsPanel');
 
 await validateLocaleContract();
 await validateEmptyStateWithoutBuiltInStyles();

@@ -2,7 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 
-const source = readFileSync('src/components/panel/right/LayerStackPanel.tsx', 'utf8');
+const source = readFileSync('src/components/panel/right/layers/LayerStackPanel.tsx', 'utf8');
 
 for (const marker of [
   'LAYER_OPACITY_PRESETS = [0, 25, 50, 75, 100]',

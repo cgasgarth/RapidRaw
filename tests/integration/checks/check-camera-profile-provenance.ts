@@ -47,7 +47,7 @@ const files = {
   cacheUtils: readFileSync('src-tauri/src/cache_utils.rs', 'utf8'),
   imageLoader: readFileSync('src-tauri/src/image_loader.rs', 'utf8'),
   receipt: readFileSync('src/utils/cameraProfileProvenanceReceipt.ts', 'utf8'),
-  metadataPanel: readFileSync('src/components/panel/right/MetadataPanel.tsx', 'utf8'),
+  metadataPanel: readFileSync('src/components/panel/right/metadata/MetadataPanel.tsx', 'utf8'),
   schemas: readFileSync('src/schemas/imageLoaderSchemas.ts', 'utf8'),
   useAppNavigation: readFileSync('src/hooks/app/useAppNavigation.ts', 'utf8'),
   useImageLoader: readFileSync('src/hooks/editor/useImageLoader.ts', 'utf8'),
