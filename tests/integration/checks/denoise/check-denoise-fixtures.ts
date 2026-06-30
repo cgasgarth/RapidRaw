@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import {
   denoiseFixtureManifestSchema,
   parseDenoiseFixtureManifest,
-} from '../../../src/schemas/denoiseFixtureSchemas.ts';
+} from '../../../../src/schemas/denoiseFixtureSchemas.ts';
 
 const MANIFEST_PATH = 'fixtures/detail/denoise/denoise-fixtures.json';
 const INVALID_PATH = 'fixtures/detail/invalid/denoise/invalid-denoise-fixtures.json';

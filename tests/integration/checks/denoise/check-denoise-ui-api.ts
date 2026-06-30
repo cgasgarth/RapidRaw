@@ -7,7 +7,7 @@ import {
   detailDenoiseRuntimeStateV1Schema,
   detailDenoiseUiControlsV1Schema,
   toDetailDenoiseControlsV1,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const failures = [];
 
