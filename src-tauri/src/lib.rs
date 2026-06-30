@@ -87,7 +87,6 @@ mod smart_preview_cache;
 #[cfg(all(test, feature = "tauri-test"))]
 mod sr_real_raw_proof;
 mod tagging;
-mod tagging_utils;
 mod tethering;
 mod wavelet_render;
 mod window_customizer;
@@ -157,7 +156,6 @@ pub use adjustment_utils::*;
 pub use android_integration::*;
 pub use app_settings::*;
 pub use app_state::*;
-use tagging_utils::{candidates, hierarchy};
 
 #[cfg(target_os = "macos")]
 extern "C" fn force_exit(_signal: libc::c_int) {
