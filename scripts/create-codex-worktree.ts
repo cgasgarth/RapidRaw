@@ -207,6 +207,13 @@ const ensureDependencyBins = (root: string, install?: () => void): void => {
   }
 };
 
+const ensureWorktreeDependencies = (worktreePath: string): void => {
+  ensureDependencyBins(worktreePath, () => {
+    console.log('worktree deps missing; running bun install --force --frozen-lockfile');
+    run(['bun', 'install', '--force', '--frozen-lockfile'], { cwd: worktreePath });
+  });
+};
+
 const updateMain = (source: WorktreeSource): void => {
   if (source.hasMainWorktree) {
     ensureMainReady(source.root);
@@ -244,7 +251,7 @@ const ensureGhResolution = (worktreePath: string): void => {
 
   if (resolvedRepo === REPO_OWNER) return;
 
-  run(['bun', 'run', 'repo:fix-gh-resolution'], { cwd: worktreePath });
+  run(['gh', 'repo', 'set-default', REPO_OWNER], { cwd: worktreePath });
   const fixedRepo = run(['gh', 'repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'], {
     cwd: worktreePath,
   });
@@ -263,8 +270,8 @@ const ensureWorktreeReady = (worktreePath: string, branch: string): void => {
   const currentBranch = run(['git', 'branch', '--show-current'], { cwd: worktreePath });
   if (currentBranch !== branch) throw new Error(`Expected ${branch}, found ${currentBranch || 'detached HEAD'}`);
   ensureWorktreeBase(worktreePath);
-  ensureDependencyBins(worktreePath);
-  run(['bun', 'run', 'check:gh-repo-resolution'], { cwd: worktreePath });
+  ensureWorktreeDependencies(worktreePath);
+  ensureGhResolution(worktreePath);
 };
 
 const main = (): void => {
