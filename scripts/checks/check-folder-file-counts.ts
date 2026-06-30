@@ -118,6 +118,10 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4330',
     reason: 'film checks are grouped under a dedicated folder for this issue',
   },
+  'tests/integration/checks/export': {
+    issue: '#4331',
+    reason: 'export checks are grouped under a dedicated folder for this issue',
+  },
 };
 
 type FolderCount = {
