@@ -8725,6 +8725,8 @@ export const aiToolDryRunResultV1Schema = z
     dryRunPlanHash: z.string().trim().min(1),
     dryRunPlanId: z.string().trim().min(1),
     maskArtifacts: z.array(artifactHandleV1Schema).min(1),
+    maskCoverageRatio: z.number().positive().max(1),
+    maskPreviewRows: z.array(z.string().regex(/^[0-9a-f]+$/u)).min(1),
     modelId: z.string().trim().min(1),
     modelVersion: z.string().trim().min(1).optional(),
     previewArtifacts: z.array(artifactHandleV1Schema),

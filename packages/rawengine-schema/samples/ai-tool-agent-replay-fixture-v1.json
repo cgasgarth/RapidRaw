@@ -419,6 +419,17 @@
             "storage": "temp_cache"
           }
         ],
+        "maskCoverageRatio": 0.5,
+        "maskPreviewRows": [
+          "00ffff00",
+          "0ffffff0",
+          "ffffffff",
+          "ffffffff",
+          "ffffffff",
+          "ffffffff",
+          "0ffffff0",
+          "00ffff00"
+        ],
         "modelId": "local_sam2_subject_mask",
         "modelVersion": "2026.06",
         "previewArtifacts": [

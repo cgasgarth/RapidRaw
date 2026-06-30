@@ -59,15 +59,19 @@ for (const toolName of [AiAppServerToolName.MaskDryRunSubject, AiAppServerToolNa
 }
 
 const bridge = createRawEngineLocalAppServerBridge();
-const dryRunCommand = aiToolCommandEnvelopeV1Schema.parse({
-  ...sampleAiToolCommandEnvelopeV1,
-  commandId: 'command_ai_subject_mask_app_server_dry_run',
-  correlationId: 'corr_ai_subject_mask_app_server',
-  parameters: {
-    ...sampleAiToolCommandEnvelopeV1.parameters,
-    sourceContentHash: 'sha256:synthetic-subject-mask-source',
-  },
-});
+const buildDryRunCommand = (overrides: Partial<typeof sampleAiToolCommandEnvelopeV1> = {}) =>
+  aiToolCommandEnvelopeV1Schema.parse({
+    ...sampleAiToolCommandEnvelopeV1,
+    commandId: 'command_ai_subject_mask_app_server_dry_run',
+    correlationId: 'corr_ai_subject_mask_app_server',
+    parameters: {
+      ...sampleAiToolCommandEnvelopeV1.parameters,
+      sourceContentHash: 'sha256:synthetic-subject-mask-source',
+    },
+    ...overrides,
+  });
+
+const dryRunCommand = buildDryRunCommand();
 const bridgeDryRun = await bridge.dispatch(dryRunCommand, {
   now: () => new Date('2026-06-20T00:02:00.000Z'),
   requestId: 'req_ai_subject_mask_app_server_dry_run',
@@ -107,6 +111,17 @@ if (dryRunResult?.sourceContentHash !== dryRunCommand.parameters.sourceContentHa
 if (dryRunResult?.maskArtifacts[0]?.kind !== 'mask') {
   failures.push('Subject-mask dry-run must expose a mask artifact.');
 }
+if ((dryRunResult?.maskCoverageRatio ?? 0) <= 0) {
+  failures.push('Subject-mask dry-run must expose non-empty mask coverage.');
+}
+if (
+  dryRunResult?.maskArtifacts[0]?.contentHash !== `sha256:synthetic-ai-mask-${dryRunResult.maskPreviewRows.join('')}`
+) {
+  failures.push('Subject-mask dry-run mask artifact hash must be derived from deterministic mask rows.');
+}
+if (dryRunResult?.maskArtifacts[0]?.dimensions.width !== dryRunResult?.maskPreviewRows[0]?.length) {
+  failures.push('Subject-mask dry-run mask artifact dimensions must match preview rows.');
+}
 if (applyResult?.outputArtifacts[0]?.kind !== 'mask') {
   failures.push('Subject-mask apply result must expose a mask sidecar artifact.');
 }
@@ -115,6 +130,66 @@ if (applyResult?.sourceGraphRevision !== applyCommand.expectedGraphRevision) {
 }
 if (applyResult?.provenanceEntryIds[0] !== `prov_subject_mask_${applyCommand.commandId}`) {
   failures.push('Subject-mask apply result must expose deterministic provenance entry id.');
+}
+if (
+  applyResult?.dryRunPlanId !== dryRunResult?.dryRunPlanId ||
+  applyResult?.dryRunPlanHash !== dryRunResult?.dryRunPlanHash
+) {
+  failures.push('Subject-mask apply result must preserve the accepted dry-run identity.');
+}
+
+const personDryRunCommand = buildDryRunCommand({
+  commandId: 'command_ai_person_mask_app_server_dry_run',
+  parameters: {
+    ...sampleAiToolCommandEnvelopeV1.parameters,
+    capability: 'person_mask',
+    maskName: 'Person mask',
+    sourceContentHash: 'sha256:synthetic-person-mask-source',
+  },
+});
+const bridgePersonDryRun = await bridge.dispatch(personDryRunCommand, {
+  now: () => new Date('2026-06-20T00:02:02.000Z'),
+  requestId: 'req_ai_person_mask_app_server_dry_run',
+});
+const personDryRunResult = bridgePersonDryRun.ok
+  ? aiToolDryRunResultV1Schema.parse(bridgePersonDryRun.result)
+  : undefined;
+if (!bridgePersonDryRun.ok) {
+  failures.push(`Person-mask bridge dry-run failed: ${bridgePersonDryRun.message}`);
+}
+if (
+  personDryRunResult !== undefined &&
+  dryRunResult !== undefined &&
+  personDryRunResult.maskPreviewRows.join('') === dryRunResult.maskPreviewRows.join('')
+) {
+  failures.push('Subject and person dry-runs must produce distinct deterministic mask rows.');
+}
+
+const missingAcceptedPlanApply = aiToolCommandEnvelopeV1Schema.safeParse({
+  ...applyCommand,
+  commandId: 'command_ai_subject_mask_missing_plan_apply',
+  parameters: {
+    ...sampleAiToolCommandEnvelopeV1.parameters,
+    sourceContentHash: dryRunCommand.parameters.sourceContentHash,
+  },
+});
+if (missingAcceptedPlanApply.success) {
+  failures.push('Subject-mask apply schema must reject a missing accepted dry-run plan identity.');
+}
+
+const staleAcceptedPlanApply = await bridge.dispatch(
+  aiToolCommandEnvelopeV1Schema.parse({
+    ...applyCommand,
+    commandId: 'command_ai_subject_mask_stale_plan_apply',
+    parameters: {
+      ...applyCommand.parameters,
+      acceptedDryRunPlanHash: 'sha256:stale-subject-mask-plan',
+    },
+  }),
+  { now: () => new Date('2026-06-20T00:02:04.000Z'), requestId: 'req_ai_subject_mask_stale_plan_apply' },
+);
+if (staleAcceptedPlanApply.ok) {
+  failures.push('Subject-mask apply must reject a stale accepted dry-run plan identity.');
 }
 
 const bridgeAuditEvents = bridge.listAuditEvents();
@@ -125,6 +200,12 @@ if (dryRunAuditEvent?.mutates !== false || dryRunAuditEvent.status !== 'complete
 }
 if (applyAuditEvent?.mutates !== true || applyAuditEvent.status !== 'completed') {
   failures.push('Subject-mask apply must record a completed mutating audit event.');
+}
+if (
+  applyAuditEvent?.acceptedDryRun?.planHash !== dryRunResult?.dryRunPlanHash ||
+  applyAuditEvent.acceptedDryRun.planId !== dryRunResult?.dryRunPlanId
+) {
+  failures.push('Subject-mask apply audit event must preserve accepted dry-run identity.');
 }
 
 if (failures.length > 0) {

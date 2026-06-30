@@ -889,6 +889,8 @@ export const sampleAiToolDryRunResultV1: AiToolDryRunResultV1 = aiToolDryRunResu
       storage: 'temp_cache',
     },
   ],
+  maskCoverageRatio: 0.5,
+  maskPreviewRows: ['00ffff00', '0ffffff0', 'ffffffff', 'ffffffff', 'ffffffff', 'ffffffff', '0ffffff0', '00ffff00'],
   modelId: sampleAiToolCommandEnvelopeV1.parameters.modelId,
   modelVersion: sampleAiToolCommandEnvelopeV1.parameters.modelVersion,
   previewArtifacts: [
