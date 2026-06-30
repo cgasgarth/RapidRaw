@@ -518,10 +518,13 @@
         "resetSectionSettings": "重置 {{section}} 设置"
       },
       "rawProcessingModeOverride": {
+        "currentValue": "",
         "description": "为此图像覆盖全局 RAW 质量模式。",
         "error": "应用 RAW 模式覆盖失败：{{error}}",
+        "hideRecipeId": "",
         "inherit": "继承（{{mode}}）",
-        "label": "RAW 质量"
+        "label": "RAW 质量",
+        "showRecipeId": ""
       },
       "rawReconstructionComparison": {
         "action": "Compare 100% crops",
@@ -3757,9 +3760,13 @@
         "performance": "性能优先"
       },
       "rawMode": {
+        "current": "",
+        "currentValue": "",
         "description": "应用带版本的 RAW 显影配方，让速度、默认质量和最高细节都清晰且可重复。",
+        "hideRecipeId": "",
         "label": "RAW 处理模式",
         "provenance": "配方来源",
+        "showRecipeId": "",
         "title": "RAW 质量模式"
       },
       "rawModes": {

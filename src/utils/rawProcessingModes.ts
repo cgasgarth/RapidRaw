@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next';
+
 export const RAW_PROCESSING_MODES = ['fast', 'balanced', 'maximum'] as const;
 
 export type RawProcessingMode = (typeof RAW_PROCESSING_MODES)[number];
@@ -62,3 +64,10 @@ export const normalizeRawProcessingModeOverride = (mode: unknown): RawProcessing
 export const buildRawProcessingModePatch = (mode: RawProcessingMode): RawProcessingModeRecipe => ({
   ...RAW_PROCESSING_MODE_RECIPES[mode],
 });
+
+export const getRawProcessingModeDisplayCopy = (mode: RawProcessingMode, translate: TFunction): string => {
+  return translate(`settings.processing.rawModes.${mode}.label`);
+};
+
+export const getRawProcessingModeProvenance = (mode: RawProcessingMode): string =>
+  RAW_PROCESSING_MODE_RECIPES[mode].provenance;

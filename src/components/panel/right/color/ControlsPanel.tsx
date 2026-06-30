@@ -1,6 +1,6 @@
 import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Aperture, ChartArea, ClipboardPaste, Copy, RotateCcw, ScanSearch } from 'lucide-react';
+import { Aperture, ChartArea, ClipboardPaste, Copy, Info, RotateCcw, ScanSearch } from 'lucide-react';
 import { type MouseEvent, type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
@@ -27,8 +27,9 @@ import {
 } from '../../../../utils/adjustments';
 import { formatUnknownError } from '../../../../utils/errorFormatting';
 import {
+  getRawProcessingModeDisplayCopy,
+  getRawProcessingModeProvenance,
   normalizeRawProcessingMode,
-  RAW_PROCESSING_MODE_RECIPES,
   RAW_PROCESSING_MODES,
   type RawProcessingMode,
 } from '../../../../utils/rawProcessingModes';
@@ -76,6 +77,7 @@ export default function Controls() {
   const [rawReconstructionComparison, setRawReconstructionComparison] =
     useState<RawReconstructionComparisonResult | null>(null);
   const [isComparingRawReconstruction, setIsComparingRawReconstruction] = useState(false);
+  const [isRawProcessingModeProvenanceVisible, setIsRawProcessingModeProvenanceVisible] = useState(false);
 
   const { appSettings, theme } = useSettingsStore(
     useShallow((state) => ({
@@ -133,6 +135,15 @@ export default function Controls() {
       waveformHeight: state.waveformHeight,
       setEditor: state.setEditor,
     })),
+  );
+
+  const rawProcessingModeDisplay = useMemo(
+    () =>
+      getRawProcessingModeDisplayCopy(
+        adjustments.rawProcessingModeOverride ?? normalizeRawProcessingMode(appSettings?.rawProcessingMode),
+        t,
+      ),
+    [adjustments.rawProcessingModeOverride, appSettings?.rawProcessingMode, t],
   );
 
   const setCopiedSectionAdjustments = useCallback(
@@ -432,13 +443,32 @@ export default function Controls() {
               value={adjustments.rawProcessingModeOverride ?? 'inherit'}
             />
           </div>
-          <UiText as="div" variant={TextVariants.small} className="font-mono text-text-secondary">
-            {
-              RAW_PROCESSING_MODE_RECIPES[
-                adjustments.rawProcessingModeOverride ?? normalizeRawProcessingMode(appSettings?.rawProcessingMode)
-              ].provenance
-            }
-          </UiText>
+          <div className="flex items-center justify-between gap-3">
+            <UiText as="div" variant={TextVariants.small} className="text-text-secondary">
+              {t('editor.adjustments.rawProcessingModeOverride.currentValue', {
+                mode: rawProcessingModeDisplay,
+              })}
+            </UiText>
+            <button
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-text-secondary transition-colors hover:text-text-primary"
+              onClick={() => {
+                setIsRawProcessingModeProvenanceVisible((previous) => !previous);
+              }}
+              type="button"
+            >
+              <Info size={12} />
+              {isRawProcessingModeProvenanceVisible
+                ? t('editor.adjustments.rawProcessingModeOverride.hideRecipeId')
+                : t('editor.adjustments.rawProcessingModeOverride.showRecipeId')}
+            </button>
+          </div>
+          {isRawProcessingModeProvenanceVisible ? (
+            <UiText as="div" variant={TextVariants.small} className="font-mono text-text-secondary">
+              {getRawProcessingModeProvenance(
+                adjustments.rawProcessingModeOverride ?? normalizeRawProcessingMode(appSettings?.rawProcessingMode),
+              )}
+            </UiText>
+          ) : null}
           <button
             className="flex w-full items-center justify-center gap-2 rounded-md bg-surface px-3 py-2 text-sm font-medium hover:bg-card-active disabled:cursor-not-allowed disabled:opacity-60"
             data-testid="raw-reconstruction-comparison-run"
