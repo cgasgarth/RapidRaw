@@ -4,7 +4,7 @@ import {
   hasStaleOrOfflineSmartPreview,
   isResolvingStaleSmartPreviewExport,
   isStaleOrOfflineSmartPreview,
-} from '../../../src/utils/exportSmartPreviewReadiness';
+} from '../../../src/utils/export/exportSmartPreviewReadiness';
 
 const smartPreviewState = (overrides: Partial<ThumbnailSmartPreviewState> = {}): ThumbnailSmartPreviewState => ({
   colorProfile: 'srgb',

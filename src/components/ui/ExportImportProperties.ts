@@ -3,7 +3,7 @@ import {
   EXPORT_FILE_FORMATS,
   ExportFileFormatId,
   type ExportFileFormatId as ExportFileFormatIdType,
-} from '../../utils/exportFormatIds';
+} from '../../utils/export/exportFormatIds';
 import type { Progress } from './AppProperties';
 
 export const EXPORT_TIMEOUT = 4000;
