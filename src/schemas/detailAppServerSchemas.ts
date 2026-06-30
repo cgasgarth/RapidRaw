@@ -9,7 +9,7 @@ import {
   DetailAppServerExecutionMode,
   DetailAppServerSchemaName,
   DetailAppServerToolName,
-} from '../utils/detailAppServerRouteIds';
+} from '../utils/detail/detailAppServerRouteIds';
 
 export const detailAppServerRouteFeatureSchema = z.enum(DETAIL_APP_SERVER_FEATURES);
 export const detailAppServerRouteExecutionModeSchema = z.enum(DETAIL_APP_SERVER_EXECUTION_MODES);

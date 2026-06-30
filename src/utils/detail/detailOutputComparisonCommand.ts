@@ -5,8 +5,8 @@ import {
   detailDeblurUiControlsV1Schema,
   detailDenoiseControlsV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from '../../packages/rawengine-schema/src';
-import { waveletDetailRecipeSchema } from '../schemas/waveletDetailSchemas';
+} from '../../../packages/rawengine-schema/src';
+import { waveletDetailRecipeSchema } from '../../schemas/waveletDetailSchemas';
 
 const normalizedCropPixelSchema = z.number().min(0).max(1);
 

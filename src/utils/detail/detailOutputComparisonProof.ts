@@ -1,7 +1,7 @@
 import {
   type DetailOutputComparisonVisualProof,
   detailOutputComparisonVisualProofSchema,
-} from '../schemas/detailValidationSchemas';
+} from '../../schemas/detailValidationSchemas';
 
 export const DETAIL_OUTPUT_COMPARISON_ARTIFACT_ROOT = 'artifacts/validation/detail-output-comparison';
 
