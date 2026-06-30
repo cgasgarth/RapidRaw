@@ -363,6 +363,8 @@
       "cullImage": "画像を選別",
       "denoise": "ノイズ低減を実行",
       "editImage": "画像を編集",
+      "enterPreview": "Enter preview mode",
+      "exitPreview": "Exit preview mode",
       "exportImage": "画像を書き出し",
       "focusStack": "Focus Stack",
       "frameImage": "画像にフレームを追加",
@@ -477,6 +479,7 @@
     "accessibility": {
       "filmstrip": "",
       "imagePreview": "",
+      "previewOnlyRegion": "Preview-only editor workspace",
       "previewRegion": "",
       "toolsPanel": "",
       "workspace": ""
@@ -1335,6 +1338,11 @@
         "tool": "ツール"
       }
     },
+    "previewOnly": {
+      "enter": "Enter preview mode",
+      "exit": "Exit preview mode",
+      "label": "Preview only"
+    },
     "switcher": {
       "tooltips": {
         "adjust": "補正",
@@ -1443,6 +1451,7 @@
       "tooltips": {
         "aperture": "絞り値",
         "backToLibrary": "ライブラリに戻る",
+        "exitPreview": "Exit preview mode (F)",
         "exportSoftProof": "",
         "fileType": "",
         "focalLength": "焦点距離",

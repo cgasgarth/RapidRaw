@@ -369,6 +369,8 @@
       "cullImage": "Seleziona Immagine",
       "denoise": "Riduci Rumore Immagine",
       "editImage": "Modifica Immagine",
+      "enterPreview": "Enter preview mode",
+      "exitPreview": "Exit preview mode",
       "exportImage": "Esporta Immagine",
       "focusStack": "Focus Stack",
       "frameImage": "Incornicia Immagine",
@@ -501,6 +503,7 @@
     "accessibility": {
       "filmstrip": "",
       "imagePreview": "",
+      "previewOnlyRegion": "Preview-only editor workspace",
       "previewRegion": "",
       "toolsPanel": "",
       "workspace": ""
@@ -1400,6 +1403,11 @@
         "tool": "Strumento"
       }
     },
+    "previewOnly": {
+      "enter": "Enter preview mode",
+      "exit": "Exit preview mode",
+      "label": "Preview only"
+    },
     "switcher": {
       "tooltips": {
         "adjust": "Regola",
@@ -1512,6 +1520,7 @@
       "tooltips": {
         "aperture": "Apertura",
         "backToLibrary": "Torna alla Libreria",
+        "exitPreview": "Exit preview mode (F)",
         "exportSoftProof": "",
         "fileType": "",
         "focalLength": "Lunghezza Focale",

@@ -28,6 +28,7 @@ interface EditorViewProps {
   isResizing: boolean;
   isCompactPortrait: boolean;
   isAndroid: boolean;
+  isFullScreen?: boolean;
   compactEditorPanelHeight: number;
   compactEditorPanelCollapsedHeight: number;
   thumbnailAspectRatio: ThumbnailAspectRatio;
@@ -53,6 +54,7 @@ export default function EditorView({
   isResizing,
   isCompactPortrait,
   isAndroid,
+  isFullScreen: isFullScreenProp,
   compactEditorPanelHeight,
   compactEditorPanelCollapsedHeight,
   thumbnailAspectRatio,
@@ -80,7 +82,7 @@ export default function EditorView({
   );
 
   const {
-    isFullScreen,
+    isFullScreen: isFullScreenFromStore,
     isInstantTransition,
     uiVisibility,
     bottomPanelHeight,
@@ -102,6 +104,7 @@ export default function EditorView({
       setUI: state.setUI,
     })),
   );
+  const isFullScreen = isFullScreenProp ?? isFullScreenFromStore;
 
   const { multiSelectedPaths, imageRatings, isViewLoading, rootPaths } = useLibraryStore(
     useShallow((state) => ({
@@ -201,6 +204,8 @@ export default function EditorView({
         'flex flex-col w-full overflow-hidden shrink-0',
         !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
       )}
+      aria-hidden={isFullScreen}
+      data-testid="editor-bottom-bar-shell"
       style={{
         maxHeight: isFullScreen ? '0px' : '500px',
         opacity: isFullScreen ? 0 : 1,
@@ -257,6 +262,8 @@ export default function EditorView({
           isCompactPortrait ? 'flex-col bg-bg-secondary rounded-lg' : 'h-full bg-transparent',
           !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
         )}
+        aria-hidden={isFullScreen}
+        data-testid="editor-right-panel-shell"
         role="complementary"
         style={
           isCompactPortrait

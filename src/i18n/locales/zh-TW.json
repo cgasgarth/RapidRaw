@@ -363,6 +363,8 @@
       "cullImage": "篩選影像",
       "denoise": "降噪影像",
       "editImage": "編輯影像",
+      "enterPreview": "Enter preview mode",
+      "exitPreview": "Exit preview mode",
       "exportImage": "匯出影像",
       "focusStack": "",
       "frameImage": "裝裱影像",
@@ -477,6 +479,7 @@
     "accessibility": {
       "filmstrip": "",
       "imagePreview": "",
+      "previewOnlyRegion": "Preview-only editor workspace",
       "previewRegion": "",
       "toolsPanel": "",
       "workspace": ""
@@ -1318,6 +1321,11 @@
         "tool": "工具"
       }
     },
+    "previewOnly": {
+      "enter": "Enter preview mode",
+      "exit": "Exit preview mode",
+      "label": "Preview only"
+    },
     "switcher": {
       "tooltips": {
         "adjust": "調整",
@@ -1418,6 +1426,7 @@
       "tooltips": {
         "aperture": "光圈",
         "backToLibrary": "返回相簿",
+        "exitPreview": "Exit preview mode (F)",
         "exportSoftProof": "",
         "fileType": "",
         "focalLength": "焦距",

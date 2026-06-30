@@ -24,6 +24,8 @@ import {
   Images,
   LayoutTemplate,
   Map,
+  Maximize,
+  Minimize2,
   Mountain,
   Palette,
   Pin,
@@ -232,7 +234,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         useEditorStore.getState();
       const { imageList } = useLibraryStore.getState();
       const { appSettings } = useSettingsStore.getState();
-      const { setRightPanel, setUI } = useUIStore.getState();
+      const { isFullScreen, setRightPanel, setUI } = useUIStore.getState();
 
       if (!selectedImage) return;
 
@@ -251,6 +253,14 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       const commonTags = getCommonTags([selectedImage.path]);
 
       const options: Array<Option> = [
+        {
+          label: isFullScreen ? t('contextMenus.editor.exitPreview') : t('contextMenus.editor.enterPreview'),
+          icon: isFullScreen ? Minimize2 : Maximize,
+          onClick: () => {
+            setUI({ isFullScreen: !isFullScreen });
+          },
+        },
+        { type: OPTION_SEPARATOR },
         {
           label: t('contextMenus.editor.exportImage'),
           icon: FileInput,

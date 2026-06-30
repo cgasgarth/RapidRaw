@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Minimize2 } from 'lucide-react';
 import {
   type MouseEvent,
   type RefObject,
@@ -64,6 +64,7 @@ import {
 } from '../../utils/mask/objectMaskPromptCanvas';
 import { debounce } from '../../utils/timing';
 import { Panel } from '../ui/AppProperties';
+import UiText from '../ui/primitives/Text';
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
 import { Mask, type SubMask } from './right/layers/Masks';
@@ -672,6 +673,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
+      if (e.detail > 1) return;
       if (e.button !== 0) return;
       const container = imageContainerRef.current;
 
@@ -1414,6 +1416,15 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     [selectedImage, adjustments.orientationSteps, setAdjustments, liveRotation],
   );
 
+  const handleDoubleClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleToggleFullScreen();
+    },
+    [handleToggleFullScreen],
+  );
+
   if (!selectedImage) {
     return null;
   }
@@ -1437,6 +1448,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   }
 
   const isWgpuActive = appSettings?.useWgpuRenderer !== false && hasRenderedFirstFrame;
+  const previewOnlyLabel = t('editor.previewOnly.label');
+  const exitPreviewLabel = t('editor.previewOnly.exit');
 
   return (
     <div
@@ -1448,6 +1461,28 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           : cx('rounded-lg p-2 gap-2', appSettings?.useWgpuRenderer !== false ? 'bg-transparent' : 'bg-bg-secondary'),
       )}
     >
+      {isFullScreen && (
+        <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center px-3">
+          <div
+            aria-live="polite"
+            className="pointer-events-auto flex max-w-full items-center gap-3 rounded-md border border-surface bg-bg-secondary/95 px-3 py-2 shadow-lg shadow-black/20"
+            data-testid="editor-preview-exit-banner"
+          >
+            <UiText as="span" className="whitespace-nowrap text-xs">
+              {previewOnlyLabel}
+            </UiText>
+            <button
+              className="inline-flex items-center gap-1.5 rounded-md bg-surface px-3 py-1.5 text-sm text-text-primary transition-colors hover:bg-card-active"
+              data-testid="editor-preview-exit-button"
+              onClick={handleToggleFullScreen}
+              type="button"
+            >
+              <Minimize2 size={16} />
+              <span className="whitespace-nowrap">{exitPreviewLabel}</span>
+            </button>
+          </div>
+        </div>
+      )}
       <div
         className={cx(
           'shrink-0 relative z-10',
@@ -1455,11 +1490,14 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           isFullScreen ? 'max-h-0 opacity-0 m-0' : 'max-h-25 opacity-100',
           toolbarOverflowVisible ? 'overflow-visible' : 'overflow-hidden',
         )}
+        aria-hidden={isFullScreen}
+        data-testid="editor-toolbar-shell"
       >
         <EditorToolbar
           canRedo={canRedo}
           canUndo={canUndo}
           isAndroid={isAndroid}
+          isFullScreen={isFullScreen}
           isLoading={isLoading}
           onBackToLibrary={onBackToLibrary}
           onRedo={redo}
@@ -1507,6 +1545,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
           onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
+          data-fullscreen-preview={String(isFullScreen)}
         >
           {showSpinner && (
             <div
