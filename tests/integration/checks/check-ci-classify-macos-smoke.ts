@@ -112,7 +112,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     'check:command-palette-workflows',
     new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario command-palette-workflows']),
   ],
-  ['check:colorchecker-fixtures', new Set(['bun tests/integration/checks/check-colorchecker-fixtures.ts'])],
+  ['check:colorchecker-fixtures', new Set(['bun tests/integration/checks/color/check-colorchecker-fixtures.ts'])],
   [
     'check:camera-profile-input-transform',
     new Set(['bun tests/integration/checks/check-camera-profile-input-transform-proof.ts']),

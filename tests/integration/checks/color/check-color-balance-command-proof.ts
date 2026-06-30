@@ -11,17 +11,17 @@ import {
   toneColorCommandEnvelopeV1Schema,
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   sampleEditGraphSnapshotV1,
   sampleToneColorCommandEnvelopeV1,
-} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { colorBalanceRgbSettingsSchema } from '../../../src/schemas/colorBalanceRgbSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
+import { colorBalanceRgbSettingsSchema } from '../../../../src/schemas/colorBalanceRgbSchemas.ts';
 import {
   applyColorBalanceRgbToPixel,
   type ColorBalanceRgbRuntimeResult,
   type RgbPixel,
-} from '../../../src/utils/color/runtime/colorBalanceRgbRuntime.ts';
+} from '../../../../src/utils/color/runtime/colorBalanceRgbRuntime.ts';
 
 const rgbPixelSchema = z
   .object({

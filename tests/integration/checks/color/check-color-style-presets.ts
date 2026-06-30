@@ -7,9 +7,9 @@ import {
   applyColorStylePresetPatch,
   listColorStylePresetAdjustmentKeys,
   parseColorStylePresetCatalog,
-} from '../../../src/schemas/colorStylePresetSchemas.ts';
-import { COLOR_STYLE_PRESET_CATALOG } from '../../../src/utils/color/style/colorStylePresetCatalog.ts';
-import { applyColorStylePresetToRgbPixel } from '../../../src/utils/color/style/colorStyleRuntime.ts';
+} from '../../../../src/schemas/colorStylePresetSchemas.ts';
+import { COLOR_STYLE_PRESET_CATALOG } from '../../../../src/utils/color/style/colorStylePresetCatalog.ts';
+import { applyColorStylePresetToRgbPixel } from '../../../../src/utils/color/style/colorStyleRuntime.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 

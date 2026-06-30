@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import {
   listActiveColorCheckerAssets,
   parseColorCheckerFixtureManifest,
-} from '../../../src/utils/colorCheckerFixtures.ts';
+} from '../../../../src/utils/colorCheckerFixtures.ts';
 
 const manifestPath = resolve('fixtures/color/reference/colorchecker-fixture-manifest.json');
 const manifestJson: unknown = JSON.parse(await readFile(manifestPath, 'utf8'));

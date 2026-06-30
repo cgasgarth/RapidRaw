@@ -13,7 +13,7 @@ import {
   colorParityShaderFunctionSchema,
   evaluateColorParityCase,
   parseColorParityManifest,
-} from '../../../src/utils/color/runtime/colorCpuGpuParity.ts';
+} from '../../../../src/utils/color/runtime/colorCpuGpuParity.ts';
 
 const FIXTURE_PATH = 'fixtures/color/proofs/cpu-gpu-parity-fixtures.json';
 const REPORT_PATH = 'docs/validation/proofs/color/color-cpu-gpu-parity-2026-06-18.json';

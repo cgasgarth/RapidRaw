@@ -74,6 +74,10 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4295',
     reason: 'AI checks are being reorganized into a dedicated subfolder.',
   },
+  'tests/integration/checks/color': {
+    issue: '#4297',
+    reason: 'color checks are grouped for dedicated organization in this issue',
+  },
 };
 
 type FolderCount = {

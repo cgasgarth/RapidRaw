@@ -4,11 +4,11 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 
-import { colorRangeMaskParametersSchema } from '../../../src/schemas/maskParameterSchemas.ts';
+import { colorRangeMaskParametersSchema } from '../../../../src/schemas/maskParameterSchemas.ts';
 import {
   createColorRangeMaskParameters,
   evaluateColorRangeMaskWeight,
-} from '../../../src/utils/colorRangeMaskParameters.ts';
+} from '../../../../src/utils/colorRangeMaskParameters.ts';
 
 const selectiveColorRangeKeySchema = z.enum([
   'reds',

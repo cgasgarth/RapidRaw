@@ -3,12 +3,12 @@
 import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
-import type { ExportReceiptOutput } from '../../../src/components/ui/ExportImportProperties.ts';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import type { ExportReceiptOutput } from '../../../../src/components/ui/ExportImportProperties.ts';
+import { INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
 import {
   buildColorStackPreviewExportParityReceipt,
   colorStackPreviewExportParityReceiptV1Schema,
-} from '../../../src/utils/colorStackPreviewExportParityReceipt.ts';
+} from '../../../../src/utils/colorStackPreviewExportParityReceipt.ts';
 
 const exportOutput: ExportReceiptOutput = {
   bitDepth: 16,

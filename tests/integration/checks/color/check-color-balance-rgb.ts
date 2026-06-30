@@ -4,14 +4,14 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { parseColorBalanceRgbSettings } from '../../../src/schemas/colorBalanceRgbSchemas.ts';
+import { parseColorBalanceRgbSettings } from '../../../../src/schemas/colorBalanceRgbSchemas.ts';
 import {
   ADJUSTMENT_GROUPS,
   ADJUSTMENT_SECTIONS,
   ColorAdjustment,
   INITIAL_ADJUSTMENTS,
-} from '../../../src/utils/adjustments.ts';
-import { applyColorBalanceRgbToPixel } from '../../../src/utils/color/runtime/colorBalanceRgbRuntime.ts';
+} from '../../../../src/utils/adjustments.ts';
+import { applyColorBalanceRgbToPixel } from '../../../../src/utils/color/runtime/colorBalanceRgbRuntime.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 const REPORT_PATH = 'docs/validation/proofs/color/color-balance-rgb-apply-proof-2026-06-18.json';
@@ -158,7 +158,9 @@ if (UPDATE_REPORT) {
 } else {
   const expectedReport = reportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
   if (JSON.stringify(expectedReport) !== JSON.stringify(report)) {
-    failures.push(`${REPORT_PATH} is stale; run bun tests/integration/checks/check-color-balance-rgb.ts --update`);
+    failures.push(
+      `${REPORT_PATH} is stale; run bun tests/integration/checks/color/check-color-balance-rgb.ts --update`,
+    );
   }
 }
 
