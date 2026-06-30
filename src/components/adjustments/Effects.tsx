@@ -5,13 +5,13 @@ import { useTranslation } from 'react-i18next';
 import { Invokes } from '../../tauri/commands';
 import { TextVariants } from '../../types/typography';
 import { type Adjustments, CreativeAdjustment, Effect } from '../../utils/adjustments';
-import { buildFilmGrainPresetAdjustmentPatch, FILM_GRAIN_UI_PRESETS } from '../../utils/filmGrainControls';
 import {
   buildFilmLookAppliedAdjustmentPatch,
   buildFilmLookPresetDraft,
   type FilmLookBrowserItem,
   formatFilmLookPresetName,
-} from '../../utils/filmLookBrowser';
+} from '../../utils/film-look/filmLookBrowser';
+import { buildFilmGrainPresetAdjustmentPatch, FILM_GRAIN_UI_PRESETS } from '../../utils/filmGrainControls';
 import type { AppSettings, Preset } from '../ui/AppProperties';
 import UiText from '../ui/primitives/Text';
 import AdjustmentSlider from './AdjustmentSlider';

@@ -14,8 +14,11 @@ import {
   buildFilmLookAppliedAdjustmentPatch,
   clampFilmLookStrength,
   type FilmLookBrowserItem,
-} from './filmLookBrowser';
-import { applyFilmLookToColorPipelinePixels, hashFilmLookColorPipelinePixels } from './filmLookColorPipelineCommand';
+} from './film-look/filmLookBrowser';
+import {
+  applyFilmLookToColorPipelinePixels,
+  hashFilmLookColorPipelinePixels,
+} from './film-look/filmLookColorPipelineCommand';
 
 export const GOVERNED_FILM_LOOK_RUNTIME_SCHEMA_VERSION = 1;
 

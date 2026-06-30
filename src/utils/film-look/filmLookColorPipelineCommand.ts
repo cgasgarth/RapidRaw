@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Adjustments } from './adjustments';
+import type { Adjustments } from '../adjustments';
 import {
   buildFilmLookAppliedAdjustmentPatch,
   clampFilmLookStrength,

@@ -7,13 +7,13 @@ import {
   buildFilmLookPresetDraft,
   getFilmLookAdjustmentSummaries,
   scaleFilmLookAdjustmentPatch,
-} from '../../../src/utils/filmLookBrowser.ts';
-import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/filmLookRegistry.ts';
+} from '../../../src/utils/film-look/filmLookBrowser.ts';
+import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/film-look/filmLookRegistry.ts';
 
 const fixtureUrl = new URL('../../../fixtures/film-simulation/film-look-fixture-outputs.json', import.meta.url);
 const browserSourceUrl = new URL('../../../src/components/adjustments/FilmLookBrowser.tsx', import.meta.url);
-const registrySourceUrl = new URL('../../../src/utils/filmLookRegistry.ts', import.meta.url);
-const utilsSourceUrl = new URL('../../../src/utils/filmLookBrowser.ts', import.meta.url);
+const registrySourceUrl = new URL('../../../src/utils/film-look/filmLookRegistry.ts', import.meta.url);
+const utilsSourceUrl = new URL('../../../src/utils/film-look/filmLookBrowser.ts', import.meta.url);
 const updateFixture = process.argv.includes('--update');
 
 const getAdjustmentFingerprint = (adjustmentSummaries) =>
@@ -25,7 +25,7 @@ const buildFixture = () => ({
     kind: 'synthetic-neutral-adjustment-state',
     note: 'Deterministic fixture for built-in Film Looks. The output captures the adjustment-domain deltas applied by each look, not a rendered image.',
   },
-  generatedFrom: 'src/utils/filmLookBrowser.ts',
+  generatedFrom: 'src/utils/film-look/filmLookBrowser.ts',
   outputs: FILM_LOOK_BROWSER_ITEMS.map((look) => {
     const adjustmentSummaries = getFilmLookAdjustmentSummaries(look);
 

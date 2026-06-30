@@ -182,7 +182,7 @@ import {
 import { AI_APP_SERVER_TOOL_ROUTES } from './aiAppServerToolRoutes';
 import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from './computational-merge/computationalMergeAppServerRoutes';
 import { DETAIL_APP_SERVER_ROUTES } from './detailAppServerRoutes';
-import { FILM_LOOK_APP_SERVER_ROUTE_MANIFEST } from './filmLookAppServerRoutes';
+import { FILM_LOOK_APP_SERVER_ROUTE_MANIFEST } from './film-look/filmLookAppServerRoutes';
 import {
   dispatchNegativeLabAgentAppServerTool,
   NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME,
