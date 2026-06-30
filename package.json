@@ -11,6 +11,7 @@
     "build": "bun scripts/ci/run-compact-command.ts --label build -- vite build",
     "tauri": "tauri",
     "start": "tauri dev",
+    "install:computer-use": "bun scripts/dev/install-computer-use-app.ts",
     "start:native-qa": "bun scripts/dev/start-native-qa-app.ts",
     "test": "bun run test:unit && bun run test:e2e",
     "test:unit": "bun test --reporter=dot tests/pure-ts",
