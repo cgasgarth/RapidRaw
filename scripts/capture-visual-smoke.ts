@@ -2095,11 +2095,11 @@ async function prepareScenario(page, mode) {
     await gamutWarningControls.getByText('sRGB gamut warning', { exact: true }).waitFor({ timeout: 10_000 });
     await gamutWarningControls.getByText('sRGB gamut · Clear', { exact: true }).waitFor({ timeout: 10_000 });
     const gamutWarningToggle = gamutWarningControls.getByTestId('gamut-warning-toggle');
-    await gamutWarningToggle.getByText('On', { exact: true }).waitFor({ timeout: 10_000 });
-    await gamutWarningToggle.click();
     await gamutWarningControls.getByText('Off', { exact: true }).waitFor({ timeout: 10_000 });
     await gamutWarningToggle.click();
     await gamutWarningControls.getByText('On', { exact: true }).waitFor({ timeout: 10_000 });
+    await gamutWarningToggle.click();
+    await gamutWarningControls.getByText('Off', { exact: true }).waitFor({ timeout: 10_000 });
     const recipe = colorPanel.getByTestId('professional-color-recipe-cleanPortrait');
     await recipe.click();
     await page.waitForFunction(
