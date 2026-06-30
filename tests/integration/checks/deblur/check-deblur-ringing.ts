@@ -2,7 +2,7 @@
 
 import { readFile } from 'node:fs/promises';
 
-import { parseDeblurFixtureManifest } from '../../../src/schemas/deblurFixtureSchemas.ts';
+import { parseDeblurFixtureManifest } from '../../../../src/schemas/deblurFixtureSchemas.ts';
 
 const manifest = parseDeblurFixtureManifest(
   JSON.parse(await readFile('fixtures/detail/deblur/deblur-fixtures.json', 'utf8')),
