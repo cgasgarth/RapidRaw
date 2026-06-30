@@ -1323,7 +1323,16 @@
       "v2ShoulderStrength": "",
       "v2ToeStrength": "",
       "zoomInTooltip": "확대",
-      "zoomOutTooltip": "축소"
+      "zoomOutTooltip": "축소",
+      "baseSampleAccepted": "Base sample accepted",
+      "baseSampleRequired": "Base sample required",
+      "baseSamplingCtaAcceptHint": "Export is blocked until the measured base sample is accepted.",
+      "baseSamplingCtaEstimateHint": "Export is blocked because the negative base has not been sampled yet. Estimate the base from the active scan or sample a visible film border.",
+      "baseSamplingCtaReadyHint": "Base sampling is accepted and the positive preview can be saved when the remaining workflow gates are ready.",
+      "baseSamplingCtaReadyTitle": "Base sample ready",
+      "baseSamplingCtaTitle": "Sample the film base before saving",
+      "estimateBaseSample": "Estimate base sample",
+      "saveBlockedByReason": "Save blocked: {{reason}}"
     },
     "panorama": {
       "cancel": "취소",
