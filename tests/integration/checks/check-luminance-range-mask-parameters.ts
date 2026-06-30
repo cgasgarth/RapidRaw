@@ -8,7 +8,7 @@ import { luminanceRangeMaskParametersSchema } from '../../../src/schemas/maskPar
 import {
   evaluateLuminanceRangeWeight,
   normalizeLuminanceRangeParameters,
-} from '../../../src/utils/luminanceRangeMaskParameters.ts';
+} from '../../../src/utils/mask/luminanceRangeMaskParameters.ts';
 
 const looseRangeSchema = z
   .object({

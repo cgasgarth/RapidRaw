@@ -8,7 +8,7 @@ import type {
   ObjectMaskProposalReplayReceipt,
   ObjectPromptCanvasState,
   ObjectPromptMode,
-} from '../../../../utils/objectMaskPromptCanvas';
+} from '../../../../utils/mask/objectMaskPromptCanvas';
 import UiText from '../../../ui/primitives/Text';
 
 interface ObjectPromptControlsProps {

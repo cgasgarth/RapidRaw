@@ -21,13 +21,13 @@ import {
   INITIAL_MASK_CONTAINER,
   type MaskContainer,
 } from '../../../src/utils/adjustments.ts';
+import { createEditorSubMaskForImage } from '../../../src/utils/editorSubMaskFactory.ts';
+import { buildLayerExportReadinessSummary } from '../../../src/utils/layers/layerStack.ts';
 import {
   createColorRangeMaskParameters,
   evaluateColorRangeMaskWeight,
-} from '../../../src/utils/colorRangeMaskParameters.ts';
-import { createEditorSubMaskForImage } from '../../../src/utils/editorSubMaskFactory.ts';
-import { buildLayerExportReadinessSummary } from '../../../src/utils/layers/layerStack.ts';
-import { buildLinearGradientMaskCommandFromParameters } from '../../../src/utils/linearGradientMaskCommandBridge.ts';
+} from '../../../src/utils/mask/colorRangeMaskParameters.ts';
+import { buildLinearGradientMaskCommandFromParameters } from '../../../src/utils/mask/linearGradientMaskCommandBridge.ts';
 
 const IMAGE_SIZE = { height: 12, width: 16 };
 const context = {

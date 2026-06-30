@@ -21,7 +21,7 @@ the issue can close without overclaiming API-command or graph-native support.
 
 ## Fixture Evidence
 
-- `src/utils/maskClipboard.ts` provides pure clone/insert helpers for mask
+- `src/utils/mask/maskClipboard.ts` provides pure clone/insert helpers for mask
   containers and sub-masks.
 - `fixtures/masks/compose/mask-copy-paste.json` covers clone/insert, invert/rename, and
   reset-adjustment behavior.

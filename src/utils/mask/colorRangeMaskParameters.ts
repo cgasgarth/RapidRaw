@@ -1,7 +1,10 @@
-import { type ColorRangeMaskParameters, colorRangeMaskParametersSchema } from '../schemas/masks/maskParameterSchemas';
-import { createSelectiveColorMaskSelection, type SelectiveColorMaskOptions } from './selectiveColorMask';
+import {
+  type ColorRangeMaskParameters,
+  colorRangeMaskParametersSchema,
+} from '../../schemas/masks/maskParameterSchemas';
+import { createSelectiveColorMaskSelection, type SelectiveColorMaskOptions } from '../selectiveColorMask';
 
-import type { SelectiveColorRangeKey } from './selectiveColorRanges';
+import type { SelectiveColorRangeKey } from '../selectiveColorRanges';
 
 function clamp01(value: number, fallback: number): number {
   if (!Number.isFinite(value)) return fallback;

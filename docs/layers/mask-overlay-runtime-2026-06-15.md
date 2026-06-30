@@ -10,7 +10,7 @@
 ## Runtime Contract
 
 `src/schemas/maskOverlaySchemas.ts` defines the TypeScript-facing Zod schema.
-`src/utils/maskOverlayModes.ts` normalizes partial settings and evaluates the
+`src/utils/mask/maskOverlayModes.ts` normalizes partial settings and evaluates the
 same preview color contract used by fixtures.
 
 `src-tauri/src/mask_generation.rs` now mirrors that contract with

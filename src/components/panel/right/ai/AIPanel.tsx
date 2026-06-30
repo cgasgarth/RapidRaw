@@ -75,13 +75,13 @@ import {
   moveSubMaskBetweenContainers,
   reorderMaskListContainers,
   splitSubMaskToContainer,
-} from '../../../../utils/maskClipboard';
+} from '../../../../utils/mask/maskClipboard';
 import {
   getMaskParameterNumber,
   mergeMaskParameters,
   toMaskParameterRecord,
-} from '../../../../utils/maskParameterAccess';
-import { createSubMask } from '../../../../utils/maskUtils';
+} from '../../../../utils/mask/maskParameterAccess';
+import { createSubMask } from '../../../../utils/mask/maskUtils';
 import { type BrushSettings, OPTION_SEPARATOR, type Option } from '../../../ui/AppProperties';
 import CollapsibleSection from '../../../ui/CollapsibleSection';
 import Button from '../../../ui/primitives/Button';

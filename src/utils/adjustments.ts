@@ -1,7 +1,7 @@
 import type { Crop } from 'react-image-crop';
 import { Mask, type SubMask, SubMaskMode } from '../components/panel/right/layers/Masks';
 import type { LevelsSettings } from '../schemas/color/levelsSchemas';
-import { toMaskParameterRecord } from './maskParameterAccess';
+import { toMaskParameterRecord } from './mask/maskParameterAccess';
 import type { RawProcessingModeOverride } from './rawProcessingModes';
 import {
   DEFAULT_SELECTIVE_COLOR_RANGE_CONTROLS,

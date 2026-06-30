@@ -32,17 +32,17 @@ import type {
   RetouchRemoveSource,
 } from '../../../utils/adjustments';
 import {
-  BRUSH_MASK_COMMAND_COORDINATE_SPACE,
-  buildBrushMaskCommandFromParameters,
-} from '../../../utils/brushMaskCommandBridge';
-import {
   formatGamutWarningCoverage,
   isCurrentExportSoftProofGamutWarningOverlay,
 } from '../../../utils/color/runtime/gamutWarningDisplay';
 import {
+  BRUSH_MASK_COMMAND_COORDINATE_SPACE,
+  buildBrushMaskCommandFromParameters,
+} from '../../../utils/mask/brushMaskCommandBridge';
+import {
   normalizeLinearGradientParameters,
   normalizeRadialGradientParameters,
-} from '../../../utils/gradientMaskParameters';
+} from '../../../utils/mask/gradientMaskParameters';
 import { calculateWhiteBalancePickerAdjustment } from '../../../utils/whiteBalancePicker';
 import type { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
 import type { OverlayMode } from '../right/color/CropPanel';

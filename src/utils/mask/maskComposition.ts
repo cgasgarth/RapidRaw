@@ -1,4 +1,4 @@
-import type { MaskComposeMode } from '../schemas/masks/maskRenderSchemas';
+import type { MaskComposeMode } from '../../schemas/masks/maskRenderSchemas';
 
 export interface MaskComposeContribution {
   mode: MaskComposeMode;

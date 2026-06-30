@@ -54,14 +54,14 @@ import {
   buildMaskOverlayInvokePayload,
   buildMaskOverlayTriggerHash,
   type MaskPreviewDefinition,
-} from '../../utils/maskOverlayRequest';
-import { toMaskParameterRecord } from '../../utils/maskParameterAccess';
+} from '../../utils/mask/maskOverlayRequest';
+import { toMaskParameterRecord } from '../../utils/mask/maskParameterAccess';
 import {
   applyObjectPromptClick,
   imagePointFromCanvasClick,
   readObjectPromptCanvasState,
   writeObjectPromptCanvasState,
-} from '../../utils/objectMaskPromptCanvas';
+} from '../../utils/mask/objectMaskPromptCanvas';
 import { debounce } from '../../utils/timing';
 import { Panel } from '../ui/AppProperties';
 import EditorToolbar from './editor/EditorToolbar';

@@ -9,7 +9,7 @@ import { Invokes } from '../../tauri/commands';
 import type { Adjustments, AiPatch, Coord, MaskContainer } from '../../utils/adjustments';
 import { getAiPeopleMaskPartCapability } from '../../utils/ai/aiPeopleMaskContracts';
 import { formatUnknownError } from '../../utils/errorFormatting';
-import { mergeMaskParameters } from '../../utils/maskParameterAccess';
+import { mergeMaskParameters } from '../../utils/mask/maskParameterAccess';
 import { useEditorActions } from '../editor/useEditorActions';
 
 type SubMaskParameters = Record<string, unknown>;

@@ -5,7 +5,10 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 
 import { maskRefinementParametersSchema } from '../../../src/schemas/maskParameterSchemas.ts';
-import { evaluateMaskRefinementWeight, normalizeMaskRefinementParameters } from '../../../src/utils/maskRefinement.ts';
+import {
+  evaluateMaskRefinementWeight,
+  normalizeMaskRefinementParameters,
+} from '../../../src/utils/mask/maskRefinement.ts';
 
 const looseParametersSchema = z
   .object({

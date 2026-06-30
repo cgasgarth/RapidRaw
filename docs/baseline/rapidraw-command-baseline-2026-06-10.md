@@ -158,7 +158,7 @@ Prettier reported formatting differences in 17 files:
 - `src/styles.css`
 - `src/utils/CollageVariants.tsx`
 - `src/utils/frontendLogBridge.ts`
-- `src/utils/maskUtils.ts`
+- `src/utils/mask/maskUtils.ts`
 - `tsconfig.json`
 
 Follow-up #289 tracks a behavior-preserving formatting PR.
