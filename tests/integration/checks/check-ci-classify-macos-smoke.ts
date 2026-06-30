@@ -214,24 +214,30 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ],
   ['check:sr-ui-api', new Set(['bun tests/integration/checks/check-sr-ui-api.ts'])],
   ['check:sr-ui-smoke', new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario sr-ui'])],
-  ['check:negative-lab-fixtures', new Set(['bun tests/integration/checks/check-negative-lab-fixtures.ts'])],
+  [
+    'check:negative-lab-fixtures',
+    new Set(['bun tests/integration/checks/negative-lab/check-negative-lab-fixtures.ts']),
+  ],
   [
     'check:negative-lab-fixtures:update',
-    new Set(['bun tests/integration/checks/check-negative-lab-fixtures.ts --update']),
+    new Set(['bun tests/integration/checks/negative-lab/check-negative-lab-fixtures.ts --update']),
   ],
   [
     'check:negative-lab-frame-health',
-    new Set(['bun tests/integration/checks/check-negative-lab-frame-health-report.ts']),
+    new Set(['bun tests/integration/checks/negative-lab/check-negative-lab-frame-health-report.ts']),
   ],
   [
     'check:negative-lab-stock-metadata-coverage',
-    new Set(['bun tests/integration/checks/check-negative-lab-stock-metadata-coverage.ts']),
+    new Set(['bun tests/integration/checks/negative-lab/check-negative-lab-stock-metadata-coverage.ts']),
   ],
   [
     'check:negative-lab-stock-metadata-coverage:update',
-    new Set(['bun tests/integration/checks/check-negative-lab-stock-metadata-coverage.ts --update']),
+    new Set(['bun tests/integration/checks/negative-lab/check-negative-lab-stock-metadata-coverage.ts --update']),
   ],
-  ['check:negative-lab-ui-presets', new Set(['bun tests/integration/checks/check-negative-lab-ui-presets.ts'])],
+  [
+    'check:negative-lab-ui-presets',
+    new Set(['bun tests/integration/checks/negative-lab/check-negative-lab-ui-presets.ts']),
+  ],
   ['check:noise-separation', new Set(['bun tests/integration/checks/check-noise-separation-fixtures.ts'])],
   ['check:output-sharpening', new Set(['bun tests/integration/checks/check-output-sharpening-fixtures.ts'])],
   ['check:mask-refine-command-ui', new Set(['bun tests/integration/checks/check-mask-refinement-command-ui.ts'])],
@@ -760,7 +766,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -125,6 +125,7 @@\n+    "check:negative-lab-ui-presets": "bun tests/integration/checks/check-negative-lab-ui-presets.ts",',
+          '@@ -125,6 +125,7 @@\n+    "check:negative-lab-ui-presets": "bun tests/integration/checks/negative-lab/check-negative-lab-ui-presets.ts",',
       },
     ],
     SMOKE_MODES.NONE,
@@ -782,7 +788,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -125,6 +125,8 @@\n+    "check:negative-lab-fixtures": "bun tests/integration/checks/check-negative-lab-fixtures.ts",\n+    "check:negative-lab-fixtures:update": "bun tests/integration/checks/check-negative-lab-fixtures.ts --update",',
+          '@@ -125,6 +125,8 @@\n+    "check:negative-lab-fixtures": "bun tests/integration/checks/negative-lab/check-negative-lab-fixtures.ts",\n+    "check:negative-lab-fixtures:update": "bun tests/integration/checks/negative-lab/check-negative-lab-fixtures.ts --update",',
       },
     ],
     SMOKE_MODES.NONE,
@@ -793,7 +799,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -125,6 +125,7 @@\n+    "check:negative-lab-frame-health": "bun tests/integration/checks/check-negative-lab-frame-health-report.ts",',
+          '@@ -125,6 +125,7 @@\n+    "check:negative-lab-frame-health": "bun tests/integration/checks/negative-lab/check-negative-lab-frame-health-report.ts",',
       },
     ],
     SMOKE_MODES.NONE,
@@ -804,7 +810,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -125,6 +125,8 @@\n+    "check:negative-lab-stock-metadata-coverage": "bun tests/integration/checks/check-negative-lab-stock-metadata-coverage.ts",\n+    "check:negative-lab-stock-metadata-coverage:update": "bun tests/integration/checks/check-negative-lab-stock-metadata-coverage.ts --update",',
+          '@@ -125,6 +125,8 @@\n+    "check:negative-lab-stock-metadata-coverage": "bun tests/integration/checks/negative-lab/check-negative-lab-stock-metadata-coverage.ts",\n+    "check:negative-lab-stock-metadata-coverage:update": "bun tests/integration/checks/negative-lab/check-negative-lab-stock-metadata-coverage.ts --update",',
       },
     ],
     SMOKE_MODES.NONE,

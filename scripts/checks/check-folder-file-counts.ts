@@ -78,6 +78,10 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4297',
     reason: 'color checks are grouped for dedicated organization in this issue',
   },
+  'tests/integration/checks/negative-lab': {
+    issue: '#4296',
+    reason: 'negative-lab checks are grouped under their domain folder',
+  },
 };
 
 type FolderCount = {
