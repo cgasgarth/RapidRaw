@@ -1,7 +1,7 @@
 import { Info, Layers, ShieldCheck, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useModalTransition } from '../../hooks/useModalTransition';
+import { useModalTransition } from '../../hooks/ui/useModalTransition';
 import type {
   PanoramaRenderedReview,
   PanoramaRuntimePlan,

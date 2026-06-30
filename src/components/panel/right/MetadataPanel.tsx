@@ -4,8 +4,8 @@ import type { TFunction } from 'i18next';
 import { AlertTriangle, Check, ChevronDown, ChevronRight, GitMerge, Plus, Star, Tag, User, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLibraryActions } from '../../../hooks/useLibraryActions';
-import { useManagedFocus } from '../../../hooks/useManagedFocus';
+import { useLibraryActions } from '../../../hooks/library/useLibraryActions';
+import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
 import {
   type ActiveDisplayProfile,
   activeDisplayProfileSchema,

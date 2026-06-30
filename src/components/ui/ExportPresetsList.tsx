@@ -1,7 +1,7 @@
 import { Check, CheckCircle, Plus, Save, Trash2, TriangleAlert, X } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useManagedFocus } from '../../hooks/useManagedFocus';
+import { useManagedFocus } from '../../hooks/ui/useManagedFocus';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../schemas/exportRecipeIds';
 import { buildExportRecipeUiRows } from '../../schemas/exportRecipeUiSchemas';
 import { TextVariants } from '../../types/typography';

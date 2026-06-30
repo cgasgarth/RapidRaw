@@ -457,7 +457,7 @@ const extractedUiSource = [
   'src/components/modals/NegativeLabQcProofPanel.tsx',
   'src/components/modals/NegativeLabRollHealthPanel.tsx',
   'src/components/modals/NegativeLabRollHealthModel.ts',
-  'src/hooks/useNegativeLabProfileBrowser.ts',
+  'src/hooks/editor/useNegativeLabProfileBrowser.ts',
 ]
   .map((path) => readFileSync(path, 'utf8'))
   .join('\n');

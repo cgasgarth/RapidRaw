@@ -1,15 +1,15 @@
 import { invoke } from '@tauri-apps/api/core';
 import { type RefObject, useEffect, useRef } from 'react';
-import type { TransformState } from '../components/ui/AppProperties';
-import { Invokes } from '../tauri/commands';
+import type { TransformState } from '../../components/ui/AppProperties';
+import { Invokes } from '../../tauri/commands';
 import {
   buildHiddenWgpuTransformPayload,
   buildVisibleWgpuTransformPayload,
   fingerprintWgpuTransformPayload,
   parseCssRgbColor,
   type RgbaColor,
-} from '../utils/wgpuTransformPayload';
-import type { RenderSize } from './useImageRenderSize';
+} from '../../utils/wgpuTransformPayload';
+import type { RenderSize } from '../viewport/useImageRenderSize';
 
 interface WgpuRenderState {
   bgPrimary: RgbaColor;

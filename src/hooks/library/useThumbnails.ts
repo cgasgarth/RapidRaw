@@ -1,8 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useCallback, useEffect, useRef } from 'react';
 
-import { useProcessStore } from '../store/useProcessStore';
-import { Invokes } from '../tauri/commands';
+import { useProcessStore } from '../../store/useProcessStore';
+import { Invokes } from '../../tauri/commands';
 
 const shuffleThumbnailPaths = (paths: string[]) => {
   for (let i = paths.length - 1; i > 0; i--) {

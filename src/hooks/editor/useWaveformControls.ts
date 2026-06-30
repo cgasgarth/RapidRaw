@@ -1,9 +1,9 @@
 import { type PointerEvent as ReactPointerEvent, useCallback, useState } from 'react';
 
-import { useEditorStore } from '../store/useEditorStore';
-import { useSettingsStore } from '../store/useSettingsStore';
+import { useEditorStore } from '../../store/useEditorStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
 
-import type { DisplayMode } from '../utils/adjustments';
+import type { DisplayMode } from '../../utils/adjustments';
 
 export function useWaveformControls() {
   const [isResizingWaveform, setIsResizingWaveform] = useState(false);

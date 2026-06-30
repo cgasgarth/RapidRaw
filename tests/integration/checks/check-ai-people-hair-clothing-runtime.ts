@@ -13,7 +13,7 @@ const fakeProviderFixture = aiPeopleMaskFakeProviderFixtureSchema.parse(
 );
 const parserSource = readFileSync(resolve('src-tauri/src/person_part_parser.rs'), 'utf8');
 const commandSource = readFileSync(resolve('src-tauri/src/ai_commands.rs'), 'utf8');
-const hookSource = readFileSync(resolve('src/hooks/useAiMasking.ts'), 'utf8');
+const hookSource = readFileSync(resolve('src/hooks/ai/useAiMasking.ts'), 'utf8');
 const maskPanelSource = readFileSync(resolve('src/components/panel/right/Masks.tsx'), 'utf8');
 const maskSettingsSource = readFileSync(resolve('src/components/panel/right/MasksPanel.tsx'), 'utf8');
 const locale = JSON.parse(readFileSync(resolve('src/i18n/locales/en.json'), 'utf8')) as {

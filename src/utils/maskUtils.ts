@@ -1,6 +1,6 @@
 import { formatMaskTypeName, Mask, type SubMask, SubMaskMode } from '../components/panel/right/Masks';
 
-import type { ImageDimensions } from '../hooks/useImageRenderSize';
+import type { ImageDimensions } from '../hooks/viewport/useImageRenderSize';
 
 export const createSubMask = (
   type: Mask,

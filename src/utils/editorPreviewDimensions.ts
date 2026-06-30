@@ -1,5 +1,5 @@
 import type { SelectedImage } from '../components/ui/AppProperties';
-import type { ImageDimensions } from '../hooks/useImageRenderSize';
+import type { ImageDimensions } from '../hooks/viewport/useImageRenderSize';
 
 const PENDING_THUMBNAIL_FRAME: ImageDimensions = { width: 3, height: 2 };
 

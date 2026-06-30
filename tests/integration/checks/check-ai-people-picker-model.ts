@@ -11,7 +11,7 @@ const fixture = aiPeopleMaskPickerModelFixtureSchema.parse(fixtureJson);
 const aiPanelSource = readFileSync(resolve('src/components/panel/right/AIPanel.tsx'), 'utf8');
 const pickerSource = readFileSync(resolve('src/components/panel/right/AiPeoplePartPickerStatus.tsx'), 'utf8');
 const maskPanelSource = readFileSync(resolve('src/components/panel/right/MasksPanel.tsx'), 'utf8');
-const hookSource = readFileSync(resolve('src/hooks/useAiMasking.ts'), 'utf8');
+const hookSource = readFileSync(resolve('src/hooks/ai/useAiMasking.ts'), 'utf8');
 const locale = JSON.parse(readFileSync(resolve('src/i18n/locales/en.json'), 'utf8')) as {
   editor?: { masks?: { aiPeopleParts?: Record<string, unknown> } };
 };

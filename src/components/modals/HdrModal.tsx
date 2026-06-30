@@ -5,7 +5,7 @@ import type {
   HdrBracketDetectionMethodV1,
   HdrBracketSourceMetadataV1,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { useModalTransition } from '../../hooks/useModalTransition';
+import { useModalTransition } from '../../hooks/ui/useModalTransition';
 import {
   applyHdrToneMappingPreset,
   HDR_TONE_MAPPING_PRESETS,

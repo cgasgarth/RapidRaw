@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 const rustEvents = readFileSync('src-tauri/src/events.rs', 'utf8');
 const rustLib = readFileSync('src-tauri/src/lib.rs', 'utf8');
 const tsEvents = readFileSync('src/utils/tauriEventNames.ts', 'utf8');
-const tsListeners = readFileSync('src/hooks/useTauriListeners.ts', 'utf8');
+const tsListeners = readFileSync('src/hooks/app/useTauriListeners.ts', 'utf8');
 
 for (const marker of [
   'pub const PREVIEW_UPDATE_UNCROPPED: &str = "preview-update-uncropped";',

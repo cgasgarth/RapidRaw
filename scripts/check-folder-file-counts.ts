@@ -109,10 +109,6 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4226',
     reason: 'shared UI components are pending primitive/widget split',
   },
-  'src/hooks': {
-    issue: '#4218',
-    reason: 'hooks are pending product-area grouping',
-  },
   'src/i18n/locales': {
     issue: '#4234',
     reason: 'locale files may intentionally stay flat by locale code',

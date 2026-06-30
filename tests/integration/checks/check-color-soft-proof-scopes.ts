@@ -153,7 +153,7 @@ for (const marker of [
   if (!waveformSource.includes(marker)) throw new Error(`Waveform missing soft-proof scope marker: ${marker}.`);
 }
 
-const listenerSource = await readFile('src/hooks/useTauriListeners.ts', 'utf8');
+const listenerSource = await readFile('src/hooks/app/useTauriListeners.ts', 'utf8');
 for (const marker of [
   'renderBasis: isExportPreview',
   'PREVIEW_SCOPE_EXPORT_SOURCE_LABEL',

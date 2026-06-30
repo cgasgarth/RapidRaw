@@ -44,9 +44,9 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import { useAiMasking } from '../../../hooks/useAiMasking';
-import { useEditorActions } from '../../../hooks/useEditorActions';
-import { useManagedFocus } from '../../../hooks/useManagedFocus';
+import { useAiMasking } from '../../../hooks/ai/useAiMasking';
+import { useEditorActions } from '../../../hooks/editor/useEditorActions';
+import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
 import type { AgentChatTranscript } from '../../../schemas/agentChatTranscriptSchemas';
 import {
   AiProviderId,

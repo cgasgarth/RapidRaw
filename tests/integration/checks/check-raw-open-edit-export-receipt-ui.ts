@@ -18,7 +18,7 @@ const [
 ] = await Promise.all([
   readFile('src/components/ui/ExportImportProperties.ts', 'utf8'),
   readFile('src/schemas/tauriEventSchemas.ts', 'utf8'),
-  readFile('src/hooks/useTauriListeners.ts', 'utf8'),
+  readFile('src/hooks/app/useTauriListeners.ts', 'utf8'),
   readFile('src/components/panel/right/ExportPanel.tsx', 'utf8'),
   readFile('src/App.tsx', 'utf8'),
   readFile('src/components/views/EditorView.tsx', 'utf8'),

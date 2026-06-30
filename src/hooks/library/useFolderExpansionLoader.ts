@@ -1,11 +1,11 @@
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
 
-import { folderTreeListSchema } from '../schemas/folderTreeSchemas';
-import { useLibraryStore } from '../store/useLibraryStore';
-import { Invokes } from '../tauri/commands';
-import { insertChildrenIntoTree } from '../utils/folderTreeUtils';
-import { invokeWithSchema } from '../utils/tauriSchemaInvoke';
+import { folderTreeListSchema } from '../../schemas/folderTreeSchemas';
+import { useLibraryStore } from '../../store/useLibraryStore';
+import { Invokes } from '../../tauri/commands';
+import { insertChildrenIntoTree } from '../../utils/folderTreeUtils';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 
 export const useFolderExpansionLoader = (showImageCounts: boolean) => {
   const setLibrary = useLibraryStore((state) => state.setLibrary);

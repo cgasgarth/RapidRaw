@@ -37,7 +37,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-import { useOsPlatform } from '../../hooks/useOsPlatform';
+import { useOsPlatform } from '../../hooks/ui/useOsPlatform';
 import {
   AiProviderId,
   type AiProviderId as AiProviderIdType,

@@ -1,14 +1,14 @@
 import { useEffect, useRef } from 'react';
-import { ExifOverlay, type ImageFile, Panel } from '../components/ui/AppProperties';
-import { normalizeKeyboardShortcutMap } from '../schemas/keyboardShortcutSchemas';
-import { useEditorStore } from '../store/useEditorStore';
-import { useLibraryStore } from '../store/useLibraryStore';
-import { useProcessStore } from '../store/useProcessStore';
-import { useSettingsStore } from '../store/useSettingsStore';
-import { useUIStore } from '../store/useUIStore';
-import { KEYBIND_DEFINITIONS, normalizeCombo } from '../utils/keyboardUtils';
-import { useEditorActions } from './useEditorActions';
-import { useLibraryActions } from './useLibraryActions';
+import { ExifOverlay, type ImageFile, Panel } from '../../components/ui/AppProperties';
+import { normalizeKeyboardShortcutMap } from '../../schemas/keyboardShortcutSchemas';
+import { useEditorStore } from '../../store/useEditorStore';
+import { useLibraryStore } from '../../store/useLibraryStore';
+import { useProcessStore } from '../../store/useProcessStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
+import { useUIStore } from '../../store/useUIStore';
+import { KEYBIND_DEFINITIONS, normalizeCombo } from '../../utils/keyboardUtils';
+import { useEditorActions } from '../editor/useEditorActions';
+import { useLibraryActions } from '../library/useLibraryActions';
 
 interface KeyboardShortcutsProps {
   sortedImageList: Array<ImageFile>;

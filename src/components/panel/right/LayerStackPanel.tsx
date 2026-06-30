@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { type KeyboardEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { debouncedSave } from '../../../hooks/useEditorActions';
+import { debouncedSave } from '../../../hooks/editor/useEditorActions';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import {

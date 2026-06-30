@@ -3,7 +3,7 @@ import type { MouseEvent, KeyboardEvent as ReactKeyboardEvent, RefObject } from 
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-import type { CreateResizeHandler } from '../../hooks/usePanelResize';
+import type { CreateResizeHandler } from '../../hooks/viewport/usePanelResize';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';

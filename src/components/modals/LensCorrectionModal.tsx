@@ -18,8 +18,8 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
-import { useModalTransition } from '../../hooks/useModalTransition';
-import { usePreviewViewport } from '../../hooks/usePreviewViewport';
+import { useModalTransition } from '../../hooks/ui/useModalTransition';
+import { usePreviewViewport } from '../../hooks/viewport/usePreviewViewport';
 import { Invokes } from '../../tauri/commands';
 import { TextColors, TextVariants } from '../../types/typography';
 import type { Adjustments } from '../../utils/adjustments';

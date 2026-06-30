@@ -2,11 +2,11 @@ import { invoke } from '@tauri-apps/api/core';
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
 
-import { useEditorStore } from '../store/useEditorStore';
-import { useLibraryStore } from '../store/useLibraryStore';
-import { useProcessStore } from '../store/useProcessStore';
-import { useSettingsStore } from '../store/useSettingsStore';
-import { Invokes } from '../tauri/commands';
+import { useEditorStore } from '../../store/useEditorStore';
+import { useLibraryStore } from '../../store/useLibraryStore';
+import { useProcessStore } from '../../store/useProcessStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
+import { Invokes } from '../../tauri/commands';
 import {
   type Adjustments,
   COPYABLE_ADJUSTMENT_KEYS,
@@ -15,16 +15,16 @@ import {
   normalizeLoadedAdjustments,
   PasteMode,
   pickAdjustmentValues,
-} from '../utils/adjustments';
+} from '../../utils/adjustments';
 import {
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
   hasBasicToneAdjustmentChange,
-} from '../utils/basicToneCommandBridge';
-import { calculateCenteredCrop } from '../utils/cropUtils';
-import { formatUnknownError } from '../utils/errorFormatting';
-import { globalImageCache } from '../utils/ImageLRUCache';
-import { debounce } from '../utils/timing';
+} from '../../utils/basicToneCommandBridge';
+import { calculateCenteredCrop } from '../../utils/cropUtils';
+import { formatUnknownError } from '../../utils/errorFormatting';
+import { globalImageCache } from '../../utils/ImageLRUCache';
+import { debounce } from '../../utils/timing';
 
 export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
   useEditorStore.getState().pushHistory(newAdj);

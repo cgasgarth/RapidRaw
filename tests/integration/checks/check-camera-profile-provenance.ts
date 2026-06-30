@@ -49,8 +49,8 @@ const files = {
   receipt: readFileSync('src/utils/cameraProfileProvenanceReceipt.ts', 'utf8'),
   metadataPanel: readFileSync('src/components/panel/right/MetadataPanel.tsx', 'utf8'),
   schemas: readFileSync('src/schemas/imageLoaderSchemas.ts', 'utf8'),
-  useAppNavigation: readFileSync('src/hooks/useAppNavigation.ts', 'utf8'),
-  useImageLoader: readFileSync('src/hooks/useImageLoader.ts', 'utf8'),
+  useAppNavigation: readFileSync('src/hooks/app/useAppNavigation.ts', 'utf8'),
+  useImageLoader: readFileSync('src/hooks/editor/useImageLoader.ts', 'utf8'),
 };
 
 const requiredMarkers: Array<[keyof typeof files, string]> = [

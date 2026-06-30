@@ -3,10 +3,10 @@ import { listen } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
-import { parseAiConnectorStatusPayload } from '../schemas/tauriEventSchemas';
-import { useEditorStore } from '../store/useEditorStore';
-import { Invokes } from '../tauri/commands';
-import { AI_CONNECTOR_STATUS_UPDATE_EVENT } from '../utils/tauriEventNames';
+import { parseAiConnectorStatusPayload } from '../../schemas/tauriEventSchemas';
+import { useEditorStore } from '../../store/useEditorStore';
+import { Invokes } from '../../tauri/commands';
+import { AI_CONNECTOR_STATUS_UPDATE_EVENT } from '../../utils/tauriEventNames';
 
 export const AI_CONNECTOR_STATUS_POLL_INTERVAL_MS = 10_000;
 
