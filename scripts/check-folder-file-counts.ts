@@ -129,10 +129,6 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4208',
     reason: 'integration checks are pending domain/native-runner cleanup',
   },
-  'tests/pure-ts': {
-    issue: '#4219',
-    reason: 'pure TS tests are pending domain grouping',
-  },
 };
 
 type FolderCount = {
