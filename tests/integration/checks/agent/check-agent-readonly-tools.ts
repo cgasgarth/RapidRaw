@@ -6,7 +6,7 @@ import { ToolType } from '../../../../src/components/panel/right/layers/Masks.ts
 import { RawEngineAppServerRouteMode } from '../../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
-import { isAgentPreviewEnvelopeCurrent } from '../../../../src/utils/agentPreviewEnvelope.ts';
+import { isAgentPreviewEnvelopeCurrent } from '../../../../src/utils/agent/context/agentPreviewEnvelope.ts';
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
@@ -14,7 +14,7 @@ import {
   agentStateGetRequestSchema,
   getAgentReadOnlyState,
   renderAgentReadOnlyPreview,
-} from '../../../../src/utils/agentReadOnlyAppServerTools.ts';
+} from '../../../../src/utils/agent/context/agentReadOnlyAppServerTools.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../../../../src/utils/rawEngineAppServerHost.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3160.ARW';

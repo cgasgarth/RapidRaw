@@ -29,6 +29,38 @@ import type {
   AgentSelectedImagePreviewLoopReview,
 } from '../../../../schemas/agent/agentChatTranscriptSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
+import { buildAgentAppServerToolReadinessSummary } from '../../../../utils/agent/context/agentAppServerToolReadiness';
+import {
+  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
+  type AgentCurrentImagePreviewLoopResult,
+  agentCurrentImagePreviewLoopResultSchema,
+} from '../../../../utils/agent/context/agentCurrentImagePreviewLoop';
+import {
+  agentImageContextSnapshotSchema,
+  buildAgentImageContextSnapshot,
+} from '../../../../utils/agent/context/agentImageContextSnapshot';
+import {
+  AGENT_PREVIEW_RENDER_TOOL_NAME,
+  AGENT_STATE_GET_TOOL_NAME,
+  getAgentReadOnlyState,
+  renderAgentReadOnlyPreview,
+} from '../../../../utils/agent/context/agentReadOnlyAppServerTools';
+import {
+  AGENT_LAYER_CREATE_TOOL_NAME,
+  AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME,
+  AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
+} from '../../../../utils/agent/layers/agentLayerMaskTools';
+import { runAgentBoundedEditPlannerLoop } from '../../../../utils/agent/planning/agentBoundedEditPlannerLoop';
+import { planAgentEditRecipe } from '../../../../utils/agent/planning/agentEditRecipePlanner';
+import {
+  AGENT_EXPORT_PROOF_TOOL_NAME,
+  agentExportProofResponseSchema,
+} from '../../../../utils/agent/safety/agentExportProofTool';
+import {
+  type AgentSafetyPolicyDecision,
+  evaluateAgentSafetyPolicy,
+  inferAgentSafetyOperationKind,
+} from '../../../../utils/agent/safety/agentSafetyPolicy';
 import { dispatchAgentLiveEditorTool } from '../../../../utils/agent/session/agentLiveToolDispatch';
 import {
   type AgentMultiTurnAppServerSessionRequest,
@@ -43,35 +75,6 @@ import {
 import { AGENT_HISTORY_ROLLBACK_TOOL_NAME } from '../../../../utils/agent/session/agentSessionHistory';
 import { AGENT_COLOR_APPLY_TOOL_NAME } from '../../../../utils/agent/tools/agentColorApplyTool';
 import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../../utils/agent/tools/agentDetailEffectsApplyTool';
-import { buildAgentAppServerToolReadinessSummary } from '../../../../utils/agentAppServerToolReadiness';
-import { runAgentBoundedEditPlannerLoop } from '../../../../utils/agentBoundedEditPlannerLoop';
-import {
-  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
-  type AgentCurrentImagePreviewLoopResult,
-  agentCurrentImagePreviewLoopResultSchema,
-} from '../../../../utils/agentCurrentImagePreviewLoop';
-import { planAgentEditRecipe } from '../../../../utils/agentEditRecipePlanner';
-import { AGENT_EXPORT_PROOF_TOOL_NAME, agentExportProofResponseSchema } from '../../../../utils/agentExportProofTool';
-import {
-  agentImageContextSnapshotSchema,
-  buildAgentImageContextSnapshot,
-} from '../../../../utils/agentImageContextSnapshot';
-import {
-  AGENT_LAYER_CREATE_TOOL_NAME,
-  AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME,
-  AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
-} from '../../../../utils/agentLayerMaskTools';
-import {
-  AGENT_PREVIEW_RENDER_TOOL_NAME,
-  AGENT_STATE_GET_TOOL_NAME,
-  getAgentReadOnlyState,
-  renderAgentReadOnlyPreview,
-} from '../../../../utils/agentReadOnlyAppServerTools';
-import {
-  type AgentSafetyPolicyDecision,
-  evaluateAgentSafetyPolicy,
-  inferAgentSafetyOperationKind,
-} from '../../../../utils/agentSafetyPolicy';
 
 interface AgentChatShellProps {
   transcript: AgentChatTranscript;

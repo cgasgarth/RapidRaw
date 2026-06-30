@@ -6,9 +6,9 @@ import { cameraProfileIdSchema, toneCurveIdSchema } from '../../../schemas/color
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
 import { getDefaultParametricCurve } from '../../adjustments';
-import { buildAgentImageContextSnapshot } from '../../agentImageContextSnapshot';
 import { pushEditHistoryEntry } from '../../editHistory';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../profileTonePresets';
+import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 
 export const AGENT_COLOR_APPLY_TOOL_NAME = 'rawengine.agent.color.apply';
 export const AGENT_COLOR_APPLY_INPUT_SCHEMA_NAME = 'AgentColorApplyRequestV1';

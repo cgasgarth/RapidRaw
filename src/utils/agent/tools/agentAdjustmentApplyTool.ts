@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { toneColorDryRunResultV1Schema } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
-import { buildAgentImageContextSnapshot } from '../../agentImageContextSnapshot';
 import {
   BASIC_TONE_ADJUSTMENT_KEYS,
   buildBasicToneCommandEnvelope,
@@ -10,6 +9,7 @@ import {
   type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
 import { pushEditHistoryEntry } from '../../editHistory';
+import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { applyBasicToneToLiveEditor } from '../session/agentLiveBasicTone';
 import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
 

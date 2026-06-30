@@ -4,12 +4,12 @@ import { RawStatus, SortDirection } from '../../../../src/components/ui/AppPrope
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { useLibraryStore } from '../../../../src/store/useLibraryStore.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
-import type { AgentApprovalState } from '../../../../src/utils/agentApprovalGate.ts';
+import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
+import type { AgentApprovalState } from '../../../../src/utils/agent/safety/agentApprovalGate.ts';
 import {
   applyApprovedAgentPlanAtomically,
   rollbackApprovedAgentPlan,
-} from '../../../../src/utils/agentAtomicApproval.ts';
-import { buildAgentImageContextSnapshot } from '../../../../src/utils/agentImageContextSnapshot.ts';
+} from '../../../../src/utils/agent/safety/agentAtomicApproval.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3160.ARW';
 

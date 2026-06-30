@@ -9,10 +9,10 @@ import {
   type RetouchCloneSource,
   type RetouchRemoveSource,
 } from '../../adjustments';
-import { buildAgentImageContextSnapshot } from '../../agentImageContextSnapshot';
-import { stableAgentPreviewHash } from '../../agentPreviewEnvelope';
 import { pushEditHistoryEntry } from '../../editHistory';
 import { applyLayerStackCommandBridgeOperation } from '../../layers/layerStackCommandBridge';
+import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
+import { stableAgentPreviewHash } from '../context/agentPreviewEnvelope';
 
 export const AGENT_RETOUCH_APPLY_TOOL_NAME = 'rawengine.agent.retouch.apply';
 export const AGENT_RETOUCH_APPLY_INPUT_SCHEMA_NAME = 'AgentRetouchApplyRequestV1';

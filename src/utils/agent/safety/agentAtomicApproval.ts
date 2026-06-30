@@ -1,9 +1,12 @@
 import { z } from 'zod';
-import { useEditorStore } from '../store/useEditorStore';
-import type { Adjustments } from './adjustments';
+import { useEditorStore } from '../../../store/useEditorStore';
+import type { Adjustments } from '../../adjustments';
+import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
+import {
+  type AgentCoreEditCommandBundleStep,
+  runAgentCoreEditCommandBundle,
+} from '../planning/agentCoreEditCommandBundle';
 import { type AgentApprovalState, agentApprovalStateSchema, assertAgentApprovalGate } from './agentApprovalGate';
-import { type AgentCoreEditCommandBundleStep, runAgentCoreEditCommandBundle } from './agentCoreEditCommandBundle';
-import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 
 export interface AgentApprovedPlan {
   approval: AgentApprovalState;

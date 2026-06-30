@@ -4,7 +4,10 @@ import { readFileSync } from 'node:fs';
 
 import { z } from 'zod';
 
-import { evaluateAgentSafetyPolicy, inferAgentSafetyOperationKind } from '../../../../src/utils/agentSafetyPolicy.ts';
+import {
+  evaluateAgentSafetyPolicy,
+  inferAgentSafetyOperationKind,
+} from '../../../../src/utils/agent/safety/agentSafetyPolicy.ts';
 
 const localeSchema = z
   .object({

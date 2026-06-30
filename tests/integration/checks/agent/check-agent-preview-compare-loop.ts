@@ -13,7 +13,7 @@ import {
   agentPreviewCompareResponseSchema,
   getAgentReadOnlyState,
   renderAgentPreviewCompare,
-} from '../../../../src/utils/agentReadOnlyAppServerTools.ts';
+} from '../../../../src/utils/agent/context/agentReadOnlyAppServerTools.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   handleRawEngineAppServerHostRequestAsync,

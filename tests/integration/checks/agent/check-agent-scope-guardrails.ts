@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { validateAgentLocalScope } from '../../../../src/utils/agentScopeGuardrails.ts';
+import { validateAgentLocalScope } from '../../../../src/utils/agent/safety/agentScopeGuardrails.ts';
 
 const selectedRoot = '/Users/cgas/Pictures/Capture One/Alaska';
 const sourceRawPath = `${selectedRoot}/DSC_3163.ARW`;

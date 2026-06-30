@@ -4,7 +4,7 @@ import { RawStatus, SortDirection } from '../../../../src/components/ui/AppPrope
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { useLibraryStore } from '../../../../src/store/useLibraryStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
-import { runAgentBoundedEditPlannerLoop } from '../../../../src/utils/agentBoundedEditPlannerLoop.ts';
+import { runAgentBoundedEditPlannerLoop } from '../../../../src/utils/agent/planning/agentBoundedEditPlannerLoop.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3159.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 10 : 2));

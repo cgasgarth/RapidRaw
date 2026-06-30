@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { agentHistoryRollbackResponseSchema } from './agent/session/agentSessionHistory';
+import { agentHistoryRollbackResponseSchema } from '../session/agentSessionHistory';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 
 export const AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME = 'rawengine.agent.selected_image.preview_loop';
@@ -193,7 +193,7 @@ export const runAgentCurrentImagePreviewLoop = async (
 ): Promise<AgentCurrentImagePreviewLoopResult> => {
   const parsedRequest = agentCurrentImagePreviewLoopRequestSchema.parse(request);
   const initialSnapshot = assertSelectedImageLoopSnapshot(parsedRequest);
-  const { runAgentIterativeEditLoop } = await import('./agentIterativeEditLoop.js');
+  const { runAgentIterativeEditLoop } = await import('../planning/agentIterativeEditLoop.js');
   const {
     expectedGraphRevision: _expectedGraphRevision,
     expectedPreviewHeight: _expectedPreviewHeight,

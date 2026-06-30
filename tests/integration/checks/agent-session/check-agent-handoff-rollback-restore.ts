@@ -6,11 +6,11 @@ import { RawStatus, SortDirection } from '../../../../src/components/ui/AppPrope
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { useLibraryStore } from '../../../../src/store/useLibraryStore.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
-import { agentChatTranscriptFixture } from '../../../../src/utils/agent/session/agentChatTranscriptFixture.ts';
 import {
   applyApprovedAgentPlanAtomically,
   rollbackApprovedAgentPlan,
-} from '../../../../src/utils/agentAtomicApproval.ts';
+} from '../../../../src/utils/agent/safety/agentAtomicApproval.ts';
+import { agentChatTranscriptFixture } from '../../../../src/utils/agent/session/agentChatTranscriptFixture.ts';
 
 const failures: string[] = [];
 const handoff = agentChatTranscriptFixture.reviewHandoff;

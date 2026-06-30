@@ -1,12 +1,13 @@
 import { z } from 'zod';
-import { useEditorStore } from '../store/useEditorStore';
-import type { Adjustments } from './adjustments';
-import { ActiveChannel } from './adjustments';
-import { buildAgentColorRecipeHashInput } from './agent/tools/agentColorRecipe';
-import { buildAgentCurveLevelsRecipeHashInput } from './agent/tools/agentCurveLevelsRecipe';
-import { buildAgentDetailEffectsRecipeHashInput } from './agent/tools/agentDetailEffectsRecipe';
-import { buildAgentGeometryRecipeHashInput } from './agent/tools/agentGeometryRecipe';
-import { buildAgentLensProfileRecipeHashInput } from './agent/tools/agentLensProfileRecipe';
+import { useEditorStore } from '../../../store/useEditorStore';
+import type { Adjustments } from '../../adjustments';
+import { ActiveChannel } from '../../adjustments';
+import { BASIC_TONE_ADJUSTMENT_KEYS } from '../../basicToneCommandBridge';
+import { buildAgentColorRecipeHashInput } from '../tools/agentColorRecipe';
+import { buildAgentCurveLevelsRecipeHashInput } from '../tools/agentCurveLevelsRecipe';
+import { buildAgentDetailEffectsRecipeHashInput } from '../tools/agentDetailEffectsRecipe';
+import { buildAgentGeometryRecipeHashInput } from '../tools/agentGeometryRecipe';
+import { buildAgentLensProfileRecipeHashInput } from '../tools/agentLensProfileRecipe';
 import {
   AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX,
   AGENT_MEDIUM_PREVIEW_QUALITY,
@@ -15,7 +16,6 @@ import {
   buildAgentPreviewEnvelope,
   stableAgentPreviewHash,
 } from './agentPreviewEnvelope';
-import { BASIC_TONE_ADJUSTMENT_KEYS } from './basicToneCommandBridge';
 
 const MAX_HISTOGRAM_BINS = 16;
 const MAX_METADATA_ENTRIES = 8;

@@ -15,6 +15,7 @@ import {
 } from '../../../../src/schemas/agent/agentChatTranscriptSchemas.ts';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
+import { buildAgentInitialPromptContext } from '../../../../src/utils/agent/context/agentInitialPromptContext.ts';
 import { agentChatTranscriptFixture } from '../../../../src/utils/agent/session/agentChatTranscriptFixture.ts';
 import {
   type AgentMultiTurnAppServerSessionResult,
@@ -26,7 +27,6 @@ import {
   appendAgentSessionAuditRecord,
   readAgentSessionAuditStore,
 } from '../../../../src/utils/agent/session/agentSessionAuditStore.ts';
-import { buildAgentInitialPromptContext } from '../../../../src/utils/agentInitialPromptContext.ts';
 
 const LIVE_AGENT_AUDIT_STORE_KEY = 'rawengine.agent.liveSessionAudit.v1';
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3164.ARW';

@@ -4,12 +4,12 @@ import { ToolType } from '../../../../src/components/panel/right/layers/Masks.ts
 import { RawEngineAppServerHostToolName } from '../../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
+import { AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME } from '../../../../src/utils/agent/context/agentCurrentImagePreviewLoop.ts';
+import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
 import {
   applyAgentGlobalAdjustments,
   dryRunAgentGlobalAdjustments,
 } from '../../../../src/utils/agent/tools/agentAdjustmentApplyTool.ts';
-import { AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME } from '../../../../src/utils/agentCurrentImagePreviewLoop.ts';
-import { buildAgentImageContextSnapshot } from '../../../../src/utils/agentImageContextSnapshot.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   handleRawEngineAppServerHostRequestAsync,

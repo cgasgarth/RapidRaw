@@ -3,28 +3,28 @@ import {
   type ToneColorMutationResultV1,
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
-} from '../../packages/rawengine-schema/src/rawEngineSchemas';
-import { useEditorStore } from '../store/useEditorStore';
-import {
-  type AgentLiveBasicTonePixel,
-  hashBasicTonePreviewPixels,
-  renderBasicTonePreviewPixels,
-} from './agent/session/agentLiveBasicTone';
-import { createLiveEditorAppServerBridge } from './agent/session/agentLiveEditorState';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
+import { useEditorStore } from '../../../store/useEditorStore';
 import {
   applyBasicToneCommandEnvelopeToAdjustments,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
   type LegacyBasicToneAdjustmentPayload,
-} from './basicToneCommandBridge';
-import { pushEditHistoryEntry } from './editHistory';
+} from '../../basicToneCommandBridge';
+import { pushEditHistoryEntry } from '../../editHistory';
 import {
   applySelectiveColorCommandEnvelopeToAdjustments,
   buildSelectiveColorCommandEnvelope,
   buildSelectiveColorImageCommandContext,
   type SelectiveColorAdjustmentPayload,
   type SelectiveColorCommandColorPipeline,
-} from './selectiveColorCommandBridge';
+} from '../../selectiveColorCommandBridge';
+import {
+  type AgentLiveBasicTonePixel,
+  hashBasicTonePreviewPixels,
+  renderBasicTonePreviewPixels,
+} from '../session/agentLiveBasicTone';
+import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
 
 export type AgentCoreEditCommandBundleStep =
   | { kind: 'basic_tone'; payload: LegacyBasicToneAdjustmentPayload }

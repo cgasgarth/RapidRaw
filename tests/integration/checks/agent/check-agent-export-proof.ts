@@ -4,7 +4,8 @@ import { ToolType } from '../../../../src/components/panel/right/layers/Masks.ts
 import { RawEngineAppServerRouteMode } from '../../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
-import type { AgentApprovalState } from '../../../../src/utils/agentApprovalGate.ts';
+import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
+import type { AgentApprovalState } from '../../../../src/utils/agent/safety/agentApprovalGate.ts';
 import {
   AGENT_EXPORT_PROOF_TOOL_NAME,
   AGENT_FINAL_EXPORT_TOOL_NAME,
@@ -12,8 +13,7 @@ import {
   agentFinalExportRequestSchema,
   buildAgentExportProof,
   buildAgentFinalExport,
-} from '../../../../src/utils/agentExportProofTool.ts';
-import { buildAgentImageContextSnapshot } from '../../../../src/utils/agentImageContextSnapshot.ts';
+} from '../../../../src/utils/agent/safety/agentExportProofTool.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../../../../src/utils/rawEngineAppServerHost.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3163.ARW';

@@ -2,7 +2,7 @@ import {
   AGENT_RETOUCH_APPLY_INPUT_SCHEMA_NAME,
   AGENT_RETOUCH_APPLY_OUTPUT_SCHEMA_NAME,
   AGENT_RETOUCH_APPLY_TOOL_NAME,
-} from './agent/tools/agentRetouchApplyTool';
+} from '../tools/agentRetouchApplyTool';
 import {
   AGENT_LAYER_CREATE_INPUT_SCHEMA_NAME,
   AGENT_LAYER_CREATE_OUTPUT_SCHEMA_NAME,

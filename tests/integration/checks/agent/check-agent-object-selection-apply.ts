@@ -4,12 +4,12 @@ import { ToolType } from '../../../../src/components/panel/right/layers/Masks.ts
 import { RawEngineAppServerRouteMode } from '../../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
-import { buildAgentImageContextSnapshot } from '../../../../src/utils/agentImageContextSnapshot.ts';
+import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
 import {
   AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME,
   agentObjectSelectionApplyRequestSchema,
   applyAgentObjectSelection,
-} from '../../../../src/utils/agentLayerMaskTools.ts';
+} from '../../../../src/utils/agent/layers/agentLayerMaskTools.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   buildRawEngineAppServerToolDispatchResponse,

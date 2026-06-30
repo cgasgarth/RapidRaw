@@ -5,16 +5,16 @@ import { mkdir } from 'node:fs/promises';
 import { ToolType } from '../../../../src/components/panel/right/layers/Masks.tsx';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
+import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
+import { buildAgentEditQualityReview } from '../../../../src/utils/agent/planning/agentEditQualityReview.ts';
+import {
+  agentIterativeEditLoopRequestSchema,
+  runAgentIterativeEditLoop,
+} from '../../../../src/utils/agent/planning/agentIterativeEditLoop.ts';
 import {
   applyAgentGlobalAdjustments,
   dryRunAgentGlobalAdjustments,
 } from '../../../../src/utils/agent/tools/agentAdjustmentApplyTool.ts';
-import { buildAgentEditQualityReview } from '../../../../src/utils/agentEditQualityReview.ts';
-import { buildAgentImageContextSnapshot } from '../../../../src/utils/agentImageContextSnapshot.ts';
-import {
-  agentIterativeEditLoopRequestSchema,
-  runAgentIterativeEditLoop,
-} from '../../../../src/utils/agentIterativeEditLoop.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3162.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 14 : 2));

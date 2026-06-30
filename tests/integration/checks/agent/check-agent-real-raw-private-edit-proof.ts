@@ -10,8 +10,8 @@ import { RawStatus, SortDirection } from '../../../../src/components/ui/AppPrope
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { useLibraryStore } from '../../../../src/store/useLibraryStore.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
-import { runAgentCoreEditCommandBundle } from '../../../../src/utils/agentCoreEditCommandBundle.ts';
-import { planAgentEditRecipe } from '../../../../src/utils/agentEditRecipePlanner.ts';
+import { runAgentCoreEditCommandBundle } from '../../../../src/utils/agent/planning/agentCoreEditCommandBundle.ts';
+import { planAgentEditRecipe } from '../../../../src/utils/agent/planning/agentEditRecipePlanner.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/agent/agent-real-raw-private-edit-proof-2026-06-22.json';
 const PRIVATE_SOURCE = process.env.RAWENGINE_PRIVATE_RAW_SOURCE ?? '/Users/cgas/Pictures/Capture One/Alaska';
