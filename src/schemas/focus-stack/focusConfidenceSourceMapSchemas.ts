@@ -40,7 +40,7 @@ export const focusConfidenceSourceMapReportSchema = z
       ]),
     ),
     fixtures: z.array(focusConfidenceSourceMapFixtureSchema).min(1),
-    generatedFrom: z.literal('tests/integration/checks/check-focus-confidence-source-map.ts'),
+    generatedFrom: z.literal('tests/integration/checks/focus/check-focus-confidence-source-map.ts'),
     issue: z.literal(2354),
     schemaVersion: z.literal(1),
     sourceSharpnessArtifact: z.literal('artifacts/focus-sharpness-map/focus-sharpness-map-report.json'),

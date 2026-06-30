@@ -6,7 +6,7 @@ import { dirname } from 'node:path';
 
 import { z } from 'zod';
 
-import { applyWeightedSharpnessFocusStackV1 } from '../../../packages/rawengine-schema/src/focus-stack/focusStackWeightedBlend.ts';
+import { applyWeightedSharpnessFocusStackV1 } from '../../../../packages/rawengine-schema/src/focus-stack/focusStackWeightedBlend.ts';
 
 const WIDTH = 96;
 const HEIGHT = 64;
@@ -138,7 +138,7 @@ if (update) {
 const committedReport = reportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
 if (JSON.stringify(committedReport) !== JSON.stringify(report)) {
   throw new Error(
-    'Focus synthetic output artifact proof is stale. Run bun tests/integration/checks/check-focus-synthetic-output-artifact.ts --update',
+    'Focus synthetic output artifact proof is stale. Run bun tests/integration/checks/focus/check-focus-synthetic-output-artifact.ts --update',
   );
 }
 

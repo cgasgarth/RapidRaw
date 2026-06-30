@@ -1,7 +1,7 @@
 {
   "alignment": {
     "badBracketWarningPath": "alignment_high_residual",
-    "command": "bun tests/integration/checks/check-focus-translation-alignment-smoke.ts",
+    "command": "bun tests/integration/checks/focus/check-focus-translation-alignment-smoke.ts",
     "fixtures": [
       {
         "fixtureId": "focus.synthetic.three-plane.v1",
@@ -24,7 +24,7 @@
   "sharpness": {
     "artifactHash": "2c85919f2ea62c139d5cc1a63c06de131546d12cfe39123da7d9002b89aa3cea",
     "artifactPath": "artifacts/focus-sharpness-map/focus-sharpness-map-report.json",
-    "command": "bun tests/integration/checks/check-focus-sharpness-map-smoke.ts",
+    "command": "bun tests/integration/checks/focus/check-focus-sharpness-map-smoke.ts",
     "doesNotProve": [
       "depth_map",
       "final_blending",

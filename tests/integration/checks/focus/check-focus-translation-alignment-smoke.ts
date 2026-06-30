@@ -6,7 +6,7 @@ import { performance } from 'node:perf_hooks';
 
 import { z } from 'zod';
 
-import { estimateFocusStackAlignmentV1 } from '../../../packages/rawengine-schema/src/focus-stack/focusStackAlignmentRuntime.ts';
+import { estimateFocusStackAlignmentV1 } from '../../../../packages/rawengine-schema/src/focus-stack/focusStackAlignmentRuntime.ts';
 
 const MANIFEST_PATH = resolve('fixtures/focus-stacking/focus-synthetic-bracket-fixtures.json');
 const SEARCH_RADIUS_PIXELS = 6;

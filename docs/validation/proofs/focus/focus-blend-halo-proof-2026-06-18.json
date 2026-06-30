@@ -1,6 +1,6 @@
 {
   "artifactReportHash": "300c6cf481e314024d6f4ee6609237bbc391c0da321bbbe9f51fca7294dc2523",
-  "command": "bun tests/integration/checks/check-focus-preview-blend-smoke.ts",
+  "command": "bun tests/integration/checks/focus/check-focus-preview-blend-smoke.ts",
   "generatedAt": "2026-06-18T00:00:00.000Z",
   "issue": 1939,
   "proofHash": "8471d50bceefbfaef1b3d6e8d81e019089ec38a79eed37c1a69af1b46aca7dee",

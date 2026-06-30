@@ -34,7 +34,7 @@ export const buildFocusConfidenceSourceMapReport = (
         warningCodes: fixture.expectedWarningCodes,
       };
     }),
-    generatedFrom: 'tests/integration/checks/check-focus-confidence-source-map.ts',
+    generatedFrom: 'tests/integration/checks/focus/check-focus-confidence-source-map.ts',
     issue: 2354,
     schemaVersion: 1,
     sourceSharpnessArtifact: 'artifacts/focus-sharpness-map/focus-sharpness-map-report.json',

@@ -75,7 +75,7 @@ const reportSchema = z
     alignment: z
       .object({
         badBracketWarningPath: z.literal('alignment_high_residual'),
-        command: z.literal('bun tests/integration/checks/check-focus-translation-alignment-smoke.ts'),
+        command: z.literal('bun tests/integration/checks/focus/check-focus-translation-alignment-smoke.ts'),
         fixtures: z.array(alignmentFixtureSchema).min(1),
         outputHash: z.string().regex(/^[a-f0-9]{64}$/),
         skippedScaleVariedFixtures: z.array(z.string().trim().min(1)),
@@ -89,7 +89,7 @@ const reportSchema = z
       .object({
         artifactHash: z.string().regex(/^[a-f0-9]{64}$/),
         artifactPath: z.literal(SHARPNESS_ARTIFACT_PATH),
-        command: z.literal('bun tests/integration/checks/check-focus-sharpness-map-smoke.ts'),
+        command: z.literal('bun tests/integration/checks/focus/check-focus-sharpness-map-smoke.ts'),
         doesNotProve: z.array(z.string().trim().min(1)),
         fixtures: z.array(
           z
@@ -112,15 +112,15 @@ const reportSchema = z
   .strict();
 
 const update = process.argv.includes('--update');
-const alignmentResult = run(['bun', 'tests/integration/checks/check-focus-translation-alignment-smoke.ts']);
-run(['bun', 'tests/integration/checks/check-focus-sharpness-map-smoke.ts']);
+const alignmentResult = run(['bun', 'tests/integration/checks/focus/check-focus-translation-alignment-smoke.ts']);
+run(['bun', 'tests/integration/checks/focus/check-focus-sharpness-map-smoke.ts']);
 const sharpnessArtifactText = await Bun.file(SHARPNESS_ARTIFACT_PATH).text();
 const sharpnessArtifact = sharpnessArtifactSchema.parse(JSON.parse(sharpnessArtifactText));
 const alignmentFixtures = parseAlignmentFixtures(alignmentResult.stdout);
 const skippedScaleVariedFixtures = parseSkippedFixtures(alignmentResult.stdout);
 const alignment = {
   badBracketWarningPath: 'alignment_high_residual' as const,
-  command: 'bun tests/integration/checks/check-focus-translation-alignment-smoke.ts' as const,
+  command: 'bun tests/integration/checks/focus/check-focus-translation-alignment-smoke.ts' as const,
   fixtures: alignmentFixtures,
   outputHash: hashString(JSON.stringify({ alignmentFixtures, skippedScaleVariedFixtures })),
   skippedScaleVariedFixtures,
@@ -128,7 +128,7 @@ const alignment = {
 const sharpness = {
   artifactHash: hashString(sharpnessArtifactText),
   artifactPath: SHARPNESS_ARTIFACT_PATH,
-  command: 'bun tests/integration/checks/check-focus-sharpness-map-smoke.ts' as const,
+  command: 'bun tests/integration/checks/focus/check-focus-sharpness-map-smoke.ts' as const,
   doesNotProve: sharpnessArtifact.doesNotProve,
   fixtures: sharpnessArtifact.fixtures.map((fixture) => ({
     fixtureId: fixture.fixtureId,

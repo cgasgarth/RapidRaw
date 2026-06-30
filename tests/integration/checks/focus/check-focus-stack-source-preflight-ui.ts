@@ -3,7 +3,7 @@
 import {
   buildFocusStackSourcePreflight,
   createFocusStackSourcePreflightMetadata,
-} from '../../../src/utils/focusStackSourcePreflight.ts';
+} from '../../../../src/utils/focusStackSourcePreflight.ts';
 
 const failures: string[] = [];
 
