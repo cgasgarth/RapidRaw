@@ -726,7 +726,8 @@
           "current": "Current",
           "graphRevision": "Graph revision",
           "recipeHash": "Recipe hash",
-          "rollback": "Rollback receipt"
+          "rollback": "Rollback receipt",
+          "run": "Selected-image loop"
         },
         "timeline": {
           "control": {
