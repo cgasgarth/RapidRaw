@@ -1787,8 +1787,6 @@ fn restore_window_state(window: &tauri::WebviewWindow, state: &WindowState) {
     const MIN_WINDOW_HEIGHT: u32 = 600;
     const DEFAULT_WINDOW_WIDTH: u32 = 1280;
     const DEFAULT_WINDOW_HEIGHT: u32 = 720;
-    const MONITOR_MARGIN: u32 = 40;
-
     let Some(monitor) = window
         .current_monitor()
         .ok()
@@ -1805,16 +1803,11 @@ fn restore_window_state(window: &tauri::WebviewWindow, state: &WindowState) {
         return;
     };
 
-    let monitor_size = monitor.size();
-    let monitor_position = monitor.position();
-    let max_width = monitor_size
-        .width
-        .saturating_sub(MONITOR_MARGIN)
-        .max(MIN_WINDOW_WIDTH);
-    let max_height = monitor_size
-        .height
-        .saturating_sub(MONITOR_MARGIN)
-        .max(MIN_WINDOW_HEIGHT);
+    let work_area = monitor.work_area();
+    let work_area_size = work_area.size;
+    let work_area_position = work_area.position;
+    let max_width = work_area_size.width.max(1);
+    let max_height = work_area_size.height.max(1);
 
     let requested_width = if state.width >= MIN_WINDOW_WIDTH {
         state.width
@@ -1827,16 +1820,20 @@ fn restore_window_state(window: &tauri::WebviewWindow, state: &WindowState) {
         DEFAULT_WINDOW_HEIGHT
     };
 
-    let width = requested_width.min(max_width).max(MIN_WINDOW_WIDTH);
-    let height = requested_height.min(max_height).max(MIN_WINDOW_HEIGHT);
-    let max_x = monitor_position.x + monitor_size.width as i32 - width as i32;
-    let max_y = monitor_position.y + monitor_size.height as i32 - height as i32;
+    let width = requested_width
+        .min(max_width)
+        .max(MIN_WINDOW_WIDTH.min(max_width));
+    let height = requested_height
+        .min(max_height)
+        .max(MIN_WINDOW_HEIGHT.min(max_height));
+    let max_x = work_area_position.x + work_area_size.width as i32 - width as i32;
+    let max_y = work_area_position.y + work_area_size.height as i32 - height as i32;
     let x = state
         .x
-        .clamp(monitor_position.x, max_x.max(monitor_position.x));
+        .clamp(work_area_position.x, max_x.max(work_area_position.x));
     let y = state
         .y
-        .clamp(monitor_position.y, max_y.max(monitor_position.y));
+        .clamp(work_area_position.y, max_y.max(work_area_position.y));
 
     let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
         width, height,
