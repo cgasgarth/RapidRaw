@@ -1,35 +1,31 @@
 #!/usr/bin/env bun
 
-import { readFile } from 'node:fs/promises';
-
-import { z } from 'zod';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { mock } from 'bun:test';
 
 import { buildPanoramaUiDryRunCommandV1 } from '../../../packages/rawengine-schema/src/panoramaUiControls.ts';
 import { DEFAULT_PANORAMA_UI_SETTINGS } from '../../../src/schemas/panoramaUiSchemas.ts';
+import { createDefaultPanoramaModalState, type PanoramaModalState } from '../../../src/store/useUIStore.ts';
+import {
+  buildPanoramaApplyCommandState,
+  buildPanoramaDryRunCommandState,
+  resetPanoramaStateForSettingsChange,
+} from '../../../src/utils/computationalMergeModalState.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
 
-const actionMetadataSchema = z
-  .object({
-    appServerToolName: z.literal(getComputationalMergeAppServerRoutePairSummary('panorama').dryRunToolName),
-    boundaryMode: z.literal('auto_crop'),
-    commandType: z.literal('computationalMerge.createPanorama'),
-    dryRun: z.literal(true),
-    maxPreviewDimensionPx: z.number().int().positive(),
-    projection: z.literal('rectilinear'),
-    sourceCount: z.number().int().min(2),
-  })
-  .strict();
-const applyActionMetadataSchema = z
-  .object({
-    acceptedDryRunPlanHash: z.string().trim().min(1),
-    acceptedDryRunPlanId: z.string().trim().min(1),
-    commandType: z.literal('computationalMerge.createPanorama'),
-    dryRun: z.literal(false),
-    sourceCount: z.number().int().min(2),
-    toolName: z.literal(getComputationalMergeAppServerRoutePairSummary('panorama').applyToolName),
-  })
-  .strict();
+mock.module('react-i18next', () => ({
+  Trans: ({ children }: { children?: React.ReactNode }) => React.createElement(React.Fragment, null, children),
+  useTranslation: () => ({
+    t: (key: string, values?: Record<string, unknown>) =>
+      values?.count === undefined ? key : `${key}:${String(values.count)}`,
+  }),
+}));
 
+const PanoramaModal = (await import('../../../src/components/modals/PanoramaModal.tsx')).default;
+
+const failures: string[] = [];
+const routePair = getComputationalMergeAppServerRoutePairSummary('panorama');
 const sourcePaths = [
   '/private-fixtures/panorama/overlap-stitch-v1/frame-01.raf',
   '/private-fixtures/panorama/overlap-stitch-v1/frame-02.raf',
@@ -44,7 +40,6 @@ const settings = {
   projection: 'rectilinear',
   qualityPreference: 'preview',
 } as const;
-const routePair = getComputationalMergeAppServerRoutePairSummary('panorama');
 const packageCommand = buildPanoramaUiDryRunCommandV1(
   {
     blendMode: settings.blendMode,
@@ -54,10 +49,7 @@ const packageCommand = buildPanoramaUiDryRunCommandV1(
     outputName: 'Panorama dry-run preview',
     projection: settings.projection,
     qualityPreference: settings.qualityPreference,
-    sources: sourcePaths.map((imagePath, sourceIndex) => ({
-      imagePath,
-      sourceIndex,
-    })),
+    sources: sourcePaths.map((imagePath, sourceIndex) => ({ imagePath, sourceIndex })),
   },
   {
     commandId: 'command_panorama_ui_action_boundary_dry_run',
@@ -66,93 +58,15 @@ const packageCommand = buildPanoramaUiDryRunCommandV1(
     targetId: 'project_panorama_ui',
   },
 );
-const actionMetadata = actionMetadataSchema.parse({
-  appServerToolName: routePair.dryRunToolName,
-  boundaryMode: settings.boundaryMode,
-  commandType: packageCommand.commandType,
-  dryRun: packageCommand.dryRun,
-  maxPreviewDimensionPx: settings.maxPreviewDimensionPx,
-  projection: settings.projection,
-  sourceCount: packageCommand.parameters.sources.length,
-});
-const applyActionMetadata = applyActionMetadataSchema.parse({
-  acceptedDryRunPlanHash: 'sha256:panorama-preview-plan',
-  acceptedDryRunPlanId: 'panorama_plan_3',
-  commandType: packageCommand.commandType,
-  dryRun: false,
-  sourceCount: packageCommand.parameters.sources.length,
-  toolName: routePair.applyToolName,
-});
-const [productivityActionsSource, appModalsSource, panoramaModalSource, tauriListenersSource] = await Promise.all([
-  readFile('src/hooks/useProductivityActions.ts', 'utf8'),
-  readFile('src/components/modals/AppModals.tsx', 'utf8'),
-  readFile('src/components/modals/PanoramaModal.tsx', 'utf8'),
-  readFile('src/hooks/useTauriListeners.ts', 'utf8'),
-]);
-const failures: string[] = [];
 
-if (!productivityActionsSource.includes("getComputationalMergeAppServerRoutePairSummary('panorama').dryRunToolName")) {
+const lastDryRunCommand = buildPanoramaDryRunCommandState(sourcePaths, settings);
+const lastApplyCommand = buildPanoramaApplyCommandState({ base64Length: 31, sourceCount: sourcePaths.length });
+
+if (lastDryRunCommand.appServerToolName !== routePair.dryRunToolName) {
   failures.push('Panorama start action must store the typed app-server dry-run route.');
 }
-if (!productivityActionsSource.includes('lastDryRunCommand: dryRunCommand')) {
-  failures.push('Panorama start action must persist dry-run command metadata.');
-}
-if (!productivityActionsSource.includes('lastApplyCommand: null')) {
-  failures.push('Panorama start action must clear stale apply command metadata.');
-}
-if (!appModalsSource.includes('lastDryRunCommand={panoramaModalState.lastDryRunCommand}')) {
-  failures.push('AppModals must pass panorama dry-run command metadata into PanoramaModal.');
-}
-if (!appModalsSource.includes('lastApplyCommand={panoramaModalState.lastApplyCommand}')) {
-  failures.push('AppModals must pass panorama apply command metadata into PanoramaModal.');
-}
-if (!panoramaModalSource.includes('data-testid="panorama-dry-run-command-state"')) {
-  failures.push('Panorama processing UI must render dry-run command state.');
-}
-if (!panoramaModalSource.includes('data-tool-name={lastDryRunCommand.appServerToolName}')) {
-  failures.push('Panorama processing UI must expose the dry-run tool name.');
-}
-if (!panoramaModalSource.includes('data-testid="panorama-apply-command-state"')) {
-  failures.push('Panorama result UI must render apply command state.');
-}
-if (!panoramaModalSource.includes('data-accepted-dry-run-plan-hash={lastApplyCommand.acceptedDryRunPlanHash}')) {
-  failures.push('Panorama apply command state must expose accepted dry-run hash.');
-}
-if (!tauriListenersSource.includes("getComputationalMergeAppServerRoutePairSummary('panorama').applyToolName")) {
-  failures.push('Panorama complete listener must store the typed app-server apply route.');
-}
-if (!tauriListenersSource.includes('lastApplyCommand:')) {
-  failures.push('Panorama complete listener must persist apply command metadata.');
-}
-for (const marker of [
-  'boundaryMode: settings.boundaryMode',
-  'projection: settings.projection',
-  'maxPreviewDimensionPx',
-]) {
-  if (!productivityActionsSource.includes(marker)) {
-    failures.push(`Panorama start action must persist runtime setting marker: ${marker}`);
-  }
-}
-if (actionMetadata.appServerToolName !== routePair.dryRunToolName) {
-  failures.push('Panorama UI action command must use the typed app-server dry-run route.');
-}
-if (applyActionMetadata.toolName !== routePair.applyToolName) {
-  failures.push('Panorama UI action command must use the typed app-server apply route.');
-}
-if (actionMetadata.commandType !== packageCommand.commandType) {
-  failures.push('Panorama UI action command type must match package command builder.');
-}
-if (actionMetadata.dryRun !== true || packageCommand.dryRun !== true) {
-  failures.push('Panorama UI action command must be dry-run only.');
-}
-if (applyActionMetadata.dryRun !== false) {
-  failures.push('Panorama apply command metadata must be mutating.');
-}
-if (actionMetadata.sourceCount !== packageCommand.parameters.sources.length) {
+if (lastDryRunCommand.sourceCount !== packageCommand.parameters.sources.length) {
   failures.push('Panorama UI action source count must match package command builder.');
-}
-if (applyActionMetadata.sourceCount !== packageCommand.parameters.sources.length) {
-  failures.push('Panorama apply command source count must match package command builder.');
 }
 if (packageCommand.parameters.sources.some((source) => source.role !== 'panorama_tile')) {
   failures.push('Package panorama UI command sources must use panorama_tile roles.');
@@ -163,12 +77,138 @@ if (settings.projection !== packageCommand.parameters.projection) {
 if (settings.boundaryMode !== packageCommand.parameters.boundaryMode) {
   failures.push('Panorama UI action boundary mode must match package command builder.');
 }
-if (actionMetadata.projection !== 'rectilinear' || actionMetadata.boundaryMode !== 'auto_crop') {
-  failures.push('Panorama UI action must use runtime-supported rectilinear auto-crop defaults.');
-}
 if ('none' !== packageCommand.parameters.exposureNormalization) {
   failures.push('Panorama UI action exposure normalization must match package command builder.');
 }
+if (lastApplyCommand.toolName !== routePair.applyToolName || lastApplyCommand.dryRun !== false) {
+  failures.push(
+    'Panorama complete listener must store mutating apply command metadata with the typed app-server route.',
+  );
+}
+if (lastApplyCommand.acceptedDryRunPlanHash !== 'sha256:panorama-preview-31') {
+  failures.push('Panorama apply command metadata must preserve the accepted dry-run hash.');
+}
+
+const staleState: PanoramaModalState = {
+  ...createDefaultPanoramaModalState(settings),
+  error: 'stale error',
+  finalImageBase64: 'data:image/png;base64,stale',
+  isProcessing: true,
+  lastApplyCommand,
+  lastDryRunCommand,
+  progressMessage: 'stale progress',
+  renderedReview: {
+    boundary: {
+      crop: { height: 90, left: 0, preCropHeight: 100, preCropWidth: 200, top: 0, width: 180 },
+      transparentPixelRatio: 0.01,
+    },
+    seamReview: {
+      policy: 'adaptive_dp_feather_v1',
+      reviewStatus: 'passed',
+      seamCount: 2,
+      seams: [],
+    },
+    sourceContribution: {
+      excludedSourceCount: 0,
+      regions: sourcePaths.map((_path, sourceIndex) => ({
+        coverageRatio: 1 / sourcePaths.length,
+        role: 'stitched',
+        sourceIndex,
+      })),
+      stitchedSourceCount: sourcePaths.length,
+    },
+  },
+  runtimePlan: {
+    output_dimensions: { height: 90, width: 180 },
+    preflight: {
+      blocked_reasons: [],
+      memory_components: { total_estimated_peak_bytes: 123_456 },
+      source_geometry: {
+        columns: 3,
+        rows: 1,
+        warning_codes: [],
+      },
+      status: 'ready',
+      warnings: [],
+    },
+  },
+};
+const resetState = resetPanoramaStateForSettingsChange(staleState, {
+  ...settings,
+  projection: 'cylindrical',
+});
+
+if (resetState.error !== null || resetState.finalImageBase64 !== null || resetState.progressMessage !== null) {
+  failures.push('Panorama settings changes must clear stale error/output/progress state.');
+}
+if (resetState.lastDryRunCommand !== null || resetState.lastApplyCommand !== null) {
+  failures.push('Panorama settings changes must clear stale dry-run and apply command metadata.');
+}
+if (resetState.renderedReview !== null || resetState.runtimePlan !== null) {
+  failures.push('Panorama settings changes must clear stale rendered review and runtime plan state.');
+}
+
+const dryRunAttrs = renderedAttrs(
+  'panorama-dry-run-command-state',
+  React.createElement(PanoramaModal, {
+    error: null,
+    finalImageBase64: null,
+    imageCount: sourcePaths.length,
+    isOpen: true,
+    isProcessing: true,
+    lastApplyCommand: null,
+    lastDryRunCommand,
+    onClose: noop,
+    onOpenFile: noop,
+    onSave: async () => '/tmp/panorama.tif',
+    onSettingsChange: noop,
+    onStitch: noop,
+    progressMessage: 'Starting panorama',
+    renderedReview: null,
+    runtimePlan: null,
+    settings,
+    sourcePaths,
+  }),
+);
+assertAttr(
+  dryRunAttrs,
+  'data-tool-name',
+  routePair.dryRunToolName,
+  'Panorama processing UI must render dry-run tool name.',
+);
+assertAttr(dryRunAttrs, 'data-source-count', '3', 'Panorama processing UI must render dry-run source count.');
+assertAttr(dryRunAttrs, 'data-dry-run', 'true', 'Panorama processing UI must render dry-run mode.');
+
+const applyAttrs = renderedAttrs(
+  'panorama-apply-command-state',
+  React.createElement(PanoramaModal, {
+    error: null,
+    finalImageBase64: 'data:image/png;base64,cGFub3JhbWEtcHJldmlldw==',
+    imageCount: sourcePaths.length,
+    isOpen: true,
+    isProcessing: false,
+    lastApplyCommand,
+    lastDryRunCommand,
+    onClose: noop,
+    onOpenFile: noop,
+    onSave: async () => '/tmp/panorama.tif',
+    onSettingsChange: noop,
+    onStitch: noop,
+    progressMessage: null,
+    renderedReview: null,
+    runtimePlan: null,
+    settings,
+    sourcePaths,
+  }),
+);
+assertAttr(applyAttrs, 'data-tool-name', routePair.applyToolName, 'Panorama result UI must render apply tool name.');
+assertAttr(
+  applyAttrs,
+  'data-accepted-dry-run-plan-hash',
+  'sha256:panorama-preview-31',
+  'Panorama result UI must render accepted dry-run hash.',
+);
+assertAttr(applyAttrs, 'data-dry-run', 'false', 'Panorama result UI must render mutating apply mode.');
 
 if (failures.length > 0) {
   console.error('panorama UI action command failed');
@@ -177,5 +217,23 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `panorama UI action command ok (${actionMetadata.appServerToolName}, sources=${actionMetadata.sourceCount})`,
+  `panorama UI action command ok (${lastDryRunCommand.appServerToolName}, sources=${lastDryRunCommand.sourceCount})`,
 );
+
+function renderedAttrs(testId: string, element: React.ReactElement): Record<string, string> {
+  const html = renderToStaticMarkup(element);
+  const match = html.match(new RegExp(`<[^>]*data-testid="${testId}"[^>]*>`, 'u'));
+  if (!match) {
+    failures.push(`Rendered panorama modal missing ${testId}.`);
+    return {};
+  }
+  return Object.fromEntries([...match[0].matchAll(/\s(data-[\w-]+)="([^"]*)"/gu)].map((attr) => [attr[1], attr[2]]));
+}
+
+function assertAttr(attrs: Record<string, string>, name: string, expected: string, message: string) {
+  if (attrs[name] !== expected) {
+    failures.push(`${message} Expected ${name}=${expected}, received ${attrs[name] ?? '<missing>'}.`);
+  }
+}
+
+function noop() {}

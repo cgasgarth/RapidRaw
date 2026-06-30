@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 import { panoramaRuntimePlanSchema } from '../schemas/panoramaUiSchemas';
 import { useUIStore } from '../store/useUIStore';
 import { Invokes } from '../tauri/commands';
-import { getComputationalMergeAppServerRoutePairSummary } from '../utils/computationalMergeAppServerRoutePairs';
+import { buildHdrDryRunActionState, buildPanoramaDryRunCommandState } from '../utils/computationalMergeModalState';
 
 export function useProductivityActions(refreshImageList: () => Promise<void>) {
   const setUI = useUIStore((state) => state.setUI);
@@ -13,16 +13,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
     async (paths: string[]) => {
       const { panoramaModalState } = useUIStore.getState();
       const { settings } = panoramaModalState;
-      const dryRunCommand = {
-        appServerToolName: getComputationalMergeAppServerRoutePairSummary('panorama').dryRunToolName,
-        boundaryMode: settings.boundaryMode,
-        commandType: 'computationalMerge.createPanorama' as const,
-        dryRun: true as const,
-        maxPreviewDimensionPx: settings.maxPreviewDimensionPx,
-        projection: settings.projection,
-        seamExposureCompensationPercent: settings.seamExposureCompensationPercent,
-        sourceCount: paths.length,
-      };
+      const dryRunCommand = buildPanoramaDryRunCommandState(paths, settings);
       setUI((state) => ({
         panoramaModalState: {
           ...state.panoramaModalState,
@@ -104,27 +95,14 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
     (paths: string[]) => {
       const { hdrModalState } = useUIStore.getState();
       const { settings } = hdrModalState;
-      const selectedIndexSet = new Set(settings.selectedSourceIndexes);
-      const selectedPaths = paths.filter((_path, sourceIndex) => selectedIndexSet.has(sourceIndex));
-      const dryRunCommand = {
-        toolName: getComputationalMergeAppServerRoutePairSummary('hdr').dryRunToolName,
-        commandType: 'computationalMerge.createHdr' as const,
-        deghosting: settings.deghosting,
-        dryRun: true as const,
-        exposureWeightingMode: settings.exposureWeightingMode,
-        maxPreviewDimensionPx: settings.maxPreviewDimensionPx,
-        mergeStrategy: settings.mergeStrategy,
-        selectedSourceIndexes: settings.selectedSourceIndexes,
-        sources: selectedPaths.length,
-        toneMappingPreset: settings.toneMappingPreset,
-      };
+      const { lastDryRunCommand, selectedPaths } = buildHdrDryRunActionState(paths, settings);
       setUI((state) => {
         const { lastApplyCommand: _lastApplyCommand, ...hdrModalState } = state.hdrModalState;
         return {
           hdrModalState: {
             ...hdrModalState,
             isProcessing: true,
-            lastDryRunCommand: dryRunCommand,
+            lastDryRunCommand,
             error: null,
             finalImageBase64: null,
             progressMessage: 'Starting HDR',

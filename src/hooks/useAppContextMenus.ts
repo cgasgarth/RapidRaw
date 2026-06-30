@@ -77,8 +77,8 @@ import { Invokes } from '../tauri/commands';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { createFocusStackSourcePreflightMetadata } from '../utils/focusStackSourcePreflight';
 import { findAlbumById } from '../utils/folderTreeUtils';
+import { findHdrAutoStackPaths } from '../utils/hdrAutoStackSelection';
 import { globalImageCache } from '../utils/ImageLRUCache';
-import { buildLibraryAutoStacks } from '../utils/libraryAutoStacks';
 import {
   applyLibraryRelinkToRuntimeState,
   planLibraryFolderRelink,
@@ -134,16 +134,6 @@ const collectFolderRelinkSourcePaths = (imageList: ImageFile[], folderPath: stri
         .filter((imagePath) => isRelinkPathInside(imagePath, folderPath)),
     ),
   ).sort((left, right) => left.localeCompare(right));
-
-const findHdrAutoStackPaths = (imageList: ImageFile[], path: string): string[] | null => {
-  const findInOrder = (images: ImageFile[]) =>
-    buildLibraryAutoStacks(images).find((stack) => stack.kind === 'bracket' && stack.paths.includes(path))?.paths ??
-    null;
-
-  return (
-    findInOrder(imageList) ?? findInOrder([...imageList].sort((left, right) => left.path.localeCompare(right.path)))
-  );
-};
 
 export function useAppContextMenus(props: UseAppContextMenusProps) {
   const { t } = useTranslation();

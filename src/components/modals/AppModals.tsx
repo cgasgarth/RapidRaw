@@ -30,6 +30,10 @@ import {
   useUIStore,
 } from '../../store/useUIStore';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
+import {
+  resetHdrStateForSettingsChange,
+  resetPanoramaStateForSettingsChange,
+} from '../../utils/computationalMergeModalState';
 import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
 import { handleNegativeConversionEditorHandoff } from '../../utils/negativeLabEditorHandoff';
 import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
@@ -223,17 +227,7 @@ export default function AppModals(props: AppModalsProps) {
         }}
         onSettingsChange={(settings) => {
           setUI((state) => ({
-            panoramaModalState: {
-              ...state.panoramaModalState,
-              error: null,
-              finalImageBase64: null,
-              lastApplyCommand: null,
-              lastDryRunCommand: null,
-              progressMessage: null,
-              renderedReview: null,
-              runtimePlan: null,
-              settings,
-            },
+            panoramaModalState: resetPanoramaStateForSettingsChange(state.panoramaModalState, settings),
           }));
         }}
         progressMessage={panoramaModalState.progressMessage}
@@ -270,24 +264,9 @@ export default function AppModals(props: AppModalsProps) {
           props.handleStartHdr(hdrModalState.stitchingSourcePaths);
         }}
         onSettingsChange={(settings) => {
-          setUI((state) => {
-            const {
-              lastApplyCommand: _lastApplyCommand,
-              lastDryRunCommand: _lastDryRunCommand,
-              savedHandoffSummary: _savedHandoffSummary,
-              ...hdrModalState
-            } = state.hdrModalState;
-            return {
-              hdrModalState: {
-                ...hdrModalState,
-                error: null,
-                finalImageBase64: null,
-                progressMessage: null,
-                savedHandoffSummary: null,
-                settings,
-              },
-            };
-          });
+          setUI((state) => ({
+            hdrModalState: resetHdrStateForSettingsChange(state.hdrModalState, settings),
+          }));
         }}
         progressMessage={hdrModalState.progressMessage}
         settings={hdrModalState.settings}
