@@ -25,7 +25,7 @@ Primary backend files:
 - `src-tauri/src/library/file_management.rs`
 - `src-tauri/src/export/export_processing.rs`
 - `src-tauri/src/render/mask_generation.rs`
-- `src-tauri/src/app_state.rs`
+- `src-tauri/src/app/state.rs`
 - `src-tauri/src/lib.rs`
 
 Primary frontend files:
