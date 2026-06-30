@@ -22,6 +22,8 @@ import { useTranslation } from 'react-i18next';
 
 import LibraryGrid from './library/LibraryGrid';
 import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
+import { buildLibraryHeaderStatusItems } from './library/libraryHeaderStatus';
+import LibraryHeaderStatusStrip from './library/LibraryHeaderStatusStrip';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../schemas/exportRecipeIds';
 import { buildLibrarySessionUiCard } from '../../schemas/librarySessionUiSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -37,8 +39,7 @@ import {
   ThumbnailAspectRatio,
   RawStatus,
   EditedStatus,
-  SortDirection,
-  LibraryViewMode,
+  type LibraryViewMode,
   type Theme,
 } from '../ui/AppProperties';
 import Button from '../ui/Button';
@@ -99,16 +100,16 @@ export interface ColumnWidths {
   focal: number;
 }
 
-interface GitHubReleaseResponse {
-  tag_name?: unknown;
-}
-
 const getPhysicalImagePath = (path: string): string => parseVirtualImagePath(path).path;
 
 const getVirtualCopyLabel = (path: string): string => {
   const copyId = parseVirtualImagePath(path).virtualCopyId;
   return copyId ? copyId.slice(0, 6).toUpperCase() : '';
 };
+
+interface GitHubReleaseResponse {
+  tag_name?: unknown;
+}
 
 export default function MainLibrary(props: MainLibraryProps) {
   const { t } = useTranslation();
@@ -190,61 +191,18 @@ export default function MainLibrary(props: MainLibraryProps) {
     [t],
   );
 
-  const libraryHeaderStatusItems = useMemo(() => {
-    const activeSearchTokenCount = searchCriteria.tags.length + (searchCriteria.text.trim().length > 0 ? 1 : 0);
-    const activeFilterCount =
-      (filterCriteria.rating !== 0 ? 1 : 0) +
-      (filterCriteria.rawStatus !== RawStatus.All ? 1 : 0) +
-      ((filterCriteria.editedStatus || EditedStatus.All) !== EditedStatus.All ? 1 : 0) +
-      (filterCriteria.colors.length > 0 ? 1 : 0);
-    const sortLabel =
-      translatedSortOptions.find((option) => option.key === sortCriteria.key)?.label ?? t('library.sort.fileName');
-    const sortDirectionLabel =
-      sortCriteria.order === SortDirection.Ascending
-        ? t('library.header.status.ascending')
-        : t('library.header.status.descending');
-    const viewModeLabel =
-      props.libraryViewMode === LibraryViewMode.Recursive
-        ? t('library.header.viewOptions.recursive')
-        : t('library.header.viewOptions.currentFolder');
-
-    return [
-      {
-        label: t('library.header.status.searchLabel'),
-        value:
-          activeSearchTokenCount > 0
-            ? t('library.header.status.searchActive', { count: activeSearchTokenCount })
-            : t('library.header.status.searchReady'),
-      },
-      {
-        label: t('library.header.status.filterLabel'),
-        value:
-          activeFilterCount > 0
-            ? t('library.header.status.filterActive', { count: activeFilterCount })
-            : t('library.header.status.filterReady'),
-      },
-      {
-        label: t('library.header.status.sortLabel'),
-        value: t('library.header.status.sortValue', { direction: sortDirectionLabel, sort: sortLabel }),
-      },
-      {
-        label: t('library.header.status.viewLabel'),
-        value: viewModeLabel,
-      },
-    ];
-  }, [
-    filterCriteria.colors.length,
-    filterCriteria.editedStatus,
-    filterCriteria.rating,
-    filterCriteria.rawStatus,
-    props.libraryViewMode,
-    searchCriteria.tags.length,
-    searchCriteria.text,
-    sortCriteria.key,
-    sortCriteria.order,
-    t,
-    translatedSortOptions,
-  ]);
+  const libraryHeaderStatusItems = useMemo(
+    () =>
+      buildLibraryHeaderStatusItems({
+        filterCriteria,
+        libraryViewMode: props.libraryViewMode,
+        searchCriteria,
+        sortCriteria,
+        t,
+        translatedSortOptions,
+      }),
+    [filterCriteria, props.libraryViewMode, searchCriteria, sortCriteria, t, translatedSortOptions],
+  );
 
   const isBusy =
     props.isLoading ||
@@ -686,25 +644,7 @@ export default function MainLibrary(props: MainLibraryProps) {
               {label}
             </UiText>
           ))}
-          <div
-            className="flex min-w-0 flex-wrap items-center gap-2 border-l border-surface pl-2"
-            data-testid="library-header-workflow-status"
-          >
-            {libraryHeaderStatusItems.map((item) => (
-              <div
-                className="flex items-center gap-1 rounded border border-surface bg-bg-secondary px-2 py-1"
-                data-library-header-status={item.label}
-                key={item.label}
-              >
-                <UiText as="span" variant={TextVariants.small} color={TextColors.secondary}>
-                  {item.label}
-                </UiText>
-                <UiText as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
-                  {item.value}
-                </UiText>
-              </div>
-            ))}
-          </div>
+          <LibraryHeaderStatusStrip items={libraryHeaderStatusItems} />
           {selectedCompareVariants && (
             <div
               className="flex min-w-0 flex-wrap items-center gap-2 border-l border-surface pl-2"
