@@ -108,6 +108,7 @@ function renderToolbar({
         isAndroid: false,
         isLoading: false,
         onBackToLibrary: () => undefined,
+        onOpenNegativeLab: () => undefined,
         onRedo: () => undefined,
         onToggleDateView: () => undefined,
         onToggleFullScreen: () => undefined,
