@@ -1819,5 +1819,12 @@
         "vectorscope": "벡터스코프"
       }
     }
+  },
+  "window": {
+    "titleBar": {
+      "close": "창 닫기",
+      "maximize": "창 최대화",
+      "minimize": "창 최소화"
+    }
   }
 }
