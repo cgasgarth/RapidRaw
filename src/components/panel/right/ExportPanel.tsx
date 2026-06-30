@@ -2,7 +2,19 @@ import { invoke } from '@tauri-apps/api/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { TFunction } from 'i18next';
-import { Ban, CheckCircle, ChevronDown, ChevronRight, FileInput, Loader, Settings, X, XCircle } from 'lucide-react';
+import {
+  Ban,
+  CheckCircle,
+  ChevronDown,
+  ChevronRight,
+  Columns2,
+  FileInput,
+  Loader,
+  RefreshCw,
+  Settings,
+  X,
+  XCircle,
+} from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
@@ -14,6 +26,7 @@ import {
 } from '../../../../packages/rawengine-schema/src/exportColorCapabilities';
 import { useExportSettings } from '../../../hooks/useExportSettings';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
+import { prepareAdjustmentPayloadForBackend } from '../../../schemas/adjustmentPayloadSchemas';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../../schemas/exportRecipeIds';
 import { outputSharpeningSettingsSchema } from '../../../schemas/outputSharpeningSchemas';
 import { emptyTauriResponseSchema } from '../../../schemas/tauriResponseSchemas';
@@ -37,6 +50,16 @@ import {
   hasStaleOrOfflineSmartPreview,
   isResolvingStaleSmartPreviewExport,
 } from '../../../utils/exportSmartPreviewReadiness';
+import {
+  buildSoftProofProfileCompareProof,
+  buildSoftProofProfileCompareRequests,
+  createInitialSoftProofProfileCompareState,
+  EXPORT_SOFT_PROOF_PROFILE_COMPARE_TARGET_RESOLUTION,
+  type ExportSoftProofProfileCompareSideId,
+  type ExportSoftProofProfileCompareSideState,
+  exportSoftProofTransformResponseSchema,
+  getSoftProofProfileCompareStatus,
+} from '../../../utils/exportSoftProofProfileCompare';
 import { formatGamutWarningCoverage } from '../../../utils/gamutWarningDisplay';
 import { buildRawWarningChips } from '../../../utils/rawWarningReceipts';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
@@ -65,6 +88,7 @@ import Switch from '../../ui/Switch';
 import UiText from '../../ui/Text';
 
 const QUALITY_FILE_FORMATS: ReadonlySet<FileFormats> = new Set([FileFormats.Jpeg, FileFormats.Webp, FileFormats.Jxl]);
+const SOFT_PROOF_PROFILE_COMPARE_SIDE_IDS = ['srgb', 'displayP3'] as const;
 
 interface ExportPanelProps {
   exportState: ExportState;
@@ -92,6 +116,7 @@ interface ImageDimensions {
 const imageDimensionsSchema = z.object({ height: z.number(), width: z.number() }).strict();
 const originalFileAvailableSchema = z.boolean();
 const exportSizeEstimateSchema = z.number().nonnegative();
+const previewBufferResponseSchema = z.instanceof(ArrayBuffer);
 const externalEditorVariantReceiptSchema = z
   .object({
     artifactId: z.string().trim().min(1),
@@ -402,6 +427,10 @@ export default function ExportPanel({
   const [exportColorCapabilityCatalog, setExportColorCapabilityCatalog] = useState<ExportColorCapabilityCatalogV1>(
     MOXCMS_EXPORT_COLOR_CAPABILITIES_V1,
   );
+  const [softProofProfileCompareState, setSoftProofProfileCompareState] = useState<
+    Record<ExportSoftProofProfileCompareSideId, ExportSoftProofProfileCompareSideState>
+  >(() => createInitialSoftProofProfileCompareState());
+  const softProofProfileCompareUrlsRef = useRef<string[]>([]);
   const filenameInputRef = useRef<HTMLInputElement>(null);
   const osPlatform = useOsPlatform();
   const isAndroid = osPlatform === 'android';
@@ -814,6 +843,125 @@ export default function ExportPanel({
     }
   }, [blackPointCompensation, isBlackPointCompensationAvailable, setBlackPointCompensation]);
 
+  const revokeSoftProofProfileCompareUrls = useCallback(() => {
+    for (const url of softProofProfileCompareUrlsRef.current) {
+      URL.revokeObjectURL(url);
+    }
+    softProofProfileCompareUrlsRef.current = [];
+  }, []);
+
+  useEffect(() => () => revokeSoftProofProfileCompareUrls(), [revokeSoftProofProfileCompareUrls]);
+
+  const handleGenerateSoftProofProfileCompare = useCallback(async () => {
+    revokeSoftProofProfileCompareUrls();
+
+    if (!selectedImage?.isReady) {
+      setSoftProofProfileCompareState({
+        displayP3: {
+          error: t('export.softProofCompare.unavailableNoImage'),
+          requestedColorProfile: ExportColorProfile.DisplayP3,
+          requestedRenderingIntent: renderingIntent,
+          side: 'displayP3',
+          status: 'unavailable',
+        },
+        srgb: {
+          error: t('export.softProofCompare.unavailableNoImage'),
+          requestedColorProfile: ExportColorProfile.Srgb,
+          requestedRenderingIntent: renderingIntent,
+          side: 'srgb',
+          status: 'unavailable',
+        },
+      });
+      return;
+    }
+
+    setSoftProofProfileCompareState({
+      displayP3: { side: 'displayP3', status: 'loading' },
+      srgb: { side: 'srgb', status: 'loading' },
+    });
+
+    const { patchesSentToBackend } = useEditorStore.getState();
+    const { newlySentPatchIds, payload } = prepareAdjustmentPayloadForBackend(
+      structuredClone(adjustments),
+      patchesSentToBackend,
+    );
+    const compareRequests = buildSoftProofProfileCompareRequests({
+      blackPointCompensation,
+      jsAdjustments: payload,
+      renderingIntent,
+      targetResolution: EXPORT_SOFT_PROOF_PROFILE_COMPARE_TARGET_RESOLUTION,
+    });
+    const nextUrls: string[] = [];
+
+    const sideEntries = await Promise.all(
+      compareRequests.map(async ({ label, request, side }) => {
+        try {
+          const [buffer, metadata] = await Promise.all([
+            invokeWithSchema(Invokes.GenerateExportSoftProofPreview, request, previewBufferResponseSchema),
+            invokeWithSchema(
+              Invokes.ResolveExportSoftProofTransformMetadata,
+              request,
+              exportSoftProofTransformResponseSchema,
+            ),
+          ]);
+
+          if (buffer.byteLength === 0) {
+            throw new Error(t('export.softProofCompare.emptyPreview'));
+          }
+
+          const previewUrl = URL.createObjectURL(new Blob([buffer], { type: 'image/jpeg' }));
+          nextUrls.push(previewUrl);
+
+          return [
+            side,
+            {
+              proof: buildSoftProofProfileCompareProof({
+                buffer,
+                label,
+                metadata,
+                previewUrl,
+                request,
+                side,
+              }),
+              side,
+              status: 'ready',
+            } satisfies ExportSoftProofProfileCompareSideState,
+          ] as const;
+        } catch (error) {
+          return [
+            side,
+            {
+              error: formatUnknownError(error),
+              requestedColorProfile: request.colorProfile,
+              requestedRenderingIntent: request.renderingIntent,
+              side,
+              status: 'unavailable',
+            } satisfies ExportSoftProofProfileCompareSideState,
+          ] as const;
+        }
+      }),
+    );
+
+    if (newlySentPatchIds.size > 0) {
+      newlySentPatchIds.forEach((id) => patchesSentToBackend.add(id));
+    }
+
+    softProofProfileCompareUrlsRef.current = nextUrls;
+    setSoftProofProfileCompareState(
+      Object.fromEntries(sideEntries) as Record<
+        ExportSoftProofProfileCompareSideId,
+        ExportSoftProofProfileCompareSideState
+      >,
+    );
+  }, [
+    adjustments,
+    blackPointCompensation,
+    renderingIntent,
+    revokeSoftProofProfileCompareUrls,
+    selectedImage?.isReady,
+    t,
+  ]);
+
   const debouncedEstimateSize = useMemo(
     () =>
       debounce(
@@ -1146,6 +1294,127 @@ export default function ExportPanel({
     selectedRenderingIntentLabel,
     t,
   ]);
+  const softProofProfileCompareStatus = getSoftProofProfileCompareStatus(softProofProfileCompareState);
+  const isSoftProofProfileCompareLoading = softProofProfileCompareStatus === 'loading';
+  const softProofProfileCompareSummary =
+    softProofProfileCompareStatus === 'ready'
+      ? t('export.softProofCompare.ready')
+      : softProofProfileCompareStatus === 'unavailable'
+        ? t('export.softProofCompare.unavailable')
+        : softProofProfileCompareStatus === 'loading'
+          ? t('export.softProofCompare.loading')
+          : t('export.softProofCompare.idle');
+  const renderSoftProofProfileCompareSide = (sideId: ExportSoftProofProfileCompareSideId) => {
+    const sideState = softProofProfileCompareState[sideId];
+    const proof = sideState.status === 'ready' ? sideState.proof : null;
+    const sideLabel =
+      sideId === 'srgb' ? t('export.softProofCompare.srgbTitle') : t('export.softProofCompare.displayP3Title');
+    const requestedColorProfile =
+      proof?.requestedColorProfile ??
+      (sideState.status === 'unavailable'
+        ? sideState.requestedColorProfile
+        : sideId === 'srgb'
+          ? ExportColorProfile.Srgb
+          : ExportColorProfile.DisplayP3);
+    const requestedRenderingIntent =
+      proof?.requestedRenderingIntent ??
+      (sideState.status === 'unavailable' ? sideState.requestedRenderingIntent : renderingIntent);
+    const effectiveColorProfile = proof?.effectiveColorProfile ?? '';
+    const effectiveRenderingIntent = proof?.effectiveRenderingIntent ?? '';
+    const transformApplied = proof?.transformApplied;
+    const sourcePrecisionPath = proof?.sourcePrecisionPath ?? '';
+    const transformPolicyFingerprint = proof?.transformPolicyFingerprint ?? '';
+    const proofRole = proof?.proofRole ?? '';
+
+    return (
+      <div
+        className="min-w-0 rounded-md border border-surface bg-bg-secondary/60 p-2"
+        data-export-soft-proof-profile-compare-effective-color-profile={effectiveColorProfile}
+        data-export-soft-proof-profile-compare-effective-rendering-intent={effectiveRenderingIntent}
+        data-export-soft-proof-profile-compare-preview-hash={proof?.previewHash ?? ''}
+        data-export-soft-proof-profile-compare-proof-role={proofRole}
+        data-export-soft-proof-profile-compare-requested-color-profile={requestedColorProfile}
+        data-export-soft-proof-profile-compare-requested-rendering-intent={requestedRenderingIntent}
+        data-export-soft-proof-profile-compare-side={sideId}
+        data-export-soft-proof-profile-compare-source-precision-path={sourcePrecisionPath}
+        data-export-soft-proof-profile-compare-status={sideState.status}
+        data-export-soft-proof-profile-compare-transform-applied={String(transformApplied ?? '')}
+        data-export-soft-proof-profile-compare-transform-policy-fingerprint={transformPolicyFingerprint}
+        data-testid={`export-soft-proof-profile-compare-${sideId}`}
+        key={sideId}
+      >
+        <div className="mb-2 flex min-w-0 items-center justify-between gap-2">
+          <UiText className="truncate" variant={TextVariants.label} weight={TextWeights.semibold}>
+            {sideLabel}
+          </UiText>
+          <UiText
+            as="span"
+            className="rounded bg-surface px-1.5 py-0.5"
+            color={sideState.status === 'unavailable' ? TextColors.error : TextColors.secondary}
+            variant={TextVariants.small}
+          >
+            {sideState.status === 'ready'
+              ? t('export.softProofCompare.sideReady')
+              : sideState.status === 'loading'
+                ? t('export.softProofCompare.sideLoading')
+                : sideState.status === 'unavailable'
+                  ? t('export.softProofCompare.sideUnavailable')
+                  : t('export.softProofCompare.sideIdle')}
+          </UiText>
+        </div>
+        <div className="aspect-video overflow-hidden rounded bg-surface">
+          {proof ? (
+            <img
+              alt={sideLabel}
+              className="h-full w-full object-contain"
+              data-testid={`export-soft-proof-profile-compare-preview-${sideId}`}
+              src={proof.previewUrl}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center px-3 text-center">
+              <UiText color={sideState.status === 'unavailable' ? TextColors.error : TextColors.secondary}>
+                {sideState.status === 'unavailable'
+                  ? sideState.error
+                  : isSoftProofProfileCompareLoading
+                    ? t('export.softProofCompare.loading')
+                    : t('export.softProofCompare.empty')}
+              </UiText>
+            </div>
+          )}
+        </div>
+        <div className="mt-2 space-y-1">
+          <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
+            {t('export.softProofCompare.requested', {
+              intent: requestedRenderingIntent,
+              profile: requestedColorProfile,
+            })}
+          </UiText>
+          {proof ? (
+            <>
+              <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
+                {t('export.softProofCompare.effective', {
+                  intent: effectiveRenderingIntent,
+                  profile: effectiveColorProfile,
+                })}
+              </UiText>
+              <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
+                {t('export.softProofCompare.transform', {
+                  applied:
+                    transformApplied === true
+                      ? t('export.softProofCompare.transformApplied')
+                      : t('export.softProofCompare.identityTransform'),
+                  source: sourcePrecisionPath,
+                })}
+              </UiText>
+              <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
+                {t('export.softProofCompare.fingerprint', { fingerprint: transformPolicyFingerprint })}
+              </UiText>
+            </>
+          ) : null}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className={onClose ? 'h-full bg-bg-secondary rounded-lg flex flex-col' : 'flex flex-col h-full'}>
@@ -1454,6 +1723,51 @@ export default function ExportPanel({
                       />
                     </div>
                   )}
+                </Section>
+
+                <Section title={t('export.softProofCompare.title')}>
+                  <div
+                    className="space-y-3"
+                    data-export-soft-proof-profile-compare-rendering-intent={renderingIntent}
+                    data-export-soft-proof-profile-compare-status={softProofProfileCompareStatus}
+                    data-export-soft-proof-profile-compare-target-resolution={
+                      EXPORT_SOFT_PROOF_PROFILE_COMPARE_TARGET_RESOLUTION
+                    }
+                    data-testid="export-soft-proof-profile-compare"
+                  >
+                    <div className="flex min-w-0 items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <UiText color={TextColors.primary} variant={TextVariants.label}>
+                          {softProofProfileCompareSummary}
+                        </UiText>
+                        <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
+                          {t('export.softProofCompare.subtitle', { intent: renderingIntent })}
+                        </UiText>
+                      </div>
+                      <Button
+                        className="h-9 shrink-0 bg-surface px-3 text-xs text-text-primary shadow-none"
+                        data-testid="export-soft-proof-profile-compare-generate"
+                        disabled={isExporting || isSoftProofProfileCompareLoading}
+                        onClick={() => {
+                          void handleGenerateSoftProofProfileCompare();
+                        }}
+                      >
+                        {isSoftProofProfileCompareLoading ? (
+                          <Loader size={14} className="animate-spin" />
+                        ) : softProofProfileCompareStatus === 'ready' ? (
+                          <RefreshCw size={14} />
+                        ) : (
+                          <Columns2 size={14} />
+                        )}
+                        {softProofProfileCompareStatus === 'ready'
+                          ? t('export.softProofCompare.refresh')
+                          : t('export.softProofCompare.generate')}
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
+                      {SOFT_PROOF_PROFILE_COMPARE_SIDE_IDS.map(renderSoftProofProfileCompareSide)}
+                    </div>
+                  </div>
                 </Section>
               </>
             )}
