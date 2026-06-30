@@ -164,6 +164,26 @@ fn repair_raw_camera_metadata(
     (metadata, changed)
 }
 
+pub fn repair_raw_sidecar_camera_metadata(
+    source_path: &Path,
+    metadata: &mut ImageMetadata,
+) -> bool {
+    let Some(sidecar_exif) = metadata.exif.take() else {
+        return false;
+    };
+
+    let Ok(file_bytes) = fs::read(source_path) else {
+        metadata.exif = Some(sidecar_exif);
+        return false;
+    };
+
+    let source_path_str = source_path.to_string_lossy();
+    let extracted_exif = read_exif_data_from_bytes(source_path_str.as_ref(), &file_bytes);
+    let (repaired_exif, changed) = repair_raw_camera_metadata(sidecar_exif, &extracted_exif);
+    metadata.exif = Some(repaired_exif);
+    changed
+}
+
 fn normalize_creation_datetime(s: &str) -> Option<String> {
     let normalized = s.replace('T', " ");
     let (date, time) = normalized.split_once(' ')?;
@@ -1421,6 +1441,32 @@ mod tests {
 
         assert!(err.contains("Failed to write"));
         assert!(directory_path.is_dir());
+    }
+
+    #[test]
+    fn repair_raw_camera_metadata_replaces_or_removes_zero_placeholders() {
+        let mut sidecar = HashMap::new();
+        sidecar.insert("Make".to_string(), "Sony".to_string());
+        sidecar.insert("FNumber".to_string(), "f/0".to_string());
+        sidecar.insert("ApertureValue".to_string(), "0".to_string());
+        sidecar.insert("FocalLength".to_string(), "0".to_string());
+        sidecar.insert(
+            "FocalLengthIn35mmFilm".to_string(),
+            "unknown mm".to_string(),
+        );
+
+        let mut extracted = HashMap::new();
+        extracted.insert("FNumber".to_string(), "f/8".to_string());
+        extracted.insert("FocalLength".to_string(), "105".to_string());
+
+        let (repaired, changed) = repair_raw_camera_metadata(sidecar, &extracted);
+
+        assert!(changed);
+        assert_eq!(repaired.get("Make").map(String::as_str), Some("Sony"));
+        assert_eq!(repaired.get("FNumber").map(String::as_str), Some("f/8"));
+        assert_eq!(repaired.get("FocalLength").map(String::as_str), Some("105"));
+        assert!(!repaired.contains_key("ApertureValue"));
+        assert!(!repaired.contains_key("FocalLengthIn35mmFilm"));
     }
 
     #[test]

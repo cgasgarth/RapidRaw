@@ -2455,17 +2455,23 @@ pub fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadat
 
     let (source_path, sidecar_path) = parse_virtual_path(&path);
     let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+    let mut should_save_sidecar = false;
 
-    if enable_xmp_sync
-        && sync_metadata_from_xmp(&source_path, &mut metadata)
-        && let Ok(json) = serde_json::to_string_pretty(&metadata)
-    {
-        let _ = fs::write(&sidecar_path, json);
+    if enable_xmp_sync && sync_metadata_from_xmp(&source_path, &mut metadata) {
+        should_save_sidecar = true;
     }
 
-    if crate::panorama_stitching::refresh_panorama_stale_artifacts(&mut metadata)
-        && let Ok(json) = serde_json::to_string_pretty(&metadata)
+    if is_raw_file(&source_path)
+        && crate::exif_processing::repair_raw_sidecar_camera_metadata(&source_path, &mut metadata)
     {
+        should_save_sidecar = true;
+    }
+
+    if crate::panorama_stitching::refresh_panorama_stale_artifacts(&mut metadata) {
+        should_save_sidecar = true;
+    }
+
+    if should_save_sidecar && let Ok(json) = serde_json::to_string_pretty(&metadata) {
         let _ = fs::write(&sidecar_path, json);
     }
 
