@@ -133,6 +133,26 @@ export const agentIterativeEditLoopResultSchema = z
     editCount: z.number().int().min(2),
     editReview: agentEditQualityReviewSchema,
     finalRecipeHash: z.string().trim().min(1),
+    applyReceipts: z
+      .array(
+        z
+          .object({
+            acceptedPlanHash: z.string().trim().min(1),
+            acceptedPlanId: z.string().trim().min(1),
+            adjustedFields: z.array(z.string().trim().min(1)).min(1),
+            appliedGraphRevision: z.string().trim().min(1),
+            changedPixelCount: z.number().int().positive(),
+            changedPixelPercent: z.number().min(0).max(100),
+            maxChannelDelta: z.number().nonnegative(),
+            meanLuminanceDelta: z.number().nonnegative(),
+            requestId: z.string().trim().min(1),
+            sampledPixelCount: z.number().int().positive(),
+            turn: z.number().int().positive(),
+            undoGraphRevision: z.string().trim().min(1),
+          })
+          .strict(),
+      )
+      .min(1),
     previewRefreshes: z.array(agentPreviewEnvelopeSchema).min(2),
     previewRefreshCount: z.number().int().min(2),
     previewLineage: z
@@ -250,6 +270,7 @@ export const runAgentIterativeEditLoop = async (
   let previewRefreshCount = 0;
   const previewRefreshes: AgentIterativeEditLoopResult['previewRefreshes'] = [];
   const previewLineage: AgentIterativeEditLoopResult['previewLineage'] = [];
+  const applyReceipts: AgentIterativeEditLoopResult['applyReceipts'] = [];
   const toolReceipts: Array<{ graphRevision: string; summary: string; toolName: string }> = [];
   const userFeedbackTurns: AgentIterativeEditLoopResult['userFeedbackTurns'] = [];
   const rollbackCheckpoint = createAgentSessionCheckpoint(parsedRequest.sessionId);
@@ -368,6 +389,20 @@ export const runAgentIterativeEditLoop = async (
       toolName: apply.toolName,
       turn,
       type: 'apply',
+    });
+    applyReceipts.push({
+      acceptedPlanHash: dryRunPlan.planHash,
+      acceptedPlanId: dryRunPlan.planId,
+      adjustedFields: apply.adjustedFields,
+      appliedGraphRevision: apply.appliedGraphRevision,
+      changedPixelCount: apply.changedPixelCount,
+      changedPixelPercent: apply.changedPixelPercent,
+      maxChannelDelta: apply.maxChannelDelta,
+      meanLuminanceDelta: apply.meanLuminanceDelta,
+      requestId: apply.requestId,
+      sampledPixelCount: apply.sampledPixelCount,
+      turn,
+      undoGraphRevision: apply.undoGraphRevision,
     });
     toolReceipts.push({
       graphRevision: apply.appliedGraphRevision,
@@ -527,6 +562,7 @@ export const runAgentIterativeEditLoop = async (
   return agentIterativeEditLoopResultSchema.parse({
     acceptedDryRunPlanCount,
     appliedGraphRevision,
+    applyReceipts,
     auditEvents,
     compareReview: {
       beforeArtifactId: compare.compare.artifacts[0].artifactId,
