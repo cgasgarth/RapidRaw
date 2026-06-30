@@ -166,6 +166,51 @@ const conversionPlanResultSchema = z.object({
     runtimeStatus: z.enum(['ui_catalog_only', 'runtime_parameter_applied']),
   }),
   profileProvenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+  profileApplyProof: z.object({
+    applyProof: z.object({
+      outputMetricChanged: z.boolean(),
+      paramsHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+      previewProofHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+    }),
+    parameterDiffs: z.array(
+      z.object({
+        after: z.string(),
+        before: z.string(),
+        group: z.enum(['base_fog', 'crosstalk', 'print_curve', 'rgb_balance', 'tone_curve']),
+        key: z.string(),
+      }),
+    ),
+    previewProof: z.object({
+      afterMetricHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+      beforeMetricHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+      metricChanged: z.boolean(),
+      previewHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+    }),
+    profileProvenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+    selectedFrameScope: z.object({
+      frameIds: z.array(z.string()),
+      scope: z.enum(['active', 'all']),
+      sourcePathCount: z.number().int().positive(),
+    }),
+    selectedProfileSnapshot: z.object({
+      claimLevel: z.enum(['generic_starting_point_only', 'measured_profile', 'user_profile']),
+      claimPolicy: z.enum([
+        'generic_starting_point_no_stock_claim',
+        'measured_profile_required_before_stock_claim',
+        'process_family_profile_no_stock_claim',
+        'named_stock_profile_requires_license_review',
+        'user_profile_no_stock_claim',
+      ]),
+      displayName: z.string(),
+      doesNotProve: z.array(z.string()),
+      presetId: z.string(),
+      profileProvenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+      profileStatus: z.enum(['generic_unmeasured', 'fixture_measured', 'user_supplied']),
+      runtimeStatus: z.enum(['ui_catalog_only', 'runtime_parameter_applied']),
+    }),
+    touchedParameterGroups: z.array(z.string()).min(1),
+    warningCodes: z.array(z.string()).min(1),
+  }),
   proof: z.object({
     densityAlgorithm: z.literal(NEGATIVE_LAB_DENSITY_ALGORITHM_ID),
     deterministic: z.literal(true),
@@ -174,6 +219,10 @@ const conversionPlanResultSchema = z.object({
   }),
   sampleRect: z.union([z.null(), z.object({ height: z.number(), width: z.number(), x: z.number(), y: z.number() })]),
   scope: z.enum(['active', 'all']),
+  selectedProfileSnapshot: z.object({
+    presetId: z.string(),
+    profileProvenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+  }),
   suffix: z.string(),
 });
 const assertParamsMatch = (actualParams, expectedParams, label) => {
@@ -381,6 +430,12 @@ if (
   acceptedBatchApplyResult.selectedProfileSnapshot.presetId !== 'negative_lab.generic.c41.neutral.v1' ||
   acceptedBatchApplyResult.apply.options.selectedProfile.profileProvenanceHash !==
     selectedProfileSnapshot.profileProvenanceHash ||
+  acceptedBatchApplyResult.apply.receipt.profileProvenanceHash !== selectedProfileSnapshot.profileProvenanceHash ||
+  acceptedBatchApplyResult.apply.receipt.selectedFrameScope.frameIds.join('|') !==
+    'negative-lab-frame-1|negative-lab-frame-2' ||
+  acceptedBatchApplyResult.apply.receipt.selectedFrameScope.sourcePathCount !== 2 ||
+  JSON.stringify(acceptedBatchApplyResult.apply.receipt) !==
+    JSON.stringify(acceptedBatchApplyResult.conversionPlan.profileApplyProof) ||
   acceptedBatchApplyResult.apply.paths.join('|') !== '/roll/001.CR3|/roll/002.CR3' ||
   acceptedBatchApplyResult.dryRunSummary.skippedFrameIds[0] !== 'negative-lab-frame-3'
 ) {
@@ -397,6 +452,13 @@ if (
     userProfileSnapshot.crosstalkProfile?.provenanceHash ||
   acceptedUserProfileApplyResult.apply.options.selectedProfile.profileProvenanceHash !==
     userProfileSnapshot.profileProvenanceHash ||
+  acceptedUserProfileApplyResult.apply.receipt.parameterDiffs.length < 3 ||
+  !acceptedUserProfileApplyResult.apply.receipt.touchedParameterGroups.includes('rgb_balance') ||
+  !acceptedUserProfileApplyResult.apply.receipt.touchedParameterGroups.includes('crosstalk') ||
+  !acceptedUserProfileApplyResult.apply.receipt.warningCodes.includes('user_profile_unmeasured') ||
+  !acceptedUserProfileApplyResult.apply.receipt.applyProof.outputMetricChanged ||
+  acceptedUserProfileApplyResult.apply.receipt.previewProof.beforeMetricHash ===
+    acceptedUserProfileApplyResult.apply.receipt.previewProof.afterMetricHash ||
   !acceptedUserProfileApplyResult.selectedProfileSnapshot.doesNotProve.includes('user_profile_unmeasured') ||
   !acceptedUserProfileApplyResult.selectedProfileSnapshot.doesNotProve.includes('no_stock_emulation_claim')
 ) {
@@ -434,6 +496,12 @@ if (
   stockFamilyConversionResult.stockFamily.genericPresetId !== 'negative_lab.generic.c41.portrait.v1' ||
   stockFamilyConversionResult.conversionPlan.presetId !== 'negative_lab.generic.c41.portrait.v1' ||
   stockFamilyConversionResult.conversionPlan.params.base_fog_sample?.x !== sampleRect.x ||
+  stockFamilyConversionResult.conversionPlan.profileApplyProof.parameterDiffs.length === 0 ||
+  !stockFamilyConversionResult.conversionPlan.profileApplyProof.touchedParameterGroups.includes('rgb_balance') ||
+  !stockFamilyConversionResult.conversionPlan.profileApplyProof.warningCodes.includes('generic_starting_point_only') ||
+  !stockFamilyConversionResult.conversionPlan.profileApplyProof.applyProof.outputMetricChanged ||
+  stockFamilyConversionResult.conversionPlan.selectedProfileSnapshot.profileProvenanceHash !==
+    stockFamilyConversionResult.conversionPlan.profileApplyProof.profileProvenanceHash ||
   !stockFamilyConversionResult.proof.registryMappedPreset
 ) {
   throw new Error('Negative Lab app-server stock-family conversion route did not map registry id to preset plan.');
@@ -575,6 +643,15 @@ for (const preset of NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets) {
 
   assertParamsMatch(activeResult.params, { ...preset.params, base_fog_sample: sampleRect }, preset.displayName);
   assertParamsMatch(batchResult.params, preset.params, preset.displayName);
+  if (activeResult.profileApplyProof.profileProvenanceHash !== activeResult.profileProvenanceHash) {
+    throw new Error(`${preset.displayName} conversion plan did not preserve profile provenance in apply proof.`);
+  }
+  if (activeResult.selectedProfileSnapshot.profileProvenanceHash !== activeResult.profileProvenanceHash) {
+    throw new Error(`${preset.displayName} conversion plan did not preserve selected profile snapshot provenance.`);
+  }
+  if (activeResult.profileApplyProof.selectedFrameScope.sourcePathCount !== 1) {
+    throw new Error(`${preset.displayName} conversion plan did not record active frame scope.`);
+  }
 }
 
 try {

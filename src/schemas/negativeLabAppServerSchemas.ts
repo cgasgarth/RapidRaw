@@ -109,6 +109,84 @@ export const negativeLabSelectedProfileSnapshotAppServerSchema = z
   })
   .strict();
 
+export const negativeLabRuntimeProfileApplyProofSchema = z
+  .object({
+    applyProof: z
+      .object({
+        deterministic: z.literal(true),
+        generatedFrom: z.literal('src/utils/negativeLabMeasuredProfileRuntime.ts'),
+        outputMetricChanged: z.boolean(),
+        paramsHash: negativeLabProfileProvenanceHashSchema,
+        previewProofHash: negativeLabProfileProvenanceHashSchema,
+      })
+      .strict(),
+    claimLevel: z.enum(['generic_starting_point_only', 'measured_profile', 'user_profile']),
+    claimPolicy: z.enum([
+      'generic_starting_point_no_stock_claim',
+      'measured_profile_required_before_stock_claim',
+      'process_family_profile_no_stock_claim',
+      'named_stock_profile_requires_license_review',
+      'user_profile_no_stock_claim',
+    ]),
+    doesNotProve: z.array(negativeLabMeasuredProfileRuntimeLimitationSchema),
+    parameterDiffs: z
+      .array(
+        z
+          .object({
+            after: z.string().trim().min(1),
+            before: z.string().trim().min(1),
+            group: z.enum(['base_fog', 'crosstalk', 'print_curve', 'rgb_balance', 'tone_curve']),
+            key: z.string().trim().min(1),
+          })
+          .strict(),
+      )
+      .min(0),
+    previewProof: z
+      .object({
+        afterMetricHash: negativeLabProfileProvenanceHashSchema,
+        beforeMetricHash: negativeLabProfileProvenanceHashSchema,
+        metricChanged: z.boolean(),
+        previewHash: negativeLabProfileProvenanceHashSchema,
+      })
+      .strict(),
+    profileProvenanceHash: negativeLabProfileProvenanceHashSchema,
+    profileStatus: z.enum(['generic_unmeasured', 'fixture_measured', 'user_supplied']),
+    selectedFrameScope: z
+      .object({
+        frameIds: z.array(z.string().trim().min(1)),
+        scope: negativeLabAppServerScopeSchema,
+        sourcePathCount: z.number().int().positive(),
+      })
+      .strict(),
+    selectedProfileSnapshot: negativeLabSelectedProfileSnapshotAppServerSchema,
+    touchedParameterGroups: z
+      .array(z.enum(['base_fog', 'crosstalk', 'print_curve', 'rgb_balance', 'tone_curve']))
+      .min(1),
+    warningCodes: z.array(z.string().trim().min(1)).min(1),
+  })
+  .strict()
+  .superRefine((proof, context) => {
+    if (proof.profileProvenanceHash !== proof.selectedProfileSnapshot.profileProvenanceHash) {
+      context.addIssue({ code: 'custom', message: 'Runtime profile proof must preserve snapshot provenance hash.' });
+    }
+
+    if (proof.claimLevel !== proof.selectedProfileSnapshot.claimLevel) {
+      context.addIssue({ code: 'custom', message: 'Runtime profile proof claim level must match snapshot.' });
+    }
+
+    if (proof.claimPolicy !== proof.selectedProfileSnapshot.claimPolicy) {
+      context.addIssue({ code: 'custom', message: 'Runtime profile proof claim policy must match snapshot.' });
+    }
+
+    if (proof.profileStatus !== proof.selectedProfileSnapshot.profileStatus) {
+      context.addIssue({ code: 'custom', message: 'Runtime profile proof status must match snapshot.' });
+    }
+
+    if (proof.previewProof.metricChanged !== proof.applyProof.outputMetricChanged) {
+      context.addIssue({ code: 'custom', message: 'Preview and apply proof metric state must match.' });
+    }
+  });
+
 export const negativeLabFrameHealthAppServerCommandSchema = z
   .object({
     activePathIndex: z.number().int().nonnegative(),
@@ -320,6 +398,7 @@ export const negativeLabConversionPlanResultSchema = z
     paths: z.array(z.string().trim().min(1)).min(1),
     presetId: negativeLabRuntimePresetIdSchema,
     profile: negativeLabResolvedRuntimeProfileSchema,
+    profileApplyProof: negativeLabRuntimeProfileApplyProofSchema,
     profileProvenanceHash: negativeLabProfileProvenanceHashSchema,
     proof: z
       .object({
@@ -331,9 +410,25 @@ export const negativeLabConversionPlanResultSchema = z
       .strict(),
     sampleRect: negativeLabBaseFogSampleRectSchema.nullable(),
     scope: negativeLabAppServerScopeSchema,
+    selectedProfileSnapshot: negativeLabSelectedProfileSnapshotAppServerSchema,
     suffix: z.string().trim().min(1).max(40),
   })
-  .strict();
+  .strict()
+  .superRefine((plan, context) => {
+    if (plan.profileProvenanceHash !== plan.selectedProfileSnapshot.profileProvenanceHash) {
+      context.addIssue({ code: 'custom', message: 'Conversion plan must preserve selected profile provenance hash.' });
+    }
+
+    if (plan.profileProvenanceHash !== plan.profileApplyProof.profileProvenanceHash) {
+      context.addIssue({ code: 'custom', message: 'Conversion proof must preserve selected profile provenance hash.' });
+    }
+
+    if (
+      JSON.stringify(plan.selectedProfileSnapshot) !== JSON.stringify(plan.profileApplyProof.selectedProfileSnapshot)
+    ) {
+      context.addIssue({ code: 'custom', message: 'Conversion proof must preserve selected profile snapshot.' });
+    }
+  });
 
 export const negativeLabAcceptedBatchPlanSchema = z
   .object({
@@ -375,6 +470,7 @@ export const negativeLabAcceptedBatchApplyPlanSchema = z
           .strict(),
         params: negativeLabPresetParamsSchema,
         paths: z.array(z.string().trim().min(1)).min(1),
+        receipt: negativeLabRuntimeProfileApplyProofSchema,
       })
       .strict(),
     commandName: negativeLabAcceptedBatchApplyCommandNameSchema,
@@ -408,6 +504,10 @@ export const negativeLabAcceptedBatchApplyPlanSchema = z
       context.addIssue({ code: 'custom', message: 'Apply options must preserve selected profile snapshot.' });
     }
 
+    if (JSON.stringify(plan.apply.receipt.selectedProfileSnapshot) !== JSON.stringify(plan.selectedProfileSnapshot)) {
+      context.addIssue({ code: 'custom', message: 'Apply receipt must preserve selected profile snapshot.' });
+    }
+
     if (plan.selectedProfileSnapshot.presetId !== plan.conversionPlan.presetId) {
       context.addIssue({ code: 'custom', message: 'Selected profile snapshot must match conversion preset.' });
     }
@@ -417,6 +517,10 @@ export const negativeLabAcceptedBatchApplyPlanSchema = z
         code: 'custom',
         message: 'Selected profile snapshot must match conversion profile provenance hash.',
       });
+    }
+
+    if (JSON.stringify(plan.apply.receipt) !== JSON.stringify(plan.conversionPlan.profileApplyProof)) {
+      context.addIssue({ code: 'custom', message: 'Apply receipt must replay conversion profile proof.' });
     }
   });
 
@@ -535,6 +639,7 @@ export type NegativeLabPlanRollNormalizationAppServerResult = z.infer<
 export type NegativeLabQcProofAppServerCommand = z.infer<typeof negativeLabQcProofAppServerCommandSchema>;
 export type NegativeLabQcProofAppServerResult = z.infer<typeof negativeLabQcProofAppServerResultSchema>;
 export type NegativeLabProfileProvenanceHash = z.infer<typeof negativeLabProfileProvenanceHashSchema>;
+export type NegativeLabRuntimeProfileApplyProof = z.infer<typeof negativeLabRuntimeProfileApplyProofSchema>;
 export type { NegativeLabCrosstalkProfile };
 export type NegativeLabSelectedProfileSnapshotAppServer = z.infer<
   typeof negativeLabSelectedProfileSnapshotAppServerSchema
