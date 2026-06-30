@@ -5,7 +5,16 @@ import path from 'node:path';
 
 const MAX_FILES_PER_FOLDER = 10;
 
-const IGNORED_DIRECTORIES = new Set(['.git', '.turbo', 'dist', 'node_modules', 'target']);
+const IGNORED_DIRECTORIES = new Set([
+  '.git',
+  '.turbo',
+  'artifacts',
+  'dist',
+  'node_modules',
+  'private-artifacts',
+  'private-fixtures',
+  'target',
+]);
 
 type FolderAllowance = {
   issue: string;
