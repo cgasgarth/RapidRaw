@@ -8,8 +8,8 @@ import { z } from 'zod';
 import {
   keyboardShortcutComboSchema,
   keyboardShortcutMapSchema,
-} from '../../../src/schemas/keyboardShortcutSchemas.ts';
-import { findKeyboardShortcutConflicts } from '../../../src/utils/keyboardShortcutConflicts.ts';
+} from '../../../../../src/schemas/keyboardShortcutSchemas.ts';
+import { findKeyboardShortcutConflicts } from '../../../../../src/utils/keyboardShortcutConflicts.ts';
 
 const conflictSchema = z
   .object({

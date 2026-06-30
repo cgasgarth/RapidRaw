@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import { keyboardShortcutComboSchema } from '../../../src/schemas/keyboardShortcutSchemas.ts';
-import { KEYBIND_DEFINITIONS, KEYBIND_SECTIONS } from '../../../src/utils/keyboardUtils.ts';
+import { keyboardShortcutComboSchema } from '../../../../../src/schemas/keyboardShortcutSchemas.ts';
+import { KEYBIND_DEFINITIONS, KEYBIND_SECTIONS } from '../../../../../src/utils/keyboardUtils.ts';
 
 const failures: string[] = [];
 const actions = new Set<string>();

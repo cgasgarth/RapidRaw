@@ -22,10 +22,10 @@ installDom();
 
 const [{ default: FolderTree }, { SortDirection, Theme }, { useLibraryStore }, { useSettingsStore }] =
   await Promise.all([
-    import('../../../src/components/panel/FolderTree.tsx'),
-    import('../../../src/components/ui/AppProperties.tsx'),
-    import('../../../src/store/useLibraryStore.ts'),
-    import('../../../src/store/useSettingsStore.ts'),
+    import('../../../../../src/components/panel/FolderTree.tsx'),
+    import('../../../../../src/components/ui/AppProperties.tsx'),
+    import('../../../../../src/store/useLibraryStore.ts'),
+    import('../../../../../src/store/useSettingsStore.ts'),
   ]);
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8')) as {
   library?: { items?: Record<string, string> };

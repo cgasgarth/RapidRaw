@@ -2,7 +2,7 @@
 
 import { strict as assert } from 'node:assert';
 
-import { type ImageFile, Panel, type SelectedImage } from '../../../src/components/ui/AppProperties';
+import { type ImageFile, Panel, type SelectedImage } from '../../../../../src/components/ui/AppProperties';
 import {
   type CommandPaletteUiState,
   commandPaletteCommands,
@@ -10,7 +10,7 @@ import {
   getCommandPaletteDisabledReasonKey,
   getCommandPaletteSelectedImages,
   getCommandPaletteSelectedPaths,
-} from '../../../src/utils/commandPaletteModel';
+} from '../../../../../src/utils/commandPaletteModel';
 
 const requiredCommandIds = [
   'collage',

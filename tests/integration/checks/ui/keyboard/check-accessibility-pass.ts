@@ -7,13 +7,13 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { z } from 'zod';
 
-import { LibraryExportPanelSlot } from '../../../src/App.tsx';
-import FocusStackModal from '../../../src/components/modals/computational-merge/FocusStackModal.tsx';
-import SuperResolutionModal from '../../../src/components/modals/computational-merge/SuperResolutionModal.tsx';
-import CommandPaletteModal from '../../../src/components/modals/navigation/CommandPaletteModal.tsx';
-import ConfirmModal from '../../../src/components/modals/navigation/ConfirmModal.tsx';
-import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../../../src/schemas/computational-merge/superResolutionUiSchemas.ts';
-import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../../src/schemas/focus-stack/focusStackUiSchemas.ts';
+import { LibraryExportPanelSlot } from '../../../../../src/App.tsx';
+import FocusStackModal from '../../../../../src/components/modals/computational-merge/FocusStackModal.tsx';
+import SuperResolutionModal from '../../../../../src/components/modals/computational-merge/SuperResolutionModal.tsx';
+import CommandPaletteModal from '../../../../../src/components/modals/navigation/CommandPaletteModal.tsx';
+import ConfirmModal from '../../../../../src/components/modals/navigation/ConfirmModal.tsx';
+import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../../../../../src/schemas/computational-merge/superResolutionUiSchemas.ts';
+import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../../../../src/schemas/focus-stack/focusStackUiSchemas.ts';
 
 const DialogTargetSchema = z
   .object({
