@@ -10,8 +10,8 @@ import {
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 
-const scenes = await readJson('fixtures/masks/mask-render-scenes.json');
-const invalidCases = await readJson('fixtures/masks/invalid-mask-render-scenes.json');
+const scenes = await readJson('fixtures/masks/render/mask-render-scenes.json');
+const invalidCases = await readJson('fixtures/masks/invalid/invalid-mask-render-scenes.json');
 const failures = [];
 
 let totalLayers = 0;

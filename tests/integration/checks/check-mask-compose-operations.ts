@@ -33,11 +33,11 @@ const invalidFixtureSchema = z
 const fixtures = z
   .array(fixtureSchema)
   .min(1)
-  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/mask-compose-operations.json'), 'utf8')));
+  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/compose/mask-compose-operations.json'), 'utf8')));
 const invalidFixtures = z
   .array(invalidFixtureSchema)
   .min(1)
-  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/invalid-mask-compose-operations.json'), 'utf8')));
+  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/invalid/invalid-mask-compose-operations.json'), 'utf8')));
 
 for (const fixture of fixtures) {
   const actualWeight = composeMaskWeights(fixture.operations);

@@ -10,11 +10,11 @@ import {
 import { createAiPeopleMaskLayerApplyPlan } from '../../../src/utils/aiPeopleMaskLayerPlan.ts';
 
 const fakeProviderFixtureJson: unknown = JSON.parse(
-  readFileSync(resolve('fixtures/masks/ai-people-fake-provider.json'), 'utf8'),
+  readFileSync(resolve('fixtures/masks/ai/ai-people-fake-provider.json'), 'utf8'),
 );
 const fakeProviderFixture = aiPeopleMaskFakeProviderFixtureSchema.parse(fakeProviderFixtureJson);
 const fixtureJson: unknown = JSON.parse(
-  readFileSync(resolve('fixtures/masks/ai-people-layer-apply-plan.json'), 'utf8'),
+  readFileSync(resolve('fixtures/masks/ai/ai-people-layer-apply-plan.json'), 'utf8'),
 );
 const fixture = aiPeopleMaskLayerApplyPlanFixtureSchema.parse(fixtureJson);
 

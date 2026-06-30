@@ -30,7 +30,7 @@ const fixtureSchema = z
   .strict();
 
 const fixture = fixtureSchema.parse(
-  JSON.parse(readFileSync(resolve('fixtures/masks/brush-mask-command.json'), 'utf8')),
+  JSON.parse(readFileSync(resolve('fixtures/masks/brush/brush-mask-command.json'), 'utf8')),
 );
 
 const baseMask: BrushBaseMaskArtifact = {

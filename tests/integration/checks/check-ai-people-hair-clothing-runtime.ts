@@ -9,7 +9,7 @@ import { renderFakeAiPeopleMask } from '../../../src/utils/aiPeopleMaskFakeProvi
 import { createAiPeopleMaskLayerApplyPlan } from '../../../src/utils/aiPeopleMaskLayerPlan.ts';
 
 const fakeProviderFixture = aiPeopleMaskFakeProviderFixtureSchema.parse(
-  JSON.parse(readFileSync(resolve('fixtures/masks/ai-people-fake-provider.json'), 'utf8')),
+  JSON.parse(readFileSync(resolve('fixtures/masks/ai/ai-people-fake-provider.json'), 'utf8')),
 );
 const parserSource = readFileSync(resolve('src-tauri/src/person_part_parser.rs'), 'utf8');
 const commandSource = readFileSync(resolve('src-tauri/src/ai_commands.rs'), 'utf8');

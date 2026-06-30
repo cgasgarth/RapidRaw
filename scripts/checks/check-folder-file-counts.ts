@@ -34,10 +34,6 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4221',
     reason: 'detail fixtures are pending feature grouping',
   },
-  'fixtures/masks': {
-    issue: '#4222',
-    reason: 'mask fixtures are pending mask-type grouping',
-  },
   'fixtures/validation': {
     issue: '#4223',
     reason: 'validation fixtures are pending journey grouping',

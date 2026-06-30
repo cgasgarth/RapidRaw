@@ -68,7 +68,7 @@ const fixtureSchema = z.discriminatedUnion('id', [
 const fixtures = z
   .array(fixtureSchema)
   .min(1)
-  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/mask-copy-paste.json'), 'utf8')));
+  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/compose/mask-copy-paste.json'), 'utf8')));
 
 const createIdFactory = (ids) => {
   const pendingIds = [...ids];

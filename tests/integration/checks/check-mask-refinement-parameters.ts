@@ -45,11 +45,11 @@ const invalidFixtureSchema = z
 const fixtures = z
   .array(fixtureSchema)
   .min(1)
-  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/mask-refinement-parameters.json'), 'utf8')));
+  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/render/mask-refinement-parameters.json'), 'utf8')));
 const invalidFixtures = z
   .array(invalidFixtureSchema)
   .min(1)
-  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/invalid-mask-refinement-parameters.json'), 'utf8')));
+  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/invalid/invalid-mask-refinement-parameters.json'), 'utf8')));
 const rustMaskGenerationSource = readFileSync(resolve('src-tauri/src/mask_generation.rs'), 'utf8');
 
 for (const fixture of fixtures) {

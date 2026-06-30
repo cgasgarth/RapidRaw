@@ -51,11 +51,11 @@ const invalidFixtureSchema = z
 const fixtures = z
   .array(fixtureSchema)
   .min(1)
-  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/gradient-mask-parameters.json'), 'utf8')));
+  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/gradient/gradient-mask-parameters.json'), 'utf8')));
 const invalidFixtures = z
   .array(invalidFixtureSchema)
   .min(1)
-  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/invalid-gradient-mask-parameters.json'), 'utf8')));
+  .parse(JSON.parse(readFileSync(resolve('fixtures/masks/invalid/invalid-gradient-mask-parameters.json'), 'utf8')));
 
 for (const fixture of fixtures) {
   const actual =

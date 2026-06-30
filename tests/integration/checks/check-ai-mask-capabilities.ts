@@ -7,7 +7,7 @@ import { aiMaskCapabilityAuditSchema } from '../../../src/schemas/aiMaskingSchem
 import { AI_MASK_CAPABILITY_AUDIT, getAiMaskCapabilityAudit } from '../../../src/utils/aiMaskCapabilities.ts';
 
 const fixture = aiMaskCapabilityAuditSchema.parse(
-  JSON.parse(readFileSync(resolve('fixtures/masks/ai-mask-capabilities.json'), 'utf8')),
+  JSON.parse(readFileSync(resolve('fixtures/masks/ai/ai-mask-capabilities.json'), 'utf8')),
 );
 
 if (JSON.stringify(fixture) !== JSON.stringify(AI_MASK_CAPABILITY_AUDIT)) {

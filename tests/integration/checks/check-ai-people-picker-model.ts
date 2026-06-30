@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { aiPeopleMaskPickerModelFixtureSchema } from '../../../src/schemas/aiMaskingSchemas.ts';
 import { buildAiPeopleMaskPickerModel } from '../../../src/utils/aiPeopleMaskPickerModel.ts';
 
-const fixtureJson: unknown = JSON.parse(readFileSync(resolve('fixtures/masks/ai-people-picker-model.json'), 'utf8'));
+const fixtureJson: unknown = JSON.parse(readFileSync(resolve('fixtures/masks/ai/ai-people-picker-model.json'), 'utf8'));
 const fixture = aiPeopleMaskPickerModelFixtureSchema.parse(fixtureJson);
 const aiPanelSource = readFileSync(resolve('src/components/panel/right/AIPanel.tsx'), 'utf8');
 const pickerSource = readFileSync(resolve('src/components/panel/right/AiPeoplePartPickerStatus.tsx'), 'utf8');

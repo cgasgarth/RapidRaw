@@ -10,7 +10,7 @@ import {
 } from '../../../src/utils/aiPeopleMaskContracts.ts';
 
 const fixture = aiPeopleMaskContractFixtureSchema.parse(
-  JSON.parse(readFileSync(resolve('fixtures/masks/ai-people-mask-contract.json'), 'utf8')),
+  JSON.parse(readFileSync(resolve('fixtures/masks/ai/ai-people-mask-contract.json'), 'utf8')),
 );
 
 if (JSON.stringify(fixture.capabilities) !== JSON.stringify(AI_PEOPLE_MASK_PART_CAPABILITIES)) {

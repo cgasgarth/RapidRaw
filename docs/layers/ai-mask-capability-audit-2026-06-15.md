@@ -19,7 +19,7 @@
 
 ## Validation Contract
 
-`fixtures/masks/ai-mask-capabilities.json` is the committed source fixture.
+`fixtures/masks/ai/ai-mask-capabilities.json` is the committed source fixture.
 `src/utils/aiMaskCapabilities.ts` exposes the runtime audit table after parsing
 through `src/schemas/aiMaskingSchemas.ts`.
 

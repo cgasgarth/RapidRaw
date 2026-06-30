@@ -6,8 +6,8 @@ import { resolve } from 'node:path';
 import { estimateMaskRenderTileCount, parseMaskRenderScene } from '../../../src/schemas/maskRenderSchemas.ts';
 import { renderFakeAiPeopleMask } from '../../../src/utils/aiPeopleMaskFakeProvider.ts';
 
-const scenes = JSON.parse(readFileSync(resolve('fixtures/masks/ai-people-render-scenes.json'), 'utf8'));
-const fakeProviderFixture = JSON.parse(readFileSync(resolve('fixtures/masks/ai-people-fake-provider.json'), 'utf8'));
+const scenes = JSON.parse(readFileSync(resolve('fixtures/masks/ai/ai-people-render-scenes.json'), 'utf8'));
+const fakeProviderFixture = JSON.parse(readFileSync(resolve('fixtures/masks/ai/ai-people-fake-provider.json'), 'utf8'));
 
 let totalOperations = 0;
 let totalTiles = 0;

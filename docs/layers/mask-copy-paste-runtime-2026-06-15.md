@@ -23,7 +23,7 @@ the issue can close without overclaiming API-command or graph-native support.
 
 - `src/utils/maskClipboard.ts` provides pure clone/insert helpers for mask
   containers and sub-masks.
-- `fixtures/masks/mask-copy-paste.json` covers clone/insert, invert/rename, and
+- `fixtures/masks/compose/mask-copy-paste.json` covers clone/insert, invert/rename, and
   reset-adjustment behavior.
 - `tests/integration/checks/check-mask-copy-paste.ts` validates fixture expectations with Zod.
 
