@@ -15,7 +15,7 @@ and validation fixtures exercise the same implementation path.
 
 ## Fixture Coverage
 
-`fixtures/color/white-balance-picker-fixtures.json` covers:
+`fixtures/color/adjustments/white-balance-picker-fixtures.json` covers:
 
 - neutral gray samples that leave sliders unchanged;
 - blue-biased samples that produce a warm correction;

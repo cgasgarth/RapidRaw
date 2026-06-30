@@ -15,7 +15,7 @@ measurement basis, and validation uses without committing any external asset.
 
 The manifest lives at:
 
-- `fixtures/color/colorchecker-fixture-manifest.json`
+- `fixtures/color/reference/colorchecker-fixture-manifest.json`
 - `docs/validation/fixtures/public-fixture-manifest.json`
 - `fixtures/detail/private-raw-evidence-ledger.json`
 
@@ -65,6 +65,6 @@ camera-profile transform tests, preview/export parity, or CPU/GPU parity.
 
 - `bun run check:colorchecker-fixtures`
 - `bun run check:unsafe-casts`
-- `bunx prettier --check tests/integration/checks/check-colorchecker-fixtures.ts fixtures/color/colorchecker-fixture-manifest.json docs/color/fixtures/colorchecker-fixtures-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
+- `bunx prettier --check tests/integration/checks/check-colorchecker-fixtures.ts fixtures/color/reference/colorchecker-fixture-manifest.json docs/color/fixtures/colorchecker-fixtures-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
 - `bun tests/integration/checks/check-markdown-links.ts`
 - `git diff --check`

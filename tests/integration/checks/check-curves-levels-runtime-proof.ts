@@ -9,7 +9,7 @@ import {
   renderCurvesLevelsRuntimeProof,
 } from '../../../scripts/lib/proofs/curves-levels-runtime-proof.ts';
 
-const fixturePath = valueAfter('--fixture') ?? 'fixtures/color/curves-levels-runtime-proof.json';
+const fixturePath = valueAfter('--fixture') ?? 'fixtures/color/proofs/curves-levels-runtime-proof.json';
 const outputPath = valueAfter('--output');
 const updateFixture = process.argv.includes('--update');
 const rawFixture = JSON.parse(await readFile(fixturePath, 'utf8'));

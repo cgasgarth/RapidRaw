@@ -9,7 +9,7 @@ import {
   renderColorRuntimeProof,
 } from '../../../scripts/lib/proofs/color-runtime-proof.ts';
 
-const fixturePath = valueAfter('--fixture') ?? 'fixtures/color/white-balance-tone-runtime-proof.json';
+const fixturePath = valueAfter('--fixture') ?? 'fixtures/color/proofs/white-balance-tone-runtime-proof.json';
 const outputPath = valueAfter('--output');
 const fixture = colorRuntimeProofFixtureSchema.parse(JSON.parse(await readFile(fixturePath, 'utf8')));
 const artifact = renderColorRuntimeProof(fixture);

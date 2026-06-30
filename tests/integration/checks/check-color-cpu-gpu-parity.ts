@@ -15,7 +15,7 @@ import {
   parseColorParityManifest,
 } from '../../../src/utils/colorCpuGpuParity.ts';
 
-const FIXTURE_PATH = 'fixtures/color/cpu-gpu-parity-fixtures.json';
+const FIXTURE_PATH = 'fixtures/color/proofs/cpu-gpu-parity-fixtures.json';
 const REPORT_PATH = 'docs/validation/proofs/color/color-cpu-gpu-parity-2026-06-18.json';
 const SHADER_PATH = 'src-tauri/src/shaders/shader.wgsl';
 const UPDATE = process.argv.includes('--update');

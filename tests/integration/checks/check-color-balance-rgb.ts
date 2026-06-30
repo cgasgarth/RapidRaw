@@ -71,15 +71,15 @@ const reportCaseSchema = z
 const reportSchema = z
   .object({
     cases: z.array(reportCaseSchema).min(1),
-    fixturePath: z.literal('fixtures/color/color-balance-rgb.json'),
+    fixturePath: z.literal('fixtures/color/adjustments/color-balance-rgb.json'),
     issue: z.literal(1877),
     previewExportParityStatus: z.literal('covered_by_existing_gpu_path_not_retested_here'),
     schemaVersion: z.literal(1),
     validationMode: z.literal('rgb_color_balance_apply_runtime_artifact'),
   })
   .strict();
-const fixtures = z.array(fixtureSchema).parse(await readJson('fixtures/color/color-balance-rgb.json'));
-const invalidCases = await readJson('fixtures/color/invalid-color-balance-rgb.json');
+const fixtures = z.array(fixtureSchema).parse(await readJson('fixtures/color/adjustments/color-balance-rgb.json'));
+const invalidCases = await readJson('fixtures/color/adjustments/invalid/invalid-color-balance-rgb.json');
 const failures = [];
 const reportCases = [];
 
@@ -146,7 +146,7 @@ if (!ADJUSTMENT_SECTIONS.color.includes(ColorAdjustment.ColorBalanceRgb)) {
 
 const report = reportSchema.parse({
   cases: reportCases,
-  fixturePath: 'fixtures/color/color-balance-rgb.json',
+  fixturePath: 'fixtures/color/adjustments/color-balance-rgb.json',
   issue: 1877,
   previewExportParityStatus: 'covered_by_existing_gpu_path_not_retested_here',
   schemaVersion: 1,

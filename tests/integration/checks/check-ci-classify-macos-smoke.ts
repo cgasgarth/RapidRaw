@@ -900,7 +900,11 @@ function runSelfTest() {
     SMOKE_MODES.RELEASE,
   );
   assertClassification('i18n helper tooling can skip smoke', ['src/i18n/update_translations.py'], SMOKE_MODES.NONE);
-  assertClassification('color fixture outputs can skip smoke', ['fixtures/color/channel-mixer.json'], SMOKE_MODES.NONE);
+  assertClassification(
+    'color fixture outputs can skip smoke',
+    ['fixtures/color/adjustments/channel-mixer.json'],
+    SMOKE_MODES.NONE,
+  );
   assertClassification(
     'film fixture outputs can skip smoke',
     ['fixtures/film-simulation/film-look-fixture-outputs.json'],
