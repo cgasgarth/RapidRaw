@@ -3,7 +3,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
-import { applySelectiveColorToRgbPixel } from '../../../../src/utils/color/runtime/selectiveColorRuntime.ts';
+import { applySelectiveColorToRgbPixel } from '../../../../src/utils/color/selective/selectiveColorRuntime.ts';
 import { calculateSelectiveColorInfluence } from '../../../../src/utils/selectiveColorFalloff.ts';
 
 const FIXTURE_PATH = 'fixtures/color/selective-color/selective-color-falloff-fixtures.json';

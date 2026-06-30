@@ -17,16 +17,16 @@ import {
   type HueSatLum,
   INITIAL_ADJUSTMENTS,
 } from '../../utils/adjustments';
+import { applyProfileToneToRgbPixel } from '../../utils/color/profile/profileToneRuntime';
 import {
   formatGamutWarningCoverage,
   isCurrentExportSoftProofGamutWarningOverlay,
 } from '../../utils/color/runtime/gamutWarningDisplay';
-import { applyProfileToneToRgbPixel } from '../../utils/color/runtime/profileToneRuntime';
 import {
   applySelectiveColorToRgbPixel,
   type RgbPixel,
   renderSelectiveColorMaskPreviewPixel,
-} from '../../utils/color/runtime/selectiveColorRuntime';
+} from '../../utils/color/selective/selectiveColorRuntime';
 import { COLOR_GRADING_PRESETS } from '../../utils/colorGradingPresets';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../utils/profileTonePresets';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../utils/selectiveColorRanges';

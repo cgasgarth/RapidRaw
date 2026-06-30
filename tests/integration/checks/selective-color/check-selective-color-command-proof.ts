@@ -26,7 +26,7 @@ import { INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
 import {
   applySelectiveColorToRgbPixel,
   type RgbPixel,
-} from '../../../../src/utils/color/runtime/selectiveColorRuntime.ts';
+} from '../../../../src/utils/color/selective/selectiveColorRuntime.ts';
 import {
   applySelectiveColorCommandEnvelopeToAdjustments,
   buildSelectiveColorCommandEnvelope,
