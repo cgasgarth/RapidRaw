@@ -10,7 +10,6 @@ import { useShallow } from 'zustand/react/shallow';
 import {
   MOXCMS_EXPORT_COLOR_CAPABILITIES_V1,
   exportColorCapabilityCatalogV1Schema,
-  type ExportColorCapabilityV1,
   type ExportColorCapabilityCatalogV1,
 } from '../../../../packages/rawengine-schema/src/exportColorCapabilities';
 import { useExportSettings } from '../../../hooks/useExportSettings';
@@ -24,6 +23,15 @@ import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { buildColorStackPreviewExportParityReceipt } from '../../../utils/colorStackPreviewExportParityReceipt';
 import { formatUnknownError } from '../../../utils/errorFormatting';
+import {
+  getBlackPointCompensationStatus,
+  getExportColorCapability,
+  getSupportedRenderingIntents,
+  hasColorManagedTransform as hasExportColorManagedTransform,
+  isBlackPointCompensationAvailable as getIsBlackPointCompensationAvailable,
+  isSupportedColorProfileForFormat,
+  supportsColorManagedOutput,
+} from '../../../utils/exportColorCapabilityContracts';
 import {
   hasStaleOrOfflineSmartPreview,
   isResolvingStaleSmartPreviewExport,
@@ -235,25 +243,6 @@ const formatBytes = (bytes: number, t: TFunction, decimals = 2) => {
   const sizeLabel = sizes[i] ?? sizes[sizes.length - 1] ?? '';
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizeLabel}`;
 };
-
-const COLOR_MANAGED_OUTPUT_FORMATS: ReadonlySet<FileFormats> = new Set([FileFormats.Jpeg, FileFormats.Tiff]);
-
-const supportsColorManagedOutput = (fileFormat: FileFormats) => COLOR_MANAGED_OUTPUT_FORMATS.has(fileFormat);
-
-const WIDE_GAMUT_EXPORT_PROFILES: ReadonlySet<ExportColorProfile> = new Set([
-  ExportColorProfile.AdobeRgb1998,
-  ExportColorProfile.DisplayP3,
-  ExportColorProfile.ProPhotoRgb,
-]);
-
-const isSupportedColorProfileForFormat = (fileFormat: FileFormats, colorProfile: ExportColorProfile) =>
-  colorProfile === ExportColorProfile.Srgb ||
-  (WIDE_GAMUT_EXPORT_PROFILES.has(colorProfile) && supportsColorManagedOutput(fileFormat));
-
-const getExportColorCapability = (
-  catalog: ExportColorCapabilityCatalogV1,
-  colorProfile: ExportColorCapabilityV1['colorProfile'],
-) => catalog.capabilities.find((capability) => capability.colorProfile === colorProfile) ?? null;
 
 export default function ExportPanel({
   exportState,
@@ -774,26 +763,31 @@ export default function ExportPanel({
     ],
     [fileFormat, t],
   );
-  const hasColorManagedTransform =
-    supportsColorManagedOutput(fileFormat) && WIDE_GAMUT_EXPORT_PROFILES.has(colorProfile);
+  const hasColorManagedTransform = hasExportColorManagedTransform(fileFormat, colorProfile);
   const exportColorCapability = useMemo(
     () => (hasColorManagedTransform ? getExportColorCapability(exportColorCapabilityCatalog, colorProfile) : null),
     [colorProfile, exportColorCapabilityCatalog, hasColorManagedTransform],
   );
   const renderingIntentOptions = useMemo(() => {
-    const supportedIntents = exportColorCapability?.renderingIntents ?? [];
+    const supportedIntents = getSupportedRenderingIntents(exportColorCapabilityCatalog, fileFormat, colorProfile);
     return [
       { label: t('export.renderingIntents.relativeColorimetric'), value: ExportRenderingIntent.RelativeColorimetric },
       { label: t('export.renderingIntents.perceptual'), value: ExportRenderingIntent.Perceptual },
       { label: t('export.renderingIntents.saturation'), value: ExportRenderingIntent.Saturation },
       { label: t('export.renderingIntents.absoluteColorimetric'), value: ExportRenderingIntent.AbsoluteColorimetric },
     ].filter((option) => supportedIntents.includes(option.value));
-  }, [exportColorCapability, t]);
-  const blackPointCompensationStatus = exportColorCapability?.blackPointCompensation ?? 'unsupported';
-  const isBlackPointCompensationAvailable =
-    (fileFormat === FileFormats.Jpeg || fileFormat === FileFormats.Tiff) &&
-    renderingIntent === ExportRenderingIntent.RelativeColorimetric &&
-    blackPointCompensationStatus === 'supported';
+  }, [colorProfile, exportColorCapabilityCatalog, fileFormat, t]);
+  const blackPointCompensationStatus = getBlackPointCompensationStatus(
+    exportColorCapabilityCatalog,
+    fileFormat,
+    colorProfile,
+  );
+  const isBlackPointCompensationAvailable = getIsBlackPointCompensationAvailable({
+    catalog: exportColorCapabilityCatalog,
+    colorProfile,
+    fileFormat,
+    renderingIntent,
+  });
 
   useEffect(() => {
     if (!isVisible) return;
