@@ -15,7 +15,7 @@ a measured film-stock profile or pixel-golden image suite.
 
 - `fixtures/negative-lab/negative-lab-fixture-manifest.json`
 - `fixtures/negative-lab/negative-lab-synthetic-fixture-proof.json`
-- `tests/integration/checks/check-negative-lab-fixtures.ts`
+- `tests/integration/checks/negative-lab/check-negative-lab-fixtures.ts`
 
 ## Coverage
 

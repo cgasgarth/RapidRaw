@@ -699,7 +699,7 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       modes: [RawEngineAppServerRouteMode.Read],
       outputSchemaNames: ['NegativeLabAgentInspectResponseV1'],
       runtimeCheckScripts: [
-        'bun tests/integration/checks/check-negative-lab-agent-readonly-tools.ts',
+        'bun tests/integration/checks/negative-lab/check-negative-lab-agent-readonly-tools.ts',
         'check:negative-lab-app-server-routes',
       ],
       toolNames: [NEGATIVE_LAB_AGENT_INSPECT_TOOL_NAME],
@@ -711,7 +711,7 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       modes: [RawEngineAppServerRouteMode.Read],
       outputSchemaNames: ['NegativeLabAgentConversionPlanResponseV1'],
       runtimeCheckScripts: [
-        'bun tests/integration/checks/check-negative-lab-agent-readonly-tools.ts',
+        'bun tests/integration/checks/negative-lab/check-negative-lab-agent-readonly-tools.ts',
         'check:negative-lab-app-server-routes',
       ],
       toolNames: [NEGATIVE_LAB_AGENT_CONVERSION_PLAN_TOOL_NAME],
@@ -723,7 +723,7 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       modes: [RawEngineAppServerRouteMode.Read],
       outputSchemaNames: ['NegativeLabAgentRollNormalizationPlanResponseV1'],
       runtimeCheckScripts: [
-        'bun tests/integration/checks/check-negative-lab-agent-readonly-tools.ts',
+        'bun tests/integration/checks/negative-lab/check-negative-lab-agent-readonly-tools.ts',
         'check:negative-lab-app-server-routes',
       ],
       toolNames: [NEGATIVE_LAB_AGENT_ROLL_NORMALIZATION_PLAN_TOOL_NAME],
@@ -735,7 +735,7 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       modes: [RawEngineAppServerRouteMode.Read],
       outputSchemaNames: ['NegativeLabAgentQcProofResponseV1'],
       runtimeCheckScripts: [
-        'bun tests/integration/checks/check-negative-lab-agent-readonly-tools.ts',
+        'bun tests/integration/checks/negative-lab/check-negative-lab-agent-readonly-tools.ts',
         'check:negative-lab-app-server-routes',
       ],
       toolNames: [NEGATIVE_LAB_AGENT_QC_PROOF_TOOL_NAME],
@@ -747,7 +747,7 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       modes: [RawEngineAppServerRouteMode.Read],
       outputSchemaNames: ['NegativeLabAgentStockFamilyPlanResponseV1'],
       runtimeCheckScripts: [
-        'bun tests/integration/checks/check-negative-lab-agent-readonly-tools.ts',
+        'bun tests/integration/checks/negative-lab/check-negative-lab-agent-readonly-tools.ts',
         'check:negative-lab-app-server-routes',
       ],
       toolNames: [NEGATIVE_LAB_AGENT_STOCK_FAMILY_PLAN_TOOL_NAME],
