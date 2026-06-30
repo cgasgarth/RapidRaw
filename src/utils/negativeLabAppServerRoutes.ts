@@ -51,6 +51,7 @@ import { buildNegativeBaseFogDensitometerReadout } from './negativeLabDensitomet
 import { buildNegativeLabDustScratchReviewReport, buildNegativeLabQcProofReport } from './negativeLabDustScratchReview';
 import { buildNegativeLabBatchDryRunSummary, buildNegativeLabFrameHealthReport } from './negativeLabFrameHealth';
 import {
+  buildNegativeLabRuntimeProfileApplyProof,
   buildNegativeLabRuntimeProfileProvenanceHash,
   buildNegativeLabRuntimeSelectedProfileSnapshot,
   NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
@@ -74,10 +75,20 @@ export const NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST = negativeLabAppServerRouteM
 export const buildNegativeLabConversionPlanResult = (
   command: NegativeLabAppServerCommand,
   runtimeCatalog: NegativeLabRuntimeProfileCatalog = NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
+  frameIds: string[] = [],
 ): NegativeLabConversionPlanResult => {
   const parsedCommand = negativeLabAppServerCommandSchema.parse(command);
   const profile = resolveNegativeLabRuntimeProfile(parsedCommand.presetId, runtimeCatalog);
   const profileProvenanceHash = buildNegativeLabRuntimeProfileProvenanceHash(profile);
+  const selectedProfileSnapshot = buildNegativeLabRuntimeSelectedProfileSnapshot(profile, profileProvenanceHash);
+  const profileApplyProof = buildNegativeLabRuntimeProfileApplyProof({
+    catalog: runtimeCatalog,
+    frameIds,
+    paths: parsedCommand.paths,
+    profile,
+    profileProvenanceHash,
+    scope: parsedCommand.scope,
+  });
 
   return negativeLabConversionPlanResultSchema.parse({
     commandName: NegativeLabAppServerCommandName.ConversionPlan,
@@ -89,6 +100,7 @@ export const buildNegativeLabConversionPlanResult = (
     paths: parsedCommand.paths,
     presetId: profile.presetId,
     profile,
+    profileApplyProof,
     profileProvenanceHash,
     proof: {
       densityAlgorithm: profile.params.print_curve_algorithm,
@@ -98,6 +110,7 @@ export const buildNegativeLabConversionPlanResult = (
     },
     sampleRect: parsedCommand.sampleRect,
     scope: parsedCommand.scope,
+    selectedProfileSnapshot,
     suffix: parsedCommand.suffix,
   });
 };
@@ -252,6 +265,7 @@ export const buildNegativeLabAcceptedBatchApplyRouteResult = (
       paths: plannedPaths,
     },
     runtimeCatalog,
+    expectedAcceptedPlan.dryRunSummary.affectedFrameIds,
   );
   const selectedProfileSnapshot = parsedCommand.selectedProfileSnapshot;
   const acceptedSelectedProfileSnapshot = expectedAcceptedPlan.selectedProfileSnapshot;
@@ -285,6 +299,7 @@ export const buildNegativeLabAcceptedBatchApplyRouteResult = (
       },
       params: conversionPlan.params,
       paths: plannedPaths,
+      receipt: conversionPlan.profileApplyProof,
     },
     commandName: NegativeLabAppServerCommandName.AcceptedBatchApply,
     conversionPlan,
