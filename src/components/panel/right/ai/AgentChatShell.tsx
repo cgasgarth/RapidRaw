@@ -2712,10 +2712,27 @@ function InitialPromptPreviewContextCard({ context }: { context: AgentInitialPro
         </span>
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-text-secondary">
-        <span className="truncate font-mono">{context.artifactId}</span>
-        <span className="truncate font-mono">{context.recipeHash}</span>
-        <span className="truncate font-mono">{context.renderHash}</span>
-        <span className="truncate font-mono">{context.previewRef}</span>
+        <div className="min-w-0">
+          <div className="uppercase text-text-tertiary">{t('editor.ai.agent.previewLineage.meta.artifact')}</div>
+          <div className="truncate font-mono text-text-primary">{context.artifactId}</div>
+        </div>
+        <div className="min-w-0">
+          <div className="uppercase text-text-tertiary">{t('editor.ai.agent.previewLineage.meta.recipeHash')}</div>
+          <div className="truncate font-mono text-text-secondary">{context.recipeHash}</div>
+        </div>
+        <div className="min-w-0">
+          <div className="uppercase text-text-tertiary">{t('editor.ai.agent.previewLineage.meta.renderHash')}</div>
+          <div className="truncate font-mono text-text-secondary">{context.renderHash}</div>
+        </div>
+      </div>
+      <div className="mt-2">
+        <div className="h-20 w-20 overflow-hidden rounded border border-white/10 bg-black/20">
+          <img
+            alt={t('editor.ai.agent.initialPreviewContext.title')}
+            className="h-full w-full object-cover"
+            src={context.previewRef}
+          />
+        </div>
       </div>
     </div>
   );
