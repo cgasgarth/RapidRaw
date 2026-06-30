@@ -14,13 +14,13 @@ const GITHUB_FILE_SCHEMA = z
   .passthrough();
 
 const CONTRACT_COMMANDS = [
-  ['bun', 'tests/integration/checks/check-agent-approval-boundaries.ts'],
-  ['bun', 'tests/integration/checks/check-agent-baseline-gates.ts'],
-  ['bun', 'tests/integration/checks/check-agent-color-apply.ts'],
-  ['bun', 'tests/integration/checks/check-agent-curve-levels-apply.ts'],
-  ['bun', 'tests/integration/checks/check-agent-detail-effects-apply.ts'],
-  ['bun', 'tests/integration/checks/check-agent-geometry-apply.ts'],
-  ['bun', 'tests/integration/checks/check-agent-lens-profile-apply.ts'],
+  ['bun', 'tests/integration/checks/agent/check-agent-approval-boundaries.ts'],
+  ['bun', 'tests/integration/checks/agent/check-agent-baseline-gates.ts'],
+  ['bun', 'tests/integration/checks/agent/check-agent-color-apply.ts'],
+  ['bun', 'tests/integration/checks/agent/check-agent-curve-levels-apply.ts'],
+  ['bun', 'tests/integration/checks/agent/check-agent-detail-effects-apply.ts'],
+  ['bun', 'tests/integration/checks/agent/check-agent-geometry-apply.ts'],
+  ['bun', 'tests/integration/checks/agent/check-agent-lens-profile-apply.ts'],
   ['bun', 'tests/integration/checks/agent-session/check-agent-rollback-proof.ts'],
   ['bun', 'tests/integration/checks/check-ui-api-coverage.ts'],
   ['bun', 'tests/integration/checks/ai/check-ai-app-server-tool-routes.ts'],
