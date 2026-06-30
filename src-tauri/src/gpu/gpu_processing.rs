@@ -142,7 +142,7 @@ impl GpuProcessor {
 
         let blur_shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Blur Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/blur.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/blur.wgsl").into()),
         });
 
         let blur_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -214,7 +214,7 @@ impl GpuProcessor {
 
         let flare_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Flare Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/flare.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/flare.wgsl").into()),
         });
 
         let flare_bgl_0 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -358,7 +358,7 @@ impl GpuProcessor {
 
         let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Image Processing Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/shader.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/shader.wgsl").into()),
         });
 
         let mut bind_group_layout_entries = vec![
