@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 
-import { parseLevelsSettings } from '../../../src/schemas/levelsSchemas.ts';
+import { parseLevelsSettings } from '../../../src/schemas/color/levelsSchemas.ts';
 import {
   ADJUSTMENT_GROUPS,
   ADJUSTMENT_SECTIONS,

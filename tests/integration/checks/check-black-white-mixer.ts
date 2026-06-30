@@ -4,7 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { parseBlackWhiteMixerSettings } from '../../../src/schemas/blackWhiteMixerSchemas.ts';
+import { parseBlackWhiteMixerSettings } from '../../../src/schemas/color/blackWhiteMixerSchemas.ts';
 import {
   ADJUSTMENT_GROUPS,
   ADJUSTMENT_SECTIONS,

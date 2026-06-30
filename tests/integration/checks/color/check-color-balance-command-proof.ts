@@ -16,7 +16,7 @@ import {
   sampleEditGraphSnapshotV1,
   sampleToneColorCommandEnvelopeV1,
 } from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { colorBalanceRgbSettingsSchema } from '../../../../src/schemas/colorBalanceRgbSchemas.ts';
+import { colorBalanceRgbSettingsSchema } from '../../../../src/schemas/color/colorBalanceRgbSchemas.ts';
 import {
   applyColorBalanceRgbToPixel,
   type ColorBalanceRgbRuntimeResult,

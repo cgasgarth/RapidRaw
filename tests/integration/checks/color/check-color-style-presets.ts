@@ -7,7 +7,7 @@ import {
   applyColorStylePresetPatch,
   listColorStylePresetAdjustmentKeys,
   parseColorStylePresetCatalog,
-} from '../../../../src/schemas/colorStylePresetSchemas.ts';
+} from '../../../../src/schemas/color/colorStylePresetSchemas.ts';
 import { COLOR_STYLE_PRESET_CATALOG } from '../../../../src/utils/color/style/colorStylePresetCatalog.ts';
 import { applyColorStylePresetToRgbPixel } from '../../../../src/utils/color/style/colorStyleRuntime.ts';
 

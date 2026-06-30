@@ -2,7 +2,10 @@
 
 import { readFile } from 'node:fs/promises';
 
-import { localContrastFixtureSchema, localContrastSettingsSchema } from '../../../src/schemas/localContrastSchemas.ts';
+import {
+  localContrastFixtureSchema,
+  localContrastSettingsSchema,
+} from '../../../src/schemas/color/localContrastSchemas.ts';
 import { ADJUSTMENT_GROUPS, DetailsAdjustment, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));

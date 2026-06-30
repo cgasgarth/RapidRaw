@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { colorStylePresetSchema } from '../../../schemas/colorStylePresetSchemas';
+import { colorStylePresetSchema } from '../../../schemas/color/colorStylePresetSchemas';
 import { calculateDefaultSelectiveColorInfluence } from '../../selectiveColorFalloff';
 import {
   getSelectiveColorRange,

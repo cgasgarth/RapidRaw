@@ -8,7 +8,7 @@ import {
   TONE_COLOR_APP_SERVER_TOOL_NAMES,
   ToneColorAppServerExecutionMode,
   ToneColorAppServerSchemaName,
-} from '../utils/toneColorAppServerRouteIds';
+} from '../../utils/toneColorAppServerRouteIds';
 
 export const toneColorAppServerRouteExecutionModeSchema = z.enum(TONE_COLOR_APP_SERVER_EXECUTION_MODES);
 export const toneColorAppServerRouteStatusSchema = z.enum(TONE_COLOR_APP_SERVER_ROUTE_STATUSES);

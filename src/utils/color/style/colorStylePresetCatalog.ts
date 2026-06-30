@@ -1,4 +1,4 @@
-import type { ColorStylePreset, ColorStylePresetCatalog } from '../../../schemas/colorStylePresetSchemas';
+import type { ColorStylePreset, ColorStylePresetCatalog } from '../../../schemas/color/colorStylePresetSchemas';
 
 export const COLOR_STYLE_PRESET_CATALOG = {
   version: 1,
