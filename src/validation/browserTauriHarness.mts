@@ -57,6 +57,7 @@ const commandNames: Record<
   | 'getLogFilePath'
   | 'getAlbumImages'
   | 'getFolderTree'
+  | 'getFolderRefreshSnapshot'
   | 'getPinnedFolderTrees'
   | 'getSupportedFileTypes'
   | 'isImageCached'
@@ -85,6 +86,7 @@ const commandNames: Record<
   getLogFilePath: Invokes.GetLogFilePath,
   getAlbumImages: Invokes.GetAlbumImages,
   getFolderTree: Invokes.GetFolderTree,
+  getFolderRefreshSnapshot: Invokes.GetFolderRefreshSnapshot,
   getPinnedFolderTrees: Invokes.GetPinnedFolderTrees,
   getSupportedFileTypes: Invokes.GetSupportedFileTypes,
   isImageCached: Invokes.IsImageCached,
@@ -202,6 +204,13 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         isDir: true,
         name: browserHarnessRoot.split('/').at(-1) ?? browserHarnessRoot,
         path: browserHarnessRoot,
+      });
+    case commandNames.getFolderRefreshSnapshot:
+      return Promise.resolve({
+        fingerprint: `${getStringArg(args, 'path') ?? browserHarnessRoot}:${getBooleanArg(args, 'recursive') ? 'recursive' : 'flat'}`,
+        itemCount: 1,
+        path: getStringArg(args, 'path') ?? browserHarnessRoot,
+        recursive: getBooleanArg(args, 'recursive'),
       });
     case commandNames.getPinnedFolderTrees:
       return Promise.resolve(getStringArrayArg(args, 'paths').map(createHarnessFolderTree));
@@ -325,6 +334,11 @@ const createHarnessExportReceipt = (args: Record<string, unknown> | undefined) =
 const getStringArg = (args: Record<string, unknown> | undefined, key: string): string | undefined => {
   const value = args?.[key];
   return typeof value === 'string' ? value : undefined;
+};
+
+const getBooleanArg = (args: Record<string, unknown> | undefined, key: string): boolean => {
+  const value = args?.[key];
+  return typeof value === 'boolean' ? value : false;
 };
 
 const getStringArrayArg = (args: Record<string, unknown> | undefined, key: string): string[] => {
