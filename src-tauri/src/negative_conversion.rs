@@ -2058,6 +2058,125 @@ mod tests {
         format!("fnv1a64:{hash:016x}")
     }
 
+    #[derive(Debug, Clone)]
+    struct NegativeLabBaseFogCandidate {
+        confidence: f32,
+        estimate: NegativeBaseFogEstimate,
+        sample_rect: NegativeBaseFogSampleRect,
+        score: f32,
+        source: &'static str,
+        warnings: Vec<&'static str>,
+    }
+
+    fn channel_cast_ratio_from_weights(
+        red_weight: f32,
+        green_weight: f32,
+        blue_weight: f32,
+    ) -> f32 {
+        let min_weight = red_weight.min(green_weight).min(blue_weight).max(0.001);
+        let max_weight = red_weight.max(green_weight).max(blue_weight);
+        max_weight / min_weight
+    }
+
+    fn negative_lab_changed_pixel_ratio(left: &Rgb32FImage, right: &Rgb32FImage) -> f32 {
+        assert_eq!(left.dimensions(), right.dimensions());
+
+        let changed = right
+            .pixels()
+            .zip(left.pixels())
+            .filter(|(right_pixel, left_pixel)| {
+                right_pixel
+                    .channels()
+                    .iter()
+                    .zip(left_pixel.channels())
+                    .any(|(right_channel, left_channel)| {
+                        (right_channel - left_channel).abs() > 0.01
+                    })
+            })
+            .count();
+        changed as f32 / (right.width() * right.height()).max(1) as f32
+    }
+
+    fn ranked_negative_lab_edge_base_fog_candidates(
+        input: &DynamicImage,
+    ) -> Vec<NegativeLabBaseFogCandidate> {
+        let candidate_rects = [
+            (
+                "left_edge_border",
+                NegativeBaseFogSampleRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 0.18,
+                    height: 1.0,
+                },
+            ),
+            (
+                "right_edge_border",
+                NegativeBaseFogSampleRect {
+                    x: 0.82,
+                    y: 0.0,
+                    width: 0.18,
+                    height: 1.0,
+                },
+            ),
+            (
+                "top_edge_border",
+                NegativeBaseFogSampleRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 1.0,
+                    height: 0.18,
+                },
+            ),
+            (
+                "bottom_edge_border",
+                NegativeBaseFogSampleRect {
+                    x: 0.0,
+                    y: 0.82,
+                    width: 1.0,
+                    height: 0.18,
+                },
+            ),
+        ];
+
+        let mut candidates: Vec<NegativeLabBaseFogCandidate> = candidate_rects
+            .into_iter()
+            .map(|(source, sample_rect)| {
+                let estimate = estimate_base_fog_from_image(input, Some(sample_rect));
+                let channel_cast_ratio = channel_cast_ratio_from_weights(
+                    estimate.red_weight,
+                    estimate.green_weight,
+                    estimate.blue_weight,
+                );
+                let mut warnings = Vec::new();
+                if estimate.confidence < 0.05 {
+                    warnings.push("low_base_estimate_confidence");
+                }
+                if channel_cast_ratio > 1.35 {
+                    warnings.push("strong_channel_cast_candidate");
+                }
+                let score = estimate.confidence - ((channel_cast_ratio - 1.0).max(0.0) * 0.12);
+
+                NegativeLabBaseFogCandidate {
+                    confidence: estimate.confidence,
+                    estimate,
+                    sample_rect,
+                    score,
+                    source,
+                    warnings,
+                }
+            })
+            .collect();
+
+        candidates.sort_by(|left, right| {
+            right
+                .score
+                .partial_cmp(&left.score)
+                .unwrap_or(Ordering::Equal)
+        });
+        candidates
+    }
+
     fn assert_near(left: f32, right: f32) {
         assert!(
             (left - right).abs() <= 0.000_001,
@@ -3343,24 +3462,52 @@ mod tests {
             "no_colorimetric_match_claim",
             "not_measured_from_manufacturer_profile",
         ];
+        let downscaled_input = downscale_f32_image(&input, 1080, 1080);
+        let base_fog_candidates = ranked_negative_lab_edge_base_fog_candidates(&downscaled_input);
+        assert!(
+            base_fog_candidates.len() >= 4,
+            "Negative Lab public proof must rank edge/border base candidates"
+        );
+        let selected_base_fog_candidate = base_fog_candidates
+            .first()
+            .expect("ranked base fog candidate")
+            .clone();
+        assert!(
+            selected_base_fog_candidate.confidence > 0.01,
+            "Negative Lab auto base estimate confidence should be positive"
+        );
+        let auto_channel_cast_ratio = channel_cast_ratio_from_weights(
+            selected_base_fog_candidate.estimate.red_weight,
+            selected_base_fog_candidate.estimate.green_weight,
+            selected_base_fog_candidate.estimate.blue_weight,
+        );
+        assert!(
+            auto_channel_cast_ratio < 1.5,
+            "Negative Lab public proof auto base estimate should avoid extreme channel cast"
+        );
+
         let params = NegativeConversionParams {
-            red_weight: 1.03,
-            green_weight: 1.0,
-            blue_weight: 0.98,
+            red_weight: selected_base_fog_candidate.estimate.red_weight,
+            green_weight: selected_base_fog_candidate.estimate.green_weight,
+            blue_weight: selected_base_fog_candidate.estimate.blue_weight,
             base_fog_strength: 1.0,
-            base_fog_sample: Some(NegativeBaseFogSampleRect {
-                x: 0.0,
-                y: 0.0,
-                width: 0.35,
-                height: 0.35,
-            }),
+            base_fog_sample: Some(selected_base_fog_candidate.sample_rect),
             exposure: 0.05,
             contrast: 0.95,
             black_point: 0.0,
             white_point: 1.0,
         };
-        let bounds_ref = downscale_f32_image(&input, 1080, 1080);
-        let ref_rgb = bounds_ref.to_rgb32f();
+        let preview_before =
+            run_pipeline(&input, &NegativeConversionParams::default(), None).to_rgb32f();
+        let preview_after = run_pipeline(&input, &params, None).to_rgb32f();
+        let preview_before_hash = hash_rendered_image(&preview_before);
+        let preview_after_hash = hash_rendered_image(&preview_after);
+        assert_ne!(
+            preview_before_hash, preview_after_hash,
+            "Negative Lab auto base estimate should change the preview render"
+        );
+
+        let ref_rgb = downscaled_input.to_rgb32f();
         let (ref_w, ref_h) = ref_rgb.dimensions();
         let log_pixels: Vec<f32> = ref_rgb
             .as_raw()
@@ -3429,24 +3576,15 @@ mod tests {
 
         let input_rgb = input.to_rgb32f();
         let rendered_rgb = rendered.to_rgb32f();
-        let changed_pixel_ratio = rendered_rgb
-            .pixels()
-            .zip(input_rgb.pixels())
-            .filter(|(rendered_pixel, input_pixel)| {
-                rendered_pixel
-                    .channels()
-                    .iter()
-                    .zip(input_pixel.channels())
-                    .any(|(rendered_channel, input_channel)| {
-                        (rendered_channel - input_channel).abs() > 0.01
-                    })
-            })
-            .count() as f32
-            / (rendered.width() * rendered.height()).max(1) as f32;
+        let changed_pixel_ratio = negative_lab_changed_pixel_ratio(&input_rgb, &rendered_rgb);
         let input_to_output_delta = mean_abs_delta(&input_rgb, &rendered_rgb);
 
         assert!(changed_pixel_ratio > 0.05);
         assert!(input_to_output_delta > 0.01);
+        assert!(
+            output_path.exists(),
+            "Negative Lab public export proof must write the positive output"
+        );
 
         let sidecar_path = negative_lab_output_sidecar_path(&output_path);
         assert!(
@@ -3492,10 +3630,10 @@ mod tests {
                 "doesNotProve": applied_profile_does_not_prove,
                 "params": {
                     "base_fog_sample": {
-                        "height": 0.35,
-                        "width": 0.35,
-                        "x": 0.0,
-                        "y": 0.0
+                        "height": params.base_fog_sample.expect("sample").height,
+                        "width": params.base_fog_sample.expect("sample").width,
+                        "x": params.base_fog_sample.expect("sample").x,
+                        "y": params.base_fog_sample.expect("sample").y
                     },
                     "base_fog_strength": params.base_fog_strength,
                     "blue_weight": params.blue_weight,
@@ -3523,10 +3661,10 @@ mod tests {
             "controlSurface": {
                 "baseFog": {
                     "sampleRect": {
-                        "height": 0.35,
-                        "width": 0.35,
-                        "x": 0.0,
-                        "y": 0.0
+                        "height": params.base_fog_sample.expect("sample").height,
+                        "width": params.base_fog_sample.expect("sample").width,
+                        "x": params.base_fog_sample.expect("sample").x,
+                        "y": params.base_fog_sample.expect("sample").y
                     },
                     "strength": params.base_fog_strength
                 },
@@ -3553,10 +3691,52 @@ mod tests {
                 }
             },
             "inputToOutputMeanAbsDelta": input_to_output_delta,
-            "issue": 2311,
+            "issue": 4398,
             "metrics": {
+                "autoBaseConfidence": selected_base_fog_candidate.confidence,
+                "baseFogSampleSource": selected_base_fog_candidate.source,
+                "channelCastRatio": auto_channel_cast_ratio,
                 "changedPixelRatio": changed_pixel_ratio,
-                "inputToOutputMeanAbsDelta": input_to_output_delta
+                "inputToOutputMeanAbsDelta": input_to_output_delta,
+                "meanInputOutputDelta": input_to_output_delta,
+                "previewAfterHash": preview_after_hash,
+                "previewBeforeHash": preview_before_hash,
+                "previewChanged": preview_before_hash != preview_after_hash,
+                "rankedBaseFogCandidates": base_fog_candidates
+                    .iter()
+                    .map(|candidate| json!({
+                        "baseDensity": candidate.estimate.base_density,
+                        "baseRgb": candidate.estimate.base_rgb,
+                        "blueWeight": candidate.estimate.blue_weight,
+                        "channelCastRatio": channel_cast_ratio_from_weights(
+                            candidate.estimate.red_weight,
+                            candidate.estimate.green_weight,
+                            candidate.estimate.blue_weight
+                        ),
+                        "confidence": candidate.confidence,
+                        "greenWeight": candidate.estimate.green_weight,
+                        "redWeight": candidate.estimate.red_weight,
+                        "sampleRect": {
+                            "height": candidate.sample_rect.height,
+                            "width": candidate.sample_rect.width,
+                            "x": candidate.sample_rect.x,
+                            "y": candidate.sample_rect.y
+                        },
+                        "score": candidate.score,
+                        "source": candidate.source,
+                        "warnings": candidate.warnings
+                    }))
+                    .collect::<Vec<_>>(),
+                "sampleRect": {
+                    "height": params.base_fog_sample.expect("sample").height,
+                    "width": params.base_fog_sample.expect("sample").width,
+                    "x": params.base_fog_sample.expect("sample").x,
+                    "y": params.base_fog_sample.expect("sample").y
+                },
+                "sampleSource": selected_base_fog_candidate.source,
+                "savedOutputExists": output_path.exists(),
+                "savedOutputPath": "src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg",
+                "warnings": selected_base_fog_candidate.warnings
             },
             "output": {
                 "contentHash": hash_negative_lab_output_file(&output_path).expect("hash output"),
