@@ -268,7 +268,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:mask-refine-command-ui', new Set(['bun tests/integration/checks/masks/check-mask-refinement-command-ui.ts'])],
   ['check:mask-refine-controls', new Set(['bun tests/integration/checks/masks/check-mask-refinement-controls.ts'])],
   ['check:mask-compose-command', new Set(['bun tests/integration/checks/masks/check-mask-compose-command.ts'])],
-  ['check:metadata-templates', new Set(['bun tests/integration/checks/check-metadata-template-fixtures.ts'])],
+  ['check:metadata-templates', new Set(['bun tests/integration/checks/metadata/check-metadata-template-fixtures.ts'])],
   ['check:public-fixture-manifest', new Set(['bun tests/integration/checks/check-public-fixture-manifest.ts'])],
   [
     'check:raw-open-edit-export-proof',

@@ -9,7 +9,7 @@ import {
   metadataTemplateCatalogSchema,
   parseMetadataTemplateCatalog,
   parseMetadataTemplateTarget,
-} from '../../../src/schemas/metadataTemplateSchemas.ts';
+} from '../../../../src/schemas/metadataTemplateSchemas.ts';
 
 const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(path, 'utf8'));
 
