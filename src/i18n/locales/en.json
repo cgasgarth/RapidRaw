@@ -520,10 +520,13 @@
         "resetSectionSettings": "Reset {{section}} Settings"
       },
       "rawProcessingModeOverride": {
+        "currentValue": "Current quality: {{mode}}",
         "description": "Override the global RAW quality mode for this image.",
         "error": "Failed to apply RAW mode override: {{error}}",
+        "hideRecipeId": "Hide recipe ID",
         "inherit": "Inherit ({{mode}})",
-        "label": "RAW quality"
+        "label": "RAW quality",
+        "showRecipeId": "Show recipe ID"
       },
       "rawReconstructionComparison": {
         "action": "Compare 100% crops",
@@ -3916,9 +3919,13 @@
         "performance": "Performance"
       },
       "rawMode": {
+        "current": "Current quality",
+        "currentValue": "Current quality: {{mode}}",
         "description": "Applies a versioned RAW development recipe so speed, default quality, and maximum detail are understandable and repeatable.",
+        "hideRecipeId": "Hide recipe ID",
         "label": "RAW Processing Mode",
         "provenance": "Recipe provenance",
+        "showRecipeId": "Show recipe ID",
         "title": "RAW Quality Mode"
       },
       "rawModes": {

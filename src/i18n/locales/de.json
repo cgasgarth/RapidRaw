@@ -520,10 +520,13 @@
         "resetSectionSettings": "{{section}}-Einstellungen zurücksetzen"
       },
       "rawProcessingModeOverride": {
+        "currentValue": "",
         "description": "Globale RAW-Qualitat fur dieses Bild uberschreiben.",
         "error": "RAW-Modus-Uberschreibung fehlgeschlagen: {{error}}",
+        "hideRecipeId": "",
         "inherit": "Erben ({{mode}})",
-        "label": "RAW-Qualitat"
+        "label": "RAW-Qualitat",
+        "showRecipeId": ""
       },
       "rawReconstructionComparison": {
         "action": "Compare 100% crops",
@@ -3795,9 +3798,13 @@
         "performance": "Leistung"
       },
       "rawMode": {
+        "current": "",
+        "currentValue": "",
         "description": "Wendet ein versioniertes RAW-Entwicklungsrezept an, damit Geschwindigkeit, Standardqualität und maximale Details verständlich und wiederholbar sind.",
+        "hideRecipeId": "",
         "label": "RAW-Verarbeitungsmodus",
         "provenance": "Rezept-Herkunft",
+        "showRecipeId": "",
         "title": "RAW-Qualitätsmodus"
       },
       "rawModes": {

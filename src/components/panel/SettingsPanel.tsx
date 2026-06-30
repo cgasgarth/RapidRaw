@@ -61,8 +61,9 @@ import {
 } from '../../utils/keyboardUtils';
 import {
   buildRawProcessingModePatch,
+  getRawProcessingModeDisplayCopy,
+  getRawProcessingModeProvenance,
   normalizeRawProcessingMode,
-  RAW_PROCESSING_MODE_RECIPES,
   RAW_PROCESSING_MODES,
   type RawProcessingMode,
 } from '../../utils/rawProcessingModes';
@@ -684,6 +685,7 @@ export function SettingsPanel({
   );
   const [restartRequired, setRestartRequired] = useState(false);
   const [activeCategory, setActiveCategory] = useState('general');
+  const [isRawProcessingModeProvenanceVisible, setIsRawProcessingModeProvenanceVisible] = useState(false);
   const [logPath, setLogPath] = useState<string | null>(null);
   const [logPathLoading, setLogPathLoading] = useState(true);
   const [logPathError, setLogPathError] = useState(false);
@@ -735,6 +737,11 @@ export function SettingsPanel({
         label: t(`settings.processing.rawModes.${mode}.label`),
       })),
     [t],
+  );
+
+  const rawProcessingModeDisplay = useMemo(
+    () => getRawProcessingModeDisplayCopy(processingSettings.rawProcessingMode, t),
+    [processingSettings.rawProcessingMode, t],
   );
 
   const linearRawOptions = useMemo<OptionItem<string>[]>(
@@ -2195,12 +2202,31 @@ export function SettingsPanel({
                       value={processingSettings.rawProcessingMode}
                     />
                     <div className="rounded-lg border border-surface bg-bg-primary/40 p-3">
-                      <UiText as="div" color={TextColors.secondary} className="text-xs uppercase tracking-wide">
-                        {t('settings.processing.rawMode.provenance')}
+                      <div className="flex items-center justify-between gap-3">
+                        <UiText as="div" color={TextColors.secondary} className="text-xs uppercase tracking-wide">
+                          {t('settings.processing.rawMode.current')}
+                        </UiText>
+                        <button
+                          className="inline-flex items-center gap-1.5 text-xs font-medium text-text-secondary transition-colors hover:text-text-primary"
+                          onClick={() => {
+                            setIsRawProcessingModeProvenanceVisible((previous) => !previous);
+                          }}
+                          type="button"
+                        >
+                          <Info size={12} />
+                          {isRawProcessingModeProvenanceVisible
+                            ? t('settings.processing.rawMode.hideRecipeId')
+                            : t('settings.processing.rawMode.showRecipeId')}
+                        </button>
+                      </div>
+                      <UiText as="div" color={TextColors.primary} className="mt-1 text-sm font-medium">
+                        {t('settings.processing.rawMode.currentValue', { mode: rawProcessingModeDisplay })}
                       </UiText>
-                      <UiText as="div" color={TextColors.primary} className="mt-1 font-mono text-xs">
-                        {RAW_PROCESSING_MODE_RECIPES[processingSettings.rawProcessingMode].provenance}
-                      </UiText>
+                      {isRawProcessingModeProvenanceVisible ? (
+                        <UiText as="div" color={TextColors.secondary} className="mt-2 font-mono text-xs">
+                          {getRawProcessingModeProvenance(processingSettings.rawProcessingMode)}
+                        </UiText>
+                      ) : null}
                       <UiText as="div" color={TextColors.secondary} className="mt-2 text-sm">
                         {t(`settings.processing.rawModes.${processingSettings.rawProcessingMode}.description`)}
                       </UiText>
