@@ -69,7 +69,7 @@ import { Invokes } from '../../tauri/commands';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../utils/adjustments';
 import { createFocusStackSourcePreflightMetadata } from '../../utils/focusStackSourcePreflight';
 import { findAlbumById } from '../../utils/folderTreeUtils';
-import { findHdrAutoStackPaths } from '../../utils/hdrAutoStackSelection';
+import { buildHdrLaunchSourceMetadata, resolveHdrLaunchSourcePaths } from '../../utils/hdrAutoStackSelection';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import {
   applyLibraryRelinkToRuntimeState,
@@ -432,8 +432,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       const commonTags = getCommonTags(finalSelection);
 
       const selectionCount = finalSelection.length;
-      const hdrStackSelection =
-        selectionCount === 1 ? (findHdrAutoStackPaths(imageList, path) ?? finalSelection) : finalSelection;
+      const hdrStackSelection = resolveHdrLaunchSourcePaths(imageList, finalSelection);
       const hdrSelectionCount = hdrStackSelection.length;
       const isSingleSelection = selectionCount === 1;
       const isEditingThisImage = selectedImage?.path === path;
@@ -719,10 +718,6 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               icon: Images,
               label: mergeLabel,
               onClick: () => {
-                const hdrSourceMetadata = hdrStackSelection.map((path) => ({
-                  exif: imageList.find((image) => image.path === path)?.exif ?? null,
-                  path,
-                }));
                 setUI({
                   hdrModalState: {
                     error: null,
@@ -732,7 +727,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     progressMessage: null,
                     savedHandoffSummary: null,
                     settings: DEFAULT_HDR_MERGE_UI_SETTINGS,
-                    sourceMetadata: hdrSourceMetadata,
+                    sourceMetadata: buildHdrLaunchSourceMetadata(imageList, finalSelection),
                     stitchingSourcePaths: hdrStackSelection,
                   },
                 });
