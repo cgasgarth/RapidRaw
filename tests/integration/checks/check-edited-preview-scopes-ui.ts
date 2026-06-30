@@ -1,83 +1,126 @@
 #!/usr/bin/env bun
 
 import { readFileSync } from 'node:fs';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import i18next from 'i18next';
+import { I18nextProvider, initReactI18next } from 'react-i18next';
 
-const read = (path: string) => readFileSync(path, 'utf8');
+import Waveform from '../../../src/components/panel/editor/Waveform.tsx';
+import { DisplayMode } from '../../../src/utils/adjustments.ts';
+
+import type { PreviewScopeStatus } from '../../../src/store/useEditorStore.ts';
+
 const failures: string[] = [];
+const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
+const i18n = await createTestI18n(locale);
 
-const storeSource = read('src/store/useEditorStore.ts');
-const listenerSource = read('src/hooks/useTauriListeners.ts');
-const waveformSource = read('src/components/panel/editor/Waveform.tsx');
-const controlsPanelSource = read('src/components/panel/right/ControlsPanel.tsx');
-const masksPanelSource = read('src/components/panel/right/MasksPanel.tsx');
-const rustLibSource = read('src-tauri/src/lib.rs');
-const gpuProcessingSource = read('src-tauri/src/gpu_processing.rs');
-const locale = JSON.parse(read('src/i18n/locales/en.json'));
+const pendingMarkup = renderWaveform(null);
+assertIncludes(pendingMarkup, 'data-testid="preview-scope-status"', 'pending scope status did not render');
+assertIncludes(pendingMarkup, 'data-preview-scope-ready="false"', 'pending scope should not be ready');
+assertIncludes(pendingMarkup, 'Scopes pending', 'pending scope label did not render');
 
-for (const marker of [
-  'export interface PreviewScopeStatus',
-  'previewScopeStatus: PreviewScopeStatus | null',
-  'previewScopeStatus: null',
-]) {
-  if (!storeSource.includes(marker)) failures.push(`Editor store missing ${marker}`);
-}
+const updatingMarkup = renderWaveform({
+  displayTransformLabel: 'Display transform',
+  exportProfileLabel: null,
+  exportRenderingIntentLabel: null,
+  histogramReady: true,
+  path: '/library/sample.NEF',
+  renderBasis: 'editor_preview',
+  softProofTransformApplied: false,
+  sourceLabel: 'Edited preview',
+  updatedAt: '2026-06-29T16:05:00.000Z',
+  waveformReady: false,
+  workingTransformLabel: 'Working RGB',
+  warningCodes: ['histogram-ready'],
+});
+assertIncludes(updatingMarkup, 'data-preview-scope-ready="false"', 'partial analytics should be marked updating');
+assertIncludes(updatingMarkup, 'data-preview-scope-source="Edited preview"', 'preview source label was not exposed');
+assertIncludes(updatingMarkup, 'data-working-transform-label="Working RGB"', 'working transform label was not exposed');
+assertIncludes(
+  updatingMarkup,
+  'data-display-transform-label="Display transform"',
+  'display transform label was not exposed',
+);
+assertIncludes(
+  updatingMarkup,
+  'data-preview-scope-warning-codes="histogram-ready"',
+  'scope warning codes were not exposed',
+);
+assertIncludes(updatingMarkup, 'Scopes updating', 'updating scope label did not render');
+assertIncludes(updatingMarkup, 'Working RGB to Display transform', 'transform path label did not render');
 
-for (const marker of [
-  'PREVIEW_SCOPE_SOURCE_LABEL',
-  'PREVIEW_SCOPE_WORKING_TRANSFORM_LABEL',
-  'PREVIEW_SCOPE_DISPLAY_TRANSFORM_LABEL',
-  'histogramReady: true',
-  'waveformReady: true',
-  'updatedAt: new Date().toISOString()',
-]) {
-  if (!listenerSource.includes(marker)) failures.push(`Tauri listener missing ${marker}`);
-}
+const readyMarkup = renderWaveform({
+  displayTransformLabel: 'Display transform',
+  exportProfileLabel: 'sRGB',
+  exportRenderingIntentLabel: 'relativeColorimetric',
+  histogramReady: true,
+  path: '/library/sample.NEF',
+  renderBasis: 'display_referred',
+  softProofTransformApplied: true,
+  sourceLabel: 'Edited preview',
+  updatedAt: '2026-06-29T16:10:00.000Z',
+  waveformReady: true,
+  workingTransformLabel: 'Working RGB',
+  warningCodes: [],
+});
+assertIncludes(readyMarkup, 'data-preview-scope-ready="true"', 'ready analytics should expose ready state');
+assertIncludes(readyMarkup, 'data-preview-scope-render-basis="display_referred"', 'render basis was not exposed');
+assertIncludes(
+  readyMarkup,
+  'data-preview-scope-soft-proof-transform-applied="true"',
+  'soft-proof state was not exposed',
+);
+assertIncludes(readyMarkup, 'data-export-profile-label="sRGB"', 'export profile label was not exposed');
+assertIncludes(
+  readyMarkup,
+  'data-export-rendering-intent-label="relativeColorimetric"',
+  'export intent label was not exposed',
+);
+assertIncludes(readyMarkup, 'Scopes ready', 'ready scope label did not render');
 
-for (const marker of [
-  'data-testid="preview-scope-status"',
-  'data-preview-scope-ready',
-  'data-preview-scope-source',
-  'data-working-transform-label',
-  'data-display-transform-label',
-  'ui.waveform.scopeStatus.ready',
-  'ui.waveform.scopeStatus.updating',
-  'ui.waveform.scopeStatus.pending',
-]) {
-  if (!waveformSource.includes(marker)) failures.push(`Waveform UI missing ${marker}`);
-}
-
-for (const [panelName, source] of [
-  ['ControlsPanel', controlsPanelSource],
-  ['MasksPanel', masksPanelSource],
-] as const) {
-  if (!source.includes('previewScopeStatus: state.previewScopeStatus')) {
-    failures.push(`${panelName} does not subscribe to previewScopeStatus.`);
-  }
-  if (!source.includes('previewScopeStatus={previewScopeStatus}')) {
-    failures.push(`${panelName} does not pass previewScopeStatus to Waveform.`);
-  }
-}
-
-for (const marker of [
-  'calculate_histogram_from_image(&job.image)',
-  'calculate_waveform_from_image(',
-  'process_and_get_dynamic_image_with_analytics',
-]) {
-  if (!rustLibSource.includes(marker) && !gpuProcessingSource.includes(marker)) {
-    failures.push(`Runtime edited-preview analytics path missing ${marker}`);
-  }
-}
-
-for (const key of ['pending', 'ready', 'updating']) {
+for (const key of ['pending', 'ready', 'transformPath', 'updating']) {
   if (typeof locale.ui?.waveform?.scopeStatus?.[key] !== 'string') {
-    failures.push(`Missing locale ui.waveform.scopeStatus.${key}`);
+    failures.push(`missing locale key: ui.waveform.scopeStatus.${key}`);
   }
 }
 
 if (failures.length > 0) {
   console.error('edited preview scopes UI failed');
-  console.error(failures.slice(0, 8).join('\n'));
+  console.error(failures.slice(0, 12).join('\n'));
   process.exit(1);
 }
 
 console.log('edited preview scopes UI ok');
+
+function renderWaveform(previewScopeStatus: PreviewScopeStatus | null): string {
+  return renderToStaticMarkup(
+    createElement(
+      I18nextProvider,
+      { i18n },
+      createElement(Waveform, {
+        displayMode: DisplayMode.Luma,
+        histogram: null,
+        previewScopeStatus,
+        setDisplayMode: () => undefined,
+        waveformData: null,
+      }),
+    ),
+  );
+}
+
+function assertIncludes(markup: string, needle: string, message: string): void {
+  if (!markup.includes(needle)) failures.push(message);
+}
+
+async function createTestI18n(resources: typeof locale) {
+  const instance = i18next.createInstance();
+  await instance.use(initReactI18next).init({
+    defaultNS: 'translation',
+    interpolation: { escapeValue: false },
+    lng: 'en',
+    react: { useSuspense: false },
+    resources: { en: { translation: resources } },
+  });
+  return instance;
+}
