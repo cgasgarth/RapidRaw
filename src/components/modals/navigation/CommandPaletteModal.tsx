@@ -76,6 +76,8 @@ const getCommandIcon = (command: CommandPaletteCommand) => {
   }
 };
 
+const editorSelectionRequiredFallback = 'Select an image in the editor to use this command';
+
 export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }: CommandPaletteModalProps) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -83,12 +85,13 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
   const [activeIndex, setActiveIndex] = useState(0);
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const imageList = useLibraryStore((state) => state.imageList);
+  const libraryActivePath = useLibraryStore((state) => state.libraryActivePath);
   const multiSelectedPaths = useLibraryStore((state) => state.multiSelectedPaths);
   const setUI = useUIStore((state) => state.setUI);
   const setRightPanel = useUIStore((state) => state.setRightPanel);
   const selectedCommandPaths = useMemo(
-    () => getCommandPaletteSelectedPaths(multiSelectedPaths, selectedImage),
-    [multiSelectedPaths, selectedImage],
+    () => getCommandPaletteSelectedPaths(multiSelectedPaths, libraryActivePath, selectedImage),
+    [libraryActivePath, multiSelectedPaths, selectedImage],
   );
   const selectedCommandImages = useMemo(() => {
     return getCommandPaletteSelectedImages(imageList, selectedCommandPaths);
@@ -297,7 +300,11 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{t(commandLabelKeys[command.id])}</span>
                       {disabledReasonKey && (
-                        <span className="block truncate text-xs text-text-tertiary">{t(disabledReasonKey)}</span>
+                        <span className="block truncate text-xs text-text-tertiary">
+                          {disabledReasonKey === 'modals.commandPalette.unavailable.selectEditorImage'
+                            ? t(disabledReasonKey, { defaultValue: editorSelectionRequiredFallback })
+                            : t(disabledReasonKey)}
+                        </span>
                       )}
                     </span>
                     <span className="shrink-0 text-xs text-text-secondary">

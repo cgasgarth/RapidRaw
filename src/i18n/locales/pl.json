@@ -2173,6 +2173,7 @@
       "searchPlaceholder": "Search commands...",
       "title": "Command Palette",
       "unavailable": {
+        "selectEditorImage": "Select an image in the editor to use this command",
         "selectImage": "Select an image to use this command",
         "selectSource": "Select one or more images to use this command"
       }
