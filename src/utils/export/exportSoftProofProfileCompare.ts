@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { ExportColorProfile, ExportRenderingIntent } from '../components/ui/ExportImportProperties';
-import type { ExportSoftProofTransformState } from '../store/useEditorStore';
+import { ExportColorProfile, ExportRenderingIntent } from '../../components/ui/ExportImportProperties';
+import type { ExportSoftProofTransformState } from '../../store/useEditorStore';
 
 export const EXPORT_SOFT_PROOF_PROFILE_COMPARE_TARGET_RESOLUTION = 1024;
 

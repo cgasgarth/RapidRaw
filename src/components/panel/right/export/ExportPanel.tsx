@@ -45,11 +45,11 @@ import {
   hasColorManagedTransform as hasExportColorManagedTransform,
   isSupportedColorProfileForFormat,
   supportsColorManagedOutput,
-} from '../../../../utils/exportColorCapabilityContracts';
+} from '../../../../utils/export/exportColorCapabilityContracts';
 import {
   hasStaleOrOfflineSmartPreview,
   isResolvingStaleSmartPreviewExport,
-} from '../../../../utils/exportSmartPreviewReadiness';
+} from '../../../../utils/export/exportSmartPreviewReadiness';
 import {
   buildSoftProofProfileCompareProof,
   buildSoftProofProfileCompareRequests,
@@ -59,7 +59,7 @@ import {
   type ExportSoftProofProfileCompareSideState,
   exportSoftProofTransformResponseSchema,
   getSoftProofProfileCompareStatus,
-} from '../../../../utils/exportSoftProofProfileCompare';
+} from '../../../../utils/export/exportSoftProofProfileCompare';
 import {
   formatGamutWarningCoverage,
   isCurrentExportSoftProofGamutWarningOverlay,

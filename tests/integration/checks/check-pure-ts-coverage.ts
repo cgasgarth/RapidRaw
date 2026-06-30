@@ -165,7 +165,7 @@ const coverageContracts = [
     id: 'smart-preview-readiness',
     owner: 'smart preview readiness utilities',
     behaviorArea: 'smart-preview export/readiness decisions',
-    sourceFiles: ['src/utils/exportSmartPreviewReadiness.ts'],
+    sourceFiles: ['src/utils/export/exportSmartPreviewReadiness.ts'],
     testFiles: ['tests/pure-ts/export/export-smart-preview-readiness.test.ts'],
     minLinePercent: 95,
     minFunctionPercent: 95,

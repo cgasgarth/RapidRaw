@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { OUTPUT_SHARPENING_FILE_FORMAT_IDS } from '../utils/exportFormatIds';
+import { OUTPUT_SHARPENING_FILE_FORMAT_IDS } from '../utils/export/exportFormatIds';
 
 export const outputSharpeningTargetSchema = z.enum(['screen', 'print', 'custom']);
 

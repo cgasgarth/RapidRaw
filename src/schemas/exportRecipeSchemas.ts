@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EXPORT_RECIPE_FILE_FORMAT_IDS, ExportFileFormatId } from '../utils/exportFormatIds';
+import { EXPORT_RECIPE_FILE_FORMAT_IDS, ExportFileFormatId } from '../utils/export/exportFormatIds';
 import { outputSharpeningSettingsSchema } from './outputSharpeningSchemas';
 
 export const exportFileFormatSchema = z.enum(EXPORT_RECIPE_FILE_FORMAT_IDS);

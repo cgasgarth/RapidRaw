@@ -9,13 +9,13 @@ import {
   buildSoftProofProfileCompareRequests,
   describeSoftProofProfileRole,
   getSoftProofProfileCompareStatus,
-} from '../../../src/utils/exportSoftProofProfileCompare.ts';
+} from '../../../src/utils/export/exportSoftProofProfileCompare.ts';
 
 const read = (path: string) => readFileSync(path, 'utf8');
 const failures: string[] = [];
 
 const exportPanelSource = read('src/components/panel/right/export/ExportPanel.tsx');
-const compareSource = read('src/utils/exportSoftProofProfileCompare.ts');
+const compareSource = read('src/utils/export/exportSoftProofProfileCompare.ts');
 const commandsSource = read('src/tauri/commands.ts');
 const rustLibSource = read('src-tauri/src/lib.rs');
 const rustExportColorPolicySource = read('src-tauri/src/export_color_policy.rs');

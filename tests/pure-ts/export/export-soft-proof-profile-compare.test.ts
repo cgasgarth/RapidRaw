@@ -7,7 +7,7 @@ import {
   buildSoftProofProfileCompareRequests,
   describeSoftProofProfileRole,
   getSoftProofProfileCompareStatus,
-} from '../../../src/utils/exportSoftProofProfileCompare';
+} from '../../../src/utils/export/exportSoftProofProfileCompare';
 
 const metadata = {
   blackPointCompensation: 'disabled',

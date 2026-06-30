@@ -20,7 +20,7 @@ import {
   isBlackPointCompensationAvailable,
   isSupportedColorProfileForFormat,
   supportsColorManagedOutput,
-} from '../../../src/utils/exportColorCapabilityContracts.ts';
+} from '../../../src/utils/export/exportColorCapabilityContracts.ts';
 
 const failures: string[] = [];
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
