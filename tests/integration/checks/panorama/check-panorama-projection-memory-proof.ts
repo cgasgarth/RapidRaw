@@ -62,8 +62,8 @@ const reportSchema = z
   .strict();
 
 const update = process.argv.includes('--update');
-run(['bun', 'tests/integration/checks/check-panorama-projection-crop.ts']);
-run(['bun', 'tests/integration/checks/check-panorama-performance-fixtures.ts']);
+run(['bun', 'tests/integration/checks/panorama/check-panorama-projection-crop.ts']);
+run(['bun', 'tests/integration/checks/panorama/check-panorama-performance-fixtures.ts']);
 const projectionText = await Bun.file(PROJECTION_REPORT_PATH).text();
 const projectionReport = projectionReportSchema.parse(JSON.parse(projectionText));
 const performanceText = await Bun.file(PERFORMANCE_FIXTURES_PATH).text();

@@ -61,7 +61,7 @@ const reportSchema = z
   .strict();
 
 const update = process.argv.includes('--update');
-run(['bun', 'tests/integration/checks/check-panorama-blend-exposure.ts']);
+run(['bun', 'tests/integration/checks/panorama/check-panorama-blend-exposure.ts']);
 const sourceText = await Bun.file(SOURCE_REPORT_PATH).text();
 const source = sourceReportSchema.parse(JSON.parse(sourceText));
 const cases = source.cases.map((sourceCase) => ({

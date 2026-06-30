@@ -109,7 +109,7 @@ if (UPDATE_REPORT) {
   const expectedReport = proofReportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
   if (JSON.stringify(expectedReport) !== JSON.stringify(report)) {
     failures.push(
-      `${REPORT_PATH} is stale; run bun tests/integration/checks/check-panorama-homography-diagnostics.ts --update`,
+      `${REPORT_PATH} is stale; run bun tests/integration/checks/panorama/check-panorama-homography-diagnostics.ts --update`,
     );
   }
 }
