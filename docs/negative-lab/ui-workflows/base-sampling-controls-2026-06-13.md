@@ -26,9 +26,9 @@ This PR adds:
 - `NegativeLabBaseSampleStatsV1`
 - `NegativeLabBaseFogEstimateV1`
 - sample artifact
-  `packages/rawengine-schema/samples/negative-lab-base-sample-record-v1.json`
+  `packages/rawengine-schema/samples/negative-lab/calibration/negative-lab-base-sample-record-v1.json`
 - sample artifact
-  `packages/rawengine-schema/samples/negative-lab-base-fog-estimate-v1.json`
+  `packages/rawengine-schema/samples/negative-lab/calibration/negative-lab-base-fog-estimate-v1.json`
 
 The existing `negativeLab.updateBaseSamples` command can optionally carry
 sample records, and rejecting samples now requires a rejection reason. The

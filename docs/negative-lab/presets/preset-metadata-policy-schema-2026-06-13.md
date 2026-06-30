@@ -23,7 +23,7 @@ This PR adds:
 - `NegativeLabPresetMetadataLegalReviewStatusV1`
 - `NegativeLabPresetMetadataUiContextV1`
 - sample artifact
-  `packages/rawengine-schema/samples/negative-lab-preset-metadata-policy-catalog-v1.json`
+  `packages/rawengine-schema/samples/negative-lab/presets/negative-lab-preset-metadata-policy-catalog-v1.json`
 
 ## Policy Tiers
 

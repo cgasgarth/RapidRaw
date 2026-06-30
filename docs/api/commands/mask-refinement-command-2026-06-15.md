@@ -3,7 +3,7 @@
 - Issue: #1258 `api(commands): expose mask refinement as typed edit command`
 - Schema: `LayerMaskCommandEnvelopeV1`
 - Command: `layerMask.refineMask`
-- Sample: `packages/rawengine-schema/samples/layer-mask-refine-command-envelope-v1.json`
+- Sample: `packages/rawengine-schema/samples/layer-mask/layer-mask-refine-command-envelope-v1.json`
 
 ## Scope
 

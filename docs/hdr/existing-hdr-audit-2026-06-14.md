@@ -18,7 +18,7 @@ The current HDR runtime is apply-capable but legacy. It loads every selected pat
 
 - Command type: `computationalMerge.createHdr`
 - Source role: `hdr_bracket`
-- Sample: `packages/rawengine-schema/samples/computational-merge-hdr-command-envelope-v1.json`
+- Sample: `packages/rawengine-schema/samples/hdr/computational-merge-hdr-command-envelope-v1.json`
 - Existing parameters: `alignmentMode`, `bracketValidation`, `deghosting`, `maxPreviewDimensionPx`, `mergeStrategy`, `outputName`, `qualityPreference`, `sources`, `toneMapPreview`
 - Existing source validation: all sources must use `hdr_bracket`; `bracketValidation: required` requires `exposureEv` on every source and at least two unique exposures.
 

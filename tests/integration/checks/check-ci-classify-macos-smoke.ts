@@ -629,7 +629,7 @@ function runSelfTest() {
     'schema package changes skip smoke',
     [
       { filename: 'packages/rawengine-schema/src/rawEngineSchemas.ts' },
-      { filename: 'packages/rawengine-schema/samples/panorama-artifact-v1.json' },
+      { filename: 'packages/rawengine-schema/samples/panorama/panorama-artifact-v1.json' },
     ],
     SMOKE_MODES.NONE,
   );

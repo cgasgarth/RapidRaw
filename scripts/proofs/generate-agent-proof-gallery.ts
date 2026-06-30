@@ -21,17 +21,17 @@ const replayFixtureInputs: Array<{ fixture: RawEngineAgentReplayFixtureV1; name:
   {
     fixture: sampleRawEngineAgentReplayFixtureV1,
     name: 'Edit graph rollback',
-    sourcePath: 'packages/rawengine-schema/samples/agent-replay-fixture-v1.json',
+    sourcePath: 'packages/rawengine-schema/samples/agent/agent-replay-fixture-v1.json',
   },
   {
     fixture: sampleAiToolAgentReplayFixtureV1,
     name: 'AI subject mask',
-    sourcePath: 'packages/rawengine-schema/samples/ai-tool-agent-replay-fixture-v1.json',
+    sourcePath: 'packages/rawengine-schema/samples/agent/ai-tool-agent-replay-fixture-v1.json',
   },
   {
     fixture: sampleAiEnhancementAgentReplayFixtureV1,
     name: 'AI enhancement',
-    sourcePath: 'packages/rawengine-schema/samples/ai-enhancement-agent-replay-fixture-v1.json',
+    sourcePath: 'packages/rawengine-schema/samples/agent/ai-enhancement-agent-replay-fixture-v1.json',
   },
 ];
 

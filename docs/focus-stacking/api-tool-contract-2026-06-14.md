@@ -60,12 +60,12 @@ Apply behavior:
 
 Schema samples added or updated by this contract:
 
-- `packages/rawengine-schema/samples/computational-merge-focus-stack-command-envelope-v1.json`
-- `packages/rawengine-schema/samples/computational-merge-focus-stack-apply-command-envelope-v1.json`
-- `packages/rawengine-schema/samples/computational-merge-focus-stack-dry-run-app-server-tool-call-validation-v1.json`
-- `packages/rawengine-schema/samples/computational-merge-focus-stack-apply-app-server-tool-call-validation-v1.json`
-- `packages/rawengine-schema/samples/computational-merge-app-server-tool-manifest-v1.json`
-- `packages/rawengine-schema/samples/tool-registry-v1.json`
+- `packages/rawengine-schema/samples/focus-stack/computational-merge-focus-stack-command-envelope-v1.json`
+- `packages/rawengine-schema/samples/focus-stack/computational-merge-focus-stack-apply-command-envelope-v1.json`
+- `packages/rawengine-schema/samples/focus-stack/computational-merge-focus-stack-dry-run-app-server-tool-call-validation-v1.json`
+- `packages/rawengine-schema/samples/focus-stack/computational-merge-focus-stack-apply-app-server-tool-call-validation-v1.json`
+- `packages/rawengine-schema/samples/computational-merge/computational-merge-app-server-tool-manifest-v1.json`
+- `packages/rawengine-schema/samples/core/tool-registry-v1.json`
 
 ## Validation
 

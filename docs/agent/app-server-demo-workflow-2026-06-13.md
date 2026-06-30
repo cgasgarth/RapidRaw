@@ -117,7 +117,7 @@ Every successful demo run should produce:
 The checked schema fixture added for #226 is the initial replay shape:
 
 ```text
-packages/rawengine-schema/samples/agent-replay-fixture-v1.json
+packages/rawengine-schema/samples/agent/agent-replay-fixture-v1.json
 ```
 
 Runtime demos should eventually produce the same shape from a live tool-call
