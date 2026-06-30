@@ -3,7 +3,7 @@
 import { createHash } from 'node:crypto';
 import { stat } from 'node:fs/promises';
 
-import { parsePublicFixtureManifest } from '../../../src/schemas/publicFixtureManifestSchemas.ts';
+import { parsePublicFixtureManifest } from '../../../../src/schemas/publicFixtureManifestSchemas.ts';
 
 const MANIFEST_PATH = 'docs/validation/fixtures/public-fixture-manifest.json';
 const FIXTURE_ID = 'real.detail.high-iso-skin-shadow.v0';

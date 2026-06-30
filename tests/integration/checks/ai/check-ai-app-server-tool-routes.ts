@@ -4,16 +4,16 @@ import { readFileSync } from 'node:fs';
 import {
   sampleAiAppServerToolManifestV1,
   sampleToolRegistryV1,
-} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+} from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
 import {
   AiAppServerToolCapability,
   AiAppServerToolName,
   AiAppServerToolRouteExecutionMode,
   AiAppServerToolRouteSourceKind,
   AiAppServerToolRouteStatus,
-} from '../../../src/utils/ai/aiAppServerToolRouteIds.ts';
-import { AI_APP_SERVER_TOOL_ROUTES } from '../../../src/utils/ai/aiAppServerToolRoutes.ts';
-import { AI_MASK_CAPABILITY_AUDIT } from '../../../src/utils/ai/aiMaskCapabilities.ts';
+} from '../../../../src/utils/ai/aiAppServerToolRouteIds.ts';
+import { AI_APP_SERVER_TOOL_ROUTES } from '../../../../src/utils/ai/aiAppServerToolRoutes.ts';
+import { AI_MASK_CAPABILITY_AUDIT } from '../../../../src/utils/ai/aiMaskCapabilities.ts';
 
 const COMMANDS_PATH = 'src/tauri/commands.ts';
 const commandsSource = readFileSync(COMMANDS_PATH, 'utf8');
@@ -39,12 +39,12 @@ const aiToolCapabilities = new Map(
 );
 const failures = [];
 const runtimeCheckCommands = [
-  ['bun', 'tests/integration/checks/check-ai-mask-capabilities.ts'],
-  ['bun', 'tests/integration/checks/check-ai-mask-app-server-tool.ts'],
-  ['bun', 'tests/integration/checks/check-ai-people-mask-contract.ts'],
-  ['bun', 'tests/integration/checks/check-ai-people-layer-apply-plan.ts'],
-  ['bun', 'tests/integration/checks/check-ai-denoise-app-server-tool.ts'],
-  ['bun', 'tests/integration/checks/check-ai-denoise-runtime-apply.ts'],
+  ['bun', 'tests/integration/checks/ai/check-ai-mask-capabilities.ts'],
+  ['bun', 'tests/integration/checks/ai/check-ai-mask-app-server-tool.ts'],
+  ['bun', 'tests/integration/checks/ai/check-ai-people-mask-contract.ts'],
+  ['bun', 'tests/integration/checks/ai/check-ai-people-layer-apply-plan.ts'],
+  ['bun', 'tests/integration/checks/ai/check-ai-denoise-app-server-tool.ts'],
+  ['bun', 'tests/integration/checks/ai/check-ai-denoise-runtime-apply.ts'],
 ] satisfies Array<[string, ...string[]]>;
 
 const toolCapabilityByAiMaskCapability = new Map([

@@ -6,8 +6,8 @@ import { resolve } from 'node:path';
 import {
   aiPeopleMaskFakeProviderFixtureSchema,
   aiPeopleMaskLayerApplyPlanFixtureSchema,
-} from '../../../src/schemas/aiMaskingSchemas.ts';
-import { createAiPeopleMaskLayerApplyPlan } from '../../../src/utils/ai/aiPeopleMaskLayerPlan.ts';
+} from '../../../../src/schemas/aiMaskingSchemas.ts';
+import { createAiPeopleMaskLayerApplyPlan } from '../../../../src/utils/ai/aiPeopleMaskLayerPlan.ts';
 
 const fakeProviderFixtureJson: unknown = JSON.parse(
   readFileSync(resolve('fixtures/masks/ai/ai-people-fake-provider.json'), 'utf8'),

@@ -1,24 +1,24 @@
 #!/usr/bin/env bun
 
-import { createRawEngineLocalAppServerBridge } from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
+import { createRawEngineLocalAppServerBridge } from '../../../../packages/rawengine-schema/src/localAppServerBridge.ts';
 import {
   aiToolApplyResultV1Schema,
   aiToolCommandEnvelopeV1Schema,
   aiToolDryRunResultV1Schema,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   sampleAiAppServerToolManifestV1,
   sampleAiToolApplyCommandEnvelopeV1,
   sampleAiToolCommandEnvelopeV1,
-} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+} from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
 import {
   AiAppServerToolCapability,
   AiAppServerToolName,
   AiAppServerToolRouteExecutionMode,
   AiAppServerToolRouteSourceKind,
-} from '../../../src/utils/ai/aiAppServerToolRouteIds.ts';
-import { AI_APP_SERVER_TOOL_ROUTES } from '../../../src/utils/ai/aiAppServerToolRoutes.ts';
-import { buildRawEngineAppServerRouteCatalog } from '../../../src/utils/rawEngineAppServerHost.ts';
+} from '../../../../src/utils/ai/aiAppServerToolRouteIds.ts';
+import { AI_APP_SERVER_TOOL_ROUTES } from '../../../../src/utils/ai/aiAppServerToolRoutes.ts';
+import { buildRawEngineAppServerRouteCatalog } from '../../../../src/utils/rawEngineAppServerHost.ts';
 
 const failures: string[] = [];
 const toolByName = new Map(sampleAiAppServerToolManifestV1.tools.map((tool) => [tool.toolName, tool]));

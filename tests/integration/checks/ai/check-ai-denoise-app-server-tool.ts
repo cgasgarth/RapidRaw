@@ -1,25 +1,28 @@
 #!/usr/bin/env bun
 
-import { createRawEngineLocalAppServerBridge } from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
+import { createRawEngineLocalAppServerBridge } from '../../../../packages/rawengine-schema/src/localAppServerBridge.ts';
 import {
   aiEnhancementApplyResultV1Schema,
   aiEnhancementCommandEnvelopeV1Schema,
   aiEnhancementDryRunResultV1Schema,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   sampleAiAppServerToolManifestV1,
   sampleAiEnhancementApplyCommandEnvelopeV1,
   sampleAiEnhancementCommandEnvelopeV1,
-} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+} from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
 import {
   AiAppServerToolCapability,
   AiAppServerToolName,
   AiAppServerToolRouteExecutionMode,
   AiAppServerToolRouteSourceKind,
-} from '../../../src/utils/ai/aiAppServerToolRouteIds.ts';
-import { AI_APP_SERVER_TOOL_ROUTES } from '../../../src/utils/ai/aiAppServerToolRoutes.ts';
-import { applyLocalAiDenoiseAdapter, buildSyntheticAiDenoiseInput } from '../../../src/utils/localAiDenoiseAdapter.ts';
-import { buildRawEngineAppServerRouteCatalog } from '../../../src/utils/rawEngineAppServerHost.ts';
+} from '../../../../src/utils/ai/aiAppServerToolRouteIds.ts';
+import { AI_APP_SERVER_TOOL_ROUTES } from '../../../../src/utils/ai/aiAppServerToolRoutes.ts';
+import {
+  applyLocalAiDenoiseAdapter,
+  buildSyntheticAiDenoiseInput,
+} from '../../../../src/utils/localAiDenoiseAdapter.ts';
+import { buildRawEngineAppServerRouteCatalog } from '../../../../src/utils/rawEngineAppServerHost.ts';
 
 const failures: string[] = [];
 const routeByToolName = new Map(
