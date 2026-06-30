@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { $ } from 'bun';
 
 const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
+const patchSamplerPanelSource = readFileSync('src/components/modals/NegativeLabPatchSamplerPanel.tsx', 'utf8');
 const smokeSource = readFileSync('scripts/capture-visual-smoke.ts', 'utf8');
 const proofSource = readFileSync('scripts/lib/visual-smoke-proofs.ts', 'utf8');
 const helperSource = readFileSync('src/utils/negativeLabPatchPicker.ts', 'utf8');
@@ -18,7 +19,7 @@ for (const marker of [
   'handlePatchPickPointerMove',
   'handlePatchPickPointerUp',
 ]) {
-  if (!modalSource.includes(marker) && !helperSource.includes(marker)) {
+  if (!modalSource.includes(marker) && !patchSamplerPanelSource.includes(marker) && !helperSource.includes(marker)) {
     throw new Error(`Negative Lab interactive patch picker marker missing: ${marker}`);
   }
 }
@@ -34,6 +35,6 @@ for (const marker of [
   }
 }
 
-await $`bun test tests/pure-ts/negative-lab-patch-picker.test.ts`.quiet();
+await $`bun test ./tests/pure-ts/negative-lab/negative-lab-patch-picker.test.ts`.quiet();
 
 console.log('negative lab interactive patch picker ok');

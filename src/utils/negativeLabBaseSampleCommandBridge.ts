@@ -6,6 +6,17 @@ import type {
 
 export type NegativeLabBaseSampleSource = 'auto_full_frame' | 'custom_rect' | 'preset_rect';
 export type NegativeLabBaseSampleConfidence = 'blocked' | 'high' | 'low' | 'medium';
+export type NegativeLabBaseSampleScope = 'frame' | 'roll' | 'selected_frames';
+export type NegativeLabBaseSampleStatus = 'accepted' | 'candidate' | 'rejected';
+export type NegativeLabBaseSampleRejectionReason =
+  | 'clipped_channel'
+  | 'dust'
+  | 'light_leak'
+  | 'manual'
+  | 'rebate_text'
+  | 'scratch'
+  | 'sprocket'
+  | 'uneven_illumination';
 export type NegativeLabBaseSampleWarningCode =
   | 'clipped_base_channel'
   | 'low_acquisition_confidence'
@@ -16,7 +27,10 @@ export interface NegativeLabBaseSampleCommandContext {
   estimate: NegativeBaseFogEstimate;
   frameId: string;
   imagePath: string;
+  rejectionReason?: NegativeLabBaseSampleRejectionReason;
   sampleRect: NegativeLabBaseFogSampleRect | null;
+  sampleScope?: NegativeLabBaseSampleScope;
+  sampleStatus?: NegativeLabBaseSampleStatus;
   source: NegativeLabBaseSampleSource;
 }
 
@@ -31,7 +45,10 @@ export interface NegativeLabBaseSamplePreviewProof {
   previewBeforeHash: string | null;
   previewChanged: boolean;
   previewRevision: number;
+  rejectionReason: NegativeLabBaseSampleRejectionReason | null;
+  sampleScope: NegativeLabBaseSampleScope;
   sampleSource: NegativeLabBaseSampleSource;
+  sampleStatus: NegativeLabBaseSampleStatus;
   warningCodes: NegativeLabBaseSampleWarningCode[];
 }
 
@@ -58,10 +75,12 @@ interface NegativeLabUpdateBaseSamplesCommand {
       qcStatuses: string[];
       warningCodes: string[];
     };
-    sampleEditMode: 'replace';
+    rejectionReason?: NegativeLabBaseSampleRejectionReason;
+    sampleEditMode: 'accept' | 'add' | 'reject' | 'remove' | 'replace';
     sampleRecords: Array<{
       confidence: NegativeLabBaseSampleConfidence;
       measuredAt: string;
+      rejectionReason?: NegativeLabBaseSampleRejectionReason;
       sampleId: string;
       sampleRegion: {
         frameId: string;
@@ -76,9 +95,14 @@ interface NegativeLabUpdateBaseSamplesCommand {
         regionId: string;
         role: 'base_fog';
       };
-      sampleScope: 'frame';
+      sampleScope: NegativeLabBaseSampleScope;
+      sampleStats?: {
+        blue: NegativeLabBaseSampleChannelStats;
+        green: NegativeLabBaseSampleChannelStats;
+        red: NegativeLabBaseSampleChannelStats;
+      };
       schemaVersion: 1;
-      status: 'candidate';
+      status: NegativeLabBaseSampleStatus;
       warningCodes: NegativeLabBaseSampleWarningCode[];
     }>;
     sampleRegions: Array<{
@@ -101,6 +125,16 @@ interface NegativeLabUpdateBaseSamplesCommand {
     imagePath: string;
     kind: 'image';
   };
+}
+
+interface NegativeLabBaseSampleChannelStats {
+  clippingFraction: number;
+  max: number;
+  mean: number;
+  median: number;
+  min: number;
+  sampleCount: number;
+  standardDeviation: number;
 }
 
 const FULL_FRAME_SAMPLE_RECT: NegativeLabBaseFogSampleRect = {
@@ -139,6 +173,42 @@ export const buildNegativeLabBaseSampleWarningCodes = (
   return [...warnings];
 };
 
+const buildNegativeLabBaseSampleChannelStats = (
+  channel: number,
+  sampleCount: number,
+): NegativeLabBaseSampleChannelStats => {
+  const mean = Number(channel.toFixed(6));
+
+  return {
+    clippingFraction: channel <= 0.01 || channel >= 0.99 ? 1 : 0,
+    max: mean,
+    mean,
+    median: mean,
+    min: mean,
+    sampleCount,
+    standardDeviation: 0,
+  };
+};
+
+const buildNegativeLabBaseSampleStats = (
+  estimate: NegativeBaseFogEstimate,
+  sampleRect: NegativeLabBaseFogSampleRect,
+) => {
+  const sampleCount = Math.max(1, Math.round(sampleRect.width * sampleRect.height * 1_000_000));
+
+  return {
+    blue: buildNegativeLabBaseSampleChannelStats(estimate.baseRgb[2], sampleCount),
+    green: buildNegativeLabBaseSampleChannelStats(estimate.baseRgb[1], sampleCount),
+    red: buildNegativeLabBaseSampleChannelStats(estimate.baseRgb[0], sampleCount),
+  };
+};
+
+const sampleEditModeForStatus = (status: NegativeLabBaseSampleStatus): 'accept' | 'reject' | 'replace' => {
+  if (status === 'accepted') return 'accept';
+  if (status === 'rejected') return 'reject';
+  return 'replace';
+};
+
 export const buildNegativeLabUpdateBaseSamplesCommand = (
   context: NegativeLabBaseSampleCommandContext,
   warningCodes: NegativeLabBaseSampleWarningCode[],
@@ -146,11 +216,17 @@ export const buildNegativeLabUpdateBaseSamplesCommand = (
 ): NegativeLabUpdateBaseSamplesCommand => {
   const sampleRect = context.sampleRect ?? FULL_FRAME_SAMPLE_RECT;
   const confidence = classifyNegativeLabBaseSampleConfidence(context.estimate);
+  const sampleScope = context.sampleScope ?? 'frame';
+  const sampleStatus = context.sampleStatus ?? 'candidate';
+  const rejectionReason = sampleStatus === 'rejected' ? (context.rejectionReason ?? 'manual') : undefined;
   const sourceHash = buildNegativeLabBaseSampleHash(
     JSON.stringify({
       frameId: context.frameId,
       imagePath: context.imagePath,
+      rejectionReason,
       sampleRect,
+      sampleScope,
+      sampleStatus,
       source: context.source,
     }),
   ).replace('fnv1a32:', '');
@@ -170,6 +246,7 @@ export const buildNegativeLabUpdateBaseSamplesCommand = (
     regionId,
     role: 'base_fog' as const,
   };
+  const sampleStats = buildNegativeLabBaseSampleStats(context.estimate, sampleRect);
 
   return {
     actor: {
@@ -194,16 +271,19 @@ export const buildNegativeLabUpdateBaseSamplesCommand = (
         qcStatuses: [],
         warningCodes: [],
       },
-      sampleEditMode: 'replace',
+      ...(rejectionReason === undefined ? {} : { rejectionReason }),
+      sampleEditMode: sampleEditModeForStatus(sampleStatus),
       sampleRecords: [
         {
           confidence,
           measuredAt,
+          ...(rejectionReason === undefined ? {} : { rejectionReason }),
           sampleId,
           sampleRegion,
-          sampleScope: 'frame',
+          sampleScope,
+          sampleStats,
           schemaVersion: 1,
-          status: 'candidate',
+          status: sampleStatus,
           warningCodes,
         },
       ],
@@ -215,6 +295,44 @@ export const buildNegativeLabUpdateBaseSamplesCommand = (
       imagePath: context.imagePath,
       kind: 'image',
     },
+  };
+};
+
+export const buildNegativeLabBaseSampleDecisionProof = (
+  proof: NegativeLabBaseSamplePreviewProof,
+  sampleStatus: NegativeLabBaseSampleStatus,
+  sampleScope: NegativeLabBaseSampleScope = proof.sampleScope,
+  rejectionReason: NegativeLabBaseSampleRejectionReason = 'manual',
+): NegativeLabBaseSamplePreviewProof => {
+  const nextRejectionReason = sampleStatus === 'rejected' ? rejectionReason : null;
+  const sampleEditMode = sampleEditModeForStatus(sampleStatus);
+
+  return {
+    ...proof,
+    command: {
+      ...proof.command,
+      parameters: {
+        ...(() => {
+          const { rejectionReason: _previousRejectionReason, ...parametersWithoutRejection } = proof.command.parameters;
+          return parametersWithoutRejection;
+        })(),
+        ...(nextRejectionReason === null ? {} : { rejectionReason: nextRejectionReason }),
+        sampleEditMode,
+        sampleRecords: proof.command.parameters.sampleRecords.map((sampleRecord) => {
+          const { rejectionReason: _previousRejectionReason, ...recordWithoutRejection } = sampleRecord;
+
+          return {
+            ...recordWithoutRejection,
+            ...(nextRejectionReason === null ? {} : { rejectionReason: nextRejectionReason }),
+            sampleScope,
+            status: sampleStatus,
+          };
+        }),
+      },
+    },
+    rejectionReason: nextRejectionReason,
+    sampleScope,
+    sampleStatus,
   };
 };
 
@@ -237,7 +355,10 @@ export const buildNegativeLabBaseSamplePreviewProof = (
     previewBeforeHash,
     previewChanged: previewBeforeHash !== previewAfterHash,
     previewRevision,
+    rejectionReason: context.sampleStatus === 'rejected' ? (context.rejectionReason ?? 'manual') : null,
+    sampleScope: context.sampleScope ?? 'frame',
     sampleSource: context.source,
+    sampleStatus: context.sampleStatus ?? 'candidate',
     warningCodes,
   };
 };

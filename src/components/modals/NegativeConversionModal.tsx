@@ -81,6 +81,7 @@ import {
 } from '../../utils/negativeLabAcquisitionProfiles';
 import { NegativeLabAppServerCommandName } from '../../utils/negativeLabAppServerCommandNames';
 import {
+  buildNegativeLabBaseSampleDecisionProof,
   buildNegativeLabBaseSamplePreviewProof,
   type NegativeLabBaseSamplePreviewProof,
   type NegativeLabBaseSamplePreviewProofContext,
@@ -1657,20 +1658,31 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     pushBaseFogSampleUndoEntry();
     setBaseFogScope('roll');
     setBaseSampleStudioDecision('accepted');
+    setBaseFogPreviewProof((proof) =>
+      proof === null ? null : buildNegativeLabBaseSampleDecisionProof(proof, 'accepted', 'roll'),
+    );
     setAcceptedBatchPlanJson(null);
   };
 
   const handleAcceptBaseSample = () => {
     if (baseFogConfidence === null) return;
     setBaseSampleStudioDecision('accepted');
+    setBaseFogPreviewProof((proof) =>
+      proof === null ? null : buildNegativeLabBaseSampleDecisionProof(proof, 'accepted', baseFogScope),
+    );
     setRejectedBaseSampleLabel(null);
   };
 
   const handleRejectBaseSample = () => {
     if (activeBaseFogSampleLabel === null) return;
     const rejectedLabel = activeBaseFogSampleLabel;
+    const rejectedProof =
+      baseFogPreviewProof === null
+        ? null
+        : buildNegativeLabBaseSampleDecisionProof(baseFogPreviewProof, 'rejected', baseFogScope, 'manual');
     handleUndoBaseFogSample();
     setRejectedBaseSampleLabel(rejectedLabel);
+    setBaseFogPreviewProof(rejectedProof);
     setBaseSampleStudioDecision('rejected');
   };
 
@@ -4182,9 +4194,15 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 data-confidence={baseFogPreviewProof.confidence}
                 data-preview-changed={String(baseFogPreviewProof.previewChanged)}
                 data-preview-revision={baseFogPreviewProof.previewRevision}
+                data-rejection-reason={baseFogPreviewProof.rejectionReason ?? ''}
+                data-sample-command-status={
+                  baseFogPreviewProof.command.parameters.sampleRecords[0]?.status ?? baseFogPreviewProof.sampleStatus
+                }
                 data-sample-edit-mode={baseFogPreviewProof.command.parameters.sampleEditMode}
                 data-sample-id={baseFogPreviewProof.command.parameters.sampleRecords[0]?.sampleId ?? ''}
+                data-sample-scope={baseFogPreviewProof.sampleScope}
                 data-sample-source={baseFogPreviewProof.sampleSource}
+                data-sample-status={baseFogPreviewProof.sampleStatus}
                 data-testid="negative-lab-base-preview-proof"
                 data-warning-codes={baseFogPreviewProof.warningCodes.join(',')}
               >
