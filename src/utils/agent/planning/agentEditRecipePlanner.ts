@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { useEditorStore } from '../../../store/useEditorStore';
 
 import type { AgentCoreEditCommandBundleStep } from './agentCoreEditCommandBundle';
+import { classifyAgentEditIntent } from './agentEditIntentClassifier';
 
 export const agentEditRecipeKindSchema = z.enum(['brighten_flat_raw', 'warm_portrait_pop', 'cool_landscape_detail']);
 
@@ -20,21 +21,10 @@ export type AgentEditRecipePlan = Omit<z.infer<typeof agentEditRecipePlanSchema>
   steps: AgentCoreEditCommandBundleStep[];
 };
 
-const includesAny = (value: string, needles: readonly string[]): boolean =>
-  needles.some((needle) => value.includes(needle));
-
 export const planAgentEditRecipe = (prompt: string): AgentEditRecipePlan => {
-  const normalized = prompt.toLowerCase();
   const base = useEditorStore.getState().adjustments;
-  const warm = includesAny(normalized, ['warm', 'skin', 'portrait', 'golden']);
-  const landscape = includesAny(normalized, ['landscape', 'mountain', 'sky', 'blue']);
-  const brighten = includesAny(normalized, ['bright', 'exposure', 'dark', 'flat']);
-
-  const recipeKind: AgentEditRecipeKind = warm
-    ? 'warm_portrait_pop'
-    : landscape
-      ? 'cool_landscape_detail'
-      : 'brighten_flat_raw';
+  const intent = classifyAgentEditIntent(prompt);
+  const { brightenIntent, recipeKind, warmToneIntent } = intent;
 
   const plan: AgentEditRecipePlan = {
     recipeKind,
@@ -53,10 +43,10 @@ export const planAgentEditRecipe = (prompt: string): AgentEditRecipePlan => {
           brightness: base.brightness,
           clarity: recipeKind === 'cool_landscape_detail' ? 18 : 10,
           contrast: recipeKind === 'brighten_flat_raw' ? 16 : 20,
-          exposure: brighten ? 0.35 : 0.18,
+          exposure: brightenIntent ? 0.35 : 0.18,
           highlights: -14,
-          saturation: warm ? 8 : 5,
-          shadows: brighten ? 12 : 7,
+          saturation: warmToneIntent ? 8 : 5,
+          shadows: brightenIntent ? 12 : 7,
           whites: 5,
         },
       },
@@ -66,8 +56,12 @@ export const planAgentEditRecipe = (prompt: string): AgentEditRecipePlan => {
           adjustment:
             recipeKind === 'cool_landscape_detail'
               ? { hue: -2, luminance: 4, saturation: 10 }
-              : { hue: warm ? -4 : 0, luminance: warm ? 5 : 2, saturation: warm ? 12 : 4 },
-          rangeKey: recipeKind === 'cool_landscape_detail' ? 'blues' : warm ? 'oranges' : 'yellows',
+              : {
+                  hue: warmToneIntent ? -4 : 0,
+                  luminance: warmToneIntent ? 5 : 2,
+                  saturation: warmToneIntent ? 12 : 4,
+                },
+          rangeKey: recipeKind === 'cool_landscape_detail' ? 'blues' : warmToneIntent ? 'oranges' : 'yellows',
         },
       },
     ],
