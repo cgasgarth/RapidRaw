@@ -1260,6 +1260,8 @@
       "redWeight": "빨강 (시안)",
       "resetTooltip": "초기화",
       "resetViewTooltip": "보기 초기화",
+      "restoreRollNormalizationPlan": "Restore roll normalization",
+      "rollNormalizationRestoreReceipt": "Restored {{frameCount}} frames from {{planId}} · revision {{revision}}",
       "title": "네거티브 변환",
       "zoomInTooltip": "확대",
       "zoomOutTooltip": "축소",
