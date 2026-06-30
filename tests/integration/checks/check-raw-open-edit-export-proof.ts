@@ -18,7 +18,7 @@ const manifest = parseRawOpenEditExportProofManifest(
   JSON.parse(await readFile('fixtures/validation/raw-open-edit-export-proof.json', 'utf8')),
 );
 const ledger = parsePrivateRawEvidenceLedger(
-  JSON.parse(await readFile('fixtures/detail/private-raw-evidence-ledger.json', 'utf8')),
+  JSON.parse(await readFile('fixtures/detail/proofs/private-raw-evidence-ledger.json', 'utf8')),
 );
 const ledgerEntries = new Map(ledger.entries.map((entry) => [entry.evidenceId, entry]));
 

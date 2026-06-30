@@ -10,10 +10,10 @@ import {
 } from '../../../scripts/lib/fixtures/fixture-checks.ts';
 import { defringeFixtureSchema, parseDefringeFixtures } from '../../../src/schemas/defringeSchemas.ts';
 
-const fixtures = parseDefringeFixtures(await readJson('fixtures/detail/defringe-fixtures.json'));
+const fixtures = parseDefringeFixtures(await readJson('fixtures/detail/defringe/defringe-fixtures.json'));
 const invalidCases = z
   .array(z.object({ case: z.string().min(1), fixture: z.unknown() }).strict())
-  .parse(await readJson('fixtures/detail/invalid-defringe-fixtures.json'));
+  .parse(await readJson('fixtures/detail/invalid/defringe/invalid-defringe-fixtures.json'));
 const failures: string[] = [];
 
 addDuplicateFieldFailures({

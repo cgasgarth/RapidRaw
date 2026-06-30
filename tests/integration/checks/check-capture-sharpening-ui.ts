@@ -13,7 +13,9 @@ import {
 const read = (path: string) => readFileSync(path, 'utf8');
 const failures: string[] = [];
 
-const fixturePresets = z.array(z.unknown()).parse(JSON.parse(read('fixtures/detail/capture-sharpening-presets.json')));
+const fixturePresets = z
+  .array(z.unknown())
+  .parse(JSON.parse(read('fixtures/detail/sharpening/capture-sharpening-presets.json')));
 const fixtureIds = fixturePresets.map((preset) => parseCaptureSharpeningPreset(preset).id).join(',');
 const runtimeIds = CAPTURE_SHARPENING_PRESETS.map((preset) => preset.id).join(',');
 

@@ -33,7 +33,7 @@ await mkdir(dirname(REPORT_PATH), { recursive: true });
 await rm(REPORT_PATH, { force: true });
 
 const fixtureManifest = parseDenoiseFixtureManifest(
-  JSON.parse(await readFile('fixtures/detail/denoise-fixtures.json', 'utf8')),
+  JSON.parse(await readFile('fixtures/detail/denoise/denoise-fixtures.json', 'utf8')),
 );
 const expectedSyntheticFixtureCount = fixtureManifest.fixtures.filter(
   (fixture) => fixture.sourceKind === 'synthetic_public',

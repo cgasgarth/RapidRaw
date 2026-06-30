@@ -17,7 +17,7 @@ const sourceOverridePath = valueAfter('--source') ?? process.env.RAWENGINE_PRIVA
 if (!isAbsolute(privateRootPath)) fail('private root must be absolute.');
 
 const ledger = parsePrivateRawEvidenceLedger(
-  JSON.parse(await readFile('fixtures/detail/private-raw-evidence-ledger.json', 'utf8')),
+  JSON.parse(await readFile('fixtures/detail/proofs/private-raw-evidence-ledger.json', 'utf8')),
 );
 const entry = ledger.entries.find((candidate) => candidate.evidenceId === EVIDENCE_ID);
 if (entry === undefined) fail(`${EVIDENCE_ID}: missing private RAW evidence ledger entry.`);

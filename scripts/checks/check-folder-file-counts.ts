@@ -30,10 +30,6 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4237',
     reason: 'workflow names are branch-protection sensitive',
   },
-  'fixtures/detail': {
-    issue: '#4221',
-    reason: 'detail fixtures are pending feature grouping',
-  },
   'fixtures/validation': {
     issue: '#4223',
     reason: 'validation fixtures are pending journey grouping',

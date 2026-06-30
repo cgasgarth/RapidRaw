@@ -25,7 +25,7 @@
           "hash": null,
           "kind": "metric_report",
           "limitations": ["preview_export_parity", "real_raw_quality", "gpu_parity", "ui_api_wiring", "e2e_workflow"],
-          "path": "fixtures/detail/deblur-fixtures.json",
+          "path": "fixtures/detail/deblur/deblur-fixtures.json",
           "publicRepoAllowed": true,
           "sourceIssue": 1173
         },

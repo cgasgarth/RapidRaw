@@ -686,7 +686,7 @@ async function readManifest(): Promise<Manifest> {
 
 async function readLedger(): Promise<Ledger> {
   return parsePrivateRawEvidenceLedger(
-    JSON.parse(await readFile('fixtures/detail/private-raw-evidence-ledger.json', 'utf8')),
+    JSON.parse(await readFile('fixtures/detail/proofs/private-raw-evidence-ledger.json', 'utf8')),
   );
 }
 

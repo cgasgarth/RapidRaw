@@ -17,7 +17,9 @@ const sourceOverridePath = valueAfter('--source') ?? process.env.RAWENGINE_PRIVA
 
 const requestJson: unknown = JSON.parse(await readFile(requestPath, 'utf8'));
 const proofJson: unknown = JSON.parse(await readFile(manifestPath, 'utf8'));
-const ledgerJson: unknown = JSON.parse(await readFile('fixtures/detail/private-raw-evidence-ledger.json', 'utf8'));
+const ledgerJson: unknown = JSON.parse(
+  await readFile('fixtures/detail/proofs/private-raw-evidence-ledger.json', 'utf8'),
+);
 
 const request = rawOpenEditExportProofRequestSchema.parse(requestJson);
 const proof = parseRawOpenEditExportProofManifest(proofJson);

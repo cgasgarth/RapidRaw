@@ -33,7 +33,7 @@ await mkdir(dirname(REPORT_PATH), { recursive: true });
 await rm(REPORT_PATH, { force: true });
 
 const fixtureManifest = parseDeblurFixtureManifest(
-  JSON.parse(await readFile('fixtures/detail/deblur-fixtures.json', 'utf8')),
+  JSON.parse(await readFile('fixtures/detail/deblur/deblur-fixtures.json', 'utf8')),
 );
 const expectedAcceptedFixtureCount = fixtureManifest.fixtures.filter(
   (fixture) => fixture.acceptancePolicy.action === 'accept',

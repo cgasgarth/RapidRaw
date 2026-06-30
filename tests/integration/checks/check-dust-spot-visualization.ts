@@ -20,11 +20,11 @@ const invalidDustSpotVisualizationCaseSchema = z
 const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(path, 'utf8'));
 
 const manifest = dustSpotVisualizationFixtureSchema.parse(
-  await readJson('fixtures/detail/dust-spot-visualization.json'),
+  await readJson('fixtures/detail/artifacts/dust-spot-visualization.json'),
 );
 const invalidCases = z
   .array(invalidDustSpotVisualizationCaseSchema)
-  .parse(await readJson('fixtures/detail/invalid-dust-spot-visualization.json'));
+  .parse(await readJson('fixtures/detail/invalid/artifacts/invalid-dust-spot-visualization.json'));
 const failures: Array<string> = [];
 const requiredAdjustmentKeys: Array<DetailsAdjustment> = [
   DetailsAdjustment.DustSpotOverlayEnabled,

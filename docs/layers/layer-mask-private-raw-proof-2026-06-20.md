@@ -3,7 +3,7 @@
 Issue: #2310
 
 The layer/mask real RAW proof uses the project-owned Alaska RAW source recorded
-in `fixtures/detail/private-raw-evidence-ledger.json`. The RAW payload remains
+in `fixtures/detail/proofs/private-raw-evidence-ledger.json`. The RAW payload remains
 local-only and ignored.
 
 Prepare the private root from the approved source folder:

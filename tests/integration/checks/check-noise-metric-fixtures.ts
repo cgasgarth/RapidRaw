@@ -7,8 +7,8 @@ import {
   parseNoiseMetricFixtureManifest,
 } from '../../../src/schemas/noiseMetricSchemas.ts';
 
-const MANIFEST_PATH = 'fixtures/detail/noise-metric-fixtures.json';
-const INVALID_PATH = 'fixtures/detail/invalid-noise-metric-fixtures.json';
+const MANIFEST_PATH = 'fixtures/detail/denoise/noise-metric-fixtures.json';
+const INVALID_PATH = 'fixtures/detail/invalid/denoise/invalid-noise-metric-fixtures.json';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 

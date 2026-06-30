@@ -11,10 +11,10 @@ import {
 
 const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(path, 'utf8'));
 
-const manifest = parseDetailArtifactManifest(await readJson('fixtures/detail/detail-artifacts.json'));
+const manifest = parseDetailArtifactManifest(await readJson('fixtures/detail/artifacts/detail-artifacts.json'));
 const invalidCases = z
   .array(z.object({ case: z.string().min(1), payload: z.unknown() }).strict())
-  .parse(await readJson('fixtures/detail/invalid-detail-artifacts.json'));
+  .parse(await readJson('fixtures/detail/invalid/artifacts/invalid-detail-artifacts.json'));
 const failures: string[] = [];
 
 const requiredKinds = new Set(['metric_report', 'private_raw_placeholder', 'synthetic_after', 'synthetic_before']);

@@ -17,7 +17,7 @@ The manifest lives at:
 
 - `fixtures/color/reference/colorchecker-fixture-manifest.json`
 - `docs/validation/fixtures/public-fixture-manifest.json`
-- `fixtures/detail/private-raw-evidence-ledger.json`
+- `fixtures/detail/proofs/private-raw-evidence-ledger.json`
 
 It currently contains:
 
