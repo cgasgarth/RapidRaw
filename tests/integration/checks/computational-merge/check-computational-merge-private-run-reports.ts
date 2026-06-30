@@ -4,8 +4,8 @@ import { createHash } from 'node:crypto';
 import { access, readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 
-import { parseComputationalMergeE2eProofManifest } from '../../../src/schemas/computational-merge/computationalMergeE2eProofSchemas.ts';
-import { parseComputationalMergePrivateRunReportCollection } from '../../../src/schemas/computational-merge/computationalMergePrivateRunReportSchemas.ts';
+import { parseComputationalMergeE2eProofManifest } from '../../../../src/schemas/computational-merge/computationalMergeE2eProofSchemas.ts';
+import { parseComputationalMergePrivateRunReportCollection } from '../../../../src/schemas/computational-merge/computationalMergePrivateRunReportSchemas.ts';
 
 const requireAssets = process.argv.includes('--require-assets');
 const inputPath = valueAfter('--input');

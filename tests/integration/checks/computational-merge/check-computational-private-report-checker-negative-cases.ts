@@ -5,11 +5,11 @@ import { mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { parseComputationalMergeE2eProofManifest } from '../../../src/schemas/computational-merge/computationalMergeE2eProofSchemas.ts';
+import { parseComputationalMergeE2eProofManifest } from '../../../../src/schemas/computational-merge/computationalMergeE2eProofSchemas.ts';
 import {
   type ComputationalMergePrivateRunReportCollection,
   parseComputationalMergePrivateRunReportCollection,
-} from '../../../src/schemas/computational-merge/computationalMergePrivateRunReportSchemas.ts';
+} from '../../../../src/schemas/computational-merge/computationalMergePrivateRunReportSchemas.ts';
 
 const manifest = parseComputationalMergeE2eProofManifest(
   await Bun.file('fixtures/validation/app-server/computational-merge-e2e-proof.json').json(),
@@ -98,7 +98,7 @@ async function expectCheckerFails(
   privateRoot?: string,
 ): Promise<void> {
   const proc = Bun.spawn(
-    ['bun', 'tests/integration/checks/check-computational-merge-private-run-reports.ts', ...args],
+    ['bun', 'tests/integration/checks/computational-merge/check-computational-merge-private-run-reports.ts', ...args],
     {
       env: { ...process.env, ...(privateRoot === undefined ? {} : { RAWENGINE_PRIVATE_RAW_ROOT: privateRoot }) },
       stderr: 'pipe',
