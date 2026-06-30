@@ -2,30 +2,30 @@
 
 import { readFile } from 'node:fs/promises';
 
-import { FocusStackAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/focus-stack/focusStackAppServerRuntime.ts';
-import type { FocusStackRuntimePlanRequestV1 } from '../../../packages/rawengine-schema/src/focus-stack/focusStackRuntimePlan.ts';
+import { FocusStackAppServerRuntimeToolBusV1 } from '../../../../packages/rawengine-schema/src/focus-stack/focusStackAppServerRuntime.ts';
+import type { FocusStackRuntimePlanRequestV1 } from '../../../../packages/rawengine-schema/src/focus-stack/focusStackRuntimePlan.ts';
 import {
   buildFocusStackUiApplyCommandV1,
   buildFocusStackUiDryRunCommandV1,
-} from '../../../packages/rawengine-schema/src/focus-stack/focusStackUiControls.ts';
-import { PanoramaAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/panorama/panoramaAppServerRuntime.ts';
-import type { PanoramaRuntimePlanRequestV1 } from '../../../packages/rawengine-schema/src/panorama/panoramaRuntimePlan.ts';
+} from '../../../../packages/rawengine-schema/src/focus-stack/focusStackUiControls.ts';
+import { PanoramaAppServerRuntimeToolBusV1 } from '../../../../packages/rawengine-schema/src/panorama/panoramaAppServerRuntime.ts';
+import type { PanoramaRuntimePlanRequestV1 } from '../../../../packages/rawengine-schema/src/panorama/panoramaRuntimePlan.ts';
 import {
   buildPanoramaUiApplyCommandV1,
   buildPanoramaUiDryRunCommandV1,
-} from '../../../packages/rawengine-schema/src/panorama/panoramaUiControls.ts';
-import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { SuperResolutionAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/super-resolution/superResolutionAppServerRuntime.ts';
-import type { SuperResolutionRuntimePlanRequestV1 } from '../../../packages/rawengine-schema/src/super-resolution/superResolutionRuntimePlan.ts';
+} from '../../../../packages/rawengine-schema/src/panorama/panoramaUiControls.ts';
+import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
+import { SuperResolutionAppServerRuntimeToolBusV1 } from '../../../../packages/rawengine-schema/src/super-resolution/superResolutionAppServerRuntime.ts';
+import type { SuperResolutionRuntimePlanRequestV1 } from '../../../../packages/rawengine-schema/src/super-resolution/superResolutionRuntimePlan.ts';
 import {
   buildSuperResolutionUiApplyCommandV1,
   buildSuperResolutionUiDryRunCommandV1,
-} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionUiControls.ts';
-import { parseComputationalMergeE2eProofManifest } from '../../../src/schemas/computational-merge/computationalMergeE2eProofSchemas.ts';
-import type { ComputationalMergePrivateSourceSet } from '../../../src/schemas/computational-merge/computationalMergeSourceSetSchemas.ts';
-import { parsePrivateRawEvidenceLedger } from '../../../src/schemas/privateRawEvidenceSchemas.ts';
-import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
-import { buildComputationalMergePrivateSourceSets } from '../../../src/utils/computational-merge/computationalMergeSourceSets.ts';
+} from '../../../../packages/rawengine-schema/src/super-resolution/superResolutionUiControls.ts';
+import { parseComputationalMergeE2eProofManifest } from '../../../../src/schemas/computational-merge/computationalMergeE2eProofSchemas.ts';
+import type { ComputationalMergePrivateSourceSet } from '../../../../src/schemas/computational-merge/computationalMergeSourceSetSchemas.ts';
+import { parsePrivateRawEvidenceLedger } from '../../../../src/schemas/privateRawEvidenceSchemas.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
+import { buildComputationalMergePrivateSourceSets } from '../../../../src/utils/computational-merge/computationalMergeSourceSets.ts';
 
 const panoramaRoutePair = getComputationalMergeAppServerRoutePairSummary('panorama');
 const focusRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');

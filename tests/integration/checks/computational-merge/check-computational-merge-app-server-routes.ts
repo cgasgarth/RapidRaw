@@ -2,7 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 
-import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutes.ts';
+import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from '../../../../src/utils/computational-merge/computationalMergeAppServerRoutes.ts';
 
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
 const packageScripts = new Set(Object.keys(packageJson.scripts ?? {}));
