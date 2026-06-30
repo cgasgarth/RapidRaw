@@ -10,8 +10,8 @@ import {
   type PanoramaHomographyPointPairV1,
   panoramaHomographyDltDiagnosticCodeV1Schema,
   panoramaHomographyDltDiagnosticsV1Schema,
-} from '../../../packages/rawengine-schema/src/panoramaHomographyDiagnostics.ts';
-import { buildPanoramaRuntimeDryRunV1 } from '../../../packages/rawengine-schema/src/panoramaRuntimePlan.ts';
+} from '../../../packages/rawengine-schema/src/panorama/panoramaHomographyDiagnostics.ts';
+import { buildPanoramaRuntimeDryRunV1 } from '../../../packages/rawengine-schema/src/panorama/panoramaRuntimePlan.ts';
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational/proof-budgets.ts';
 

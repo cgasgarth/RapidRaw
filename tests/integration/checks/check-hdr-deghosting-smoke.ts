@@ -11,7 +11,7 @@ import {
   measureHdrMotionMaskV1,
   measureHdrMotionRegionMaeV1,
   mergeHdrWithReferenceInMotionRegionsV1,
-} from '../../../packages/rawengine-schema/src/hdrDeghostRuntime.ts';
+} from '../../../packages/rawengine-schema/src/hdr/hdrDeghostRuntime.ts';
 
 const background = createBackground(WIDTH, HEIGHT);
 const objectMasks = [

@@ -7,7 +7,7 @@ import { dirname } from 'node:path';
 import { format, resolveConfig } from 'prettier';
 import { z } from 'zod';
 
-import { superResolutionReconstructionDiagnosticsV1Schema } from '../../../packages/rawengine-schema/src/superResolutionReconstructionDiagnostics.ts';
+import { superResolutionReconstructionDiagnosticsV1Schema } from '../../../packages/rawengine-schema/src/super-resolution/superResolutionReconstructionDiagnostics.ts';
 
 const REPORT_PATH = 'artifacts/validation/super-resolution-reconstruction-proof-2026-06-20.json';
 const RUNTIME_REPORT_PATH =

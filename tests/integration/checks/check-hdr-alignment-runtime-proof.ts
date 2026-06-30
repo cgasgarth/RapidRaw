@@ -7,7 +7,7 @@ import { dirname } from 'node:path';
 import { format, resolveConfig } from 'prettier';
 import { z } from 'zod';
 
-import { estimateHdrAlignmentTransformsV1 } from '../../../packages/rawengine-schema/src/hdrAlignmentRuntime.ts';
+import { estimateHdrAlignmentTransformsV1 } from '../../../packages/rawengine-schema/src/hdr/hdrAlignmentRuntime.ts';
 
 const REPORT_PATH = 'artifacts/validation/hdr-alignment-runtime-proof-2026-06-20.json';
 const GENERATED_AT = '2026-06-20T00:00:00.000Z';

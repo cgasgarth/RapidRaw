@@ -6,11 +6,11 @@ import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawe
 import {
   calculateMeanAbsoluteErrorV1,
   createNearestNeighborBaselineV1,
-} from '../../../packages/rawengine-schema/src/superResolutionPixelShift.ts';
+} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionPixelShift.ts';
 import {
   applySuperResolutionRuntimePlanV1,
   buildSuperResolutionRuntimeDryRunV1,
-} from '../../../packages/rawengine-schema/src/superResolutionRuntimePlan.ts';
+} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionRuntimePlan.ts';
 
 const SCALE = 2;
 const LOW_WIDTH = 48;

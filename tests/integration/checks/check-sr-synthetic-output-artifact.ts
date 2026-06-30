@@ -10,8 +10,8 @@ import {
   applyPixelShiftSuperResolutionV1,
   calculateMeanAbsoluteErrorV1,
   createNearestNeighborBaselineV1,
-} from '../../../packages/rawengine-schema/src/superResolutionPixelShift.ts';
-import { superResolutionReconstructionDiagnosticsV1Schema } from '../../../packages/rawengine-schema/src/superResolutionReconstructionDiagnostics.ts';
+} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionPixelShift.ts';
+import { superResolutionReconstructionDiagnosticsV1Schema } from '../../../packages/rawengine-schema/src/super-resolution/superResolutionReconstructionDiagnostics.ts';
 import { superResolutionSyntheticReviewArtifacts } from '../../../src/utils/superResolutionOutputReview.ts';
 
 const WIDTH = 48;

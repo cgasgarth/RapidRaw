@@ -1,4 +1,4 @@
-import type { ComputationalMergePreflightWarningCodeV1 } from './rawEngineSchemas.js';
+import type { ComputationalMergePreflightWarningCodeV1 } from '../rawEngineSchemas.js';
 
 export const computationalMergePreflightWarningCodes = {
   geometryEstimateLowConfidence: 'geometry_estimate_low_confidence',

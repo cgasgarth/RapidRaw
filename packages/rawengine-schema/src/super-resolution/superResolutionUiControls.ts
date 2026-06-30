@@ -3,16 +3,18 @@ import { z } from 'zod';
 import {
   ApprovalClass,
   type ComputationalMergeCommandEnvelopeV1,
+  computationalMergeAlignmentModeV1Schema,
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeQualityPreferenceV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from './rawEngineSchemas.js';
+  superResolutionDetailPolicyV1Schema,
+  superResolutionReconstructionModeV1Schema,
+} from '../rawEngineSchemas.js';
 
-const hdrMergeUiSourceV1Schema = z
+const superResolutionUiSourceV1Schema = z
   .object({
     colorSpaceHint: z.string().trim().min(1).default('camera_rgb'),
-    exposureEv: z.number(),
-    exposureWeightMultiplier: z.number().positive().default(1),
+    exposureEv: z.number().optional(),
     imageId: z.string().trim().min(1).optional(),
     imagePath: z.string().trim().min(1),
     rawDefaultsApplied: z.boolean().default(true),
@@ -21,26 +23,20 @@ const hdrMergeUiSourceV1Schema = z
   })
   .strict();
 
-const hdrToneMappingPresetV1Schema = z.enum(['custom', 'natural', 'highlight_detail', 'interior_lift', 'fast_preview']);
-
-export const hdrMergeUiControlsV1Schema = z
+export const superResolutionUiControlsV1Schema = z
   .object({
-    alignmentMode: z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']).default('auto'),
-    bracketValidation: z.enum(['required', 'warn', 'disabled']).default('required'),
-    deghostConfidenceMapVisible: z.boolean().default(false),
-    deghostRegionIntensityPercent: z.number().int().min(0).max(100).default(65),
-    deghosting: z.enum(['off', 'low', 'medium', 'high']).default('medium'),
+    alignmentMode: computationalMergeAlignmentModeV1Schema.exclude(['none']),
+    detailPolicy: superResolutionDetailPolicyV1Schema,
     maxPreviewDimensionPx: z.number().int().positive().max(8192).default(2400),
-    mergeStrategy: z.enum(['scene_linear_radiance', 'exposure_fusion_preview']).default('scene_linear_radiance'),
     outputName: z.string().trim().min(1),
-    qualityPreference: computationalMergeQualityPreferenceV1Schema.default('balanced'),
-    sources: z.array(hdrMergeUiSourceV1Schema).min(2),
-    toneMapPreview: z.boolean().default(true),
-    toneMappingPreset: hdrToneMappingPresetV1Schema.default('natural'),
+    outputScale: z.number().min(1.1).max(4),
+    qualityPreference: computationalMergeQualityPreferenceV1Schema.default('best'),
+    reconstructionMode: superResolutionReconstructionModeV1Schema.default('model_detail'),
+    sources: z.array(superResolutionUiSourceV1Schema).min(2),
   })
   .strict();
 
-export const hdrMergeDryRunContextV1Schema = z
+export const superResolutionDryRunContextV1Schema = z
   .object({
     actorId: z.string().trim().min(1).default('agent_rawengine'),
     commandId: z.string().trim().min(1),
@@ -51,7 +47,7 @@ export const hdrMergeDryRunContextV1Schema = z
   })
   .strict();
 
-export const hdrMergeApplyContextV1Schema = hdrMergeDryRunContextV1Schema
+export const superResolutionApplyContextV1Schema = superResolutionDryRunContextV1Schema
   .extend({
     acceptedDryRunPlanHash: z.string().trim().min(1),
     acceptedDryRunPlanId: z.string().trim().min(1),
@@ -59,74 +55,70 @@ export const hdrMergeApplyContextV1Schema = hdrMergeDryRunContextV1Schema
   })
   .strict();
 
-export type HdrMergeUiControlsV1 = z.infer<typeof hdrMergeUiControlsV1Schema>;
-export type HdrMergeDryRunContextV1 = z.infer<typeof hdrMergeDryRunContextV1Schema>;
-export type HdrMergeApplyContextV1 = z.infer<typeof hdrMergeApplyContextV1Schema>;
+export type SuperResolutionUiControlsV1 = z.infer<typeof superResolutionUiControlsV1Schema>;
+export type SuperResolutionDryRunContextV1 = z.infer<typeof superResolutionDryRunContextV1Schema>;
+export type SuperResolutionApplyContextV1 = z.infer<typeof superResolutionApplyContextV1Schema>;
 
-export const buildHdrMergeUiDryRunCommandV1 = (
+export const buildSuperResolutionUiDryRunCommandV1 = (
   controlsValue: unknown,
   contextValue: unknown,
 ): ComputationalMergeCommandEnvelopeV1 => {
-  const controls = hdrMergeUiControlsV1Schema.parse(controlsValue);
-  const context = hdrMergeDryRunContextV1Schema.parse(contextValue);
+  const controls = superResolutionUiControlsV1Schema.parse(controlsValue) as SuperResolutionUiControlsV1;
+  const context = superResolutionDryRunContextV1Schema.parse(contextValue);
 
   return computationalMergeCommandEnvelopeV1Schema.parse({
     actor: { id: context.actorId, kind: 'agent' },
     approval: {
       approvalClass: ApprovalClass.PreviewOnly,
-      reason: 'HDR merge UI dry-run validates bracket controls without mutating pixels.',
+      reason: 'Super-resolution UI dry-run validates multi-frame controls without mutating pixels.',
       state: 'not_required',
     },
     commandId: context.commandId,
-    commandType: 'computationalMerge.createHdr',
+    commandType: 'computationalMerge.createSuperResolution',
     correlationId: context.correlationId,
     dryRun: true,
     expectedGraphRevision: context.expectedGraphRevision,
     parameters: {
-      alignmentMode: controls.alignmentMode,
-      bracketValidation: controls.bracketValidation,
-      deghostConfidenceMapVisible: controls.deghostConfidenceMapVisible,
-      deghostRegionIntensityPercent: controls.deghostRegionIntensityPercent,
-      deghosting: controls.deghosting,
+      alignmentMode: controls['alignmentMode'],
+      detailPolicy: controls['detailPolicy'],
       maxPreviewDimensionPx: controls.maxPreviewDimensionPx,
-      mergeStrategy: controls.mergeStrategy,
+      mode: 'multi_image',
       outputName: controls.outputName,
-      qualityPreference: controls.qualityPreference,
+      outputScale: controls.outputScale,
+      qualityPreference: controls['qualityPreference'],
+      reconstructionMode: controls['reconstructionMode'],
       sources: controls.sources.map((source) => ({
         colorSpaceHint: source.colorSpaceHint,
         exposureEv: source.exposureEv,
-        exposureWeightMultiplier: source.exposureWeightMultiplier,
         imageId: source.imageId,
         imagePath: source.imagePath,
         rawDefaultsApplied: source.rawDefaultsApplied,
-        role: 'hdr_bracket',
+        role: 'sr_frame',
         sourceIndex: source.sourceIndex,
         virtualCopyId: source.virtualCopyId,
       })),
-      toneMapPreview: controls.toneMapPreview,
-      toneMappingPreset: controls.toneMappingPreset,
     },
     schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     target: { id: context.targetId, kind: context.targetKind },
   });
 };
 
-export const buildHdrMergeUiApplyCommandV1 = (
+export const buildSuperResolutionUiApplyCommandV1 = (
   controlsValue: unknown,
   contextValue: unknown,
 ): ComputationalMergeCommandEnvelopeV1 => {
-  const controls = hdrMergeUiControlsV1Schema.parse(controlsValue);
-  const context = hdrMergeApplyContextV1Schema.parse(contextValue);
+  const controls = superResolutionUiControlsV1Schema.parse(controlsValue) as SuperResolutionUiControlsV1;
+  const context = superResolutionApplyContextV1Schema.parse(contextValue);
 
   return computationalMergeCommandEnvelopeV1Schema.parse({
     actor: { id: context.actorId, kind: 'agent' },
     approval: {
       approvalClass: ApprovalClass.EditApply,
-      reason: 'HDR merge UI apply uses an accepted dry-run plan before mutating the edit graph.',
+      reason: 'Super-resolution UI apply uses an accepted dry-run plan before mutating the edit graph.',
       state: 'approved',
     },
     commandId: context.commandId,
-    commandType: 'computationalMerge.createHdr',
+    commandType: 'computationalMerge.createSuperResolution',
     correlationId: context.correlationId,
     dryRun: false,
     expectedGraphRevision: context.expectedGraphRevision,
@@ -134,28 +126,24 @@ export const buildHdrMergeUiApplyCommandV1 = (
     parameters: {
       acceptedDryRunPlanHash: context.acceptedDryRunPlanHash,
       acceptedDryRunPlanId: context.acceptedDryRunPlanId,
-      alignmentMode: controls.alignmentMode,
-      bracketValidation: controls.bracketValidation,
-      deghostConfidenceMapVisible: controls.deghostConfidenceMapVisible,
-      deghostRegionIntensityPercent: controls.deghostRegionIntensityPercent,
-      deghosting: controls.deghosting,
+      alignmentMode: controls['alignmentMode'],
+      detailPolicy: controls['detailPolicy'],
       maxPreviewDimensionPx: controls.maxPreviewDimensionPx,
-      mergeStrategy: controls.mergeStrategy,
+      mode: 'multi_image',
       outputName: controls.outputName,
-      qualityPreference: controls.qualityPreference,
+      outputScale: controls.outputScale,
+      qualityPreference: controls['qualityPreference'],
+      reconstructionMode: controls['reconstructionMode'],
       sources: controls.sources.map((source) => ({
         colorSpaceHint: source.colorSpaceHint,
         exposureEv: source.exposureEv,
-        exposureWeightMultiplier: source.exposureWeightMultiplier,
         imageId: source.imageId,
         imagePath: source.imagePath,
         rawDefaultsApplied: source.rawDefaultsApplied,
-        role: 'hdr_bracket',
+        role: 'sr_frame',
         sourceIndex: source.sourceIndex,
         virtualCopyId: source.virtualCopyId,
       })),
-      toneMapPreview: controls.toneMapPreview,
-      toneMappingPreset: controls.toneMappingPreset,
     },
     schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     target: { id: context.targetId, kind: context.targetKind },

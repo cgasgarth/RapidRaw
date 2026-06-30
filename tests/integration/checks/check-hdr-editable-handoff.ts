@@ -9,7 +9,7 @@ const mergeStatusSource = readFileSync('src/components/modals/computational-merg
 const hdrModalSource = readFileSync('src/components/modals/computational-merge/HdrModal.tsx', 'utf8');
 const appModalsSource = readFileSync('src/components/modals/AppModals.tsx', 'utf8');
 const hdrRuntimeSource = readFileSync('src-tauri/src/lib.rs', 'utf8');
-const hdrRuntimePlanSource = readFileSync('packages/rawengine-schema/src/hdrRuntimePlan.ts', 'utf8');
+const hdrRuntimePlanSource = readFileSync('packages/rawengine-schema/src/hdr/hdrRuntimePlan.ts', 'utf8');
 const visualSmokeSource = readFileSync('scripts/proofs/capture-visual-smoke.ts', 'utf8');
 
 for (const marker of [

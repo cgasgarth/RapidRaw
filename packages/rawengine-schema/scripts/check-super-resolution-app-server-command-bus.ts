@@ -9,7 +9,7 @@ import {
   sampleComputationalMergeSuperResolutionCommandEnvelopeV1,
   sampleSuperResolutionArtifactV1,
 } from '../src/samplePayloads.js';
-import { createSuperResolutionPlanOnlyDryRunResultV1 } from '../src/superResolutionPreflight.js';
+import { createSuperResolutionPlanOnlyDryRunResultV1 } from '../src/super-resolution/superResolutionPreflight.js';
 import {
   ComputationalMergeAppServerCommandBusHarness,
   type ComputationalMergeAppServerCommandBusHarnessOptions,

@@ -9,8 +9,8 @@ import {
   buildHdrDeghostConfidenceMapV1,
   detectHdrMotionMaskV1,
   summarizeHdrDeghostConfidenceMapV1,
-} from '../../../packages/rawengine-schema/src/hdrDeghostRuntime.ts';
-import { buildHdrRuntimeDryRunV1 } from '../../../packages/rawengine-schema/src/hdrRuntimePlan.ts';
+} from '../../../packages/rawengine-schema/src/hdr/hdrDeghostRuntime.ts';
+import { buildHdrRuntimeDryRunV1 } from '../../../packages/rawengine-schema/src/hdr/hdrRuntimePlan.ts';
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/hdr/hdr-deghost-confidence-map-2026-06-20.json';

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import {
   detectHdrBracketV1,
   type HdrBracketDetectionSourceInputV1,
-} from '../../packages/rawengine-schema/src/hdrBracketDetection.ts';
+} from '../../packages/rawengine-schema/src/hdr/hdrBracketDetection.ts';
 
 import type { HdrBracketDetectionResultV1 } from '../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 

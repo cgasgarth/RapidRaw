@@ -6,11 +6,11 @@ import { join, resolve } from 'node:path';
 
 import { z } from 'zod';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { SuperResolutionAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/superResolutionAppServerRuntime.ts';
+import { SuperResolutionAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/super-resolution/superResolutionAppServerRuntime.ts';
 import {
   buildSuperResolutionUiApplyCommandV1,
   buildSuperResolutionUiDryRunCommandV1,
-} from '../../../packages/rawengine-schema/src/superResolutionUiControls.ts';
+} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionUiControls.ts';
 import { privateRawReportMetric } from '../../../scripts/lib/private-raw/computational-report-fixtures.ts';
 import {
   type ComputationalMergePrivateRunReportCollection,

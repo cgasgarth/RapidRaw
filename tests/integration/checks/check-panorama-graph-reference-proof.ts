@@ -4,7 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { buildPanoramaRuntimeDryRunV1 } from '../../../packages/rawengine-schema/src/panoramaRuntimePlan.ts';
+import { buildPanoramaRuntimeDryRunV1 } from '../../../packages/rawengine-schema/src/panorama/panoramaRuntimePlan.ts';
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational/proof-budgets.ts';
 

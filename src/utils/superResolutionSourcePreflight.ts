@@ -3,7 +3,7 @@ import {
   type SuperResolutionSourceValidationInputV1,
   type SuperResolutionSourceValidationResultV1,
   validateSuperResolutionSourcesV1,
-} from '../../packages/rawengine-schema/src/superResolutionSourceValidation.ts';
+} from '../../packages/rawengine-schema/src/super-resolution/superResolutionSourceValidation.ts';
 import { parseExifInteger, parseExposureEv, readExifString } from './exifPreflightMetadata';
 
 export const superResolutionSourcePreflightMetadataSchema = z

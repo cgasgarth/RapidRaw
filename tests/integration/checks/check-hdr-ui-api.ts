@@ -3,7 +3,7 @@
 import {
   buildHdrMergeUiApplyCommandV1,
   buildHdrMergeUiDryRunCommandV1,
-} from '../../../packages/rawengine-schema/src/hdrMergeUiControls.ts';
+} from '../../../packages/rawengine-schema/src/hdr/hdrMergeUiControls.ts';
 import { runComputationalUiApiSmoke } from '../../../scripts/lib/computational/ui-api-smoke.ts';
 
 const hdrSources = [

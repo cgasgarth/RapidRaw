@@ -3,7 +3,7 @@ import { z } from 'zod';
 import {
   type DerivedArtifactInvalidationInput,
   deriveArtifactInvalidationReasons,
-} from './derivedArtifactInvalidation.js';
+} from '../derivedArtifactInvalidation.js';
 import {
   type ArtifactHandleV1,
   type ComputationalMergeCommandEnvelopeV1,
@@ -13,7 +13,7 @@ import {
   type SuperResolutionInvalidationReasonV1,
   superResolutionArtifactV1Schema,
   superResolutionInvalidationReasonV1Schema,
-} from './rawEngineSchemas.js';
+} from '../rawEngineSchemas.js';
 
 import type { SuperResolutionRuntimeProvenanceV1 } from './superResolutionRuntimePlan.js';
 
@@ -252,7 +252,9 @@ export const markSuperResolutionArtifactHumanReviewPassed = (
       humanReviewStatus: 'passed',
     },
     warningCodes: normalizeSuperResolutionWarningCodes(
-      parsedArtifact.warningCodes.filter((warningCode) => warningCode !== 'human_review_required'),
+      parsedArtifact.warningCodes.filter(
+        (warningCode: SuperResolutionArtifactV1['warningCodes'][number]) => warningCode !== 'human_review_required',
+      ),
     ),
   });
 };
@@ -289,7 +291,9 @@ const normalizeSuperResolutionWarningCodes = (
 const sortSuperResolutionInvalidationReasons = (
   reasons: SuperResolutionInvalidationReasonV1[],
 ): SuperResolutionInvalidationReasonV1[] =>
-  superResolutionInvalidationReasonV1Schema.options.filter((reason) => reasons.includes(reason));
+  superResolutionInvalidationReasonV1Schema.options.filter((reason: SuperResolutionInvalidationReasonV1) =>
+    reasons.includes(reason),
+  );
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);

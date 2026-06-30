@@ -4,7 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { estimatePanoramaLoRansacTranslationV1 } from '../../../packages/rawengine-schema/src/panoramaLocalOptimizationRansac.ts';
+import { estimatePanoramaLoRansacTranslationV1 } from '../../../packages/rawengine-schema/src/panorama/panoramaLocalOptimizationRansac.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/panorama/panorama-distributed-inlier-proof-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');

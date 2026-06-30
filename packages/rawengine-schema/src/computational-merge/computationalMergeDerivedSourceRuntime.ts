@@ -4,7 +4,7 @@ import {
   computationalMergeDerivedSourceOpenRequestV1Schema,
   computationalMergeDerivedSourceOpenResultV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from './rawEngineSchemas.js';
+} from '../rawEngineSchemas.js';
 
 export function openComputationalMergeDerivedSourceV1(value: unknown): ComputationalMergeDerivedSourceOpenResultV1 {
   const request = computationalMergeDerivedSourceOpenRequestV1Schema.parse(value);

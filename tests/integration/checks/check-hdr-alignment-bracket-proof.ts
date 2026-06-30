@@ -3,8 +3,8 @@
 import { existsSync } from 'node:fs';
 
 import { z } from 'zod';
-import { estimateHdrAlignmentTransformsV1 } from '../../../packages/rawengine-schema/src/hdrAlignmentRuntime.ts';
-import { detectHdrBracketV1 } from '../../../packages/rawengine-schema/src/hdrBracketDetection.ts';
+import { estimateHdrAlignmentTransformsV1 } from '../../../packages/rawengine-schema/src/hdr/hdrAlignmentRuntime.ts';
+import { detectHdrBracketV1 } from '../../../packages/rawengine-schema/src/hdr/hdrBracketDetection.ts';
 import { hdrAlignmentSummaryV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const MANIFEST_PATH = 'fixtures/hdr/hdr-synthetic-bracket-fixtures.json';
