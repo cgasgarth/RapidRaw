@@ -1,7 +1,7 @@
 import {
   removeSourcePointToNormalized,
   resolveRemoveSamplingPlan,
-} from '../../packages/rawengine-schema/src/retouchRemoveRuntime';
+} from '../../../packages/rawengine-schema/src/retouchRemoveRuntime';
 
 export type LayerBlendMode = 'multiply' | 'normal' | 'overlay' | 'screen' | 'soft_light';
 

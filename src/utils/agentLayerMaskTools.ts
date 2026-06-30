@@ -23,7 +23,7 @@ import { agentApprovalStateSchema, assertAgentApprovalGate } from './agentApprov
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import { stableAgentPreviewHash } from './agentPreviewEnvelope';
 import { pushEditHistoryEntry } from './editHistory';
-import { applyLayerStackCommandBridgeOperation } from './layerStackCommandBridge';
+import { applyLayerStackCommandBridgeOperation } from './layers/layerStackCommandBridge';
 
 export const AGENT_LAYER_CREATE_TOOL_NAME = 'rawengine.agent.layer.create';
 export const AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME = 'rawengine.agent.mask.create_or_update';

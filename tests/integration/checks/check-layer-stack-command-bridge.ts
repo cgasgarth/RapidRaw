@@ -8,11 +8,11 @@ import {
   applyResolvedRemoveSourcesToLayerStack,
   buildLayerStackSidecarFromMasks,
   type LayerStackCommandBridgeContext,
-} from '../../../src/utils/layerStackCommandBridge.ts';
+} from '../../../src/utils/layers/layerStackCommandBridge.ts';
 import {
   hydrateLayerStackMasksFromMetadata,
   persistLayerStackSidecarInAdjustments,
-} from '../../../src/utils/layerStackSidecarAdjustments.ts';
+} from '../../../src/utils/layers/layerStackSidecarAdjustments.ts';
 
 const layerSummarySchema = z
   .object({

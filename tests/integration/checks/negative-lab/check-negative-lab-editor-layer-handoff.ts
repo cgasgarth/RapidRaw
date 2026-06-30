@@ -9,7 +9,7 @@ import {
   readLayerStackSidecarsFromSidecar,
 } from '../../../../packages/rawengine-schema/src';
 import { INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../../src/utils/adjustments.ts';
-import { applyLayerStackCommandBridgeOperation } from '../../../../src/utils/layerStackCommandBridge.ts';
+import { applyLayerStackCommandBridgeOperation } from '../../../../src/utils/layers/layerStackCommandBridge.ts';
 
 const appModalsSource = readFileSync('src/components/modals/AppModals.tsx', 'utf8');
 const appNavigationSource = readFileSync('src/hooks/app/useAppNavigation.ts', 'utf8');

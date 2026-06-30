@@ -20,7 +20,7 @@ import {
   renderLayerExportStack,
   renderLayerHeadlessStack,
   renderLayerPreviewStack,
-} from '../../../src/utils/layerPreviewExportParity.ts';
+} from '../../../src/utils/layers/layerPreviewExportParity.ts';
 
 const OUTPUT_DIR = 'artifacts/layers/range-mask-layer-output';
 const width = 4;

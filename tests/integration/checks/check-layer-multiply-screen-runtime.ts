@@ -4,7 +4,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 
-import { renderLayerBlendStack } from '../../../src/utils/layerPreviewExportParity.ts';
+import { renderLayerBlendStack } from '../../../src/utils/layers/layerPreviewExportParity.ts';
 
 const FIXTURE_PATH = 'fixtures/layers/layer-multiply-screen-runtime.json';
 const OUTPUT_DIR = 'artifacts/layers/multiply-screen-runtime';

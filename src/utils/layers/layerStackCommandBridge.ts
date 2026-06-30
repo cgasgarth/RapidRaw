@@ -12,14 +12,14 @@ import {
   layerMaskCommandEnvelopeV1Schema,
   layerStackSidecarV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from '../../packages/rawengine-schema/src';
+} from '../../../packages/rawengine-schema/src';
 import {
   DEFAULT_LAYER_BLEND_MODE,
   INITIAL_MASK_ADJUSTMENTS,
   type MaskContainer,
   type RetouchCloneSource,
   type RetouchRemoveSource,
-} from './adjustments';
+} from '../adjustments';
 
 export type LayerStackCommandBridgeOperation =
   | {

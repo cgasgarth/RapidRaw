@@ -72,7 +72,7 @@ import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/comp
 import { DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF } from '../../utils/detailOutputComparisonProof';
 import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
-import { applyLayerStackCommandBridgeOperation } from '../../utils/layerStackCommandBridge';
+import { applyLayerStackCommandBridgeOperation } from '../../utils/layers/layerStackCommandBridge';
 import { handleNegativeConversionEditorHandoff } from '../../utils/negativeLabEditorHandoff';
 import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
 import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';

@@ -1,4 +1,4 @@
-import { DEFAULT_LAYER_BLEND_MODE, LAYER_BLEND_MODES, type LayerBlendMode, type MaskContainer } from './adjustments';
+import { DEFAULT_LAYER_BLEND_MODE, LAYER_BLEND_MODES, type LayerBlendMode, type MaskContainer } from '../adjustments';
 
 export type LayerStackMoveDirection = 'down' | 'up';
 

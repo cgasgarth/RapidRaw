@@ -13,8 +13,8 @@ const requiredDocFragments = [
   'AiPatch',
   'src/components/panel/right/layers/MasksPanel.tsx',
   'src/components/panel/right/layers/LayerStackPanel.tsx',
-  'src/utils/layerStack.ts',
-  'src/utils/layerAdjustments.ts',
+  'src/utils/layers/layerStack.ts',
+  'src/utils/layers/layerAdjustments.ts',
   'src-tauri/src/mask_generation.rs',
   'graph-native layer',
   'Blend mode is not persisted or rendered',
@@ -32,8 +32,8 @@ const sourceChecks = [
   ['src/utils/adjustments.ts', 'export interface MaskContainer'],
   ['src/utils/adjustments.ts', 'export interface AiPatch'],
   ['src/components/panel/right/layers/LayerStackPanel.tsx', 'function getLayerRows'],
-  ['src/utils/layerStack.ts', 'export function moveLayer'],
-  ['src/utils/layerAdjustments.ts', 'export const LAYER_ADJUSTMENT_KEYS'],
+  ['src/utils/layers/layerStack.ts', 'export function moveLayer'],
+  ['src/utils/layers/layerAdjustments.ts', 'export const LAYER_ADJUSTMENT_KEYS'],
   ['src-tauri/src/mask_generation.rs', 'pub fn generate_mask_bitmap'],
 ];
 
