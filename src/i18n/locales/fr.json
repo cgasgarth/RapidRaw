@@ -369,6 +369,8 @@
       "cullImage": "Trier l'image",
       "denoise": "Débruiter l'image",
       "editImage": "Modifier l'image",
+      "enterPreview": "Enter preview mode",
+      "exitPreview": "Exit preview mode",
       "exportImage": "Exporter l'image",
       "focusStack": "Focus Stack",
       "frameImage": "Encadrer l'image",
@@ -501,6 +503,7 @@
     "accessibility": {
       "filmstrip": "Film fixe de l'éditeur",
       "imagePreview": "Aperçu de l'image",
+      "previewOnlyRegion": "Preview-only editor workspace",
       "previewRegion": "Aperçu de l'éditeur",
       "toolsPanel": "Outils de l'éditeur",
       "workspace": "Espace de travail de l'éditeur"
@@ -1400,6 +1403,11 @@
         "tool": "Outil"
       }
     },
+    "previewOnly": {
+      "enter": "Enter preview mode",
+      "exit": "Exit preview mode",
+      "label": "Preview only"
+    },
     "switcher": {
       "tooltips": {
         "adjust": "Ajuster",
@@ -1512,6 +1520,7 @@
       "tooltips": {
         "aperture": "Ouverture",
         "backToLibrary": "Retour à la bibliothèque",
+        "exitPreview": "Exit preview mode (F)",
         "exportSoftProof": "",
         "fileType": "",
         "focalLength": "Longueur focale",

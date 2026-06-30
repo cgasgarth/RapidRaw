@@ -393,6 +393,8 @@
       "cullImage": "Bild aussortieren",
       "denoise": "Bild entrauschen",
       "editImage": "Bild bearbeiten",
+      "enterPreview": "Enter preview mode",
+      "exitPreview": "Exit preview mode",
       "exportImage": "Bild exportieren",
       "focusStack": "Focus Stack",
       "frameImage": "Bild rahmen",
@@ -508,6 +510,7 @@
     "accessibility": {
       "filmstrip": "",
       "imagePreview": "",
+      "previewOnlyRegion": "Preview-only editor workspace",
       "previewRegion": "",
       "toolsPanel": "",
       "workspace": ""
@@ -1422,6 +1425,11 @@
         "tool": "Werkzeug"
       }
     },
+    "previewOnly": {
+      "enter": "Enter preview mode",
+      "exit": "Exit preview mode",
+      "label": "Preview only"
+    },
     "switcher": {
       "tooltips": {
         "adjust": "Anpassen",
@@ -1532,6 +1540,7 @@
       "tooltips": {
         "aperture": "Blende",
         "backToLibrary": "Zurück zur Bibliothek",
+        "exitPreview": "Exit preview mode (F)",
         "exportSoftProof": "",
         "fileType": "",
         "focalLength": "Brennweite",

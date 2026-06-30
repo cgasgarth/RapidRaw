@@ -372,6 +372,8 @@
       "cullImage": "Отсортировать изображение",
       "denoise": "Шумоподавление",
       "editImage": "Редактировать изображение",
+      "enterPreview": "Enter preview mode",
+      "exitPreview": "Exit preview mode",
       "exportImage": "Экспортировать изображение",
       "focusStack": "Focus Stack",
       "frameImage": "Добавить рамку",
@@ -521,6 +523,7 @@
     "accessibility": {
       "filmstrip": "",
       "imagePreview": "",
+      "previewOnlyRegion": "Preview-only editor workspace",
       "previewRegion": "",
       "toolsPanel": "",
       "workspace": ""
@@ -1443,6 +1446,11 @@
         "tool": "Инструмент"
       }
     },
+    "previewOnly": {
+      "enter": "Enter preview mode",
+      "exit": "Exit preview mode",
+      "label": "Preview only"
+    },
     "switcher": {
       "tooltips": {
         "adjust": "Коррекция",
@@ -1557,6 +1565,7 @@
       "tooltips": {
         "aperture": "Диафрагма",
         "backToLibrary": "Назад в библиотеку",
+        "exitPreview": "Exit preview mode (F)",
         "exportSoftProof": "",
         "fileType": "",
         "focalLength": "Фокусное расстояние",

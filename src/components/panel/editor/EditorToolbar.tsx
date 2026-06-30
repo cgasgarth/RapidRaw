@@ -1,10 +1,11 @@
 import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Eye, EyeOff, Loader2, Maximize, Palette, Redo, Undo } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, Loader2, Maximize, Minimize2, Palette, Redo, Undo } from 'lucide-react';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
+import { useUIStore } from '../../../store/useUIStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import type { Adjustments, AiPatch, MaskContainer } from '../../../utils/adjustments';
 import { formatShortcutLabel } from '../../../utils/keyboardUtils';
@@ -18,6 +19,7 @@ interface EditorToolbarProps {
   canRedo: boolean;
   canUndo: boolean;
   isAndroid: boolean;
+  isFullScreen?: boolean;
   isLoading: boolean;
   onBackToLibrary: () => void;
   onRedo: () => void;
@@ -39,6 +41,7 @@ const EditorToolbar = memo(
     canRedo,
     canUndo,
     isAndroid,
+    isFullScreen: isFullScreenProp,
     isLoading,
     onBackToLibrary,
     onRedo,
@@ -70,6 +73,8 @@ const EditorToolbar = memo(
     const isExportSoftProofEnabled = useEditorStore((state) => state.isExportSoftProofEnabled);
     const exportSoftProofRecipeId = useEditorStore((state) => state.exportSoftProofRecipeId);
     const exportSoftProofTransform = useEditorStore((state) => state.exportSoftProofTransform);
+    const isFullScreenFromStore = useUIStore((state) => state.isFullScreen);
+    const isFullScreen = isFullScreenProp ?? isFullScreenFromStore;
     const setEditor = useEditorStore((state) => state.setEditor);
     const exportProofRecipeOptions = useMemo(
       () =>
@@ -93,6 +98,9 @@ const EditorToolbar = memo(
           intent: selectedExportProofIntent,
         })
       : t('editor.toolbar.exportSoftProofUnavailable');
+    const fullscreenTooltip = isFullScreen
+      ? t('editor.toolbar.tooltips.exitPreview')
+      : t('editor.toolbar.tooltips.fullscreen');
 
     const showResolution = !isAndroid && selectedImage.width > 0 && selectedImage.height > 0;
     const [displayedResolution, setDisplayedResolution] = useState('');
@@ -870,10 +878,13 @@ const EditorToolbar = memo(
             className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
             onClick={onToggleFullScreen}
             onKeyDown={handleButtonKeyDown}
-            data-tooltip={t('editor.toolbar.tooltips.fullscreen')}
+            aria-label={fullscreenTooltip}
+            aria-pressed={isFullScreen}
+            data-testid="editor-fullscreen-toggle"
+            data-tooltip={fullscreenTooltip}
           >
             <div className="relative w-5 h-5 flex items-center justify-center">
-              <Maximize size={20} />
+              {isFullScreen ? <Minimize2 size={20} /> : <Maximize size={20} />}
             </div>
           </button>
         </div>

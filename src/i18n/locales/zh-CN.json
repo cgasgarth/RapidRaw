@@ -392,6 +392,8 @@
       "cullImage": "筛选图像",
       "denoise": "降噪图像",
       "editImage": "编辑图像",
+      "enterPreview": "Enter preview mode",
+      "exitPreview": "Exit preview mode",
       "exportImage": "导出图像",
       "focusStack": "Focus Stack",
       "frameImage": "装裱图像",
@@ -506,6 +508,7 @@
     "accessibility": {
       "filmstrip": "",
       "imagePreview": "",
+      "previewOnlyRegion": "Preview-only editor workspace",
       "previewRegion": "",
       "toolsPanel": "",
       "workspace": ""
@@ -1409,6 +1412,11 @@
         "tool": "工具"
       }
     },
+    "previewOnly": {
+      "enter": "Enter preview mode",
+      "exit": "Exit preview mode",
+      "label": "Preview only"
+    },
     "switcher": {
       "tooltips": {
         "adjust": "调整",
@@ -1517,6 +1525,7 @@
       "tooltips": {
         "aperture": "光圈",
         "backToLibrary": "返回图库",
+        "exitPreview": "Exit preview mode (F)",
         "exportSoftProof": "",
         "fileType": "",
         "focalLength": "焦距",

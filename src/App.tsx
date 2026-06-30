@@ -667,6 +667,7 @@ function App() {
                   isResizing={isResizing}
                   isCompactPortrait={isCompactPortrait}
                   isAndroid={isAndroid}
+                  isFullScreen={isFullScreen}
                   compactEditorPanelHeight={compactEditorPanelHeight}
                   compactEditorPanelCollapsedHeight={compactEditorPanelCollapsedHeight}
                   thumbnailAspectRatio={thumbnailAspectRatio}

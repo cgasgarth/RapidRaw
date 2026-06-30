@@ -193,7 +193,9 @@
       "resetAdjustments": "조정값 초기화",
       "stitchPanorama": "파노라마 스티칭",
       "tagging": "태그 지정",
-      "undo": "실행 취소"
+      "undo": "실행 취소",
+      "enterPreview": "Enter preview mode",
+      "exitPreview": "Exit preview mode"
     },
     "folders": {
       "changeIcon": "아이콘 변경",
@@ -725,9 +727,18 @@
         "showEdited": "편집본 표시 (B)",
         "showOriginal": "원본 표시 (B)",
         "shutterSpeed": "셔터 속도",
-        "undo": "실행 취소 ({{shortcut}}) 또는 기록 (우클릭)"
+        "undo": "실행 취소 ({{shortcut}}) 또는 기록 (우클릭)",
+        "exitPreview": "Exit preview mode (F)"
       },
       "vc": "VC"
+    },
+    "accessibility": {
+      "previewOnlyRegion": "Preview-only editor workspace"
+    },
+    "previewOnly": {
+      "enter": "Enter preview mode",
+      "exit": "Exit preview mode",
+      "label": "Preview only"
     }
   },
   "export": {

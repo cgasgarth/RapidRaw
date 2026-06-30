@@ -393,6 +393,8 @@
       "cullImage": "Cull Image",
       "denoise": "Denoise Image",
       "editImage": "Edit Image",
+      "enterPreview": "Enter preview mode",
+      "exitPreview": "Exit preview mode",
       "exportImage": "Export Image",
       "focusStack": "Focus Stack",
       "frameImage": "Frame Image",
@@ -508,6 +510,7 @@
     "accessibility": {
       "filmstrip": "Editor filmstrip",
       "imagePreview": "Image preview",
+      "previewOnlyRegion": "Preview-only editor workspace",
       "previewRegion": "Editor preview",
       "toolsPanel": "Editor tools",
       "workspace": "Editor workspace"
@@ -1438,6 +1441,11 @@
         "tool": "Tool"
       }
     },
+    "previewOnly": {
+      "enter": "Enter preview",
+      "exit": "Exit preview",
+      "label": "Preview only"
+    },
     "switcher": {
       "tooltips": {
         "adjust": "Adjust",
@@ -1548,10 +1556,11 @@
       "tooltips": {
         "aperture": "Aperture",
         "backToLibrary": "Back to Library",
+        "exitPreview": "Exit preview mode (F)",
         "exportSoftProof": "Soft proof selected export recipe",
         "fileType": "File Type",
         "focalLength": "Focal Length",
-        "fullscreen": "Toggle Fullscreen (F)",
+        "fullscreen": "Toggle preview mode (F)",
         "history": "Show History Stack",
         "iso": "ISO",
         "redo": "Redo ({{shortcut}}) or History (Right-click)",
@@ -3760,7 +3769,7 @@
         "toggle_crop": "Toggle Crop / Straighten",
         "toggle_crop_panel": "Toggle Crop panel",
         "toggle_export": "Toggle Export panel",
-        "toggle_fullscreen": "Toggle fullscreen",
+        "toggle_fullscreen": "Toggle preview mode",
         "toggle_library_exif": "Toggle EXIF overlay",
         "toggle_masks": "Toggle Masks panel",
         "toggle_metadata": "Toggle Metadata panel",
