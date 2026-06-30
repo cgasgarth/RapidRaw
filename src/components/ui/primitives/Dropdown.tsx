@@ -2,8 +2,8 @@ import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useManagedFocus } from '../../hooks/ui/useManagedFocus';
-import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../types/typography';
+import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
+import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import Input from './Input';
 import UiText from './Text';
 

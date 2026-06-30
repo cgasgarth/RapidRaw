@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
-import UiText from './Text';
+import UiText from './primitives/Text';
 
 const TOOLTIP_DELAY = 500;
 const OFFSET = 8;

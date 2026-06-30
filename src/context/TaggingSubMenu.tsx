@@ -4,7 +4,7 @@ import { Plus, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AppSettings } from '../components/ui/AppProperties';
-import UiText from '../components/ui/Text';
+import UiText from '../components/ui/primitives/Text';
 import { Invokes } from '../tauri/commands';
 import { TextVariants } from '../types/typography';
 import { formatUnknownError } from '../utils/errorFormatting';

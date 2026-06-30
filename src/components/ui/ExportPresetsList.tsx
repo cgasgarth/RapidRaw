@@ -6,9 +6,9 @@ import { EXPORT_LAST_USED_PRESET_ID } from '../../schemas/exportRecipeIds';
 import { buildExportRecipeUiRows } from '../../schemas/exportRecipeUiSchemas';
 import { TextVariants } from '../../types/typography';
 import type { AppSettings } from './AppProperties';
-import Dropdown from './Dropdown';
 import type { ExportPreset } from './ExportImportProperties';
-import UiText from './Text';
+import Dropdown from './primitives/Dropdown';
+import UiText from './primitives/Text';
 
 interface ExportPresetsListProps {
   appSettings: AppSettings | null;
