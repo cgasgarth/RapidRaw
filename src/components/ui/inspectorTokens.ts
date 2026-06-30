@@ -1,12 +1,16 @@
 export const inspectorSectionTokens = {
-  body: 'px-3 pb-3 transition-opacity duration-300',
-  chevron: 'text-accent/90 transition-transform duration-300',
+  badge: 'rounded px-1.5 py-0.5 text-xs font-semibold uppercase leading-4 tracking-normal',
+  body: 'px-3 pb-2 pt-1 transition-opacity duration-200',
+  chevron: 'text-text-secondary transition-transform duration-200',
+  dirtyBadge: 'bg-accent/15 text-accent',
   header:
-    'min-h-9 w-full px-3 py-2 flex items-center justify-between gap-3 text-left hover:bg-card-active transition-colors duration-200',
-  shell: 'bg-surface rounded-md overflow-hidden shrink-0 border border-surface/70',
+    'min-h-8 w-full px-3 py-1 flex items-center justify-between gap-2 text-left hover:bg-card-active transition-colors duration-150',
+  hiddenBadge: 'bg-surface text-text-secondary',
+  shell: 'bg-surface overflow-hidden shrink-0 border-b border-surface/70',
   title: 'truncate text-[13px] leading-4 tracking-normal text-text-primary',
-  titleRow: 'flex min-w-0 items-center gap-2',
-  visibilityButton: 'p-1 rounded-full text-text-secondary hover:bg-bg-primary z-10 transition-opacity duration-300',
+  titleRow: 'flex min-w-0 items-center gap-1.5',
+  visibilityButton:
+    'z-10 flex h-5 w-5 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-bg-primary hover:text-text-primary',
   visibilitySlot: 'w-5 h-5 flex items-center justify-center shrink-0',
 } as const;
 

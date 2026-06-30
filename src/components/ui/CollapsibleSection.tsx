@@ -1,14 +1,6 @@
 import cx from 'clsx';
 import { ChevronDown, Eye, EyeOff } from 'lucide-react';
-import {
-  type KeyboardEvent,
-  type MouseEvent,
-  type MouseEventHandler,
-  type ReactNode,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import { type KeyboardEvent, type MouseEvent, type MouseEventHandler, type ReactNode, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextVariants, TextWeights } from '../../types/typography';
 import { inspectorSectionTokens } from './inspectorTokens';
@@ -18,6 +10,7 @@ interface CollapsibleSectionProps {
   canToggleVisibility?: boolean;
   children: ReactNode;
   isContentVisible: boolean;
+  isDirty?: boolean;
   isOpen: boolean;
   onContextMenu?: MouseEventHandler<HTMLDivElement>;
   onToggle: () => void;
@@ -29,6 +22,7 @@ export default function CollapsibleSection({
   canToggleVisibility = true,
   children,
   isContentVisible,
+  isDirty = false,
   isOpen,
   onContextMenu,
   onToggle,
@@ -38,8 +32,6 @@ export default function CollapsibleSection({
   const { t } = useTranslation();
   const contentRef = useRef<HTMLDivElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
-  const [isHovering, setIsHovering] = useState(false);
-  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -67,23 +59,6 @@ export default function CollapsibleSection({
     };
   }, [isOpen]);
 
-  const handleMouseEnter = () => {
-    if (!canToggleVisibility) {
-      return;
-    }
-    hoverTimeoutRef.current = setTimeout(() => {
-      setIsHovering(true);
-    }, 250);
-  };
-
-  const handleMouseLeave = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-    setIsHovering(false);
-  };
-
   const handleVisibilityClick = (e: MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     onToggleVisibility();
@@ -100,26 +75,44 @@ export default function CollapsibleSection({
   return (
     <div className={inspectorSectionTokens.shell} onContextMenu={onContextMenu}>
       <div
-        className={inspectorSectionTokens.header}
+        className={cx(inspectorSectionTokens.header, !isContentVisible && 'bg-bg-primary')}
         aria-expanded={isOpen}
         onClick={onToggle}
         onKeyDown={handleHeaderKeyDown}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
         role="button"
         tabIndex={0}
       >
         <div className={inspectorSectionTokens.titleRow}>
-          <UiText variant={TextVariants.label} weight={TextWeights.medium} className={inspectorSectionTokens.title}>
+          <ChevronDown className={cx(inspectorSectionTokens.chevron, { 'rotate-180': isOpen })} size={14} />
+          <UiText
+            variant={TextVariants.label}
+            weight={TextWeights.medium}
+            className={cx(inspectorSectionTokens.title, !isContentVisible && 'text-text-secondary')}
+          >
             {title}
           </UiText>
+          {!isContentVisible && (
+            <span className={cx(inspectorSectionTokens.badge, inspectorSectionTokens.hiddenBadge)}>
+              {t('ui.collapsibleSection.disabledBadge', { defaultValue: 'Off' })}
+            </span>
+          )}
+          {isDirty && (
+            <span className={cx(inspectorSectionTokens.badge, inspectorSectionTokens.dirtyBadge)}>
+              {t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' })}
+            </span>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
           {canToggleVisibility && (
             <div className={inspectorSectionTokens.visibilitySlot}>
               <button
-                className={cx(
-                  inspectorSectionTokens.visibilityButton,
-                  isHovering || !isContentVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
-                )}
+                aria-label={
+                  isContentVisible
+                    ? t('ui.collapsibleSection.disableSection')
+                    : t('ui.collapsibleSection.enableSection')
+                }
+                aria-pressed={!isContentVisible}
+                className={cx(inspectorSectionTokens.visibilityButton, !isContentVisible && 'text-accent')}
                 onClick={handleVisibilityClick}
                 data-tooltip={
                   isContentVisible
@@ -132,9 +125,8 @@ export default function CollapsibleSection({
             </div>
           )}
         </div>
-        <ChevronDown className={cx(inspectorSectionTokens.chevron, { 'rotate-180': isOpen })} size={16} />
       </div>
-      <div ref={wrapperRef} className="overflow-hidden transition-all duration-300 ease-in-out">
+      <div ref={wrapperRef} className="overflow-hidden transition-all duration-200 ease-in-out">
         <div
           className={cx(inspectorSectionTokens.body, !isContentVisible && 'opacity-30 pointer-events-none')}
           ref={contentRef}

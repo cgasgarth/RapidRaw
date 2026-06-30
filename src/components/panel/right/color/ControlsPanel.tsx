@@ -22,6 +22,7 @@ import { TextVariants } from '../../../../types/typography';
 import {
   ADJUSTMENT_SECTIONS,
   type Adjustments,
+  hasAdjustmentValueChanges,
   INITIAL_ADJUSTMENTS,
   pickAdjustmentValues,
 } from '../../../../utils/adjustments';
@@ -610,6 +611,7 @@ export default function Controls() {
             <div className="shrink-0 group" key={sectionName}>
               <CollapsibleSection
                 isContentVisible={sectionVisibility[sectionName]}
+                isDirty={hasAdjustmentValueChanges(ADJUSTMENT_SECTIONS[sectionName], adjustments)}
                 isOpen={collapsibleSectionsState[sectionName]}
                 onContextMenu={(event: MouseEvent<HTMLDivElement>) => {
                   handleSectionContextMenu(event, sectionName);
