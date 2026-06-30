@@ -161,6 +161,26 @@ export default function ColorPanel({
           setAdjustments={setAdjustments}
         />
       )}
+      <ColorMixerControls
+        activeChannelMixerOutput={activeChannelMixerOutput}
+        activeColor={activeColor}
+        activeColorBalanceRange={activeColorBalanceRange}
+        adjustmentVisibility={adjustmentVisibility}
+        adjustments={adjustments}
+        appSettings={appSettings}
+        isForMask={isForMask}
+        onDragStateChange={onDragStateChange}
+        setActiveChannelMixerOutput={setActiveChannelMixerOutput}
+        setActiveColor={setActiveColor}
+        setActiveColorBalanceRange={setActiveColorBalanceRange}
+        setAdjustments={setAdjustments}
+      />
+      <ColorGradingControls
+        adjustments={adjustments}
+        appSettings={appSettings}
+        onDragStateChange={onDragStateChange}
+        setAdjustments={setAdjustments}
+      />
       {!isForMask && (
         <ColorProofingDiagnostics
           activeCameraProfileLabel={activeCameraProfileLabel}
@@ -184,26 +204,6 @@ export default function ColorPanel({
           syncSkinToneUniformity={syncSkinToneUniformity}
         />
       )}
-      <ColorMixerControls
-        activeChannelMixerOutput={activeChannelMixerOutput}
-        activeColor={activeColor}
-        activeColorBalanceRange={activeColorBalanceRange}
-        adjustmentVisibility={adjustmentVisibility}
-        adjustments={adjustments}
-        appSettings={appSettings}
-        isForMask={isForMask}
-        onDragStateChange={onDragStateChange}
-        setActiveChannelMixerOutput={setActiveChannelMixerOutput}
-        setActiveColor={setActiveColor}
-        setActiveColorBalanceRange={setActiveColorBalanceRange}
-        setAdjustments={setAdjustments}
-      />
-      <ColorGradingControls
-        adjustments={adjustments}
-        appSettings={appSettings}
-        onDragStateChange={onDragStateChange}
-        setAdjustments={setAdjustments}
-      />
       {!isForMask && (isLevelsVisible || isColorCalibrationVisible) && (
         <ColorAdvancedControls
           adjustmentVisibility={adjustmentVisibility}

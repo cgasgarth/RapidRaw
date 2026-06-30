@@ -21,6 +21,10 @@
       "activeRangeAdjustedHue": "",
       "activeRangeDeltas": "",
       "adjustedPreviewEnabled": "",
+      "advanced": {
+        "summary": "Levels, primary calibration, and shadows tint.",
+        "title": "Advanced Color"
+      },
       "ariaSelectColor": "{{name}}色を選択",
       "blackWhiteMixer": {
         "ariaSelectChannel": "",
@@ -35,6 +39,7 @@
           "green": "グリーン",
           "red": "レッド"
         },
+        "disclosureSummary": "Primary calibration and shadows tint.",
         "hue": "色相",
         "primaries": "プライマリ",
         "saturation": "彩度",
@@ -59,6 +64,7 @@
         },
         "title": ""
       },
+      "collapsed": "Collapsed",
       "colorBalanceRgb": {
         "channels": {
           "blue": "",
@@ -152,6 +158,10 @@
           "shadow_lift": "",
           "soft_contrast": ""
         }
+      },
+      "proofingDiagnostics": {
+        "summary": "{{warningCount}} warning/status item(s) · {{coverage}} gamut coverage",
+        "title": "Proofing / Diagnostics"
       },
       "rangeCenter": "",
       "rangeWidth": "",

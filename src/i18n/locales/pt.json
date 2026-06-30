@@ -21,6 +21,10 @@
       "activeRangeAdjustedHue": "",
       "activeRangeDeltas": "",
       "adjustedPreviewEnabled": "",
+      "advanced": {
+        "summary": "Levels, primary calibration, and shadows tint.",
+        "title": "Advanced Color"
+      },
       "ariaSelectColor": "Selecionar cor {{name}}",
       "blackWhiteMixer": {
         "ariaSelectChannel": "",
@@ -35,6 +39,7 @@
           "green": "Verde",
           "red": "Vermelho"
         },
+        "disclosureSummary": "Primary calibration and shadows tint.",
         "hue": "Matiz",
         "primaries": "Cores Primárias",
         "saturation": "Saturação",
@@ -59,6 +64,7 @@
         },
         "title": ""
       },
+      "collapsed": "Collapsed",
       "colorBalanceRgb": {
         "channels": {
           "blue": "",
@@ -152,6 +158,10 @@
           "shadow_lift": "",
           "soft_contrast": ""
         }
+      },
+      "proofingDiagnostics": {
+        "summary": "{{warningCount}} warning/status item(s) · {{coverage}} gamut coverage",
+        "title": "Proofing / Diagnostics"
       },
       "rangeCenter": "",
       "rangeWidth": "",

@@ -21,6 +21,10 @@
       "activeRangeAdjustedHue": "Adjusted hue",
       "activeRangeDeltas": "HSL deltas",
       "adjustedPreviewEnabled": "",
+      "advanced": {
+        "summary": "Levels, primary calibration, and shadows tint.",
+        "title": "Advanced Color"
+      },
       "ariaSelectColor": "{{name}}-Farbe auswählen",
       "blackWhiteMixer": {
         "ariaSelectChannel": "{{name}} Schwarzweißkanal auswählen",
@@ -35,6 +39,7 @@
           "green": "Grün",
           "red": "Rot"
         },
+        "disclosureSummary": "Primary calibration and shadows tint.",
         "hue": "Farbton",
         "primaries": "Primärfarben",
         "saturation": "Sättigung",
@@ -59,6 +64,7 @@
         },
         "title": "Kanalmischer"
       },
+      "collapsed": "Collapsed",
       "colorBalanceRgb": {
         "channels": {
           "blue": "Blau",
@@ -158,6 +164,10 @@
           "shadow_lift": "Schatten anheben",
           "soft_contrast": "Weicher Kontrast"
         }
+      },
+      "proofingDiagnostics": {
+        "summary": "{{warningCount}} warning/status item(s) · {{coverage}} gamut coverage",
+        "title": "Proofing / Diagnostics"
       },
       "rangeCenter": "Bereichsmitte",
       "rangeWidth": "Bereichsbreite",

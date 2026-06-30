@@ -21,6 +21,10 @@
       "activeRangeAdjustedHue": "Adjusted hue",
       "activeRangeDeltas": "HSL deltas",
       "adjustedPreviewEnabled": "",
+      "advanced": {
+        "summary": "Levels, primary calibration, and shadows tint.",
+        "title": "Advanced Color"
+      },
       "ariaSelectColor": "选择 {{name}} 颜色",
       "blackWhiteMixer": {
         "ariaSelectChannel": "选择 {{name}} 黑白通道",
@@ -35,6 +39,7 @@
           "green": "绿色",
           "red": "红色"
         },
+        "disclosureSummary": "Primary calibration and shadows tint.",
         "hue": "色相",
         "primaries": "原色",
         "saturation": "饱和度",
@@ -59,6 +64,7 @@
         },
         "title": "通道混合器"
       },
+      "collapsed": "Collapsed",
       "colorBalanceRgb": {
         "channels": {
           "blue": "蓝色",
@@ -158,6 +164,10 @@
           "shadow_lift": "提升阴影",
           "soft_contrast": "柔和对比"
         }
+      },
+      "proofingDiagnostics": {
+        "summary": "{{warningCount}} warning/status item(s) · {{coverage}} gamut coverage",
+        "title": "Proofing / Diagnostics"
       },
       "rangeCenter": "范围中心",
       "rangeWidth": "范围宽度",

@@ -30,7 +30,7 @@ export const ColorQuickControls = ({
 
   return (
     <div className="space-y-3" data-testid="quick-color-controls">
-      <div className="p-2 bg-bg-tertiary rounded-md">
+      <div className="p-2 bg-bg-tertiary rounded-md" data-testid="color-quick-white-balance">
         <div className="flex justify-between items-center mb-2">
           <UiText variant={TextVariants.heading}>{t('adjustments.color.whiteBalance')}</UiText>
           {!isForMask && toggleWbPicker && (
@@ -79,7 +79,7 @@ export const ColorQuickControls = ({
         />
       </div>
 
-      <div className="p-2 bg-bg-tertiary rounded-md">
+      <div className="p-2 bg-bg-tertiary rounded-md" data-testid="color-quick-presence">
         <UiText variant={TextVariants.heading} className="mb-2">
           {t('adjustments.color.presence')}
         </UiText>

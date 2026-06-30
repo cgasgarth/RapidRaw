@@ -91,155 +91,168 @@ export const ColorAdvancedControls = ({
   const trackSuffix = `${activePrimary}s`;
 
   return (
-    <div className="space-y-3" data-testid="advanced-color-controls">
-      {isLevelsVisible && (
-        <div className="p-2 bg-bg-tertiary rounded-md" data-testid="color-levels-controls">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <UiText variant={TextVariants.heading}>{t('adjustments.color.levels.title')}</UiText>
-            <button
-              className={`px-2 py-1 rounded text-xs transition-colors ${
-                levels.enabled ? 'bg-accent text-button-text' : 'bg-bg-secondary text-text-secondary hover:bg-surface'
-              }`}
-              onClick={handleLevelsToggle}
-              type="button"
-            >
-              {levels.enabled ? t('adjustments.color.levels.enabled') : t('adjustments.color.levels.disabled')}
-            </button>
-          </div>
-          <AdjustmentSlider
-            label={t('adjustments.color.levels.inputBlack')}
-            max={inputBlackMax}
-            min={0}
-            onValueChange={(value) => {
-              handleLevelsChange('inputBlack', value / 100);
-            }}
-            step={1}
-            value={Math.round(levels.inputBlack * 100)}
-            onDragStateChange={onDragStateChange}
-          />
-          <AdjustmentSlider
-            label={t('adjustments.color.levels.inputWhite')}
-            max={100}
-            min={inputWhiteMin}
-            onValueChange={(value) => {
-              handleLevelsChange('inputWhite', value / 100);
-            }}
-            step={1}
-            value={Math.round(levels.inputWhite * 100)}
-            onDragStateChange={onDragStateChange}
-          />
-          <AdjustmentSlider
-            label={t('adjustments.color.levels.gamma')}
-            max={300}
-            min={25}
-            onValueChange={(value) => {
-              handleLevelsChange('gamma', value / 100);
-            }}
-            step={1}
-            value={Math.round(levels.gamma * 100)}
-            onDragStateChange={onDragStateChange}
-          />
-          <AdjustmentSlider
-            label={t('adjustments.color.levels.outputBlack')}
-            max={outputBlackMax}
-            min={0}
-            onValueChange={(value) => {
-              handleLevelsChange('outputBlack', value / 100);
-            }}
-            step={1}
-            value={Math.round(levels.outputBlack * 100)}
-            onDragStateChange={onDragStateChange}
-          />
-          <AdjustmentSlider
-            label={t('adjustments.color.levels.outputWhite')}
-            max={100}
-            min={outputWhiteMin}
-            onValueChange={(value) => {
-              handleLevelsChange('outputWhite', value / 100);
-            }}
-            step={1}
-            value={Math.round(levels.outputWhite * 100)}
-            onDragStateChange={onDragStateChange}
-          />
-          {levelsClippingWarnings.length > 0 && (
-            <div className="mt-2 space-y-1">
-              {levelsClippingWarnings.map((warning) => (
-                <UiText key={warning} variant={TextVariants.small} color={TextColors.secondary} className="block">
-                  {warning}
-                </UiText>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-      {isColorCalibrationVisible && (
-        <div className="p-2 bg-bg-tertiary rounded-md" data-testid="color-calibration-controls">
-          <UiText variant={TextVariants.heading} className="mb-2">
-            {t('adjustments.color.calibration.title')}
+    <details className="rounded-md border border-border bg-bg-tertiary" data-testid="advanced-color-disclosure">
+      <summary className="flex cursor-pointer items-center justify-between gap-3 px-2 py-2 text-xs">
+        <span className="min-w-0">
+          <UiText variant={TextVariants.heading}>{t('adjustments.color.advanced.title')}</UiText>
+          <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+            {t('adjustments.color.advanced.summary')}
           </UiText>
-          <div>
-            <UiText color={TextColors.primary} weight={TextWeights.medium} className="mb-1">
-              {t('adjustments.color.calibration.shadows')}
-            </UiText>
-            <AdjustmentSlider
-              label={t('adjustments.color.calibration.tint')}
-              min={-100}
-              max={100}
-              step={1}
-              defaultValue={0}
-              value={colorCalibration.shadowsTint}
-              onValueChange={(value) => {
-                handleShadowsChange(value);
-              }}
-              onDragStateChange={onDragStateChange}
-              trackClassName="tint-gradient-track"
-            />
-          </div>
-          <div className="mt-3">
-            <UiText color={TextColors.primary} weight={TextWeights.medium} className="mb-3">
-              {t('adjustments.color.calibration.primaries')}
-            </UiText>
-            <div className="flex justify-center gap-6 mb-4 px-1">
-              {primaryColors.map(({ name, color, label }) => (
-                <ColorSwatch
-                  color={color}
-                  isActive={activePrimary === name}
-                  key={name}
-                  name={name}
-                  onClick={setActivePrimary}
-                  ariaLabel={t('adjustments.color.ariaSelectColor', { name: label })}
-                />
-              ))}
+        </span>
+        <span className="shrink-0 rounded bg-bg-secondary px-2 py-1 text-[10px] font-semibold uppercase tracking-normal text-text-secondary">
+          {t('adjustments.color.collapsed')}
+        </span>
+      </summary>
+      <div className="space-y-3 border-t border-border p-2" data-testid="advanced-color-controls">
+        {isLevelsVisible && (
+          <div className="p-2 bg-bg-tertiary rounded-md" data-testid="color-levels-controls">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <UiText variant={TextVariants.heading}>{t('adjustments.color.levels.title')}</UiText>
+              <button
+                className={`px-2 py-1 rounded text-xs transition-colors ${
+                  levels.enabled ? 'bg-accent text-button-text' : 'bg-bg-secondary text-text-secondary hover:bg-surface'
+                }`}
+                onClick={handleLevelsToggle}
+                type="button"
+              >
+                {levels.enabled ? t('adjustments.color.levels.enabled') : t('adjustments.color.levels.disabled')}
+              </button>
             </div>
             <AdjustmentSlider
-              label={t('adjustments.color.calibration.hue')}
-              min={-100}
-              max={100}
-              step={1}
-              defaultValue={0}
-              value={currentValues.hue}
+              label={t('adjustments.color.levels.inputBlack')}
+              max={inputBlackMax}
+              min={0}
               onValueChange={(value) => {
-                handlePrimaryChange('Hue', value);
+                handleLevelsChange('inputBlack', value / 100);
               }}
+              step={1}
+              value={Math.round(levels.inputBlack * 100)}
               onDragStateChange={onDragStateChange}
-              trackClassName={`hue-slider-${trackSuffix}`}
             />
             <AdjustmentSlider
-              label={t('adjustments.color.calibration.saturation')}
-              min={-100}
+              label={t('adjustments.color.levels.inputWhite')}
               max={100}
-              step={1}
-              defaultValue={0}
-              value={currentValues.saturation}
+              min={inputWhiteMin}
               onValueChange={(value) => {
-                handlePrimaryChange('Saturation', value);
+                handleLevelsChange('inputWhite', value / 100);
               }}
+              step={1}
+              value={Math.round(levels.inputWhite * 100)}
               onDragStateChange={onDragStateChange}
-              trackClassName={`sat-slider-${trackSuffix}`}
             />
+            <AdjustmentSlider
+              label={t('adjustments.color.levels.gamma')}
+              max={300}
+              min={25}
+              onValueChange={(value) => {
+                handleLevelsChange('gamma', value / 100);
+              }}
+              step={1}
+              value={Math.round(levels.gamma * 100)}
+              onDragStateChange={onDragStateChange}
+            />
+            <AdjustmentSlider
+              label={t('adjustments.color.levels.outputBlack')}
+              max={outputBlackMax}
+              min={0}
+              onValueChange={(value) => {
+                handleLevelsChange('outputBlack', value / 100);
+              }}
+              step={1}
+              value={Math.round(levels.outputBlack * 100)}
+              onDragStateChange={onDragStateChange}
+            />
+            <AdjustmentSlider
+              label={t('adjustments.color.levels.outputWhite')}
+              max={100}
+              min={outputWhiteMin}
+              onValueChange={(value) => {
+                handleLevelsChange('outputWhite', value / 100);
+              }}
+              step={1}
+              value={Math.round(levels.outputWhite * 100)}
+              onDragStateChange={onDragStateChange}
+            />
+            {levelsClippingWarnings.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {levelsClippingWarnings.map((warning) => (
+                  <UiText key={warning} variant={TextVariants.small} color={TextColors.secondary} className="block">
+                    {warning}
+                  </UiText>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      )}
-    </div>
+        )}
+        {isColorCalibrationVisible && (
+          <div className="p-2 bg-bg-tertiary rounded-md" data-testid="color-calibration-controls">
+            <UiText variant={TextVariants.heading} className="mb-2">
+              {t('adjustments.color.calibration.title')}
+            </UiText>
+            <div>
+              <UiText color={TextColors.primary} weight={TextWeights.medium} className="mb-1">
+                {t('adjustments.color.calibration.shadows')}
+              </UiText>
+              <AdjustmentSlider
+                label={t('adjustments.color.calibration.tint')}
+                min={-100}
+                max={100}
+                step={1}
+                defaultValue={0}
+                value={colorCalibration.shadowsTint}
+                onValueChange={(value) => {
+                  handleShadowsChange(value);
+                }}
+                onDragStateChange={onDragStateChange}
+                trackClassName="tint-gradient-track"
+              />
+            </div>
+            <div className="mt-3">
+              <UiText color={TextColors.primary} weight={TextWeights.medium} className="mb-3">
+                {t('adjustments.color.calibration.primaries')}
+              </UiText>
+              <div className="flex justify-center gap-6 mb-4 px-1">
+                {primaryColors.map(({ name, color, label }) => (
+                  <ColorSwatch
+                    color={color}
+                    isActive={activePrimary === name}
+                    key={name}
+                    name={name}
+                    onClick={setActivePrimary}
+                    ariaLabel={t('adjustments.color.ariaSelectColor', { name: label })}
+                  />
+                ))}
+              </div>
+              <AdjustmentSlider
+                label={t('adjustments.color.calibration.hue')}
+                min={-100}
+                max={100}
+                step={1}
+                defaultValue={0}
+                value={currentValues.hue}
+                onValueChange={(value) => {
+                  handlePrimaryChange('Hue', value);
+                }}
+                onDragStateChange={onDragStateChange}
+                trackClassName={`hue-slider-${trackSuffix}`}
+              />
+              <AdjustmentSlider
+                label={t('adjustments.color.calibration.saturation')}
+                min={-100}
+                max={100}
+                step={1}
+                defaultValue={0}
+                value={currentValues.saturation}
+                onValueChange={(value) => {
+                  handlePrimaryChange('Saturation', value);
+                }}
+                onDragStateChange={onDragStateChange}
+                trackClassName={`sat-slider-${trackSuffix}`}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </details>
   );
 };

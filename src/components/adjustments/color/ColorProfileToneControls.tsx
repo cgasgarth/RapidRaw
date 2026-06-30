@@ -417,14 +417,22 @@ export const ColorProfileToneControls = ({
         </div>
       )}
 
-      <div className="rounded-md border border-border bg-bg-tertiary p-2" data-testid="professional-color-recipes">
-        <div className="mb-2">
-          <UiText variant={TextVariants.heading}>{t('adjustments.color.workflowRecipes.title')}</UiText>
-          <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
-            {t('adjustments.color.workflowRecipes.description')}
-          </UiText>
-        </div>
-        <div className="grid gap-2">
+      <details
+        className="rounded-md border border-border bg-bg-tertiary"
+        data-testid="professional-color-recipes-disclosure"
+      >
+        <summary className="flex cursor-pointer items-start justify-between gap-3 px-2 py-2 text-xs">
+          <span className="min-w-0">
+            <UiText variant={TextVariants.heading}>{t('adjustments.color.workflowRecipes.title')}</UiText>
+            <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+              {t('adjustments.color.workflowRecipes.description')}
+            </UiText>
+          </span>
+          <span className="shrink-0 rounded bg-bg-secondary px-2 py-1 text-[10px] font-semibold uppercase tracking-normal text-text-secondary">
+            {t('adjustments.color.collapsed')}
+          </span>
+        </summary>
+        <div className="grid gap-2 border-t border-border p-2" data-testid="professional-color-recipes">
           {professionalColorRecipes.map((recipe) => {
             const isApplied = isProfessionalColorRecipeApplied(adjustments, recipe);
 
@@ -488,7 +496,7 @@ export const ColorProfileToneControls = ({
             );
           })}
         </div>
-      </div>
+      </details>
     </>
   );
 };
