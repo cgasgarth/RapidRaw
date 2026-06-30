@@ -27,7 +27,7 @@ This is not a full lens-profile deblur system and not an AI deblur feature.
 
 ## Current Evidence
 
-- `fixtures/detail/deblur-fixtures.json` defines accepted Gaussian PSF cases and rejected high-noise, unknown-motion, and saturated-edge cases.
+- `fixtures/detail/deblur/deblur-fixtures.json` defines accepted Gaussian PSF cases and rejected high-noise, unknown-motion, and saturated-edge cases.
 - `bun run check:deblur-fixtures` validates fixture scope and rejects private-path leakage.
 - `bun run check:deblur-ringing` gates ringing, halo width, false edges, and noise amplification.
 - `bun run check:deblur-cpu-reference` proves the CPU reference path applies accepted synthetic fixtures and skips rejected fixtures.

@@ -7,8 +7,8 @@ import {
   parseDenoiseFixtureManifest,
 } from '../../../src/schemas/denoiseFixtureSchemas.ts';
 
-const MANIFEST_PATH = 'fixtures/detail/denoise-fixtures.json';
-const INVALID_PATH = 'fixtures/detail/invalid-denoise-fixtures.json';
+const MANIFEST_PATH = 'fixtures/detail/denoise/denoise-fixtures.json';
+const INVALID_PATH = 'fixtures/detail/invalid/denoise/invalid-denoise-fixtures.json';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 

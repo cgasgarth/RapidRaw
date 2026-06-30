@@ -7,10 +7,10 @@ import { parseDeblurRealRawQualityManifest } from '../../../src/schemas/deblurRe
 import { parsePrivateRawEvidenceLedger } from '../../../src/schemas/privateRawEvidenceSchemas.ts';
 
 const manifest = parseDeblurRealRawQualityManifest(
-  JSON.parse(await readFile('fixtures/detail/deblur-real-raw-quality.json', 'utf8')),
+  JSON.parse(await readFile('fixtures/detail/deblur/deblur-real-raw-quality.json', 'utf8')),
 );
 const ledger = parsePrivateRawEvidenceLedger(
-  JSON.parse(await readFile('fixtures/detail/private-raw-evidence-ledger.json', 'utf8')),
+  JSON.parse(await readFile('fixtures/detail/proofs/private-raw-evidence-ledger.json', 'utf8')),
 );
 const ledgerEntries = new Map(ledger.entries.map((entry) => [entry.evidenceId, entry]));
 const root = process.env.RAWENGINE_PRIVATE_RAW_ROOT;

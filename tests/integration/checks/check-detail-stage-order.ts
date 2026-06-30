@@ -9,8 +9,8 @@ import {
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 
-const manifest = parseDetailStageOrderManifest(await readJson('fixtures/detail/detail-stage-order.json'));
-const invalidCases = await readJson('fixtures/detail/invalid-detail-stage-order.json');
+const manifest = parseDetailStageOrderManifest(await readJson('fixtures/detail/artifacts/detail-stage-order.json'));
+const invalidCases = await readJson('fixtures/detail/invalid/artifacts/invalid-detail-stage-order.json');
 const failures = [];
 
 const requiredSequence = [

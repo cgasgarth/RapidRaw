@@ -11,10 +11,10 @@ import {
 
 const invalidCaseSchema = z.object({ case: z.string().min(1), recipe: z.unknown() }).strict();
 
-const recipes = z.array(z.unknown()).parse(await readJson('fixtures/detail/output-sharpening-recipes.json'));
+const recipes = z.array(z.unknown()).parse(await readJson('fixtures/detail/sharpening/output-sharpening-recipes.json'));
 const invalidCases = z
   .array(invalidCaseSchema)
-  .parse(await readJson('fixtures/detail/invalid-output-sharpening-recipes.json'));
+  .parse(await readJson('fixtures/detail/invalid/sharpening/invalid-output-sharpening-recipes.json'));
 const failures: string[] = [];
 
 let totalPasses = 0;

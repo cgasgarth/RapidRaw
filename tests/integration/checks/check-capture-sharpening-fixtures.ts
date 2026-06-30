@@ -11,10 +11,12 @@ import {
 
 const invalidCaseSchema = z.object({ case: z.string().min(1), preset: z.unknown() }).strict();
 
-const presets = z.array(z.unknown()).parse(await readJson('fixtures/detail/capture-sharpening-presets.json'));
+const presets = z
+  .array(z.unknown())
+  .parse(await readJson('fixtures/detail/sharpening/capture-sharpening-presets.json'));
 const invalidCases = z
   .array(invalidCaseSchema)
-  .parse(await readJson('fixtures/detail/invalid-capture-sharpening-presets.json'));
+  .parse(await readJson('fixtures/detail/invalid/sharpening/invalid-capture-sharpening-presets.json'));
 const failures: string[] = [];
 
 let totalKernelDiameter = 0;

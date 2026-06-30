@@ -927,7 +927,7 @@ function runSelfTest() {
   );
   assertClassification(
     'private RAW evidence fixture ledger can skip smoke',
-    ['fixtures/detail/private-raw-evidence-ledger.json'],
+    ['fixtures/detail/proofs/private-raw-evidence-ledger.json'],
     SMOKE_MODES.NONE,
   );
   assertClassification(

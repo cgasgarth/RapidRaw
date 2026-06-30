@@ -11,10 +11,10 @@ import {
 
 const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(path, 'utf8'));
 
-const fixtures = parseNoiseSeparationFixtures(await readJson('fixtures/detail/noise-separation-fixtures.json'));
+const fixtures = parseNoiseSeparationFixtures(await readJson('fixtures/detail/denoise/noise-separation-fixtures.json'));
 const invalidCases = z
   .array(z.object({ case: z.string().min(1), fixture: z.unknown() }).strict())
-  .parse(await readJson('fixtures/detail/invalid-noise-separation-fixtures.json'));
+  .parse(await readJson('fixtures/detail/invalid/denoise/invalid-noise-separation-fixtures.json'));
 const failures: string[] = [];
 const fixtureIds = new Set<string>();
 

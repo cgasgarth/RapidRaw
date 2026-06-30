@@ -7,8 +7,10 @@ import { ADJUSTMENT_GROUPS, DetailsAdjustment, INITIAL_ADJUSTMENTS } from '../..
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 
-const manifest = localContrastFixtureSchema.parse(await readJson('fixtures/detail/local-contrast-controls.json'));
-const invalidCases = await readJson('fixtures/detail/invalid-local-contrast-controls.json');
+const manifest = localContrastFixtureSchema.parse(
+  await readJson('fixtures/detail/local-contrast/local-contrast-controls.json'),
+);
+const invalidCases = await readJson('fixtures/detail/invalid/local-contrast/invalid-local-contrast-controls.json');
 const failures = [];
 
 for (const mode of ['classic', 'edge_protected', 'midtone_masked']) {

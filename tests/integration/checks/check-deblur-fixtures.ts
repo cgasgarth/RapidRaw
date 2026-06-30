@@ -3,8 +3,8 @@
 import { expectInvalidCases, finishFixtureCheck, readJson } from '../../../scripts/lib/fixtures/fixture-checks.ts';
 import { deblurFixtureManifestSchema, parseDeblurFixtureManifest } from '../../../src/schemas/deblurFixtureSchemas.ts';
 
-const MANIFEST_PATH = 'fixtures/detail/deblur-fixtures.json';
-const INVALID_PATH = 'fixtures/detail/invalid-deblur-fixtures.json';
+const MANIFEST_PATH = 'fixtures/detail/deblur/deblur-fixtures.json';
+const INVALID_PATH = 'fixtures/detail/invalid/deblur/invalid-deblur-fixtures.json';
 
 const manifest = parseDeblurFixtureManifest(await readJson(MANIFEST_PATH));
 const invalidCases = await readJson(INVALID_PATH);

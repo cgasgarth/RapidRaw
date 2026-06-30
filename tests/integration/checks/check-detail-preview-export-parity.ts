@@ -97,8 +97,10 @@ const runCase = (parityCase) => {
   };
 };
 
-const manifest = parseDetailPreviewExportParityManifest(await readJson('fixtures/detail/preview-export-parity.json'));
-const invalidCases = await readJson('fixtures/detail/invalid-preview-export-parity.json');
+const manifest = parseDetailPreviewExportParityManifest(
+  await readJson('fixtures/detail/proofs/preview-export-parity.json'),
+);
+const invalidCases = await readJson('fixtures/detail/invalid/proofs/invalid-preview-export-parity.json');
 const failures = [];
 
 for (const parityCase of manifest.cases) {
