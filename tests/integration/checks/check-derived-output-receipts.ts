@@ -4,14 +4,14 @@ import { readFileSync } from 'node:fs';
 import {
   type DerivedOutputReceipt,
   derivedOutputReceiptSchema,
-} from '../../../src/schemas/derivedOutputReceiptSchemas.ts';
-import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../../src/schemas/focus-stack/focusStackUiSchemas.ts';
-import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../../src/schemas/hdrMergeUiSchemas.ts';
+} from '../../../src/schemas/computational-merge/derivedOutputReceiptSchemas.ts';
+import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../../src/schemas/computational-merge/hdrMergeUiSchemas.ts';
 import {
   DEFAULT_PANORAMA_UI_SETTINGS,
   type PanoramaSavedReviewSummary,
-} from '../../../src/schemas/panoramaUiSchemas.ts';
-import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../../../src/schemas/superResolutionUiSchemas.ts';
+} from '../../../src/schemas/computational-merge/panoramaUiSchemas.ts';
+import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../../../src/schemas/computational-merge/superResolutionUiSchemas.ts';
+import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../../src/schemas/focus-stack/focusStackUiSchemas.ts';
 import { useUIStore } from '../../../src/store/useUIStore.ts';
 import {
   buildFocusStackDerivedOutputReceipt,

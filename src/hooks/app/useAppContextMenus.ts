@@ -53,11 +53,11 @@ import {
   Panel,
 } from '../../components/ui/AppProperties';
 import { useContextMenu } from '../../context/ContextMenuContext';
+import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../schemas/computational-merge/hdrMergeUiSchemas';
+import { DEFAULT_PANORAMA_UI_SETTINGS } from '../../schemas/computational-merge/panoramaUiSchemas';
+import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../../schemas/computational-merge/superResolutionUiSchemas';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../schemas/focus-stack/focusStackUiSchemas';
-import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../schemas/hdrMergeUiSchemas';
 import { libraryRelinkIdentitySchema } from '../../schemas/libraryRelinkSchemas';
-import { DEFAULT_PANORAMA_UI_SETTINGS } from '../../schemas/panoramaUiSchemas';
-import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../../schemas/superResolutionUiSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';

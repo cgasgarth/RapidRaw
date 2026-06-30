@@ -15,7 +15,7 @@ import { privateRawReportMetric } from '../../../scripts/lib/private-raw/computa
 import {
   type ComputationalMergePrivateRunReportCollection,
   parseComputationalMergePrivateRunReportCollection,
-} from '../../../src/schemas/computationalMergePrivateRunReportSchemas.ts';
+} from '../../../src/schemas/computational-merge/computationalMergePrivateRunReportSchemas.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
 
 const superResolutionRoutePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');

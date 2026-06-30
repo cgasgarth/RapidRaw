@@ -1,6 +1,6 @@
 import { Download, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { DerivedOutputReceipt } from '../../../schemas/derivedOutputReceiptSchemas';
+import type { DerivedOutputReceipt } from '../../../schemas/computational-merge/derivedOutputReceiptSchemas';
 import { TextColors, TextVariants } from '../../../types/typography';
 import Button from '../../ui/primitives/Button';
 import UiText from '../../ui/primitives/Text';

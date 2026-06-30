@@ -2,7 +2,10 @@
 
 import { readFileSync } from 'node:fs';
 
-import { DEFAULT_PANORAMA_UI_SETTINGS, panoramaUiSettingsSchema } from '../../../src/schemas/panoramaUiSchemas.ts';
+import {
+  DEFAULT_PANORAMA_UI_SETTINGS,
+  panoramaUiSettingsSchema,
+} from '../../../src/schemas/computational-merge/panoramaUiSchemas.ts';
 
 const requiredLocaleKeys = [
   'apiPending',

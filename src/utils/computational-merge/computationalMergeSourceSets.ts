@@ -1,8 +1,8 @@
-import type { ComputationalMergeE2eProofManifest } from '../../schemas/computationalMergeE2eProofSchemas';
+import type { ComputationalMergeE2eProofManifest } from '../../schemas/computational-merge/computationalMergeE2eProofSchemas';
 import {
   type ComputationalMergePrivateSourceSetCollection,
   computationalMergePrivateSourceSetCollectionSchema,
-} from '../../schemas/computationalMergeSourceSetSchemas';
+} from '../../schemas/computational-merge/computationalMergeSourceSetSchemas';
 import type { PrivateRawEvidenceLedger } from '../../schemas/privateRawEvidenceSchemas';
 
 const privatePathPrefixes = ['private-fixtures/', 'private-artifacts/'] as const;

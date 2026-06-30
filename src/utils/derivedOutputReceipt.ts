@@ -5,14 +5,13 @@ import {
   type DerivedOutputStaleReason,
   derivedOutputProvenanceSidecarSchema,
   derivedOutputReceiptSchema,
-} from '../schemas/derivedOutputReceiptSchemas';
-
+} from '../schemas/computational-merge/derivedOutputReceiptSchemas';
+import type { HdrEditableHandoffSummary, HdrMergeUiSettings } from '../schemas/computational-merge/hdrMergeUiSchemas';
+import type { PanoramaSavedReviewSummary, PanoramaUiSettings } from '../schemas/computational-merge/panoramaUiSchemas';
+import type { SuperResolutionOutputReviewWorkflow } from '../schemas/computational-merge/superResolutionOutputReviewSchemas';
+import type { SuperResolutionUiSettings } from '../schemas/computational-merge/superResolutionUiSchemas';
 import type { FocusStackOutputReviewWorkflow } from '../schemas/focus-stack/focusStackOutputReviewSchemas';
 import type { FocusStackUiSettings } from '../schemas/focus-stack/focusStackUiSchemas';
-import type { HdrEditableHandoffSummary, HdrMergeUiSettings } from '../schemas/hdrMergeUiSchemas';
-import type { PanoramaSavedReviewSummary, PanoramaUiSettings } from '../schemas/panoramaUiSchemas';
-import type { SuperResolutionOutputReviewWorkflow } from '../schemas/superResolutionOutputReviewSchemas';
-import type { SuperResolutionUiSettings } from '../schemas/superResolutionUiSchemas';
 
 type BuildReceiptInput = Omit<DerivedOutputReceipt, 'provenanceSidecar' | 'receiptId' | 'settingsHash'> & {
   provenanceSidecar?: {

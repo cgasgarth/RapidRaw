@@ -2,7 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 
-import { panoramaRuntimePlanSchema } from '../../../src/schemas/panoramaUiSchemas.ts';
+import { panoramaRuntimePlanSchema } from '../../../src/schemas/computational-merge/panoramaUiSchemas.ts';
 
 const failures: string[] = [];
 

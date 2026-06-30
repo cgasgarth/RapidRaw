@@ -2,25 +2,25 @@ import { create } from 'zustand';
 
 import { RIGHT_PANEL_ORDER } from '../components/panel/right/rightPanelRegistry';
 import { type CullingSuggestions, type ImageFile, Panel, type UiVisibility } from '../components/ui/AppProperties';
-import type { DerivedOutputReceipt } from '../schemas/derivedOutputReceiptSchemas';
-import type { FocusStackOutputReviewWorkflow } from '../schemas/focus-stack/focusStackOutputReviewSchemas';
-import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../schemas/focus-stack/focusStackUiSchemas';
+import type { DerivedOutputReceipt } from '../schemas/computational-merge/derivedOutputReceiptSchemas';
 import {
   DEFAULT_HDR_MERGE_UI_SETTINGS,
   type HdrEditableHandoffSummary,
   type HdrMergeUiSettings,
-} from '../schemas/hdrMergeUiSchemas';
+} from '../schemas/computational-merge/hdrMergeUiSchemas';
 import {
   DEFAULT_PANORAMA_UI_SETTINGS,
   type PanoramaRenderedReview,
   type PanoramaRuntimePlan,
   type PanoramaUiSettings,
-} from '../schemas/panoramaUiSchemas';
-import type { SuperResolutionOutputReviewWorkflow } from '../schemas/superResolutionOutputReviewSchemas';
+} from '../schemas/computational-merge/panoramaUiSchemas';
+import type { SuperResolutionOutputReviewWorkflow } from '../schemas/computational-merge/superResolutionOutputReviewSchemas';
 import {
   DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
   type SuperResolutionUiSettings,
-} from '../schemas/superResolutionUiSchemas';
+} from '../schemas/computational-merge/superResolutionUiSchemas';
+import type { FocusStackOutputReviewWorkflow } from '../schemas/focus-stack/focusStackOutputReviewSchemas';
+import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../schemas/focus-stack/focusStackUiSchemas';
 import type { FocusStackSourcePreflightMetadata } from '../utils/focusStackSourcePreflight';
 import type { HdrBracketPreflightSourceMetadata } from '../utils/hdrBracketPreflight';
 import type { SuperResolutionSourcePreflightMetadata } from '../utils/superResolutionSourcePreflight';

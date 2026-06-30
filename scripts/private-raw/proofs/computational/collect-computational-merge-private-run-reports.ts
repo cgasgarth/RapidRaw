@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { parseComputationalMergePrivateRunReportCollection } from '../../../../src/schemas/computationalMergePrivateRunReportSchemas.ts';
+import { parseComputationalMergePrivateRunReportCollection } from '../../../../src/schemas/computational-merge/computationalMergePrivateRunReportSchemas.ts';
 
 const REPORT_ROOT = 'private-artifacts/validation/computational-merge';
 const REPORT_SUFFIX = '-private-run-report.json';

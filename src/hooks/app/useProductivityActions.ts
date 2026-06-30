@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useCallback } from 'react';
 
-import { panoramaRuntimePlanSchema } from '../../schemas/panoramaUiSchemas';
+import { panoramaRuntimePlanSchema } from '../../schemas/computational-merge/panoramaUiSchemas';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import {

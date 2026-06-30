@@ -25,24 +25,27 @@ import {
   type SelectedImage,
   SortDirection,
 } from '../../components/ui/AppProperties';
-import type { FocusStackOutputReviewWorkflow } from '../../schemas/focus-stack/focusStackOutputReviewSchemas';
 import {
-  DEFAULT_FOCUS_STACK_UI_SETTINGS,
-  type FocusStackUiSettings,
-} from '../../schemas/focus-stack/focusStackUiSchemas';
-import { DEFAULT_HDR_MERGE_UI_SETTINGS, type HdrMergeUiSettings } from '../../schemas/hdrMergeUiSchemas';
-import type { MaskOverlaySettings } from '../../schemas/maskOverlaySchemas';
+  DEFAULT_HDR_MERGE_UI_SETTINGS,
+  type HdrMergeUiSettings,
+} from '../../schemas/computational-merge/hdrMergeUiSchemas';
 import {
   DEFAULT_PANORAMA_UI_SETTINGS,
   type PanoramaRenderedReview,
   type PanoramaRuntimePlan,
   type PanoramaUiSettings,
-} from '../../schemas/panoramaUiSchemas';
-import type { SuperResolutionOutputReviewWorkflow } from '../../schemas/superResolutionOutputReviewSchemas';
+} from '../../schemas/computational-merge/panoramaUiSchemas';
+import type { SuperResolutionOutputReviewWorkflow } from '../../schemas/computational-merge/superResolutionOutputReviewSchemas';
 import {
   DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
   type SuperResolutionUiSettings,
-} from '../../schemas/superResolutionUiSchemas';
+} from '../../schemas/computational-merge/superResolutionUiSchemas';
+import type { FocusStackOutputReviewWorkflow } from '../../schemas/focus-stack/focusStackOutputReviewSchemas';
+import {
+  DEFAULT_FOCUS_STACK_UI_SETTINGS,
+  type FocusStackUiSettings,
+} from '../../schemas/focus-stack/focusStackUiSchemas';
+import type { MaskOverlaySettings } from '../../schemas/maskOverlaySchemas';
 import type {
   TetherCaptureResponse,
   TetherDiscoveryResponse,

@@ -2,7 +2,7 @@
 
 import { readFile } from 'node:fs/promises';
 
-import { parseComputationalMergeE2eProofManifest } from '../../../src/schemas/computationalMergeE2eProofSchemas.ts';
+import { parseComputationalMergeE2eProofManifest } from '../../../src/schemas/computational-merge/computationalMergeE2eProofSchemas.ts';
 import { parsePrivateRawEvidenceLedger } from '../../../src/schemas/privateRawEvidenceSchemas.ts';
 import { buildComputationalMergePrivateSourceSets } from '../../../src/utils/computational-merge/computationalMergeSourceSets.ts';
 

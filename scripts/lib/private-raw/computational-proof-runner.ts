@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { parseComputationalMergePrivateRunReportCollection } from '../../../src/schemas/computationalMergePrivateRunReportSchemas.ts';
+import { parseComputationalMergePrivateRunReportCollection } from '../../../src/schemas/computational-merge/computationalMergePrivateRunReportSchemas.ts';
 import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../ci/compact-output.ts';
 
 const argsSchema = z

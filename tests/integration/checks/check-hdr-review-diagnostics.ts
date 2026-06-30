@@ -2,7 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 
-import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../../src/schemas/hdrMergeUiSchemas.ts';
+import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../../src/schemas/computational-merge/hdrMergeUiSchemas.ts';
 import { buildHdrBracketPreflight } from '../../../src/utils/hdrBracketPreflight.ts';
 import { buildHdrReviewDiagnostics } from '../../../src/utils/hdrReviewDiagnostics.ts';
 
