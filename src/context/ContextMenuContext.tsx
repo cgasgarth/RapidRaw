@@ -50,6 +50,7 @@ interface ContextMenuValue {
   activeSubmenu: number[] | null;
   cancelCloseSubmenu: () => void;
   closeSubmenu: (path: number[]) => void;
+  focusMenuItem: (path: number[]) => void;
   hideContextMenu: () => void;
   menuId: number;
   menuRef: RefObject<HTMLDivElement | null>;
@@ -76,6 +77,28 @@ interface SubMenuProps {
 const ContextMenuContext = createContext<ContextMenuValue | undefined>(undefined);
 const cssPx = (value: number): string => `${String(value)}px`;
 const svgNumber = (value: number): string => String(value);
+const menuPath = (path: number[]): string => path.join('-');
+const afterMenuRender = (callback: () => void): void => {
+  window.setTimeout(callback, 0);
+};
+const focusMenuItemByPath = (path: number[]): boolean => {
+  const item = document.querySelector<HTMLButtonElement>(`[data-menu-item-path="${menuPath(path)}"]`);
+  item?.focus();
+  return Boolean(item);
+};
+
+const focusFirstMenuItem = (root: ParentNode | null): void => {
+  const firstItem = root?.querySelector<HTMLButtonElement>('[role="menuitem"]:not([disabled])');
+  firstItem?.focus();
+};
+
+const firstEnabledOptionPath = (
+  options: Array<ContextMenuOption> | undefined,
+  parentPath: number[],
+): number[] | null => {
+  const index = options?.findIndex((option) => option.type !== OPTION_SEPARATOR && !option.disabled) ?? -1;
+  return index >= 0 ? [...parentPath, index] : null;
+};
 
 export const useContextMenu = (): ContextMenuValue => {
   const value = useContext(ContextMenuContext);
@@ -200,7 +223,7 @@ function SubMenu({ cancelCloseSubmenu, closeSubmenu, hideContextMenu, options, p
 }
 
 function MenuItem({ option, path, hideContextMenu }: MenuItemProps) {
-  const { activeSubmenu, openSubmenu, closeSubmenu, cancelCloseSubmenu } = useContextMenu();
+  const { activeSubmenu, openSubmenu, closeSubmenu, cancelCloseSubmenu, focusMenuItem } = useContextMenu();
   const itemRef = useRef<HTMLButtonElement | null>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstSubmenuOption = option.submenu?.[0];
@@ -216,6 +239,9 @@ function MenuItem({ option, path, hideContextMenu }: MenuItemProps) {
 
   const handleMouseEnter = () => {
     cancelCloseSubmenu();
+    if (!option.disabled) {
+      itemRef.current?.focus();
+    }
     hoverTimeoutRef.current = setTimeout(() => {
       if (option.disabled) {
         const parentPath = path.slice(0, -1);
@@ -241,6 +267,114 @@ function MenuItem({ option, path, hideContextMenu }: MenuItemProps) {
     }
   };
 
+  const focusSibling = (direction: 1 | -1) => {
+    const currentItem = itemRef.current;
+    const currentMenu = currentItem?.closest('[role="menu"]');
+    if (!currentMenu) {
+      return;
+    }
+
+    const items = Array.from(currentMenu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not([disabled])'));
+    if (!currentItem) {
+      items[0]?.focus();
+      return;
+    }
+
+    const currentIndex = items.indexOf(currentItem);
+    if (currentIndex < 0 || items.length === 0) {
+      return;
+    }
+
+    const nextIndex = (currentIndex + direction + items.length) % items.length;
+    items[nextIndex]?.focus();
+  };
+
+  const openKeyboardSubmenu = () => {
+    if (!option.submenu || option.disabled) {
+      return;
+    }
+
+    openSubmenu(path);
+    afterMenuRender(() => {
+      const firstChildPath = firstEnabledOptionPath(option.submenu, path);
+      if (firstChildPath) {
+        focusMenuItem(firstChildPath);
+        return;
+      }
+
+      const submenu = itemRef.current?.parentElement?.querySelector<HTMLElement>('[role="menu"]');
+      focusFirstMenuItem(submenu ?? null);
+    });
+  };
+
+  const activateMenuItem = () => {
+    if (option.disabled) {
+      return;
+    }
+
+    if (option.submenu) {
+      openKeyboardSubmenu();
+      return;
+    }
+
+    option.onClick?.();
+    hideContextMenu();
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+        focusSibling(1);
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        focusSibling(-1);
+        break;
+      case 'Home': {
+        event.preventDefault();
+        const currentMenu = itemRef.current?.closest('[role="menu"]');
+        focusFirstMenuItem(currentMenu ?? null);
+        break;
+      }
+      case 'End': {
+        event.preventDefault();
+        const currentMenu = itemRef.current?.closest('[role="menu"]');
+        const items = Array.from(
+          currentMenu?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not([disabled])') ?? [],
+        );
+        items.at(-1)?.focus();
+        break;
+      }
+      case 'ArrowRight':
+        if (option.submenu) {
+          event.preventDefault();
+          openKeyboardSubmenu();
+        }
+        break;
+      case 'ArrowLeft':
+        if (path.length > 1) {
+          event.preventDefault();
+          const parentPath = path.slice(0, -1);
+          const grandparentPath = path.slice(0, -2);
+          openSubmenu(grandparentPath.length > 0 ? grandparentPath : null);
+          focusMenuItem(parentPath);
+        }
+        break;
+      case 'Enter':
+      case ' ':
+        event.preventDefault();
+        activateMenuItem();
+        break;
+      case 'Escape':
+        event.preventDefault();
+        hideContextMenu();
+        break;
+      default:
+        break;
+    }
+  };
+
   if (option.type === OPTION_SEPARATOR) {
     return <div className="h-px bg-text-secondary/20 my-1 mx-2" />;
   }
@@ -255,6 +389,9 @@ function MenuItem({ option, path, hideContextMenu }: MenuItemProps) {
           ${option.disabled ? 'text-text-secondary bg-transparent cursor-not-allowed' : ''}
         `}
         disabled={option.disabled}
+        aria-expanded={option.submenu ? isSubmenuOpen : undefined}
+        aria-haspopup={option.submenu ? 'menu' : undefined}
+        data-menu-item-path={menuPath(path)}
         onClick={() => {
           if (!option.disabled && !option.submenu && option.onClick) {
             option.onClick();
@@ -273,8 +410,10 @@ function MenuItem({ option, path, hideContextMenu }: MenuItemProps) {
             hideContextMenu();
           }
         }}
+        onKeyDown={handleKeyDown}
         ref={itemRef}
         role="menuitem"
+        tabIndex={-1}
       >
         <div className="flex items-center gap-3">
           {option.color && <div className="w-3 h-3 rounded-full" style={{ backgroundColor: option.color }}></div>}
@@ -350,6 +489,14 @@ export function ContextMenuProvider({ children }: ContextMenuProviderProps) {
     setActiveSubmenu(null);
   }, []);
 
+  const focusMenuItem = useCallback((path: number[]) => {
+    if (!focusMenuItemByPath(path)) {
+      afterMenuRender(() => {
+        focusMenuItemByPath(path);
+      });
+    }
+  }, []);
+
   const hideContextMenu = useCallback(() => {
     setMenuState((prev) => ({ ...prev, isVisible: false }));
     setActiveSubmenu(null);
@@ -411,10 +558,26 @@ export function ContextMenuProvider({ children }: ContextMenuProviderProps) {
     };
   }, [menuState.isVisible, hideContextMenu]);
 
+  useEffect(() => {
+    if (!menuState.isVisible) {
+      return;
+    }
+
+    afterMenuRender(() => {
+      const firstPath = firstEnabledOptionPath(menuState.options, []);
+      if (firstPath) {
+        focusMenuItem(firstPath);
+      } else {
+        focusFirstMenuItem(menuRef.current);
+      }
+    });
+  }, [focusMenuItem, menuId, menuState.isVisible, menuState.options, menuRef]);
+
   const value: ContextMenuValue = {
     activeSubmenu,
     cancelCloseSubmenu,
     closeSubmenu,
+    focusMenuItem,
     hideContextMenu,
     menuId,
     menuRef,
