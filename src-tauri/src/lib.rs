@@ -1781,6 +1781,68 @@ fn handle_file_open(app_handle: &tauri::AppHandle, path: PathBuf) {
     }
 }
 
+#[cfg(not(target_os = "android"))]
+fn restore_window_state(window: &tauri::WebviewWindow, state: &WindowState) {
+    const MIN_WINDOW_WIDTH: u32 = 800;
+    const MIN_WINDOW_HEIGHT: u32 = 600;
+    const DEFAULT_WINDOW_WIDTH: u32 = 1280;
+    const DEFAULT_WINDOW_HEIGHT: u32 = 720;
+    let Some(monitor) = window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| window.primary_monitor().ok().flatten())
+        .or_else(|| {
+            window
+                .available_monitors()
+                .ok()
+                .and_then(|m| m.into_iter().next())
+        })
+    else {
+        let _ = window.center();
+        return;
+    };
+
+    let work_area = monitor.work_area();
+    let work_area_size = work_area.size;
+    let work_area_position = work_area.position;
+    let max_width = work_area_size.width.max(1);
+    let max_height = work_area_size.height.max(1);
+
+    let requested_width = if state.width >= MIN_WINDOW_WIDTH {
+        state.width
+    } else {
+        DEFAULT_WINDOW_WIDTH
+    };
+    let requested_height = if state.height >= MIN_WINDOW_HEIGHT {
+        state.height
+    } else {
+        DEFAULT_WINDOW_HEIGHT
+    };
+
+    let width = requested_width
+        .min(max_width)
+        .max(MIN_WINDOW_WIDTH.min(max_width));
+    let height = requested_height
+        .min(max_height)
+        .max(MIN_WINDOW_HEIGHT.min(max_height));
+    let max_x = work_area_position.x + work_area_size.width as i32 - width as i32;
+    let max_y = work_area_position.y + work_area_size.height as i32 - height as i32;
+    let x = state
+        .x
+        .clamp(work_area_position.x, max_x.max(work_area_position.x));
+    let y = state
+        .y
+        .clamp(work_area_position.y, max_y.max(work_area_position.y));
+
+    let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
+        width, height,
+    )));
+    let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
+        x, y,
+    )));
+}
+
 #[tauri::command]
 fn frontend_ready(
     app_handle: tauri::AppHandle,
@@ -2056,21 +2118,7 @@ pub fn run() {
                     let path = config_dir.join("window_state.json");
                     if let Ok(contents) = std::fs::read_to_string(&path) {
                         if let Ok(state) = serde_json::from_str::<WindowState>(&contents) {
-                            if state.width >= 800  && state.height >= 600 {
-                                let _ = window.set_size(tauri::Size::Physical(
-                                    tauri::PhysicalSize::new(state.width, state.height),
-                                ));
-                                let _ = window.set_position(tauri::Position::Physical(
-                                    tauri::PhysicalPosition::new(state.x, state.y),
-                                ));
-                            } else {
-                                log::warn!(
-                                    "Saved window state had unreasonable dimensions ({}x{}), centering instead.",
-                                    state.width,
-                                    state.height
-                                );
-                                let _ = window.center();
-                            }
+                            restore_window_state(&window, &state);
                         } else {
                             let _ = window.center();
                         }
