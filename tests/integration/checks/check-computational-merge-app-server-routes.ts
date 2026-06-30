@@ -14,7 +14,10 @@ const runtimeCheckCommands = new Map<string, [string, ...string[]]>([
     'check:panorama-app-server-runtime',
     ['bun', 'tests/integration/checks/panorama/check-panorama-app-server-runtime.ts'],
   ],
-  ['check:sr-app-server-runtime', ['bun', 'tests/integration/checks/check-super-resolution-app-server-runtime.ts']],
+  [
+    'check:sr-app-server-runtime',
+    ['bun', 'tests/integration/checks/super-resolution/check-super-resolution-app-server-runtime.ts'],
+  ],
 ]);
 
 for (const route of COMPUTATIONAL_MERGE_APP_SERVER_ROUTES) {

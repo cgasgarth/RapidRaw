@@ -6,17 +6,17 @@ import {
   ApprovalClass,
   computationalMergeCommandEnvelopeV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   applySuperResolutionRuntimePlanV1,
   buildSuperResolutionRuntimeDryRunV1,
-} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionRuntimePlan.ts';
+} from '../../../../packages/rawengine-schema/src/super-resolution/superResolutionRuntimePlan.ts';
 import {
   buildSuperResolutionArtifactSidecarRecordV1,
   markSuperResolutionArtifactHumanReviewPassed,
   markSuperResolutionArtifactStaleState,
-} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionSidecarProvenance.ts';
-import { buildSuperResolutionOutputReviewFromArtifact } from '../../../src/utils/superResolutionOutputReview.ts';
+} from '../../../../packages/rawengine-schema/src/super-resolution/superResolutionSidecarProvenance.ts';
+import { buildSuperResolutionOutputReviewFromArtifact } from '../../../../src/utils/superResolutionOutputReview.ts';
 
 const SCALE = 2;
 const LOW_WIDTH = 16;

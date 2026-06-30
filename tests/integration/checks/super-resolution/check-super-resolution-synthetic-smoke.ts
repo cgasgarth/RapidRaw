@@ -9,7 +9,7 @@ import {
   applyPixelShiftSuperResolutionV1,
   calculateMeanAbsoluteErrorV1,
   createNearestNeighborBaselineV1,
-} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionPixelShift.ts';
+} from '../../../../packages/rawengine-schema/src/super-resolution/superResolutionPixelShift.ts';
 
 const SCALE = 2;
 const LOW_WIDTH = 48;
