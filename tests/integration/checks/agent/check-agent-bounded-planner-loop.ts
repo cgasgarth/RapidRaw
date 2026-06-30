@@ -6,7 +6,7 @@ import { useLibraryStore } from '../../../../src/store/useLibraryStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
 import { runAgentBoundedEditPlannerLoop } from '../../../../src/utils/agent/planning/agentBoundedEditPlannerLoop.ts';
 
-const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3159.ARW';
+const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/_DSC7513.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 10 : 2));
 
 useLibraryStore.getState().setLibrary({
@@ -51,9 +51,9 @@ useEditorStore.getState().setEditor({
     height: 4000,
     isRaw: true,
     isReady: true,
-    originalUrl: 'blob:rawengine-original-3159',
+    originalUrl: 'blob:rawengine-original-7513',
     path: selectedPath,
-    thumbnailUrl: 'blob:rawengine-thumb-3159',
+    thumbnailUrl: 'blob:rawengine-thumb-7513',
     width: 6000,
   },
 });
@@ -108,7 +108,7 @@ if (
 }
 if (
   result.inspected.initialPreview.mediaType !== 'image/jpeg' ||
-  result.inspected.initialPreview.previewRef === 'blob:rawengine-original-3159'
+  result.inspected.initialPreview.previewRef === 'blob:rawengine-original-7513'
 ) {
   throw new Error('Agent planner loop did not attach the safe initial preview context.');
 }
@@ -134,6 +134,27 @@ if (
 }
 if (!result.transcript[0]?.detail.includes(result.initialPromptContext.preview.artifactId)) {
   throw new Error('Agent planner loop transcript did not prove the initial preview was part of inspection.');
+}
+
+const issue4375Result = await runAgentBoundedEditPlannerLoop({
+  maxSteps: 5,
+  operationId: 'planner_loop_7513_issue_4375',
+  prompt:
+    'Tone this landscape for a polished travel print: recover sky highlights, deepen foreground contrast, keep mountains natural, and reduce the warm cast.',
+  sessionId: 'agent-planner-loop-7513-issue-4375',
+});
+const issue4375SelectiveColorStep = issue4375Result.plannedSteps.find((step) => step.kind === 'selective_color');
+if (
+  issue4375SelectiveColorStep?.kind !== 'selective_color' ||
+  issue4375SelectiveColorStep.payload.rangeKey !== 'blues'
+) {
+  throw new Error('Agent planner loop routed issue #4375 prompt to warm/orange instead of landscape/blue.');
+}
+if (
+  issue4375Result.stopState !== 'approval_ready' ||
+  issue4375Result.dryRunBeforeHash === issue4375Result.dryRunAfterHash
+) {
+  throw new Error('Agent planner loop issue #4375 dry-run did not produce an approval-ready changed preview.');
 }
 
 console.log('agent bounded planner loop ok (initial-preview+dry-run)');
