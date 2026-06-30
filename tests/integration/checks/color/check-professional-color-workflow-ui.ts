@@ -112,6 +112,7 @@ const { default: ColorPanel } = await import('../../../../src/components/adjustm
 
 await validateLocaleContract();
 const rendered = await renderColorPanel();
+await validateFoundationalColorControlOrder(rendered.container);
 await validateRenderedWorkspaceCoverage(rendered.container);
 await validateGamutWarningCoverage(rendered.container);
 await validateProfileToneAndReadiness(rendered.container);
@@ -255,6 +256,23 @@ async function validateRenderedWorkspaceCoverage(container: Element) {
   assertVisibleText(container, 'Linear RAW', 'working-space label was not rendered.');
   assertVisibleText(container, 'Vectorscope', 'scope label was not rendered.');
   await waitForText(container, 'sRGB gamut · 12.5%', 'gamut warning chip copy was not rendered.');
+}
+
+async function validateFoundationalColorControlOrder(container: Element) {
+  const quickColor = getByTestId(container, 'quick-color-controls');
+  const profileTone = getByTestId(container, 'profile-tone-controls');
+  const profileToneReceipt = getByTestId(container, 'profile-tone-visible-receipt');
+  const recipes = getByTestId(container, 'professional-color-recipes');
+  const proofing = getByTestId(container, 'professional-color-workspace-panel');
+  const levels = getByTestId(container, 'color-levels-controls');
+
+  assertAppearsBefore(quickColor, profileTone, 'Quick Color should render before Profile & Tone.');
+  assertAppearsBefore(profileTone, recipes, 'Profile & Tone should render before workflow recipes.');
+  assertAppearsBefore(profileTone, proofing, 'Profile & Tone should render before proof diagnostics.');
+  assertAppearsBefore(profileToneReceipt, levels, 'Levels should be downstream from the Profile & Tone receipt.');
+  assertVisibleText(quickColor, 'White Balance', 'Quick Color did not render white balance first.');
+  assertVisibleText(quickColor, 'Presence', 'Quick Color did not render presence controls.');
+  assertVisibleText(levels, 'Levels', 'Advanced levels controls were not rendered.');
 }
 
 async function validateGamutWarningCoverage(container: Element) {
@@ -537,6 +555,12 @@ function assertNumericDataGreaterThan(element: HTMLElement, key: string, minimum
   const actual = Number(element.dataset[key]);
   if (!(Number.isFinite(actual) && actual > minimum)) {
     failures.push(`${message} Expected > ${minimum}, got ${element.dataset[key] ?? '<missing>'}.`);
+  }
+}
+
+function assertAppearsBefore(first: Element, second: Element, message: string) {
+  if ((first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING) === 0) {
+    failures.push(message);
   }
 }
 
