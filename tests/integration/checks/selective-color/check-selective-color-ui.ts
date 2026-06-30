@@ -28,7 +28,7 @@ if (missingKeys.length > 0) {
   process.exit(1);
 }
 
-const source = readFileSync('src/components/adjustments/Color.tsx', 'utf8');
+const source = readFileSync('src/components/adjustments/color/ColorMixerControls.tsx', 'utf8');
 for (const marker of [
   'data-testid="selective-color-range-summary"',
   'data-testid="selective-color-adjusted-hue"',

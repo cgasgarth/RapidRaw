@@ -46,7 +46,7 @@ if (Math.abs(shiftedPreview.red - shiftedYellowWeight) > 0.0001) {
   throw new Error('Mask preview pixel did not use custom selective color range controls.');
 }
 
-const colorPanelSource = readFileSync('src/components/adjustments/Color.tsx', 'utf8');
+const colorPanelSource = readFileSync('src/components/adjustments/color/ColorMixerControls.tsx', 'utf8');
 for (const marker of [
   'data-testid="selective-color-range-shape-controls"',
   "handleSelectiveColorRangeControlChange('centerHueDegrees'",
