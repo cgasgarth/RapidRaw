@@ -25,6 +25,13 @@ export interface NegativeLabQcContactSheetArtifact {
     rows: number;
   };
   frameIds: string[];
+  frameStates: Array<{
+    contactSheetSlot: number;
+    frameId: string;
+    included: boolean;
+    proofState: 'included' | 'excluded' | 'rejected';
+    qcDecision: 'approved' | 'pending' | 'rejected';
+  }>;
   generatedAt: string;
   overlays: Array<{
     frameId: string;
@@ -124,6 +131,18 @@ const warningForBlockedRow = (frameId: string, evidence: string): NegativeLabQcC
   severity: 'warning',
 });
 
+const buildFrameProofState = ({
+  included,
+  qcDecision,
+}: {
+  included: boolean;
+  qcDecision: 'approved' | 'pending' | 'rejected';
+}): 'included' | 'excluded' | 'rejected' => {
+  if (qcDecision === 'rejected') return 'rejected';
+  if (!included) return 'excluded';
+  return 'included';
+};
+
 export const buildNegativeLabQcContactSheetArtifact = ({
   generatedAt = '2026-06-21T00:00:00.000Z',
   outputIntent = 'proof_preview',
@@ -164,6 +183,17 @@ export const buildNegativeLabQcContactSheetArtifact = ({
       rows,
     },
     frameIds: report.frames.map((frame) => frame.frameId),
+    frameStates: report.frames.map((frame) => {
+      const qcDecision = qcDecisionByFrameId[frame.frameId] ?? 'pending';
+
+      return {
+        contactSheetSlot: frame.contactSheetSlot,
+        frameId: frame.frameId,
+        included: frame.included,
+        proofState: buildFrameProofState({ included: frame.included, qcDecision }),
+        qcDecision,
+      };
+    }),
     generatedAt,
     overlays: report.frames.flatMap((frame) => {
       const overlays = [];

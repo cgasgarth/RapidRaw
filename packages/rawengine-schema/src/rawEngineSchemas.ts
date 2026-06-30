@@ -7735,6 +7735,19 @@ export const negativeLabQcProofArtifactV1Schema = z
       })
       .strict(),
     frameIds: z.array(z.string().trim().min(1)).min(1),
+    frameStates: z
+      .array(
+        z
+          .object({
+            contactSheetSlot: z.number().int().positive(),
+            frameId: z.string().trim().min(1),
+            included: z.boolean(),
+            proofState: z.enum(['included', 'excluded', 'rejected']),
+            qcDecision: z.enum(['approved', 'pending', 'rejected']),
+          })
+          .strict(),
+      )
+      .min(1),
     generatedAt: z.string().trim().min(1),
     overlays: z.array(negativeLabQcOverlayV1Schema),
     positiveVariants: z.array(negativeLabQcPositiveVariantV1Schema).min(1),
@@ -7752,6 +7765,50 @@ export const negativeLabQcProofArtifactV1Schema = z
         code: 'custom',
         message: 'QC proof frameIds must be unique.',
         path: ['frameIds'],
+      });
+    }
+
+    const frameStateFrameIds = new Set<string>();
+    for (const [index, frameState] of proof.frameStates.entries()) {
+      if (!frameIds.has(frameState.frameId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'QC frame state frameId must be included in proof frameIds.',
+          path: ['frameStates', index, 'frameId'],
+        });
+      }
+
+      if (frameStateFrameIds.has(frameState.frameId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'QC frame states must be unique per frame.',
+          path: ['frameStates', index, 'frameId'],
+        });
+      }
+      frameStateFrameIds.add(frameState.frameId);
+
+      if (!frameState.included && frameState.qcDecision !== 'rejected' && frameState.proofState !== 'excluded') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Excluded QC frame states must use the excluded proof state.',
+          path: ['frameStates', index, 'proofState'],
+        });
+      }
+
+      if (frameState.qcDecision === 'rejected' && frameState.proofState !== 'rejected') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Rejected QC decisions must use the rejected proof state.',
+          path: ['frameStates', index, 'proofState'],
+        });
+      }
+    }
+
+    if (frameStateFrameIds.size !== frameIds.size) {
+      context.addIssue({
+        code: 'custom',
+        message: 'QC frame states must cover every proof frameId.',
+        path: ['frameStates'],
       });
     }
 
