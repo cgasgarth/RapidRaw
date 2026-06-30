@@ -70,12 +70,12 @@ import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { THEMES, type ThemeProps } from '../../utils/themes';
 import ConfirmModal from '../modals/navigation/ConfirmModal';
 import type { AppSettings, Theme } from '../ui/AppProperties';
-import Button from '../ui/Button';
-import Dropdown, { type OptionItem } from '../ui/Dropdown';
-import Input from '../ui/Input';
-import Slider from '../ui/Slider';
-import Switch from '../ui/Switch';
-import UiText from '../ui/Text';
+import Button from '../ui/primitives/Button';
+import Dropdown, { type OptionItem } from '../ui/primitives/Dropdown';
+import Input from '../ui/primitives/Input';
+import Slider from '../ui/primitives/Slider';
+import Switch from '../ui/primitives/Switch';
+import UiText from '../ui/primitives/Text';
 
 interface ConfirmModalState {
   confirmText: string;

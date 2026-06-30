@@ -18,9 +18,9 @@ import {
 import { buildFocusStackOutputReviewWorkflow } from '../../../utils/focusStackOutputReview';
 import type { FocusStackSourcePreflightMetadata } from '../../../utils/focusStackSourcePreflight';
 import { buildFocusStackSourcePreflight } from '../../../utils/focusStackSourcePreflight';
-import Button from '../../ui/Button';
-import Dropdown, { type OptionItem } from '../../ui/Dropdown';
-import UiText from '../../ui/Text';
+import Button from '../../ui/primitives/Button';
+import Dropdown, { type OptionItem } from '../../ui/primitives/Dropdown';
+import UiText from '../../ui/primitives/Text';
 import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
 import {
   ComputationalSetupModalShell,

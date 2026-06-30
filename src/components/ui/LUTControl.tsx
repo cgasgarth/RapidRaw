@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { useOsPlatform } from '../../hooks/ui/useOsPlatform';
 import { Invokes } from '../../tauri/commands';
-import Slider from './Slider';
+import Slider from './primitives/Slider';
 
 interface LUTControlProps {
   lutName: string | null;

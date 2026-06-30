@@ -30,7 +30,7 @@ import { COLOR_LABELS, type Color } from '../../../utils/adjustments';
 import type { LibraryAutoStackDisplay, LibraryAutoStackItem } from '../../../utils/libraryAutoStacks';
 import { buildRawQualityBadges, formatRawQualityBadgeTooltip } from '../../../utils/rawQualityBadges';
 import { ExifOverlay, type ImageFile, ThumbnailAspectRatio } from '../../ui/AppProperties';
-import UiText from '../../ui/Text';
+import UiText from '../../ui/primitives/Text';
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
 import type { ColumnWidths } from '../MainLibrary';
 

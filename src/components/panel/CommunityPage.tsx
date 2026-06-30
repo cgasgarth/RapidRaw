@@ -8,10 +8,10 @@ import { Invokes } from '../../tauri/commands';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
 import type { ImageFile, SupportedTypes } from '../ui/AppProperties';
-import Button from '../ui/Button';
-import Dropdown from '../ui/Dropdown';
-import Input from '../ui/Input';
-import UiText from '../ui/Text';
+import Button from '../ui/primitives/Button';
+import Dropdown from '../ui/primitives/Dropdown';
+import Input from '../ui/primitives/Input';
+import UiText from '../ui/primitives/Text';
 
 const DEFAULT_PREVIEW_IMAGE_URL = 'https://raw.githubusercontent.com/CyberTimon/RapidRAW-Presets/main/sample-image.jpg';
 

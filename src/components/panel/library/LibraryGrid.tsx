@@ -26,7 +26,7 @@ import {
   type ThumbnailAspectRatio,
   ThumbnailSize,
 } from '../../ui/AppProperties';
-import UiText from '../../ui/Text';
+import UiText from '../../ui/primitives/Text';
 
 import type { ColumnWidths } from '../MainLibrary';
 import { type LibraryRow, type LibraryRowProps, Row } from './LibraryItems';

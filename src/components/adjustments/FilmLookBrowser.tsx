@@ -13,7 +13,7 @@ import {
   sortFilmLookBrowserItems,
 } from '../../utils/filmLookBrowser';
 import { getFilmLookBrowserGroups } from '../../utils/filmLookRegistry';
-import UiText from '../ui/Text';
+import UiText from '../ui/primitives/Text';
 
 interface FilmLookBrowserProps {
   activeLookId: string | null;

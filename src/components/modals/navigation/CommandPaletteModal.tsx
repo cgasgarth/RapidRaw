@@ -30,9 +30,9 @@ import {
   getCommandPaletteSelectedImages,
   getCommandPaletteSelectedPaths,
 } from '../../../utils/commandPaletteModel';
-import Button from '../../ui/Button';
-import Input from '../../ui/Input';
-import UiText from '../../ui/Text';
+import Button from '../../ui/primitives/Button';
+import Input from '../../ui/primitives/Input';
+import UiText from '../../ui/primitives/Text';
 
 interface CommandPaletteModalProps {
   isOpen: boolean;

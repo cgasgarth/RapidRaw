@@ -9,8 +9,8 @@ import { TextColors, TextVariants, TextWeights } from '../../../types/typography
 import type { Adjustments, AiPatch, MaskContainer } from '../../../utils/adjustments';
 import { parseVirtualImagePath } from '../../../utils/virtualImagePath';
 import type { SelectedImage } from '../../ui/AppProperties';
-import Dropdown from '../../ui/Dropdown';
-import UiText from '../../ui/Text';
+import Dropdown from '../../ui/primitives/Dropdown';
+import UiText from '../../ui/primitives/Text';
 import { IconAperture, IconCalendar, IconClock, IconFocalLength, IconIso, IconShutter } from './ExifIcons';
 
 interface EditorToolbarProps {

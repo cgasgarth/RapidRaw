@@ -33,7 +33,7 @@ import {
 import { applySkinToneUniformity, type SkinToneUniformityInput } from '../../utils/skinToneUniformity';
 import type { AppSettings } from '../ui/AppProperties';
 import ColorWheel from '../ui/ColorWheel';
-import UiText from '../ui/Text';
+import UiText from '../ui/primitives/Text';
 import AdjustmentSlider from './AdjustmentSlider';
 
 interface ColorProps {

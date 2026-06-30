@@ -9,7 +9,7 @@ import type {
   ObjectPromptCanvasState,
   ObjectPromptMode,
 } from '../../../../utils/objectMaskPromptCanvas';
-import UiText from '../../../ui/Text';
+import UiText from '../../../ui/primitives/Text';
 
 interface ObjectPromptControlsProps {
   commandInput: ObjectMaskProposalCommandInput | null;

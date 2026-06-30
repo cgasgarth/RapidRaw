@@ -68,8 +68,6 @@ import { buildRawWarningChips } from '../../../../utils/rawWarningReceipts';
 import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
 import { debounce } from '../../../../utils/timing';
 import type { AppSettings, SelectedImage } from '../../../ui/AppProperties';
-import Button from '../../../ui/Button';
-import Dropdown from '../../../ui/Dropdown';
 import {
   ExportColorProfile,
   type ExportPreset,
@@ -86,9 +84,11 @@ import {
 } from '../../../ui/ExportImportProperties';
 import ExportPresetsList from '../../../ui/ExportPresetsList';
 import ImagePicker from '../../../ui/ImagePicker';
-import Slider from '../../../ui/Slider';
-import Switch from '../../../ui/Switch';
-import UiText from '../../../ui/Text';
+import Button from '../../../ui/primitives/Button';
+import Dropdown from '../../../ui/primitives/Dropdown';
+import Slider from '../../../ui/primitives/Slider';
+import Switch from '../../../ui/primitives/Switch';
+import UiText from '../../../ui/primitives/Text';
 
 const QUALITY_FILE_FORMATS: ReadonlySet<FileFormats> = new Set([FileFormats.Jpeg, FileFormats.Webp, FileFormats.Jxl]);
 const SOFT_PROOF_PROFILE_COMPARE_SIDE_IDS = ['srgb', 'displayP3'] as const;

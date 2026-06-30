@@ -39,7 +39,7 @@ import {
 } from '../../../../utils/metadataPanelContracts';
 import { buildRawWarningChips } from '../../../../utils/rawWarningReceipts';
 import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
-import UiText from '../../../ui/Text';
+import UiText from '../../../ui/primitives/Text';
 import { IconAperture, IconFocalLength, IconIso, IconLens, IconShutter } from '../../editor/ExifIcons';
 
 interface CameraSetting {

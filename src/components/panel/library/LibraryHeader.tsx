@@ -31,8 +31,8 @@ import {
   type ThumbnailAspectRatio,
   type ThumbnailSize,
 } from '../../ui/AppProperties';
-import Button from '../../ui/Button';
-import UiText from '../../ui/Text';
+import Button from '../../ui/primitives/Button';
+import UiText from '../../ui/primitives/Text';
 
 interface DropdownMenuProps {
   buttonContent: React.ReactNode;

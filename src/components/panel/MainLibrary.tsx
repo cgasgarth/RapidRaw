@@ -38,9 +38,9 @@ import {
   ThumbnailAspectRatio,
   ThumbnailSize,
 } from '../ui/AppProperties';
-import Button from '../ui/Button';
 import { type ImportState, Status } from '../ui/ExportImportProperties';
-import UiText from '../ui/Text';
+import Button from '../ui/primitives/Button';
+import UiText from '../ui/primitives/Text';
 import LibraryGrid from './library/LibraryGrid';
 import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
 import LibraryHeaderStatusStrip from './library/LibraryHeaderStatusStrip';

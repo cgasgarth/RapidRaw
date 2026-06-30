@@ -8,7 +8,7 @@ import {
   TextVariants,
   type TextWeight,
   type VariantConfig,
-} from '../../types/typography';
+} from '../../../types/typography';
 
 export interface TextProps extends HTMLAttributes<HTMLElement> {
   variant?: VariantConfig;

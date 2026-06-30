@@ -1,5 +1,5 @@
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import UiText from '../../ui/Text';
+import UiText from '../../ui/primitives/Text';
 
 import type { LibraryHeaderStatusItem } from './libraryHeaderStatus';
 

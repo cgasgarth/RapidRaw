@@ -158,9 +158,9 @@ import {
 } from '../../../utils/negativeLabStockRegistry';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import { throttle } from '../../../utils/timing';
-import Button from '../../ui/Button';
-import Slider from '../../ui/Slider';
-import UiText from '../../ui/Text';
+import Button from '../../ui/primitives/Button';
+import Slider from '../../ui/primitives/Slider';
+import UiText from '../../ui/primitives/Text';
 import {
   type DensitometerPatchLabelKey,
   type NegativeLabPatchRole,

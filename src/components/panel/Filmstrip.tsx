@@ -10,7 +10,7 @@ import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { COLOR_LABELS, type Color } from '../../utils/adjustments';
 import { buildRawQualityBadges, formatRawQualityBadgeTooltip } from '../../utils/rawQualityBadges';
 import { type ImageFile, type SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
-import UiText from '../ui/Text';
+import UiText from '../ui/primitives/Text';
 
 const HORIZONTAL_PADDING = 4;
 const ITEM_GAP = 8;

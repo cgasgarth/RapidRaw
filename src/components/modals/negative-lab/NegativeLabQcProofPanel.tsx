@@ -6,7 +6,7 @@ import type {
   NegativeLabQcContactSheetArtifact,
   NegativeLabQcOverlayVisibility,
 } from '../../../utils/negativeLabQcContactSheetArtifact';
-import UiText from '../../ui/Text';
+import UiText from '../../ui/primitives/Text';
 import type { NegativeLabQcDecision } from './NegativeLabRollHealthModel';
 
 type NegativeLabQcOverlayKey = keyof NegativeLabQcOverlayVisibility;

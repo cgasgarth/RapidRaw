@@ -25,11 +25,11 @@ import { TextColors, TextVariants } from '../../../types/typography';
 import type { Adjustments } from '../../../utils/adjustments';
 import { throttle } from '../../../utils/timing';
 import type { SelectedImage } from '../../ui/AppProperties';
-import Button from '../../ui/Button';
-import Dropdown from '../../ui/Dropdown';
-import Slider from '../../ui/Slider';
-import Switch from '../../ui/Switch';
-import UiText from '../../ui/Text';
+import Button from '../../ui/primitives/Button';
+import Dropdown from '../../ui/primitives/Dropdown';
+import Slider from '../../ui/primitives/Slider';
+import Switch from '../../ui/primitives/Switch';
+import UiText from '../../ui/primitives/Text';
 
 interface GeometryParams {
   distortion: number;

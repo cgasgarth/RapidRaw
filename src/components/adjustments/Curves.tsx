@@ -14,7 +14,7 @@ import { useContextMenu } from '../../context/ContextMenuContext';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { ActiveChannel, type Adjustments, type Coord, type ParametricCurveSettings } from '../../utils/adjustments';
 import { OPTION_SEPARATOR, Theme } from '../ui/AppProperties';
-import UiText from '../ui/Text';
+import UiText from '../ui/primitives/Text';
 import AdjustmentSlider from './AdjustmentSlider';
 
 let curveClipboard: Array<Coord> | null = null;

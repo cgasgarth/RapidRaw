@@ -8,8 +8,8 @@ import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import { TextVariants } from '../../../types/typography';
 import { ADJUSTMENT_GROUPS } from '../../../utils/adjustments';
 import type { Preset } from '../../ui/AppProperties';
-import Switch from '../../ui/Switch';
-import UiText from '../../ui/Text';
+import Switch from '../../ui/primitives/Switch';
+import UiText from '../../ui/primitives/Text';
 
 interface ConfigurePresetModalProps {
   isOpen: boolean;

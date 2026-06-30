@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextVariants, TextWeights } from '../../types/typography';
-import UiText from './Text';
+import UiText from './primitives/Text';
 
 interface CollapsibleSectionProps {
   canToggleVisibility?: boolean;

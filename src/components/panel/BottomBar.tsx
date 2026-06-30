@@ -8,7 +8,7 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { COLOR_LABELS } from '../../utils/adjustments';
 import { GLOBAL_KEYS, type ImageFile, type SelectedImage, type ThumbnailAspectRatio } from '../ui/AppProperties';
-import UiText from '../ui/Text';
+import UiText from '../ui/primitives/Text';
 import Filmstrip from './Filmstrip';
 
 interface BottomBarProps {

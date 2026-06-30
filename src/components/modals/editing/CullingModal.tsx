@@ -8,11 +8,11 @@ import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants } from '../../../types/typography';
 import type { CullingSettings, CullingSuggestions, ImageAnalysisResult, Progress } from '../../ui/AppProperties';
-import Button from '../../ui/Button';
-import Dropdown from '../../ui/Dropdown';
-import Slider from '../../ui/Slider';
-import Switch from '../../ui/Switch';
-import UiText from '../../ui/Text';
+import Button from '../../ui/primitives/Button';
+import Dropdown from '../../ui/primitives/Dropdown';
+import Slider from '../../ui/primitives/Slider';
+import Switch from '../../ui/primitives/Switch';
+import UiText from '../../ui/primitives/Text';
 
 interface CullingModalProps {
   isOpen: boolean;

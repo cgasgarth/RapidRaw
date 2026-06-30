@@ -14,7 +14,7 @@ import {
 } from '../../utils/filmLookBrowser';
 import type { AppSettings, Preset } from '../ui/AppProperties';
 import LUTControl from '../ui/LUTControl';
-import UiText from '../ui/Text';
+import UiText from '../ui/primitives/Text';
 import AdjustmentSlider from './AdjustmentSlider';
 
 const FilmLookBrowser = lazy(() =>

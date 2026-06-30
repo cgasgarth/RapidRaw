@@ -40,9 +40,9 @@ import DetailsPanel from '../../../adjustments/Details';
 import EffectsPanel from '../../../adjustments/Effects';
 import { OPTION_SEPARATOR, type Option, Orientation } from '../../../ui/AppProperties';
 import CollapsibleSection from '../../../ui/CollapsibleSection';
-import Dropdown, { type OptionItem } from '../../../ui/Dropdown';
+import Dropdown, { type OptionItem } from '../../../ui/primitives/Dropdown';
+import UiText from '../../../ui/primitives/Text';
 import Resizer from '../../../ui/Resizer';
-import UiText from '../../../ui/Text';
 import Waveform from '../../editor/Waveform';
 
 const ADJUSTMENT_SECTION_NAMES = ['basic', 'curves', 'color', 'details', 'effects'] as const;

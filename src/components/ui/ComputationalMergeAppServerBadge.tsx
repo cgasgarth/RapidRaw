@@ -2,7 +2,7 @@ import { CheckCircle2 } from 'lucide-react';
 import type { ComputationalMergeAppServerRouteFamily } from '../../schemas/computationalMergeAppServerSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
-import UiText from './Text';
+import UiText from './primitives/Text';
 
 interface ComputationalMergeAppServerBadgeProps {
   family: ComputationalMergeAppServerRouteFamily;
