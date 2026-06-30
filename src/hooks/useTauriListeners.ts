@@ -22,7 +22,7 @@ import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useUIStore } from '../store/useUIStore';
-import { getComputationalMergeAppServerRoutePairSummary } from '../utils/computationalMergeAppServerRoutePairs';
+import { buildHdrApplyCommandState, buildPanoramaApplyCommandState } from '../utils/computationalMergeModalState';
 import {
   AI_MODEL_DOWNLOAD_FINISH_EVENT,
   AI_MODEL_DOWNLOAD_START_EVENT,
@@ -396,14 +396,10 @@ export function useTauriListeners({
               error: null,
               finalImageBase64: payload.base64,
               isProcessing: false,
-              lastApplyCommand: {
-                acceptedDryRunPlanHash: `sha256:panorama-preview-${payload.base64.length}`,
-                acceptedDryRunPlanId: `panorama_plan_${state.panoramaModalState.stitchingSourcePaths.length}`,
-                commandType: 'computationalMerge.createPanorama',
-                dryRun: false,
+              lastApplyCommand: buildPanoramaApplyCommandState({
+                base64Length: payload.base64.length,
                 sourceCount: state.panoramaModalState.stitchingSourcePaths.length,
-                toolName: getComputationalMergeAppServerRoutePairSummary('panorama').applyToolName,
-              },
+              }),
               progressMessage: null,
               renderedReview: payload.review,
             },
@@ -446,14 +442,10 @@ export function useTauriListeners({
               error: null,
               finalImageBase64: payload.base64,
               isProcessing: false,
-              lastApplyCommand: {
-                acceptedDryRunPlanHash: `sha256:hdr-preview-${payload.base64.length}`,
-                acceptedDryRunPlanId: `hdr_plan_${state.hdrModalState.stitchingSourcePaths.length}`,
-                commandType: 'computationalMerge.createHdr',
-                dryRun: false,
-                sources: state.hdrModalState.stitchingSourcePaths.length,
-                toolName: getComputationalMergeAppServerRoutePairSummary('hdr').applyToolName,
-              },
+              lastApplyCommand: buildHdrApplyCommandState({
+                base64Length: payload.base64.length,
+                sourceCount: state.hdrModalState.stitchingSourcePaths.length,
+              }),
               progressMessage: 'Hdr Ready',
             },
           }));

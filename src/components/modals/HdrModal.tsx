@@ -350,12 +350,13 @@ export default function HdrModal({
 
     if (finalImageBase64 && !isProcessing) {
       return (
-        <MergeResultPreview
-          alt={t('modals.hdr.mergedAlt')}
-          imageBase64={finalImageBase64}
-          savedPath={savedPath}
-          savedSuccessLabel={t('modals.hdr.savedSuccess')}
-        >
+        <div>
+          <MergeResultPreview
+            alt={t('modals.hdr.mergedAlt')}
+            imageBase64={finalImageBase64}
+            savedPath={savedPath}
+            savedSuccessLabel={t('modals.hdr.savedSuccess')}
+          />
           {lastApplyCommand && (
             <section
               className="mx-auto mt-4 grid max-w-2xl grid-cols-3 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-left"
@@ -502,7 +503,7 @@ export default function HdrModal({
               />
             </div>
           ) : null}
-        </MergeResultPreview>
+        </div>
       );
     }
 
