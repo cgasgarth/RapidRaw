@@ -224,6 +224,11 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     }
   }, [isFullScreen, selectedImage, targetZoom, setUI]);
 
+  const handleOpenNegativeLab = useCallback(() => {
+    if (!selectedImage) return;
+    setUI({ negativeModalState: { isOpen: true, targetPaths: [selectedImage.path] } });
+  }, [selectedImage, setUI]);
+
   const handleDisplaySizeChange = useCallback(
     (size: DisplaySizeUpdate) => {
       setEditor({ displaySize: { width: size.width, height: size.height } });
@@ -1500,6 +1505,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           isFullScreen={isFullScreen}
           isLoading={isLoading}
           onBackToLibrary={onBackToLibrary}
+          onOpenNegativeLab={handleOpenNegativeLab}
           onRedo={redo}
           onToggleFullScreen={handleToggleFullScreen}
           onToggleShowOriginal={toggleShowOriginal}

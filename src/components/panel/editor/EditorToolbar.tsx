@@ -1,6 +1,6 @@
 import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Eye, EyeOff, Loader2, Maximize, Minimize2, Palette, Redo, Undo } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, Film, Loader2, Maximize, Minimize2, Palette, Redo, Undo } from 'lucide-react';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEditorStore } from '../../../store/useEditorStore';
@@ -22,6 +22,7 @@ interface EditorToolbarProps {
   isFullScreen?: boolean;
   isLoading: boolean;
   onBackToLibrary: () => void;
+  onOpenNegativeLab: () => void;
   onRedo: () => void;
   onToggleFullScreen: () => void;
   onToggleShowOriginal: () => void;
@@ -44,6 +45,7 @@ const EditorToolbar = memo(
     isFullScreen: isFullScreenProp,
     isLoading,
     onBackToLibrary,
+    onOpenNegativeLab,
     onRedo,
     onToggleFullScreen,
     onToggleShowOriginal,
@@ -773,6 +775,18 @@ const EditorToolbar = memo(
               )}
             </AnimatePresence>
           </div>
+
+          <button
+            aria-label={t('contextMenus.editor.convertNegative')}
+            className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors shrink-0"
+            data-testid="editor-toolbar-negative-lab"
+            data-tooltip={t('contextMenus.editor.convertNegative')}
+            onClick={onOpenNegativeLab}
+            onKeyDown={handleButtonKeyDown}
+            type="button"
+          >
+            <Film size={20} />
+          </button>
 
           <div
             className="hidden xl:flex items-center gap-2"
