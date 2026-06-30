@@ -53,7 +53,7 @@ for (const marker of [
   if (!settingsSource.includes(marker)) failures.push(`SettingsPanel missing ${marker}`);
 }
 
-const imageLoaderSource = read('src-tauri/src/image_loader.rs');
+const imageLoaderSource = read('src-tauri/src/io/image_loader.rs');
 for (const marker of [
   'settings.raw_preprocessing_color_nr.unwrap_or(0.5)',
   'settings.raw_preprocessing_sharpening.unwrap_or(0.35)',
@@ -65,7 +65,7 @@ for (const marker of [
   if (!imageLoaderSource.includes(marker)) failures.push(`image_loader missing ${marker}`);
 }
 
-const imageProcessingSource = read('src-tauri/src/image_processing.rs');
+const imageProcessingSource = read('src-tauri/src/render/image_processing.rs');
 for (const marker of [
   'fn capture_pre_sharpening_enhances_synthetic_edge()',
   'fn disabled_capture_pre_sharpening_preserves_synthetic_edge()',

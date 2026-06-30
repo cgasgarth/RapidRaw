@@ -30,7 +30,7 @@ through `src/schemas/masks/aiMaskingSchemas.ts`.
 - TypeScript mask enum coverage in `src/components/panel/right/Masks.tsx`;
 - frontend invoke command coverage in `src/components/ui/AppProperties.tsx`;
 - Rust Tauri command coverage in `src-tauri/src/ai_commands.rs`;
-- Rust render branch coverage in `src-tauri/src/mask_generation.rs`.
+- Rust render branch coverage in `src-tauri/src/render/mask_generation.rs`.
 
 ## Known Gaps
 

@@ -13,7 +13,7 @@
 `src/utils/mask/maskOverlayModes.ts` normalizes partial settings and evaluates the
 same preview color contract used by fixtures.
 
-`src-tauri/src/mask_generation.rs` now mirrors that contract with
+`src-tauri/src/render/mask_generation.rs` now mirrors that contract with
 `MaskOverlaySettings`, `MaskOverlayMode`, and `mask_overlay_pixel`. The Tauri
 `generate_mask_overlay` command accepts optional `overlaySettings`; omitted
 settings preserve the previous rubylith overlay behavior.

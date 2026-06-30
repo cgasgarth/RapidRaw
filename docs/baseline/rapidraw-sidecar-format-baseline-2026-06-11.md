@@ -33,7 +33,7 @@ the primary sidecar path is:
 The filename includes the full image filename, including the original extension.
 This is implemented by appending `.rrdata` to `image_path.file_name()` in
 `src-tauri/src/exif_processing.rs:1074` and by `parse_virtual_path` in
-`src-tauri/src/file_management.rs:165`.
+`src-tauri/src/library/file_management.rs:165`.
 
 `load_sidecar` returns `ImageMetadata::default()` when the `.rrdata` file is
 missing, unreadable, or invalid JSON. If EXIF strings longer than 500 bytes are
@@ -56,10 +56,10 @@ The corresponding sidecar is:
 
 `create_virtual_copy` generates `abc123` from the first six characters of a UUID
 v4 string, then returns the virtual path with `?vc=<id>`
-(`src-tauri/src/file_management.rs:3374`). Directory scanners reconstruct virtual
+(`src-tauri/src/library/file_management.rs:3374`). Directory scanners reconstruct virtual
 copies by looking for `.rrdata` files whose basename ends with a dot plus six
 lowercase hexadecimal characters before `.rrdata`
-(`src-tauri/src/file_management.rs:295` and `src-tauri/src/file_management.rs:413`).
+(`src-tauri/src/library/file_management.rs:295` and `src-tauri/src/library/file_management.rs:413`).
 
 When a virtual copy is created, RapidRAW copies the source virtual sidecar if it
 exists. If the source sidecar does not exist, it writes a default
@@ -68,7 +68,7 @@ exists. If the source sidecar does not exist, it writes a default
 ## ImageMetadata Shape
 
 The persisted Rust type is `ImageMetadata` in
-`src-tauri/src/image_processing.rs:51`:
+`src-tauri/src/render/image_processing.rs:51`:
 
 | Field         | Type                          | Default | Notes                                                                 |
 | ------------- | ----------------------------- | ------- | --------------------------------------------------------------------- |
@@ -99,7 +99,7 @@ When `exif` is absent, serde skips it because the field uses
 current frontend adjustment object to `save_metadata_and_update_thumbnail`
 (`src/hooks/useEditorActions.ts:25`), and the command replaces
 `metadata.adjustments` with that JSON value
-(`src-tauri/src/file_management.rs:2015`).
+(`src-tauri/src/library/file_management.rs:2015`).
 
 Frontend adjustment keys visible in `src/utils/adjustments.ts` include:
 
@@ -123,20 +123,20 @@ Frontend adjustment keys visible in `src/utils/adjustments.ts` include:
 
 Rust rendering code reads known keys and applies defaults for missing values
 while converting to GPU adjustment structs
-(`src-tauri/src/image_processing.rs:1985` and
-`src-tauri/src/image_processing.rs:2194`). Resetting adjustments writes `{}` to
-the sidecar, not `null` (`src-tauri/src/file_management.rs:2205`).
+(`src-tauri/src/render/image_processing.rs:1985` and
+`src-tauri/src/render/image_processing.rs:2194`). Resetting adjustments writes `{}` to
+the sidecar, not `null` (`src-tauri/src/library/file_management.rs:2205`).
 
 ## Ratings, Color Labels, And Tags
 
 Ratings are stored in `ImageMetadata.rating`. `set_rating_for_paths` loads each
 path's sidecar, assigns the supplied `u8`, pretty-prints the whole metadata
-object, and optionally syncs XMP (`src-tauri/src/file_management.rs:2433`).
+object, and optionally syncs XMP (`src-tauri/src/library/file_management.rs:2433`).
 
 Color labels are stored inside `ImageMetadata.tags` with the prefix `color:`.
 `set_color_label_for_paths` removes all existing `color:` tags, optionally adds
 one new `color:<name>` tag, and clears `tags` back to `None` when no tags remain
-(`src-tauri/src/file_management.rs:2391`). The frontend color label set is
+(`src-tauri/src/library/file_management.rs:2391`). The frontend color label set is
 currently `red`, `yellow`, `green`, `blue`, and `purple`
 (`src/utils/adjustments.ts:359`).
 
@@ -178,7 +178,7 @@ EXIF field edits are physical-image scoped. The frontend strips any `?vc=`
 component before calling `update_exif_fields`
 (`src/hooks/useLibraryActions.ts:111`), and the Rust command writes the primary
 physical sidecar with `get_primary_sidecar_path`
-(`src-tauri/src/file_management.rs:234`).
+(`src-tauri/src/library/file_management.rs:234`).
 
 ## XMP Sync
 
@@ -210,7 +210,7 @@ Writes can export rating, color label, and non-color tags to XMP through
 
 If no XMP exists, the writer returns unless `create_xmp_if_missing` is true. When
 creation is allowed, it writes a minimal XMP skeleton next to the source image
-(`src-tauri/src/file_management.rs:3508`).
+(`src-tauri/src/library/file_management.rs:3508`).
 
 ## Read And Write Flow
 
@@ -231,7 +231,7 @@ Full image load:
 3. It decodes the physical source image.
 4. It reads EXIF from the physical image path, using primary `.rrdata` EXIF,
    legacy `.rrexif`, or file extraction as needed
-   (`src-tauri/src/image_loader.rs:372`).
+   (`src-tauri/src/io/image_loader.rs:372`).
 
 Editor save:
 
@@ -256,14 +256,14 @@ Bulk adjustment writes:
 Filesystem operations:
 
 - Physical duplicate/import paths copy the current source `.rrdata` and also
-  copy legacy `.rrexif` if present (`src-tauri/src/file_management.rs:1785` and
-  `src-tauri/src/file_management.rs:3104`).
+  copy legacy `.rrexif` if present (`src-tauri/src/library/file_management.rs:1785` and
+  `src-tauri/src/library/file_management.rs:3104`).
 - Physical delete finds and trashes the source image, primary `.rrdata`, virtual
   copy `.rrdata` files, and legacy `.rrexif`
-  (`src-tauri/src/file_management.rs:1814`).
+  (`src-tauri/src/library/file_management.rs:1814`).
 - Virtual copy delete only trashes the virtual copy sidecar.
 - Rename operations rename primary `.rrdata`, virtual-copy `.rrdata`, and legacy
-  `.rrexif` files with the image (`src-tauri/src/file_management.rs:3264`).
+  `.rrexif` files with the image (`src-tauri/src/library/file_management.rs:3264`).
 
 ## Compatibility And Error Behavior
 

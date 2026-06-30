@@ -5,93 +5,41 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-mod adjustment_fields;
-mod adjustment_utils;
 mod adjustments;
 mod ai;
 mod album_management;
 mod android_integration;
 mod app_settings;
 mod app_state;
-mod auto_adjust;
-mod bayer_hq;
-mod cache_utils;
-#[cfg(feature = "validation-harness")]
-mod color_gpu_readback_probe;
+mod color;
 mod community_presets;
-mod culling;
-mod deblur_api;
-pub mod deblur_cpu_reference;
-#[cfg(all(test, feature = "tauri-test"))]
-mod deblur_real_raw_proof;
-mod deblur_render;
-mod delete_plan;
-mod denoise_api;
-pub mod denoise_cpu_reference;
-#[cfg(all(test, feature = "tauri-test"))]
-mod denoise_real_raw_proof;
-mod denoise_render;
-mod denoising;
-mod derived_output_provenance;
-mod display_profile;
+mod computational;
 mod events;
-mod exif_processing;
 mod export;
-mod file_management;
-#[cfg(all(test, feature = "tauri-test"))]
-mod focus_real_raw_proof;
-mod formats;
-mod gamut_mapping;
 mod geometry;
-mod gpu_context;
-mod gpu_display;
-mod gpu_processing;
-mod gpu_readback;
-mod gpu_textures;
-mod hdr_artifact_sidecar;
-#[cfg(all(test, feature = "tauri-test"))]
-mod hdr_real_raw_proof;
-mod image_analytics;
-mod image_codecs;
-mod image_loader;
-mod image_processing;
-#[cfg(all(test, feature = "tauri-test"))]
-mod layer_mask_real_raw_proof;
-mod lens_correction;
-mod library_identity;
-#[cfg(feature = "validation-harness")]
-mod linear_gradient_mask_real_raw_proof;
-mod lut_processing;
-mod mask_generation;
-mod negative_conversion;
-#[cfg(feature = "panorama-opencv-spike")]
-mod panorama_opencv_spike;
-#[cfg(all(test, feature = "tauri-test"))]
-mod panorama_real_raw_proof;
-mod panorama_stitching;
-mod panorama_utils;
+mod gpu;
+mod io;
+mod library;
+mod merge;
 mod preset_converter;
 mod presets;
-mod preview_worker;
-#[cfg(all(test, feature = "tauri-test"))]
-mod private_decode_raw_proof;
-#[cfg(feature = "validation-harness")]
-mod raw_open_edit_export_proof;
-mod raw_processing;
-mod render_caches;
-mod render_pipeline;
-#[cfg(all(test, feature = "tauri-test"))]
-mod retouch_clone_real_raw_proof;
-mod retouch_render;
-mod smart_preview_cache;
-#[cfg(all(test, feature = "tauri-test"))]
-mod sr_real_raw_proof;
+mod proofs;
+mod raw;
+mod render;
 mod tagging;
-mod tethering;
-mod wavelet_render;
 mod window_customizer;
-mod xmp_sidecar;
-mod xtrans_hq;
+
+pub(crate) use color::*;
+pub(crate) use computational::*;
+pub use computational::{deblur_cpu_reference, denoise_cpu_reference};
+pub(crate) use gpu::*;
+pub(crate) use io::*;
+pub(crate) use library::*;
+pub(crate) use merge::*;
+#[cfg(any(all(test, feature = "tauri-test"), feature = "validation-harness"))]
+pub(crate) use proofs::*;
+pub(crate) use raw::*;
+pub(crate) use render::*;
 
 use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::fs;

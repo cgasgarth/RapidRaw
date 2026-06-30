@@ -15,7 +15,7 @@ const requiredDocFragments = [
   'src/components/panel/right/layers/LayerStackPanel.tsx',
   'src/utils/layers/layerStack.ts',
   'src/utils/layers/layerAdjustments.ts',
-  'src-tauri/src/mask_generation.rs',
+  'src-tauri/src/render/mask_generation.rs',
   'graph-native layer',
   'Blend mode is not persisted or rendered',
   'legacy dynamic bags',
@@ -34,7 +34,7 @@ const sourceChecks = [
   ['src/components/panel/right/layers/LayerStackPanel.tsx', 'function getLayerRows'],
   ['src/utils/layers/layerStack.ts', 'export function moveLayer'],
   ['src/utils/layers/layerAdjustments.ts', 'export const LAYER_ADJUSTMENT_KEYS'],
-  ['src-tauri/src/mask_generation.rs', 'pub fn generate_mask_bitmap'],
+  ['src-tauri/src/render/mask_generation.rs', 'pub fn generate_mask_bitmap'],
 ];
 
 for (const [path, fragment] of sourceChecks) {

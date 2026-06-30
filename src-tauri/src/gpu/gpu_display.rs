@@ -168,7 +168,7 @@ pub(crate) fn create_wgpu_display(
 
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Display Shader"),
-        source: wgpu::ShaderSource::Wgsl(include_str!("shaders/display.wgsl").into()),
+        source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/display.wgsl").into()),
     });
 
     let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {

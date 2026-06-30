@@ -50,8 +50,9 @@ for (const invalidSuggestion of [
 }
 
 const modalSource = readFileSync('src/components/modals/negative-lab/NegativeConversionModal.tsx', 'utf8');
+const patchSamplerSource = readFileSync('src/components/modals/negative-lab/NegativeLabPatchSamplerPanel.tsx', 'utf8');
 const visualSource = readFileSync('src/validation/visual/main.tsx', 'utf8');
-const rustSource = readFileSync('src-tauri/src/negative_conversion.rs', 'utf8');
+const rustSource = readFileSync('src-tauri/src/raw/negative_conversion.rs', 'utf8');
 
 for (const marker of [
   'SuggestNegativeLabNeutralPatchRgbBalance',
@@ -65,7 +66,7 @@ for (const marker of [
   'setFrameRgbBalanceOffsetByFrameId(nextOffsetsByFrameId)',
   'buildParamsWithFrameOverrides(',
 ]) {
-  if (!modalSource.includes(marker) && !visualSource.includes(marker)) {
+  if (!modalSource.includes(marker) && !patchSamplerSource.includes(marker) && !visualSource.includes(marker)) {
     throw new Error(`Negative Lab neutral patch RGB UI marker missing: ${marker}`);
   }
 }

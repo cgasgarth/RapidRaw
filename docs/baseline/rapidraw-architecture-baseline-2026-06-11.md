@@ -307,7 +307,7 @@ stores generated patch color/mask data back into the adjustment payload.
 
 These are current-state observations, not proposed designs.
 
-- `src/App.tsx`, `src-tauri/src/lib.rs`, and `src-tauri/src/file_management.rs`
+- `src/App.tsx`, `src-tauri/src/lib.rs`, and `src-tauri/src/library/file_management.rs`
   are broad orchestration files with many responsibilities. Future RawEngine work
   that changes navigation, persistence, processing, or UI state is likely to
   touch these files unless boundaries are introduced first.
@@ -356,7 +356,7 @@ sed -n '1,540p' src/hooks/useImageProcessing.ts
 sed -n '1,260p' src/hooks/useAiMasking.ts
 sed -n '1,260p' src-tauri/src/app_state.rs
 sed -n '1800,2335p' src-tauri/src/lib.rs
-sed -n '1,260p' src-tauri/src/file_management.rs
+sed -n '1,260p' src-tauri/src/library/file_management.rs
 sed -n '1060,1205p' src-tauri/src/exif_processing.rs
 sed -n '384,620p' src-tauri/src/ai_commands.rs
 sed -n '1,180p' src-tauri/src/ai_connector.rs

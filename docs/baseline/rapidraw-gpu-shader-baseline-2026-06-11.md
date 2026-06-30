@@ -17,19 +17,19 @@ It is a static audit of the existing code. It does not define a target design.
 
 Primary backend files:
 
-- `src-tauri/src/gpu_processing.rs`
+- `src-tauri/src/gpu/gpu_processing.rs`
 - `src-tauri/src/shaders/shader.wgsl`
 - `src-tauri/src/shaders/blur.wgsl`
 - `src-tauri/src/shaders/flare.wgsl`
 - `src-tauri/src/shaders/display.wgsl`
 - `src-tauri/src/app_state.rs`
 - `src-tauri/src/lib.rs`
-- `src-tauri/src/image_processing.rs`
+- `src-tauri/src/render/image_processing.rs`
 - `src-tauri/src/app_settings.rs`
-- `src-tauri/src/cache_utils.rs`
-- `src-tauri/src/image_loader.rs`
-- `src-tauri/src/mask_generation.rs`
-- `src-tauri/src/export_processing.rs`
+- `src-tauri/src/io/cache_utils.rs`
+- `src-tauri/src/io/image_loader.rs`
+- `src-tauri/src/render/mask_generation.rs`
+- `src-tauri/src/export/export_processing.rs`
 
 Primary frontend files:
 

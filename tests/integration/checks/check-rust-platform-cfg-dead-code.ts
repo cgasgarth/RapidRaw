@@ -1,4 +1,4 @@
-const sourcePath = 'src-tauri/src/display_profile.rs';
+const sourcePath = 'src-tauri/src/color/display_profile.rs';
 const source = await Bun.file(sourcePath).text();
 
 const enumMatch = source.match(/pub enum DisplayPreviewLutTransformStatus \{(?<body>[\s\S]*?)\n\}/);

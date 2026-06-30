@@ -29,12 +29,12 @@ state, visibility, invert, and its own `subMasks`.
 
 ## Current UI Model
 
-`src/components/panel/right/MasksPanel.tsx` owns the main mask workflow. It can
-create mask containers, add submasks, duplicate, invert, copy, paste, delete,
-rename, select, and apply mask-scoped adjustments.
+`src/components/panel/right/layers/MasksPanel.tsx` owns the main mask workflow.
+It can create mask containers, add submasks, duplicate, invert, copy, paste,
+delete, rename, select, and apply mask-scoped adjustments.
 
-`src/components/panel/right/LayerStackPanel.tsx` presents the current mask
-containers as layers. It includes a base RAW row and supports visibility,
+`src/components/panel/right/layers/LayerStackPanel.tsx` presents the current
+mask containers as layers. It includes a base RAW row and supports visibility,
 opacity, move up/down, duplicate, delete, and selection. The blend mode menu is
 presentational only today: current `MaskContainer` does not persist blend mode.
 
@@ -44,7 +44,7 @@ helpers for clamped per-layer scalar adjustments.
 
 ## Current Renderer Model
 
-`src-tauri/src/mask_generation.rs` renders each visible `MaskDefinition` into a
+`src-tauri/src/render/mask_generation.rs` renders each visible `MaskDefinition` into a
 grayscale bitmap. Each `SubMask` has a type, visibility, invert, opacity, mode,
 and dynamic parameter payload.
 

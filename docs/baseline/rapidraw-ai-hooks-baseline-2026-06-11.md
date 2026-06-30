@@ -19,7 +19,7 @@ server design.
 | Area                          | Files                                                                                                                        |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | Local model loading/inference | `src-tauri/src/ai_processing.rs`, `src-tauri/src/ai_commands.rs`, `src-tauri/src/denoising.rs`, `src-tauri/src/tagging.rs`   |
-| Mask and patch rasterization  | `src-tauri/src/mask_generation.rs`, `src-tauri/src/image_loader.rs`, `src-tauri/src/adjustment_utils.rs`                     |
+| Mask and patch rasterization  | `src-tauri/src/render/mask_generation.rs`, `src-tauri/src/io/image_loader.rs`, `src-tauri/src/adjustment_utils.rs`                     |
 | App state/settings            | `src-tauri/src/app_state.rs`, `src-tauri/src/app_settings.rs`, `src/store/useEditorStore.ts`, `src/store/useProcessStore.ts` |
 | Frontend AI UI/hooks          | `src/hooks/useAiMasking.ts`, `src/components/panel/right/AIPanel.tsx`, `src/components/panel/right/Masks.tsx`                |
 | Settings/auth touchpoints     | `src/App.tsx`, `src/components/panel/SettingsPanel.tsx`, `src/store/useSettingsStore.ts`                                     |

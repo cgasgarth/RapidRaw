@@ -80,17 +80,18 @@ const appModalsSource = readFileSync('src/components/modals/AppModals.tsx', 'utf
 if (!appModalsSource.includes('runtimePlan={panoramaModalState.runtimePlan}')) {
   failures.push('AppModals must pass panorama runtimePlan into PanoramaModal.');
 }
+const modalStateSource = readFileSync('src/utils/computational-merge/computationalMergeModalState.ts', 'utf8');
 for (const marker of [
   'finalImageBase64: null',
   'lastDryRunCommand: null',
   'renderedReview: null',
   'runtimePlan: null',
 ]) {
-  if (!appModalsSource.includes(marker)) {
+  if (!modalStateSource.includes(marker)) {
     failures.push(`Panorama settings changes must clear stale review marker: ${marker}`);
   }
 }
-if (!appModalsSource.includes('runtimePlan: null')) {
+if (!modalStateSource.includes('runtimePlan: null')) {
   failures.push('Panorama settings changes must clear stale runtimePlan.');
 }
 
@@ -107,7 +108,7 @@ for (const marker of [
   }
 }
 
-const sidecarSource = readFileSync('src-tauri/src/panorama_stitching.rs', 'utf8');
+const sidecarSource = readFileSync('src-tauri/src/merge/panorama_stitching.rs', 'utf8');
 for (const marker of [
   'artifact["projectionSettings"]["requestedProjection"]',
   'artifact["projectionSettings"]["effectiveProjection"]',
