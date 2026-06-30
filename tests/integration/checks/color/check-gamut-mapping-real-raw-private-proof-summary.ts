@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { parseRawOpenEditExportRunReportCollection } from '../../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
+import { parseRawOpenEditExportRunReportCollection } from '../../../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/color/gamut-mapping-real-raw-private-proof-2026-06-26.json';
 const PRIVATE_ROOT = '/tmp/rawengine-gamut-mapping-v4-real-raw-proof';

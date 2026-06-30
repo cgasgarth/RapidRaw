@@ -5,12 +5,12 @@ import { readFile } from 'node:fs/promises';
 import {
   rawEngineColorPipelineContextV1Schema,
   toneColorCommandEnvelopeV1Schema,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { sampleToneColorCommandEnvelopeV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { colorRuntimeProofFixtureSchema } from '../../../scripts/lib/proofs/color-runtime-proof.ts';
-import { curvesLevelsRuntimeProofFixtureSchema } from '../../../scripts/lib/proofs/curves-levels-runtime-proof.ts';
-import { headlessRenderRequestSchema } from '../../../src/schemas/export/headlessRenderCommandSchemas.ts';
-import { rawOpenEditExportProofRequestSchema } from '../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { sampleToneColorCommandEnvelopeV1 } from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
+import { colorRuntimeProofFixtureSchema } from '../../../../scripts/lib/proofs/color-runtime-proof.ts';
+import { curvesLevelsRuntimeProofFixtureSchema } from '../../../../scripts/lib/proofs/curves-levels-runtime-proof.ts';
+import { headlessRenderRequestSchema } from '../../../../src/schemas/export/headlessRenderCommandSchemas.ts';
+import { rawOpenEditExportProofRequestSchema } from '../../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
 
 const failures: string[] = [];
 

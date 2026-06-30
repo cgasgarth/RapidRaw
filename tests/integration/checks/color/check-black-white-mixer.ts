@@ -4,14 +4,14 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { parseBlackWhiteMixerSettings } from '../../../src/schemas/color/blackWhiteMixerSchemas.ts';
+import { parseBlackWhiteMixerSettings } from '../../../../src/schemas/color/blackWhiteMixerSchemas.ts';
 import {
   ADJUSTMENT_GROUPS,
   ADJUSTMENT_SECTIONS,
   ColorAdjustment,
   INITIAL_ADJUSTMENTS,
-} from '../../../src/utils/adjustments.ts';
-import { applyBlackWhiteMixerToRgbPixel } from '../../../src/utils/color/runtime/blackWhiteMixerRuntime.ts';
+} from '../../../../src/utils/adjustments.ts';
+import { applyBlackWhiteMixerToRgbPixel } from '../../../../src/utils/color/runtime/blackWhiteMixerRuntime.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 const REPORT_PATH = 'docs/validation/proofs/color/black-white-mixer-apply-proof-2026-06-18.json';
@@ -146,7 +146,9 @@ if (UPDATE_REPORT) {
 } else {
   const expectedReport = reportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
   if (JSON.stringify(expectedReport) !== JSON.stringify(report)) {
-    failures.push(`${REPORT_PATH} is stale; run bun tests/integration/checks/check-black-white-mixer.ts --update`);
+    failures.push(
+      `${REPORT_PATH} is stale; run bun tests/integration/checks/color/check-black-white-mixer.ts --update`,
+    );
   }
 }
 

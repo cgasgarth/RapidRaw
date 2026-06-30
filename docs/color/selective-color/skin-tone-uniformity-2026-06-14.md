@@ -46,8 +46,8 @@ artifact is `docs/validation/proofs/color/color-hue-memory-gate-2026-06-18.json`
 - `bun run check:skin-tone-uniformity`
 - `bun run check:hue-memory-color`
 - `bun run check:types`
-- `bunx eslint src/utils/skinToneUniformity.ts tests/integration/checks/check-skin-tone-uniformity.ts --max-warnings 0`
+- `bunx eslint src/utils/skinToneUniformity.ts tests/integration/checks/color/check-skin-tone-uniformity.ts --max-warnings 0`
 - `bun run check:unsafe-casts`
-- `bunx prettier --check src/utils/skinToneUniformity.ts tests/integration/checks/check-skin-tone-uniformity.ts fixtures/color/selective-color/skin-tone-uniformity-fixtures.json docs/color/selective-color/skin-tone-uniformity-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
+- `bunx prettier --check src/utils/skinToneUniformity.ts tests/integration/checks/color/check-skin-tone-uniformity.ts fixtures/color/selective-color/skin-tone-uniformity-fixtures.json docs/color/selective-color/skin-tone-uniformity-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
 - `bun tests/integration/checks/check-markdown-links.ts`
 - `git diff --check`

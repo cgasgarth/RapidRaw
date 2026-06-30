@@ -4,14 +4,14 @@ import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { parseChannelMixerSettings } from '../../../src/schemas/color/channelMixerSchemas.ts';
+import { parseChannelMixerSettings } from '../../../../src/schemas/color/channelMixerSchemas.ts';
 import {
   ADJUSTMENT_GROUPS,
   ADJUSTMENT_SECTIONS,
   ColorAdjustment,
   INITIAL_ADJUSTMENTS,
-} from '../../../src/utils/adjustments.ts';
-import { applyChannelMixerToRgbPixel } from '../../../src/utils/color/runtime/channelMixerRuntime.ts';
+} from '../../../../src/utils/adjustments.ts';
+import { applyChannelMixerToRgbPixel } from '../../../../src/utils/color/runtime/channelMixerRuntime.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 const identityRows = {

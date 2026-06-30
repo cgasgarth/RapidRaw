@@ -24,14 +24,14 @@ const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
 const packageScripts = new Set(Object.keys(packageJson.scripts ?? {}));
 const runtimeCheckCommands = new Map<string, [string, ...string[]]>([
   ['check:basic-tone-command-bridge', ['bun', 'tests/integration/checks/check-basic-tone-command-bridge.ts']],
-  ['check:black-white-mixer', ['bun', 'tests/integration/checks/check-black-white-mixer.ts']],
-  ['check:channel-mixer', ['bun', 'tests/integration/checks/check-channel-mixer.ts']],
+  ['check:black-white-mixer', ['bun', 'tests/integration/checks/color/check-black-white-mixer.ts']],
+  ['check:channel-mixer', ['bun', 'tests/integration/checks/color/check-channel-mixer.ts']],
   ['check:color-balance-rgb', ['bun', 'tests/integration/checks/color/check-color-balance-rgb.ts']],
   ['check:color-grading-presets', ['bun', 'tests/integration/checks/color/check-color-grading-presets.ts']],
   ['check:levels-runtime', ['bun', 'test', '--reporter=dot', 'tests/pure-ts/adjustments/levels-runtime.test.ts']],
-  ['check:profile-tone', ['bun', 'tests/integration/checks/check-profile-tone.ts']],
+  ['check:profile-tone', ['bun', 'tests/integration/checks/color/check-profile-tone.ts']],
   ['check:selective-color-ranges', ['bun', 'tests/integration/checks/selective-color/check-selective-color-ranges.ts']],
-  ['check:skin-tone-uniformity', ['bun', 'tests/integration/checks/check-skin-tone-uniformity.ts']],
+  ['check:skin-tone-uniformity', ['bun', 'tests/integration/checks/color/check-skin-tone-uniformity.ts']],
   ['check:white-balance-picker', ['bun', 'tests/integration/checks/check-white-balance-picker-fixtures.ts']],
 ]);
 const routeToolNames = new Set(TONE_COLOR_APP_SERVER_ROUTES.map((route) => route.toolName));

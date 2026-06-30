@@ -95,6 +95,6 @@ export gamut mapping quality.
 - `bun run check:deltae-fixtures`
 - `bun run check:color-preview-export-parity`
 - `bun run check:unsafe-casts`
-- `bunx prettier --check docs/color/architecture/gamut-mapping-plan-2026-06-15.md fixtures/color/proofs/gamut-mapping-fixtures.json tests/integration/checks/check-gamut-mapping-fixtures.ts packages/rawengine-schema/src/rawEngineSchemas.ts docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
+- `bunx prettier --check docs/color/architecture/gamut-mapping-plan-2026-06-15.md fixtures/color/proofs/gamut-mapping-fixtures.json tests/integration/checks/color/check-gamut-mapping-fixtures.ts packages/rawengine-schema/src/rawEngineSchemas.ts docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
 - `bun tests/integration/checks/check-markdown-links.ts`
 - `git diff --check`
