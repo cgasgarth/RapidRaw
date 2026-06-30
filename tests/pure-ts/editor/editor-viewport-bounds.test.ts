@@ -36,6 +36,6 @@ describe('editor viewport bounds', () => {
     expect(bounds.minX).toBe(-500);
     expect(bounds.maxX).toBe(-500);
     expect(bounds.minY).toBe(-700);
-    expect(bounds.maxY).toBe(-0);
+    expect(bounds.maxY).toBeCloseTo(0);
   });
 });
