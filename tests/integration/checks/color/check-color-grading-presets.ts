@@ -36,7 +36,7 @@ const fixture = fixtureSchema.parse(await readJson('fixtures/color/adjustments/c
 const catalog = parseColorGradingPresetCatalog({ presets: fixture.presets, version: fixture.version });
 const sourceCatalog = parseColorGradingPresetCatalog(COLOR_GRADING_PRESET_CATALOG);
 const invalidCases = await readJson('fixtures/color/adjustments/invalid/invalid-color-grading-presets.json');
-const colorPanelSource = await readText('src/components/adjustments/Color.tsx');
+const colorPanelSource = await readText('src/components/adjustments/color/ColorGradingControls.tsx');
 const failures = [];
 
 if (

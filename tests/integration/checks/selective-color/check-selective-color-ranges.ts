@@ -8,7 +8,7 @@ import { SELECTIVE_COLOR_RANGES } from '../../../../src/utils/selectiveColorRang
 
 const FIXTURE_PATH = 'fixtures/color/selective-color/selective-color-ranges.json';
 const SHADER_PATH = 'src-tauri/src/shaders/shader.wgsl';
-const COLOR_PANEL_PATH = 'src/components/adjustments/Color.tsx';
+const COLOR_PANEL_PATH = 'src/components/adjustments/color/ColorMixerControls.tsx';
 
 const rangeKeySchema = z.enum(['reds', 'oranges', 'yellows', 'greens', 'aquas', 'blues', 'purples', 'magentas']);
 const labelKeySchema = z.enum(rangeKeySchema.options.map((key) => `adjustments.color.mixerColors.${key}`));
