@@ -3,7 +3,7 @@ import {
   type FocusStackSourceValidationInputV1,
   type FocusStackSourceValidationResultV1,
   validateFocusStackSourcesV1,
-} from '../../packages/rawengine-schema/src/focusStackSourceValidation.ts';
+} from '../../packages/rawengine-schema/src/focus-stack/focusStackSourceValidation.ts';
 import { parseExifDistanceMm, parseExifInteger, parseExposureEv, readExifString } from './exifPreflightMetadata';
 
 export const focusStackSourcePreflightMetadataSchema = z

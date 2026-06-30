@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 
-import { FocusStackAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/focusStackAppServerRuntime.ts';
+import { FocusStackAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/focus-stack/focusStackAppServerRuntime.ts';
 import {
   buildFocusStackUiApplyCommandV1,
   buildFocusStackUiDryRunCommandV1,
-} from '../../../packages/rawengine-schema/src/focusStackUiControls.ts';
+} from '../../../packages/rawengine-schema/src/focus-stack/focusStackUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational/proof-budgets.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';

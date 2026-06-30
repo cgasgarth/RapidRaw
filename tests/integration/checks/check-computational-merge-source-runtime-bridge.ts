@@ -2,12 +2,12 @@
 
 import { readFile } from 'node:fs/promises';
 
-import { FocusStackAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/focusStackAppServerRuntime.ts';
-import type { FocusStackRuntimePlanRequestV1 } from '../../../packages/rawengine-schema/src/focusStackRuntimePlan.ts';
+import { FocusStackAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/focus-stack/focusStackAppServerRuntime.ts';
+import type { FocusStackRuntimePlanRequestV1 } from '../../../packages/rawengine-schema/src/focus-stack/focusStackRuntimePlan.ts';
 import {
   buildFocusStackUiApplyCommandV1,
   buildFocusStackUiDryRunCommandV1,
-} from '../../../packages/rawengine-schema/src/focusStackUiControls.ts';
+} from '../../../packages/rawengine-schema/src/focus-stack/focusStackUiControls.ts';
 import { PanoramaAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/panoramaAppServerRuntime.ts';
 import type { PanoramaRuntimePlanRequestV1 } from '../../../packages/rawengine-schema/src/panoramaRuntimePlan.ts';
 import {

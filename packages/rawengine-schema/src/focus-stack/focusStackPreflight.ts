@@ -3,7 +3,7 @@ import { z } from 'zod';
 import {
   computationalMergePreflightWarningCodes,
   uniqueComputationalMergePreflightWarningCodes,
-} from './computationalMergeWarningCodes.js';
+} from '../computationalMergeWarningCodes.js';
 import {
   type ComputationalMergeDryRunResultV1,
   type ComputationalMergeMemoryComponentsV1,
@@ -11,7 +11,7 @@ import {
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeDryRunResultV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from './rawEngineSchemas.js';
+} from '../rawEngineSchemas.js';
 
 export const focusStackDryRunPreflightSourceStateV1Schema = z
   .object({

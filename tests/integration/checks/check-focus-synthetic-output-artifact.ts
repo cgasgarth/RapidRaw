@@ -6,7 +6,7 @@ import { dirname } from 'node:path';
 
 import { z } from 'zod';
 
-import { applyWeightedSharpnessFocusStackV1 } from '../../../packages/rawengine-schema/src/focusStackWeightedBlend.ts';
+import { applyWeightedSharpnessFocusStackV1 } from '../../../packages/rawengine-schema/src/focus-stack/focusStackWeightedBlend.ts';
 
 const WIDTH = 96;
 const HEIGHT = 64;

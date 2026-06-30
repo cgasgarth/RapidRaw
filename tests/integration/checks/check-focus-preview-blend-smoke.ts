@@ -7,7 +7,7 @@ import { performance } from 'node:perf_hooks';
 
 import { z } from 'zod';
 
-import { applyWeightedSharpnessFocusStackV1 } from '../../../packages/rawengine-schema/src/focusStackWeightedBlend.ts';
+import { applyWeightedSharpnessFocusStackV1 } from '../../../packages/rawengine-schema/src/focus-stack/focusStackWeightedBlend.ts';
 import { parseFocusPreviewBlendReport } from '../../../src/schemas/focusPreviewBlendSchemas.ts';
 import { parseFocusSharpnessMapReport } from '../../../src/schemas/focusSharpnessMapSchemas.ts';
 

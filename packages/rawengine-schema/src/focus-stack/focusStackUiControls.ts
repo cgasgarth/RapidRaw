@@ -7,7 +7,7 @@ import {
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeQualityPreferenceV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from './rawEngineSchemas.js';
+} from '../rawEngineSchemas.js';
 
 const focusStackUiSourceV1Schema = z
   .object({
@@ -78,13 +78,13 @@ export const buildFocusStackUiDryRunCommandV1 = (
     dryRun: true,
     expectedGraphRevision: context.expectedGraphRevision,
     parameters: {
-      alignmentMode: controls.alignmentMode,
+      alignmentMode: controls['alignmentMode'],
       blendMethod: controls.blendMethod,
       haloSuppressionStrengthPercent: controls.haloSuppressionStrengthPercent,
       maxPreviewDimensionPx: controls.maxPreviewDimensionPx,
       memoryBudgetBytes: controls.memoryBudgetBytes,
       outputName: controls.outputName,
-      qualityPreference: controls.qualityPreference,
+      qualityPreference: controls['qualityPreference'],
       retouchLayerPolicy: controls.retouchLayerPolicy,
       sources: controls.sources.map((source) => ({
         colorSpaceHint: source.colorSpaceHint,
@@ -125,13 +125,13 @@ export const buildFocusStackUiApplyCommandV1 = (
     parameters: {
       acceptedDryRunPlanHash: context.acceptedDryRunPlanHash,
       acceptedDryRunPlanId: context.acceptedDryRunPlanId,
-      alignmentMode: controls.alignmentMode,
+      alignmentMode: controls['alignmentMode'],
       blendMethod: controls.blendMethod,
       haloSuppressionStrengthPercent: controls.haloSuppressionStrengthPercent,
       maxPreviewDimensionPx: controls.maxPreviewDimensionPx,
       memoryBudgetBytes: controls.memoryBudgetBytes,
       outputName: controls.outputName,
-      qualityPreference: controls.qualityPreference,
+      qualityPreference: controls['qualityPreference'],
       retouchLayerPolicy: controls.retouchLayerPolicy,
       sources: controls.sources.map((source) => ({
         colorSpaceHint: source.colorSpaceHint,

@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 
-import { createFocusStackPlanOnlyDryRunResultV1 } from '../src/focusStackPreflight.js';
+import { createFocusStackPlanOnlyDryRunResultV1 } from '../src/focus-stack/focusStackPreflight.js';
 import { detectHdrBracketV1 } from '../src/hdrBracketDetection.js';
 import {
   aiAppServerToolManifestV1Schema,
