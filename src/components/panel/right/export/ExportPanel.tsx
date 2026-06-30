@@ -82,13 +82,13 @@ import {
   Status,
   WatermarkAnchor,
 } from '../../../ui/ExportImportProperties';
-import ExportPresetsList from '../../../ui/ExportPresetsList';
-import ImagePicker from '../../../ui/ImagePicker';
 import Button from '../../../ui/primitives/Button';
 import Dropdown from '../../../ui/primitives/Dropdown';
 import Slider from '../../../ui/primitives/Slider';
 import Switch from '../../../ui/primitives/Switch';
 import UiText from '../../../ui/primitives/Text';
+import ExportPresetsList from './ExportPresetsList';
+import ImagePicker from './ImagePicker';
 
 const QUALITY_FILE_FORMATS: ReadonlySet<FileFormats> = new Set([FileFormats.Jpeg, FileFormats.Webp, FileFormats.Jxl]);
 const SOFT_PROOF_PROFILE_COMPARE_SIDE_IDS = ['srgb', 'displayP3'] as const;

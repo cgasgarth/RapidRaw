@@ -1,8 +1,8 @@
 import { open } from '@tauri-apps/plugin-dialog';
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { TextVariants } from '../../types/typography';
-import UiText from './primitives/Text';
+import { TextVariants } from '../../../../types/typography';
+import UiText from '../../../ui/primitives/Text';
 
 interface ImagePickerProps {
   imageName: string | null;

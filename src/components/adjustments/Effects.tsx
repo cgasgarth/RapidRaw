@@ -13,9 +13,9 @@ import {
   formatFilmLookPresetName,
 } from '../../utils/filmLookBrowser';
 import type { AppSettings, Preset } from '../ui/AppProperties';
-import LUTControl from '../ui/LUTControl';
 import UiText from '../ui/primitives/Text';
 import AdjustmentSlider from './AdjustmentSlider';
+import LUTControl from './LUTControl';
 
 const FilmLookBrowser = lazy(() =>
   import('./FilmLookBrowser.js').then((module) => ({ default: module.FilmLookBrowser })),

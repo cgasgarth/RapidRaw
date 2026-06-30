@@ -32,9 +32,9 @@ import {
 } from '../../utils/selectiveColorRuntime';
 import { applySkinToneUniformity, type SkinToneUniformityInput } from '../../utils/skinToneUniformity';
 import type { AppSettings } from '../ui/AppProperties';
-import ColorWheel from '../ui/ColorWheel';
 import UiText from '../ui/primitives/Text';
 import AdjustmentSlider from './AdjustmentSlider';
+import ColorWheel from './ColorWheel';
 
 interface ColorProps {
   color: string;
