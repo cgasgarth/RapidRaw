@@ -78,6 +78,10 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4208',
     reason: 'integration checks are pending domain/native-runner cleanup',
   },
+  'tests/integration/checks/masks': {
+    issue: '#4333',
+    reason: 'mask-domain checks are being grouped into a dedicated folder for this issue',
+  },
   'tests/integration/checks/layers': {
     issue: '#4329',
     reason: 'layer integration checks are grouped under a dedicated folder for this issue',

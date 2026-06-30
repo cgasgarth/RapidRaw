@@ -9,7 +9,7 @@ import {
   type MaskAlphaArtifact,
   MaskComposeCommandRuntime,
   renderComposedMask,
-} from '../../../packages/rawengine-schema/src/maskComposeCommandRuntime.ts';
+} from '../../../../packages/rawengine-schema/src/maskComposeCommandRuntime.ts';
 import {
   ActorKind,
   ApprovalClass,
@@ -17,7 +17,7 @@ import {
   layerMaskDryRunResultV1Schema,
   layerMaskMutationResultV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const composeModeSchema = z.enum(['add', 'subtract', 'intersect']);
 

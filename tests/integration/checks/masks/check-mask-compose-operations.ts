@@ -4,8 +4,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 
-import { maskComposeModeSchema } from '../../../src/schemas/maskRenderSchemas.ts';
-import { composeMaskWeights } from '../../../src/utils/mask/maskComposition.ts';
+import { maskComposeModeSchema } from '../../../../src/schemas/maskRenderSchemas.ts';
+import { composeMaskWeights } from '../../../../src/utils/mask/maskComposition.ts';
 
 const operationSchema = z
   .object({

@@ -8,9 +8,9 @@ import { z } from 'zod';
 import {
   BrushMaskCommandRuntime,
   renderBrushMask,
-} from '../../../packages/rawengine-schema/src/brushMaskCommandRuntime.ts';
-import { layerMaskCommandEnvelopeV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { sampleLayerMaskRefineCommandEnvelopeV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+} from '../../../../packages/rawengine-schema/src/brushMaskCommandRuntime.ts';
+import { layerMaskCommandEnvelopeV1Schema } from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { sampleLayerMaskRefineCommandEnvelopeV1 } from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/layers-masks/brush-mask-refine-workflow-e2e-2026-06-21.json';
 const RUNTIME_REPORT_PATH = 'docs/validation/proofs/layers-masks/layer-mask-real-raw-proof-2026-06-18.json';

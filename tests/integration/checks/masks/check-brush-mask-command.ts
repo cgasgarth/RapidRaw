@@ -9,7 +9,7 @@ import {
   type BrushBaseMaskArtifact,
   BrushMaskCommandRuntime,
   renderBrushMask,
-} from '../../../packages/rawengine-schema/src/brushMaskCommandRuntime.ts';
+} from '../../../../packages/rawengine-schema/src/brushMaskCommandRuntime.ts';
 import {
   ActorKind,
   ApprovalClass,
@@ -17,7 +17,7 @@ import {
   layerMaskDryRunResultV1Schema,
   layerMaskMutationResultV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const fixtureSchema = z
   .object({

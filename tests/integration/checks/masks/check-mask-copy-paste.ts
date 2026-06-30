@@ -4,14 +4,14 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 
-import { INITIAL_MASK_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-import { copyLayerMasksToLayer } from '../../../src/utils/layers/layerStack.ts';
+import { INITIAL_MASK_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
+import { copyLayerMasksToLayer } from '../../../../src/utils/layers/layerStack.ts';
 import {
   cloneMaskContainerForPaste,
   cloneSubMaskForPaste,
   insertMaskContainerAt,
   insertSubMaskAt,
-} from '../../../src/utils/mask/maskClipboard.ts';
+} from '../../../../src/utils/mask/maskClipboard.ts';
 
 const fixtureSchema = z.discriminatedUnion('id', [
   z
