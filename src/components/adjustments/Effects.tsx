@@ -139,13 +139,14 @@ export default function EffectsPanel({
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
 
   return (
-    <div className="space-y-4">
-      <div className="p-2 bg-bg-tertiary rounded-md">
-        <UiText variant={TextVariants.heading} className="mb-2">
+    <div className="space-y-2">
+      <div className="rounded-md bg-bg-tertiary p-1.5">
+        <UiText variant={TextVariants.heading} className="mb-1">
           {t('adjustments.effects.creative')}
         </UiText>
 
         <AdjustmentSlider
+          density="compact"
           label={t('adjustments.effects.glow')}
           max={100}
           min={0}
@@ -158,6 +159,7 @@ export default function EffectsPanel({
         />
 
         <AdjustmentSlider
+          density="compact"
           label={t('adjustments.effects.halation')}
           max={100}
           min={0}
@@ -171,6 +173,7 @@ export default function EffectsPanel({
 
         {!isForMask && (
           <AdjustmentSlider
+            density="compact"
             label={t('adjustments.effects.lightFlares')}
             max={100}
             min={0}
@@ -185,8 +188,8 @@ export default function EffectsPanel({
       </div>
 
       {!isForMask && (
-        <div className="space-y-4">
-          <div className="p-2 bg-bg-tertiary rounded-md">
+        <div className="space-y-2">
+          <div className="rounded-md bg-bg-tertiary p-1.5">
             <Suspense fallback={null}>
               <FilmLookBrowser
                 activeLookId={adjustments.filmLookId}
@@ -199,7 +202,7 @@ export default function EffectsPanel({
             {filmLookPresetStatus !== null && (
               <UiText
                 aria-live="polite"
-                className="mt-2 rounded-md border border-surface bg-bg-secondary px-3 py-2 text-text-secondary"
+                className="mt-1.5 rounded-md border border-surface bg-bg-secondary px-2 py-1.5 text-text-secondary"
                 data-testid="film-look-preset-status"
                 variant={TextVariants.small}
               >
@@ -208,8 +211,8 @@ export default function EffectsPanel({
             )}
           </div>
 
-          <div className="p-2 bg-bg-tertiary rounded-md">
-            <UiText variant={TextVariants.heading} className="mb-2">
+          <div className="rounded-md bg-bg-tertiary p-1.5">
+            <UiText variant={TextVariants.heading} className="mb-1">
               {t('adjustments.effects.lut')}
             </UiText>
             <LUTControl
@@ -223,11 +226,12 @@ export default function EffectsPanel({
           </div>
 
           {adjustmentVisibility['vignette'] !== false && (
-            <div className="p-2 bg-bg-tertiary rounded-md">
-              <UiText variant={TextVariants.heading} className="mb-2">
+            <div className="rounded-md bg-bg-tertiary p-1.5">
+              <UiText variant={TextVariants.heading} className="mb-1">
                 {t('adjustments.effects.vignette')}
               </UiText>
               <AdjustmentSlider
+                density="compact"
                 label={t('adjustments.effects.amount')}
                 max={100}
                 min={-100}
@@ -239,6 +243,7 @@ export default function EffectsPanel({
                 onDragStateChange={onDragStateChange}
               />
               <AdjustmentSlider
+                density="compact"
                 defaultValue={50}
                 label={t('adjustments.effects.midpoint')}
                 max={100}
@@ -252,6 +257,7 @@ export default function EffectsPanel({
                 fillOrigin="min"
               />
               <AdjustmentSlider
+                density="compact"
                 label={t('adjustments.effects.roundness')}
                 max={100}
                 min={-100}
@@ -263,6 +269,7 @@ export default function EffectsPanel({
                 onDragStateChange={onDragStateChange}
               />
               <AdjustmentSlider
+                density="compact"
                 defaultValue={50}
                 label={t('adjustments.effects.feather')}
                 max={100}
@@ -279,20 +286,20 @@ export default function EffectsPanel({
           )}
 
           {adjustmentVisibility['grain'] !== false && (
-            <div className="p-2 bg-bg-tertiary rounded-md" data-testid="film-grain-ui-controls">
-              <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="rounded-md bg-bg-tertiary p-1.5" data-testid="film-grain-ui-controls">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
                 <UiText variant={TextVariants.heading}>{t('adjustments.effects.grain')}</UiText>
                 <span
-                  className="rounded border border-surface bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary"
+                  className="rounded border border-surface bg-bg-secondary px-1.5 py-0.5 text-[10px] leading-4 text-text-secondary"
                   data-testid="film-grain-renderer-status"
                 >
                   {t('adjustments.effects.grainRendererStatus')}
                 </span>
               </div>
-              <div className="mb-3 grid grid-cols-3 gap-2" data-testid="film-grain-preset-shortcuts">
+              <div className="mb-1.5 grid grid-cols-3 gap-1.5" data-testid="film-grain-preset-shortcuts">
                 {FILM_GRAIN_UI_PRESETS.map((preset) => (
                   <button
-                    className="rounded border border-surface bg-bg-secondary px-2 py-1.5 text-xs text-text-primary transition-colors hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
+                    className="rounded border border-surface bg-bg-secondary px-1.5 py-1 text-[11px] leading-4 text-text-primary transition-colors hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
                     data-testid={`film-grain-preset-${preset.id}`}
                     key={preset.id}
                     onClick={() => {
@@ -305,6 +312,7 @@ export default function EffectsPanel({
                 ))}
               </div>
               <AdjustmentSlider
+                density="compact"
                 label={t('adjustments.effects.amount')}
                 max={100}
                 min={0}
@@ -316,6 +324,7 @@ export default function EffectsPanel({
                 onDragStateChange={onDragStateChange}
               />
               <AdjustmentSlider
+                density="compact"
                 defaultValue={25}
                 label={t('adjustments.effects.size')}
                 max={100}
@@ -329,6 +338,7 @@ export default function EffectsPanel({
                 fillOrigin="min"
               />
               <AdjustmentSlider
+                density="compact"
                 defaultValue={50}
                 label={t('adjustments.effects.roughness')}
                 max={100}
@@ -342,7 +352,7 @@ export default function EffectsPanel({
                 fillOrigin="min"
               />
               <div
-                className="mt-3 rounded border border-surface bg-bg-secondary px-3 py-2 text-xs text-text-secondary"
+                className="mt-2 rounded border border-surface bg-bg-secondary px-2 py-1.5 text-xs text-text-secondary"
                 data-testid="film-grain-chroma-planned"
               >
                 {t('adjustments.effects.grainChromaPlanned')}

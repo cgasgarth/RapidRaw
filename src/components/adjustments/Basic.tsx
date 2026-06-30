@@ -89,8 +89,8 @@ const ToneMapperSwitch = ({
   }, [selectedMapper, toneMapperOptions]);
 
   return (
-    <div className="group mb-3">
-      <div className="flex justify-between items-center mb-2">
+    <div className="group mb-2">
+      <div className="mb-1 flex items-center justify-between">
         <button
           type="button"
           className="grid cursor-pointer bg-transparent border-0 p-0 font-inherit text-left"
@@ -105,7 +105,7 @@ const ToneMapperSwitch = ({
         >
           <span
             aria-hidden={isLabelHovered}
-            className={`col-start-1 row-start-1 text-sm font-medium text-text-secondary select-none transition-opacity duration-200 ease-in-out ${
+            className={`col-start-1 row-start-1 text-[12px] font-medium leading-4 text-text-secondary select-none transition-opacity duration-200 ease-in-out ${
               isLabelHovered ? 'opacity-0' : 'opacity-100'
             }`}
           >
@@ -113,7 +113,7 @@ const ToneMapperSwitch = ({
           </span>
           <span
             aria-hidden={!isLabelHovered}
-            className={`col-start-1 row-start-1 text-sm font-medium text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none ${
+            className={`col-start-1 row-start-1 text-[12px] font-medium leading-4 text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none ${
               isLabelHovered ? 'opacity-100' : 'opacity-0'
             }`}
           >
@@ -121,7 +121,7 @@ const ToneMapperSwitch = ({
           </span>
         </button>
       </div>
-      <div className="w-full p-2 pb-1 bg-card-active rounded-md">
+      <div className="w-full rounded-md bg-card-active p-1.5 pb-1">
         <div className="relative flex w-full">
           <motion.div
             className="absolute top-0 bottom-0 z-0 bg-accent"
@@ -137,7 +137,7 @@ const ToneMapperSwitch = ({
                 onMapperChange(mapper.id);
               }}
               className={cx(
-                'relative flex-1 flex items-center justify-center gap-2 px-3 p-1.5 text-sm font-medium rounded-md transition-colors',
+                'relative flex-1 flex items-center justify-center gap-2 rounded-md px-2 py-1 text-[12px] font-medium leading-4 transition-colors',
                 {
                   'text-text-primary hover:bg-surface': selectedMapper !== mapper.id,
                   'text-button-text': selectedMapper === mapper.id,
@@ -149,8 +149,9 @@ const ToneMapperSwitch = ({
             </button>
           ))}
         </div>
-        <div className="mt-2.5 px-1">
+        <div className="mt-1.5 px-0.5">
           <AdjustmentSlider
+            density="compact"
             label={t('adjustments.basic.evShift')}
             max={5}
             min={-5}
@@ -192,6 +193,7 @@ export default function BasicAdjustments({
     <div>
       {hideTonemapper ? (
         <AdjustmentSlider
+          density="compact"
           label={t('adjustments.basic.evShift')}
           max={5}
           min={-5}
@@ -214,6 +216,7 @@ export default function BasicAdjustments({
         />
       )}
       <AdjustmentSlider
+        density="compact"
         label={t('adjustments.basic.exposure')}
         max={5}
         min={-5}
@@ -225,6 +228,7 @@ export default function BasicAdjustments({
         onDragStateChange={onDragStateChange}
       />
       <AdjustmentSlider
+        density="compact"
         label={t('adjustments.basic.contrast')}
         max={100}
         min={-100}
@@ -236,6 +240,7 @@ export default function BasicAdjustments({
         onDragStateChange={onDragStateChange}
       />
       <AdjustmentSlider
+        density="compact"
         label={t('adjustments.basic.highlights')}
         max={100}
         min={-100}
@@ -247,6 +252,7 @@ export default function BasicAdjustments({
         onDragStateChange={onDragStateChange}
       />
       <AdjustmentSlider
+        density="compact"
         label={t('adjustments.basic.shadows')}
         max={100}
         min={-100}
@@ -258,6 +264,7 @@ export default function BasicAdjustments({
         onDragStateChange={onDragStateChange}
       />
       <AdjustmentSlider
+        density="compact"
         label={t('adjustments.basic.whites')}
         max={100}
         min={-100}
@@ -269,6 +276,7 @@ export default function BasicAdjustments({
         onDragStateChange={onDragStateChange}
       />
       <AdjustmentSlider
+        density="compact"
         label={t('adjustments.basic.blacks')}
         max={100}
         min={-100}

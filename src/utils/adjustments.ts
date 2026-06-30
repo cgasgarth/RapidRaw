@@ -1200,6 +1200,17 @@ export const pickAdjustmentValues = (
   return values;
 };
 
+export const hasAdjustmentValueChanges = (
+  keys: readonly string[],
+  source: Partial<Adjustments>,
+  defaults: Partial<Adjustments> = INITIAL_ADJUSTMENTS,
+): boolean =>
+  keys.some((key) => {
+    const currentValue = (source as Record<string, unknown>)[key];
+    const defaultValue = (defaults as Record<string, unknown>)[key];
+    return JSON.stringify(currentValue) !== JSON.stringify(defaultValue);
+  });
+
 export const ADJUSTMENT_SECTIONS: Sections = {
   basic: [
     BasicAdjustment.Brightness,

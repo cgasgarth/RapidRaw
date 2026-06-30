@@ -1789,6 +1789,8 @@
       "zoomLabelReset": "확대/축소 초기화"
     },
     "collapsibleSection": {
+      "dirtyBadge": "편집됨",
+      "disabledBadge": "꺼짐",
       "disableSection": "섹션 비활성화",
       "enableSection": "섹션 활성화"
     },

@@ -3955,6 +3955,8 @@
       "zoomLabelReset": "Zoom zurücksetzen"
     },
     "collapsibleSection": {
+      "dirtyBadge": "Geändert",
+      "disabledBadge": "Aus",
       "disableSection": "Bereich deaktivieren",
       "enableSection": "Bereich aktivieren"
     },

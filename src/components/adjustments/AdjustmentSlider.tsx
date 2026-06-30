@@ -12,6 +12,7 @@ export interface AdjustmentSliderProps {
   value: number;
   defaultValue?: number;
   disabled?: boolean;
+  density?: 'default' | 'compact';
   fillOrigin?: 'default' | 'min';
   suffix?: string;
   trackClassName?: string;
