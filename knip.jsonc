@@ -8,7 +8,7 @@
     "eslint.config.js",
     "i18next.config.ts",
     "scripts/**/*.ts",
-    "tests/integration/checks/**/*.ts",
+    "tests/integration/checks/**/*.ts"
   ],
   "project": [
     "src/**/*.{ts,tsx}",
@@ -16,18 +16,18 @@
     "tests/**/*.ts",
     "*.config.{js,ts}",
     "vite.config.js",
-    "i18next.config.ts",
+    "i18next.config.ts"
   ],
   "ignore": ["dist/**", "node_modules/**", "src-tauri/**"],
   "ignoreBinaries": ["scripts/run-compact-command.ts", "sips"],
-  "ignoreDependencies": ["i18next-cli", "license-checker-rseidelsohn", "lint-staged"],
+  "ignoreDependencies": ["@biomejs/biome", "i18next-cli", "license-checker-rseidelsohn", "lint-staged"],
   "ignoreIssues": {
-    "packages/rawengine-schema/src/**/*.ts": ["exports", "types"],
+    "packages/rawengine-schema/src/**/*.ts": ["exports", "types"]
   },
   "workspaces": {
     "packages/rawengine-schema": {
       "entry": ["src/index.ts", "scripts/**/*.ts"],
-      "project": ["src/**/*.ts", "scripts/**/*.ts"],
-    },
-  },
+      "project": ["src/**/*.ts", "scripts/**/*.ts"]
+    }
+  }
 }

@@ -25,9 +25,7 @@
       },
       "processFamily": "c41_color_negative",
       "runtimeStatus": "metadata_only_not_applicable",
-      "sourceReferences": [
-        "public manufacturer/reference metadata; no endorsement"
-      ],
+      "sourceReferences": ["public manufacturer/reference metadata; no endorsement"],
       "stockClass": "color_negative",
       "stockFamilyDescriptor": "Everyday still color negative",
       "suggestedGenericPresetId": "negative_lab.generic.c41.neutral.v1"
@@ -56,9 +54,7 @@
       },
       "processFamily": "e6_slide_reversal",
       "runtimeStatus": "metadata_only_not_applicable",
-      "sourceReferences": [
-        "public manufacturer/reference metadata; no endorsement"
-      ],
+      "sourceReferences": ["public manufacturer/reference metadata; no endorsement"],
       "stockClass": "slide_reversal",
       "stockFamilyDescriptor": "Daylight color reversal",
       "suggestedGenericPresetId": null
@@ -87,9 +83,7 @@
       },
       "processFamily": "e6_slide_reversal",
       "runtimeStatus": "metadata_only_not_applicable",
-      "sourceReferences": [
-        "public manufacturer/reference metadata; no endorsement"
-      ],
+      "sourceReferences": ["public manufacturer/reference metadata; no endorsement"],
       "stockClass": "slide_reversal",
       "stockFamilyDescriptor": "Saturated color reversal",
       "suggestedGenericPresetId": null
@@ -118,9 +112,7 @@
       },
       "processFamily": "black_and_white_silver_negative",
       "runtimeStatus": "metadata_only_not_applicable",
-      "sourceReferences": [
-        "public manufacturer/reference metadata; no endorsement"
-      ],
+      "sourceReferences": ["public manufacturer/reference metadata; no endorsement"],
       "stockClass": "black_and_white_negative",
       "stockFamilyDescriptor": "Fine-grain silver negative",
       "suggestedGenericPresetId": "negative_lab.generic.bw.fine_grain.v1"
@@ -149,9 +141,7 @@
       },
       "processFamily": "black_and_white_silver_negative",
       "runtimeStatus": "metadata_only_not_applicable",
-      "sourceReferences": [
-        "public manufacturer/reference metadata; no endorsement"
-      ],
+      "sourceReferences": ["public manufacturer/reference metadata; no endorsement"],
       "stockClass": "black_and_white_negative",
       "stockFamilyDescriptor": "High-speed silver negative",
       "suggestedGenericPresetId": "negative_lab.generic.bw.push_contrast.v1"
@@ -180,9 +170,7 @@
       },
       "processFamily": "e6_slide_reversal",
       "runtimeStatus": "metadata_only_not_applicable",
-      "sourceReferences": [
-        "public manufacturer/reference metadata; no endorsement"
-      ],
+      "sourceReferences": ["public manufacturer/reference metadata; no endorsement"],
       "stockClass": "slide_reversal",
       "stockFamilyDescriptor": "Daylight color reversal",
       "suggestedGenericPresetId": null
@@ -211,9 +199,7 @@
       },
       "processFamily": "c41_color_negative",
       "runtimeStatus": "metadata_only_not_applicable",
-      "sourceReferences": [
-        "public manufacturer/reference metadata; no endorsement"
-      ],
+      "sourceReferences": ["public manufacturer/reference metadata; no endorsement"],
       "stockClass": "color_negative",
       "stockFamilyDescriptor": "Saturated still color negative",
       "suggestedGenericPresetId": "negative_lab.generic.c41.saturated.v1"
@@ -242,9 +228,7 @@
       },
       "processFamily": "c41_color_negative",
       "runtimeStatus": "metadata_only_not_applicable",
-      "sourceReferences": [
-        "public manufacturer/reference metadata; no endorsement"
-      ],
+      "sourceReferences": ["public manufacturer/reference metadata; no endorsement"],
       "stockClass": "color_negative",
       "stockFamilyDescriptor": "Consumer still color negative",
       "suggestedGenericPresetId": "negative_lab.generic.c41.warm_consumer.v1"
@@ -273,9 +257,7 @@
       },
       "processFamily": "c41_color_negative",
       "runtimeStatus": "metadata_only_not_applicable",
-      "sourceReferences": [
-        "public manufacturer/reference metadata; no endorsement"
-      ],
+      "sourceReferences": ["public manufacturer/reference metadata; no endorsement"],
       "stockClass": "color_negative",
       "stockFamilyDescriptor": "Portrait still color negative",
       "suggestedGenericPresetId": "negative_lab.generic.c41.portrait.v1"
@@ -304,9 +286,7 @@
       },
       "processFamily": "c41_color_negative",
       "runtimeStatus": "metadata_only_not_applicable",
-      "sourceReferences": [
-        "public manufacturer/reference metadata; no endorsement"
-      ],
+      "sourceReferences": ["public manufacturer/reference metadata; no endorsement"],
       "stockClass": "color_negative",
       "stockFamilyDescriptor": "Portrait still color negative",
       "suggestedGenericPresetId": "negative_lab.generic.c41.portrait.v1"
@@ -335,9 +315,7 @@
       },
       "processFamily": "c41_color_negative",
       "runtimeStatus": "metadata_only_not_applicable",
-      "sourceReferences": [
-        "public manufacturer/reference metadata; no endorsement"
-      ],
+      "sourceReferences": ["public manufacturer/reference metadata; no endorsement"],
       "stockClass": "color_negative",
       "stockFamilyDescriptor": "High-speed portrait still color negative",
       "suggestedGenericPresetId": "negative_lab.generic.c41.high_speed.v1"
@@ -366,9 +344,7 @@
       },
       "processFamily": "black_and_white_silver_negative",
       "runtimeStatus": "metadata_only_not_applicable",
-      "sourceReferences": [
-        "public manufacturer/reference metadata; no endorsement"
-      ],
+      "sourceReferences": ["public manufacturer/reference metadata; no endorsement"],
       "stockClass": "black_and_white_negative",
       "stockFamilyDescriptor": "Fine-grain silver negative",
       "suggestedGenericPresetId": "negative_lab.generic.bw.fine_grain.v1"
@@ -397,9 +373,7 @@
       },
       "processFamily": "black_and_white_silver_negative",
       "runtimeStatus": "metadata_only_not_applicable",
-      "sourceReferences": [
-        "public manufacturer/reference metadata; no endorsement"
-      ],
+      "sourceReferences": ["public manufacturer/reference metadata; no endorsement"],
       "stockClass": "black_and_white_negative",
       "stockFamilyDescriptor": "Classic silver negative",
       "suggestedGenericPresetId": "negative_lab.generic.bw.classic.v1"
@@ -428,9 +402,7 @@
       },
       "processFamily": "ecn2_cinema_negative",
       "runtimeStatus": "metadata_only_not_applicable",
-      "sourceReferences": [
-        "public manufacturer/reference metadata; no endorsement"
-      ],
+      "sourceReferences": ["public manufacturer/reference metadata; no endorsement"],
       "stockClass": "cinema_negative",
       "stockFamilyDescriptor": "Daylight cinema color negative",
       "suggestedGenericPresetId": null
@@ -459,9 +431,7 @@
       },
       "processFamily": "ecn2_cinema_negative",
       "runtimeStatus": "metadata_only_not_applicable",
-      "sourceReferences": [
-        "public manufacturer/reference metadata; no endorsement"
-      ],
+      "sourceReferences": ["public manufacturer/reference metadata; no endorsement"],
       "stockClass": "cinema_negative",
       "stockFamilyDescriptor": "Tungsten cinema color negative",
       "suggestedGenericPresetId": null
@@ -490,9 +460,7 @@
       },
       "processFamily": "ecn2_cinema_negative",
       "runtimeStatus": "metadata_only_not_applicable",
-      "sourceReferences": [
-        "public manufacturer/reference metadata; no endorsement"
-      ],
+      "sourceReferences": ["public manufacturer/reference metadata; no endorsement"],
       "stockClass": "cinema_negative",
       "stockFamilyDescriptor": "Daylight cinema color negative",
       "suggestedGenericPresetId": null

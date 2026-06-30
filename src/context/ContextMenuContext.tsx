@@ -2,21 +2,21 @@ import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import {
+  type ComponentType,
   createContext,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  type RefObject,
   useCallback,
   useContext,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
-  type ComponentType,
-  type MouseEvent as ReactMouseEvent,
-  type ReactNode,
-  type RefObject,
 } from 'react';
 import { createPortal } from 'react-dom';
 
-import { OPTION_SEPARATOR, type Option as AppOption } from '../components/ui/AppProperties';
+import { type Option as AppOption, OPTION_SEPARATOR } from '../components/ui/AppProperties';
 
 interface ContextMenuProviderProps {
   children: ReactNode;
@@ -209,9 +209,9 @@ function MenuItem({ option, path, hideContextMenu }: MenuItemProps) {
   const submenuOptions = option.submenu;
   const isSubmenuOpen = Boolean(
     submenuOptions &&
-    activeSubmenu &&
-    activeSubmenu.length >= path.length &&
-    path.every((val, i) => val === activeSubmenu[i]),
+      activeSubmenu &&
+      activeSubmenu.length >= path.length &&
+      path.every((val, i) => val === activeSubmenu[i]),
   );
 
   const handleMouseEnter = () => {

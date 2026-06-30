@@ -76,7 +76,7 @@ for (const requiredFastGate of ['bun lint-staged --quiet --concurrent false']) {
 }
 
 if (unconditionalSection.split('\n').some((line) => line.trim() === 'bun run check:lint')) {
-  throw new Error('pre-commit must not run full-repo ESLint unconditionally.');
+  throw new Error('pre-commit must not run full-repo Biome unconditionally.');
 }
 
 const fullLintLine = hook.split('\n').find((line) => line.trim() === 'bun run check:lint') ?? '';
@@ -87,8 +87,20 @@ const fullLintCondition = hook
     hook.split('\n').findIndex((line) => line === fullLintLine),
   )
   .findLast((line) => line.includes("grep -Eq '"));
-if (!fullLintCondition?.includes('^eslint\\.config\\.js$')) {
-  throw new Error('pre-commit should reserve full-repo ESLint for ESLint config changes.');
+if (!fullLintCondition?.includes('^biome\\.json$')) {
+  throw new Error('pre-commit should reserve full-repo Biome lint for Biome config changes.');
+}
+
+const eslintGapLine = hook.split('\n').find((line) => line.trim() === 'bun run check:eslint-gaps') ?? '';
+const eslintGapCondition = hook
+  .split('\n')
+  .slice(
+    0,
+    hook.split('\n').findIndex((line) => line === eslintGapLine),
+  )
+  .findLast((line) => line.includes("grep -Eq '"));
+if (!eslintGapCondition?.includes('^eslint\\.config\\.js$')) {
+  throw new Error('pre-commit should reserve full-repo ESLint gap lint for ESLint config changes.');
 }
 
 console.log('precommit fast path ok');

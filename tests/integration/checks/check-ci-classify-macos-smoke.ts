@@ -55,6 +55,7 @@ const SAFE_ROOT_FILES = new Set(['.gitignore', 'AGENTS.md', 'LICENSE', 'README.m
 
 const SAFE_TOOLING_FILES = new Set([
   '.githooks/pre-commit',
+  'biome.json',
   'eslint.config.js',
   'i18next.config.ts',
   'knip.jsonc',
@@ -975,7 +976,7 @@ function runSelfTest() {
     SMOKE_MODES.NONE,
   );
   assertClassification('pure TS tests can skip smoke', ['tests/pure-ts/edit-command-bus.test.ts'], SMOKE_MODES.NONE);
-  assertClassification('lint config changes can skip smoke', ['eslint.config.js'], SMOKE_MODES.NONE);
+  assertClassification('lint config changes can skip smoke', ['biome.json', 'eslint.config.js'], SMOKE_MODES.NONE);
   assertClassification('unused-code config changes can skip smoke', ['knip.jsonc'], SMOKE_MODES.NONE);
   assertClassification(
     'validation scripts can skip smoke',

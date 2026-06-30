@@ -25,11 +25,15 @@ if printf '%s\n' "$staged_files" | grep -Eq '^(src/|i18next\.config\.ts$|package
   bun run check:i18n
 fi
 
-if printf '%s\n' "$staged_files" | grep -Eq '^(src/|scripts/|tests/|eslint\.config\.js|package\.json|bun\.lock|tsconfig[^/]*\.json$)'; then
+if printf '%s\n' "$staged_files" | grep -Eq '^(src/|scripts/|tests/|eslint\.config\.js|biome\.json|package\.json|bun\.lock|tsconfig[^/]*\.json$)'; then
   bun run check:lint-escapes
 fi
 
 if printf '%s\n' "$staged_files" | grep -Eq '^eslint\.config\.js$'; then
+  bun run check:eslint-gaps
+fi
+
+if printf '%s\n' "$staged_files" | grep -Eq '^biome\.json$'; then
   bun run check:lint
 fi
 

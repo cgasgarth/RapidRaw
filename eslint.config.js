@@ -1,3 +1,5 @@
+// Default lint/format runs through Biome. This ESLint config is kept for
+// temporary gap rules that Biome does not cover yet, via check:eslint-gaps.
 const { fixupPluginRules } = require('@eslint/compat');
 const js = require('@eslint/js');
 const tseslint = require('typescript-eslint');

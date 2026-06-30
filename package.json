@@ -14,10 +14,10 @@
     "start": "tauri dev",
     "start:native-qa": "bun scripts/start-native-qa-app.ts",
     "typecheck": "bun scripts/run-compact-command.ts --label typecheck -- tsc --noEmit --pretty false",
-    "lint": "bun scripts/run-compact-command.ts --label lint -- eslint . --max-warnings 0",
-    "lint:fix": "bun scripts/run-compact-command.ts --label lint:fix -- eslint . --fix",
-    "format": "bun scripts/run-compact-command.ts --label format -- prettier --write . --log-level warn",
-    "format:check": "bun scripts/run-compact-command.ts --label format -- prettier --check .",
+    "lint": "bun scripts/run-compact-command.ts --label lint -- biome ci --formatter-enabled=false --assist-enabled=false .",
+    "lint:fix": "bun scripts/run-compact-command.ts --label lint:fix -- biome check --write .",
+    "format": "bun scripts/run-compact-command.ts --label format -- biome format --write .",
+    "format:check": "bun scripts/run-compact-command.ts --label format -- biome ci --linter-enabled=false --assist-enabled=false .",
     "worktree:create": "bun scripts/create-codex-worktree.ts",
     "check:worktree-create": "bun scripts/create-codex-worktree.ts --self-test",
     "hooks:install": "git config core.hooksPath .githooks",
@@ -519,9 +519,10 @@
     "check:computational-private-proof-runner-negative-cases": "bun tests/integration/checks/check-computational-private-proof-runner-negative-cases.ts",
     "check:computational-merge-review-panel-contract": "bun tests/integration/checks/check-computational-merge-review-panel-contract.ts",
     "check:lint-escapes": "bun tests/integration/checks/check-eslint-escape-hatches.ts",
-    "check:lint": "bun scripts/run-compact-command.ts --label lint -- eslint . --max-warnings 0",
+    "check:lint": "bun run lint",
+    "check:eslint-gaps": "bun scripts/run-compact-command.ts --label eslint-gaps -- eslint . --max-warnings 0",
     "check:precommit-fast-path": "bun tests/integration/checks/check-precommit-fast-path.ts",
-    "check:format": "bun scripts/run-compact-command.ts --label format -- prettier --check .",
+    "check:format": "bun run format:check",
     "check:actions": "bun run check:actions:lint && bun run check:workflow-policy && bun run check:workflow-policy:self-test && bun run check:compact-commands && bun run check:compact-commands:self-test && bun run check:rust-feature-policy && bun run check:rust-feature-policy:self-test && bun run schema:contract-gate:self-test",
     "check:actions:lint": "bun scripts/run-compact-command.ts --label actionlint -- go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml",
     "check:workflow-policy": "bun tests/integration/checks/check-github-workflow-policy.ts",
@@ -690,8 +691,7 @@
     "check:agent-live-session-shell": "bun tests/integration/checks/check-agent-live-session-shell.ts"
   },
   "lint-staged": {
-    "*.{cjs,css,html,js,json,jsx,md,ts,tsx,yaml,yml}": "bun prettier --write --log-level warn",
-    "*.{cjs,js,jsx,ts,tsx}": "bun eslint --fix --max-warnings 0 --no-warn-ignored",
+    "*.{cjs,css,js,json,jsonc,jsx,mjs,ts,tsx}": "bun biome check --write --no-errors-on-unmatched",
     "src/**/*.{js,jsx,ts,tsx}": "sh -c 'bun run i18n:extract && bun run i18n:check && bun run i18n:lint'",
     "src/i18n/locales/*.json": "sh -c 'bun run i18n:check && bun run i18n:lint'"
   },
@@ -723,6 +723,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.1",
     "@eslint/compat": "^2.1.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
