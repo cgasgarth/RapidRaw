@@ -5,7 +5,7 @@ import {
   type ComputationalMergeRuntimeApplyToolResultV1,
   type ComputationalMergeRuntimeDryRunToolResultV1,
   type ComputationalMergeRuntimeToolResultV1,
-} from './computationalMergeAppServerRuntimeBus.js';
+} from '../computationalMergeAppServerRuntimeBus.js';
 import {
   applyFocusStackRuntimePlanV1,
   buildFocusStackRuntimeDryRunV1,

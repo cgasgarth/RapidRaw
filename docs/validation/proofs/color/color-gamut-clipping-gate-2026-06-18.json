@@ -153,7 +153,7 @@
       "warnings": ["output_gamut_high_component_v1"]
     }
   ],
-  "fixturePath": "fixtures/color/gamut-mapping-fixtures.json",
+  "fixturePath": "fixtures/color/proofs/gamut-mapping-fixtures.json",
   "generatedFromSnapshotDate": "2026-06-15",
   "issue": 3495,
   "parentIssue": 3238,

@@ -27,7 +27,7 @@
       "warning": "camera_profile_embedded_fallback"
     }
   ],
-  "fixturePath": "fixtures/color/camera-profile-input-transform-proof.json",
+  "fixturePath": "fixtures/color/proofs/camera-profile-input-transform-proof.json",
   "generatedFromSnapshotDate": "2026-06-18",
   "issue": 1261,
   "lookupFixturePath": "fixtures/color/camera-profile-lookup-fixtures.json",

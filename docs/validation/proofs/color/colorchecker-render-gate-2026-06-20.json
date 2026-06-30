@@ -1,6 +1,6 @@
 {
   "fixtureId": "colorchecker.synthetic.render-gate.v1",
-  "fixturePath": "fixtures/color/colorchecker-render-gate.json",
+  "fixturePath": "fixtures/color/proofs/colorchecker-render-gate.json",
   "issue": 2328,
   "maxDeltaE00": 0.777521,
   "meanDeltaE00": 0.603481,

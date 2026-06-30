@@ -1,4 +1,4 @@
-import { createFocusStackPlanOnlyDryRunResultV1 } from '../src/focusStackPreflight.js';
+import { createFocusStackPlanOnlyDryRunResultV1 } from '../src/focus-stack/focusStackPreflight.js';
 import {
   type ComputationalMergeCommandEnvelopeV1,
   computationalMergeCommandEnvelopeV1Schema,

@@ -58,7 +58,7 @@
       "targetStatus": "targeted_changed"
     }
   ],
-  "fixturePath": "fixtures/color/selective-color-falloff-fixtures.json",
+  "fixturePath": "fixtures/color/selective-color/selective-color-falloff-fixtures.json",
   "issue": 1876,
   "schemaVersion": 1,
   "shaderPath": "src-tauri/src/shaders/shader.wgsl",

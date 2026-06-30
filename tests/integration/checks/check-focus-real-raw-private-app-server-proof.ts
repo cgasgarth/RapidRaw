@@ -6,11 +6,11 @@ import { join, resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { FocusStackAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/focusStackAppServerRuntime.ts';
+import { FocusStackAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/focus-stack/focusStackAppServerRuntime.ts';
 import {
   buildFocusStackUiApplyCommandV1,
   buildFocusStackUiDryRunCommandV1,
-} from '../../../packages/rawengine-schema/src/focusStackUiControls.ts';
+} from '../../../packages/rawengine-schema/src/focus-stack/focusStackUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational/proof-budgets.ts';
 import { privateRawReportMetric } from '../../../scripts/lib/private-raw/computational-report-fixtures.ts';

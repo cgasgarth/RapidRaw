@@ -4,11 +4,7 @@ import {
   buildComputationalMergeArtifactHandleV1,
   buildComputationalMergeDryRunResultV1,
   buildComputationalMergeMutationResultV1,
-} from './computationalMergeRuntimeResultBuilders.js';
-import {
-  applyWeightedSharpnessFocusStackV1,
-  focusStackRuntimeSharpnessCellV1Schema,
-} from './focusStackWeightedBlend.js';
+} from '../computationalMergeRuntimeResultBuilders.js';
 import {
   type ArtifactHandleV1,
   type ComputationalMergeCommandEnvelopeV1,
@@ -18,7 +14,11 @@ import {
   type FocusStackArtifactV1,
   focusStackArtifactV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from './rawEngineSchemas.js';
+} from '../rawEngineSchemas.js';
+import {
+  applyWeightedSharpnessFocusStackV1,
+  focusStackRuntimeSharpnessCellV1Schema,
+} from './focusStackWeightedBlend.js';
 
 const FOCUS_RUNTIME_ENGINE_ID = 'rawengine_focus_stack_runtime_v1';
 const FOCUS_RUNTIME_ENGINE_VERSION = '0.1.0';
@@ -787,16 +787,16 @@ const findWinningFocusConfidence = (sourceScores: FocusStackRuntimePlanRequestV1
 const resolveFocusReferenceSource = (
   request: ParsedFocusStackRuntimePlanRequestV1,
 ): { selectionReason: 'explicit_request' | 'first_frame_default'; sourceIndex: number } => {
-  const defaultReferenceSourceIndex = request.frames[0]?.sourceIndex;
+  const defaultReferenceSourceIndex = request['frames'][0]?.sourceIndex;
   if (defaultReferenceSourceIndex === undefined) {
     throw new Error('Focus stack runtime plan requires at least one frame.');
   }
-  const sourceIndex = request.referenceSourceIndex ?? defaultReferenceSourceIndex;
-  if (!request.frames.some((frame) => frame.sourceIndex === sourceIndex)) {
+  const sourceIndex = request['referenceSourceIndex'] ?? defaultReferenceSourceIndex;
+  if (!request['frames'].some((frame: FocusStackRuntimePlanFrameV1) => frame.sourceIndex === sourceIndex)) {
     throw new Error(`Focus stack runtime reference source ${sourceIndex} does not match a frame.`);
   }
   return {
-    selectionReason: request.referenceSourceIndex === undefined ? 'first_frame_default' : 'explicit_request',
+    selectionReason: request['referenceSourceIndex'] === undefined ? 'first_frame_default' : 'explicit_request',
     sourceIndex,
   };
 };

@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { buildFocusStackUiDryRunCommandV1 } from '../../../packages/rawengine-schema/src/focusStackUiControls.ts';
+import { buildFocusStackUiDryRunCommandV1 } from '../../../packages/rawengine-schema/src/focus-stack/focusStackUiControls.ts';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../../src/schemas/focusStackUiSchemas.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
 

@@ -47,7 +47,7 @@
       "weightedAdjustment": -0.28
     }
   ],
-  "fixturePath": "fixtures/color/black-white-mixer.json",
+  "fixturePath": "fixtures/color/adjustments/black-white-mixer.json",
   "issue": 1878,
   "schemaVersion": 1,
   "validationMode": "black_white_mixer_apply_runtime_artifact"
