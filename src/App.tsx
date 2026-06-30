@@ -1,6 +1,6 @@
 import { ClerkProvider } from '@clerk/react';
 import cx from 'clsx';
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, type ReactNode } from 'react';
 import { ToastContainer, Slide } from 'react-toastify';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -75,6 +75,18 @@ interface PreloadedAppData {
   images?: Promise<ImageFile[]> | undefined;
   rootPaths?: string[];
   trees?: Promise<FolderTreeNode[]> | undefined;
+}
+
+export function LibraryExportPanelSlot({
+  children,
+  hasSelectedImage,
+  isLibraryExportPanelVisible,
+}: {
+  children: ReactNode;
+  hasSelectedImage: boolean;
+  isLibraryExportPanelVisible: boolean;
+}) {
+  return !hasSelectedImage && isLibraryExportPanelVisible ? <>{children}</> : null;
 }
 
 function App() {
@@ -695,7 +707,10 @@ function App() {
                 />
               )}
             </div>
-            {!selectedImage && isLibraryExportPanelVisible && (
+            <LibraryExportPanelSlot
+              hasSelectedImage={selectedImage !== null}
+              isLibraryExportPanelVisible={isLibraryExportPanelVisible}
+            >
               <>
                 <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
                 <div
@@ -721,7 +736,7 @@ function App() {
                   />
                 </div>
               </>
-            )}
+            </LibraryExportPanelSlot>
           </div>
         </div>
         <AppModals
