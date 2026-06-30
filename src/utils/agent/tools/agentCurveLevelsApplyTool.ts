@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { levelsSettingsSchema } from '../schemas/levelsSchemas';
-import { useEditorStore } from '../store/useEditorStore';
-import type { Adjustments, Coord, Curves, ParametricCurve, ParametricCurveSettings } from './adjustments';
-import { ActiveChannel, getDefaultParametricCurve } from './adjustments';
-import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
-import { pushEditHistoryEntry } from './editHistory';
+import { levelsSettingsSchema } from '../../../schemas/levelsSchemas';
+import { useEditorStore } from '../../../store/useEditorStore';
+import type { Adjustments, Coord, Curves, ParametricCurve, ParametricCurveSettings } from '../../adjustments';
+import { ActiveChannel, getDefaultParametricCurve } from '../../adjustments';
+import { buildAgentImageContextSnapshot } from '../../agentImageContextSnapshot';
+import { pushEditHistoryEntry } from '../../editHistory';
 
 export const AGENT_CURVE_LEVELS_APPLY_TOOL_NAME = 'rawengine.agent.curve_levels.apply';
 export const AGENT_CURVE_LEVELS_APPLY_INPUT_SCHEMA_NAME = 'AgentCurveLevelsApplyRequestV1';

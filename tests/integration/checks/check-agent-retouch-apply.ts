@@ -4,12 +4,12 @@ import { ToolType } from '../../../src/components/panel/right/layers/Masks.tsx';
 import { RawEngineAppServerRouteMode } from '../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-import { buildAgentImageContextSnapshot } from '../../../src/utils/agentImageContextSnapshot.ts';
 import {
   AGENT_RETOUCH_APPLY_TOOL_NAME,
   agentRetouchApplyRequestSchema,
   applyAgentRetouch,
-} from '../../../src/utils/agentRetouchApplyTool.ts';
+} from '../../../src/utils/agent/tools/agentRetouchApplyTool.ts';
+import { buildAgentImageContextSnapshot } from '../../../src/utils/agentImageContextSnapshot.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../../../src/utils/rawEngineAppServerHost.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3163.ARW';

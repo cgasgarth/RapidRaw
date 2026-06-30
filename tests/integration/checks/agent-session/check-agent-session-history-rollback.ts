@@ -12,7 +12,7 @@ import {
 import {
   applyAgentGlobalAdjustments,
   dryRunAgentGlobalAdjustments,
-} from '../../../../src/utils/agentAdjustmentApplyTool.ts';
+} from '../../../../src/utils/agent/tools/agentAdjustmentApplyTool.ts';
 import { buildAgentImageContextSnapshot } from '../../../../src/utils/agentImageContextSnapshot.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../../../../src/utils/rawEngineAppServerHost.ts';
 

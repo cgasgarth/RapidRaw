@@ -14,7 +14,7 @@ import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustmen
 import {
   applyAgentGlobalAdjustments,
   dryRunAgentGlobalAdjustments,
-} from '../../../src/utils/agentAdjustmentApplyTool.ts';
+} from '../../../src/utils/agent/tools/agentAdjustmentApplyTool.ts';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agentImageContextSnapshot.ts';
 import { runAgentIterativeEditLoop } from '../../../src/utils/agentIterativeEditLoop.ts';
 

@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { useEditorStore } from '../store/useEditorStore';
-import type { Adjustments } from './adjustments';
-import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
-import { pushEditHistoryEntry } from './editHistory';
+import { useEditorStore } from '../../../store/useEditorStore';
+import type { Adjustments } from '../../adjustments';
+import { buildAgentImageContextSnapshot } from '../../agentImageContextSnapshot';
+import { pushEditHistoryEntry } from '../../editHistory';
 
 export const AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME = 'rawengine.agent.detail_effects.apply';
 export const AGENT_DETAIL_EFFECTS_APPLY_INPUT_SCHEMA_NAME = 'AgentDetailEffectsApplyRequestV1';

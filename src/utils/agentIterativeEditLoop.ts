@@ -11,7 +11,7 @@ import {
   AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
   agentAdjustmentsApplyResponseSchema,
   agentAdjustmentsDryRunResponseSchema,
-} from './agentAdjustmentApplyTool';
+} from './agent/tools/agentAdjustmentApplyTool';
 import { agentEditQualityReviewSchema, buildAgentEditQualityReview } from './agentEditQualityReview';
 import { agentPreviewEnvelopeSchema } from './agentPreviewEnvelope';
 import {

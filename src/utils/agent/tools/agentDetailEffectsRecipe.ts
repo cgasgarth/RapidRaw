@@ -1,4 +1,4 @@
-import type { Adjustments } from './adjustments';
+import type { Adjustments } from '../../adjustments';
 
 export const buildAgentDetailEffectsRecipeHashInput = (adjustments: Adjustments) => ({
   chromaticAberrationBlueYellow: adjustments.chromaticAberrationBlueYellow,

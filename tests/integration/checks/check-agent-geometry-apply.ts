@@ -13,7 +13,7 @@ import {
   AGENT_GEOMETRY_APPLY_TOOL_NAME,
   agentGeometryApplyRequestSchema,
   applyAgentGeometry,
-} from '../../../src/utils/agentGeometryApplyTool.ts';
+} from '../../../src/utils/agent/tools/agentGeometryApplyTool.ts';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agentImageContextSnapshot.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
