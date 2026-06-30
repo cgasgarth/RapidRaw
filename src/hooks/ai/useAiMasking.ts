@@ -2,7 +2,7 @@ import { useAuth } from '@clerk/react';
 import { invoke } from '@tauri-apps/api/core';
 import { useCallback, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { Mask, type SubMask } from '../../components/panel/right/Masks';
+import { Mask, type SubMask } from '../../components/panel/right/layers/Masks';
 import { type AiPeopleMaskPart, parseAiPatchDataJson } from '../../schemas/masks/aiMaskingSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { Invokes } from '../../tauri/commands';

@@ -1,9 +1,9 @@
 import cx from 'clsx';
 import { useTranslation } from 'react-i18next';
 
-import { TextColors, TextVariants } from '../../../types/typography';
-import { buildAiPeopleMaskPickerModel } from '../../../utils/aiPeopleMaskPickerModel';
-import UiText from '../../ui/Text';
+import { TextColors, TextVariants } from '../../../../types/typography';
+import { buildAiPeopleMaskPickerModel } from '../../../../utils/aiPeopleMaskPickerModel';
+import UiText from '../../../ui/Text';
 
 export function AiPeoplePartPickerStatus() {
   const { t } = useTranslation();

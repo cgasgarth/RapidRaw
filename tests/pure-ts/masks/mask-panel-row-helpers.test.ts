@@ -4,7 +4,7 @@ import {
   getMaskLikeContainerDropClass,
   getMaskLikeSubMaskDropClass,
   isMaskLikeContainerDrag,
-} from '../../../src/components/panel/right/maskPanelRowHelpers.ts';
+} from '../../../src/components/panel/right/layers/maskPanelRowHelpers.ts';
 
 test('container drop class distinguishes container reorder from cross-container drops', () => {
   expect(

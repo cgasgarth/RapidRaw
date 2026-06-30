@@ -9,7 +9,7 @@ import {
 } from '../../../src/utils/maskRefinementCommandBus.ts';
 
 const busSource = readFileSync('src/utils/maskRefinementCommandBus.ts', 'utf8');
-const panelSource = readFileSync('src/components/panel/right/MasksPanel.tsx', 'utf8');
+const panelSource = readFileSync('src/components/panel/right/layers/MasksPanel.tsx', 'utf8');
 
 const requiredBusFragments: string[] = [
   'maskRefinementUiCommandSchema',

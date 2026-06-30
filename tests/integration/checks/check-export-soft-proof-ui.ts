@@ -6,7 +6,7 @@ const read = (path: string) => readFileSync(path, 'utf8');
 const failures: string[] = [];
 
 const toolbarSource = read('src/components/panel/editor/EditorToolbar.tsx');
-const exportPanelSource = read('src/components/panel/right/ExportPanel.tsx');
+const exportPanelSource = read('src/components/panel/right/export/ExportPanel.tsx');
 const hookSource = read('src/hooks/editor/useImageProcessing.ts');
 const storeSource = read('src/store/useEditorStore.ts');
 const commandsSource = read('src/tauri/commands.ts');

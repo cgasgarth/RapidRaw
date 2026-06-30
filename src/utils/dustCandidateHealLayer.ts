@@ -1,4 +1,4 @@
-import { Mask, SubMaskMode } from '../components/panel/right/Masks';
+import { Mask, SubMaskMode } from '../components/panel/right/layers/Masks';
 import {
   type NegativeLabDustHealCorrectionMetrics,
   type NegativeLabDustScratchReviewReport,

@@ -15,7 +15,7 @@ import {
   layerMaskMutationResultV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { Mask, type SubMask, SubMaskMode } from '../../../src/components/panel/right/Masks.tsx';
+import { Mask, type SubMask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks.tsx';
 import {
   INITIAL_MASK_ADJUSTMENTS,
   INITIAL_MASK_CONTAINER,

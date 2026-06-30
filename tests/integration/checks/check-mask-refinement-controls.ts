@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-const source = readFileSync('src/components/panel/right/MasksPanel.tsx', 'utf8');
+const source = readFileSync('src/components/panel/right/layers/MasksPanel.tsx', 'utf8');
 
 const requiredFragments = [
   'const MASK_REFINEMENT_PARAMETERS',

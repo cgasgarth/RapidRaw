@@ -1,4 +1,4 @@
-import { Mask, type MaskType, type SubMask, SubMaskMode } from '../components/panel/right/Masks';
+import { Mask, type MaskType, type SubMask, SubMaskMode } from '../components/panel/right/layers/Masks';
 import type { ImageDimensions } from '../hooks/viewport/useImageRenderSize';
 import { toMaskParameterRecord } from './maskParameterAccess';
 import { createSubMask } from './maskUtils';

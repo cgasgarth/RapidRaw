@@ -27,51 +27,51 @@ import type {
   AgentReviewHandoff,
   AgentSelectedFrameScope,
   AgentSelectedImagePreviewLoopReview,
-} from '../../../schemas/agentChatTranscriptSchemas';
-import { useEditorStore } from '../../../store/useEditorStore';
-import { buildAgentAppServerToolReadinessSummary } from '../../../utils/agentAppServerToolReadiness';
-import { runAgentBoundedEditPlannerLoop } from '../../../utils/agentBoundedEditPlannerLoop';
-import { AGENT_COLOR_APPLY_TOOL_NAME } from '../../../utils/agentColorApplyTool';
+} from '../../../../schemas/agentChatTranscriptSchemas';
+import { useEditorStore } from '../../../../store/useEditorStore';
+import { buildAgentAppServerToolReadinessSummary } from '../../../../utils/agentAppServerToolReadiness';
+import { runAgentBoundedEditPlannerLoop } from '../../../../utils/agentBoundedEditPlannerLoop';
+import { AGENT_COLOR_APPLY_TOOL_NAME } from '../../../../utils/agentColorApplyTool';
 import {
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
   type AgentCurrentImagePreviewLoopResult,
   agentCurrentImagePreviewLoopResultSchema,
-} from '../../../utils/agentCurrentImagePreviewLoop';
-import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../utils/agentDetailEffectsApplyTool';
-import { planAgentEditRecipe } from '../../../utils/agentEditRecipePlanner';
-import { AGENT_EXPORT_PROOF_TOOL_NAME, agentExportProofResponseSchema } from '../../../utils/agentExportProofTool';
+} from '../../../../utils/agentCurrentImagePreviewLoop';
+import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../../utils/agentDetailEffectsApplyTool';
+import { planAgentEditRecipe } from '../../../../utils/agentEditRecipePlanner';
+import { AGENT_EXPORT_PROOF_TOOL_NAME, agentExportProofResponseSchema } from '../../../../utils/agentExportProofTool';
 import {
   agentImageContextSnapshotSchema,
   buildAgentImageContextSnapshot,
-} from '../../../utils/agentImageContextSnapshot';
+} from '../../../../utils/agentImageContextSnapshot';
 import {
   AGENT_LAYER_CREATE_TOOL_NAME,
   AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
-} from '../../../utils/agentLayerMaskTools';
-import { dispatchAgentLiveEditorTool } from '../../../utils/agentLiveToolDispatch';
+} from '../../../../utils/agentLayerMaskTools';
+import { dispatchAgentLiveEditorTool } from '../../../../utils/agentLiveToolDispatch';
 import {
   type AgentMultiTurnAppServerSessionRequest,
   type AgentMultiTurnAppServerSessionResult,
   runAgentMultiTurnAppServerSession,
-} from '../../../utils/agentMultiTurnAppServerSession';
+} from '../../../../utils/agentMultiTurnAppServerSession';
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
   getAgentReadOnlyState,
   renderAgentReadOnlyPreview,
-} from '../../../utils/agentReadOnlyAppServerTools';
+} from '../../../../utils/agentReadOnlyAppServerTools';
 import {
   type AgentSafetyPolicyDecision,
   evaluateAgentSafetyPolicy,
   inferAgentSafetyOperationKind,
-} from '../../../utils/agentSafetyPolicy';
+} from '../../../../utils/agentSafetyPolicy';
 import {
   type AgentSessionAuditRecord,
   type AgentSessionAuditStorageAdapter,
   appendAgentSessionAuditRecord,
-} from '../../../utils/agentSessionAuditStore';
-import { AGENT_HISTORY_ROLLBACK_TOOL_NAME } from '../../../utils/agentSessionHistory';
+} from '../../../../utils/agentSessionAuditStore';
+import { AGENT_HISTORY_ROLLBACK_TOOL_NAME } from '../../../../utils/agentSessionHistory';
 
 interface AgentChatShellProps {
   transcript: AgentChatTranscript;

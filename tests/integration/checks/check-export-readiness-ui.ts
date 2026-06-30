@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 
 const [source, locale, packageJson] = await Promise.all([
-  readFile('src/components/panel/right/ExportPanel.tsx', 'utf8'),
+  readFile('src/components/panel/right/export/ExportPanel.tsx', 'utf8'),
   readFile('src/i18n/locales/en.json', 'utf8'),
   readFile('package.json', 'utf8'),
 ]);

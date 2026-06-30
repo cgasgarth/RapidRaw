@@ -39,7 +39,7 @@ if (summary.dryRunRouteCount === 0) failures.push('Dry-run route count should be
 if (summary.applyRouteCount === 0) failures.push('Apply route count should be visible.');
 if (summary.runtimeCheckCount === 0) failures.push('Runtime check count should be visible.');
 
-const source = readFileSync('src/components/panel/right/AgentChatShell.tsx', 'utf8');
+const source = readFileSync('src/components/panel/right/ai/AgentChatShell.tsx', 'utf8');
 for (const marker of [
   'buildAgentAppServerToolReadinessSummary',
   'data-testid="agent-app-server-tool-readiness"',

@@ -106,7 +106,7 @@ if (restoredState.adjustments.exposure !== INITIAL_ADJUSTMENTS.exposure) {
   failures.push('Rollback restore path must recover pre-agent adjustments.');
 }
 
-const shellSource = readFileSync('src/components/panel/right/AgentChatShell.tsx', 'utf8');
+const shellSource = readFileSync('src/components/panel/right/ai/AgentChatShell.tsx', 'utf8');
 for (const marker of [
   'data-testid="agent-review-handoff-rollback-restore"',
   'data-rollback-restore-state={rollbackRestoreState}',

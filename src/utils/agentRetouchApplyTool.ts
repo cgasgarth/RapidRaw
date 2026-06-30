@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { type ArtifactHandleV1, artifactHandleV1Schema } from '../../packages/rawengine-schema/src';
-import { Mask, SubMaskMode } from '../components/panel/right/Masks';
+import { Mask, SubMaskMode } from '../components/panel/right/layers/Masks';
 import { useEditorStore } from '../store/useEditorStore';
 import {
   DEFAULT_LAYER_BLEND_MODE,

@@ -50,10 +50,6 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4213',
     reason: 'Rust modules are pending domain grouping where practical',
   },
-  'src/components/panel/right': {
-    issue: '#4225',
-    reason: 'right-panel components are pending editor-surface grouping',
-  },
   'src/components/ui': {
     issue: '#4226',
     reason: 'shared UI components are pending primitive/widget split',

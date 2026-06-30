@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { Mask, SubMaskMode } from '../../../src/components/panel/right/Masks';
+import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
 import { createEditorSubMaskFallback, createEditorSubMaskForImage } from '../../../src/utils/editorSubMaskFactory';
 
 describe('editor sub-mask factory', () => {

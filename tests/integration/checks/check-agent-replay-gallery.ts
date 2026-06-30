@@ -22,7 +22,7 @@ if (gallery === undefined) {
   }
 }
 
-const shellSource = readFileSync('src/components/panel/right/AgentChatShell.tsx', 'utf8');
+const shellSource = readFileSync('src/components/panel/right/ai/AgentChatShell.tsx', 'utf8');
 for (const marker of [
   'data-testid="agent-replay-gallery"',
   'data-gallery-role={entry.role}',

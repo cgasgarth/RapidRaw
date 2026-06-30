@@ -78,7 +78,7 @@ if (inferAgentSafetyOperationKind('make the subject brighter') !== 'ambiguous_su
   throw new Error('Prompt inference should classify subject prompts as ambiguous_subject_edit.');
 }
 
-const source = readFileSync('src/components/panel/right/AgentChatShell.tsx', 'utf8');
+const source = readFileSync('src/components/panel/right/ai/AgentChatShell.tsx', 'utf8');
 for (const marker of [
   'evaluateAgentSafetyPolicy',
   'inferAgentSafetyOperationKind',

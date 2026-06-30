@@ -34,7 +34,7 @@ if (handoff === undefined) {
   }
 }
 
-const shellSource = readFileSync('src/components/panel/right/AgentChatShell.tsx', 'utf8');
+const shellSource = readFileSync('src/components/panel/right/ai/AgentChatShell.tsx', 'utf8');
 for (const marker of [
   'data-testid="agent-review-handoff-audit-trail"',
   'data-tool-name={entry.toolName}',

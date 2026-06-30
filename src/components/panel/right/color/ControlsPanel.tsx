@@ -6,44 +6,44 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { useShallow } from 'zustand/react/shallow';
 
-import { useContextMenu } from '../../../context/ContextMenuContext';
-import { useEditorActions } from '../../../hooks/editor/useEditorActions';
-import { useWaveformControls } from '../../../hooks/editor/useWaveformControls';
+import { useContextMenu } from '../../../../context/ContextMenuContext';
+import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
+import { useWaveformControls } from '../../../../hooks/editor/useWaveformControls';
 import {
   type RawReconstructionComparisonResult,
   rawReconstructionComparisonResultSchema,
-} from '../../../schemas/rawReconstructionComparisonSchemas';
-import { emptyTauriResponseSchema } from '../../../schemas/tauriResponseSchemas';
-import { type CopiedSectionAdjustments, useEditorStore } from '../../../store/useEditorStore';
-import { useSettingsStore } from '../../../store/useSettingsStore';
-import { type CollapsibleSectionsState, useUIStore } from '../../../store/useUIStore';
-import { Invokes } from '../../../tauri/commands';
-import { TextVariants } from '../../../types/typography';
+} from '../../../../schemas/rawReconstructionComparisonSchemas';
+import { emptyTauriResponseSchema } from '../../../../schemas/tauriResponseSchemas';
+import { type CopiedSectionAdjustments, useEditorStore } from '../../../../store/useEditorStore';
+import { useSettingsStore } from '../../../../store/useSettingsStore';
+import { type CollapsibleSectionsState, useUIStore } from '../../../../store/useUIStore';
+import { Invokes } from '../../../../tauri/commands';
+import { TextVariants } from '../../../../types/typography';
 import {
   ADJUSTMENT_SECTIONS,
   type Adjustments,
   INITIAL_ADJUSTMENTS,
   pickAdjustmentValues,
-} from '../../../utils/adjustments';
-import { formatUnknownError } from '../../../utils/errorFormatting';
+} from '../../../../utils/adjustments';
+import { formatUnknownError } from '../../../../utils/errorFormatting';
 import {
   normalizeRawProcessingMode,
   RAW_PROCESSING_MODE_RECIPES,
   RAW_PROCESSING_MODES,
   type RawProcessingMode,
-} from '../../../utils/rawProcessingModes';
-import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
-import BasicAdjustments from '../../adjustments/Basic';
-import ColorPanel from '../../adjustments/Color';
-import CurveGraph from '../../adjustments/Curves';
-import DetailsPanel from '../../adjustments/Details';
-import EffectsPanel from '../../adjustments/Effects';
-import { OPTION_SEPARATOR, type Option, Orientation } from '../../ui/AppProperties';
-import CollapsibleSection from '../../ui/CollapsibleSection';
-import Dropdown, { type OptionItem } from '../../ui/Dropdown';
-import Resizer from '../../ui/Resizer';
-import UiText from '../../ui/Text';
-import Waveform from '../editor/Waveform';
+} from '../../../../utils/rawProcessingModes';
+import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
+import BasicAdjustments from '../../../adjustments/Basic';
+import ColorPanel from '../../../adjustments/Color';
+import CurveGraph from '../../../adjustments/Curves';
+import DetailsPanel from '../../../adjustments/Details';
+import EffectsPanel from '../../../adjustments/Effects';
+import { OPTION_SEPARATOR, type Option, Orientation } from '../../../ui/AppProperties';
+import CollapsibleSection from '../../../ui/CollapsibleSection';
+import Dropdown, { type OptionItem } from '../../../ui/Dropdown';
+import Resizer from '../../../ui/Resizer';
+import UiText from '../../../ui/Text';
+import Waveform from '../../editor/Waveform';
 
 const ADJUSTMENT_SECTION_NAMES = ['basic', 'curves', 'color', 'details', 'effects'] as const;
 type AdjustmentSectionName = (typeof ADJUSTMENT_SECTION_NAMES)[number];

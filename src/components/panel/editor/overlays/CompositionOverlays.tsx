@@ -1,4 +1,4 @@
-import type { OverlayMode } from '../../right/CropPanel';
+import type { OverlayMode } from '../../right/color/CropPanel';
 
 interface CompositionOverlaysProps {
   width: number;

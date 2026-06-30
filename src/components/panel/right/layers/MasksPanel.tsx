@@ -44,23 +44,23 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-import { useContextMenu } from '../../../context/ContextMenuContext';
-import { useAiMasking } from '../../../hooks/ai/useAiMasking';
-import { useEditorActions } from '../../../hooks/editor/useEditorActions';
-import { type UserPreset, usePresets } from '../../../hooks/editor/usePresets';
-import { useWaveformControls } from '../../../hooks/editor/useWaveformControls';
-import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
-import type { MaskOverlaySettings } from '../../../schemas/masks/maskOverlaySchemas';
+import { useContextMenu } from '../../../../context/ContextMenuContext';
+import { useAiMasking } from '../../../../hooks/ai/useAiMasking';
+import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
+import { type UserPreset, usePresets } from '../../../../hooks/editor/usePresets';
+import { useWaveformControls } from '../../../../hooks/editor/useWaveformControls';
+import { useManagedFocus } from '../../../../hooks/ui/useManagedFocus';
+import type { MaskOverlaySettings } from '../../../../schemas/masks/maskOverlaySchemas';
 import {
   aiDepthMaskParametersSchema,
   type MaskRefinementParameters,
-} from '../../../schemas/masks/maskParameterSchemas';
-import { useEditorStore } from '../../../store/useEditorStore';
-import { useProcessStore } from '../../../store/useProcessStore';
-import { useSettingsStore } from '../../../store/useSettingsStore';
-import { useUIStore } from '../../../store/useUIStore';
-import { Invokes } from '../../../tauri/commands';
-import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
+} from '../../../../schemas/masks/maskParameterSchemas';
+import { useEditorStore } from '../../../../store/useEditorStore';
+import { useProcessStore } from '../../../../store/useProcessStore';
+import { useSettingsStore } from '../../../../store/useSettingsStore';
+import { useUIStore } from '../../../../store/useUIStore';
+import { Invokes } from '../../../../tauri/commands';
+import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../../types/typography';
 import {
   ADJUSTMENT_SECTIONS,
   type Adjustments,
@@ -68,8 +68,8 @@ import {
   INITIAL_MASK_ADJUSTMENTS,
   INITIAL_MASK_CONTAINER,
   type MaskContainer,
-} from '../../../utils/adjustments';
-import { createEditorSubMaskFallback, createEditorSubMaskForImage } from '../../../utils/editorSubMaskFactory';
+} from '../../../../utils/adjustments';
+import { createEditorSubMaskFallback, createEditorSubMaskForImage } from '../../../../utils/editorSubMaskFactory';
 import {
   cloneMaskContainerForPaste,
   cloneSubMaskForPaste,
@@ -79,17 +79,21 @@ import {
   moveSubMaskBetweenContainers,
   reorderMaskListContainers,
   splitSubMaskToContainer,
-} from '../../../utils/maskClipboard';
+} from '../../../../utils/maskClipboard';
 import {
   nextMaskOverlayHotkeySettings,
   saveMaskOverlaySettingsPreference,
-} from '../../../utils/maskOverlayPreferences';
-import { getMaskParameterNumber, mergeMaskParameters, toMaskParameterRecord } from '../../../utils/maskParameterAccess';
+} from '../../../../utils/maskOverlayPreferences';
+import {
+  getMaskParameterNumber,
+  mergeMaskParameters,
+  toMaskParameterRecord,
+} from '../../../../utils/maskParameterAccess';
 import {
   createMaskRefinementCommand,
   dispatchMaskRefinementCommand,
   readMaskRefinementReplayReceipt,
-} from '../../../utils/maskRefinementCommandBus';
+} from '../../../../utils/maskRefinementCommandBus';
 import {
   type AiObjectMaskProposal,
   acceptObjectMaskProposal,
@@ -100,13 +104,13 @@ import {
   readObjectPromptCanvasState,
   setObjectPromptMode,
   writeObjectPromptCanvasState,
-} from '../../../utils/objectMaskPromptCanvas';
-import AdjustmentSlider from '../../adjustments/AdjustmentSlider';
-import BasicAdjustments from '../../adjustments/Basic';
-import ColorPanel from '../../adjustments/Color';
-import CurveGraph, { type ChannelConfig } from '../../adjustments/Curves';
-import DetailsPanel from '../../adjustments/Details';
-import EffectsPanel from '../../adjustments/Effects';
+} from '../../../../utils/objectMaskPromptCanvas';
+import AdjustmentSlider from '../../../adjustments/AdjustmentSlider';
+import BasicAdjustments from '../../../adjustments/Basic';
+import ColorPanel from '../../../adjustments/Color';
+import CurveGraph, { type ChannelConfig } from '../../../adjustments/Curves';
+import DetailsPanel from '../../../adjustments/Details';
+import EffectsPanel from '../../../adjustments/Effects';
 import {
   type AppSettings,
   type BrushSettings,
@@ -114,13 +118,13 @@ import {
   type Option,
   Orientation,
   Theme,
-} from '../../ui/AppProperties';
-import CollapsibleSection from '../../ui/CollapsibleSection';
-import Resizer from '../../ui/Resizer';
-import Switch from '../../ui/Switch';
-import UiText from '../../ui/Text';
-import Waveform from '../editor/Waveform';
-import { AiPeoplePartPickerStatus } from './AiPeoplePartPickerStatus';
+} from '../../../ui/AppProperties';
+import CollapsibleSection from '../../../ui/CollapsibleSection';
+import Resizer from '../../../ui/Resizer';
+import Switch from '../../../ui/Switch';
+import UiText from '../../../ui/Text';
+import Waveform from '../../editor/Waveform';
+import { AiPeoplePartPickerStatus } from '../ai/AiPeoplePartPickerStatus';
 import LayerStackPanel from './LayerStackPanel';
 import { MaskOverlayReviewControls } from './MaskOverlayReviewControls';
 import {

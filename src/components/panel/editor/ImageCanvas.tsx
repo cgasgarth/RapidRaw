@@ -45,8 +45,8 @@ import {
 } from '../../../utils/gradientMaskParameters';
 import { calculateWhiteBalancePickerAdjustment } from '../../../utils/whiteBalancePicker';
 import type { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
-import type { OverlayMode } from '../right/CropPanel';
-import { Mask, type SubMask, SubMaskMode, ToolType } from '../right/Masks';
+import type { OverlayMode } from '../right/color/CropPanel';
+import { Mask, type SubMask, SubMaskMode, ToolType } from '../right/layers/Masks';
 import CompositionOverlays from './overlays/CompositionOverlays';
 
 declare global {

@@ -4,7 +4,7 @@ import {
   sampleNegativeLabApplyPlanRequestV1,
   sampleNegativeLabCommandEnvelopeV1,
 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { ToolType } from '../../../src/components/panel/right/Masks.tsx';
+import { ToolType } from '../../../src/components/panel/right/layers/Masks.tsx';
 import {
   RawEngineAppServerHostToolName,
   rawEngineAppServerToolDispatchResponseSchema,

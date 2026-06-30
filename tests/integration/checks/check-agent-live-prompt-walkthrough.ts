@@ -24,7 +24,7 @@ if (walkthrough === undefined) {
   }
 }
 
-const shellSource = readFileSync('src/components/panel/right/AgentChatShell.tsx', 'utf8');
+const shellSource = readFileSync('src/components/panel/right/ai/AgentChatShell.tsx', 'utf8');
 for (const marker of [
   'data-testid="agent-live-prompt-composer"',
   'data-testid="agent-live-prompt-input"',

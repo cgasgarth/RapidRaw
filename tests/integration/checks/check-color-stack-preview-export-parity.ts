@@ -115,7 +115,7 @@ if (!inactiveProofReceipt.mismatches.includes('soft_proof_inactive')) {
   throw new Error('Inactive soft proof must be recorded as a parity warning.');
 }
 
-const exportPanelSource = await readFile('src/components/panel/right/ExportPanel.tsx', 'utf8');
+const exportPanelSource = await readFile('src/components/panel/right/export/ExportPanel.tsx', 'utf8');
 for (const marker of [
   'buildColorStackPreviewExportParityReceipt',
   'data-color-stack-parity-hash={colorStackParityReceipt?.activeColorStackHash',

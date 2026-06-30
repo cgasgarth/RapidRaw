@@ -2,8 +2,8 @@
 
 import { readFileSync } from 'node:fs';
 
-const aiPanelSource = readFileSync('src/components/panel/right/AIPanel.tsx', 'utf8');
-const shellSource = readFileSync('src/components/panel/right/AgentChatShell.tsx', 'utf8');
+const aiPanelSource = readFileSync('src/components/panel/right/ai/AIPanel.tsx', 'utf8');
+const shellSource = readFileSync('src/components/panel/right/ai/AgentChatShell.tsx', 'utf8');
 const schemaSource = readFileSync('src/schemas/agentChatTranscriptSchemas.ts', 'utf8');
 const visualSmokeSource = readFileSync('src/validation/visual/VisualSmokeApp.tsx', 'utf8');
 

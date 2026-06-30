@@ -2,15 +2,15 @@ import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import { lazy, type ReactNode, Suspense } from 'react';
 import { type AppSettings, Panel, type SelectedImage } from '../../ui/AppProperties';
 import type { ExportState } from '../../ui/ExportImportProperties';
-import Controls from './ControlsPanel';
-import CropPanel from './CropPanel';
-import ExportPanel from './ExportPanel';
-import MetadataPanel from './MetadataPanel';
+import Controls from './color/ControlsPanel';
+import CropPanel from './color/CropPanel';
+import ExportPanel from './export/ExportPanel';
+import MetadataPanel from './metadata/MetadataPanel';
 
-const AIPanel = lazy(() => import('./AIPanel.js').then((module) => ({ default: module.AIPanel })));
-const MasksPanel = lazy(() => import('./MasksPanel.js').then((module) => ({ default: module.MasksPanel })));
-const PresetsPanel = lazy(() => import('./PresetsPanel.js').then((module) => ({ default: module.PresetsPanel })));
-const TetherPanel = lazy(() => import('./TetherPanel.js').then((module) => ({ default: module.TetherPanel })));
+const AIPanel = lazy(() => import('./ai/AIPanel.js').then((module) => ({ default: module.AIPanel })));
+const MasksPanel = lazy(() => import('./layers/MasksPanel.js').then((module) => ({ default: module.MasksPanel })));
+const PresetsPanel = lazy(() => import('./color/PresetsPanel.js').then((module) => ({ default: module.PresetsPanel })));
+const TetherPanel = lazy(() => import('./capture/TetherPanel.js').then((module) => ({ default: module.TetherPanel })));
 
 const panelVariants: Variants = {
   animate: (direction: number) => ({

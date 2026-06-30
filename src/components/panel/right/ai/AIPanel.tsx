@@ -43,29 +43,29 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useContextMenu } from '../../../context/ContextMenuContext';
-import { useAiMasking } from '../../../hooks/ai/useAiMasking';
-import { useEditorActions } from '../../../hooks/editor/useEditorActions';
-import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
-import type { AgentChatTranscript } from '../../../schemas/agentChatTranscriptSchemas';
+import { useContextMenu } from '../../../../context/ContextMenuContext';
+import { useAiMasking } from '../../../../hooks/ai/useAiMasking';
+import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
+import { useManagedFocus } from '../../../../hooks/ui/useManagedFocus';
+import type { AgentChatTranscript } from '../../../../schemas/agentChatTranscriptSchemas';
 import {
   AiProviderId,
   type AiProviderId as AiProviderIdType,
   normalizeAiProviderId,
   resolveAiEditApprovalPolicy,
   resolveAiProviderRuntimeState,
-} from '../../../schemas/aiProviderSchemas';
-import { type CloudUsage, cloudUsageSchema } from '../../../schemas/cloudUsageSchemas';
-import { useEditorStore } from '../../../store/useEditorStore';
-import { useProcessStore } from '../../../store/useProcessStore';
-import { useSettingsStore } from '../../../store/useSettingsStore';
-import { useUIStore } from '../../../store/useUIStore';
-import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import type { Adjustments, AiPatch } from '../../../utils/adjustments';
+} from '../../../../schemas/aiProviderSchemas';
+import { type CloudUsage, cloudUsageSchema } from '../../../../schemas/cloudUsageSchemas';
+import { useEditorStore } from '../../../../store/useEditorStore';
+import { useProcessStore } from '../../../../store/useProcessStore';
+import { useSettingsStore } from '../../../../store/useSettingsStore';
+import { useUIStore } from '../../../../store/useUIStore';
+import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../../types/typography';
+import type { Adjustments, AiPatch } from '../../../../utils/adjustments';
 import {
   type AgentInitialPromptContext,
   buildAgentInitialPromptContext,
-} from '../../../utils/agentInitialPromptContext';
+} from '../../../../utils/agentInitialPromptContext';
 import {
   cloneMaskLikeContainerForPaste,
   cloneSubMaskForPaste,
@@ -75,18 +75,20 @@ import {
   moveSubMaskBetweenContainers,
   reorderMaskListContainers,
   splitSubMaskToContainer,
-} from '../../../utils/maskClipboard';
-import { getMaskParameterNumber, mergeMaskParameters, toMaskParameterRecord } from '../../../utils/maskParameterAccess';
-import { createSubMask } from '../../../utils/maskUtils';
-import { type BrushSettings, OPTION_SEPARATOR, type Option } from '../../ui/AppProperties';
-import Button from '../../ui/Button';
-import CollapsibleSection from '../../ui/CollapsibleSection';
-import Input from '../../ui/Input';
-import Slider from '../../ui/Slider';
-import Switch from '../../ui/Switch';
-import UiText from '../../ui/Text';
-import AgentChatShell from './AgentChatShell';
-import { AiPeoplePartPickerStatus } from './AiPeoplePartPickerStatus';
+} from '../../../../utils/maskClipboard';
+import {
+  getMaskParameterNumber,
+  mergeMaskParameters,
+  toMaskParameterRecord,
+} from '../../../../utils/maskParameterAccess';
+import { createSubMask } from '../../../../utils/maskUtils';
+import { type BrushSettings, OPTION_SEPARATOR, type Option } from '../../../ui/AppProperties';
+import Button from '../../../ui/Button';
+import CollapsibleSection from '../../../ui/CollapsibleSection';
+import Input from '../../../ui/Input';
+import Slider from '../../../ui/Slider';
+import Switch from '../../../ui/Switch';
+import UiText from '../../../ui/Text';
 import {
   AI_PANEL_CREATION_TYPES,
   AI_SUB_MASK_COMPONENT_TYPES,
@@ -98,14 +100,16 @@ import {
   type SubMask,
   SubMaskMode,
   ToolType,
-} from './Masks';
+} from '../layers/Masks';
 import {
   getMaskLikeContainerDropClass,
   getMaskLikeSubMaskDropClass,
   isMaskLikeContainerDrag,
   type MaskLikeDragData,
   useDelayedHover,
-} from './maskPanelRowHelpers';
+} from '../layers/maskPanelRowHelpers';
+import AgentChatShell from './AgentChatShell';
+import { AiPeoplePartPickerStatus } from './AiPeoplePartPickerStatus';
 
 interface DragData extends MaskLikeDragData {
   type: 'Container' | 'SubMask' | 'Creation';

@@ -11,7 +11,7 @@ import {
   layerScopedToneAdjustmentV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../../packages/rawengine-schema/src';
-import { Mask, type SubMask, SubMaskMode } from '../components/panel/right/Masks';
+import { Mask, type SubMask, SubMaskMode } from '../components/panel/right/layers/Masks';
 import { useEditorStore } from '../store/useEditorStore';
 import {
   DEFAULT_LAYER_BLEND_MODE,

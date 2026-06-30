@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import type { RawDevelopmentReport } from '../../schemas/imageLoaderSchemas';
 import type { Adjustments, CopyPasteSettings } from '../../utils/adjustments';
-import type { ToolType } from '../panel/right/Masks';
+import type { ToolType } from '../panel/right/layers/Masks';
 import type { ExportPreset } from './ExportImportProperties';
 
 export const GLOBAL_KEYS = [

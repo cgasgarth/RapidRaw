@@ -46,7 +46,7 @@ const reportSchema = z
   })
   .strict();
 
-const sourcePanel = await readFile('src/components/panel/right/MasksPanel.tsx', 'utf8');
+const sourcePanel = await readFile('src/components/panel/right/layers/MasksPanel.tsx', 'utf8');
 const sourceSubMaskFactory = await readFile('src/utils/editorSubMaskFactory.ts', 'utf8');
 const uiMarkers = [
   'data-testid="linear-gradient-mask-controls"',
