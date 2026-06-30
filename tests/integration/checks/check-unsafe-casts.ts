@@ -2,10 +2,13 @@
 // @ts-check
 
 import { readFileSync } from 'node:fs';
+import { relative } from 'node:path';
 
 import ts from 'typescript';
 
 import { getExtension, walkRepoFiles } from '../../../scripts/lib/ci/repo-files.ts';
+
+const ROOT = process.cwd();
 
 const CHECKED_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.ts', '.cjs']);
 

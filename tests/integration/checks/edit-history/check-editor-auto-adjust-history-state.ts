@@ -167,7 +167,10 @@ function createSelectedImage(): SelectedImage {
 function installDom() {
   const window = new Window({ pretendToBeVisual: true });
   const { document } = window;
-  globalThis.window = window as unknown as Window & typeof globalThis.window;
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: window,
+  });
   globalThis.document = document;
   globalThis.HTMLElement = window.HTMLElement;
   globalThis.Node = window.Node;
