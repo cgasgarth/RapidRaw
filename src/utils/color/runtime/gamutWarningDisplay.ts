@@ -1,4 +1,10 @@
+import type { SelectedImage } from '../../../components/ui/AppProperties';
 import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
+
+export interface ProofDimensions {
+  height: number;
+  width: number;
+}
 
 interface ExportSoftProofTransformForGamutWarning {
   blackPointCompensation: string | null;
@@ -29,6 +35,26 @@ export const formatGamutWarningCoverage = (overlay: GamutWarningOverlayPayload |
 };
 
 const matchesNullableString = (left: string, right: string | null): boolean => right !== null && left === right;
+
+export const resolveGamutWarningProofDimensions = (
+  overlay: GamutWarningOverlayPayload | null,
+  selectedImage: SelectedImage | null,
+): ProofDimensions => {
+  if (overlay) {
+    return { height: overlay.height, width: overlay.width };
+  }
+
+  const runtimeDimensions = selectedImage?.rawDevelopmentReport?.runtime?.outputDimensions;
+  if (runtimeDimensions && runtimeDimensions[0] > 0 && runtimeDimensions[1] > 0) {
+    return { height: runtimeDimensions[1], width: runtimeDimensions[0] };
+  }
+
+  if (selectedImage && selectedImage.width > 0 && selectedImage.height > 0) {
+    return { height: selectedImage.height, width: selectedImage.width };
+  }
+
+  return { height: 0, width: 0 };
+};
 
 export const isCurrentExportSoftProofGamutWarningOverlay = (
   overlay: GamutWarningOverlayPayload | null,
