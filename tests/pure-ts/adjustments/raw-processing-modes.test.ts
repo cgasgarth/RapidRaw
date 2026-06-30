@@ -2,6 +2,8 @@ import { expect, test } from 'bun:test';
 
 import {
   buildRawProcessingModePatch,
+  getRawProcessingModeDisplayCopy,
+  getRawProcessingModeProvenance,
   normalizeRawProcessingMode,
   normalizeRawProcessingModeOverride,
   RAW_PROCESSING_MODE_RECIPES,
@@ -27,6 +29,20 @@ test('RAW processing mode normalization falls back to balanced', () => {
   expect(normalizeRawProcessingMode('unknown')).toBe('balanced');
   expect(normalizeRawProcessingMode(undefined)).toBe('balanced');
   expect(RAW_PROCESSING_MODE_RECIPES.balanced.provenance).toBe('default_quality_capture_preprocessing_v1');
+});
+
+test('RAW processing mode display copy stays localized while provenance remains available', () => {
+  const translate = ((key: string) => {
+    const labels: Record<string, string> = {
+      'settings.processing.rawModes.balanced.label': 'Balanced',
+      'settings.processing.rawModes.fast.label': 'Fast',
+      'settings.processing.rawModes.maximum.label': 'Maximum',
+    };
+    return labels[key] ?? key;
+  }) as unknown as Parameters<typeof getRawProcessingModeDisplayCopy>[1];
+
+  expect(getRawProcessingModeDisplayCopy('balanced', translate)).toBe('Balanced');
+  expect(getRawProcessingModeProvenance('balanced')).toBe('default_quality_capture_preprocessing_v1');
 });
 
 test('RAW processing mode override normalization keeps inherit separate from invalid values', () => {

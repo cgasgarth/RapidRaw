@@ -489,10 +489,13 @@
         "resetSectionSettings": "{{section}}設定をリセット"
       },
       "rawProcessingModeOverride": {
+        "currentValue": "",
         "description": "",
         "error": "",
+        "hideRecipeId": "",
         "inherit": "",
-        "label": ""
+        "label": "",
+        "showRecipeId": ""
       },
       "rawReconstructionComparison": {
         "action": "Compare 100% crops",
@@ -3604,9 +3607,13 @@
         "performance": "パフォーマンス優先"
       },
       "rawMode": {
+        "current": "",
+        "currentValue": "",
         "description": "",
+        "hideRecipeId": "",
         "label": "",
         "provenance": "",
+        "showRecipeId": "",
         "title": ""
       },
       "rawModes": {

@@ -513,10 +513,13 @@
         "resetSectionSettings": "Restablecer ajustes de {{section}}"
       },
       "rawProcessingModeOverride": {
+        "currentValue": "",
         "description": "",
         "error": "",
+        "hideRecipeId": "",
         "inherit": "",
-        "label": ""
+        "label": "",
+        "showRecipeId": ""
       },
       "rawReconstructionComparison": {
         "action": "Compare 100% crops",
@@ -3753,9 +3756,13 @@
         "performance": "Rendimiento"
       },
       "rawMode": {
+        "current": "",
+        "currentValue": "",
         "description": "",
+        "hideRecipeId": "",
         "label": "",
         "provenance": "",
+        "showRecipeId": "",
         "title": ""
       },
       "rawModes": {
