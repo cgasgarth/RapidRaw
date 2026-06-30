@@ -19,6 +19,7 @@ const i18n = await createTestI18n(locale);
 const zeroDepthMarkup = renderToolbar({
   adjustmentsHistory: [],
   adjustmentsHistoryIndex: 0,
+  osPlatform: 'linux',
 });
 const zeroDepthControl = getHistoryDepthControlMarkup(zeroDepthMarkup);
 assertIncludes(zeroDepthMarkup, 'data-testid="editor-history-depth-control"', 'history depth control did not render');
@@ -33,6 +34,7 @@ const nonZeroDepthMarkup = renderToolbar({
     { ...INITIAL_ADJUSTMENTS, exposure: 0.5, contrast: 12 },
   ],
   adjustmentsHistoryIndex: 1,
+  osPlatform: 'linux',
 });
 const nonZeroDepthControl = getHistoryDepthControlMarkup(nonZeroDepthMarkup);
 assertIncludes(
@@ -53,6 +55,24 @@ assertExcludes(
   'history stack menu should remain collapsed before the toggle is used',
 );
 
+const macMarkup = renderToolbar({
+  adjustmentsHistory: [INITIAL_ADJUSTMENTS, { ...INITIAL_ADJUSTMENTS, exposure: 0.5 }],
+  adjustmentsHistoryIndex: 1,
+  osPlatform: 'macos',
+});
+assertIncludes(
+  macMarkup,
+  'data-tooltip="Undo (⌘Z) or History (Right-click)"',
+  'macOS undo tooltip should use the command symbol',
+);
+assertIncludes(
+  macMarkup,
+  'data-tooltip="Redo (⌘Y) or History (Right-click)"',
+  'macOS redo tooltip should use the command symbol',
+);
+assertExcludes(macMarkup, 'Ctrl+Z', 'macOS undo tooltip should not render a Ctrl label');
+assertExcludes(macMarkup, 'Ctrl+Y', 'macOS redo tooltip should not render a Ctrl label');
+
 const toolbar = locale.editor?.toolbar;
 if (typeof toolbar?.historyDepth !== 'string') failures.push('missing locale key: editor.toolbar.historyDepth');
 if (typeof toolbar?.tooltips?.history !== 'string')
@@ -69,9 +89,11 @@ console.log('editor history toolbar UI ok');
 function renderToolbar({
   adjustmentsHistory,
   adjustmentsHistoryIndex,
+  osPlatform,
 }: {
   adjustmentsHistory: Array<Adjustments>;
   adjustmentsHistoryIndex: number;
+  osPlatform: string;
 }): string {
   return renderToStaticMarkup(
     createElement(
@@ -94,6 +116,7 @@ function renderToolbar({
         selectedImage: createSelectedImage(),
         showDateView: false,
         showOriginal: false,
+        osPlatform,
       }),
     ),
   );

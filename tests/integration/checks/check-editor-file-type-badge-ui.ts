@@ -96,6 +96,7 @@ function renderToolbar(path: string): string {
         selectedImage: createSelectedImage(path),
         showDateView: false,
         showOriginal: false,
+        osPlatform: 'linux',
       }),
     ),
   );

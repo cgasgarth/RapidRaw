@@ -7,6 +7,7 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import type { Adjustments, AiPatch, MaskContainer } from '../../../utils/adjustments';
+import { formatShortcutLabel } from '../../../utils/keyboardUtils';
 import { parseVirtualImagePath } from '../../../utils/virtualImagePath';
 import type { SelectedImage } from '../../ui/AppProperties';
 import Dropdown from '../../ui/primitives/Dropdown';
@@ -30,6 +31,7 @@ interface EditorToolbarProps {
   adjustmentsHistory: Array<Adjustments>;
   adjustmentsHistoryIndex: number;
   goToAdjustmentsHistoryIndex: (index: number) => void;
+  osPlatform?: string;
 }
 
 const EditorToolbar = memo(
@@ -50,6 +52,7 @@ const EditorToolbar = memo(
     adjustmentsHistory,
     adjustmentsHistoryIndex,
     goToAdjustmentsHistoryIndex,
+    osPlatform,
   }: EditorToolbarProps) => {
     const { t } = useTranslation();
     const isAnyLoading = isLoading;
@@ -63,6 +66,7 @@ const EditorToolbar = memo(
     const historyContainerRef = useRef<HTMLDivElement>(null);
     const historyButtonRef = useRef<HTMLDivElement>(null);
     const appSettings = useSettingsStore((state) => state.appSettings);
+    const osPlatformFromStore = useSettingsStore((state) => state.osPlatform);
     const isExportSoftProofEnabled = useEditorStore((state) => state.isExportSoftProofEnabled);
     const exportSoftProofRecipeId = useEditorStore((state) => state.exportSoftProofRecipeId);
     const exportSoftProofTransform = useEditorStore((state) => state.exportSoftProofTransform);
@@ -403,6 +407,9 @@ const EditorToolbar = memo(
       current: Math.min(adjustmentsHistoryIndex + 1, historyDepthTotal),
       total: historyDepthTotal,
     });
+    const effectiveOsPlatform = osPlatform ?? osPlatformFromStore;
+    const undoShortcutLabel = formatShortcutLabel(['ctrl', 'KeyZ'], effectiveOsPlatform);
+    const redoShortcutLabel = formatShortcutLabel(['ctrl', 'KeyY'], effectiveOsPlatform);
 
     return (
       <div className="relative shrink-0 flex items-center justify-between px-4 h-14 gap-4 z-40">
@@ -666,7 +673,7 @@ const EditorToolbar = memo(
                 setIsHistoryVisible((prev) => !prev);
               }}
               aria-label={t('editor.toolbar.tooltips.undo')}
-              data-tooltip={t('editor.toolbar.tooltips.undo')}
+              data-tooltip={t('editor.toolbar.tooltips.undo', { shortcut: undoShortcutLabel })}
             >
               <Undo size={20} />
             </button>
@@ -680,7 +687,7 @@ const EditorToolbar = memo(
                 setIsHistoryVisible((prev) => !prev);
               }}
               aria-label={t('editor.toolbar.tooltips.redo')}
-              data-tooltip={t('editor.toolbar.tooltips.redo')}
+              data-tooltip={t('editor.toolbar.tooltips.redo', { shortcut: redoShortcutLabel })}
             >
               <Redo size={20} />
             </button>

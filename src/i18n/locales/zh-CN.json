@@ -1523,11 +1523,11 @@
         "fullscreen": "切换全屏（F）",
         "history": "",
         "iso": "ISO",
-        "redo": "重做（Ctrl+Y）或历史记录（右键单击）",
+        "redo": "重做（{{shortcut}}）或历史记录（右键单击）",
         "showEdited": "显示编辑后（B）",
         "showOriginal": "显示原始（B）",
         "shutterSpeed": "快门速度",
-        "undo": "撤销（Ctrl+Z）或历史记录（右键单击）"
+        "undo": "撤销（{{shortcut}}）或历史记录（右键单击）"
       },
       "vc": "VC"
     }

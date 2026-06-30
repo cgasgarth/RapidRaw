@@ -721,11 +721,11 @@
         "focalLength": "초점 거리",
         "fullscreen": "전체 화면 전환 (F)",
         "iso": "ISO",
-        "redo": "다시 실행 (Ctrl+Y) 또는 기록 (우클릭)",
+        "redo": "다시 실행 ({{shortcut}}) 또는 기록 (우클릭)",
         "showEdited": "편집본 표시 (B)",
         "showOriginal": "원본 표시 (B)",
         "shutterSpeed": "셔터 속도",
-        "undo": "실행 취소 (Ctrl+Z) 또는 기록 (우클릭)"
+        "undo": "실행 취소 ({{shortcut}}) 또는 기록 (우클릭)"
       },
       "vc": "VC"
     }
