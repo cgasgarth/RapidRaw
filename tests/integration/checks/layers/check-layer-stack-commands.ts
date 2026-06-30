@@ -11,7 +11,7 @@ import {
   layerMaskCommandEnvelopeV1Schema,
   layerStackSidecarV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from '../../../packages/rawengine-schema/src';
+} from '../../../../packages/rawengine-schema/src';
 
 const commandStepSchema = z
   .object({

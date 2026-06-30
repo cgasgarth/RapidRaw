@@ -9,7 +9,7 @@ import { z } from 'zod';
 import {
   type LayerOpacityOrderRuntimeOperation,
   renderLayerOpacityOrderRuntime,
-} from '../../../src/utils/layers/layerOpacityOrderRuntime.ts';
+} from '../../../../src/utils/layers/layerOpacityOrderRuntime.ts';
 
 const FIXTURE_PATH = 'fixtures/layers/layer-visibility-opacity-proof.json';
 const REPORT_PATH = 'docs/validation/proofs/layers-masks/layer-visibility-opacity-proof-2026-06-21.json';
@@ -145,7 +145,7 @@ if (update) {
 const committedReport = proofReportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
 if (JSON.stringify(committedReport) !== JSON.stringify(expectedReport)) {
   throw new Error(
-    `${REPORT_PATH} is stale; run bun tests/integration/checks/check-layer-visibility-opacity-proof.ts --update.`,
+    `${REPORT_PATH} is stale; run bun tests/integration/checks/layers/check-layer-visibility-opacity-proof.ts --update.`,
   );
 }
 

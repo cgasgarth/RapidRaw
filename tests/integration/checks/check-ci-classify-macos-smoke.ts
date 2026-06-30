@@ -169,8 +169,11 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:import-presets', new Set(['bun tests/integration/checks/check-import-preset-fixtures.ts'])],
   ['check:keyboard-shortcut-conflicts', new Set(['bun tests/integration/checks/check-keyboard-shortcut-conflicts.ts'])],
   ['check:keyboard-shortcuts', new Set(['bun tests/integration/checks/check-keyboard-shortcuts.ts'])],
-  ['check:layer-blend-runtime', new Set(['bun tests/integration/checks/check-layer-blend-runtime.ts'])],
-  ['check:layer-runtime-parent-status', new Set(['bun tests/integration/checks/check-layer-runtime-parent-status.ts'])],
+  ['check:layer-blend-runtime', new Set(['bun tests/integration/checks/layers/check-layer-blend-runtime.ts'])],
+  [
+    'check:layer-runtime-parent-status',
+    new Set(['bun tests/integration/checks/layers/check-layer-runtime-parent-status.ts']),
+  ],
   [
     'check:linear-gradient-mask-command',
     new Set(['bun tests/integration/checks/check-linear-gradient-mask-command.ts']),
@@ -1043,7 +1046,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -80,6 +80,7 @@\n+    "check:layer-blend-runtime": "bun tests/integration/checks/check-layer-blend-runtime.ts",',
+          '@@ -80,6 +80,7 @@\n+    "check:layer-blend-runtime": "bun tests/integration/checks/layers/check-layer-blend-runtime.ts",',
       },
     ],
     SMOKE_MODES.NONE,

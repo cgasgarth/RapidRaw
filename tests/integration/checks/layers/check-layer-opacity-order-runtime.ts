@@ -5,11 +5,11 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 
-import { layerMaskBlendModeV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { layerMaskBlendModeV1Schema } from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   type LayerOpacityOrderRuntimeOperation,
   renderLayerOpacityOrderRuntime,
-} from '../../../src/utils/layers/layerOpacityOrderRuntime.ts';
+} from '../../../../src/utils/layers/layerOpacityOrderRuntime.ts';
 
 const OUTPUT_DIR = 'artifacts/layers/opacity-order-runtime';
 

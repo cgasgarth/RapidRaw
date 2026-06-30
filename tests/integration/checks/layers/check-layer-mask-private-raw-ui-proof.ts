@@ -153,7 +153,7 @@ if (update) {
 const committedReport = proofReportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
 if (JSON.stringify(committedReport) !== JSON.stringify(expectedReport)) {
   throw new Error(
-    `${REPORT_PATH} is stale; run bun tests/integration/checks/check-layer-mask-private-raw-ui-proof.ts --update.`,
+    `${REPORT_PATH} is stale; run bun tests/integration/checks/layers/check-layer-mask-private-raw-ui-proof.ts --update.`,
   );
 }
 

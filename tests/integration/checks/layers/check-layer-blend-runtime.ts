@@ -14,7 +14,7 @@ import {
   renderLayerExportStack,
   renderLayerHeadlessStack,
   renderLayerPreviewStack,
-} from '../../../packages/rawengine-schema/src/layerBlendRuntime.ts';
+} from '../../../../packages/rawengine-schema/src/layerBlendRuntime.ts';
 
 const FIXTURE_PATH = 'fixtures/layers/layer-preview-export-parity.json';
 
