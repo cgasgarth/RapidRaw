@@ -68,6 +68,21 @@ struct ColorBalanceRgbSettings {
     _pad2: u32,
 }
 
+struct BlackWhiteMixerSettings {
+    reds: f32,
+    oranges: f32,
+    yellows: f32,
+    greens: f32,
+    aquas: f32,
+    blues: f32,
+    purples: f32,
+    magentas: f32,
+    enabled: u32,
+    _pad1: u32,
+    _pad2: u32,
+    _pad3: u32,
+}
+
 struct GlobalAdjustments {
     exposure: f32,
     brightness: f32,
@@ -136,6 +151,7 @@ struct GlobalAdjustments {
     color_calibration: ColorCalibrationSettings,
     color_balance_rgb: ColorBalanceRgbSettings,
     channel_mixer: ChannelMixerSettings,
+    black_white_mixer: BlackWhiteMixerSettings,
     levels: LevelsSettings,
 
     hsl: array<HslColor, 8>,
@@ -233,6 +249,28 @@ const HSL_RANGES: array<HslRange, 8> = array<HslRange, 8>(
     HslRange(225.0, 60.0),  // Blue
     HslRange(280.0, 55.0),  // Purple
     HslRange(330.0, 50.0)   // Magenta
+);
+
+const BLACK_WHITE_MIXER_RANGE_CENTERS: array<f32, 8> = array<f32, 8>(
+    358.0,
+    25.0,
+    60.0,
+    115.0,
+    180.0,
+    225.0,
+    280.0,
+    330.0,
+);
+
+const BLACK_WHITE_MIXER_RANGE_WIDTHS: array<f32, 8> = array<f32, 8>(
+    35.0,
+    45.0,
+    40.0,
+    90.0,
+    60.0,
+    60.0,
+    55.0,
+    50.0,
 );
 
 @group(0) @binding(0) var input_texture: texture_2d<f32>;
@@ -693,6 +731,71 @@ fn apply_channel_mixer(color: vec3<f32>, settings: ChannelMixerSettings) -> vec3
 
     mixed = clamp(mixed * (source_luma / mixed_luma), vec3<f32>(0.0), vec3<f32>(1.0));
     return mixed;
+}
+
+fn circular_hue_distance(left: f32, right: f32) -> f32 {
+    let delta = abs(left - right) % 360.0;
+    return min(delta, 360.0 - delta);
+}
+
+fn rgb_to_hue_degrees(color: vec3<f32>) -> f32 {
+    let c_max = max(color.r, max(color.g, color.b));
+    let c_min = min(color.r, min(color.g, color.b));
+    let chroma = c_max - c_min;
+    if (chroma <= 0.0) {
+        return -1.0;
+    }
+
+    if (c_max == color.r) {
+        return ((color.g - color.b) / chroma) * 60.0 + select(0.0, 360.0, color.g < color.b);
+    }
+    if (c_max == color.g) {
+        return ((color.b - color.r) / chroma) * 60.0 + 120.0;
+    }
+    return ((color.r - color.g) / chroma) * 60.0 + 240.0;
+}
+
+fn apply_black_white_mixer(color: vec3<f32>, settings: BlackWhiteMixerSettings) -> vec3<f32> {
+    if (settings.enabled == 0u) {
+        return color;
+    }
+
+    let hue = rgb_to_hue_degrees(color);
+    let luma = get_luma(color);
+    if (hue < 0.0) {
+        return vec3<f32>(luma);
+    }
+
+    let weights = array<f32, 8>(
+        settings.reds,
+        settings.oranges,
+        settings.yellows,
+        settings.greens,
+        settings.aquas,
+        settings.blues,
+        settings.purples,
+        settings.magentas,
+    );
+
+    var influence_total = 0.0;
+    var weighted_adjustment = 0.0;
+    for (var i = 0u; i < 8u; i = i + 1u) {
+        let influence = clamp(
+            1.0 - circular_hue_distance(hue, BLACK_WHITE_MIXER_RANGE_CENTERS[i]) / (BLACK_WHITE_MIXER_RANGE_WIDTHS[i] * 0.5),
+            0.0,
+            1.0,
+        );
+        if (influence > 0.0) {
+            influence_total += influence;
+            weighted_adjustment += influence * weights[i];
+        }
+    }
+
+    if (influence_total > 0.0) {
+        weighted_adjustment = weighted_adjustment / influence_total / 100.0;
+    }
+    let mixed = clamp(luma * (1.0 + weighted_adjustment * 0.5), 0.0, 1.0);
+    return vec3<f32>(mixed);
 }
 
 fn color_balance_rgb_weights(luma: f32) -> vec3<f32> {
@@ -1770,6 +1873,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             composite_rgb_linear = mix(composite_rgb_linear, mask_graded, influence);
         }
     }
+
+    composite_rgb_linear = apply_black_white_mixer(composite_rgb_linear, adjustments.global.black_white_mixer);
 
     if (adjustments.global.vignette_amount != 0.0) {
         let full_dims_f = vec2<f32>(textureDimensions(input_texture));
