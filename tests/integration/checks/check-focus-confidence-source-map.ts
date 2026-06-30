@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 
 import { existsSync } from 'node:fs';
-import { parseFocusConfidenceSourceMapReport } from '../../../src/schemas/focusConfidenceSourceMapSchemas.ts';
-import { parseFocusSharpnessMapReport } from '../../../src/schemas/focusSharpnessMapSchemas.ts';
+import { parseFocusConfidenceSourceMapReport } from '../../../src/schemas/focus-stack/focusConfidenceSourceMapSchemas.ts';
+import { parseFocusSharpnessMapReport } from '../../../src/schemas/focus-stack/focusSharpnessMapSchemas.ts';
 import { buildFocusConfidenceSourceMapReport } from '../../../src/utils/focusConfidenceSourceMap.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/focus/focus-confidence-source-map-2026-06-20.json';

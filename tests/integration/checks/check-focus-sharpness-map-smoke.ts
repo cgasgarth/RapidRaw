@@ -6,7 +6,7 @@ import { performance } from 'node:perf_hooks';
 
 import { z } from 'zod';
 
-import { parseFocusSharpnessMapReport } from '../../../src/schemas/focusSharpnessMapSchemas.ts';
+import { parseFocusSharpnessMapReport } from '../../../src/schemas/focus-stack/focusSharpnessMapSchemas.ts';
 
 const MANIFEST_PATH = resolve('fixtures/focus-stacking/focus-synthetic-bracket-fixtures.json');
 const REPORT_PATH = resolve('artifacts/focus-sharpness-map/focus-sharpness-map-report.json');
