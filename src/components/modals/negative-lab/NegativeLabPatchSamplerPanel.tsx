@@ -11,7 +11,7 @@ import type {
 } from '../../../schemas/negativeLabPresetCatalogSchemas';
 import type { NegativeLabShadowPatchBlackPointSuggestion } from '../../../schemas/negativeLabShadowPatchBlackPointSuggestionSchemas';
 import { TextVariants } from '../../../types/typography';
-import UiText from '../../ui/Text';
+import UiText from '../../ui/primitives/Text';
 
 export type NegativeLabPatchRole = 'highlight' | 'neutral';
 export type DensitometerPatchLabelKey =

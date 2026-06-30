@@ -2,7 +2,7 @@ import cx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import type { MaskOverlayMode, MaskOverlaySettings } from '../../../../schemas/masks/maskOverlaySchemas';
 import AdjustmentSlider from '../../../adjustments/AdjustmentSlider';
-import Switch from '../../../ui/Switch';
+import Switch from '../../../ui/primitives/Switch';
 
 const MASK_OVERLAY_REVIEW_MODES = [
   { color: '#f43f5e', mode: 'rubylith' },

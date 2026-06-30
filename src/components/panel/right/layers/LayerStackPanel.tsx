@@ -52,8 +52,8 @@ import {
   type LayerStackCommandBridgeOperation,
 } from '../../../../utils/layerStackCommandBridge';
 import { persistLayerStackSidecarInAdjustments } from '../../../../utils/layerStackSidecarAdjustments';
-import Slider, { type SliderChangeEvent } from '../../../ui/Slider';
-import UiText from '../../../ui/Text';
+import Slider, { type SliderChangeEvent } from '../../../ui/primitives/Slider';
+import UiText from '../../../ui/primitives/Text';
 import { Mask, SubMaskMode } from './Masks';
 
 interface LayerStackPanelProps {

@@ -24,8 +24,8 @@ import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../utils/adjustm
 import LensCorrectionModal from '../../../modals/editing/LensCorrectionModal';
 import TransformModal from '../../../modals/editing/TransformModal';
 import { Orientation } from '../../../ui/AppProperties';
-import Slider from '../../../ui/Slider';
-import UiText from '../../../ui/Text';
+import Slider from '../../../ui/primitives/Slider';
+import UiText from '../../../ui/primitives/Text';
 
 const BASE_RATIO = 1.618;
 const ORIGINAL_RATIO = 0;

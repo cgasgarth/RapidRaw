@@ -1,6 +1,6 @@
 import type { DerivedOutputReceipt } from '../../../schemas/derivedOutputReceiptSchemas';
 import { TextColors, TextVariants } from '../../../types/typography';
-import UiText from '../../ui/Text';
+import UiText from '../../ui/primitives/Text';
 import DerivedOutputReceiptPanel from './DerivedOutputReceiptPanel';
 
 interface ComputationalMergeReviewItem {

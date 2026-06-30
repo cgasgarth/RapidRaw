@@ -21,7 +21,7 @@ import type {
   NegativeLabRollNormalizationApplyReceipt,
   NegativeLabRollNormalizationRestoreReceipt,
 } from '../../../utils/negativeLabRollNormalizationApply';
-import UiText from '../../ui/Text';
+import UiText from '../../ui/primitives/Text';
 import {
   ACQUISITION_SOURCE_FAMILY_LABEL_KEYS,
   ACQUISITION_WARNING_LABEL_KEYS,

@@ -44,7 +44,7 @@ import { Invokes } from '../../tauri/commands';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { type AlbumItem, type FolderTreeSort, SortDirection } from '../ui/AppProperties';
-import UiText from '../ui/Text';
+import UiText from '../ui/primitives/Text';
 
 export interface FolderTree {
   children: FolderTree[];

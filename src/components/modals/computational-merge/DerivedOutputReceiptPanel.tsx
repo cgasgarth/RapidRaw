@@ -2,8 +2,8 @@ import { Download, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { DerivedOutputReceipt } from '../../../schemas/derivedOutputReceiptSchemas';
 import { TextColors, TextVariants } from '../../../types/typography';
-import Button from '../../ui/Button';
-import UiText from '../../ui/Text';
+import Button from '../../ui/primitives/Button';
+import UiText from '../../ui/primitives/Text';
 
 interface DerivedOutputReceiptPanelProps {
   exportActionLabel?: string | undefined;

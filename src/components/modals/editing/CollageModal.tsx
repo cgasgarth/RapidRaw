@@ -25,10 +25,10 @@ import { createBlobFromUint8Array } from '../../../utils/blobUtils';
 import { LAYOUTS, type Layout, type LayoutDefinition } from '../../../utils/CollageVariants';
 import { getDisplayFileName } from '../../../utils/displayFilePath';
 import type { ImageFile } from '../../ui/AppProperties';
-import Button from '../../ui/Button';
-import Slider from '../../ui/Slider';
-import Switch from '../../ui/Switch';
-import UiText from '../../ui/Text';
+import Button from '../../ui/primitives/Button';
+import Slider from '../../ui/primitives/Slider';
+import Switch from '../../ui/primitives/Switch';
+import UiText from '../../ui/primitives/Text';
 
 interface CollageModalProps {
   isOpen: boolean;

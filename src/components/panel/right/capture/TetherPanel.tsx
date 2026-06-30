@@ -39,8 +39,8 @@ import {
   buildTetherIngestProofReceipt,
   buildTetherRecoveryProofReceipt,
 } from '../../../../utils/tetherIngestProofReceipt';
-import Button from '../../../ui/Button';
-import UiText from '../../../ui/Text';
+import Button from '../../../ui/primitives/Button';
+import UiText from '../../../ui/primitives/Text';
 
 interface TetherPanelProps {
   captureFrame?: (request: TetherCaptureRequest) => Promise<TetherCaptureResponse>;

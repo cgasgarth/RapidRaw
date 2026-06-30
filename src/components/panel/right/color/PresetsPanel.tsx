@@ -63,8 +63,8 @@ import ConfigurePresetModal from '../../../modals/library/ConfigurePresetModal';
 import CreateFolderModal from '../../../modals/library/CreateFolderModal';
 import RenameFolderModal from '../../../modals/library/RenameFolderModal';
 import { type Folder, OPTION_SEPARATOR, type Option, Panel, type Preset } from '../../../ui/AppProperties';
-import Button from '../../../ui/Button';
-import UiText from '../../../ui/Text';
+import Button from '../../../ui/primitives/Button';
+import UiText from '../../../ui/primitives/Text';
 
 interface DroppableFolderItemProps {
   children: ReactNode;

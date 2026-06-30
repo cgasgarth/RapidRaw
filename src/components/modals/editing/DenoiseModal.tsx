@@ -9,10 +9,10 @@ import { usePreviewViewport } from '../../../hooks/viewport/usePreviewViewport';
 import { parsePathProgressPayload } from '../../../schemas/tauriEventSchemas';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { getDisplayFileName } from '../../../utils/displayFilePath';
-import Button from '../../ui/Button';
-import Dropdown from '../../ui/Dropdown';
-import Slider from '../../ui/Slider';
-import UiText from '../../ui/Text';
+import Button from '../../ui/primitives/Button';
+import Dropdown from '../../ui/primitives/Dropdown';
+import Slider from '../../ui/primitives/Slider';
+import UiText from '../../ui/primitives/Text';
 
 interface DenoiseModalProps {
   isOpen: boolean;

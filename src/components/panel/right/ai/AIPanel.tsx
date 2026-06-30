@@ -83,12 +83,12 @@ import {
 } from '../../../../utils/maskParameterAccess';
 import { createSubMask } from '../../../../utils/maskUtils';
 import { type BrushSettings, OPTION_SEPARATOR, type Option } from '../../../ui/AppProperties';
-import Button from '../../../ui/Button';
 import CollapsibleSection from '../../../ui/CollapsibleSection';
-import Input from '../../../ui/Input';
-import Slider from '../../../ui/Slider';
-import Switch from '../../../ui/Switch';
-import UiText from '../../../ui/Text';
+import Button from '../../../ui/primitives/Button';
+import Input from '../../../ui/primitives/Input';
+import Slider from '../../../ui/primitives/Slider';
+import Switch from '../../../ui/primitives/Switch';
+import UiText from '../../../ui/primitives/Text';
 import {
   AI_PANEL_CREATION_TYPES,
   AI_SUB_MASK_COMPONENT_TYPES,

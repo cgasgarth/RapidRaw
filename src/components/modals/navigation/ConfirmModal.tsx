@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
 import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import { TextVariants } from '../../../types/typography';
-import Button from '../../ui/Button';
-import UiText from '../../ui/Text';
+import Button from '../../ui/primitives/Button';
+import UiText from '../../ui/primitives/Text';
 
 interface ConfirmModalProps {
   cancelText?: string;

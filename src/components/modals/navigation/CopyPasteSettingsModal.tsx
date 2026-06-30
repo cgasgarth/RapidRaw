@@ -11,9 +11,9 @@ import {
   type CopyPasteSettings,
   PasteMode,
 } from '../../../utils/adjustments';
-import Button from '../../ui/Button';
-import Switch from '../../ui/Switch';
-import UiText from '../../ui/Text';
+import Button from '../../ui/primitives/Button';
+import Switch from '../../ui/primitives/Switch';
+import UiText from '../../ui/primitives/Text';
 
 interface CopyPasteSettingsModalProps {
   isOpen: boolean;

@@ -5,8 +5,8 @@ import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
 import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import { TextVariants } from '../../../types/typography';
 import { FILENAME_VARIABLES } from '../../ui/ExportImportProperties';
-import Switch from '../../ui/Switch';
-import UiText from '../../ui/Text';
+import Switch from '../../ui/primitives/Switch';
+import UiText from '../../ui/primitives/Text';
 
 interface ImportSettings {
   dateFolderFormat: string;

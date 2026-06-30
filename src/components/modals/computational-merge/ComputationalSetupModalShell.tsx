@@ -5,7 +5,7 @@ import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import type { ComputationalMergeAppServerRouteFamily } from '../../../schemas/computationalMergeAppServerSchemas';
 import { TextColors, TextVariants } from '../../../types/typography';
 import ComputationalMergeAppServerBadge from '../../ui/ComputationalMergeAppServerBadge';
-import UiText from '../../ui/Text';
+import UiText from '../../ui/primitives/Text';
 
 interface ComputationalSetupModalShellProps {
   appServerFamily: ComputationalMergeAppServerRouteFamily;

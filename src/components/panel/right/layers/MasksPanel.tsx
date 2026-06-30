@@ -120,9 +120,9 @@ import {
   Theme,
 } from '../../../ui/AppProperties';
 import CollapsibleSection from '../../../ui/CollapsibleSection';
+import Switch from '../../../ui/primitives/Switch';
+import UiText from '../../../ui/primitives/Text';
 import Resizer from '../../../ui/Resizer';
-import Switch from '../../../ui/Switch';
-import UiText from '../../../ui/Text';
 import Waveform from '../../editor/Waveform';
 import { AiPeoplePartPickerStatus } from '../ai/AiPeoplePartPickerStatus';
 import LayerStackPanel from './LayerStackPanel';

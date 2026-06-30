@@ -5,7 +5,7 @@ import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
 import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import { TextVariants } from '../../../types/typography';
 import { FILENAME_VARIABLES } from '../../ui/ExportImportProperties';
-import UiText from '../../ui/Text';
+import UiText from '../../ui/primitives/Text';
 
 interface RenameFileModalProps {
   filesToRename: Array<string>;
