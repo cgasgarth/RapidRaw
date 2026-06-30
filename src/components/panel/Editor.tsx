@@ -50,6 +50,7 @@ import {
   WHEEL_SNAP_DELAY_MS,
 } from '../../utils/editorGestureMath';
 import { getEditorPreviewDimensions } from '../../utils/editorPreviewDimensions';
+import { reconcileViewportTransform, type ViewportSnapshot } from '../../utils/editorViewportBounds';
 import {
   buildMaskOverlayInvokePayload,
   buildMaskOverlayTriggerHash,
@@ -190,19 +191,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const isMiddleMousePanning = useRef(false);
   const wasPanningDisabledOnDown = useRef(false);
 
-  const prevRenderState = useRef({
-    containerLeft: 0,
-    containerTop: 0,
-    offsetX: 0,
-    offsetY: 0,
-    width: 0,
-  });
-  const transitionAnchorRef = useRef<{
-    active: boolean;
-    screenImageLeft: number;
-    screenImageTop: number;
-    physicalImageWidth: number;
-  } | null>(null);
+  const prevViewportSnapshotRef = useRef<ViewportSnapshot | null>(null);
+  const prevViewportContextKeyRef = useRef<string | null>(null);
   const toggleShowOriginal = useCallback(() => {
     setEditor((state) => ({ showOriginal: !state.showOriginal }));
   }, [setEditor]);
@@ -302,6 +292,15 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     }
     return getEditorPreviewDimensions(selectedImage, adjustments.orientationSteps || 0);
   }, [selectedImage, adjustments.crop, adjustments.orientationSteps]);
+  const viewportContextKey = useMemo(() => {
+    const crop = adjustments.crop;
+    return JSON.stringify({
+      path: selectedImage?.path ?? null,
+      crop: crop ? { x: crop.x, y: crop.y, width: crop.width, height: crop.height } : null,
+      dimensions: croppedDimensions,
+      orientationSteps: adjustments.orientationSteps || 0,
+    });
+  }, [adjustments.crop, adjustments.orientationSteps, croppedDimensions, selectedImage?.path]);
 
   const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions);
   const handleZoomed = useCallback(
@@ -794,51 +793,39 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
   useLayoutEffect(() => {
     const container = imageContainerRef.current;
-    if (!container || imageRenderSize.width === 0) return;
+    if (!container || imageRenderSize.width === 0 || imageRenderSize.height === 0) return;
 
-    const currentRect = container.getBoundingClientRect();
-    const scaleOld = transformStateRef.current.scale;
-    const posOldX = transformStateRef.current.positionX;
-    const posOldY = transformStateRef.current.positionY;
-
-    if (isInstantTransition && !transitionAnchorRef.current && scaleOld > 1.01) {
-      transitionAnchorRef.current = {
-        active: true,
-        screenImageLeft: prevRenderState.current.containerLeft + posOldX + prevRenderState.current.offsetX * scaleOld,
-        screenImageTop: prevRenderState.current.containerTop + posOldY + prevRenderState.current.offsetY * scaleOld,
-        physicalImageWidth: prevRenderState.current.width * scaleOld,
-      };
-    }
-
-    if (!isInstantTransition && transitionAnchorRef.current) {
-      transitionAnchorRef.current = null;
-    }
-
-    if (transitionAnchorRef.current && transitionAnchorRef.current.active) {
-      const anchor = transitionAnchorRef.current;
-
-      const scaleNew = anchor.physicalImageWidth / imageRenderSize.width;
-
-      const posNewX = anchor.screenImageLeft - currentRect.left - imageRenderSize.offsetX * scaleNew;
-      const posNewY = anchor.screenImageTop - currentRect.top - imageRenderSize.offsetY * scaleNew;
-
-      if (
-        Math.abs(scaleNew - scaleOld) > 0.001 ||
-        Math.abs(posNewX - posOldX) > 0.5 ||
-        Math.abs(posNewY - posOldY) > 0.5
-      ) {
-        applyTransform(posNewX, posNewY, scaleNew);
-      }
-    }
-
-    prevRenderState.current = {
-      containerLeft: currentRect.left,
-      containerTop: currentRect.top,
-      offsetX: imageRenderSize.offsetX,
-      offsetY: imageRenderSize.offsetY,
-      width: imageRenderSize.width,
+    const currentSnapshot: ViewportSnapshot = {
+      containerWidth: container.clientWidth,
+      containerHeight: container.clientHeight,
+      renderSize: imageRenderSize,
     };
-  }, [isFullScreen, imageRenderSize, isInstantTransition, applyTransform, transformStateRef]);
+    const contextChanged =
+      prevViewportContextKeyRef.current !== null && prevViewportContextKeyRef.current !== viewportContextKey;
+    const nextTransform = reconcileViewportTransform({
+      contextChanged,
+      current: currentSnapshot,
+      previous: prevViewportSnapshotRef.current,
+      transform: transformStateRef.current,
+    });
+
+    if (contextChanged) {
+      if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
+      if (physicsFrameId.current) cancelAnimationFrame(physicsFrameId.current);
+      savedZoomState.current = null;
+    }
+
+    if (
+      Math.abs(nextTransform.scale - transformStateRef.current.scale) > 0.001 ||
+      Math.abs(nextTransform.positionX - transformStateRef.current.positionX) > 0.5 ||
+      Math.abs(nextTransform.positionY - transformStateRef.current.positionY) > 0.5
+    ) {
+      applyTransform(nextTransform.positionX, nextTransform.positionY, nextTransform.scale);
+    }
+
+    prevViewportSnapshotRef.current = currentSnapshot;
+    prevViewportContextKeyRef.current = viewportContextKey;
+  }, [animationFrameId, imageRenderSize, physicsFrameId, viewportContextKey, applyTransform, transformStateRef]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
