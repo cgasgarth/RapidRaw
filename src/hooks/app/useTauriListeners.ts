@@ -161,6 +161,20 @@ export function useTauriListeners({
         useProcessStore.getState().setProcess((state) => ({
           thumbnails: { ...state.thumbnails, ...pendingThumbs },
         }));
+
+        const selectedImage = useEditorStore.getState().selectedImage;
+        if (selectedImage?.path && pendingThumbs[selectedImage.path]) {
+          useEditorStore.getState().setEditor((state) =>
+            state.selectedImage?.path === selectedImage.path
+              ? {
+                  selectedImage: {
+                    ...state.selectedImage,
+                    thumbnailUrl: pendingThumbs[selectedImage.path] ?? state.selectedImage.thumbnailUrl,
+                  },
+                }
+              : state,
+          );
+        }
       }
 
       if (Object.keys(pendingSmartPreviews).length > 0) {
