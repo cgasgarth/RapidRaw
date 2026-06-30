@@ -2,21 +2,18 @@ import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import { Loader2 } from 'lucide-react';
 import {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  useMemo,
-  useLayoutEffect,
-  useImperativeHandle,
   type MouseEvent,
   type RefObject,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import EditorToolbar from './editor/EditorToolbar';
-import ImageCanvas from './editor/ImageCanvas';
-import { Mask, type SubMask } from './right/Masks';
+import type { Crop, PercentCrop } from 'react-image-crop';
 import { useAiMasking } from '../../hooks/useAiMasking';
 import { useEditorViewportPhysics } from '../../hooks/useEditorViewportPhysics';
 import {
@@ -31,13 +28,14 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
+import type { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
 import {
+  type CropGeometryParams,
   didCropGeometryChange,
   isCropChangeMeaningful,
   isCropValidAfterRotation,
   percentCropFromPixelCrop,
   resolveNextCropForGeometryChange,
-  type CropGeometryParams,
 } from '../../utils/cropUtils';
 import {
   applyPointerOverscrollResistance,
@@ -66,9 +64,9 @@ import {
 } from '../../utils/objectMaskPromptCanvas';
 import { debounce } from '../../utils/timing';
 import { Panel } from '../ui/AppProperties';
-
-import type { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
-import type { Crop, PercentCrop } from 'react-image-crop';
+import EditorToolbar from './editor/EditorToolbar';
+import ImageCanvas from './editor/ImageCanvas';
+import { Mask, type SubMask } from './right/Masks';
 
 interface TransformController {
   resetTransform(time?: number): void;

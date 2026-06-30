@@ -1,10 +1,9 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { z } from 'zod';
-
+import { Invokes } from '../../tauri/commands';
 import VisualSmokeApp from './VisualSmokeApp';
 import { VISUAL_SMOKE_SCENARIO_IDS } from './visualSmokeScenarios';
-import { Invokes } from '../../tauri/commands';
 
 import '../../i18n';
 import '../../styles.css';

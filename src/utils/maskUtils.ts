@@ -1,4 +1,4 @@
-import { Mask, type SubMask, SubMaskMode, formatMaskTypeName } from '../components/panel/right/Masks';
+import { formatMaskTypeName, Mask, type SubMask, SubMaskMode } from '../components/panel/right/Masks';
 
 import type { ImageDimensions } from '../hooks/useImageRenderSize';
 

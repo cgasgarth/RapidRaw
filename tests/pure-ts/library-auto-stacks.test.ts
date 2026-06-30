@@ -1,12 +1,10 @@
 import { expect, test } from 'bun:test';
-
+import type { ImageFile } from '../../src/components/ui/AppProperties.tsx';
 import {
   buildLibraryAutoStackItems,
   buildLibraryAutoStacks,
   type LibraryAutoStackKind,
 } from '../../src/utils/libraryAutoStacks.ts';
-
-import type { ImageFile } from '../../src/components/ui/AppProperties.tsx';
 
 const baseExif = {
   DateTimeOriginal: '2026:06:01 12:00:00',

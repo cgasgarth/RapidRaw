@@ -3,14 +3,13 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-
+import { INITIAL_MASK_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import {
-  LAYER_ADJUSTMENT_KEYS,
   getLayerAdjustmentSnapshot,
+  LAYER_ADJUSTMENT_KEYS,
   setLayerAdjustment,
   setLayerAdjustments,
 } from '../../../src/utils/layerAdjustments.ts';
-import { INITIAL_MASK_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 
 const adjustmentKeySchema = z.enum(LAYER_ADJUSTMENT_KEYS);
 const adjustmentPatchSchema = z.partialRecord(adjustmentKeySchema, z.number());

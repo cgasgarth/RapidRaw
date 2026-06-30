@@ -26,15 +26,15 @@ import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
 } from '../../../src/utils/agentReadOnlyAppServerTools.ts';
+import { AGENT_RETOUCH_APPLY_TOOL_NAME } from '../../../src/utils/agentRetouchApplyTool.ts';
+import { AGENT_HISTORY_ROLLBACK_TOOL_NAME } from '../../../src/utils/agentSessionHistory.ts';
 import {
+  buildRawEngineAppServerRouteCatalog,
   createRawEngineAppServerSupervisorState,
   failRawEngineAppServerSupervisor,
-  buildRawEngineAppServerRouteCatalog,
   handleRawEngineAppServerHostRequestAsync,
   startRawEngineAppServerSupervisor,
 } from '../../../src/utils/rawEngineAppServerHost.ts';
-import { AGENT_RETOUCH_APPLY_TOOL_NAME } from '../../../src/utils/agentRetouchApplyTool.ts';
-import { AGENT_HISTORY_ROLLBACK_TOOL_NAME } from '../../../src/utils/agentSessionHistory.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3164.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 18 : 2));

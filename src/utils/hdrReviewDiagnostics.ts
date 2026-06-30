@@ -1,7 +1,6 @@
-import { hdrReviewDiagnosticsSchema, type HdrReviewDiagnostics } from '../schemas/hdrReviewDiagnosticsSchemas';
-
 import type { HdrBracketDetectionResultV1 } from '../../packages/rawengine-schema/src/rawEngineSchemas';
 import type { HdrMergeUiSettings } from '../schemas/hdrMergeUiSchemas';
+import { type HdrReviewDiagnostics, hdrReviewDiagnosticsSchema } from '../schemas/hdrReviewDiagnosticsSchemas';
 
 interface BuildHdrReviewDiagnosticsInput {
   bracketPreflight: HdrBracketDetectionResultV1 | null;

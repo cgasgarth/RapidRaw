@@ -1,5 +1,5 @@
 import cx from 'clsx';
-import { forwardRef, type ButtonHTMLAttributes, type MouseEventHandler, type ReactNode } from 'react';
+import { type ButtonHTMLAttributes, forwardRef, type MouseEventHandler, type ReactNode } from 'react';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;

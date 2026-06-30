@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import process from 'node:process';
 
 const SCRIPT_DIR = 'scripts';

@@ -52,17 +52,14 @@ contracts instead of making contributors memorize workflow internals.
 | Config              | Used by                                  | Notes                                                                                              |
 | ------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `vite.config.js`    | `dev`, `build`, Tauri                    | Dev server uses strict port `1420`; `TAURI_DEV_HOST` controls host/HMR.                            |
-| `tsconfig.json`     | `typecheck`, ESLint project-service work | `strict` and additional strict compiler options are enabled.                                       |
-| `eslint.config.js`  | `lint`, `lint:fix`, `check:lint`         | Flat config with type-aware TypeScript, React, hooks, accessibility, import, and boundary plugins. |
+| `tsconfig.json`     | `typecheck`                              | `strict` and additional strict compiler options are enabled.                                       |
+| `biome.json`        | `lint`, `lint:fix`, `format`             | Biome linting and formatting configuration.                                                        |
 | `i18next.config.ts` | `i18n:*`                                 | Extracts `en`, `de`, `pl`, `zh-CN` strings from `src/**/*.{ts,tsx}`.                               |
 
 Important current gaps:
 
-- Some high-volume React compiler hook rules remain fenced.
-- Import cycles and unknown-file boundary rules remain fenced for focused
-  cleanup PRs.
-- `format` and `format:check` are whole-repo commands; changed-file local hooks
-  may need narrower wrappers to stay fast.
+- Some deeper architectural checks remain outside the fast lint gate and should
+  be handled by focused feature or hardening PRs.
 
 ## Tauri And Vite Entrypoints
 
@@ -135,12 +132,11 @@ Future PRs should add named scripts so local and CI behavior can converge:
 | `check:quick`     | Fast local pre-commit/pre-push validation. | #38, #41      |
 | `check`           | Full local PR mirror for ordinary changes. | #38           |
 | `check:types`     | TypeScript-only validation.                | #23-#28, #283 |
-| `check:lint`      | ESLint-only validation.                    | #29-#37, #286 |
+| `lint`            | Biome lint validation.                     | #29-#37, #286 |
 | `check:format`    | Formatting check.                          | #289          |
 | `check:i18n`      | i18n extract and hardcoded-string checks.  | #285          |
 | `check:rust`      | Rust fmt/check/clippy bundle.              | #43, #287     |
 | `check:security`  | JS and Rust dependency vulnerability gate. | #44, #262     |
-| `check:licenses`  | JS and Rust dependency license gate.       | #45           |
 | `build:frontend`  | Frontend Vite production build.            | #288          |
 | `build:app:macos` | macOS Tauri app package smoke.             | #52           |
 

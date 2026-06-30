@@ -1,10 +1,10 @@
 import {
-  aiPeopleMaskFakeAlphaMaskSchema,
-  aiPeopleMaskTargetSchema,
   type AiPeopleMaskAnalysis,
   type AiPeopleMaskFakeAlphaMask,
   type AiPeopleMaskPart,
   type AiPeopleMaskTarget,
+  aiPeopleMaskFakeAlphaMaskSchema,
+  aiPeopleMaskTargetSchema,
 } from '../schemas/aiMaskingSchemas';
 
 type NormalizedRect = AiPeopleMaskAnalysis['people'][number]['bounds'];

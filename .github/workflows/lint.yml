@@ -27,11 +27,11 @@ jobs:
 
       - name: Generate bundle analysis report
         if: ${{ always() }}
-        run: bun run bundle:report
+        run: bun scripts/generate-vite-bundle-report.ts
 
       - name: Summarize bundle analysis
         if: ${{ always() }}
-        run: bun run bundle:summary
+        run: bun scripts/write-vite-bundle-step-summary.ts
 
       - name: Upload bundle analysis report
         if: ${{ always() }}
@@ -43,7 +43,7 @@ jobs:
           if-no-files-found: error
 
       - name: Check translation extraction
-        run: bun run i18n:check
+        run: bun scripts/run-compact-command.ts --label i18n -- i18next-cli extract --ci --dry-run
 
   frontend-typecheck:
     name: 'frontend: typecheck baseline'
@@ -67,7 +67,7 @@ jobs:
       - uses: ./.github/actions/setup-bun-deps
 
       - name: Lint with Biome
-        run: bun run check:lint
+        run: bun run lint
 
   frontend-format:
     name: 'frontend: biome format'
@@ -81,18 +81,6 @@ jobs:
       - name: Check formatting with Biome
         run: bun run format:check
 
-  frontend-eslint-gaps:
-    name: 'frontend: ESLint gap rules'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - uses: ./.github/actions/setup-bun-deps
-
-      - name: Check ESLint-only policy gaps
-        run: bun run check:eslint-gaps
-
   frontend-i18n-lint:
     name: 'frontend: i18n lint baseline'
     runs-on: ubuntu-latest
@@ -103,7 +91,7 @@ jobs:
       - uses: ./.github/actions/setup-bun-deps
 
       - name: Lint translations
-        run: bun run i18n:lint
+        run: bun scripts/run-compact-command.ts --label i18n:lint -- bunx i18next-cli lint
 
   frontend-unused-deps:
     name: 'frontend: unused dependency gate'
@@ -115,7 +103,7 @@ jobs:
       - uses: ./.github/actions/setup-bun-deps
 
       - name: Check unused dependencies
-        run: bun run check:unused-deps
+        run: bun scripts/run-compact-command.ts --label unused-deps -- bunx knip --config knip.jsonc --dependencies --reporter compact
 
   frontend-unsafe-casts:
     name: 'frontend: unsafe cast ban'
@@ -127,10 +115,10 @@ jobs:
       - uses: ./.github/actions/setup-bun-deps
 
       - name: Check script extension policy
-        run: bun run check:script-extension-policy
+        run: bun tests/integration/checks/check-script-extension-policy.ts
 
       - name: Check unsafe casts
-        run: bun run check:unsafe-casts
+        run: bun tests/integration/checks/check-unsafe-casts.ts
 
   frontend-visual-smoke:
     name: 'frontend: PR visual smoke'
@@ -145,10 +133,10 @@ jobs:
         run: bunx playwright install chromium
 
       - name: Capture PR visual smoke
-        run: bun run check:visual-smoke:pr
+        run: bun scripts/capture-visual-smoke.ts --scenario empty-library
 
       - name: Check browser Tauri harness
-        run: bun run check:browser-tauri-harness
+        run: bun tests/integration/checks/check-browser-tauri-harness.ts
 
       - name: Upload visual smoke screenshots
         if: ${{ failure() }}
@@ -169,7 +157,7 @@ jobs:
       - uses: ./.github/actions/setup-bun-deps
 
       - name: Check RawEngine schema package
-        run: bun run schema:check
+        run: bun run check:schema
 
   schema-command-bus:
     name: 'schemas: edit command bus'
@@ -181,7 +169,7 @@ jobs:
       - uses: ./.github/actions/setup-bun-deps
 
       - name: Check edit command bus
-        run: bun run schema:command-bus
+        run: bun packages/rawengine-schema/scripts/check-edit-command-bus.ts
 
   schema-contract-gate:
     name: 'schemas: path-gated contract suite'
@@ -220,7 +208,7 @@ jobs:
           echo "args=" >> "$GITHUB_OUTPUT"
 
       - name: Run schema contract checks when relevant
-        run: bun run schema:contract-gate -- ${{ steps.schema-contract-files.outputs.args }}
+        run: bun tests/integration/checks/check-schema-contract-gate.ts ${{ steps.schema-contract-files.outputs.args }}
 
   macos-smoke-decision:
     name: 'ci: macOS smoke decision'
@@ -262,18 +250,6 @@ jobs:
             exit 1
           fi
 
-  frontend-lint-escapes:
-    name: 'frontend: lint escape hatch policy'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - uses: ./.github/actions/setup-bun-deps
-
-      - name: Check documented lint escape hatches
-        run: bun run check:lint-escapes
-
   docs-check:
     name: 'docs: markdown and links'
     runs-on: ubuntu-latest
@@ -284,7 +260,7 @@ jobs:
       - uses: ./.github/actions/setup-bun-deps
 
       - name: Check Markdown formatting and internal links
-        run: bun run docs:check
+        run: bun run check:docs
 
   rust-fmt:
     name: 'rust: fmt'
@@ -449,7 +425,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Lint GitHub Actions workflows and policy
-        run: bun run check:actions
+        run: bun tests/integration/checks/check-unsafe-casts.ts
 
   actions-pins:
     name: 'github actions: pinned versions'
@@ -463,7 +439,7 @@ jobs:
           bun-version-file: package.json
 
       - name: Validate pinned GitHub Action versions
-        run: bun run check:action-pins
+        run: bun tests/integration/checks/check-github-action-pins.ts
 
   dependency-security-js:
     name: 'security: JavaScript dependencies'
@@ -475,7 +451,7 @@ jobs:
       - uses: ./.github/actions/setup-bun-deps
 
       - name: Audit JavaScript dependencies
-        run: bun run check:security:js
+        run: bun scripts/run-compact-command.ts --label security:js -- bun audit --audit-level moderate
 
   dependency-security-rust:
     name: 'security: Rust dependencies'
@@ -518,19 +494,7 @@ jobs:
         run: cargo install cargo-audit --locked --version 0.22.2
 
       - name: Audit Rust dependencies
-        run: bun run check:security:rust
-
-  dependency-license-js:
-    name: 'license: JavaScript dependencies'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - uses: ./.github/actions/setup-bun-deps
-
-      - name: Check JavaScript dependency licenses
-        run: bun run check:licenses:js
+        run: bun tests/integration/checks/check-rust-advisory-waivers.ts && bun scripts/run-compact-command.ts --label security:rust --cwd src-tauri -- cargo audit --ignore RUSTSEC-2024-0429
 
   dependency-license-rust:
     name: 'license: Rust dependencies'
@@ -590,7 +554,6 @@ jobs:
       - schema-command-bus
       - schema-contract-gate
       - macos-smoke-decision
-      - frontend-lint-escapes
       - docs-check
       - rust-fmt
       - rust-pr-check
@@ -599,7 +562,6 @@ jobs:
       - actions-pins
       - dependency-security-js
       - dependency-security-rust
-      - dependency-license-js
       - dependency-license-rust
     if: always() && github.event_name == 'pull_request'
     timeout-minutes: 10

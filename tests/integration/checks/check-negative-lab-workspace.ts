@@ -1,18 +1,17 @@
 import { readFileSync } from 'node:fs';
-
-import {
-  buildNegativeLabDustScratchReviewReport,
-  buildNegativeLabQcProofReport,
-} from '../../../src/utils/negativeLabDustScratchReview.ts';
-import {
-  buildDustCandidateHealLayer,
-  buildDustHealCorrectionMetrics,
-} from '../../../src/utils/dustCandidateHealLayer.ts';
-import { buildNegativeLabFrameHealthReport } from '../../../src/utils/negativeLabFrameHealth.ts';
 import {
   NEGATIVE_LAB_WORKSPACE_SCHEMA_VERSION,
   negativeLabWorkspaceProofSchema,
 } from '../../../src/schemas/negativeLabWorkspaceSchemas.ts';
+import {
+  buildDustCandidateHealLayer,
+  buildDustHealCorrectionMetrics,
+} from '../../../src/utils/dustCandidateHealLayer.ts';
+import {
+  buildNegativeLabDustScratchReviewReport,
+  buildNegativeLabQcProofReport,
+} from '../../../src/utils/negativeLabDustScratchReview.ts';
+import { buildNegativeLabFrameHealthReport } from '../../../src/utils/negativeLabFrameHealth.ts';
 
 const targetPaths = [
   '/fixtures/negative-lab/synthetic-color-negative-001.tif',

@@ -1,7 +1,7 @@
 import {
-  renderLayerBlendStack,
   type LayerBlendStackInput,
   type LayerBlendStackLayer,
+  renderLayerBlendStack,
 } from './layerPreviewExportParity';
 
 export type LayerOpacityOrderRuntimeOperation =

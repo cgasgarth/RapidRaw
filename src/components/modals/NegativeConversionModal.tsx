@@ -3,79 +3,71 @@ import { listen } from '@tauri-apps/api/event';
 import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  RotateCcw,
-  ZoomIn,
-  ZoomOut,
-  Maximize,
-  Save,
-  Loader2,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
   Eye,
   EyeOff,
   Info,
+  Loader2,
+  Maximize,
+  RotateCcw,
+  Save,
   WandSparkles,
-  Copy,
-  ChevronLeft,
-  ChevronRight,
   X,
-  CheckCircle2,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
-import { useState, useEffect, useMemo, useRef, type PointerEvent } from 'react';
-import { useTranslation, Trans } from 'react-i18next';
+import { type PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { z } from 'zod';
-
-import {
-  NegativeLabPatchSamplerPanel,
-  type DensitometerPatchLabelKey,
-  type NegativeLabPatchRole,
-} from './NegativeLabPatchSamplerPanel';
-import { NegativeLabQcProofPanel } from './NegativeLabQcProofPanel';
-import {
-  ACQUISITION_SOURCE_FAMILY_LABEL_KEYS,
-  ACQUISITION_WARNING_LABEL_KEYS,
-  BATCH_DISPOSITION_LABEL_KEYS,
-  FRAME_WARNING_SEVERITY_SCORE,
-  getNegativeLabFrameWarningCount,
-  type NegativeLabFrameHealthFilter,
-  type NegativeLabFrameHealthSort,
-  type NegativeLabQcDecision,
-} from './NegativeLabRollHealthModel';
-import { NegativeLabRollHealthPanel } from './NegativeLabRollHealthPanel';
+import type { LayerStackSidecarLayerV1 } from '../../../packages/rawengine-schema/src';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import {
-  NEGATIVE_LAB_PROFILE_BROWSER_ROWS,
-  NEGATIVE_LAB_PROFILE_BROWSER_ROW_BY_ID,
-  NEGATIVE_LAB_PROFILE_FILTERS,
-  NEGATIVE_LAB_PROFILE_FILTER_TEST_IDS,
-  NEGATIVE_LAB_PROFILE_SORTS,
-  NEGATIVE_LAB_PROFILE_SORT_TEST_IDS,
   isNegativeLabProfileSort,
-  useNegativeLabProfileBrowser,
+  NEGATIVE_LAB_PROFILE_BROWSER_ROW_BY_ID,
+  NEGATIVE_LAB_PROFILE_BROWSER_ROWS,
+  NEGATIVE_LAB_PROFILE_FILTER_TEST_IDS,
+  NEGATIVE_LAB_PROFILE_FILTERS,
+  NEGATIVE_LAB_PROFILE_SORT_TEST_IDS,
+  NEGATIVE_LAB_PROFILE_SORTS,
   type NegativeLabProfileFilter,
   type NegativeLabProfileSort,
+  useNegativeLabProfileBrowser,
 } from '../../hooks/useNegativeLabProfileBrowser';
 import { usePreviewViewport } from '../../hooks/usePreviewViewport';
+import type { NegativeLabAcquisitionProfileId } from '../../schemas/negativeLabAcquisitionProfileSchemas';
 import { negativeLabAcquisitionProfileIdSchema } from '../../schemas/negativeLabAcquisitionProfileSchemas';
+import type {
+  NegativeLabAcquisitionHealthReport,
+  NegativeLabFrameCropStatus,
+} from '../../schemas/negativeLabFrameHealthSchemas';
+import type { NegativeLabFrameRgbBalanceOffset } from '../../schemas/negativeLabFrameRgbBalanceOverrideSchemas';
 import {
-  negativeLabHighlightPatchExposureSuggestionSchema,
   type NegativeLabHighlightPatchExposureSuggestion,
+  negativeLabHighlightPatchExposureSuggestionSchema,
 } from '../../schemas/negativeLabHighlightPatchExposureSuggestionSchemas';
+import type { NegativeLabRuntimeProfileBrowserRow } from '../../schemas/negativeLabMeasuredProfileSchemas';
 import {
-  negativeLabNeutralPatchSuggestionSchema,
   type NegativeLabNeutralPatchSuggestion,
+  negativeLabNeutralPatchSuggestionSchema,
 } from '../../schemas/negativeLabNeutralPatchSuggestionSchemas';
 import {
-  negativeBaseFogEstimateSchema,
-  negativeBaseFogSampleReadoutSchema,
-  negativeConversionSavedPathsSchema,
   type NegativeBaseFogDensitometerReadout,
   type NegativeBaseFogEstimate,
   type NegativeLabBaseFogSampleRect,
   type NegativeLabPresetParams,
+  negativeBaseFogEstimateSchema,
+  negativeBaseFogSampleReadoutSchema,
+  negativeConversionSavedPathsSchema,
 } from '../../schemas/negativeLabPresetCatalogSchemas';
+import type { NegativeLabSelectedProfileSnapshot } from '../../schemas/negativeLabProfileComparisonSchemas';
 import {
-  negativeLabShadowPatchBlackPointSuggestionSchema,
   type NegativeLabShadowPatchBlackPointSuggestion,
+  negativeLabShadowPatchBlackPointSuggestionSchema,
 } from '../../schemas/negativeLabShadowPatchBlackPointSuggestionSchemas';
+import type { NegativeLabWorkspaceProof } from '../../schemas/negativeLabWorkspaceSchemas';
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { Invokes } from '../../tauri/commands';
@@ -84,21 +76,22 @@ import { buildDustCandidateHealLayer, buildDustHealCorrectionMetrics } from '../
 import { buildLayerStackSidecarFromMasks } from '../../utils/layerStackCommandBridge';
 import {
   DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID,
-  NEGATIVE_LAB_ACQUISITION_PROFILES,
   getNegativeLabAcquisitionProfile,
+  NEGATIVE_LAB_ACQUISITION_PROFILES,
 } from '../../utils/negativeLabAcquisitionProfiles';
 import { NegativeLabAppServerCommandName } from '../../utils/negativeLabAppServerCommandNames';
 import {
   buildNegativeLabBaseSamplePreviewProof,
-  type NegativeLabBaseSampleWarningCode,
   type NegativeLabBaseSamplePreviewProof,
   type NegativeLabBaseSamplePreviewProofContext,
+  type NegativeLabBaseSampleWarningCode,
 } from '../../utils/negativeLabBaseSampleCommandBridge';
 import { buildNegativeBaseFogDensitometerReadout } from '../../utils/negativeLabDensitometer';
 import {
   buildNegativeLabDustScratchReviewReport,
   buildNegativeLabQcProofReport,
 } from '../../utils/negativeLabDustScratchReview';
+import type { NegativeConversionEditorHandoff } from '../../utils/negativeLabEditorHandoff';
 import {
   buildNegativeLabCanSave,
   buildNegativeLabPositiveHandoffReadiness,
@@ -117,15 +110,15 @@ import {
   getNegativeLabScanLabel,
 } from '../../utils/negativeLabFrameHealth';
 import {
-  DEFAULT_NEGATIVE_LAB_FRAME_RGB_BALANCE_OFFSET,
   buildNegativeLabFrameRgbBalanceOverridePayload,
+  DEFAULT_NEGATIVE_LAB_FRAME_RGB_BALANCE_OFFSET,
   getNegativeLabEffectiveFrameRgbBalance,
   negativeLabFrameRgbBalanceOffsetIsZero,
   snapNegativeLabFrameRgbBalanceOffsets,
 } from '../../utils/negativeLabFrameRgbBalanceOverrides';
 import {
-  NegativeLabOutputFormatId,
   NEGATIVE_LAB_OUTPUT_FORMAT_SELECTOR_IDS,
+  NegativeLabOutputFormatId,
   type NegativeLabOutputFormatId as NegativeOutputFormat,
 } from '../../utils/negativeLabOutputFormatIds';
 import { buildNegativeLabPickedPatchRect, type NegativeLabPatchPickerPoint } from '../../utils/negativeLabPatchPicker';
@@ -146,27 +139,32 @@ import {
 } from '../../utils/negativeLabQcContactSheetArtifact';
 import { buildNegativeLabRollNormalizationPlan } from '../../utils/negativeLabRollNormalizationPlan';
 import {
-  NEGATIVE_LAB_STOCK_METADATA_CATALOG,
   buildNegativeLabStockMetadataCounts,
+  NEGATIVE_LAB_STOCK_METADATA_CATALOG,
 } from '../../utils/negativeLabStockMetadataCatalog';
-import { NEGATIVE_LAB_STOCK_REGISTRY, buildNegativeLabStockRegistryCounts } from '../../utils/negativeLabStockRegistry';
+import { buildNegativeLabStockRegistryCounts, NEGATIVE_LAB_STOCK_REGISTRY } from '../../utils/negativeLabStockRegistry';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { throttle } from '../../utils/timing';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
 import UiText from '../ui/Text';
-
-import type { LayerStackSidecarLayerV1 } from '../../../packages/rawengine-schema/src';
-import type { NegativeLabAcquisitionProfileId } from '../../schemas/negativeLabAcquisitionProfileSchemas';
-import type {
-  NegativeLabAcquisitionHealthReport,
-  NegativeLabFrameCropStatus,
-} from '../../schemas/negativeLabFrameHealthSchemas';
-import type { NegativeLabFrameRgbBalanceOffset } from '../../schemas/negativeLabFrameRgbBalanceOverrideSchemas';
-import type { NegativeLabRuntimeProfileBrowserRow } from '../../schemas/negativeLabMeasuredProfileSchemas';
-import type { NegativeLabSelectedProfileSnapshot } from '../../schemas/negativeLabProfileComparisonSchemas';
-import type { NegativeLabWorkspaceProof } from '../../schemas/negativeLabWorkspaceSchemas';
-import type { NegativeConversionEditorHandoff } from '../../utils/negativeLabEditorHandoff';
+import {
+  type DensitometerPatchLabelKey,
+  type NegativeLabPatchRole,
+  NegativeLabPatchSamplerPanel,
+} from './NegativeLabPatchSamplerPanel';
+import { NegativeLabQcProofPanel } from './NegativeLabQcProofPanel';
+import {
+  ACQUISITION_SOURCE_FAMILY_LABEL_KEYS,
+  ACQUISITION_WARNING_LABEL_KEYS,
+  BATCH_DISPOSITION_LABEL_KEYS,
+  FRAME_WARNING_SEVERITY_SCORE,
+  getNegativeLabFrameWarningCount,
+  type NegativeLabFrameHealthFilter,
+  type NegativeLabFrameHealthSort,
+  type NegativeLabQcDecision,
+} from './NegativeLabRollHealthModel';
+import { NegativeLabRollHealthPanel } from './NegativeLabRollHealthPanel';
 
 type NegativeParams = NegativeLabPresetParams;
 type NegativeConversionScope = 'active' | 'all' | 'ready';

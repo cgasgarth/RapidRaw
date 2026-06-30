@@ -1,8 +1,7 @@
-import DerivedOutputReceiptPanel from './DerivedOutputReceiptPanel';
+import type { DerivedOutputReceipt } from '../../schemas/derivedOutputReceiptSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import UiText from '../ui/Text';
-
-import type { DerivedOutputReceipt } from '../../schemas/derivedOutputReceiptSchemas';
+import DerivedOutputReceiptPanel from './DerivedOutputReceiptPanel';
 
 interface ComputationalMergeReviewItem {
   label: string;

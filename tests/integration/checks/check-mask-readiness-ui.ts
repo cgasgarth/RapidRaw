@@ -15,19 +15,19 @@ import {
   layerMaskMutationResultV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { Mask, SubMaskMode, type SubMask } from '../../../src/components/panel/right/Masks.tsx';
-import { createEditorSubMaskForImage } from '../../../src/utils/editorSubMaskFactory.ts';
+import { Mask, type SubMask, SubMaskMode } from '../../../src/components/panel/right/Masks.tsx';
 import {
   INITIAL_MASK_ADJUSTMENTS,
   INITIAL_MASK_CONTAINER,
   type MaskContainer,
 } from '../../../src/utils/adjustments.ts';
-import { buildLayerExportReadinessSummary } from '../../../src/utils/layerStack.ts';
-import { buildLinearGradientMaskCommandFromParameters } from '../../../src/utils/linearGradientMaskCommandBridge.ts';
 import {
   createColorRangeMaskParameters,
   evaluateColorRangeMaskWeight,
 } from '../../../src/utils/colorRangeMaskParameters.ts';
+import { createEditorSubMaskForImage } from '../../../src/utils/editorSubMaskFactory.ts';
+import { buildLayerExportReadinessSummary } from '../../../src/utils/layerStack.ts';
+import { buildLinearGradientMaskCommandFromParameters } from '../../../src/utils/linearGradientMaskCommandBridge.ts';
 
 const IMAGE_SIZE = { height: 12, width: 16 };
 const context = {

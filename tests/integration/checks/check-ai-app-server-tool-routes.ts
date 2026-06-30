@@ -1,9 +1,6 @@
 #!/usr/bin/env bun
 
 import { readFileSync } from 'node:fs';
-
-import { AI_APP_SERVER_TOOL_ROUTES } from '../../../src/utils/aiAppServerToolRoutes.ts';
-import { AI_MASK_CAPABILITY_AUDIT } from '../../../src/utils/aiMaskCapabilities.ts';
 import {
   sampleAiAppServerToolManifestV1,
   sampleToolRegistryV1,
@@ -15,6 +12,8 @@ import {
   AiAppServerToolRouteSourceKind,
   AiAppServerToolRouteStatus,
 } from '../../../src/utils/aiAppServerToolRouteIds.ts';
+import { AI_APP_SERVER_TOOL_ROUTES } from '../../../src/utils/aiAppServerToolRoutes.ts';
+import { AI_MASK_CAPABILITY_AUDIT } from '../../../src/utils/aiMaskCapabilities.ts';
 
 const COMMANDS_PATH = 'src/tauri/commands.ts';
 const commandsSource = readFileSync(COMMANDS_PATH, 'utf8');
@@ -39,14 +38,14 @@ const aiToolCapabilities = new Map(
   sampleAiAppServerToolManifestV1.tools.map((tool) => [tool.toolName, new Set(tool.allowedCapabilities)]),
 );
 const failures = [];
-const runtimeCheckScripts = [
-  'check:ai-mask-capabilities',
-  'check:ai-mask-app-server-tool',
-  'check:ai-people-masks',
-  'check:ai-people-apply-plan',
-  'check:ai-denoise-app-server-tool',
-  'check:ai-denoise-runtime-apply',
-];
+const runtimeCheckCommands = [
+  ['bun', 'tests/integration/checks/check-ai-mask-capabilities.ts'],
+  ['bun', 'tests/integration/checks/check-ai-mask-app-server-tool.ts'],
+  ['bun', 'tests/integration/checks/check-ai-people-mask-contract.ts'],
+  ['bun', 'tests/integration/checks/check-ai-people-layer-apply-plan.ts'],
+  ['bun', 'tests/integration/checks/check-ai-denoise-app-server-tool.ts'],
+  ['bun', 'tests/integration/checks/check-ai-denoise-runtime-apply.ts'],
+] satisfies Array<[string, ...string[]]>;
 
 const toolCapabilityByAiMaskCapability = new Map([
   ['depth', AiAppServerToolCapability.DepthMask],
@@ -209,8 +208,8 @@ for (const capability of AI_MASK_CAPABILITY_AUDIT) {
   }
 }
 
-for (const runtimeCheckScript of runtimeCheckScripts) {
-  runPackageScript(runtimeCheckScript);
+for (const runtimeCheckCommand of runtimeCheckCommands) {
+  runCommand(runtimeCheckCommand);
 }
 
 if (failures.length > 0) {
@@ -223,8 +222,8 @@ if (failures.length > 0) {
 
 console.log('ai app-server routes ok');
 
-function runPackageScript(scriptName: string): void {
-  const result = Bun.spawnSync(['bun', 'run', scriptName], {
+function runCommand(command: [string, ...string[]]): void {
+  const result = Bun.spawnSync(command, {
     stderr: 'pipe',
     stdout: 'pipe',
   });
@@ -237,5 +236,5 @@ function runPackageScript(scriptName: string): void {
     .filter(Boolean)
     .slice(-20)
     .join('\n');
-  failures.push(`${scriptName} failed:\n${output}`);
+  failures.push(`${command.join(' ')} failed:\n${output}`);
 }

@@ -6,9 +6,9 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 
 import {
+  type BrushBaseMaskArtifact,
   BrushMaskCommandRuntime,
   renderBrushMask,
-  type BrushBaseMaskArtifact,
 } from '../../../packages/rawengine-schema/src/brushMaskCommandRuntime.ts';
 import {
   ActorKind,

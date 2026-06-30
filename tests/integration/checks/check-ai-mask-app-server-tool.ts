@@ -1,13 +1,5 @@
 #!/usr/bin/env bun
 
-import { AI_APP_SERVER_TOOL_ROUTES } from '../../../src/utils/aiAppServerToolRoutes.ts';
-import {
-  AiAppServerToolCapability,
-  AiAppServerToolName,
-  AiAppServerToolRouteExecutionMode,
-  AiAppServerToolRouteSourceKind,
-} from '../../../src/utils/aiAppServerToolRouteIds.ts';
-import { buildRawEngineAppServerRouteCatalog } from '../../../src/utils/rawEngineAppServerHost.ts';
 import { createRawEngineLocalAppServerBridge } from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
 import {
   aiToolApplyResultV1Schema,
@@ -19,6 +11,14 @@ import {
   sampleAiToolApplyCommandEnvelopeV1,
   sampleAiToolCommandEnvelopeV1,
 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+import {
+  AiAppServerToolCapability,
+  AiAppServerToolName,
+  AiAppServerToolRouteExecutionMode,
+  AiAppServerToolRouteSourceKind,
+} from '../../../src/utils/aiAppServerToolRouteIds.ts';
+import { AI_APP_SERVER_TOOL_ROUTES } from '../../../src/utils/aiAppServerToolRoutes.ts';
+import { buildRawEngineAppServerRouteCatalog } from '../../../src/utils/rawEngineAppServerHost.ts';
 
 const failures: string[] = [];
 const toolByName = new Map(sampleAiAppServerToolManifestV1.tools.map((tool) => [tool.toolName, tool]));

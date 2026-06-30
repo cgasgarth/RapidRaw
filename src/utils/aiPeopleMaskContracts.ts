@@ -1,8 +1,8 @@
 import {
-  aiPeopleMaskProviderCapabilitySchema,
-  aiPeopleMaskPartSchema,
   type AiPeopleMaskPart,
   type AiPeopleMaskProviderCapability,
+  aiPeopleMaskPartSchema,
+  aiPeopleMaskProviderCapabilitySchema,
 } from '../schemas/aiMaskingSchemas';
 
 export const AI_PEOPLE_MASK_PART_CAPABILITIES: Array<AiPeopleMaskProviderCapability> =

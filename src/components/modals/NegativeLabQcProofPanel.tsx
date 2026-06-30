@@ -1,15 +1,13 @@
 import cx from 'clsx';
 import { useTranslation } from 'react-i18next';
-
-import { TextVariants } from '../../types/typography';
-import UiText from '../ui/Text';
-
-import type { NegativeLabQcDecision } from './NegativeLabRollHealthModel';
 import type { NegativeLabQcProofReport } from '../../schemas/negativeLabWorkspaceSchemas';
+import { TextVariants } from '../../types/typography';
 import type {
   NegativeLabQcContactSheetArtifact,
   NegativeLabQcOverlayVisibility,
 } from '../../utils/negativeLabQcContactSheetArtifact';
+import UiText from '../ui/Text';
+import type { NegativeLabQcDecision } from './NegativeLabRollHealthModel';
 
 type NegativeLabQcOverlayKey = keyof NegativeLabQcOverlayVisibility;
 

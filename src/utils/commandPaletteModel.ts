@@ -1,14 +1,13 @@
-import { createFocusStackSourcePreflightMetadata } from './focusStackSourcePreflight';
-import { createSuperResolutionSourcePreflightMetadata } from './superResolutionSourcePreflight';
-import { Panel, type ImageFile, type SelectedImage } from '../components/ui/AppProperties';
+import { type ImageFile, Panel, type SelectedImage } from '../components/ui/AppProperties';
 import {
-  commandPaletteCommandSchema,
   type CommandPaletteCommand,
   type CommandPaletteCommandCategory,
   type CommandPaletteCommandId,
+  commandPaletteCommandSchema,
 } from '../schemas/commandPaletteSchemas';
-
 import type { UIState } from '../store/useUIStore';
+import { createFocusStackSourcePreflightMetadata } from './focusStackSourcePreflight';
+import { createSuperResolutionSourcePreflightMetadata } from './superResolutionSourcePreflight';
 
 export type { CommandPaletteCommand };
 

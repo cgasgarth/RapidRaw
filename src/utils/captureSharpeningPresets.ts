@@ -1,4 +1,4 @@
-import { captureSharpeningPresetSchema, type CaptureSharpeningPreset } from '../schemas/captureSharpeningSchemas';
+import { type CaptureSharpeningPreset, captureSharpeningPresetSchema } from '../schemas/captureSharpeningSchemas';
 
 export const CAPTURE_SHARPENING_PRESETS: Array<CaptureSharpeningPreset> = [
   {

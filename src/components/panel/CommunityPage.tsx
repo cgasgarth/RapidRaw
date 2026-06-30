@@ -1,18 +1,17 @@
 import { invoke } from '@tauri-apps/api/core';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, GitPullRequest, Loader2, Search, Users } from 'lucide-react';
-import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Invokes } from '../../tauri/commands';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
+import type { ImageFile, SupportedTypes } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
 import Input from '../ui/Input';
 import UiText from '../ui/Text';
-
-import type { SupportedTypes, ImageFile } from '../ui/AppProperties';
 
 const DEFAULT_PREVIEW_IMAGE_URL = 'https://raw.githubusercontent.com/CyberTimon/RapidRAW-Presets/main/sample-image.jpg';
 

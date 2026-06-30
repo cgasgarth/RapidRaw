@@ -4,11 +4,10 @@ import { mkdir, readdir, readFile, stat } from 'node:fs/promises';
 import { extname, join, resolve } from 'node:path';
 
 import { z } from 'zod';
-
+import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../scripts/compact-output.ts';
 import { rawDevelopmentReportSchema } from '../../../src/schemas/imageLoaderSchemas.ts';
 import { buildCameraProfileProvenanceReceipt } from '../../../src/utils/cameraProfileProvenanceReceipt.ts';
 import { calculateDeltaE00, labColorSchema } from '../../../src/utils/deltaE00.ts';
-import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../scripts/compact-output.ts';
 
 const FIXTURE_PATH = 'fixtures/color/dual-illuminant-profile-proof-fixture.json';
 const DEFAULT_REPORT_DIR = 'src-tauri/target/dual-illuminant-profile-proof';

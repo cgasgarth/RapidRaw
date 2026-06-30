@@ -1,8 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
-import { useCallback, type MouseEvent } from 'react';
+import { type MouseEvent, useCallback } from 'react';
 import { toast } from 'react-toastify';
-
-import { computeSortedLibrary } from './useSortedLibrary';
+import type { FolderTree } from '../components/panel/FolderTree';
+import type { AlbumItem, ImageFile } from '../components/ui/AppProperties';
 import { albumTreeSchema } from '../schemas/albumSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
@@ -12,9 +12,7 @@ import { Invokes } from '../tauri/commands';
 import { formatUnknownError } from '../utils/errorFormatting';
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { invokeWithSchema } from '../utils/tauriSchemaInvoke';
-
-import type { FolderTree } from '../components/panel/FolderTree';
-import type { ImageFile, AlbumItem } from '../components/ui/AppProperties';
+import { computeSortedLibrary } from './useSortedLibrary';
 
 type LibraryClickEvent = Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey'>;
 

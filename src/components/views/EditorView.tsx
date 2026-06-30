@@ -1,8 +1,9 @@
 import cx from 'clsx';
+import type { MouseEvent, KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-
+import type { CreateResizeHandler } from '../../hooks/usePanelResize';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
@@ -14,9 +15,6 @@ import { EditorRightPanelHost } from '../panel/right/EditorRightPanelHost';
 import RightPanelSwitcher from '../panel/right/RightPanelSwitcher';
 import { type ImageFile, Orientation, type Panel, type ThumbnailAspectRatio } from '../ui/AppProperties';
 import Resizer from '../ui/Resizer';
-
-import type { CreateResizeHandler } from '../../hooks/usePanelResize';
-import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent, RefObject } from 'react';
 
 interface TransformController {
   resetTransform(time?: number): void;

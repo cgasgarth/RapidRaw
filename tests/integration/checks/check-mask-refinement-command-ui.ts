@@ -4,8 +4,8 @@ import {
   createMaskRefinementCommand,
   dispatchMaskRefinementCommand,
   MASK_REFINEMENT_REPLAY_PARAMETER_KEY,
-  readMaskRefinementReplayReceipt,
   maskRefinementUiCommandSchema,
+  readMaskRefinementReplayReceipt,
 } from '../../../src/utils/maskRefinementCommandBus.ts';
 
 const busSource = readFileSync('src/utils/maskRefinementCommandBus.ts', 'utf8');

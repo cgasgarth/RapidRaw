@@ -4,13 +4,12 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 import { z } from 'zod';
-
+import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/filmLookRegistry.ts';
 import {
   applyGovernedFilmLookRuntime,
   buildGovernedFilmLookCommand,
   type GovernedFilmLookPixel,
 } from '../../../src/utils/governedFilmLookRuntime.ts';
-import { FILM_LOOK_BROWSER_ITEMS } from '../../../src/utils/filmLookRegistry.ts';
 
 const FIXTURE_PATH = resolve('fixtures/film-simulation/governed-film-look-runtime.json');
 const updateFixture = process.argv.includes('--update');

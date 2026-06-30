@@ -1,19 +1,18 @@
 import { invoke } from '@tauri-apps/api/core';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CheckCircle, XCircle, Loader2, Users, Trash2, Star, Tag, Move, Link2, Unlink } from 'lucide-react';
+import { CheckCircle, Link2, Loader2, Move, Star, Tag, Trash2, Unlink, Users, XCircle } from 'lucide-react';
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { Invokes } from '../../tauri/commands';
 import { TextColors, TextVariants } from '../../types/typography';
+import type { CullingSettings, CullingSuggestions, ImageAnalysisResult, Progress } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
 import Slider from '../ui/Slider';
 import Switch from '../ui/Switch';
 import UiText from '../ui/Text';
-
-import type { CullingSettings, CullingSuggestions, ImageAnalysisResult, Progress } from '../ui/AppProperties';
 
 interface CullingModalProps {
   isOpen: boolean;

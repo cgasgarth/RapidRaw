@@ -7,12 +7,12 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 
 import {
+  type ColorParityManifest,
+  type ColorParityVec3,
   colorParityCaseSchema,
   colorParityShaderFunctionSchema,
   evaluateColorParityCase,
   parseColorParityManifest,
-  type ColorParityManifest,
-  type ColorParityVec3,
 } from '../../../src/utils/colorCpuGpuParity.ts';
 
 const FIXTURE_PATH = 'fixtures/color/cpu-gpu-parity-fixtures.json';

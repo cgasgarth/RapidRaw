@@ -1,9 +1,7 @@
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-
-import { RIGHT_PANEL_GROUPS } from './rightPanelRegistry';
-
 import type { Panel } from '../../ui/AppProperties';
+import { RIGHT_PANEL_GROUPS } from './rightPanelRegistry';
 
 interface RightPanelSwitcherProps {
   activePanel: Panel | null;

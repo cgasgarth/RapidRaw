@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { useEffect, type RefObject } from 'react';
+import { type RefObject, useEffect } from 'react';
 import { toast } from 'react-toastify';
 
 import { isNullAdjustmentSnapshot, parseLoadedMetadata, parseLoadImageResult } from '../schemas/imageLoaderSchemas';
@@ -9,10 +9,9 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { Invokes } from '../tauri/commands';
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { formatUnknownError } from '../utils/errorFormatting';
+import type { ImageCacheEntry } from '../utils/ImageLRUCache';
 import { hydrateLayerStackMasksFromMetadata } from '../utils/layerStackSidecarAdjustments';
 import { consumePendingNegativeConversionDustHealLayers } from '../utils/negativeLabEditorHandoff';
-
-import type { ImageCacheEntry } from '../utils/ImageLRUCache';
 
 export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | null>) {
   const selectedImage = useEditorStore((s) => s.selectedImage);

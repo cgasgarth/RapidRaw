@@ -4,13 +4,13 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import {
-  RAW_ENGINE_SCHEMA_VERSION,
   dispatchLayerStackCommand,
-  layerMaskCommandEnvelopeV1Schema,
-  layerStackSidecarV1Schema,
-  renderLayerScopedToneStack,
   type LayerRgbPixel,
   type LayerStackSidecarV1,
+  layerMaskCommandEnvelopeV1Schema,
+  layerStackSidecarV1Schema,
+  RAW_ENGINE_SCHEMA_VERSION,
+  renderLayerScopedToneStack,
 } from '../../../packages/rawengine-schema/src';
 
 const OUTPUT_DIR = 'artifacts/layers/layer-scoped-tone-output';

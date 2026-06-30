@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { z } from 'zod';
 import {
   EDIT_GRAPH_DOCUMENT_KIND,
   LEGACY_EDIT_GRAPH_SCHEMA_VERSION,
@@ -5,8 +7,6 @@ import {
 } from '../src/editGraphMigrations.js';
 import { RAW_ENGINE_SCHEMA_VERSION } from '../src/rawEngineSchemas.js';
 import { sampleCommandEnvelopeV1 } from '../src/samplePayloads.js';
-import { readFile } from 'node:fs/promises';
-import { z } from 'zod';
 
 const policySchema = z
   .object({

@@ -1,9 +1,7 @@
 import { useMemo } from 'react';
-
+import type { NegativeLabRuntimeProfileBrowserRow } from '../schemas/negativeLabMeasuredProfileSchemas';
 import { buildNegativeLabProfileBrowserRows } from '../utils/negativeLabProfileBrowserRows';
 import { listNegativeLabStockMetadataReferencesForPreset } from '../utils/negativeLabStockMetadataCatalog';
-
-import type { NegativeLabRuntimeProfileBrowserRow } from '../schemas/negativeLabMeasuredProfileSchemas';
 
 export type NegativeLabProfileFilter = 'all' | 'black_and_white_silver' | 'color_negative' | 'measured';
 export type NegativeLabProfileSort = 'catalog' | 'evidence_desc' | 'name_asc' | 'runtime_applied';

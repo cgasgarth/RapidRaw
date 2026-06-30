@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { Mask, SubMaskMode } from '../../src/components/panel/right/Masks';
-import { createEditorSubMaskForImage, createEditorSubMaskFallback } from '../../src/utils/editorSubMaskFactory';
+import { createEditorSubMaskFallback, createEditorSubMaskForImage } from '../../src/utils/editorSubMaskFactory';
 
 describe('editor sub-mask factory', () => {
   test('initializes linear masks in oriented image coordinates', () => {

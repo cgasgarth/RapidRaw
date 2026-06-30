@@ -2,10 +2,10 @@
 
 import {
   ApprovalClass,
-  RAW_ENGINE_SCHEMA_VERSION,
   detailDeblurCommandEnvelopeV1Schema,
   detailDeblurDryRunResultV1Schema,
   detailDeblurRuntimeStateV1Schema,
+  RAW_ENGINE_SCHEMA_VERSION,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   DetailAppServerCommandType,

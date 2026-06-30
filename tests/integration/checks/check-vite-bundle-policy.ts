@@ -3,9 +3,9 @@
 import { readFile } from 'node:fs/promises';
 
 import {
-  VITE_BUNDLE_BUDGET_POLICY,
   formatBundlePolicyBytes,
   getViteChunkSizeWarningLimitKb,
+  VITE_BUNDLE_BUDGET_POLICY,
 } from '../../../scripts/lib/vite-bundle-policy.ts';
 
 const failures: string[] = [];

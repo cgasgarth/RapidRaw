@@ -1,11 +1,9 @@
+import type { UnlistenFn } from '@tauri-apps/api/event';
 import { platform } from '@tauri-apps/plugin-os';
 import { Minus, Square, X } from 'lucide-react';
-import { useCallback, useState, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { getOptionalCurrentWindow } from './currentWindow';
-
-import type { UnlistenFn } from '@tauri-apps/api/event';
 
 const RestoreDownIcon = ({ size = 14, className = '' }) => (
   <svg

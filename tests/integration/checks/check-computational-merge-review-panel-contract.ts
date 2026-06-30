@@ -4,9 +4,9 @@ import { readFile } from 'node:fs/promises';
 
 import { parseComputationalMergeE2eProofManifest } from '../../../src/schemas/computationalMergeE2eProofSchemas.ts';
 import { parsePrivateRawEvidenceLedger } from '../../../src/schemas/privateRawEvidenceSchemas.ts';
-import { buildComputationalMergePrivateSourceSets } from '../../../src/utils/computationalMergeSourceSets.ts';
 import { buildComputationalMergeReviewPanelDiagnostics } from '../../../src/utils/computationalMergeReviewPanels.ts';
 import { computationalMergeReviewThresholds } from '../../../src/utils/computationalMergeReviewThresholds.ts';
+import { buildComputationalMergePrivateSourceSets } from '../../../src/utils/computationalMergeSourceSets.ts';
 
 const manifest = parseComputationalMergeE2eProofManifest(
   JSON.parse(await readFile('fixtures/validation/computational-merge-e2e-proof.json', 'utf8')),

@@ -4,8 +4,8 @@ import {
   ApprovalClass,
   toneColorCommandEnvelopeV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { sampleRawEngineSceneColorPipelineV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { sampleAgentActor, sampleImageTarget } from '../../../packages/rawengine-schema/src/samplePayloadFactories.ts';
+import { sampleRawEngineSceneColorPipelineV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import {
   buildBasicToneCommandEnvelope,

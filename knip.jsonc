@@ -5,7 +5,6 @@
     "src/App.tsx",
     "src/validation/visual/main.tsx",
     "vite.config.js",
-    "eslint.config.js",
     "i18next.config.ts",
     "scripts/**/*.ts",
     "tests/integration/checks/**/*.ts"
@@ -19,8 +18,13 @@
     "i18next.config.ts"
   ],
   "ignore": ["dist/**", "node_modules/**", "src-tauri/**"],
-  "ignoreBinaries": ["scripts/run-compact-command.ts", "sips"],
-  "ignoreDependencies": ["@biomejs/biome", "i18next-cli", "license-checker-rseidelsohn", "lint-staged"],
+  "ignoreBinaries": [
+    "scripts/run-compact-command.ts",
+    "sips",
+    "tests/integration/checks/check-production-payload.ts",
+    "tests/integration/checks/check-vite-minification.ts"
+  ],
+  "ignoreDependencies": ["@biomejs/biome", "happy-dom", "i18next-cli"],
   "ignoreIssues": {
     "packages/rawengine-schema/src/**/*.ts": ["exports", "types"]
   },

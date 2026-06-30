@@ -7,8 +7,8 @@ import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 
 import {
-  renderLayerOpacityOrderRuntime,
   type LayerOpacityOrderRuntimeOperation,
+  renderLayerOpacityOrderRuntime,
 } from '../../../src/utils/layerOpacityOrderRuntime.ts';
 
 const FIXTURE_PATH = 'fixtures/layers/layer-visibility-opacity-proof.json';

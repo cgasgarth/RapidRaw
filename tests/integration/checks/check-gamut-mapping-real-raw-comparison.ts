@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 
 import { createHash } from 'node:crypto';
-import { deflateSync, inflateSync } from 'node:zlib';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import { deflateSync, inflateSync } from 'node:zlib';
 
 import Color from 'colorjs.io';
 import { z } from 'zod';

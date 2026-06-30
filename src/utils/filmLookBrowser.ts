@@ -1,4 +1,4 @@
-import { INITIAL_ADJUSTMENTS, type Adjustments } from './adjustments';
+import { type Adjustments, INITIAL_ADJUSTMENTS } from './adjustments';
 
 export type FilmLookCategory =
   | 'black_and_white'

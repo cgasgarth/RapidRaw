@@ -1,8 +1,6 @@
 import { z } from 'zod';
-
-import { readAgentSessionAuditStore, verifyAgentSessionArtifactLineage } from './agentSessionAuditStore';
-
 import type { AgentSessionAuditRecord, AgentSessionAuditStorageAdapter } from './agentSessionAuditStore';
+import { readAgentSessionAuditStore, verifyAgentSessionArtifactLineage } from './agentSessionAuditStore';
 
 export const agentSessionReplayStatusSchema = z.enum(['matched', 'diverged']);
 

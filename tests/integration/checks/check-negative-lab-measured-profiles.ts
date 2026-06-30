@@ -5,9 +5,15 @@ import {
   negativeLabFixtureManifestV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
-  negativeLabMeasurementReportSchema,
+  assertGenericNegativeLabCatalogIsNotPromoted,
+  genericNegativeLabPresetById,
+  isNegativeLabProfileEligibleFixture,
+  readJson,
+} from '../../../scripts/lib/negative-lab-validation.ts';
+import {
   negativeLabMeasuredProfileCatalogSchema,
   negativeLabMeasuredProfileSchema,
+  negativeLabMeasurementReportSchema,
 } from '../../../src/schemas/negativeLabMeasuredProfileSchemas.ts';
 import {
   buildNegativeLabAcceptedBatchApplyRouteResult,
@@ -20,12 +26,6 @@ import {
 } from '../../../src/utils/negativeLabMeasuredProfileRuntime.ts';
 import { NegativeLabOutputFormatId } from '../../../src/utils/negativeLabOutputFormatIds.ts';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../../../src/utils/negativeLabPresetCatalog.ts';
-import {
-  assertGenericNegativeLabCatalogIsNotPromoted,
-  genericNegativeLabPresetById,
-  isNegativeLabProfileEligibleFixture,
-  readJson,
-} from '../../../scripts/lib/negative-lab-validation.ts';
 
 const manifestUrl = new URL('../../../fixtures/negative-lab/negative-lab-fixture-manifest.json', import.meta.url);
 const measuredCatalogUrl = new URL(

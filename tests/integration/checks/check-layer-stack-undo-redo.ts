@@ -6,9 +6,9 @@ import { z } from 'zod';
 
 import { INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../src/utils/adjustments.ts';
 import {
-  redoEditHistory,
   type EditHistoryState,
   pushEditHistoryEntry,
+  redoEditHistory,
   undoEditHistory,
 } from '../../../src/utils/editHistory.ts';
 import {

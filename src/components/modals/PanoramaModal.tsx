@@ -1,22 +1,10 @@
 import { Info, Layers, ShieldCheck, XCircle } from 'lucide-react';
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
-import DerivedOutputReceiptPanel from './DerivedOutputReceiptPanel';
-import { MergeErrorState, MergeFooterActions, MergeProcessingState, MergeResultPreview } from './MergeStatusViews';
 import { useModalTransition } from '../../hooks/useModalTransition';
-import { useUIStore, type PanoramaModalState } from '../../store/useUIStore';
-import { TextColors, TextVariants } from '../../types/typography';
-import { buildPanoramaDerivedOutputReceipt, deriveDerivedOutputReceiptState } from '../../utils/derivedOutputReceipt';
-import { buildPanoramaSavedReviewSummary } from '../../utils/panoramaSavedReview';
-import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerBadge';
-import Dropdown, { type OptionItem } from '../ui/Dropdown';
-import UiText from '../ui/Text';
-
 import type {
-  PanoramaRuntimePlan,
   PanoramaRenderedReview,
+  PanoramaRuntimePlan,
   PanoramaSavedReviewSummary,
   PanoramaUiBlendMode,
   PanoramaUiBoundaryMode,
@@ -25,6 +13,16 @@ import type {
   PanoramaUiQualityPreference,
   PanoramaUiSettings,
 } from '../../schemas/panoramaUiSchemas';
+import { type PanoramaModalState, useUIStore } from '../../store/useUIStore';
+import { TextColors, TextVariants } from '../../types/typography';
+import { buildPanoramaDerivedOutputReceipt, deriveDerivedOutputReceiptState } from '../../utils/derivedOutputReceipt';
+import { buildPanoramaSavedReviewSummary } from '../../utils/panoramaSavedReview';
+import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerBadge';
+import Dropdown, { type OptionItem } from '../ui/Dropdown';
+import UiText from '../ui/Text';
+import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
+import DerivedOutputReceiptPanel from './DerivedOutputReceiptPanel';
+import { MergeErrorState, MergeFooterActions, MergeProcessingState, MergeResultPreview } from './MergeStatusViews';
 
 interface PanoramaModalProps {
   error: string | null;

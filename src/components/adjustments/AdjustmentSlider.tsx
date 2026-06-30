@@ -1,7 +1,6 @@
-import { getSliderEventNumber } from './adjustmentSliderValue';
-import Slider from '../ui/Slider';
-
 import type { ReactNode } from 'react';
+import Slider from '../ui/Slider';
+import { getSliderEventNumber } from './adjustmentSliderValue';
 
 export interface AdjustmentSliderProps {
   label: ReactNode;

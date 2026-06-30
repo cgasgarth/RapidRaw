@@ -1,7 +1,5 @@
 import { Camera, CircleGauge, FolderOpen, Layers3, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
-
-import { VISUAL_SMOKE_PROOF_TEST_IDS, VISUAL_SMOKE_SCENARIO_IDS, type VisualSmokeMode } from './visualSmokeScenarios';
 import ColorPanel from '../../components/adjustments/Color';
 import DetailsPanel from '../../components/adjustments/Details';
 import EffectsPanel from '../../components/adjustments/Effects';
@@ -15,37 +13,45 @@ import SuperResolutionModal from '../../components/modals/SuperResolutionModal';
 import ImageCanvas from '../../components/panel/editor/ImageCanvas';
 import AgentChatShell from '../../components/panel/right/AgentChatShell';
 import { MaskOverlayReviewControls } from '../../components/panel/right/MaskOverlayReviewControls';
-import { Mask, SubMaskMode, ToolType, type SubMask } from '../../components/panel/right/Masks';
+import { Mask, type SubMask, SubMaskMode, ToolType } from '../../components/panel/right/Masks';
 import { ObjectPromptControls } from '../../components/panel/right/ObjectPromptControls';
 import RightPanelSwitcher from '../../components/panel/right/RightPanelSwitcher';
 import { TetherPanel } from '../../components/panel/right/TetherPanel';
 import {
-  Panel,
-  RawStatus,
-  SortDirection,
   type BrushSettings,
   type CullingSuggestions,
+  Panel,
+  RawStatus,
   type SelectedImage,
+  SortDirection,
 } from '../../components/ui/AppProperties';
+import type { FocusStackOutputReviewWorkflow } from '../../schemas/focusStackOutputReviewSchemas';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../../schemas/focusStackUiSchemas';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS, type HdrMergeUiSettings } from '../../schemas/hdrMergeUiSchemas';
+import type { MaskOverlaySettings } from '../../schemas/maskOverlaySchemas';
 import {
   DEFAULT_PANORAMA_UI_SETTINGS,
   type PanoramaRenderedReview,
   type PanoramaRuntimePlan,
   type PanoramaUiSettings,
 } from '../../schemas/panoramaUiSchemas';
+import type { SuperResolutionOutputReviewWorkflow } from '../../schemas/superResolutionOutputReviewSchemas';
 import {
   DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
   type SuperResolutionUiSettings,
 } from '../../schemas/superResolutionUiSchemas';
+import type {
+  TetherCaptureResponse,
+  TetherDiscoveryResponse,
+  TetherSessionResponse,
+} from '../../schemas/tetheringSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useUIStore } from '../../store/useUIStore';
 import {
+  type Adjustments,
   INITIAL_ADJUSTMENTS,
   INITIAL_MASK_ADJUSTMENTS,
-  type Adjustments,
   type MaskContainer,
 } from '../../utils/adjustments';
 import { agentChatTranscriptFixture } from '../../utils/agentChatTranscriptFixture';
@@ -64,16 +70,8 @@ import { applyLayerStackCommandBridgeOperation } from '../../utils/layerStackCom
 import { handleNegativeConversionEditorHandoff } from '../../utils/negativeLabEditorHandoff';
 import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
 import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
-
-import type { FocusStackOutputReviewWorkflow } from '../../schemas/focusStackOutputReviewSchemas';
-import type { MaskOverlaySettings } from '../../schemas/maskOverlaySchemas';
-import type { SuperResolutionOutputReviewWorkflow } from '../../schemas/superResolutionOutputReviewSchemas';
-import type {
-  TetherCaptureResponse,
-  TetherDiscoveryResponse,
-  TetherSessionResponse,
-} from '../../schemas/tetheringSchemas';
 import type { SuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
+import { VISUAL_SMOKE_PROOF_TEST_IDS, VISUAL_SMOKE_SCENARIO_IDS, type VisualSmokeMode } from './visualSmokeScenarios';
 
 interface VisualSmokeAppProps {
   mode: string;

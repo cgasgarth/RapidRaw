@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
+import { chromium } from '@playwright/test';
 
 const host = 'localhost';
 const port = 1420;

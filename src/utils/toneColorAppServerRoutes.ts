@@ -1,3 +1,4 @@
+import { toneColorAppServerRouteManifestSchema } from '../schemas/toneColorAppServerSchemas';
 import {
   type ToneColorAppServerCommandType,
   ToneColorAppServerExecutionMode,
@@ -5,7 +6,6 @@ import {
   ToneColorAppServerSchemaName,
   ToneColorAppServerToolName,
 } from './toneColorAppServerRouteIds';
-import { toneColorAppServerRouteManifestSchema } from '../schemas/toneColorAppServerSchemas';
 
 const inputSchemaName = ToneColorAppServerSchemaName.CommandEnvelope;
 const runtimeCheckScript = 'check:basic-tone-command-bridge';

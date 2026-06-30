@@ -43,7 +43,7 @@ export interface WhiteBalanceRgbResult {
 const clampSlider = (value: number): number => Math.max(sliderMinimum, Math.min(sliderMaximum, value));
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
 
-const srgbToLinear = (value: number): number => Math.pow(value / 255.0, 2.2);
+const srgbToLinear = (value: number): number => (value / 255.0) ** 2.2;
 
 export const calculateWhiteBalancePickerAdjustment = (input: WhiteBalancePickerInput): WhiteBalancePickerResult => {
   const parsed = whiteBalancePickerInputSchema.parse(input);

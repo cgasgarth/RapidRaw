@@ -6,11 +6,11 @@ import { TextVariants } from '../../types/typography';
 import {
   buildFilmLookAppliedAdjustmentPatch,
   clampFilmLookStrength,
-  getFilmLookAdjustmentSummaries,
-  sortFilmLookBrowserItems,
   type FilmLookBrowserItem,
   type FilmLookCategory,
   type FilmLookSortMode,
+  getFilmLookAdjustmentSummaries,
+  sortFilmLookBrowserItems,
 } from '../../utils/filmLookBrowser';
 import { getFilmLookBrowserGroups } from '../../utils/filmLookRegistry';
 import UiText from '../ui/Text';

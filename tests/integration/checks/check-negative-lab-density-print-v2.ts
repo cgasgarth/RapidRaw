@@ -3,10 +3,10 @@
 import { negativeLabPresetParamsSchema } from '../../../src/schemas/negativeLabPresetCatalogSchemas.ts';
 import type { NegativeLabScanMetricsV1 } from '../../../src/schemas/negativeLabScanMetricsSchemas.ts';
 import {
-  NEGATIVE_LAB_DENSITY_PRINT_V2_ALGORITHM_ID,
   buildNegativeLabDensityBoundsFromScanMetrics,
   convertNegativeLabDensityPrintV2Sample,
   convertNegativeLabDensitySample,
+  NEGATIVE_LAB_DENSITY_PRINT_V2_ALGORITHM_ID,
   type NegativeLabDensityBounds,
   type NegativeLabRgbTriplet,
 } from '../../../src/utils/negativeLabDensityConversion.ts';
@@ -195,7 +195,7 @@ assert(
   'Scan metrics must produce deterministic density bounds.',
 );
 
-const negativeRgb: NegativeLabRgbTriplet = [Math.pow(10, -1), Math.pow(10, -1), Math.pow(10, -1)];
+const negativeRgb: NegativeLabRgbTriplet = [10 ** -1, 10 ** -1, 10 ** -1];
 const v2ViaLegacyEntry = convertNegativeLabDensitySample({
   baseFogRgb: [1, 1, 1],
   densityBounds,

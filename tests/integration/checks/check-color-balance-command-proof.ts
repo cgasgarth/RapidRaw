@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import { createHash } from 'node:crypto';
 import { strict as assert } from 'node:assert';
+import { createHash } from 'node:crypto';
 
 import { z } from 'zod';
 

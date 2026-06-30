@@ -6,11 +6,11 @@ import { z } from 'zod';
 import {
   ActorKind,
   ApprovalClass,
-  RAW_ENGINE_SCHEMA_VERSION,
   dispatchLayerStackCommand,
+  type LayerStackSidecarV1,
   layerMaskCommandEnvelopeV1Schema,
   layerStackSidecarV1Schema,
-  type LayerStackSidecarV1,
+  RAW_ENGINE_SCHEMA_VERSION,
 } from '../../../packages/rawengine-schema/src';
 
 const commandStepSchema = z

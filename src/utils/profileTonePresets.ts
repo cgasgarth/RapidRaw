@@ -1,5 +1,5 @@
-import type { ParametricCurveSettings } from './adjustments';
 import type { ToneCurveId } from '../schemas/profileToneSchemas';
+import type { ParametricCurveSettings } from './adjustments';
 
 const BASE_PARAMETRIC_CURVE: ParametricCurveSettings = {
   blackLevel: 0,

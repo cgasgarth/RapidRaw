@@ -1,17 +1,15 @@
 import { create } from 'zustand';
-
-import { ToolType } from '../components/panel/right/Masks';
-import { type Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, type MaskContainer } from '../utils/adjustments';
-import { goToEditHistoryIndex, pushEditHistoryEntry, redoEditHistory, undoEditHistory } from '../utils/editHistory';
-import { loadMaskOverlaySettingsPreference } from '../utils/maskOverlayPreferences';
-
 import type { ChannelConfig } from '../components/adjustments/Curves';
 import type { OverlayMode } from '../components/panel/right/CropPanel';
-import type { SelectedImage, WaveformData, BrushSettings } from '../components/ui/AppProperties';
+import { ToolType } from '../components/panel/right/Masks';
+import type { BrushSettings, SelectedImage, WaveformData } from '../components/ui/AppProperties';
 import type { BaseRenderSize, ImageDimensions } from '../hooks/useImageRenderSize';
 import type { MaskOverlaySettings } from '../schemas/maskOverlaySchemas';
 import type { GamutWarningOverlayPayload } from '../schemas/tauriEventSchemas';
+import { type Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, type MaskContainer } from '../utils/adjustments';
 import type { BasicToneCommandEnvelope } from '../utils/basicToneCommandBridge';
+import { goToEditHistoryIndex, pushEditHistoryEntry, redoEditHistory, undoEditHistory } from '../utils/editHistory';
+import { loadMaskOverlaySettingsPreference } from '../utils/maskOverlayPreferences';
 
 export interface InteractivePatch {
   url: string;

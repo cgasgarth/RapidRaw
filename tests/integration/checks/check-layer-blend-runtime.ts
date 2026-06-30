@@ -6,14 +6,14 @@ import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 
 import {
+  type LayerRgbPixel,
   layerBlendCoverageSchema,
-  layerBlendStackLayerSchema,
   layerBlendStackInputSchema,
+  layerBlendStackLayerSchema,
   layerRgbPixelSchema,
   renderLayerExportStack,
   renderLayerHeadlessStack,
   renderLayerPreviewStack,
-  type LayerRgbPixel,
 } from '../../../packages/rawengine-schema/src/layerBlendRuntime.ts';
 
 const FIXTURE_PATH = 'fixtures/layers/layer-preview-export-parity.json';

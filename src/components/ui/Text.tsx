@@ -1,13 +1,13 @@
 import cx from 'clsx';
-import { forwardRef, type ElementType, type HTMLAttributes, type ReactNode } from 'react';
+import { type ElementType, forwardRef, type HTMLAttributes, type ReactNode } from 'react';
 
 import {
-  type TextWeight,
-  type TextColor,
-  type VariantConfig,
-  TEXT_WEIGHT_KEYS,
   TEXT_COLOR_KEYS,
+  TEXT_WEIGHT_KEYS,
+  type TextColor,
   TextVariants,
+  type TextWeight,
+  type VariantConfig,
 } from '../../types/typography';
 
 export interface TextProps extends HTMLAttributes<HTMLElement> {

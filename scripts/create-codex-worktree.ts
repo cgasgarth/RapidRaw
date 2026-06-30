@@ -195,15 +195,14 @@ const ensurePrimaryDependencies = (root: string): void => {
 const ensureDependencyBins = (root: string, install?: () => void): void => {
   const nodeModules = resolve(root, 'node_modules');
   const biomeBin = resolve(nodeModules, '.bin/biome');
-  const eslintBin = resolve(nodeModules, '.bin/eslint');
   const prettierBin = resolve(nodeModules, '.bin/prettier');
   const i18nBin = resolve(nodeModules, '.bin/i18next-cli');
 
-  if (existsSync(biomeBin) && existsSync(eslintBin) && existsSync(prettierBin) && existsSync(i18nBin)) return;
+  if (existsSync(biomeBin) && existsSync(prettierBin) && existsSync(i18nBin)) return;
 
   install?.();
 
-  if (!existsSync(biomeBin) || !existsSync(eslintBin) || !existsSync(prettierBin) || !existsSync(i18nBin)) {
+  if (!existsSync(biomeBin) || !existsSync(prettierBin) || !existsSync(i18nBin)) {
     throw new Error(`Required dependency bins are missing under ${nodeModules}`);
   }
 };

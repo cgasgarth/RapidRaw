@@ -18,7 +18,9 @@ bun run hooks:install
 - Commits on feature branches continue.
 - Detached HEAD states continue, because release and bisect workflows can use
   detached checkouts.
-- Staged lint, format, and i18n checks run through `lint-staged`.
+- The hook runs `bun run lint:fix`, stages autofixes with `git add -u`, then
+  runs the standard local lint, format, typecheck, test, Rust, bundle, i18n,
+  unused dependency, docs, schema, and schema-routing gates in parallel.
 
 The hook error is:
 

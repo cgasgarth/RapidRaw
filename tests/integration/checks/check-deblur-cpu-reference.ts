@@ -2,9 +2,8 @@
 
 import { mkdir, readFile, rm } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-
-import { parseDeblurFixtureManifest } from '../../../src/schemas/deblurFixtureSchemas.ts';
 import { writeBoundedOutput } from '../../../scripts/compact-output.ts';
+import { parseDeblurFixtureManifest } from '../../../src/schemas/deblurFixtureSchemas.ts';
 
 const REPORT_PATH = resolve('src-tauri/target/rawengine-deblur-cpu-reference-report.json');
 const REQUIRED_RUST_TOOLCHAIN = '1.95.0';

@@ -25,7 +25,7 @@ jobs:
       - uses: ./.github/actions/setup-bun-deps
 
       - name: Run performance smoke
-        run: bun run check:performance-smoke
+        run: bun tests/integration/checks/check-performance-smoke.ts
 
       - name: Summarize performance smoke
         if: ${{ always() }}

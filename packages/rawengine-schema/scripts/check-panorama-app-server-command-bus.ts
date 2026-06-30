@@ -1,20 +1,20 @@
 import {
-  ComputationalMergeAppServerCommandBusHarness,
-  type ComputationalMergeAppServerCommandBusHarnessOptions,
-  expectThrows,
-} from './appServerCommandBusHarness.js';
-import {
-  computationalMergeCommandEnvelopeV1Schema,
   type ComputationalMergeCommandEnvelopeV1,
+  computationalMergeCommandEnvelopeV1Schema,
 } from '../src/rawEngineSchemas.js';
 import {
-  sampleComputationalMergeAppServerToolManifestV1,
   sampleComputationalMergeApplyCommandEnvelopeV1,
+  sampleComputationalMergeAppServerToolManifestV1,
   sampleComputationalMergeCommandEnvelopeV1,
   sampleComputationalMergeDryRunResultV1,
   sampleComputationalMergeFocusStackCommandEnvelopeV1,
   sampleComputationalMergeMutationResultV1,
 } from '../src/samplePayloads.js';
+import {
+  ComputationalMergeAppServerCommandBusHarness,
+  type ComputationalMergeAppServerCommandBusHarnessOptions,
+  expectThrows,
+} from './appServerCommandBusHarness.js';
 
 const panoramaCommandBusConfig: ComputationalMergeAppServerCommandBusHarnessOptions = {
   buildDryRun: (tool, command: ComputationalMergeCommandEnvelopeV1) => {

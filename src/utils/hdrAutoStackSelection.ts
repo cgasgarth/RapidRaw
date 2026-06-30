@@ -1,6 +1,5 @@
-import { buildLibraryAutoStacks } from './libraryAutoStacks';
-
 import type { ImageFile } from '../components/ui/AppProperties';
+import { buildLibraryAutoStacks } from './libraryAutoStacks';
 
 export const findHdrAutoStackPaths = (imageList: ImageFile[], path: string): string[] | null => {
   const findInOrder = (images: ImageFile[]) =>

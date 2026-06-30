@@ -1,8 +1,7 @@
 import QuickLRU from 'quick-lru';
-
-import type { Adjustments } from './adjustments';
 import type { ChannelConfig } from '../components/adjustments/Curves';
 import type { SelectedImage, WaveformData } from '../components/ui/AppProperties';
+import type { Adjustments } from './adjustments';
 
 export interface ImageCacheEntry {
   adjustments: Adjustments;

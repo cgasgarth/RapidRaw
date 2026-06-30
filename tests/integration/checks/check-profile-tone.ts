@@ -11,8 +11,8 @@ import {
   ColorAdjustment,
   INITIAL_ADJUSTMENTS,
 } from '../../../src/utils/adjustments.ts';
-import { applyProfileToneToRgbPixel } from '../../../src/utils/profileToneRuntime.ts';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../../src/utils/profileTonePresets.ts';
+import { applyProfileToneToRgbPixel } from '../../../src/utils/profileToneRuntime.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 const rgbPixelSchema = z

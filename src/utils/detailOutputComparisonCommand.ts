@@ -2,9 +2,9 @@ import { z } from 'zod';
 
 import {
   ApprovalClass,
-  RAW_ENGINE_SCHEMA_VERSION,
   detailDeblurUiControlsV1Schema,
   detailDenoiseControlsV1Schema,
+  RAW_ENGINE_SCHEMA_VERSION,
 } from '../../packages/rawengine-schema/src';
 import { waveletDetailRecipeSchema } from '../schemas/waveletDetailSchemas';
 

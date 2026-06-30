@@ -13,69 +13,46 @@ export RAWENGINE_COMPACT_MAX_LINES="${RAWENGINE_COMPACT_MAX_LINES:-16}"
 export RAWENGINE_COMPACT_HEAD_LINES="${RAWENGINE_COMPACT_HEAD_LINES:-5}"
 export RAWENGINE_COMPACT_TAIL_LINES="${RAWENGINE_COMPACT_TAIL_LINES:-8}"
 
-staged_files="$(git diff --cached --name-only --diff-filter=ACMR)"
+bun run lint:fix
+git add -u
 
-bun lint-staged --quiet --concurrent false
+tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/rapidraw-precommit.XXXXXX")"
+trap 'rm -rf "$tmpdir"' EXIT INT TERM
 
-if printf '%s\n' "$staged_files" | grep -Eq '^(AGENTS\.md|docs/|.*\.md$)'; then
-  bun run docs:check
-fi
+pids=""
 
-if printf '%s\n' "$staged_files" | grep -Eq '^(src/|i18next\.config\.ts$|package\.json$|bun\.lock$)'; then
-  bun run check:i18n
-fi
+run_gate() {
+  label="$1"
+  shift
+  log="$tmpdir/$label.log"
+  ("$@" >"$log" 2>&1) &
+  pids="$pids $!:$label"
+}
 
-if printf '%s\n' "$staged_files" | grep -Eq '^(src/|scripts/|tests/|eslint\.config\.js|biome\.json|package\.json|bun\.lock|tsconfig[^/]*\.json$)'; then
-  bun run check:lint-escapes
-fi
+run_gate lint bun run lint
+run_gate format bun run format:check
+run_gate typecheck bun run typecheck
+run_gate test bun run test
+run_gate rust bun run check:rust
+run_gate bundle bun run check:bundle
+run_gate i18n bun scripts/run-compact-command.ts --label i18n:lint -- bunx i18next-cli lint
+run_gate unused-deps bun scripts/run-compact-command.ts --label unused-deps -- bunx knip --config knip.jsonc --dependencies --reporter compact
+run_gate docs bun run check:docs
+run_gate schema bun run check:schema
+run_gate schema-routing bun tests/integration/checks/check-schema-contract-gate.ts --self-test
 
-if printf '%s\n' "$staged_files" | grep -Eq '^eslint\.config\.js$'; then
-  bun run check:eslint-gaps
-fi
-
-if printf '%s\n' "$staged_files" | grep -Eq '^biome\.json$'; then
-  bun run check:lint
-fi
-
-if printf '%s\n' "$staged_files" | grep -Eq '^(knip\.jsonc|package\.json|bun\.lock|tsconfig[^/]*\.json$)'; then
-  bun run check:unused-deps
-fi
-
-if [ -n "$staged_files" ]; then
-  macos_smoke_files="$(mktemp)"
-  macos_smoke_outputs="$(mktemp)"
-  printf '%s\n' "$staged_files" > "$macos_smoke_files"
-  bun tests/integration/checks/check-ci-classify-macos-smoke.ts --files "$macos_smoke_files" > "$macos_smoke_outputs"
-  if grep -q '^macos_smoke_decision=unclassified-fail-closed$' "$macos_smoke_outputs"; then
-    echo "Unclassified path requires explicit CI routing before merge." >&2
-    sed -n '/^macos_smoke_required_paths<<EOF_macos_smoke_required_paths$/,/^EOF_macos_smoke_required_paths$/p' "$macos_smoke_outputs" >&2
-    rm -f "$macos_smoke_files" "$macos_smoke_outputs"
-    exit 1
+failed=0
+for entry in $pids; do
+  pid="${entry%%:*}"
+  label="${entry#*:}"
+  log="$tmpdir/$label.log"
+  if wait "$pid"; then
+    echo "$label ok"
+  else
+    failed=1
+    echo "$label failed" >&2
+    tail -n "${RAWENGINE_COMPACT_TAIL_LINES:-8}" "$log" >&2
   fi
-  rm -f "$macos_smoke_files" "$macos_smoke_outputs"
-fi
+done
 
-if printf '%s\n' "$staged_files" | grep -Eq '(^|/)(package\.json|bun\.lock|tsconfig[^/]*\.json)$|\.tsx?$'; then
-  bun run check:types
-  bun run check:unsafe-casts
-fi
-
-if printf '%s\n' "$staged_files" | grep -Eq '^(packages/rawengine-schema/|fixtures/|samples/)'; then
-  bun run schema:check
-  bun run schema:command-bus
-  bun run schema:contract-gate
-fi
-
-if printf '%s\n' "$staged_files" | grep -Eq '^(src-tauri/.*\.rs|src-tauri/Cargo\.(toml|lock)|\.cargo/.*|rust-toolchain\.toml)$'; then
-  bun run check:rust:fmt
-  bun run check:rust:platform-cfg-dead-code
-fi
-
-if printf '%s\n' "$staged_files" | grep -Eq '^(\.github/|tests/integration/checks/check-(actions|workflow|compact|rust-feature|schema-contract)|scripts/compact-output\.ts|scripts/run-compact-command\.ts|scripts/run-compact-checks\.ts)'; then
-  bun run check:actions
-  bun run check:action-pins
-fi
-
-if printf '%s\n' "$staged_files" | grep -Eq '^(\.githooks/pre-commit|tests/integration/checks/check-precommit-fast-path\.ts|package\.json)$'; then
-  bun run check:precommit-fast-path
-fi
+exit "$failed"

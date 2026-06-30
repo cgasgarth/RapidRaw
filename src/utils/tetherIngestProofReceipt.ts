@@ -1,10 +1,10 @@
 import {
-  tetherIngestProofReceiptSchema,
-  tetherRecoveryProofReceiptSchema,
   type TetherCaptureResponse,
   type TetherIngestProofReceipt,
   type TetherRecoveryProofReceipt,
   type TetherSessionSnapshot,
+  tetherIngestProofReceiptSchema,
+  tetherRecoveryProofReceiptSchema,
 } from '../schemas/tetheringSchemas';
 
 export function buildTetherIngestProofReceipt(capture: TetherCaptureResponse): TetherIngestProofReceipt {

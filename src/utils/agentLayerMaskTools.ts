@@ -1,29 +1,29 @@
 import { z } from 'zod';
-
+import {
+  ActorKind,
+  ApprovalClass,
+  type ArtifactHandleV1,
+  artifactHandleV1Schema,
+  BrushMaskCommandRuntime,
+  layerMaskBlendModeV1Schema,
+  layerMaskBrushStrokeV1Schema,
+  layerMaskCommandEnvelopeV1Schema,
+  layerScopedToneAdjustmentV1Schema,
+  RAW_ENGINE_SCHEMA_VERSION,
+} from '../../packages/rawengine-schema/src';
+import { Mask, type SubMask, SubMaskMode } from '../components/panel/right/Masks';
+import { useEditorStore } from '../store/useEditorStore';
 import {
   DEFAULT_LAYER_BLEND_MODE,
   INITIAL_MASK_ADJUSTMENTS,
-  type MaskContainer,
   type MaskAdjustments,
+  type MaskContainer,
 } from './adjustments';
 import { agentApprovalStateSchema, assertAgentApprovalGate } from './agentApprovalGate';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import { stableAgentPreviewHash } from './agentPreviewEnvelope';
 import { pushEditHistoryEntry } from './editHistory';
 import { applyLayerStackCommandBridgeOperation } from './layerStackCommandBridge';
-import { artifactHandleV1Schema, type ArtifactHandleV1 } from '../../packages/rawengine-schema/src';
-import {
-  ActorKind,
-  ApprovalClass,
-  BrushMaskCommandRuntime,
-  RAW_ENGINE_SCHEMA_VERSION,
-  layerMaskBlendModeV1Schema,
-  layerMaskBrushStrokeV1Schema,
-  layerScopedToneAdjustmentV1Schema,
-  layerMaskCommandEnvelopeV1Schema,
-} from '../../packages/rawengine-schema/src';
-import { Mask, SubMaskMode, type SubMask } from '../components/panel/right/Masks';
-import { useEditorStore } from '../store/useEditorStore';
 
 export const AGENT_LAYER_CREATE_TOOL_NAME = 'rawengine.agent.layer.create';
 export const AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME = 'rawengine.agent.mask.create_or_update';

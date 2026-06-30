@@ -1,9 +1,7 @@
 import { z } from 'zod';
-
+import type { CullingSuggestions, Progress } from '../components/ui/AppProperties';
 import { rawDevelopmentReportSchema } from './imageLoaderSchemas';
 import { panoramaRenderedReviewSchema } from './panoramaUiSchemas';
-
-import type { CullingSuggestions, Progress } from '../components/ui/AppProperties';
 
 const nonnegativeNumberSchema = z.number().nonnegative();
 type ProgressPayload = z.infer<typeof progressPayloadSchema>;

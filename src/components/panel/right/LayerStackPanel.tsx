@@ -16,8 +16,6 @@ import {
 } from 'lucide-react';
 import { type KeyboardEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { Mask, SubMaskMode } from './Masks';
 import { debouncedSave } from '../../../hooks/useEditorActions';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
@@ -32,9 +30,9 @@ import {
   type RetouchRemoveSource,
 } from '../../../utils/adjustments';
 import {
+  buildLayerExportReadinessSummary,
   buildLayerGroupSummaries,
   buildLayerGroupWorkflowProof,
-  buildLayerExportReadinessSummary,
   canGroupLayerWithNext,
   deleteLayerGroup,
   duplicateLayerGroup,
@@ -56,6 +54,7 @@ import {
 import { persistLayerStackSidecarInAdjustments } from '../../../utils/layerStackSidecarAdjustments';
 import Slider, { type SliderChangeEvent } from '../../ui/Slider';
 import UiText from '../../ui/Text';
+import { Mask, SubMaskMode } from './Masks';
 
 interface LayerStackPanelProps {
   activeMaskContainerId: string | null;

@@ -1,8 +1,7 @@
-import { superResolutionOutputReviewWorkflowSchema } from '../schemas/superResolutionOutputReviewSchemas';
-import { getSuperResolutionModeForDetailPolicy } from '../schemas/superResolutionUiSchemas';
-
 import type { SuperResolutionOutputReviewWorkflow } from '../schemas/superResolutionOutputReviewSchemas';
+import { superResolutionOutputReviewWorkflowSchema } from '../schemas/superResolutionOutputReviewSchemas';
 import type { SuperResolutionUiSettings } from '../schemas/superResolutionUiSchemas';
+import { getSuperResolutionModeForDetailPolicy } from '../schemas/superResolutionUiSchemas';
 
 type SuperResolutionArtifactReviewInput = {
   decisionStatus: 'blocked' | 'downgraded' | 'eligible_for_apply' | 'preview_only';

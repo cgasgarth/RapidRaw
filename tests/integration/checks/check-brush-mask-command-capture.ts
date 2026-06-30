@@ -16,8 +16,8 @@ import {
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   BRUSH_MASK_COMMAND_COORDINATE_SPACE,
-  buildBrushMaskCommandFromParameters,
   brushMaskCommandEnvelopeSchema,
+  buildBrushMaskCommandFromParameters,
 } from '../../../src/utils/brushMaskCommandBridge.ts';
 
 const REPORT_PATH = 'docs/validation/brush-mask-command-capture-2026-06-21.json';

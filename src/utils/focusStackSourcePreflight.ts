@@ -1,11 +1,10 @@
 import { z } from 'zod';
-
-import { parseExifDistanceMm, parseExifInteger, parseExposureEv, readExifString } from './exifPreflightMetadata';
 import {
-  validateFocusStackSourcesV1,
   type FocusStackSourceValidationInputV1,
   type FocusStackSourceValidationResultV1,
+  validateFocusStackSourcesV1,
 } from '../../packages/rawengine-schema/src/focusStackSourceValidation.ts';
+import { parseExifDistanceMm, parseExifInteger, parseExposureEv, readExifString } from './exifPreflightMetadata';
 
 export const focusStackSourcePreflightMetadataSchema = z
   .object({

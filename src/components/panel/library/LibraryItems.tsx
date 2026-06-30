@@ -1,40 +1,38 @@
 import cx from 'clsx';
+import type { TFunction } from 'i18next';
 import {
-  Image as ImageIcon,
+  AlertTriangle,
+  CloudOff,
   Folder,
   FolderOpen,
-  Star as StarIcon,
-  SlidersHorizontal,
+  Image as ImageIcon,
   Images,
-  CloudOff,
-  AlertTriangle,
+  SlidersHorizontal,
+  Star as StarIcon,
 } from 'lucide-react';
 import {
-  memo,
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-  useLayoutEffect,
   type CSSProperties,
+  memo,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
-import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
+import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { COLOR_LABELS, type Color } from '../../../utils/adjustments';
+import type { LibraryAutoStackDisplay, LibraryAutoStackItem } from '../../../utils/libraryAutoStacks';
 import { buildRawQualityBadges, formatRawQualityBadgeTooltip } from '../../../utils/rawQualityBadges';
-import { ThumbnailAspectRatio, type ImageFile, ExifOverlay } from '../../ui/AppProperties';
+import { ExifOverlay, type ImageFile, ThumbnailAspectRatio } from '../../ui/AppProperties';
 import UiText from '../../ui/Text';
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
-
-import type { LibraryAutoStackDisplay, LibraryAutoStackItem } from '../../../utils/libraryAutoStacks';
 import type { ColumnWidths } from '../MainLibrary';
-import type { TFunction } from 'i18next';
 
 interface ImageLayer {
   id: string;

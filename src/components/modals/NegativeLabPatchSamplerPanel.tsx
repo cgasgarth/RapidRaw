@@ -1,10 +1,6 @@
 import cx from 'clsx';
 import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-
-import { TextVariants } from '../../types/typography';
-import UiText from '../ui/Text';
-
 import type { NegativeLabHighlightPatchExposureSuggestion } from '../../schemas/negativeLabHighlightPatchExposureSuggestionSchemas';
 import type { NegativeLabNeutralPatchSuggestion } from '../../schemas/negativeLabNeutralPatchSuggestionSchemas';
 import type {
@@ -14,6 +10,8 @@ import type {
   NegativeLabBaseFogSampleRect,
 } from '../../schemas/negativeLabPresetCatalogSchemas';
 import type { NegativeLabShadowPatchBlackPointSuggestion } from '../../schemas/negativeLabShadowPatchBlackPointSuggestionSchemas';
+import { TextVariants } from '../../types/typography';
+import UiText from '../ui/Text';
 
 export type NegativeLabPatchRole = 'highlight' | 'neutral';
 export type DensitometerPatchLabelKey =

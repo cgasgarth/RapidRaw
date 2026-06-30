@@ -1,10 +1,8 @@
-import { Check, Palette, Star, Tag, X } from 'lucide-react';
-
-import TaggingSubMenu from '../context/TaggingSubMenu';
-import { type Color, COLOR_LABELS } from '../utils/adjustments';
-
-import type { Option, AppSettings } from '../components/ui/AppProperties';
 import type { TFunction } from 'i18next';
+import { Check, Palette, Star, Tag, X } from 'lucide-react';
+import type { AppSettings, Option } from '../components/ui/AppProperties';
+import TaggingSubMenu from '../context/TaggingSubMenu';
+import { COLOR_LABELS, type Color } from '../utils/adjustments';
 
 export interface CommonTag {
   isUser: boolean;

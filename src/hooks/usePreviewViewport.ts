@@ -2,12 +2,12 @@ import {
   type CSSProperties,
   type MouseEvent,
   type RefObject,
-  type WheelEvent,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
+  type WheelEvent,
 } from 'react';
 
 interface PreviewViewportOptions {

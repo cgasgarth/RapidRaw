@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 
 import {
-  validateFocusStackSourcesV1,
   type FocusStackSourceValidationBlockCodeV1,
   type FocusStackSourceValidationInputV1,
   type FocusStackSourceValidationWarningCodeV1,
+  validateFocusStackSourcesV1,
 } from '../../../packages/rawengine-schema/src/focusStackSourceValidation.ts';
 
 const failures: string[] = [];

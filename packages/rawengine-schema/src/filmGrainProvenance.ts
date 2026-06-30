@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { filmGrainModelV1Schema, RAW_ENGINE_SCHEMA_VERSION, type FilmGrainModelV1 } from './rawEngineSchemas.js';
+import { type FilmGrainModelV1, filmGrainModelV1Schema, RAW_ENGINE_SCHEMA_VERSION } from './rawEngineSchemas.js';
 
 export const filmGrainProvenanceEvidenceStateV1Schema = z.enum([
   'synthetic_runtime_reference_only',

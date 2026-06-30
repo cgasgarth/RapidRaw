@@ -1,7 +1,7 @@
 import cx from 'clsx';
-import { motion, AnimatePresence } from 'framer-motion';
-import { RotateCcw, Copy, ClipboardPaste, Aperture, ChartArea, ScanSearch } from 'lucide-react';
-import { useCallback, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Aperture, ChartArea, ClipboardPaste, Copy, RotateCcw, ScanSearch } from 'lucide-react';
+import { type MouseEvent, type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { useShallow } from 'zustand/react/shallow';
@@ -10,8 +10,8 @@ import { useContextMenu } from '../../../context/ContextMenuContext';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useWaveformControls } from '../../../hooks/useWaveformControls';
 import {
-  rawReconstructionComparisonResultSchema,
   type RawReconstructionComparisonResult,
+  rawReconstructionComparisonResultSchema,
 } from '../../../schemas/rawReconstructionComparisonSchemas';
 import { emptyTauriResponseSchema } from '../../../schemas/tauriResponseSchemas';
 import { type CopiedSectionAdjustments, useEditorStore } from '../../../store/useEditorStore';
@@ -20,16 +20,16 @@ import { type CollapsibleSectionsState, useUIStore } from '../../../store/useUIS
 import { Invokes } from '../../../tauri/commands';
 import { TextVariants } from '../../../types/typography';
 import {
+  ADJUSTMENT_SECTIONS,
   type Adjustments,
   INITIAL_ADJUSTMENTS,
-  ADJUSTMENT_SECTIONS,
   pickAdjustmentValues,
 } from '../../../utils/adjustments';
 import { formatUnknownError } from '../../../utils/errorFormatting';
 import {
+  normalizeRawProcessingMode,
   RAW_PROCESSING_MODE_RECIPES,
   RAW_PROCESSING_MODES,
-  normalizeRawProcessingMode,
   type RawProcessingMode,
 } from '../../../utils/rawProcessingModes';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
@@ -38,7 +38,7 @@ import ColorPanel from '../../adjustments/Color';
 import CurveGraph from '../../adjustments/Curves';
 import DetailsPanel from '../../adjustments/Details';
 import EffectsPanel from '../../adjustments/Effects';
-import { OPTION_SEPARATOR, Orientation, type Option } from '../../ui/AppProperties';
+import { OPTION_SEPARATOR, type Option, Orientation } from '../../ui/AppProperties';
 import CollapsibleSection from '../../ui/CollapsibleSection';
 import Dropdown, { type OptionItem } from '../../ui/Dropdown';
 import Resizer from '../../ui/Resizer';

@@ -5,29 +5,29 @@ import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 
 import { NegativeLabAppServerCommandName } from '../../../src/utils/negativeLabAppServerCommandNames.ts';
-import { NEGATIVE_LAB_DENSITY_ALGORITHM_ID } from '../../../src/utils/negativeLabDensityConversion.ts';
 import {
-  NegativeLabOutputFormatId,
-  NEGATIVE_LAB_OUTPUT_FORMAT_IDS,
-} from '../../../src/utils/negativeLabOutputFormatIds.ts';
-import {
-  buildNegativeLabRuntimeSelectedProfileSnapshot,
-  resolveNegativeLabRuntimeProfile,
-} from '../../../src/utils/negativeLabMeasuredProfileRuntime.ts';
-import {
-  buildNegativeLabBatchSummaryRouteResult,
   buildNegativeLabAcceptedBatchApplyRouteResult,
   buildNegativeLabAcceptedBatchPlanRouteResult,
+  buildNegativeLabBatchSummaryRouteResult,
   buildNegativeLabConversionPlanResult,
   buildNegativeLabDensitometerRouteResult,
   buildNegativeLabFrameHealthRouteResult,
   buildNegativeLabPlanRollNormalizationRouteResult,
   buildNegativeLabQcProofRouteResult,
-  buildNegativeLabStockMetadataRouteResult,
   buildNegativeLabStockFamilyConversionRouteResult,
+  buildNegativeLabStockMetadataRouteResult,
   buildNegativeLabStockRegistryRouteResult,
   NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST,
 } from '../../../src/utils/negativeLabAppServerRoutes.ts';
+import { NEGATIVE_LAB_DENSITY_ALGORITHM_ID } from '../../../src/utils/negativeLabDensityConversion.ts';
+import {
+  buildNegativeLabRuntimeSelectedProfileSnapshot,
+  resolveNegativeLabRuntimeProfile,
+} from '../../../src/utils/negativeLabMeasuredProfileRuntime.ts';
+import {
+  NEGATIVE_LAB_OUTPUT_FORMAT_IDS,
+  NegativeLabOutputFormatId,
+} from '../../../src/utils/negativeLabOutputFormatIds.ts';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../../../src/utils/negativeLabPresetCatalog.ts';
 import {
   buildNegativeLabScanMetricsV1,
@@ -127,7 +127,7 @@ const buildDensityPixels = (p50: number, range: number): NegativeLabScanMetricPi
     const x = index % 20;
     const y = Math.floor(index / 20);
     const density = Math.max(0.04, p50 + ((x + y) / 38 - 0.5) * range);
-    return { b: Math.pow(10, -density), g: Math.pow(10, -density), r: Math.pow(10, -density) };
+    return { b: 10 ** -density, g: 10 ** -density, r: 10 ** -density };
   });
 const densitometerReadoutSchema = z.object({
   densityRange: z.number().min(0),

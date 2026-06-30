@@ -4,13 +4,13 @@ import { readFileSync } from 'node:fs';
 
 import { rawEngineLocalAppServerBridgeCapabilities } from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
 import {
-  sampleToolRegistryV1,
-  sampleToneColorCommandEnvelopeV1,
-} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import {
   toneColorCommandEnvelopeV1Schema,
   toneColorCommandTypeV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import {
+  sampleToneColorCommandEnvelopeV1,
+  sampleToolRegistryV1,
+} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import {
   TONE_COLOR_APP_SERVER_COMMAND_TYPES,
   TONE_COLOR_APP_SERVER_EXECUTION_MODES,
@@ -22,6 +22,18 @@ import { TONE_COLOR_APP_SERVER_ROUTES } from '../../../src/utils/toneColorAppSer
 
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
 const packageScripts = new Set(Object.keys(packageJson.scripts ?? {}));
+const runtimeCheckCommands = new Map<string, [string, ...string[]]>([
+  ['check:basic-tone-command-bridge', ['bun', 'tests/integration/checks/check-basic-tone-command-bridge.ts']],
+  ['check:black-white-mixer', ['bun', 'tests/integration/checks/check-black-white-mixer.ts']],
+  ['check:channel-mixer', ['bun', 'tests/integration/checks/check-channel-mixer.ts']],
+  ['check:color-balance-rgb', ['bun', 'tests/integration/checks/check-color-balance-rgb.ts']],
+  ['check:color-grading-presets', ['bun', 'tests/integration/checks/check-color-grading-presets.ts']],
+  ['check:levels-runtime', ['bun', 'test', '--reporter=dot', 'tests/pure-ts/levels-runtime.test.ts']],
+  ['check:profile-tone', ['bun', 'tests/integration/checks/check-profile-tone.ts']],
+  ['check:selective-color-ranges', ['bun', 'tests/integration/checks/check-selective-color-ranges.ts']],
+  ['check:skin-tone-uniformity', ['bun', 'tests/integration/checks/check-skin-tone-uniformity.ts']],
+  ['check:white-balance-picker', ['bun', 'tests/integration/checks/check-white-balance-picker-fixtures.ts']],
+]);
 const routeToolNames = new Set(TONE_COLOR_APP_SERVER_ROUTES.map((route) => route.toolName));
 const expectedCommandTypes = toneColorCommandTypeV1Schema.options;
 const expectedCommandTypeSet = new Set<string>(expectedCommandTypes);
@@ -64,7 +76,7 @@ for (const route of TONE_COLOR_APP_SERVER_ROUTES) {
     failures.push(`${route.commandType} lacks an executable bridge handler but is not marked unavailable.`);
   }
 
-  if (!packageScripts.has(route.runtimeCheckScript)) {
+  if (!packageScripts.has(route.runtimeCheckScript) && !runtimeCheckCommands.has(route.runtimeCheckScript)) {
     failures.push(`${route.toolName} references missing runtime check ${route.runtimeCheckScript}.`);
   }
 }
@@ -268,7 +280,7 @@ for (const commandType of expectedCommandTypes) {
 }
 
 for (const runtimeCheckScript of new Set(TONE_COLOR_APP_SERVER_ROUTES.map((route) => route.runtimeCheckScript))) {
-  runPackageScript(runtimeCheckScript);
+  runRuntimeCheck(runtimeCheckScript);
 }
 
 if (failures.length > 0) {
@@ -279,8 +291,9 @@ if (failures.length > 0) {
 
 console.log(`tone-color app-server routes ok (${TONE_COLOR_APP_SERVER_ROUTES.length})`);
 
-function runPackageScript(scriptName: string): void {
-  const result = Bun.spawnSync(['bun', 'run', scriptName], {
+function runRuntimeCheck(scriptName: string): void {
+  const command = runtimeCheckCommands.get(scriptName) ?? ['bun', 'run', scriptName];
+  const result = Bun.spawnSync(command, {
     stderr: 'pipe',
     stdout: 'pipe',
   });

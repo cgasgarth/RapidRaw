@@ -1,4 +1,4 @@
-import { LibraryViewMode, Theme, ThumbnailSize, type AppSettings } from '../components/ui/AppProperties.tsx';
+import { type AppSettings, LibraryViewMode, Theme, ThumbnailSize } from '../components/ui/AppProperties.tsx';
 import { Invokes } from '../tauri/commands.ts';
 
 type BrowserTauriInvoke = (command: string, args?: Record<string, unknown>, options?: unknown) => Promise<unknown>;

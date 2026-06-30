@@ -1,51 +1,9 @@
-import { NegativeLabAppServerCommandName } from './negativeLabAppServerCommandNames';
-import { buildNegativeBaseFogDensitometerReadout } from './negativeLabDensitometer';
-import { buildNegativeLabDustScratchReviewReport, buildNegativeLabQcProofReport } from './negativeLabDustScratchReview';
-import { buildNegativeLabBatchDryRunSummary, buildNegativeLabFrameHealthReport } from './negativeLabFrameHealth';
 import {
-  NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
-  buildNegativeLabRuntimeProfileProvenanceHash,
-  buildNegativeLabRuntimeSelectedProfileSnapshot,
-  type NegativeLabRuntimeProfileCatalog,
-  resolveNegativeLabRuntimeProfile,
-} from './negativeLabMeasuredProfileRuntime';
-import { buildNegativeLabPlanHash } from './negativeLabPlanIdentity';
-import { buildNegativeLabRollNormalizationPlan } from './negativeLabRollNormalizationPlan';
-import {
-  NEGATIVE_LAB_STOCK_METADATA_CATALOG,
-  buildNegativeLabStockMetadataCounts,
-} from './negativeLabStockMetadataCatalog';
-import { NEGATIVE_LAB_STOCK_REGISTRY, buildNegativeLabStockRegistryCounts } from './negativeLabStockRegistry';
-import {
-  negativeLabAppServerCommandSchema,
-  negativeLabAppServerRouteManifestSchema,
-  negativeLabAcceptedBatchApplyAppServerCommandSchema,
-  negativeLabAcceptedBatchApplyAppServerResultSchema,
-  negativeLabAcceptBatchPlanAppServerCommandSchema,
-  negativeLabAcceptBatchPlanAppServerResultSchema,
-  negativeLabBatchSummaryAppServerCommandSchema,
-  negativeLabBatchSummaryAppServerResultSchema,
-  negativeLabConversionPlanResultSchema,
-  negativeLabDensitometerAppServerCommandSchema,
-  negativeLabDensitometerAppServerResultSchema,
-  negativeLabFrameHealthAppServerCommandSchema,
-  negativeLabFrameHealthAppServerResultSchema,
-  negativeLabPlanRollNormalizationAppServerCommandSchema,
-  negativeLabPlanRollNormalizationAppServerResultSchema,
-  negativeLabQcProofAppServerCommandSchema,
-  negativeLabQcProofAppServerResultSchema,
-  negativeLabStockMetadataAppServerCommandSchema,
-  negativeLabStockMetadataAppServerResultSchema,
-  negativeLabStockFamilyConversionAppServerCommandSchema,
-  negativeLabStockFamilyConversionResultSchema,
-  negativeLabStockRegistryAppServerCommandSchema,
-  negativeLabStockRegistryAppServerResultSchema,
-  negativeLabRouteDescriptors,
-  type NegativeLabAppServerCommand,
-  type NegativeLabAcceptedBatchApplyAppServerCommand,
-  type NegativeLabAcceptedBatchApplyAppServerResult,
   type NegativeLabAcceptBatchPlanAppServerCommand,
   type NegativeLabAcceptBatchPlanAppServerResult,
+  type NegativeLabAcceptedBatchApplyAppServerCommand,
+  type NegativeLabAcceptedBatchApplyAppServerResult,
+  type NegativeLabAppServerCommand,
   type NegativeLabBatchSummaryAppServerCommand,
   type NegativeLabBatchSummaryAppServerResult,
   type NegativeLabConversionPlanResult,
@@ -57,13 +15,55 @@ import {
   type NegativeLabPlanRollNormalizationAppServerResult,
   type NegativeLabQcProofAppServerCommand,
   type NegativeLabQcProofAppServerResult,
-  type NegativeLabStockMetadataAppServerCommand,
-  type NegativeLabStockMetadataAppServerResult,
   type NegativeLabStockFamilyConversionAppServerCommand,
   type NegativeLabStockFamilyConversionResult,
+  type NegativeLabStockMetadataAppServerCommand,
+  type NegativeLabStockMetadataAppServerResult,
   type NegativeLabStockRegistryAppServerCommand,
   type NegativeLabStockRegistryAppServerResult,
+  negativeLabAcceptBatchPlanAppServerCommandSchema,
+  negativeLabAcceptBatchPlanAppServerResultSchema,
+  negativeLabAcceptedBatchApplyAppServerCommandSchema,
+  negativeLabAcceptedBatchApplyAppServerResultSchema,
+  negativeLabAppServerCommandSchema,
+  negativeLabAppServerRouteManifestSchema,
+  negativeLabBatchSummaryAppServerCommandSchema,
+  negativeLabBatchSummaryAppServerResultSchema,
+  negativeLabConversionPlanResultSchema,
+  negativeLabDensitometerAppServerCommandSchema,
+  negativeLabDensitometerAppServerResultSchema,
+  negativeLabFrameHealthAppServerCommandSchema,
+  negativeLabFrameHealthAppServerResultSchema,
+  negativeLabPlanRollNormalizationAppServerCommandSchema,
+  negativeLabPlanRollNormalizationAppServerResultSchema,
+  negativeLabQcProofAppServerCommandSchema,
+  negativeLabQcProofAppServerResultSchema,
+  negativeLabRouteDescriptors,
+  negativeLabStockFamilyConversionAppServerCommandSchema,
+  negativeLabStockFamilyConversionResultSchema,
+  negativeLabStockMetadataAppServerCommandSchema,
+  negativeLabStockMetadataAppServerResultSchema,
+  negativeLabStockRegistryAppServerCommandSchema,
+  negativeLabStockRegistryAppServerResultSchema,
 } from '../schemas/negativeLabAppServerSchemas';
+import { NegativeLabAppServerCommandName } from './negativeLabAppServerCommandNames';
+import { buildNegativeBaseFogDensitometerReadout } from './negativeLabDensitometer';
+import { buildNegativeLabDustScratchReviewReport, buildNegativeLabQcProofReport } from './negativeLabDustScratchReview';
+import { buildNegativeLabBatchDryRunSummary, buildNegativeLabFrameHealthReport } from './negativeLabFrameHealth';
+import {
+  buildNegativeLabRuntimeProfileProvenanceHash,
+  buildNegativeLabRuntimeSelectedProfileSnapshot,
+  NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
+  type NegativeLabRuntimeProfileCatalog,
+  resolveNegativeLabRuntimeProfile,
+} from './negativeLabMeasuredProfileRuntime';
+import { buildNegativeLabPlanHash } from './negativeLabPlanIdentity';
+import { buildNegativeLabRollNormalizationPlan } from './negativeLabRollNormalizationPlan';
+import {
+  buildNegativeLabStockMetadataCounts,
+  NEGATIVE_LAB_STOCK_METADATA_CATALOG,
+} from './negativeLabStockMetadataCatalog';
+import { buildNegativeLabStockRegistryCounts, NEGATIVE_LAB_STOCK_REGISTRY } from './negativeLabStockRegistry';
 
 export const NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST = negativeLabAppServerRouteManifestSchema.parse({
   routes: negativeLabRouteDescriptors.map((descriptor) => ({ ...descriptor, status: 'mapped' as const })),

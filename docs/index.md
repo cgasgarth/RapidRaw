@@ -155,11 +155,9 @@ generator before the release workflow needs one.
 - [Rust unused dependency gate evaluation](tooling/rust-unused-dependency-gate-2026-06-15.md)
 - [Strict type-checked ESLint](tooling/eslint-strict-type-checked-2026-06-11.md)
 - [TypeScript suppression policy](tooling/typescript-suppression-policy-2026-06-15.md)
-- [ESLint escape hatches](tooling/eslint-escape-hatches-2026-06-11.md)
 - [ESLint accessibility rules](tooling/eslint-accessibility-rules-2026-06-11.md)
 - [ESLint async safety rules](tooling/eslint-async-safety-rules-2026-06-11.md)
 - [ESLint import and boundary rules](tooling/eslint-import-boundary-rules-2026-06-11.md)
-- [ESLint project service](tooling/eslint-project-service-2026-06-11.md)
 - [ESLint React hooks rules](tooling/eslint-react-hooks-rules-2026-06-11.md)
 - [ESLint warning inventory](tooling/eslint-warning-inventory-2026-06-11.md)
 - [ESLint zero-warning CI](tooling/eslint-zero-warning-ci-2026-06-11.md)
@@ -169,7 +167,6 @@ generator before the release workflow needs one.
 - [Pre-commit main guard](tooling/pre-commit-main-guard-2026-06-10.md)
 - [Pre-push main guard](tooling/pre-push-main-guard-2026-06-11.md)
 - [Script entrypoints](tooling/rapidraw-script-entrypoints-2026-06-10.md)
-- [Staged hook checks](tooling/staged-hook-checks-2026-06-11.md)
 - [TypeScript compiler options audit](tooling/typescript-compiler-options-audit-2026-06-10.md)
 - [Skip lib check evaluation](tooling/skip-lib-check-evaluation-2026-06-15.md)
 - [Vite bundle budget](tooling/vite-bundle-budget-2026-06-11.md)
@@ -179,7 +176,6 @@ generator before the release workflow needs one.
 - [Frontend Clerk boundary audit](tooling/frontend-clerk-boundary-audit-2026-06-19.md)
 - [Workflow topology](ci/workflow-topology-2026-06-11.md)
 - [Dependency vulnerability checks](ci/dependency-vulnerability-checks-2026-06-11.md)
-- [Dependency license checks](ci/dependency-license-checks-2026-06-11.md)
 - [Deferred Rust advisories](security/deferred-rust-advisories.md)
 
 ## Fixture And Review Artifacts

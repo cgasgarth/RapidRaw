@@ -1,6 +1,6 @@
 import { getVersion } from '@tauri-apps/api/app';
 import { open } from '@tauri-apps/plugin-shell';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertTriangle,
   Check,
@@ -11,42 +11,40 @@ import {
   Image as ImageIcon,
   Loader2,
   RefreshCw,
-  Settings,
   Search,
+  Settings,
+  SlidersHorizontal,
   Star,
   Users,
-  SlidersHorizontal,
 } from 'lucide-react';
-import { lazy, Suspense, useState, useEffect, useMemo } from 'react';
+import type React from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import LibraryGrid from './library/LibraryGrid';
-import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
-import { buildLibraryHeaderStatusItems } from './library/libraryHeaderStatus';
-import LibraryHeaderStatusStrip from './library/LibraryHeaderStatusStrip';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../schemas/exportRecipeIds';
 import { buildLibrarySessionUiCard } from '../../schemas/librarySessionUiSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
-import { type ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
+import { DEFAULT_THEME_ID, THEMES, type ThemeProps } from '../../utils/themes';
 import { parseVirtualImagePath } from '../../utils/virtualImagePath';
 import {
   type AppSettings,
-  type ImageFile,
-  type Progress,
-  ThumbnailSize,
-  ThumbnailAspectRatio,
-  RawStatus,
   EditedStatus,
+  type ImageFile,
   type LibraryViewMode,
+  type Progress,
+  RawStatus,
   type Theme,
+  ThumbnailAspectRatio,
+  ThumbnailSize,
 } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import { type ImportState, Status } from '../ui/ExportImportProperties';
 import UiText from '../ui/Text';
-
-import type React from 'react';
+import LibraryGrid from './library/LibraryGrid';
+import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
+import LibraryHeaderStatusStrip from './library/LibraryHeaderStatusStrip';
+import { buildLibraryHeaderStatusItems } from './library/libraryHeaderStatus';
 
 const SettingsPanel = lazy(() => import('./SettingsPanel.js').then((module) => ({ default: module.SettingsPanel })));
 

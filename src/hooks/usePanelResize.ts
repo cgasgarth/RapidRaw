@@ -1,4 +1,4 @@
-import { useCallback, type PointerEvent as ReactPointerEvent } from 'react';
+import { type PointerEvent as ReactPointerEvent, useCallback } from 'react';
 
 export type ResizeTarget = 'bottom' | 'compact' | 'left' | 'right';
 

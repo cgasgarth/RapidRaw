@@ -21,4 +21,4 @@ jobs:
           bun-version-file: package.json
 
       - name: Check latest action pins
-        run: bun run check:action-pins:latest
+        run: bun tests/integration/checks/check-github-action-pins.ts --check-latest

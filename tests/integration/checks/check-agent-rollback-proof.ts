@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import { sampleRawEngineAgentReplayFixtureV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { rawEngineAgentReplayFixtureV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { sampleRawEngineAgentReplayFixtureV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 
 const fixture = rawEngineAgentReplayFixtureV1Schema.parse(sampleRawEngineAgentReplayFixtureV1);
 

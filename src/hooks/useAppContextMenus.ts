@@ -1,7 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import {
+  Album as AlbumIcon,
   Aperture,
+  Briefcase,
+  Camera,
+  Car,
   Check,
   ClipboardPaste,
   Copy,
@@ -9,58 +13,44 @@ import {
   Edit,
   FileEdit,
   FileInput,
+  Film,
   Folder,
   FolderInput,
   FolderPlus,
+  Gauge,
+  Grip,
+  Heart,
+  Home,
   Images,
   LayoutTemplate,
+  Map,
+  Mountain,
+  Palette,
+  Pin,
+  PinOff,
+  Plane,
   Redo,
   RefreshCw,
   RotateCcw,
   ScanSearch,
-  Star,
   SquaresUnite,
-  Palette,
+  Star,
+  Sun,
   Trash2,
   Undo,
-  Pin,
-  PinOff,
-  Users,
-  Gauge,
-  Grip,
-  Film,
-  Home,
-  Plane,
-  Mountain,
-  Sun,
-  Camera,
-  Map,
-  Heart,
-  Car,
-  Briefcase,
   User,
-  Album as AlbumIcon,
+  Users,
 } from 'lucide-react';
-import { useCallback, useMemo, type MouseEvent } from 'react';
+import { type MouseEvent, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
-
 import {
-  buildColorLabelMenu,
-  buildDestructiveConfirmSubmenu,
-  buildRatingMenu,
-  buildTaggingMenu,
-  type CommonTag,
-} from './contextMenuOptionBuilders';
-import { useEditorActions } from './useEditorActions';
-import { useLibraryActions } from './useLibraryActions';
-import {
-  type Option,
-  OPTION_SEPARATOR,
-  Panel,
   type AlbumItem,
-  type ImageFile,
   type AppSettings,
+  type ImageFile,
+  OPTION_SEPARATOR,
+  type Option,
+  Panel,
 } from '../components/ui/AppProperties';
 import { useContextMenu } from '../context/ContextMenuContext';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../schemas/focusStackUiSchemas';
@@ -87,6 +77,15 @@ import {
 } from '../utils/libraryRelinkIdentity';
 import { createSuperResolutionSourcePreflightMetadata } from '../utils/superResolutionSourcePreflight';
 import { invokeWithSchema } from '../utils/tauriSchemaInvoke';
+import {
+  buildColorLabelMenu,
+  buildDestructiveConfirmSubmenu,
+  buildRatingMenu,
+  buildTaggingMenu,
+  type CommonTag,
+} from './contextMenuOptionBuilders';
+import { useEditorActions } from './useEditorActions';
+import { useLibraryActions } from './useLibraryActions';
 
 export interface UseAppContextMenusProps {
   handleImageSelect: (path: string) => void;

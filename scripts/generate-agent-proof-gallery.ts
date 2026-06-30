@@ -3,16 +3,15 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 
 import { format, resolveConfig } from 'prettier';
-
+import {
+  type RawEngineAgentReplayFixtureV1,
+  rawEngineAgentReplayFixtureV1Schema,
+} from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   sampleAiEnhancementAgentReplayFixtureV1,
   sampleAiToolAgentReplayFixtureV1,
   sampleRawEngineAgentReplayFixtureV1,
 } from '../packages/rawengine-schema/src/samplePayloads.ts';
-import {
-  rawEngineAgentReplayFixtureV1Schema,
-  type RawEngineAgentReplayFixtureV1,
-} from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const OUTPUT_PATH = 'docs/validation/agent-replay-proof-gallery-2026-06-16.html';
 const args = new Set(process.argv.slice(2));

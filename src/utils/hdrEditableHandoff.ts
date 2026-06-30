@@ -1,9 +1,9 @@
-import { getDisplayFileName } from './displayFilePath';
 import {
-  hdrEditableHandoffSummarySchema,
   type HdrEditableHandoffSummary,
   type HdrMergeUiSettings,
+  hdrEditableHandoffSummarySchema,
 } from '../schemas/hdrMergeUiSchemas';
+import { getDisplayFileName } from './displayFilePath';
 
 const HDR_GRAPH_REVISION = 'hdr_legacy_runtime_v1';
 const HDR_PREVIEW_EXPORT_PARITY_FIELDS = [

@@ -2,11 +2,11 @@ import { z } from 'zod';
 
 import {
   ApprovalClass,
-  RAW_ENGINE_SCHEMA_VERSION,
+  type ComputationalMergeCommandEnvelopeV1,
   computationalMergeAlignmentModeV1Schema,
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeQualityPreferenceV1Schema,
-  type ComputationalMergeCommandEnvelopeV1,
+  RAW_ENGINE_SCHEMA_VERSION,
 } from './rawEngineSchemas.js';
 
 const focusStackUiSourceV1Schema = z

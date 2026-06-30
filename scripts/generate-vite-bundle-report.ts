@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
-import { basename, extname, join } from 'node:path';
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { basename, extname, join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { z } from 'zod';
 

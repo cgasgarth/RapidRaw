@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
-
-import type { RenderSize } from './useImageRenderSize';
+import { type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { TransformState } from '../components/ui/AppProperties';
+import type { RenderSize } from './useImageRenderSize';
 
 interface EditorViewportPhysicsOptions {
   contentRef: RefObject<HTMLDivElement | null>;
@@ -151,7 +150,7 @@ export function useEditorViewportPhysics({
       const step = (currentTime: number) => {
         const elapsed = currentTime - startTime;
         const progress = Math.min(elapsed / duration, 1);
-        const easeProgress = 1 - Math.pow(1 - progress, 3);
+        const easeProgress = 1 - (1 - progress) ** 3;
 
         applyTransform(
           startX + (boundedTarget.x - startX) * easeProgress,
@@ -190,7 +189,7 @@ export function useEditorViewportPhysics({
         x += vx * dt;
         y += vy * dt;
 
-        const decay = Math.pow(0.994, dt);
+        const decay = 0.994 ** dt;
         vx *= decay;
         vy *= decay;
 

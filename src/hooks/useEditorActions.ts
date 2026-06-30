@@ -9,12 +9,12 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { Invokes } from '../tauri/commands';
 import {
   type Adjustments,
-  INITIAL_ADJUSTMENTS,
   COPYABLE_ADJUSTMENT_KEYS,
-  PasteMode,
+  INITIAL_ADJUSTMENTS,
   LensAdjustment,
-  pickAdjustmentValues,
   normalizeLoadedAdjustments,
+  PasteMode,
+  pickAdjustmentValues,
 } from '../utils/adjustments';
 import {
   buildBasicToneCommandEnvelope,

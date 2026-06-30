@@ -1,9 +1,8 @@
-import { ExportColorProfile, ExportRenderingIntent, FileFormats } from '../components/ui/ExportImportProperties';
-
 import type {
   ExportColorCapabilityCatalogV1,
   ExportColorCapabilityV1,
 } from '../../packages/rawengine-schema/src/exportColorCapabilities';
+import { ExportColorProfile, ExportRenderingIntent, FileFormats } from '../components/ui/ExportImportProperties';
 
 const COLOR_MANAGED_OUTPUT_FORMATS: ReadonlySet<FileFormats> = new Set([FileFormats.Jpeg, FileFormats.Tiff]);
 

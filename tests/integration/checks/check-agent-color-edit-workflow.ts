@@ -3,14 +3,14 @@
 import { runAgentColorEditWorkflowV1 } from '../../../packages/rawengine-schema/src/agentColorEditWorkflow.ts';
 import { createRawEngineLocalAppServerBridge } from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
 import {
+  RAW_ENGINE_SCHEMA_VERSION,
+  toneColorCommandEnvelopeV1Schema,
+} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import {
   sampleRawEngineSceneColorPipelineV1,
   sampleToneColorApplyCommandEnvelopeV1,
   sampleToneColorCommandEnvelopeV1,
 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import {
-  RAW_ENGINE_SCHEMA_VERSION,
-  toneColorCommandEnvelopeV1Schema,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const context = {
   now: () => new Date('2026-06-22T08:00:00.000Z'),

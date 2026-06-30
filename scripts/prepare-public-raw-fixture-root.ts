@@ -260,4 +260,4 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-export { IDR_FOCUS_STACK_LICENSE_NOTE, RAW_PIXLS_LICENSE_NOTE, RAW_PIXLS_SOURCE_PAGE, publicRawFixtureSources };
+export { IDR_FOCUS_STACK_LICENSE_NOTE, publicRawFixtureSources, RAW_PIXLS_LICENSE_NOTE, RAW_PIXLS_SOURCE_PAGE };

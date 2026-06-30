@@ -1,18 +1,18 @@
 #!/usr/bin/env bun
 
+import { mock } from 'bun:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { mock } from 'bun:test';
 
 import { buildPanoramaUiDryRunCommandV1 } from '../../../packages/rawengine-schema/src/panoramaUiControls.ts';
 import { DEFAULT_PANORAMA_UI_SETTINGS } from '../../../src/schemas/panoramaUiSchemas.ts';
 import { createDefaultPanoramaModalState, type PanoramaModalState } from '../../../src/store/useUIStore.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
 import {
   buildPanoramaApplyCommandState,
   buildPanoramaDryRunCommandState,
   resetPanoramaStateForSettingsChange,
 } from '../../../src/utils/computationalMergeModalState.ts';
-import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
 
 mock.module('react-i18next', () => ({
   Trans: ({ children }: { children?: React.ReactNode }) => React.createElement(React.Fragment, null, children),

@@ -1,7 +1,6 @@
-import { useImageProcessing } from '../../hooks/useImageProcessing';
-
-import type { Adjustments } from '../../utils/adjustments';
 import type { RefObject } from 'react';
+import { useImageProcessing } from '../../hooks/useImageProcessing';
+import type { Adjustments } from '../../utils/adjustments';
 
 interface Props {
   transformWrapperRef: RefObject<TransformController | null>;

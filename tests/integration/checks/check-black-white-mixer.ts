@@ -5,13 +5,13 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
 
 import { parseBlackWhiteMixerSettings } from '../../../src/schemas/blackWhiteMixerSchemas.ts';
-import { applyBlackWhiteMixerToRgbPixel } from '../../../src/utils/blackWhiteMixerRuntime.ts';
 import {
   ADJUSTMENT_GROUPS,
   ADJUSTMENT_SECTIONS,
   ColorAdjustment,
   INITIAL_ADJUSTMENTS,
 } from '../../../src/utils/adjustments.ts';
+import { applyBlackWhiteMixerToRgbPixel } from '../../../src/utils/blackWhiteMixerRuntime.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 const REPORT_PATH = 'docs/validation/black-white-mixer-apply-proof-2026-06-18.json';

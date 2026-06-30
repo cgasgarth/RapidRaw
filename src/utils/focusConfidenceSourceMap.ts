@@ -1,6 +1,6 @@
 import {
-  focusConfidenceSourceMapReportSchema,
   type FocusConfidenceSourceMapReport,
+  focusConfidenceSourceMapReportSchema,
 } from '../schemas/focusConfidenceSourceMapSchemas';
 
 import type { FocusSharpnessMapReport } from '../schemas/focusSharpnessMapSchemas';

@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { join, relative } from 'node:path';
 import { z } from 'zod';
 
 const CliSchema = z

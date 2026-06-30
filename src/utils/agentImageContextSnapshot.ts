@@ -1,5 +1,6 @@
 import { z } from 'zod';
-
+import { useEditorStore } from '../store/useEditorStore';
+import type { Adjustments } from './adjustments';
 import { ActiveChannel } from './adjustments';
 import { buildAgentColorRecipeHashInput } from './agentColorRecipe';
 import { buildAgentCurveLevelsRecipeHashInput } from './agentCurveLevelsRecipe';
@@ -9,15 +10,12 @@ import { buildAgentLensProfileRecipeHashInput } from './agentLensProfileRecipe';
 import {
   AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX,
   AGENT_MEDIUM_PREVIEW_QUALITY,
+  type AgentPreviewEnvelope,
   agentPreviewEnvelopeSchema,
   buildAgentPreviewEnvelope,
   stableAgentPreviewHash,
-  type AgentPreviewEnvelope,
 } from './agentPreviewEnvelope';
 import { BASIC_TONE_ADJUSTMENT_KEYS } from './basicToneCommandBridge';
-import { useEditorStore } from '../store/useEditorStore';
-
-import type { Adjustments } from './adjustments';
 
 const MAX_HISTOGRAM_BINS = 16;
 const MAX_METADATA_ENTRIES = 8;

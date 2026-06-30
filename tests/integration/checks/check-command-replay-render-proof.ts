@@ -5,14 +5,14 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
 
 import { toneColorCommandEnvelopeV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { INITIAL_ADJUSTMENTS, type Adjustments } from '../../../src/utils/adjustments.ts';
+import { proofContractSchema } from '../../../src/schemas/proofLevelSemanticsSchemas.ts';
+import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import {
+  type BasicToneCommandEnvelope,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
-  type BasicToneCommandEnvelope,
 } from '../../../src/utils/basicToneCommandBridge.ts';
 import { pushEditHistoryEntry } from '../../../src/utils/editHistory.ts';
-import { proofContractSchema } from '../../../src/schemas/proofLevelSemanticsSchemas.ts';
 
 const pixelSchema = z.tuple([z.number().min(0).max(1), z.number().min(0).max(1), z.number().min(0).max(1)]);
 const REPORT_PATH = 'docs/validation/command-replay-render-proof-2026-06-20.json';

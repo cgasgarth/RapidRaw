@@ -1,17 +1,17 @@
-import { useUser, useAuth } from '@clerk/react';
+import { useAuth, useUser } from '@clerk/react';
 import {
   DndContext,
+  type DragEndEvent,
   DragOverlay,
+  type DragStartEvent,
   PointerSensor,
+  pointerWithin,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
-  type DragEndEvent,
-  type DragStartEvent,
-  pointerWithin,
 } from '@dnd-kit/core';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   Circle,
   ClipboardPaste,
@@ -19,16 +19,16 @@ import {
   Eye,
   EyeOff,
   FileEdit,
+  FolderOpen,
   Loader2,
   Minus,
   Plus,
   PlusSquare,
   RotateCcw,
+  Send,
+  SquaresIntersect,
   Trash2,
   Wand2,
-  Send,
-  FolderOpen,
-  SquaresIntersect,
 } from 'lucide-react';
 import {
   type ChangeEvent,
@@ -36,55 +36,35 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type SetStateAction,
-  useState,
-  useEffect,
-  useRef,
   useCallback,
+  useEffect,
   useMemo,
+  useRef,
+  useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import AgentChatShell from './AgentChatShell';
-import { AiPeoplePartPickerStatus } from './AiPeoplePartPickerStatus';
-import {
-  getMaskLikeContainerDropClass,
-  getMaskLikeSubMaskDropClass,
-  isMaskLikeContainerDrag,
-  type MaskLikeDragData,
-  useDelayedHover,
-} from './maskPanelRowHelpers';
-import {
-  Mask,
-  type MaskType,
-  type SubMask,
-  SubMaskMode,
-  ToolType,
-  MASK_ICON_MAP,
-  AI_PANEL_CREATION_TYPES,
-  AI_SUB_MASK_COMPONENT_TYPES,
-  formatMaskTypeName,
-  getSubMaskName,
-} from './Masks';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { useAiMasking } from '../../../hooks/useAiMasking';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useManagedFocus } from '../../../hooks/useManagedFocus';
+import type { AgentChatTranscript } from '../../../schemas/agentChatTranscriptSchemas';
 import {
   AiProviderId,
+  type AiProviderId as AiProviderIdType,
   normalizeAiProviderId,
   resolveAiEditApprovalPolicy,
   resolveAiProviderRuntimeState,
-  type AiProviderId as AiProviderIdType,
 } from '../../../schemas/aiProviderSchemas';
-import { cloudUsageSchema, type CloudUsage } from '../../../schemas/cloudUsageSchemas';
+import { type CloudUsage, cloudUsageSchema } from '../../../schemas/cloudUsageSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import type { Adjustments, AiPatch } from '../../../utils/adjustments';
 import {
-  buildAgentInitialPromptContext,
   type AgentInitialPromptContext,
+  buildAgentInitialPromptContext,
 } from '../../../utils/agentInitialPromptContext';
 import {
   cloneMaskLikeContainerForPaste,
@@ -105,9 +85,27 @@ import Input from '../../ui/Input';
 import Slider from '../../ui/Slider';
 import Switch from '../../ui/Switch';
 import UiText from '../../ui/Text';
-
-import type { AgentChatTranscript } from '../../../schemas/agentChatTranscriptSchemas';
-import type { Adjustments, AiPatch } from '../../../utils/adjustments';
+import AgentChatShell from './AgentChatShell';
+import { AiPeoplePartPickerStatus } from './AiPeoplePartPickerStatus';
+import {
+  AI_PANEL_CREATION_TYPES,
+  AI_SUB_MASK_COMPONENT_TYPES,
+  formatMaskTypeName,
+  getSubMaskName,
+  MASK_ICON_MAP,
+  Mask,
+  type MaskType,
+  type SubMask,
+  SubMaskMode,
+  ToolType,
+} from './Masks';
+import {
+  getMaskLikeContainerDropClass,
+  getMaskLikeSubMaskDropClass,
+  isMaskLikeContainerDrag,
+  type MaskLikeDragData,
+  useDelayedHover,
+} from './maskPanelRowHelpers';
 
 interface DragData extends MaskLikeDragData {
   type: 'Container' | 'SubMask' | 'Creation';

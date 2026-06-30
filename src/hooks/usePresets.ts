@@ -1,17 +1,15 @@
 import { invoke } from '@tauri-apps/api/core';
-import { useState, useEffect, useCallback, useMemo } from 'react';
-
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { Folder, Preset } from '../components/ui/AppProperties';
 import { Invokes } from '../tauri/commands';
 import {
+  ADJUSTMENT_GROUPS,
   type Adjustments,
   COPYABLE_ADJUSTMENT_KEYS,
-  ADJUSTMENT_GROUPS,
   INITIAL_ADJUSTMENTS,
   pickAdjustmentValues,
 } from '../utils/adjustments';
 import { debounce } from '../utils/timing';
-
-import type { Folder, Preset } from '../components/ui/AppProperties';
 
 export enum PresetListType {
   Folder = 'folder',

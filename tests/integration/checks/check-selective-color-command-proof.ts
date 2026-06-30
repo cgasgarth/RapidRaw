@@ -11,8 +11,8 @@ import {
 } from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
 import {
   editGraphSnapshotV1Schema,
-  rawEngineColorPipelineContextV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
+  rawEngineColorPipelineContextV1Schema,
   toneColorCommandEnvelopeV1Schema,
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
@@ -21,6 +21,7 @@ import {
   sampleEditGraphSnapshotV1,
   sampleRawEngineSceneColorPipelineV1,
 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+import { proofContractSchema } from '../../../src/schemas/proofLevelSemanticsSchemas.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import {
   applySelectiveColorCommandEnvelopeToAdjustments,
@@ -30,7 +31,6 @@ import {
   selectiveColorCommandEnvelopeSchema,
 } from '../../../src/utils/selectiveColorCommandBridge.ts';
 import { applySelectiveColorToRgbPixel, type RgbPixel } from '../../../src/utils/selectiveColorRuntime.ts';
-import { proofContractSchema } from '../../../src/schemas/proofLevelSemanticsSchemas.ts';
 
 const REPORT_PATH = 'docs/validation/selective-color-command-proof-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');

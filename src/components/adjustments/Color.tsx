@@ -1,9 +1,11 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Pipette, RotateCcw, Sliders } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import AdjustmentSlider from './AdjustmentSlider';
+import type { BlackWhiteMixerChannel } from '../../schemas/blackWhiteMixerSchemas';
+import type { ChannelMixerOutput, ChannelMixerSource } from '../../schemas/channelMixerSchemas';
+import type { ColorBalanceRgbChannel, ColorBalanceRgbRange } from '../../schemas/colorBalanceRgbSchemas';
+import type { CameraProfileId, ToneCurveId } from '../../schemas/profileToneSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import {
@@ -22,18 +24,14 @@ import { applyProfileToneToRgbPixel } from '../../utils/profileToneRuntime';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../utils/selectiveColorRanges';
 import {
   applySelectiveColorToRgbPixel,
-  renderSelectiveColorMaskPreviewPixel,
   type RgbPixel,
+  renderSelectiveColorMaskPreviewPixel,
 } from '../../utils/selectiveColorRuntime';
 import { applySkinToneUniformity, type SkinToneUniformityInput } from '../../utils/skinToneUniformity';
+import type { AppSettings } from '../ui/AppProperties';
 import ColorWheel from '../ui/ColorWheel';
 import UiText from '../ui/Text';
-
-import type { BlackWhiteMixerChannel } from '../../schemas/blackWhiteMixerSchemas';
-import type { ChannelMixerOutput, ChannelMixerSource } from '../../schemas/channelMixerSchemas';
-import type { ColorBalanceRgbChannel, ColorBalanceRgbRange } from '../../schemas/colorBalanceRgbSchemas';
-import type { CameraProfileId, ToneCurveId } from '../../schemas/profileToneSchemas';
-import type { AppSettings } from '../ui/AppProperties';
+import AdjustmentSlider from './AdjustmentSlider';
 
 interface ColorProps {
   color: string;

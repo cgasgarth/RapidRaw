@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { maskAlphaArtifactSchema, type MaskAlphaArtifact } from './maskComposeCommandRuntime.js';
+import { type MaskAlphaArtifact, maskAlphaArtifactSchema } from './maskComposeCommandRuntime.js';
 
 const normalizedPixelSchema = z.number().min(0).max(1);
 const maskComposeLayerAdjustmentSchema = z

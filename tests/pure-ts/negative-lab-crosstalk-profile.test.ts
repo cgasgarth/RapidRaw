@@ -2,10 +2,10 @@ import { describe, expect, test } from 'bun:test';
 
 import { negativeLabRuntimeProfileBrowserRowSchema } from '../../src/schemas/negativeLabMeasuredProfileSchemas.ts';
 import {
-  NEGATIVE_LAB_IDENTITY_CROSSTALK_PROFILE,
   applyNegativeLabDensityCrosstalk,
   buildNegativeLabCrosstalkProfile,
   buildNegativeLabCrosstalkProfileProvenanceHash,
+  NEGATIVE_LAB_IDENTITY_CROSSTALK_PROFILE,
   normalizeNegativeLabCrosstalkMatrixRows,
 } from '../../src/utils/negativeLabCrosstalkProfile.ts';
 import {

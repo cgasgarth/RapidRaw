@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { z } from 'zod';

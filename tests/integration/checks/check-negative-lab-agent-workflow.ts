@@ -3,7 +3,19 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 
 import { format, resolveConfig } from 'prettier';
-
+import { NegativeLabAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/negativeLabAppServerRuntime.ts';
+import {
+  negativeLabApplyPlanRequestV1Schema,
+  negativeLabAppServerToolManifestV1Schema,
+  rawEngineAgentReplayFixtureV1Schema,
+} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import {
+  sampleNegativeLabApplyPlanRequestV1,
+  sampleNegativeLabAppServerToolManifestV1,
+  sampleNegativeLabCommandEnvelopeV1,
+  sampleToolRegistryV1,
+} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+import { NegativeLabAppServerCommandName } from '../../../src/utils/negativeLabAppServerCommandNames.ts';
 import {
   buildNegativeLabAcceptedBatchApplyRouteResult,
   buildNegativeLabAcceptedBatchPlanRouteResult,
@@ -15,20 +27,7 @@ import {
   buildNegativeLabStockFamilyConversionRouteResult,
   NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST,
 } from '../../../src/utils/negativeLabAppServerRoutes.ts';
-import {
-  rawEngineAgentReplayFixtureV1Schema,
-  negativeLabApplyPlanRequestV1Schema,
-  negativeLabAppServerToolManifestV1Schema,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { NegativeLabAppServerCommandName } from '../../../src/utils/negativeLabAppServerCommandNames.ts';
 import { NegativeLabOutputFormatId } from '../../../src/utils/negativeLabOutputFormatIds.ts';
-import { NegativeLabAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/negativeLabAppServerRuntime.ts';
-import {
-  sampleNegativeLabApplyPlanRequestV1,
-  sampleNegativeLabAppServerToolManifestV1,
-  sampleNegativeLabCommandEnvelopeV1,
-  sampleToolRegistryV1,
-} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 
 const OUTPUT_PATH = 'docs/validation/negative-lab-agent-workflow-proof-2026-06-16.html';
 const args = new Set(process.argv.slice(2));

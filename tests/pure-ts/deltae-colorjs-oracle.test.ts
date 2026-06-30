@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import Color from 'colorjs.io';
 import { readFileSync } from 'node:fs';
+import Color from 'colorjs.io';
 
-import { calculateDeltaE00, labColorSchema, type LabColor } from '../../src/utils/deltaE00';
+import { calculateDeltaE00, type LabColor, labColorSchema } from '../../src/utils/deltaE00';
 
 type DeltaEFixture = {
   expectedDeltaE00: number;

@@ -1,16 +1,16 @@
 import { invoke } from '@tauri-apps/api/core';
-import { save, open } from '@tauri-apps/plugin-dialog';
-import { motion, AnimatePresence } from 'framer-motion';
-import { FileInput, CheckCircle, XCircle, Loader, Ban, ChevronDown, ChevronRight, Settings, X } from 'lucide-react';
-import { useState, useEffect, useRef, useMemo, useCallback, type ReactNode } from 'react';
+import { open, save } from '@tauri-apps/plugin-dialog';
+import { AnimatePresence, motion } from 'framer-motion';
+import type { TFunction } from 'i18next';
+import { Ban, CheckCircle, ChevronDown, ChevronRight, FileInput, Loader, Settings, X, XCircle } from 'lucide-react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { useShallow } from 'zustand/react/shallow';
-
 import {
-  MOXCMS_EXPORT_COLOR_CAPABILITIES_V1,
-  exportColorCapabilityCatalogV1Schema,
   type ExportColorCapabilityCatalogV1,
+  exportColorCapabilityCatalogV1Schema,
+  MOXCMS_EXPORT_COLOR_CAPABILITIES_V1,
 } from '../../../../packages/rawengine-schema/src/exportColorCapabilities';
 import { useExportSettings } from '../../../hooks/useExportSettings';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
@@ -21,14 +21,15 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import type { Adjustments } from '../../../utils/adjustments';
 import { buildColorStackPreviewExportParityReceipt } from '../../../utils/colorStackPreviewExportParityReceipt';
 import { formatUnknownError } from '../../../utils/errorFormatting';
 import {
   getBlackPointCompensationStatus,
   getExportColorCapability,
+  isBlackPointCompensationAvailable as getIsBlackPointCompensationAvailable,
   getSupportedRenderingIntents,
   hasColorManagedTransform as hasExportColorManagedTransform,
-  isBlackPointCompensationAvailable as getIsBlackPointCompensationAvailable,
   isSupportedColorProfileForFormat,
   supportsColorManagedOutput,
 } from '../../../utils/exportColorCapabilityContracts';
@@ -40,20 +41,21 @@ import { formatGamutWarningCoverage } from '../../../utils/gamutWarningDisplay';
 import { buildRawWarningChips } from '../../../utils/rawWarningReceipts';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import { debounce } from '../../../utils/timing';
+import type { AppSettings, SelectedImage } from '../../ui/AppProperties';
 import Button from '../../ui/Button';
 import Dropdown from '../../ui/Dropdown';
 import {
   ExportColorProfile,
-  ExportRenderingIntent,
   type ExportPreset,
+  ExportRenderingIntent,
   type ExportSettings,
-  type FileFormat,
+  type ExportState,
   FILE_FORMATS,
   FILENAME_VARIABLES,
-  Status,
-  type ExportState,
+  type FileFormat,
   FileFormats,
   type OutputSharpeningSettings,
+  Status,
   WatermarkAnchor,
 } from '../../ui/ExportImportProperties';
 import ExportPresetsList from '../../ui/ExportPresetsList';
@@ -61,10 +63,6 @@ import ImagePicker from '../../ui/ImagePicker';
 import Slider from '../../ui/Slider';
 import Switch from '../../ui/Switch';
 import UiText from '../../ui/Text';
-
-import type { Adjustments } from '../../../utils/adjustments';
-import type { SelectedImage, AppSettings } from '../../ui/AppProperties';
-import type { TFunction } from 'i18next';
 
 const QUALITY_FILE_FORMATS: ReadonlySet<FileFormats> = new Set([FileFormats.Jpeg, FileFormats.Webp, FileFormats.Jxl]);
 
@@ -241,7 +239,7 @@ const formatBytes = (bytes: number, t: TFunction, decimals = 2) => {
   ];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   const sizeLabel = sizes[i] ?? sizes[sizes.length - 1] ?? '';
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizeLabel}`;
+  return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizeLabel}`;
 };
 
 export default function ExportPanel({

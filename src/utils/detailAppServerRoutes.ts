@@ -1,3 +1,4 @@
+import { detailAppServerRouteManifestSchema } from '../schemas/detailAppServerSchemas';
 import {
   DetailAppServerCommandType,
   DetailAppServerExecutionMode,
@@ -6,7 +7,6 @@ import {
   DetailAppServerSchemaName,
   DetailAppServerToolName,
 } from './detailAppServerRouteIds';
-import { detailAppServerRouteManifestSchema } from '../schemas/detailAppServerSchemas';
 
 export const DETAIL_APP_SERVER_ROUTE_MANIFEST = detailAppServerRouteManifestSchema.parse({
   routes: [

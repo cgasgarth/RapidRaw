@@ -560,10 +560,6 @@
           "path": "docs/tooling/typescript-suppression-policy-2026-06-15.md"
         },
         {
-          "title": "ESLint escape hatches",
-          "path": "docs/tooling/eslint-escape-hatches-2026-06-11.md"
-        },
-        {
           "title": "ESLint accessibility rules",
           "path": "docs/tooling/eslint-accessibility-rules-2026-06-11.md"
         },
@@ -574,10 +570,6 @@
         {
           "title": "ESLint import and boundary rules",
           "path": "docs/tooling/eslint-import-boundary-rules-2026-06-11.md"
-        },
-        {
-          "title": "ESLint project service",
-          "path": "docs/tooling/eslint-project-service-2026-06-11.md"
         },
         {
           "title": "ESLint React hooks rules",
@@ -614,10 +606,6 @@
         {
           "title": "Script entrypoints",
           "path": "docs/tooling/rapidraw-script-entrypoints-2026-06-10.md"
-        },
-        {
-          "title": "Staged hook checks",
-          "path": "docs/tooling/staged-hook-checks-2026-06-11.md"
         },
         {
           "title": "TypeScript compiler options audit",

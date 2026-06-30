@@ -2,30 +2,30 @@
 
 import { readFileSync } from 'node:fs';
 import { Window } from 'happy-dom';
+import i18next from 'i18next';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import i18next from 'i18next';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import AgentChatShell from '../../../src/components/panel/right/AgentChatShell.tsx';
 import { ToolType } from '../../../src/components/panel/right/Masks.tsx';
 import {
-  agentChatTranscriptSchema,
   type AgentChatTranscript,
+  agentChatTranscriptSchema,
 } from '../../../src/schemas/agentChatTranscriptSchemas.ts';
-import { agentChatTranscriptFixture } from '../../../src/utils/agentChatTranscriptFixture.ts';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { agentChatTranscriptFixture } from '../../../src/utils/agentChatTranscriptFixture.ts';
 import { buildAgentInitialPromptContext } from '../../../src/utils/agentInitialPromptContext.ts';
 import {
+  type AgentMultiTurnAppServerSessionResult,
   agentMultiTurnAppServerSessionRequestSchema,
   runAgentMultiTurnAppServerSession,
-  type AgentMultiTurnAppServerSessionResult,
 } from '../../../src/utils/agentMultiTurnAppServerSession.ts';
 import {
+  type AgentSessionAuditRecord,
   appendAgentSessionAuditRecord,
   readAgentSessionAuditStore,
-  type AgentSessionAuditRecord,
 } from '../../../src/utils/agentSessionAuditStore.ts';
 
 const LIVE_AGENT_AUDIT_STORE_KEY = 'rawengine.agent.liveSessionAudit.v1';

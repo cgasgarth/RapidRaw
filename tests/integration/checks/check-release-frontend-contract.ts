@@ -31,27 +31,22 @@ const [packageJson, tauriConfig, viteConfig, buildWorkflow] = await Promise.all(
 
 expectEqual(
   packageJson.scripts.build,
-  'bun run build:frontend',
-  'package build script must delegate to build:frontend.',
-);
-expectIncludes(
-  packageJson.scripts['build:frontend'],
-  'vite build',
-  'build:frontend must produce a Vite production build.',
+  'bun scripts/run-compact-command.ts --label build -- vite build',
+  'package build script must run the compact Vite production build.',
 );
 expectIncludes(
   packageJson.scripts['check:bundle'],
-  'check:vite-minification',
+  'check-vite-minification-contract.ts',
   'check:bundle must enforce minification.',
 );
 expectIncludes(
   packageJson.scripts['check:bundle'],
-  'build:frontend',
+  'bun run build',
   'check:bundle must build the measured frontend artifact.',
 );
 expectIncludes(
   packageJson.scripts['check:bundle'],
-  'check:bundle:budget',
+  'check-vite-bundle-budget.ts',
   'check:bundle must enforce the measured budget.',
 );
 

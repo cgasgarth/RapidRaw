@@ -1,19 +1,17 @@
 import cx from 'clsx';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, ArrowLeft, Maximize, Loader2, Undo, Redo, Palette } from 'lucide-react';
-import { memo, useState, useEffect, useRef, useMemo } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowLeft, Eye, EyeOff, Loader2, Maximize, Palette, Redo, Undo } from 'lucide-react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { IconAperture, IconCalendar, IconClock, IconFocalLength, IconIso, IconShutter } from './ExifIcons';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import type { Adjustments, AiPatch, MaskContainer } from '../../../utils/adjustments';
 import { parseVirtualImagePath } from '../../../utils/virtualImagePath';
+import type { SelectedImage } from '../../ui/AppProperties';
 import Dropdown from '../../ui/Dropdown';
 import UiText from '../../ui/Text';
-
-import type { Adjustments, AiPatch, MaskContainer } from '../../../utils/adjustments';
-import type { SelectedImage } from '../../ui/AppProperties';
+import { IconAperture, IconCalendar, IconClock, IconFocalLength, IconIso, IconShutter } from './ExifIcons';
 
 interface EditorToolbarProps {
   canRedo: boolean;

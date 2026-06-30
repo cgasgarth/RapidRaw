@@ -1,7 +1,6 @@
-import { focusStackOutputReviewWorkflowSchema } from '../schemas/focusStackOutputReviewSchemas';
-
 import type { FocusStackArtifactV1 } from '../../packages/rawengine-schema/src/rawEngineSchemas';
 import type { FocusStackOutputReviewWorkflow } from '../schemas/focusStackOutputReviewSchemas';
+import { focusStackOutputReviewWorkflowSchema } from '../schemas/focusStackOutputReviewSchemas';
 import type { FocusStackUiSettings } from '../schemas/focusStackUiSchemas';
 
 interface BuildFocusStackOutputReviewOptions {

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { toMaskParameterRecord, type MaskParameterRecord } from './maskParameterAccess';
+import { type MaskParameterRecord, toMaskParameterRecord } from './maskParameterAccess';
 
 export const maskRefinementParametersCommandSchema = z
   .object({

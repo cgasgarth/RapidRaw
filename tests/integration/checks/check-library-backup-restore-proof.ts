@@ -6,7 +6,7 @@ import { basename, join } from 'node:path';
 
 import { z } from 'zod';
 
-import { parseLibraryBackupManifest, type LibraryBackupFileEntry } from '../../../src/schemas/libraryBackupSchemas.ts';
+import { type LibraryBackupFileEntry, parseLibraryBackupManifest } from '../../../src/schemas/libraryBackupSchemas.ts';
 import { parseLibrarySessionSet } from '../../../src/schemas/librarySessionSchemas.ts';
 import { buildLibraryBackupManifest, verifyLibraryBackupRestore } from '../../../src/utils/libraryBackupManifest.ts';
 

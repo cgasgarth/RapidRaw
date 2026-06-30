@@ -1,16 +1,15 @@
 import cx from 'clsx';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Copy, ClipboardPaste, ChevronUp, ChevronDown, Check, FileInput, Settings, Filter } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Check, ChevronDown, ChevronUp, ClipboardPaste, Copy, FileInput, Filter, Settings, Star } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-
-import Filmstrip from './Filmstrip';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { COLOR_LABELS } from '../../utils/adjustments';
 import { GLOBAL_KEYS, type ImageFile, type SelectedImage, type ThumbnailAspectRatio } from '../ui/AppProperties';
 import UiText from '../ui/Text';
+import Filmstrip from './Filmstrip';
 
 interface BottomBarProps {
   filmstripHeight?: number;

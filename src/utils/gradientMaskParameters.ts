@@ -1,8 +1,8 @@
 import {
-  linearGradientMaskParametersSchema,
-  radialGradientMaskParametersSchema,
   type LinearGradientMaskParameters,
+  linearGradientMaskParametersSchema,
   type RadialGradientMaskParameters,
+  radialGradientMaskParametersSchema,
 } from '../schemas/maskParameterSchemas';
 
 function clamp(value: number, min: number, max: number, fallback: number): number {

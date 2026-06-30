@@ -2,13 +2,13 @@ import { z } from 'zod';
 
 import {
   ApprovalClass,
-  RAW_ENGINE_SCHEMA_VERSION,
+  type ComputationalMergeCommandEnvelopeV1,
   computationalMergeAlignmentModeV1Schema,
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeQualityPreferenceV1Schema,
-  superResolutionReconstructionModeV1Schema,
+  RAW_ENGINE_SCHEMA_VERSION,
   superResolutionDetailPolicyV1Schema,
-  type ComputationalMergeCommandEnvelopeV1,
+  superResolutionReconstructionModeV1Schema,
 } from './rawEngineSchemas.js';
 
 const superResolutionUiSourceV1Schema = z

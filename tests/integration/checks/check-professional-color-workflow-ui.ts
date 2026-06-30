@@ -8,20 +8,18 @@ import i18next from 'i18next';
 import { act, createElement, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
-
-import { useEditorStore } from '../../../src/store/useEditorStore';
-import { Theme, type AppSettings } from '../../../src/components/ui/AppProperties';
+import { type AppSettings, Theme } from '../../../src/components/ui/AppProperties';
 import {
   ExportColorProfile,
+  type ExportPreset,
   ExportRenderingIntent,
   WatermarkAnchor,
-  type ExportPreset,
 } from '../../../src/components/ui/ExportImportProperties';
-import { INITIAL_ADJUSTMENTS, type Adjustments } from '../../../src/utils/adjustments';
+import type { GamutWarningOverlayPayload } from '../../../src/schemas/tauriEventSchemas';
+import { useEditorStore } from '../../../src/store/useEditorStore';
+import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { formatGamutWarningCoverage } from '../../../src/utils/gamutWarningDisplay';
 import { applyProfileToneToRgbPixel } from '../../../src/utils/profileToneRuntime';
-
-import type { GamutWarningOverlayPayload } from '../../../src/schemas/tauriEventSchemas';
 
 type RenderedPanel = {
   container: HTMLDivElement;

@@ -1,15 +1,14 @@
 #!/usr/bin/env bun
 
 import { readFileSync } from 'node:fs';
+import i18next from 'i18next';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import i18next from 'i18next';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import Waveform from '../../../src/components/panel/editor/Waveform.tsx';
-import { DisplayMode } from '../../../src/utils/adjustments.ts';
-
 import type { PreviewScopeStatus } from '../../../src/store/useEditorStore.ts';
+import { DisplayMode } from '../../../src/utils/adjustments.ts';
 
 const failures: string[] = [];
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));

@@ -1,7 +1,7 @@
 import { ClerkProvider } from '@clerk/react';
 import cx from 'clsx';
-import { useState, useEffect, useCallback, useRef, useMemo, type ReactNode } from 'react';
-import { ToastContainer, Slide } from 'react-toastify';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Slide, ToastContainer } from 'react-toastify';
 import { useShallow } from 'zustand/react/shallow';
 
 import ImageLoaderManager from './components/managers/ImageLoaderManager';
@@ -12,11 +12,11 @@ import ExportPanel from './components/panel/right/ExportPanel';
 import {
   type ImageFile,
   LibraryViewMode,
+  Orientation,
   Panel,
   Theme,
-  Orientation,
-  ThumbnailSize,
   ThumbnailAspectRatio,
+  ThumbnailSize,
 } from './components/ui/AppProperties';
 import GlobalTooltip from './components/ui/GlobalTooltip';
 import Resizer from './components/ui/Resizer';
@@ -39,21 +39,20 @@ import { useTauriListeners } from './hooks/useTauriListeners';
 import { useThumbnails } from './hooks/useThumbnails';
 import { useTooltipAccessibility } from './hooks/useTooltipAccessibility';
 import './i18n';
+import type { UnlistenFn } from '@tauri-apps/api/event';
+import type { FolderTree as FolderTreeNode } from './components/panel/FolderTree';
+import type { ImageDimensions } from './hooks/useImageRenderSize';
 import { useEditorStore } from './store/useEditorStore';
 import { useLibraryStore } from './store/useLibraryStore';
 import { useProcessStore } from './store/useProcessStore';
 import { useSettingsStore } from './store/useSettingsStore';
 import { useUIStore } from './store/useUIStore';
+import type { Adjustments } from './utils/adjustments';
 import { findAlbumById } from './utils/folderTreeUtils';
 import { getViteEnv } from './utils/frontendEnv.mjs';
+import type { ImageCacheEntry } from './utils/ImageLRUCache';
 import { getOptionalCurrentWindow } from './window/currentWindow';
 import TitleBar from './window/TitleBar';
-
-import type { FolderTree as FolderTreeNode } from './components/panel/FolderTree';
-import type { ImageDimensions } from './hooks/useImageRenderSize';
-import type { Adjustments } from './utils/adjustments';
-import type { ImageCacheEntry } from './utils/ImageLRUCache';
-import type { UnlistenFn } from '@tauri-apps/api/event';
 
 const LOCAL_DEV_CLERK_PUBLISHABLE_KEY = 'pk_test_YnJpZWYtc2Vhc25haWwtMTIuY2xlcmsuYWNjb3VudHMuZGV2JA';
 const CLERK_PUBLISHABLE_KEY = getViteEnv().VITE_CLERK_PUBLISHABLE_KEY ?? LOCAL_DEV_CLERK_PUBLISHABLE_KEY;

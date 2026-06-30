@@ -1,8 +1,8 @@
 import {
-  aiMaskCapabilityAuditSchema,
-  aiMaskCapabilitySchema,
   type AiMaskCapability,
   type AiMaskCapabilityAuditEntry,
+  aiMaskCapabilityAuditSchema,
+  aiMaskCapabilitySchema,
 } from '../schemas/aiMaskingSchemas';
 
 export const AI_MASK_CAPABILITY_AUDIT: Array<AiMaskCapabilityAuditEntry> = aiMaskCapabilityAuditSchema.parse([

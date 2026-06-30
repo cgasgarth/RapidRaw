@@ -2,14 +2,14 @@
 
 import { strict as assert } from 'node:assert';
 
-import { Panel, type ImageFile, type SelectedImage } from '../../../src/components/ui/AppProperties';
+import { type ImageFile, Panel, type SelectedImage } from '../../../src/components/ui/AppProperties';
 import {
+  type CommandPaletteUiState,
+  commandPaletteCommands,
   createCommandPaletteAction,
   getCommandPaletteDisabledReasonKey,
   getCommandPaletteSelectedImages,
   getCommandPaletteSelectedPaths,
-  type CommandPaletteUiState,
-  commandPaletteCommands,
 } from '../../../src/utils/commandPaletteModel';
 
 const requiredCommandIds = [

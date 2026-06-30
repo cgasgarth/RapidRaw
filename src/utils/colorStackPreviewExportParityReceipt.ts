@@ -1,9 +1,8 @@
 import { z } from 'zod';
-
-import { DEFAULT_SELECTIVE_COLOR_RANGE_CONTROLS, SELECTIVE_COLOR_RANGE_KEYS } from './selectiveColorRanges';
+import type { ExportReceiptOutput } from '../components/ui/ExportImportProperties';
 
 import type { Adjustments } from './adjustments';
-import type { ExportReceiptOutput } from '../components/ui/ExportImportProperties';
+import { DEFAULT_SELECTIVE_COLOR_RANGE_CONTROLS, SELECTIVE_COLOR_RANGE_KEYS } from './selectiveColorRanges';
 
 const hashString = (value: string): string => {
   let hash = 0x811c9dc5;

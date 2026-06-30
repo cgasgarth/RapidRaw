@@ -1,8 +1,8 @@
 import {
   ApprovalClass,
   RAW_ENGINE_SCHEMA_VERSION,
-  rawEngineToolRegistryV1Schema,
   type RawEngineToolRegistryV1,
+  rawEngineToolRegistryV1Schema,
 } from './rawEngineSchemas.js';
 
 export const rawEngineDefaultToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegistryV1Schema.parse({

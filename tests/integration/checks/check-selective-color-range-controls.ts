@@ -4,8 +4,8 @@ import { readFileSync } from 'node:fs';
 
 import {
   calculateSelectiveColorMaskWeight,
-  renderSelectiveColorMaskPreviewPixel,
   type RgbPixel,
+  renderSelectiveColorMaskPreviewPixel,
 } from '../../../src/utils/selectiveColorRuntime.ts';
 
 const orangePixel: RgbPixel = { blue: 0.08, green: 0.38, red: 0.92 };

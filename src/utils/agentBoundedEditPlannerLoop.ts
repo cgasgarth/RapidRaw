@@ -1,11 +1,9 @@
 import { z } from 'zod';
-
-import { buildAgentBasicToneDryRunPreviewArtifacts } from './agentDryRunPreviewArtifacts';
-import { buildAgentInitialPromptContext, type AgentInitialPromptContext } from './agentInitialPromptContext';
 import { useEditorStore } from '../store/useEditorStore';
-
 import type { AgentCoreEditCommandBundleStep } from './agentCoreEditCommandBundle';
+import { buildAgentBasicToneDryRunPreviewArtifacts } from './agentDryRunPreviewArtifacts';
 import type { AgentImageContextSnapshot } from './agentImageContextSnapshot';
+import { type AgentInitialPromptContext, buildAgentInitialPromptContext } from './agentInitialPromptContext';
 
 export type AgentPlannerLoopStopState = 'approval_ready' | 'blocked' | 'max_steps_reached';
 export type AgentPlannerLoopStage = 'inspect' | 'plan' | 'dry_run' | 'apply' | 'observe';

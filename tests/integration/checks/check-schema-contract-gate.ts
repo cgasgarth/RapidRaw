@@ -13,46 +13,60 @@ const GITHUB_FILE_SCHEMA = z
   })
   .passthrough();
 
-const CONTRACT_CHECKS = [
-  'check:agent-approval-boundaries',
-  'check:agent-baseline-gates',
-  'check:agent-color-apply',
-  'check:agent-curve-levels-apply',
-  'check:agent-detail-effects-apply',
-  'check:agent-geometry-apply',
-  'check:agent-lens-profile-apply',
-  'check:agent-rollback-proof',
-  'check:agent-proof-gallery',
-  'check:ui-api-coverage',
-  'check:ai-app-server-routes',
-  'check:ai-denoise-app-server-tool',
-  'check:tone-color-app-server-routes',
-  'check:rawengine-app-server-host',
-  'check:computational-merge-app-server-routes',
-  'check:computational-merge-ui-route-badges',
-  'check:deblur-app-server-tool',
-  'check:focus-ui-api',
-  'check:focus-ui-runtime-bridge',
-  'check:hdr-ui-api',
-  'check:hdr-ui-runtime-bridge',
-  'check:panorama-ui-api',
-  'check:panorama-ui-runtime-bridge',
-  'check:sr-ui-api',
-  'check:sr-ui-runtime-bridge',
-  'schema:check',
-  'schema:command-bus',
-  'check:focus-app-server-runtime',
-  'check:hdr-app-server-runtime',
-  'schema:focus-app-server',
-  'schema:hdr-app-server',
-  'schema:hdr-api-tools',
-  'check:sr-app-server-runtime',
-  'schema:sr-app-server',
-  'check:panorama-app-server-runtime',
-  'schema:panorama-app-server',
-  'check:tauri-schema-validation',
-  'check:tone-color-app-server-routes',
-];
+const CONTRACT_COMMANDS = [
+  ['bun', 'tests/integration/checks/check-agent-approval-boundaries.ts'],
+  ['bun', 'tests/integration/checks/check-agent-baseline-gates.ts'],
+  ['bun', 'tests/integration/checks/check-agent-color-apply.ts'],
+  ['bun', 'tests/integration/checks/check-agent-curve-levels-apply.ts'],
+  ['bun', 'tests/integration/checks/check-agent-detail-effects-apply.ts'],
+  ['bun', 'tests/integration/checks/check-agent-geometry-apply.ts'],
+  ['bun', 'tests/integration/checks/check-agent-lens-profile-apply.ts'],
+  ['bun', 'tests/integration/checks/check-agent-rollback-proof.ts'],
+  ['bun', 'tests/integration/checks/check-ui-api-coverage.ts'],
+  ['bun', 'tests/integration/checks/check-ai-app-server-tool-routes.ts'],
+  ['bun', 'tests/integration/checks/check-ai-denoise-app-server-tool.ts'],
+  ['bun', 'tests/integration/checks/check-tone-color-app-server-routes.ts'],
+  ['bun', 'tests/integration/checks/check-rawengine-app-server-host.ts'],
+  ['bun', 'tests/integration/checks/check-computational-merge-app-server-routes.ts'],
+  ['bun', 'tests/integration/checks/check-computational-merge-ui-route-badges.ts'],
+  ['bun', 'tests/integration/checks/check-deblur-app-server-tool.ts'],
+  ['bun', 'tests/integration/checks/check-focus-ui-api.ts'],
+  ['bun', 'tests/integration/checks/check-focus-ui-runtime-bridge.ts'],
+  ['bun', 'tests/integration/checks/check-hdr-ui-api.ts'],
+  ['bun', 'tests/integration/checks/check-hdr-ui-runtime-bridge.ts'],
+  ['bun', 'tests/integration/checks/check-panorama-ui-api.ts'],
+  ['bun', 'tests/integration/checks/check-panorama-ui-runtime-bridge.ts'],
+  ['bun', 'tests/integration/checks/check-sr-ui-api.ts'],
+  ['bun', 'tests/integration/checks/check-sr-ui-runtime-bridge.ts'],
+  ['bun', 'tests/integration/checks/check-tauri-schema-validation.ts'],
+  ['bun', 'tests/integration/checks/check-focus-app-server-runtime.ts'],
+  ['bun', 'tests/integration/checks/check-hdr-app-server-runtime.ts'],
+  ['bun', 'tests/integration/checks/check-super-resolution-app-server-runtime.ts'],
+  ['bun', 'tests/integration/checks/check-panorama-app-server-runtime.ts'],
+  [
+    'bun',
+    'scripts/run-compact-command.ts',
+    '--label',
+    'schema:types',
+    '--',
+    'bunx',
+    'tsc',
+    '-p',
+    'packages/rawengine-schema/tsconfig.json',
+    '--noEmit',
+    '--pretty',
+    'false',
+  ],
+  ['bun', 'packages/rawengine-schema/scripts/check-samples.ts'],
+  ['bun', 'packages/rawengine-schema/scripts/check-sample-artifacts.ts'],
+  ['bun', 'packages/rawengine-schema/scripts/check-edit-graph-migrations.ts'],
+  ['bun', 'packages/rawengine-schema/scripts/check-edit-command-bus.ts'],
+  ['bun', 'packages/rawengine-schema/scripts/check-focus-app-server-command-bus.ts'],
+  ['bun', 'packages/rawengine-schema/scripts/check-hdr-app-server-command-bus.ts'],
+  ['bun', 'packages/rawengine-schema/scripts/check-hdr-api-tools.ts'],
+  ['bun', 'packages/rawengine-schema/scripts/check-super-resolution-app-server-command-bus.ts'],
+  ['bun', 'packages/rawengine-schema/scripts/check-panorama-app-server-command-bus.ts'],
+] satisfies Array<[string, ...string[]]>;
 
 const RELEVANT_PREFIXES = ['packages/rawengine-schema/', 'src/schemas/', 'src-tauri/gen/schemas/'];
 
@@ -194,8 +208,7 @@ function readFiles(path) {
     .map((filename) => ({ filename }));
 }
 
-async function runPackageScript(scriptName) {
-  const command = ['bun', 'run', scriptName];
+async function runCommand(command: [string, ...string[]]) {
   const proc = Bun.spawn(command, {
     stdout: 'pipe',
     stderr: 'pipe',
@@ -206,7 +219,7 @@ async function runPackageScript(scriptName) {
 
   if (exitCode === 0) return;
 
-  console.error(`${scriptName} failed`);
+  console.error(`${command.join(' ')} failed`);
   console.error(`$ ${formatCommandForLog(command[0], command.slice(1))}`);
   writeBoundedOutput('stdout', await stdout);
   writeBoundedOutput('stderr', await stderr);
@@ -221,11 +234,11 @@ async function runContractChecks(changes) {
     return;
   }
 
-  for (const scriptName of CONTRACT_CHECKS) {
-    await runPackageScript(scriptName);
+  for (const command of CONTRACT_COMMANDS) {
+    await runCommand(command);
   }
 
-  console.log(`schema-contract ok (${CONTRACT_CHECKS.length}); ${result.reason}`);
+  console.log(`schema-contract ok (${CONTRACT_COMMANDS.length}); ${result.reason}`);
 }
 
 function assertClassification(name, changes, expectedRun) {

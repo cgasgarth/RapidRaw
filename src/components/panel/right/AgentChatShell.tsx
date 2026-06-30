@@ -11,7 +11,22 @@ import {
 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import type {
+  AgentArtifactReview,
+  AgentAuditTranscript,
+  AgentChatDryRunReview,
+  AgentChatMessage,
+  AgentChatToolCall,
+  AgentChatTranscript,
+  AgentE2eClosure,
+  AgentFailureRecovery,
+  AgentInitialPromptPreviewContext,
+  AgentLivePromptWalkthrough,
+  AgentLongEditProgress,
+  AgentPrivateRawArtifacts,
+  AgentReviewHandoff,
+  AgentSelectedFrameScope,
+} from '../../../schemas/agentChatTranscriptSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { buildAgentAppServerToolReadinessSummary } from '../../../utils/agentAppServerToolReadiness';
 import { runAgentBoundedEditPlannerLoop } from '../../../utils/agentBoundedEditPlannerLoop';
@@ -30,9 +45,9 @@ import {
 } from '../../../utils/agentLayerMaskTools';
 import { dispatchAgentLiveEditorTool } from '../../../utils/agentLiveToolDispatch';
 import {
-  runAgentMultiTurnAppServerSession,
   type AgentMultiTurnAppServerSessionRequest,
   type AgentMultiTurnAppServerSessionResult,
+  runAgentMultiTurnAppServerSession,
 } from '../../../utils/agentMultiTurnAppServerSession';
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
@@ -41,32 +56,15 @@ import {
   renderAgentReadOnlyPreview,
 } from '../../../utils/agentReadOnlyAppServerTools';
 import {
+  type AgentSafetyPolicyDecision,
   evaluateAgentSafetyPolicy,
   inferAgentSafetyOperationKind,
-  type AgentSafetyPolicyDecision,
 } from '../../../utils/agentSafetyPolicy';
 import {
-  appendAgentSessionAuditRecord,
   type AgentSessionAuditRecord,
   type AgentSessionAuditStorageAdapter,
+  appendAgentSessionAuditRecord,
 } from '../../../utils/agentSessionAuditStore';
-
-import type {
-  AgentArtifactReview,
-  AgentAuditTranscript,
-  AgentChatDryRunReview,
-  AgentLivePromptWalkthrough,
-  AgentChatMessage,
-  AgentChatToolCall,
-  AgentChatTranscript,
-  AgentE2eClosure,
-  AgentFailureRecovery,
-  AgentInitialPromptPreviewContext,
-  AgentLongEditProgress,
-  AgentPrivateRawArtifacts,
-  AgentReviewHandoff,
-  AgentSelectedFrameScope,
-} from '../../../schemas/agentChatTranscriptSchemas';
 
 interface AgentChatShellProps {
   transcript: AgentChatTranscript;

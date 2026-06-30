@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 
 import {
-  WGPU_HIDDEN_COORDINATE,
   buildHiddenWgpuTransformPayload,
   buildVisibleWgpuTransformPayload,
   fingerprintWgpuTransformPayload,
   parseCssRgbColor,
+  WGPU_HIDDEN_COORDINATE,
 } from '../../src/utils/wgpuTransformPayload';
 
 const colors = {

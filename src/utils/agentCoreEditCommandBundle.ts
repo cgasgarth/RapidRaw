@@ -1,7 +1,14 @@
 import {
+  type ToneColorDryRunResultV1,
+  type ToneColorMutationResultV1,
+  toneColorDryRunResultV1Schema,
+  toneColorMutationResultV1Schema,
+} from '../../packages/rawengine-schema/src/rawEngineSchemas';
+import { useEditorStore } from '../store/useEditorStore';
+import {
+  type AgentLiveBasicTonePixel,
   hashBasicTonePreviewPixels,
   renderBasicTonePreviewPixels,
-  type AgentLiveBasicTonePixel,
 } from './agentLiveBasicTone';
 import { createLiveEditorAppServerBridge } from './agentLiveEditorState';
 import {
@@ -18,13 +25,6 @@ import {
   type SelectiveColorAdjustmentPayload,
   type SelectiveColorCommandColorPipeline,
 } from './selectiveColorCommandBridge';
-import {
-  toneColorDryRunResultV1Schema,
-  toneColorMutationResultV1Schema,
-  type ToneColorDryRunResultV1,
-  type ToneColorMutationResultV1,
-} from '../../packages/rawengine-schema/src/rawEngineSchemas';
-import { useEditorStore } from '../store/useEditorStore';
 
 export type AgentCoreEditCommandBundleStep =
   | { kind: 'basic_tone'; payload: LegacyBasicToneAdjustmentPayload }

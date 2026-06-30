@@ -1,4 +1,4 @@
-import { parseChannelMixerSettings, type ChannelMixerSettings } from '../schemas/channelMixerSchemas';
+import { type ChannelMixerSettings, parseChannelMixerSettings } from '../schemas/channelMixerSchemas';
 
 export interface RgbPixel {
   blue: number;

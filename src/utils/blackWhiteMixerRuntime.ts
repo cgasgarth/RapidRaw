@@ -1,5 +1,5 @@
-import { SELECTIVE_COLOR_RANGES } from './selectiveColorRanges';
 import { parseBlackWhiteMixerSettings } from '../schemas/blackWhiteMixerSchemas';
+import { SELECTIVE_COLOR_RANGES } from './selectiveColorRanges';
 
 export interface RgbPixel {
   blue: number;

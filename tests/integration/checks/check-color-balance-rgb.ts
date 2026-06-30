@@ -5,13 +5,13 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
 
 import { parseColorBalanceRgbSettings } from '../../../src/schemas/colorBalanceRgbSchemas.ts';
-import { applyColorBalanceRgbToPixel } from '../../../src/utils/colorBalanceRgbRuntime.ts';
 import {
   ADJUSTMENT_GROUPS,
   ADJUSTMENT_SECTIONS,
   ColorAdjustment,
   INITIAL_ADJUSTMENTS,
 } from '../../../src/utils/adjustments.ts';
+import { applyColorBalanceRgbToPixel } from '../../../src/utils/colorBalanceRgbRuntime.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 const REPORT_PATH = 'docs/validation/color-balance-rgb-apply-proof-2026-06-18.json';

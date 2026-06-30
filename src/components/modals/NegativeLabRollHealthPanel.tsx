@@ -1,29 +1,7 @@
 import cx from 'clsx';
+import type { TFunction } from 'i18next';
 import { Copy, WandSparkles } from 'lucide-react';
-
-import {
-  ACQUISITION_SOURCE_FAMILY_LABEL_KEYS,
-  ACQUISITION_WARNING_LABEL_KEYS,
-  BATCH_DISPOSITION_LABEL_KEYS,
-  BATCH_DISPOSITION_REASON_LABEL_KEYS,
-  NEGATIVE_LAB_FRAME_HEALTH_FILTERS,
-  NEGATIVE_LAB_FRAME_HEALTH_SORTS,
-  QC_DECISION_LABEL_KEYS,
-  getNegativeLabFrameWarningCount,
-  isNegativeLabFrameHealthFilter,
-  isNegativeLabFrameHealthSort,
-  type NegativeLabFrameHealthFilter,
-  type NegativeLabFrameHealthSort,
-  type NegativeLabQcDecision,
-} from './NegativeLabRollHealthModel';
-import { TextVariants } from '../../types/typography';
-import { snapNegativeLabFrameExposureOffset } from '../../utils/negativeLabFrameExposureOverrides';
-import {
-  negativeLabFrameRgbBalanceOffsetIsZero,
-  snapNegativeLabFrameRgbBalanceOffsets,
-} from '../../utils/negativeLabFrameRgbBalanceOverrides';
-import UiText from '../ui/Text';
-
+import type { Dispatch, SetStateAction } from 'react';
 import type {
   NegativeLabBatchDryRunSummary,
   NegativeLabFrameCropStatus,
@@ -33,8 +11,28 @@ import type {
 import type { NegativeLabFrameRgbBalanceOffset } from '../../schemas/negativeLabFrameRgbBalanceOverrideSchemas';
 import type { NegativeLabPresetParams } from '../../schemas/negativeLabPresetCatalogSchemas';
 import type { NegativeLabRollNormalizationPlan } from '../../schemas/negativeLabRollNormalizationSchemas';
-import type { TFunction } from 'i18next';
-import type { Dispatch, SetStateAction } from 'react';
+import { TextVariants } from '../../types/typography';
+import { snapNegativeLabFrameExposureOffset } from '../../utils/negativeLabFrameExposureOverrides';
+import {
+  negativeLabFrameRgbBalanceOffsetIsZero,
+  snapNegativeLabFrameRgbBalanceOffsets,
+} from '../../utils/negativeLabFrameRgbBalanceOverrides';
+import UiText from '../ui/Text';
+import {
+  ACQUISITION_SOURCE_FAMILY_LABEL_KEYS,
+  ACQUISITION_WARNING_LABEL_KEYS,
+  BATCH_DISPOSITION_LABEL_KEYS,
+  BATCH_DISPOSITION_REASON_LABEL_KEYS,
+  getNegativeLabFrameWarningCount,
+  isNegativeLabFrameHealthFilter,
+  isNegativeLabFrameHealthSort,
+  NEGATIVE_LAB_FRAME_HEALTH_FILTERS,
+  NEGATIVE_LAB_FRAME_HEALTH_SORTS,
+  type NegativeLabFrameHealthFilter,
+  type NegativeLabFrameHealthSort,
+  type NegativeLabQcDecision,
+  QC_DECISION_LABEL_KEYS,
+} from './NegativeLabRollHealthModel';
 
 export interface NegativeLabRollNormalizationApplyReceipt {
   acceptedDryRunPlanHash: string;

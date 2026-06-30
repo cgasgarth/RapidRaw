@@ -1,18 +1,16 @@
 import cx from 'clsx';
-import { AlertTriangle, Image as ImageIcon, Star, SlidersHorizontal } from 'lucide-react';
-import { useState, useEffect, useRef, useCallback, useMemo, memo, useLayoutEffect } from 'react';
+import { AlertTriangle, Image as ImageIcon, SlidersHorizontal, Star } from 'lucide-react';
+import type React from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Grid, useGridCallbackRef, type GridImperativeAPI } from 'react-window';
-
+import { Grid, type GridImperativeAPI, useGridCallbackRef } from 'react-window';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
-import { type Color, COLOR_LABELS } from '../../utils/adjustments';
+import { COLOR_LABELS, type Color } from '../../utils/adjustments';
 import { buildRawQualityBadges, formatRawQualityBadgeTooltip } from '../../utils/rawQualityBadges';
 import { type ImageFile, type SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
 import UiText from '../ui/Text';
-
-import type React from 'react';
 
 const HORIZONTAL_PADDING = 4;
 const ITEM_GAP = 8;

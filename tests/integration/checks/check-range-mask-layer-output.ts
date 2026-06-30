@@ -6,8 +6,8 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 
 import { renderLayerPreviewStack as renderPackageLayerPreviewStack } from '../../../packages/rawengine-schema/src/layerBlendRuntime.ts';
-import { applyComposedMaskToLayerPixels } from '../../../packages/rawengine-schema/src/maskComposeLayerApplication.ts';
 import { renderComposedMask } from '../../../packages/rawengine-schema/src/maskComposeCommandRuntime.ts';
+import { applyComposedMaskToLayerPixels } from '../../../packages/rawengine-schema/src/maskComposeLayerApplication.ts';
 import { renderRangeMaskAlphaArtifact } from '../../../packages/rawengine-schema/src/rangeMaskCommandRuntime.ts';
 import {
   ActorKind,
@@ -16,10 +16,10 @@ import {
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
+  type LayerRgbPixel,
   renderLayerExportStack,
   renderLayerHeadlessStack,
   renderLayerPreviewStack,
-  type LayerRgbPixel,
 } from '../../../src/utils/layerPreviewExportParity.ts';
 
 const OUTPUT_DIR = 'artifacts/layers/range-mask-layer-output';

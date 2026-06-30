@@ -1,14 +1,14 @@
 #!/usr/bin/env bun
 
+import { buildNegativeLabDustScratchReviewReport } from '../../../src/utils/negativeLabDustScratchReview.ts';
 import {
   buildNegativeLabExportReadiness,
   buildNegativeLabPositiveHandoffReadiness,
   buildNegativeLabWorkspaceProof,
-  selectNegativeLabActivePositiveVariant,
   type NegativeLabPositiveVariant,
+  selectNegativeLabActivePositiveVariant,
 } from '../../../src/utils/negativeLabExportHandoff.ts';
 import { buildNegativeLabFrameHealthReport } from '../../../src/utils/negativeLabFrameHealth.ts';
-import { buildNegativeLabDustScratchReviewReport } from '../../../src/utils/negativeLabDustScratchReview.ts';
 
 const ready = buildNegativeLabExportReadiness({
   baseReady: true,

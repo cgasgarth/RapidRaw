@@ -1,6 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useRef } from 'react';
-
+import type { ChannelConfig } from '../components/adjustments/Curves';
+import type { ImageFile, WaveformData } from '../components/ui/AppProperties';
 import { Status } from '../components/ui/ExportImportProperties';
 import {
   parseBase64Payload,
@@ -20,6 +21,7 @@ import {
 } from '../schemas/tauriEventSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
+import type { ThumbnailSmartPreviewState } from '../store/useProcessStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useUIStore } from '../store/useUIStore';
 import { buildHdrApplyCommandState, buildPanoramaApplyCommandState } from '../utils/computationalMergeModalState';
@@ -60,10 +62,6 @@ import {
   WAVEFORM_UPDATE_EVENT,
   WGPU_FRAME_READY_EVENT,
 } from '../utils/tauriEventNames';
-
-import type { ChannelConfig } from '../components/adjustments/Curves';
-import type { ImageFile, WaveformData } from '../components/ui/AppProperties';
-import type { ThumbnailSmartPreviewState } from '../store/useProcessStore';
 
 interface TauriListenerProps {
   refreshAllFolderTrees: () => void;

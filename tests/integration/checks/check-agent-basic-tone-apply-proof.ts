@@ -4,15 +4,20 @@ import { createHash } from 'node:crypto';
 
 import { createRawEngineLocalAppServerBridge } from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
 import {
+  rawEngineAgentReplayFixtureV1Schema,
+  toneColorDryRunResultV1Schema,
+  toneColorMutationResultV1Schema,
+} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import {
   sampleBasicToneAgentReplayFixtureV1,
   sampleToneColorApplyCommandEnvelopeV1,
   sampleToneColorCommandEnvelopeV1,
 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import {
-  rawEngineAgentReplayFixtureV1Schema,
-  toneColorDryRunResultV1Schema,
-  toneColorMutationResultV1Schema,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+  RawEngineAppServerSupervisorEventKind,
+  RawEngineAppServerSupervisorPhase,
+  rawEngineAppServerSupervisorStateSchema,
+} from '../../../src/schemas/agentRuntimeSchemas.ts';
 import {
   cancelRawEngineAppServerSupervisor,
   createRawEngineAppServerSupervisorState,
@@ -20,11 +25,6 @@ import {
   startRawEngineAppServerSupervisor,
   stopRawEngineAppServerSupervisor,
 } from '../../../src/utils/rawEngineAppServerHost.ts';
-import {
-  RawEngineAppServerSupervisorEventKind,
-  RawEngineAppServerSupervisorPhase,
-  rawEngineAppServerSupervisorStateSchema,
-} from '../../../src/schemas/agentRuntimeSchemas.ts';
 
 type RgbPixel = readonly [number, number, number];
 

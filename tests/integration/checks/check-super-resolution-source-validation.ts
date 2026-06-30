@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
 
 import {
-  validateSuperResolutionSourcesV1,
   type SuperResolutionSourceValidationBlockCodeV1,
   type SuperResolutionSourceValidationDowngradeReasonV1,
   type SuperResolutionSourceValidationInputV1,
   type SuperResolutionSourceValidationWarningCodeV1,
+  validateSuperResolutionSourcesV1,
 } from '../../../packages/rawengine-schema/src/superResolutionSourceValidation.ts';
 
 const failures: string[] = [];

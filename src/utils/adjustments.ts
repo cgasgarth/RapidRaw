@@ -1,14 +1,13 @@
+import type { Crop } from 'react-image-crop';
+import { Mask, type SubMask, SubMaskMode } from '../components/panel/right/Masks';
+import type { LevelsSettings } from '../schemas/levelsSchemas';
 import { toMaskParameterRecord } from './maskParameterAccess';
+import type { RawProcessingModeOverride } from './rawProcessingModes';
 import {
   DEFAULT_SELECTIVE_COLOR_RANGE_CONTROLS,
   type SelectiveColorRangeControl,
   type SelectiveColorRangeKey,
 } from './selectiveColorRanges';
-import { Mask, type SubMask, SubMaskMode } from '../components/panel/right/Masks';
-
-import type { RawProcessingModeOverride } from './rawProcessingModes';
-import type { LevelsSettings } from '../schemas/levelsSchemas';
-import type { Crop } from 'react-image-crop';
 
 export type JsonPrimitive = boolean | null | number | string;
 export type JsonValue = JsonPrimitive | { [key: string]: JsonValue } | Array<JsonValue>;

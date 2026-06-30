@@ -1,7 +1,8 @@
 import { t } from 'i18next';
+import type { LucideIcon } from 'lucide-react';
 import {
-  Brush,
   BringToFront,
+  Brush,
   Circle,
   Cloud,
   Droplet,
@@ -10,13 +11,11 @@ import {
   MoreHorizontal,
   RectangleHorizontal,
   Sparkles,
+  Sun,
   TriangleRight,
   User,
-  Sun,
 } from 'lucide-react';
-
 import type { AiPeopleMaskPart } from '../../../schemas/aiMaskingSchemas';
-import type { LucideIcon } from 'lucide-react';
 
 export type SubMaskParameters = Record<string, unknown>;
 

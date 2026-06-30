@@ -1,34 +1,25 @@
-import { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import CropOverlay, { type PercentCrop, type Crop } from 'react-image-crop';
+import CropOverlay, { type Crop, type PercentCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
+import type { KonvaEventObject, Node as KonvaNode } from 'konva/lib/Node';
+import type { Stage as KonvaStage } from 'konva/lib/Stage';
+import type { Ellipse as KonvaEllipse } from 'konva/lib/shapes/Ellipse';
+import type { Transformer as KonvaTransformer } from 'konva/lib/shapes/Transformer';
+import type { Vector2d } from 'konva/lib/types';
 import {
-  Stage,
-  Layer,
-  Ellipse,
-  Line,
-  Transformer,
-  Group,
   Circle,
-  Rect,
-  Label,
-  Tag,
+  Ellipse,
+  Group,
   Text as KonvaText,
+  Label,
+  Layer,
+  Line,
+  Rect,
+  Stage,
+  Tag,
+  Transformer,
 } from 'react-konva';
-
-import CompositionOverlays from './overlays/CompositionOverlays';
-import {
-  BRUSH_MASK_COMMAND_COORDINATE_SPACE,
-  buildBrushMaskCommandFromParameters,
-} from '../../../utils/brushMaskCommandBridge';
-import { formatGamutWarningCoverage } from '../../../utils/gamutWarningDisplay';
-import {
-  normalizeLinearGradientParameters,
-  normalizeRadialGradientParameters,
-} from '../../../utils/gradientMaskParameters';
-import { calculateWhiteBalancePickerAdjustment } from '../../../utils/whiteBalancePicker';
-import { Mask, type SubMask, SubMaskMode, ToolType } from '../right/Masks';
-
 import type { RenderSize } from '../../../hooks/useImageRenderSize';
 import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
 import type {
@@ -39,13 +30,20 @@ import type {
   RetouchCloneSource,
   RetouchRemoveSource,
 } from '../../../utils/adjustments';
+import {
+  BRUSH_MASK_COMMAND_COORDINATE_SPACE,
+  buildBrushMaskCommandFromParameters,
+} from '../../../utils/brushMaskCommandBridge';
+import { formatGamutWarningCoverage } from '../../../utils/gamutWarningDisplay';
+import {
+  normalizeLinearGradientParameters,
+  normalizeRadialGradientParameters,
+} from '../../../utils/gradientMaskParameters';
+import { calculateWhiteBalancePickerAdjustment } from '../../../utils/whiteBalancePicker';
 import type { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
 import type { OverlayMode } from '../right/CropPanel';
-import type { KonvaEventObject, Node as KonvaNode } from 'konva/lib/Node';
-import type { Ellipse as KonvaEllipse } from 'konva/lib/shapes/Ellipse';
-import type { Transformer as KonvaTransformer } from 'konva/lib/shapes/Transformer';
-import type { Stage as KonvaStage } from 'konva/lib/Stage';
-import type { Vector2d } from 'konva/lib/types';
+import { Mask, type SubMask, SubMaskMode, ToolType } from '../right/Masks';
+import CompositionOverlays from './overlays/CompositionOverlays';
 
 declare global {
   interface Window {
