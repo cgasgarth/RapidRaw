@@ -1,4 +1,7 @@
-import { type MaskRefinementParameters, maskRefinementParametersSchema } from '../schemas/masks/maskParameterSchemas';
+import {
+  type MaskRefinementParameters,
+  maskRefinementParametersSchema,
+} from '../../schemas/masks/maskParameterSchemas';
 
 const clamp = (value: number, min: number, max: number, fallback: number) => {
   if (!Number.isFinite(value)) return fallback;

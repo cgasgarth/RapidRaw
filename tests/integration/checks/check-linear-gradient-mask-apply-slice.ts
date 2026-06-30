@@ -17,7 +17,7 @@ import {
 import {
   buildLinearGradientMaskCommandFromParameters,
   LINEAR_GRADIENT_MASK_COMMAND_COORDINATE_SPACE,
-} from '../../../src/utils/linearGradientMaskCommandBridge.ts';
+} from '../../../src/utils/mask/linearGradientMaskCommandBridge.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/layers-masks/linear-gradient-mask-apply-slice-2026-06-21.json';
 const ARTIFACT_PATH = 'artifacts/validation/linear-gradient-mask-apply-slice.svg';
@@ -58,7 +58,7 @@ const uiMarkers = [
 for (const marker of uiMarkers) {
   const source =
     marker === 'buildLinearGradientMaskCommandFromParameters'
-      ? await readFile('src/utils/linearGradientMaskCommandBridge.ts', 'utf8')
+      ? await readFile('src/utils/mask/linearGradientMaskCommandBridge.ts', 'utf8')
       : marker.startsWith('LINEAR_MASK_')
         ? sourceSubMaskFactory
         : sourcePanel;

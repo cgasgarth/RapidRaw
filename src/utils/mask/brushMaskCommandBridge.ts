@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { brushMaskParametersSchema, flowBrushMaskParametersSchema } from '../schemas/masks/maskParameterSchemas';
+import { brushMaskParametersSchema, flowBrushMaskParametersSchema } from '../../schemas/masks/maskParameterSchemas';
 
 export const BRUSH_MASK_COMMAND_SCHEMA_VERSION = 1;
 export const BRUSH_MASK_COMMAND_COORDINATE_SPACE = 'normalized_image' as const;

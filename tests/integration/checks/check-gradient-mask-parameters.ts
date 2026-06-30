@@ -11,7 +11,7 @@ import {
 import {
   normalizeLinearGradientParameters,
   normalizeRadialGradientParameters,
-} from '../../../src/utils/gradientMaskParameters.ts';
+} from '../../../src/utils/mask/gradientMaskParameters.ts';
 
 const linearSchema = linearGradientMaskParametersSchema;
 const radialSchema = radialGradientMaskParametersSchema;

@@ -9,7 +9,7 @@
 ## Runtime Contract
 
 `src/schemas/maskParameterSchemas.ts` defines the TypeScript-facing Zod schema
-for mask refinement parameters. `src/utils/maskRefinement.ts` normalizes partial
+for mask refinement parameters. `src/utils/mask/maskRefinement.ts` normalizes partial
 settings and evaluates fixture weights for deterministic validation.
 
 `src-tauri/src/mask_generation.rs` mirrors the contract with

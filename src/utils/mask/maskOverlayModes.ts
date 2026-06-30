@@ -1,4 +1,4 @@
-import { type MaskOverlaySettings, maskOverlaySettingsSchema } from '../schemas/masks/maskOverlaySchemas';
+import { type MaskOverlaySettings, maskOverlaySettingsSchema } from '../../schemas/masks/maskOverlaySchemas';
 
 export interface MaskOverlayColor {
   a: number;

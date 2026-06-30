@@ -5,7 +5,7 @@ import {
   moveSubMaskBetweenContainers,
   reorderMaskListContainers,
   splitSubMaskToContainer,
-} from '../../../src/utils/maskClipboard.ts';
+} from '../../../src/utils/mask/maskClipboard.ts';
 
 const subMask = (id) => ({ id, invert: false, mode: 'Additive', opacity: 100, type: 'Brush', visible: true });
 const container = (id, subMasks) => ({ id, invert: false, name: id, subMasks });

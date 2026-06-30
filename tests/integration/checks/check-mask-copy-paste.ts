@@ -11,7 +11,7 @@ import {
   cloneSubMaskForPaste,
   insertMaskContainerAt,
   insertSubMaskAt,
-} from '../../../src/utils/maskClipboard.ts';
+} from '../../../src/utils/mask/maskClipboard.ts';
 
 const fixtureSchema = z.discriminatedUnion('id', [
   z

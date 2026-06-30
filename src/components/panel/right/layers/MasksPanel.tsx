@@ -79,21 +79,21 @@ import {
   moveSubMaskBetweenContainers,
   reorderMaskListContainers,
   splitSubMaskToContainer,
-} from '../../../../utils/maskClipboard';
+} from '../../../../utils/mask/maskClipboard';
 import {
   nextMaskOverlayHotkeySettings,
   saveMaskOverlaySettingsPreference,
-} from '../../../../utils/maskOverlayPreferences';
+} from '../../../../utils/mask/maskOverlayPreferences';
 import {
   getMaskParameterNumber,
   mergeMaskParameters,
   toMaskParameterRecord,
-} from '../../../../utils/maskParameterAccess';
+} from '../../../../utils/mask/maskParameterAccess';
 import {
   createMaskRefinementCommand,
   dispatchMaskRefinementCommand,
   readMaskRefinementReplayReceipt,
-} from '../../../../utils/maskRefinementCommandBus';
+} from '../../../../utils/mask/maskRefinementCommandBus';
 import {
   type AiObjectMaskProposal,
   acceptObjectMaskProposal,
@@ -104,7 +104,7 @@ import {
   readObjectPromptCanvasState,
   setObjectPromptMode,
   writeObjectPromptCanvasState,
-} from '../../../../utils/objectMaskPromptCanvas';
+} from '../../../../utils/mask/objectMaskPromptCanvas';
 import AdjustmentSlider from '../../../adjustments/AdjustmentSlider';
 import BasicAdjustments from '../../../adjustments/Basic';
 import ColorPanel from '../../../adjustments/Color';

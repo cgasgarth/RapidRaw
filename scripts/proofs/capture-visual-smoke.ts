@@ -20,7 +20,7 @@ import { sampleToneColorCommandEnvelopeV1 } from '../../packages/rawengine-schem
 import {
   BRUSH_MASK_COMMAND_COORDINATE_SPACE,
   buildBrushMaskCommandFromParameters,
-} from '../../src/utils/brushMaskCommandBridge.ts';
+} from '../../src/utils/mask/brushMaskCommandBridge.ts';
 import { NegativeLabAppServerCommandName } from '../../src/utils/negative-lab/app-server/negativeLabAppServerCommandNames.ts';
 import {
   VISUAL_SMOKE_PROOF_TEST_IDS,

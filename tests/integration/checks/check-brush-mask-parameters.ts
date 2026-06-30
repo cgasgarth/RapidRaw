@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 
 import { brushMaskParametersSchema } from '../../../src/schemas/maskParameterSchemas.ts';
-import { appendBrushStroke, setFlowBrushFlow } from '../../../src/utils/brushMaskParameters.ts';
+import { appendBrushStroke, setFlowBrushFlow } from '../../../src/utils/mask/brushMaskParameters.ts';
 
 const strokeSchema = z
   .object({

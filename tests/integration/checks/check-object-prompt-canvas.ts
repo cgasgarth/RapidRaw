@@ -18,7 +18,7 @@ import {
   readObjectPromptCanvasState,
   setObjectPromptMode,
   writeObjectPromptCanvasState,
-} from '../../../src/utils/objectMaskPromptCanvas.ts';
+} from '../../../src/utils/mask/objectMaskPromptCanvas.ts';
 
 const renderSize = { height: 800, offsetX: 100, offsetY: 50, width: 1200 };
 const center = imagePointFromCanvasClick({ x: 700, y: 450 }, renderSize);

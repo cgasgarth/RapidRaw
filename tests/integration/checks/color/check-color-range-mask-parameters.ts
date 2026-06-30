@@ -8,7 +8,7 @@ import { colorRangeMaskParametersSchema } from '../../../../src/schemas/maskPara
 import {
   createColorRangeMaskParameters,
   evaluateColorRangeMaskWeight,
-} from '../../../../src/utils/colorRangeMaskParameters.ts';
+} from '../../../../src/utils/mask/colorRangeMaskParameters.ts';
 
 const selectiveColorRangeKeySchema = z.enum([
   'reds',

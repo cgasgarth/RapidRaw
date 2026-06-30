@@ -8,7 +8,7 @@ import {
   readObjectMaskProposalReplayReceipt,
   readObjectPromptCanvasState,
   writeObjectPromptCanvasState,
-} from '../../../src/utils/objectMaskPromptCanvas.ts';
+} from '../../../src/utils/mask/objectMaskPromptCanvas.ts';
 
 const makeProposal = (overrides: Partial<AiObjectMaskProposal> = {}): AiObjectMaskProposal =>
   aiObjectMaskProposalSchema.parse({

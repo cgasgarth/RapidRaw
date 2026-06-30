@@ -5,8 +5,8 @@ import {
   ApprovalClass,
   layerMaskCommandEnvelopeV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from '../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { linearGradientMaskParametersSchema } from '../schemas/masks/maskParameterSchemas';
+} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { linearGradientMaskParametersSchema } from '../../schemas/masks/maskParameterSchemas';
 
 export const LINEAR_GRADIENT_MASK_COMMAND_COORDINATE_SPACE = 'normalized_image' as const;
 

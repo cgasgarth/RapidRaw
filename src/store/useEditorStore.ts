@@ -10,7 +10,7 @@ import { type Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, type MaskContainer 
 import type { BasicToneCommandEnvelope } from '../utils/basicToneCommandBridge';
 import { isPendingExportSoftProofGamutWarningOverlay } from '../utils/color/runtime/gamutWarningDisplay';
 import { goToEditHistoryIndex, pushEditHistoryEntry, redoEditHistory, undoEditHistory } from '../utils/editHistory';
-import { loadMaskOverlaySettingsPreference } from '../utils/maskOverlayPreferences';
+import { loadMaskOverlaySettingsPreference } from '../utils/mask/maskOverlayPreferences';
 
 export interface InteractivePatch {
   url: string;

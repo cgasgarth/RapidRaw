@@ -1,7 +1,7 @@
-import type { SubMask } from '../components/panel/right/layers/Masks';
-import type { RenderSize } from '../hooks/viewport/useImageRenderSize';
-import type { MaskOverlaySettings } from '../schemas/masks/maskOverlaySchemas';
-import type { Adjustments, AiPatch, MaskContainer } from './adjustments';
+import type { SubMask } from '../../components/panel/right/layers/Masks';
+import type { RenderSize } from '../../hooks/viewport/useImageRenderSize';
+import type { MaskOverlaySettings } from '../../schemas/masks/maskOverlaySchemas';
+import type { Adjustments, AiPatch, MaskContainer } from '../adjustments';
 import { normalizeMaskOverlaySettings } from './maskOverlayModes';
 import { toMaskParameterRecord } from './maskParameterAccess';
 
@@ -87,13 +87,13 @@ export const stripMaskPayloadsForOverlay = <T extends MaskPreviewDefinition | Ad
   const clone = structuredClone(value);
 
   if ('masks' in clone) {
-    clone.masks.forEach((mask) => {
-      stripBackendMaskDataFromSubMasks(mask.subMasks, patchesSentToBackend);
+    clone.masks.forEach((mask: unknown) => {
+      stripBackendMaskDataFromSubMasks((mask as { subMasks: Array<SubMask> }).subMasks, patchesSentToBackend);
     });
   }
 
   if ('aiPatches' in clone) {
-    clone.aiPatches.forEach((patch) => {
+    clone.aiPatches.forEach((patch: AiPatch) => {
       stripBackendMaskDataFromSubMasks(patch.subMasks, patchesSentToBackend);
     });
   }
