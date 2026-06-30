@@ -36,7 +36,7 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 ## Pull Requests
 
-- Max three active open PRs total.
+- Max four active open PRs total.
 - Keep at least two PR-bound workstreams active whenever independent work
   exists: PRs in CI/review and/or clearly scoped subagent-owned implementation
   or validation worktrees that are expected to become PRs.
@@ -371,11 +371,6 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   structure.
 - Do not dump full CI logs, full JSON, broad file lists, or unchanged green
   status.
-- Resource cleanup concerns are primarily about RAM pressure, not disk space.
-  Do not delete `node_modules`, build outputs, or target directories just for
-  disk cleanup.
-- Avoid leaving unnecessary local servers, browser sessions, or long-running
-  build processes alive after they are no longer needed.
 - Worktrees are allowed for parallel work when they reduce wait time without
   confusing branch ownership.
 - Use `rg`/`rg --files` for repo search when available.
