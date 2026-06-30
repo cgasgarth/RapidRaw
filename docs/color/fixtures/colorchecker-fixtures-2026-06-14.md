@@ -65,6 +65,6 @@ camera-profile transform tests, preview/export parity, or CPU/GPU parity.
 
 - `bun run check:colorchecker-fixtures`
 - `bun run check:unsafe-casts`
-- `bunx prettier --check tests/integration/checks/check-colorchecker-fixtures.ts fixtures/color/reference/colorchecker-fixture-manifest.json docs/color/fixtures/colorchecker-fixtures-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
+- `bunx prettier --check tests/integration/checks/color/check-colorchecker-fixtures.ts fixtures/color/reference/colorchecker-fixture-manifest.json docs/color/fixtures/colorchecker-fixtures-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
 - `bun tests/integration/checks/check-markdown-links.ts`
 - `git diff --check`

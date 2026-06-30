@@ -47,6 +47,6 @@ preview/export parity, and CPU/GPU parity.
 - `bun run check:deltae-fixtures`
 - `bun run check:colorchecker-fixtures`
 - `bun run check:unsafe-casts`
-- `bunx prettier --check tests/integration/checks/check-deltae-fixtures.ts fixtures/color/reference/deltae-reference-fixtures.json docs/color/fixtures/deltae-harness-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
+- `bunx prettier --check tests/integration/checks/color/check-deltae-fixtures.ts fixtures/color/reference/deltae-reference-fixtures.json docs/color/fixtures/deltae-harness-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
 - `bun tests/integration/checks/check-markdown-links.ts`
 - `git diff --check`

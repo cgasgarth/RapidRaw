@@ -68,6 +68,6 @@ bun run check:color-preview-export-parity
 - `bun run check:deltae-fixtures`
 - `bun run check:colorchecker-fixtures`
 - `bun run check:unsafe-casts`
-- `bunx prettier --check tests/integration/checks/check-color-cpu-gpu-parity.ts fixtures/color/proofs/cpu-gpu-parity-fixtures.json docs/color/runtime/color-cpu-gpu-parity-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
+- `bunx prettier --check tests/integration/checks/color/check-color-cpu-gpu-parity.ts fixtures/color/proofs/cpu-gpu-parity-fixtures.json docs/color/runtime/color-cpu-gpu-parity-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
 - `bun tests/integration/checks/check-markdown-links.ts`
 - `git diff --check`

@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { calculateDeltaE00, labColorSchema } from '../../../src/utils/deltaE00.ts';
+import { calculateDeltaE00, labColorSchema } from '../../../../src/utils/deltaE00.ts';
 
 const DeltaEFixtureSchema = z
   .object({
