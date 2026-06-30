@@ -1,6 +1,9 @@
 #!/usr/bin/env bun
 
-import { applyLocalAiDenoiseAdapter, buildSyntheticAiDenoiseInput } from '../../../src/utils/localAiDenoiseAdapter.ts';
+import {
+  applyLocalAiDenoiseAdapter,
+  buildSyntheticAiDenoiseInput,
+} from '../../../../src/utils/localAiDenoiseAdapter.ts';
 
 const failures: string[] = [];
 const input = buildSyntheticAiDenoiseInput();

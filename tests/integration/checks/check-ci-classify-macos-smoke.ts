@@ -94,10 +94,10 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
       'bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures && bun run check:release-notes && bun run check:ai-fallbacks',
     ]),
   ],
-  ['check:ai-fallbacks', new Set(['bun tests/integration/checks/check-ai-provider-fallbacks.ts'])],
-  ['check:ai-people-fake-provider', new Set(['bun tests/integration/checks/check-ai-people-fake-provider.ts'])],
-  ['check:ai-people-apply-plan', new Set(['bun tests/integration/checks/check-ai-people-layer-apply-plan.ts'])],
-  ['check:ai-people-picker', new Set(['bun tests/integration/checks/check-ai-people-picker-model.ts'])],
+  ['check:ai-fallbacks', new Set(['bun tests/integration/checks/ai/check-ai-provider-fallbacks.ts'])],
+  ['check:ai-people-fake-provider', new Set(['bun tests/integration/checks/ai/check-ai-people-fake-provider.ts'])],
+  ['check:ai-people-apply-plan', new Set(['bun tests/integration/checks/ai/check-ai-people-layer-apply-plan.ts'])],
+  ['check:ai-people-picker', new Set(['bun tests/integration/checks/ai/check-ai-people-picker-model.ts'])],
   ['check:script-type-coverage', new Set(['bun tests/integration/checks/check-script-type-coverage.ts'])],
   [
     'check:script-type-coverage:self-test',
@@ -870,7 +870,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -17,7 +17,7 @@\n-    "check:quick": "bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures && bun run check:release-notes",\n+    "check:quick": "bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures && bun run check:release-notes && bun run check:ai-fallbacks",\n+    "check:ai-fallbacks": "bun tests/integration/checks/check-ai-provider-fallbacks.ts",',
+          '@@ -17,7 +17,7 @@\n-    "check:quick": "bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures && bun run check:release-notes",\n+    "check:quick": "bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures && bun run check:release-notes && bun run check:ai-fallbacks",\n+    "check:ai-fallbacks": "bun tests/integration/checks/ai/check-ai-provider-fallbacks.ts",',
       },
     ],
     SMOKE_MODES.NONE,

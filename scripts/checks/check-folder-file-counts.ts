@@ -70,6 +70,10 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4208',
     reason: 'integration checks are pending domain/native-runner cleanup',
   },
+  'tests/integration/checks/ai': {
+    issue: '#4295',
+    reason: 'AI checks are being reorganized into a dedicated subfolder.',
+  },
 };
 
 type FolderCount = {
