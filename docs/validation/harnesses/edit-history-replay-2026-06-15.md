@@ -23,7 +23,7 @@ push, and go-to-index actions.
 
 ## Validation
 
-`tests/integration/checks/check-edit-history-replay.ts` replays representative adjustment
+`tests/integration/checks/edit-history/check-edit-history-replay.ts` replays representative adjustment
 snapshots and verifies:
 
 - undo restores the previous exposure/contrast snapshot;
@@ -32,7 +32,7 @@ snapshots and verifies:
 - pushing after undo truncates redo history;
 - the 50-entry cap remains stable.
 
-`tests/integration/checks/check-command-replay-render-proof.ts` adds the first synthetic
+`tests/integration/checks/edit-history/check-command-replay-render-proof.ts` adds the first synthetic
 headless render bridge for #1257. It builds a typed `toneColor.setBasicTone`
 command from UI-style adjustments, replays it into history, renders a small
 synthetic image through the same replayed adjustment state for preview and

@@ -3861,7 +3861,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `validation(sidecar): add sidecar roundtrip tests`
 - `validation(history): add edit history replay tests`
   - Docs: `docs/validation/harnesses/edit-history-replay-2026-06-15.md`
-  - Validation: `scripts/check-edit-history-replay.ts`
+  - Validation: `tests/integration/checks/edit-history/check-edit-history-replay.ts`
   - Runtime status: current in-memory editor history push, undo, redo, jump, branch truncation, and 50-entry bound are helper-backed and fixture-validated; graph-native command replay remains future work.
 - `validation(render): add baseline render smoke tests`
 - `validation(fixtures): add fixture download policy`
@@ -3939,7 +3939,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `api(commands): add edit command bus`
 - `api(commands): route representative UI operations through command bus`
 - `api(history): add undo redo command tests`
-  - Validation: `scripts/check-edit-graph-history-commands.ts`
+  - Validation: `tests/integration/checks/edit-history/check-edit-graph-history-commands.ts`
 - `api(cli): add headless render command`
 - `docs(api): document edit command API`
 

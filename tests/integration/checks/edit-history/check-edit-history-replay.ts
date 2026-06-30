@@ -2,13 +2,13 @@
 
 import { z } from 'zod';
 
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
 import {
   goToEditHistoryIndex,
   pushEditHistoryEntry,
   redoEditHistory,
   undoEditHistory,
-} from '../../../src/utils/editHistory.ts';
+} from '../../../../src/utils/editHistory.ts';
 
 const stepSchema = z
   .object({

@@ -1,18 +1,18 @@
 #!/usr/bin/env bun
 
-import { deriveArtifactInvalidationReasons } from '../../../packages/rawengine-schema/src/derivedArtifactInvalidation.ts';
+import { deriveArtifactInvalidationReasons } from '../../../../packages/rawengine-schema/src/derivedArtifactInvalidation.ts';
 import {
   focusStackArtifactV1Schema,
   hdrMergeArtifactV1Schema,
   panoramaArtifactV1Schema,
   superResolutionArtifactV1Schema,
-} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   sampleFocusStackArtifactV1,
   sampleHdrMergeArtifactV1,
   samplePanoramaArtifactV1,
   sampleSuperResolutionArtifactV1,
-} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+} from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
 
 const CASES = [
   {
