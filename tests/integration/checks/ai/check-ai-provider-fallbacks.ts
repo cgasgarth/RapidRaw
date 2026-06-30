@@ -8,7 +8,7 @@ import {
   normalizeAiProviderId,
   resolveAiEditApprovalPolicy,
   resolveAiProviderRuntimeState,
-} from '../../../../src/schemas/aiProviderSchemas.ts';
+} from '../../../../src/schemas/ai/aiProviderSchemas.ts';
 
 const fallbackCases = [
   {

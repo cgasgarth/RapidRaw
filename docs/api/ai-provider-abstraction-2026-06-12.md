@@ -7,7 +7,7 @@ Issue: #209 `ai(api): define provider abstraction for local self-hosted and clou
 This slice defines the first TypeScript-facing AI provider contract without
 changing runtime behavior.
 
-The contract lives in `src/schemas/aiProviderSchemas.ts` and is backed by Zod so
+The contract lives in `src/schemas/ai/aiProviderSchemas.ts` and is backed by Zod so
 settings, future tool schemas, and provenance code can validate image-provider
 IDs instead of accepting arbitrary strings.
 

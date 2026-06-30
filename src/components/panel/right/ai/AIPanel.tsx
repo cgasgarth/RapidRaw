@@ -54,7 +54,7 @@ import {
   normalizeAiProviderId,
   resolveAiEditApprovalPolicy,
   resolveAiProviderRuntimeState,
-} from '../../../../schemas/aiProviderSchemas';
+} from '../../../../schemas/ai/aiProviderSchemas';
 import { type CloudUsage, cloudUsageSchema } from '../../../../schemas/cloudUsageSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { useProcessStore } from '../../../../store/useProcessStore';

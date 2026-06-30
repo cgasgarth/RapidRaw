@@ -6,7 +6,7 @@ import {
   aiDenoiseQualityReportSchema,
   isEligibleRealRun,
   parseAiDenoiseQualityReport,
-} from '../../../src/schemas/aiDenoiseQualityReportSchemas.ts';
+} from '../../../src/schemas/ai/aiDenoiseQualityReportSchemas.ts';
 import { collectProofContractFailures } from '../../../src/schemas/proofLevelSemanticsSchemas.ts';
 
 const proofContractReportPaths = [

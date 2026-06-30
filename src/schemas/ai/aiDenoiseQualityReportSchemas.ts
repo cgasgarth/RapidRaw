@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { proofContractSchema } from './proofLevelSemanticsSchemas.ts';
+import { proofContractSchema } from '../proofLevelSemanticsSchemas.ts';
 
 const hashSchema = z.string().regex(/^[a-f0-9]{64}$/u);
 const namespacedHashSchema = z.string().regex(/^(fnv1a32|sha256):[a-f0-9]+$/u);
