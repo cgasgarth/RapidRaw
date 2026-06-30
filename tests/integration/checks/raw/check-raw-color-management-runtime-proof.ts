@@ -4,7 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { parseRawOpenEditExportRunReportCollection } from '../../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
+import { parseRawOpenEditExportRunReportCollection } from '../../../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
 
 const REQUEST_PATH = 'fixtures/validation/raw-open-edit-export/raw-open-edit-export-proof-request.json';
 const REPORT_PATH = 'docs/validation/proofs/color/raw-color-management-runtime-proof-2026-06-20.json';
@@ -277,7 +277,7 @@ if (UPDATE_REPORT) {
   const expectedReport = proofReportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
   if (JSON.stringify(expectedReport) !== JSON.stringify(proofReport)) {
     failures.push(
-      `${REPORT_PATH} is stale; run bun tests/integration/checks/check-raw-color-management-runtime-proof.ts --update`,
+      `${REPORT_PATH} is stale; run bun tests/integration/checks/raw/check-raw-color-management-runtime-proof.ts --update`,
     );
   }
 }

@@ -36,7 +36,7 @@ The RAW open/edit/export proof path currently separates:
 - `check:raw-open-edit-export-private-proof-acceptance`: public-safe acceptance helper.
 - RAW open/edit/export report validation is now input-driven. Generate a
   private report through the private-root runner and validate it with
-  `tests/integration/checks/check-raw-open-edit-export-run-reports.ts --input
+  `tests/integration/checks/raw/check-raw-open-edit-export-run-reports.ts --input
 <report>`.
   and the final HTML review page.
 

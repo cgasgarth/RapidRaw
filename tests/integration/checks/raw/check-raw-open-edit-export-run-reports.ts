@@ -4,8 +4,8 @@ import { createHash } from 'node:crypto';
 import { access, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import { parseRawOpenEditExportProofManifest } from '../../../src/schemas/rawOpenEditExportProofSchemas.ts';
-import { parseRawOpenEditExportRunReportCollection } from '../../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
+import { parseRawOpenEditExportProofManifest } from '../../../../src/schemas/rawOpenEditExportProofSchemas.ts';
+import { parseRawOpenEditExportRunReportCollection } from '../../../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
 
 const requireAssets = process.argv.includes('--require-assets');
 const allowFreshHashes = process.argv.includes('--allow-fresh-hashes');

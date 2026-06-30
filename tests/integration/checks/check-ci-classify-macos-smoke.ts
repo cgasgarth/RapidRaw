@@ -270,10 +270,13 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:mask-compose-command', new Set(['bun tests/integration/checks/masks/check-mask-compose-command.ts'])],
   ['check:metadata-templates', new Set(['bun tests/integration/checks/check-metadata-template-fixtures.ts'])],
   ['check:public-fixture-manifest', new Set(['bun tests/integration/checks/check-public-fixture-manifest.ts'])],
-  ['check:raw-open-edit-export-proof', new Set(['bun tests/integration/checks/check-raw-open-edit-export-proof.ts'])],
+  [
+    'check:raw-open-edit-export-proof',
+    new Set(['bun tests/integration/checks/raw/check-raw-open-edit-export-proof.ts']),
+  ],
   [
     'check:raw-open-edit-export-command-wrapper',
-    new Set(['bun tests/integration/checks/check-raw-open-edit-export-command-wrapper.ts']),
+    new Set(['bun tests/integration/checks/raw/check-raw-open-edit-export-command-wrapper.ts']),
   ],
   [
     'check:raw-open-edit-export-private-report-collector',
@@ -849,7 +852,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -110,6 +110,7 @@\n+    "check:raw-open-edit-export-proof": "bun tests/integration/checks/check-raw-open-edit-export-proof.ts",',
+          '@@ -110,6 +110,7 @@\n+    "check:raw-open-edit-export-proof": "bun tests/integration/checks/raw/check-raw-open-edit-export-proof.ts",',
       },
     ],
     SMOKE_MODES.NONE,
@@ -860,7 +863,7 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch:
-          '@@ -110,6 +110,7 @@\n+    "check:raw-open-edit-export-command-wrapper": "bun tests/integration/checks/check-raw-open-edit-export-command-wrapper.ts",',
+          '@@ -110,6 +110,7 @@\n+    "check:raw-open-edit-export-command-wrapper": "bun tests/integration/checks/raw/check-raw-open-edit-export-command-wrapper.ts",',
       },
     ],
     SMOKE_MODES.NONE,

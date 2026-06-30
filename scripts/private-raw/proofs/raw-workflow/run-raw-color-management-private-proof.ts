@@ -142,7 +142,7 @@ try {
       'RAW open/edit/export private report validation',
       [
         'bun',
-        'tests/integration/checks/check-raw-open-edit-export-run-reports.ts',
+        'tests/integration/checks/raw/check-raw-open-edit-export-run-reports.ts',
         '--input',
         reportOutputPath,
         '--fixture-id',
@@ -160,7 +160,7 @@ try {
 
   await runRequired('RAW color-management private report schema validation', [
     'bun',
-    'tests/integration/checks/check-raw-color-management-runtime-proof.ts',
+    'tests/integration/checks/raw/check-raw-color-management-runtime-proof.ts',
     '--run-reports',
     reportOutputPath,
     ...requestArgs(),

@@ -2,11 +2,11 @@
 
 import { readFile } from 'node:fs/promises';
 
-import { toneColorCommandEnvelopeV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { toneColorCommandEnvelopeV1Schema } from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   rawOpenEditExportProofReportSchema,
   rawOpenEditExportProofRequestSchema,
-} from '../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
+} from '../../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
 
 const [wrapperSource, commandsSource, rustSource, rustLibSource, proofRequestFixtureSource] = await Promise.all([
   readFile('src/utils/rawOpenEditExportProofCommand.ts', 'utf8'),
