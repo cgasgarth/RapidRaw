@@ -2,7 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 
-import { agentChatTranscriptFixture } from '../../../../src/utils/agentChatTranscriptFixture.ts';
+import { agentChatTranscriptFixture } from '../../../../src/utils/agent/session/agentChatTranscriptFixture.ts';
 
 const failures: string[] = [];
 const handoff = agentChatTranscriptFixture.reviewHandoff;

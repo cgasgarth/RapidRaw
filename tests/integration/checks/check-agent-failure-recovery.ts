@@ -8,7 +8,7 @@ import {
   sampleAiEnhancementCommandEnvelopeV1,
   sampleToneColorCommandEnvelopeV1,
 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { agentChatTranscriptFixture } from '../../../src/utils/agentChatTranscriptFixture.ts';
+import { agentChatTranscriptFixture } from '../../../src/utils/agent/session/agentChatTranscriptFixture.ts';
 
 const failures: string[] = [];
 const recovery = agentChatTranscriptFixture.failureRecovery;

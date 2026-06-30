@@ -5,22 +5,22 @@ import {
   AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
   agentAdjustmentsApplyResponseSchema,
   agentAdjustmentsDryRunResponseSchema,
-} from './agentAdjustmentApplyTool';
-import { AGENT_COLOR_APPLY_TOOL_NAME, agentColorApplyResponseSchema } from './agentColorApplyTool';
+} from '../../agentAdjustmentApplyTool';
+import { AGENT_COLOR_APPLY_TOOL_NAME, agentColorApplyResponseSchema } from '../../agentColorApplyTool';
 import {
   AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
   agentDetailEffectsApplyResponseSchema,
-} from './agentDetailEffectsApplyTool';
-import { agentEditQualityReviewSchema, buildAgentEditQualityReview } from './agentEditQualityReview';
-import { agentInitialPromptContextSchema, buildAgentInitialPromptContext } from './agentInitialPromptContext';
-import { dispatchAgentLiveEditorTool } from './agentLiveToolDispatch';
-import { agentPreviewEnvelopeSchema } from './agentPreviewEnvelope';
+} from '../../agentDetailEffectsApplyTool';
+import { agentEditQualityReviewSchema, buildAgentEditQualityReview } from '../../agentEditQualityReview';
+import { agentInitialPromptContextSchema, buildAgentInitialPromptContext } from '../../agentInitialPromptContext';
+import { agentPreviewEnvelopeSchema } from '../../agentPreviewEnvelope';
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
   agentPreviewRenderResponseSchema,
   agentStateGetResponseSchema,
-} from './agentReadOnlyAppServerTools';
+} from '../../agentReadOnlyAppServerTools';
+import { dispatchAgentLiveEditorTool } from './agentLiveToolDispatch';
 import { createAgentSessionCheckpoint } from './agentSessionHistory';
 
 const sessionAdjustmentPatchSchema = z

@@ -11,11 +11,11 @@ import {
 } from '../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-import { dispatchAgentLiveEditorTool } from '../../../src/utils/agentLiveToolDispatch.ts';
+import { dispatchAgentLiveEditorTool } from '../../../src/utils/agent/session/agentLiveToolDispatch.ts';
 import {
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
   createAgentSessionCheckpoint,
-} from '../../../src/utils/agentSessionHistory.ts';
+} from '../../../src/utils/agent/session/agentSessionHistory.ts';
 import {
   NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME,
   NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME,

@@ -1,7 +1,6 @@
 import { z } from 'zod';
-
+import { agentHistoryRollbackResponseSchema } from './agent/session/agentSessionHistory';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
-import { agentHistoryRollbackResponseSchema } from './agentSessionHistory';
 
 export const AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME = 'rawengine.agent.selected_image.preview_loop';
 export const AGENT_CURRENT_IMAGE_PREVIEW_LOOP_INPUT_SCHEMA_NAME = 'AgentCurrentImagePreviewLoopRequestV1';

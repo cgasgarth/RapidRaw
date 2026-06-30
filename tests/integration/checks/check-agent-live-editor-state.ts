@@ -9,7 +9,7 @@ import {
 import { RawStatus, SortDirection } from '../../../src/components/ui/AppProperties.tsx';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { useLibraryStore } from '../../../src/store/useLibraryStore.ts';
-import { createLiveEditorAppServerBridge } from '../../../src/utils/agentLiveEditorState.ts';
+import { createLiveEditorAppServerBridge } from '../../../src/utils/agent/session/agentLiveEditorState.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3154.ARW';
 const virtualCopyPath = `${selectedPath}?vc=agent-live-state`;

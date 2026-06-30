@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 import { z } from 'zod';
 
-import { agentChatTranscriptFixture } from '../../../src/utils/agentChatTranscriptFixture.ts';
+import { agentChatTranscriptFixture } from '../../../src/utils/agent/session/agentChatTranscriptFixture.ts';
 
 const failures: string[] = [];
 const walkthrough = agentChatTranscriptFixture.livePromptWalkthrough;

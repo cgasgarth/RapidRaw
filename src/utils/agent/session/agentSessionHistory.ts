@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { useEditorStore } from '../store/useEditorStore';
-import type { Adjustments } from './adjustments';
-import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
+import { useEditorStore } from '../../../store/useEditorStore';
+import type { Adjustments } from '../../adjustments';
+import { buildAgentImageContextSnapshot } from '../../agentImageContextSnapshot';
 
 export const AGENT_HISTORY_ROLLBACK_TOOL_NAME = 'rawengine.agent.history.rollback';
 export const AGENT_HISTORY_ROLLBACK_INPUT_SCHEMA_NAME = 'AgentHistoryRollbackRequestV1';

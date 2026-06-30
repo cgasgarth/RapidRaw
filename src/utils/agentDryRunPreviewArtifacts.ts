@@ -10,8 +10,8 @@ import {
   type AgentLiveBasicTonePixel,
   hashBasicTonePreviewPixels,
   renderBasicTonePreviewPixels,
-} from './agentLiveBasicTone';
-import { createLiveEditorAppServerBridge } from './agentLiveEditorState';
+} from './agent/session/agentLiveBasicTone';
+import { createLiveEditorAppServerBridge } from './agent/session/agentLiveEditorState';
 import {
   type AgentPreviewEnvelope,
   agentPreviewEnvelopeSchema,
