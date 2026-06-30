@@ -50,6 +50,10 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   action.
 - Do not rebase or force-push a healthy PR that is only waiting on required
   checks unless it is behind/conflicting or branch protection requires it.
+- When a PR is healthy, checks are running or passing, and there are no known
+  blockers or conflicts, enable GitHub auto-merge so it can land without
+  sitting stale; keep queue discipline intact and do not use auto-merge to
+  skip review or unresolved issues.
 - Prefer vertical feature delivery over planning, schema-only, proof-only,
   probe-only, inventory-only, routing-only, or meta-tooling PRs.
 - Feature PRs may exceed cleanup/CI/tooling PRs, but cleanup/CI/tooling PRs
