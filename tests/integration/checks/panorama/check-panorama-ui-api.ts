@@ -3,8 +3,8 @@
 import {
   buildPanoramaUiApplyCommandV1,
   buildPanoramaUiDryRunCommandV1,
-} from '../../../packages/rawengine-schema/src/panorama/panoramaUiControls.ts';
-import { runComputationalUiApiSmoke } from '../../../scripts/lib/computational/ui-api-smoke.ts';
+} from '../../../../packages/rawengine-schema/src/panorama/panoramaUiControls.ts';
+import { runComputationalUiApiSmoke } from '../../../../scripts/lib/computational/ui-api-smoke.ts';
 
 runComputationalUiApiSmoke({
   buildApplyCommand: buildPanoramaUiApplyCommandV1,

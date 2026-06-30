@@ -6,19 +6,19 @@ import { join, resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { PanoramaAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/panorama/panoramaAppServerRuntime.ts';
+import { PanoramaAppServerRuntimeToolBusV1 } from '../../../../packages/rawengine-schema/src/panorama/panoramaAppServerRuntime.ts';
 import {
   buildPanoramaUiApplyCommandV1,
   buildPanoramaUiDryRunCommandV1,
-} from '../../../packages/rawengine-schema/src/panorama/panoramaUiControls.ts';
-import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational/proof-budgets.ts';
-import { privateRawReportMetric } from '../../../scripts/lib/private-raw/computational-report-fixtures.ts';
+} from '../../../../packages/rawengine-schema/src/panorama/panoramaUiControls.ts';
+import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
+import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../../scripts/lib/computational/proof-budgets.ts';
+import { privateRawReportMetric } from '../../../../scripts/lib/private-raw/computational-report-fixtures.ts';
 import {
   type ComputationalMergePrivateRunReportCollection,
   parseComputationalMergePrivateRunReportCollection,
-} from '../../../src/schemas/computational-merge/computationalMergePrivateRunReportSchemas.ts';
-import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
+} from '../../../../src/schemas/computational-merge/computationalMergePrivateRunReportSchemas.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
 
 const panoramaRoutePair = getComputationalMergeAppServerRoutePairSummary('panorama');
 const ARTIFACT_ROOT = 'private-artifacts/validation/computational-merge';
