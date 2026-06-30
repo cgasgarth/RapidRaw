@@ -2,12 +2,15 @@
 
 import { readFileSync } from 'node:fs';
 
-import { RawStatus, SortDirection } from '../../../src/components/ui/AppProperties.tsx';
-import { useEditorStore } from '../../../src/store/useEditorStore.ts';
-import { useLibraryStore } from '../../../src/store/useLibraryStore.ts';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-import { applyApprovedAgentPlanAtomically, rollbackApprovedAgentPlan } from '../../../src/utils/agentAtomicApproval.ts';
-import { agentChatTranscriptFixture } from '../../../src/utils/agentChatTranscriptFixture.ts';
+import { RawStatus, SortDirection } from '../../../../src/components/ui/AppProperties.tsx';
+import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
+import { useLibraryStore } from '../../../../src/store/useLibraryStore.ts';
+import { INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
+import {
+  applyApprovedAgentPlanAtomically,
+  rollbackApprovedAgentPlan,
+} from '../../../../src/utils/agentAtomicApproval.ts';
+import { agentChatTranscriptFixture } from '../../../../src/utils/agentChatTranscriptFixture.ts';
 
 const failures: string[] = [];
 const handoff = agentChatTranscriptFixture.reviewHandoff;
