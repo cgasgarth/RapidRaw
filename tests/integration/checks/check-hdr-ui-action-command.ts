@@ -8,12 +8,12 @@ import { buildHdrMergeUiDryRunCommandV1 } from '../../../packages/rawengine-sche
 import type { ImageFile } from '../../../src/components/ui/AppProperties.tsx';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../../src/schemas/hdrMergeUiSchemas.ts';
 import { createDefaultHdrModalState, type HdrModalState } from '../../../src/store/useUIStore.ts';
-import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
 import {
   buildHdrApplyCommandState,
   buildHdrDryRunActionState,
   resetHdrStateForSettingsChange,
-} from '../../../src/utils/computationalMergeModalState.ts';
+} from '../../../src/utils/computational-merge/computationalMergeModalState.ts';
 import { findHdrAutoStackPaths } from '../../../src/utils/hdrAutoStackSelection.ts';
 
 mock.module('react-i18next', () => ({

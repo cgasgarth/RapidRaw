@@ -180,7 +180,7 @@ import {
   rollbackAgentSessionHistory,
 } from './agentSessionHistory';
 import { AI_APP_SERVER_TOOL_ROUTES } from './aiAppServerToolRoutes';
-import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from './computationalMergeAppServerRoutes';
+import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from './computational-merge/computationalMergeAppServerRoutes';
 import { DETAIL_APP_SERVER_ROUTES } from './detailAppServerRoutes';
 import { FILM_LOOK_APP_SERVER_ROUTE_MANIFEST } from './filmLookAppServerRoutes';
 import {

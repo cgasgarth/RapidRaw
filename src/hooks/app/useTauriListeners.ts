@@ -24,7 +24,10 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import type { ThumbnailSmartPreviewState } from '../../store/useProcessStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useUIStore } from '../../store/useUIStore';
-import { buildHdrApplyCommandState, buildPanoramaApplyCommandState } from '../../utils/computationalMergeModalState';
+import {
+  buildHdrApplyCommandState,
+  buildPanoramaApplyCommandState,
+} from '../../utils/computational-merge/computationalMergeModalState';
 import {
   AI_MODEL_DOWNLOAD_FINISH_EVENT,
   AI_MODEL_DOWNLOAD_START_EVENT,

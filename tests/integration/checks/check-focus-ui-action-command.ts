@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 import { buildFocusStackUiDryRunCommandV1 } from '../../../packages/rawengine-schema/src/focus-stack/focusStackUiControls.ts';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../../src/schemas/focus-stack/focusStackUiSchemas.ts';
-import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
 
 const actionMetadataSchema = z
   .object({

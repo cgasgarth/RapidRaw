@@ -6,7 +6,7 @@ import {
   buildHdrMergeUiDryRunCommandV1,
 } from '../../../packages/rawengine-schema/src/hdrMergeUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
 
 const hdrRoutePair = getComputationalMergeAppServerRoutePairSummary('hdr');
 const WIDTH = 48;

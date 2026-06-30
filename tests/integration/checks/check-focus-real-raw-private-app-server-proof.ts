@@ -18,7 +18,7 @@ import {
   type ComputationalMergePrivateRunReportCollection,
   parseComputationalMergePrivateRunReportCollection,
 } from '../../../src/schemas/computationalMergePrivateRunReportSchemas.ts';
-import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computationalMergeAppServerRoutePairs.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
 
 const focusRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
 const ARTIFACT_ROOT = 'private-artifacts/validation/computational-merge';
