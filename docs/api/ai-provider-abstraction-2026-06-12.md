@@ -28,7 +28,7 @@ TypeScript code.
 ## Agent Runtime Split
 
 Issue #869 split the app-server runtime concept into
-`src/schemas/agentRuntimeSchemas.ts`.
+`src/schemas/agent/agentRuntimeSchemas.ts`.
 
 | Runtime ID   | Current meaning                        | Current UI exposure       |
 | ------------ | -------------------------------------- | ------------------------- |
@@ -45,7 +45,7 @@ providers.
   handlers.
 - `AIPanel` normalizes persisted settings before checking cloud or connector
   availability.
-- `agentRuntimeSchemas.ts` owns the app-server runtime ID separately from image
+- `agent/agentRuntimeSchemas.ts` owns the app-server runtime ID separately from image
   providers.
 - Existing settings persistence remains string-compatible so current sidecars
   and Rust settings do not need a migration in this PR.

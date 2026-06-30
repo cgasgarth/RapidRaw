@@ -19,7 +19,7 @@ import {
   toneColorDryRunResultV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { sampleRawEngineSceneColorPipelineV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { agentExpertEditDemoWorkflowSchema } from '../../../src/schemas/agentExpertEditDemoWorkflowSchemas.ts';
+import { agentExpertEditDemoWorkflowSchema } from '../../../src/schemas/agent/agentExpertEditDemoWorkflowSchemas.ts';
 
 const REPORT_PATH = 'docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.json';
 const HTML_PATH = 'docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html';

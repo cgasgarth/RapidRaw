@@ -17,7 +17,7 @@ import {
   RawEngineAppServerSupervisorEventKind,
   RawEngineAppServerSupervisorPhase,
   rawEngineAppServerSupervisorStateSchema,
-} from '../../../src/schemas/agentRuntimeSchemas.ts';
+} from '../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import {
   cancelRawEngineAppServerSupervisor,
   createRawEngineAppServerSupervisorState,

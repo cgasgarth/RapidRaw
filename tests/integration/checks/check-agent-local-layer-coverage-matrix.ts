@@ -2,7 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 
-import { RawEngineAppServerRouteMode } from '../../../src/schemas/agentRuntimeSchemas.ts';
+import { RawEngineAppServerRouteMode } from '../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { AGENT_LOCAL_LAYER_COVERAGE_MATRIX } from '../../../src/utils/agentLocalLayerCoverageMatrix.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../../../src/utils/rawEngineAppServerHost.ts';
 

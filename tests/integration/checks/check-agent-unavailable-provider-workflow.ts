@@ -8,7 +8,7 @@ import {
   sampleAiEnhancementApplyCommandEnvelopeV1,
   sampleAiEnhancementCommandEnvelopeV1,
 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { RawEngineAppServerResponseStatus } from '../../../src/schemas/agentRuntimeSchemas.ts';
+import { RawEngineAppServerResponseStatus } from '../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { buildRawEngineAppServerToolDispatchResponse } from '../../../src/utils/rawEngineAppServerHost.ts';
 
 const failures: string[] = [];

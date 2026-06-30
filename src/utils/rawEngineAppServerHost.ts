@@ -57,7 +57,7 @@ import {
   rawEngineAppServerStructuredErrorSchema,
   rawEngineAppServerSupervisorStateSchema,
   rawEngineAppServerToolDispatchResponseSchema,
-} from '../schemas/agentRuntimeSchemas';
+} from '../schemas/agent/agentRuntimeSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import {
   AGENT_ADJUSTMENTS_APPLY_INPUT_SCHEMA_NAME,

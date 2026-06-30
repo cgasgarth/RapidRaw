@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RawEngineAppServerHostToolName } from '../schemas/agentRuntimeSchemas';
+import { RawEngineAppServerHostToolName } from '../schemas/agent/agentRuntimeSchemas';
 import { handleRawEngineAppServerHostRequestAsync } from './rawEngineAppServerHost';
 
 const agentLiveToolDispatchResultSchema = z.looseObject({
