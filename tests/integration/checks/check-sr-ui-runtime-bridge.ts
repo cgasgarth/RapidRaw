@@ -1,15 +1,15 @@
 #!/usr/bin/env bun
 
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { SuperResolutionAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/superResolutionAppServerRuntime.ts';
+import { SuperResolutionAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/super-resolution/superResolutionAppServerRuntime.ts';
 import {
   calculateMeanAbsoluteErrorV1,
   createNearestNeighborBaselineV1,
-} from '../../../packages/rawengine-schema/src/superResolutionPixelShift.ts';
+} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionPixelShift.ts';
 import {
   buildSuperResolutionUiApplyCommandV1,
   buildSuperResolutionUiDryRunCommandV1,
-} from '../../../packages/rawengine-schema/src/superResolutionUiControls.ts';
+} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionUiControls.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
 import { buildSuperResolutionOutputReviewFromArtifact } from '../../../src/utils/superResolutionOutputReview.ts';
 

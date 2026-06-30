@@ -8,7 +8,7 @@ import {
   panoramaBoundaryModeSchema,
   panoramaProjectionSchema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from './rawEngineSchemas.js';
+} from '../rawEngineSchemas.js';
 
 const panoramaUiSourceV1Schema = z
   .object({

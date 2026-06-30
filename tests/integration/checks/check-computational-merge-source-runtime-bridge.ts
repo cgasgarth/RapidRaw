@@ -8,19 +8,19 @@ import {
   buildFocusStackUiApplyCommandV1,
   buildFocusStackUiDryRunCommandV1,
 } from '../../../packages/rawengine-schema/src/focus-stack/focusStackUiControls.ts';
-import { PanoramaAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/panoramaAppServerRuntime.ts';
-import type { PanoramaRuntimePlanRequestV1 } from '../../../packages/rawengine-schema/src/panoramaRuntimePlan.ts';
+import { PanoramaAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/panorama/panoramaAppServerRuntime.ts';
+import type { PanoramaRuntimePlanRequestV1 } from '../../../packages/rawengine-schema/src/panorama/panoramaRuntimePlan.ts';
 import {
   buildPanoramaUiApplyCommandV1,
   buildPanoramaUiDryRunCommandV1,
-} from '../../../packages/rawengine-schema/src/panoramaUiControls.ts';
+} from '../../../packages/rawengine-schema/src/panorama/panoramaUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { SuperResolutionAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/superResolutionAppServerRuntime.ts';
-import type { SuperResolutionRuntimePlanRequestV1 } from '../../../packages/rawengine-schema/src/superResolutionRuntimePlan.ts';
+import { SuperResolutionAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/super-resolution/superResolutionAppServerRuntime.ts';
+import type { SuperResolutionRuntimePlanRequestV1 } from '../../../packages/rawengine-schema/src/super-resolution/superResolutionRuntimePlan.ts';
 import {
   buildSuperResolutionUiApplyCommandV1,
   buildSuperResolutionUiDryRunCommandV1,
-} from '../../../packages/rawengine-schema/src/superResolutionUiControls.ts';
+} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionUiControls.ts';
 import { parseComputationalMergeE2eProofManifest } from '../../../src/schemas/computational-merge/computationalMergeE2eProofSchemas.ts';
 import type { ComputationalMergePrivateSourceSet } from '../../../src/schemas/computational-merge/computationalMergeSourceSetSchemas.ts';
 import { parsePrivateRawEvidenceLedger } from '../../../src/schemas/privateRawEvidenceSchemas.ts';

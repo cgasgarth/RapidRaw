@@ -1,10 +1,4 @@
 import { z } from 'zod';
-
-import {
-  detectHdrBracketV1,
-  hdrBracketDetectionOptionsV1Schema,
-  hdrBracketDetectionSourceInputV1Schema,
-} from './hdrBracketDetection.js';
 import {
   ApprovalClass,
   type ComputationalMergeCommandEnvelopeV1,
@@ -13,7 +7,12 @@ import {
   RAW_ENGINE_SCHEMA_VERSION,
   rawEngineActorSchema,
   rawEngineTargetSchema,
-} from './rawEngineSchemas.js';
+} from '../rawEngineSchemas.js';
+import {
+  detectHdrBracketV1,
+  hdrBracketDetectionOptionsV1Schema,
+  hdrBracketDetectionSourceInputV1Schema,
+} from './hdrBracketDetection.js';
 
 export const hdrMergeApiToolRequestV1Schema = z
   .object({

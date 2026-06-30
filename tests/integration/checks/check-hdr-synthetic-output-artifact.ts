@@ -9,7 +9,7 @@ import { z } from 'zod';
 import {
   measureHdrMergeWeightingV1,
   mergeExposureWeightedRadianceV1,
-} from '../../../packages/rawengine-schema/src/hdrMergeWeightingRuntime.ts';
+} from '../../../packages/rawengine-schema/src/hdr/hdrMergeWeightingRuntime.ts';
 
 const WIDTH = 96;
 const HEIGHT = 64;

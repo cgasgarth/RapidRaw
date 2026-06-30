@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 
-import { HdrAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/hdrAppServerRuntime.ts';
+import { HdrAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/hdr/hdrAppServerRuntime.ts';
 import {
   buildHdrMergeUiApplyCommandV1,
   buildHdrMergeUiDryRunCommandV1,
-} from '../../../packages/rawengine-schema/src/hdrMergeUiControls.ts';
+} from '../../../packages/rawengine-schema/src/hdr/hdrMergeUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
 

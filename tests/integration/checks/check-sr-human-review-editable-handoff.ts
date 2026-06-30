@@ -10,12 +10,12 @@ import {
 import {
   applySuperResolutionRuntimePlanV1,
   buildSuperResolutionRuntimeDryRunV1,
-} from '../../../packages/rawengine-schema/src/superResolutionRuntimePlan.ts';
+} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionRuntimePlan.ts';
 import {
   buildSuperResolutionArtifactSidecarRecordV1,
   markSuperResolutionArtifactHumanReviewPassed,
   markSuperResolutionArtifactStaleState,
-} from '../../../packages/rawengine-schema/src/superResolutionSidecarProvenance.ts';
+} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionSidecarProvenance.ts';
 import { buildSuperResolutionOutputReviewFromArtifact } from '../../../src/utils/superResolutionOutputReview.ts';
 
 const SCALE = 2;

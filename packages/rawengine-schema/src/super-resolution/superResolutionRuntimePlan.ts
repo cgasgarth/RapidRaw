@@ -4,7 +4,7 @@ import {
   buildComputationalMergeArtifactHandleV1,
   buildComputationalMergeDryRunResultV1,
   buildComputationalMergeMutationResultV1,
-} from './computationalMergeRuntimeResultBuilders.js';
+} from '../computational-merge/computationalMergeRuntimeResultBuilders.js';
 import {
   type ArtifactHandleV1,
   type ComputationalMergeCommandEnvelopeV1,
@@ -12,7 +12,7 @@ import {
   type ComputationalMergeMutationResultV1,
   computationalMergeCommandEnvelopeV1Schema,
   type SuperResolutionArtifactV1,
-} from './rawEngineSchemas.js';
+} from '../rawEngineSchemas.js';
 import {
   assertSuperResolutionAlignmentDiagnosticsRenderableV1,
   buildSuperResolutionAlignmentDiagnosticsV1,
@@ -170,7 +170,7 @@ export const buildSuperResolutionRuntimeDryRunV1 = (requestValue: unknown): Supe
       },
       outputName: request.command.parameters.outputName,
       performanceEstimate: {
-        estimatedPeakMemoryBytes: runtime.width * runtime.height * request.frames.length * 4,
+        estimatedPeakMemoryBytes: runtime.width * runtime.height * request['frames'].length * 4,
         estimatedRuntimeMs: 1,
         requiresBackgroundJob: false,
       },
@@ -178,7 +178,7 @@ export const buildSuperResolutionRuntimeDryRunV1 = (requestValue: unknown): Supe
       preflight: buildSrPreflightEstimate(request, runtime.width, runtime.height),
       qualityMetrics: {
         expectedDetailGainRatio: runtime.provenance.effectiveOutputScale,
-        sourceCount: request.frames.length,
+        sourceCount: request['frames'].length,
       },
       sourceImageRefs: request.command.parameters.sources,
       warnings: runtime.warnings,
@@ -280,7 +280,7 @@ const parseSuperResolutionRuntimePlanRequest = (
     throw new Error('Super-resolution runtime pixel-shift apply requires an integer output scale.');
   }
 
-  const frameIndexes = new Set(request.frames.map((frame) => frame.sourceIndex));
+  const frameIndexes = new Set(request['frames'].map((frame) => frame.sourceIndex));
   for (const source of request.command.parameters.sources) {
     if (!frameIndexes.has(source.sourceIndex)) {
       throw new Error(`Super-resolution runtime plan missing frame for command source ${source.sourceIndex}.`);
@@ -291,19 +291,19 @@ const parseSuperResolutionRuntimePlanRequest = (
 };
 
 const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanRequestV1) => {
-  const firstFrame = request.frames[0];
+  const firstFrame = request['frames'][0];
   if (firstFrame === undefined) {
     throw new Error('Super-resolution runtime requires at least one frame.');
   }
-  const scale = getEffectiveRuntimeScale(request.command.parameters.outputScale, request.frames.length);
-  const alignmentDiagnostics = buildSuperResolutionAlignmentDiagnosticsV1(request.frames, scale);
+  const scale = getEffectiveRuntimeScale(request.command.parameters.outputScale, request['frames'].length);
+  const alignmentDiagnostics = buildSuperResolutionAlignmentDiagnosticsV1(request['frames'], scale);
   const renderable = isSuperResolutionAlignmentRenderable(alignmentDiagnostics);
   if (!renderable && request.command.dryRun) {
     return renderDegradedSuperResolutionDryRun(request, alignmentDiagnostics, firstFrame, scale);
   }
   assertSuperResolutionAlignmentDiagnosticsRenderableV1(alignmentDiagnostics);
   const result = applyPixelShiftSuperResolutionV1({
-    frames: request.frames.map((frame) => ({
+    frames: request['frames'].map((frame) => ({
       pixels: frame.pixels,
       shiftX: frame.shiftX,
       shiftY: frame.shiftY,
@@ -314,7 +314,7 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
   });
   const warnings = deriveSrWarnings(result.changedPixelRatioAgainstNearest, request.command.parameters.detailPolicy);
   const confidenceMap = buildSrConfidenceMap(
-    request.frames,
+    request['frames'],
     result.outputWidth,
     result.outputHeight,
     result.outputScale,
@@ -329,7 +329,7 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
       confidenceMap,
       detailPolicy: request.command.parameters.detailPolicy,
       detailQuality: buildSrDetailQuality(
-        request.frames,
+        request['frames'],
         result.outputWidth,
         result.outputHeight,
         result.changedPixelRatioAgainstNearest,
@@ -337,7 +337,7 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
       effectiveOutputScale: result.outputScale,
       engineId: SR_RUNTIME_ENGINE_ID,
       engineVersion: SR_RUNTIME_ENGINE_VERSION,
-      frameRegistrations: request.frames.map((frame) => ({
+      frameRegistrations: request['frames'].map((frame) => ({
         confidence: alignmentDiagnostics.confidence,
         shiftX: frame.shiftX,
         shiftY: frame.shiftY,
@@ -350,7 +350,7 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
       reconstructionDiagnostics: result.reconstructionDiagnostics,
       resolvedAlignmentMode: request.command.parameters.alignmentMode,
       runtimeStatus: 'dry_run_rendered',
-      sourceState: request.frames.map((frame) => ({
+      sourceState: request['frames'].map((frame) => ({
         contentHash: frame.contentHash,
         graphRevision: frame.graphRevision,
         sourceIndex: frame.sourceIndex,
@@ -377,8 +377,8 @@ const renderDegradedSuperResolutionDryRun = (
   const outputWidth = firstFrame.width * scale;
   const outputHeight = firstFrame.height * scale;
   const outputPixels = createNearestNeighborBaselineV1(firstFrame.pixels, firstFrame.width, firstFrame.height, scale);
-  const confidenceMap = buildSrConfidenceMap(request.frames, outputWidth, outputHeight, scale);
-  const sampleCounts = buildSrSampleCounts(request.frames, outputWidth, outputHeight, scale);
+  const confidenceMap = buildSrConfidenceMap(request['frames'], outputWidth, outputHeight, scale);
+  const sampleCounts = buildSrSampleCounts(request['frames'], outputWidth, outputHeight, scale);
   const reconstructionDiagnostics = buildSuperResolutionReconstructionDiagnosticsV1({
     outputPixelCount: outputWidth * outputHeight,
     outputPixels,
@@ -395,11 +395,11 @@ const renderDegradedSuperResolutionDryRun = (
       changedPixelRatioAgainstNearest: 0,
       confidenceMap,
       detailPolicy: request.command.parameters.detailPolicy,
-      detailQuality: buildSrDetailQuality(request.frames, outputWidth, outputHeight, 0),
+      detailQuality: buildSrDetailQuality(request['frames'], outputWidth, outputHeight, 0),
       effectiveOutputScale: scale,
       engineId: SR_RUNTIME_ENGINE_ID,
       engineVersion: SR_RUNTIME_ENGINE_VERSION,
-      frameRegistrations: request.frames.map((frame) => ({
+      frameRegistrations: request['frames'].map((frame) => ({
         confidence: alignmentDiagnostics.confidence,
         shiftX: frame.shiftX,
         shiftY: frame.shiftY,
@@ -412,7 +412,7 @@ const renderDegradedSuperResolutionDryRun = (
       reconstructionDiagnostics,
       resolvedAlignmentMode: request.command.parameters.alignmentMode,
       runtimeStatus: 'dry_run_rendered',
-      sourceState: request.frames.map((frame) => ({
+      sourceState: request['frames'].map((frame) => ({
         contentHash: frame.contentHash,
         graphRevision: frame.graphRevision,
         sourceIndex: frame.sourceIndex,
@@ -497,7 +497,9 @@ const buildSrPreflightEstimate = (
   width: number,
   height: number,
 ) => {
-  const sourcePixelCount = request.frames.reduce((total, frame) => total + frame.width * frame.height, 0);
+  const sourcePixelCount = request['frames'].reduce((total: number, frame: SuperResolutionRuntimeFrameV1) => {
+    return total + frame.width * frame.height;
+  }, 0);
   const outputPixelCount = width * height;
   const sourceDecodeBytes = sourcePixelCount * 4;
   const outputCanvasBytes = outputPixelCount * 4;
@@ -530,7 +532,7 @@ const buildSrPreflightEstimate = (
         x: 0,
         y: 0,
       },
-      sourceCount: request.frames.length,
+      sourceCount: request['frames'].length,
       sourcePixelCount,
     },
     memoryBudgetBytes,

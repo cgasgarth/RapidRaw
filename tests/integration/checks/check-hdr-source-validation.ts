@@ -5,7 +5,7 @@ import {
   type HdrBracketDetectionOptionsV1,
   type HdrBracketDetectionSourceInputV1,
   hdrBracketDetectionRequestV1Schema,
-} from '../../../packages/rawengine-schema/src/hdrBracketDetection.ts';
+} from '../../../packages/rawengine-schema/src/hdr/hdrBracketDetection.ts';
 import type {
   HdrBracketDetectionResultV1,
   HdrMergeBlockCodeV1,

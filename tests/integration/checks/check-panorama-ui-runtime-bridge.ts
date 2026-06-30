@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 
-import { PanoramaAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/panoramaAppServerRuntime.ts';
+import { PanoramaAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/panorama/panoramaAppServerRuntime.ts';
 import {
   buildPanoramaUiApplyCommandV1,
   buildPanoramaUiDryRunCommandV1,
-} from '../../../packages/rawengine-schema/src/panoramaUiControls.ts';
+} from '../../../packages/rawengine-schema/src/panorama/panoramaUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../scripts/lib/computational/proof-budgets.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';

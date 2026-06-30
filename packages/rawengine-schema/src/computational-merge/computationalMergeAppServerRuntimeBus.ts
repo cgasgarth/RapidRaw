@@ -4,7 +4,7 @@ import {
   type ComputationalMergeCommandEnvelopeV1,
   computationalMergeAppServerToolManifestV1Schema,
   computationalMergeCommandEnvelopeV1Schema,
-} from './rawEngineSchemas.js';
+} from '../rawEngineSchemas.js';
 
 export interface ComputationalMergeRuntimeRequestEnvelopeV1<TToolName extends string, TRequest> {
   request: TRequest;

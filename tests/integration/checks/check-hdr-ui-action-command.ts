@@ -4,7 +4,7 @@ import { mock } from 'bun:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { buildHdrMergeUiDryRunCommandV1 } from '../../../packages/rawengine-schema/src/hdrMergeUiControls.ts';
+import { buildHdrMergeUiDryRunCommandV1 } from '../../../packages/rawengine-schema/src/hdr/hdrMergeUiControls.ts';
 import type { ImageFile } from '../../../src/components/ui/AppProperties.tsx';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../../src/schemas/computational-merge/hdrMergeUiSchemas.ts';
 import { createDefaultHdrModalState, type HdrModalState } from '../../../src/store/useUIStore.ts';

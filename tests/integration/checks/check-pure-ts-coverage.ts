@@ -69,7 +69,7 @@ const coverageContracts = [
     owner: 'library auto-stack and HDR bracket preflight',
     behaviorArea: 'auto-stack grouping and HDR bracket detection behavior',
     sourceFiles: [
-      'packages/rawengine-schema/src/hdrBracketDetection.ts',
+      'packages/rawengine-schema/src/hdr/hdrBracketDetection.ts',
       'src/utils/hdrBracketPreflight.ts',
       'src/utils/libraryAutoStacks.ts',
     ],

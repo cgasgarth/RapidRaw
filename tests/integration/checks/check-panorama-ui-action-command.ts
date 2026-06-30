@@ -4,7 +4,7 @@ import { mock } from 'bun:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { buildPanoramaUiDryRunCommandV1 } from '../../../packages/rawengine-schema/src/panoramaUiControls.ts';
+import { buildPanoramaUiDryRunCommandV1 } from '../../../packages/rawengine-schema/src/panorama/panoramaUiControls.ts';
 import { DEFAULT_PANORAMA_UI_SETTINGS } from '../../../src/schemas/computational-merge/panoramaUiSchemas.ts';
 import { createDefaultPanoramaModalState, type PanoramaModalState } from '../../../src/store/useUIStore.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';

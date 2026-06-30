@@ -3,7 +3,7 @@ import { z } from 'zod';
 import {
   computationalMergePreflightWarningCodes,
   uniqueComputationalMergePreflightWarningCodes,
-} from '../computationalMergeWarningCodes.js';
+} from '../computational-merge/computationalMergeWarningCodes.js';
 import {
   type ComputationalMergeDryRunResultV1,
   type ComputationalMergeMemoryComponentsV1,

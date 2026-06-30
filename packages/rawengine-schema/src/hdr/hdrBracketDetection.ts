@@ -7,7 +7,7 @@ import {
   type HdrMergeBlockCodeV1,
   type HdrMergeWarningCodeV1,
   hdrBracketDetectionResultV1Schema,
-} from './rawEngineSchemas.js';
+} from '../rawEngineSchemas.js';
 
 export const hdrBracketDetectionSourceInputV1Schema = z
   .object({

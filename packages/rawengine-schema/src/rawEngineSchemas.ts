@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { createAppServerCommandSchemasV1 } from './appServerCommandSchemas.js';
 import { artifactHandleV1Schema } from './artifactSchemas.js';
-import { panoramaHomographyDltDiagnosticsV1Schema } from './panoramaHomographyDiagnostics.js';
+import { panoramaHomographyDltDiagnosticsV1Schema } from './panorama/panoramaHomographyDiagnostics.js';
 import { createToneColorSchemasV1 } from './toneColorSchemas.js';
 
 export type { ArtifactHandleV1 } from './artifactSchemas.js';

@@ -9,7 +9,7 @@ import { z } from 'zod';
 import {
   encodeSyntheticPanoramaPpmV1,
   renderSyntheticPanoramaStitchV1,
-} from '../../../packages/rawengine-schema/src/panoramaSyntheticStitch.ts';
+} from '../../../packages/rawengine-schema/src/panorama/panoramaSyntheticStitch.ts';
 
 const FixtureStatusSchema = z.enum(['active_metadata_only', 'active_generated_asset', 'planned']);
 const WarningCodeSchema = z.enum([

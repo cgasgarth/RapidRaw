@@ -7,7 +7,7 @@ import {
   computationalMergeDryRunResultV1Schema,
   computationalMergeMutationResultV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from './rawEngineSchemas.js';
+} from '../rawEngineSchemas.js';
 
 export interface ComputationalMergeArtifactHandleInputV1 {
   artifactId: string;

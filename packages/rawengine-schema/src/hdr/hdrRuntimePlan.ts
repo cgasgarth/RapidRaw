@@ -1,14 +1,4 @@
 import { z } from 'zod';
-
-import { estimateHdrAlignmentTransformsV1 } from './hdrAlignmentRuntime.js';
-import { detectHdrBracketV1, type HdrBracketDetectionSourceInputV1 } from './hdrBracketDetection.js';
-import {
-  buildHdrDeghostConfidenceMapV1,
-  countHdrMotionPixelsV1,
-  detectHdrMotionMaskV1,
-  summarizeHdrDeghostConfidenceMapV1,
-} from './hdrDeghostRuntime.js';
-import { mergeExposureWeightedRadianceV1 } from './hdrMergeWeightingRuntime.js';
 import {
   type ArtifactHandleV1,
   artifactHandleV1Schema,
@@ -22,7 +12,16 @@ import {
   type HdrMergeArtifactV1,
   hdrMergeArtifactV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from './rawEngineSchemas.js';
+} from '../rawEngineSchemas.js';
+import { estimateHdrAlignmentTransformsV1 } from './hdrAlignmentRuntime.js';
+import { detectHdrBracketV1, type HdrBracketDetectionSourceInputV1 } from './hdrBracketDetection.js';
+import {
+  buildHdrDeghostConfidenceMapV1,
+  countHdrMotionPixelsV1,
+  detectHdrMotionMaskV1,
+  summarizeHdrDeghostConfidenceMapV1,
+} from './hdrDeghostRuntime.js';
+import { mergeExposureWeightedRadianceV1 } from './hdrMergeWeightingRuntime.js';
 
 const HDR_RUNTIME_ENGINE_ID = 'rawengine_hdr_runtime_v1';
 const HDR_RUNTIME_ENGINE_VERSION = '0.1.0';

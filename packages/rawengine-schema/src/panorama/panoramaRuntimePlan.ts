@@ -1,11 +1,4 @@
 import { z } from 'zod';
-
-import {
-  buildPanoramaHomographyDltDiagnosticsV1,
-  type PanoramaHomographyPointPairV1,
-  panoramaHomographyDltDiagnosticsV1Schema,
-} from './panoramaHomographyDiagnostics.js';
-import { type PanoramaSyntheticSourceFrameV1, renderSyntheticPanoramaStitchV1 } from './panoramaSyntheticStitch.js';
 import {
   artifactHandleV1Schema,
   type ComputationalMergeCommandEnvelopeV1,
@@ -17,7 +10,13 @@ import {
   type PanoramaArtifactV1,
   panoramaArtifactV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-} from './rawEngineSchemas.js';
+} from '../rawEngineSchemas.js';
+import {
+  buildPanoramaHomographyDltDiagnosticsV1,
+  type PanoramaHomographyPointPairV1,
+  panoramaHomographyDltDiagnosticsV1Schema,
+} from './panoramaHomographyDiagnostics.js';
+import { type PanoramaSyntheticSourceFrameV1, renderSyntheticPanoramaStitchV1 } from './panoramaSyntheticStitch.js';
 
 const PANORAMA_RUNTIME_ENGINE_ID = 'rawengine_panorama_synthetic_v1';
 const PANORAMA_RUNTIME_ENGINE_VERSION = '0.1.0';

@@ -4,7 +4,7 @@ import {
   buildComputationalMergeArtifactHandleV1,
   buildComputationalMergeDryRunResultV1,
   buildComputationalMergeMutationResultV1,
-} from '../computationalMergeRuntimeResultBuilders.js';
+} from '../computational-merge/computationalMergeRuntimeResultBuilders.js';
 import {
   type ArtifactHandleV1,
   type ComputationalMergeCommandEnvelopeV1,

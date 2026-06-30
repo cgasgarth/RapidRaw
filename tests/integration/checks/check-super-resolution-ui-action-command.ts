@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { buildSuperResolutionUiDryRunCommandV1 } from '../../../packages/rawengine-schema/src/superResolutionUiControls.ts';
+import { buildSuperResolutionUiDryRunCommandV1 } from '../../../packages/rawengine-schema/src/super-resolution/superResolutionUiControls.ts';
 import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../../../src/schemas/computational-merge/superResolutionUiSchemas.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
 

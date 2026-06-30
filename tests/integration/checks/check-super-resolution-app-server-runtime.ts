@@ -3,11 +3,11 @@
 import { z } from 'zod';
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
-import { SuperResolutionAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/superResolutionAppServerRuntime.ts';
+import { SuperResolutionAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/super-resolution/superResolutionAppServerRuntime.ts';
 import {
   calculateMeanAbsoluteErrorV1,
   createNearestNeighborBaselineV1,
-} from '../../../packages/rawengine-schema/src/superResolutionPixelShift.ts';
+} from '../../../packages/rawengine-schema/src/super-resolution/superResolutionPixelShift.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
 
 const superResolutionRoutePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');

@@ -1,4 +1,4 @@
-import { buildHdrMergeApiCommandV1 } from '../src/hdrMergeApiTools.js';
+import { buildHdrMergeApiCommandV1 } from '../src/hdr/hdrMergeApiTools.js';
 import { ApprovalClass } from '../src/rawEngineSchemas.js';
 
 const baseRequest = {

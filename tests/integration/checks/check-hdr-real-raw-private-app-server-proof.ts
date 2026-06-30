@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { HdrAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/hdrAppServerRuntime.ts';
+import { HdrAppServerRuntimeToolBusV1 } from '../../../packages/rawengine-schema/src/hdr/hdrAppServerRuntime.ts';
 import {
   ActorKind,
   ApprovalClass,
