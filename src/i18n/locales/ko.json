@@ -286,6 +286,15 @@
         "pasteSettings": "설정 붙여넣기",
         "resetSectionSettings": "{{section}} 설정 초기화"
       },
+      "rawReconstructionComparison": {
+        "action": "Compare 100% crops",
+        "cropAlt": "{{mode}} 100% RAW reconstruction crop",
+        "cropSizeLabel": "{{size}}px",
+        "decodeMsLabel": "{{ms}}ms",
+        "error": "Failed to compare RAW reconstruction modes: {{error}}",
+        "running": "Comparing crops...",
+        "title": "100% RAW crop comparison"
+      },
       "sections": {
         "basic": "기본",
         "color": "색상",
@@ -298,15 +307,6 @@
         "autoAdjust": "이미지 자동 조정",
         "resetAdjustments": "조정값 초기화",
         "toggleAnalytics": "분석 표시 전환"
-      },
-      "rawReconstructionComparison": {
-        "action": "Compare 100% crops",
-        "cropAlt": "{{mode}} 100% RAW reconstruction crop",
-        "error": "Failed to compare RAW reconstruction modes: {{error}}",
-        "running": "Comparing crops...",
-        "title": "100% RAW crop comparison",
-        "cropSizeLabel": "{{size}}px",
-        "decodeMsLabel": "{{ms}}ms"
       }
     },
     "ai": {
@@ -333,6 +333,17 @@
         "switchToSubtract": "빼기 모드로 전환"
       },
       "addNewEdit": "새 편집 추가",
+      "agent": {
+        "selectedImageLoop": {
+          "audit": "Audit summary",
+          "before": "Before",
+          "changedPixels": "Changed pixels",
+          "current": "Current",
+          "graphRevision": "Graph revision",
+          "recipeHash": "Recipe hash",
+          "rollback": "Rollback receipt"
+        }
+      },
       "brush": {
         "add": "추가",
         "erase": "지우기",
@@ -395,17 +406,6 @@
         "quickEraseDesc": "선택 영역을 채워 객체를 제거합니다.",
         "selectionPropertiesTitle": "선택 영역 속성",
         "useBasicInpaint": "기본 인페인팅 사용"
-      },
-      "agent": {
-        "selectedImageLoop": {
-          "audit": "Audit summary",
-          "before": "Before",
-          "changedPixels": "Changed pixels",
-          "current": "Current",
-          "graphRevision": "Graph revision",
-          "recipeHash": "Recipe hash",
-          "rollback": "Rollback receipt"
-        }
       }
     },
     "crop": {
@@ -840,6 +840,11 @@
         "name": "이름 (가나다순)"
       }
     },
+    "empty": {
+      "rawOnlyDescription": "",
+      "rawOnlyReset": "",
+      "rawOnlyTitle": ""
+    },
     "filters": {
       "edited": {
         "all": "모든 이미지",
@@ -1187,6 +1192,26 @@
       "titleBatch": "이미지 노이즈 제거",
       "titleSingle": "이미지 노이즈 제거"
     },
+    "derivedOutput": {
+      "staleReason": {
+        "accepted_dry_run_plan_changed": "accepted dry-run plan changed",
+        "output_artifact_changed": "output hash changed",
+        "recipe_hash_changed": "recipe hash changed",
+        "settings_hash_changed": "settings changed",
+        "source_content_hash_changed": "source hash changed",
+        "source_graph_revision_changed": "source graph revision changed",
+        "source_order_changed": "source order changed",
+        "source_set_changed": "source set changed"
+      },
+      "staleWarning": "This existing derived output is stale: {{reasons}}. Regenerate before using it as current output.",
+      "staleWarningTitle": "Stale output",
+      "status": "Status",
+      "statusValue": {
+        "current": "Current",
+        "stale": "Stale",
+        "unknown": "Unknown"
+      }
+    },
     "hdr": {
       "cancel": "취소",
       "close": "닫기",
@@ -1274,20 +1299,20 @@
       "restoreRollNormalizationPlan": "Restore roll normalization",
       "rollNormalizationRestoreReceipt": "Restored {{frameCount}} frames from {{planId}} · revision {{revision}}",
       "title": "네거티브 변환",
-      "zoomInTooltip": "확대",
-      "zoomOutTooltip": "축소",
-      "v2QcReadouts": "",
-      "v2AlgorithmEnabled": "",
       "v2AlgorithmDisabled": "",
-      "v2CrosstalkStatus": "",
+      "v2AlgorithmEnabled": "",
       "v2AutoSuggestionStatus": "",
-      "v2DensityRangeStatus": "",
-      "v2PreviewExportReady": "",
-      "v2PreviewExportBlocked": "",
       "v2ContrastGrade": "",
-      "v2ToeStrength": "",
+      "v2CrosstalkStatus": "",
+      "v2DensityOffset": "",
+      "v2DensityRangeStatus": "",
+      "v2PreviewExportBlocked": "",
+      "v2PreviewExportReady": "",
+      "v2QcReadouts": "",
       "v2ShoulderStrength": "",
-      "v2DensityOffset": ""
+      "v2ToeStrength": "",
+      "zoomInTooltip": "확대",
+      "zoomOutTooltip": "축소"
     },
     "panorama": {
       "cancel": "취소",
@@ -1353,26 +1378,6 @@
       "yAxis": "Y축",
       "zoomInTooltip": "확대",
       "zoomOutTooltip": "축소"
-    },
-    "derivedOutput": {
-      "status": "Status",
-      "statusValue": {
-        "current": "Current",
-        "stale": "Stale",
-        "unknown": "Unknown"
-      },
-      "staleReason": {
-        "accepted_dry_run_plan_changed": "accepted dry-run plan changed",
-        "output_artifact_changed": "output hash changed",
-        "recipe_hash_changed": "recipe hash changed",
-        "settings_hash_changed": "settings changed",
-        "source_content_hash_changed": "source hash changed",
-        "source_graph_revision_changed": "source graph revision changed",
-        "source_order_changed": "source order changed",
-        "source_set_changed": "source set changed"
-      },
-      "staleWarning": "This existing derived output is stale: {{reasons}}. Regenerate before using it as current output.",
-      "staleWarningTitle": "Stale output"
     }
   },
   "settings": {

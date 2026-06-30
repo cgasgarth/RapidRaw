@@ -1781,6 +1781,11 @@
         "name": "Name (A-Z)"
       }
     },
+    "empty": {
+      "rawOnlyDescription": "RAW-only is hiding the JPEGs and other files in this folder.",
+      "rawOnlyReset": "Show all files",
+      "rawOnlyTitle": "No RAW files here"
+    },
     "filters": {
       "edited": {
         "all": "All Images",

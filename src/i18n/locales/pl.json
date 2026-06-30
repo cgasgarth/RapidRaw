@@ -1863,6 +1863,11 @@
         "name": "Nazwa (A-Z)"
       }
     },
+    "empty": {
+      "rawOnlyDescription": "",
+      "rawOnlyReset": "",
+      "rawOnlyTitle": ""
+    },
     "filters": {
       "edited": {
         "all": "Wszystkie obrazy",

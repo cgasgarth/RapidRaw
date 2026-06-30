@@ -1747,6 +1747,11 @@
         "name": "Nome (A-Z)"
       }
     },
+    "empty": {
+      "rawOnlyDescription": "",
+      "rawOnlyReset": "",
+      "rawOnlyTitle": ""
+    },
     "filters": {
       "edited": {
         "all": "Todas as Imagens",

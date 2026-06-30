@@ -1672,6 +1672,11 @@
         "name": "名前 (A-Z)"
       }
     },
+    "empty": {
+      "rawOnlyDescription": "",
+      "rawOnlyReset": "",
+      "rawOnlyTitle": ""
+    },
     "filters": {
       "edited": {
         "all": "すべての画像",

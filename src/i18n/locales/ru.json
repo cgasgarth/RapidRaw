@@ -1796,6 +1796,11 @@
         "name": "Имя (А-Я)"
       }
     },
+    "empty": {
+      "rawOnlyDescription": "",
+      "rawOnlyReset": "",
+      "rawOnlyTitle": ""
+    },
     "filters": {
       "edited": {
         "all": "Все изображения",
