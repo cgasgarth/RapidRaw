@@ -20,7 +20,7 @@ import {
   NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME,
   NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME,
   resetNegativeLabAgentAppServerToolDispatchForTests,
-} from '../../../../src/utils/negativeLabAgentAppServerToolDispatch.ts';
+} from '../../../../src/utils/negative-lab/app-server/negativeLabAgentAppServerToolDispatch.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   handleRawEngineAppServerHostRequestAsync,

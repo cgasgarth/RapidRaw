@@ -21,7 +21,7 @@ import {
   BRUSH_MASK_COMMAND_COORDINATE_SPACE,
   buildBrushMaskCommandFromParameters,
 } from '../../src/utils/brushMaskCommandBridge.ts';
-import { NegativeLabAppServerCommandName } from '../../src/utils/negativeLabAppServerCommandNames.ts';
+import { NegativeLabAppServerCommandName } from '../../src/utils/negative-lab/app-server/negativeLabAppServerCommandNames.ts';
 import {
   VISUAL_SMOKE_PROOF_TEST_IDS,
   VISUAL_SMOKE_SCENARIO_IDS,

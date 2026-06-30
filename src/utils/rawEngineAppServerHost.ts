@@ -187,7 +187,7 @@ import {
   dispatchNegativeLabAgentAppServerTool,
   NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME,
   NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME,
-} from './negativeLabAgentAppServerToolDispatch';
+} from './negative-lab/app-server/negativeLabAgentAppServerToolDispatch';
 import {
   buildNegativeLabAgentQcProofReadOnly,
   inspectNegativeLabAgentReadOnly,
@@ -205,8 +205,8 @@ import {
   planNegativeLabAgentConversionReadOnly,
   planNegativeLabAgentRollNormalizationReadOnly,
   planNegativeLabAgentStockFamilyReadOnly,
-} from './negativeLabAgentReadOnlyAppServerTools';
-import { NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST } from './negativeLabAppServerRoutes';
+} from './negative-lab/app-server/negativeLabAgentReadOnlyAppServerTools';
+import { NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST } from './negative-lab/app-server/negativeLabAppServerRoutes';
 import { ToneColorAppServerRouteStatus } from './toneColorAppServerRouteIds';
 import { TONE_COLOR_APP_SERVER_ROUTES } from './toneColorAppServerRoutes';
 
