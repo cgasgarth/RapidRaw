@@ -183,7 +183,7 @@ physical sidecar with `get_primary_sidecar_path`
 ## XMP Sync
 
 XMP sync is enabled by default in app settings, while creating missing XMP files
-is disabled by default (`src-tauri/src/app_settings.rs:470`). The two settings
+is disabled by default (`src-tauri/src/app/settings.rs:470`). The two settings
 are `enable_xmp_sync` and `create_xmp_if_missing`.
 
 When enabled, reads can import data from a sibling `.xmp` or `.XMP` file:

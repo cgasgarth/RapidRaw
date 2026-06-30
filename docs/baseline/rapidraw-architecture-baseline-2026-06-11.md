@@ -113,8 +113,8 @@ Important Rust modules and current responsibilities:
 
 | Module                                      | Current responsibility                                                                                                                           |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `app_state.rs`                              | Shared backend state: loaded image, caches, GPU state, AI state, worker senders, task handles, and results.                                      |
-| `app_settings.rs`                           | Settings schema/defaults, copy/paste adjustment keys, settings load/save under Tauri app data.                                                   |
+| `app/state.rs`                              | Shared backend state: loaded image, caches, GPU state, AI state, worker senders, task handles, and results.                                      |
+| `app/settings.rs`                           | Settings schema/defaults, copy/paste adjustment keys, settings load/save under Tauri app data.                                                   |
 | `file_management.rs`                        | Folder scans, image listing, thumbnails, sidecar metadata writes, ratings/color labels/tags, albums, file ops, import, virtual copies, XMP sync. |
 | `image_loader.rs`                           | Load source images, decode RAW/non-RAW images, apply orientation, composite AI patches, and populate decoded-image cache.                        |
 | `raw_processing.rs`                         | RAW development through `rawler` and fast demosaic scaling helpers.                                                                              |
@@ -354,7 +354,7 @@ sed -n '1,260p' src/hooks/useTauriListeners.ts
 sed -n '1,260p' src/hooks/useImageLoader.ts
 sed -n '1,540p' src/hooks/useImageProcessing.ts
 sed -n '1,260p' src/hooks/useAiMasking.ts
-sed -n '1,260p' src-tauri/src/app_state.rs
+sed -n '1,260p' src-tauri/src/app/state.rs
 sed -n '1800,2335p' src-tauri/src/lib.rs
 sed -n '1,260p' src-tauri/src/library/file_management.rs
 sed -n '1060,1205p' src-tauri/src/exif_processing.rs

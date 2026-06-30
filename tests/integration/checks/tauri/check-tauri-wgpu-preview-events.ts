@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 
-const rustEvents = readFileSync('src-tauri/src/events.rs', 'utf8');
+const rustEvents = readFileSync('src-tauri/src/app/events.rs', 'utf8');
 const rustLib = readFileSync('src-tauri/src/lib.rs', 'utf8');
+const rustPreviewWorker = readFileSync('src-tauri/src/render/preview_worker.rs', 'utf8');
 const tsEvents = readFileSync('src/utils/tauriEventNames.ts', 'utf8');
 const tsListeners = readFileSync('src/hooks/app/useTauriListeners.ts', 'utf8');
 
@@ -23,11 +24,11 @@ for (const marker of [
   }
 }
 
-if (rustLib.includes('emit(\n                "wgpu-frame-ready"')) {
+if (rustLib.includes('"wgpu-frame-ready"') || rustPreviewWorker.includes('"wgpu-frame-ready"')) {
   throw new Error('WGPU frame-ready emit must use crate::events::WGPU_FRAME_READY.');
 }
 
-if (!rustLib.includes('app_handle.emit(\n                crate::events::WGPU_FRAME_READY,')) {
+if (!rustPreviewWorker.includes('crate::events::WGPU_FRAME_READY')) {
   throw new Error('WGPU frame-ready emit is not using the Rust event constant.');
 }
 
