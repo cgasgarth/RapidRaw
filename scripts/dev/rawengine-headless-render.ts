@@ -8,7 +8,7 @@ import {
   type HeadlessRenderPixel,
   headlessRenderArtifactSchema,
   headlessRenderRequestSchema,
-} from '../../src/schemas/headlessRenderCommandSchemas.ts';
+} from '../../src/schemas/export/headlessRenderCommandSchemas.ts';
 
 const requestPath = valueAfter('--request');
 const outputPathOverride = valueAfter('--output');

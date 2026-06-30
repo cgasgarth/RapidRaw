@@ -9,7 +9,7 @@ import {
 import { sampleToneColorCommandEnvelopeV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { colorRuntimeProofFixtureSchema } from '../../../scripts/lib/proofs/color-runtime-proof.ts';
 import { curvesLevelsRuntimeProofFixtureSchema } from '../../../scripts/lib/proofs/curves-levels-runtime-proof.ts';
-import { headlessRenderRequestSchema } from '../../../src/schemas/headlessRenderCommandSchemas.ts';
+import { headlessRenderRequestSchema } from '../../../src/schemas/export/headlessRenderCommandSchemas.ts';
 import { rawOpenEditExportProofRequestSchema } from '../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
 
 const failures: string[] = [];

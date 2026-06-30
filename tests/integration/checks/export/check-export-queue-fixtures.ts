@@ -6,7 +6,7 @@ import {
   buildExportQueueExecutionPlan,
   exportQueueSchema,
   parseExportQueue,
-} from '../../../../src/schemas/exportQueueSchemas.ts';
+} from '../../../../src/schemas/export/exportQueueSchemas.ts';
 
 const validQueuePath = 'fixtures/export/export-queue.json';
 const invalidCasesPath = 'fixtures/export/invalid-export-queue-cases.json';

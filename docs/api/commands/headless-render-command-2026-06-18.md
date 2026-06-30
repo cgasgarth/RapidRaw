@@ -6,7 +6,7 @@ Issue: #81
 
 Inputs:
 
-- `HeadlessRenderRequest` in `src/schemas/headlessRenderCommandSchemas.ts`.
+- `HeadlessRenderRequest` in `src/schemas/export/headlessRenderCommandSchemas.ts`.
 - Current public fixture: `fixtures/validation/render-requests/headless-render-command-request.json`.
 
 Outputs:

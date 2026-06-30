@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { headlessRenderArtifactSchema } from '../../../src/schemas/headlessRenderCommandSchemas.ts';
+import { headlessRenderArtifactSchema } from '../../../src/schemas/export/headlessRenderCommandSchemas.ts';
 
 const tempDir = await mkdtemp(join(tmpdir(), 'rawengine-headless-render-'));
 const outputPath = join(tempDir, 'artifact.json');

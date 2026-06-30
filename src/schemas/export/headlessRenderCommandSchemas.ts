@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { rawOpenEditExportBasicToneCommandSchema } from './rawOpenEditExportCommandSchemas';
+import { rawOpenEditExportBasicToneCommandSchema } from '../rawOpenEditExportCommandSchemas';
 
 const pixelSchema = z.tuple([z.number().min(0).max(1), z.number().min(0).max(1), z.number().min(0).max(1)]);
 

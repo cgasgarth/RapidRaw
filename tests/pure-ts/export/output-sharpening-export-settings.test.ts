@@ -10,7 +10,7 @@ import {
   WatermarkAnchor,
 } from '../../../src/components/ui/ExportImportProperties';
 import { useExportSettings } from '../../../src/hooks/export/useExportSettings';
-import { parseExportRecipe } from '../../../src/schemas/exportRecipeSchemas';
+import { parseExportRecipe } from '../../../src/schemas/export/exportRecipeSchemas';
 import type { OutputSharpeningSettings } from '../../../src/schemas/outputSharpeningSchemas';
 
 type ExportSettingsHookState = ReturnType<typeof useExportSettings>;

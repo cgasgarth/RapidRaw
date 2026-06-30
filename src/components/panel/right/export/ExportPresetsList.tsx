@@ -2,8 +2,8 @@ import { Check, CheckCircle, Plus, Save, Trash2, TriangleAlert, X } from 'lucide
 import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useManagedFocus } from '../../../../hooks/ui/useManagedFocus';
-import { EXPORT_LAST_USED_PRESET_ID } from '../../../../schemas/exportRecipeIds';
-import { buildExportRecipeUiRows } from '../../../../schemas/exportRecipeUiSchemas';
+import { EXPORT_LAST_USED_PRESET_ID } from '../../../../schemas/export/exportRecipeIds';
+import { buildExportRecipeUiRows } from '../../../../schemas/export/exportRecipeUiSchemas';
 import { TextVariants } from '../../../../types/typography';
 import type { AppSettings } from '../../../ui/AppProperties';
 import type { ExportPreset } from '../../../ui/ExportImportProperties';

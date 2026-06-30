@@ -10,7 +10,7 @@ import {
   ExportRenderingIntent,
   FileFormats,
 } from '../../../../src/components/ui/ExportImportProperties.ts';
-import { exportRecipeSchema } from '../../../../src/schemas/exportRecipeSchemas.ts';
+import { exportRecipeSchema } from '../../../../src/schemas/export/exportRecipeSchemas.ts';
 import {
   getBlackPointCompensationStatus,
   getExportColorCapability,
