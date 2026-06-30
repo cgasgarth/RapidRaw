@@ -40,11 +40,12 @@ for (const marker of [
   'data-export-soft-proof-profile-compare-transform-policy-fingerprint',
   'Invokes.GenerateExportSoftProofPreview',
   'Invokes.ResolveExportSoftProofTransformMetadata',
+  'buildSoftProofProfileCompareInvokeRequest',
   'prepareAdjustmentPayloadForBackend',
   'buildSoftProofProfileCompareRequests',
   'buildSoftProofProfileCompareProof',
+  'buildSoftProofProfileCompareUnavailableState',
   'setSoftProofProfileCompareState',
-  "status: 'unavailable'",
 ]) {
   if (!exportPanelSource.includes(marker)) failures.push(`ExportPanel missing ${marker}`);
 }

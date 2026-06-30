@@ -20,6 +20,13 @@ export interface ExportSoftProofProfileCompareSideRequest {
   side: ExportSoftProofProfileCompareSideId;
 }
 
+export interface ExportSoftProofProfileCompareUnavailableState {
+  error: string;
+  requestedColorProfile: ExportColorProfile;
+  requestedRenderingIntent: ExportRenderingIntent;
+  side: ExportSoftProofProfileCompareSideId;
+}
+
 export interface ExportSoftProofProfileCompareProof {
   colorManagedTransform: string | null;
   effectiveColorProfile: string | null;
@@ -122,6 +129,27 @@ export const buildSoftProofProfileCompareRequests = ({
     side: 'displayP3',
   },
 ];
+
+export const buildSoftProofProfileCompareInvokeRequest = (
+  request: ExportSoftProofProfileCompareRequest,
+): {
+  request: ExportSoftProofProfileCompareRequest;
+} => ({
+  request,
+});
+
+export const buildSoftProofProfileCompareUnavailableState = ({
+  error,
+  requestedColorProfile,
+  requestedRenderingIntent,
+  side,
+}: ExportSoftProofProfileCompareUnavailableState): ExportSoftProofProfileCompareSideState => ({
+  error,
+  requestedColorProfile,
+  requestedRenderingIntent,
+  side,
+  status: 'unavailable',
+});
 
 export const hashSoftProofPreviewBuffer = (buffer: ArrayBuffer): string => {
   const bytes = new Uint8Array(buffer);
