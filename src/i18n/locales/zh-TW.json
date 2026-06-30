@@ -669,6 +669,15 @@
         },
         "runtimeApplyDemo": "",
         "runtimeApplyProof": "",
+        "selectedImageLoop": {
+          "audit": "Audit summary",
+          "before": "Before",
+          "changedPixels": "Changed pixels",
+          "current": "Current",
+          "graphRevision": "Graph revision",
+          "recipeHash": "Recipe hash",
+          "rollback": "Rollback receipt"
+        },
         "timeline": {
           "control": {
             "approval": "",
@@ -2743,11 +2752,14 @@
       "qcDecisionRejected": "",
       "qcDecisionRejectVisible_other": "",
       "qcDecisionResetVisible_other": "",
+      "qcProofArtifactDimensions": "",
       "qcProofArtifactGrid": "",
       "qcProofArtifactHash": "",
+      "qcProofArtifactOverlays": "",
       "qcProofArtifactVariants": "",
       "qcProofArtifactWarnings": "",
       "qcProofHint": "",
+      "qcProofPositiveVariant": "",
       "qcProofReport": "",
       "qcRejectedCount": "",
       "queuedScans": "",

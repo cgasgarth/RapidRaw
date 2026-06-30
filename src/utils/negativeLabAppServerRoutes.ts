@@ -59,6 +59,7 @@ import {
   resolveNegativeLabRuntimeProfile,
 } from './negativeLabMeasuredProfileRuntime';
 import { buildNegativeLabPlanHash } from './negativeLabPlanIdentity';
+import { buildNegativeLabQcContactSheetArtifact } from './negativeLabQcContactSheetArtifact';
 import { buildNegativeLabRollNormalizationPlan } from './negativeLabRollNormalizationPlan';
 import {
   buildNegativeLabStockMetadataCounts,
@@ -170,17 +171,42 @@ export const buildNegativeLabQcProofRouteResult = (
   command: NegativeLabQcProofAppServerCommand,
 ): NegativeLabQcProofAppServerResult => {
   const parsedCommand = negativeLabQcProofAppServerCommandSchema.parse(command);
-  const frameHealthReport = buildNegativeLabFrameHealthRouteResult(parsedCommand);
+  const frameHealthCommand = {
+    activePathIndex: parsedCommand.activePathIndex,
+    baseFogConfidence: parsedCommand.baseFogConfidence,
+    includedPaths: parsedCommand.includedPaths,
+    previewReady: parsedCommand.previewReady,
+    targetPaths: parsedCommand.targetPaths,
+  };
+  const frameHealthReport = buildNegativeLabFrameHealthRouteResult(frameHealthCommand);
   const reviewReport = buildNegativeLabDustScratchReviewReport(frameHealthReport, parsedCommand.previewReady);
   const exportReady =
     parsedCommand.previewReady &&
     frameHealthReport.queuedCount > 0 &&
     frameHealthReport.includedCount === frameHealthReport.frames.length &&
     !reviewReport.frames.some((frame) => frame.severity === 'retouch');
+  const report = buildNegativeLabQcProofReport(reviewReport, parsedCommand.previewReady, exportReady);
+  const sourcePathsByFrameId = new Map(frameHealthReport.frames.map((frame) => [frame.frameId, frame.sourcePath]));
+  const artifact = buildNegativeLabQcContactSheetArtifact({
+    outputIntent: parsedCommand.outputIntent ?? 'proof_preview',
+    ...(parsedCommand.overlayVisibility === undefined ? {} : { overlayVisibility: parsedCommand.overlayVisibility }),
+    ...(parsedCommand.qcDecisionByFrameId === undefined
+      ? {}
+      : { qcDecisionByFrameId: parsedCommand.qcDecisionByFrameId }),
+    report,
+    sessionId: `negative_lab_app_server_qc_${frameHealthReport.frames.length}_${frameHealthReport.includedCount}`,
+    sourcePathsByFrameId,
+  });
 
-  return negativeLabQcProofAppServerResultSchema.parse(
-    buildNegativeLabQcProofReport(reviewReport, parsedCommand.previewReady, exportReady),
-  );
+  return negativeLabQcProofAppServerResultSchema.parse({
+    artifact,
+    commandName: NegativeLabAppServerCommandName.QcProof,
+    outputPolicy: {
+      allowOverwrite: false,
+      storage: 'temp_cache',
+    },
+    report,
+  });
 };
 
 export const buildNegativeLabAcceptedBatchPlanRouteResult = (

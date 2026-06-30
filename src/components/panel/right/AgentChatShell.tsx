@@ -26,11 +26,17 @@ import type {
   AgentPrivateRawArtifacts,
   AgentReviewHandoff,
   AgentSelectedFrameScope,
+  AgentSelectedImagePreviewLoopReview,
 } from '../../../schemas/agentChatTranscriptSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { buildAgentAppServerToolReadinessSummary } from '../../../utils/agentAppServerToolReadiness';
 import { runAgentBoundedEditPlannerLoop } from '../../../utils/agentBoundedEditPlannerLoop';
 import { AGENT_COLOR_APPLY_TOOL_NAME } from '../../../utils/agentColorApplyTool';
+import {
+  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
+  type AgentCurrentImagePreviewLoopResult,
+  agentCurrentImagePreviewLoopResultSchema,
+} from '../../../utils/agentCurrentImagePreviewLoop';
 import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../utils/agentDetailEffectsApplyTool';
 import { planAgentEditRecipe } from '../../../utils/agentEditRecipePlanner';
 import { AGENT_EXPORT_PROOF_TOOL_NAME, agentExportProofResponseSchema } from '../../../utils/agentExportProofTool';
@@ -65,6 +71,7 @@ import {
   type AgentSessionAuditStorageAdapter,
   appendAgentSessionAuditRecord,
 } from '../../../utils/agentSessionAuditStore';
+import { AGENT_HISTORY_ROLLBACK_TOOL_NAME } from '../../../utils/agentSessionHistory';
 
 interface AgentChatShellProps {
   transcript: AgentChatTranscript;
@@ -119,6 +126,14 @@ const rollbackStatusStyles = {
   blocked: 'border-red-500/30 bg-red-500/10 text-red-100',
   not_required: 'border-white/10 bg-white/5 text-text-secondary',
 } satisfies Record<AgentReviewHandoff['rollback']['status'], string>;
+
+const selectedImageLoopControlStyles = {
+  available: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100',
+  disabled: 'border-white/10 bg-white/5 text-text-secondary',
+  dispatched: 'border-sky-500/30 bg-sky-500/10 text-sky-100',
+  rejected: 'border-red-500/30 bg-red-500/10 text-red-100',
+  unavailable: 'border-amber-500/30 bg-amber-500/10 text-amber-100',
+} satisfies Record<AgentSelectedImagePreviewLoopReview['controls']['acceptApply']['state'], string>;
 
 const scopePolicyStateStyles = {
   passed: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100',
@@ -726,6 +741,324 @@ function LiveAuditArtifactPanel({ artifact }: { artifact: LiveAuditArtifactState
           {t('editor.ai.agent.audit.evidence')}: {artifact.persistedRecordCount}
         </span>
       </div>
+    </div>
+  );
+}
+
+type SelectedImageLoopRuntimeState =
+  | {
+      error: string;
+      status: 'rejected';
+    }
+  | {
+      result: AgentCurrentImagePreviewLoopResult | unknown;
+      status: 'accepted' | 'revised' | 'rolled_back';
+    }
+  | {
+      status: 'idle' | 'pending';
+    };
+
+function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelectedImagePreviewLoopReview }) {
+  const { t } = useTranslation();
+  const [runtimeState, setRuntimeState] = useState<SelectedImageLoopRuntimeState>({ status: 'idle' });
+  const latestResult =
+    runtimeState.status === 'accepted' || runtimeState.status === 'revised'
+      ? agentCurrentImagePreviewLoopResultSchema.safeParse(runtimeState.result).data
+      : undefined;
+  const latestApplyReceipt = latestResult?.applyReceipts.at(-1);
+  const baseReceipt = review.applyReceipts.at(-1);
+  const changedFields = Array.from(new Set(review.applyReceipts.flatMap((receipt) => receipt.adjustedFields)));
+  const disabledReason = review.blockers[0] ?? '';
+  const acceptEnabled = review.controls.acceptApply.state === 'available' && runtimeState.status !== 'pending';
+  const reviseEnabled = review.controls.reviseWithFeedback.state === 'available' && runtimeState.status !== 'pending';
+  const rollbackEnabled = review.controls.rollback.state === 'available' && runtimeState.status !== 'pending';
+
+  const dispatchLoop = async (
+    control: AgentSelectedImagePreviewLoopReview['controls']['acceptApply'],
+    status: 'accepted' | 'revised',
+  ) => {
+    if (control.state !== 'available' || control.commandRequest === undefined) return;
+    setRuntimeState({ status: 'pending' });
+    try {
+      const result = agentCurrentImagePreviewLoopResultSchema.parse(
+        await dispatchAgentLiveEditorTool({
+          args: control.commandRequest,
+          requestId: `${review.command.requestId}-${status}`,
+          runtimeToolName: AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
+        }),
+      );
+      setRuntimeState({ result, status });
+    } catch (error) {
+      setRuntimeState({
+        error: error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError'),
+        status: 'rejected',
+      });
+    }
+  };
+
+  const rollback = async () => {
+    if (review.controls.rollback.state !== 'available' || review.controls.rollback.commandRequest === undefined) {
+      return;
+    }
+    setRuntimeState({ status: 'pending' });
+    try {
+      const result = await dispatchAgentLiveEditorTool({
+        args: review.controls.rollback.commandRequest,
+        requestId: `${review.command.requestId}-rollback`,
+        runtimeToolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+      });
+      setRuntimeState({ result, status: 'rolled_back' });
+    } catch (error) {
+      setRuntimeState({
+        error: error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError'),
+        status: 'rejected',
+      });
+    }
+  };
+
+  return (
+    <div
+      className="space-y-3 rounded-md border border-sky-500/20 bg-sky-500/5 p-3"
+      data-accepted-dry-run-plan-count={review.acceptedDryRunPlanCount}
+      data-apply-receipt-count={review.applyReceipts.length}
+      data-audit-event-count={review.auditEventSummary.length}
+      data-blockers={review.blockers.join(',')}
+      data-before-artifact-id={review.compareArtifacts.beforeArtifactId}
+      data-changed-field-count={changedFields.length}
+      data-command-request-id={review.command.requestId}
+      data-current-artifact-id={
+        latestResult?.compareArtifactIds.currentArtifactId ?? review.compareArtifacts.currentArtifactId
+      }
+      data-final-graph-revision={latestResult?.finalGraphRevision ?? review.finalGraphRevision}
+      data-final-recipe-hash={latestResult?.finalRecipeHash ?? review.finalRecipeHash}
+      data-initial-graph-revision={review.initialGraphRevision}
+      data-initial-preview-artifact-id={review.initialPreviewArtifactId}
+      data-initial-recipe-hash={review.initialRecipeHash}
+      data-preview-identity={review.previewIdentity ?? ''}
+      data-preview-lineage-count={latestResult?.previewLineage.length ?? review.previewLineage.length}
+      data-review-status={latestResult?.reviewStatus ?? review.reviewStatus}
+      data-rollback-checkpoint-graph-revision={review.rollbackCheckpoint.graphRevision}
+      data-rollback-receipt-graph-revision={review.rollbackReceipt?.graphRevision ?? ''}
+      data-runtime-state={runtimeState.status}
+      data-selected-image-path={review.selectedImage.path}
+      data-testid="agent-selected-image-preview-loop-review"
+      data-tool-name={review.command.toolName}
+      data-warning-count={review.warnings.length}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-xs font-semibold text-text-primary">
+            <Eye size={15} />
+            <span>{review.title}</span>
+          </div>
+          <p className="mt-1 text-[11px] leading-4 text-text-secondary">{review.prompt}</p>
+        </div>
+        <span className="shrink-0 rounded border border-sky-500/25 bg-sky-500/10 px-2 py-0.5 text-[11px] text-sky-100">
+          {review.status}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2" data-testid="agent-selected-image-preview-loop-compare">
+        <div
+          className="min-h-28 rounded border border-white/10 bg-gradient-to-br from-[#27313a] via-[#53606a] to-[#bea36f] p-2"
+          data-artifact-id={review.compareArtifacts.beforeArtifactId}
+          data-graph-revision={review.initialGraphRevision}
+          data-recipe-hash={review.initialRecipeHash}
+          data-testid="agent-selected-image-preview-loop-before"
+        >
+          <span className="rounded bg-black/35 px-1.5 py-0.5 text-[10px] uppercase text-text-primary">
+            {t('editor.ai.agent.selectedImageLoop.before')}
+          </span>
+          <div className="mt-12 truncate font-mono text-[10px] text-text-primary">
+            {review.compareArtifacts.beforeArtifactId}
+          </div>
+        </div>
+        <div
+          className="min-h-28 rounded border border-sky-500/25 bg-gradient-to-br from-[#334d56] via-[#6f746b] to-[#e6c472] p-2"
+          data-artifact-id={
+            latestResult?.compareArtifactIds.currentArtifactId ?? review.compareArtifacts.currentArtifactId
+          }
+          data-graph-revision={latestResult?.finalGraphRevision ?? review.finalGraphRevision}
+          data-recipe-hash={latestResult?.finalRecipeHash ?? review.finalRecipeHash}
+          data-testid="agent-selected-image-preview-loop-current"
+        >
+          <span className="rounded bg-black/35 px-1.5 py-0.5 text-[10px] uppercase text-text-primary">
+            {t('editor.ai.agent.selectedImageLoop.current')}
+          </span>
+          <div className="mt-12 truncate font-mono text-[10px] text-text-primary">
+            {latestResult?.compareArtifactIds.currentArtifactId ?? review.compareArtifacts.currentArtifactId}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-2 text-[11px] md:grid-cols-3" data-testid="agent-selected-image-preview-loop-metrics">
+        <div className="rounded border border-white/10 bg-black/15 p-2">
+          <div className="text-[10px] uppercase text-text-secondary">
+            {t('editor.ai.agent.selectedImageLoop.changedPixels')}
+          </div>
+          <div
+            className="mt-1 font-mono text-emerald-100"
+            data-testid="agent-selected-image-preview-loop-changed-pixels"
+          >
+            {latestApplyReceipt?.changedPixelCount ?? baseReceipt?.changedPixelCount}
+          </div>
+          <div className="font-mono text-[10px] text-text-secondary">
+            {latestApplyReceipt?.changedPixelPercent ?? baseReceipt?.changedPixelPercent}%
+          </div>
+        </div>
+        <div className="rounded border border-white/10 bg-black/15 p-2">
+          <div className="text-[10px] uppercase text-text-secondary">
+            {t('editor.ai.agent.selectedImageLoop.graphRevision')}
+          </div>
+          <div className="mt-1 truncate font-mono text-text-primary">
+            {latestResult?.finalGraphRevision ?? review.finalGraphRevision}
+          </div>
+          <div className="truncate font-mono text-[10px] text-text-secondary">{review.initialGraphRevision}</div>
+        </div>
+        <div className="rounded border border-white/10 bg-black/15 p-2">
+          <div className="text-[10px] uppercase text-text-secondary">
+            {t('editor.ai.agent.selectedImageLoop.recipeHash')}
+          </div>
+          <div className="mt-1 truncate font-mono text-text-primary">
+            {latestResult?.finalRecipeHash ?? review.finalRecipeHash}
+          </div>
+          <div className="truncate font-mono text-[10px] text-text-secondary">{review.initialRecipeHash}</div>
+        </div>
+      </div>
+
+      <div className="space-y-1" data-testid="agent-selected-image-preview-loop-lineage">
+        {review.previewLineage.map((lineage) => (
+          <div
+            className="grid gap-2 rounded border border-white/10 bg-white/[0.03] p-2 text-[11px] md:grid-cols-[1fr_auto]"
+            data-applied-graph-revision={lineage.appliedGraphRevision}
+            data-artifact-id={lineage.previewArtifactId}
+            data-purpose={lineage.previewPurpose}
+            data-recipe-hash={lineage.recipeHash}
+            data-testid="agent-selected-image-preview-loop-lineage-entry"
+            data-tool-name={lineage.sourceToolName}
+            data-turn={lineage.turn}
+            key={`${lineage.turn}-${lineage.previewArtifactId}`}
+          >
+            <div className="min-w-0">
+              <div className="truncate font-mono text-text-primary">{lineage.previewArtifactId}</div>
+              <div className="mt-1 truncate font-mono text-text-secondary">{lineage.recipeHash}</div>
+            </div>
+            <span className="rounded border border-white/10 bg-black/20 px-1.5 py-0.5 text-text-secondary">
+              {lineage.previewPurpose}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-1.5" data-testid="agent-selected-image-preview-loop-changed-fields">
+        {changedFields.map((field) => (
+          <span
+            className="rounded border border-white/10 bg-black/20 px-1.5 py-0.5 text-[11px] text-text-secondary"
+            key={field}
+          >
+            {field}
+          </span>
+        ))}
+      </div>
+
+      {review.warnings.length > 0 || review.blockers.length > 0 ? (
+        <div className="space-y-1" data-testid="agent-selected-image-preview-loop-warnings">
+          {[...review.warnings, ...review.blockers].map((warning) => (
+            <div
+              className="rounded border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-100"
+              key={warning}
+            >
+              {warning}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="grid gap-2 text-[11px] md:grid-cols-2">
+        <div
+          className="rounded border border-white/10 bg-black/15 p-2"
+          data-rollback-checkpoint-graph-revision={review.rollbackCheckpoint.graphRevision}
+          data-rollback-checkpoint-recipe-hash={review.rollbackCheckpoint.previewRecipeHash}
+          data-rollback-receipt-graph-revision={review.rollbackReceipt?.graphRevision ?? ''}
+          data-testid="agent-selected-image-preview-loop-rollback-receipt"
+        >
+          <div className="font-semibold text-text-primary">{t('editor.ai.agent.selectedImageLoop.rollback')}</div>
+          <div className="mt-1 truncate font-mono text-text-secondary">{review.rollbackCheckpoint.graphRevision}</div>
+          <div className="mt-1 truncate font-mono text-emerald-100">{review.rollbackReceipt?.graphRevision}</div>
+        </div>
+        <div
+          className="rounded border border-white/10 bg-black/15 p-2"
+          data-audit-event-count={review.auditEventSummary.length}
+          data-testid="agent-selected-image-preview-loop-audit-summary"
+        >
+          <div className="font-semibold text-text-primary">{t('editor.ai.agent.selectedImageLoop.audit')}</div>
+          <div className="mt-1 font-mono text-text-secondary">
+            {review.auditEventSummary.length} {t('editor.ai.agent.readiness.tools')}
+          </div>
+          <div className="mt-1 truncate font-mono text-[10px] text-text-secondary">
+            {review.auditEventSummary.map((event) => event.toolName).join(' -> ')}
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="grid gap-2 md:grid-cols-3"
+        data-disabled-reason={disabledReason}
+        data-testid="agent-selected-image-preview-loop-controls"
+      >
+        <button
+          className={`rounded-md border px-2 py-1.5 text-left text-[11px] ${selectedImageLoopControlStyles[review.controls.acceptApply.state]}`}
+          data-control-state={review.controls.acceptApply.state}
+          data-dispatch-path={AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME}
+          data-testid="agent-selected-image-preview-loop-accept-apply"
+          disabled={!acceptEnabled}
+          onClick={() => {
+            void dispatchLoop(review.controls.acceptApply, 'accepted');
+          }}
+          type="button"
+        >
+          <span className="block font-semibold">{review.controls.acceptApply.label}</span>
+          <span className="mt-1 block leading-4 opacity-80">{review.controls.acceptApply.reason}</span>
+        </button>
+        <button
+          className={`rounded-md border px-2 py-1.5 text-left text-[11px] ${selectedImageLoopControlStyles[review.controls.reviseWithFeedback.state]}`}
+          data-control-state={review.controls.reviseWithFeedback.state}
+          data-dispatch-path={AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME}
+          data-feedback={review.controls.reviseWithFeedback.feedback}
+          data-testid="agent-selected-image-preview-loop-revise"
+          disabled={!reviseEnabled}
+          onClick={() => {
+            void dispatchLoop(review.controls.reviseWithFeedback, 'revised');
+          }}
+          type="button"
+        >
+          <span className="block font-semibold">{review.controls.reviseWithFeedback.label}</span>
+          <span className="mt-1 block leading-4 opacity-80">{review.controls.reviseWithFeedback.reason}</span>
+        </button>
+        <button
+          className={`rounded-md border px-2 py-1.5 text-left text-[11px] ${selectedImageLoopControlStyles[review.controls.rollback.state]}`}
+          data-control-state={review.controls.rollback.state}
+          data-dispatch-path={review.controls.rollback.toolName}
+          data-testid="agent-selected-image-preview-loop-rollback"
+          disabled={!rollbackEnabled}
+          onClick={() => {
+            void rollback();
+          }}
+          type="button"
+        >
+          <span className="block font-semibold">{review.controls.rollback.label}</span>
+          <span className="mt-1 block leading-4 opacity-80">{review.controls.rollback.reason}</span>
+        </button>
+      </div>
+
+      {runtimeState.status === 'rejected' ? (
+        <div
+          className="rounded border border-red-500/25 bg-red-500/10 px-2 py-1 text-[11px] text-red-100"
+          data-testid="agent-selected-image-preview-loop-error"
+        >
+          {runtimeState.error}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -2772,6 +3105,10 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
       </div>
 
       {transcript.selectedFrameScope ? <SelectedFrameScopePanel scope={transcript.selectedFrameScope} /> : null}
+
+      {transcript.selectedImagePreviewLoopReview ? (
+        <SelectedImagePreviewLoopReviewPanel review={transcript.selectedImagePreviewLoopReview} />
+      ) : null}
 
       {transcript.artifactReview ? <ArtifactReviewPanel review={transcript.artifactReview} /> : null}
 

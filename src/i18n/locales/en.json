@@ -709,6 +709,15 @@
         },
         "runtimeApplyDemo": "Runtime apply demo",
         "runtimeApplyProof": "Runtime apply proof",
+        "selectedImageLoop": {
+          "audit": "Audit summary",
+          "before": "Before",
+          "changedPixels": "Changed pixels",
+          "current": "Current",
+          "graphRevision": "Graph revision",
+          "recipeHash": "Recipe hash",
+          "rollback": "Rollback receipt"
+        },
         "timeline": {
           "control": {
             "approval": "Approve",
@@ -3066,11 +3075,14 @@
       "qcOverlayDensityWarnings": "Density warnings",
       "qcOverlayFrameBounds": "Frame bounds",
       "qcOverlayRejectedMarkers": "Rejected markers",
+      "qcProofArtifactDimensions": "{{width}} x {{height}} px",
       "qcProofArtifactGrid": "{{columns}} x {{rows}} grid",
       "qcProofArtifactHash": "Artifact {{hash}}",
+      "qcProofArtifactOverlays": "{{overlayCount}} overlays",
       "qcProofArtifactVariants": "{{variantCount}} variants",
       "qcProofArtifactWarnings": "{{warningCount}} warnings",
       "qcProofHint": "Contact-sheet proof state for batch handoff; image pixels are not retouched here.",
+      "qcProofPositiveVariant": "{{intent}} {{artifactId}}",
       "qcProofReport": "QC proof report",
       "qcRejectedCount": "Rejected {{rejectedCount}}",
       "queuedScans": "{{queuedCount}} queued",

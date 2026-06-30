@@ -23,6 +23,23 @@ export const agentLivePromptWalkthroughStageStateSchema = z.enum(['completed', '
 export const agentFailureRecoveryActionStateSchema = z.enum(['available', 'completed']);
 export const agentLongEditProgressStageStateSchema = z.enum(['completed', 'current', 'pending']);
 export const agentE2eClosureStepStatusSchema = z.enum(['verified']);
+export const agentSelectedImagePreviewLoopControlStateSchema = z.enum([
+  'available',
+  'disabled',
+  'dispatched',
+  'rejected',
+  'unavailable',
+]);
+export const agentSelectedImagePreviewLoopBlockerSchema = z.enum([
+  'missing_dry_run_approval',
+  'missing_selected_image',
+  'private_raw_proof_unavailable',
+  'provider_unavailable',
+  'rejected_command_result',
+  'rollback_unavailable',
+  'stale_graph_revision',
+  'stale_recipe_hash',
+]);
 
 export const agentChatMessageSchema = z
   .object({
@@ -419,6 +436,144 @@ export const agentPrivateRawArtifactsSchema = z
   })
   .strict();
 
+export const agentSelectedImagePreviewLoopReviewSchema = z
+  .object({
+    acceptedDryRunPlanCount: z.number().int().min(1),
+    applyReceipts: z
+      .array(
+        z
+          .object({
+            acceptedPlanHash: z.string().min(1),
+            acceptedPlanId: z.string().min(1),
+            adjustedFields: z.array(z.string().min(1)).min(1),
+            appliedGraphRevision: z.string().min(1),
+            changedPixelCount: z.number().int().positive(),
+            changedPixelPercent: z.number().min(0).max(100),
+            maxChannelDelta: z.number().nonnegative(),
+            meanLuminanceDelta: z.number().nonnegative(),
+            sampledPixelCount: z.number().int().positive(),
+            turn: z.number().int().positive(),
+            undoGraphRevision: z.string().min(1),
+          })
+          .strict(),
+      )
+      .min(1),
+    auditEventSummary: z
+      .array(
+        z
+          .object({
+            graphRevision: z.string().min(1),
+            recipeHash: z.string().min(1),
+            toolName: z.string().min(1),
+            turn: z.number().int().positive(),
+            type: z.string().min(1),
+          })
+          .strict(),
+      )
+      .min(1),
+    blockers: z.array(agentSelectedImagePreviewLoopBlockerSchema),
+    command: z
+      .object({
+        operationId: z.string().min(1),
+        requestId: z.string().min(1),
+        sessionId: z.string().min(1),
+        toolName: z.literal('rawengine.agent.selected_image.preview_loop'),
+      })
+      .strict(),
+    compareArtifacts: z
+      .object({
+        beforeArtifactId: z.string().min(1),
+        currentArtifactId: z.string().min(1),
+      })
+      .strict(),
+    controls: z
+      .object({
+        acceptApply: z
+          .object({
+            commandRequest: z.unknown().optional(),
+            label: z.string().min(1),
+            reason: z.string().min(1),
+            state: agentSelectedImagePreviewLoopControlStateSchema,
+          })
+          .strict(),
+        reviseWithFeedback: z
+          .object({
+            commandRequest: z.unknown().optional(),
+            feedback: z.string().min(1),
+            label: z.string().min(1),
+            reason: z.string().min(1),
+            state: agentSelectedImagePreviewLoopControlStateSchema,
+          })
+          .strict(),
+        rollback: z
+          .object({
+            commandRequest: z.unknown().optional(),
+            label: z.string().min(1),
+            reason: z.string().min(1),
+            state: agentSelectedImagePreviewLoopControlStateSchema,
+            toolName: z.literal('rawengine.agent.history.rollback'),
+          })
+          .strict(),
+      })
+      .strict(),
+    editCount: z.number().int().min(1),
+    finalGraphRevision: z.string().min(1),
+    finalRecipeHash: z.string().min(1),
+    id: z.string().min(1),
+    initialGraphRevision: z.string().min(1),
+    initialPreviewArtifactId: z.string().min(1),
+    initialRecipeHash: z.string().min(1),
+    previewIdentity: z.string().min(1).nullable(),
+    previewLineage: z
+      .array(
+        z
+          .object({
+            appliedGraphRevision: z.string().min(1),
+            previewArtifactId: z.string().min(1),
+            previewPurpose: z.enum(['detail_review', 'refresh']),
+            recipeHash: z.string().min(1),
+            sourceToolName: z.literal('rawengine.agent.adjustments.apply'),
+            turn: z.number().int().positive(),
+          })
+          .strict(),
+      )
+      .min(1),
+    previewRefreshCount: z.number().int().min(1),
+    prompt: z.string().min(1),
+    reviewStatus: z.enum(['max_iterations_reached', 'needs_user_review']),
+    rollbackCheckpoint: z
+      .object({
+        graphRevision: z.string().min(1),
+        previewRecipeHash: z.string().min(1),
+        sessionId: z.string().min(1),
+      })
+      .strict(),
+    rollbackReceipt: z
+      .object({
+        graphRevision: z.string().min(1),
+        previewRecipeHash: z.string().min(1),
+        requestId: z.string().min(1),
+        restoredHistoryIndex: z.number().int().nonnegative(),
+        scope: z.enum(['operation', 'session_start']),
+        sessionId: z.string().min(1),
+        toolName: z.literal('rawengine.agent.history.rollback'),
+      })
+      .strict()
+      .optional(),
+    selectedImage: z
+      .object({
+        height: z.number().int().positive(),
+        path: z.string().min(1),
+        previewIdentity: z.string().min(1).nullable(),
+        width: z.number().int().positive(),
+      })
+      .strict(),
+    status: z.enum(['max_iterations_reached', 'needs_user_review']),
+    title: z.string().min(1),
+    warnings: z.array(z.string().min(1)),
+  })
+  .strict();
+
 export const agentInitialPromptPreviewContextSchema = z
   .object({
     accessScope: z.literal('local_private'),
@@ -456,6 +611,7 @@ export const agentChatTranscriptSchema = z
     reviewHandoff: agentReviewHandoffSchema.optional(),
     runtimeStatus: agentChatRuntimeStatusSchema,
     selectedFrameScope: agentSelectedFrameScopeSchema.optional(),
+    selectedImagePreviewLoopReview: agentSelectedImagePreviewLoopReviewSchema.optional(),
     sessionTitle: z.string().min(1),
     toolCalls: z.array(agentChatToolCallSchema).min(1),
   })
@@ -474,4 +630,5 @@ export type AgentLongEditProgress = z.infer<typeof agentLongEditProgressSchema>;
 export type AgentPrivateRawArtifacts = z.infer<typeof agentPrivateRawArtifactsSchema>;
 export type AgentReviewHandoff = z.infer<typeof agentReviewHandoffSchema>;
 export type AgentSelectedFrameScope = z.infer<typeof agentSelectedFrameScopeSchema>;
+export type AgentSelectedImagePreviewLoopReview = z.infer<typeof agentSelectedImagePreviewLoopReviewSchema>;
 export type AgentChatTranscript = z.infer<typeof agentChatTranscriptSchema>;

@@ -252,7 +252,16 @@ const qcProofResult = buildNegativeLabQcProofRouteResult({
   activePathIndex: 1,
   baseFogConfidence: 0.82,
   includedPaths: ['/roll/001.CR3', '/roll/002.CR3'],
+  outputIntent: 'export_ready_preview',
+  overlayVisibility: {
+    densityWarnings: true,
+    frameBounds: true,
+    rejectedMarkers: true,
+  },
   previewReady: true,
+  qcDecisionByFrameId: {
+    'negative-lab-frame-2': 'rejected',
+  },
   targetPaths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
 });
 const batchSummaryResult = buildNegativeLabBatchSummaryRouteResult({
@@ -382,13 +391,21 @@ if (!frameHealthResult.warningCodes.includes('excluded_from_batch')) {
   throw new Error('Negative Lab app-server frame health route did not roll up skipped-frame warnings.');
 }
 if (
-  qcProofResult.totalFrameCount !== 3 ||
-  qcProofResult.includedFrameCount !== 2 ||
-  qcProofResult.contactSheetColumnCount !== 3 ||
-  qcProofResult.frames[2]?.exportBlockedReason !== 'Frame excluded from batch.' ||
-  qcProofResult.exportReady
+  qcProofResult.report.totalFrameCount !== 3 ||
+  qcProofResult.report.includedFrameCount !== 2 ||
+  qcProofResult.report.contactSheetColumnCount !== 3 ||
+  qcProofResult.report.frames[2]?.exportBlockedReason !== 'Frame excluded from batch.' ||
+  qcProofResult.report.exportReady ||
+  qcProofResult.commandName !== expectedQcProofCommandName ||
+  qcProofResult.outputPolicy.allowOverwrite ||
+  qcProofResult.artifact.contactSheet.columns !== qcProofResult.report.contactSheetColumnCount ||
+  qcProofResult.artifact.frameStates[1]?.proofState !== 'rejected' ||
+  qcProofResult.artifact.frameStates[2]?.proofState !== 'excluded' ||
+  qcProofResult.artifact.positiveVariants[0]?.sourcePath !== '/roll/001.CR3' ||
+  qcProofResult.artifact.positiveVariants.some((variant) => variant.outputIntent !== 'export_ready_preview') ||
+  !qcProofResult.artifact.overlays.some((overlay) => overlay.overlayId === 'overlay_negative_lab_qc_rejected_2')
 ) {
-  throw new Error('Negative Lab app-server QC proof route did not expose contact-sheet proof state.');
+  throw new Error('Negative Lab app-server QC proof route did not expose contact-sheet report/artifact state.');
 }
 if (batchSummaryResult.plannedApplyCount !== 2 || batchSummaryResult.skippedFrameIds[0] !== 'negative-lab-frame-3') {
   throw new Error('Negative Lab app-server batch summary route did not report apply/skip counts.');

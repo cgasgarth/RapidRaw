@@ -708,6 +708,15 @@
         },
         "runtimeApplyDemo": "",
         "runtimeApplyProof": "",
+        "selectedImageLoop": {
+          "audit": "Audit summary",
+          "before": "Before",
+          "changedPixels": "Changed pixels",
+          "current": "Current",
+          "graphRevision": "Graph revision",
+          "recipeHash": "Recipe hash",
+          "rollback": "Rollback receipt"
+        },
         "timeline": {
           "control": {
             "approval": "",
@@ -2998,11 +3007,14 @@
       "qcDecisionRejectVisible_other": "Reject visible ({{count}})",
       "qcDecisionResetVisible_one": "Reset visible ({{count}})",
       "qcDecisionResetVisible_other": "Reset visible ({{count}})",
+      "qcProofArtifactDimensions": "",
       "qcProofArtifactGrid": "",
       "qcProofArtifactHash": "",
+      "qcProofArtifactOverlays": "",
       "qcProofArtifactVariants": "",
       "qcProofArtifactWarnings": "",
       "qcProofHint": "Contact-sheet proof state for batch handoff; image pixels are not retouched here.",
+      "qcProofPositiveVariant": "",
       "qcProofReport": "QC proof report",
       "qcRejectedCount": "Rejected {{rejectedCount}}",
       "queuedScans": "{{queuedCount}} queued",

@@ -14,6 +14,15 @@
     "rows": 1
   },
   "frameIds": ["frame_0001"],
+  "frameStates": [
+    {
+      "contactSheetSlot": 1,
+      "frameId": "frame_0001",
+      "included": true,
+      "proofState": "included",
+      "qcDecision": "pending"
+    }
+  ],
   "generatedAt": "2026-06-13T00:10:00.000Z",
   "overlays": [
     {
