@@ -473,12 +473,20 @@ const buildLiveAgentAuditRecord = ({
   prompt: acceptedPrompt,
   rollbackGraphRevision: sessionResult.rollbackGraphRevision,
   sessionId: sessionResult.sessionId,
-  toolCalls: sessionResult.toolCalls.map((toolCall) => ({
-    id: toolCall.id,
-    name: toolCall.name,
-    resultSummary: toolCall.receiptGraphRevision ?? toolCall.previewArtifactId ?? `${toolCall.name} succeeded`,
-    status: toolCall.status,
-  })),
+  toolCalls: [
+    {
+      id: sessionResult.previewLineage[0]?.toolCallId ?? `${sessionResult.sessionId}-initial-preview`,
+      name: 'rawengine.agent.initial_prompt_preview',
+      resultSummary: sessionResult.initialContext.preview.artifactId,
+      status: 'succeeded',
+    },
+    ...sessionResult.toolCalls.map((toolCall) => ({
+      id: toolCall.id,
+      name: toolCall.name,
+      resultSummary: toolCall.receiptGraphRevision ?? toolCall.previewArtifactId ?? `${toolCall.name} succeeded`,
+      status: toolCall.status,
+    })),
+  ],
   traceEvents: [
     {
       id: `${sessionResult.sessionId}-prompt`,
