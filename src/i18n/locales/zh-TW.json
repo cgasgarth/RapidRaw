@@ -2532,6 +2532,7 @@
       "agentDryRunReady": "",
       "agentPlanId": "",
       "agentProofHash": "",
+      "agentReadOnlySequence": "",
       "agentRollbackTarget": "",
       "analyzeHighlightRecovery": "",
       "analyzeShadowBlackPoint": "",

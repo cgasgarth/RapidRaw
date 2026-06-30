@@ -189,6 +189,13 @@ const NEGATIVE_LAB_AGENT_COMMIT_LABELS = {
   not_committed: 'modals.negativeConversion.agentCommitNotCommitted',
   ready_to_commit: 'modals.negativeConversion.agentCommitReady',
 } satisfies Record<NegativeLabAgentCommitState, `modals.negativeConversion.${string}`>;
+const NEGATIVE_LAB_AGENT_READ_ONLY_SEQUENCE = [
+  'inspect',
+  'conversion_plan',
+  'roll_normalization_plan',
+  'qc_proof',
+  'stock_family_plan',
+] as const;
 type BaseFogSampleLabelKey = 'modals.negativeConversion.sampleCenterPatch' | 'modals.negativeConversion.sampleLeftEdge';
 type ConversionScopeLabelKey =
   | 'modals.negativeConversion.scopeActive'
@@ -2781,6 +2788,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       data-agent-dry-run-state={agentDryRunState}
       data-agent-plan-id={agentPlanId}
       data-agent-proof-hash={agentProofHash}
+      data-agent-readonly-mutates="false"
+      data-agent-readonly-sequence={NEGATIVE_LAB_AGENT_READ_ONLY_SEQUENCE.join('|')}
       data-agent-rollback-target={agentRollbackTarget}
       data-affected-frame-count={batchDryRunSummary.affectedFrameIds.length}
       data-testid="negative-lab-agent-activity"
@@ -2829,6 +2838,15 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           title={agentRollbackTarget}
         >
           {t('modals.negativeConversion.agentRollbackTarget', { rollbackTarget: agentRollbackTarget })}
+        </span>
+        <span
+          className="col-span-2 truncate rounded bg-bg-secondary px-1.5 py-0.5"
+          data-testid="negative-lab-agent-readonly-sequence"
+          title={NEGATIVE_LAB_AGENT_READ_ONLY_SEQUENCE.join(' -> ')}
+        >
+          {t('modals.negativeConversion.agentReadOnlySequence', {
+            sequence: NEGATIVE_LAB_AGENT_READ_ONLY_SEQUENCE.join(' -> '),
+          })}
         </span>
       </div>
     </div>
