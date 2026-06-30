@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { jsonValueSchema } from './aiMaskingSchemas';
+import { jsonValueSchema } from './masks/aiMaskingSchemas';
 
 const sha256Schema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 const privatePathSchema = z

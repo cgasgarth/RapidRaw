@@ -1,6 +1,6 @@
 import cx from 'clsx';
 import { useTranslation } from 'react-i18next';
-import type { MaskOverlayMode, MaskOverlaySettings } from '../../../schemas/maskOverlaySchemas';
+import type { MaskOverlayMode, MaskOverlaySettings } from '../../../schemas/masks/maskOverlaySchemas';
 import AdjustmentSlider from '../../adjustments/AdjustmentSlider';
 import Switch from '../../ui/Switch';
 

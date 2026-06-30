@@ -15,7 +15,7 @@ import {
   TriangleRight,
   User,
 } from 'lucide-react';
-import type { AiPeopleMaskPart } from '../../../schemas/aiMaskingSchemas';
+import type { AiPeopleMaskPart } from '../../../schemas/masks/aiMaskingSchemas';
 
 export type SubMaskParameters = Record<string, unknown>;
 

@@ -3,7 +3,7 @@ import {
   type AiPeopleMaskPickerModel,
   type AiPeopleMaskProviderCapability,
   aiPeopleMaskPickerModelSchema,
-} from '../schemas/aiMaskingSchemas';
+} from '../schemas/masks/aiMaskingSchemas';
 import { AI_PEOPLE_MASK_PART_CAPABILITIES } from './aiPeopleMaskContracts';
 
 const PART_LABELS: Record<AiPeopleMaskPart, string> = {

@@ -50,8 +50,11 @@ import { useEditorActions } from '../../../hooks/editor/useEditorActions';
 import { type UserPreset, usePresets } from '../../../hooks/editor/usePresets';
 import { useWaveformControls } from '../../../hooks/editor/useWaveformControls';
 import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
-import type { MaskOverlaySettings } from '../../../schemas/maskOverlaySchemas';
-import { aiDepthMaskParametersSchema, type MaskRefinementParameters } from '../../../schemas/maskParameterSchemas';
+import type { MaskOverlaySettings } from '../../../schemas/masks/maskOverlaySchemas';
+import {
+  aiDepthMaskParametersSchema,
+  type MaskRefinementParameters,
+} from '../../../schemas/masks/maskParameterSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';

@@ -3,7 +3,7 @@ import {
   linearGradientMaskParametersSchema,
   type RadialGradientMaskParameters,
   radialGradientMaskParametersSchema,
-} from '../schemas/maskParameterSchemas';
+} from '../schemas/masks/maskParameterSchemas';
 
 function clamp(value: number, min: number, max: number, fallback: number): number {
   if (!Number.isFinite(value)) return fallback;
