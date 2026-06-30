@@ -9,6 +9,7 @@ mod adjustments;
 mod ai;
 mod album_management;
 mod android_integration;
+mod app;
 mod app_settings;
 mod app_state;
 mod color;

@@ -225,7 +225,7 @@ Observed output:
 Representative warning categories:
 
 - `unexpected_cfgs` warnings from the Objective-C `msg_send!` macro in
-  `src/window_customizer.rs`.
+  `src-tauri/src/app/window_customizer.rs`.
 - Unused `mut` bindings and an unused `saved_state` in `src/lib.rs`.
 - Direct cast of a function item into an integer for the SIGABRT handler.
 
