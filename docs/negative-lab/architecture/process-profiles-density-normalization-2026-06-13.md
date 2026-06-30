@@ -29,8 +29,8 @@ The v1 schema deliberately separates:
 
 The generated samples are:
 
-- `packages/rawengine-schema/samples/negative-lab-density-normalization-profile-v1.json`
-- `packages/rawengine-schema/samples/negative-lab-process-profile-v1.json`
+- `packages/rawengine-schema/samples/negative-lab/calibration/negative-lab-density-normalization-profile-v1.json`
+- `packages/rawengine-schema/samples/negative-lab/calibration/negative-lab-process-profile-v1.json`
 
 ## Validation Rules
 

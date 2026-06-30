@@ -21,7 +21,7 @@ This PR adds:
 - `NegativeLabRollBatchWorkflowStageV1`
 - `NegativeLabRollBatchWorkflowStagePlanV1`
 - sample artifact
-  `packages/rawengine-schema/samples/negative-lab-roll-batch-workflow-v1.json`
+  `packages/rawengine-schema/samples/negative-lab/workflows/negative-lab-roll-batch-workflow-v1.json`
 
 ## Workflow Stages
 

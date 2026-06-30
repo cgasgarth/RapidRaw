@@ -25,7 +25,7 @@ import code can review the same payload.
 
 The generated sample is:
 
-- `packages/rawengine-schema/samples/negative-lab-frame-detection-result-v1.json`
+- `packages/rawengine-schema/samples/negative-lab/workflows/negative-lab-frame-detection-result-v1.json`
 
 ## Validation Rules
 

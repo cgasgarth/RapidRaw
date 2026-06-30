@@ -29,7 +29,7 @@ The schema package exposes:
 - `NegativeLabPerChannelInversionCurveSetSourceV1`
 - `NegativeLabPerChannelInversionCurveSetScopeV1`
 - sample artifact
-  `packages/rawengine-schema/samples/negative-lab-per-channel-inversion-curve-set-v1.json`
+  `packages/rawengine-schema/samples/negative-lab/calibration/negative-lab-per-channel-inversion-curve-set-v1.json`
 
 `negativeLab.setConversionRecipe` can include an optional
 `curveModel.inversionCurveSet` plus an `inversionCurveSetPolicy`.

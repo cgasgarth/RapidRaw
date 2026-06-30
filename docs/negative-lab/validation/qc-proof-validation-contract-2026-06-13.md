@@ -22,7 +22,7 @@ and generated proof metadata.
 
 The generated sample is:
 
-- `packages/rawengine-schema/samples/negative-lab-qc-proof-artifact-v1.json`
+- `packages/rawengine-schema/samples/negative-lab/fixtures/negative-lab-qc-proof-artifact-v1.json`
 
 ## Validation Rules
 

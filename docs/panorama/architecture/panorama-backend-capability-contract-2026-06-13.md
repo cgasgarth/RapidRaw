@@ -62,7 +62,7 @@ The contract is validated by:
 - `packages/rawengine-schema/src/samplePayloads.ts`
 - `packages/rawengine-schema/scripts/check-samples.ts`
 - `packages/rawengine-schema/scripts/check-sample-artifacts.ts`
-- `packages/rawengine-schema/samples/panorama-backend-capability-report-v1.json`
+- `packages/rawengine-schema/samples/panorama/panorama-backend-capability-report-v1.json`
 
 Required local checks:
 

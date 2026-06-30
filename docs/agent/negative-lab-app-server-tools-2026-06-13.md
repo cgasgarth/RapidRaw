@@ -15,7 +15,7 @@ dry-run requirements are valid for the OpenAI app-server adapter.
 The checked sample artifact is:
 
 ```text
-packages/rawengine-schema/samples/negative-lab-app-server-tool-manifest-v1.json
+packages/rawengine-schema/samples/negative-lab/workflows/negative-lab-app-server-tool-manifest-v1.json
 ```
 
 ## Tool Boundary

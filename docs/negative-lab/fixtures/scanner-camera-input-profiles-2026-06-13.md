@@ -34,7 +34,7 @@ The schema adds:
 
 The generated sample artifact is:
 
-- `packages/rawengine-schema/samples/negative-lab-input-profile-catalog-v1.json`
+- `packages/rawengine-schema/samples/negative-lab/presets/negative-lab-input-profile-catalog-v1.json`
 
 ## Validation Rules
 

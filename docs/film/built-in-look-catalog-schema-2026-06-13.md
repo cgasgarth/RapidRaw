@@ -35,4 +35,4 @@ claims about specific commercial film stocks.
 
 `bun run schema:check` validates the TypeScript schema, parses the sample catalog,
 rejects unsafe exact-emulation naming, and checks the generated JSON artifact at
-`packages/rawengine-schema/samples/film-look-catalog-v1.json`.
+`packages/rawengine-schema/samples/film/film-look-catalog-v1.json`.

@@ -123,7 +123,7 @@
   },
   "replay": {
     "contentHash": "sha256:sample-agent-tone-color-replay",
-    "path": "packages/rawengine-schema/samples/agent-replay-fixture-v1.json",
+    "path": "packages/rawengine-schema/samples/agent/agent-replay-fixture-v1.json",
     "replayId": "replay_agent_tone_color_basic_001"
   },
   "schemaVersion": 1,

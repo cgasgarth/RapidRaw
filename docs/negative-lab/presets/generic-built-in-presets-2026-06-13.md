@@ -42,7 +42,7 @@ The schema adds:
 
 The generated sample artifact is:
 
-- `packages/rawengine-schema/samples/negative-lab-built-in-preset-catalog-v1.json`
+- `packages/rawengine-schema/samples/negative-lab/presets/negative-lab-built-in-preset-catalog-v1.json`
 
 ## Catalog Shape
 

@@ -37,7 +37,7 @@ The schema adds:
 
 The generated sample artifact is:
 
-- `packages/rawengine-schema/samples/negative-lab-fixture-manifest-v1.json`
+- `packages/rawengine-schema/samples/negative-lab/fixtures/negative-lab-fixture-manifest-v1.json`
 
 ## Required Metadata
 

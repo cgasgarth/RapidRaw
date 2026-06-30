@@ -46,10 +46,6 @@ const ALLOWED_LARGE_FOLDERS: Record<string, FolderAllowance> = {
     issue: '#4223',
     reason: 'validation fixtures are pending journey grouping',
   },
-  'packages/rawengine-schema/samples': {
-    issue: '#4212',
-    reason: 'schema samples are pending schema-family grouping',
-  },
   'packages/rawengine-schema/src': {
     issue: '#4214',
     reason: 'schema package source is pending domain grouping',

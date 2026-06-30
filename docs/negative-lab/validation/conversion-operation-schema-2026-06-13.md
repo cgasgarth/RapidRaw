@@ -27,7 +27,7 @@ This PR adds:
 - `NegativeLabConversionOperationProvenanceV1`
 - `NegativeLabOperationClass`
 - sample artifact
-  `packages/rawengine-schema/samples/negative-lab-conversion-operation-v1.json`
+  `packages/rawengine-schema/samples/negative-lab/workflows/negative-lab-conversion-operation-v1.json`
 
 The operation stage enum now includes `output_generation` so positive variant
 creation is not mislabeled as creative rendering.
