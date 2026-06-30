@@ -38,8 +38,8 @@ const fixtureSchema = z
     runtimeExpectation: runtimeExpectationSchema.optional(),
   })
   .strict();
-const fixtures = z.array(fixtureSchema).parse(await readJson('fixtures/color/profile-tone.json'));
-const invalidCases = await readJson('fixtures/color/invalid-profile-tone.json');
+const fixtures = z.array(fixtureSchema).parse(await readJson('fixtures/color/adjustments/profile-tone.json'));
+const invalidCases = await readJson('fixtures/color/adjustments/invalid/invalid-profile-tone.json');
 const failures = [];
 
 for (const fixture of fixtures) {

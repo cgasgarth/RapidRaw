@@ -10,7 +10,7 @@ import {
   lookupCameraProfile,
 } from '../../../src/utils/cameraProfileLookup.ts';
 
-const FIXTURE_PATH = 'fixtures/color/camera-profile-lookup-fixtures.json';
+const FIXTURE_PATH = 'fixtures/color/reference/camera-profile-lookup-fixtures.json';
 
 const lookupCaseSchema = z.object({
   id: z.string().min(1),

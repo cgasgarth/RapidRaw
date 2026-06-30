@@ -36,7 +36,7 @@ const fixtureSchema = z
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 
-const fixtures = fixtureSchema.parse(await readJson('fixtures/color/chromatic-adaptation-fixtures.json'));
+const fixtures = fixtureSchema.parse(await readJson('fixtures/color/reference/chromatic-adaptation-fixtures.json'));
 const failures = [];
 
 for (const fixture of fixtures) {

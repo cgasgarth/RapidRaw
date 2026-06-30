@@ -52,7 +52,7 @@ const DeltaEFixtureManifestSchema = z
     }
   });
 
-const manifestPath = resolve('fixtures/color/deltae-reference-fixtures.json');
+const manifestPath = resolve('fixtures/color/reference/deltae-reference-fixtures.json');
 const manifest = DeltaEFixtureManifestSchema.parse(JSON.parse(await readFile(manifestPath, 'utf8')));
 const failures = [];
 

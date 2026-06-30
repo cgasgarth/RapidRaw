@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 import { SELECTIVE_COLOR_RANGES } from '../../../src/utils/selectiveColorRanges.ts';
 
-const FIXTURE_PATH = 'fixtures/color/selective-color-ranges.json';
+const FIXTURE_PATH = 'fixtures/color/selective-color/selective-color-ranges.json';
 const SHADER_PATH = 'src-tauri/src/shaders/shader.wgsl';
 const COLOR_PANEL_PATH = 'src/components/adjustments/Color.tsx';
 

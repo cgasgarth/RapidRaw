@@ -38,8 +38,11 @@ const invalidCaseSchema = z
   })
   .strict();
 
-const fixtures = z.array(fixtureSchema).min(1).parse(readJson('fixtures/color/levels.json'));
-const invalidCases = z.array(invalidCaseSchema).min(1).parse(readJson('fixtures/color/invalid-levels.json'));
+const fixtures = z.array(fixtureSchema).min(1).parse(readJson('fixtures/color/adjustments/levels.json'));
+const invalidCases = z
+  .array(invalidCaseSchema)
+  .min(1)
+  .parse(readJson('fixtures/color/adjustments/invalid/invalid-levels.json'));
 
 describe('levels runtime', () => {
   test.each(fixtures)('matches fixture output for $case', (fixture) => {

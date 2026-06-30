@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 import { calculateDeltaE00, labColorSchema } from '../../../src/utils/deltaE00.ts';
 
-const FIXTURE_PATH = 'fixtures/color/colorchecker-render-gate.json';
+const FIXTURE_PATH = 'fixtures/color/proofs/colorchecker-render-gate.json';
 const REPORT_PATH = 'docs/validation/proofs/color/colorchecker-render-gate-2026-06-20.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 

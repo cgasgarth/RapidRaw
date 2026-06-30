@@ -37,13 +37,13 @@ const fixtureSchema = z
   })
   .strict();
 
-const fixture = fixtureSchema.parse(await readJson('fixtures/color/color-style-presets.json'));
+const fixture = fixtureSchema.parse(await readJson('fixtures/color/adjustments/color-style-presets.json'));
 const catalog = parseColorStylePresetCatalog({
   defaultPresetId: fixture.defaultPresetId,
   presets: fixture.presets,
   version: fixture.version,
 });
-const invalidCases = await readJson('fixtures/color/invalid-color-style-presets.json');
+const invalidCases = await readJson('fixtures/color/adjustments/invalid/invalid-color-style-presets.json');
 const presetsPanelSource = await readFile('src/components/panel/right/PresetsPanel.tsx', 'utf8');
 const usePresetsSource = await readFile('src/hooks/editor/usePresets.ts', 'utf8');
 const appPropertiesSource = await readFile('src/components/ui/AppProperties.tsx', 'utf8');

@@ -8,7 +8,7 @@ import {
   parseColorCheckerFixtureManifest,
 } from '../../../src/utils/colorCheckerFixtures.ts';
 
-const manifestPath = resolve('fixtures/color/colorchecker-fixture-manifest.json');
+const manifestPath = resolve('fixtures/color/reference/colorchecker-fixture-manifest.json');
 const manifestJson: unknown = JSON.parse(await readFile(manifestPath, 'utf8'));
 const manifest = parseColorCheckerFixtureManifest(manifestJson);
 

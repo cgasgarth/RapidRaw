@@ -59,15 +59,15 @@ const reportCaseSchema = z
 const reportSchema = z
   .object({
     cases: z.array(reportCaseSchema).min(1),
-    fixturePath: z.literal('fixtures/color/black-white-mixer.json'),
+    fixturePath: z.literal('fixtures/color/adjustments/black-white-mixer.json'),
     issue: z.literal(1878),
     schemaVersion: z.literal(1),
     validationMode: z.literal('black_white_mixer_apply_runtime_artifact'),
   })
   .strict();
 
-const fixtures = z.array(fixtureSchema).parse(await readJson('fixtures/color/black-white-mixer.json'));
-const invalidCases = await readJson('fixtures/color/invalid-black-white-mixer.json');
+const fixtures = z.array(fixtureSchema).parse(await readJson('fixtures/color/adjustments/black-white-mixer.json'));
+const invalidCases = await readJson('fixtures/color/adjustments/invalid/invalid-black-white-mixer.json');
 const failures = [];
 const reportCases = [];
 
@@ -135,7 +135,7 @@ if (!ADJUSTMENT_SECTIONS.color.includes(ColorAdjustment.BlackWhiteMixer)) {
 
 const report = reportSchema.parse({
   cases: reportCases,
-  fixturePath: 'fixtures/color/black-white-mixer.json',
+  fixturePath: 'fixtures/color/adjustments/black-white-mixer.json',
   issue: 1878,
   schemaVersion: 1,
   validationMode: 'black_white_mixer_apply_runtime_artifact',
