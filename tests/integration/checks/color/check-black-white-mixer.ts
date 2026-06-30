@@ -48,7 +48,7 @@ const reportCaseSchema = z
     influence: z.record(z.string(), z.number().min(0).max(1)),
     inputRgb: rgbPixelSchema,
     maxExpectedDelta: z.number().min(0),
-    maxOutputDelta: z.number().positive(),
+    maxOutputDelta: z.number().min(0),
     outputRgb: rgbPixelSchema,
     runtimeStatus: z.literal('apply_runtime_proof'),
     schemaStatus: z.literal('validated_by_zod'),
@@ -93,8 +93,12 @@ for (const fixture of fixtures) {
         failures.push(`${fixture.case}: expected ${channel}=${expected}, got ${actual}.`);
       }
     }
-    if (outputDelta <= 0) {
-      failures.push(`${fixture.case}: runtime output did not change the source pixel.`);
+    if (settings.enabled) {
+      if (outputDelta <= 0) {
+        failures.push(`${fixture.case}: runtime output did not change the source pixel.`);
+      }
+    } else if (outputDelta > fixture.runtimeExpectation.tolerance) {
+      failures.push(`${fixture.case}: disabled mixer must not change the source pixel.`);
     }
     reportCases.push({
       case: fixture.case,

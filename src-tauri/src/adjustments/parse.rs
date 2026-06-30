@@ -1,7 +1,7 @@
 use crate::adjustments::abi::{
-    AllAdjustments, ChannelMixerRow, ChannelMixerSettings, ColorBalanceRgbSettings,
-    ColorCalibrationSettings, ColorGradeSettings, GlobalAdjustments, HslColor, LevelsSettings,
-    MAX_MASKS, MaskAdjustments, Point,
+    AllAdjustments, BlackWhiteMixerSettings, ChannelMixerRow, ChannelMixerSettings,
+    ColorBalanceRgbSettings, ColorCalibrationSettings, ColorGradeSettings, GlobalAdjustments,
+    HslColor, LevelsSettings, MAX_MASKS, MaskAdjustments, Point,
 };
 use crate::adjustments::scales::SCALES;
 use crate::image_processing::calculate_agx_matrices;
@@ -99,6 +99,47 @@ fn parse_channel_mixer_settings(js_channel_mixer: &JsonValue) -> ChannelMixerSet
         ),
         _pad1: 0,
         _pad2: 0,
+    }
+}
+
+fn parse_black_white_mixer_settings(js_black_white_mixer: &JsonValue) -> BlackWhiteMixerSettings {
+    BlackWhiteMixerSettings {
+        reds: js_black_white_mixer["weights"]["reds"]
+            .as_f64()
+            .unwrap_or(0.0) as f32
+            / 100.0,
+        oranges: js_black_white_mixer["weights"]["oranges"]
+            .as_f64()
+            .unwrap_or(0.0) as f32
+            / 100.0,
+        yellows: js_black_white_mixer["weights"]["yellows"]
+            .as_f64()
+            .unwrap_or(0.0) as f32
+            / 100.0,
+        greens: js_black_white_mixer["weights"]["greens"]
+            .as_f64()
+            .unwrap_or(0.0) as f32
+            / 100.0,
+        aquas: js_black_white_mixer["weights"]["aquas"]
+            .as_f64()
+            .unwrap_or(0.0) as f32
+            / 100.0,
+        blues: js_black_white_mixer["weights"]["blues"]
+            .as_f64()
+            .unwrap_or(0.0) as f32
+            / 100.0,
+        purples: js_black_white_mixer["weights"]["purples"]
+            .as_f64()
+            .unwrap_or(0.0) as f32
+            / 100.0,
+        magentas: js_black_white_mixer["weights"]["magentas"]
+            .as_f64()
+            .unwrap_or(0.0) as f32
+            / 100.0,
+        enabled: u32::from(js_black_white_mixer["enabled"].as_bool().unwrap_or(false)),
+        _pad1: 0,
+        _pad2: 0,
+        _pad3: 0,
     }
 }
 
@@ -200,6 +241,10 @@ fn get_global_adjustments_from_json(
         .unwrap_or_default();
     let channel_mixer_obj = js_adjustments
         .get("channelMixer")
+        .cloned()
+        .unwrap_or_default();
+    let black_white_mixer_obj = js_adjustments
+        .get("blackWhiteMixer")
         .cloned()
         .unwrap_or_default();
     let color_balance_obj = js_adjustments
@@ -437,6 +482,11 @@ fn get_global_adjustments_from_json(
             parse_channel_mixer_settings(&channel_mixer_obj)
         } else {
             ChannelMixerSettings::default()
+        },
+        black_white_mixer: if section_is_visible(js_adjustments, "color") {
+            parse_black_white_mixer_settings(&black_white_mixer_obj)
+        } else {
+            BlackWhiteMixerSettings::default()
         },
         levels: if section_is_visible(js_adjustments, "color") {
             parse_levels_settings(&levels_obj)
