@@ -20,6 +20,11 @@ import {
   buildRawEngineAppServerRouteCatalog,
   handleRawEngineAppServerHostRequestAsync,
 } from '../../../../src/utils/rawEngineAppServerHost.ts';
+import {
+  buildSelectiveColorCommandEnvelope,
+  buildSelectiveColorImageCommandContext,
+} from '../../../../src/utils/selectiveColorCommandBridge.ts';
+import { ToneColorAppServerToolName } from '../../../../src/utils/toneColorAppServerRouteIds.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3167.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 14 : 2));
@@ -42,6 +47,19 @@ const colorResultSchema = z
         adjustedFields: z.array(z.string()).min(1),
         operationId: z.literal('agent_color_3167'),
         sessionId: z.literal('agent-color-3167'),
+        typedCommands: z
+          .array(
+            z
+              .object({
+                appliedGraphRevision: z.string().min(1),
+                changedNodeIds: z.array(z.string()).min(1),
+                commandId: z.string().min(1),
+                commandType: z.literal('toneColor.adjustHsl'),
+                sourceGraphRevision: z.literal('history_0'),
+              })
+              .strict(),
+          )
+          .min(1),
         undoGraphRevision: z.literal('history_0'),
       })
       .passthrough(),
@@ -172,7 +190,7 @@ if (
 const initialSnapshot = buildAgentImageContextSnapshot();
 let staleRejected = false;
 try {
-  applyAgentColor({
+  await applyAgentColor({
     color: { vibrance: 8 },
     expectedRecipeHash: 'recipe:stale',
     operationId: 'agent_color_stale',
@@ -184,7 +202,61 @@ try {
 }
 if (!staleRejected) throw new Error('agent.color.apply did not reject stale recipe hash.');
 
-const result = applyAgentColor({
+const dryRunCommand = buildSelectiveColorCommandEnvelope(
+  {
+    adjustment: { hue: 6, luminance: 1, saturation: 9 },
+    rangeControl: { centerHueDegrees: 28, falloffSmoothness: 1.4, widthDegrees: 48 },
+    rangeKey: 'oranges',
+  },
+  buildSelectiveColorImageCommandContext({
+    colorPipeline: {
+      chromaticAdaptation: {
+        method: 'bradford_v1',
+        sourceWhitePoint: { x: 0.3457, y: 0.3585 },
+        status: 'math_validated',
+        targetWhitePoint: { x: 0.32168, y: 0.33767 },
+        warnings: [],
+      },
+      inputDomain: 'camera_linear_rgb',
+      operationDomain: 'acescg_linear_v1',
+      renderTarget: {
+        bitDepth: 8,
+        embedIcc: true,
+        intent: 'relative_colorimetric',
+        outputProfile: 'display_p3',
+        viewTransform: 'rawengine_agx_v1',
+      },
+      sceneToDisplayTransform: 'rawengine_agx_v1',
+      workingSpace: 'acescg_linear_v1',
+    },
+    expectedGraphRevision: 'history_0',
+    imagePath: selectedPath,
+    operationId: 'agent_color_dry_run_3167',
+    sessionId: 'agent-color-3167',
+  }),
+  { dryRun: true },
+);
+const dryRunStateBefore = useEditorStore.getState();
+const dryRunDispatch = dispatchResponseSchema.parse(
+  await handleRawEngineAppServerHostRequestAsync({
+    arguments: dryRunCommand,
+    requestId: 'agent-color-hsl-dry-run-host-3167',
+    runtimeToolName: ToneColorAppServerToolName.DryRunCommand,
+    toolName: RawEngineAppServerHostToolName.DispatchTool,
+  }),
+);
+const dryRunStateAfter = useEditorStore.getState();
+if (dryRunDispatch.dispatchStatus !== 'completed') throw new Error('agent color typed HSL dry-run failed.');
+if (
+  dryRunStateAfter.historyIndex !== dryRunStateBefore.historyIndex ||
+  dryRunStateAfter.history.length !== dryRunStateBefore.history.length ||
+  dryRunStateAfter.adjustments.hsl.oranges.saturation !== dryRunStateBefore.adjustments.hsl.oranges.saturation ||
+  dryRunStateAfter.uncroppedAdjustedPreviewUrl !== dryRunStateBefore.uncroppedAdjustedPreviewUrl
+) {
+  throw new Error('agent color typed HSL dry-run mutated live editor state.');
+}
+
+const result = await applyAgentColor({
   color: {
     blackWhiteMixer: {
       enabled: true,
@@ -275,6 +347,13 @@ if (
 }
 if (state.historyIndex !== 1 || state.history.length !== 2 || state.uncroppedAdjustedPreviewUrl !== null) {
   throw new Error('agent.color.apply must create undo history and invalidate stale preview output.');
+}
+if (
+  parsedResult.receipt.typedCommands.length !== 2 ||
+  !parsedResult.receipt.typedCommands.every((command) => command.commandType === 'toneColor.adjustHsl') ||
+  !parsedResult.receipt.typedCommands.every((command) => command.changedNodeIds.some((node) => node.includes('hsl')))
+) {
+  throw new Error('agent.color.apply did not record typed HSL command provenance.');
 }
 if (parsedResult.beforePreviewHash === parsedResult.afterPreviewHash) {
   throw new Error('agent.color.apply did not update preview render identity.');
