@@ -1,7 +1,11 @@
 import { z } from 'zod';
 
+import { openComputationalMergeDerivedSourceV1 } from './computational-merge/computationalMergeDerivedSourceRuntime.js';
 import { EditCommandBus, type EditCommandBusContext, type EditCommandDispatchResult } from './editCommandBus.js';
+import { FocusStackAppServerRuntimeToolBusV1 } from './focus-stack/focusStackAppServerRuntime.js';
+import { HdrAppServerRuntimeToolBusV1 } from './hdr/hdrAppServerRuntime.js';
 import { LinearGradientMaskCommandRuntime } from './linearGradientMaskCommandRuntime.js';
+import { PanoramaAppServerRuntimeToolBusV1 } from './panorama/panoramaAppServerRuntime.js';
 import {
   ApprovalClass,
   aiEnhancementApplyResultV1Schema,
@@ -10,6 +14,12 @@ import {
   aiToolApplyResultV1Schema,
   aiToolCommandEnvelopeV1Schema,
   aiToolDryRunResultV1Schema,
+  type ComputationalMergeCommandEnvelopeV1,
+  type ComputationalMergeCommandTypeV1,
+  type ComputationalMergeDerivedSourceOpenRequestV1,
+  type ComputationalMergeFamilyV1,
+  computationalMergeCommandEnvelopeV1Schema,
+  computationalMergeDerivedSourceOpenRequestV1Schema,
   type LayerMaskCommandEnvelopeV1,
   layerMaskCommandEnvelopeV1Schema,
   type ProjectLibrarySnapshotV1,
@@ -24,6 +34,7 @@ import {
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
 } from './rawEngineSchemas.js';
+import { SuperResolutionAppServerRuntimeToolBusV1 } from './super-resolution/superResolutionAppServerRuntime.js';
 import { rawEngineDefaultToolRegistryV1 } from './toolRegistry.js';
 
 export const RawEngineLocalAppServerCommandType = {
@@ -311,6 +322,19 @@ export type RawEngineLocalAppServerAiEnhancementCommandV1 = z.infer<
   typeof rawEngineLocalAppServerAiEnhancementCommandV1Schema
 >;
 
+export const rawEngineLocalAppServerComputationalMergeCommandV1Schema = computationalMergeCommandEnvelopeV1Schema;
+
+export type RawEngineLocalAppServerComputationalMergeCommandV1 = z.infer<
+  typeof rawEngineLocalAppServerComputationalMergeCommandV1Schema
+>;
+
+export const rawEngineLocalAppServerComputationalMergeDerivedSourceOpenRequestV1Schema =
+  computationalMergeDerivedSourceOpenRequestV1Schema;
+
+export type RawEngineLocalAppServerComputationalMergeDerivedSourceOpenRequestV1 = z.infer<
+  typeof rawEngineLocalAppServerComputationalMergeDerivedSourceOpenRequestV1Schema
+>;
+
 export const rawEngineLocalAppServerLayerMaskCommandV1Schema = layerMaskCommandEnvelopeV1Schema.superRefine(
   (command, context) => {
     if (
@@ -379,6 +403,18 @@ const RAW_ENGINE_LOCAL_APP_SERVER_EXECUTABLE_TOOL_NAMES = new Set([
   'ai.enhancement.dry_run_command',
   'ai.mask.apply_subject',
   'ai.mask.dry_run_subject',
+  'computationalmerge.focus_stack.apply_command',
+  'computationalmerge.focus_stack.dry_run_command',
+  'computationalmerge.focus_stack.open_derived_source',
+  'computationalmerge.hdr.apply_command',
+  'computationalmerge.hdr.dry_run_command',
+  'computationalmerge.hdr.open_derived_source',
+  'computationalmerge.panorama.apply_command',
+  'computationalmerge.panorama.dry_run_command',
+  'computationalmerge.panorama.open_derived_source',
+  'computationalmerge.super_resolution.apply_command',
+  'computationalmerge.super_resolution.dry_run_command',
+  'computationalmerge.super_resolution.open_derived_source',
   'layermask.apply_command',
   'layermask.dry_run_command',
   'tonecolor.apply_command',
@@ -1026,6 +1062,325 @@ const buildEditorStateResult = (snapshot: ProjectLibrarySnapshotV1): RawEngineLo
     visibleImageCount: snapshot.imageList.length,
   });
 
+const computationalMergeFamilyForCommand = (
+  command: ComputationalMergeCommandEnvelopeV1,
+): ComputationalMergeFamilyV1 => {
+  switch (command.commandType) {
+    case 'computationalMerge.createFocusStack':
+      return 'focus_stack';
+    case 'computationalMerge.createHdr':
+      return 'hdr';
+    case 'computationalMerge.createPanorama':
+      return 'panorama';
+    case 'computationalMerge.createSuperResolution':
+      return 'super_resolution';
+  }
+};
+
+const computationalMergeCommandTypeForFamily = (
+  family: ComputationalMergeFamilyV1,
+): ComputationalMergeCommandTypeV1 => {
+  switch (family) {
+    case 'focus_stack':
+      return 'computationalMerge.createFocusStack';
+    case 'hdr':
+      return 'computationalMerge.createHdr';
+    case 'panorama':
+      return 'computationalMerge.createPanorama';
+    case 'super_resolution':
+      return 'computationalMerge.createSuperResolution';
+  }
+};
+
+const buildLocalComputationalMergeRuntimeManifest = () => ({
+  schemaVersion: 1,
+  serverRuntime: 'openai_app_server',
+  tools: (['focus_stack', 'hdr', 'panorama', 'super_resolution'] as const).flatMap((family) => {
+    const commandType = computationalMergeCommandTypeForFamily(family);
+    return [
+      {
+        allowedCommandTypes: [commandType],
+        approvalClass: ApprovalClass.PreviewOnly,
+        auditEvents: ['computational_merge_dry_run_requested', 'computational_merge_dry_run_completed'],
+        description: `Preview a local ${family} computational merge and return a non-mutating dry-run plan.`,
+        executionMode: 'dry_run_command',
+        inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+        localOnly: true,
+        mutates: false,
+        outputSchemaName: 'ComputationalMergeDryRunResultV1',
+        recordsProvenance: true,
+        requiresDryRunPlan: false,
+        returnsArtifactHandles: true,
+        toolName: `computationalmerge.${family}.dry_run_command`,
+      },
+      {
+        allowedCommandTypes: [commandType],
+        approvalClass: ApprovalClass.EditApply,
+        auditEvents: ['computational_merge_apply_requested', 'computational_merge_apply_completed'],
+        description: `Apply an accepted local ${family} computational merge dry-run plan.`,
+        executionMode: 'apply_dry_run_plan',
+        inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+        localOnly: true,
+        mutates: true,
+        outputSchemaName: 'ComputationalMergeMutationResultV1',
+        recordsProvenance: true,
+        requiresDryRunPlan: true,
+        returnsArtifactHandles: true,
+        toolName: `computationalmerge.${family}.apply_command`,
+      },
+    ];
+  }),
+});
+
+const localComputationalMergeRuntimeManifest = buildLocalComputationalMergeRuntimeManifest();
+
+const computationalMergeToolNameForCommand = (command: ComputationalMergeCommandEnvelopeV1): string =>
+  `computationalmerge.${computationalMergeFamilyForCommand(command)}.${
+    command.dryRun ? 'dry_run_command' : 'apply_command'
+  }`;
+
+const buildComputationalMergeRuntimeRequest = (command: ComputationalMergeCommandEnvelopeV1): unknown => {
+  switch (command.commandType) {
+    case 'computationalMerge.createHdr':
+      return buildHdrRuntimeRequest(command);
+    case 'computationalMerge.createPanorama':
+      return buildPanoramaRuntimeRequest(command);
+    case 'computationalMerge.createFocusStack':
+      return buildFocusRuntimeRequest(command);
+    case 'computationalMerge.createSuperResolution':
+      return buildSuperResolutionRuntimeRequest(command);
+  }
+};
+
+const buildHdrRuntimeRequest = (
+  command: Extract<ComputationalMergeCommandEnvelopeV1, { commandType: 'computationalMerge.createHdr' }>,
+) => {
+  const width = 48;
+  const height = 36;
+  const scene = createHdrScene(width, height);
+  const frames = command.parameters.sources.map((source, index) => {
+    const exposureEv = source.exposureEv ?? index - 1;
+    return {
+      contentHash: `sha256:local-app-server-hdr-${source.sourceIndex}`,
+      exposureEv,
+      graphRevision: `${command.expectedGraphRevision}:source:${source.sourceIndex}`,
+      height,
+      pixels: shiftFloat64Frame(renderHdrBracket(scene, exposureEv), width, height, index - 1, index % 2 === 0 ? 1 : 0),
+      sourceIndex: source.sourceIndex,
+      width,
+    };
+  });
+
+  return {
+    clipThreshold: 0.99,
+    command,
+    frames,
+    motionThreshold: 0.03,
+    outputArtifactId: `artifact_${command.commandId}_output`,
+    previewArtifactId: `artifact_${command.commandId}_preview`,
+    searchRadiusPx: 5,
+    sensorWhiteRadiance: 1,
+  };
+};
+
+const buildPanoramaRuntimeRequest = (
+  command: Extract<ComputationalMergeCommandEnvelopeV1, { commandType: 'computationalMerge.createPanorama' }>,
+) => {
+  const sourceFrames = command.parameters.sources.map((source) => ({
+    contentHash: `sha256:local-app-server-panorama-${source.sourceIndex}`,
+    expectedOffsetX: source.sourceIndex * 48,
+    expectedOffsetY: source.sourceIndex % 2 === 0 ? 0 : 2,
+    graphRevision: `${command.expectedGraphRevision}:source:${source.sourceIndex}`,
+    height: 48,
+    sourceIndex: source.sourceIndex,
+    width: 72,
+  }));
+
+  return {
+    artifactCreatedAt: '2026-06-22T12:00:00.000Z',
+    command,
+    connectedSourceIndices: command.parameters.sources.map((source) => source.sourceIndex),
+    outputArtifactId: `artifact_${command.commandId}_output`,
+    previewArtifactId: `artifact_${command.commandId}_preview`,
+    seed: `rawengine-local-app-server-${command.commandId}`,
+    sourceFrames,
+  };
+};
+
+const buildFocusRuntimeRequest = (
+  command: Extract<ComputationalMergeCommandEnvelopeV1, { commandType: 'computationalMerge.createFocusStack' }>,
+) => {
+  const width = 72;
+  const height = 48;
+  const sourceCount = command.parameters.sources.length;
+  const regionWidth = Math.floor(width / sourceCount);
+  const sourceRegions = command.parameters.sources.map((source, index) => ({
+    height,
+    sourceIndex: source.sourceIndex,
+    width: index === sourceCount - 1 ? width - regionWidth * index : regionWidth,
+    x: regionWidth * index,
+    y: 0,
+  }));
+  const frames = command.parameters.sources.map((source, index) => ({
+    contentHash: `sha256:local-app-server-focus-${source.sourceIndex}`,
+    focusDistanceMm: source.focusDistanceMm ?? 180 + index * 60,
+    graphRevision: `${command.expectedGraphRevision}:source:${source.sourceIndex}`,
+    height,
+    pixels: createFocusFrame(width, height, source.sourceIndex, sourceRegions),
+    sourceIndex: source.sourceIndex,
+    translationX: 0,
+    translationY: 0,
+    width,
+  }));
+  const cells = sourceRegions.map((region) => ({
+    height: region.height,
+    lowConfidence: false,
+    sourceScores: command.parameters.sources.map((source) => ({
+      relativeConfidence: source.sourceIndex === region.sourceIndex ? 1 : 0.01,
+      sourceIndex: source.sourceIndex,
+    })),
+    width: region.width,
+    x: region.x,
+    y: region.y,
+  }));
+
+  return {
+    artifactCreatedAt: '2026-06-22T12:00:00.000Z',
+    cells,
+    command,
+    depthConfidenceArtifactId: `artifact_${command.commandId}_depth_confidence`,
+    frames,
+    outputArtifactId: `artifact_${command.commandId}_output`,
+    previewArtifactId: `artifact_${command.commandId}_preview`,
+    retouchLayerArtifactId: `artifact_${command.commandId}_retouch`,
+    sharpnessMapArtifactId: `artifact_${command.commandId}_sharpness`,
+  };
+};
+
+const buildSuperResolutionRuntimeRequest = (
+  command: Extract<ComputationalMergeCommandEnvelopeV1, { commandType: 'computationalMerge.createSuperResolution' }>,
+) => {
+  const scale = Math.min(2, Math.floor(command.parameters.outputScale));
+  const lowWidth = 24;
+  const lowHeight = 18;
+  const highWidth = lowWidth * scale;
+  const highHeight = lowHeight * scale;
+  const truth = createSuperResolutionTruth(highWidth, highHeight);
+  const frames = command.parameters.sources.map((source, index) => ({
+    contentHash: `sha256:local-app-server-sr-${source.sourceIndex}`,
+    graphRevision: `${command.expectedGraphRevision}:source:${source.sourceIndex}`,
+    height: lowHeight,
+    pixels: downsampleSuperResolutionTruth(
+      truth,
+      highWidth,
+      lowWidth,
+      lowHeight,
+      index % scale,
+      Math.floor(index / scale) % scale,
+      scale,
+    ),
+    shiftX: index % scale,
+    shiftY: Math.floor(index / scale) % scale,
+    sourceIndex: source.sourceIndex,
+    width: lowWidth,
+  }));
+
+  return {
+    command,
+    confidenceMapArtifactId: `artifact_${command.commandId}_support_map`,
+    frames,
+    outputArtifactId: `artifact_${command.commandId}_output`,
+    previewArtifactId: `artifact_${command.commandId}_preview`,
+  };
+};
+
+const createHdrScene = (width: number, height: number): Float64Array => {
+  const pixels = new Float64Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      pixels[y * width + x] = 0.03 + (x / Math.max(1, width - 1)) * 0.11 + (x > 25 && y > 10 && y < 22 ? 0.14 : 0);
+    }
+  }
+  return pixels;
+};
+
+const renderHdrBracket = (scenePixels: Float64Array, exposureEv: number): Float64Array => {
+  const pixels = new Float64Array(scenePixels.length);
+  for (let index = 0; index < scenePixels.length; index += 1) {
+    pixels[index] = Math.min(1, (scenePixels[index] ?? 0) * 2 ** exposureEv);
+  }
+  return pixels;
+};
+
+const shiftFloat64Frame = (
+  image: Float64Array,
+  width: number,
+  height: number,
+  shiftX: number,
+  shiftY: number,
+): Float64Array => {
+  const shifted = new Float64Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const sourceX = x - shiftX;
+      const sourceY = y - shiftY;
+      if (sourceX >= 0 && sourceX < width && sourceY >= 0 && sourceY < height) {
+        shifted[y * width + x] = image[sourceY * width + sourceX] ?? 0;
+      }
+    }
+  }
+  return shifted;
+};
+
+const createFocusFrame = (
+  width: number,
+  height: number,
+  sourceIndex: number,
+  sourceRegions: Array<{ sourceIndex: number; width: number; x: number }>,
+): Float32Array => {
+  const pixels = new Float32Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const localPattern = ((x * 7 + y * 11 + sourceIndex * 19) % 31) / 255;
+      const sourceRegion = sourceRegions.find((region) => x >= region.x && x < region.x + region.width);
+      const focusBoost = sourceRegion?.sourceIndex === sourceIndex ? 0.72 : 0.08;
+      pixels[y * width + x] = Math.min(1, 0.12 + localPattern + focusBoost);
+    }
+  }
+  return pixels;
+};
+
+const createSuperResolutionTruth = (width: number, height: number): Float32Array => {
+  const pixels = new Float32Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      pixels[y * width + x] = Math.max(
+        0,
+        Math.min(1, (x / width) * 0.35 + (y / height) * 0.25 + (x % 3 === 0 ? 0.28 : 0.08)),
+      );
+    }
+  }
+  return pixels;
+};
+
+const downsampleSuperResolutionTruth = (
+  truthPixels: Float32Array,
+  highWidth: number,
+  lowWidth: number,
+  lowHeight: number,
+  shiftX: number,
+  shiftY: number,
+  scale: number,
+): Float32Array => {
+  const pixels = new Float32Array(lowWidth * lowHeight);
+  for (let y = 0; y < lowHeight; y += 1) {
+    for (let x = 0; x < lowWidth; x += 1) {
+      pixels[y * lowWidth + x] = truthPixels[(y * scale + shiftY) * highWidth + x * scale + shiftX] ?? 0;
+    }
+  }
+  return pixels;
+};
+
 export class RawEngineLocalAppServerBridge {
   readonly #acceptedAiEnhancementDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedAiToolDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
@@ -1035,6 +1390,12 @@ export class RawEngineLocalAppServerBridge {
   readonly #auditEvents: Array<RawEngineLocalAppServerAuditEventV1> = [];
   readonly #availableAiProviderIds: ReadonlySet<string>;
   readonly #commandBus: EditCommandBus;
+  readonly #computationalMergeRuntimeBuses = {
+    focus_stack: new FocusStackAppServerRuntimeToolBusV1(localComputationalMergeRuntimeManifest),
+    hdr: new HdrAppServerRuntimeToolBusV1(localComputationalMergeRuntimeManifest),
+    panorama: new PanoramaAppServerRuntimeToolBusV1(localComputationalMergeRuntimeManifest),
+    super_resolution: new SuperResolutionAppServerRuntimeToolBusV1(localComputationalMergeRuntimeManifest),
+  };
   readonly #linearGradientMaskRuntime = new LinearGradientMaskCommandRuntime({ height: 512, width: 768 });
   readonly #projectLibrarySnapshot: ProjectLibrarySnapshotV1;
   readonly #toolRegistry: RawEngineToolRegistryV1;
@@ -1166,6 +1527,14 @@ export class RawEngineLocalAppServerBridge {
     if (providerFallback === undefined) return;
 
     throw new Error(providerFallback.userVisibleMessage);
+  }
+
+  #dispatchComputationalMergeCommand(command: RawEngineLocalAppServerComputationalMergeCommandV1): unknown {
+    const family = computationalMergeFamilyForCommand(command);
+    return this.#computationalMergeRuntimeBuses[family].execute({
+      request: buildComputationalMergeRuntimeRequest(command),
+      toolName: computationalMergeToolNameForCommand(command),
+    });
   }
 
   #registerHandlers(): void {
@@ -1378,8 +1747,25 @@ export class RawEngineLocalAppServerBridge {
       },
       schema: rawEngineLocalAppServerAiEnhancementCommandV1Schema,
     });
+
+    for (const commandType of [
+      'computationalMerge.createFocusStack',
+      'computationalMerge.createHdr',
+      'computationalMerge.createPanorama',
+      'computationalMerge.createSuperResolution',
+    ] as const) {
+      this.#commandBus.register({
+        commandType,
+        execute: (command) => this.#dispatchComputationalMergeCommand(command),
+        schema: rawEngineLocalAppServerComputationalMergeCommandV1Schema,
+      });
+    }
   }
 }
+
+export const dispatchRawEngineLocalAppServerComputationalMergeDerivedSourceOpen = (
+  request: ComputationalMergeDerivedSourceOpenRequestV1,
+): unknown => openComputationalMergeDerivedSourceV1(request);
 
 export const createRawEngineLocalAppServerBridge = (
   options: { availableAiProviderIds?: readonly string[]; projectLibrarySnapshot?: ProjectLibrarySnapshotV1 } = {},
