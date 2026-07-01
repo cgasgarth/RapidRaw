@@ -17,6 +17,7 @@ import {
 import {
   buildNegativeLabAcceptedApplyPlanFingerprint,
   buildNegativeLabAcceptedPlanIdentity,
+  getNegativeLabAcceptedApplyPlanStaleReasons,
   isNegativeLabAcceptedApplyPlanCurrent,
 } from '../../../../src/utils/negative-lab/negativeLabPlanIdentity.ts';
 import { DEFAULT_NEGATIVE_LAB_UI_PRESET } from '../../../../src/utils/negative-lab/negativeLabPresetCatalog.ts';
@@ -136,6 +137,31 @@ for (const [label, fingerprint] of [
     throw new Error(`Accepted Negative Lab apply fingerprint did not reject stale ${label}.`);
   }
 }
+const staleReasons = getNegativeLabAcceptedApplyPlanStaleReasons({
+  acceptedApplyPlanFingerprint: baseFingerprint,
+  currentApplyPlanFingerprint: buildNegativeLabAcceptedApplyPlanFingerprint({
+    dryRunPlanJson: basePlanJson,
+    outputFormat: 'jpeg_proof',
+    params: {
+      ...DEFAULT_NEGATIVE_LAB_UI_PRESET.params,
+      exposure: DEFAULT_NEGATIVE_LAB_UI_PRESET.params.exposure + 0.1,
+    },
+    pathsToConvert: [targetPaths[0] ?? ''],
+    selectedProfileSnapshot: null,
+    suffix: 'Proof',
+    writeConversionBundle: false,
+  }),
+});
+for (const expectedReason of [
+  'source_paths_changed',
+  'conversion_params_changed',
+  'output_format_changed',
+  'output_options_changed',
+] as const) {
+  if (!staleReasons.includes(expectedReason)) {
+    throw new Error(`Accepted Negative Lab apply fingerprint did not expose stale reason: ${expectedReason}.`);
+  }
+}
 
 const acceptedPlanIdentity = buildNegativeLabAcceptedPlanIdentity(baseFingerprint);
 const conversionPlan = {
@@ -187,13 +213,19 @@ for (const receipt of outputs.exportedPositives) {
 }
 
 const modalSource = readFileSync('src/components/modals/negative-lab/NegativeConversionModal.tsx', 'utf8');
+const rollHealthPanelSource = readFileSync('src/components/modals/negative-lab/NegativeLabRollHealthPanel.tsx', 'utf8');
 const handoffSource = readFileSync('src/utils/negative-lab/negativeLabEditorHandoff.ts', 'utf8');
 
 for (const [label, source, marker] of [
   ['modal fingerprints accepted apply plan', modalSource, 'buildNegativeLabAcceptedApplyPlanFingerprint'],
   ['modal rejects stale apply plan before save', modalSource, 'if (!isBatchPlanAccepted)'],
+  ['modal computes accepted apply stale reasons', modalSource, 'getNegativeLabAcceptedApplyPlanStaleReasons'],
+  ['modal surfaces accepted apply stale reasons', modalSource, 'batchPlanStaleReasons={batchPlanStaleReasons}'],
   ['modal passes accepted identity to ConvertNegatives', modalSource, '...acceptedBatchPlanIdentity,'],
   ['modal preserves saved positive handoffs', modalSource, 'savedPositiveHandoffs,'],
+  ['roll health shows stale apply reasons', rollHealthPanelSource, 'negative-lab-batch-plan-stale-reasons'],
+  ['roll health requires accepted plan before apply', rollHealthPanelSource, 'data-accepted-plan-required="true"'],
+  ['roll health shows per-frame receipts', rollHealthPanelSource, 'negative-lab-batch-per-frame-receipts'],
   ['editor handoff refreshes before select', handoffSource, 'await refreshImageList();'],
   ['editor handoff requests thumbnails', handoffSource, 'requestThumbnails?.([firstSavedPath]);'],
 ] as const) {
