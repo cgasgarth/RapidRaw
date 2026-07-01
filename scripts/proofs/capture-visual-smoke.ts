@@ -1006,6 +1006,9 @@ async function assertAdjustmentsPanelRetune(page) {
 
   await assertAdjustmentSectionHeaderActions(page, panel);
 
+  await panel.getByText('Edited', { exact: true }).first().waitFor({ timeout: 10_000 });
+  await panel.getByText('Off', { exact: true }).first().waitFor({ timeout: 10_000 });
+
   const rawProcessingControl = panel.getByTestId('raw-processing-mode-override-control');
   await rawProcessingControl.waitFor({ timeout: 10_000 });
   const rawProcessingToggle = rawProcessingControl.locator('button[aria-expanded]').first();
@@ -1326,7 +1329,10 @@ async function assertProfessionalEditorToolbar(page) {
 }
 
 async function prepareScenario(page, mode) {
-  if (mode === VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune) {
+  if (
+    mode === VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune ||
+    mode === VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAdjustmentsCompact
+  ) {
     await assertAdjustmentsPanelRetune(page);
     return;
   }
@@ -3891,6 +3897,9 @@ async function main() {
     });
 
     for (const scenario of selectedScenarios) {
+      const scenarioViewport =
+        scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAdjustmentsCompact ? compactPortraitViewport : viewport;
+      await page.setViewportSize(scenarioViewport);
       await page.goto(`${baseUrl}/visual-smoke.html?scenario=${scenario.appMode ?? scenario.mode}`, {
         waitUntil: 'networkidle',
       });
@@ -3900,9 +3909,9 @@ async function main() {
       await prepareScenario(page, scenario.mode);
       await page.screenshot({ path: scenario.outputPath, fullPage: false });
       const dimensions = await readPngDimensions(scenario.outputPath);
-      if (dimensions.width !== viewport.width || dimensions.height !== viewport.height) {
+      if (dimensions.width !== scenarioViewport.width || dimensions.height !== scenarioViewport.height) {
         throw new Error(
-          `${scenario.mode} dimensions mismatch: expected ${viewport.width}x${viewport.height}, got ${dimensions.width}x${dimensions.height}`,
+          `${scenario.mode} dimensions mismatch: expected ${scenarioViewport.width}x${scenarioViewport.height}, got ${dimensions.width}x${dimensions.height}`,
         );
       }
       if (scenario.compactOutputPath !== undefined) {

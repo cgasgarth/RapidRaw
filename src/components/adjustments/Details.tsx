@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { TextVariants } from '../../types/typography';
 import { type Adjustments, DetailsAdjustment } from '../../utils/adjustments';
 import type { AppSettings } from '../ui/AppProperties';
+import { professionalInspectorDensityTokens } from '../ui/inspectorTokens';
 import Switch from '../ui/primitives/Switch';
 import UiText from '../ui/primitives/Text';
 import AdjustmentSlider from './AdjustmentSlider';
@@ -38,12 +39,13 @@ export default function DetailsPanel({
   };
 
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
+  const density = professionalInspectorDensityTokens;
 
   return (
-    <div className="space-y-2">
+    <div className={density.gutter.section}>
       {!isForMask && adjustmentVisibility['deblur'] !== false && (
-        <div className="rounded-md bg-bg-tertiary p-1.5">
-          <UiText variant={TextVariants.heading} className="mb-1">
+        <div className={density.card.nestedPanel}>
+          <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
             {t('adjustments.details.deblur')}
           </UiText>
           <Switch
@@ -83,15 +85,15 @@ export default function DetailsPanel({
             defaultValue={0.8}
             suffix=" px"
           />
-          <UiText variant={TextVariants.small} className="mt-1 text-text-secondary">
+          <UiText variant={TextVariants.small} className="mt-1 text-[11px] leading-4 text-text-secondary">
             {t('adjustments.details.deblurStatus')}
           </UiText>
         </div>
       )}
 
       {!isForMask && (
-        <div className="rounded-md bg-bg-tertiary p-1.5">
-          <UiText variant={TextVariants.heading} className="mb-1">
+        <div className={density.card.nestedPanel}>
+          <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
             {t('adjustments.details.dustSpotVisualization')}
           </UiText>
           <Switch
@@ -102,7 +104,7 @@ export default function DetailsPanel({
               handleBooleanAdjustmentChange(DetailsAdjustment.DustSpotOverlayEnabled, checked);
             }}
           />
-          <div className="mt-2 rounded-md border border-border-color bg-bg-primary p-2">
+          <div className="mt-1.5 rounded border border-editor-border bg-editor-panel p-1.5">
             <div className="relative h-16 overflow-hidden rounded bg-linear-to-br from-[#20242a] via-[#34313a] to-[#15171b]">
               {[18, 31, 46, 59, 77].map((left, index) => (
                 <span
@@ -122,7 +124,7 @@ export default function DetailsPanel({
                 />
               ))}
             </div>
-            <UiText variant={TextVariants.small} className="mt-1 text-text-secondary">
+            <UiText variant={TextVariants.small} className="mt-1 text-[11px] leading-4 text-text-secondary">
               {t('adjustments.details.dustOverlayStatus')}
             </UiText>
           </div>
@@ -158,8 +160,8 @@ export default function DetailsPanel({
       )}
 
       {adjustmentVisibility['sharpening'] !== false && (
-        <div className="rounded-md bg-bg-tertiary p-1.5">
-          <UiText variant={TextVariants.heading} className="mb-1">
+        <div className={density.card.nestedPanel}>
+          <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
             {t('adjustments.details.sharpening')}
           </UiText>
           <AdjustmentSlider
@@ -192,8 +194,8 @@ export default function DetailsPanel({
       )}
 
       {adjustmentVisibility['presence'] !== false && (
-        <div className="rounded-md bg-bg-tertiary p-1.5">
-          <UiText variant={TextVariants.heading} className="mb-1">
+        <div className={density.card.nestedPanel}>
+          <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
             {t('adjustments.details.presence')}
           </UiText>
           <AdjustmentSlider
@@ -276,7 +278,7 @@ export default function DetailsPanel({
                 defaultValue={50}
                 fillOrigin="min"
               />
-              <UiText variant={TextVariants.small} className="mt-1 text-text-secondary">
+              <UiText variant={TextVariants.small} className="mt-1 text-[11px] leading-4 text-text-secondary">
                 {t('adjustments.details.localContrastStatus')}
               </UiText>
             </>
@@ -299,8 +301,8 @@ export default function DetailsPanel({
       )}
 
       {adjustmentVisibility['noiseReduction'] !== false && (
-        <div className="rounded-md bg-bg-tertiary p-1.5">
-          <UiText variant={TextVariants.heading} className="mb-1">
+        <div className={density.card.nestedPanel}>
+          <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
             {t('adjustments.details.noiseReduction')}
           </UiText>
           <AdjustmentSlider
@@ -331,8 +333,8 @@ export default function DetailsPanel({
       )}
 
       {!isForMask && adjustmentVisibility['chromaticAberration'] !== false && (
-        <div className="rounded-md bg-bg-tertiary p-1.5">
-          <UiText variant={TextVariants.heading} className="mb-1">
+        <div className={density.card.nestedPanel}>
+          <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
             {t('adjustments.details.chromaticAberration')}
           </UiText>
           <AdjustmentSlider
