@@ -42,6 +42,14 @@ RAWENGINE_PRIVATE_RAW_ROOT="$(pwd)" bun scripts/private-raw/prepare/prepare-sr-r
 
 The SR selector uses the same ordered burst requirements as panorama and writes four project-owned RAW sources into `private-fixtures/super-resolution/alaska-burst-v1/`.
 
+For the local Alaska runtime-proof path, point the private root at the Capture One Alaska folder and run the SR wrapper:
+
+```sh
+RAWENGINE_PRIVATE_RAW_ROOT="/Users/cgas/Pictures/Capture One/Alaska" bun run run:sr-local-alaska-runtime-sample
+```
+
+The wrapper uses the same folder as the source by default, writes ignored symlinks under `private-fixtures/super-resolution/alaska-burst-v1/`, decodes the selected ARWs, and emits the local-only runtime sample at `private-artifacts/validation/computational-merge/sr-subpixel-runtime-sample.json`.
+
 Validation rules:
 
 - RAW payloads stay local and ignored.

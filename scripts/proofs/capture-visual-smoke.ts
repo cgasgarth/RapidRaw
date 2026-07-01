@@ -2357,7 +2357,7 @@ async function prepareScenario(page, mode) {
     }
     const reconstructionPath = proofBefore.reconstructionPath;
     if (reconstructionPath === undefined) throw new Error('SR private RAW modal proof is missing reconstruction path.');
-    await page.getByRole('button', { exact: true, name: 'Preview plan' }).click();
+    await page.getByTestId('sr-preview-plan-button').click();
     const proofAfter = await page
       .getByTestId('sr-private-raw-modal-review-proof')
       .evaluate((element) => ({ ...element.dataset }));
@@ -2406,12 +2406,13 @@ async function prepareScenario(page, mode) {
       const riskCount = await page.getByTestId('sr-support-map-review').locator(`[data-region-risk="${risk}"]`).count();
       if (riskCount < 1) throw new Error(`SR private RAW support-map review missing ${risk} region.`);
     }
-    await page.getByTestId('sr-review-diagnostics').getByText(reconstructionPath, { exact: true }).waitFor({
+    await page.getByTestId('sr-review-diagnostics').getByText(reconstructionPath, { exact: true }).first().waitFor({
       timeout: 10_000,
     });
     await page
       .getByTestId('sr-review-diagnostics')
       .getByText(proofBefore.reconstructionHash, { exact: true })
+      .first()
       .waitFor({ timeout: 10_000 });
     await page
       .getByTestId('sr-review-diagnostics')
