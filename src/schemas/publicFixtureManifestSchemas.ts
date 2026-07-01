@@ -68,12 +68,30 @@ export const publicFixtureManifestEntrySchema = z
     }
   });
 
+const activePublicFixtureManifestEntrySchema = publicFixtureManifestEntrySchema.safeExtend({
+  expectedSha256: z.string().regex(/^[a-f0-9]{64}$/u),
+  expectedSizeBytes: z.number().int().positive(),
+  status: z.literal('active'),
+});
+
+const plannedPublicFixtureManifestEntrySchema = publicFixtureManifestEntrySchema.safeExtend({
+  publicCiAllowed: z.literal(false),
+  status: z.literal('planned'),
+});
+
+const retiredPublicFixtureManifestEntrySchema = publicFixtureManifestEntrySchema.safeExtend({
+  publicCiAllowed: z.literal(false),
+  status: z.literal('retired'),
+});
+
 export const publicFixtureManifestSchema = z
   .object({
     $schema: z.url(),
-    entries: z.array(publicFixtureManifestEntrySchema).min(1),
+    activeEntries: z.array(activePublicFixtureManifestEntrySchema),
     issue: z.number().int().positive(),
     policy: z.string().trim().min(1),
+    plannedEntries: z.array(plannedPublicFixtureManifestEntrySchema),
+    retiredEntries: z.array(retiredPublicFixtureManifestEntrySchema),
     schemaVersion: z.literal(0),
     snapshotDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
   })
@@ -81,16 +99,32 @@ export const publicFixtureManifestSchema = z
   .superRefine((manifest, context) => {
     const seenFixtureIds = new Set<string>();
 
-    manifest.entries.forEach((entry, index) => {
-      if (seenFixtureIds.has(entry.fixtureId)) {
-        context.addIssue({
-          code: 'custom',
-          message: `Duplicate fixture ID: ${entry.fixtureId}.`,
-          path: ['entries', index, 'fixtureId'],
-        });
-      }
-      seenFixtureIds.add(entry.fixtureId);
-    });
+    const entryGroups = [
+      ['activeEntries', manifest.activeEntries],
+      ['plannedEntries', manifest.plannedEntries],
+      ['retiredEntries', manifest.retiredEntries],
+    ] as const;
+
+    for (const [groupName, entries] of entryGroups) {
+      entries.forEach((entry, index) => {
+        if (seenFixtureIds.has(entry.fixtureId)) {
+          context.addIssue({
+            code: 'custom',
+            message: `Duplicate fixture ID: ${entry.fixtureId}.`,
+            path: [groupName, index, 'fixtureId'],
+          });
+        }
+        seenFixtureIds.add(entry.fixtureId);
+      });
+    }
+
+    if (manifest.activeEntries.length + manifest.plannedEntries.length + manifest.retiredEntries.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Public fixture manifest must contain at least one active, planned, or retired entry.',
+        path: ['activeEntries'],
+      });
+    }
   });
 
 export type PublicFixtureManifest = z.infer<typeof publicFixtureManifestSchema>;
@@ -98,3 +132,15 @@ export type PublicFixtureManifestEntry = z.infer<typeof publicFixtureManifestEnt
 
 export const parsePublicFixtureManifest = (value: unknown): PublicFixtureManifest =>
   publicFixtureManifestSchema.parse(value);
+
+export const getPublicFixtureManifestEntries = (manifest: PublicFixtureManifest): PublicFixtureManifestEntry[] => [
+  ...manifest.activeEntries,
+  ...manifest.plannedEntries,
+  ...manifest.retiredEntries,
+];
+
+export const getActivePublicFixtureEntries = (manifest: PublicFixtureManifest): PublicFixtureManifestEntry[] =>
+  manifest.activeEntries;
+
+export const getPlannedPublicFixtureEntries = (manifest: PublicFixtureManifest): PublicFixtureManifestEntry[] =>
+  manifest.plannedEntries;

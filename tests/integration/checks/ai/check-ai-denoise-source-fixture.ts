@@ -3,14 +3,17 @@
 import { createHash } from 'node:crypto';
 import { stat } from 'node:fs/promises';
 
-import { parsePublicFixtureManifest } from '../../../../src/schemas/publicFixtureManifestSchemas.ts';
+import {
+  getPlannedPublicFixtureEntries,
+  parsePublicFixtureManifest,
+} from '../../../../src/schemas/publicFixtureManifestSchemas.ts';
 
 const MANIFEST_PATH = 'docs/validation/fixtures/public-fixture-manifest.json';
 const FIXTURE_ID = 'real.detail.high-iso-skin-shadow.v0';
 const sourcePath = process.env.RAWENGINE_AI_DENOISE_SOURCE_PATH;
 
 const manifest = parsePublicFixtureManifest(JSON.parse(await Bun.file(MANIFEST_PATH).text()));
-const fixture = manifest.entries.find((entry) => entry.fixtureId === FIXTURE_ID);
+const fixture = getPlannedPublicFixtureEntries(manifest).find((entry) => entry.fixtureId === FIXTURE_ID);
 
 if (fixture === undefined) {
   console.error(`AI denoise source fixture failed: missing ${FIXTURE_ID}`);
