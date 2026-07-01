@@ -116,6 +116,105 @@
       "warnings": []
     }
   ],
+  "timeline": {
+    "deterministicReplayHash": "fnv1a32:sample-tone-cycle",
+    "eventCount": 4,
+    "events": [
+      {
+        "eventId": "timeline:tone_color_demo:preview",
+        "graphRevisionBefore": "graph_rev_44",
+        "linked": {
+          "auditEventIds": [],
+          "previewArtifactId": "artifact_tone_color_before_preview",
+          "previewRef": "rawengine://agent-preview/session_agent_tone_color_demo/before",
+          "replayStepId": "agent_iterative_edit_timeline:session_agent_tone_color_demo:tone_color_demo:preview"
+        },
+        "nextEventId": "timeline:tone_color_demo:dry_run",
+        "occurredAtIso": "2026-06-13T17:45:02.000Z",
+        "phase": "preview",
+        "previousEventId": null,
+        "renderHash": "render:sample-before-preview",
+        "requestId": "request_tone_color_preview_before",
+        "status": "succeeded",
+        "toolName": "rawengine.agent.preview.render",
+        "warnings": []
+      },
+      {
+        "eventId": "timeline:tone_color_demo:dry_run",
+        "expectedGraphRevision": "graph_rev_44",
+        "graphRevisionAfter": "graph_rev_45_predicted",
+        "graphRevisionBefore": "graph_rev_44",
+        "linked": {
+          "auditEventIds": ["audit_tone_color_dry_run_001"],
+          "commandId": "command_tone_color_basic_preview_sample",
+          "dryRunPlanHash": "sha256:sample-tone-color-plan",
+          "dryRunPlanId": "dryrun_tone_color_basic_sample",
+          "previewArtifactId": "artifact_tone_color_basic_preview",
+          "previewRef": "rawengine://agent-tone-preview-after/session_agent_tone_color_demo/command_tone_color_basic_preview_sample/render:sample-dry-run-preview",
+          "replayStepId": "agent_iterative_edit_timeline:session_agent_tone_color_demo:tone_color_demo:dry_run"
+        },
+        "nextEventId": "timeline:tone_color_demo:apply",
+        "occurredAtIso": "2026-06-13T17:45:05.000Z",
+        "phase": "dry_run",
+        "previousEventId": "timeline:tone_color_demo:preview",
+        "renderHash": "render:sample-dry-run-preview",
+        "requestId": "request_tone_color_dry_run",
+        "status": "succeeded",
+        "toolName": "rawengine.agent.tone_adjustment.dry_run",
+        "warnings": []
+      },
+      {
+        "acceptedPlanHash": "sha256:sample-tone-color-plan",
+        "acceptedPlanId": "dryrun_tone_color_basic_sample",
+        "eventId": "timeline:tone_color_demo:apply",
+        "expectedGraphRevision": "graph_rev_44",
+        "graphRevisionAfter": "graph_rev_46",
+        "graphRevisionBefore": "graph_rev_44",
+        "linked": {
+          "auditEventIds": ["audit_tone_color_apply_preflight_001", "audit_tone_color_apply_001"],
+          "commandId": "command_tone_color_basic_apply_sample",
+          "dryRunPlanHash": "sha256:sample-tone-color-plan",
+          "dryRunPlanId": "dryrun_tone_color_basic_sample",
+          "previewArtifactId": "artifact_tone_color_apply_preview_after",
+          "previewRef": "rawengine://agent-tone-preview-after/session_agent_tone_color_demo/command_tone_color_basic_apply_sample/render:sample-apply-preview",
+          "replayStepId": "agent_iterative_edit_timeline:session_agent_tone_color_demo:tone_color_demo:apply"
+        },
+        "nextEventId": "timeline:tone_color_demo:preview_after",
+        "occurredAtIso": "2026-06-13T17:45:16.000Z",
+        "phase": "apply",
+        "previousEventId": "timeline:tone_color_demo:dry_run",
+        "renderHash": "render:sample-apply-preview",
+        "requestId": "request_tone_color_apply",
+        "status": "succeeded",
+        "toolName": "rawengine.agent.tone_adjustment.apply",
+        "warnings": []
+      },
+      {
+        "eventId": "timeline:tone_color_demo:preview_after",
+        "graphRevisionAfter": "graph_rev_46",
+        "graphRevisionBefore": "graph_rev_44",
+        "linked": {
+          "auditEventIds": ["audit_tone_color_apply_preflight_001", "audit_tone_color_apply_001"],
+          "previewArtifactId": "artifact_tone_color_after_preview",
+          "previewRef": "rawengine://agent-preview/session_agent_tone_color_demo/after",
+          "replayStepId": "agent_iterative_edit_timeline:session_agent_tone_color_demo:tone_color_demo:preview_after"
+        },
+        "nextEventId": null,
+        "occurredAtIso": "2026-06-13T17:45:18.000Z",
+        "phase": "preview_after",
+        "previousEventId": "timeline:tone_color_demo:apply",
+        "renderHash": "render:sample-after-preview",
+        "requestId": "request_tone_color_preview_after",
+        "status": "succeeded",
+        "toolName": "rawengine.agent.preview.render",
+        "warnings": []
+      }
+    ],
+    "operationId": "tone_color_demo",
+    "replayId": "agent_iterative_edit_timeline:session_agent_tone_color_demo:tone_color_demo",
+    "schemaVersion": 1,
+    "sessionId": "session_agent_tone_color_demo"
+  },
   "redactions": {
     "applied": false,
     "fields": [],

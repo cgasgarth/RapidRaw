@@ -46,6 +46,7 @@ Each audit file contains one session object:
 | `target`                    | Project, image, virtual copy, layer, mask, or artifact scope. |
 | `startedAt` / `completedAt` | ISO timestamps for the audited sequence.                      |
 | `entries`                   | Ordered tool-call records.                                    |
+| `timeline`                  | Optional compact linked edit-cycle timeline.                  |
 | `replay`                    | Optional replay fixture id, path, and content hash.           |
 | `redactions`                | Declares which fields were removed before sharing.            |
 
@@ -71,6 +72,42 @@ Each entry records one boundary crossing:
 | `warnings`                             | Structured warning codes and severity.                                           |
 | `durationMs`                           | Wall time for the operation.                                                     |
 | `status`                               | `started`, `succeeded`, `failed`, `cancelled`, or `skipped`.                     |
+
+## Iterative Edit Timeline
+
+When an agent performs an iterative edit cycle, the audit log should also include
+a compact `timeline` artifact. The timeline is not a replacement for full
+entries. It is the small ordered model used by UI history, validation, and replay
+checks to prove the edit loop that the user saw.
+
+For the tone adjustment flow, the required event order is:
+
+```text
+preview -> dry_run -> apply -> preview_after
+```
+
+Each timeline event should link the identifiers already returned by the tools:
+
+| Field                           | Requirement                                               |
+| ------------------------------- | --------------------------------------------------------- |
+| `eventId`                       | Stable event id unique within the timeline.               |
+| `phase`                         | `preview`, `dry_run`, `apply`, or `preview_after`.        |
+| `previousEventId`/`nextEventId` | Linked-list pointers proving cycle order.                 |
+| `requestId` / `toolName`        | App-server request and tool identity.                     |
+| `graphRevisionBefore/After`     | Revision boundary when known.                             |
+| `linked.commandId`              | Command id when the tool returns one.                     |
+| `linked.dryRunPlanId/Hash`      | Dry-run identity, repeated on apply as the accepted plan. |
+| `linked.previewArtifactId`      | Preview or preview-after artifact id when returned.       |
+| `linked.auditEventIds`          | Lower-level runtime audit event ids returned by the tool. |
+| `linked.replayStepId`           | Stable replay step id for this timeline event.            |
+| `warnings`                      | Warning strings/codes returned by the tool.               |
+| `status`                        | `succeeded`, `failed`, `cancelled`, or `skipped`.         |
+
+The timeline has a deterministic replay hash over stable identifiers and result
+metadata. Runtime validation must reject out-of-order phases, broken
+previous/next links, and apply events that do not reference the dry-run plan.
+Cancellation and replay IDs should be carried when the underlying app-server
+tool or session surface provides them.
 
 ## Invariants
 
@@ -138,6 +175,7 @@ Runtime validation follow-ups should add:
 - mutation approval tests;
 - dry-run/apply graph revision tests;
 - replay fixture linkage tests;
+- iterative timeline ordering and replay-hash stability tests;
 - redaction policy tests for shareable logs.
 
 The audit log is complete only when it can be generated from a live app-server
