@@ -194,7 +194,6 @@ interface MaskRefinementParameterConfig extends NumericParameterConfig<MaskRefin
     | 'editor.masks.refinement.edgeContrast'
     | 'editor.masks.refinement.edgeShiftPx'
     | 'editor.masks.refinement.featherPx'
-    | 'editor.masks.refinement.hairDetail'
     | 'editor.masks.refinement.smoothness';
 }
 
@@ -258,15 +257,6 @@ const MASK_REFINEMENT_PARAMETERS: Array<MaskRefinementParameterConfig> = [
     defaultValue: 0,
   },
   {
-    key: 'hairDetail',
-    labelKey: 'editor.masks.refinement.hairDetail',
-    min: 0,
-    max: 100,
-    step: 1,
-    multiplier: 100,
-    defaultValue: 0,
-  },
-  {
     key: 'smoothness',
     labelKey: 'editor.masks.refinement.smoothness',
     min: 0,
@@ -280,7 +270,6 @@ const MASK_REFINEMENT_PARAMETERS: Array<MaskRefinementParameterConfig> = [
 const MASK_REFINEMENT_WARNING_LABEL_KEYS = {
   densityLow: 'editor.masks.refinement.warnings.densityLow',
   featherHigh: 'editor.masks.refinement.warnings.featherHigh',
-  hairDetailHigh: 'editor.masks.refinement.warnings.hairDetailHigh',
   shiftLarge: 'editor.masks.refinement.warnings.shiftLarge',
 } as const;
 
@@ -1130,7 +1119,6 @@ function MaskRefinementControls({
           ...(replayReceipt.density <= 0.1 ? (['densityLow'] as const) : []),
           ...(replayReceipt.featherPx >= 40 ? (['featherHigh'] as const) : []),
           ...(Math.abs(replayReceipt.edgeShiftPx) >= 48 ? (['shiftLarge'] as const) : []),
-          ...(replayReceipt.hairDetail >= 0.75 ? (['hairDetailHigh'] as const) : []),
         ];
 
   return (
