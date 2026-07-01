@@ -36,6 +36,11 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 installDom();
 
 const { ContextMenuProvider, useContextMenu } = await import('../../../../src/context/ContextMenuContext.tsx');
+const { useAppContextMenus } = await import('../../../../src/hooks/app/useAppContextMenus.ts');
+const { useEditorStore } = await import('../../../../src/store/useEditorStore.ts');
+const { useLibraryStore } = await import('../../../../src/store/useLibraryStore.ts');
+const { useSettingsStore } = await import('../../../../src/store/useSettingsStore.ts');
+const { useUIStore } = await import('../../../../src/store/useUIStore.ts');
 
 const openedTargets: string[][] = [];
 const rendered = await renderContextMenuHarness(() => {
@@ -134,6 +139,9 @@ assert.equal(
 
 rendered.unmount();
 
+await assertAppThumbnailContextMenuOpensSupportedSelection();
+await assertAppThumbnailContextMenuDisablesUnsupportedSelection();
+
 console.log('negative lab context menu keyboard ok');
 
 function ContextMenuHarness({ onOpenNegativeLab }: { onOpenNegativeLab: () => void }) {
@@ -206,6 +214,188 @@ async function renderContextMenuHarness(onOpenNegativeLab: () => void): Promise<
       container.remove();
     },
   };
+}
+
+function AppThumbnailContextMenuHarness({ path }: { path: string }) {
+  const menus = useAppContextMenus({
+    executeDelete: async () => undefined,
+    handleBackToLibrary: () => undefined,
+    handleImageSelect: () => undefined,
+    handleImportClick: () => undefined,
+    handleLibraryRefresh: async () => undefined,
+    handleRenameFiles: () => undefined,
+    handleTogglePinFolder: async () => undefined,
+    refreshAllFolderTrees: async () => undefined,
+    refreshImageList: async () => undefined,
+  });
+
+  return createElement(
+    'button',
+    {
+      'data-testid': 'negative-lab-app-thumbnail-context-menu-surface',
+      onContextMenu: (event: MouseEvent) => {
+        menus.handleThumbnailContextMenu(event, path);
+      },
+      type: 'button',
+    },
+    'Open thumbnail context menu',
+  );
+}
+
+async function assertAppThumbnailContextMenuOpensSupportedSelection() {
+  const supportedPath = '/library/negative-lab/context-menu-negative.dng';
+  prepareAppStores({
+    imagePaths: [supportedPath],
+    multiSelectedPaths: [supportedPath],
+    supportedTypes: { nonRaw: ['jpg', 'jpeg', 'tif', 'tiff'], raw: ['arw', 'dng'] },
+  });
+
+  const renderedAppMenu = await renderAppThumbnailContextMenuHarness(supportedPath);
+  await openContextMenu(renderedAppMenu.container);
+  await openProductivitySubmenu();
+
+  const convertButton = findMenuButton(locale.contextMenus.editor.convertNegative);
+  assert(convertButton, 'Actual thumbnail context menu should render Convert Negative for supported sources.');
+  assert.equal(convertButton.disabled, false, 'Supported thumbnail selection should enable Convert Negative.');
+
+  await act(async () => {
+    convertButton.click();
+    await flushTimers();
+  });
+
+  assert.deepEqual(
+    useUIStore.getState().negativeModalState,
+    { isOpen: true, targetPaths: [supportedPath] },
+    'Supported thumbnail context menu should open Negative Lab with selected paths.',
+  );
+
+  renderedAppMenu.unmount();
+}
+
+async function assertAppThumbnailContextMenuDisablesUnsupportedSelection() {
+  const unsupportedPath = '/library/negative-lab/readme.txt';
+  prepareAppStores({
+    imagePaths: [unsupportedPath],
+    multiSelectedPaths: [unsupportedPath],
+    supportedTypes: { nonRaw: ['jpg', 'jpeg', 'tif', 'tiff'], raw: ['arw', 'dng'] },
+  });
+
+  const renderedAppMenu = await renderAppThumbnailContextMenuHarness(unsupportedPath);
+  await openContextMenu(renderedAppMenu.container);
+  await openProductivitySubmenu();
+
+  const disabledLabel = `${locale.contextMenus.thumbnail.convertNegative_one} - ${locale.negativeLabEntryPoints.disabled.unsupported}`;
+  const convertButton = findMenuButton(disabledLabel);
+  assert(convertButton, 'Actual thumbnail context menu should render unsupported disabled reason.');
+  assert.equal(convertButton.disabled, true, 'Unsupported thumbnail selection should disable Convert Negative.');
+  assert.deepEqual(
+    useUIStore.getState().negativeModalState,
+    { isOpen: false, targetPaths: [] },
+    'Unsupported thumbnail context menu should not open Negative Lab.',
+  );
+
+  renderedAppMenu.unmount();
+}
+
+async function renderAppThumbnailContextMenuHarness(path: string): Promise<{
+  container: HTMLDivElement;
+  root: Root;
+  unmount: () => void;
+}> {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+
+  await act(async () => {
+    root.render(
+      createElement(
+        I18nextProvider,
+        { i18n },
+        createElement(ContextMenuProvider, null, createElement(AppThumbnailContextMenuHarness, { path })),
+      ),
+    );
+    await flushTimers();
+  });
+
+  return {
+    container,
+    root,
+    unmount: () => {
+      act(() => {
+        root.unmount();
+      });
+      container.remove();
+      document.querySelectorAll('[role="menu"]').forEach((menu) => menu.remove());
+    },
+  };
+}
+
+function prepareAppStores({
+  imagePaths,
+  multiSelectedPaths,
+  supportedTypes,
+}: {
+  imagePaths: string[];
+  multiSelectedPaths: string[];
+  supportedTypes: { nonRaw: string[]; raw: string[] };
+}) {
+  useEditorStore.setState({ copiedAdjustments: null, selectedImage: null });
+  useLibraryStore.setState({
+    activeAlbumId: null,
+    albumTree: [],
+    imageList: imagePaths.map((path) => ({
+      exif: null,
+      is_edited: false,
+      is_virtual_copy: false,
+      modified: 0,
+      path,
+      rating: 0,
+      tags: null,
+    })),
+    libraryActivePath: multiSelectedPaths[0] ?? null,
+    multiSelectedPaths,
+  });
+  useSettingsStore.setState({ appSettings: null, supportedTypes });
+  useUIStore.setState({ negativeModalState: { isOpen: false, targetPaths: [] } });
+}
+
+async function openContextMenu(container: HTMLElement) {
+  const surface = container.querySelector<HTMLButtonElement>(
+    '[data-testid="negative-lab-app-thumbnail-context-menu-surface"]',
+  );
+  assert(surface, 'App thumbnail context menu surface should render.');
+  await act(async () => {
+    surface.dispatchEvent(
+      new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 48,
+        clientY: 48,
+      }),
+    );
+    await flushTimers();
+  });
+}
+
+async function openProductivitySubmenu() {
+  const productivityButton = findMenuButton(locale.contextMenus.editor.productivity);
+  assert(productivityButton, 'Productivity submenu should render in actual thumbnail context menu.');
+  await act(async () => {
+    productivityButton.focus();
+    productivityButton.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'ArrowRight' }),
+    );
+    await flushTimers();
+  });
+  assert.equal(productivityButton.getAttribute('aria-expanded'), 'true', 'Productivity submenu should open.');
+}
+
+function findMenuButton(label: string): HTMLButtonElement | null {
+  return (
+    Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')).find((button) =>
+      button.textContent?.includes(label),
+    ) ?? null
+  );
 }
 
 async function pressKey(key: string) {

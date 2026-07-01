@@ -21,6 +21,7 @@ interface EditorToolbarProps {
   isAndroid: boolean;
   isFullScreen?: boolean;
   isLoading: boolean;
+  negativeLabDisabledReason?: string | null;
   onBackToLibrary: () => void;
   onOpenNegativeLab: () => void;
   onRedo: () => void;
@@ -44,6 +45,7 @@ const EditorToolbar = memo(
     isAndroid,
     isFullScreen: isFullScreenProp,
     isLoading,
+    negativeLabDisabledReason = null,
     onBackToLibrary,
     onOpenNegativeLab,
     onRedo,
@@ -103,6 +105,8 @@ const EditorToolbar = memo(
     const fullscreenTooltip = isFullScreen
       ? t('editor.toolbar.tooltips.exitPreview')
       : t('editor.toolbar.tooltips.fullscreen');
+    const negativeLabLabel = t('contextMenus.editor.convertNegative');
+    const negativeLabTooltip = negativeLabDisabledReason ?? negativeLabLabel;
 
     const showResolution = !isAndroid && selectedImage.width > 0 && selectedImage.height > 0;
     const [displayedResolution, setDisplayedResolution] = useState('');
@@ -777,10 +781,16 @@ const EditorToolbar = memo(
           </div>
 
           <button
-            aria-label={t('contextMenus.editor.convertNegative')}
-            className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors shrink-0"
+            aria-label={
+              negativeLabDisabledReason ? `${negativeLabLabel}: ${negativeLabDisabledReason}` : negativeLabLabel
+            }
+            className={cx(
+              'bg-surface text-text-primary p-2 rounded-full transition-colors shrink-0',
+              negativeLabDisabledReason ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active',
+            )}
             data-testid="editor-toolbar-negative-lab"
-            data-tooltip={t('contextMenus.editor.convertNegative')}
+            data-tooltip={negativeLabTooltip}
+            disabled={negativeLabDisabledReason !== null}
             onClick={onOpenNegativeLab}
             onKeyDown={handleButtonKeyDown}
             type="button"

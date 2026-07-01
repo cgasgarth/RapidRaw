@@ -2,7 +2,12 @@
 
 import { strict as assert } from 'node:assert';
 
-import { type ImageFile, Panel, type SelectedImage } from '../../../../../src/components/ui/AppProperties';
+import {
+  type ImageFile,
+  Panel,
+  type SelectedImage,
+  type SupportedTypes,
+} from '../../../../../src/components/ui/AppProperties';
 import {
   type CommandPaletteUiState,
   commandPaletteCommands,
@@ -25,6 +30,8 @@ const requiredCommandIds = [
 
 const imageA = makeImage('/photos/a.ARW', { ISO: '100' });
 const imageB = makeImage('/photos/b.ARW', { ISO: '200' });
+const unsupportedDocument = makeImage('/photos/readme.txt', { ISO: '100' });
+const supportedTypes: SupportedTypes = { nonRaw: ['jpg', 'jpeg', 'png', 'tif', 'tiff'], raw: ['arw', 'dng', 'cr3'] };
 const alaskaHdrStack = [
   makeImage('/photos/alaska/_DSC7527.ARW', { DateTimeOriginal: '2026:01:01 00:00:00', ExposureTime: '1/1000' }, 0),
   makeImage('/photos/alaska/_DSC7528.ARW', { DateTimeOriginal: '2026:01:01 00:00:01', ExposureTime: '1/250' }, 1),
@@ -82,6 +89,14 @@ function assertUnavailableReasons() {
     'modals.commandPalette.unavailable.selectEditorImage',
   );
   assert.equal(reasonFor('negativeLab', [imageA], [imageA.path], null), null);
+  assert.equal(
+    reasonFor('negativeLab', [unsupportedDocument], [unsupportedDocument.path], null),
+    'modals.commandPalette.unavailable.negativeLabUnsupported',
+  );
+  assert.equal(
+    reasonFor('negativeLab', [imageA], [imageA.path], null, null, null),
+    'modals.commandPalette.unavailable.negativeLabLoading',
+  );
 }
 
 function assertWorkflowActionsOpenModalsWithSelectedSources() {
@@ -214,6 +229,7 @@ function runCommand(
     selectedCommandImages?: ImageFile[];
     selectedCommandPaths?: string[];
     selectedImage?: SelectedImage | null;
+    supportedTypes?: SupportedTypes | null;
   } = {},
 ): { panels: Array<Panel | null>; state: CommandPaletteUiState } {
   const state = makeUiState();
@@ -241,6 +257,7 @@ function runCommand(
       const patch = typeof updater === 'function' ? updater(state) : updater;
       Object.assign(state, patch);
     },
+    supportedTypes: overrides.supportedTypes === undefined ? supportedTypes : overrides.supportedTypes,
   });
 
   assert.ok(action, `missing action for command: ${commandId}`);
@@ -254,6 +271,7 @@ function reasonFor(
   selectedCommandPaths: string[],
   currentSelectedImage: SelectedImage | null,
   libraryActivePath: string | null = null,
+  currentSupportedTypes: SupportedTypes | null = supportedTypes,
 ) {
   const command = commandPaletteCommands.find((candidate) => candidate.id === commandId);
   assert.ok(command, `missing command fixture: ${commandId}`);
@@ -266,6 +284,7 @@ function reasonFor(
         ? [libraryActivePath]
         : selectedCommandPaths,
     currentSelectedImage,
+    currentSupportedTypes,
   );
 }
 

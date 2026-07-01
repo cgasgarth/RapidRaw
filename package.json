@@ -36,6 +36,7 @@
     "check:working-space-contract": "bun tests/integration/checks/color/check-working-space-contract.ts",
     "check:negative-lab-agent-apply-rollback": "bun tests/integration/checks/negative-lab/check-negative-lab-agent-apply-rollback.ts",
     "check:negative-lab-agent-workflow": "bun tests/integration/checks/negative-lab/check-negative-lab-agent-workflow.ts",
+    "check:negative-lab-entrypoints": "bun tests/integration/checks/negative-lab/check-negative-lab-entrypoint-readiness.ts && bun tests/integration/checks/negative-lab/check-negative-lab-toolbar-entry.ts && bun tests/integration/checks/negative-lab/check-negative-lab-context-menu-keyboard.ts && bun tests/integration/checks/ui/keyboard/check-command-palette-behavior.ts",
     "check:agent-selected-image-preview-loop": "bun tests/integration/checks/agent/check-agent-selected-image-preview-loop.ts",
     "check:agent-selected-image-export-output": "bun tests/integration/checks/agent/check-agent-selected-image-export-output.ts",
     "check:agent-selected-image-preview-loop-private-raw": "bun tests/integration/checks/agent/check-agent-selected-image-preview-loop-private-raw.ts",

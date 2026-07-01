@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import type { CommandPaletteCommand } from '../../../schemas/commandPaletteSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useLibraryStore } from '../../../store/useLibraryStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { TextColors, TextVariants } from '../../../types/typography';
 import {
@@ -87,6 +88,7 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
   const imageList = useLibraryStore((state) => state.imageList);
   const libraryActivePath = useLibraryStore((state) => state.libraryActivePath);
   const multiSelectedPaths = useLibraryStore((state) => state.multiSelectedPaths);
+  const supportedTypes = useSettingsStore((state) => state.supportedTypes);
   const setUI = useUIStore((state) => state.setUI);
   const setRightPanel = useUIStore((state) => state.setRightPanel);
   const selectedCommandPaths = useMemo(
@@ -123,7 +125,13 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
   }, [query, t]);
 
   const getDisabledReasonKey = (command: CommandPaletteCommand) => {
-    return getCommandPaletteDisabledReasonKey(command, selectedCommandImages, selectedCommandPaths, selectedImage);
+    return getCommandPaletteDisabledReasonKey(
+      command,
+      selectedCommandImages,
+      selectedCommandPaths,
+      selectedImage,
+      supportedTypes,
+    );
   };
 
   const resolvedActiveIndex = Math.min(activeIndex, Math.max(visibleCommands.length - 1, 0));
@@ -157,6 +165,7 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
       selectedImage,
       setRightPanel,
       setUI,
+      supportedTypes,
     });
     if (action) closeAndRun(action);
   };

@@ -77,6 +77,10 @@ import {
   planLibraryRelink,
   rewriteLibraryRelinkPath,
 } from '../../utils/libraryRelinkIdentity';
+import {
+  getNegativeLabDisabledReasonKey,
+  getNegativeLabSourceReadiness,
+} from '../../utils/negative-lab/negativeLabSourceReadiness';
 import { createSuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { useEditorActions } from '../editor/useEditorActions';
@@ -233,7 +237,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       const { selectedImage, history, historyIndex, undo, redo, resetHistory, copiedAdjustments, setEditor } =
         useEditorStore.getState();
       const { imageList } = useLibraryStore.getState();
-      const { appSettings } = useSettingsStore.getState();
+      const { appSettings, supportedTypes } = useSettingsStore.getState();
       const { isFullScreen, setRightPanel, setUI } = useUIStore.getState();
 
       if (!selectedImage) return;
@@ -251,6 +255,11 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       const canUndo = historyIndex > 0;
       const canRedo = historyIndex < history.length - 1;
       const commonTags = getCommonTags([selectedImage.path]);
+      const negativeLabReadiness = getNegativeLabSourceReadiness([selectedImage.path], supportedTypes);
+      const negativeLabDisabledReasonKey = getNegativeLabDisabledReasonKey(negativeLabReadiness);
+      const negativeLabLabel = negativeLabDisabledReasonKey
+        ? `${t('contextMenus.editor.convertNegative')} - ${t(negativeLabDisabledReasonKey)}`
+        : t('contextMenus.editor.convertNegative');
 
       const options: Array<Option> = [
         {
@@ -317,10 +326,12 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               },
             },
             {
-              label: t('contextMenus.editor.convertNegative'),
+              label: negativeLabLabel,
               icon: Film,
+              disabled: !negativeLabReadiness.isReady,
               onClick: () => {
-                setUI({ negativeModalState: { isOpen: true, targetPaths: [selectedImage.path] } });
+                if (!negativeLabReadiness.isReady) return;
+                setUI({ negativeModalState: { isOpen: true, targetPaths: negativeLabReadiness.targetPaths } });
               },
             },
             {
@@ -412,7 +423,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       const { selectedImage, copiedAdjustments, setEditor } = useEditorStore.getState();
       const { multiSelectedPaths, imageList, libraryActivePath, albumTree, activeAlbumId, setLibrary } =
         useLibraryStore.getState();
-      const { appSettings } = useSettingsStore.getState();
+      const { appSettings, supportedTypes } = useSettingsStore.getState();
       const { setUI, setRightPanel } = useUIStore.getState();
       const { setProcess } = useProcessStore.getState();
 
@@ -501,7 +512,12 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       const stitchLabel = t('contextMenus.editor.stitchPanorama');
       const superResolutionLabel = t('contextMenus.editor.superResolution');
       const focusStackLabel = t('contextMenus.editor.focusStack');
-      const conversionLabel = t('contextMenus.thumbnail.convertNegative', { count: selectionCount });
+      const negativeLabReadiness = getNegativeLabSourceReadiness(finalSelection, supportedTypes);
+      const negativeLabDisabledReasonKey = getNegativeLabDisabledReasonKey(negativeLabReadiness);
+      const conversionBaseLabel = t('contextMenus.thumbnail.convertNegative', { count: selectionCount });
+      const conversionLabel = negativeLabDisabledReasonKey
+        ? `${conversionBaseLabel} - ${t(negativeLabDisabledReasonKey)}`
+        : conversionBaseLabel;
       const denoiseLabel = t('contextMenus.thumbnail.denoise', { count: selectionCount });
       const mergeLabel = t('contextMenus.editor.mergeHdr');
 
@@ -654,9 +670,10 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
             {
               label: conversionLabel,
               icon: Film,
-              disabled: selectionCount === 0,
+              disabled: !negativeLabReadiness.isReady,
               onClick: () => {
-                setUI({ negativeModalState: { isOpen: true, targetPaths: finalSelection } });
+                if (!negativeLabReadiness.isReady) return;
+                setUI({ negativeModalState: { isOpen: true, targetPaths: negativeLabReadiness.targetPaths } });
               },
             },
             {
