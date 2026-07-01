@@ -92,11 +92,11 @@
     },
     {
       "baselinePreviewMaxDelta": 0.048047,
-      "caseId": "film.look.measured.film_look.project_owned.tiff_color_checker_001.film_look.stock_reference.portra_400_portrait.v1",
-      "displayName": "Portra 400 Inspired Portrait",
+      "caseId": "film.look.measured.film_look.project_owned.tiff_color_checker_001.film_look.generic.soft_portrait_color.v1",
+      "displayName": "Soft Portrait Color",
       "exportHash": "70cb229eeea3c4cb",
       "fixtureId": "film_look.project_owned.tiff_color_checker_001",
-      "lookId": "film_look.stock_reference.portra_400_portrait.v1",
+      "lookId": "film_look.generic.soft_portrait_color.v1",
       "maxAllowedBaselinePreviewDelta": 0.36,
       "maxAllowedPreviewExportDelta": 0,
       "previewExportMaxDelta": 0,
@@ -107,11 +107,11 @@
     },
     {
       "baselinePreviewMaxDelta": 0.042829,
-      "caseId": "film.look.measured.film_look.project_owned.tiff_color_checker_001.film_look.stock_reference.gold_200_warmth.v1",
-      "displayName": "Gold 200 Inspired Warmth",
+      "caseId": "film.look.measured.film_look.project_owned.tiff_color_checker_001.film_look.generic.sunlit_warmth.v1",
+      "displayName": "Sunlit Warmth",
       "exportHash": "c366152aef388dc6",
       "fixtureId": "film_look.project_owned.tiff_color_checker_001",
-      "lookId": "film_look.stock_reference.gold_200_warmth.v1",
+      "lookId": "film_look.generic.sunlit_warmth.v1",
       "maxAllowedBaselinePreviewDelta": 0.36,
       "maxAllowedPreviewExportDelta": 0,
       "previewExportMaxDelta": 0,
@@ -122,11 +122,11 @@
     },
     {
       "baselinePreviewMaxDelta": 0.154079,
-      "caseId": "film.look.measured.film_look.project_owned.tiff_color_checker_001.film_look.stock_reference.velvia_50_chrome.v1",
-      "displayName": "Velvia 50 Inspired Chrome",
+      "caseId": "film.look.measured.film_look.project_owned.tiff_color_checker_001.film_look.generic.deep_chroma.v1",
+      "displayName": "Deep Chroma",
       "exportHash": "0441f1c8bc0abccb",
       "fixtureId": "film_look.project_owned.tiff_color_checker_001",
-      "lookId": "film_look.stock_reference.velvia_50_chrome.v1",
+      "lookId": "film_look.generic.deep_chroma.v1",
       "maxAllowedBaselinePreviewDelta": 0.36,
       "maxAllowedPreviewExportDelta": 0,
       "previewExportMaxDelta": 0,
@@ -136,16 +136,16 @@
       "reviewIssue": 1556
     },
     {
-      "baselinePreviewMaxDelta": 0.315903,
-      "caseId": "film.look.measured.film_look.project_owned.tiff_color_checker_001.film_look.stock_reference.tri_x_400_mono.v1",
-      "displayName": "Tri-X 400 Inspired Mono",
-      "exportHash": "5a4db6074c621a68",
+      "baselinePreviewMaxDelta": 0.317923,
+      "caseId": "film.look.measured.film_look.project_owned.tiff_color_checker_001.film_look.generic.bold_mono_grain.v1",
+      "displayName": "Bold Mono Grain",
+      "exportHash": "07bff5c716b98d38",
       "fixtureId": "film_look.project_owned.tiff_color_checker_001",
-      "lookId": "film_look.stock_reference.tri_x_400_mono.v1",
+      "lookId": "film_look.generic.bold_mono_grain.v1",
       "maxAllowedBaselinePreviewDelta": 0.36,
       "maxAllowedPreviewExportDelta": 0,
       "previewExportMaxDelta": 0,
-      "previewHash": "5a4db6074c621a68",
+      "previewHash": "07bff5c716b98d38",
       "proofLevel": "private_payload_metadata_and_adjustment_domain",
       "renderBoundsStatus": "within_bounds",
       "reviewIssue": 1556
@@ -162,12 +162,18 @@
   "fixtureManifest": {
     "fixtures": [
       {
-        "allowedValidationUses": ["preview_export_parity", "render_bounds"],
+        "allowedValidationUses": [
+          "preview_export_parity",
+          "render_bounds"
+        ],
         "autoCorrectionBakedIn": "known_absent",
         "colorProfile": "rawengine_camera_tiff_profile_v1",
         "copyrightOwner": "RawEngine project",
         "developmentProcessKnown": true,
-        "disallowedValidationUses": ["stock_reference_mapping", "marketing_screenshot"],
+        "disallowedValidationUses": [
+          "stock_reference_mapping",
+          "marketing_screenshot"
+        ],
         "expectedRenderBounds": {
           "maxBaselinePreviewDelta": 0.36,
           "maxPreviewExportDelta": 0

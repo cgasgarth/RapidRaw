@@ -35,10 +35,10 @@ export interface FilmLookBrowserItem {
 }
 
 export interface FilmLookBrowserItemProvenance {
-  claimLevel: 'generic_engineered' | 'stock_family_reference_metadata';
-  legalNamingStatus: 'descriptive_stock_family' | 'generic_safe_name';
+  claimLevel: 'generic_engineered';
+  legalNamingStatus: 'generic_safe_name';
   legalNote: string;
-  measurementSource: 'generic_engineered_starting_point' | 'research_reference_metadata_only';
+  measurementSource: 'generic_engineered_starting_point';
 }
 
 export interface FilmLookBrowserGroup {

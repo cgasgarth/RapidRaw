@@ -36,6 +36,7 @@ pub use crate::export::export_postprocess::{
 };
 use crate::export::export_postprocess::{apply_export_postprocess, calculate_resize_target};
 use crate::file_management::{parse_virtual_path, read_file_mapped};
+use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::formats::is_raw_file;
 use crate::image_loader::{
     composite_patches_on_image, load_and_composite_with_report, load_base_image_from_bytes,
@@ -213,12 +214,15 @@ fn prepare_export_render_inputs(
     tm_override: Option<u32>,
     hash_salt: u64,
 ) -> ExportRenderInputs {
-    let mut adjustments = get_all_adjustments_from_json(js_adjustments, is_raw, tm_override);
+    let render_adjustments = normalize_film_look_adjustments_for_render(js_adjustments);
+    let mut adjustments =
+        get_all_adjustments_from_json(render_adjustments.as_ref(), is_raw, tm_override);
     adjustments.global.show_clipping = 0;
-    let lut = js_adjustments["lutPath"]
+    let lut = render_adjustments["lutPath"]
         .as_str()
         .and_then(|p| get_or_load_lut(state, p).ok());
-    let unique_hash = calculate_full_job_hash(path, js_adjustments).wrapping_add(hash_salt);
+    let unique_hash =
+        calculate_full_job_hash(path, render_adjustments.as_ref()).wrapping_add(hash_salt);
 
     ExportRenderInputs {
         adjustments,
@@ -496,10 +500,12 @@ fn export_masks_for_image(
 
     if !mask_bitmaps.is_empty() {
         let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
-        let all_adjustments = get_all_adjustments_from_json(js_adjustments, is_raw, tm_override);
-        let lut_path = js_adjustments["lutPath"].as_str();
+        let render_adjustments = normalize_film_look_adjustments_for_render(js_adjustments);
+        let all_adjustments =
+            get_all_adjustments_from_json(render_adjustments.as_ref(), is_raw, tm_override);
+        let lut_path = render_adjustments["lutPath"].as_str();
         let lut = lut_path.and_then(|p| get_or_load_lut(state, p).ok());
-        let unique_hash = calculate_full_job_hash(source_path_str, js_adjustments);
+        let unique_hash = calculate_full_job_hash(source_path_str, render_adjustments.as_ref());
         let output_dir = output_path_obj.parent().unwrap_or(output_path_obj);
         let stem = output_path_obj
             .file_stem()
@@ -586,7 +592,9 @@ fn export_adjustments_as_lut(
     let identity_image = generate_identity_lut_image(lut_size);
 
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, false);
-    let mut all_adjustments = get_all_adjustments_from_json(js_adjustments, false, tm_override);
+    let render_adjustments = normalize_film_look_adjustments_for_render(js_adjustments);
+    let mut all_adjustments =
+        get_all_adjustments_from_json(render_adjustments.as_ref(), false, tm_override);
 
     all_adjustments.global.show_clipping = 0;
     all_adjustments.global.vignette_amount = 0.0;
@@ -604,9 +612,9 @@ fn export_adjustments_as_lut(
     all_adjustments.global.chromatic_aberration_red_cyan = 0.0;
     all_adjustments.global.chromatic_aberration_blue_yellow = 0.0;
 
-    let lut_path = js_adjustments["lutPath"].as_str();
+    let lut_path = render_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(state, p).ok());
-    let unique_hash = calculate_full_job_hash(source_path_str, js_adjustments);
+    let unique_hash = calculate_full_job_hash(source_path_str, render_adjustments.as_ref());
 
     let processed_lut = process_and_get_dynamic_image(
         context,

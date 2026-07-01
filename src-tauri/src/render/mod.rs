@@ -1,4 +1,5 @@
 pub(crate) mod culling;
+pub(crate) mod film_look_render;
 pub(crate) mod image_analytics;
 pub(crate) mod image_processing;
 pub(crate) mod mask_generation;

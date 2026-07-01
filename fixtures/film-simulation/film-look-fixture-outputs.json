@@ -4,7 +4,7 @@
     "kind": "synthetic-neutral-adjustment-state",
     "note": "Deterministic fixture for built-in Film Looks. The output captures the adjustment-domain deltas applied by each look, not a rendered image."
   },
-  "generatedFrom": "src/utils/filmLookBrowser.ts",
+  "generatedFrom": "src/utils/film-look/filmLookBrowser.ts",
   "outputs": [
     {
       "adjustmentFingerprint": "31703de7f4a90d5b0be8c0d50911b6e4328017f8ce6dfa251253f1b2f0fdaacb",
@@ -589,14 +589,14 @@
         }
       ],
       "category": "color_warm",
-      "description": "Warm portrait color negative with restrained contrast.",
-      "displayName": "Portra 400 Inspired Portrait",
-      "id": "film_look.stock_reference.portra_400_portrait.v1",
+      "description": "Warm restrained color with gentle contrast for people-focused edits.",
+      "displayName": "Soft Portrait Color",
+      "id": "film_look.generic.soft_portrait_color.v1",
       "provenance": {
-        "claimLevel": "stock_family_reference_metadata",
-        "legalNamingStatus": "descriptive_stock_family",
-        "legalNote": "Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.",
-        "measurementSource": "research_reference_metadata_only"
+        "claimLevel": "generic_engineered",
+        "legalNamingStatus": "generic_safe_name",
+        "legalNote": "Generic creative look; not measured from, endorsed by, or claiming to match a film stock.",
+        "measurementSource": "generic_engineered_starting_point"
       },
       "runtimeSupport": "adjustment_patch_preview_export",
       "strengthDefault": 70,
@@ -641,7 +641,7 @@
           },
           "includeCropTransform": false,
           "includeMasks": false,
-          "name": "Portra 400 Inspired Portrait 70%",
+          "name": "Soft Portrait Color 70%",
           "presetType": "style"
         },
         "half": {
@@ -653,7 +653,7 @@
           },
           "includeCropTransform": false,
           "includeMasks": false,
-          "name": "Portra 400 Inspired Portrait 50%",
+          "name": "Soft Portrait Color 50%",
           "presetType": "style"
         },
         "full": {
@@ -665,7 +665,7 @@
           },
           "includeCropTransform": false,
           "includeMasks": false,
-          "name": "Portra 400 Inspired Portrait 100%",
+          "name": "Soft Portrait Color 100%",
           "presetType": "style"
         }
       }
@@ -695,14 +695,14 @@
         }
       ],
       "category": "color_warm",
-      "description": "Golden consumer color negative with soft highlights.",
-      "displayName": "Gold 200 Inspired Warmth",
-      "id": "film_look.stock_reference.gold_200_warmth.v1",
+      "description": "Sunny warm color with lifted blacks and soft highlight rolloff.",
+      "displayName": "Sunlit Warmth",
+      "id": "film_look.generic.sunlit_warmth.v1",
       "provenance": {
-        "claimLevel": "stock_family_reference_metadata",
-        "legalNamingStatus": "descriptive_stock_family",
-        "legalNote": "Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.",
-        "measurementSource": "research_reference_metadata_only"
+        "claimLevel": "generic_engineered",
+        "legalNamingStatus": "generic_safe_name",
+        "legalNote": "Generic creative look; not measured from, endorsed by, or claiming to match a film stock.",
+        "measurementSource": "generic_engineered_starting_point"
       },
       "runtimeSupport": "adjustment_patch_preview_export",
       "strengthDefault": 68,
@@ -751,7 +751,7 @@
           },
           "includeCropTransform": false,
           "includeMasks": false,
-          "name": "Gold 200 Inspired Warmth 68%",
+          "name": "Sunlit Warmth 68%",
           "presetType": "style"
         },
         "half": {
@@ -764,7 +764,7 @@
           },
           "includeCropTransform": false,
           "includeMasks": false,
-          "name": "Gold 200 Inspired Warmth 50%",
+          "name": "Sunlit Warmth 50%",
           "presetType": "style"
         },
         "full": {
@@ -777,7 +777,7 @@
           },
           "includeCropTransform": false,
           "includeMasks": false,
-          "name": "Gold 200 Inspired Warmth 100%",
+          "name": "Sunlit Warmth 100%",
           "presetType": "style"
         }
       }
@@ -803,14 +803,14 @@
         }
       ],
       "category": "color_contrast",
-      "description": "Dense saturated slide color for landscape contrast.",
-      "displayName": "Velvia 50 Inspired Chrome",
-      "id": "film_look.stock_reference.velvia_50_chrome.v1",
+      "description": "Dense saturated color with stronger separation for scenic contrast.",
+      "displayName": "Deep Chroma",
+      "id": "film_look.generic.deep_chroma.v1",
       "provenance": {
-        "claimLevel": "stock_family_reference_metadata",
-        "legalNamingStatus": "descriptive_stock_family",
-        "legalNote": "Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.",
-        "measurementSource": "research_reference_metadata_only"
+        "claimLevel": "generic_engineered",
+        "legalNamingStatus": "generic_safe_name",
+        "legalNote": "Generic creative look; not measured from, endorsed by, or claiming to match a film stock.",
+        "measurementSource": "generic_engineered_starting_point"
       },
       "runtimeSupport": "adjustment_patch_preview_export",
       "strengthDefault": 58,
@@ -855,7 +855,7 @@
           },
           "includeCropTransform": false,
           "includeMasks": false,
-          "name": "Velvia 50 Inspired Chrome 58%",
+          "name": "Deep Chroma 58%",
           "presetType": "style"
         },
         "half": {
@@ -867,7 +867,7 @@
           },
           "includeCropTransform": false,
           "includeMasks": false,
-          "name": "Velvia 50 Inspired Chrome 50%",
+          "name": "Deep Chroma 50%",
           "presetType": "style"
         },
         "full": {
@@ -879,7 +879,7 @@
           },
           "includeCropTransform": false,
           "includeMasks": false,
-          "name": "Velvia 50 Inspired Chrome 100%",
+          "name": "Deep Chroma 100%",
           "presetType": "style"
         }
       }
@@ -909,14 +909,14 @@
         }
       ],
       "category": "black_and_white",
-      "description": "Bold high-speed black-and-white with visible grain.",
-      "displayName": "Tri-X 400 Inspired Mono",
-      "id": "film_look.stock_reference.tri_x_400_mono.v1",
+      "description": "High-contrast monochrome with visible synthetic texture.",
+      "displayName": "Bold Mono Grain",
+      "id": "film_look.generic.bold_mono_grain.v1",
       "provenance": {
-        "claimLevel": "stock_family_reference_metadata",
-        "legalNamingStatus": "descriptive_stock_family",
-        "legalNote": "Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.",
-        "measurementSource": "research_reference_metadata_only"
+        "claimLevel": "generic_engineered",
+        "legalNamingStatus": "generic_safe_name",
+        "legalNote": "Generic creative look; not measured from, endorsed by, or claiming to match a film stock.",
+        "measurementSource": "generic_engineered_starting_point"
       },
       "runtimeSupport": "adjustment_patch_preview_export",
       "strengthDefault": 72,
@@ -965,7 +965,7 @@
           },
           "includeCropTransform": false,
           "includeMasks": false,
-          "name": "Tri-X 400 Inspired Mono 72%",
+          "name": "Bold Mono Grain 72%",
           "presetType": "style"
         },
         "half": {
@@ -978,7 +978,7 @@
           },
           "includeCropTransform": false,
           "includeMasks": false,
-          "name": "Tri-X 400 Inspired Mono 50%",
+          "name": "Bold Mono Grain 50%",
           "presetType": "style"
         },
         "full": {
@@ -991,7 +991,7 @@
           },
           "includeCropTransform": false,
           "includeMasks": false,
-          "name": "Tri-X 400 Inspired Mono 100%",
+          "name": "Bold Mono Grain 100%",
           "presetType": "style"
         }
       }

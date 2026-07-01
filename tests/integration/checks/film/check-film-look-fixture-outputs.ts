@@ -149,25 +149,12 @@ for (const look of FILM_LOOK_BROWSER_ITEMS) {
     throw new Error(`${look.id}: built-in film look must use generic-safe provenance`);
   }
 
-  if (
-    look.provenance.claimLevel === 'stock_family_reference_metadata' &&
-    (look.provenance.legalNamingStatus !== 'descriptive_stock_family' ||
-      look.provenance.measurementSource !== 'research_reference_metadata_only' ||
-      !/\binspired\b/iu.test(look.displayName))
-  ) {
-    throw new Error(`${look.id}: stock-reference film look must disclose inspired stock metadata`);
-  }
-
   if (!/\bnot (?:measured|official)\b/iu.test(look.provenance.legalNote)) {
     throw new Error(`${look.id}: built-in film look legal note must disclose unmeasured or unofficial status`);
   }
 }
 
-for (const marker of [
-  'GENERIC_FILM_LOOK_PROVENANCE',
-  'STOCK_REFERENCE_FILM_LOOK_PROVENANCE',
-  'FILM_LOOK_BROWSER_ITEMS',
-]) {
+for (const marker of ['GENERIC_FILM_LOOK_PROVENANCE', 'FILM_LOOK_BROWSER_ITEMS']) {
   if (!registrySource.includes(marker)) {
     throw new Error(`Film look registry is missing catalog marker: ${marker}`);
   }

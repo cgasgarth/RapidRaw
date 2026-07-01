@@ -272,15 +272,15 @@
     },
     {
       "category": "color_warm",
-      "description": "Warm portrait color negative with restrained contrast.",
-      "displayName": "Portra 400 Inspired Portrait",
+      "description": "Warm restrained color with gentle contrast for people-focused edits.",
+      "displayName": "Soft Portrait Color",
       "intendedInputModes": ["raw_photo", "rendered_photo", "negative_lab_positive"],
-      "lookId": "film_look.stock_reference.portra_400_portrait.v1",
+      "lookId": "film_look.generic.soft_portrait_color.v1",
       "lookVersion": "2026-06-19",
       "nodes": [
         {
           "enabledByDefault": true,
-          "nodeId": "tone.portrait_soft_contrast",
+          "nodeId": "tone.soft_portrait_contrast",
           "nodeKind": "tone_curve",
           "parameters": {
             "contrast": 0.08,
@@ -290,7 +290,7 @@
         },
         {
           "enabledByDefault": true,
-          "nodeId": "color.warm_skin_bias",
+          "nodeId": "color.soft_portrait_warmth",
           "nodeKind": "color_matrix",
           "parameters": {
             "saturation": 1.06,
@@ -300,31 +300,31 @@
         }
       ],
       "provenance": {
-        "claimLevel": "stock_family_reference_metadata",
+        "claimLevel": "generic_engineered",
         "fixtureIds": [],
-        "legalNamingStatus": "descriptive_stock_family",
-        "legalNote": "Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.",
+        "legalNamingStatus": "generic_safe_name",
+        "legalNote": "Generic RawEngine creative look with no brand, stock, manufacturer, or matching-behavior claim.",
         "licenseRecordIds": [],
-        "measurementSource": "research_reference_metadata_only",
-        "sourceCitationIds": ["film_stock_public_reference_metadata.v1"],
+        "measurementSource": "generic_engineered_starting_point",
+        "sourceCitationIds": [],
         "sourceProfileIds": []
       },
       "renderDomain": "working_rgb",
-      "requiredWarnings": ["creative_not_exact_emulation", "requires_user_review"],
+      "requiredWarnings": ["creative_not_exact_emulation"],
       "schemaVersion": 1,
       "strengthDefault": 70
     },
     {
       "category": "color_warm",
-      "description": "Golden consumer color negative with soft highlights.",
-      "displayName": "Gold 200 Inspired Warmth",
+      "description": "Sunny warm color with lifted blacks and soft highlight rolloff.",
+      "displayName": "Sunlit Warmth",
       "intendedInputModes": ["raw_photo", "rendered_photo", "negative_lab_positive"],
-      "lookId": "film_look.stock_reference.gold_200_warmth.v1",
+      "lookId": "film_look.generic.sunlit_warmth.v1",
       "lookVersion": "2026-06-19",
       "nodes": [
         {
           "enabledByDefault": true,
-          "nodeId": "tone.consumer_warm_rolloff",
+          "nodeId": "tone.sunlit_rolloff",
           "nodeKind": "tone_curve",
           "parameters": {
             "blackLift": 0.04,
@@ -335,7 +335,7 @@
         },
         {
           "enabledByDefault": true,
-          "nodeId": "color.golden_warmth",
+          "nodeId": "color.sunlit_warmth",
           "nodeKind": "color_matrix",
           "parameters": {
             "saturation": 1.1,
@@ -345,31 +345,31 @@
         }
       ],
       "provenance": {
-        "claimLevel": "stock_family_reference_metadata",
+        "claimLevel": "generic_engineered",
         "fixtureIds": [],
-        "legalNamingStatus": "descriptive_stock_family",
-        "legalNote": "Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.",
+        "legalNamingStatus": "generic_safe_name",
+        "legalNote": "Generic RawEngine creative look with no brand, stock, manufacturer, or matching-behavior claim.",
         "licenseRecordIds": [],
-        "measurementSource": "research_reference_metadata_only",
-        "sourceCitationIds": ["film_stock_public_reference_metadata.v1"],
+        "measurementSource": "generic_engineered_starting_point",
+        "sourceCitationIds": [],
         "sourceProfileIds": []
       },
       "renderDomain": "working_rgb",
-      "requiredWarnings": ["creative_not_exact_emulation", "requires_user_review"],
+      "requiredWarnings": ["creative_not_exact_emulation"],
       "schemaVersion": 1,
       "strengthDefault": 68
     },
     {
       "category": "color_contrast",
-      "description": "Dense saturated slide color for landscape contrast.",
-      "displayName": "Velvia 50 Inspired Chrome",
+      "description": "Dense saturated color with stronger separation for scenic contrast.",
+      "displayName": "Deep Chroma",
       "intendedInputModes": ["raw_photo", "rendered_photo", "negative_lab_positive"],
-      "lookId": "film_look.stock_reference.velvia_50_chrome.v1",
+      "lookId": "film_look.generic.deep_chroma.v1",
       "lookVersion": "2026-06-19",
       "nodes": [
         {
           "enabledByDefault": true,
-          "nodeId": "tone.slide_dense_curve",
+          "nodeId": "tone.deep_chroma_curve",
           "nodeKind": "tone_curve",
           "parameters": {
             "blackLift": -0.06,
@@ -380,7 +380,7 @@
         },
         {
           "enabledByDefault": true,
-          "nodeId": "color.chrome_saturation",
+          "nodeId": "color.deep_chroma_saturation",
           "nodeKind": "color_matrix",
           "parameters": {
             "saturation": 1.28
@@ -389,31 +389,31 @@
         }
       ],
       "provenance": {
-        "claimLevel": "stock_family_reference_metadata",
+        "claimLevel": "generic_engineered",
         "fixtureIds": [],
-        "legalNamingStatus": "descriptive_stock_family",
-        "legalNote": "Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.",
+        "legalNamingStatus": "generic_safe_name",
+        "legalNote": "Generic RawEngine creative look with no brand, stock, manufacturer, or matching-behavior claim.",
         "licenseRecordIds": [],
-        "measurementSource": "research_reference_metadata_only",
-        "sourceCitationIds": ["film_stock_public_reference_metadata.v1"],
+        "measurementSource": "generic_engineered_starting_point",
+        "sourceCitationIds": [],
         "sourceProfileIds": []
       },
       "renderDomain": "working_rgb",
-      "requiredWarnings": ["creative_not_exact_emulation", "requires_user_review"],
+      "requiredWarnings": ["creative_not_exact_emulation"],
       "schemaVersion": 1,
       "strengthDefault": 58
     },
     {
       "category": "black_and_white",
-      "description": "Bold high-speed black-and-white with visible grain.",
-      "displayName": "Tri-X 400 Inspired Mono",
+      "description": "High-contrast monochrome with visible synthetic texture.",
+      "displayName": "Bold Mono Grain",
       "intendedInputModes": ["raw_photo", "rendered_photo", "negative_lab_positive"],
-      "lookId": "film_look.stock_reference.tri_x_400_mono.v1",
+      "lookId": "film_look.generic.bold_mono_grain.v1",
       "lookVersion": "2026-06-19",
       "nodes": [
         {
           "enabledByDefault": true,
-          "nodeId": "mono.classic_high_speed_mix",
+          "nodeId": "mono.bold_grain_mix",
           "nodeKind": "black_and_white_mixer",
           "parameters": {
             "blue": 0.18,
@@ -424,7 +424,7 @@
         },
         {
           "enabledByDefault": true,
-          "nodeId": "texture.bold_high_speed_grain",
+          "nodeId": "texture.bold_mono_grain",
           "nodeKind": "grain",
           "parameters": {
             "amount": 0.32,
@@ -434,17 +434,17 @@
         }
       ],
       "provenance": {
-        "claimLevel": "stock_family_reference_metadata",
+        "claimLevel": "generic_engineered",
         "fixtureIds": [],
-        "legalNamingStatus": "descriptive_stock_family",
-        "legalNote": "Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.",
+        "legalNamingStatus": "generic_safe_name",
+        "legalNote": "Generic RawEngine creative look with no brand, stock, manufacturer, or matching-behavior claim.",
         "licenseRecordIds": [],
-        "measurementSource": "research_reference_metadata_only",
-        "sourceCitationIds": ["film_stock_public_reference_metadata.v1"],
+        "measurementSource": "generic_engineered_starting_point",
+        "sourceCitationIds": [],
         "sourceProfileIds": []
       },
       "renderDomain": "working_rgb",
-      "requiredWarnings": ["creative_not_exact_emulation", "requires_user_review"],
+      "requiredWarnings": ["creative_not_exact_emulation"],
       "schemaVersion": 1,
       "strengthDefault": 72
     }
