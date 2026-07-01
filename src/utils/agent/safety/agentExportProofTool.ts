@@ -1,9 +1,12 @@
 import { z } from 'zod';
 import {
+  type ExportRecipeV1,
   exportRecipeColorProfileV1Schema,
   exportRecipeFileFormatV1Schema,
   exportRecipeRenderingIntentV1Schema,
+  exportRecipeV1Schema,
 } from '../../../../packages/rawengine-schema/src/exportRecipeSchemas';
+import { EXPORT_LAST_USED_PRESET_ID } from '../../../schemas/export/exportRecipeIds';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { agentApprovalStateSchema, assertAgentApprovalGate } from './agentApprovalGate';
@@ -14,6 +17,8 @@ export const AGENT_EXPORT_PROOF_INPUT_SCHEMA_NAME = 'AgentExportProofRequestV1';
 export const AGENT_EXPORT_PROOF_OUTPUT_SCHEMA_NAME = 'AgentExportProofResponseV1';
 export const AGENT_FINAL_EXPORT_INPUT_SCHEMA_NAME = 'AgentFinalExportRequestV1';
 export const AGENT_FINAL_EXPORT_OUTPUT_SCHEMA_NAME = 'AgentFinalExportResponseV1';
+
+const agentExportApprovalStateSchema = z.enum(['approved', 'cancelled', 'pending']);
 
 const stableHash = (value: string): string => {
   let hash = 0x811c9dc5;
@@ -50,6 +55,8 @@ export const agentExportProofRequestSchema = z
     jpegQuality: z.number().int().min(50).max(95).default(86),
     longEdgePx: z.number().int().min(256).max(8192).default(1536),
     operationId: z.string().trim().min(1),
+    presetId: z.string().trim().min(1).optional(),
+    presetName: z.string().trim().min(1).optional(),
     renderingIntent: exportRecipeRenderingIntentV1Schema.default('relativeColorimetric'),
     requestId: z.string().trim().min(1),
     sessionId: z.string().trim().min(1),
@@ -77,12 +84,21 @@ export const agentExportProofResponseSchema = z
       .object({
         activeImagePath: z.string().trim().min(1),
         approvalId: z.string().trim().min(1),
+        approvalState: agentExportApprovalStateSchema,
+        dimensions: z
+          .object({
+            height: z.number().int().positive(),
+            width: z.number().int().positive(),
+          })
+          .strict(),
         exportSettings: z
           .object({
             colorProfile: exportRecipeColorProfileV1Schema,
             fileFormat: exportRecipeFileFormatV1Schema.extract(['jpeg', 'png']),
             jpegQuality: z.number().int().min(50).max(95),
             longEdgePx: z.number().int().min(256).max(8192),
+            presetId: z.string().trim().min(1).optional(),
+            presetName: z.string().trim().min(1).optional(),
             renderingIntent: exportRecipeRenderingIntentV1Schema,
           })
           .strict(),
@@ -95,6 +111,7 @@ export const agentExportProofResponseSchema = z
         recipeHash: z.string().trim().min(1),
         requestId: z.string().trim().min(1),
         sessionId: z.string().trim().min(1),
+        targetPathPreview: z.string().trim().min(1),
       })
       .strict(),
     requestId: z.string().trim().min(1),
@@ -131,6 +148,11 @@ export type AgentExportProofResponse = z.infer<typeof agentExportProofResponseSc
 export type AgentFinalExportRequest = z.infer<typeof agentFinalExportRequestSchema>;
 export type AgentFinalExportResponse = z.infer<typeof agentFinalExportResponseSchema>;
 
+export type AgentExportPresetSettings = Pick<
+  AgentExportProofRequest,
+  'colorProfile' | 'fileFormat' | 'jpegQuality' | 'longEdgePx' | 'presetId' | 'presetName' | 'renderingIntent'
+>;
+
 const fitDimensions = (width: number, height: number, longEdgePx: number): { height: number; width: number } => {
   const longEdge = Math.max(width, height);
   if (longEdge <= 0) return { height: longEdgePx, width: longEdgePx };
@@ -151,14 +173,17 @@ export const buildAgentExportProof = (request: AgentExportProofRequest): AgentEx
   const editor = useEditorStore.getState();
   const selectedImage = editor.selectedImage;
   if (selectedImage === null) throw new Error('Agent export proof requires a selected image.');
-  const approval = assertAgentApprovalGate({
-    approval: parsedRequest.approval,
-    expectedGraphRevision: snapshot.graphRevision,
-    expectedRecipeHash: snapshot.initialPreview.recipeHash,
-    expectedSessionId: parsedRequest.sessionId,
-    operation: 'export proof',
-    selectedImagePath: snapshot.activeImagePath,
-  });
+  const approval = agentApprovalStateSchema.parse(parsedRequest.approval);
+  if (approval.status === 'approved') {
+    assertAgentApprovalGate({
+      approval,
+      expectedGraphRevision: snapshot.graphRevision,
+      expectedRecipeHash: snapshot.initialPreview.recipeHash,
+      expectedSessionId: parsedRequest.sessionId,
+      operation: 'export proof',
+      selectedImagePath: snapshot.activeImagePath,
+    });
+  }
 
   const dimensions = fitDimensions(selectedImage.width, selectedImage.height, parsedRequest.longEdgePx);
   const mediaType = parsedRequest.fileFormat === 'png' ? 'image/png' : 'image/jpeg';
@@ -177,6 +202,11 @@ export const buildAgentExportProof = (request: AgentExportProofRequest): AgentEx
       selectedImagePath: selectedImage.path,
     }),
   );
+  const outputPath = buildAgentExportOutputPath({
+    activeImagePath: snapshot.activeImagePath,
+    exportHash,
+    fileFormat: parsedRequest.fileFormat,
+  });
 
   return agentExportProofResponseSchema.parse({
     dryRun: true,
@@ -195,26 +225,27 @@ export const buildAgentExportProof = (request: AgentExportProofRequest): AgentEx
     receipt: {
       activeImagePath: snapshot.activeImagePath,
       approvalId: approval.approvalId,
+      approvalState: approval.status,
+      dimensions,
       exportSettings: {
         colorProfile: parsedRequest.colorProfile,
         fileFormat: parsedRequest.fileFormat,
         jpegQuality: parsedRequest.jpegQuality,
         longEdgePx: parsedRequest.longEdgePx,
+        presetId: parsedRequest.presetId,
+        presetName: parsedRequest.presetName,
         renderingIntent: parsedRequest.renderingIntent,
       },
       graphRevision: snapshot.graphRevision,
       noOverwritePolicy: 'never_overwrite_original',
       operationId: parsedRequest.operationId,
       outputHash: exportHash,
-      outputPath: buildAgentExportOutputPath({
-        activeImagePath: snapshot.activeImagePath,
-        exportHash,
-        fileFormat: parsedRequest.fileFormat,
-      }),
+      outputPath,
       previewRenderHash: snapshot.initialPreview.renderHash,
       recipeHash: snapshot.initialPreview.recipeHash,
       requestId: parsedRequest.requestId,
       sessionId: parsedRequest.sessionId,
+      targetPathPreview: outputPath,
     },
     requestId: parsedRequest.requestId,
     staleRecipeHash: false,
@@ -224,6 +255,15 @@ export const buildAgentExportProof = (request: AgentExportProofRequest): AgentEx
 
 export const buildAgentFinalExport = (request: AgentFinalExportRequest): AgentFinalExportResponse => {
   const parsedRequest = agentFinalExportRequestSchema.parse(request);
+  const snapshot = buildAgentImageContextSnapshot();
+  assertAgentApprovalGate({
+    approval: parsedRequest.approval,
+    expectedGraphRevision: snapshot.graphRevision,
+    expectedRecipeHash: snapshot.initialPreview.recipeHash,
+    expectedSessionId: parsedRequest.sessionId,
+    operation: 'final export',
+    selectedImagePath: snapshot.activeImagePath,
+  });
   const { destinationPolicy, ...proofRequest } = parsedRequest;
   const proof = buildAgentExportProof({ ...proofRequest, dryRun: true });
   const artifactId = `artifact_agent_final_export_${stableHash(
@@ -242,4 +282,41 @@ export const buildAgentFinalExport = (request: AgentFinalExportRequest): AgentFi
     },
     toolName: AGENT_FINAL_EXPORT_TOOL_NAME,
   });
+};
+
+export const buildAgentExportPresetSettings = ({
+  preferredPresetId,
+  presets,
+}: {
+  preferredPresetId?: string | undefined;
+  presets: unknown;
+}): AgentExportPresetSettings => {
+  const parsedPresets = z.array(exportRecipeV1Schema).parse(presets);
+  const preset =
+    (preferredPresetId === undefined
+      ? undefined
+      : parsedPresets.find((candidate) => candidate.id === preferredPresetId)) ??
+    parsedPresets.find((candidate) => candidate.id === EXPORT_LAST_USED_PRESET_ID) ??
+    parsedPresets.find((candidate) => candidate.fileFormat === 'jpeg' || candidate.fileFormat === 'png');
+  if (preset === undefined) {
+    throw new Error('Agent export review requires an existing export preset.');
+  }
+  if (preset.fileFormat !== 'jpeg' && preset.fileFormat !== 'png') {
+    throw new Error('Agent export review requires a JPEG or PNG export preset.');
+  }
+
+  return {
+    colorProfile: preset.colorProfile,
+    fileFormat: preset.fileFormat,
+    jpegQuality: preset.fileFormat === 'jpeg' ? Math.min(95, Math.max(50, preset.jpegQuality)) : 95,
+    longEdgePx: resolveAgentPresetLongEdge(preset),
+    presetId: preset.id,
+    presetName: preset.name,
+    renderingIntent: preset.renderingIntent,
+  };
+};
+
+const resolveAgentPresetLongEdge = (preset: ExportRecipeV1): number => {
+  if (!preset.enableResize || preset.resizeMode !== 'longEdge') return 4096;
+  return Math.min(8192, Math.max(512, preset.resizeValue));
 };
