@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import cx from 'clsx';
+import { type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { BlackWhiteMixerChannel } from '../../schemas/color/blackWhiteMixerSchemas';
 import type { ChannelMixerOutput } from '../../schemas/color/channelMixerSchemas';
@@ -36,6 +37,27 @@ const skinToneInspectorSample: SkinToneUniformityInput = {
   saturation: 0.45,
 };
 
+const COLOR_WORKSPACE_TAB_IDS = ['quick', 'editor', 'grading', 'output', 'advanced'] as const;
+type ColorWorkspaceTabId = (typeof COLOR_WORKSPACE_TAB_IDS)[number];
+
+interface ColorWorkspaceTab {
+  id: ColorWorkspaceTabId;
+  label: string;
+  panel: ReactNode;
+}
+
+const getNextColorWorkspaceTabId = (
+  tabs: Array<ColorWorkspaceTab>,
+  activeTabId: ColorWorkspaceTabId,
+  direction: 1 | -1,
+): ColorWorkspaceTabId => {
+  const activeIndex = tabs.findIndex((tab) => tab.id === activeTabId);
+  const currentIndex = activeIndex >= 0 ? activeIndex : 0;
+  const nextIndex = (currentIndex + direction + tabs.length) % tabs.length;
+
+  return tabs[nextIndex]?.id ?? tabs[0]?.id ?? 'quick';
+};
+
 const skinToneTargetDistance = (
   input: SkinToneUniformityInput,
   settings: Pick<Adjustments['skinToneUniformity'], 'targetHueDegrees' | 'targetLuminance' | 'targetSaturation'>,
@@ -71,6 +93,8 @@ export default function ColorPanel({
   onDragStateChange,
 }: ColorPanelProps) {
   const { t } = useTranslation();
+  const tablistId = useId();
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<ColorWorkspaceTabId>('quick');
   const [activeColor, setActiveColor] = useState<BlackWhiteMixerChannel>('reds');
   const [activeColorBalanceRange, setActiveColorBalanceRange] = useState<ColorBalanceRgbRange>('midtones');
   const [activeChannelMixerOutput, setActiveChannelMixerOutput] = useState<ChannelMixerOutput>('red');
@@ -137,84 +161,254 @@ export default function ColorPanel({
     }));
   };
 
+  const workspaceTabs = useMemo<Array<ColorWorkspaceTab>>(() => {
+    const tabs: Array<ColorWorkspaceTab> = [
+      {
+        id: 'quick',
+        label: t('adjustments.color.workspaceTabs.quick'),
+        panel: (
+          <ColorQuickControls
+            adjustments={adjustments}
+            appSettings={appSettings}
+            isForMask={isForMask}
+            isWbPickerActive={isWbPickerActive}
+            isWgpuEnabled={isWgpuEnabled}
+            onDragStateChange={onDragStateChange}
+            setAdjustments={setAdjustments}
+            {...(toggleWbPicker ? { toggleWbPicker } : {})}
+          />
+        ),
+      },
+      {
+        id: 'editor',
+        label: t('adjustments.color.workspaceTabs.editor'),
+        panel: (
+          <div className="space-y-4">
+            {!isForMask && (
+              <ColorProfileToneControls
+                adjustmentVisibility={adjustmentVisibility}
+                adjustments={adjustments}
+                appSettings={appSettings}
+                onDragStateChange={onDragStateChange}
+                setActiveChannelMixerOutput={setActiveChannelMixerOutput}
+                setActiveColor={setActiveColor}
+                setActiveColorBalanceRange={setActiveColorBalanceRange}
+                setAdjustments={setAdjustments}
+              />
+            )}
+            <ColorMixerControls
+              activeChannelMixerOutput={activeChannelMixerOutput}
+              activeColor={activeColor}
+              activeColorBalanceRange={activeColorBalanceRange}
+              adjustmentVisibility={adjustmentVisibility}
+              adjustments={adjustments}
+              appSettings={appSettings}
+              isForMask={isForMask}
+              onDragStateChange={onDragStateChange}
+              setActiveChannelMixerOutput={setActiveChannelMixerOutput}
+              setActiveColor={setActiveColor}
+              setActiveColorBalanceRange={setActiveColorBalanceRange}
+              setAdjustments={setAdjustments}
+            />
+          </div>
+        ),
+      },
+      {
+        id: 'grading',
+        label: t('adjustments.color.workspaceTabs.grading'),
+        panel: (
+          <ColorGradingControls
+            adjustments={adjustments}
+            appSettings={appSettings}
+            onDragStateChange={onDragStateChange}
+            setAdjustments={setAdjustments}
+          />
+        ),
+      },
+    ];
+
+    if (!isForMask) {
+      tabs.push({
+        id: 'output',
+        label: t('adjustments.color.workspaceTabs.output'),
+        panel: (
+          <ColorProofingDiagnostics
+            activeCameraProfileLabel={activeCameraProfileLabel}
+            activeExportPresetName={activeExportPresetName}
+            activeToneCurveLabel={activeToneCurveLabel}
+            adjustments={adjustments}
+            appSettings={appSettings}
+            colorWorkspaceWarningChips={colorWorkspaceWarningChips}
+            currentGamutWarningOverlay={currentGamutWarningOverlay}
+            gamutWarningCoverage={gamutWarningCoverage}
+            isGamutWarningOverlayVisible={isGamutWarningOverlayVisible}
+            onDragStateChange={onDragStateChange}
+            proofDimensions={proofDimensions}
+            setAdjustments={setAdjustments}
+            setEditor={setEditor}
+            skinToneInspectorAfterDistance={skinToneInspectorAfterDistance}
+            skinToneInspectorBeforeDistance={skinToneInspectorBeforeDistance}
+            skinToneInspectorImprovement={skinToneInspectorImprovement}
+            skinToneInspectorOutputHue={skinToneInspectorOutput.hueDegrees}
+            skinTonePreview={skinTonePreview}
+            syncSkinToneUniformity={syncSkinToneUniformity}
+          />
+        ),
+      });
+    }
+
+    if (!isForMask && (isLevelsVisible || isColorCalibrationVisible)) {
+      tabs.push({
+        id: 'advanced',
+        label: t('adjustments.color.workspaceTabs.advanced'),
+        panel: (
+          <ColorAdvancedControls
+            adjustmentVisibility={adjustmentVisibility}
+            adjustments={adjustments}
+            appSettings={appSettings}
+            isColorCalibrationVisible={isColorCalibrationVisible}
+            levelsClippingWarnings={levelsClippingWarnings}
+            onDragStateChange={onDragStateChange}
+            setAdjustments={setAdjustments}
+          />
+        ),
+      });
+    }
+
+    return tabs;
+  }, [
+    activeCameraProfileLabel,
+    activeChannelMixerOutput,
+    activeColor,
+    activeColorBalanceRange,
+    activeExportPresetName,
+    activeToneCurveLabel,
+    adjustmentVisibility,
+    adjustments,
+    appSettings,
+    colorWorkspaceWarningChips,
+    currentGamutWarningOverlay,
+    gamutWarningCoverage,
+    isColorCalibrationVisible,
+    isForMask,
+    isGamutWarningOverlayVisible,
+    isLevelsVisible,
+    isWbPickerActive,
+    isWgpuEnabled,
+    levelsClippingWarnings,
+    onDragStateChange,
+    proofDimensions,
+    setAdjustments,
+    setEditor,
+    skinToneInspectorAfterDistance,
+    skinToneInspectorBeforeDistance,
+    skinToneInspectorImprovement,
+    skinToneInspectorOutput.hueDegrees,
+    skinTonePreview,
+    syncSkinToneUniformity,
+    t,
+    toggleWbPicker,
+  ]);
+
+  useEffect(() => {
+    if (!workspaceTabs.some((tab) => tab.id === activeWorkspaceTab)) {
+      setActiveWorkspaceTab(workspaceTabs[0]?.id ?? 'quick');
+    }
+  }, [activeWorkspaceTab, workspaceTabs]);
+
+  const focusColorWorkspaceTab = (tabId: ColorWorkspaceTabId) => {
+    requestAnimationFrame(() => {
+      document.getElementById(`${tablistId}-${tabId}-tab`)?.focus();
+    });
+  };
+
+  const handleWorkspaceTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      const nextTabId = getNextColorWorkspaceTabId(workspaceTabs, activeWorkspaceTab, 1);
+
+      setActiveWorkspaceTab(nextTabId);
+      focusColorWorkspaceTab(nextTabId);
+      return;
+    }
+
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const nextTabId = getNextColorWorkspaceTabId(workspaceTabs, activeWorkspaceTab, -1);
+
+      setActiveWorkspaceTab(nextTabId);
+      focusColorWorkspaceTab(nextTabId);
+      return;
+    }
+
+    if (event.key === 'Home') {
+      event.preventDefault();
+      const nextTabId = workspaceTabs[0]?.id ?? 'quick';
+
+      setActiveWorkspaceTab(nextTabId);
+      focusColorWorkspaceTab(nextTabId);
+      return;
+    }
+
+    if (event.key === 'End') {
+      event.preventDefault();
+      const nextTabId = workspaceTabs.at(-1)?.id ?? 'quick';
+
+      setActiveWorkspaceTab(nextTabId);
+      focusColorWorkspaceTab(nextTabId);
+    }
+  };
+
   return (
-    <div className="space-y-4">
-      <ColorQuickControls
-        adjustments={adjustments}
-        appSettings={appSettings}
-        isForMask={isForMask}
-        isWbPickerActive={isWbPickerActive}
-        isWgpuEnabled={isWgpuEnabled}
-        onDragStateChange={onDragStateChange}
-        setAdjustments={setAdjustments}
-        {...(toggleWbPicker ? { toggleWbPicker } : {})}
-      />
-      {!isForMask && (
-        <ColorProfileToneControls
-          adjustmentVisibility={adjustmentVisibility}
-          adjustments={adjustments}
-          appSettings={appSettings}
-          onDragStateChange={onDragStateChange}
-          setActiveChannelMixerOutput={setActiveChannelMixerOutput}
-          setActiveColor={setActiveColor}
-          setActiveColorBalanceRange={setActiveColorBalanceRange}
-          setAdjustments={setAdjustments}
-        />
-      )}
-      <ColorMixerControls
-        activeChannelMixerOutput={activeChannelMixerOutput}
-        activeColor={activeColor}
-        activeColorBalanceRange={activeColorBalanceRange}
-        adjustmentVisibility={adjustmentVisibility}
-        adjustments={adjustments}
-        appSettings={appSettings}
-        isForMask={isForMask}
-        onDragStateChange={onDragStateChange}
-        setActiveChannelMixerOutput={setActiveChannelMixerOutput}
-        setActiveColor={setActiveColor}
-        setActiveColorBalanceRange={setActiveColorBalanceRange}
-        setAdjustments={setAdjustments}
-      />
-      <ColorGradingControls
-        adjustments={adjustments}
-        appSettings={appSettings}
-        onDragStateChange={onDragStateChange}
-        setAdjustments={setAdjustments}
-      />
-      {!isForMask && (
-        <ColorProofingDiagnostics
-          activeCameraProfileLabel={activeCameraProfileLabel}
-          activeExportPresetName={activeExportPresetName}
-          activeToneCurveLabel={activeToneCurveLabel}
-          adjustments={adjustments}
-          appSettings={appSettings}
-          colorWorkspaceWarningChips={colorWorkspaceWarningChips}
-          currentGamutWarningOverlay={currentGamutWarningOverlay}
-          gamutWarningCoverage={gamutWarningCoverage}
-          isGamutWarningOverlayVisible={isGamutWarningOverlayVisible}
-          onDragStateChange={onDragStateChange}
-          proofDimensions={proofDimensions}
-          setAdjustments={setAdjustments}
-          setEditor={setEditor}
-          skinToneInspectorAfterDistance={skinToneInspectorAfterDistance}
-          skinToneInspectorBeforeDistance={skinToneInspectorBeforeDistance}
-          skinToneInspectorImprovement={skinToneInspectorImprovement}
-          skinToneInspectorOutputHue={skinToneInspectorOutput.hueDegrees}
-          skinTonePreview={skinTonePreview}
-          syncSkinToneUniformity={syncSkinToneUniformity}
-        />
-      )}
-      {!isForMask && (isLevelsVisible || isColorCalibrationVisible) && (
-        <ColorAdvancedControls
-          adjustmentVisibility={adjustmentVisibility}
-          adjustments={adjustments}
-          appSettings={appSettings}
-          isColorCalibrationVisible={isColorCalibrationVisible}
-          levelsClippingWarnings={levelsClippingWarnings}
-          onDragStateChange={onDragStateChange}
-          setAdjustments={setAdjustments}
-        />
-      )}
+    <div className="space-y-3">
+      <div
+        aria-label={t('adjustments.color.workspaceTabs.label')}
+        className="flex gap-1 overflow-x-auto rounded-md border border-surface bg-bg-tertiary p-1"
+        data-testid="color-workspace-tabs"
+        onKeyDown={handleWorkspaceTabKeyDown}
+        role="tablist"
+      >
+        {workspaceTabs.map((tab) => {
+          const isActive = activeWorkspaceTab === tab.id;
+
+          return (
+            <button
+              aria-controls={`${tablistId}-${tab.id}-panel`}
+              aria-selected={isActive}
+              className={cx(
+                'min-h-7 shrink-0 rounded px-2.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+                isActive
+                  ? 'bg-accent text-button-text shadow-sm'
+                  : 'text-text-secondary hover:bg-bg-secondary hover:text-text-primary',
+              )}
+              data-testid={`color-workspace-tab-${tab.id}`}
+              id={`${tablistId}-${tab.id}-tab`}
+              key={tab.id}
+              onClick={() => {
+                setActiveWorkspaceTab(tab.id);
+              }}
+              role="tab"
+              tabIndex={isActive ? 0 : -1}
+              type="button"
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {workspaceTabs.map((tab) => (
+        <div
+          aria-labelledby={`${tablistId}-${tab.id}-tab`}
+          hidden={activeWorkspaceTab !== tab.id}
+          id={`${tablistId}-${tab.id}-panel`}
+          key={tab.id}
+          role="tabpanel"
+          data-testid={`color-workspace-tab-panel-${tab.id}`}
+        >
+          {tab.panel}
+        </div>
+      ))}
     </div>
   );
 }

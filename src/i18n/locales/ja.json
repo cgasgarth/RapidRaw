@@ -197,6 +197,14 @@
         "title": "",
         "toneChip": "",
         "whiteBalanceChip": ""
+      },
+      "workspaceTabs": {
+        "advanced": "Advanced",
+        "editor": "Editor",
+        "grading": "Grading",
+        "label": "Color workspace tools",
+        "output": "Output",
+        "quick": "Quick"
       }
     },
     "curves": {

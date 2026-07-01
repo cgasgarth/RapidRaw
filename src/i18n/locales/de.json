@@ -218,6 +218,14 @@
         "title": "Workflow Recipes",
         "toneChip": "Tone {{value}}",
         "whiteBalanceChip": "WB {{temperature}} / {{tint}}"
+      },
+      "workspaceTabs": {
+        "advanced": "Advanced",
+        "editor": "Editor",
+        "grading": "Grading",
+        "label": "Color workspace tools",
+        "output": "Output",
+        "quick": "Quick"
       }
     },
     "curves": {

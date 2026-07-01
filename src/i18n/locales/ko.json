@@ -73,7 +73,15 @@
       "vibrance": "생동감",
       "wbPickerTooltip": "화이트 밸런스 피커",
       "wbPickerWgpuDisabled": "WB 피커: 설정에서 WGPU를 비활성화하세요.",
-      "whiteBalance": "화이트 밸런스"
+      "whiteBalance": "화이트 밸런스",
+      "workspaceTabs": {
+        "advanced": "Advanced",
+        "editor": "Editor",
+        "grading": "Grading",
+        "label": "Color workspace tools",
+        "output": "Output",
+        "quick": "Quick"
+      }
     },
     "curves": {
       "channelTitle": "{{channel}} 채널",
