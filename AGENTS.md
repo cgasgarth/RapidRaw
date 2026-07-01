@@ -37,6 +37,23 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 ## Pull Requests
 
 - Max four active open PRs total.
+- Before a PR is opened, do a human-cleanliness pass over the diff. Ask whether
+  a reviewer would see any files, scripts, reports, generated artifacts, helper
+  indirection, or tests and reasonably say "what is this doing here?". Fix that
+  before publishing.
+- Do not add per-test or per-proof aliases to `package.json`. Package scripts
+  must stay suite-level or user-facing workflow-level commands such as
+  `test`, `check`, `lint`, `format`, `build`, `check:schema`, `check:bundle`,
+  Rust gates, app launchers, and worktree setup. Run individual checks with
+  direct native commands such as `bun path/to/check.ts`, `bun test path`, Cargo,
+  or Playwright.
+- Do not add custom repo scripts when a standard package, native test runner,
+  shell command, GitHub Actions feature, Bun/Cargo/Playwright capability, or
+  existing project helper cleanly handles the job. Prefer deleting custom
+  indirection over expanding it.
+- PR review must reject package-script bloat, generated inventory/report churn,
+  tests that only assert repo metadata or command wiring, and validation IDs
+  masquerading as executable package commands.
 - Keep at least two PR-bound workstreams active whenever independent work
   exists: PRs in CI/review and/or clearly scoped subagent-owned implementation
   or validation worktrees that are expected to become PRs.
