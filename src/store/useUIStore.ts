@@ -41,6 +41,7 @@ export interface CollapsibleSectionsState {
   curves: boolean;
   details: boolean;
   effects: boolean;
+  transformLens: boolean;
 }
 
 const DEVELOP_PANEL_PINNED_CONTROL_IDS_STORAGE_KEY = 'rapidraw.developPanelPinnedControlIds.v1';
@@ -70,6 +71,7 @@ export const DEFAULT_COLLAPSIBLE_SECTIONS_STATE: CollapsibleSectionsState = {
   curves: true,
   details: false,
   effects: false,
+  transformLens: false,
 };
 
 export interface ConfirmModalState {
