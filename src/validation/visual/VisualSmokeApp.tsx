@@ -6016,6 +6016,7 @@ function ColorRangeLocalAdjustmentVisualSmoke() {
 
 function ColorWorkflowVisualSmoke() {
   const [adjustments, setAdjustments] = useState<Adjustments>(() => structuredClone(INITIAL_ADJUSTMENTS));
+  const [isWbPickerActive, setIsWbPickerActive] = useState(false);
   const handleAdjustmentsChange = (update: Partial<Adjustments> | ((current: Adjustments) => Adjustments)) => {
     setAdjustments((current) => (typeof update === 'function' ? update(current) : { ...current, ...update }));
   };
@@ -6168,7 +6169,15 @@ function ColorWorkflowVisualSmoke() {
           <div className="mb-3 flex items-center justify-between">
             <span className="text-sm font-semibold">{copy.colorWorkflow}</span>
           </div>
-          <ColorPanel adjustments={adjustments} appSettings={null} setAdjustments={handleAdjustmentsChange} />
+          <ColorPanel
+            adjustments={adjustments}
+            appSettings={null}
+            isWbPickerActive={isWbPickerActive}
+            setAdjustments={handleAdjustmentsChange}
+            toggleWbPicker={() => {
+              setIsWbPickerActive((isActive) => !isActive);
+            }}
+          />
         </aside>
       </div>
     </main>

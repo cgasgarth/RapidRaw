@@ -111,7 +111,7 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
         {t('adjustments.color.colorGrading')}
       </UiText>
       <div>
-        <div className="mb-2 flex items-center justify-start gap-1.5">
+        <div className="mb-2 flex items-center justify-start gap-1.5 rounded-md border border-editor-border bg-editor-panel p-1">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
@@ -125,12 +125,12 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
                 onClick={() => {
                   setActiveTab(tab.id as '3way' | 'global');
                 }}
-                className={`flex h-6 w-6 items-center justify-center rounded-full transition-all focus:outline-none
-                  ${
-                    isActive
-                      ? 'ring-2 ring-offset-2 ring-offset-surface ring-accent text-text-primary'
-                      : 'bg-bg-secondary text-text-secondary hover:text-text-primary hover:bg-bg-secondary/80'
-                  }`}
+                className={cx(
+                  density.actionButton.base,
+                  density.actionButton.icon,
+                  isActive ? density.actionButton.selectedQuiet : density.actionButton.quiet,
+                )}
+                data-state={isActive ? 'active' : 'idle'}
                 type="button"
               >
                 {tab.icon}
@@ -147,9 +147,10 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
             className={`flex h-6 w-6 items-center justify-center rounded-full transition-all focus:outline-none
               ${
                 isExpanded
-                  ? 'bg-accent text-button-text'
-                  : 'bg-bg-secondary text-text-secondary hover:text-text-primary hover:bg-bg-secondary/80'
+                  ? 'bg-editor-primary-active text-editor-primary-active-text'
+                  : 'bg-transparent text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary'
               }`}
+            data-state={isExpanded ? 'active' : 'idle'}
             data-tooltip={t('adjustments.color.toggleSliders')}
             type="button"
           >
@@ -180,7 +181,7 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
             {isPresetDrawerOpen && (
               <motion.div
                 animate={{ height: 'auto', opacity: 1 }}
-                className="grid gap-1 border-t border-surface p-1.5"
+                className="grid gap-1 border-t border-editor-border p-1.5"
                 exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
                 initial={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.18 }}
@@ -201,7 +202,7 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
                       className={`grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-1 rounded border px-2 py-1 text-left text-[11px] transition-colors hover:border-accent hover:text-text-primary ${
                         isActivePreset
                           ? 'border-accent bg-accent/10 text-text-primary ring-1 ring-accent/40'
-                          : 'border-border bg-bg-secondary text-text-secondary hover:bg-surface'
+                          : 'border-editor-border bg-editor-panel text-text-secondary hover:bg-editor-panel-raised'
                       }`}
                       data-active={isActivePreset ? 'true' : 'false'}
                       data-testid="color-grading-preset-card"
@@ -213,7 +214,7 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
                       type="button"
                     >
                       <span className="min-w-0 truncate font-semibold text-text-primary">{preset.name}</span>
-                      <span className="shrink-0 rounded bg-bg-tertiary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-normal">
+                      <span className="shrink-0 rounded bg-editor-selected-quiet px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-normal text-text-secondary">
                         {categoryLabel}
                       </span>
                       <span aria-hidden="true" className="mt-1 grid grid-cols-4 gap-1">

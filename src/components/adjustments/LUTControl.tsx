@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { useOsPlatform } from '../../hooks/ui/useOsPlatform';
 import { Invokes } from '../../tauri/commands';
+import { professionalInspectorDensityTokens } from '../ui/inspectorTokens';
 import Slider from '../ui/primitives/Slider';
 
 interface LUTControlProps {
@@ -25,6 +26,7 @@ export default function LUTControl({
   onDragStateChange,
 }: LUTControlProps) {
   const { t } = useTranslation();
+  const density = professionalInspectorDensityTokens;
   const osPlatform = useOsPlatform();
   const isAndroid = osPlatform === 'android';
 
@@ -73,16 +75,17 @@ export default function LUTControl({
   };
 
   return (
-    <div className="mb-2">
-      <div className="flex justify-between items-center mb-1">
-        <span className="text-sm font-medium text-text-secondary select-none">{t('ui.lut.label')}</span>
+    <div className={density.card.panel} data-testid="lut-control">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className={density.sectionHeader.title}>{t('ui.lut.label')}</span>
         <div className="group flex items-center">
           <button
             onClick={() => {
               void handleSelectFile();
             }}
-            className="text-sm text-text-primary text-right select-none cursor-pointer truncate max-w-[150px] hover:text-accent transition-colors"
+            className="max-w-[150px] cursor-pointer truncate rounded px-1 text-right text-[12px] font-medium leading-5 text-text-primary transition-colors hover:bg-editor-selected-quiet focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
             data-tooltip={lutName || t('ui.lut.selectLutFile')}
+            type="button"
           >
             {lutName || t('ui.lut.select')}
           </button>
@@ -90,11 +93,12 @@ export default function LUTControl({
           {lutName && (
             <button
               onClick={onClear}
-              className="flex items-center justify-center p-0.5 rounded-full bg-bg-tertiary hover:bg-surface
+              className="flex items-center justify-center rounded bg-editor-panel-raised p-0.5 hover:bg-editor-selected-quiet
                          w-0 ml-0 opacity-0 group-hover:w-6 group-hover:ml-0 group-hover:opacity-100
                          overflow-hidden pointer-events-none group-hover:pointer-events-auto
-                         transition-all duration-200 ease-in-out"
+                         transition-all duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
               data-tooltip={t('ui.lut.clearLut')}
+              type="button"
             >
               <X size={14} />
             </button>

@@ -2606,6 +2606,18 @@ async function prepareScenario(page, mode) {
       await colorPanel.getByRole('tab', { exact: true, name }).click();
       await colorPanel.getByTestId(`color-workspace-tab-panel-${activePanel}`).waitFor({ state: 'visible' });
       await colorPanel.getByTestId(`color-workspace-tab-panel-${hiddenPanel}`).waitFor({ state: 'hidden' });
+      const tabState = await colorPanel.getByRole('tab', { exact: true, name }).evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          active: (element as HTMLElement).dataset.active,
+          minHeight: Number.parseFloat(style.minHeight),
+          offsetHeight: (element as HTMLElement).offsetHeight,
+          radius: Number.parseFloat(style.borderTopLeftRadius),
+        };
+      });
+      if (tabState.active !== 'true' || tabState.offsetHeight > 32 || tabState.minHeight > 28 || tabState.radius > 6) {
+        throw new Error(`Color workspace tab compact state proof failed for ${name}: ${JSON.stringify(tabState)}`);
+      }
     };
     const assertCompactRangeDensity = async (slider: Locator, proofLabel: string) => {
       const selectedSliderCount = await slider.count();
@@ -2655,6 +2667,16 @@ async function prepareScenario(page, mode) {
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
       }, value);
+    };
+    const waitForColorAdjustmentProofText = async (text: string) => {
+      await page.waitForFunction(
+        (expectedText) =>
+          document
+            .querySelector('[data-testid="color-workflow-adjustment-proof"]')
+            ?.textContent?.includes(expectedText),
+        text,
+        { timeout: 10_000 },
+      );
     };
     await assertColorWorkspaceTab('Output', 'output', 'quick');
     await colorPanel.getByTestId('color-runtime-status-rail').getByText('Preview/export', { exact: true }).waitFor({
@@ -2709,6 +2731,13 @@ async function prepareScenario(page, mode) {
     await assertColorWorkspaceTab('Grading', 'grading', 'editor');
     await assertCompactSliderDensity(colorPanel, 'Blending', 'color grading blending');
     await assertColorWorkspaceTab('Quick', 'quick', 'grading');
+    const pickerState = await colorPanel.getByTestId('color-white-balance-picker').evaluate((element) => ({
+      disabled: (element as HTMLButtonElement).disabled,
+      state: (element as HTMLElement).dataset.state,
+    }));
+    if (pickerState.state !== 'disabled' || pickerState.disabled !== true) {
+      throw new Error(`White-balance picker disabled state proof failed: ${JSON.stringify(pickerState)}`);
+    }
     await setRangeInput(colorPanel, 'Temperature', 12);
     await setRangeInput(colorPanel, 'Saturation', 18);
     await assertColorWorkspaceTab('Editor', 'editor', 'quick');
@@ -2721,11 +2750,9 @@ async function prepareScenario(page, mode) {
     await setRangeInput(selectiveControls, 'Luminance', -11);
     selectiveColorUiProofDatasetSchema.parse(await selectiveControls.evaluate((element) => ({ ...element.dataset })));
     await selectiveControls.getByTestId('selective-color-reset-active-range').click();
-    await page.getByTestId('selective-color-ui-proof').getByText('Orange 0', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByText('Orange sat 0', { exact: true }).waitFor({ timeout: 10_000 });
-    await page.getByText('Orange lum 0', { exact: true }).waitFor({ timeout: 10_000 });
+    await waitForColorAdjustmentProofText('Orange 0');
+    await waitForColorAdjustmentProofText('Orange sat 0');
+    await waitForColorAdjustmentProofText('Orange lum 0');
     const resetDataset = await selectiveControls.evaluate((element) => ({ ...element.dataset }));
     if (resetDataset.dirty !== 'false') {
       throw new Error('Selective color reset did not clear active range dirty state.');
@@ -2749,18 +2776,10 @@ async function prepareScenario(page, mode) {
       colorPanel.getByTestId('skin-tone-uniformity-controls').locator('input[type="range"]').first(),
       'skin tone uniformity',
     );
-    await page.getByTestId('color-workflow-adjustment-proof').getByText('Temp 12', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByTestId('color-workflow-adjustment-proof').getByText('Sat 18', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByTestId('color-workflow-adjustment-proof').getByText('CB on', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByTestId('color-workflow-adjustment-proof').getByText('CM on', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
+    await waitForColorAdjustmentProofText('Temp 12');
+    await waitForColorAdjustmentProofText('Sat 18');
+    await waitForColorAdjustmentProofText('CB on');
+    await waitForColorAdjustmentProofText('CM on');
     colorBalanceCompareProofDatasetSchema.parse(
       await page.getByTestId('color-balance-compare-strip').evaluate((element) => ({ ...element.dataset })),
     );
@@ -2779,9 +2798,7 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('color-balance-gamut-warning').getByText('No gamut clipping', { exact: true }).waitFor({
       timeout: 10_000,
     });
-    await page.getByTestId('skin-tone-uniformity-ui-proof').getByText('Skin 0.725', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
+    await waitForColorAdjustmentProofText('Skin 0.725');
     const skinToneInspector = await colorPanel
       .getByTestId('skin-tone-uniformity-controls')
       .evaluate((element) => ({ ...element.dataset }));

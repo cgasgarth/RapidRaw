@@ -46,17 +46,24 @@ export const ColorQuickControls = ({
           </div>
           {!isForMask && toggleWbPicker && (
             <button
+              aria-label={
+                isWgpuEnabled ? t('adjustments.color.wbPickerWgpuDisabled') : t('adjustments.color.wbPickerTooltip')
+              }
+              aria-pressed={isWbPickerActive}
               onClick={toggleWbPicker}
               disabled={isWgpuEnabled}
               className={cx(
                 density.actionButton.base,
                 density.actionButton.icon,
+                'border border-transparent data-[state=active]:border-accent',
                 isWgpuEnabled
                   ? 'cursor-not-allowed text-text-secondary hover:bg-transparent'
                   : isWbPickerActive
                     ? density.actionButton.active
                     : density.actionButton.quiet,
               )}
+              data-state={isWbPickerActive ? 'active' : isWgpuEnabled ? 'disabled' : 'idle'}
+              data-testid="color-white-balance-picker"
               data-tooltip={
                 isWgpuEnabled ? t('adjustments.color.wbPickerWgpuDisabled') : t('adjustments.color.wbPickerTooltip')
               }

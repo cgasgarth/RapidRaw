@@ -2,6 +2,7 @@ import cx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { TextColors, TextVariants } from '../../../types/typography';
 import type { Adjustments } from '../../../utils/adjustments';
+import { editorChromeStatusChipClassName } from '../../ui/editorChromeTokens';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import UiText from '../../ui/primitives/Text';
 import AdjustmentSlider from '../AdjustmentSlider';
@@ -14,6 +15,8 @@ const colorRuntimeStatusItems = [
 ] as const;
 type RuntimeStatusKey = (typeof colorRuntimeStatusItems)[number][number] | 'ariaLabel';
 export const runtimeStatusKey = (key: RuntimeStatusKey) => `adjustments.color.runtimeStatus.${key}` as const;
+const colorWarningChipClassName = (hasWarning: boolean) =>
+  hasWarning ? editorChromeStatusChipClassName('warning') : editorChromeStatusChipClassName('neutral');
 
 export const ColorRuntimeStatusRail = () => {
   const { t } = useTranslation();
@@ -22,14 +25,17 @@ export const ColorRuntimeStatusRail = () => {
   return (
     <div
       aria-label={t(runtimeStatusKey('ariaLabel'))}
-      className={cx('grid grid-cols-2 gap-1', density.card.nestedPanel)}
+      className={cx('grid grid-cols-2 gap-1 border-editor-border bg-editor-panel', density.card.nestedPanel)}
       data-testid="color-runtime-status-rail"
     >
       {colorRuntimeStatusItems.map(([labelKey, stateKey]) => {
         const state = t(runtimeStatusKey(stateKey));
 
         return (
-          <div className={density.card.nestedBare} key={labelKey}>
+          <div
+            className={cx(density.card.nestedBare, 'border border-editor-border bg-editor-panel-raised')}
+            key={labelKey}
+          >
             <div className="text-[10px] font-semibold uppercase leading-tight tracking-normal text-text-secondary">
               {t(runtimeStatusKey(labelKey))}
             </div>
@@ -54,7 +60,7 @@ export const ColorWorkflowReadinessRail = () => {
 
   return (
     <div
-      className={cx('grid gap-1', density.card.nestedPanel)}
+      className={cx('grid gap-1 border-editor-border bg-editor-panel', density.card.nestedPanel)}
       data-channel-mixer-ready="true"
       data-color-balance-ready="true"
       data-grading-ready="true"
@@ -63,7 +69,11 @@ export const ColorWorkflowReadinessRail = () => {
       data-testid="professional-color-workflow-readiness"
     >
       {readinessItems.map((item) => (
-        <div className={density.card.nestedBare} data-testid="professional-color-readiness-item" key={item.key}>
+        <div
+          className={cx(density.card.nestedBare, 'border border-editor-border bg-editor-panel-raised')}
+          data-testid="professional-color-readiness-item"
+          key={item.key}
+        >
           <div className="text-[10px] font-semibold uppercase leading-tight tracking-normal text-text-secondary">
             {item.label}
           </div>
@@ -146,8 +156,11 @@ export const ColorProofingDiagnostics = ({
     <>
       <ColorRuntimeStatusRail />
       <ColorWorkflowReadinessRail />
-      <details className={density.card.nestedPanel} data-testid="color-proofing-diagnostics-disclosure">
-        <summary className="cursor-pointer px-1 py-1 text-xs">
+      <details
+        className={cx(density.card.nestedPanel, 'bg-editor-panel')}
+        data-testid="color-proofing-diagnostics-disclosure"
+      >
+        <summary className="cursor-pointer px-1 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring">
           <div className={density.sectionHeader.rootLoose}>
             <div className="min-w-0">
               <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
@@ -174,7 +187,7 @@ export const ColorProofingDiagnostics = ({
               ? colorWorkspaceWarningChips
               : [t('adjustments.color.gamutWarning.off')]
             ).map((warning) => (
-              <span className="rounded bg-bg-secondary px-1.5 py-1" key={warning}>
+              <span className={colorWarningChipClassName(colorWorkspaceWarningChips.length > 0)} key={warning}>
                 {warning}
               </span>
             ))}
@@ -182,7 +195,7 @@ export const ColorProofingDiagnostics = ({
         </summary>
         <div className={cx(density.gutter.panel, 'border-t border-border p-1.5')}>
           <div
-            className={density.card.nestedPanel}
+            className={cx(density.card.nestedPanel, 'bg-editor-panel')}
             data-active-camera-profile={adjustments.cameraProfile}
             data-active-tone-curve={adjustments.toneCurve}
             data-export-transform-label={activeExportPresetName ?? ''}
@@ -213,13 +226,22 @@ export const ColorProofingDiagnostics = ({
               <span className={density.sectionHeader.badge}>{t(runtimeStatusKey('previewExport'))}</span>
             </div>
             <div className="grid grid-cols-3 gap-1 text-[10px] font-medium text-text-secondary">
-              <span className="min-w-0 rounded bg-bg-secondary px-1.5 py-1" data-testid="color-workspace-working-label">
+              <span
+                className="min-w-0 rounded bg-editor-panel-raised px-1.5 py-1"
+                data-testid="color-workspace-working-label"
+              >
                 {t(runtimeStatusKey('apiLabel'))}: {t('adjustments.color.profileTone.cameraProfiles.linear_raw')}
               </span>
-              <span className="min-w-0 rounded bg-bg-secondary px-1.5 py-1" data-testid="color-workspace-export-label">
+              <span
+                className="min-w-0 rounded bg-editor-panel-raised px-1.5 py-1"
+                data-testid="color-workspace-export-label"
+              >
                 {t(runtimeStatusKey('uiLabel'))}: {activeExportPresetName ?? t(runtimeStatusKey('previewExport'))}
               </span>
-              <span className="min-w-0 rounded bg-bg-secondary px-1.5 py-1" data-testid="color-workspace-scope-label">
+              <span
+                className="min-w-0 rounded bg-editor-panel-raised px-1.5 py-1"
+                data-testid="color-workspace-scope-label"
+              >
                 {t(runtimeStatusKey('gpuLabel'))}: {t('ui.waveform.tooltips.vectorscope')}
               </span>
             </div>
@@ -231,7 +253,7 @@ export const ColorProofingDiagnostics = ({
                 ? colorWorkspaceWarningChips
                 : [t('adjustments.color.gamutWarning.off')]
               ).map((warning) => (
-                <span className="rounded bg-bg-secondary px-1.5 py-1" key={warning}>
+                <span className={colorWarningChipClassName(colorWorkspaceWarningChips.length > 0)} key={warning}>
                   {warning}
                 </span>
               ))}
@@ -239,7 +261,10 @@ export const ColorProofingDiagnostics = ({
           </div>
 
           <div
-            className={density.card.nestedPanel}
+            className={cx(
+              density.card.nestedPanel,
+              currentGamutWarningOverlay === null ? 'bg-editor-panel' : 'border-accent bg-accent/10',
+            )}
             data-coverage-ratio={(currentGamutWarningOverlay?.coverage_ratio ?? 0).toFixed(6)}
             data-effective-color-profile={currentGamutWarningOverlay?.effective_color_profile ?? ''}
             data-effective-rendering-intent={currentGamutWarningOverlay?.effective_rendering_intent ?? ''}
@@ -299,7 +324,10 @@ export const ColorProofingDiagnostics = ({
           </div>
 
           <div
-            className={density.card.nestedPanel}
+            className={cx(
+              density.card.nestedPanel,
+              adjustments.skinToneUniformity.enabled ? 'border-accent bg-accent/10' : 'bg-editor-panel',
+            )}
             data-hsl-preview-hue={skinTonePreview.hue}
             data-hsl-preview-luminance={skinTonePreview.luminance}
             data-hsl-preview-saturation={skinTonePreview.saturation}
@@ -341,7 +369,7 @@ export const ColorProofingDiagnostics = ({
                   : t('adjustments.color.skinToneUniformity.disabled')}
               </button>
             </div>
-            <div className="grid gap-1 rounded bg-bg-secondary p-1.5 text-[11px] text-text-secondary">
+            <div className="grid gap-1 rounded border border-editor-border bg-editor-panel-raised p-1.5 text-[11px] text-text-secondary">
               <span>{t('adjustments.color.skinToneUniformity.warning')}</span>
               <span>
                 {t('adjustments.color.skinToneUniformity.preview', {
