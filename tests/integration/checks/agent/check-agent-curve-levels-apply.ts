@@ -136,7 +136,7 @@ if (
 const initialSnapshot = buildAgentImageContextSnapshot();
 let staleRejected = false;
 try {
-  applyAgentCurveLevels({
+  await applyAgentCurveLevels({
     curveLevels: { toneCurve: 'linear' },
     expectedRecipeHash: 'recipe:stale',
     operationId: 'agent_curve_levels_stale',
@@ -148,7 +148,7 @@ try {
 }
 if (!staleRejected) throw new Error('agent.curve_levels.apply did not reject stale recipe hash.');
 
-const result = applyAgentCurveLevels({
+const result = await applyAgentCurveLevels({
   curveLevels: {
     curveMode: 'parametric',
     levels: { enabled: true, gamma: 0.94, inputBlack: 0.02, inputWhite: 0.98, outputBlack: 0.01, outputWhite: 0.99 },

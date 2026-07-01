@@ -102,7 +102,7 @@ if (
 const initialSnapshot = buildAgentImageContextSnapshot();
 let staleRejected = false;
 try {
-  applyAgentGeometry({
+  await applyAgentGeometry({
     expectedRecipeHash: 'recipe:stale',
     geometry: { rotation: 1 },
     operationId: 'agent_geometry_stale',
@@ -114,7 +114,7 @@ try {
 }
 if (!staleRejected) throw new Error('agent.geometry.apply did not reject stale recipe hash.');
 
-const result = applyAgentGeometry({
+const result = await applyAgentGeometry({
   expectedRecipeHash: initialSnapshot.initialPreview.recipeHash,
   geometry: {
     aspectRatio: 1.5,

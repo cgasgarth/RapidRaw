@@ -1288,7 +1288,7 @@ const dispatchAgentAppServerTool = async (
       result = await applyAgentColor(agentColorApplyRequestSchema.parse(request.arguments));
       break;
     case AGENT_CURVE_LEVELS_APPLY_TOOL_NAME:
-      result = applyAgentCurveLevels(agentCurveLevelsApplyRequestSchema.parse(request.arguments));
+      result = await applyAgentCurveLevels(agentCurveLevelsApplyRequestSchema.parse(request.arguments));
       break;
     case AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME:
       result = await applyAgentDetailEffects(agentDetailEffectsApplyRequestSchema.parse(request.arguments));
@@ -1328,7 +1328,7 @@ const dispatchAgentAppServerTool = async (
       );
       break;
     case AGENT_GEOMETRY_APPLY_TOOL_NAME:
-      result = applyAgentGeometry(agentGeometryApplyRequestSchema.parse(request.arguments));
+      result = await applyAgentGeometry(agentGeometryApplyRequestSchema.parse(request.arguments));
       break;
     case AGENT_LENS_PROFILE_APPLY_TOOL_NAME:
       result = await applyAgentLensProfile(agentLensProfileApplyRequestSchema.parse(request.arguments));
