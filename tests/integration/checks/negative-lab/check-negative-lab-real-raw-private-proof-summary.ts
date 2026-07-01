@@ -10,8 +10,8 @@ const REPORT_PATH = 'docs/validation/proofs/negative-lab/negative-lab-real-raw-p
 const PRIVATE_REPORT_PATH = 'private-artifacts/validation/negative-lab-real-raw/alaska-negative-lab-v1-report.json';
 const PRIVATE_ROOT = '/tmp/rawengine-negative-lab-alaska-proof';
 const PRIVATE_SOURCE = '/Users/cgas/Pictures/Capture One/Alaska';
-const SOURCE_COMMAND = `RAWENGINE_PRIVATE_RAW_ROOT=${PRIVATE_ROOT} RAWENGINE_PRIVATE_RAW_SOURCE="${PRIVATE_SOURCE}" bun run run:negative-lab-real-raw-private-proof -- --require-assets`;
-const ASSET_COMMAND = `RAWENGINE_PRIVATE_RAW_ROOT=${PRIVATE_ROOT} bun run run:negative-lab-real-raw-private-proof -- --require-assets`;
+const SOURCE_COMMAND = `RAWENGINE_PRIVATE_RAW_ROOT=${PRIVATE_ROOT} RAWENGINE_PRIVATE_RAW_SOURCE="${PRIVATE_SOURCE}" bun scripts/private-raw/proofs/raw-workflow/run-negative-lab-real-raw-private-proof.ts -- --require-assets`;
+const ASSET_COMMAND = `RAWENGINE_PRIVATE_RAW_ROOT=${PRIVATE_ROOT} bun scripts/private-raw/proofs/raw-workflow/run-negative-lab-real-raw-private-proof.ts -- --require-assets`;
 const UPDATE_REPORT = process.argv.includes('--update');
 const requireAssets = process.argv.includes('--require-assets');
 const allowFreshHashes = process.argv.includes('--allow-fresh-hashes');

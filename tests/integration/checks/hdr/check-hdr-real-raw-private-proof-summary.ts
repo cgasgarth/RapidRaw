@@ -55,10 +55,10 @@ const reportSchema = z
     validationCommands: z
       .array(
         z.enum([
-          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof RAWENGINE_PRIVATE_RAW_SOURCE="/Users/cgas/Pictures/Capture One/Alaska" bun run prepare:hdr-real-raw-private-root -- --require-assets',
-          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof bun run run:hdr-real-raw-private-proof',
-          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof bun run check:hdr-real-raw-private-app-server-proof',
-          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof bun run check:hdr-private-raw-ui-smoke',
+          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof RAWENGINE_PRIVATE_RAW_SOURCE="/Users/cgas/Pictures/Capture One/Alaska" bun scripts/private-raw/prepare/prepare-hdr-real-raw-private-root.ts -- --require-assets',
+          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof bun scripts/private-raw/proofs/computational/run-hdr-real-raw-private-proof.ts',
+          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof bun tests/integration/checks/hdr/check-hdr-real-raw-private-app-server-proof.ts',
+          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof bun scripts/proofs/capture-visual-smoke.ts --scenario hdr-private-raw-ui',
         ]),
       )
       .length(4),

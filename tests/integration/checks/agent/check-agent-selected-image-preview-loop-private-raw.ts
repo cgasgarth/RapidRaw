@@ -105,7 +105,7 @@ const publicReport = publicProofReportSchema.parse({
   proofStatus: 'public_contract_private_runtime_required',
   schemaVersion: 1,
   validationCommand:
-    'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-agent-preview-loop-proof RAWENGINE_PRIVATE_RAW_SOURCE="/Users/cgas/Pictures/Capture One/Alaska" bun run check:agent-selected-image-preview-loop-private-raw -- --require-assets',
+    'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-agent-preview-loop-proof RAWENGINE_PRIVATE_RAW_SOURCE="/Users/cgas/Pictures/Capture One/Alaska" bun tests/integration/checks/agent/check-agent-selected-image-preview-loop.ts-private-raw -- --require-assets',
   validationMode: 'agent_selected_image_preview_loop_private_raw',
 });
 

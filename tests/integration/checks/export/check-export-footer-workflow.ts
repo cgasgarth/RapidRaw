@@ -4,15 +4,13 @@ import { readFile } from 'node:fs/promises';
 import { Status } from '../../../../src/components/ui/ExportImportProperties.ts';
 import { useProcessStore } from '../../../../src/store/useProcessStore.ts';
 
-const [exportPanelSource, processStoreSource, localeSource, packageSource] = await Promise.all([
+const [exportPanelSource, processStoreSource, localeSource] = await Promise.all([
   readFile('src/components/panel/right/export/ExportPanel.tsx', 'utf8'),
   readFile('src/store/useProcessStore.ts', 'utf8'),
   readFile('src/i18n/locales/en.json', 'utf8'),
-  readFile('package.json', 'utf8'),
 ]);
 
 const locale = JSON.parse(localeSource) as { export?: { status?: Record<string, string> } };
-const packageJson = JSON.parse(packageSource) as { scripts?: Record<string, string> };
 const statusKeys = locale.export?.status ?? {};
 const failures: string[] = [];
 
@@ -72,13 +70,6 @@ const requiredLocaleKeys = [
 
 for (const key of requiredLocaleKeys) {
   if (statusKeys[key] === undefined) failures.push(`missing locale export.status.${key}`);
-}
-
-if (
-  packageJson.scripts?.['check:export-footer-workflow'] !==
-  'bun tests/integration/checks/export/check-export-footer-workflow.ts'
-) {
-  failures.push('package.json missing check:export-footer-workflow');
 }
 
 const receipt = {

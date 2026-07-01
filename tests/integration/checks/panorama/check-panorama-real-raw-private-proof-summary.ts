@@ -76,10 +76,10 @@ const reportSchema = z
     validationCommands: z
       .array(
         z.enum([
-          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-panorama-alaska-proof RAWENGINE_PRIVATE_RAW_SOURCE="/Users/cgas/Pictures/Capture One/Alaska" bun run prepare:panorama-real-raw-private-root -- --require-assets',
-          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-panorama-alaska-proof bun run run:panorama-real-raw-private-proof',
-          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-panorama-alaska-proof bun run check:panorama-real-raw-private-app-server-proof',
-          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-panorama-alaska-proof bun run check:panorama-private-raw-ui-smoke',
+          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-panorama-alaska-proof RAWENGINE_PRIVATE_RAW_SOURCE="/Users/cgas/Pictures/Capture One/Alaska" bun scripts/private-raw/prepare/prepare-panorama-real-raw-private-root.ts -- --require-assets',
+          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-panorama-alaska-proof bun scripts/private-raw/proofs/computational/run-panorama-real-raw-private-proof.ts',
+          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-panorama-alaska-proof bun tests/integration/checks/panorama/check-panorama-real-raw-private-app-server-proof.ts',
+          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-panorama-alaska-proof bun scripts/proofs/capture-visual-smoke.ts --scenario panorama-private-raw-ui',
         ]),
       )
       .length(4),
