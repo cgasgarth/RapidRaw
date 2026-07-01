@@ -1,211 +1,116 @@
 # RawEngine Agent Instructions
 
-These instructions apply to the RapidRaw fork used for RawEngine work.
+Rules for RawEngine's RapidRaw fork.
 
-## Operating Defaults
+## Mission
 
-- Work toward the full macOS-first Capture One/Lightroom-class RAW editor in
-  `RAW_EDITOR_PLAN.md`; do not redefine success around a smaller slice.
-- Inspect current repo/GitHub state before relying on older context. If one
-  area blocks, continue useful implementation, validation, issue cleanup, or PR
-  maintenance.
-- Keep searches repo-scoped. Use `rg` for text/files and `sg` for syntax-aware
-  search or rewrites, for example `sg --lang <language> -p '<pattern>'`.
-- Exclude dependency/build/cache paths such as `node_modules`, `dist`, `target`,
-  `src-tauri/target`, plugin caches, and `~/.codex` unless explicitly needed.
-- Prefer bounded `sed`/`head`/`tail`, `rg -l`, `rg --count`, `jq` summaries, and
-  compact command wrappers over broad dumps.
-- Use `apply_patch` for manual edits. Use Bun for TypeScript/React package
-  management, scripts, tests, CI, and one-off JS/TS commands where applicable.
-- Do not use AppleScript, `osascript`, System Events GUI scripting, JavaScript
-  from Apple Events, or Apple Events automation unless the user explicitly
-  permits that task.
+Work toward the macOS-first Capture One/Lightroom-class editor in
+`RAW_EDITOR_PLAN.md`; never redefine success around a smaller slice. Prefer
+vertical product PRs; planning, schemas, probes, inventories, reports, routing
+checks, CI/tooling, and cleanup only support product slices. Cleanup and
+CI/tooling PRs must not outnumber feature PRs. Trust current repo/GitHub state;
+if blocked, continue implementation, validation, issue cleanup, or PR care.
 
-## Compact Output
+## Output, Search, And Edits
 
-- Keep command, hook, poll, validation, and thread output compact. On success,
-  summarize; on failure, include the failing step, short actionable excerpt, and
-  next action/blocker.
-- Do not dump full logs, JSON, long file lists, repeated green output, or
-  unchanged PR/CI/branch/status blocks unless needed for the next decision.
-- Preserve hard evidence: exact validation commands, runtime proof, blockers,
-  safety decisions, and accepted/rejected consult advice. Prefer updating
-  existing issues, docs, plans, and PR descriptions over duplicated summaries.
+Keep thread, command, hook, poll, and validation output compact: summarize
+success; on failure show the failing step, short excerpt, and next action. Avoid
+full logs, JSON, long lists, repeated green output, and unchanged status.
+Preserve validation commands, runtime proof, blockers, and consult decisions.
 
-## Startup And Repo Resolution
+Keep searches repo-scoped. Use `rg` for text/files, `sg` for structural
+search/rewrites. Exclude dependency/build/cache paths unless needed. Prefer
+bounded output (`sed`, `head`, `tail`, `rg -l`, `rg --count`, `jq`). Use
+`apply_patch` for manual edits and Bun for TS/React package work. Do not use
+AppleScript, `osascript`, System Events, JavaScript from Apple Events, or Apple
+Events automation unless permitted.
 
-- In each new turn or worktree, do one compact preflight: repo root,
-  branch/worktree state, dependency availability, remotes, GitHub repo
-  resolution, and open PR count. Fix preflight failures before feature work.
-- Keep `gh` resolved to `cgasgarth/RapidRaw`. If
-  `gh repo view --json nameWithOwner --jq .nameWithOwner` returns anything
-  else, run `bun run repo:fix-gh-resolution` rather than adding repeated `-R`
-  flags.
-- Intended remotes: `origin=https://github.com/cgasgarth/RapidRaw.git` and
-  `upstream=https://github.com/CyberTimon/RapidRAW.git`; `origin` is the
-  gh-resolved base remote, `upstream` is not.
-- Use the checked-in Codex local environment when available. Create new Codex
-  worktrees with `bun run worktree:create -- --branch codex/name` or validate
-  with `--dry-run`; fix that helper if recurring setup needs are missing.
-- Do not add or preserve repo scripts whose main purpose is agent workflow.
+## Repo, Worktrees, And PRs
 
-## Pull Requests
+Start each turn/worktree with compact preflight: repo root, branch/worktree,
+deps, remotes, GitHub repo, and open PR count. Fix failures first.
+`gh repo view --json nameWithOwner --jq .nameWithOwner` must be
+`cgasgarth/RapidRaw`; otherwise run `bun run repo:fix-gh-resolution`. Remotes:
+`origin=https://github.com/cgasgarth/RapidRaw.git`,
+`upstream=https://github.com/CyberTimon/RapidRAW.git`. Create worktrees
+with `bun run worktree:create -- --branch codex/name`; fix that helper if setup
+is missing.
 
-- Keep at most four active open PRs. Before opening one, check the queue with
-  `gh`; every open PR needs a disposition: merge, fix, close, or explicit
-  deferral.
-- Do not leave PRs stale. Do not rebase/force-push a healthy PR that only awaits
-  checks unless it is behind/conflicting or branch protection requires it. Enable
-  auto-merge when checks are running/passing and no blockers remain.
-- Before publishing, do a human-cleanliness pass: remove any file, script,
-  report, artifact, helper indirection, or test that would make a reviewer ask,
-  "what is this doing here?"
-- Prefer vertical product feature PRs. Planning, schemas, probes, inventories,
-  reports, routing checks, CI/tooling, and cleanup only support product slices;
-  cleanup/CI/tooling PRs must not exceed feature PRs.
-- Avoid meta-tooling unless it clearly improves product quality or prevents a
-  recurring real failure. Proof scripts belong in the feature PR they validate.
-- Avoid committed generated inventory/report JSON unless required for a product
-  validation gate or deliberate human-review artifact. Clean up slop before
-  building on it.
+Keep at most four active PRs. Check the queue before opening one; every PR needs
+merge, fix, close, or deferral. Do not leave PRs stale, or rebase/force-push
+healthy PRs only waiting for checks unless behind/conflicting/required. Enable
+auto-merge when safe. Never push to protected `main`. Before publishing, remove
+anything that would make a reviewer ask "what is this doing here?": stray files,
+scripts, reports, artifacts, helper indirection, weak tests, generated
+inventory/report JSON, or agent-workflow scripts.
 
-## Package Scripts And Tooling
+## Scripts, Tooling, And Types
 
-- Do not add per-test or per-proof aliases to `package.json`. Package scripts
-  must stay suite-level or user-facing workflow-level commands (`test`, `check`,
-  `lint`, `format`, `build`, `check:schema`, `check:bundle`, Rust gates, app
-  launchers, worktree setup). Run individual checks with direct native commands.
-- Do not add custom scripts when a standard package, native runner, shell
-  command, GitHub Actions feature, Bun/Cargo/Playwright capability, or existing
-  helper cleanly handles the job. Prefer deleting custom indirection.
-- PR review must reject package-script bloat, inventory/report churn, tests that
-  only assert metadata or wiring, and validation IDs masquerading as commands.
-- Keep TypeScript and linting strict. Do not introduce `as any` or
-  `as unknown as`. Use Zod for TypeScript-facing runtime schemas and structured
-  config validation.
+Do not add per-test/per-proof `package.json` aliases. Scripts stay
+suite/workflow-level (`test`, `check`, `lint`, `format`, `build`,
+`check:schema`, `check:bundle`, Rust gates, app launchers, worktree setup). Run
+individual checks directly. Do not add custom scripts when standard tooling
+handles the job; prefer deleting indirection.
 
-## Testing And Validation
+Reject package-script bloat, inventory/report churn, metadata-only tests,
+wiring-only tests, and validation IDs masquerading as commands. Keep TS/lint
+strict. No `as any` or `as unknown as`. Use Zod for TS-facing runtime schemas
+and config. Track current stable packages/tools; major or semver-risky bumps
+need dedicated issues.
 
-- Tests should prove product logic or user journeys. Use Bun test for non-UI
-  TypeScript logic, Playwright or native app automation for UI/e2e journeys, and
-  Cargo test for Rust.
-- Do not create tests whose main value is package script text, hook wiring,
-  workflow strings, generated inventories, command names, or agent/process
-  metadata. Do not wrap policy probes, schema-only checks, inventory scans, or
-  config assertions in `.test.ts` to make them look like product tests.
-- Delete or simplify stale `tests/integration/checks/check-*.ts` files that do
-  not validate runtime behavior, source logic, or real user workflow. Do not
-  build more checks on weak checks.
-- New integration, validation, runtime-proof, fixture-proof, and E2E-style
-  checks belong in `tests/integration/checks/`; keep `scripts/` for reusable
-  helpers, generators, CI classifiers, and command wrappers.
-- Before push or PR creation, stage intended files and try the commit so the
-  precommit hook runs. Fix reported issues and retry. Do not bypass hooks unless
-  the user explicitly paused local validation; then state that hosted CI is the
-  validation source.
-- Run extra focused validation only when it proves changed runtime,
-  preview/export, UI, or image-output behavior that precommit cannot cover, and
-  record those commands as PR evidence.
-- Do not wait for CI to find basic format, lint, i18n, missing dependency, or
-  bundle-budget failures. If GitHub Actions exposes a deterministic repo issue,
-  add or update the cheapest local/precommit gate unless that failure class is
-  already covered.
-- Match validation scope to the claim. Treat plan-only, schema-only, API-only,
-  dry-run-only, UI-only, and runtime-capable work as distinct completion states.
-- Do not close or describe a feature as complete until runtime behavior,
-  preview/export behavior, E2E or equivalent workflow proof, screenshots or
-  artifacts, and follow-up gaps are proven or explicitly tracked.
-- Image-editing features require running the app/software with the new feature
-  on RAW images and validating output images or artifacts. Schemas, dry-runs,
-  synthetic fixtures, and UI smoke checks are intermediate proof only.
-- For private RAW/image work, prove real runtime output behavior. The user has
-  allowed validation with their RAW files under
-  `/Users/cgas/Pictures/Capture One/Alaska`; do not commit those files or
-  generated private artifacts.
-- Keep private RAW validation standardized around one reusable private root and
-  report pattern. Commit private reports only as deliberate human-review
-  artifacts.
-- Use Computer Use for local macOS app verification when completing
-  user-visible UI or workflow claims. Prefer `bun run install:computer-use` so
-  verification attaches to `/Applications/RapidRAW.app`.
+## Tests And Validation
 
-## GitHub Issues And Backlog
+Tests prove product logic or user journeys: Bun test for non-UI TS, Playwright
+or native app automation for UI/e2e, Cargo test for Rust. Do not test script
+text, hook wiring, workflow strings, generated inventories, command names, or
+agent metadata. Delete weak `tests/integration/checks/check-*.ts` files. New
+integration/runtime/fixture/E2E checks belong in `tests/integration/checks/`;
+keep `scripts/` for helpers, generators, CI classifiers, and wrappers.
 
-- New issues should be delegation packets sized for one small/medium PR where
-  practical, with product intent, ownership, constraints, and validation
-  evidence needed to branch, implement, validate, commit, push, and open a PR.
-- Issue bodies need concise `Why`, `How`, and `Validation` sections with enough
-  links, checks, artifacts, runtime proof, or plan-only status to avoid
-  rediscovery.
-- Use milestones for larger themes. After feature PR batches, review the active
-  goal and `RAW_EDITOR_PLAN.md`, consult at milestone level, then create/update
-  milestones and PR-sized issues.
-- Include consult decisions, constraints, validation expectations, and follow-up
-  gaps directly in issues. Split broad issues, close obsolete/meta-only or
-  duplicate work, refresh stale context, and keep enough backlog for parallel
-  workstreams.
+Before push/PR, stage intended files and try the commit so precommit runs. Fix
+failures and retry. Bypass hooks only if the user paused local validation, then
+say hosted CI is the source. Extra validation should prove runtime,
+preview/export, UI, or image-output behavior beyond precommit. If GHA exposes
+deterministic repo failures, add/update the cheapest local gate unless covered.
 
-## Consult And Research
+Match proof to claim: plan-only, schema-only, API-only, dry-run-only, UI-only,
+and runtime-capable are distinct. Do not call a feature complete until runtime,
+preview/export, E2E/equivalent proof, screenshots/artifacts, and gaps are proven
+or tracked. Image features require app execution on RAWs and output validation.
+Prefer `/Users/cgas/Pictures/Capture One/Alaska`; never commit private RAWs or
+artifacts. Use one private-root/report pattern. Use Computer Use for visible UI
+claims; prefer `bun run install:computer-use` for `/Applications/RapidRAW.app`.
 
-- Use consult at the milestone level before creating or materially reshaping a
-  milestone. Ask for product goal, architecture, sequencing, risks, validation
-  strategy, and a PR-sized issue breakdown.
-- For milestone GitHub planning, create or confirm milestones first, then pass
-  titles/numbers into consult. When the GitHub connector is available, ask
-  consult to create or assign PR-sized issues to those milestones.
-- Do not consult separately for each PR by default. Reconsult only when scope,
-  risk, UI direction, science/math, architecture, or validation strategy
-  materially changes.
-- Use consult heavily for design decisions, color science, negative processing,
-  film simulations, deblur, denoise, sharpening/detail math, panorama stitching,
-  HDR, focus stacking, super-resolution, app-server/agent architecture, GitHub
-  Actions strategy, and tricky UI architecture.
-- For science/math-heavy image features, iterate: consult, define math and
-  rejected alternatives, add fixtures/metrics, implement runtime behavior,
-  verify preview/export parity, and prove quality on representative real images.
-- For RawEngine/RapidRaw consults, start inside the RapidRaw ChatGPT project and
-  attach the `cgasgarth/RapidRaw` GitHub repo/app data source when available.
-  Record any limitation if the project or data source is unavailable.
-- Start consult prompts with the concrete milestone, feature, bug, PR, or
-  decision context; do not add meta labels such as "new topic." Treat consult
-  as advice and verify it against current repo state before implementing.
+## Issues, Consult, And Subagents
 
-## Subagents And Worktrees
+Issues are one-PR delegation packets where practical, with concise `Why`, `How`,
+`Validation`, intent, constraints, links/artifacts, runtime proof, and plan-only
+status as needed. Use milestones for themes. Split broad issues, close stale or
+duplicate work, and keep backlog for parallel streams.
 
-- Treat the main agent as engineering manager: own task selection, design
-  judgment, review, integration, merge decisions, and acceptance/rejection of
-  subagent output.
-- Keep at least two PR-bound workstreams active whenever independent useful work
-  exists: PRs in CI/review and/or scoped subagent-owned worktrees expected to
-  become PRs.
-- Use subagents/worktrees for independent implementation, validation, CI
-  diagnosis, issue refinement, backlog cleanup, log polling, or PR monitoring
-  when this will not create ownership conflicts or reduce review quality.
-- Delegate only clear outputs: patch, diagnosis, issue list, validation summary,
-  PR, or next action. Straightforward tasks can use a smaller/faster model such
-  as 5.4 mini when available.
-- PR-sized issues may be owned end to end by subagents: branch, implementation,
-  validation, commit, push, PR description, and initial CI follow-up. Use draft
-  PRs only for a stated blocker or intentionally incomplete patch.
-- Do not let subagents open broad/under-refined PRs, create meta-tooling churn,
-  or mark feature work complete without runtime/product proof. While CI runs,
-  start/delegate another independent stream or monitor the queue.
+Use consult at milestone level before creating/materially reshaping a milestone.
+Ask for goal, architecture, sequence, risks, validation, and PR-sized issues;
+pass milestone titles/numbers and, when available, ask consult with GitHub
+connector to create/assign issues. Do not consult per PR by default; reconsult
+only when scope, risk, UI, science/math, architecture, or validation changes.
 
-## Dependency Freshness
+Use consult heavily for design, color science, negative processing, film sims,
+deblur, denoise, detail math, panorama, HDR, focus stacking, super-resolution,
+app-server/agent architecture, GHA, and tricky UI. For science/math image work,
+iterate through consult, math/alternatives, fixtures/metrics, runtime
+implementation, preview/export parity, and real image proof. RapidRaw consults
+use the RapidRaw ChatGPT project with `cgasgarth/RapidRaw` data when available.
+Start with concrete context; do not add labels such as "new topic."
 
-- Track latest stable major/minor versions for JS/Bun packages, Rust crates,
-  GitHub Actions, Node, Bun, Tauri, Rust tooling, and validation CLIs.
-- Compatible patch/minor refreshes may be grouped after the full validation
-  story passes.
-- Every discovered major package/tooling bump needs a dedicated issue before
-  implementation. Treat Cargo `0.x` semver-incompatible minor or patch jumps as
-  major-style migrations.
-- Do not hide major migrations inside broad lockfile refresh PRs.
+Main agent acts as engineering manager: select tasks, judge design, review,
+integrate, merge, and accept/reject output. Keep at least two PR-bound streams
+active when independent work exists. Use subagents/worktrees for implementation,
+validation, CI diagnosis, issue refinement, backlog cleanup, polling, or PR
+monitoring. Delegate clear outputs only. PR-sized issues may be subagent-owned
+end to end. Do not allow broad PRs, meta-tooling churn, or feature completion
+without runtime/product proof.
 
-## Main Protection And CI
+## Main And CI
 
-- Maintain the stable `PR CI / required` aggregate gate and keep GitHub Actions
-  on supported major versions.
-- New `main` or PR workflow runs should not cancel older validation runs.
-- Never push directly to protected `main`; use PRs and the queue discipline
-  above.
+Maintain the stable `PR CI / required` aggregate gate and supported GitHub
+Actions versions. New `main` or PR workflow runs should not cancel older runs.
