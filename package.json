@@ -44,6 +44,7 @@
     "check:negative-lab-measured-render-proof": "bun tests/integration/checks/negative-lab/check-negative-lab-measured-render-proof.ts",
     "check:negative-lab-profile-comparison": "bun tests/integration/checks/negative-lab/check-negative-lab-profile-comparison.ts",
     "check:negative-lab-rendered-profile-candidates": "bun tests/integration/checks/negative-lab/check-negative-lab-rendered-profile-candidates.ts",
+    "check:negative-lab-save-editor-handoff": "bun tests/integration/checks/negative-lab/check-negative-lab-save-editor-handoff.ts",
     "lint": "bun scripts/checks/check-folder-file-counts.ts && bun scripts/ci/run-compact-command.ts --label lint -- biome ci --formatter-enabled=false --assist-enabled=false .",
     "lint:fix": "bun scripts/ci/run-compact-command.ts --label lint:fix -- biome check --write .",
     "format": "bun scripts/ci/run-compact-command.ts --label format -- biome format --write .",

@@ -11,7 +11,10 @@ import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../utils/adj
 import { formatUnknownError } from '../../utils/errorFormatting';
 import type { ImageCacheEntry } from '../../utils/ImageLRUCache';
 import { hydrateLayerStackMasksFromMetadata } from '../../utils/layers/layerStackSidecarAdjustments';
-import { consumePendingNegativeConversionDustHealLayers } from '../../utils/negative-lab/negativeLabEditorHandoff';
+import {
+  consumePendingNegativeConversionDustHealLayers,
+  consumePendingNegativeConversionSavedPositiveHandoff,
+} from '../../utils/negative-lab/negativeLabEditorHandoff';
 
 export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | null>) {
   const selectedImage = useEditorStore((s) => s.selectedImage);
@@ -120,6 +123,25 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
             }
             return state;
           });
+          const savedPositiveHandoff = consumePendingNegativeConversionSavedPositiveHandoff(selectedImagePath);
+          if (savedPositiveHandoff !== null) {
+            setEditor((state) => ({
+              selectedImage:
+                state.selectedImage?.path === selectedImagePath
+                  ? {
+                      ...state.selectedImage,
+                      metadata: {
+                        ...(typeof state.selectedImage.metadata === 'object' &&
+                        state.selectedImage.metadata !== null &&
+                        !Array.isArray(state.selectedImage.metadata)
+                          ? state.selectedImage.metadata
+                          : {}),
+                        rawEngineNegativeLabHandoff: savedPositiveHandoff,
+                      },
+                    }
+                  : state.selectedImage,
+            }));
+          }
           consumePendingNegativeConversionDustHealLayers(selectedImagePath);
         } catch (err) {
           if (isEffectActive) {

@@ -2792,7 +2792,8 @@ async function prepareScenario(page, mode) {
       batchSavedPathProof.refreshBeforeOpen !== 'true' ||
       batchSavedPathProof.optOutRefreshed !== 'true' ||
       batchSavedPathProof.optOutOpenedPath !== '' ||
-      batchSavedPathProof.startedFromNonTargetEditorImage !== 'true'
+      batchSavedPathProof.startedFromNonTargetEditorImage !== 'true' ||
+      batchSavedPathProof.thumbnailRequested !== 'true'
     ) {
       throw new Error('Negative Lab batch save did not open the saved positive in the editor handoff.');
     }

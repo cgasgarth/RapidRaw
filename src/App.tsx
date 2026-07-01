@@ -746,6 +746,7 @@ function App() {
           handleStartPanorama={handleStartPanoramaVoid}
           handleSaveHdr={handleSaveHdr}
           handleStartHdr={handleStartHdr}
+          requestThumbnails={requestThumbnails}
           refreshImageList={handleLibraryRefresh}
           handleApplyDenoise={handleApplyDenoise}
           handleBatchDenoise={handleBatchDenoise}

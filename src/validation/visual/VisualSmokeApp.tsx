@@ -4317,6 +4317,7 @@ function NegativeLabVisualSmoke() {
   const [openedPath, setOpenedPath] = useState<string | null>(null);
   const [handoffOrder, setHandoffOrder] = useState('');
   const [refreshCount, setRefreshCount] = useState(0);
+  const [thumbnailRequestPath, setThumbnailRequestPath] = useState<string | null>(null);
   const [optOutOpenedPath, setOptOutOpenedPath] = useState<string | null>(null);
   const [optOutRefreshCount, setOptOutRefreshCount] = useState(0);
 
@@ -4344,6 +4345,9 @@ function NegativeLabVisualSmoke() {
                 await Promise.resolve();
                 defaultOnEvents.push('refresh');
                 setRefreshCount((currentCount) => currentCount + 1);
+              },
+              requestThumbnails: (paths) => {
+                setThumbnailRequestPath(paths[0] ?? null);
               },
               savedPaths: nextSavedPaths,
             });
@@ -4377,6 +4381,9 @@ function NegativeLabVisualSmoke() {
         data-refresh-before-open={handoffOrder === `refresh>select:${savedPaths[0] ?? ''}` ? 'true' : 'false'}
         data-refresh-count={String(refreshCount)}
         data-started-from-non-target-editor-image="true"
+        data-thumbnail-requested={
+          thumbnailRequestPath !== null && thumbnailRequestPath === savedPaths[0] ? 'true' : 'false'
+        }
         data-testid={VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabSavedPathProof}
       >
         {savedPaths.length > 0 ? savedPaths.join(', ') : NEGATIVE_LAB_NO_SAVED_PATHS_LABEL}

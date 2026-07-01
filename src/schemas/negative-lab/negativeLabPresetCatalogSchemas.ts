@@ -286,11 +286,55 @@ export const negativeBaseFogDensitometerReadoutSchema = z
   })
   .strict();
 
+export const negativeLabSavedPositiveHandoffSchema = z
+  .object({
+    artifactId: z.string().trim().min(1),
+    conversionBundlePath: z.string().trim().min(1).nullable(),
+    dimensions: z.object({ height: z.number().int().positive(), width: z.number().int().positive() }).strict(),
+    frameExposureOverrides: z.unknown(),
+    frameRgbBalanceOverrides: z.unknown(),
+    outputArtifactId: z.string().trim().min(1),
+    outputFormat: z.enum(['jpeg_proof', 'tiff16']),
+    outputHash: z.string().regex(/^fnv1a64:[a-f0-9]{16}$/u),
+    outputPath: z.string().trim().min(1),
+    path: z.string().trim().min(1),
+    positiveVariantId: z.string().trim().min(1),
+    profileProvenanceHash: z
+      .string()
+      .regex(/^fnv1a32:[a-f0-9]{8}$/u)
+      .nullable(),
+    replayPlanHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+    selectedAcquisitionProfile: z.unknown(),
+    selectedProfile: z.unknown().nullable(),
+    sidecarPath: z.string().trim().min(1),
+    sourceImageRef: z.string().trim().min(1),
+    sourcePath: z.string().trim().min(1),
+  })
+  .strict()
+  .superRefine((handoff, context) => {
+    if (handoff.path !== handoff.outputPath) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab saved positive path must match outputPath.',
+        path: ['path'],
+      });
+    }
+    if (handoff.sourceImageRef !== handoff.sourcePath) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab sourceImageRef must match sourcePath.',
+        path: ['sourceImageRef'],
+      });
+    }
+  });
+
+export const negativeConversionSavedPositiveHandoffsSchema = z.array(negativeLabSavedPositiveHandoffSchema).min(1);
 export const negativeConversionSavedPathsSchema = z.array(z.string().trim().min(1)).min(1);
 
 export type NegativeBaseFogDensitometerReadout = z.infer<typeof negativeBaseFogDensitometerReadoutSchema>;
 export type NegativeBaseFogEstimate = z.infer<typeof negativeBaseFogEstimateSchema>;
 export type NegativeBaseFogSampleReadout = z.infer<typeof negativeBaseFogSampleReadoutSchema>;
+export type NegativeLabSavedPositiveHandoff = z.infer<typeof negativeLabSavedPositiveHandoffSchema>;
 
 export const parseNegativeBaseFogEstimate = (value: unknown): NegativeBaseFogEstimate =>
   negativeBaseFogEstimateSchema.parse(value);
