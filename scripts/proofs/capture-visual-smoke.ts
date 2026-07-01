@@ -2906,6 +2906,14 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('negative-lab-acquisition-warning-lab_processed_input_for_negative_lab').waitFor({
       timeout: 10_000,
     });
+    await page.getByTestId('negative-lab-auto-base-fog').click();
+    await page.getByTestId('negative-lab-base-status').getByText('Base 91%', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('negative-lab-promote-base-roll').click();
+    await page.getByTestId('negative-lab-roll-selected-base').getByText('Roll base 91%', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
     await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabBatchReadiness).waitFor({ timeout: 10_000 });
     await page
       .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabQueuedCount)
@@ -2916,10 +2924,11 @@ async function prepareScenario(page, mode) {
       .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAcceptBatchPlan)
       .getByText('Batch plan accepted', { exact: true })
       .waitFor({ timeout: 10_000 });
-    const colorSliders = page.locator('input[type="range"]');
-    await colorSliders.nth(1).fill('1.23');
-    await colorSliders.nth(2).fill('0.91');
-    await colorSliders.nth(3).fill('1.14');
+    await page.getByTestId('negative-lab-apply-batch-plan').click();
+    await page.getByTestId('negative-lab-batch-apply-receipt').waitFor({ timeout: 10_000 });
+    await page.locator('input[type="range"][aria-label="Red (Cyan)"]:not([disabled])').first().fill('1.23');
+    await page.locator('input[type="range"][aria-label="Green (Magenta)"]:not([disabled])').first().fill('0.91');
+    await page.locator('input[type="range"][aria-label="Blue (Yellow)"]:not([disabled])').first().fill('1.14');
     await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAcceptBatchPlan).click();
     await page
       .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAcceptBatchPlan)

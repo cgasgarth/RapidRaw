@@ -87,6 +87,10 @@ import {
   type NegativeLabBaseSamplePreviewProofContext,
   type NegativeLabBaseSampleWarningCode,
 } from '../../../utils/negative-lab/negativeLabBaseSampleCommandBridge';
+import {
+  buildNegativeLabBatchApplyReceipt,
+  type NegativeLabBatchApplyReceipt,
+} from '../../../utils/negative-lab/negativeLabBatchApplyReceipt';
 import { buildNegativeBaseFogDensitometerReadout } from '../../../utils/negative-lab/negativeLabDensitometer';
 import {
   buildNegativeLabDustScratchReviewReport,
@@ -486,6 +490,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [isMeasuringCustomBaseSample, setIsMeasuringCustomBaseSample] = useState(false);
   const [copiedBatchPlanJson, setCopiedBatchPlanJson] = useState<string | null>(null);
   const [acceptedBatchPlanJson, setAcceptedBatchPlanJson] = useState<string | null>(null);
+  const [batchApplyReceipt, setBatchApplyReceipt] = useState<NegativeLabBatchApplyReceipt | null>(null);
   const [rollNormalizationApplyReceipt, setRollNormalizationApplyReceipt] =
     useState<NegativeLabRollNormalizationApplyReceipt | null>(null);
   const [rollNormalizationRestoreReceipt, setRollNormalizationRestoreReceipt] =
@@ -1004,6 +1009,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const visibleRollNormalizationRestoreReceipt =
     rollNormalizationRestoreReceipt?.acceptedDryRunPlanHash === acceptedBatchPlanIdentity.acceptedDryRunPlanHash
       ? rollNormalizationRestoreReceipt
+      : null;
+  const visibleBatchApplyReceipt =
+    batchApplyReceipt?.acceptedDryRunPlanHash === acceptedBatchPlanIdentity.acceptedDryRunPlanHash
+      ? batchApplyReceipt
       : null;
   const profileComparisonRows = useMemo(
     () =>
@@ -2109,6 +2118,19 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const handleAcceptBatchPlan = () => {
     if (batchDryRunSummary.blocked) return;
     setAcceptedBatchPlanJson(batchDryRunPlanJson);
+    setBatchApplyReceipt(null);
+  };
+
+  const handleApplyBatchPlan = () => {
+    if (!isBatchPlanAccepted) return;
+    setBatchApplyReceipt(
+      buildNegativeLabBatchApplyReceipt({
+        acceptedPlanIdentity: acceptedBatchPlanIdentity,
+        dryRunSummary: batchDryRunSummary,
+        openInEditor: openSavedPositiveInEditor,
+        qcProofArtifact,
+      }),
+    );
   };
 
   const handleApplyRollNormalizationPlan = () => {
@@ -2398,7 +2420,17 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       const savedPaths = savedPositiveHandoffs.map((handoff) => handoff.path);
       const activePositivePath =
         savedPositiveHandoffs.find((handoff) => handoff.sourcePath === activePositiveVariant?.sourcePath)?.path ??
-        savedPaths[0];
+        savedPaths[0] ??
+        null;
+      const savedBatchApplyReceipt = buildNegativeLabBatchApplyReceipt({
+        acceptedPlanIdentity: acceptedBatchPlanIdentity,
+        activePositivePath,
+        dryRunSummary: batchDryRunSummary,
+        openInEditor: openSavedPositiveInEditor,
+        qcProofArtifact,
+        savedPositiveHandoffs,
+      });
+      setBatchApplyReceipt(savedBatchApplyReceipt);
       const acceptedDustHealLayersBySavedPath = Object.fromEntries(
         savedPaths
           .map((savedPath, savedPathIndex) => {
@@ -2417,7 +2449,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       onSave(savedPaths, {
         acceptedDustHealLayers,
         acceptedDustHealLayersBySavedPath,
-        ...(activePositivePath === undefined ? {} : { activePositivePath }),
+        ...(activePositivePath === null ? {} : { activePositivePath }),
         savedPositiveHandoffs,
         openInEditor: openSavedPositiveInEditor,
       });
@@ -2985,6 +3017,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           approvedQcFrameIds={approvedQcFrameIds}
           batchApplyFrameCount={batchApplyFrameCount}
           batchDryRunSummary={batchDryRunSummary}
+          batchApplyReceipt={visibleBatchApplyReceipt}
           batchReviewFrameCount={batchReviewFrameCount}
           batchSkippedFrameCount={batchSkippedFrameCount}
           frameExposureOffsetByFrameId={frameExposureOffsetByFrameId}
@@ -2993,6 +3026,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           frameHealthSort={frameHealthSort}
           frameRgbBalanceOffsetByFrameId={frameRgbBalanceOffsetByFrameId}
           handleAcceptBatchPlan={handleAcceptBatchPlan}
+          handleApplyBatchPlan={handleApplyBatchPlan}
           handleApplyRollNormalizationPlan={handleApplyRollNormalizationPlan}
           handleCopyBatchPlan={handleCopyBatchPlan}
           handleRestoreRollNormalizationPlan={handleRestoreRollNormalizationPlan}
