@@ -11,6 +11,10 @@ import {
   buildHdrDerivedOutputReceipt,
   deriveDerivedOutputReceiptState,
 } from '../../../../src/utils/derivedOutputReceipt.ts';
+import {
+  buildHdrReopenedDerivedOutputReceipt,
+  upsertHdrReopenedDerivedOutputReceipt,
+} from '../../../../src/utils/hdrDerivedSourceReopen.ts';
 import { buildHdrEditableHandoffSummary } from '../../../../src/utils/hdrEditableHandoff.ts';
 
 const sourcePaths = [
@@ -279,10 +283,76 @@ expectThrows('stale HDR derived source open', () =>
   }),
 );
 
+const provenanceSidecar = receipt.provenanceSidecar;
+if (provenanceSidecar === undefined) {
+  throw new Error('HDR derived receipt must include a provenance sidecar before reopen validation.');
+}
+
+const reopenedSidecarMetadata = {
+  rawEngineArtifacts: {
+    derivedOutputProvenanceSidecars: [provenanceSidecar],
+    hdrMergeArtifacts: [
+      {
+        dryRun: {
+          acceptedDryRunPlanHash,
+          acceptedDryRunPlanId,
+        },
+        editableDerivedAssetId: receipt.outputArtifactId,
+        family: 'hdr',
+        outputArtifact: {
+          artifactId: runtimeSidecarReceipt.output.artifactId,
+          contentHash: receipt.outputContentHash,
+        },
+        staleState: {
+          state: 'current',
+        },
+      },
+    ],
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  },
+};
+const reopenedReceipt = buildHdrReopenedDerivedOutputReceipt({
+  imagePath: handoff.outputPath,
+  metadata: reopenedSidecarMetadata,
+});
+if (reopenedReceipt === null) {
+  throw new Error('Reopened HDR output metadata must produce an editable derived-source receipt.');
+}
+if (reopenedReceipt.openInEditorAction.path !== handoff.outputPath) {
+  throw new Error('Reopened HDR output receipt must open the saved merge output, not a source bracket.');
+}
+if (reopenedReceipt.provenanceSidecar?.sourceState[1]?.path !== sourcePaths[1]) {
+  throw new Error('Reopened HDR output receipt must preserve source provenance paths from the runtime sidecar.');
+}
+if (reopenedReceipt.outputContentHash !== receipt.outputContentHash) {
+  throw new Error('Reopened HDR output receipt must preserve the saved output content hash.');
+}
+if (reopenedReceipt.acceptedDryRunPlanHash !== acceptedDryRunPlanHash) {
+  throw new Error('Reopened HDR output receipt must preserve the accepted runtime dry-run plan hash.');
+}
+const reopenedReceipts = new Map<string, typeof reopenedReceipt>();
+const upsertedReceipt = upsertHdrReopenedDerivedOutputReceipt({
+  imagePath: handoff.outputPath,
+  metadata: reopenedSidecarMetadata,
+  upsert: (nextReceipt) => reopenedReceipts.set(nextReceipt.receiptId, nextReceipt),
+});
+if (upsertedReceipt === null || reopenedReceipts.get(reopenedReceipt.receiptId)?.staleState !== 'current') {
+  throw new Error('Selecting a reopened HDR output must upsert the editable receipt into runtime UI state.');
+}
+if (
+  buildHdrReopenedDerivedOutputReceipt({
+    imagePath: sourcePaths[0]!,
+    metadata: reopenedSidecarMetadata,
+  }) !== null
+) {
+  throw new Error('HDR sidecar reopen must not attach the derived receipt to an original bracket source.');
+}
+
 console.log(
   JSON.stringify({
     openedDerivedSourceId: openResult.derivedSourceId,
     outputPath: openResult.openPath,
+    reopenedReceiptId: reopenedReceipt.receiptId,
     staleReasons: [...(staleByContent.staleReasons ?? []), ...(staleByGraph.staleReasons ?? [])],
   }),
 );
