@@ -301,20 +301,12 @@ export const buildPanoramaRuntimeDryRunV1 = (requestValue: unknown): PanoramaRun
     ].join(':'),
   )}`;
   const renderedContentHash = hashPanoramaRuntimePixels(runtime.outputPixels);
-  const previewArtifacts = [
-    {
-      artifactId: request.previewArtifactId,
-      contentHash: `sha256:${stablePanoramaRuntimeHash(`${planHash}:${request.previewArtifactId}:${renderedContentHash}`)}`,
-      dimensions: {
-        height: runtime.height,
-        width: runtime.width,
-      },
-      kind: 'preview' as const,
-      storage: 'temp_cache' as const,
-    },
-    runtime.provenance.seamReview.contributionMapArtifact,
-    runtime.provenance.seamReview.seamMaskArtifact,
-  ];
+  const previewArtifacts = buildPanoramaRuntimeSeamPreviewArtifacts({
+    planHash,
+    previewArtifactId: request.previewArtifactId,
+    provenance: runtime.provenance,
+    renderedContentHash,
+  });
 
   const dryRunResult = computationalMergeDryRunResultV1Schema.parse({
     commandId: request.command.commandId,
@@ -420,6 +412,12 @@ export const applyPanoramaRuntimePlanV1 = (requestValue: unknown): PanoramaRunti
       },
       command: request.command,
       createdAt: request.artifactCreatedAt ?? new Date(0).toISOString(),
+      previewArtifacts: buildPanoramaRuntimeSeamPreviewArtifacts({
+        planHash: acceptedDryRunPlanHash,
+        previewArtifactId: request.previewArtifactId,
+        provenance,
+        renderedContentHash: hashPanoramaRuntimePixels(runtime.outputPixels),
+      }),
     }),
   };
 };
@@ -1220,6 +1218,41 @@ const stablePanoramaRuntimeHash = (input: string): string => {
   }
   return value.toString(16).padStart(8, '0');
 };
+
+const buildPanoramaRuntimeSeamPreviewArtifacts = ({
+  planHash,
+  previewArtifactId,
+  provenance,
+  renderedContentHash,
+}: {
+  planHash: string;
+  previewArtifactId: string;
+  provenance: PanoramaRuntimeProvenanceV1;
+  renderedContentHash: string;
+}): ComputationalMergeDryRunResultV1['previewArtifacts'] => [
+  {
+    artifactId: previewArtifactId,
+    contentHash: `sha256:${stablePanoramaRuntimeHash(`${planHash}:${previewArtifactId}:${renderedContentHash}`)}`,
+    dimensions: {
+      height: provenance.crop.height,
+      width: provenance.crop.width,
+    },
+    kind: 'preview',
+    storage: 'temp_cache',
+  },
+  {
+    ...provenance.seamReview.contributionMapArtifact,
+    contentHash: `sha256:${stablePanoramaRuntimeHash(
+      `${planHash}:${provenance.seamReview.contributionMapArtifact.artifactId}:${renderedContentHash}:contribution-map`,
+    )}`,
+  },
+  {
+    ...provenance.seamReview.seamMaskArtifact,
+    contentHash: `sha256:${stablePanoramaRuntimeHash(
+      `${planHash}:${provenance.seamReview.seamMaskArtifact.artifactId}:${renderedContentHash}:seam-mask`,
+    )}`,
+  },
+];
 
 const hashPanoramaRuntimePixels = (pixels: Uint8Array): string => {
   let value = 2166136261;

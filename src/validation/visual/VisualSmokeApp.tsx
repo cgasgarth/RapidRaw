@@ -4329,9 +4329,11 @@ const panoramaRenderedReviewFixture: PanoramaRenderedReview = {
   outputDimensions: { height: 3200, width: 9024 },
   projection: { effective: 'cylindrical', requested: 'cylindrical' },
   seamReview: {
+    contributionMapArtifactId: 'artifact_visual_panorama_contribution_map',
     policy: 'adaptive_dp_feather_v1',
     reviewStatus: 'requires_review',
     seamCount: 4,
+    seamMaskArtifactId: 'artifact_visual_panorama_seam_mask',
     seams: [
       { confidence: 'high', featherWidthPx: 100, fromSourceIndex: 0, p95ErrorPx: 1.2, toSourceIndex: 1 },
       { confidence: 'medium', featherWidthPx: 100, fromSourceIndex: 1, p95ErrorPx: 2.4, toSourceIndex: 2 },
@@ -4355,6 +4357,13 @@ const panoramaRenderedReviewFixture: PanoramaRenderedReview = {
   },
   exposureNormalizationSummary: {
     appliedGainCount: 2,
+    appliedLuminanceGains: [
+      { gain: 0.94, sourceIndex: 1 },
+      { gain: 1.08, sourceIndex: 3 },
+    ],
+    compensationStrengthPercent: 85,
+    medianLogLuminanceDeltaAfter: 0.031,
+    medianLogLuminanceDeltaBefore: 0.214,
     mode: 'scalar_overlap_luminance_gain_v1',
   },
   warningCodes: ['geometry_estimate_low_confidence'],
