@@ -614,6 +614,9 @@ export const runAgentIterativeEditLoop = async (
     ? agentHistoryRollbackResponseSchema.parse(
         rollbackAgentSessionHistory({
           checkpoint: rollbackCheckpoint,
+          expectedCurrentGraphRevision: appliedGraphRevision,
+          expectedCurrentPreviewRecipeHash: recipeHash,
+          expectedSelectedImagePath: rollbackCheckpoint.activeImagePath,
           requestId: `${parsedRequest.requestId}-rollback-review`,
           scope: 'session_start',
           sessionId: parsedRequest.sessionId,
