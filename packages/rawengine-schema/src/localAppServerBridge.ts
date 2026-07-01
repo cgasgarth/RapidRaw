@@ -103,6 +103,51 @@ export const rawEngineLocalAppServerEditorStateResultV1Schema = z
   })
   .strict();
 
+export const rawEngineAgentInitialPreviewReceiptV1Schema = z
+  .object({
+    colorPipeline: z
+      .object({
+        encodedProfile: z.literal('srgb-preview'),
+        outputProfile: z.literal('srgb'),
+        previewTransform: z.literal('editor-preview-to-srgb-jpeg'),
+        workingSpace: z.literal('rawengine-scene-linear'),
+      })
+      .strict(),
+    contentHash: z.string().regex(/^sha256:[a-f0-9]{16,64}$/u),
+    graphRevision: z.string().trim().min(1),
+    imagePath: z.string().trim().min(1),
+    preview: z
+      .object({
+        accessScope: z.literal('local_private'),
+        artifactId: z.string().trim().min(1),
+        encodedFormat: z.literal('jpeg'),
+        height: z.number().int().positive(),
+        includesOriginalRaw: z.literal(false),
+        longEdgePx: z.literal(1536),
+        mediaType: z.literal('image/jpeg'),
+        previewRef: z.string().trim().min(1),
+        purpose: z.literal('initial_context'),
+        quality: z.literal(0.86),
+        recipeHash: z.string().trim().min(1),
+        renderHash: z.string().trim().min(1),
+        width: z.number().int().positive(),
+      })
+      .strict(),
+    proofContext: z
+      .object({
+        stale: z.boolean(),
+        transport: z.literal('codex_app_server'),
+      })
+      .strict(),
+    requestId: z.string().trim().min(1),
+    schemaVersion: z.literal(1),
+    sessionId: z.string().trim().min(1),
+    toolName: z.literal('rawengine.agent.initial_prompt_preview'),
+  })
+  .strict();
+
+export type RawEngineAgentInitialPreviewReceiptV1 = z.infer<typeof rawEngineAgentInitialPreviewReceiptV1Schema>;
+
 export const rawEngineLocalAppServerBasicToneDryRunCommandV1Schema = toneColorCommandEnvelopeV1Schema.superRefine(
   (command, context) => {
     if (command.commandType !== 'toneColor.setBasicTone') {

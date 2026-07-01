@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  type RawEngineAgentInitialPreviewReceiptV1,
+  rawEngineAgentInitialPreviewReceiptV1Schema,
+} from '../../../../packages/rawengine-schema/src/localAppServerBridge';
 import { agentInitialPromptContextSchema, buildAgentInitialPromptContext } from '../context/agentInitialPromptContext';
 import { agentPreviewEnvelopeSchema } from '../context/agentPreviewEnvelope';
 import {
@@ -93,6 +97,7 @@ export const agentMultiTurnAppServerSessionRequestSchema = z
 
 const sessionToolCallSchema = z
   .object({
+    contentHash: z.string().trim().min(1).optional(),
     id: z.string().trim().min(1),
     name: z.string().trim().min(1),
     previewArtifactId: z.string().trim().min(1).optional(),
@@ -120,6 +125,7 @@ export const agentMultiTurnAppServerSessionResultSchema = z
     finalGraphRevision: z.string().trim().min(1),
     finalRecipeHash: z.string().trim().min(1),
     initialContext: agentInitialPromptContextSchema,
+    initialPreviewReceipt: rawEngineAgentInitialPreviewReceiptV1Schema,
     maxChannelDelta: z.number().nonnegative(),
     meanLuminanceDelta: z.number().nonnegative(),
     messages: z.array(sessionMessageSchema).min(5),
@@ -172,6 +178,69 @@ const refreshRecipeHash = async (requestId: string): Promise<string> =>
     }),
   );
 
+const buildInitialPreviewContentHash = (receiptSeed: {
+  artifactId: string;
+  imagePath: string;
+  renderHash: string;
+  sessionId: string;
+}): string => {
+  const hashSeed = JSON.stringify(receiptSeed);
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < hashSeed.length; index += 1) {
+    hash ^= hashSeed.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+
+  return `sha256:${(hash >>> 0).toString(16).padStart(16, '0')}`;
+};
+
+const buildInitialPreviewReceipt = ({
+  initialContext,
+  requestId,
+}: {
+  initialContext: ReturnType<typeof buildAgentInitialPromptContext>;
+  requestId: string;
+}): RawEngineAgentInitialPreviewReceiptV1 =>
+  rawEngineAgentInitialPreviewReceiptV1Schema.parse({
+    colorPipeline: {
+      encodedProfile: 'srgb-preview',
+      outputProfile: 'srgb',
+      previewTransform: 'editor-preview-to-srgb-jpeg',
+      workingSpace: 'rawengine-scene-linear',
+    },
+    contentHash: buildInitialPreviewContentHash({
+      artifactId: initialContext.preview.artifactId,
+      imagePath: initialContext.modelInput.activeImagePath,
+      renderHash: initialContext.preview.renderHash,
+      sessionId: initialContext.sessionId,
+    }),
+    graphRevision: initialContext.modelInput.graphRevision,
+    imagePath: initialContext.modelInput.activeImagePath,
+    preview: {
+      accessScope: initialContext.preview.accessScope,
+      artifactId: initialContext.preview.artifactId,
+      encodedFormat: initialContext.preview.encodedFormat,
+      height: initialContext.modelInput.initialPreview.height,
+      includesOriginalRaw: initialContext.modelInput.initialPreview.includesOriginalRaw,
+      longEdgePx: initialContext.preview.longEdgePx,
+      mediaType: initialContext.preview.mediaType,
+      previewRef: initialContext.preview.previewRef,
+      purpose: initialContext.preview.purpose,
+      quality: initialContext.preview.quality,
+      recipeHash: initialContext.preview.recipeHash,
+      renderHash: initialContext.preview.renderHash,
+      width: initialContext.modelInput.initialPreview.width,
+    },
+    proofContext: {
+      stale: initialContext.imageContext.initialPreview.recipeHash !== initialContext.preview.recipeHash,
+      transport: initialContext.modelInput.transport,
+    },
+    requestId,
+    schemaVersion: 1,
+    sessionId: initialContext.sessionId,
+    toolName: 'rawengine.agent.initial_prompt_preview',
+  });
+
 export const runAgentMultiTurnAppServerSession = async (
   request: AgentMultiTurnAppServerSessionRequest,
 ): Promise<AgentMultiTurnAppServerSessionResult> => {
@@ -182,11 +251,23 @@ export const runAgentMultiTurnAppServerSession = async (
     prompt: parsedRequest.prompt,
     sessionId: parsedRequest.sessionId,
   });
+  const initialPreviewToolCallId = `${parsedRequest.requestId}-initial-preview`;
+  const initialPreviewReceipt = buildInitialPreviewReceipt({
+    initialContext,
+    requestId: initialPreviewToolCallId,
+  });
   const messages: AgentMultiTurnAppServerSessionResult['messages'] = [
     {
-      content: parsedRequest.prompt,
+      content: `${parsedRequest.prompt}\n\nInitial medium preview ${initialPreviewReceipt.preview.artifactId} (${initialPreviewReceipt.contentHash}) is attached.`,
       previewArtifactId: initialContext.preview.artifactId,
       role: 'user',
+      turn: 0,
+    },
+    {
+      content: `Initial selected-image preview ${initialPreviewReceipt.preview.artifactId} is ready at ${initialPreviewReceipt.preview.width}x${initialPreviewReceipt.preview.height}.`,
+      previewArtifactId: initialPreviewReceipt.preview.artifactId,
+      role: 'tool',
+      toolCallId: initialPreviewToolCallId,
       turn: 0,
     },
   ];
@@ -198,11 +279,21 @@ export const runAgentMultiTurnAppServerSession = async (
       purpose: 'initial_context',
       recipeHash: initialContext.preview.recipeHash,
       renderHash: initialContext.preview.renderHash,
-      toolCallId: `${parsedRequest.requestId}-initial-preview`,
+      toolCallId: initialPreviewToolCallId,
       turn: 0,
     },
   ];
-  const toolCalls: AgentMultiTurnAppServerSessionResult['toolCalls'] = [];
+  const toolCalls: AgentMultiTurnAppServerSessionResult['toolCalls'] = [
+    {
+      contentHash: initialPreviewReceipt.contentHash,
+      id: initialPreviewToolCallId,
+      name: initialPreviewReceipt.toolName,
+      previewArtifactId: initialPreviewReceipt.preview.artifactId,
+      receiptGraphRevision: initialPreviewReceipt.graphRevision,
+      status: 'succeeded',
+      turn: 0,
+    },
+  ];
   let recipeHash = initialContext.preview.recipeHash;
   let finalGraphRevision = initialContext.imageContext.graphRevision;
   let changedPixelCount = 0;
@@ -422,6 +513,7 @@ export const runAgentMultiTurnAppServerSession = async (
     finalGraphRevision,
     finalRecipeHash: recipeHash,
     initialContext,
+    initialPreviewReceipt,
     maxChannelDelta,
     meanLuminanceDelta: Number((meanLuminanceDelta / parsedRequest.turns.length).toFixed(4)),
     messages,

@@ -97,7 +97,7 @@ if (auditStore.records.length !== 1 || persisted === undefined) {
   if (persisted.artifactLineage.length !== sessionResult.previewLineage.length) {
     failures.push('audit artifact lineage count did not match preview lineage.');
   }
-  if (persisted.toolCalls.length !== sessionResult.toolCalls.length + 1) {
+  if (persisted.toolCalls.length !== sessionResult.toolCalls.length) {
     failures.push('audit tool call count did not match session result.');
   }
   if (
@@ -277,6 +277,25 @@ async function validateRenderedShellBehavior(
   );
   assertData(audit, 'persistedRecordCount', '1', 'rendered audit output did not expose persisted record count.');
   assertData(audit, 'rollbackGraphRevision', 'history_0', 'rendered audit output did not preserve rollback revision.');
+  const initialReceipt = getByTestId(
+    rendered.container,
+    'agent-live-session-initial-preview-receipt',
+    'live session initial preview receipt did not render after apply.',
+  );
+  assertData(
+    initialReceipt,
+    'toolName',
+    'rawengine.agent.initial_prompt_preview',
+    'initial preview receipt did not expose the typed preview tool.',
+  );
+  assertData(initialReceipt, 'imagePath', selectedPath, 'initial preview receipt did not bind selected image path.');
+  assertData(initialReceipt, 'longEdgePx', '1536', 'initial preview receipt did not expose medium long edge.');
+  assertData(initialReceipt, 'quality', '0.86', 'initial preview receipt did not expose medium quality.');
+  assertData(initialReceipt, 'stale', 'false', 'initial preview receipt should start non-stale.');
+  const renderedInitialContentHash = initialReceipt.dataset.contentHash ?? '';
+  if (!/^sha256:[a-f0-9]{16,64}$/u.test(renderedInitialContentHash)) {
+    failures.push(`initial preview receipt did not expose a content hash: ${renderedInitialContentHash}`);
+  }
 
   rendered.unmount();
 }
@@ -931,9 +950,46 @@ function validateSessionResult(sessionResult: AgentMultiTurnAppServerSessionResu
   const previewPurposes = sessionResult.previews.map((preview) => preview.purpose);
   const lineagePurposes = sessionResult.previewLineage.map((preview) => preview.purpose);
   const toolNames = sessionResult.toolCalls.map((toolCall) => toolCall.name);
+  const initialPreviewToolCall = sessionResult.toolCalls[0];
+  const firstUserMessage = sessionResult.messages[0];
+  const firstToolMessage = sessionResult.messages[1];
 
   if (sessionResult.sessionId !== request.sessionId || sessionResult.turnCount !== 2) {
     failures.push('live session did not preserve session identity and turn count.');
+  }
+  if (
+    sessionResult.initialPreviewReceipt.toolName !== 'rawengine.agent.initial_prompt_preview' ||
+    sessionResult.initialPreviewReceipt.requestId !== `${request.requestId}-initial-preview` ||
+    sessionResult.initialPreviewReceipt.sessionId !== request.sessionId ||
+    sessionResult.initialPreviewReceipt.imagePath !== selectedPath ||
+    sessionResult.initialPreviewReceipt.preview.longEdgePx !== 1536 ||
+    sessionResult.initialPreviewReceipt.preview.quality !== 0.86 ||
+    sessionResult.initialPreviewReceipt.preview.includesOriginalRaw !== false ||
+    sessionResult.initialPreviewReceipt.proofContext.stale !== false
+  ) {
+    failures.push('live session initial preview receipt did not preserve typed medium preview identity.');
+  }
+  if (!/^sha256:[a-f0-9]{16,64}$/u.test(sessionResult.initialPreviewReceipt.contentHash)) {
+    failures.push(
+      `live session initial preview receipt had invalid hash: ${sessionResult.initialPreviewReceipt.contentHash}`,
+    );
+  }
+  if (
+    initialPreviewToolCall?.turn !== 0 ||
+    initialPreviewToolCall.name !== sessionResult.initialPreviewReceipt.toolName ||
+    initialPreviewToolCall.previewArtifactId !== sessionResult.initialPreviewReceipt.preview.artifactId ||
+    initialPreviewToolCall.contentHash !== sessionResult.initialPreviewReceipt.contentHash
+  ) {
+    failures.push('first session tool call did not carry the initial preview receipt identity/hash.');
+  }
+  if (
+    firstUserMessage?.turn !== 0 ||
+    firstUserMessage.previewArtifactId !== sessionResult.initialPreviewReceipt.preview.artifactId ||
+    !firstUserMessage.content.includes(sessionResult.initialPreviewReceipt.contentHash) ||
+    firstToolMessage?.toolCallId !== initialPreviewToolCall?.id ||
+    firstToolMessage.previewArtifactId !== sessionResult.initialPreviewReceipt.preview.artifactId
+  ) {
+    failures.push('first session turn did not attach the initial preview receipt to user/tool messages.');
   }
   if (previewPurposes.join(',') !== 'initial_context,refresh,detail_review') {
     failures.push(`live session preview order was wrong: ${previewPurposes.join(',')}`);
@@ -955,6 +1011,13 @@ function validateSessionResult(sessionResult: AgentMultiTurnAppServerSessionResu
     sessionResult.editReview.beforePreview.id !== sessionResult.previews[0]?.id
   ) {
     failures.push('live session review did not bind to before/after previews.');
+  }
+  if (
+    sessionResult.initialPreviewReceipt.preview.artifactId !== sessionResult.previewLineage[0]?.artifactId ||
+    sessionResult.initialPreviewReceipt.preview.renderHash !== sessionResult.previewLineage[0]?.renderHash ||
+    sessionResult.initialPreviewReceipt.preview.recipeHash !== sessionResult.previewLineage[0]?.recipeHash
+  ) {
+    failures.push('initial preview receipt did not match the first preview lineage entry.');
   }
   if (sessionResult.editReview.toolReceiptCount !== 2) {
     failures.push(`expected two applied tool receipts, got ${sessionResult.editReview.toolReceiptCount}.`);
@@ -980,20 +1043,16 @@ function buildAuditRecord(sessionResult: AgentMultiTurnAppServerSessionResult): 
     prompt,
     rollbackGraphRevision: sessionResult.rollbackGraphRevision,
     sessionId: sessionResult.sessionId,
-    toolCalls: [
-      {
-        id: sessionResult.previewLineage[0]?.toolCallId ?? `${sessionResult.sessionId}-initial-preview`,
-        name: 'rawengine.agent.initial_prompt_preview',
-        resultSummary: sessionResult.initialContext.preview.artifactId,
-        status: 'succeeded',
-      },
-      ...sessionResult.toolCalls.map((toolCall) => ({
-        id: toolCall.id,
-        name: toolCall.name,
-        resultSummary: toolCall.receiptGraphRevision ?? toolCall.previewArtifactId ?? `${toolCall.name} succeeded`,
-        status: toolCall.status,
-      })),
-    ],
+    toolCalls: sessionResult.toolCalls.map((toolCall) => ({
+      id: toolCall.id,
+      name: toolCall.name,
+      resultSummary:
+        toolCall.contentHash ??
+        toolCall.receiptGraphRevision ??
+        toolCall.previewArtifactId ??
+        `${toolCall.name} succeeded`,
+      status: toolCall.status,
+    })),
     traceEvents: [
       {
         id: `${sessionResult.sessionId}-prompt`,

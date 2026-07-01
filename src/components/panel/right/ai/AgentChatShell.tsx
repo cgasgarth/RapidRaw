@@ -227,6 +227,7 @@ interface LiveSessionReviewState {
   applyState: 'applied' | 'pending';
   finalGraphRevision: string;
   finalRecipeHash: string;
+  initialPreviewReceipt?: AgentMultiTurnAppServerSessionResult['initialPreviewReceipt'];
   previewLineage: AgentMultiTurnAppServerSessionResult['previewLineage'];
   rollbackGraphRevision: string;
   rollbackState: 'available' | 'invalidated' | 'restored';
@@ -673,20 +674,16 @@ const buildLiveAgentAuditRecord = ({
   prompt: acceptedPrompt,
   rollbackGraphRevision: sessionResult.rollbackGraphRevision,
   sessionId: sessionResult.sessionId,
-  toolCalls: [
-    {
-      id: sessionResult.previewLineage[0]?.toolCallId ?? `${sessionResult.sessionId}-initial-preview`,
-      name: 'rawengine.agent.initial_prompt_preview',
-      resultSummary: sessionResult.initialContext.preview.artifactId,
-      status: 'succeeded',
-    },
-    ...sessionResult.toolCalls.map((toolCall) => ({
-      id: toolCall.id,
-      name: toolCall.name,
-      resultSummary: toolCall.receiptGraphRevision ?? toolCall.previewArtifactId ?? `${toolCall.name} succeeded`,
-      status: toolCall.status,
-    })),
-  ],
+  toolCalls: sessionResult.toolCalls.map((toolCall) => ({
+    id: toolCall.id,
+    name: toolCall.name,
+    resultSummary:
+      toolCall.contentHash ??
+      toolCall.receiptGraphRevision ??
+      toolCall.previewArtifactId ??
+      `${toolCall.name} succeeded`,
+    status: toolCall.status,
+  })),
   traceEvents: [
     {
       id: `${sessionResult.sessionId}-prompt`,
@@ -829,7 +826,13 @@ function LiveSessionReviewPanel({ review }: { review: LiveSessionReviewState | n
       data-final-graph-revision={review.finalGraphRevision}
       data-final-preview-artifact-id={finalPreview?.artifactId ?? ''}
       data-final-recipe-hash={review.finalRecipeHash}
+      data-initial-preview-content-hash={review.initialPreviewReceipt?.contentHash ?? ''}
       data-initial-preview-artifact-id={firstPreview?.artifactId ?? ''}
+      data-initial-preview-image-path={review.initialPreviewReceipt?.imagePath ?? ''}
+      data-initial-preview-long-edge-px={review.initialPreviewReceipt?.preview.longEdgePx ?? ''}
+      data-initial-preview-quality={review.initialPreviewReceipt?.preview.quality ?? ''}
+      data-initial-preview-stale={review.initialPreviewReceipt?.proofContext.stale ?? ''}
+      data-initial-preview-tool-name={review.initialPreviewReceipt?.toolName ?? ''}
       data-preview-lineage-count={review.previewLineage.length}
       data-rollback-graph-revision={review.rollbackGraphRevision}
       data-rollback-state={review.rollbackState}
@@ -842,6 +845,36 @@ function LiveSessionReviewPanel({ review }: { review: LiveSessionReviewState | n
           {review.applyState}
         </span>
       </div>
+      {review.initialPreviewReceipt === undefined ? null : (
+        <div
+          className="rounded border border-sky-500/20 bg-sky-500/10 p-2"
+          data-artifact-id={review.initialPreviewReceipt.preview.artifactId}
+          data-content-hash={review.initialPreviewReceipt.contentHash}
+          data-height={review.initialPreviewReceipt.preview.height}
+          data-image-path={review.initialPreviewReceipt.imagePath}
+          data-long-edge-px={review.initialPreviewReceipt.preview.longEdgePx}
+          data-quality={review.initialPreviewReceipt.preview.quality}
+          data-recipe-hash={review.initialPreviewReceipt.preview.recipeHash}
+          data-render-hash={review.initialPreviewReceipt.preview.renderHash}
+          data-stale={String(review.initialPreviewReceipt.proofContext.stale)}
+          data-testid="agent-live-session-initial-preview-receipt"
+          data-tool-name={review.initialPreviewReceipt.toolName}
+          data-width={review.initialPreviewReceipt.preview.width}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-semibold text-text-primary">{t('editor.ai.agent.initialPreviewContext.title')}</span>
+            <span className="font-mono text-sky-100">{review.initialPreviewReceipt.toolName}</span>
+          </div>
+          <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 font-mono text-[10px]">
+            <dt className="text-text-tertiary">{t('editor.ai.agent.previewLineage.meta.artifact')}</dt>
+            <dd className="truncate text-text-secondary">{review.initialPreviewReceipt.preview.artifactId}</dd>
+            <dt className="text-text-tertiary">{t('editor.ai.agent.previewLineage.meta.renderHash')}</dt>
+            <dd className="truncate text-sky-100">{review.initialPreviewReceipt.contentHash}</dd>
+            <dt className="text-text-tertiary">{t('editor.ai.agent.previewLineage.meta.recipeHash')}</dt>
+            <dd className="truncate text-text-secondary">{review.initialPreviewReceipt.preview.recipeHash}</dd>
+          </dl>
+        </div>
+      )}
       <div
         className="grid gap-1.5"
         data-testid="agent-live-session-preview-lineage"
@@ -1989,10 +2022,51 @@ function LivePromptComposer({
           turn: 1,
         },
       ];
+      const initialPreviewReceipt =
+        initialPromptPreviewContext === undefined
+          ? undefined
+          : ({
+              colorPipeline: {
+                encodedProfile: 'srgb-preview',
+                outputProfile: 'srgb',
+                previewTransform: 'editor-preview-to-srgb-jpeg',
+                workingSpace: 'rawengine-scene-linear',
+              },
+              contentHash: `sha256:${initialPromptPreviewContext.renderHash
+                .replace(/^render:/u, '')
+                .padEnd(16, '0')
+                .slice(0, 64)}`,
+              graphRevision: selectedImageReceipt.initialGraphRevision,
+              imagePath: selectedImageReceipt.selectedImagePath,
+              preview: {
+                accessScope: initialPromptPreviewContext.accessScope,
+                artifactId: initialPromptPreviewContext.artifactId,
+                encodedFormat: initialPromptPreviewContext.encodedFormat,
+                height: initialPromptPreviewContext.height,
+                includesOriginalRaw: initialPromptPreviewContext.includesOriginalRaw,
+                longEdgePx: initialPromptPreviewContext.longEdgePx,
+                mediaType: initialPromptPreviewContext.mediaType,
+                previewRef: initialPromptPreviewContext.previewRef,
+                purpose: initialPromptPreviewContext.purpose,
+                quality: initialPromptPreviewContext.quality,
+                recipeHash: initialPromptPreviewContext.recipeHash,
+                renderHash: initialPromptPreviewContext.renderHash,
+                width: initialPromptPreviewContext.width,
+              },
+              proofContext: {
+                stale: initialPromptPreviewContext.recipeHash !== selectedImageReceipt.initialRecipeHash,
+                transport: initialPromptPreviewContext.transport,
+              },
+              requestId: `${requestId}-initial-preview`,
+              schemaVersion: 1,
+              sessionId: selectedImageReceipt.sessionId,
+              toolName: 'rawengine.agent.initial_prompt_preview',
+            } satisfies AgentMultiTurnAppServerSessionResult['initialPreviewReceipt']);
       setSessionReview({
         applyState: 'applied',
         finalGraphRevision: selectedImageApply.apply.appliedGraphRevision,
         finalRecipeHash: selectedImageFinalRecipeHash,
+        ...(initialPreviewReceipt === undefined ? {} : { initialPreviewReceipt }),
         previewLineage,
         rollbackGraphRevision: selectedImageReceipt.rollbackGraphRevision,
         rollbackState: 'available',
