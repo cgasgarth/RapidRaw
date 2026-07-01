@@ -125,6 +125,23 @@ if (layer.adjustments.exposure !== 0.25 || layer.adjustments.shadows !== 14) {
 if (subMask.type !== 'ai-object' || subMask.parameters?.providerStatus !== 'prompt_proxy_mask_v1') {
   throw new Error('agent.object_selection.apply did not create prompt-provenance object mask parameters.');
 }
+const maskDimensions =
+  typeof subMask.parameters.maskDimensions === 'object' && subMask.parameters.maskDimensions !== null
+    ? (subMask.parameters.maskDimensions as { height?: unknown; width?: unknown })
+    : null;
+if (
+  subMask.parameters.sourceImagePath !== selectedPath ||
+  subMask.parameters.commandId !== 'layer_stack_agent_object_product' ||
+  subMask.parameters.graphRevision !== initialSnapshot.graphRevision ||
+  subMask.parameters.objectPromptHash !== result.objectPromptHash ||
+  typeof subMask.parameters.alphaHash !== 'string' ||
+  !subMask.parameters.alphaHash.startsWith('sha256:') ||
+  subMask.parameters.promptTextHash !== result.objectPromptHash ||
+  maskDimensions?.width !== 6000 ||
+  maskDimensions.height !== 4000
+) {
+  throw new Error('agent.object_selection.apply did not persist editable mask layer provenance.');
+}
 if (
   !Array.isArray(subMask.parameters?.generatedPreviewStrokes) ||
   subMask.parameters.generatedPreviewStrokes.length < 2
@@ -138,8 +155,12 @@ if (state.historyIndex !== 1 || state.history.length !== 2 || state.uncroppedAdj
   throw new Error('agent.object_selection.apply did not create undoable history and invalidate preview.');
 }
 if (
+  !result.mutates ||
   result.beforePreviewHash === result.afterPreviewHash ||
   result.providerStatus !== 'prompt_proxy_mask_v1' ||
+  result.receipt.commandId !== 'layer_stack_agent_object_product' ||
+  result.receipt.commandType !== 'layerMask.createLayer' ||
+  result.rollbackTarget.historyIndex !== 0 ||
   !result.objectPromptHash.startsWith('sha256:') ||
   result.overlayPreview.layerId !== result.layerId ||
   result.overlayPreview.maskId !== result.maskId ||

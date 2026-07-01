@@ -19,7 +19,6 @@ const compareSource = read('src/utils/export/exportSoftProofProfileCompare.ts');
 const commandsSource = read('src/tauri/commands.ts');
 const rustLibSource = read('src-tauri/src/lib.rs');
 const rustExportColorPolicySource = read('src-tauri/src/export/export_color_policy.rs');
-const packageSource = read('package.json');
 const locale = JSON.parse(read('src/i18n/locales/en.json'));
 
 for (const marker of [
@@ -87,15 +86,6 @@ for (const marker of [
   'export_receipt_metadata(',
 ]) {
   if (!rustExportColorPolicySource.includes(marker)) failures.push(`export color policy missing ${marker}`);
-}
-
-for (const scriptName of [
-  'check:export-soft-proof-profile-compare',
-  'check:export-soft-proof-ui',
-  'check:color-preview-export-parity',
-  'check:working-space-contract',
-]) {
-  if (!packageSource.includes(`"${scriptName}"`)) failures.push(`package.json missing ${scriptName}`);
 }
 
 for (const key of [

@@ -180,6 +180,16 @@ if (applied.apply.sidecarArtifact.outputArtifact.contentHash === undefined) {
 if (applied.apply.sidecarArtifact.outputArtifact.dimensions?.width !== HIGH_WIDTH) {
   throw new Error('Expected SR sidecar output width to match rendered output.');
 }
+const registrationMetrics = applied.apply.sidecarArtifact.validationSummary.registrationMetrics;
+if (registrationMetrics === undefined) {
+  throw new Error('Expected SR app-server sidecar to include measured registration metadata.');
+}
+if (registrationMetrics.maxResidualPx !== 0) {
+  throw new Error('Expected SR app-server sidecar to include measured registration residual metadata.');
+}
+if (registrationMetrics.measuredSubpixelFrameCount !== 3) {
+  throw new Error('Expected SR app-server sidecar to count measured subpixel frame registrations.');
+}
 
 expectThrows('unaccepted apply plan', () =>
   new SuperResolutionAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1).execute({
@@ -205,6 +215,7 @@ const result = {
   fixture: 'synthetic_sr_app_server_runtime_v1',
   humanReviewStatus: applied.apply.sidecarArtifact.validationSummary.humanReviewStatus,
   improvementRatio,
+  registrationMetrics,
   supportMapScenarios: [
     supportedTranscript.scenario,
     downgradedTranscript.scenario,

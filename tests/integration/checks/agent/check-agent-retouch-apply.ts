@@ -92,6 +92,27 @@ try {
 }
 if (!staleRejected) throw new Error('agent.retouch.apply did not reject stale recipe hash.');
 
+let noOpRejected = false;
+try {
+  applyAgentRetouch({
+    expectedRecipeHash: initialSnapshot.initialPreview.recipeHash,
+    layerId: 'agent_clone_no_op',
+    mode: 'clone',
+    operationId: 'clone_no_op',
+    radiusPx: 44,
+    requestId: 'clone-no-op',
+    sessionId: 'agent-retouch-3163',
+    sourcePoint: { x: 0.55, y: 0.52 },
+    targetPoint: { x: 0.55, y: 0.52 },
+  });
+} catch {
+  noOpRejected = true;
+}
+if (!noOpRejected) throw new Error('agent.retouch.apply did not reject no-op runtime output.');
+if (useEditorStore.getState().historyIndex !== 0) {
+  throw new Error('agent.retouch.apply no-op rejection must not create history.');
+}
+
 const cloneResult = applyAgentRetouch({
   expectedRecipeHash: initialSnapshot.initialPreview.recipeHash,
   layerId: 'agent_clone_spot',
@@ -107,6 +128,19 @@ const cloneState = useEditorStore.getState();
 const cloneLayer = cloneState.adjustments.masks.find((mask) => mask.id === 'agent_clone_spot');
 if (cloneLayer?.retouchCloneSource?.retouchMode !== 'clone') {
   throw new Error('agent.retouch.apply did not create a clone retouch layer.');
+}
+const cloneProvenance = cloneLayer.retouchCloneSource.provenance;
+if (
+  cloneProvenance?.editableLayer !== true ||
+  cloneProvenance.algorithmId !== 'local_clone_v1' ||
+  cloneProvenance.mode !== 'clone' ||
+  cloneProvenance.outputHash !== cloneResult.outputProof.applyHash ||
+  cloneProvenance.maskAlphaHash !== cloneResult.outputProof.maskAlphaHash ||
+  cloneProvenance.sourcePoint?.x !== 0.24 ||
+  cloneProvenance.targetPoint.x !== 0.54 ||
+  cloneProvenance.changedPixelCount !== cloneResult.outputProof.applyDelta.changedPixelCount
+) {
+  throw new Error('agent.retouch.apply did not persist editable clone layer provenance.');
 }
 if (cloneLayer.subMasks[0]?.type !== 'radial' || cloneLayer.subMasks[0].id !== cloneResult.overlayMaskId) {
   throw new Error('agent.retouch.apply did not create a target overlay mask.');
@@ -132,6 +166,17 @@ if (
 ) {
   throw new Error('agent.retouch.apply clone did not return a complete overlay preview receipt.');
 }
+if (
+  !cloneResult.outputProof.changedOutput ||
+  !cloneResult.outputProof.previewApplyParity ||
+  cloneResult.outputProof.previewDelta.status !== 'changed' ||
+  cloneResult.outputProof.applyDelta.changedPixelCount <= 0 ||
+  cloneResult.outputProof.previewDelta.maskAware !== true ||
+  cloneResult.outputProof.previewDelta.maskAlphaHash !== cloneResult.outputProof.maskAlphaHash ||
+  cloneResult.outputProof.previewDelta.mode !== 'clone'
+) {
+  throw new Error('agent.retouch.apply clone did not return mask-aware changed output proof.');
+}
 
 resetEditor();
 const removeSnapshot = buildAgentImageContextSnapshot();
@@ -152,9 +197,25 @@ const removeLayer = useEditorStore.getState().adjustments.masks.find((mask) => m
 if (
   removeLayer?.retouchRemoveSource?.generator !== 'local_patch_fill_v1' ||
   removeLayer.retouchRemoveSource.targetMaskId !== removeResult.overlayMaskId ||
-  removeLayer.retouchRemoveSource.seed !== 7
+  removeLayer.retouchRemoveSource.seed !== 7 ||
+  removeLayer.retouchRemoveSource.status !== 'ready' ||
+  removeLayer.retouchRemoveSource.resolvedSourcePoint === undefined
 ) {
   throw new Error('agent.retouch.apply did not create a bounded remove retouch layer.');
+}
+const removeProvenance = removeLayer.retouchRemoveSource.provenance;
+if (
+  removeProvenance?.editableLayer !== true ||
+  removeProvenance.algorithmId !== 'local_patch_fill_v1' ||
+  removeProvenance.mode !== 'remove' ||
+  removeProvenance.outputHash !== removeResult.outputProof.applyHash ||
+  removeProvenance.outputSampleHash !== removeResult.outputProof.resolvedRemoveSourceOutputSampleHash ||
+  removeProvenance.sourceSampleHash !== removeResult.outputProof.resolvedRemoveSourceSampleHash ||
+  removeProvenance.resolvedSourcePoint === undefined ||
+  removeProvenance.targetMaskId !== removeResult.overlayMaskId ||
+  removeProvenance.changedPixelCount !== removeResult.outputProof.applyDelta.changedPixelCount
+) {
+  throw new Error('agent.retouch.apply did not persist editable remove layer provenance.');
 }
 if (
   removeResult.overlayPreview.artifact.kind !== 'preview' ||
@@ -165,6 +226,15 @@ if (
   removeResult.overlayPreview.renderHash !== removeResult.afterPreviewHash
 ) {
   throw new Error('agent.retouch.apply remove did not return a complete overlay preview receipt.');
+}
+if (
+  !removeResult.outputProof.changedOutput ||
+  removeResult.outputProof.previewDelta.mode !== 'remove' ||
+  removeResult.outputProof.previewDelta.targetMaskId !== removeResult.overlayMaskId ||
+  removeResult.outputProof.resolvedRemoveSourceStatus !== 'ready' ||
+  removeResult.outputProof.applyDelta.meanAbsDelta <= 0
+) {
+  throw new Error('agent.retouch.apply remove did not return mask-aware remove output proof.');
 }
 
 const route = buildRawEngineAppServerRouteCatalog().find(

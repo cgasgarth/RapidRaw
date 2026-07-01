@@ -23,6 +23,24 @@ type LayerStackMetadataEnvelope = {
   [key: string]: unknown;
 };
 
+function readLayerStackSidecarsFromMetadata(metadata: LayerStackMetadataEnvelope): Array<LayerStackSidecarV1> {
+  const rootSidecars = readLayerStackSidecarsFromSidecar(metadata);
+  const adjustmentSidecars =
+    typeof metadata.adjustments === 'object' && metadata.adjustments !== null
+      ? readLayerStackSidecarsFromSidecar(metadata.adjustments)
+      : [];
+  const sidecarsBySourcePath = new Map<string, LayerStackSidecarV1>();
+
+  for (const sidecar of adjustmentSidecars) {
+    sidecarsBySourcePath.set(sidecar.sourceImagePath, sidecar);
+  }
+  for (const sidecar of rootSidecars) {
+    sidecarsBySourcePath.set(sidecar.sourceImagePath, sidecar);
+  }
+
+  return [...sidecarsBySourcePath.values()];
+}
+
 export function persistLayerStackSidecarInAdjustments(
   adjustments: Adjustments,
   layerStackSidecar: LayerStackSidecarV1,
@@ -44,7 +62,7 @@ export function hydrateLayerStackMasksFromMetadata(
   metadata: LayerStackMetadataEnvelope,
   imagePath: string,
 ): Adjustments {
-  const layerStackSidecar = readLayerStackSidecarsFromSidecar(metadata).find(
+  const layerStackSidecar = readLayerStackSidecarsFromMetadata(metadata).find(
     (sidecar) => sidecar.sourceImagePath === imagePath,
   );
   if (layerStackSidecar === undefined) return adjustments;

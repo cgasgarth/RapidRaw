@@ -3413,6 +3413,8 @@
         "limitation": "Runtime bridge proof only; private RAW decode, visual seam QA, and UI E2E remain open.",
         "maxSeamError": "Max seam error",
         "maxSeamErrorValue": "{{value}} px P95",
+        "overlapConfidence": "Overlap confidence",
+        "overlapConfidenceValue": "{{value}}%",
         "privateRawPending": "Private RAW review pending",
         "projectionCrop": "Projection/crop",
         "proofStatus": "App-server bridge ready",
@@ -3422,6 +3424,7 @@
         "seamCount_one": "",
         "seamCount_other": "",
         "seams": "Seams",
+        "seamWarningState": "Seam warning",
         "sourceChip": "S{{index}} {{value}}%",
         "sourceContribution": "Source contribution",
         "sourceContributionCount": "{{count}} source regions",
@@ -3430,7 +3433,12 @@
         "sourceUsage": "Source usage",
         "sourceUsageValue": "{{stitched}} stitched / {{excluded}} excluded",
         "title": "Quality review",
-        "uiE2ePending": "UI E2E pending"
+        "uiE2ePending": "UI E2E pending",
+        "warningState": {
+          "blocked": "Blocked",
+          "clear": "Clear",
+          "warning": "Review"
+        }
       },
       "save": "Save",
       "savedSuccess": "Panorama Saved Successfully!",

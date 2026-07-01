@@ -173,43 +173,43 @@
     },
     {
       "approvalClass": "preview_only",
-      "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+      "inputSchemaName": "DetailEffectsCommandEnvelopeV1",
       "mutates": false,
-      "outputSchemaName": "ComputationalMergeDryRunResultV1",
+      "outputSchemaName": "DetailEffectsDryRunResultV1",
       "requiresDryRun": true,
-      "returnsArtifactHandles": true,
+      "returnsArtifactHandles": false,
       "toolKind": "dry_run",
-      "toolName": "computationalmerge.dry_run_command"
+      "toolName": "detail.effects.dry_run_command"
     },
     {
       "approvalClass": "edit_apply",
-      "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+      "inputSchemaName": "DetailEffectsCommandEnvelopeV1",
       "mutates": true,
-      "outputSchemaName": "ComputationalMergeMutationResultV1",
+      "outputSchemaName": "DetailEffectsMutationResultV1",
       "requiresDryRun": false,
-      "returnsArtifactHandles": true,
+      "returnsArtifactHandles": false,
       "toolKind": "apply",
-      "toolName": "computationalmerge.apply_command"
+      "toolName": "detail.effects.apply_command"
     },
     {
       "approvalClass": "preview_only",
-      "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+      "inputSchemaName": "LensProfileCommandEnvelopeV1",
       "mutates": false,
-      "outputSchemaName": "ComputationalMergeDryRunResultV1",
+      "outputSchemaName": "LensProfileDryRunResultV1",
       "requiresDryRun": true,
-      "returnsArtifactHandles": true,
+      "returnsArtifactHandles": false,
       "toolKind": "dry_run",
-      "toolName": "computationalmerge.panorama.dry_run_command"
+      "toolName": "lensprofile.dry_run_command"
     },
     {
       "approvalClass": "edit_apply",
-      "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+      "inputSchemaName": "LensProfileCommandEnvelopeV1",
       "mutates": true,
-      "outputSchemaName": "ComputationalMergeMutationResultV1",
+      "outputSchemaName": "LensProfileMutationResultV1",
       "requiresDryRun": false,
-      "returnsArtifactHandles": true,
+      "returnsArtifactHandles": false,
       "toolKind": "apply",
-      "toolName": "computationalmerge.panorama.apply_command"
+      "toolName": "lensprofile.apply_command"
     },
     {
       "approvalClass": "preview_only",
@@ -232,6 +232,76 @@
       "toolName": "computationalmerge.focus_stack.apply_command"
     },
     {
+      "approvalClass": "edit_apply",
+      "inputSchemaName": "ComputationalMergeDerivedSourceOpenRequestV1",
+      "mutates": true,
+      "outputSchemaName": "ComputationalMergeDerivedSourceOpenResultV1",
+      "requiresDryRun": false,
+      "returnsArtifactHandles": true,
+      "toolKind": "apply",
+      "toolName": "computationalmerge.focus_stack.open_derived_source"
+    },
+    {
+      "approvalClass": "preview_only",
+      "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+      "mutates": false,
+      "outputSchemaName": "ComputationalMergeDryRunResultV1",
+      "requiresDryRun": true,
+      "returnsArtifactHandles": true,
+      "toolKind": "dry_run",
+      "toolName": "computationalmerge.hdr.dry_run_command"
+    },
+    {
+      "approvalClass": "edit_apply",
+      "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+      "mutates": true,
+      "outputSchemaName": "ComputationalMergeMutationResultV1",
+      "requiresDryRun": false,
+      "returnsArtifactHandles": true,
+      "toolKind": "apply",
+      "toolName": "computationalmerge.hdr.apply_command"
+    },
+    {
+      "approvalClass": "edit_apply",
+      "inputSchemaName": "ComputationalMergeDerivedSourceOpenRequestV1",
+      "mutates": true,
+      "outputSchemaName": "ComputationalMergeDerivedSourceOpenResultV1",
+      "requiresDryRun": false,
+      "returnsArtifactHandles": true,
+      "toolKind": "apply",
+      "toolName": "computationalmerge.hdr.open_derived_source"
+    },
+    {
+      "approvalClass": "preview_only",
+      "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+      "mutates": false,
+      "outputSchemaName": "ComputationalMergeDryRunResultV1",
+      "requiresDryRun": true,
+      "returnsArtifactHandles": true,
+      "toolKind": "dry_run",
+      "toolName": "computationalmerge.panorama.dry_run_command"
+    },
+    {
+      "approvalClass": "edit_apply",
+      "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+      "mutates": true,
+      "outputSchemaName": "ComputationalMergeMutationResultV1",
+      "requiresDryRun": false,
+      "returnsArtifactHandles": true,
+      "toolKind": "apply",
+      "toolName": "computationalmerge.panorama.apply_command"
+    },
+    {
+      "approvalClass": "edit_apply",
+      "inputSchemaName": "ComputationalMergeDerivedSourceOpenRequestV1",
+      "mutates": true,
+      "outputSchemaName": "ComputationalMergeDerivedSourceOpenResultV1",
+      "requiresDryRun": false,
+      "returnsArtifactHandles": true,
+      "toolKind": "apply",
+      "toolName": "computationalmerge.panorama.open_derived_source"
+    },
+    {
       "approvalClass": "preview_only",
       "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
       "mutates": false,
@@ -250,6 +320,16 @@
       "returnsArtifactHandles": true,
       "toolKind": "apply",
       "toolName": "computationalmerge.super_resolution.apply_command"
+    },
+    {
+      "approvalClass": "edit_apply",
+      "inputSchemaName": "ComputationalMergeDerivedSourceOpenRequestV1",
+      "mutates": true,
+      "outputSchemaName": "ComputationalMergeDerivedSourceOpenResultV1",
+      "requiresDryRun": false,
+      "returnsArtifactHandles": true,
+      "toolKind": "apply",
+      "toolName": "computationalmerge.super_resolution.open_derived_source"
     },
     {
       "approvalClass": "preview_only",

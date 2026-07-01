@@ -247,6 +247,7 @@ interface LiveAuditArtifactState {
 type LiveActivityKind = 'approval' | 'error' | 'export' | 'preview' | 'prompt' | 'rollback' | 'state' | 'tool_call';
 
 interface LiveActivityEntry {
+  acceptedPreviewArtifactId?: string;
   approvalId?: string;
   body: string;
   exportArtifactId?: string;
@@ -263,6 +264,7 @@ interface LiveActivityEntry {
 type LiveActivityEntryInput = Omit<
   LiveActivityEntry,
   | 'approvalId'
+  | 'acceptedPreviewArtifactId'
   | 'exportArtifactId'
   | 'graphRevision'
   | 'id'
@@ -271,6 +273,7 @@ type LiveActivityEntryInput = Omit<
   | 'recipeHash'
   | 'toolName'
 > & {
+  acceptedPreviewArtifactId?: string | undefined;
   approvalId?: string | undefined;
   exportArtifactId?: string | undefined;
   graphRevision?: string | undefined;
@@ -740,6 +743,7 @@ function LiveActivityTimeline({ entries }: { entries: LiveActivityEntry[] }) {
           entries.map((entry) => (
             <div
               className="rounded border border-white/10 bg-white/[0.03] p-2 text-[11px]"
+              data-accepted-preview-artifact-id={entry.acceptedPreviewArtifactId ?? ''}
               data-approval-id={entry.approvalId ?? ''}
               data-export-artifact-id={entry.exportArtifactId ?? ''}
               data-graph-revision={entry.graphRevision ?? ''}
@@ -1642,6 +1646,9 @@ function LivePromptComposer({
         status: entry.status,
       };
 
+      if (entry.acceptedPreviewArtifactId !== undefined) {
+        nextEntry.acceptedPreviewArtifactId = entry.acceptedPreviewArtifactId;
+      }
       if (entry.graphRevision !== undefined) nextEntry.graphRevision = entry.graphRevision;
       if (entry.approvalId !== undefined) nextEntry.approvalId = entry.approvalId;
       if (entry.exportArtifactId !== undefined) nextEntry.exportArtifactId = entry.exportArtifactId;
@@ -2083,6 +2090,7 @@ function LivePromptComposer({
         toolCallCount: selectedImageReceipt.toolCalls.length,
       });
       pushActivityEntry({
+        acceptedPreviewArtifactId: selectedImageReceipt.acceptedPreviewArtifactId,
         body: `Approved selected-image dry-run ${selectedImageReceipt.dryRunPlanId}.`,
         graphRevision: selectedImageApply.apply.appliedGraphRevision,
         kind: 'tool_call',

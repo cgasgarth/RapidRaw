@@ -32,6 +32,7 @@ const REPORT_ID: &str = "layer-mask-real-raw.alaska-local-adjustment.v1";
 #[serde(rename_all = "camelCase")]
 struct LayerMaskRealRawProofReport {
     artifacts: Vec<LayerMaskRealRawArtifact>,
+    export_parity_receipt: LayerMaskExportParityReceipt,
     fixture_id: String,
     generated_at: String,
     issue: u32,
@@ -49,6 +50,33 @@ struct LayerMaskRealRawArtifact {
     kind: String,
     path: String,
     public_repo_allowed: bool,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LayerMaskExportParityReceipt {
+    changed_pixel_ratio: f64,
+    export_artifact_path: String,
+    final_export_hash: String,
+    fixture_id: String,
+    metric_count: u32,
+    parity_metric: String,
+    parity_status: String,
+    parity_threshold: f64,
+    parity_value: f64,
+    receipt_id: String,
+    receipt_version: u32,
+    refined_mask_content_hash: String,
+    refined_preview_artifact_path: String,
+    refined_preview_hash: String,
+    source_content_hash: String,
+    source_graph_revision: String,
+    source_path: String,
+    stale_reasons: Vec<String>,
+    stale_state: String,
+    tracking_issue: u32,
+    unmasked_preview_hash: String,
+    unrefined_preview_hash: String,
 }
 
 #[derive(Serialize)]
@@ -426,8 +454,16 @@ fn run_private_layer_mask_real_raw_proof(
         ),
     ];
 
+    let export_parity_receipt = build_export_parity_receipt(
+        &artifacts,
+        masked_changed_pixel_ratio,
+        metrics.len() as u32,
+        preview_export_mean_abs_delta,
+    )?;
+
     let report = LayerMaskRealRawProofReport {
         artifacts: Vec::new(),
+        export_parity_receipt,
         fixture_id: FIXTURE_ID.to_string(),
         generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         issue: 3251,
@@ -495,6 +531,79 @@ fn render_with_masks(
         tm_override,
         &mask_bitmaps,
     )
+}
+
+fn build_export_parity_receipt(
+    artifacts: &[LayerMaskRealRawArtifact],
+    changed_pixel_ratio: f64,
+    metric_count: u32,
+    parity_value: f64,
+) -> Result<LayerMaskExportParityReceipt, String> {
+    let source = artifact(artifacts, "source_raw_private")?;
+    let unmasked = artifact(artifacts, "unmasked_preview_private")?;
+    let unrefined = artifact(artifacts, "unrefined_preview_private")?;
+    let refined = artifact(artifacts, "refined_preview_private")?;
+    let refined_mask = artifact(artifacts, "hair_aware_mask_alpha_private")?;
+    let export = artifact(artifacts, "refined_export_private")?;
+    let source_graph_revision = format!(
+        "layer_mask_graph_private_raw_{}",
+        short_hash(&format!(
+            "{}:{}:{}",
+            source.hash, refined_mask.hash, refined.hash
+        ))
+    );
+    let receipt_id = format!(
+        "layer_mask_export_parity_{}",
+        short_hash(&format!(
+            "{}:{}:{}:{}",
+            source_graph_revision, refined.hash, refined_mask.hash, export.hash
+        ))
+    );
+
+    Ok(LayerMaskExportParityReceipt {
+        changed_pixel_ratio,
+        export_artifact_path: export.path.clone(),
+        final_export_hash: export.hash.clone(),
+        fixture_id: FIXTURE_ID.to_string(),
+        metric_count,
+        parity_metric: "previewExportMeanAbsDelta".to_string(),
+        parity_status: if parity_value <= 0.015 {
+            "matched".to_string()
+        } else {
+            "mismatch".to_string()
+        },
+        parity_threshold: 0.015,
+        parity_value,
+        receipt_id,
+        receipt_version: 1,
+        refined_mask_content_hash: refined_mask.hash.clone(),
+        refined_preview_artifact_path: refined.path.clone(),
+        refined_preview_hash: refined.hash.clone(),
+        source_content_hash: source.hash.clone(),
+        source_graph_revision,
+        source_path: source.path.clone(),
+        stale_reasons: Vec::new(),
+        stale_state: "current".to_string(),
+        tracking_issue: 4558,
+        unmasked_preview_hash: unmasked.hash.clone(),
+        unrefined_preview_hash: unrefined.hash.clone(),
+    })
+}
+
+fn artifact<'a>(
+    artifacts: &'a [LayerMaskRealRawArtifact],
+    kind: &str,
+) -> Result<&'a LayerMaskRealRawArtifact, String> {
+    artifacts
+        .iter()
+        .find(|artifact| artifact.kind == kind)
+        .ok_or_else(|| format!("{kind}: missing layer mask proof artifact"))
+}
+
+fn short_hash(value: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(value.as_bytes());
+    hex::encode(hasher.finalize())[..16].to_string()
 }
 
 fn layer_mask_adjustments(refinement: Value, base_image: &DynamicImage) -> Value {

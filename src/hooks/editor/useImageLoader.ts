@@ -6,9 +6,11 @@ import { isNullAdjustmentSnapshot, parseLoadedMetadata, parseLoadImageResult } f
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
+import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../utils/adjustments';
 import { formatUnknownError } from '../../utils/errorFormatting';
+import { upsertHdrReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
 import type { ImageCacheEntry } from '../../utils/ImageLRUCache';
 import { hydrateLayerStackMasksFromMetadata } from '../../utils/layers/layerStackSidecarAdjustments';
 import {
@@ -76,6 +78,11 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
           if (!isEffectActive) return;
 
           const { width, height } = loadImageResult;
+          upsertHdrReopenedDerivedOutputReceipt({
+            imagePath: selectedImagePath,
+            metadata: loadImageResult.metadata,
+            upsert: useUIStore.getState().upsertDerivedOutputReceipt,
+          });
           setEditor({ originalSize: { width, height } });
 
           if (appSettings?.editorPreviewResolution) {

@@ -117,10 +117,10 @@ await expectRejects(() => applyAgentSelectedImageLiveSession(staleDraft), 'image
 seedEditor();
 const stalePreviewDraft = approveAgentSelectedImageLiveSession(await startDraft('agent-live-session-stale-preview'));
 useEditorStore.setState({ finalPreviewUrl: 'blob:rawengine-agent-live-session-refreshed-preview' });
-if (getAgentSelectedImageLiveSessionStaleReason(stalePreviewDraft) !== 'preview_identity_changed') {
-  throw new Error('live session stale guard did not detect selected preview identity change.');
+if (getAgentSelectedImageLiveSessionStaleReason(stalePreviewDraft) !== 'preview_artifact_changed') {
+  throw new Error('live session stale guard did not detect selected preview artifact change.');
 }
-await expectRejects(() => applyAgentSelectedImageLiveSession(stalePreviewDraft), 'preview_identity_changed');
+await expectRejects(() => applyAgentSelectedImageLiveSession(stalePreviewDraft), 'preview_artifact_changed');
 
 seedEditor();
 const applyDraft = approveAgentSelectedImageLiveSession(await startDraft('agent-live-session-apply'));
@@ -128,12 +128,54 @@ const applyResult = await applyAgentSelectedImageLiveSession(applyDraft);
 const appliedReceipt = replayAgentSelectedImageLiveSessionAudit(applyResult.audit);
 if (
   appliedReceipt.approvalDecision !== 'approved' ||
+  appliedReceipt.acceptedPreviewArtifactId !== applyDraft.snapshot.previewArtifactId ||
+  appliedReceipt.applyGuard?.status !== 'passed' ||
   appliedReceipt.state !== 'applied' ||
   appliedReceipt.finalGraphRevision !== applyResult.apply.appliedGraphRevision ||
   appliedReceipt.afterPreviewHash !== applyResult.previewAfterHash
 ) {
   throw new Error('live session apply audit did not replay apply receipt.');
 }
+const transcriptKinds = applyResult.audit.transcript.map((entry) => entry.kind);
+if (
+  transcriptKinds.join(',') !==
+  'preview,tool_call,tool_result,tool_call,tool_result,tool_call,tool_result,approval,apply_decision'
+) {
+  throw new Error(`live session transcript did not persist replayable tool order: ${transcriptKinds.join(',')}`);
+}
+if (
+  !applyResult.audit.transcript.some(
+    (entry) =>
+      entry.kind === 'apply_decision' &&
+      entry.acceptedPreviewArtifactId === applyDraft.snapshot.previewArtifactId &&
+      entry.status === 'succeeded',
+  )
+) {
+  throw new Error('live session transcript did not persist accepted apply decision metadata.');
+}
+
+await expectReplayRejects(
+  {
+    ...applyResult.audit,
+    transcript: applyResult.audit.transcript.map((entry) =>
+      entry.kind === 'apply_decision' ? { ...entry, acceptedPreviewArtifactId: 'artifact_stale_preview' } : entry,
+    ),
+  },
+  'stale apply decision preview artifact',
+);
+await expectReplayRejects(
+  {
+    ...applyResult.audit,
+    receipt: {
+      ...applyResult.audit.receipt,
+      applyGuard:
+        applyResult.audit.receipt.applyGuard === undefined
+          ? undefined
+          : { ...applyResult.audit.receipt.applyGuard, status: 'rejected', staleReason: 'preview_artifact_changed' },
+    },
+  },
+  'failed apply guard',
+);
 
 const postApplySnapshot = buildAgentImageContextSnapshot();
 if (postApplySnapshot.graphRevision !== applyResult.apply.appliedGraphRevision) {
@@ -162,4 +204,17 @@ async function expectRejects(action: () => Promise<unknown>, expectedMessage: st
     throw error;
   }
   throw new Error(`expected rejection containing ${expectedMessage}.`);
+}
+
+async function expectReplayRejects(
+  audit: Parameters<typeof replayAgentSelectedImageLiveSessionAudit>[0],
+  expectedMessage: string,
+) {
+  try {
+    replayAgentSelectedImageLiveSessionAudit(audit);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes(expectedMessage)) return;
+    throw error;
+  }
+  throw new Error(`expected replay rejection containing ${expectedMessage}.`);
 }

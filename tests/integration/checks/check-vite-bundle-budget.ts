@@ -21,7 +21,7 @@ type InitialEntryReport = {
   rawBytes: number;
 };
 
-type BundleBudgetMetric = 'gzip' | 'missing' | 'raw';
+type BundleBudgetMetric = 'forbidden' | 'gzip' | 'missing' | 'raw';
 
 type BundleBudgetFailure = {
   actualBytes?: number;
@@ -65,6 +65,17 @@ const budgetMode = VITE_BUNDLE_BUDGET_POLICY.budgetMode;
 const formatBytes = (bytes: number) => `${(bytes / 1024).toFixed(1)} KiB`;
 const reproduceCommand = 'bun run check:bundle';
 const bundleRunbook = 'docs/tooling/frontend/vite-bundle-budget-2026-06-11.md';
+const validationVisualTailwindSentinels = ['bg|#1b3442', 'bg|#213427', 'h|880px'].map((token) => {
+  const [prefix, arbitraryValue] = token.split('|');
+  if (prefix === undefined || arbitraryValue === undefined) {
+    throw new Error(`Invalid validation visual Tailwind sentinel token: ${token}`);
+  }
+  const className = `${prefix}-[${arbitraryValue}]`;
+  return {
+    className,
+    cssSelectorFragment: escapeTailwindClassSelector(className),
+  };
+});
 
 if (process.argv.includes('--self-test')) {
   runSelfTest();
@@ -181,6 +192,7 @@ warnings.push(
   }),
 );
 failures.push(...getInitialEntryFailures(initialEntryReport, initialEntryBudget));
+failures.push(...getValidationVisualCssFailures(initialEntryReport));
 
 for (const warning of warnings.filter((warning) => !isCoveredByFailure(warning, failures))) {
   console.warn(`Bundle budget warning: ${formatBudgetFailure(warning)}`);
@@ -255,6 +267,35 @@ function getInitialEntryFailures(
   }
 
   return budgetFailures;
+}
+
+function getValidationVisualCssFailures(report: InitialEntryReport): BundleBudgetFailure[] {
+  const cssFiles = report.files.filter((file) => file.extension === '.css');
+  const leakedClasses = new Map<string, string[]>();
+
+  for (const file of cssFiles) {
+    const contents = file.contents.toString('utf8');
+    const classes = validationVisualTailwindSentinels
+      .filter((sentinel) => contents.includes(sentinel.cssSelectorFragment))
+      .map((sentinel) => sentinel.className);
+    if (classes.length > 0) leakedClasses.set(file.name, classes);
+  }
+
+  if (leakedClasses.size === 0) return [];
+
+  return [
+    {
+      files: [...leakedClasses].map(([fileName, classes]) => `${fileName} (${classes.join(', ')})`),
+      label: 'Product CSS validation source scope',
+      metric: 'forbidden',
+      nextAction:
+        'Keep product CSS on src/product-styles.css with source(none) and @source not "./validation/visual"; visual smoke styling must stay on src/validation/visual/visual-smoke-styles.css.',
+    },
+  ];
+}
+
+function escapeTailwindClassSelector(className: string): string {
+  return className.replaceAll('\\', '\\\\').replaceAll('#', '\\#').replaceAll('[', '\\[').replaceAll(']', '\\]');
 }
 
 function getThresholdWarnings({
@@ -361,6 +402,7 @@ function formatBudgetFailure(failure: BundleBudgetFailure): string {
 }
 
 function formatMetricLabel(metric: BundleBudgetMetric): string {
+  if (metric === 'forbidden') return 'forbidden validation-only Tailwind selectors found';
   if (metric === 'raw') return 'raw size exceeded';
   if (metric === 'gzip') return 'gzip size exceeded';
   return 'expected asset missing';
@@ -431,6 +473,22 @@ function runSelfTest(): void {
   }
   if (!annotation.includes(reproduceCommand) || !annotation.includes(bundleRunbook)) {
     throw new Error('self-test: annotation is missing reproduction guidance.');
+  }
+
+  const validationScopeFailures = getValidationVisualCssFailures({
+    files: [
+      fixtureFile(
+        'entry.css',
+        100,
+        20,
+        `.${validationVisualTailwindSentinels[0]?.cssSelectorFragment ?? failSelfTest('sentinel missing')}{}`,
+      ),
+    ],
+    gzipBytes: 20,
+    rawBytes: 100,
+  });
+  if (validationScopeFailures.length !== 1) {
+    throw new Error('self-test: validation-only Tailwind selector leakage was not detected.');
   }
 
   const thresholdWarnings = getThresholdWarnings({

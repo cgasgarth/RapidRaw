@@ -15,6 +15,10 @@ import {
   renderLayerHeadlessStack,
   renderLayerPreviewStack,
 } from '../../../../packages/rawengine-schema/src/layerBlendRuntime.ts';
+import {
+  layerMaskCloneSourceV1Schema,
+  layerMaskRemoveSourceV1Schema,
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const FIXTURE_PATH = 'fixtures/layers/layer-preview-export-parity.json';
 
@@ -24,6 +28,8 @@ const sidecarLayerSchema = z
     id: z.string().trim().min(1),
     maskPersisted: z.boolean(),
     opacity: z.number().min(0).max(1),
+    retouchCloneSource: layerMaskCloneSourceV1Schema.optional(),
+    retouchRemoveSource: layerMaskRemoveSourceV1Schema.optional(),
     visible: z.boolean(),
   })
   .strict();

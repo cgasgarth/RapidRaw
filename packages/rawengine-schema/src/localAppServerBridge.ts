@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
+import { openComputationalMergeDerivedSourceV1 } from './computational-merge/computationalMergeDerivedSourceRuntime.js';
 import { EditCommandBus, type EditCommandBusContext, type EditCommandDispatchResult } from './editCommandBus.js';
+import { FocusStackAppServerRuntimeToolBusV1 } from './focus-stack/focusStackAppServerRuntime.js';
+import { HdrAppServerRuntimeToolBusV1 } from './hdr/hdrAppServerRuntime.js';
+import { LinearGradientMaskCommandRuntime } from './linearGradientMaskCommandRuntime.js';
+import { PanoramaAppServerRuntimeToolBusV1 } from './panorama/panoramaAppServerRuntime.js';
 import {
   ApprovalClass,
   aiEnhancementApplyResultV1Schema,
@@ -9,6 +14,24 @@ import {
   aiToolApplyResultV1Schema,
   aiToolCommandEnvelopeV1Schema,
   aiToolDryRunResultV1Schema,
+  type ComputationalMergeCommandEnvelopeV1,
+  type ComputationalMergeCommandTypeV1,
+  type ComputationalMergeDerivedSourceOpenRequestV1,
+  type ComputationalMergeFamilyV1,
+  computationalMergeCommandEnvelopeV1Schema,
+  computationalMergeDerivedSourceOpenRequestV1Schema,
+  type DetailEffectsCommandEnvelopeV1,
+  type DetailEffectsPatchV1,
+  detailEffectsCommandEnvelopeV1Schema,
+  detailEffectsDryRunResultV1Schema,
+  detailEffectsMutationResultV1Schema,
+  type LayerMaskCommandEnvelopeV1,
+  type LensProfileCommandEnvelopeV1,
+  type LensProfilePatchV1,
+  layerMaskCommandEnvelopeV1Schema,
+  lensProfileCommandEnvelopeV1Schema,
+  lensProfileDryRunResultV1Schema,
+  lensProfileMutationResultV1Schema,
   type ProjectLibrarySnapshotV1,
   projectLibrarySnapshotV1Schema,
   type RawEngineToolRegistryV1,
@@ -21,6 +44,7 @@ import {
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
 } from './rawEngineSchemas.js';
+import { SuperResolutionAppServerRuntimeToolBusV1 } from './super-resolution/superResolutionAppServerRuntime.js';
 import { rawEngineDefaultToolRegistryV1 } from './toolRegistry.js';
 
 export const RawEngineLocalAppServerCommandType = {
@@ -308,6 +332,48 @@ export type RawEngineLocalAppServerAiEnhancementCommandV1 = z.infer<
   typeof rawEngineLocalAppServerAiEnhancementCommandV1Schema
 >;
 
+export const rawEngineLocalAppServerComputationalMergeCommandV1Schema = computationalMergeCommandEnvelopeV1Schema;
+
+export type RawEngineLocalAppServerComputationalMergeCommandV1 = z.infer<
+  typeof rawEngineLocalAppServerComputationalMergeCommandV1Schema
+>;
+
+export const rawEngineLocalAppServerComputationalMergeDerivedSourceOpenRequestV1Schema =
+  computationalMergeDerivedSourceOpenRequestV1Schema;
+
+export type RawEngineLocalAppServerComputationalMergeDerivedSourceOpenRequestV1 = z.infer<
+  typeof rawEngineLocalAppServerComputationalMergeDerivedSourceOpenRequestV1Schema
+>;
+
+export const rawEngineLocalAppServerDetailEffectsCommandV1Schema = detailEffectsCommandEnvelopeV1Schema;
+
+export type RawEngineLocalAppServerDetailEffectsCommandV1 = z.infer<
+  typeof rawEngineLocalAppServerDetailEffectsCommandV1Schema
+>;
+
+export const rawEngineLocalAppServerLensProfileCommandV1Schema = lensProfileCommandEnvelopeV1Schema;
+
+export type RawEngineLocalAppServerLensProfileCommandV1 = z.infer<
+  typeof rawEngineLocalAppServerLensProfileCommandV1Schema
+>;
+
+export const rawEngineLocalAppServerLayerMaskCommandV1Schema = layerMaskCommandEnvelopeV1Schema.superRefine(
+  (command, context) => {
+    if (
+      command.commandType !== 'layerMask.createGradientMask' ||
+      command.parameters.gradient.gradientKind !== 'linear'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Local app-server bridge currently supports linear gradient layer-mask commands only.',
+        path: ['commandType'],
+      });
+    }
+  },
+);
+
+export type RawEngineLocalAppServerLayerMaskCommandV1 = z.infer<typeof rawEngineLocalAppServerLayerMaskCommandV1Schema>;
+
 type BasicToneCommandV1 = Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.setBasicTone' }>;
 type BasicToneAdjustmentParameterKeyV1 = Exclude<
   keyof BasicToneCommandV1['parameters'],
@@ -340,6 +406,10 @@ const AI_COMMAND_TYPE_TO_APP_SERVER_TOOL_NAME = {
   'ai.enhancement.dryRun': 'ai.enhancement.dry_run_command',
   'ai.mask.applySubject': 'ai.mask.apply_subject',
   'ai.mask.generateSubject': 'ai.mask.dry_run_subject',
+  'detailEffects.applyAdjustments': 'detail.effects.apply_command',
+  'detailEffects.dryRunAdjustments': 'detail.effects.dry_run_command',
+  'lensProfile.applyCorrection': 'lensprofile.apply_command',
+  'lensProfile.dryRunCorrection': 'lensprofile.dry_run_command',
   [RawEngineLocalAppServerCommandType.EditorStateQuery]: 'agent.editor_state.query',
   [RawEngineLocalAppServerCommandType.ImageMetadataQuery]: 'agent.image_metadata.query',
   [RawEngineLocalAppServerCommandType.ProjectMetadataQuery]: 'agent.project_metadata.query',
@@ -359,6 +429,24 @@ const RAW_ENGINE_LOCAL_APP_SERVER_EXECUTABLE_TOOL_NAMES = new Set([
   'ai.enhancement.dry_run_command',
   'ai.mask.apply_subject',
   'ai.mask.dry_run_subject',
+  'computationalmerge.focus_stack.apply_command',
+  'computationalmerge.focus_stack.dry_run_command',
+  'computationalmerge.focus_stack.open_derived_source',
+  'computationalmerge.hdr.apply_command',
+  'computationalmerge.hdr.dry_run_command',
+  'computationalmerge.hdr.open_derived_source',
+  'computationalmerge.panorama.apply_command',
+  'computationalmerge.panorama.dry_run_command',
+  'computationalmerge.panorama.open_derived_source',
+  'computationalmerge.super_resolution.apply_command',
+  'computationalmerge.super_resolution.dry_run_command',
+  'computationalmerge.super_resolution.open_derived_source',
+  'detail.effects.apply_command',
+  'detail.effects.dry_run_command',
+  'layermask.apply_command',
+  'layermask.dry_run_command',
+  'lensprofile.apply_command',
+  'lensprofile.dry_run_command',
   'tonecolor.apply_command',
   'tonecolor.dry_run_command',
 ]);
@@ -501,6 +589,198 @@ const stableBasicToneHash = (value: string): string => {
 
   return (hash >>> 0).toString(16).padStart(8, '0');
 };
+
+const DETAIL_EFFECTS_PATCH_KEYS = [
+  'chromaticAberrationBlueYellow',
+  'chromaticAberrationRedCyan',
+  'clarity',
+  'colorNoiseReduction',
+  'deblurEnabled',
+  'deblurSigmaPx',
+  'deblurStrength',
+  'dehaze',
+  'dustSpotMinRadiusPx',
+  'dustSpotOverlayEnabled',
+  'dustSpotSensitivity',
+  'flareAmount',
+  'glowAmount',
+  'grainAmount',
+  'grainRoughness',
+  'grainSize',
+  'halationAmount',
+  'localContrastHaloGuard',
+  'localContrastMidtoneMask',
+  'localContrastRadiusPx',
+  'lumaNoiseReduction',
+  'sharpness',
+  'sharpnessThreshold',
+  'structure',
+  'vignetteAmount',
+  'vignetteFeather',
+  'vignetteMidpoint',
+  'vignetteRoundness',
+] as const satisfies ReadonlyArray<keyof DetailEffectsPatchV1>;
+
+type DetailEffectsCommandV1 = Extract<
+  DetailEffectsCommandEnvelopeV1,
+  { commandType: 'detailEffects.dryRunAdjustments' | 'detailEffects.applyAdjustments' }
+>;
+
+const buildDetailEffectsPlanPatch = (command: DetailEffectsCommandV1): Partial<DetailEffectsPatchV1> =>
+  Object.fromEntries(
+    DETAIL_EFFECTS_PATCH_KEYS.flatMap((key) =>
+      command.parameters[key] === undefined ? [] : [[key, command.parameters[key]]],
+    ),
+  );
+
+const LENS_PROFILE_PATCH_KEYS = [
+  'lensCorrectionMode',
+  'lensDistortionAmount',
+  'lensDistortionEnabled',
+  'lensDistortionParams',
+  'lensMaker',
+  'lensModel',
+  'lensTcaAmount',
+  'lensTcaEnabled',
+  'lensVignetteAmount',
+  'lensVignetteEnabled',
+] as const satisfies ReadonlyArray<keyof LensProfilePatchV1>;
+
+type LensProfileCommandV1 = Extract<
+  LensProfileCommandEnvelopeV1,
+  { commandType: 'lensProfile.dryRunCorrection' | 'lensProfile.applyCorrection' }
+>;
+
+const buildLensProfilePlanPatch = (command: LensProfileCommandV1): Partial<LensProfilePatchV1> =>
+  Object.fromEntries(
+    LENS_PROFILE_PATCH_KEYS.flatMap((key) =>
+      command.parameters[key] === undefined ? [] : [[key, command.parameters[key]]],
+    ),
+  );
+
+const buildDetailEffectsPlanKey = (command: DetailEffectsCommandV1): string =>
+  JSON.stringify([command.expectedGraphRevision, command.target, buildDetailEffectsPlanPatch(command)]);
+
+const buildDetailEffectsPlanId = (command: DetailEffectsCommandV1): string =>
+  `dryrun_detail_effects_${stableBasicToneHash(buildDetailEffectsPlanKey(command))}`;
+
+const buildDetailEffectsPlanHash = (command: DetailEffectsCommandV1): string =>
+  `sha256:detail-effects:${stableBasicToneHash(
+    `${buildDetailEffectsPlanId(command)}:${buildDetailEffectsPlanKey(command)}`,
+  )}`;
+
+const buildDetailEffectsDryRunResult = (
+  command: Extract<DetailEffectsCommandEnvelopeV1, { commandType: 'detailEffects.dryRunAdjustments' }>,
+): z.infer<typeof detailEffectsDryRunResultV1Schema> =>
+  detailEffectsDryRunResultV1Schema.parse({
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: true,
+    dryRunPlanHash: buildDetailEffectsPlanHash(command),
+    dryRunPlanId: buildDetailEffectsPlanId(command),
+    mutates: false,
+    parameterDiff: DETAIL_EFFECTS_PATCH_KEYS.flatMap((key) =>
+      command.parameters[key] === undefined
+        ? []
+        : [
+            {
+              nodeId: null,
+              path: `/parameters/${key}`,
+              value: command.parameters[key],
+            },
+          ],
+    ),
+    predictedGraphRevision: `${command.expectedGraphRevision}:preview:${command.commandId}`,
+    previewArtifacts: [],
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    warnings: [],
+  });
+
+const buildDetailEffectsMutationResult = (
+  command: Extract<DetailEffectsCommandEnvelopeV1, { commandType: 'detailEffects.applyAdjustments' }>,
+): z.infer<typeof detailEffectsMutationResultV1Schema> =>
+  detailEffectsMutationResultV1Schema.parse({
+    appliedGraphRevision: `${command.expectedGraphRevision}:detail_effects:${command.commandId}`,
+    changedNodeIds: DETAIL_EFFECTS_PATCH_KEYS.flatMap((key) =>
+      command.parameters[key] === undefined ? [] : [`detail_effects:${key}:${command.target.kind}`],
+    ),
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: false,
+    dryRunPlanHash: command.parameters.acceptedDryRunPlanHash,
+    dryRunPlanId: command.parameters.acceptedDryRunPlanId,
+    mutates: true,
+    provenanceEntryIds: [`prov_detail_effects_${command.commandId}`],
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    undoRevision: command.expectedGraphRevision,
+    warnings: [],
+  });
+
+const buildLensProfilePlanKey = (command: LensProfileCommandV1): string =>
+  JSON.stringify([command.expectedGraphRevision, command.target, buildLensProfilePlanPatch(command)]);
+
+const buildLensProfilePlanId = (command: LensProfileCommandV1): string =>
+  `dryrun_lens_profile_${stableBasicToneHash(buildLensProfilePlanKey(command))}`;
+
+const buildLensProfilePlanHash = (command: LensProfileCommandV1): string =>
+  `sha256:lens-profile:${stableBasicToneHash(
+    `${buildLensProfilePlanId(command)}:${buildLensProfilePlanKey(command)}`,
+  )}`;
+
+const buildLensProfileDryRunResult = (
+  command: Extract<LensProfileCommandEnvelopeV1, { commandType: 'lensProfile.dryRunCorrection' }>,
+): z.infer<typeof lensProfileDryRunResultV1Schema> =>
+  lensProfileDryRunResultV1Schema.parse({
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: true,
+    dryRunPlanHash: buildLensProfilePlanHash(command),
+    dryRunPlanId: buildLensProfilePlanId(command),
+    mutates: false,
+    parameterDiff: LENS_PROFILE_PATCH_KEYS.flatMap((key) =>
+      command.parameters[key] === undefined
+        ? []
+        : [
+            {
+              nodeId: null,
+              path: `/parameters/${key}`,
+              value: command.parameters[key],
+            },
+          ],
+    ),
+    predictedGraphRevision: `${command.expectedGraphRevision}:preview:${command.commandId}`,
+    previewArtifacts: [],
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    warnings: [],
+  });
+
+const buildLensProfileMutationResult = (
+  command: Extract<LensProfileCommandEnvelopeV1, { commandType: 'lensProfile.applyCorrection' }>,
+): z.infer<typeof lensProfileMutationResultV1Schema> =>
+  lensProfileMutationResultV1Schema.parse({
+    appliedGraphRevision: `${command.expectedGraphRevision}:lens_profile:${command.commandId}`,
+    changedNodeIds: LENS_PROFILE_PATCH_KEYS.flatMap((key) =>
+      command.parameters[key] === undefined ? [] : [`lens_profile:${key}:${command.target.kind}`],
+    ),
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: false,
+    dryRunPlanHash: command.parameters.acceptedDryRunPlanHash,
+    dryRunPlanId: command.parameters.acceptedDryRunPlanId,
+    mutates: true,
+    provenanceEntryIds: [`prov_lens_profile_${command.commandId}`],
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    undoRevision: command.expectedGraphRevision,
+    warnings: [],
+  });
 
 const buildBasicTonePlanId = (command: BasicToneCommandV1): string =>
   `dryrun_basic_tone_${stableBasicToneHash(buildBasicTonePlanKey(command))}`;
@@ -1004,15 +1284,343 @@ const buildEditorStateResult = (snapshot: ProjectLibrarySnapshotV1): RawEngineLo
     visibleImageCount: snapshot.imageList.length,
   });
 
+const computationalMergeFamilyForCommand = (
+  command: ComputationalMergeCommandEnvelopeV1,
+): ComputationalMergeFamilyV1 => {
+  switch (command.commandType) {
+    case 'computationalMerge.createFocusStack':
+      return 'focus_stack';
+    case 'computationalMerge.createHdr':
+      return 'hdr';
+    case 'computationalMerge.createPanorama':
+      return 'panorama';
+    case 'computationalMerge.createSuperResolution':
+      return 'super_resolution';
+  }
+};
+
+const computationalMergeCommandTypeForFamily = (
+  family: ComputationalMergeFamilyV1,
+): ComputationalMergeCommandTypeV1 => {
+  switch (family) {
+    case 'focus_stack':
+      return 'computationalMerge.createFocusStack';
+    case 'hdr':
+      return 'computationalMerge.createHdr';
+    case 'panorama':
+      return 'computationalMerge.createPanorama';
+    case 'super_resolution':
+      return 'computationalMerge.createSuperResolution';
+  }
+};
+
+const buildLocalComputationalMergeRuntimeManifest = () => ({
+  schemaVersion: 1,
+  serverRuntime: 'openai_app_server',
+  tools: (['focus_stack', 'hdr', 'panorama', 'super_resolution'] as const).flatMap((family) => {
+    const commandType = computationalMergeCommandTypeForFamily(family);
+    return [
+      {
+        allowedCommandTypes: [commandType],
+        approvalClass: ApprovalClass.PreviewOnly,
+        auditEvents: ['computational_merge_dry_run_requested', 'computational_merge_dry_run_completed'],
+        description: `Preview a local ${family} computational merge and return a non-mutating dry-run plan.`,
+        executionMode: 'dry_run_command',
+        inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+        localOnly: true,
+        mutates: false,
+        outputSchemaName: 'ComputationalMergeDryRunResultV1',
+        recordsProvenance: true,
+        requiresDryRunPlan: false,
+        returnsArtifactHandles: true,
+        toolName: `computationalmerge.${family}.dry_run_command`,
+      },
+      {
+        allowedCommandTypes: [commandType],
+        approvalClass: ApprovalClass.EditApply,
+        auditEvents: ['computational_merge_apply_requested', 'computational_merge_apply_completed'],
+        description: `Apply an accepted local ${family} computational merge dry-run plan.`,
+        executionMode: 'apply_dry_run_plan',
+        inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+        localOnly: true,
+        mutates: true,
+        outputSchemaName: 'ComputationalMergeMutationResultV1',
+        recordsProvenance: true,
+        requiresDryRunPlan: true,
+        returnsArtifactHandles: true,
+        toolName: `computationalmerge.${family}.apply_command`,
+      },
+    ];
+  }),
+});
+
+const localComputationalMergeRuntimeManifest = buildLocalComputationalMergeRuntimeManifest();
+
+const computationalMergeToolNameForCommand = (command: ComputationalMergeCommandEnvelopeV1): string =>
+  `computationalmerge.${computationalMergeFamilyForCommand(command)}.${
+    command.dryRun ? 'dry_run_command' : 'apply_command'
+  }`;
+
+const buildComputationalMergeRuntimeRequest = (command: ComputationalMergeCommandEnvelopeV1): unknown => {
+  switch (command.commandType) {
+    case 'computationalMerge.createHdr':
+      return buildHdrRuntimeRequest(command);
+    case 'computationalMerge.createPanorama':
+      return buildPanoramaRuntimeRequest(command);
+    case 'computationalMerge.createFocusStack':
+      return buildFocusRuntimeRequest(command);
+    case 'computationalMerge.createSuperResolution':
+      return buildSuperResolutionRuntimeRequest(command);
+  }
+};
+
+const buildHdrRuntimeRequest = (
+  command: Extract<ComputationalMergeCommandEnvelopeV1, { commandType: 'computationalMerge.createHdr' }>,
+) => {
+  const width = 48;
+  const height = 36;
+  const scene = createHdrScene(width, height);
+  const frames = command.parameters.sources.map((source, index) => {
+    const exposureEv = source.exposureEv ?? index - 1;
+    return {
+      contentHash: `sha256:local-app-server-hdr-${source.sourceIndex}`,
+      exposureEv,
+      graphRevision: `${command.expectedGraphRevision}:source:${source.sourceIndex}`,
+      height,
+      pixels: shiftFloat64Frame(renderHdrBracket(scene, exposureEv), width, height, index - 1, index % 2 === 0 ? 1 : 0),
+      sourceIndex: source.sourceIndex,
+      width,
+    };
+  });
+
+  return {
+    clipThreshold: 0.99,
+    command,
+    frames,
+    motionThreshold: 0.03,
+    outputArtifactId: `artifact_${command.commandId}_output`,
+    previewArtifactId: `artifact_${command.commandId}_preview`,
+    searchRadiusPx: 5,
+    sensorWhiteRadiance: 1,
+  };
+};
+
+const buildPanoramaRuntimeRequest = (
+  command: Extract<ComputationalMergeCommandEnvelopeV1, { commandType: 'computationalMerge.createPanorama' }>,
+) => {
+  const sourceFrames = command.parameters.sources.map((source) => ({
+    contentHash: `sha256:local-app-server-panorama-${source.sourceIndex}`,
+    expectedOffsetX: source.sourceIndex * 48,
+    expectedOffsetY: source.sourceIndex % 2 === 0 ? 0 : 2,
+    graphRevision: `${command.expectedGraphRevision}:source:${source.sourceIndex}`,
+    height: 48,
+    sourceIndex: source.sourceIndex,
+    width: 72,
+  }));
+
+  return {
+    artifactCreatedAt: '2026-06-22T12:00:00.000Z',
+    command,
+    connectedSourceIndices: command.parameters.sources.map((source) => source.sourceIndex),
+    outputArtifactId: `artifact_${command.commandId}_output`,
+    previewArtifactId: `artifact_${command.commandId}_preview`,
+    seed: `rawengine-local-app-server-${command.commandId}`,
+    sourceFrames,
+  };
+};
+
+const buildFocusRuntimeRequest = (
+  command: Extract<ComputationalMergeCommandEnvelopeV1, { commandType: 'computationalMerge.createFocusStack' }>,
+) => {
+  const width = 72;
+  const height = 48;
+  const sourceCount = command.parameters.sources.length;
+  const regionWidth = Math.floor(width / sourceCount);
+  const sourceRegions = command.parameters.sources.map((source, index) => ({
+    height,
+    sourceIndex: source.sourceIndex,
+    width: index === sourceCount - 1 ? width - regionWidth * index : regionWidth,
+    x: regionWidth * index,
+    y: 0,
+  }));
+  const frames = command.parameters.sources.map((source, index) => ({
+    contentHash: `sha256:local-app-server-focus-${source.sourceIndex}`,
+    focusDistanceMm: source.focusDistanceMm ?? 180 + index * 60,
+    graphRevision: `${command.expectedGraphRevision}:source:${source.sourceIndex}`,
+    height,
+    pixels: createFocusFrame(width, height, source.sourceIndex, sourceRegions),
+    sourceIndex: source.sourceIndex,
+    translationX: 0,
+    translationY: 0,
+    width,
+  }));
+  const cells = sourceRegions.map((region) => ({
+    height: region.height,
+    lowConfidence: false,
+    sourceScores: command.parameters.sources.map((source) => ({
+      relativeConfidence: source.sourceIndex === region.sourceIndex ? 1 : 0.01,
+      sourceIndex: source.sourceIndex,
+    })),
+    width: region.width,
+    x: region.x,
+    y: region.y,
+  }));
+
+  return {
+    artifactCreatedAt: '2026-06-22T12:00:00.000Z',
+    cells,
+    command,
+    depthConfidenceArtifactId: `artifact_${command.commandId}_depth_confidence`,
+    frames,
+    outputArtifactId: `artifact_${command.commandId}_output`,
+    previewArtifactId: `artifact_${command.commandId}_preview`,
+    retouchLayerArtifactId: `artifact_${command.commandId}_retouch`,
+    sharpnessMapArtifactId: `artifact_${command.commandId}_sharpness`,
+  };
+};
+
+const buildSuperResolutionRuntimeRequest = (
+  command: Extract<ComputationalMergeCommandEnvelopeV1, { commandType: 'computationalMerge.createSuperResolution' }>,
+) => {
+  const scale = Math.min(2, Math.floor(command.parameters.outputScale));
+  const lowWidth = 24;
+  const lowHeight = 18;
+  const highWidth = lowWidth * scale;
+  const highHeight = lowHeight * scale;
+  const truth = createSuperResolutionTruth(highWidth, highHeight);
+  const frames = command.parameters.sources.map((source, index) => ({
+    contentHash: `sha256:local-app-server-sr-${source.sourceIndex}`,
+    graphRevision: `${command.expectedGraphRevision}:source:${source.sourceIndex}`,
+    height: lowHeight,
+    pixels: downsampleSuperResolutionTruth(
+      truth,
+      highWidth,
+      lowWidth,
+      lowHeight,
+      index % scale,
+      Math.floor(index / scale) % scale,
+      scale,
+    ),
+    shiftX: index % scale,
+    shiftY: Math.floor(index / scale) % scale,
+    sourceIndex: source.sourceIndex,
+    width: lowWidth,
+  }));
+
+  return {
+    command,
+    confidenceMapArtifactId: `artifact_${command.commandId}_support_map`,
+    frames,
+    outputArtifactId: `artifact_${command.commandId}_output`,
+    previewArtifactId: `artifact_${command.commandId}_preview`,
+  };
+};
+
+const createHdrScene = (width: number, height: number): Float64Array => {
+  const pixels = new Float64Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      pixels[y * width + x] = 0.03 + (x / Math.max(1, width - 1)) * 0.11 + (x > 25 && y > 10 && y < 22 ? 0.14 : 0);
+    }
+  }
+  return pixels;
+};
+
+const renderHdrBracket = (scenePixels: Float64Array, exposureEv: number): Float64Array => {
+  const pixels = new Float64Array(scenePixels.length);
+  for (let index = 0; index < scenePixels.length; index += 1) {
+    pixels[index] = Math.min(1, (scenePixels[index] ?? 0) * 2 ** exposureEv);
+  }
+  return pixels;
+};
+
+const shiftFloat64Frame = (
+  image: Float64Array,
+  width: number,
+  height: number,
+  shiftX: number,
+  shiftY: number,
+): Float64Array => {
+  const shifted = new Float64Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const sourceX = x - shiftX;
+      const sourceY = y - shiftY;
+      if (sourceX >= 0 && sourceX < width && sourceY >= 0 && sourceY < height) {
+        shifted[y * width + x] = image[sourceY * width + sourceX] ?? 0;
+      }
+    }
+  }
+  return shifted;
+};
+
+const createFocusFrame = (
+  width: number,
+  height: number,
+  sourceIndex: number,
+  sourceRegions: Array<{ sourceIndex: number; width: number; x: number }>,
+): Float32Array => {
+  const pixels = new Float32Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const localPattern = ((x * 7 + y * 11 + sourceIndex * 19) % 31) / 255;
+      const sourceRegion = sourceRegions.find((region) => x >= region.x && x < region.x + region.width);
+      const focusBoost = sourceRegion?.sourceIndex === sourceIndex ? 0.72 : 0.08;
+      pixels[y * width + x] = Math.min(1, 0.12 + localPattern + focusBoost);
+    }
+  }
+  return pixels;
+};
+
+const createSuperResolutionTruth = (width: number, height: number): Float32Array => {
+  const pixels = new Float32Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      pixels[y * width + x] = Math.max(
+        0,
+        Math.min(1, (x / width) * 0.35 + (y / height) * 0.25 + (x % 3 === 0 ? 0.28 : 0.08)),
+      );
+    }
+  }
+  return pixels;
+};
+
+const downsampleSuperResolutionTruth = (
+  truthPixels: Float32Array,
+  highWidth: number,
+  lowWidth: number,
+  lowHeight: number,
+  shiftX: number,
+  shiftY: number,
+  scale: number,
+): Float32Array => {
+  const pixels = new Float32Array(lowWidth * lowHeight);
+  for (let y = 0; y < lowHeight; y += 1) {
+    for (let x = 0; x < lowWidth; x += 1) {
+      pixels[y * lowWidth + x] = truthPixels[(y * scale + shiftY) * highWidth + x * scale + shiftX] ?? 0;
+    }
+  }
+  return pixels;
+};
+
 export class RawEngineLocalAppServerBridge {
   readonly #acceptedAiEnhancementDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedAiToolDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedBasicToneDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
+  readonly #acceptedDetailEffectsDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
+  readonly #acceptedLensProfileDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedHslDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #acceptedSkinToneUniformityDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #auditEvents: Array<RawEngineLocalAppServerAuditEventV1> = [];
   readonly #availableAiProviderIds: ReadonlySet<string>;
   readonly #commandBus: EditCommandBus;
+  readonly #computationalMergeRuntimeBuses = {
+    focus_stack: new FocusStackAppServerRuntimeToolBusV1(localComputationalMergeRuntimeManifest),
+    hdr: new HdrAppServerRuntimeToolBusV1(localComputationalMergeRuntimeManifest),
+    panorama: new PanoramaAppServerRuntimeToolBusV1(localComputationalMergeRuntimeManifest),
+    super_resolution: new SuperResolutionAppServerRuntimeToolBusV1(localComputationalMergeRuntimeManifest),
+  };
+  readonly #linearGradientMaskRuntime = new LinearGradientMaskCommandRuntime({ height: 512, width: 768 });
   readonly #projectLibrarySnapshot: ProjectLibrarySnapshotV1;
   readonly #toolRegistry: RawEngineToolRegistryV1;
 
@@ -1145,6 +1753,14 @@ export class RawEngineLocalAppServerBridge {
     throw new Error(providerFallback.userVisibleMessage);
   }
 
+  #dispatchComputationalMergeCommand(command: RawEngineLocalAppServerComputationalMergeCommandV1): unknown {
+    const family = computationalMergeFamilyForCommand(command);
+    return this.#computationalMergeRuntimeBuses[family].execute({
+      request: buildComputationalMergeRuntimeRequest(command),
+      toolName: computationalMergeToolNameForCommand(command),
+    });
+  }
+
   #registerHandlers(): void {
     this.#commandBus.register({
       commandType: RawEngineLocalAppServerCommandType.ToolRegistryQuery,
@@ -1257,6 +1873,86 @@ export class RawEngineLocalAppServerBridge {
     });
 
     this.#commandBus.register({
+      commandType: 'detailEffects.dryRunAdjustments',
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerDetailEffectsCommandV1Schema.parse(command);
+        if (parsedCommand.commandType !== 'detailEffects.dryRunAdjustments') {
+          throw new Error('Local app-server bridge expected a detail/effects dry-run command.');
+        }
+
+        const dryRunResult = buildDetailEffectsDryRunResult(parsedCommand);
+        this.#acceptedDetailEffectsDryRunPlanKeys.set(buildDetailEffectsPlanKey(parsedCommand), {
+          planHash: dryRunResult.dryRunPlanHash,
+          planId: dryRunResult.dryRunPlanId,
+        });
+        return dryRunResult;
+      },
+      schema: rawEngineLocalAppServerDetailEffectsCommandV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: 'detailEffects.applyAdjustments',
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerDetailEffectsCommandV1Schema.parse(command);
+        if (parsedCommand.commandType !== 'detailEffects.applyAdjustments') {
+          throw new Error('Local app-server bridge expected a detail/effects apply command.');
+        }
+
+        const plan = this.#acceptedDetailEffectsDryRunPlanKeys.get(buildDetailEffectsPlanKey(parsedCommand));
+        if (
+          plan === undefined ||
+          plan.planHash !== parsedCommand.parameters.acceptedDryRunPlanHash ||
+          plan.planId !== parsedCommand.parameters.acceptedDryRunPlanId
+        ) {
+          throw new Error('Local app-server bridge rejected detail/effects apply without a matching accepted dry-run.');
+        }
+
+        return buildDetailEffectsMutationResult(parsedCommand);
+      },
+      schema: rawEngineLocalAppServerDetailEffectsCommandV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: 'lensProfile.dryRunCorrection',
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerLensProfileCommandV1Schema.parse(command);
+        if (parsedCommand.commandType !== 'lensProfile.dryRunCorrection') {
+          throw new Error('Local app-server bridge expected a lens/profile dry-run command.');
+        }
+
+        const dryRunResult = buildLensProfileDryRunResult(parsedCommand);
+        this.#acceptedLensProfileDryRunPlanKeys.set(buildLensProfilePlanKey(parsedCommand), {
+          planHash: dryRunResult.dryRunPlanHash,
+          planId: dryRunResult.dryRunPlanId,
+        });
+        return dryRunResult;
+      },
+      schema: rawEngineLocalAppServerLensProfileCommandV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: 'lensProfile.applyCorrection',
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerLensProfileCommandV1Schema.parse(command);
+        if (parsedCommand.commandType !== 'lensProfile.applyCorrection') {
+          throw new Error('Local app-server bridge expected a lens/profile apply command.');
+        }
+
+        const plan = this.#acceptedLensProfileDryRunPlanKeys.get(buildLensProfilePlanKey(parsedCommand));
+        if (
+          plan === undefined ||
+          plan.planHash !== parsedCommand.parameters.acceptedDryRunPlanHash ||
+          plan.planId !== parsedCommand.parameters.acceptedDryRunPlanId
+        ) {
+          throw new Error('Local app-server bridge rejected lens/profile apply without a matching accepted dry-run.');
+        }
+
+        return buildLensProfileMutationResult(parsedCommand);
+      },
+      schema: rawEngineLocalAppServerLensProfileCommandV1Schema,
+    });
+
+    this.#commandBus.register({
       commandType: 'ai.mask.generateSubject',
       execute: (command) => {
         const parsedCommand = rawEngineLocalAppServerAiToolCommandV1Schema.parse(command);
@@ -1296,6 +1992,22 @@ export class RawEngineLocalAppServerBridge {
         return buildAiToolMutationResult(parsedCommand);
       },
       schema: rawEngineLocalAppServerAiToolCommandV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: 'layerMask.createGradientMask',
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerLayerMaskCommandV1Schema.parse(command);
+        if (
+          parsedCommand.commandType !== 'layerMask.createGradientMask' ||
+          parsedCommand.parameters.gradient.gradientKind !== 'linear'
+        ) {
+          throw new Error('Local app-server bridge expected a linear gradient layer-mask command.');
+        }
+
+        return this.#linearGradientMaskRuntime.dispatch(parsedCommand satisfies LayerMaskCommandEnvelopeV1);
+      },
+      schema: rawEngineLocalAppServerLayerMaskCommandV1Schema,
     });
 
     this.#commandBus.register({
@@ -1339,8 +2051,25 @@ export class RawEngineLocalAppServerBridge {
       },
       schema: rawEngineLocalAppServerAiEnhancementCommandV1Schema,
     });
+
+    for (const commandType of [
+      'computationalMerge.createFocusStack',
+      'computationalMerge.createHdr',
+      'computationalMerge.createPanorama',
+      'computationalMerge.createSuperResolution',
+    ] as const) {
+      this.#commandBus.register({
+        commandType,
+        execute: (command) => this.#dispatchComputationalMergeCommand(command),
+        schema: rawEngineLocalAppServerComputationalMergeCommandV1Schema,
+      });
+    }
   }
 }
+
+export const dispatchRawEngineLocalAppServerComputationalMergeDerivedSourceOpen = (
+  request: ComputationalMergeDerivedSourceOpenRequestV1,
+): unknown => openComputationalMergeDerivedSourceV1(request);
 
 export const createRawEngineLocalAppServerBridge = (
   options: { availableAiProviderIds?: readonly string[]; projectLibrarySnapshot?: ProjectLibrarySnapshotV1 } = {},

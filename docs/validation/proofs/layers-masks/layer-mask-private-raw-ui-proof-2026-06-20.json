@@ -1,24 +1,64 @@
 {
-  "doesNotProve": ["full_macos_app_manual_session", "manual_layer_panel_interaction"],
-  "e2eIssue": 2310,
-  "issue": 2310,
-  "proofBoundary": "private_raw_tauri_runtime_plus_visual_smoke_not_manual_layer_panel_e2e",
-  "proofStatus": "private_raw_layer_mask_runtime_with_ui_smoke",
+  "doesNotProve": [
+    "full_macos_app_manual_session",
+    "manual_layer_panel_interaction"
+  ],
+  "e2eIssue": 4558,
+  "issue": 4558,
+  "predecessorIssue": 2310,
+  "proofBoundary": "private_raw_tauri_runtime_plus_refined_mask_export_receipt",
+  "proofStatus": "private_raw_refined_mask_preview_export_parity_receipted",
   "privateRawRuntime": {
-    "artifactCount": 6,
+    "artifactCount": 12,
     "fixtureId": "validation.layer-mask-real-raw.alaska-local-adjustment.v1",
-    "metricCount": 5,
+    "metricCount": 14,
     "proves": [
       "private_real_raw_decode",
       "layer_mask_generation",
       "masked_adjustment_changes_pixels",
       "mask_refinement_changes_pixels",
-      "refined_preview_export_parity"
+      "image_evidence_guided_refinement",
+      "hair_detail_chroma_edge_refinement",
+      "refined_preview_export_parity",
+      "luminance_and_color_range_mask_generation",
+      "range_mask_preview_export_parity"
     ],
     "runtimeReportPath": "docs/validation/proofs/layers-masks/layer-mask-real-raw-proof-2026-06-18.json",
     "validationMode": "private_raw_tauri_runtime_proof"
   },
+  "refinedMaskExportParity": {
+    "changedPixelRatio": 0.030468083333333333,
+    "exportArtifactPath": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-refined-export.tiff",
+    "finalExportHash": "sha256:94c17ce837aebca03ae45125269748243ad8334162066d32c3305d8dbe9cdffa",
+    "fixtureId": "validation.layer-mask-real-raw.alaska-local-adjustment.v1",
+    "metricCount": 14,
+    "parityMetric": "previewExportMeanAbsDelta",
+    "parityStatus": "matched",
+    "parityThreshold": 0.015,
+    "parityValue": 0,
+    "receiptId": "layer_mask_export_parity_c4e532b435d8e879",
+    "receiptVersion": 1,
+    "refinedMaskContentHash": "sha256:80dc3423c38dac4ccda8bab971803f31210068470a96b5ec4c39bc8c5da7a545",
+    "refinedPreviewArtifactPath": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-refined-preview.png",
+    "refinedPreviewHash": "sha256:5fe72ba564902f73d44720c191468792c32a2b41e800a8a0c815e9624c7f26e9",
+    "sourceContentHash": "sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b",
+    "sourceGraphRevision": "layer_mask_graph_private_raw_73d7f8bcc83f6569",
+    "sourcePath": "private-fixtures/layers/alaska-layer-mask-v1.arw",
+    "staleReasons": [],
+    "staleState": "current",
+    "trackingIssue": 4558,
+    "unmaskedPreviewHash": "sha256:0be6c87c4864730c35c70b56b4777dc58bcb13d7548636198873002e4cd7733b",
+    "unrefinedPreviewHash": "sha256:2c72fb7ad5b7d4a72e1d6d2a969a710a52fabe961cb01d3e41afbe001d4755e3"
+  },
   "schemaVersion": 1,
+  "staleInvalidation": {
+    "parityStatus": "stale_blocked",
+    "staleReasons": [
+      "source_graph_revision_changed",
+      "mask_alpha_changed"
+    ],
+    "staleState": "stale"
+  },
   "validationCommands": [
     "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root bun run check:layer-mask-real-raw-proof -- --require-assets",
     "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root bun run check:layer-mask-private-raw-ui-smoke",
@@ -30,7 +70,8 @@
       "width": 1440
     },
     "scenario": "layer-mask-private-raw-ui",
-    "screenshotHash": "sha256:523bdbd5bdd6b343d8aeb25421ab8ca11f08f3b5932913a3331e0d648322a381",
+    "screenshotHash": "sha256:655d9f873555c60727008f050bc1c124ccd351217c8895f8cd37865cea02c419",
+    "screenshotSource": "generated_private_raw_visual_smoke",
     "screenshotPath": "artifacts/visual-smoke/layer-mask-private-raw-ui.png",
     "workflowControlsExercised": true
   }

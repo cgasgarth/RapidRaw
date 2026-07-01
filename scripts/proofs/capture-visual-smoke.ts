@@ -17,6 +17,7 @@ import {
   toneColorCommandEnvelopeV1Schema,
 } from '../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { sampleToneColorCommandEnvelopeV1 } from '../../packages/rawengine-schema/src/samplePayloads.ts';
+import { layerMaskExportParityReceiptSchema } from '../../src/utils/layers/layerMaskExportParityReceipt.ts';
 import {
   BRUSH_MASK_COMMAND_COORDINATE_SPACE,
   buildBrushMaskCommandFromParameters,
@@ -55,6 +56,7 @@ import {
   hdrPrivateRawReviewProofSchema,
   hdrReviewWorkspaceProofSchema,
   hdrUiSettingsProofSchema,
+  layerBrushLocalAdjustmentProofSchema,
   layerMaskPrivateRawReviewProofSchema,
   layerStackExportParityProofSchema,
   layerStackWorkflowProofSchema,
@@ -232,15 +234,23 @@ interface PanoramaPrivateRawBrowserProof {
 }
 
 interface LayerMaskPrivateRawBrowserProof {
+  changedPixelRatio: string;
   exportArtifact: string;
+  exportParityReceipt: z.infer<typeof layerMaskExportParityReceiptSchema>;
+  finalExportHash: string;
   fixtureId: string;
   metricCount: string;
+  refinedMaskContentHash: string;
   refinedPreviewArtifact: string;
   refinedPreviewDataUrl: string;
+  refinedPreviewHash: string;
+  sourceGraphRevision: string;
   unmaskedPreviewArtifact: string;
   unmaskedPreviewDataUrl: string;
+  unmaskedPreviewHash: string;
   unrefinedPreviewArtifact: string;
   unrefinedPreviewDataUrl: string;
+  unrefinedPreviewHash: string;
 }
 
 interface NegativeLabPublicExportBrowserProof {
@@ -454,7 +464,9 @@ const strokeLineSchema = z
     brushSize: z.number().positive(),
     feather: z.number().min(0).max(1).optional(),
     flow: z.number().min(0).max(100).optional(),
-    points: z.array(z.object({ x: z.number(), y: z.number() }).strict()).min(2),
+    points: z
+      .array(z.object({ pressure: z.number().min(0).max(1).optional(), x: z.number(), y: z.number() }).strict())
+      .min(2),
     tool: z.enum(['brush', 'eraser']),
   })
   .strict();
@@ -486,6 +498,22 @@ async function writeBrushMaskCanvasProof(page): Promise<void> {
   const paintCommand = buildBrushMaskCommandFromParameters({ lines: [lines[0]] }, context, { dryRun: true });
   const dryRunCommand = buildBrushMaskCommandFromParameters({ lines }, context, { dryRun: true });
   const applyCommand = buildBrushMaskCommandFromParameters({ lines }, context, { dryRun: false });
+  const pressureLines = [
+    {
+      ...lines[0],
+      points:
+        lines[0]?.points.map((point, index) => ({
+          ...point,
+          pressure: index === 0 ? 0.25 : 0.5,
+        })) ?? [],
+    },
+  ];
+  const pressureDryRunCommand = buildBrushMaskCommandFromParameters({ lines: pressureLines }, context, {
+    dryRun: true,
+  });
+  const pressureApplyCommand = buildBrushMaskCommandFromParameters({ lines: pressureLines }, context, {
+    dryRun: false,
+  });
   const renderRequest = {
     baseMask: {
       alpha: new Array<number>(64 * 36).fill(0),
@@ -501,8 +529,17 @@ async function writeBrushMaskCanvasProof(page): Promise<void> {
   const runtime = new BrushMaskCommandRuntime();
   const dryRunResult = layerMaskDryRunResultV1Schema.parse(runtime.dispatch(dryRunCommand, renderRequest));
   const applyResult = layerMaskMutationResultV1Schema.parse(runtime.dispatch(applyCommand, renderRequest));
+  const pressureRender = renderBrushMask({ ...renderRequest, command: pressureDryRunCommand });
+  const pressureRuntime = new BrushMaskCommandRuntime();
+  const pressureDryRunResult = layerMaskDryRunResultV1Schema.parse(
+    pressureRuntime.dispatch(pressureDryRunCommand, renderRequest),
+  );
+  const pressureApplyResult = layerMaskMutationResultV1Schema.parse(
+    pressureRuntime.dispatch(pressureApplyCommand, renderRequest),
+  );
   const paintCoverage = alphaSum(paintRender.alpha);
   const finalCoverage = alphaSum(finalRender.alpha);
+  const pressureCoverage = alphaSum(pressureRender.alpha);
 
   if (lines[0]?.tool !== 'brush' || lines[1]?.tool !== 'eraser') {
     throw new Error(`Expected brush,eraser stroke order; got ${proofDataset.toolOrder}`);
@@ -512,6 +549,12 @@ async function writeBrushMaskCanvasProof(page): Promise<void> {
   }
   if (paintRender.contentHash === finalRender.contentHash) {
     throw new Error('Paint and final brush mask hashes should differ after eraser stroke.');
+  }
+  if (pressureRender.contentHash === paintRender.contentHash || pressureCoverage >= paintCoverage) {
+    throw new Error('Pressure replay should reduce paint coverage and change the mask hash.');
+  }
+  if (pressureDryRunResult.maskArtifacts[0]?.contentHash !== pressureApplyResult.maskArtifacts?.[0]?.contentHash) {
+    throw new Error('Pressure replay dry-run/apply mask hashes must match.');
   }
   if (lines[0]?.brushSize !== Number(proofDataset.refineBrushSize) || lines[0]?.feather !== 0.64) {
     throw new Error('Brush refine controls did not update the live canvas stroke parameters.');
@@ -537,6 +580,12 @@ async function writeBrushMaskCanvasProof(page): Promise<void> {
       paintMaskHash: paintRender.contentHash,
       paintScreenshot: brushMaskCanvasPaintReportPath,
       pointCounts: proofDataset.pointCounts.split(',').map(Number),
+      pressureApplyMaskHash: pressureApplyResult.maskArtifacts?.[0]?.contentHash,
+      pressureCoverage,
+      pressureDryRunMaskHash: pressureDryRunResult.maskArtifacts[0]?.contentHash,
+      pressureMaskHash: pressureRender.contentHash,
+      pressurePointCount: pressureRender.provenance.pressurePointCount,
+      pressureUsed: pressureRender.provenance.pressureUsed,
       refineBrushFeather: Number(proofDataset.refineBrushFeather),
       refineBrushSize: Number(proofDataset.refineBrushSize),
       schemaVersion: 1,
@@ -874,20 +923,40 @@ async function loadPanoramaPrivateRawProof(): Promise<PanoramaPrivateRawBrowserP
 
 async function loadLayerMaskPrivateRawProof(): Promise<LayerMaskPrivateRawBrowserProof> {
   const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT ?? '/tmp/rawengine-private-root';
-  const artifactRoot = `${privateRoot}/private-artifacts/validation/layer-mask-real-raw`;
-  const unmaskedPreviewArtifact = `${artifactRoot}/alaska-layer-mask-v1-unmasked-preview.png`;
-  const unrefinedPreviewArtifact = `${artifactRoot}/alaska-layer-mask-v1-unrefined-preview.png`;
-  const refinedPreviewArtifact = `${artifactRoot}/alaska-layer-mask-v1-refined-preview.png`;
+  const runtimeReport = z
+    .object({
+      exportParityReceipt: layerMaskExportParityReceiptSchema,
+    })
+    .passthrough()
+    .parse(
+      JSON.parse(
+        await readFile('docs/validation/proofs/layers-masks/layer-mask-real-raw-proof-2026-06-18.json', 'utf8'),
+      ),
+    );
+  const { exportParityReceipt } = runtimeReport;
+  const unmaskedPreviewArtifact =
+    'private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-unmasked-preview.png';
+  const unrefinedPreviewArtifact =
+    'private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-unrefined-preview.png';
+  const refinedPreviewArtifact = exportParityReceipt.refinedPreviewArtifactPath;
   return {
-    exportArtifact: `${artifactRoot}/alaska-layer-mask-v1-refined-export.tiff`,
-    fixtureId: 'validation.layer-mask-real-raw.alaska-local-adjustment.v1',
-    metricCount: '5',
+    changedPixelRatio: String(exportParityReceipt.changedPixelRatio),
+    exportArtifact: exportParityReceipt.exportArtifactPath,
+    exportParityReceipt,
+    finalExportHash: exportParityReceipt.finalExportHash,
+    fixtureId: exportParityReceipt.fixtureId,
+    metricCount: String(exportParityReceipt.metricCount),
+    refinedMaskContentHash: exportParityReceipt.refinedMaskContentHash,
     refinedPreviewArtifact,
-    refinedPreviewDataUrl: await readLayerMaskPreviewDataUrl(refinedPreviewArtifact),
+    refinedPreviewDataUrl: await readLayerMaskPreviewDataUrl(resolve(privateRoot, refinedPreviewArtifact)),
+    refinedPreviewHash: exportParityReceipt.refinedPreviewHash,
+    sourceGraphRevision: exportParityReceipt.sourceGraphRevision,
     unmaskedPreviewArtifact,
-    unmaskedPreviewDataUrl: await readLayerMaskPreviewDataUrl(unmaskedPreviewArtifact),
+    unmaskedPreviewDataUrl: await readLayerMaskPreviewDataUrl(resolve(privateRoot, unmaskedPreviewArtifact)),
+    unmaskedPreviewHash: exportParityReceipt.unmaskedPreviewHash,
     unrefinedPreviewArtifact,
-    unrefinedPreviewDataUrl: await readLayerMaskPreviewDataUrl(unrefinedPreviewArtifact),
+    unrefinedPreviewDataUrl: await readLayerMaskPreviewDataUrl(resolve(privateRoot, unrefinedPreviewArtifact)),
+    unrefinedPreviewHash: exportParityReceipt.unrefinedPreviewHash,
   };
 }
 
@@ -1723,10 +1792,14 @@ async function prepareScenario(page, mode) {
     if (
       proof.boxReady !== 'true' ||
       proof.hasRaster !== 'true' ||
+      proof.maskEditable !== 'true' ||
       proof.modelId !== 'sam_vit_b_01ec64' ||
+      proof.objectPromptHash !== 'sha256:object-prompt-visual-smoke-v1' ||
+      proof.overlayOpacityPercent !== '72' ||
       proof.pointCount !== '3' ||
       proof.promptKind !== 'box' ||
-      proof.providerStatus !== 'local_sam_proposal_v1'
+      proof.providerStatus !== 'local_sam_proposal_v1' ||
+      proof.sourceImagePath !== '/private-fixtures/layers/alaska-layer-mask-v1.arw'
     ) {
       throw new Error(`Object prompt visual proof failed: ${JSON.stringify(proof)}`);
     }
@@ -1734,6 +1807,20 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('object-prompt-generate-proposal').waitFor({ timeout: 10_000 });
     await page.getByTestId('object-prompt-replay-receipt').waitFor({ timeout: 10_000 });
     await page.getByTestId('object-prompt-proof-box').waitFor({ timeout: 10_000 });
+    await page.getByTestId('object-prompt-editable-mask-overlay').waitFor({ timeout: 10_000 });
+    const layerReceipt = await page
+      .getByTestId('object-prompt-editable-layer-receipt')
+      .evaluate((element) => ({ ...element.dataset }));
+    if (
+      layerReceipt.alphaHash !== 'sha256:object-prompt-alpha-visual-smoke-v1' ||
+      layerReceipt.commandId !== 'layer_stack_visual_object_prompt' ||
+      layerReceipt.layerId !== 'visual_object_prompt_layer' ||
+      layerReceipt.maskDimensions !== '6000x4000' ||
+      layerReceipt.maskEditable !== 'true' ||
+      layerReceipt.maskId !== 'visual_object_prompt_mask'
+    ) {
+      throw new Error(`Object prompt editable layer receipt failed: ${JSON.stringify(layerReceipt)}`);
+    }
     return;
   }
 
@@ -2270,7 +2357,7 @@ async function prepareScenario(page, mode) {
     }
     const reconstructionPath = proofBefore.reconstructionPath;
     if (reconstructionPath === undefined) throw new Error('SR private RAW modal proof is missing reconstruction path.');
-    await page.getByRole('button', { exact: true, name: 'Preview plan' }).click();
+    await page.getByTestId('sr-preview-plan-button').click();
     const proofAfter = await page
       .getByTestId('sr-private-raw-modal-review-proof')
       .evaluate((element) => ({ ...element.dataset }));
@@ -2319,12 +2406,13 @@ async function prepareScenario(page, mode) {
       const riskCount = await page.getByTestId('sr-support-map-review').locator(`[data-region-risk="${risk}"]`).count();
       if (riskCount < 1) throw new Error(`SR private RAW support-map review missing ${risk} region.`);
     }
-    await page.getByTestId('sr-review-diagnostics').getByText(reconstructionPath, { exact: true }).waitFor({
+    await page.getByTestId('sr-review-diagnostics').getByText(reconstructionPath, { exact: true }).first().waitFor({
       timeout: 10_000,
     });
     await page
       .getByTestId('sr-review-diagnostics')
       .getByText(proofBefore.reconstructionHash, { exact: true })
+      .first()
       .waitFor({ timeout: 10_000 });
     await page
       .getByTestId('sr-review-diagnostics')
@@ -2390,6 +2478,13 @@ async function prepareScenario(page, mode) {
     await page.getByRole('button', { name: 'Compare preview/export' }).click();
     layerStackExportParityProofSchema.parse(
       await page.getByTestId('layer-stack-export-parity-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    return;
+  }
+
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.LayerBrushLocalAdjustment) {
+    layerBrushLocalAdjustmentProofSchema.parse(
+      await page.getByTestId('layer-brush-local-adjustment-proof').evaluate((element) => ({ ...element.dataset })),
     );
     return;
   }

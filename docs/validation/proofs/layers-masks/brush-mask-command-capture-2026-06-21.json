@@ -6,14 +6,22 @@
     "captured points normalize into image-relative command coordinates",
     "paint/erase mode, feather-derived hardness, radius, and flow are command fields",
     "mouse capture omits pressure unless real pen pressure is supplied",
+    "pen capture preserves pressure and changes deterministic replay coverage",
     "dry-run must precede apply"
   ],
   "coordinateSpace": "normalized_image",
   "dryRunMaskHash": "fnv1a32:8389d0e8",
   "issue": 2888,
+  "pressureApplyMaskHash": "fnv1a32:fbbdc7df",
+  "pressureCommandHash": "sha256:249a3137f79834ecb29aed9547972c1b5f81119814dba24293719cead31b173b",
+  "pressureDryRunMaskHash": "fnv1a32:fbbdc7df",
   "renderMaskHash": "fnv1a32:8389d0e8",
   "schemaVersion": 1,
   "strokeCount": 1,
-  "uiMarkers": ["image-canvas-brush-command-capture", "recordBrushMaskCommandCapture", "layerMask.createBrushMask"],
+  "uiMarkers": [
+    "image-canvas-brush-command-capture",
+    "recordBrushMaskCommandCapture",
+    "layerMask.createBrushMask"
+  ],
   "validationMode": "brush_mask_ui_capture_to_typed_command_runtime_proof"
 }

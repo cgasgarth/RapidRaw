@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { agentPreviewEnvelopeSchema } from '../context/agentPreviewEnvelope';
 import {
+  AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX,
+  AGENT_MEDIUM_PREVIEW_QUALITY,
   AGENT_PREVIEW_COMPARE_TOOL_NAME,
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
@@ -498,10 +500,10 @@ export const runAgentIterativeEditLoop = async (
         args: {
           crop: previewRequest?.crop,
           expectedRecipeHash: recipeHash,
-          longEdgePx: previewRequest?.longEdgePx ?? 1024,
+          longEdgePx: previewRequest?.longEdgePx ?? AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX,
           maxPixelCount: previewRequest?.maxPixelCount,
           purpose: previewRequest?.purpose ?? 'refresh',
-          quality: previewRequest?.quality ?? 0.82,
+          quality: previewRequest?.quality ?? AGENT_MEDIUM_PREVIEW_QUALITY,
           requestId: previewRequestId,
           zoom: previewRequest?.zoom,
         },

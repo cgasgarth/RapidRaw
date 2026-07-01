@@ -1,12 +1,15 @@
 import {
   buildRawEngineLocalAppServerToolRegistryQuery,
   createRawEngineLocalAppServerBridge,
+  dispatchRawEngineLocalAppServerComputationalMergeDerivedSourceOpen,
   RawEngineLocalAppServerCommandType,
+  rawEngineLocalAppServerComputationalMergeDerivedSourceOpenRequestV1Schema,
 } from '../../packages/rawengine-schema/src/localAppServerBridge';
 import {
   type RawEngineToolRegistryV1,
   rawEngineAppServerToolCallValidationV1Schema,
   rawEngineToolRegistryV1Schema,
+  toneColorCommandEnvelopeV1Schema,
 } from '../../packages/rawengine-schema/src/rawEngineSchemas';
 import { rawEngineDefaultToolRegistryV1 } from '../../packages/rawengine-schema/src/toolRegistry';
 import {
@@ -65,10 +68,15 @@ import {
 } from '../schemas/agent/agentRuntimeSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import {
+  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_INPUT_SCHEMA_NAME,
+  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_OUTPUT_SCHEMA_NAME,
+  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME,
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_INPUT_SCHEMA_NAME,
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_OUTPUT_SCHEMA_NAME,
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
+  agentCurrentImagePreviewLoopApplyReviewRequestSchema,
   agentCurrentImagePreviewLoopRequestSchema,
+  applyAgentCurrentImagePreviewLoopReviewedEdit,
   runAgentCurrentImagePreviewLoop,
 } from './agent/context/agentCurrentImagePreviewLoop';
 import { buildAgentImageContextSnapshot } from './agent/context/agentImageContextSnapshot';
@@ -123,6 +131,10 @@ import {
   buildAgentExportProof,
   buildAgentFinalExport,
 } from './agent/safety/agentExportProofTool';
+import {
+  applyBasicToneCommandToLiveEditor,
+  dryRunBasicToneCommandInLiveEditor,
+} from './agent/session/agentLiveBasicTone';
 import {
   AGENT_HISTORY_ROLLBACK_INPUT_SCHEMA_NAME,
   AGENT_HISTORY_ROLLBACK_OUTPUT_SCHEMA_NAME,
@@ -212,7 +224,7 @@ import {
   planNegativeLabAgentStockFamilyReadOnly,
 } from './negative-lab/app-server/negativeLabAgentReadOnlyAppServerTools';
 import { NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST } from './negative-lab/app-server/negativeLabAppServerRoutes';
-import { ToneColorAppServerRouteStatus } from './toneColorAppServerRouteIds';
+import { ToneColorAppServerRouteStatus, ToneColorAppServerToolName } from './toneColorAppServerRouteIds';
 import { TONE_COLOR_APP_SERVER_ROUTES } from './toneColorAppServerRoutes';
 
 export const RAW_ENGINE_APP_SERVER_HOST_MANIFEST = rawEngineAppServerHostManifestSchema.parse({
@@ -644,6 +656,15 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       toolNames: [AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME],
     }),
     buildRouteCatalogEntry({
+      commandName: AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.ApplyDryRunPlan],
+      outputSchemaNames: [AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-selected-image-preview-loop'],
+      toolNames: [AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
       commandName: AGENT_COLOR_APPLY_TOOL_NAME,
       family: 'agent',
       inputSchemaNames: [AGENT_COLOR_APPLY_INPUT_SCHEMA_NAME],
@@ -871,7 +892,10 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
         inputSchemaNames: routes.map((route) => route.inputSchemaName),
         modes: routes.map((route) => route.executionMode),
         outputSchemaNames: routes.map((route) => route.outputSchemaName),
-        runtimeCheckScripts: routes.map((route) => route.runtimeCheckScript),
+        runtimeCheckScripts: [
+          ...routes.map((route) => route.runtimeCheckScript),
+          'check:computational-merge-route-e2e',
+        ],
         toolNames: routes.map((route) => route.toolName),
       }),
     );
@@ -972,10 +996,24 @@ export const buildRawEngineAppServerRouteCatalogResponse = ({
   });
 
 const getCommandType = (command: unknown): string | undefined => {
-  if (typeof command !== 'object' || command === null || !('commandType' in command)) return undefined;
-  const commandType = command.commandType;
+  if (typeof command !== 'object' || command === null) return undefined;
+  const record = command as Record<string, unknown>;
+  const nestedCommand = record['command'];
+  const commandType =
+    typeof record['commandType'] === 'string'
+      ? record['commandType']
+      : typeof nestedCommand === 'object' && nestedCommand !== null
+        ? (nestedCommand as Record<string, unknown>)['commandType']
+        : undefined;
   return typeof commandType === 'string' && commandType.trim().length > 0 ? commandType : undefined;
 };
+
+const COMPUTATIONAL_MERGE_COMMAND_TYPE_TO_FAMILY = new Map<string, string>([
+  ['computationalMerge.createFocusStack', 'focus_stack'],
+  ['computationalMerge.createHdr', 'hdr'],
+  ['computationalMerge.createPanorama', 'panorama'],
+  ['computationalMerge.createSuperResolution', 'super_resolution'],
+]);
 
 const localBridgeToolMatchesCommand = ({
   commandType,
@@ -1004,6 +1042,12 @@ const localBridgeToolMatchesCommand = ({
   if (runtimeToolName === 'tonecolor.apply_command') {
     return commandType?.startsWith('toneColor.') === true && dryRun === false;
   }
+  if (runtimeToolName === 'layermask.dry_run_command') {
+    return commandType?.startsWith('layerMask.') === true && dryRun === true;
+  }
+  if (runtimeToolName === 'layermask.apply_command') {
+    return commandType?.startsWith('layerMask.') === true && dryRun === false;
+  }
   if (runtimeToolName === 'ai.mask.dry_run_subject')
     return commandType === 'ai.mask.generateSubject' && dryRun === true;
   if (runtimeToolName === 'ai.mask.apply_subject') return commandType === 'ai.mask.applySubject' && dryRun === false;
@@ -1013,12 +1057,27 @@ const localBridgeToolMatchesCommand = ({
   if (runtimeToolName === 'ai.enhancement.apply_command') {
     return commandType === 'ai.enhancement.apply' && dryRun === false;
   }
+  if (runtimeToolName.startsWith('computationalmerge.')) {
+    const family = commandType === undefined ? undefined : COMPUTATIONAL_MERGE_COMMAND_TYPE_TO_FAMILY.get(commandType);
+    if (family === undefined || !runtimeToolName.startsWith(`computationalmerge.${family}.`)) return false;
+    if (runtimeToolName.endsWith('.dry_run_command')) return dryRun === true;
+    if (runtimeToolName.endsWith('.apply_command')) return dryRun === false;
+    if (runtimeToolName.endsWith('.open_derived_source')) return dryRun === false;
+  }
   return false;
 };
 
 const getDryRunFlag = (command: unknown): boolean | undefined => {
-  if (typeof command !== 'object' || command === null || !('dryRun' in command)) return undefined;
-  return typeof command.dryRun === 'boolean' ? command.dryRun : undefined;
+  if (typeof command !== 'object' || command === null) return undefined;
+  const record = command as Record<string, unknown>;
+  const nestedCommand = record['command'];
+  const dryRun =
+    typeof record['dryRun'] === 'boolean'
+      ? record['dryRun']
+      : typeof nestedCommand === 'object' && nestedCommand !== null
+        ? (nestedCommand as Record<string, unknown>)['dryRun']
+        : undefined;
+  return typeof dryRun === 'boolean' ? dryRun : undefined;
 };
 
 const getApprovalRequirement = (command: unknown): unknown => {
@@ -1115,6 +1174,7 @@ const rejectToolDispatch = ({
 const APPROVED_AGENT_APP_SERVER_TOOL_NAMES = new Set<string>([
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
   AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
+  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME,
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
   AGENT_COLOR_APPLY_TOOL_NAME,
   AGENT_CURVE_LEVELS_APPLY_TOOL_NAME,
@@ -1135,6 +1195,8 @@ const APPROVED_AGENT_APP_SERVER_TOOL_NAMES = new Set<string>([
   NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME,
   ...NEGATIVE_LAB_AGENT_READ_ONLY_TOOL_NAMES,
   NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME,
+  ToneColorAppServerToolName.ApplyCommand,
+  ToneColorAppServerToolName.DryRunCommand,
 ]);
 
 const hasAgentSessionIntent = ({
@@ -1143,14 +1205,25 @@ const hasAgentSessionIntent = ({
 }: RawEngineAppServerToolDispatchRequest): boolean => {
   if (runtimeToolName.startsWith('rawengine.agent.')) return true;
   if (typeof args !== 'object' || args === null) return false;
+  const actor =
+    'actor' in args && typeof args.actor === 'object' && args.actor !== null
+      ? (args.actor as Record<string, unknown>)
+      : null;
   return (
     ('sessionId' in args && typeof args.sessionId === 'string' && args.sessionId.trim().length > 0) ||
-    ('operationId' in args && typeof args.operationId === 'string' && args.operationId.trim().length > 0)
+    ('operationId' in args && typeof args.operationId === 'string' && args.operationId.trim().length > 0) ||
+    (actor !== null &&
+      actor['id'] === 'rapidraw-ui' &&
+      actor['kind'] === 'ui' &&
+      typeof actor['sessionId'] === 'string' &&
+      actor['sessionId'].trim().length > 0)
   );
 };
 
 export const isApprovedAgentAppServerToolName = (runtimeToolName: string): boolean =>
   APPROVED_AGENT_APP_SERVER_TOOL_NAMES.has(runtimeToolName);
+
+const rawEngineAppServerLocalBridge = createRawEngineLocalAppServerBridge();
 
 const validateDraftSessionForDispatch = (request: RawEngineAppServerToolDispatchRequest): string | null => {
   const draftSession = request.draftSession;
@@ -1181,6 +1254,20 @@ const dispatchAgentAppServerTool = async (
   let result: unknown;
 
   switch (request.runtimeToolName) {
+    case ToneColorAppServerToolName.DryRunCommand: {
+      if (!hasAgentSessionIntent(request)) return null;
+      const command = toneColorCommandEnvelopeV1Schema.parse(request.arguments);
+      if (command.commandType !== 'toneColor.setBasicTone') return null;
+      result = await dryRunBasicToneCommandInLiveEditor(command);
+      break;
+    }
+    case ToneColorAppServerToolName.ApplyCommand: {
+      if (!hasAgentSessionIntent(request)) return null;
+      const command = toneColorCommandEnvelopeV1Schema.parse(request.arguments);
+      if (command.commandType !== 'toneColor.setBasicTone') return null;
+      result = await applyBasicToneCommandToLiveEditor(command);
+      break;
+    }
     case AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME:
       result = await dryRunAgentGlobalAdjustments(agentAdjustmentsDryRunRequestSchema.parse(request.arguments));
       break;
@@ -1192,14 +1279,19 @@ const dispatchAgentAppServerTool = async (
         agentCurrentImagePreviewLoopRequestSchema.parse(request.arguments),
       );
       break;
+    case AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME:
+      result = await applyAgentCurrentImagePreviewLoopReviewedEdit(
+        agentCurrentImagePreviewLoopApplyReviewRequestSchema.parse(request.arguments),
+      );
+      break;
     case AGENT_COLOR_APPLY_TOOL_NAME:
-      result = applyAgentColor(agentColorApplyRequestSchema.parse(request.arguments));
+      result = await applyAgentColor(agentColorApplyRequestSchema.parse(request.arguments));
       break;
     case AGENT_CURVE_LEVELS_APPLY_TOOL_NAME:
       result = applyAgentCurveLevels(agentCurveLevelsApplyRequestSchema.parse(request.arguments));
       break;
     case AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME:
-      result = applyAgentDetailEffects(agentDetailEffectsApplyRequestSchema.parse(request.arguments));
+      result = await applyAgentDetailEffects(agentDetailEffectsApplyRequestSchema.parse(request.arguments));
       break;
     case AGENT_EXPORT_PROOF_TOOL_NAME:
       result = buildAgentExportProof(agentExportProofRequestSchema.parse(request.arguments));
@@ -1297,7 +1389,7 @@ export const buildRawEngineAppServerToolDispatchResponse = async (
     });
   }
 
-  const bridge = createRawEngineLocalAppServerBridge();
+  const bridge = rawEngineAppServerLocalBridge;
   const registryResult = await bridge.dispatch(buildRawEngineLocalAppServerToolRegistryQuery(request.requestId));
   const activeRegistry = registryResult.ok
     ? mergeRawEngineToolRegistries(
@@ -1369,6 +1461,35 @@ export const buildRawEngineAppServerToolDispatchResponse = async (
       status: RawEngineAppServerResponseStatus.Ok,
       transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
     });
+  }
+
+  if (request.runtimeToolName.endsWith('.open_derived_source')) {
+    try {
+      const result = dispatchRawEngineLocalAppServerComputationalMergeDerivedSourceOpen(
+        rawEngineLocalAppServerComputationalMergeDerivedSourceOpenRequestV1Schema.parse(request.arguments),
+      );
+      return rawEngineAppServerToolDispatchResponseSchema.parse({
+        commandType,
+        dispatchStatus: 'completed',
+        requestId: request.requestId,
+        result,
+        runtime: AgentRuntimeId.AppServer,
+        runtimeToolName: request.runtimeToolName,
+        status: RawEngineAppServerResponseStatus.Ok,
+        transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
+      });
+    } catch (error) {
+      return rawEngineAppServerToolDispatchResponseSchema.parse({
+        commandType,
+        dispatchStatus: 'rejected',
+        message: error instanceof Error ? error.message : 'Computational derived-source open failed.',
+        requestId: request.requestId,
+        runtime: AgentRuntimeId.AppServer,
+        runtimeToolName: request.runtimeToolName,
+        status: RawEngineAppServerResponseStatus.Ok,
+        transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
+      });
+    }
   }
 
   const result = await bridge.dispatch(request.arguments, {

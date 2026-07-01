@@ -1,0 +1,938 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RapidRAW Local Feature Review</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7f8;
+        --ink: #17202a;
+        --muted: #5f6b7a;
+        --panel: #ffffff;
+        --line: #d8dee6;
+        --green: #11695f;
+        --green-soft: #dff3ef;
+        --blue: #2457a6;
+        --blue-soft: #dfeafe;
+        --amber: #92540b;
+        --amber-soft: #fff1d6;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        line-height: 1.55;
+      }
+
+      main {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 32px 24px 56px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 36px;
+        line-height: 1.12;
+      }
+
+      h2 {
+        margin-bottom: 12px;
+        font-size: 22px;
+      }
+
+      h3 {
+        font-size: 16px;
+      }
+
+      a {
+        color: var(--green);
+      }
+
+      header,
+      section {
+        margin-bottom: 22px;
+      }
+
+      header {
+        display: grid;
+        gap: 12px;
+      }
+
+      section,
+      .tile,
+      .artifact {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      section {
+        padding: 18px;
+      }
+
+      .summary {
+        max-width: 860px;
+        color: var(--muted);
+        font-size: 17px;
+      }
+
+      .pills,
+      .tiles,
+      .artifacts {
+        display: grid;
+        gap: 12px;
+      }
+
+      .pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .pill {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--panel);
+        padding: 5px 10px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .tiles {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .tile,
+      .artifact {
+        padding: 14px;
+      }
+
+      .tile span {
+        display: block;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .tile strong {
+        display: block;
+        overflow-wrap: anywhere;
+        font-size: 22px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 12px 8px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      td p {
+        margin-top: 6px;
+        color: var(--muted);
+      }
+
+      details {
+        margin-bottom: 8px;
+      }
+
+      summary {
+        cursor: pointer;
+      }
+
+      summary span,
+      .muted {
+        color: var(--muted);
+      }
+
+      .proof-detail {
+        display: grid;
+        gap: 8px;
+        margin: 8px 0 12px;
+        padding: 10px 12px;
+        border-left: 3px solid var(--line);
+      }
+
+      .status {
+        display: inline-flex;
+        border-radius: 999px;
+        padding: 4px 8px;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .runtime-proof {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .ui-proof {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .private-runtime-contract {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .artifacts {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .artifact {
+        display: grid;
+        gap: 10px;
+      }
+
+      .artifact img {
+        width: 100%;
+        max-height: 300px;
+        object-fit: contain;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #f8fafc;
+      }
+
+      code {
+        border-radius: 4px;
+        background: #eef2f6;
+        padding: 1px 5px;
+        overflow-wrap: anywhere;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      @media (max-width: 860px) {
+        .tiles,
+        .artifacts {
+          grid-template-columns: 1fr;
+        }
+
+        h1 {
+          font-size: 30px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="pills">
+          <span class="pill">Review date: 2026-07-01</span>
+          <span class="pill">Issue: #4566</span>
+          <span class="pill">Local HTML artifact</span>
+          <span class="pill">Private images excluded</span>
+        </div>
+        <h1>RapidRAW Local Feature Review</h1>
+        <p class="summary">
+          This page is a bounded human review artifact for recent/current app features. It links known proof files,
+          committed visual artifacts, validation commands, app build metadata, and explicit design decisions without
+          expanding into a full repository inventory.
+        </p>
+      </header>
+
+      <section>
+        <h2>Current App Build Metadata</h2>
+        <div class="tiles">
+          <div class="tile">
+            <span>Package manager</span>
+            <strong>bun@1.3.13</strong>
+          </div>
+          <div class="tile">
+            <span>Build command</span>
+            <strong>bun scripts/ci/run-compact-command.ts --label build -- vite build</strong>
+          </div>
+          <div class="tile">
+            <span>Tauri version</span>
+            <strong>1.5.8</strong>
+          </div>
+          <div class="tile">
+            <span>Tauri identifier</span>
+            <strong>io.github.CyberTimon.RapidRAW</strong>
+          </div>
+          <div class="tile">
+            <span>Frontend dist</span>
+            <strong>../dist</strong>
+          </div>
+          <div class="tile">
+            <span>Bundle category</span>
+            <strong>Photography</strong>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Review Bounds</h2>
+        <div class="tiles">
+          <div class="tile">
+            <span>Reviewed feature areas</span>
+            <strong>6</strong>
+          </div>
+          <div class="tile">
+            <span>Bounded proof files</span>
+            <strong>18</strong>
+          </div>
+          <div class="tile">
+            <span>Committed visual artifacts</span>
+            <strong>4</strong>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Feature Evidence</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>Status</th>
+              <th>Review Decision</th>
+              <th>Proofs And Validation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <strong>Selected-image agent preview loop</strong>
+                <p>
+                  The public proof records the acceptance criteria and exact private validation command while
+                  withholding Alaska RAW pixels, hashes, and per-file metadata.
+                </p>
+              </td>
+              <td><span class="status private-runtime-contract">Private runtime contract</span></td>
+              <td>
+                Review the agent flow as a selected-image private RAW contract: dry-run approval, mutating apply turns,
+                preview envelopes, rollback, and no private pixel publication.
+              </td>
+              <td>
+                <details>
+                  <summary>
+                    <a href="../proofs/agent/agent-selected-image-preview-loop-private-raw-2026-06-30.json"
+                      >docs/validation/proofs/agent/agent-selected-image-preview-loop-private-raw-2026-06-30.json</a
+                    >
+                    <span
+                      >mode: agent_selected_image_preview_loop_private_raw | status:
+                      public_contract_private_runtime_required | schema: 1</span
+                    >
+                  </summary>
+                  <div class="proof-detail">
+                    <strong>Validation</strong>
+                    <ul>
+                      <li>
+                        <code
+                          >RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-agent-preview-loop-proof
+                          RAWENGINE_PRIVATE_RAW_SOURCE=&quot;/Users/cgas/Pictures/Capture One/Alaska&quot; bun run
+                          check:agent-selected-image-preview-loop-private-raw -- --require-assets</code
+                        >
+                      </li>
+                    </ul>
+                    <strong>Caveats</strong>
+                    <ul>
+                      <li>Does not commit or publish private Alaska image pixels, RAW hashes, or per-file metadata.</li>
+                      <li>
+                        Does not prove a separate #4149 outer selected-image preview-loop command because this branch
+                        only exposes selected-image state and approved inner agent dispatch tools.
+                      </li>
+                      <li>Does not prove Capture One or Lightroom quality equivalence.</li>
+                    </ul>
+                    <strong>Artifacts</strong>
+                    <span class="muted">No artifact path list in proof JSON.</span>
+                  </div>
+                </details>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <strong>Expert agent handoff</strong>
+                <p>
+                  Committed HTML and JSON proof artifacts show the expert edit workflow and link it to replay/audit
+                  evidence.
+                </p>
+              </td>
+              <td><span class="status runtime-proof">Runtime proof</span></td>
+              <td>
+                Keep the review focused on approved dry-run/apply handoff, audit rows, rollback targets, and
+                before/after proof data instead of a broad agent capability matrix.
+              </td>
+              <td>
+                <details>
+                  <summary>
+                    <a href="../proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.json"
+                      >docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.json</a
+                    >
+                    <span
+                      >mode: agent_expert_edit_demo_workflow | status: runtime_apply_demo | issue: #3022 | schema:
+                      n/a</span
+                    >
+                  </summary>
+                  <div class="proof-detail">
+                    <strong>Validation</strong>
+                    <span class="muted">No validation command recorded in this proof.</span>
+                    <strong>Caveats</strong>
+                    <span class="muted">No caveats recorded.</span>
+                    <strong>Artifacts</strong>
+                    <span class="muted">No artifact path list in proof JSON.</span>
+                  </div>
+                </details>
+                <details>
+                  <summary>
+                    <a href="../proofs/agent/agent-app-server-raw-edit-proof-2026-06-20.json"
+                      >docs/validation/proofs/agent/agent-app-server-raw-edit-proof-2026-06-20.json</a
+                    >
+                    <span
+                      >mode: agent_chat_raw_app_server_bridge_apply_proof | status: runtime_apply_partial | issue: #2315
+                      | schema: 1</span
+                    >
+                  </summary>
+                  <div class="proof-detail">
+                    <strong>Validation</strong>
+                    <span class="muted">No validation command recorded in this proof.</span>
+                    <strong>Caveats</strong>
+                    <span class="muted">No caveats recorded.</span>
+                    <strong>Artifacts</strong>
+                    <span class="muted">No artifact path list in proof JSON.</span>
+                  </div>
+                </details>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <strong>Negative Lab workspace</strong>
+                <p>
+                  The linked SVG renders a committed contact-sheet proof, and the live-preview JSON records a typed
+                  command boundary with changed preview hashes.
+                </p>
+              </td>
+              <td><span class="status ui-proof">UI proof</span></td>
+              <td>
+                Use deterministic public QC/contact-sheet artifacts and command proof rows for review; do not require
+                private scans to open this page.
+              </td>
+              <td>
+                <details>
+                  <summary>
+                    <a href="../proofs/negative-lab/negative-lab-live-preview-sample-2026-06-21.json"
+                      >docs/validation/proofs/negative-lab/negative-lab-live-preview-sample-2026-06-21.json</a
+                    >
+                    <span>issue: #2889 | schema: 1</span>
+                  </summary>
+                  <div class="proof-detail">
+                    <strong>Validation</strong>
+                    <span class="muted">No validation command recorded in this proof.</span>
+                    <strong>Caveats</strong>
+                    <span class="muted">No caveats recorded.</span>
+                    <strong>Artifacts</strong>
+                    <span class="muted">No artifact path list in proof JSON.</span>
+                  </div>
+                </details>
+                <details>
+                  <summary>
+                    <a href="../proofs/negative-lab/negative-lab-public-export-ui-proof-2026-06-20.json"
+                      >docs/validation/proofs/negative-lab/negative-lab-public-export-ui-proof-2026-06-20.json</a
+                    >
+                    <span>status: public_scan_positive_export_ui_smoke | issue: #2311 | schema: 1</span>
+                  </summary>
+                  <div class="proof-detail">
+                    <strong>Validation</strong>
+                    <ul>
+                      <li><code>bun run check:negative-lab-public-export-review-smoke</code></li>
+                      <li><code>bun run check:negative-lab-public-export-ui-proof</code></li>
+                    </ul>
+                    <strong>Caveats</strong>
+                    <ul>
+                      <li>camera_raw_decode_path</li>
+                      <li>capture_one_class_quality</li>
+                      <li>commercial_converter_parity</li>
+                    </ul>
+                    <strong>Artifacts</strong>
+                    <span class="muted">No artifact path list in proof JSON.</span>
+                  </div>
+                </details>
+                <details>
+                  <summary>
+                    <a href="../proofs/negative-lab/negative-lab-real-raw-private-proof-2026-06-22.json"
+                      >docs/validation/proofs/negative-lab/negative-lab-real-raw-private-proof-2026-06-22.json</a
+                    >
+                    <span
+                      >mode: local_alaska_raw_negative_lab_runtime | status:
+                      private_raw_negative_lab_positive_export_rendered | issue: #4527 | schema: 1</span
+                    >
+                  </summary>
+                  <div class="proof-detail">
+                    <strong>Validation</strong>
+                    <ul>
+                      <li>
+                        <code
+                          >RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-negative-lab-alaska-proof
+                          RAWENGINE_PRIVATE_RAW_SOURCE=&quot;/Users/cgas/Pictures/Capture One/Alaska&quot; bun run
+                          run:negative-lab-real-raw-private-proof -- --require-assets</code
+                        >
+                      </li>
+                      <li>
+                        <code
+                          >RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-negative-lab-alaska-proof bun run
+                          run:negative-lab-real-raw-private-proof -- --require-assets</code
+                        >
+                      </li>
+                    </ul>
+                    <strong>Caveats</strong>
+                    <ul>
+                      <li>capture_one_class_quality</li>
+                      <li>commercial_converter_parity</li>
+                      <li>film_stock_emulation_accuracy</li>
+                    </ul>
+                    <strong>Artifacts</strong>
+                    <span class="muted">No artifact path list in proof JSON.</span>
+                  </div>
+                </details>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <strong>Color and gamut mapping</strong>
+                <p>
+                  The gamut-mapping proof records perceptual-vs-relative comparison metrics, caveats, validation
+                  commands, and a private heatmap path flagged as not repo-allowed.
+                </p>
+              </td>
+              <td><span class="status private-runtime-contract">Private runtime contract</span></td>
+              <td>
+                Summarize the public comparison metrics and private artifact boundaries without committing heatmaps or
+                RAW-derived output images.
+              </td>
+              <td>
+                <details>
+                  <summary>
+                    <a href="../proofs/color/gamut-mapping-real-raw-comparison-2026-06-26.json"
+                      >docs/validation/proofs/color/gamut-mapping-real-raw-comparison-2026-06-26.json</a
+                    >
+                    <span
+                      >mode: local_alaska_raw_srgb_perceptual_vs_relative_comparison | issue: #3238 | schema: 1</span
+                    >
+                  </summary>
+                  <div class="proof-detail">
+                    <strong>Validation</strong>
+                    <ul>
+                      <li>
+                        <code
+                          >RAWENGINE_PRIVATE_RAW_SOURCE=&quot;/Users/cgas/Pictures/Capture One/Alaska&quot; bun
+                          scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request
+                          fixtures/validation/raw-open-edit-export/raw-open-edit-export-srgb-perceptual-proof-request.json
+                          --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output
+                          /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-run-reports.json
+                          --require-assets</code
+                        >
+                      </li>
+                      <li>
+                        <code
+                          >RAWENGINE_PRIVATE_RAW_SOURCE=&quot;/Users/cgas/Pictures/Capture One/Alaska&quot; bun
+                          scripts/private-raw/proofs/raw-workflow/run-raw-color-management-private-proof.ts --request
+                          fixtures/validation/raw-open-edit-export/raw-open-edit-export-srgb-relative-proof-request.json
+                          --root /tmp/rawengine-gamut-mapping-v4-real-raw-proof --output
+                          /tmp/rawengine-gamut-mapping-v4-real-raw-proof/raw-open-edit-export-relative-run-reports.json
+                          --require-assets</code
+                        >
+                      </li>
+                    </ul>
+                    <strong>Caveats</strong>
+                    <ul>
+                      <li>DeltaE00 is a pairwise guardrail, not a final image-quality score.</li>
+                      <li>
+                        The comparison uses soft-proof RGB8 artifacts because the runtime report proves soft proof and
+                        TIFF export parity.
+                      </li>
+                      <li>
+                        perceptualDeltaE00VsRelativeClip compares against relative colorimetric clipping, not a
+                        ground-truth visual target.
+                      </li>
+                    </ul>
+                    <strong>Artifacts</strong>
+                    <ul>
+                      <li>
+                        deltaHeatmap: private-artifacts/validation/open-edit-export/gamut-mapping-delta-heatmap.png
+                        (publicRepoAllowed: false)
+                      </li>
+                    </ul>
+                  </div>
+                </details>
+                <details>
+                  <summary>
+                    <a href="../proofs/color/colorchecker-render-gate-2026-06-20.json"
+                      >docs/validation/proofs/color/colorchecker-render-gate-2026-06-20.json</a
+                    >
+                    <span>mode: colorchecker_synthetic_deltae_render_gate | issue: #2328 | schema: 1</span>
+                  </summary>
+                  <div class="proof-detail">
+                    <strong>Validation</strong>
+                    <span class="muted">No validation command recorded in this proof.</span>
+                    <strong>Caveats</strong>
+                    <span class="muted">No caveats recorded.</span>
+                    <strong>Artifacts</strong>
+                    <span class="muted">No artifact path list in proof JSON.</span>
+                  </div>
+                </details>
+                <details>
+                  <summary>
+                    <a href="../proofs/color/camera-profile-input-transform-proof-2026-06-18.json"
+                      >docs/validation/proofs/color/camera-profile-input-transform-proof-2026-06-18.json</a
+                    >
+                    <span>mode: headless_camera_profile_matrix_transform | issue: #1261 | schema: 1</span>
+                  </summary>
+                  <div class="proof-detail">
+                    <strong>Validation</strong>
+                    <span class="muted">No validation command recorded in this proof.</span>
+                    <strong>Caveats</strong>
+                    <span class="muted">No caveats recorded.</span>
+                    <strong>Artifacts</strong>
+                    <span class="muted">No artifact path list in proof JSON.</span>
+                  </div>
+                </details>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <strong>Layers and masks</strong>
+                <p>
+                  The proof set covers stack UI, brush mask canvas output, visibility/opacity behavior, gradient apply
+                  slices, and private RAW mask metrics.
+                </p>
+              </td>
+              <td><span class="status runtime-proof">Runtime proof</span></td>
+              <td>
+                Review visible layer/mask behavior through bounded UI/runtime proofs: stack operations,
+                visibility/opacity, brush capture, and real RAW mask summaries.
+              </td>
+              <td>
+                <details>
+                  <summary>
+                    <a href="../proofs/layers-masks/layer-stack-ui-proof-2026-06-20.json"
+                      >docs/validation/proofs/layers-masks/layer-stack-ui-proof-2026-06-20.json</a
+                    >
+                    <span>issue: #2310 | schema: 1</span>
+                  </summary>
+                  <div class="proof-detail">
+                    <strong>Validation</strong>
+                    <ul>
+                      <li><code>bun run check:layer-stack-commands</code></li>
+                      <li><code>bun run check:layer-preview-export-parity</code></li>
+                    </ul>
+                    <strong>Caveats</strong>
+                    <ul>
+                      <li>full_macos_app_manual_session</li>
+                      <li>private_raw_source_decode</li>
+                      <li>real_raw_export_acceptance</li>
+                    </ul>
+                    <strong>Artifacts</strong>
+                    <span class="muted">No artifact path list in proof JSON.</span>
+                  </div>
+                </details>
+                <details>
+                  <summary>
+                    <a href="../proofs/layers-masks/layer-visibility-opacity-proof-2026-06-21.json"
+                      >docs/validation/proofs/layers-masks/layer-visibility-opacity-proof-2026-06-21.json</a
+                    >
+                    <span>issue: #2876 | schema: 1</span>
+                  </summary>
+                  <div class="proof-detail">
+                    <strong>Validation</strong>
+                    <ul>
+                      <li><code>bun run check:layer-visibility-opacity-proof</code></li>
+                      <li><code>bun run check:layer-opacity-order-runtime</code></li>
+                    </ul>
+                    <strong>Caveats</strong>
+                    <ul>
+                      <li>full_macos_app_manual_session</li>
+                      <li>private_raw_decode</li>
+                      <li>group_opacity_rendering</li>
+                    </ul>
+                    <strong>Artifacts</strong>
+                    <span class="muted">No artifact path list in proof JSON.</span>
+                  </div>
+                </details>
+                <details>
+                  <summary>
+                    <a href="../proofs/layers-masks/brush-mask-canvas-ui-proof-2026-06-22.json"
+                      >docs/validation/proofs/layers-masks/brush-mask-canvas-ui-proof-2026-06-22.json</a
+                    >
+                    <span>mode: brush_mask_canvas_ui_drag_to_runtime_output_proof | issue: #2996 | schema: 1</span>
+                  </summary>
+                  <div class="proof-detail">
+                    <strong>Validation</strong>
+                    <span class="muted">No validation command recorded in this proof.</span>
+                    <strong>Caveats</strong>
+                    <span class="muted">No caveats recorded.</span>
+                    <strong>Artifacts</strong>
+                    <span class="muted">No artifact path list in proof JSON.</span>
+                  </div>
+                </details>
+                <details>
+                  <summary>
+                    <a href="../proofs/layers-masks/whole-person-mask-runtime-proof-2026-06-27.json"
+                      >docs/validation/proofs/layers-masks/whole-person-mask-runtime-proof-2026-06-27.json</a
+                    >
+                    <span
+                      >mode: private_raster_macos_vision_whole_person_mask_runtime_proof | issue: #3247 | schema:
+                      n/a</span
+                    >
+                  </summary>
+                  <div class="proof-detail">
+                    <strong>Validation</strong>
+                    <span class="muted">No validation command recorded in this proof.</span>
+                    <strong>Caveats</strong>
+                    <span class="muted">No caveats recorded.</span>
+                    <strong>Artifacts</strong>
+                    <span class="muted">No artifact path list in proof JSON.</span>
+                  </div>
+                </details>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <strong>Computational workflows</strong>
+                <p>
+                  The selected proofs cover synthetic output artifacts, app-server/runtime handoff, private RAW
+                  contracts, and sidecar provenance where available.
+                </p>
+              </td>
+              <td><span class="status runtime-proof">Runtime proof</span></td>
+              <td>
+                Keep HDR, panorama, focus stack, and super-resolution as separate proof links while reviewing them
+                together as current app merge workflows.
+              </td>
+              <td>
+                <details>
+                  <summary>
+                    <a href="../proofs/hdr/hdr-synthetic-output-artifact-proof-2026-06-20.json"
+                      >docs/validation/proofs/hdr/hdr-synthetic-output-artifact-proof-2026-06-20.json</a
+                    >
+                    <span>issue: #2312 | schema: 1</span>
+                  </summary>
+                  <div class="proof-detail">
+                    <strong>Validation</strong>
+                    <span class="muted">No validation command recorded in this proof.</span>
+                    <strong>Caveats</strong>
+                    <ul>
+                      <li>app_ui_e2e</li>
+                      <li>deghost_visual_quality</li>
+                      <li>export_tiff_pipeline</li>
+                    </ul>
+                    <strong>Artifacts</strong>
+                    <ul>
+                      <li>
+                        mergedPreview: artifacts/validation/hdr-synthetic-output-artifact/merged-preview.pgm
+                        (publicRepoAllowed: false)
+                      </li>
+                    </ul>
+                  </div>
+                </details>
+                <details>
+                  <summary>
+                    <a href="../proofs/panorama/panorama-real-raw-private-proof-2026-06-20.json"
+                      >docs/validation/proofs/panorama/panorama-real-raw-private-proof-2026-06-20.json</a
+                    >
+                    <span>status: runtime_apply_capable | schema: n/a</span>
+                  </summary>
+                  <div class="proof-detail">
+                    <strong>Validation</strong>
+                    <ul>
+                      <li>
+                        <code
+                          >RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-panorama-alaska-proof
+                          RAWENGINE_PRIVATE_RAW_SOURCE=&quot;/Users/cgas/Pictures/Capture One/Alaska&quot; bun run
+                          prepare:panorama-real-raw-private-root -- --require-assets</code
+                        >
+                      </li>
+                      <li>
+                        <code
+                          >RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-panorama-alaska-proof bun run
+                          run:panorama-real-raw-private-proof</code
+                        >
+                      </li>
+                    </ul>
+                    <strong>Caveats</strong>
+                    <ul>
+                      <li>full_macos_manual_panorama_session</li>
+                      <li>final_panorama_quality_acceptance</li>
+                      <li>full_resolution_app_server_apply</li>
+                    </ul>
+                    <strong>Artifacts</strong>
+                    <ul>
+                      <li>0: private-fixtures/panorama/overlap-stitch-v1 (publicRepoAllowed: false)</li>
+                      <li>
+                        1: private-artifacts/validation/computational-merge/panorama-overlap-decode-report.json
+                        (publicRepoAllowed: false)
+                      </li>
+                      <li>
+                        2: private-artifacts/validation/computational-merge/panorama-overlap-alignment.json
+                        (publicRepoAllowed: false)
+                      </li>
+                    </ul>
+                  </div>
+                </details>
+                <details>
+                  <summary>
+                    <a href="../proofs/focus/focus-synthetic-output-artifact-proof-2026-06-20.json"
+                      >docs/validation/proofs/focus/focus-synthetic-output-artifact-proof-2026-06-20.json</a
+                    >
+                    <span>issue: #2313 | schema: 1</span>
+                  </summary>
+                  <div class="proof-detail">
+                    <strong>Validation</strong>
+                    <span class="muted">No validation command recorded in this proof.</span>
+                    <strong>Caveats</strong>
+                    <ul>
+                      <li>app_ui_e2e</li>
+                      <li>halo_quality_maturity</li>
+                      <li>real_raw_focus_bracket_decode</li>
+                    </ul>
+                    <strong>Artifacts</strong>
+                    <ul>
+                      <li>
+                        stackedPreview: artifacts/validation/focus-synthetic-output-artifact/focus-stack-preview.pgm
+                        (publicRepoAllowed: false)
+                      </li>
+                    </ul>
+                  </div>
+                </details>
+                <details>
+                  <summary>
+                    <a href="../proofs/super-resolution/sr-synthetic-output-artifact-proof-2026-06-20.json"
+                      >docs/validation/proofs/super-resolution/sr-synthetic-output-artifact-proof-2026-06-20.json</a
+                    >
+                    <span>issue: #2980 | schema: 1</span>
+                  </summary>
+                  <div class="proof-detail">
+                    <strong>Validation</strong>
+                    <span class="muted">No validation command recorded in this proof.</span>
+                    <strong>Caveats</strong>
+                    <ul>
+                      <li>app_ui_e2e</li>
+                      <li>demosaic_aware_detail_quality</li>
+                      <li>motion_robustness</li>
+                    </ul>
+                    <strong>Artifacts</strong>
+                    <ul>
+                      <li>
+                        baselineReviewCrop:
+                        artifacts/validation/sr-synthetic-output-artifact/sr-x2-baseline-crop-center.pgm
+                        (publicRepoAllowed: false)
+                      </li>
+                      <li>
+                        cropReviewSheet: artifacts/validation/sr-synthetic-output-artifact/sr-x2-crop-review-sheet.html
+                        (publicRepoAllowed: false)
+                      </li>
+                      <li>
+                        reconstructionPreview: artifacts/validation/sr-synthetic-output-artifact/sr-x2-preview.pgm
+                        (publicRepoAllowed: false)
+                      </li>
+                    </ul>
+                  </div>
+                </details>
+                <details>
+                  <summary>
+                    <a href="../proofs/super-resolution/super-resolution-sidecar-provenance-2026-06-20.json"
+                      >docs/validation/proofs/super-resolution/super-resolution-sidecar-provenance-2026-06-20.json</a
+                    >
+                    <span>mode: sr_sidecar_provenance_roundtrip | issue: #2359 | schema: n/a</span>
+                  </summary>
+                  <div class="proof-detail">
+                    <strong>Validation</strong>
+                    <span class="muted">No validation command recorded in this proof.</span>
+                    <strong>Caveats</strong>
+                    <ul>
+                      <li>filesystem_sidecar_write</li>
+                      <li>ui_reload_badge</li>
+                      <li>real_raw_e2e</li>
+                    </ul>
+                    <strong>Artifacts</strong>
+                    <span class="muted">No artifact path list in proof JSON.</span>
+                  </div>
+                </details>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Screenshots And HTML Artifacts</h2>
+        <div class="artifacts">
+          <article class="artifact">
+            <h3>Expert agent handoff</h3>
+
+            <a href="../proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html"
+              >docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html</a
+            >
+          </article>
+          <article class="artifact">
+            <h3>Negative Lab workspace</h3>
+            <img
+              src="../proofs/negative-lab/negative-lab-qc-contact-sheet-proof-2026-06-16.svg"
+              alt="Negative Lab workspace artifact"
+            />
+            <a href="../proofs/negative-lab/negative-lab-qc-contact-sheet-proof-2026-06-16.svg"
+              >docs/validation/proofs/negative-lab/negative-lab-qc-contact-sheet-proof-2026-06-16.svg</a
+            >
+          </article>
+          <article class="artifact">
+            <h3>Negative Lab workspace</h3>
+
+            <a href="../proofs/negative-lab/negative-lab-qc-contact-sheet-proof-2026-06-16.html"
+              >docs/validation/proofs/negative-lab/negative-lab-qc-contact-sheet-proof-2026-06-16.html</a
+            >
+          </article>
+          <article class="artifact">
+            <h3>Negative Lab workspace</h3>
+
+            <a href="../proofs/negative-lab/negative-lab-agent-workflow-proof-2026-06-16.html"
+              >docs/validation/proofs/negative-lab/negative-lab-agent-workflow-proof-2026-06-16.html</a
+            >
+          </article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -194,7 +194,7 @@ if (
 if (
   result.previewRefreshes.length !== 2 ||
   result.previewRefreshes[0]?.purpose !== 'refresh' ||
-  result.previewRefreshes[0]?.longEdgePx !== 1024 ||
+  result.previewRefreshes[0]?.longEdgePx !== 1536 ||
   result.previewRefreshes[0]?.cacheKey === result.previewRefreshes[1]?.cacheKey
 ) {
   throw new Error('agent iterative loop did not preserve distinct preview envelopes.');
