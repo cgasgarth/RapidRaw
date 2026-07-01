@@ -1,7 +1,15 @@
 import { z } from 'zod';
 
 import { type MaskAlphaArtifact, maskAlphaArtifactSchema } from './maskComposeCommandRuntime.js';
-import { layerMaskRangeSelectionV1Schema } from './rawEngineSchemas.js';
+import {
+  type LayerMaskCommandEnvelopeV1,
+  type LayerMaskDryRunResultV1,
+  type LayerMaskMutationResultV1,
+  layerMaskCommandEnvelopeV1Schema,
+  layerMaskDryRunResultV1Schema,
+  layerMaskMutationResultV1Schema,
+  layerMaskRangeSelectionV1Schema,
+} from './rawEngineSchemas.js';
 
 const normalizedPixelSchema = z.number().min(0).max(1);
 
@@ -44,6 +52,7 @@ export const rangeMaskAlphaRenderResultSchema = z
 
 export type RangeMaskAlphaRenderRequest = z.infer<typeof rangeMaskAlphaRenderRequestSchema>;
 export type RangeMaskAlphaRenderResult = z.infer<typeof rangeMaskAlphaRenderResultSchema>;
+export type RangeMaskCommand = Extract<LayerMaskCommandEnvelopeV1, { commandType: 'layerMask.createRangeMask' }>;
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 const quantizeAlpha = (value: number): number => Math.round(clamp01(value) * 255);
@@ -52,6 +61,26 @@ const stableAlphaHash = (alpha: ReadonlyArray<number>): string => {
   let hash = 0x811c9dc5;
   for (const value of alpha) {
     hash ^= quantizeAlpha(value);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `fnv1a32:${hash.toString(16).padStart(8, '0')}`;
+};
+
+const buildPlanKey = (command: RangeMaskCommand, request: RangeMaskAlphaRenderRequest): string =>
+  JSON.stringify([
+    command.expectedGraphRevision,
+    command.target,
+    command.parameters,
+    request.maskId,
+    request.width,
+    request.height,
+    stableRgbHash(request.sourceRgbPixels),
+  ]);
+
+const stableRgbHash = (pixels: ReadonlyArray<number>): string => {
+  let hash = 0x811c9dc5;
+  for (const value of pixels) {
+    hash ^= Math.round(clamp01(value) * 65535);
     hash = Math.imul(hash, 0x01000193) >>> 0;
   }
   return `fnv1a32:${hash.toString(16).padStart(8, '0')}`;
@@ -162,3 +191,102 @@ export const renderRangeMaskAlphaArtifact = (value: unknown): RangeMaskAlphaRend
     stats: buildStats(alpha),
   });
 };
+
+export class RangeMaskCommandRuntime {
+  readonly #acceptedDryRuns: Set<string> = new Set<string>();
+
+  dispatch(
+    command: LayerMaskCommandEnvelopeV1,
+    request: Omit<RangeMaskAlphaRenderRequest, 'selection' | 'source'>,
+  ): LayerMaskDryRunResultV1 | LayerMaskMutationResultV1 {
+    const parsedCommand = layerMaskCommandEnvelopeV1Schema.parse(command);
+    if (parsedCommand.commandType !== 'layerMask.createRangeMask') {
+      throw new Error('Range mask runtime only supports createRangeMask commands.');
+    }
+    if (parsedCommand.parameters.source !== 'working_rgb') {
+      throw new Error('Range mask runtime currently requires working_rgb source samples.');
+    }
+
+    const renderRequest = rangeMaskAlphaRenderRequestSchema.parse({
+      ...request,
+      selection: parsedCommand.parameters.selection,
+      source: parsedCommand.parameters.source,
+    });
+    const render = renderRangeMaskAlphaArtifact(renderRequest);
+    const planKey = buildPlanKey(parsedCommand, renderRequest);
+    if (parsedCommand.dryRun) {
+      this.#acceptedDryRuns.add(planKey);
+      return buildRangeMaskDryRunResult(parsedCommand, render);
+    }
+
+    if (!this.#acceptedDryRuns.has(planKey)) {
+      throw new Error('Range mask runtime rejected apply without a matching dry-run.');
+    }
+
+    return buildRangeMaskMutationResult(parsedCommand, render);
+  }
+}
+
+export const buildRangeMaskDryRunResult = (
+  command: RangeMaskCommand,
+  render: RangeMaskAlphaRenderResult,
+): LayerMaskDryRunResultV1 =>
+  layerMaskDryRunResultV1Schema.parse({
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: true,
+    maskArtifacts: [
+      {
+        artifactId: `artifact_${render.artifact.maskId}`,
+        contentHash: render.artifact.contentHash,
+        dimensions: {
+          height: render.artifact.height,
+          width: render.artifact.width,
+        },
+        kind: 'mask',
+        storage: 'temp_cache',
+      },
+    ],
+    mutates: false,
+    parameterDiff: [
+      {
+        entityId: null,
+        entityKind: 'mask',
+        path: '/masks/-',
+        value: {
+          colorMath: render.colorMath,
+          maskId: render.artifact.maskId,
+          maskName: command.parameters.maskName,
+          selection: command.parameters.selection,
+          source: command.parameters.source,
+          stats: render.stats,
+        },
+      },
+    ],
+    predictedGraphRevision: `${command.expectedGraphRevision}:preview:${command.commandId}`,
+    previewArtifacts: [],
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    warnings: render.stats.warningCodes,
+  });
+
+export const buildRangeMaskMutationResult = (
+  command: RangeMaskCommand,
+  render: RangeMaskAlphaRenderResult,
+): LayerMaskMutationResultV1 =>
+  layerMaskMutationResultV1Schema.parse({
+    appliedGraphRevision: `${command.expectedGraphRevision}:apply:${command.commandId}`,
+    changedLayerIds: [],
+    changedMaskIds: [render.artifact.maskId],
+    changedNodeIds: [`node_${render.artifact.maskId}`],
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: false,
+    mutates: true,
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    undoRevision: command.expectedGraphRevision,
+    warnings: render.stats.warningCodes,
+  });

@@ -294,6 +294,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune]: AdjustmentsPanelRetuneVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.AgentChatUi]: AgentChatVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.BrushMaskCanvasUi]: BrushMaskCanvasVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ColorRangeLocalAdjustment]: ColorRangeLocalAdjustmentVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ColorWorkflow]: ColorWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.CommandPaletteWorkflows]: CommandPaletteWorkflowSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.CullingCompareSync]: CullingCompareSyncVisualSmoke,
@@ -1305,6 +1306,14 @@ const copy = {
   cullingCompareSync: 'Culling compare sync',
   filmLook: 'Film look',
   filmPreset: 'Neutral 400',
+  colorRangeLocalAdjustment: 'Color Range Local Adjustment',
+  colorRangeWorkspaceLabel: 'Color workspace',
+  colorRangeLayerSummary: 'Layer: Oranges local adjustment',
+  colorRangeAdjustmentSummary: 'Adjustment: saturation +18, exposure +0.18',
+  colorRangeOverlayLabel: 'Overlay:',
+  colorRangeOverlayCoverageSuffix: '% proposal coverage',
+  colorRangeReceiptTitle: 'Range mask receipt',
+  colorRangeReplayReady: 'Replay ready',
   focusStackSmoke: 'Focus Stack Smoke',
   focusReview: 'Focus review',
   focusDryRunPreview: 'Dry-run preview',
@@ -4839,6 +4848,90 @@ function FilmLookVisualSmoke() {
             isForMask={false}
             setAdjustments={handleAdjustmentsChange}
           />
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function ColorRangeLocalAdjustmentVisualSmoke() {
+  const receipt = {
+    afterPreviewHash: 'fnv1a32:5b448470',
+    beforePreviewHash: 'fnv1a32:0d18f3b4',
+    colorMath: 'encoded_rgb_hsv_rec709_luma_v1',
+    commandType: 'layerMask.createRangeMask',
+    contentHash: 'fnv1a32:7ad02c1e',
+    graphRevision: 'history_0_layer_stack_color_range_local',
+    maskCoverage: 0.46875,
+    maskId: 'color_range_orange_mask',
+    range: 'oranges',
+  };
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ColorRangeLocalAdjustment}
+    >
+      <div className="grid h-screen grid-cols-[1fr_380px] overflow-hidden bg-[#0f1114]">
+        <section className="relative p-8" data-visual-smoke-section="color-range-local-preview">
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase text-[#9ba6b2]">{copy.colorRangeWorkspaceLabel}</p>
+              <h1 className="text-lg font-semibold">{copy.colorRangeLocalAdjustment}</h1>
+            </div>
+            <span className="rounded border border-white/10 bg-white/5 px-3 py-1 text-xs text-[#cbd5df]">
+              {receipt.commandType}
+            </span>
+          </div>
+          <div className="relative h-[calc(100%-4rem)] overflow-hidden rounded-md border border-white/10 bg-[linear-gradient(135deg,#172125,#31504d_38%,#b77734_70%,#f3d0a2)]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_32%_34%,rgba(255,222,176,0.75),transparent_16%),radial-gradient(circle_at_66%_52%,rgba(244,129,45,0.58),transparent_18%),linear-gradient(110deg,transparent_50%,rgba(19,38,45,0.52)_51%)]" />
+            <div className="absolute left-[48%] top-[22%] h-[330px] w-[230px] rotate-6 rounded-full border border-orange-200/50 bg-orange-400/25 shadow-[0_0_0_999px_rgba(11,14,18,0.22)]" />
+            <div className="absolute left-[52%] top-[30%] h-[230px] w-[150px] rotate-6 rounded-full bg-orange-300/35 blur-[2px]" />
+            <div className="absolute bottom-8 left-8 grid gap-1 rounded border border-white/10 bg-black/40 px-3 py-2 text-xs text-[#d8dee8]">
+              <span>{copy.colorRangeLayerSummary}</span>
+              <span>{copy.colorRangeAdjustmentSummary}</span>
+              <span>
+                {copy.colorRangeOverlayLabel} {Math.round(receipt.maskCoverage * 100)}
+                {copy.colorRangeOverlayCoverageSuffix}
+              </span>
+            </div>
+          </div>
+        </section>
+        <aside
+          className="border-l border-white/10 bg-[#171a1f] p-4 text-sm"
+          data-visual-smoke-section="color-range-local-receipt"
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <span className="font-semibold">{copy.colorRangeReceiptTitle}</span>
+            <span className="rounded bg-white/10 px-2 py-0.5 text-xs">{copy.colorRangeReplayReady}</span>
+          </div>
+          <div
+            className="sr-only"
+            data-after-preview-hash={receipt.afterPreviewHash}
+            data-before-preview-hash={receipt.beforePreviewHash}
+            data-color-math={receipt.colorMath}
+            data-command-type={receipt.commandType}
+            data-content-hash={receipt.contentHash}
+            data-graph-revision={receipt.graphRevision}
+            data-mask-coverage={receipt.maskCoverage}
+            data-mask-id={receipt.maskId}
+            data-range={receipt.range}
+            data-testid="color-range-local-adjustment-proof"
+          />
+          <div className="space-y-2">
+            {[
+              ['Source range', receipt.range],
+              ['Mask content hash', receipt.contentHash],
+              ['Graph revision', receipt.graphRevision],
+              ['Preview hashes', `${receipt.beforePreviewHash} -> ${receipt.afterPreviewHash}`],
+            ].map(([label, value]) => (
+              <div className="rounded border border-white/10 bg-white/5 p-2" key={label}>
+                <p className="text-xs text-[#aab2bd]">{label}</p>
+                <p className="break-all">{value}</p>
+              </div>
+            ))}
+          </div>
         </aside>
       </div>
     </main>

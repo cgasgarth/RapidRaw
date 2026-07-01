@@ -1,6 +1,7 @@
 import cx from 'clsx';
 import { type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { debouncedSave } from '../../hooks/editor/useEditorActions';
 import type { BlackWhiteMixerChannel } from '../../schemas/color/blackWhiteMixerSchemas';
 import type { ChannelMixerOutput } from '../../schemas/color/channelMixerSchemas';
 import type { ColorBalanceRgbRange } from '../../schemas/color/colorBalanceRgbSchemas';
@@ -11,6 +12,14 @@ import {
   isCurrentExportSoftProofGamutWarningOverlay,
   resolveGamutWarningProofDimensions,
 } from '../../utils/color/runtime/gamutWarningDisplay';
+import {
+  applyColorRangeLocalAdjustmentLayerFlow,
+  buildColorRangeProposalSourcePixels,
+  createColorRangeLocalAdjustmentLayerDraft,
+} from '../../utils/layers/colorRangeLocalAdjustmentCommandFlow';
+import { persistLayerStackSidecarInAdjustments } from '../../utils/layers/layerStackSidecarAdjustments';
+import { createColorRangeMaskParameters } from '../../utils/mask/colorRangeMaskParameters';
+import { getSelectiveColorRange } from '../../utils/selectiveColorRanges';
 import { applySkinToneUniformity, type SkinToneUniformityInput } from '../../utils/skinToneUniformity';
 import type { AppSettings } from '../ui/AppProperties';
 import { ColorAdvancedControls } from './color/ColorAdvancedControls';
@@ -136,6 +145,7 @@ export default function ColorPanel({
   const exportSoftProofTransform = useEditorStore((state) => state.exportSoftProofTransform);
   const isExportSoftProofEnabled = useEditorStore((state) => state.isExportSoftProofEnabled);
   const isGamutWarningOverlayVisible = useEditorStore((state) => state.isGamutWarningOverlayVisible);
+  const pushHistory = useEditorStore((state) => state.pushHistory);
   const setEditor = useEditorStore((state) => state.setEditor);
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
   const isColorCalibrationVisible = (adjustmentVisibility as { colorCalibration?: boolean }).colorCalibration !== false;
@@ -174,6 +184,74 @@ export default function ColorPanel({
   );
   const skinToneInspectorImprovement = skinToneInspectorBeforeDistance - skinToneInspectorAfterDistance;
   const { activeCameraProfileLabel, activeToneCurveLabel } = getProfileToneLabels(adjustments, t);
+
+  const createLocalAdjustmentFromActiveColorRange = () => {
+    if (isForMask || selectedImage === null) return;
+
+    const currentState = useEditorStore.getState();
+    const rangeControl = adjustments.selectiveColorRangeControls[activeColor];
+    const currentHsl = adjustments.hsl[activeColor];
+    const rangeLabel = t(getSelectiveColorRange(activeColor).labelKey);
+    const layerId = crypto.randomUUID();
+    const maskId = `${layerId}_color_range_mask`;
+    const operationId = crypto.randomUUID();
+    const feather = Math.max(0.05, Math.min(0.95, rangeControl.falloffSmoothness / 4));
+    const colorRangeParameters = createColorRangeMaskParameters(activeColor, {
+      centerHueDegrees: rangeControl.centerHueDegrees,
+      feather,
+      hueToleranceDegrees: Math.max(1, Math.min(180, rangeControl.widthDegrees / 2)),
+    });
+    const toneColor = {
+      blackPoint: 0,
+      clarity: 0,
+      contrast: 0,
+      exposureEv: Number((currentHsl.luminance / 100).toFixed(3)),
+      highlights: 0,
+      saturation: currentHsl.saturation === 0 && currentHsl.luminance === 0 ? 10 : currentHsl.saturation,
+      shadows: 0,
+      whitePoint: 0,
+    };
+    const layer = createColorRangeLocalAdjustmentLayerDraft({
+      layerId,
+      maskId,
+      maskName: t('adjustments.color.colorRangeLocalAdjustmentMaskName', {
+        defaultValue: '{{range}} range mask',
+        range: rangeLabel,
+      }),
+      name: t('adjustments.color.colorRangeLocalAdjustmentLayerName', {
+        defaultValue: '{{range}} local adjustment',
+        range: rangeLabel,
+      }),
+      parameters: colorRangeParameters,
+    });
+    const result = applyColorRangeLocalAdjustmentLayerFlow(currentState.adjustments.masks, {
+      colorRangeParameters,
+      context: {
+        graphRevision: `history_${currentState.historyIndex}`,
+        imagePath: selectedImage.path,
+        operationId,
+        sessionId: 'rapidraw-color-workspace',
+      },
+      imageSize: { height: 8, width: 8 },
+      layer,
+      maskName: layer.subMasks[0]?.name ?? `${rangeLabel} range mask`,
+      sourceRgbPixels: buildColorRangeProposalSourcePixels(activeColor),
+      toneColor,
+    });
+    const nextAdjustments = persistLayerStackSidecarInAdjustments(
+      { ...currentState.adjustments, masks: result.masks },
+      result.toneResult.sidecar,
+    );
+
+    setEditor({
+      activeMaskContainerId: layerId,
+      activeMaskId: maskId,
+      adjustments: nextAdjustments,
+      uncroppedAdjustedPreviewUrl: null,
+    });
+    pushHistory(nextAdjustments);
+    debouncedSave(selectedImage.path, nextAdjustments);
+  };
 
   const syncSkinToneUniformity = (nextSettings: Adjustments['skinToneUniformity']) => {
     const nextPreview = skinTonePreviewHsl(nextSettings);
@@ -233,8 +311,10 @@ export default function ColorPanel({
               activeColorBalanceRange={activeColorBalanceRange}
               adjustmentVisibility={adjustmentVisibility}
               adjustments={adjustments}
+              canCreateLocalAdjustmentFromActiveRange={!isForMask && selectedImage !== null}
               appSettings={appSettings}
               isForMask={isForMask}
+              onCreateLocalAdjustmentFromActiveRange={createLocalAdjustmentFromActiveColorRange}
               onDragStateChange={onDragStateChange}
               setActiveChannelMixerOutput={setActiveChannelMixerOutput}
               setActiveColor={setActiveColor}

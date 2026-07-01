@@ -72,6 +72,7 @@ import {
 } from '../../../../utils/adjustments';
 import { createEditorSubMaskFallback, createEditorSubMaskForImage } from '../../../../utils/editorSubMaskFactory';
 import { readBrushLocalAdjustmentReceipt } from '../../../../utils/layers/brushLocalAdjustmentCommandFlow';
+import { readColorRangeLocalAdjustmentReceipt } from '../../../../utils/layers/colorRangeLocalAdjustmentCommandFlow';
 import {
   cloneMaskContainerForPaste,
   cloneSubMaskForPaste,
@@ -3212,6 +3213,10 @@ function SettingsPanel({
     activeSubMaskType === Mask.Brush && activeSubMask !== null
       ? readBrushLocalAdjustmentReceipt(activeSubMask.parameters)
       : null;
+  const colorRangeLocalAdjustmentReceipt =
+    activeSubMaskType === Mask.Color && activeSubMask !== null
+      ? readColorRangeLocalAdjustmentReceipt(activeSubMask.parameters)
+      : null;
   const handleObjectPromptModeChange = (mode: ObjectPromptMode) => {
     if (!activeSubMask || objectPromptState === null) return;
     updateSubMask(activeSubMask.id, {
@@ -3507,6 +3512,36 @@ function SettingsPanel({
                   <UiText variant={TextVariants.small} className="block text-text-tertiary">
                     {t('editor.masks.settings.brushLocalAdjustmentReceiptSummary', {
                       count: brushLocalAdjustmentReceipt.brushStrokeCount,
+                    })}
+                  </UiText>
+                </div>
+              )}
+
+              {colorRangeLocalAdjustmentReceipt !== null && (
+                <div
+                  className="rounded-md border border-surface bg-card/40 p-3 text-xs text-text-secondary"
+                  data-after-preview-hash={colorRangeLocalAdjustmentReceipt.afterPreviewHash}
+                  data-before-preview-hash={colorRangeLocalAdjustmentReceipt.beforePreviewHash}
+                  data-color-math={colorRangeLocalAdjustmentReceipt.colorMath}
+                  data-color-range-content-hash={colorRangeLocalAdjustmentReceipt.colorRangeContentHash}
+                  data-color-range-mask-id={colorRangeLocalAdjustmentReceipt.colorRangeMaskId}
+                  data-graph-revision={colorRangeLocalAdjustmentReceipt.graphRevision}
+                  data-layer-id={colorRangeLocalAdjustmentReceipt.layerId}
+                  data-mask-nonzero-alpha-ratio={colorRangeLocalAdjustmentReceipt.maskStats.nonzeroAlphaRatio}
+                  data-receipt-version={colorRangeLocalAdjustmentReceipt.receiptVersion}
+                  data-replay-key={colorRangeLocalAdjustmentReceipt.replayKey}
+                  data-rollback-graph-revision={colorRangeLocalAdjustmentReceipt.rollbackGraphRevision}
+                  data-source={colorRangeLocalAdjustmentReceipt.source}
+                  data-source-range-key={colorRangeLocalAdjustmentReceipt.sourceRangeKey}
+                  data-testid="color-range-local-adjustment-receipt"
+                >
+                  <UiText variant={TextVariants.small} weight={TextWeights.medium} className="block text-text-primary">
+                    {t('editor.masks.settings.colorRangeLocalAdjustmentReceiptTitle')}
+                  </UiText>
+                  <UiText variant={TextVariants.small} className="block text-text-tertiary">
+                    {t('editor.masks.settings.colorRangeLocalAdjustmentReceiptSummary', {
+                      range: colorRangeLocalAdjustmentReceipt.sourceRangeKey,
+                      ratio: Math.round(colorRangeLocalAdjustmentReceipt.maskStats.nonzeroAlphaRatio * 100),
                     })}
                   </UiText>
                 </div>

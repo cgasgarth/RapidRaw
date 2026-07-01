@@ -85,6 +85,18 @@ export const colorRangeMaskParametersSchema = z
     minLuma: z.number().min(0).max(1),
     minSaturation: z.number().min(0).max(1),
     rangeKind: z.literal('color'),
+    rawEngine: z
+      .object({
+        colorMath: z.string().trim().min(1).optional(),
+        colorRangeLocalAdjustmentReceipt: z.unknown().optional(),
+        commandId: z.string().trim().min(1).optional(),
+        contentHash: z.string().trim().min(1).optional(),
+        height: z.number().int().positive().optional(),
+        source: z.string().trim().min(1).optional(),
+        width: z.number().int().positive().optional(),
+      })
+      .strict()
+      .optional(),
     sourceRangeKey: z.enum(['reds', 'oranges', 'yellows', 'greens', 'aquas', 'blues', 'purples', 'magentas']),
   })
   .strict()

@@ -82,7 +82,10 @@
         "label": "Color workspace tools",
         "output": "Output",
         "quick": "Quick"
-      }
+      },
+      "colorRangeLocalAdjustmentLayerName": "{{range}} local adjustment",
+      "colorRangeLocalAdjustmentMaskName": "{{range}} range mask",
+      "createLocalAdjustmentFromRange": "Create local adjustment"
     },
     "curves": {
       "channelTitle": "{{channel}} 채널",
@@ -640,7 +643,9 @@
         "brushLocalAdjustmentReceiptSummary_one": "",
         "brushLocalAdjustmentReceiptSummary_other": "",
         "brushLocalAdjustmentReceiptSummary_few": "",
-        "brushLocalAdjustmentReceiptSummary_many": ""
+        "brushLocalAdjustmentReceiptSummary_many": "",
+        "colorRangeLocalAdjustmentReceiptSummary": "{{range}} range · {{ratio}}% proposal coverage",
+        "colorRangeLocalAdjustmentReceiptTitle": "Color range local adjustment receipt"
       },
       "toggleAnalyticsTooltip": "분석 표시 전환",
       "tooltips": {

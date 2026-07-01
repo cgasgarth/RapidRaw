@@ -84,6 +84,9 @@
       },
       "colorGrading": "顏色分級",
       "colorMixer": "顏色混合器",
+      "colorRangeLocalAdjustmentLayerName": "{{range}} local adjustment",
+      "colorRangeLocalAdjustmentMaskName": "{{range}} range mask",
+      "createLocalAdjustmentFromRange": "Create local adjustment",
       "falloffSmoothness": "",
       "gamutWarning": {
         "coverage": "",
@@ -1158,6 +1161,8 @@
         "brushLocalAdjustmentReceiptSummary_many": "",
         "brushLocalAdjustmentReceiptSummary_other": "",
         "brushLocalAdjustmentReceiptTitle": "",
+        "colorRangeLocalAdjustmentReceiptSummary": "{{range}} range · {{ratio}}% proposal coverage",
+        "colorRangeLocalAdjustmentReceiptTitle": "Color range local adjustment receipt",
         "componentPropertiesTitle": "{{name}} 屬性",
         "copySectionSettings": "複製 {{section}} 設定",
         "invertComponent": "反轉元件",

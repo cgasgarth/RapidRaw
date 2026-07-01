@@ -13,6 +13,7 @@ export interface SelectiveColorMaskSelection {
 }
 
 export interface SelectiveColorMaskOptions {
+  centerHueDegrees?: number;
   feather?: number;
   hueToleranceDegrees?: number;
   maxLuma?: number;
@@ -34,7 +35,7 @@ export const createSelectiveColorMaskSelection = (
   const maxLuma = clamp(options.maxLuma ?? 0.98, minLuma + 0.01, 1);
 
   return {
-    centerHueDegrees: range.centerHueDegrees,
+    centerHueDegrees: clamp(options.centerHueDegrees ?? range.centerHueDegrees, 0, 359.999),
     feather: clamp(options.feather ?? 0.35, 0, 1),
     hueToleranceDegrees: clamp(options.hueToleranceDegrees ?? range.widthDegrees * 0.5, 1, 180),
     maxLuma,
