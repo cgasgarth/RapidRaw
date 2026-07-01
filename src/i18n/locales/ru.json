@@ -84,6 +84,9 @@
       },
       "colorGrading": "Цветокоррекция",
       "colorMixer": "Смешение цветов",
+      "colorRangeLocalAdjustmentLayerName": "{{range}} local adjustment",
+      "colorRangeLocalAdjustmentMaskName": "{{range}} range mask",
+      "createLocalAdjustmentFromRange": "Create local adjustment",
       "falloffSmoothness": "",
       "gamutWarning": {
         "coverage": "",
@@ -1252,6 +1255,8 @@
         "brushLocalAdjustmentReceiptSummary_many": "",
         "brushLocalAdjustmentReceiptSummary_other": "",
         "brushLocalAdjustmentReceiptTitle": "",
+        "colorRangeLocalAdjustmentReceiptSummary": "{{range}} range · {{ratio}}% proposal coverage",
+        "colorRangeLocalAdjustmentReceiptTitle": "Color range local adjustment receipt",
         "componentPropertiesTitle": "Свойства компонента {{name}}",
         "copySectionSettings": "Копировать настройки раздела {{section}}",
         "invertComponent": "Инвертировать компонент",

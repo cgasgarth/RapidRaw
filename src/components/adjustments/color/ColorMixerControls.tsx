@@ -1,5 +1,5 @@
 import cx from 'clsx';
-import { RotateCcw } from 'lucide-react';
+import { Layers, RotateCcw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { BlackWhiteMixerChannel } from '../../../schemas/color/blackWhiteMixerSchemas';
@@ -47,7 +47,9 @@ interface ColorMixerControlsProps extends ColorPanelGroupProps {
   activeColor: BlackWhiteMixerChannel;
   activeColorBalanceRange: ColorBalanceRgbRange;
   adjustmentVisibility: Record<string, boolean>;
+  canCreateLocalAdjustmentFromActiveRange?: boolean;
   isForMask: boolean;
+  onCreateLocalAdjustmentFromActiveRange?: () => void;
   setActiveChannelMixerOutput: (output: ChannelMixerOutput) => void;
   setActiveColor: (color: BlackWhiteMixerChannel) => void;
   setActiveColorBalanceRange: (range: ColorBalanceRgbRange) => void;
@@ -59,7 +61,9 @@ export const ColorMixerControls = ({
   activeColorBalanceRange,
   adjustmentVisibility,
   adjustments,
+  canCreateLocalAdjustmentFromActiveRange = false,
   isForMask,
+  onCreateLocalAdjustmentFromActiveRange,
   onDragStateChange,
   setActiveChannelMixerOutput,
   setActiveColor,
@@ -701,6 +705,26 @@ export const ColorMixerControls = ({
             <RotateCcw size={13} />
             <span>{t('adjustments.color.resetActiveRange')}</span>
           </button>
+          {!isForMask && (
+            <button
+              aria-label={t('adjustments.color.createLocalAdjustmentFromRange')}
+              className={cx(
+                density.actionButton.base,
+                'col-span-2 gap-1 border border-surface bg-bg-secondary text-text-secondary hover:border-accent hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50',
+              )}
+              data-command-type="layerMask.createRangeMask"
+              data-range-key={activeColor}
+              data-testid="selective-color-create-local-adjustment"
+              disabled={
+                !canCreateLocalAdjustmentFromActiveRange || onCreateLocalAdjustmentFromActiveRange === undefined
+              }
+              onClick={onCreateLocalAdjustmentFromActiveRange}
+              type="button"
+            >
+              <Layers size={13} />
+              <span>{t('adjustments.color.createLocalAdjustmentFromRange')}</span>
+            </button>
+          )}
         </div>
         <details className={cx('mb-2 text-xs', density.card.surface)}>
           <summary className="flex cursor-pointer items-center justify-between gap-2 px-2 py-1.5 font-medium text-text-secondary">

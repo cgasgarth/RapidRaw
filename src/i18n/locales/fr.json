@@ -84,6 +84,9 @@
       },
       "colorGrading": "Colorimétrie",
       "colorMixer": "Mélangeur de couleurs",
+      "colorRangeLocalAdjustmentLayerName": "{{range}} local adjustment",
+      "colorRangeLocalAdjustmentMaskName": "{{range}} range mask",
+      "createLocalAdjustmentFromRange": "Create local adjustment",
       "falloffSmoothness": "",
       "gamutWarning": {
         "coverage": "",
@@ -1217,6 +1220,8 @@
         "brushLocalAdjustmentReceiptSummary_many": "",
         "brushLocalAdjustmentReceiptSummary_other": "",
         "brushLocalAdjustmentReceiptTitle": "",
+        "colorRangeLocalAdjustmentReceiptSummary": "{{range}} range · {{ratio}}% proposal coverage",
+        "colorRangeLocalAdjustmentReceiptTitle": "Color range local adjustment receipt",
         "componentPropertiesTitle": "Propriétés de {{name}}",
         "copySectionSettings": "Copier les paramètres de la section {{section}}",
         "invertComponent": "Inverser le composant",

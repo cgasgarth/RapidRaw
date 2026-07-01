@@ -84,6 +84,9 @@
       },
       "colorGrading": "カラーグレーディング",
       "colorMixer": "カラーミキサー",
+      "colorRangeLocalAdjustmentLayerName": "{{range}} local adjustment",
+      "colorRangeLocalAdjustmentMaskName": "{{range}} range mask",
+      "createLocalAdjustmentFromRange": "Create local adjustment",
       "falloffSmoothness": "",
       "gamutWarning": {
         "coverage": "",
@@ -1169,6 +1172,8 @@
         "brushLocalAdjustmentReceiptSummary_many": "",
         "brushLocalAdjustmentReceiptSummary_other": "",
         "brushLocalAdjustmentReceiptTitle": "",
+        "colorRangeLocalAdjustmentReceiptSummary": "{{range}} range · {{ratio}}% proposal coverage",
+        "colorRangeLocalAdjustmentReceiptTitle": "Color range local adjustment receipt",
         "componentPropertiesTitle": "{{name}} のプロパティ",
         "copySectionSettings": "{{section}}設定をコピー",
         "invertComponent": "コンポーネントを反転",

@@ -84,6 +84,9 @@
       },
       "colorGrading": "Color Grading",
       "colorMixer": "Color Mixer",
+      "colorRangeLocalAdjustmentLayerName": "{{range}} local adjustment",
+      "colorRangeLocalAdjustmentMaskName": "{{range}} range mask",
+      "createLocalAdjustmentFromRange": "Create local adjustment",
       "falloffSmoothness": "Falloff",
       "gamutWarning": {
         "coverage": "sRGB gamut · {{value}}",
@@ -1245,6 +1248,8 @@
         "brushLocalAdjustmentReceiptSummary_one": "{{count}} brush stroke, rollback and replay ready",
         "brushLocalAdjustmentReceiptSummary_other": "{{count}} brush strokes, rollback and replay ready",
         "brushLocalAdjustmentReceiptTitle": "Brush local adjustment receipt",
+        "colorRangeLocalAdjustmentReceiptSummary": "{{range}} range · {{ratio}}% proposal coverage",
+        "colorRangeLocalAdjustmentReceiptTitle": "Color range local adjustment receipt",
         "componentPropertiesTitle": "{{name}} Properties",
         "copySectionSettings": "Copy {{section}} Settings",
         "invertComponent": "Invert Component",
