@@ -41,6 +41,18 @@ const detailEffectsResultSchema = z
         adjustedFields: z.array(z.string()).min(1),
         operationId: z.literal('agent_detail_effects_3168'),
         sessionId: z.literal('agent-detail-effects-3168'),
+        typedCommand: z
+          .object({
+            appliedGraphRevision: z.string().min(1),
+            changedNodeIds: z.array(z.string()).min(1),
+            commandId: z.literal('agent_detail_effects_3168_apply'),
+            commandType: z.literal('detailEffects.applyAdjustments'),
+            dryRunPlanHash: z.string().min(1),
+            dryRunPlanId: z.string().min(1),
+            provenanceEntryIds: z.array(z.string()).min(1),
+            sourceGraphRevision: z.literal('history_0'),
+          })
+          .strict(),
         undoGraphRevision: z.literal('history_0'),
       })
       .passthrough(),
@@ -113,7 +125,7 @@ if (
 const initialSnapshot = buildAgentImageContextSnapshot();
 let staleRejected = false;
 try {
-  applyAgentDetailEffects({
+  await applyAgentDetailEffects({
     detailEffects: { sharpness: 12 },
     expectedRecipeHash: 'recipe:stale',
     operationId: 'agent_detail_effects_stale',
@@ -125,7 +137,7 @@ try {
 }
 if (!staleRejected) throw new Error('agent.detail_effects.apply did not reject stale recipe hash.');
 
-const result = applyAgentDetailEffects({
+const result = await applyAgentDetailEffects({
   detailEffects: {
     chromaticAberrationBlueYellow: -3,
     chromaticAberrationRedCyan: 4,
@@ -189,6 +201,9 @@ if (state.historyIndex !== 1 || state.history.length !== 2 || state.uncroppedAdj
 if (parsedResult.beforePreviewHash === parsedResult.afterPreviewHash) {
   throw new Error('agent.detail_effects.apply did not update preview render identity.');
 }
+if (parsedResult.receipt.typedCommand.appliedGraphRevision === parsedResult.receipt.typedCommand.sourceGraphRevision) {
+  throw new Error('agent.detail_effects.apply typed command did not advance graph revision.');
+}
 if (afterSnapshot.initialPreview.recipeHash === initialSnapshot.initialPreview.recipeHash) {
   throw new Error('agent detail/effects recipe hash did not change after apply.');
 }
@@ -243,6 +258,44 @@ const dispatched = dispatchResponseSchema.parse(
 );
 if (dispatched.dispatchStatus !== 'completed') {
   throw new Error('agent.detail_effects.apply did not dispatch via app-server.');
+}
+const dispatchedResult = z
+  .object({
+    receipt: z
+      .object({
+        typedCommand: z
+          .object({
+            commandType: z.literal('detailEffects.applyAdjustments'),
+            dryRunPlanHash: z.string().min(1),
+            dryRunPlanId: z.string().min(1),
+            provenanceEntryIds: z.array(z.string()).min(1),
+          })
+          .passthrough(),
+      })
+      .passthrough(),
+  })
+  .passthrough()
+  .parse(dispatched.result);
+if (!dispatchedResult.receipt.typedCommand.dryRunPlanHash.startsWith('sha256:detail-effects:')) {
+  throw new Error('agent.detail_effects.apply host dispatch did not return typed detail/effects plan metadata.');
+}
+
+const invalidDispatch = dispatchResponseSchema.parse(
+  await handleRawEngineAppServerHostRequestAsync({
+    arguments: {
+      detailEffects: { grainAmount: 101 },
+      expectedRecipeHash: buildAgentImageContextSnapshot().initialPreview.recipeHash,
+      operationId: 'agent_detail_effects_invalid_dispatch_3168',
+      requestId: 'agent-detail-effects-invalid-dispatch-3168',
+      sessionId: 'agent-detail-effects-3168',
+    },
+    requestId: 'agent-detail-effects-invalid-dispatch-host-3168',
+    runtimeToolName: AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
+    toolName: RawEngineAppServerHostToolName.DispatchTool,
+  }),
+);
+if (invalidDispatch.dispatchStatus !== 'rejected') {
+  throw new Error('agent.detail_effects.apply host dispatch accepted a malformed detail/effects payload.');
 }
 
 const route = buildRawEngineAppServerRouteCatalog().find(
