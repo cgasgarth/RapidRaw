@@ -2,6 +2,10 @@
 
 import { z } from 'zod';
 
+import {
+  toneColorDryRunResultV1Schema,
+  toneColorMutationResultV1Schema,
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { ToolType } from '../../../../src/components/panel/right/layers/Masks.tsx';
 import { RawEngineAppServerHostToolName } from '../../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
@@ -11,13 +15,15 @@ import {
   AGENT_STATE_GET_TOOL_NAME,
 } from '../../../../src/utils/agent/context/agentReadOnlyAppServerTools.ts';
 import {
-  AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
-  AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
-} from '../../../../src/utils/agent/tools/agentAdjustmentApplyTool.ts';
+  buildBasicToneCommandEnvelope,
+  buildBasicToneImageCommandContext,
+  type LegacyBasicToneAdjustmentPayload,
+} from '../../../../src/utils/basicToneCommandBridge.ts';
 import {
   handleRawEngineAppServerHostRequestAsync,
   isApprovedAgentAppServerToolName,
 } from '../../../../src/utils/rawEngineAppServerHost.ts';
+import { ToneColorAppServerToolName } from '../../../../src/utils/toneColorAppServerRouteIds.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3163.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 10 : 2));
@@ -57,19 +63,18 @@ const previewResultSchema = z
   .passthrough();
 const applyResultSchema = z
   .object({
-    adjustedFields: z.array(z.string()).min(1),
     appliedGraphRevision: z.string().min(1),
-    staleRecipeHash: z.literal(false),
-    toolName: z.literal(AGENT_ADJUSTMENTS_APPLY_TOOL_NAME),
+    commandType: z.literal('toneColor.setBasicTone'),
+    mutates: z.literal(true),
   })
   .passthrough();
 const dryRunResultSchema = z
   .object({
+    commandType: z.literal('toneColor.setBasicTone'),
     dryRunPlanHash: z.string().min(1),
     dryRunPlanId: z.string().min(1),
+    mutates: z.literal(false),
     sourceGraphRevision: z.string().min(1),
-    staleRecipeHash: z.literal(false),
-    toolName: z.literal(AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME),
   })
   .passthrough();
 
@@ -103,6 +108,53 @@ const dispatchWithDraftSession = async (
       runtimeToolName,
       toolName: RawEngineAppServerHostToolName.DispatchTool,
     }),
+  );
+
+const buildBasicTonePayload = (patch: Partial<LegacyBasicToneAdjustmentPayload>): LegacyBasicToneAdjustmentPayload => {
+  const base = useEditorStore.getState().adjustments;
+  return {
+    blacks: patch.blacks ?? base.blacks,
+    brightness: patch.brightness ?? base.brightness,
+    clarity: patch.clarity ?? base.clarity,
+    contrast: patch.contrast ?? base.contrast,
+    exposure: patch.exposure ?? base.exposure,
+    highlights: patch.highlights ?? base.highlights,
+    saturation: patch.saturation ?? base.saturation,
+    shadows: patch.shadows ?? base.shadows,
+    whites: patch.whites ?? base.whites,
+  };
+};
+
+const buildTypedBasicToneCommand = ({
+  acceptedPlanHash,
+  acceptedPlanId,
+  dryRun,
+  expectedGraphRevision,
+  operationId,
+  patch,
+  sessionId,
+}: {
+  acceptedPlanHash?: string;
+  acceptedPlanId?: string;
+  dryRun: boolean;
+  expectedGraphRevision: string;
+  operationId: string;
+  patch: Partial<LegacyBasicToneAdjustmentPayload>;
+  sessionId: string;
+}) =>
+  buildBasicToneCommandEnvelope(
+    buildBasicTonePayload(patch),
+    buildBasicToneImageCommandContext({
+      expectedGraphRevision,
+      imagePath: selectedPath,
+      operationId,
+      sessionId,
+    }),
+    {
+      ...(acceptedPlanHash === undefined ? {} : { acceptedDryRunPlanHash: acceptedPlanHash }),
+      ...(acceptedPlanId === undefined ? {} : { acceptedDryRunPlanId: acceptedPlanId }),
+      dryRun,
+    },
   );
 
 useEditorStore.getState().setEditor({
@@ -148,42 +200,65 @@ if (previewResultSchema.parse(initialPreview.result).preview.purpose !== 'initia
 }
 
 const dryRun = await dispatch(
-  AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
-  {
-    adjustments: { exposure: 0.32, shadows: 18 },
+  ToneColorAppServerToolName.DryRunCommand,
+  buildTypedBasicToneCommand({
+    dryRun: true,
     expectedGraphRevision: initialState.snapshot.graphRevision,
-    expectedRecipeHash: initialRecipeHash,
     operationId: 'agent_dispatch_apply_3163',
-    requestId: 'agent-dispatch-dry-run-1',
+    patch: { exposure: 0.32, shadows: 18 },
     sessionId: 'agent-dispatch-3163',
-  },
+  }),
   'dispatch-dry-run-1',
 );
-const dryRunPayload = dryRunResultSchema.parse(dryRun.result);
-if (
-  dryRun.dispatchStatus !== 'completed' ||
-  dryRunPayload.sourceGraphRevision !== initialState.snapshot.graphRevision
-) {
-  throw new Error('agent.adjustments.dry_run dispatch did not produce a bound receipt.');
+if (dryRun.dispatchStatus !== 'completed') {
+  throw new Error(`typed tonecolor.dry_run_command dispatch rejected: ${dryRun.message ?? 'missing message'}`);
+}
+const dryRunPayload = dryRunResultSchema.parse(toneColorDryRunResultV1Schema.parse(dryRun.result));
+if (dryRunPayload.sourceGraphRevision !== initialState.snapshot.graphRevision) {
+  throw new Error('typed tonecolor.dry_run_command dispatch did not produce a bound receipt.');
+}
+
+const invalidTypedDryRun = await dispatch(
+  ToneColorAppServerToolName.DryRunCommand,
+  {
+    ...buildTypedBasicToneCommand({
+      dryRun: true,
+      expectedGraphRevision: initialState.snapshot.graphRevision,
+      operationId: 'agent_dispatch_invalid_3163',
+      patch: { exposure: 0.2 },
+      sessionId: 'agent-dispatch-3163',
+    }),
+    dryRun: false,
+  },
+  'dispatch-invalid-typed-dry-run-1',
+);
+if (invalidTypedDryRun.dispatchStatus !== 'rejected' || !invalidTypedDryRun.message?.includes('validation rejected')) {
+  throw new Error('typed tonecolor.dry_run_command accepted an invalid dryRun=false payload.');
 }
 
 const apply = await dispatch(
-  AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
-  {
+  ToneColorAppServerToolName.ApplyCommand,
+  buildTypedBasicToneCommand({
     acceptedPlanHash: dryRunPayload.dryRunPlanHash,
     acceptedPlanId: dryRunPayload.dryRunPlanId,
-    adjustments: { exposure: 0.32, shadows: 18 },
+    dryRun: false,
     expectedGraphRevision: dryRunPayload.sourceGraphRevision,
-    expectedRecipeHash: initialRecipeHash,
     operationId: 'agent_dispatch_apply_3163',
-    requestId: 'agent-dispatch-apply-1',
+    patch: { exposure: 0.32, shadows: 18 },
     sessionId: 'agent-dispatch-3163',
-  },
+  }),
   'dispatch-apply-1',
 );
-const applyPayload = applyResultSchema.parse(apply.result);
-if (apply.dispatchStatus !== 'completed' || applyPayload.appliedGraphRevision !== 'history_1') {
-  throw new Error('agent.adjustments.apply dispatch did not mutate the editor session.');
+if (apply.dispatchStatus !== 'completed') {
+  throw new Error(`typed tonecolor.apply_command dispatch rejected: ${apply.message ?? 'missing message'}`);
+}
+const applyPayload = applyResultSchema.parse(toneColorMutationResultV1Schema.parse(apply.result));
+if (
+  applyPayload.appliedGraphRevision.length === 0 ||
+  useEditorStore.getState().historyIndex !== 1 ||
+  useEditorStore.getState().adjustments.exposure !== 0.32
+) {
+  throw new Error('typed tonecolor.apply_command dispatch did not mutate the editor session.');
 }
 
 const refreshedState = await dispatch(
@@ -204,34 +279,32 @@ const draftSession = {
   status: 'active' as const,
 };
 const draftDryRun = await dispatchWithDraftSession(
-  AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
-  {
-    adjustments: { contrast: 9 },
+  ToneColorAppServerToolName.DryRunCommand,
+  buildTypedBasicToneCommand({
+    dryRun: true,
     expectedGraphRevision: refreshedStatePayload.snapshot.graphRevision,
-    expectedRecipeHash: draftSession.parentRecipeHash,
     operationId: 'agent_dispatch_draft_apply_3163',
-    requestId: 'agent-dispatch-draft-dry-run-1',
+    patch: { contrast: 9 },
     sessionId: draftSession.sessionId,
-  },
+  }),
   'dispatch-draft-dry-run-1',
   draftSession,
 );
-const draftDryRunPayload = dryRunResultSchema.parse(draftDryRun.result);
+const draftDryRunPayload = dryRunResultSchema.parse(toneColorDryRunResultV1Schema.parse(draftDryRun.result));
 if (draftDryRun.dispatchStatus !== 'completed') {
   throw new Error('agent draft session did not allow current active typed dry-run.');
 }
 const draftApply = await dispatchWithDraftSession(
-  AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
-  {
+  ToneColorAppServerToolName.ApplyCommand,
+  buildTypedBasicToneCommand({
     acceptedPlanHash: draftDryRunPayload.dryRunPlanHash,
     acceptedPlanId: draftDryRunPayload.dryRunPlanId,
-    adjustments: { contrast: 9 },
+    dryRun: false,
     expectedGraphRevision: draftDryRunPayload.sourceGraphRevision,
-    expectedRecipeHash: draftSession.parentRecipeHash,
     operationId: 'agent_dispatch_draft_apply_3163',
-    requestId: 'agent-dispatch-draft-apply-1',
+    patch: { contrast: 9 },
     sessionId: draftSession.sessionId,
-  },
+  }),
   'dispatch-draft-apply-1',
   draftSession,
 );
@@ -281,17 +354,16 @@ const draftRejectCases = [
 ];
 for (const { expectedMessage, session } of draftRejectCases) {
   const rejected = await dispatchWithDraftSession(
-    AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
-    {
+    ToneColorAppServerToolName.ApplyCommand,
+    buildTypedBasicToneCommand({
       acceptedPlanHash: draftDryRunPayload.dryRunPlanHash,
       acceptedPlanId: draftDryRunPayload.dryRunPlanId,
-      adjustments: { contrast: 12 },
+      dryRun: false,
       expectedGraphRevision: postDraftStatePayload.snapshot.graphRevision,
-      expectedRecipeHash: postDraftStatePayload.snapshot.initialPreview.recipeHash,
       operationId: `agent_dispatch_reject_${expectedMessage}`,
-      requestId: `agent-dispatch-reject-${expectedMessage}`,
+      patch: { contrast: 12 },
       sessionId: draftSession.sessionId,
-    },
+    }),
     `dispatch-reject-${expectedMessage}`,
     session,
   );
@@ -320,20 +392,19 @@ if (
 }
 
 const staleApply = await dispatch(
-  AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
-  {
+  ToneColorAppServerToolName.ApplyCommand,
+  buildTypedBasicToneCommand({
     acceptedPlanHash: dryRunPayload.dryRunPlanHash,
     acceptedPlanId: dryRunPayload.dryRunPlanId,
-    adjustments: { exposure: 0.5 },
+    dryRun: false,
     expectedGraphRevision: dryRunPayload.sourceGraphRevision,
-    expectedRecipeHash: initialRecipeHash,
     operationId: 'agent_dispatch_stale_3163',
-    requestId: 'agent-dispatch-stale-1',
+    patch: { exposure: 0.5 },
     sessionId: 'agent-dispatch-3163',
-  },
+  }),
   'dispatch-stale-1',
 );
-if (staleApply.dispatchStatus !== 'rejected' || !staleApply.message?.includes('stale recipe hash')) {
+if (staleApply.dispatchStatus !== 'rejected' || !staleApply.message?.includes('stale graph revision')) {
   throw new Error('agent dispatch did not reject stale mutating tool calls.');
 }
 

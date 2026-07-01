@@ -1,4 +1,7 @@
 import {
+  ApprovalClass,
+  type ToneColorCommandEnvelopeV1,
+  type ToneColorDryRunResultV1,
   type ToneColorMutationResultV1,
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
@@ -125,6 +128,86 @@ export const hashBasicTonePreviewPixels = (pixels: readonly AgentLiveBasicTonePi
   Array.from(JSON.stringify(pixels))
     .reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 0)
     .toString(16);
+
+type TypedBasicToneCommand = Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.setBasicTone' }>;
+
+const buildTypedBasicToneDryRunCommand = (command: TypedBasicToneCommand): TypedBasicToneCommand => {
+  const {
+    acceptedDryRunPlanHash: _acceptedDryRunPlanHash,
+    acceptedDryRunPlanId: _acceptedDryRunPlanId,
+    ...parameters
+  } = command.parameters;
+
+  return {
+    ...command,
+    approval: {
+      approvalClass: ApprovalClass.PreviewOnly,
+      reason: 'Preview typed basic tone command before mutating the live editor.',
+      state: 'not_required',
+    },
+    dryRun: true,
+    parameters,
+  } as unknown as TypedBasicToneCommand;
+};
+
+export const dryRunBasicToneCommandInLiveEditor = async (
+  command: TypedBasicToneCommand,
+): Promise<ToneColorDryRunResultV1> => {
+  if (!command.dryRun) throw new Error('Live editor typed basic-tone dry-run requires dryRun=true.');
+  if (command.expectedGraphRevision !== `history_${useEditorStore.getState().historyIndex}`) {
+    throw new Error('Live editor typed basic-tone dry-run rejected stale graph revision.');
+  }
+
+  const bridge = createLiveEditorAppServerBridge();
+  const dryRun = await bridge.dispatch(command);
+  if (!dryRun.ok) throw new Error(`Typed basic-tone dry-run failed: ${dryRun.message}`);
+  return toneColorDryRunResultV1Schema.parse(dryRun.result);
+};
+
+export const applyBasicToneCommandToLiveEditor = async (
+  command: TypedBasicToneCommand,
+): Promise<ToneColorMutationResultV1> => {
+  if (command.dryRun) throw new Error('Live editor typed basic-tone apply requires dryRun=false.');
+  if (command.expectedGraphRevision !== `history_${useEditorStore.getState().historyIndex}`) {
+    throw new Error('Live editor typed basic-tone apply rejected stale graph revision.');
+  }
+  if (
+    command.parameters.acceptedDryRunPlanHash === undefined ||
+    command.parameters.acceptedDryRunPlanId === undefined
+  ) {
+    throw new Error('Live editor typed basic-tone apply requires accepted dry-run plan identity.');
+  }
+
+  const bridge = createLiveEditorAppServerBridge();
+  const dryRun = await bridge.dispatch(buildTypedBasicToneDryRunCommand(command));
+  if (!dryRun.ok) throw new Error(`Typed basic-tone apply preflight failed: ${dryRun.message}`);
+  const dryRunResult = toneColorDryRunResultV1Schema.parse(dryRun.result);
+  if (
+    dryRunResult.dryRunPlanHash !== command.parameters.acceptedDryRunPlanHash ||
+    dryRunResult.dryRunPlanId !== command.parameters.acceptedDryRunPlanId
+  ) {
+    throw new Error('Live editor typed basic-tone apply rejected a mismatched dry-run plan identity.');
+  }
+
+  const apply = await bridge.dispatch(command);
+  if (!apply.ok) throw new Error(`Typed basic-tone apply failed: ${apply.message}`);
+  const mutation = toneColorMutationResultV1Schema.parse(apply.result);
+  const basicToneCommand = command as unknown as BasicToneCommandEnvelope;
+
+  useEditorStore.setState((state) => {
+    const adjustments = applyBasicToneCommandEnvelopeToAdjustments(state.adjustments, basicToneCommand);
+    const history = pushEditHistoryEntry(state.history, state.historyIndex, adjustments);
+    return {
+      adjustments,
+      history: history.history,
+      historyIndex: history.historyIndex,
+      lastBasicToneCommand: basicToneCommand,
+      uncroppedAdjustedPreviewUrl: null,
+    };
+  });
+
+  return mutation;
+};
 
 export const applyBasicToneToLiveEditor = async ({
   acceptedPlanHash,
