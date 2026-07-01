@@ -65,10 +65,15 @@ import {
 } from '../schemas/agent/agentRuntimeSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import {
+  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_INPUT_SCHEMA_NAME,
+  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_OUTPUT_SCHEMA_NAME,
+  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME,
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_INPUT_SCHEMA_NAME,
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_OUTPUT_SCHEMA_NAME,
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
+  agentCurrentImagePreviewLoopApplyReviewRequestSchema,
   agentCurrentImagePreviewLoopRequestSchema,
+  applyAgentCurrentImagePreviewLoopReviewedEdit,
   runAgentCurrentImagePreviewLoop,
 } from './agent/context/agentCurrentImagePreviewLoop';
 import { buildAgentImageContextSnapshot } from './agent/context/agentImageContextSnapshot';
@@ -644,6 +649,15 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       toolNames: [AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME],
     }),
     buildRouteCatalogEntry({
+      commandName: AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.ApplyDryRunPlan],
+      outputSchemaNames: [AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-selected-image-preview-loop'],
+      toolNames: [AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
       commandName: AGENT_COLOR_APPLY_TOOL_NAME,
       family: 'agent',
       inputSchemaNames: [AGENT_COLOR_APPLY_INPUT_SCHEMA_NAME],
@@ -1121,6 +1135,7 @@ const rejectToolDispatch = ({
 const APPROVED_AGENT_APP_SERVER_TOOL_NAMES = new Set<string>([
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
   AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
+  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME,
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
   AGENT_COLOR_APPLY_TOOL_NAME,
   AGENT_CURVE_LEVELS_APPLY_TOOL_NAME,
@@ -1198,6 +1213,11 @@ const dispatchAgentAppServerTool = async (
     case AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME:
       result = await runAgentCurrentImagePreviewLoop(
         agentCurrentImagePreviewLoopRequestSchema.parse(request.arguments),
+      );
+      break;
+    case AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME:
+      result = await applyAgentCurrentImagePreviewLoopReviewedEdit(
+        agentCurrentImagePreviewLoopApplyReviewRequestSchema.parse(request.arguments),
       );
       break;
     case AGENT_COLOR_APPLY_TOOL_NAME:

@@ -12,6 +12,8 @@ import {
 export const AGENT_STATE_GET_TOOL_NAME = 'rawengine.agent.state.get';
 export const AGENT_PREVIEW_RENDER_TOOL_NAME = 'rawengine.agent.preview.render';
 export const AGENT_PREVIEW_COMPARE_TOOL_NAME = 'rawengine.agent.preview.compare';
+export const AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX = 1536;
+export const AGENT_MEDIUM_PREVIEW_QUALITY = 0.86;
 export const AGENT_STATE_GET_INPUT_SCHEMA_NAME = 'AgentStateGetRequestV1';
 export const AGENT_STATE_GET_OUTPUT_SCHEMA_NAME = 'AgentStateGetResponseV1';
 export const AGENT_PREVIEW_RENDER_INPUT_SCHEMA_NAME = 'AgentPreviewRenderRequestV1';
@@ -46,7 +48,7 @@ export const agentPreviewRenderRequestSchema = z
       })
       .optional(),
     expectedRecipeHash: z.string().trim().min(1).optional(),
-    longEdgePx: z.number().int().min(256).max(2048).default(1536),
+    longEdgePx: z.number().int().min(256).max(2048).default(AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX),
     maxPixelCount: z
       .number()
       .int()
@@ -54,7 +56,7 @@ export const agentPreviewRenderRequestSchema = z
       .max(AGENT_PREVIEW_MAX_PIXEL_COUNT)
       .default(AGENT_PREVIEW_MAX_PIXEL_COUNT),
     purpose: z.enum(['detail_review', 'initial_context', 'refresh']).default('refresh'),
-    quality: z.number().min(0.5).max(0.95).default(0.86),
+    quality: z.number().min(0.5).max(0.95).default(AGENT_MEDIUM_PREVIEW_QUALITY),
     requestId: z.string().trim().min(1),
     zoom: z
       .object({
@@ -72,14 +74,14 @@ export const agentPreviewCompareRequestSchema = z
     beforeGraphRevision: z.string().trim().min(1).optional(),
     beforeRecipeHash: z.string().trim().min(1).optional(),
     expectedRecipeHash: z.string().trim().min(1).optional(),
-    longEdgePx: z.number().int().min(256).max(2048).default(1536),
+    longEdgePx: z.number().int().min(256).max(2048).default(AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX),
     maxPixelCount: z
       .number()
       .int()
       .min(65_536)
       .max(AGENT_PREVIEW_MAX_PIXEL_COUNT)
       .default(AGENT_PREVIEW_MAX_PIXEL_COUNT),
-    quality: z.number().min(0.5).max(0.95).default(0.86),
+    quality: z.number().min(0.5).max(0.95).default(AGENT_MEDIUM_PREVIEW_QUALITY),
     requestId: z.string().trim().min(1),
   })
   .strict();
