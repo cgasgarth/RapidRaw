@@ -1285,7 +1285,7 @@ const dispatchAgentAppServerTool = async (
       );
       break;
     case AGENT_COLOR_APPLY_TOOL_NAME:
-      result = applyAgentColor(agentColorApplyRequestSchema.parse(request.arguments));
+      result = await applyAgentColor(agentColorApplyRequestSchema.parse(request.arguments));
       break;
     case AGENT_CURVE_LEVELS_APPLY_TOOL_NAME:
       result = applyAgentCurveLevels(agentCurveLevelsApplyRequestSchema.parse(request.arguments));
