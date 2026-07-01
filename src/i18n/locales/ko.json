@@ -340,6 +340,9 @@
         "curves": "Tone Curves",
         "details": "Detail",
         "effects": "Effects & Looks"
+      },
+      "rawProcessingModeOverride": {
+        "attention": "Check"
       }
     },
     "ai": {

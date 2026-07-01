@@ -33,9 +33,9 @@ export const VITE_BUNDLE_BUDGET_POLICY = {
     {
       extension: '.css',
       label: 'Largest CSS asset',
-      maxBytes: 163_840,
+      maxBytes: 172_032,
       maxGzipBytes: 26_624,
-      warnBytes: 147_456,
+      warnBytes: 154_829,
       warnGzipBytes: 23_962,
     },
   ],

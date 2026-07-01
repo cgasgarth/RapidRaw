@@ -33,6 +33,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   PanoramaProcessingCommand: 'panorama-processing-command',
   PanoramaSavedReview: 'panorama-saved-review',
   PanoramaUi: 'panorama-ui',
+  ProfessionalEditorTokens: 'professional-editor-tokens',
   SrPrivateRawModalReview: 'sr-private-raw-modal-review',
   SrPrivateRawUi: 'sr-private-raw-ui',
   SrUi: 'sr-ui',
@@ -247,6 +248,13 @@ export const VISUAL_SMOKE_SCENARIOS = [
     mode: VISUAL_SMOKE_SCENARIO_IDS.WorkflowRail,
     outputFile: 'workflow-rail.png',
     sectionMinimum: 2,
+  },
+  {
+    compactOutputFile: 'professional-editor-tokens-compact.png',
+    marker: 'Professional editor tokens',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorTokens,
+    outputFile: 'professional-editor-tokens-desktop.png',
+    sectionMinimum: 3,
   },
   {
     marker: 'Local Adjustment Stack',

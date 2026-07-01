@@ -545,6 +545,7 @@
         "resetSectionSettings": "{{section}}-Einstellungen zurücksetzen"
       },
       "rawProcessingModeOverride": {
+        "attention": "Check",
         "currentValue": "",
         "description": "Globale RAW-Qualitat fur dieses Bild uberschreiben.",
         "error": "RAW-Modus-Uberschreibung fehlgeschlagen: {{error}}",

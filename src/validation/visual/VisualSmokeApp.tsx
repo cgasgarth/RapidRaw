@@ -1,6 +1,7 @@
-import { Camera, CircleGauge, FolderOpen, Layers3, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { Camera, CircleGauge, FolderOpen, Layers3, RotateCcw, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import AdjustmentSlider from '../../components/adjustments/AdjustmentSlider';
 import ColorPanel from '../../components/adjustments/Color';
 import DetailsPanel from '../../components/adjustments/Details';
 import EffectsPanel from '../../components/adjustments/Effects';
@@ -29,6 +30,11 @@ import {
   SortDirection,
 } from '../../components/ui/AppProperties';
 import { Status } from '../../components/ui/ExportImportProperties';
+import { editorChromeStatusChipClassName, editorChromeTokens } from '../../components/ui/editorChromeTokens';
+import Button from '../../components/ui/primitives/Button';
+import Dropdown from '../../components/ui/primitives/Dropdown';
+import Input from '../../components/ui/primitives/Input';
+import Switch from '../../components/ui/primitives/Switch';
 import { ContextMenuProvider } from '../../context/ContextMenuContext';
 import {
   DEFAULT_HDR_MERGE_UI_SETTINGS,
@@ -290,6 +296,169 @@ function AdjustmentsPanelRetuneVisualSmoke() {
   );
 }
 
+function ProfessionalEditorTokensVisualSmoke() {
+  const [sliderValue, setSliderValue] = useState(18);
+  const [isSwitchChecked, setIsSwitchChecked] = useState(true);
+  const [dropdownValue, setDropdownValue] = useState<'balanced' | 'proof' | 'mask'>('balanced');
+  const token = editorChromeTokens;
+  const focusStateClass = 'ring-2 ring-editor-focus-ring ring-offset-1 ring-offset-editor-matte outline-none';
+
+  return (
+    <main
+      className="min-h-screen bg-editor-matte p-5 font-sans text-text-primary max-[700px]:p-3"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorTokens}
+      data-visual-smoke-ready="true"
+    >
+      <div className="mx-auto grid h-[calc(100vh-40px)] max-w-6xl grid-cols-[minmax(0,1fr)_360px] overflow-hidden rounded-lg border border-editor-border bg-editor-panel shadow-[0_14px_34px_var(--editor-overlay-shadow)] max-[700px]:h-auto max-[700px]:min-h-[calc(100vh-24px)] max-[700px]:grid-cols-1">
+        <section
+          className="relative flex min-h-0 items-center justify-center overflow-hidden border-r border-editor-border bg-editor-panel-well p-6 max-[700px]:min-h-[280px] max-[700px]:flex-col max-[700px]:items-stretch max-[700px]:border-r-0 max-[700px]:border-b"
+          data-visual-smoke-section="professional-editor-preview"
+        >
+          <div className="absolute left-4 top-4 flex gap-1.5 max-[700px]:static max-[700px]:mb-2 max-[700px]:flex-wrap">
+            {(['success', 'warning', 'danger', 'info'] as const).map((status) => (
+              <span className={editorChromeStatusChipClassName(status)} key={status}>
+                {status}
+              </span>
+            ))}
+          </div>
+          <div className="aspect-[4/3] w-full max-w-3xl overflow-hidden rounded-md border border-editor-overlay-stroke bg-[linear-gradient(135deg,#182329,#405559_38%,#9c8d68_63%,#efe1bf)] shadow-[0_24px_52px_var(--editor-overlay-shadow)]">
+            <div className="h-full w-full bg-[radial-gradient(circle_at_34%_30%,rgba(255,255,238,0.54),transparent_18%),linear-gradient(165deg,transparent_48%,rgba(12,18,23,0.68)_49%)]" />
+          </div>
+        </section>
+
+        <aside
+          className="grid min-h-0 grid-cols-[42px_minmax(0,1fr)] bg-editor-panel max-[700px]:grid-cols-1"
+          data-visual-smoke-section="professional-editor-controls"
+        >
+          <nav
+            aria-label={copy.professionalEditorModeRail}
+            className="flex flex-col items-center gap-1 border-r border-editor-border bg-editor-matte p-1.5 max-[700px]:h-[42px] max-[700px]:flex-row max-[700px]:border-r-0 max-[700px]:border-b"
+          >
+            <button
+              aria-label={copy.professionalEditorAdjust}
+              aria-pressed="true"
+              className={`${token.button.base} ${token.button.iconCompact} ${token.button.selectedQuiet} ${token.focusRing}`}
+              type="button"
+            >
+              <SlidersHorizontal size={15} />
+            </button>
+            <button
+              aria-label={copy.professionalEditorAi}
+              className={`${token.button.base} ${token.button.iconCompact} ${token.button.quiet} ${focusStateClass}`}
+              type="button"
+            >
+              <Sparkles size={15} />
+            </button>
+            <button
+              aria-label={copy.professionalEditorReset}
+              className={`${token.button.base} ${token.button.iconCompact} ${token.button.quiet} ${token.focusRing}`}
+              disabled={true}
+              type="button"
+            >
+              <RotateCcw size={15} />
+            </button>
+          </nav>
+
+          <div className="min-h-0 overflow-y-auto">
+            <header className="flex min-h-9 items-center justify-between border-b border-editor-border px-3">
+              <h1 className={token.typography.panelTitle}>{copy.professionalEditorTokens}</h1>
+              <span className={editorChromeStatusChipClassName('neutral')}>{copy.professionalEditorMatte}</span>
+            </header>
+
+            <div className="space-y-3 p-3">
+              <section className="space-y-2" data-visual-smoke-section="professional-editor-state-matrix">
+                <div className="flex items-center justify-between">
+                  <h2 className={token.typography.inspectorLabel}>{copy.professionalEditorControlStates}</h2>
+                  <span className={editorChromeStatusChipClassName('info')}>{copy.professionalEditorFocus}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[11px] max-[700px]:grid-cols-3">
+                  <Button onClick={() => {}} variant="editorPrimary">
+                    {copy.professionalEditorApply}
+                  </Button>
+                  <Button onClick={() => {}} variant="editorQuiet">
+                    {copy.professionalEditorHover}
+                  </Button>
+                  <Button onClick={() => {}} variant="editorSelected" aria-pressed="true">
+                    {copy.professionalEditorActive}
+                  </Button>
+                  <Button onClick={() => {}} variant="editorDestructive">
+                    {copy.professionalEditorReset}
+                  </Button>
+                  <Button onClick={() => {}} variant="editorQuiet" disabled={true}>
+                    {copy.professionalEditorDisabled}
+                  </Button>
+                  <Button onClick={() => {}} variant="editorQuiet" aria-busy="true">
+                    {copy.professionalEditorLoading}
+                  </Button>
+                </div>
+              </section>
+
+              <section className="space-y-2 rounded-md border border-editor-border bg-editor-panel-well p-2">
+                <div className="flex items-center justify-between">
+                  <h2 className={token.typography.inspectorLabel}>{copy.professionalEditorCompactRow}</h2>
+                  <span className={editorChromeStatusChipClassName('success')}>{copy.professionalEditorReady}</span>
+                </div>
+                <Input
+                  autoFocus={true}
+                  chrome="editor"
+                  density="compact"
+                  aria-label="Focused exposure value"
+                  defaultValue="+0.18 EV"
+                />
+                <Dropdown
+                  chrome="editor"
+                  options={[
+                    { label: 'Balanced RAW', value: 'balanced' },
+                    { label: 'Soft proof', value: 'proof' },
+                    { label: 'Mask edit', value: 'mask' },
+                  ]}
+                  value={dropdownValue}
+                  onChange={setDropdownValue}
+                />
+                <Switch
+                  chrome="editor"
+                  checked={isSwitchChecked}
+                  label="Highlight warnings"
+                  onChange={setIsSwitchChecked}
+                />
+                <AdjustmentSlider
+                  density="compact"
+                  label="Clarity"
+                  max={100}
+                  min={-100}
+                  onValueChange={setSliderValue}
+                  step={1}
+                  value={sliderValue}
+                />
+                <AdjustmentSlider
+                  density="compact"
+                  disabled={true}
+                  label="Disabled row"
+                  max={100}
+                  min={0}
+                  onValueChange={() => {}}
+                  step={1}
+                  value={34}
+                  fillOrigin="min"
+                />
+              </section>
+
+              <section className="grid grid-cols-2 gap-2 text-[11px] max-[700px]:grid-cols-3">
+                {(['success', 'warning', 'danger', 'info'] as const).map((status) => (
+                  <div className="rounded border border-editor-border bg-editor-panel-raised p-2" key={status}>
+                    <span className={editorChromeStatusChipClassName(status)}>{status}</span>
+                    <p className="mt-1 font-mono tabular-nums text-text-secondary">{copy.professionalEditorRailSize}</p>
+                  </div>
+                ))}
+              </section>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
+
 const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune]: AdjustmentsPanelRetuneVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.AgentChatUi]: AgentChatVisualSmoke,
@@ -322,6 +491,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaProcessingCommand]: PanoramaProcessingCommandVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaSavedReview]: PanoramaSavedReviewVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaUi]: PanoramaVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorTokens]: ProfessionalEditorTokensVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawModalReview]: SuperResolutionPrivateRawModalReviewSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi]: SuperResolutionPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrUi]: SuperResolutionVisualSmoke,
@@ -1263,7 +1433,7 @@ function DetailDustSpotVisualSmoke() {
               <span
                 className={`absolute rounded-full border ${
                   adjustments.dustSpotOverlayEnabled
-                    ? 'border-red-200 bg-red-500/25 shadow-[0_0_18px_rgba(248,113,113,0.55)]'
+                    ? 'border-editor-danger bg-editor-danger-surface shadow-[0_0_18px_var(--editor-danger-surface)]'
                     : 'border-white/10 bg-white/5'
                 }`}
                 key={left}
@@ -1314,6 +1484,22 @@ const copy = {
   colorRangeOverlayCoverageSuffix: '% proposal coverage',
   colorRangeReceiptTitle: 'Range mask receipt',
   colorRangeReplayReady: 'Replay ready',
+  professionalEditorTokens: 'Professional editor tokens',
+  professionalEditorMatte: 'matte',
+  professionalEditorModeRail: 'Editor mode rail',
+  professionalEditorAdjust: 'Adjust',
+  professionalEditorAi: 'AI',
+  professionalEditorApply: 'Apply',
+  professionalEditorHover: 'Hover',
+  professionalEditorActive: 'Active',
+  professionalEditorControlStates: 'Control states',
+  professionalEditorFocus: 'focus',
+  professionalEditorReset: 'Reset',
+  professionalEditorDisabled: 'Disabled',
+  professionalEditorLoading: 'Loading',
+  professionalEditorCompactRow: 'Compact inspector row',
+  professionalEditorReady: 'ready',
+  professionalEditorRailSize: '42 px rail',
   focusStackSmoke: 'Focus Stack Smoke',
   focusReview: 'Focus review',
   focusDryRunPreview: 'Dry-run preview',

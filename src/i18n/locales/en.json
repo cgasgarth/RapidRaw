@@ -545,6 +545,7 @@
         "resetSectionSettings": "Reset {{section}} Settings"
       },
       "rawProcessingModeOverride": {
+        "attention": "Check",
         "currentValue": "Current quality: {{mode}}",
         "description": "Override the global RAW quality mode for this image.",
         "error": "Failed to apply RAW mode override: {{error}}",

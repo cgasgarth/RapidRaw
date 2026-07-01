@@ -1,9 +1,12 @@
 import cx from 'clsx';
 import { forwardRef, type InputHTMLAttributes } from 'react';
+import { editorChromeTokens } from '../editorChromeTokens';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   bgClassName?: string;
   className?: string;
+  chrome?: 'app' | 'editor';
+  density?: 'default' | 'compact';
 }
 
 /**
@@ -14,24 +17,39 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
  * @param {string} type - The type of the input (e.g., 'text', 'password', 'email').
  * @param {object} props - Other standard input props (value, onChange, placeholder, etc.).
  */
-const Input = forwardRef<HTMLInputElement, InputProps>(({ className, type = 'text', bgClassName, ...props }, ref) => {
-  return (
-    <input
-      className={cx(
-        'flex h-10 w-full rounded-md border px-3 py-2 text-sm',
-        'border-border-color text-text-primary placeholder:text-text-secondary',
-        'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent',
-        'disabled:cursor-not-allowed disabled:opacity-50',
-        'file:border-0 file:bg-transparent file:text-sm file:font-medium',
-        bgClassName || 'bg-surface',
-        className,
-      )}
-      ref={ref}
-      type={type}
-      {...props}
-    />
-  );
-});
+const Input = forwardRef<HTMLInputElement, InputProps>(
+  ({ className, type = 'text', bgClassName, chrome = 'app', density = 'default', ...props }, ref) => {
+    const editorClasses =
+      chrome === 'editor'
+        ? cx(
+            'flex w-full',
+            editorChromeTokens.input.base,
+            editorChromeTokens.focusRing,
+            density === 'compact' ? editorChromeTokens.input.compact : editorChromeTokens.input.default,
+            type === 'number' && editorChromeTokens.input.numeric,
+          )
+        : null;
+
+    return (
+      <input
+        className={cx(
+          editorClasses ?? [
+            'flex h-10 w-full rounded-md border px-3 py-2 text-sm',
+            'border-border-color text-text-primary placeholder:text-text-secondary',
+            'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+            bgClassName || 'bg-surface',
+          ],
+          'file:border-0 file:bg-transparent file:text-sm file:font-medium',
+          className,
+        )}
+        ref={ref}
+        type={type}
+        {...props}
+      />
+    );
+  },
+);
 
 Input.displayName = 'Input';
 

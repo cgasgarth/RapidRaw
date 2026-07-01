@@ -47,6 +47,7 @@ export default function DetailsPanel({
             {t('adjustments.details.deblur')}
           </UiText>
           <Switch
+            chrome="editor"
             checked={adjustments.deblurEnabled}
             label={t('adjustments.details.enableDeblur')}
             onChange={(checked) => {
@@ -94,6 +95,7 @@ export default function DetailsPanel({
             {t('adjustments.details.dustSpotVisualization')}
           </UiText>
           <Switch
+            chrome="editor"
             checked={adjustments.dustSpotOverlayEnabled}
             label={t('adjustments.details.showDustOverlay')}
             onChange={(checked) => {
@@ -107,7 +109,7 @@ export default function DetailsPanel({
                   aria-hidden="true"
                   className={`absolute rounded-full border ${
                     adjustments.dustSpotOverlayEnabled
-                      ? 'border-red-300 bg-red-500/25 shadow-[0_0_12px_rgba(248,113,113,0.45)]'
+                      ? 'border-editor-danger bg-editor-danger-surface shadow-[0_0_12px_var(--editor-danger-surface)]'
                       : 'border-white/10 bg-white/5'
                   }`}
                   key={left}

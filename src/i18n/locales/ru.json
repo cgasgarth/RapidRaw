@@ -558,6 +558,7 @@
         "resetSectionSettings": "Сбросить настройки раздела «{{section}}»"
       },
       "rawProcessingModeOverride": {
+        "attention": "Check",
         "currentValue": "",
         "description": "",
         "error": "",
