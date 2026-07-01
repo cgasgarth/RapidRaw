@@ -640,6 +640,9 @@
           "finalRevision": "Final revision",
           "html": "HTML",
           "initialRevision": "Initial revision",
+          "replayBlocked": "Replay blocked: {{reason}}",
+          "replayCheck": "Check replay lineage",
+          "replayReady": "Replay lineage ready: {{hash}}",
           "target": "Target",
           "title": "Audit transcript",
           "uiOnly": "Local HTML evidence only; no edits are applied."

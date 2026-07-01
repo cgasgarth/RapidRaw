@@ -217,9 +217,47 @@ export const agentSelectedImageLiveSessionAuditRecordSchema = z
   })
   .strict();
 
+export const agentSelectedImageLiveSessionAuditStoreSchema = z
+  .object({
+    records: z.array(agentSelectedImageLiveSessionAuditRecordSchema),
+    schemaVersion: z.literal(1),
+  })
+  .strict();
+
+export const agentSelectedImageLiveSessionReplayPreflightSchema = z
+  .object({
+    currentGraphRevision: z.string().trim().min(1),
+    currentPreviewArtifactId: z.string().trim().min(1),
+    currentRecipeHash: z.string().trim().min(1),
+    currentSelectedImagePath: z.string().trim().min(1),
+    expectedGraphRevision: z.string().trim().min(1),
+    expectedPreviewArtifactId: z.string().trim().min(1),
+    expectedRecipeHash: z.string().trim().min(1),
+    expectedSelectedImagePath: z.string().trim().min(1),
+    replayPreviewHash: z.string().trim().min(1),
+    sessionId: z.string().trim().min(1),
+    staleReason: z
+      .enum([
+        'graph_revision_changed',
+        'image_changed',
+        'preview_artifact_changed',
+        'preview_dimensions_changed',
+        'preview_identity_changed',
+        'recipe_hash_changed',
+      ])
+      .optional(),
+    status: z.enum(['ready', 'stale']),
+    toolCallCount: z.number().int().positive(),
+  })
+  .strict();
+
 export type AgentSelectedImageLiveSessionAuditEvent = z.infer<typeof selectedImageLiveSessionAuditEventSchema>;
 export type AgentSelectedImageLiveSessionAuditRecord = z.infer<typeof agentSelectedImageLiveSessionAuditRecordSchema>;
+export type AgentSelectedImageLiveSessionAuditStore = z.infer<typeof agentSelectedImageLiveSessionAuditStoreSchema>;
 export type AgentSelectedImageLiveSessionApplyGuard = z.infer<typeof selectedImageLiveSessionApplyGuardSchema>;
+export type AgentSelectedImageLiveSessionReplayPreflight = z.infer<
+  typeof agentSelectedImageLiveSessionReplayPreflightSchema
+>;
 export type AgentSelectedImageLiveSessionReceipt = z.infer<typeof agentSelectedImageLiveSessionReceiptSchema>;
 export type AgentSelectedImageLiveSessionTranscriptEntry = z.infer<
   typeof selectedImageLiveSessionTranscriptEntrySchema
@@ -244,6 +282,11 @@ export interface AgentSelectedImageLiveSessionApplyResult {
   audit: AgentSelectedImageLiveSessionAuditRecord;
   previewAfterHash: string;
   previewBeforeHash: string;
+}
+
+export interface AgentSelectedImageLiveSessionAuditStorageAdapter {
+  readText: () => string | null;
+  writeText: (value: string) => void;
 }
 
 const buildSnapshot = (): z.infer<typeof selectedImageLiveSessionSnapshotSchema> => {
@@ -338,6 +381,49 @@ export const getAgentSelectedImageLiveSessionStaleReason = (
   draft: AgentSelectedImageLiveSessionDraft,
 ): AgentSelectedImageLiveSessionStaleReason | null => {
   return getAgentSelectedImageLiveSessionStaleReasonForSnapshot(draft, buildSnapshot());
+};
+
+export const parseAgentSelectedImageLiveSessionAuditStore = (
+  value: string | null,
+): AgentSelectedImageLiveSessionAuditStore => {
+  if (value === null) return { records: [], schemaVersion: 1 };
+
+  let parsedValue: unknown;
+  try {
+    parsedValue = JSON.parse(value);
+  } catch {
+    return { records: [], schemaVersion: 1 };
+  }
+
+  const currentStore = agentSelectedImageLiveSessionAuditStoreSchema.safeParse(parsedValue);
+  if (currentStore.success) return currentStore.data;
+
+  const legacyRecords = z.array(agentSelectedImageLiveSessionAuditRecordSchema).safeParse(parsedValue);
+  if (legacyRecords.success) {
+    return agentSelectedImageLiveSessionAuditStoreSchema.parse({
+      records: legacyRecords.data,
+      schemaVersion: 1,
+    });
+  }
+
+  return { records: [], schemaVersion: 1 };
+};
+
+export const readAgentSelectedImageLiveSessionAuditStore = (
+  adapter: AgentSelectedImageLiveSessionAuditStorageAdapter,
+): AgentSelectedImageLiveSessionAuditStore => parseAgentSelectedImageLiveSessionAuditStore(adapter.readText());
+
+export const appendAgentSelectedImageLiveSessionAuditRecord = (
+  adapter: AgentSelectedImageLiveSessionAuditStorageAdapter,
+  record: AgentSelectedImageLiveSessionAuditRecord,
+): AgentSelectedImageLiveSessionAuditStore => {
+  const store = readAgentSelectedImageLiveSessionAuditStore(adapter);
+  const nextStore = agentSelectedImageLiveSessionAuditStoreSchema.parse({
+    records: [...store.records, agentSelectedImageLiveSessionAuditRecordSchema.parse(record)],
+    schemaVersion: 1,
+  });
+  adapter.writeText(JSON.stringify(nextStore));
+  return nextStore;
 };
 
 export const startAgentSelectedImageLiveSessionDryRun = async ({
@@ -899,6 +985,41 @@ export const replayAgentSelectedImageLiveSessionAudit = (
     }
   }
   return receipt;
+};
+
+export const preflightAgentSelectedImageLiveSessionAuditReplay = (
+  audit: AgentSelectedImageLiveSessionAuditRecord,
+): AgentSelectedImageLiveSessionReplayPreflight => {
+  const receipt = replayAgentSelectedImageLiveSessionAudit(audit);
+  const current = buildSnapshot();
+  const staleReason = getAgentSelectedImageLiveSessionReplayStaleReason(receipt, current);
+
+  return agentSelectedImageLiveSessionReplayPreflightSchema.parse({
+    currentGraphRevision: current.graphRevision,
+    currentPreviewArtifactId: current.previewArtifactId,
+    currentRecipeHash: current.recipeHash,
+    currentSelectedImagePath: current.selectedImagePath,
+    expectedGraphRevision: receipt.initialGraphRevision,
+    expectedPreviewArtifactId: receipt.acceptedPreviewArtifactId,
+    expectedRecipeHash: receipt.initialRecipeHash,
+    expectedSelectedImagePath: receipt.selectedImagePath,
+    replayPreviewHash: receipt.afterPreviewHash ?? receipt.beforePreviewHash,
+    sessionId: receipt.sessionId,
+    staleReason: staleReason ?? undefined,
+    status: staleReason === null ? 'ready' : 'stale',
+    toolCallCount: receipt.toolCalls.length,
+  });
+};
+
+const getAgentSelectedImageLiveSessionReplayStaleReason = (
+  receipt: AgentSelectedImageLiveSessionReceipt,
+  current: z.infer<typeof selectedImageLiveSessionSnapshotSchema>,
+): AgentSelectedImageLiveSessionStaleReason | null => {
+  if (current.selectedImagePath !== receipt.selectedImagePath) return 'image_changed';
+  if (current.graphRevision !== receipt.initialGraphRevision) return 'graph_revision_changed';
+  if (current.recipeHash !== receipt.initialRecipeHash) return 'recipe_hash_changed';
+  if (current.previewArtifactId !== receipt.acceptedPreviewArtifactId) return 'preview_artifact_changed';
+  return null;
 };
 
 const verifyAgentSelectedImageLiveSessionTranscript = (audit: AgentSelectedImageLiveSessionAuditRecord): void => {
