@@ -721,6 +721,7 @@ pub fn composite_patches_on_image(
                 name: patch_info.name,
                 visible: true,
                 invert: patch_info.invert,
+                blend_mode: "normal".to_string(),
                 opacity: 100.0,
                 adjustments: Value::Null,
                 sub_masks: patch_info.sub_masks,

@@ -261,7 +261,7 @@ pub struct MaskAdjustments {
     pub flare_amount: f32,
     pub sharpness_threshold: f32,
     pub hue: f32,
-    pub(crate) _pad_cg1: f32,
+    pub blend_mode: f32,
     pub(crate) _pad_cg2: f32,
     pub color_grading_shadows: ColorGradeSettings,
     pub color_grading_midtones: ColorGradeSettings,

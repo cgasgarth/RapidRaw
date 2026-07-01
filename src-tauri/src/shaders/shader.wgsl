@@ -200,7 +200,7 @@ struct MaskAdjustments {
     sharpness_threshold: f32,
 
     hue: f32,
-    _pad_cg1: f32,
+    blend_mode: f32,
     _pad_cg2: f32,
     color_grading_shadows: ColorGradeSettings,
     color_grading_midtones: ColorGradeSettings,
@@ -261,6 +261,16 @@ const BLACK_WHITE_MIXER_RANGE_CENTERS: array<f32, 8> = array<f32, 8>(
     280.0,
     330.0,
 );
+
+fn blend_mask_layer(base: vec3<f32>, layer: vec3<f32>, influence: f32, blend_mode: f32) -> vec3<f32> {
+    var blended = layer;
+    if (blend_mode > 0.5 && blend_mode < 1.5) {
+        blended = base * layer;
+    } else if (blend_mode > 1.5 && blend_mode < 2.5) {
+        blended = 1.0 - (1.0 - base) * (1.0 - layer);
+    }
+    return mix(base, blended, influence);
+}
 
 const BLACK_WHITE_MIXER_RANGE_WIDTHS: array<f32, 8> = array<f32, 8>(
     35.0,
@@ -1870,7 +1880,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
                 composite_rgb_linear,
                 m.color_grading_shadows, m.color_grading_midtones, m.color_grading_highlights, m.color_grading_global, m.color_grading_blending, m.color_grading_balance
             );
-            composite_rgb_linear = mix(composite_rgb_linear, mask_graded, influence);
+            composite_rgb_linear = blend_mask_layer(composite_rgb_linear, mask_graded, influence, m.blend_mode);
         }
     }
 
@@ -1926,7 +1936,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
                 m.green_curve, m.green_curve_count,
                 m.blue_curve, m.blue_curve_count
             );
-            final_rgb = mix(final_rgb, mask_curved_srgb, influence);
+            final_rgb = blend_mask_layer(final_rgb, mask_curved_srgb, influence, m.blend_mode);
         }
     }
 
