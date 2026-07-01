@@ -4,6 +4,16 @@ import {
   type RawEngineAppServerToolDispatchRequest,
 } from '../../../schemas/agent/agentRuntimeSchemas';
 import { handleRawEngineAppServerHostRequestAsync } from '../../rawEngineAppServerHost';
+import {
+  AGENT_EXPORT_PROOF_TOOL_NAME,
+  AGENT_FINAL_EXPORT_TOOL_NAME,
+  type AgentExportProofRequest,
+  type AgentExportProofResponse,
+  type AgentFinalExportRequest,
+  type AgentFinalExportResponse,
+  agentExportProofResponseSchema,
+  agentFinalExportResponseSchema,
+} from '../safety/agentExportProofTool';
 
 const agentLiveToolDispatchResultSchema = z.looseObject({
   dispatchStatus: z.enum(['completed']),
@@ -33,3 +43,33 @@ export const dispatchAgentLiveEditorTool = async ({
   );
   return response.result;
 };
+
+export const dispatchAgentExportReviewTool = async ({
+  request,
+  requestId,
+}: {
+  request: AgentExportProofRequest;
+  requestId: string;
+}): Promise<AgentExportProofResponse> =>
+  agentExportProofResponseSchema.parse(
+    await dispatchAgentLiveEditorTool({
+      args: request,
+      requestId,
+      runtimeToolName: AGENT_EXPORT_PROOF_TOOL_NAME,
+    }),
+  );
+
+export const dispatchAgentFinalExportTool = async ({
+  request,
+  requestId,
+}: {
+  request: AgentFinalExportRequest;
+  requestId: string;
+}): Promise<AgentFinalExportResponse> =>
+  agentFinalExportResponseSchema.parse(
+    await dispatchAgentLiveEditorTool({
+      args: request,
+      requestId,
+      runtimeToolName: AGENT_FINAL_EXPORT_TOOL_NAME,
+    }),
+  );
