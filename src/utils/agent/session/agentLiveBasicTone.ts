@@ -14,9 +14,9 @@ import {
 import { useEditorStore } from '../../../store/useEditorStore';
 import {
   applyBasicToneCommandEnvelopeToAdjustments,
-  type BasicToneCommandEnvelope,
   type BasicToneCommandContextActor,
   type BasicToneCommandContextTarget,
+  type BasicToneCommandEnvelope,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
   type LegacyBasicToneAdjustmentPayload,
