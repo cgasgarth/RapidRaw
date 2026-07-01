@@ -482,7 +482,8 @@ const rejectedMismatchedToolCall = await handleRawEngineAppServerHostRequestAsyn
 if (
   !('dispatchStatus' in rejectedMismatchedToolCall) ||
   rejectedMismatchedToolCall.dispatchStatus !== 'rejected' ||
-  rejectedMismatchedToolCall.message?.includes('cannot dispatch') !== true
+  rejectedMismatchedToolCall.message?.includes('validation rejected') !== true ||
+  rejectedMismatchedToolCall.schemaIssues?.some((issue) => issue.path.join('.') === 'toolCall.approval.state') !== true
 ) {
   failures.push('Mismatched host tool dispatch must fail closed.');
 }

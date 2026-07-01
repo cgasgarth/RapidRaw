@@ -302,6 +302,20 @@ export const rawEngineAppServerToolDispatchRequestSchema = z
       .optional(),
     requestId: z.string().trim().min(1),
     runtimeToolName: z.string().trim().min(1),
+    toolCall: z
+      .object({
+        approval: z.unknown().optional(),
+        dryRun: z.boolean().optional(),
+        inputSchemaName: z.string().trim().min(1).optional(),
+        itemId: z.string().trim().min(1).optional(),
+        jsonRpcRequestId: z.union([z.string().trim().min(1), z.number().int().nonnegative()]).optional(),
+        threadId: z.string().trim().min(1).optional(),
+        toolKind: z.string().trim().min(1).optional(),
+        toolName: z.string().trim().min(1).optional(),
+        turnId: z.string().trim().min(1).optional(),
+      })
+      .strict()
+      .optional(),
     toolName: z.literal(RawEngineAppServerHostToolName.DispatchTool),
   })
   .strict();
@@ -384,6 +398,16 @@ export const rawEngineAppServerToolDispatchResponseSchema = z
     result: z.unknown().optional(),
     runtime: z.literal(AgentRuntimeId.AppServer),
     runtimeToolName: z.string().trim().min(1),
+    schemaIssues: z
+      .array(
+        z
+          .object({
+            message: z.string().trim().min(1),
+            path: z.array(z.string()),
+          })
+          .strict(),
+      )
+      .optional(),
     status: z.literal(RawEngineAppServerResponseStatus.Ok),
     transport: rawEngineAppServerTransportSchema,
   })
