@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 
 import { z } from 'zod';
 
+import { openComputationalMergeDerivedSourceV1 } from '../../../../packages/rawengine-schema/src/computational-merge/computationalMergeDerivedSourceRuntime.ts';
 import { HdrAppServerRuntimeToolBusV1 } from '../../../../packages/rawengine-schema/src/hdr/hdrAppServerRuntime.ts';
 import {
   ActorKind,
@@ -19,7 +20,13 @@ import {
   type ComputationalMergePrivateRunReportCollection,
   parseComputationalMergePrivateRunReportCollection,
 } from '../../../../src/schemas/computational-merge/computationalMergePrivateRunReportSchemas.ts';
+import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../../../src/schemas/computational-merge/hdrMergeUiSchemas.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
+import {
+  buildHdrDerivedOutputReceipt,
+  deriveDerivedOutputReceiptState,
+} from '../../../../src/utils/derivedOutputReceipt.ts';
+import { buildHdrEditableHandoffSummary } from '../../../../src/utils/hdrEditableHandoff.ts';
 
 const hdrRoutePair = getComputationalMergeAppServerRoutePairSummary('hdr');
 const ARTIFACT_ROOT = 'private-artifacts/validation/computational-merge';
@@ -27,6 +34,7 @@ const FIXTURE_ID = 'validation.computational-merge.hdr-bracket-alignment.v1';
 const SAMPLE_PATH = `${ARTIFACT_ROOT}/hdr-bracket-runtime-sample.json`;
 const PROOF_PATH = `${ARTIFACT_ROOT}/hdr-bracket-app-server-runtime-proof.json`;
 const REPORT_PATH = `${ARTIFACT_ROOT}/hdr-bracket-private-run-report.json`;
+const DERIVED_HDR_OUTPUT_PATH = `${ARTIFACT_ROOT}/hdr-bracket-export.tiff`;
 
 const runtimeSampleSchema = z
   .object({
@@ -81,6 +89,10 @@ async function runProof(rootPath: string): Promise<void> {
     toolName: hdrRoutePair.dryRunToolName,
   });
   if (dryRun.kind !== 'dry_run') throw new Error('Expected HDR private app-server dry-run result.');
+  const dryRunReview = dryRun.dryRun.provenance.derivedSourceReview;
+  if (dryRunReview.bracketReadiness === 'blocked') {
+    throw new Error(`HDR private app-server dry-run blocked: ${dryRunReview.blockCodes.join(', ')}.`);
+  }
 
   const applyCommand = buildCommand(sample, false, {
     acceptedDryRunPlanHash: dryRun.acceptedDryRunPlanHash,
@@ -94,6 +106,111 @@ async function runProof(rootPath: string): Promise<void> {
   if (applied.apply.provenance.runtimeStatus !== 'apply_rendered') {
     throw new Error(`Expected apply_rendered, got ${applied.apply.provenance.runtimeStatus}.`);
   }
+  const runtimeReceipt = applied.apply.sidecarArtifact.runtimeSidecarReceipt;
+  if (runtimeReceipt === undefined) throw new Error('HDR private app-server proof missing runtime sidecar receipt.');
+  if (runtimeReceipt.output.contentHash !== applied.apply.mutationResult.outputArtifacts[0]?.contentHash) {
+    throw new Error('HDR private app-server proof lost the measured runtime output hash.');
+  }
+
+  const collection = parseComputationalMergePrivateRunReportCollection(
+    JSON.parse(await readFile(join(rootPath, REPORT_PATH), 'utf8')),
+  );
+  const sourceHashIntegrity = await verifySourceHashesUnchanged(rootPath, collection);
+  const settings = buildSettings(applyCommand);
+  const sourceMetadata = sample.frames.map((frame) => ({
+    contentHash: frame.contentHash,
+    graphRevision: frame.graphRevision,
+    path: frame.sourcePath,
+  }));
+  const handoff = buildHdrEditableHandoffSummary({
+    deghostReviewAccepted: dryRunReview.reviewStatus !== 'review_required',
+    deghostReviewRequired: dryRunReview.reviewStatus === 'review_required',
+    outputPath: DERIVED_HDR_OUTPUT_PATH,
+    runtimeSidecarReceipt: runtimeReceipt,
+    settings,
+    sourceMetadata,
+    sourcePaths: sample.frames.map((frame) => frame.sourcePath),
+  });
+  const derivedReceipt = buildHdrDerivedOutputReceipt({
+    acceptedDryRunPlanHash: dryRun.acceptedDryRunPlanHash,
+    acceptedDryRunPlanId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+    handoff,
+    settings,
+  });
+  const openResult = openComputationalMergeDerivedSourceV1({
+    actor: applyCommand.actor,
+    approval: applyCommand.approval,
+    command: applyCommand,
+    correlationId: 'corr_hdr_private_raw_open_derived_v1',
+    currentGraphRevision: applied.apply.mutationResult.appliedGraphRevision,
+    mutationResult: applied.apply.mutationResult,
+    receipt: buildDerivedSourceReceiptIdentity(derivedReceipt),
+    requestId: 'request_hdr_private_raw_open_derived_v1',
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  });
+  if (openResult.openPath !== DERIVED_HDR_OUTPUT_PATH) {
+    throw new Error('HDR private app-server proof opened the wrong derived output path.');
+  }
+
+  const staleBySourceHash = deriveDerivedOutputReceiptState({
+    current: buildHdrDerivedOutputReceipt({
+      acceptedDryRunPlanHash: dryRun.acceptedDryRunPlanHash,
+      acceptedDryRunPlanId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+      handoff: buildHdrEditableHandoffSummary({
+        deghostReviewAccepted: handoff.deghostReviewAccepted,
+        deghostReviewRequired: handoff.deghostReviewRequired,
+        outputPath: DERIVED_HDR_OUTPUT_PATH,
+        runtimeSidecarReceipt: runtimeReceipt,
+        settings,
+        sourceMetadata: [
+          { ...sourceMetadata[0]!, contentHash: `${sourceMetadata[0]!.contentHash}_rewritten` },
+          ...sourceMetadata.slice(1),
+        ],
+        sourcePaths: sample.frames.map((frame) => frame.sourcePath),
+      }),
+      settings,
+    }),
+    receipt: derivedReceipt,
+  });
+  if (!staleBySourceHash.staleReasons?.includes('source_content_hash_changed')) {
+    throw new Error('HDR private app-server proof did not produce source-content stale-state metadata.');
+  }
+  const staleBySourceGraph = deriveDerivedOutputReceiptState({
+    current: buildHdrDerivedOutputReceipt({
+      acceptedDryRunPlanHash: dryRun.acceptedDryRunPlanHash,
+      acceptedDryRunPlanId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+      handoff: buildHdrEditableHandoffSummary({
+        deghostReviewAccepted: handoff.deghostReviewAccepted,
+        deghostReviewRequired: handoff.deghostReviewRequired,
+        outputPath: DERIVED_HDR_OUTPUT_PATH,
+        runtimeSidecarReceipt: runtimeReceipt,
+        settings,
+        sourceMetadata: [
+          sourceMetadata[0]!,
+          { ...sourceMetadata[1]!, graphRevision: `${sourceMetadata[1]!.graphRevision}_retouched` },
+          sourceMetadata[2]!,
+        ],
+        sourcePaths: sample.frames.map((frame) => frame.sourcePath),
+      }),
+      settings,
+    }),
+    receipt: derivedReceipt,
+  });
+  if (!staleBySourceGraph.staleReasons?.includes('source_graph_revision_changed')) {
+    throw new Error('HDR private app-server proof did not produce source-graph stale-state metadata.');
+  }
+  const staleBySettings = deriveDerivedOutputReceiptState({
+    current: buildHdrDerivedOutputReceipt({
+      acceptedDryRunPlanHash: dryRun.acceptedDryRunPlanHash,
+      acceptedDryRunPlanId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+      handoff,
+      settings: { ...settings, deghostRegionIntensityPercent: settings.deghostRegionIntensityPercent + 10 },
+    }),
+    receipt: derivedReceipt,
+  });
+  if (!staleBySettings.staleReasons?.includes('settings_hash_changed')) {
+    throw new Error('HDR private app-server proof did not produce settings stale-state metadata.');
+  }
 
   const proofRelativePath = PROOF_PATH;
   const proof = {
@@ -101,16 +218,57 @@ async function runProof(rootPath: string): Promise<void> {
     acceptedDryRunPlanId: dryRun.dryRun.dryRunResult.mergePlan.planId,
     alignmentConfidence: applied.apply.provenance.alignmentConfidence,
     appliedGraphRevision: applied.apply.mutationResult.appliedGraphRevision,
+    applyToolName: hdrRoutePair.applyToolName,
+    derivedHandoff: {
+      family: openResult.family,
+      openDerivedSourceId: openResult.derivedSourceId,
+      openPath: openResult.openPath,
+      outputArtifactId: derivedReceipt.outputArtifactId,
+      outputDimensions: runtimeReceipt.output.dimensions,
+      outputPath: derivedReceipt.outputPath,
+      sourceCount: derivedReceipt.sourceCount,
+      warningCodes: handoff.warningCodes,
+    },
+    dryRunReview: {
+      blockCodes: dryRunReview.blockCodes,
+      bracketReadiness: dryRunReview.bracketReadiness,
+      reviewStatus: dryRunReview.reviewStatus,
+      warningCodes: dryRunReview.warningCodes,
+    },
+    dryRunToolName: hdrRoutePair.dryRunToolName,
     fixtureId: FIXTURE_ID,
     outputContentHash: applied.apply.mutationResult.outputArtifacts[0]?.contentHash,
+    outputDimensions: runtimeReceipt.output.dimensions,
+    runtimeMeasurements: {
+      bracketAccepted: runtimeReceipt.bracket.accepted,
+      bracketExposureSpreadEv: runtimeReceipt.bracket.exposureSpreadEv,
+      motionCoverageRatio: runtimeReceipt.deghost.motionCoverageRatio,
+      motionPixelCount: runtimeReceipt.deghost.motionPixelCount,
+      referenceSourceIndex: runtimeReceipt.bracket.referenceSourceIndex,
+    },
     runtimeStatus: applied.apply.provenance.runtimeStatus,
+    sourceHashIntegrity,
     sourceCount: sample.frames.length,
+    staleProof: {
+      currentState: derivedReceipt.staleState,
+      settings: {
+        reasons: staleBySettings.staleReasons ?? [],
+        state: staleBySettings.staleState,
+      },
+      sourceContentHash: {
+        reasons: staleBySourceHash.staleReasons ?? [],
+        state: staleBySourceHash.staleState,
+      },
+      sourceGraphRevision: {
+        reasons: staleBySourceGraph.staleReasons ?? [],
+        state: staleBySourceGraph.staleState,
+      },
+    },
   };
   await writeFile(join(rootPath, proofRelativePath), `${JSON.stringify(proof, null, 2)}\n`);
 
   const proofHash = await sha256File(join(rootPath, proofRelativePath));
   const reportPath = join(rootPath, REPORT_PATH);
-  const collection = parseComputationalMergePrivateRunReportCollection(JSON.parse(await readFile(reportPath, 'utf8')));
   const upgraded = upgradeReport(collection, {
     applyCommandId: applyCommand.commandId,
     applyRuntimeId: applied.apply.mutationResult.derivedAssetId,
@@ -217,7 +375,7 @@ function upgradeReport(
           dryRun: proof.dryRunCommandId,
         },
         notes:
-          'Private RAW HDR decoded samples replayed through the typed app-server dry-run/apply bus; full browser E2E quality remains tracked separately.',
+          'Private RAW HDR decoded samples replayed through the typed app-server dry-run/apply bus, opened as an editable derived source, and rechecked for source-hash and stale-state parity against the accepted apply receipt; full browser E2E quality remains tracked separately.',
         runtimeResultIds: {
           apply: proof.applyRuntimeId,
           dryRun: proof.dryRunRuntimeId,
@@ -237,8 +395,21 @@ async function runSelfTest(): Promise<void> {
   const rootPath = await mkdtemp(join(tmpdir(), 'rawengine-hdr-private-app-server-proof-'));
   try {
     await mkdir(join(rootPath, ARTIFACT_ROOT), { recursive: true });
+    await mkdir(join(rootPath, 'private-fixtures/hdr/bracket-alignment-v1'), { recursive: true });
+    await Promise.all(
+      [
+        ['frame-01-under.arw', 'self-test-hdr-under'],
+        ['frame-02-mid.arw', 'self-test-hdr-mid'],
+        ['frame-03-over.arw', 'self-test-hdr-over'],
+      ].map(([name, contents]) =>
+        writeFile(join(rootPath, 'private-fixtures/hdr/bracket-alignment-v1', name), `${contents}\n`),
+      ),
+    );
     await writeFile(join(rootPath, SAMPLE_PATH), `${JSON.stringify(sampleRuntimeSample(), null, 2)}\n`);
-    await writeFile(join(rootPath, REPORT_PATH), `${JSON.stringify(samplePrivateReportCollection(), null, 2)}\n`);
+    await writeFile(
+      join(rootPath, REPORT_PATH),
+      `${JSON.stringify(await samplePrivateReportCollection(rootPath), null, 2)}\n`,
+    );
     await runProof(rootPath);
 
     const upgraded = parseComputationalMergePrivateRunReportCollection(
@@ -278,12 +449,24 @@ function sampleRuntimeSample(): z.infer<typeof runtimeSampleSchema> {
   });
 }
 
-function samplePrivateReportCollection(): ComputationalMergePrivateRunReportCollection {
+async function samplePrivateReportCollection(rootPath: string): Promise<ComputationalMergePrivateRunReportCollection> {
   const hash = `sha256:${'0'.repeat(64)}`;
   const asset = (path: string) => ({ hash, path, publicRepoAllowed: false });
-  const source = (path: string) => ({ ...asset(path), localRelativePath: path });
   const artifact = (kind: string, path: string) => ({ ...asset(path), kind });
   const previewExportParity = privateRawReportMetric('previewExportMeanAbsDelta', 0.015, 0);
+  const sourcePaths = [
+    'private-fixtures/hdr/bracket-alignment-v1/frame-01-under.arw',
+    'private-fixtures/hdr/bracket-alignment-v1/frame-02-mid.arw',
+    'private-fixtures/hdr/bracket-alignment-v1/frame-03-over.arw',
+  ];
+  const sourceHashes = await Promise.all(
+    sourcePaths.map(async (path) => ({
+      hash: await sha256File(join(rootPath, path)),
+      localRelativePath: path,
+      path,
+      publicRepoAllowed: false,
+    })),
+  );
 
   return parseComputationalMergePrivateRunReportCollection({
     $schema: 'https://rawengine.dev/schemas/computational-merge-private-run-reports-v1.json',
@@ -321,11 +504,7 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
           { ...asset(`${ARTIFACT_ROOT}/hdr-bracket-modal-before.png`), label: 'modal_before_apply' },
           { ...asset(`${ARTIFACT_ROOT}/hdr-bracket-modal-after.png`), label: 'modal_after_apply' },
         ],
-        sourceHashes: [
-          source('private-fixtures/hdr/bracket-alignment-v1/frame-01-under.arw'),
-          source('private-fixtures/hdr/bracket-alignment-v1/frame-02-mid.arw'),
-          source('private-fixtures/hdr/bracket-alignment-v1/frame-03-over.arw'),
-        ],
+        sourceHashes,
         uiIssue: 171,
       },
     ],
@@ -338,4 +517,65 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
 function valueAfter(flag: string): string | undefined {
   const index = process.argv.indexOf(flag);
   return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
+function buildSettings(command: ComputationalMergeCommandEnvelopeV1) {
+  return {
+    ...DEFAULT_HDR_MERGE_UI_SETTINGS,
+    alignmentMode: command.parameters.alignmentMode,
+    bracketValidation: command.parameters.bracketValidation,
+    deghostConfidenceMapVisible: command.parameters.deghostConfidenceMapVisible ?? false,
+    deghostRegionIntensityPercent: command.parameters.deghostRegionIntensityPercent ?? 65,
+    deghosting: command.parameters.deghosting,
+    maxPreviewDimensionPx: command.parameters.maxPreviewDimensionPx,
+    mergeStrategy: command.parameters.mergeStrategy,
+    qualityPreference: command.parameters.qualityPreference,
+    toneMapPreview: command.parameters.toneMapPreview,
+    ...(command.parameters.toneMappingPreset === undefined
+      ? {}
+      : { toneMappingPreset: command.parameters.toneMappingPreset }),
+  };
+}
+
+function buildDerivedSourceReceiptIdentity(receipt: ReturnType<typeof buildHdrDerivedOutputReceipt>) {
+  return {
+    acceptedDryRunPlanHash: receipt.acceptedDryRunPlanHash,
+    acceptedDryRunPlanId: receipt.acceptedDryRunPlanId,
+    family: receipt.family,
+    openInEditorAction: {
+      path: receipt.openInEditorAction.path,
+      state: receipt.openInEditorAction.state,
+    },
+    outputArtifactId: receipt.outputArtifactId,
+    outputContentHash: receipt.outputContentHash,
+    outputPath: receipt.outputPath,
+    provenanceSidecarPath: receipt.provenanceSidecar?.sidecarPath,
+    receiptId: receipt.receiptId,
+    settingsHash: receipt.settingsHash,
+    sourceGraphRevisions: receipt.sourceGraphRevisions,
+    staleReasons: receipt.staleReasons,
+    staleState: receipt.staleState,
+  };
+}
+
+async function verifySourceHashesUnchanged(rootPath: string, collection: ComputationalMergePrivateRunReportCollection) {
+  const report = collection.reports.find((candidate) => candidate.fixtureId === FIXTURE_ID);
+  if (report === undefined) throw new Error(`Missing private run report for ${FIXTURE_ID}.`);
+  const sourceHashes = await Promise.all(
+    report.sourceHashes.map(async (source) => {
+      const actualHash = await sha256File(join(rootPath, source.localRelativePath));
+      if (actualHash !== source.hash) {
+        throw new Error(`${source.localRelativePath}: source RAW hash changed (${source.hash} -> ${actualHash}).`);
+      }
+      return {
+        hash: actualHash,
+        localRelativePath: source.localRelativePath,
+      };
+    }),
+  );
+
+  return {
+    sourceHashes,
+    state: 'unchanged' as const,
+  };
 }

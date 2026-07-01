@@ -2,6 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 
+import { hdrRuntimeSidecarReceiptV1Schema } from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../../../src/schemas/computational-merge/hdrMergeUiSchemas.ts';
 import { buildHdrEditableHandoffSummary } from '../../../../src/utils/hdrEditableHandoff.ts';
 
@@ -11,6 +12,7 @@ const appModalsSource = readFileSync('src/components/modals/AppModals.tsx', 'utf
 const hdrRuntimeSource = readFileSync('src-tauri/src/lib.rs', 'utf8');
 const hdrRuntimePlanSource = readFileSync('packages/rawengine-schema/src/hdr/hdrRuntimePlan.ts', 'utf8');
 const visualSmokeSource = readFileSync('scripts/proofs/capture-visual-smoke.ts', 'utf8');
+const visualSmokeAppSource = readFileSync('src/validation/visual/VisualSmokeApp.tsx', 'utf8');
 
 for (const marker of [
   'data-testid="merge-open-saved-output"',
@@ -82,15 +84,62 @@ for (const marker of [
   'hdr-private-raw-artifact-handoff',
   'previewExportParityStatus',
 ]) {
-  if (!visualSmokeSource.includes(marker)) {
+  if (
+    !visualSmokeSource.includes(marker) &&
+    !visualSmokeAppSource.includes(marker) &&
+    !hdrModalSource.includes(marker)
+  ) {
     throw new Error(`HDR visual handoff smoke marker missing: ${marker}`);
   }
 }
+
+const runtimeSidecarReceipt = hdrRuntimeSidecarReceiptV1Schema.parse({
+  alignment: {
+    confidence: 0.991,
+    maxRmsError: 0.24,
+    mode: 'translation',
+    transformCount: 3,
+  },
+  bracket: {
+    accepted: true,
+    detectionConfidence: 0.96,
+    exposureSpreadEv: 3.8,
+    referenceSourceIndex: 1,
+    sourceCount: 3,
+    sourceRoles: [
+      { exposureEv: -1.8, role: 'under_exposed', sourceIndex: 0 },
+      { exposureEv: 0, role: 'reference', sourceIndex: 1 },
+      { exposureEv: 2, role: 'over_exposed', sourceIndex: 2 },
+    ],
+  },
+  deghost: {
+    averageConfidence: 0.88,
+    maxConfidence: 1,
+    motionCoverageRatio: 0.02,
+    motionPixelCount: 1440,
+    regionIntensityPercent: 65,
+    requestedDeghosting: 'high',
+  },
+  handoff: {
+    editableDerivedAssetId: 'derived_hdr_editable_handoff',
+    openInEditorPath: '/tmp/rawengine-hdr-smoke.tif',
+    route: 'computational_merge_derived_source',
+  },
+  measurementSource: 'hdr_runtime_apply',
+  output: {
+    artifactId: 'artifact_hdr_editable_handoff',
+    contentHash: 'sha256:hdr-editable-handoff-output',
+    dimensions: { height: 640, width: 960 },
+  },
+  receiptKind: 'hdr_runtime_sidecar_receipt',
+  schemaVersion: 1,
+});
 
 const handoffSummary = buildHdrEditableHandoffSummary({
   deghostReviewAccepted: true,
   deghostReviewRequired: true,
   outputPath: '/tmp/rawengine-hdr-smoke.tif',
+  runtimeSidecarReceipt,
   settings: {
     ...DEFAULT_HDR_MERGE_UI_SETTINGS,
     deghosting: 'high',
@@ -105,16 +154,19 @@ const handoffSummary = buildHdrEditableHandoffSummary({
   sourceMetadata: [
     {
       contentHash: 'blake3:hdr-source-under',
+      exif: { ExposureTime: '1/60', FNumber: '5.6', ISO: '100' },
       graphRevision: 'graph_hdr_under_edited',
       path: '/private-fixtures/hdr/bracket-alignment-v1/frame-01-under.arw',
     },
     {
       contentHash: 'blake3:hdr-source-mid',
+      exif: { ExposureTime: '1/250', FNumber: '5.6', ISO: '100' },
       graphRevision: 'graph_hdr_mid_edited',
       path: '/private-fixtures/hdr/bracket-alignment-v1/frame-02-mid.arw',
     },
     {
       contentHash: 'blake3:hdr-source-over',
+      exif: { ExposureTime: '1/15', FNumber: '5.6', ISO: '100' },
       graphRevision: 'graph_hdr_over_edited',
       path: '/private-fixtures/hdr/bracket-alignment-v1/frame-03-over.arw',
     },
@@ -147,6 +199,11 @@ if (handoffSummary.sourceRefs[0]?.contentHash !== 'blake3:hdr-source-under') {
 }
 if (handoffSummary.sourceRefs[0]?.graphRevision !== 'graph_hdr_under_edited') {
   throw new Error('HDR handoff must preserve source graph revisions for stale-source detection.');
+}
+for (const warningCode of ['bracket_order_inferred', 'motion_detected', 'tone_mapped_preview_only']) {
+  if (!handoffSummary.warningCodes.includes(warningCode)) {
+    throw new Error(`HDR handoff must preserve ${warningCode} warnings.`);
+  }
 }
 
 console.log('hdr editable handoff ok');

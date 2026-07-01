@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { hdrRuntimeSidecarReceiptV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas';
+import {
+  hdrMergeWarningCodeV1Schema,
+  hdrRuntimeSidecarReceiptV1Schema,
+} from '../../../packages/rawengine-schema/src/rawEngineSchemas';
 
 export const hdrMergeAlignmentModeSchema = z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']);
 export const hdrMergeBracketValidationSchema = z.enum(['required', 'warn', 'disabled']);
@@ -145,7 +148,7 @@ export const hdrEditableHandoffSummarySchema = z
     sceneMergeColorState: z.literal('legacy_display_referred_merge_after_linear_to_srgb'),
     sourceCount: z.number().int().nonnegative(),
     sourceRefs: z.array(hdrEditableSourceRefSchema),
-    warningCodes: z.array(z.literal('tone_mapped_preview_only')),
+    warningCodes: z.array(hdrMergeWarningCodeV1Schema),
     workingColorSpace: z.literal('srgb_display_referred_v1'),
   })
   .strict();

@@ -32,7 +32,7 @@ const reportSchema = z
     e2eIssue: z.literal(2312),
     featureFamily: z.literal('hdr_merge'),
     fixtureId: z.literal('validation.computational-merge.hdr-bracket-alignment.v1'),
-    implementationIssue: z.literal(2062),
+    implementationIssue: z.literal(4655),
     proofClaims: z.array(z.string().min(1)).min(5),
     proofStatus: z.literal('runtime_apply_capable'),
     runtimeProof: z
@@ -56,7 +56,7 @@ const reportSchema = z
       .array(
         z.enum([
           'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof RAWENGINE_PRIVATE_RAW_SOURCE="/Users/cgas/Pictures/Capture One/Alaska" bun scripts/private-raw/prepare/prepare-hdr-real-raw-private-root.ts -- --require-assets',
-          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof bun scripts/private-raw/proofs/computational/run-hdr-real-raw-private-proof.ts',
+          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof bun scripts/private-raw/proofs/computational/run-hdr-real-raw-private-proof.ts --require-assets',
           'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof bun tests/integration/checks/hdr/check-hdr-real-raw-private-app-server-proof.ts',
           'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof bun scripts/proofs/capture-visual-smoke.ts --scenario hdr-private-raw-ui',
         ]),
@@ -79,6 +79,12 @@ const reportSchema = z
       if (!artifactKinds.has(requiredKind)) {
         context.addIssue({ code: 'custom', message: `missing artifact ${requiredKind}`, path: ['artifacts'] });
       }
+    }
+    if (!report.proofClaims.some((claim) => claim.includes('source RAW hashes'))) {
+      context.addIssue({ code: 'custom', message: 'HDR proof summary must claim source RAW hash integrity.' });
+    }
+    if (!report.proofClaims.some((claim) => claim.includes('stale-state'))) {
+      context.addIssue({ code: 'custom', message: 'HDR proof summary must claim stale-state coverage.' });
     }
     if (!report.proofClaims.some((claim) => claim.includes('not final HDR/deghosting quality acceptance'))) {
       context.addIssue({ code: 'custom', message: 'HDR proof summary must keep quality acceptance boundary.' });
