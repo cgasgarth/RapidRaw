@@ -352,11 +352,12 @@ export const buildFocusStackDerivedOutputReceipt = ({
     family: 'focus_stack',
     openInEditorAction: {
       label: 'Open focus stack output',
-      state: review.editableHandoff.status === 'ready' ? 'deferred' : 'unavailable',
+      ...(review.applyReceipt.status === 'apply_ready' ? { path: review.artifactPath } : {}),
+      state: review.applyReceipt.status === 'apply_ready' ? 'available' : 'unavailable',
     },
     outputArtifactId: review.editableHandoff.artifactId,
     outputContentHash: review.editableHandoff.artifactHash,
-    ...(review.editableHandoff.status === 'ready'
+    ...(review.applyReceipt.status === 'apply_ready'
       ? {
           outputPath: review.artifactPath,
           provenanceSidecar: {
@@ -372,7 +373,7 @@ export const buildFocusStackDerivedOutputReceipt = ({
     sourceCount: review.sourceCount,
     sourceGraphRevisions: review.sourceRefs.map((source) => source.graphRevision),
     staleReasons: undefined,
-    staleState: 'unknown',
+    staleState: review.applyReceipt.status === 'apply_ready' ? 'current' : 'unknown',
     storagePolicy: 'sidecar_artifact',
   });
 

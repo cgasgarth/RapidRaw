@@ -2576,6 +2576,11 @@
       "previewPlanReady": "Previewed",
       "previewPlanStatus": "Preview state",
       "previewWorkloadValue": "{{value}} MP",
+      "quality": {
+        "balanced": "Balanced",
+        "best": "Best",
+        "preview": "Preview"
+      },
       "qualityBalanced": "Balanced",
       "qualityBest": "Best",
       "qualityLabel": "Quality",
@@ -2593,6 +2598,20 @@
         }
       },
       "review": {
+        "alignmentStatus": {
+          "applied": "Alignment applied",
+          "not_requested": "Alignment not requested",
+          "planned": "Alignment planned",
+          "review_required": "Alignment review required"
+        },
+        "applyReceipt": "Apply receipt",
+        "applyReceiptStatus": {
+          "apply_ready": "Apply-ready output",
+          "blocked": "Blocked",
+          "preview_only": "Preview only",
+          "review_required": "Review required"
+        },
+        "artifactHandle": "Artifact handle",
         "decision": {
           "blocked": "Blocked",
           "editable_review_required": "Editable artifact review required",
@@ -2644,9 +2663,13 @@
         "overlayTitle": "Sharpness overlay review",
         "overlayValue": "{{mode}} at {{value}}%",
         "percentValue": "{{value}}%",
+        "previewDimensions": "Output preview",
+        "previewDimensionsValue": "{{width}} x {{height}} px",
         "privateRawPending": "Private RAW review pending",
         "proofStatus": "App-server bridge ready",
         "provenance": "Provenance",
+        "qualitySummaryUnavailable": "Sharpness summary unavailable",
+        "qualitySummaryValue": "{{quality}} / {{sharpness}}% sharpness coverage / {{low}}% low confidence",
         "retouchedExportParity": "Retouched export parity",
         "retouchedExportParityPending": "Pending",
         "retouchLayer": "Retouch layer",
@@ -2662,9 +2685,16 @@
         "transitions": "Focus transitions",
         "uiE2ePending": "UI E2E pending",
         "warning": {
+          "alignment_low_confidence": "alignment low confidence",
           "depth_map_preview_only": "depth-map preview only",
+          "focus_coverage_low": "focus coverage low",
+          "high_memory_estimate": "high memory estimate",
           "human_review_required": "human review required",
+          "parallax_detected": "parallax detected",
           "retouch_layer_deferred": "retouch layer deferred",
+          "retouch_layer_required": "retouch layer required",
+          "runtime_estimate_high": "runtime estimate high",
+          "source_order_unverified": "source order unverified",
           "synthetic_runtime_only": "synthetic runtime only",
           "transition_halo_risk": "transition halo risk",
           "unsupported_blend_method_preview_only": "unsupported blend method preview only"

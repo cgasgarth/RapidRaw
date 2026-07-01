@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
 import {
+  type ArtifactHandleV1,
+  artifactHandleV1Schema,
+} from '../../../packages/rawengine-schema/src/artifactSchemas.ts';
+import {
   focusStackAlignmentModeSchema,
   focusStackBlendMethodSchema,
   focusStackQualityPreferenceSchema,
@@ -11,7 +15,14 @@ import {
 export const focusStackOutputReviewDecisionSchema = z.enum(['editable_review_required', 'preview_only', 'blocked']);
 
 export const focusStackOutputReviewWarningSchema = z.enum([
+  'alignment_low_confidence',
+  'focus_coverage_low',
+  'high_memory_estimate',
   'human_review_required',
+  'parallax_detected',
+  'retouch_layer_required',
+  'runtime_estimate_high',
+  'source_order_unverified',
   'synthetic_runtime_only',
   'transition_halo_risk',
   'depth_map_preview_only',
@@ -21,6 +32,8 @@ export const focusStackOutputReviewWarningSchema = z.enum([
 export const focusStackSourceContributionWarningStateSchema = z.enum(['artifact_review_required', 'clear']);
 export const focusStackEditableHandoffStatusSchema = z.enum(['blocked', 'ready', 'review_required']);
 export const focusStackHaloReviewStatusSchema = z.enum(['apply_ready', 'blocked', 'review_required']);
+export const focusStackApplyReceiptStatusSchema = z.enum(['apply_ready', 'blocked', 'preview_only', 'review_required']);
+export const focusStackAlignmentReviewStatusSchema = z.enum(['applied', 'not_requested', 'planned', 'review_required']);
 
 const focusStackSourceRefSchema = z
   .object({
@@ -35,6 +48,38 @@ export const focusStackOutputReviewWorkflowSchema = z
   .object({
     alignmentMode: focusStackAlignmentModeSchema,
     artifactPath: z.string().min(1),
+    applyReceipt: z
+      .object({
+        alignment: z
+          .object({
+            confidence: z.number().min(0).max(1).optional(),
+            mode: focusStackAlignmentModeSchema,
+            status: focusStackAlignmentReviewStatusSchema,
+          })
+          .strict(),
+        artifactHandle: artifactHandleV1Schema,
+        artifactPath: z.string().trim().min(1),
+        outputPreviewDimensions: z
+          .object({
+            height: z.number().int().positive(),
+            width: z.number().int().positive(),
+          })
+          .strict()
+          .optional(),
+        receiptId: z.string().trim().min(1),
+        sharpnessQualitySummary: z
+          .object({
+            lowConfidenceCellRatio: z.number().min(0).max(1).optional(),
+            qualityPreference: focusStackQualityPreferenceSchema,
+            sharpnessCoverageRatio: z.number().min(0).max(1).optional(),
+          })
+          .strict()
+          .optional(),
+        sourceCount: z.number().int().min(2),
+        status: focusStackApplyReceiptStatusSchema,
+        warnings: z.array(focusStackOutputReviewWarningSchema),
+      })
+      .strict(),
     blendMethod: focusStackBlendMethodSchema,
     decision: focusStackOutputReviewDecisionSchema,
     editableHandoff: z
@@ -126,6 +171,21 @@ export const focusStackOutputReviewWorkflowSchema = z
         path: ['sourceRefs'],
       });
     }
+    if (workflow.applyReceipt.sourceCount !== workflow.sourceCount) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Focus stack apply receipt sourceCount must match sourceCount.',
+        path: ['applyReceipt', 'sourceCount'],
+      });
+    }
+    if (workflow.applyReceipt.artifactPath !== workflow.artifactPath) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Focus stack apply receipt artifactPath must match artifactPath.',
+        path: ['applyReceipt', 'artifactPath'],
+      });
+    }
   });
 
 export type FocusStackOutputReviewWorkflow = z.infer<typeof focusStackOutputReviewWorkflowSchema>;
+export type FocusStackOutputReviewArtifactHandle = ArtifactHandleV1;

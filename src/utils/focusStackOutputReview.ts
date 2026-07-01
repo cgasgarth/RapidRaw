@@ -1,4 +1,4 @@
-import type { FocusStackArtifactV1 } from '../../packages/rawengine-schema/src/rawEngineSchemas';
+import type { ArtifactHandleV1, FocusStackArtifactV1 } from '../../packages/rawengine-schema/src/rawEngineSchemas';
 import type { FocusStackOutputReviewWorkflow } from '../schemas/focus-stack/focusStackOutputReviewSchemas';
 import { focusStackOutputReviewWorkflowSchema } from '../schemas/focus-stack/focusStackOutputReviewSchemas';
 import type { FocusStackUiSettings } from '../schemas/focus-stack/focusStackUiSchemas';
@@ -36,10 +36,43 @@ export const buildFocusStackOutputReviewWorkflow = ({
   const effectiveHaloRiskCellRatio = roundRatio(
     Math.max(0.03, haloRiskCellRatio * (1 - settings.haloSuppressionStrengthPercent / haloSuppressionScale)),
   );
+  const artifactHandle = buildOutputArtifactHandle({
+    artifactId: artifactPath,
+    contentHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
+    dimensions: {
+      height: settings.maxPreviewDimensionPx,
+      width: settings.maxPreviewDimensionPx,
+    },
+  });
+  const sharpnessSummary = buildSharpnessQualitySummary({
+    lowConfidenceRatio: lowConfidenceCellRatio,
+    qualityPreference: settings.qualityPreference,
+    sharpnessCoverage: sharpnessCoverageRatio,
+  });
+  const status = decision === 'editable_review_required' ? 'review_required' : 'preview_only';
 
   return focusStackOutputReviewWorkflowSchema.parse({
     alignmentMode: settings.alignmentMode,
     artifactPath,
+    applyReceipt: {
+      alignment: {
+        mode: settings.alignmentMode,
+        status: settings.alignmentMode === 'none' ? 'not_requested' : 'planned',
+      },
+      artifactHandle,
+      artifactPath,
+      outputPreviewDimensions: artifactHandle.dimensions,
+      receiptId: buildFocusStackApplyReceiptId({
+        artifactHash: artifactHandle.contentHash,
+        artifactId: artifactHandle.artifactId,
+        sourceCount,
+        warningCodes,
+      }),
+      sharpnessQualitySummary: sharpnessSummary,
+      sourceCount,
+      status,
+      warnings: warningCodes,
+    },
     blendMethod: settings.blendMethod,
     decision,
     editableHandoff: {
@@ -102,29 +135,80 @@ export const buildFocusStackOutputReviewFromArtifact = (
       sourceIndex,
     };
   });
+  const warningCodes: FocusStackOutputReviewWorkflow['warningCodes'] = uniqueWarnings([
+    ...artifact.warningCodes,
+    'human_review_required',
+    'synthetic_runtime_only',
+    'transition_halo_risk',
+    ...(artifact.retouchLayerPolicy === 'generate_retouch_layer' ? ['retouch_layer_deferred' as const] : []),
+  ]);
+  const editableHandoffStatus = artifact.haloReview?.editableHandoffStatus ?? 'review_required';
+  const haloReviewStatus = artifact.haloReview?.reviewStatus ?? 'review_required';
+  const decision =
+    haloReviewStatus === 'blocked'
+      ? 'blocked'
+      : artifact.blendMethod === 'weighted_sharpness'
+        ? 'editable_review_required'
+        : 'preview_only';
+  const outputPreviewDimensions = artifact.previewArtifacts[0]?.dimensions ?? artifact.outputArtifact.dimensions;
+  const sharpnessSummary = buildSharpnessQualitySummary({
+    lowConfidenceRatio: artifact.haloReview?.lowConfidenceCellRatio,
+    qualityPreference: artifact.qualityPreference,
+    sharpnessCoverage: artifact.validationSummary.focusCoverageRatio,
+  });
+  const artifactPath = artifact.outputArtifact.artifactId;
 
   return focusStackOutputReviewWorkflowSchema.parse({
     alignmentMode: artifact.resolvedAlignmentMode,
-    artifactPath: artifact.outputArtifact.artifactId,
+    artifactPath,
+    applyReceipt: {
+      alignment: {
+        ...(artifact.validationSummary.alignmentConfidence === undefined
+          ? {}
+          : { confidence: artifact.validationSummary.alignmentConfidence }),
+        mode: artifact.resolvedAlignmentMode,
+        status:
+          haloReviewStatus === 'blocked'
+            ? 'review_required'
+            : artifact.resolvedAlignmentMode === 'none'
+              ? 'not_requested'
+              : 'applied',
+      },
+      artifactHandle: artifact.outputArtifact,
+      artifactPath,
+      ...(outputPreviewDimensions === undefined ? {} : { outputPreviewDimensions }),
+      receiptId: buildFocusStackApplyReceiptId({
+        artifactHash: artifact.outputArtifact.contentHash,
+        artifactId: artifact.outputArtifact.artifactId,
+        sourceCount: artifact.sourceImageRefs.length,
+        warningCodes,
+      }),
+      sharpnessQualitySummary: sharpnessSummary,
+      sourceCount: artifact.sourceImageRefs.length,
+      status:
+        editableHandoffStatus === 'blocked'
+          ? 'blocked'
+          : editableHandoffStatus === 'ready' && haloReviewStatus === 'apply_ready'
+            ? 'apply_ready'
+            : decision === 'preview_only'
+              ? 'preview_only'
+              : 'review_required',
+      warnings: warningCodes,
+    },
     blendMethod: artifact.blendMethod,
-    decision:
-      artifact.haloReview?.reviewStatus === 'blocked'
-        ? 'blocked'
-        : artifact.blendMethod === 'weighted_sharpness'
-          ? 'editable_review_required'
-          : 'preview_only',
+    decision,
     editableHandoff: {
       artifactHash: artifact.outputArtifact.contentHash,
       artifactId: artifact.outputArtifact.artifactId,
       exportReviewArtifactId: `${artifact.outputArtifact.artifactId}:export-review`,
       retouchedExportParity: artifact.retouchedExportParity,
-      status: artifact.haloReview?.editableHandoffStatus ?? 'review_required',
+      status: editableHandoffStatus,
     },
     haloRiskCellRatio: artifact.haloReview?.haloRiskCellRatio ?? haloRiskCellRatio,
     haloReview: {
       artifactHash: artifact.haloMapArtifact?.contentHash ?? artifact.haloReview?.artifactHash,
       artifactId: artifact.haloReview?.artifactId ?? `${artifact.outputArtifact.artifactId}:halo-review`,
-      reviewStatus: artifact.haloReview?.reviewStatus ?? 'review_required',
+      reviewStatus: haloReviewStatus,
       transitionRiskRegions:
         artifact.haloReview?.transitionRiskRegions ??
         buildDefaultTransitionRiskRegions(artifact.sourceImageRefs.length),
@@ -143,9 +227,32 @@ export const buildFocusStackOutputReviewFromArtifact = (
     sharpnessCoverageRatio: artifact.validationSummary.focusCoverageRatio,
     sourceCount: artifact.sourceImageRefs.length,
     sourceRefs,
-    warningCodes: ['human_review_required', 'synthetic_runtime_only', 'transition_halo_risk', 'retouch_layer_deferred'],
+    warningCodes,
   });
 };
+
+export const markFocusStackOutputReviewApplyReady = (
+  review: FocusStackOutputReviewWorkflow,
+): FocusStackOutputReviewWorkflow =>
+  focusStackOutputReviewWorkflowSchema.parse({
+    ...review,
+    applyReceipt: {
+      ...review.applyReceipt,
+      alignment: {
+        ...review.applyReceipt.alignment,
+        status: review.applyReceipt.alignment.mode === 'none' ? 'not_requested' : 'applied',
+      },
+      status: 'apply_ready',
+    },
+    editableHandoff: {
+      ...review.editableHandoff,
+      status: 'ready',
+    },
+    haloReview: {
+      ...review.haloReview,
+      reviewStatus: 'apply_ready',
+    },
+  });
 
 const buildSourceRefs = (sourceCount: number, sourcePaths: string[]): FocusStackOutputReviewWorkflow['sourceRefs'] =>
   Array.from({ length: sourceCount }, (_value, sourceIndex) => {
@@ -197,6 +304,58 @@ const buildDefaultTransitionRiskRegions = (
   }));
 
 const roundRatio = (value: number): number => Number(value.toFixed(6));
+
+const buildOutputArtifactHandle = ({
+  artifactId,
+  contentHash,
+  dimensions,
+}: {
+  artifactId: string;
+  contentHash: string;
+  dimensions: NonNullable<ArtifactHandleV1['dimensions']>;
+}): ArtifactHandleV1 => ({
+  artifactId,
+  contentHash,
+  dimensions,
+  kind: 'merge_output',
+  storage: 'sidecar_artifact',
+});
+
+const buildSharpnessQualitySummary = ({
+  lowConfidenceRatio,
+  qualityPreference,
+  sharpnessCoverage,
+}: {
+  lowConfidenceRatio?: number | undefined;
+  qualityPreference: FocusStackOutputReviewWorkflow['qualityPreference'];
+  sharpnessCoverage?: number | undefined;
+}): NonNullable<FocusStackOutputReviewWorkflow['applyReceipt']['sharpnessQualitySummary']> => ({
+  ...(lowConfidenceRatio === undefined ? {} : { lowConfidenceCellRatio: roundRatio(lowConfidenceRatio) }),
+  qualityPreference,
+  ...(sharpnessCoverage === undefined ? {} : { sharpnessCoverageRatio: roundRatio(sharpnessCoverage) }),
+});
+
+const buildFocusStackApplyReceiptId = ({
+  artifactHash,
+  artifactId,
+  sourceCount,
+  warningCodes,
+}: {
+  artifactHash?: string | undefined;
+  artifactId: string;
+  sourceCount: number;
+  warningCodes: FocusStackOutputReviewWorkflow['warningCodes'];
+}): string =>
+  `focus_stack_apply_${hashStableJson({
+    artifactHash,
+    artifactId,
+    sourceCount,
+    warningCodes,
+  }).replace(':', '_')}`;
+
+const uniqueWarnings = (
+  warningCodes: FocusStackOutputReviewWorkflow['warningCodes'],
+): FocusStackOutputReviewWorkflow['warningCodes'] => [...new Set(warningCodes)];
 
 const hashStableJson = (value: unknown): string => `fnv1a32:${fnv1a32(stableJson(value))}`;
 

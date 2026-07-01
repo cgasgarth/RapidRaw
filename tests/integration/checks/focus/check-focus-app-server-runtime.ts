@@ -144,8 +144,11 @@ const derivedReceipt = buildFocusStackDerivedOutputReceipt({
     sourceMode: 'focus_bracket',
   },
 });
-if (derivedReceipt.openInEditorAction.state !== 'deferred') {
-  throw new Error('Expected focus stack derived receipt to expose typed deferred editor handoff.');
+if (derivedReceipt.openInEditorAction.state !== 'available') {
+  throw new Error('Expected focus stack derived receipt to expose typed available editor handoff.');
+}
+if (derivedReceipt.openInEditorAction.path !== outputReview.artifactPath) {
+  throw new Error('Expected focus stack derived receipt to expose the applied output path.');
 }
 if (derivedReceipt.provenanceSidecar?.acceptedDryRunId !== outputReview.editableHandoff.exportReviewArtifactId) {
   throw new Error('Expected focus stack derived receipt to preserve export-review handoff metadata.');
