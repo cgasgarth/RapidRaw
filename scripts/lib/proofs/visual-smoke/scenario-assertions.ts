@@ -463,7 +463,12 @@ async function assertPanelScopesStripControls(page, panel, strip, toggleTestId, 
     );
   }
 
-  const resizer = panel.getByTestId(`${await strip.getAttribute('data-testid')}-resizer`);
+  const stripTestId = await strip.getAttribute('data-testid');
+  if (!stripTestId) {
+    throw new Error(`${label} scopes strip should expose a data-testid for scoped controls.`);
+  }
+
+  const resizer = panel.getByTestId(`${stripTestId}-resizer`);
   await resizer.waitFor({ state: 'visible', timeout: 10_000 });
   const orientation = await resizer.getAttribute('aria-orientation');
   if (orientation !== 'horizontal') {
@@ -477,12 +482,12 @@ async function assertPanelScopesStripControls(page, panel, strip, toggleTestId, 
   }
 
   await strip.hover();
-  const rgbMode = panel.getByTestId('waveform-mode-rgb');
+  const rgbMode = panel.getByTestId(`${stripTestId}-mode-rgb`);
   await rgbMode.waitFor({ state: 'visible', timeout: 10_000 });
   await rgbMode.click();
   await pageWaitForAttribute(page, strip, 'data-active-waveform-channel', 'rgb', label);
 
-  const clippingToggle = panel.getByTestId('waveform-clipping-toggle');
+  const clippingToggle = panel.getByTestId(`${stripTestId}-clipping-toggle`);
   await clippingToggle.click();
   await pageWaitForAttribute(page, strip, 'data-show-clipping', 'true', label);
 }
