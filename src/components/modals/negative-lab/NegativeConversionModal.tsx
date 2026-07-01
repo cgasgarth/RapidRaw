@@ -141,8 +141,10 @@ import {
   removeNegativeLabPatchSamplerCorrections,
 } from '../../../utils/negative-lab/negativeLabPatchSamplerCorrections';
 import {
+  buildNegativeLabAcceptedApplyPlanFingerprint,
   buildNegativeLabAcceptedPlanIdentity,
   buildNegativeLabPlanHash,
+  isNegativeLabAcceptedApplyPlanCurrent,
 } from '../../../utils/negative-lab/negativeLabPlanIdentity';
 import {
   DEFAULT_NEGATIVE_LAB_UI_PRESET,
@@ -150,7 +152,6 @@ import {
 } from '../../../utils/negative-lab/negativeLabPresetCatalog';
 import {
   buildNegativeLabBrowserProfileProvenanceHash,
-  buildNegativeLabProfileBoundPlanIdentity,
   buildNegativeLabProfileComparisonRows,
   buildNegativeLabSelectedProfileSnapshot,
 } from '../../../utils/negative-lab/negativeLabProfileComparison';
@@ -962,7 +963,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     });
     setDustCandidateDecisionById((previous) => ({ ...previous, [candidate.candidateId]: 'rejected' }));
   };
-  const batchDryRunSummaryJson = useMemo(() => JSON.stringify(batchDryRunSummary), [batchDryRunSummary]);
   const batchDryRunPlanJson = useMemo(
     () =>
       JSON.stringify(
@@ -996,12 +996,30 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       selectedProfileSnapshot,
     ],
   );
+  const acceptedApplyPlanFingerprint = useMemo(
+    () =>
+      buildNegativeLabAcceptedApplyPlanFingerprint({
+        dryRunPlanJson: batchDryRunPlanJson,
+        outputFormat: saveOptions.outputFormat,
+        params,
+        pathsToConvert,
+        selectedProfileSnapshot,
+        suffix: saveOptions.suffix,
+        writeConversionBundle: saveOptions.writeConversionBundle,
+      }),
+    [
+      batchDryRunPlanJson,
+      params,
+      pathsToConvert,
+      saveOptions.outputFormat,
+      saveOptions.suffix,
+      saveOptions.writeConversionBundle,
+      selectedProfileSnapshot,
+    ],
+  );
   const acceptedBatchPlanIdentity = useMemo(() => {
-    if (selectedProfileSnapshot === null) {
-      return buildNegativeLabAcceptedPlanIdentity(batchDryRunPlanJson);
-    }
-    return buildNegativeLabProfileBoundPlanIdentity(batchDryRunSummaryJson, selectedProfileSnapshot);
-  }, [batchDryRunPlanJson, batchDryRunSummaryJson, selectedProfileSnapshot]);
+    return buildNegativeLabAcceptedPlanIdentity(acceptedApplyPlanFingerprint);
+  }, [acceptedApplyPlanFingerprint]);
   const visibleRollNormalizationApplyReceipt =
     rollNormalizationApplyReceipt?.acceptedDryRunPlanHash === acceptedBatchPlanIdentity.acceptedDryRunPlanHash
       ? rollNormalizationApplyReceipt
@@ -1038,7 +1056,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     ],
   );
   const isBatchPlanCopied = copiedBatchPlanJson === batchDryRunPlanJson;
-  const isBatchPlanAccepted = acceptedBatchPlanJson === batchDryRunPlanJson && !batchDryRunSummary.blocked;
+  const isBatchPlanAccepted =
+    isNegativeLabAcceptedApplyPlanCurrent({
+      acceptedApplyPlanFingerprint: acceptedBatchPlanJson,
+      currentApplyPlanFingerprint: acceptedApplyPlanFingerprint,
+    }) && !batchDryRunSummary.blocked;
   const canApplyRollNormalizationPlan = isBatchPlanAccepted && rollNormalizationPlan.affectedFrameIds.length > 0;
   const agentDryRunState: NegativeLabAgentDryRunState = batchDryRunSummary.blocked
     ? 'blocked'
@@ -1062,7 +1084,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const agentRollbackTarget = isBatchPlanAccepted
     ? acceptedBatchPlanIdentity.acceptedDryRunPlanId
     : 'accept_dry_run_plan_first';
-  const requiresAcceptedBatchPlan = hasMultipleScans && conversionScope !== 'active';
+  const requiresAcceptedBatchPlan = pathsToConvert.length > 0;
   const exportReadinessInput = {
     baseReady: baseFogEstimate !== null,
     batchPlanAccepted: isBatchPlanAccepted,
@@ -2117,7 +2139,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
 
   const handleAcceptBatchPlan = () => {
     if (batchDryRunSummary.blocked) return;
-    setAcceptedBatchPlanJson(batchDryRunPlanJson);
+    setAcceptedBatchPlanJson(acceptedApplyPlanFingerprint);
     setBatchApplyReceipt(null);
   };
 
@@ -2366,6 +2388,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
 
   const handleSave = async () => {
     if (!canSave) return;
+    if (!isBatchPlanAccepted) {
+      setAcceptedBatchPlanJson(null);
+      return;
+    }
     setIsSaving(true);
     setProgress(null);
     try {
@@ -2397,7 +2423,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           params,
           options: {
             ...saveOptions,
-            ...(requiresAcceptedBatchPlan ? acceptedBatchPlanIdentity : {}),
+            ...acceptedBatchPlanIdentity,
             batchDisposition: batchDryRunSummary.dispositionCounts,
             batchScope: conversionScope,
             frameExposureOverrides: frameExposureOverridePayload,
