@@ -138,6 +138,36 @@ assertEqual(dryRun.provenance.qualityMetrics.sourcePixelCount, 72 * 48 * 3, 'sou
 assertEqual(dryRun.provenance.qualityMetrics.stitchedSourceRatio, 1, 'stitched source ratio');
 assertEqual(dryRun.provenance.seamBlend.blendMode, 'feather', 'blend mode');
 assertEqual(dryRun.provenance.seamBlend.seamMethod, 'adaptive_feather', 'seam method');
+assertEqual(dryRun.provenance.tileRender.tileBackedRender, true, 'tile-backed render');
+assertEqual(dryRun.provenance.tileRender.tileSizePx, 512, 'tile size');
+assertEqual(dryRun.provenance.tileRender.seamHaloPx, 64, 'tile seam halo');
+if (dryRun.provenance.tileRender.tileCount < 2) {
+  throw new Error('Expected panorama runtime to render through multiple tiles.');
+}
+assertEqual(dryRun.dryRunResult.mergePlan.preflight.executionMode, 'tile_backed_render', 'preflight execution mode');
+assertEqual(
+  dryRun.dryRunResult.mergePlan.preflight.engineCapabilities.tileBackedRender,
+  true,
+  'preflight tile capability',
+);
+assertEqual(
+  dryRun.dryRunResult.mergePlan.preflight.engineCapabilities.fullFrameLegacy,
+  false,
+  'preflight legacy capability',
+);
+assertEqual(
+  dryRun.dryRunResult.mergePlan.preflight.tileCount,
+  dryRun.provenance.tileRender.tileCount,
+  'preflight tile count',
+);
+assertEqual(
+  dryRun.dryRunResult.mergePlan.performanceEstimate.estimatedPeakMemoryBytes,
+  dryRun.dryRunResult.mergePlan.preflight.memoryComponents.totalEstimatedPeakBytes,
+  'preflight peak memory estimate',
+);
+if (dryRun.dryRunResult.warnings.includes('legacy_full_frame_render')) {
+  throw new Error('Tile-backed panorama runtime must not report legacy_full_frame_render.');
+}
 assertEqual(applied.provenance.runtimeStatus, 'apply_rendered', 'apply runtime status');
 assertEqual(applied.provenance.acceptedDryRunPlanId, dryRun.dryRunResult.mergePlan.planId, 'accepted plan id');
 const [outputArtifact] = applied.mutationResult.outputArtifacts;
@@ -157,6 +187,12 @@ assertEqual(applied.sidecarArtifact.outputArtifacts[0]?.artifactId, outputArtifa
 assertEqual(applied.sidecarArtifact.sourceImageRefs.length, sourceFrames.length, 'apply sidecar source refs');
 assertEqual(applied.sidecarArtifact.sourceState.length, sourceFrames.length, 'apply sidecar source state');
 assertEqual(applied.sidecarArtifact.projection, 'cylindrical', 'apply sidecar effective projection');
+assertEqual(applied.sidecarArtifact.engine.capabilities.tiledRender, true, 'apply sidecar tiled capability');
+assertEqual(
+  applied.sidecarArtifact.validationMetrics.tileCount,
+  applied.provenance.tileRender.tileCount,
+  'apply sidecar tile count',
+);
 assertEqual(
   applied.sidecarArtifact.projectionSettings.requestedProjection,
   'cylindrical',
@@ -229,6 +265,7 @@ console.log(
         lensCorrectionPolicy: applied.provenance.lensCorrectionPolicy,
         qualityMetrics: applied.provenance.qualityMetrics,
         seamBlend: applied.provenance.seamBlend,
+        tileRender: applied.provenance.tileRender,
       },
       warnings: dryRun.dryRunResult.warnings,
     },

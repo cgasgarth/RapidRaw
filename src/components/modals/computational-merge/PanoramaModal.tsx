@@ -129,6 +129,9 @@ export default function PanoramaModal({
   const runtimePlanOutput = runtimePlan
     ? `${runtimePlan.output_dimensions.width} x ${runtimePlan.output_dimensions.height}`
     : t('modals.panorama.summaryBlocked');
+  const runtimePlanTileCount = runtimePlan?.preflight.tile_count ?? null;
+  const runtimePlanWorkload =
+    runtimePlan === null ? runtimePlanOutput : `${runtimePlanOutput} / ${runtimePlanTileCount ?? 0} tiles`;
   const runtimePlanStatus =
     runtimePlan === null
       ? t('modals.panorama.summaryBlocked')
@@ -698,7 +701,7 @@ export default function PanoramaModal({
             data-execution-mode={runtimePlan?.preflight.execution_mode ?? ''}
             data-memory-budget-ratio={runtimePlan?.preflight.memory_budget_ratio ?? ''}
             data-output-dimensions={runtimePlanOutput}
-            data-plan-scope="geometry_memory_only"
+            data-plan-scope="tile_runtime_output"
             data-plan-status={runtimePlan?.preflight.status ?? 'pending'}
             data-projection={settings.projection}
             data-runtime-plan-ready={String(runtimePlan !== null)}
@@ -707,6 +710,7 @@ export default function PanoramaModal({
             data-source-row-count-estimate={runtimePlanSourceGeometry?.row_count_estimate ?? ''}
             data-source-vertical-span-px={runtimePlanSourceGeometry?.vertical_span_px ?? ''}
             data-testid="panorama-runtime-plan-summary"
+            data-tile-count={runtimePlanTileCount ?? ''}
           >
             {[
               {
@@ -715,7 +719,7 @@ export default function PanoramaModal({
               },
               {
                 label: t('modals.panorama.summaryWorkload'),
-                value: runtimePlanOutput,
+                value: runtimePlanWorkload,
               },
               {
                 label: t('modals.panorama.summaryMemory'),

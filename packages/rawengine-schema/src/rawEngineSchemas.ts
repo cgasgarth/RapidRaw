@@ -2583,6 +2583,7 @@ export const panoramaValidationMetricsV1Schema = z
     seamEnergy: z.number().nonnegative().optional(),
     sourceCount: z.number().int().positive(),
     stitchedSourceCount: z.number().int().positive(),
+    tileCount: z.number().int().positive().optional(),
   })
   .strict();
 

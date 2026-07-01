@@ -4265,12 +4265,12 @@ const panoramaRuntimePlanFixture: PanoramaRuntimePlan = {
   preflight: {
     blocked_reasons: [],
     engine_capabilities: {
-      full_frame_legacy: true,
+      full_frame_legacy: false,
       max_preview_dimension_px: 8192,
       plan_only: true,
-      tile_backed_render: false,
+      tile_backed_render: true,
     },
-    execution_mode: 'full_frame_legacy',
+    execution_mode: 'tile_backed_render',
     geometry_estimate: {
       output_pixel_count: 28_876_800,
       projected_bounds: { height: 3200, width: 9024, x: 0, y: 0 },
@@ -4298,8 +4298,8 @@ const panoramaRuntimePlanFixture: PanoramaRuntimePlan = {
       warning_codes: [],
     },
     status: 'accepted',
-    tile_count: 1,
-    warning_codes: ['geometry_estimate_low_confidence', 'legacy_full_frame_render'],
+    tile_count: 18,
+    warning_codes: ['geometry_estimate_low_confidence'],
   },
   source_image_refs: Array.from({ length: 5 }, (_, sourceIndex) => ({
     height: 3000,
@@ -4357,7 +4357,7 @@ const panoramaRenderedReviewFixture: PanoramaRenderedReview = {
     appliedGainCount: 2,
     mode: 'scalar_overlap_luminance_gain_v1',
   },
-  warningCodes: ['geometry_estimate_low_confidence', 'legacy_full_frame_render'],
+  warningCodes: ['geometry_estimate_low_confidence'],
 };
 const panoramaSavedReviewSmokeSettings: PanoramaUiSettings = {
   ...DEFAULT_PANORAMA_UI_SETTINGS,
@@ -5917,7 +5917,7 @@ function PanoramaVisualSmoke() {
           data-plan-memory-mb={Math.round(
             panoramaRuntimePlanFixture.preflight.memory_components.total_estimated_peak_bytes / 1_000_000,
           )}
-          data-plan-scope="geometry_memory_only"
+          data-plan-scope="tile_runtime_output"
           data-plan-status={panoramaRuntimePlanFixture.preflight.status}
           data-plan-width={panoramaRuntimePlanFixture.output_dimensions.width}
           data-projection={settings.projection}

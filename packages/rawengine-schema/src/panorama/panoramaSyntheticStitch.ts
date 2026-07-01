@@ -5,6 +5,7 @@ const MAX_SYNTHETIC_SOURCE_PIXELS = 1_000_000;
 const MAX_EXPOSURE_GAIN = 4;
 const MIN_EXPOSURE_GAIN = 0.25;
 const MIN_EXPOSURE_OVERLAP_SAMPLES = 16;
+const PANORAMA_TILE_SIZE_PX = 512;
 
 export const panoramaSyntheticSourceFrameV1Schema = z
   .object({
@@ -24,6 +25,7 @@ export const panoramaSyntheticStitchRequestV1Schema = z
     expectedWarningCodes: z.array(z.string().min(1)),
     fixtureId: z.string().min(1),
     memoryBudgetBytes: z.number().int().positive(),
+    seamHaloPx: z.number().int().nonnegative().default(64),
     projection: z.enum(['rectilinear', 'cylindrical']).default('rectilinear'),
     seed: z.string().min(1),
     seamExposureCompensationPercent: z.number().int().min(0).max(100).default(100),
@@ -70,7 +72,16 @@ export interface PanoramaSyntheticStitchResultV1 {
   };
   outputPixels: Uint8Array | null;
   stitchedSourceCount: number;
+  tilePlan: PanoramaSyntheticTilePlanV1;
   warningCodes: string[];
+}
+
+export interface PanoramaSyntheticTilePlanV1 {
+  maxTileHeightPx: number;
+  maxTileWidthPx: number;
+  seamHaloPx: number;
+  tileCount: number;
+  tileSizePx: number;
 }
 
 export const renderSyntheticPanoramaStitchV1 = (requestValue: unknown): PanoramaSyntheticStitchResultV1 => {
@@ -82,53 +93,21 @@ export const renderSyntheticPanoramaStitchV1 = (requestValue: unknown): Panorama
   }
 
   const bounds = calculatePanoramaBounds(connectedFrames, request.projection);
+  const tilePlan = buildPanoramaSyntheticTilePlan(bounds.outputWidth, bounds.height, request.seamHaloPx);
   const outputPixels = canRenderSyntheticPanorama(connectedFrames)
-    ? new Uint8Array(bounds.outputWidth * bounds.height * 3)
+    ? renderSyntheticPanoramaTiles(request, connectedFrames, bounds, tilePlan)
     : null;
 
   if (outputPixels !== null) {
-    const weights = new Uint8Array(bounds.outputWidth * bounds.height);
-    const exposureSamples: ExposureDeltaSample[] = [];
-    const appliedLuminanceGains: Array<{ gain: number; sourceIndex: number }> = [];
-    for (const sourceFrame of connectedFrames) {
-      const exposureGain =
-        request.exposureNormalization === 'none'
-          ? ({ gain: 1, sampleCount: 0, samples: [] } satisfies EstimatedExposureGain)
-          : estimateSourceExposureGain(
-              request.seed,
-              sourceFrame,
-              bounds.minLeft,
-              bounds.minTop,
-              outputPixels,
-              weights,
-              bounds,
-              request.projection,
-              request.seamExposureCompensationPercent,
-            );
-      compositeSourceFrame(
-        request.seed,
-        sourceFrame,
-        bounds.minLeft,
-        bounds.minTop,
-        outputPixels,
-        weights,
-        bounds,
-        exposureGain.gain,
-        request.projection,
-      );
-      if (exposureGain.sampleCount >= MIN_EXPOSURE_OVERLAP_SAMPLES) {
-        appliedLuminanceGains.push({ gain: roundMetric(exposureGain.gain), sourceIndex: sourceFrame.sourceIndex });
-        exposureSamples.push(...exposureGain.samples);
-      }
-    }
-    fillUncoveredPixels(outputPixels, weights);
+    const exposureProof = buildSyntheticTileExposureProof(request, connectedFrames, bounds, tilePlan);
     return buildSyntheticStitchResult({
-      appliedLuminanceGains,
+      appliedLuminanceGains: exposureProof.appliedLuminanceGains,
       bounds,
       connectedFrames,
-      exposureSamples,
+      exposureSamples: exposureProof.exposureSamples,
       outputPixels,
       request,
+      tilePlan,
     });
   }
 
@@ -139,6 +118,7 @@ export const renderSyntheticPanoramaStitchV1 = (requestValue: unknown): Panorama
     exposureSamples: [],
     outputPixels,
     request,
+    tilePlan,
   });
 };
 
@@ -152,6 +132,7 @@ const buildSyntheticStitchResult = ({
   exposureSamples,
   outputPixels,
   request,
+  tilePlan,
 }: {
   appliedLuminanceGains: Array<{ gain: number; sourceIndex: number }>;
   bounds: ReturnType<typeof calculatePanoramaBounds>;
@@ -159,6 +140,7 @@ const buildSyntheticStitchResult = ({
   exposureSamples: ExposureDeltaSample[];
   outputPixels: Uint8Array | null;
   request: z.infer<typeof panoramaSyntheticStitchRequestV1Schema>;
+  tilePlan: PanoramaSyntheticTilePlanV1;
 }): PanoramaSyntheticStitchResultV1 => {
   const estimatedOutputBytes = bounds.outputWidth * bounds.height * BYTES_PER_PIXEL_RGBA;
   const warningCodes = new Set(request.expectedWarningCodes);
@@ -183,7 +165,153 @@ const buildSyntheticStitchResult = ({
     },
     outputPixels,
     stitchedSourceCount: connectedFrames.length,
+    tilePlan,
     warningCodes: [...warningCodes].sort(),
+  };
+};
+
+const buildPanoramaSyntheticTilePlan = (
+  width: number,
+  height: number,
+  seamHaloPx: number,
+): PanoramaSyntheticTilePlanV1 => {
+  const tileWidth = width > 1 ? Math.min(PANORAMA_TILE_SIZE_PX, Math.ceil(width / 2)) : 1;
+  const tileHeight =
+    height > 1 && width === 1 ? Math.min(PANORAMA_TILE_SIZE_PX, Math.ceil(height / 2)) : PANORAMA_TILE_SIZE_PX;
+  const columns = Math.max(1, Math.ceil(width / tileWidth));
+  const rows = Math.max(1, Math.ceil(height / tileHeight));
+  return {
+    maxTileHeightPx: Math.min(tileHeight, height),
+    maxTileWidthPx: Math.min(tileWidth, width),
+    seamHaloPx,
+    tileCount: columns * rows,
+    tileSizePx: PANORAMA_TILE_SIZE_PX,
+  };
+};
+
+const renderSyntheticPanoramaTiles = (
+  request: z.infer<typeof panoramaSyntheticStitchRequestV1Schema>,
+  connectedFrames: PanoramaSyntheticSourceFrameV1[],
+  bounds: ReturnType<typeof calculatePanoramaBounds>,
+  tilePlan: PanoramaSyntheticTilePlanV1,
+): Uint8Array => {
+  const outputPixels = new Uint8Array(bounds.outputWidth * bounds.height * 3);
+  for (let tileY = 0; tileY < bounds.height; tileY += tilePlan.maxTileHeightPx) {
+    const tileHeight = Math.min(tilePlan.maxTileHeightPx, bounds.height - tileY);
+    for (let tileX = 0; tileX < bounds.outputWidth; tileX += tilePlan.maxTileWidthPx) {
+      const tileWidth = Math.min(tilePlan.maxTileWidthPx, bounds.outputWidth - tileX);
+      const tilePixels = new Uint8Array(tileWidth * tileHeight * 3);
+      const tileWeights = new Uint8Array(tileWidth * tileHeight);
+      for (const sourceFrame of connectedFrames) {
+        const exposureGain =
+          request.exposureNormalization === 'none'
+            ? ({ gain: 1, sampleCount: 0, samples: [] } satisfies EstimatedExposureGain)
+            : estimateSourceExposureGainForTile(
+                request.seed,
+                sourceFrame,
+                bounds.minLeft,
+                bounds.minTop,
+                tilePixels,
+                tileWeights,
+                bounds,
+                tileX,
+                tileY,
+                tileWidth,
+                tileHeight,
+                request.projection,
+                request.seamExposureCompensationPercent,
+              );
+        compositeSourceFrameTile(
+          request.seed,
+          sourceFrame,
+          bounds.minLeft,
+          bounds.minTop,
+          tilePixels,
+          tileWeights,
+          bounds,
+          tileX,
+          tileY,
+          tileWidth,
+          tileHeight,
+          exposureGain.gain,
+          request.projection,
+        );
+      }
+      fillUncoveredPixels(tilePixels, tileWeights);
+      copyTileToOutput(outputPixels, bounds.outputWidth, tilePixels, tileX, tileY, tileWidth, tileHeight);
+    }
+  }
+  return outputPixels;
+};
+
+const buildSyntheticTileExposureProof = (
+  request: z.infer<typeof panoramaSyntheticStitchRequestV1Schema>,
+  connectedFrames: PanoramaSyntheticSourceFrameV1[],
+  bounds: ReturnType<typeof calculatePanoramaBounds>,
+  tilePlan: PanoramaSyntheticTilePlanV1,
+): {
+  appliedLuminanceGains: Array<{ gain: number; sourceIndex: number }>;
+  exposureSamples: ExposureDeltaSample[];
+} => {
+  if (request.exposureNormalization === 'none') return { appliedLuminanceGains: [], exposureSamples: [] };
+  const samplesBySource = new Map<number, ExposureDeltaSample[]>();
+  const gainsBySource = new Map<number, number[]>();
+  for (let tileY = 0; tileY < bounds.height; tileY += tilePlan.maxTileHeightPx) {
+    const tileHeight = Math.min(tilePlan.maxTileHeightPx, bounds.height - tileY);
+    for (let tileX = 0; tileX < bounds.outputWidth; tileX += tilePlan.maxTileWidthPx) {
+      const tileWidth = Math.min(tilePlan.maxTileWidthPx, bounds.outputWidth - tileX);
+      const tilePixels = new Uint8Array(tileWidth * tileHeight * 3);
+      const tileWeights = new Uint8Array(tileWidth * tileHeight);
+      for (const sourceFrame of connectedFrames) {
+        const exposureGain = estimateSourceExposureGainForTile(
+          request.seed,
+          sourceFrame,
+          bounds.minLeft,
+          bounds.minTop,
+          tilePixels,
+          tileWeights,
+          bounds,
+          tileX,
+          tileY,
+          tileWidth,
+          tileHeight,
+          request.projection,
+          request.seamExposureCompensationPercent,
+        );
+        compositeSourceFrameTile(
+          request.seed,
+          sourceFrame,
+          bounds.minLeft,
+          bounds.minTop,
+          tilePixels,
+          tileWeights,
+          bounds,
+          tileX,
+          tileY,
+          tileWidth,
+          tileHeight,
+          exposureGain.gain,
+          request.projection,
+        );
+        if (exposureGain.sampleCount >= MIN_EXPOSURE_OVERLAP_SAMPLES) {
+          gainsBySource.set(sourceFrame.sourceIndex, [
+            ...(gainsBySource.get(sourceFrame.sourceIndex) ?? []),
+            exposureGain.gain,
+          ]);
+          samplesBySource.set(sourceFrame.sourceIndex, [
+            ...(samplesBySource.get(sourceFrame.sourceIndex) ?? []),
+            ...exposureGain.samples,
+          ]);
+        }
+      }
+    }
+  }
+  return {
+    appliedLuminanceGains: [...gainsBySource.entries()].map(([sourceIndex, gains]) => ({
+      gain: roundMetric(median(gains)),
+      sourceIndex,
+    })),
+    exposureSamples: [...samplesBySource.values()].flat(),
   };
 };
 
@@ -231,14 +359,18 @@ const mapPanoramaProjectionX = (
   return Math.round(((cylindrical + 1) / 2) * (bounds.outputWidth - 1));
 };
 
-const compositeSourceFrame = (
+const compositeSourceFrameTile = (
   seed: string,
   sourceFrame: PanoramaSyntheticSourceFrameV1,
   minLeft: number,
   minTop: number,
-  outputPixels: Uint8Array,
-  weights: Uint8Array,
+  tilePixels: Uint8Array,
+  tileWeights: Uint8Array,
   bounds: ReturnType<typeof calculatePanoramaBounds>,
+  tileX: number,
+  tileY: number,
+  tileWidth: number,
+  tileHeight: number,
   exposureGain: number,
   projection: z.infer<typeof panoramaSyntheticStitchRequestV1Schema>['projection'],
 ): void => {
@@ -248,28 +380,34 @@ const compositeSourceFrame = (
     for (let x = 0; x < sourceFrame.width; x += 1) {
       const mappedX = mapPanoramaProjectionX(x + offsetX, bounds, projection);
       if (mappedX < 0 || mappedX >= bounds.outputWidth) continue;
-      const outputPixelIndex = (y + offsetY) * bounds.outputWidth + mappedX;
-      const outputIndex = outputPixelIndex * 3;
-      const oldWeight = weights[outputPixelIndex] ?? 0;
+      const outputY = y + offsetY;
+      if (mappedX < tileX || mappedX >= tileX + tileWidth || outputY < tileY || outputY >= tileY + tileHeight) continue;
+      const tilePixelIndex = (outputY - tileY) * tileWidth + (mappedX - tileX);
+      const outputIndex = tilePixelIndex * 3;
+      const oldWeight = tileWeights[tilePixelIndex] ?? 0;
       const newWeight = oldWeight + 1;
       for (let channel = 0; channel < 3; channel += 1) {
-        const oldValue = outputPixels[outputIndex + channel] ?? 0;
+        const oldValue = tilePixels[outputIndex + channel] ?? 0;
         const newValue = exposureAdjustedPanoramaByte(seed, sourceFrame, x, y, channel, exposureGain);
-        outputPixels[outputIndex + channel] = Math.round((oldValue * oldWeight + newValue) / newWeight);
+        tilePixels[outputIndex + channel] = Math.round((oldValue * oldWeight + newValue) / newWeight);
       }
-      weights[outputPixelIndex] = newWeight;
+      tileWeights[tilePixelIndex] = newWeight;
     }
   }
 };
 
-const estimateSourceExposureGain = (
+const estimateSourceExposureGainForTile = (
   seed: string,
   sourceFrame: PanoramaSyntheticSourceFrameV1,
   minLeft: number,
   minTop: number,
-  outputPixels: Uint8Array,
-  weights: Uint8Array,
+  tilePixels: Uint8Array,
+  tileWeights: Uint8Array,
   bounds: ReturnType<typeof calculatePanoramaBounds>,
+  tileX: number,
+  tileY: number,
+  tileWidth: number,
+  tileHeight: number,
   projection: z.infer<typeof panoramaSyntheticStitchRequestV1Schema>['projection'],
   compensationStrengthPercent: number,
 ): EstimatedExposureGain => {
@@ -280,13 +418,15 @@ const estimateSourceExposureGain = (
     for (let x = 0; x < sourceFrame.width; x += 1) {
       const mappedX = mapPanoramaProjectionX(x + offsetX, bounds, projection);
       if (mappedX < 0 || mappedX >= bounds.outputWidth) continue;
-      const outputPixelIndex = (y + offsetY) * bounds.outputWidth + mappedX;
-      if ((weights[outputPixelIndex] ?? 0) === 0) continue;
+      const outputY = y + offsetY;
+      if (mappedX < tileX || mappedX >= tileX + tileWidth || outputY < tileY || outputY >= tileY + tileHeight) continue;
+      const outputPixelIndex = (outputY - tileY) * tileWidth + (mappedX - tileX);
+      if ((tileWeights[outputPixelIndex] ?? 0) === 0) continue;
       const outputIndex = outputPixelIndex * 3;
       const targetLuminance = rgbLuminance(
-        outputPixels[outputIndex] ?? 0,
-        outputPixels[outputIndex + 1] ?? 0,
-        outputPixels[outputIndex + 2] ?? 0,
+        tilePixels[outputIndex] ?? 0,
+        tilePixels[outputIndex + 1] ?? 0,
+        tilePixels[outputIndex + 2] ?? 0,
       );
       const sourceLuminance = rgbLuminance(
         exposureAdjustedPanoramaByte(seed, sourceFrame, x, y, 0, 1),
@@ -309,6 +449,22 @@ const estimateSourceExposureGain = (
       before: Math.abs(Math.log2(ratio)),
     })),
   };
+};
+
+const copyTileToOutput = (
+  outputPixels: Uint8Array,
+  outputWidth: number,
+  tilePixels: Uint8Array,
+  tileX: number,
+  tileY: number,
+  tileWidth: number,
+  tileHeight: number,
+): void => {
+  for (let row = 0; row < tileHeight; row += 1) {
+    const sourceStart = row * tileWidth * 3;
+    const sourceEnd = sourceStart + tileWidth * 3;
+    outputPixels.set(tilePixels.subarray(sourceStart, sourceEnd), ((tileY + row) * outputWidth + tileX) * 3);
+  }
 };
 
 const buildExposureNormalizationResult = (
