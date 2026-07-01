@@ -1,7 +1,9 @@
+import cx from 'clsx';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { type Adjustments, ColorAdjustment, type ColorCalibration } from '../../../utils/adjustments';
+import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import UiText from '../../ui/primitives/Text';
 import AdjustmentSlider from '../AdjustmentSlider';
 import { ColorSwatch } from './ColorSwatch';
@@ -24,6 +26,7 @@ export const ColorAdvancedControls = ({
   onDragStateChange,
 }: ColorAdvancedControlsProps) => {
   const { t } = useTranslation();
+  const density = professionalInspectorDensityTokens;
   const [activePrimary, setActivePrimary] = useState('red');
   const colorCalibration = adjustments.colorCalibration;
   const levels = adjustments.levels;
@@ -91,27 +94,30 @@ export const ColorAdvancedControls = ({
   const trackSuffix = `${activePrimary}s`;
 
   return (
-    <details className="rounded-md border border-border bg-bg-tertiary" data-testid="advanced-color-disclosure">
-      <summary className="flex cursor-pointer items-center justify-between gap-3 px-2 py-2 text-xs">
+    <details className={density.card.nestedPanel} data-testid="advanced-color-disclosure">
+      <summary className="flex cursor-pointer items-center justify-between gap-2 px-1 py-1 text-xs">
         <span className="min-w-0">
-          <UiText variant={TextVariants.heading}>{t('adjustments.color.advanced.title')}</UiText>
-          <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+          <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+            {t('adjustments.color.advanced.title')}
+          </UiText>
+          <UiText variant={TextVariants.small} color={TextColors.secondary} className={density.sectionHeader.summary}>
             {t('adjustments.color.advanced.summary')}
           </UiText>
         </span>
-        <span className="shrink-0 rounded bg-bg-secondary px-2 py-1 text-[10px] font-semibold uppercase tracking-normal text-text-secondary">
-          {t('adjustments.color.collapsed')}
-        </span>
+        <span className={density.sectionHeader.badge}>{t('adjustments.color.collapsed')}</span>
       </summary>
-      <div className="space-y-3 border-t border-border p-2" data-testid="advanced-color-controls">
+      <div className={cx(density.gutter.panel, 'border-t border-border p-1.5')} data-testid="advanced-color-controls">
         {isLevelsVisible && (
-          <div className="p-2 bg-bg-tertiary rounded-md" data-testid="color-levels-controls">
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <UiText variant={TextVariants.heading}>{t('adjustments.color.levels.title')}</UiText>
+          <div className={density.card.panel} data-testid="color-levels-controls">
+            <div className={density.sectionHeader.root}>
+              <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+                {t('adjustments.color.levels.title')}
+              </UiText>
               <button
-                className={`px-2 py-1 rounded text-xs transition-colors ${
-                  levels.enabled ? 'bg-accent text-button-text' : 'bg-bg-secondary text-text-secondary hover:bg-surface'
-                }`}
+                className={cx(
+                  density.actionButton.base,
+                  levels.enabled ? density.actionButton.active : density.actionButton.inactive,
+                )}
                 onClick={handleLevelsToggle}
                 type="button"
               >
@@ -119,6 +125,7 @@ export const ColorAdvancedControls = ({
               </button>
             </div>
             <AdjustmentSlider
+              density="compact"
               label={t('adjustments.color.levels.inputBlack')}
               max={inputBlackMax}
               min={0}
@@ -130,6 +137,7 @@ export const ColorAdvancedControls = ({
               onDragStateChange={onDragStateChange}
             />
             <AdjustmentSlider
+              density="compact"
               label={t('adjustments.color.levels.inputWhite')}
               max={100}
               min={inputWhiteMin}
@@ -141,6 +149,7 @@ export const ColorAdvancedControls = ({
               onDragStateChange={onDragStateChange}
             />
             <AdjustmentSlider
+              density="compact"
               label={t('adjustments.color.levels.gamma')}
               max={300}
               min={25}
@@ -152,6 +161,7 @@ export const ColorAdvancedControls = ({
               onDragStateChange={onDragStateChange}
             />
             <AdjustmentSlider
+              density="compact"
               label={t('adjustments.color.levels.outputBlack')}
               max={outputBlackMax}
               min={0}
@@ -163,6 +173,7 @@ export const ColorAdvancedControls = ({
               onDragStateChange={onDragStateChange}
             />
             <AdjustmentSlider
+              density="compact"
               label={t('adjustments.color.levels.outputWhite')}
               max={100}
               min={outputWhiteMin}
@@ -185,15 +196,16 @@ export const ColorAdvancedControls = ({
           </div>
         )}
         {isColorCalibrationVisible && (
-          <div className="p-2 bg-bg-tertiary rounded-md" data-testid="color-calibration-controls">
-            <UiText variant={TextVariants.heading} className="mb-2">
+          <div className={density.card.panel} data-testid="color-calibration-controls">
+            <UiText variant={TextVariants.heading} className={cx(density.sectionHeader.title, 'mb-2 block')}>
               {t('adjustments.color.calibration.title')}
             </UiText>
             <div>
-              <UiText color={TextColors.primary} weight={TextWeights.medium} className="mb-1">
+              <UiText color={TextColors.primary} weight={TextWeights.medium} className="mb-1 text-[12px] leading-4">
                 {t('adjustments.color.calibration.shadows')}
               </UiText>
               <AdjustmentSlider
+                density="compact"
                 label={t('adjustments.color.calibration.tint')}
                 min={-100}
                 max={100}
@@ -207,11 +219,11 @@ export const ColorAdvancedControls = ({
                 trackClassName="tint-gradient-track"
               />
             </div>
-            <div className="mt-3">
-              <UiText color={TextColors.primary} weight={TextWeights.medium} className="mb-3">
+            <div className="mt-2">
+              <UiText color={TextColors.primary} weight={TextWeights.medium} className="mb-2 text-[12px] leading-4">
                 {t('adjustments.color.calibration.primaries')}
               </UiText>
-              <div className="flex justify-center gap-6 mb-4 px-1">
+              <div className="mb-2 flex justify-center gap-5 px-1">
                 {primaryColors.map(({ name, color, label }) => (
                   <ColorSwatch
                     color={color}
@@ -224,6 +236,7 @@ export const ColorAdvancedControls = ({
                 ))}
               </div>
               <AdjustmentSlider
+                density="compact"
                 label={t('adjustments.color.calibration.hue')}
                 min={-100}
                 max={100}
@@ -237,6 +250,7 @@ export const ColorAdvancedControls = ({
                 trackClassName={`hue-slider-${trackSuffix}`}
               />
               <AdjustmentSlider
+                density="compact"
                 label={t('adjustments.color.calibration.saturation')}
                 min={-100}
                 max={100}

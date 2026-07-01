@@ -1,6 +1,8 @@
+import cx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { TextColors, TextVariants } from '../../../types/typography';
 import type { Adjustments } from '../../../utils/adjustments';
+import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import UiText from '../../ui/primitives/Text';
 import AdjustmentSlider from '../AdjustmentSlider';
 import type { ColorPanelGroupProps } from './types';
@@ -15,18 +17,19 @@ export const runtimeStatusKey = (key: RuntimeStatusKey) => `adjustments.color.ru
 
 export const ColorRuntimeStatusRail = () => {
   const { t } = useTranslation();
+  const density = professionalInspectorDensityTokens;
 
   return (
     <div
       aria-label={t(runtimeStatusKey('ariaLabel'))}
-      className="grid grid-cols-2 gap-1 rounded-md border border-border bg-bg-tertiary p-1"
+      className={cx('grid grid-cols-2 gap-1', density.card.nestedPanel)}
       data-testid="color-runtime-status-rail"
     >
       {colorRuntimeStatusItems.map(([labelKey, stateKey]) => {
         const state = t(runtimeStatusKey(stateKey));
 
         return (
-          <div className="min-w-0 rounded bg-bg-secondary px-2 py-1" key={labelKey}>
+          <div className={density.card.nestedBare} key={labelKey}>
             <div className="text-[10px] font-semibold uppercase leading-tight tracking-normal text-text-secondary">
               {t(runtimeStatusKey(labelKey))}
             </div>
@@ -40,6 +43,7 @@ export const ColorRuntimeStatusRail = () => {
 
 export const ColorWorkflowReadinessRail = () => {
   const { t } = useTranslation();
+  const density = professionalInspectorDensityTokens;
   const readinessItems = [
     { key: 'profile-tone', label: t('adjustments.color.profileTone.title') },
     { key: 'rgb-balance', label: t('adjustments.color.colorBalanceRgb.title') },
@@ -50,7 +54,7 @@ export const ColorWorkflowReadinessRail = () => {
 
   return (
     <div
-      className="grid gap-1 rounded-md border border-border bg-bg-tertiary p-1"
+      className={cx('grid gap-1', density.card.nestedPanel)}
       data-channel-mixer-ready="true"
       data-color-balance-ready="true"
       data-grading-ready="true"
@@ -59,11 +63,7 @@ export const ColorWorkflowReadinessRail = () => {
       data-testid="professional-color-workflow-readiness"
     >
       {readinessItems.map((item) => (
-        <div
-          className="min-w-0 rounded bg-bg-secondary px-2 py-1"
-          data-testid="professional-color-readiness-item"
-          key={item.key}
-        >
+        <div className={density.card.nestedBare} data-testid="professional-color-readiness-item" key={item.key}>
           <div className="text-[10px] font-semibold uppercase leading-tight tracking-normal text-text-secondary">
             {item.label}
           </div>
@@ -123,6 +123,7 @@ export const ColorProofingDiagnostics = ({
   syncSkinToneUniformity,
 }: ColorProofingDiagnosticsProps) => {
   const { t } = useTranslation();
+  const density = professionalInspectorDensityTokens;
 
   const handleSkinToneUniformityToggle = () => {
     syncSkinToneUniformity({
@@ -145,27 +146,28 @@ export const ColorProofingDiagnostics = ({
     <>
       <ColorRuntimeStatusRail />
       <ColorWorkflowReadinessRail />
-      <details
-        className="rounded-md border border-border bg-bg-tertiary"
-        data-testid="color-proofing-diagnostics-disclosure"
-      >
-        <summary className="cursor-pointer px-2 py-2 text-xs">
-          <div className="flex items-start justify-between gap-3">
+      <details className={density.card.nestedPanel} data-testid="color-proofing-diagnostics-disclosure">
+        <summary className="cursor-pointer px-1 py-1 text-xs">
+          <div className={density.sectionHeader.rootLoose}>
             <div className="min-w-0">
-              <UiText variant={TextVariants.heading}>{t('adjustments.color.proofingDiagnostics.title')}</UiText>
-              <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+              <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+                {t('adjustments.color.proofingDiagnostics.title')}
+              </UiText>
+              <UiText
+                variant={TextVariants.small}
+                color={TextColors.secondary}
+                className={density.sectionHeader.summary}
+              >
                 {t('adjustments.color.proofingDiagnostics.summary', {
                   coverage: gamutWarningCoverage,
                   warningCount: colorWorkspaceWarningChips.length,
                 })}
               </UiText>
             </div>
-            <span className="shrink-0 rounded bg-bg-secondary px-2 py-1 text-[10px] font-semibold uppercase tracking-normal text-text-secondary">
-              {t(runtimeStatusKey('previewExport'))}
-            </span>
+            <span className={density.sectionHeader.badge}>{t(runtimeStatusKey('previewExport'))}</span>
           </div>
           <div
-            className="mt-2 flex flex-wrap gap-1 text-[10px] font-medium text-text-secondary"
+            className="mt-1.5 flex flex-wrap gap-1 text-[10px] font-medium text-text-secondary"
             data-testid="color-proofing-warning-summary"
           >
             {(colorWorkspaceWarningChips.length > 0
@@ -178,9 +180,9 @@ export const ColorProofingDiagnostics = ({
             ))}
           </div>
         </summary>
-        <div className="space-y-2 border-t border-border p-2">
+        <div className={cx(density.gutter.panel, 'border-t border-border p-1.5')}>
           <div
-            className="rounded-md border border-border bg-bg-tertiary p-2"
+            className={density.card.nestedPanel}
             data-active-camera-profile={adjustments.cameraProfile}
             data-active-tone-curve={adjustments.toneCurve}
             data-export-transform-label={activeExportPresetName ?? ''}
@@ -192,19 +194,23 @@ export const ColorProofingDiagnostics = ({
             data-waveform-hook="waveform"
             data-working-space-label="linear-raw-to-working-rgb"
           >
-            <div className="mb-2 flex items-start justify-between gap-3">
+            <div className={density.sectionHeader.rootLoose}>
               <div className="min-w-0">
-                <UiText variant={TextVariants.heading}>{t('adjustments.color.colorMixer')}</UiText>
-                <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+                <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+                  {t('adjustments.color.colorMixer')}
+                </UiText>
+                <UiText
+                  variant={TextVariants.small}
+                  color={TextColors.secondary}
+                  className={density.sectionHeader.summary}
+                >
                   {t('adjustments.color.profileTone.receiptSummary', {
                     profile: activeCameraProfileLabel,
                     toneCurve: activeToneCurveLabel,
                   })}
                 </UiText>
               </div>
-              <span className="shrink-0 rounded bg-bg-secondary px-2 py-1 text-[10px] font-semibold uppercase tracking-normal text-text-secondary">
-                {t(runtimeStatusKey('previewExport'))}
-              </span>
+              <span className={density.sectionHeader.badge}>{t(runtimeStatusKey('previewExport'))}</span>
             </div>
             <div className="grid grid-cols-3 gap-1 text-[10px] font-medium text-text-secondary">
               <span className="min-w-0 rounded bg-bg-secondary px-1.5 py-1" data-testid="color-workspace-working-label">
@@ -233,7 +239,7 @@ export const ColorProofingDiagnostics = ({
           </div>
 
           <div
-            className="rounded-md border border-border bg-bg-tertiary p-2"
+            className={density.card.nestedPanel}
             data-coverage-ratio={(currentGamutWarningOverlay?.coverage_ratio ?? 0).toFixed(6)}
             data-effective-color-profile={currentGamutWarningOverlay?.effective_color_profile ?? ''}
             data-effective-rendering-intent={currentGamutWarningOverlay?.effective_rendering_intent ?? ''}
@@ -248,16 +254,22 @@ export const ColorProofingDiagnostics = ({
             data-testid="gamut-warning-controls"
             data-visible={String(isGamutWarningOverlayVisible)}
           >
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-2">
               <div>
-                <UiText variant={TextVariants.heading}>{t('adjustments.color.gamutWarning.title')}</UiText>
-                <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+                <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+                  {t('adjustments.color.gamutWarning.title')}
+                </UiText>
+                <UiText
+                  variant={TextVariants.small}
+                  color={TextColors.secondary}
+                  className={density.sectionHeader.summary}
+                >
                   {t('adjustments.color.gamutWarning.coverage', { value: gamutWarningCoverage })}
                 </UiText>
                 <UiText
                   variant={TextVariants.small}
                   color={TextColors.secondary}
-                  className="mt-1 block"
+                  className={density.sectionHeader.summary}
                   data-testid="gamut-warning-proof-details"
                 >
                   {t('adjustments.color.gamutWarning.proofDetails', {
@@ -269,11 +281,10 @@ export const ColorProofingDiagnostics = ({
               </div>
               <button
                 aria-pressed={isGamutWarningOverlayVisible}
-                className={`shrink-0 rounded px-2 py-1 text-xs transition-colors ${
-                  isGamutWarningOverlayVisible
-                    ? 'bg-accent text-button-text'
-                    : 'bg-bg-secondary text-text-secondary hover:bg-surface'
-                }`}
+                className={cx(
+                  density.actionButton.base,
+                  isGamutWarningOverlayVisible ? density.actionButton.active : density.actionButton.inactive,
+                )}
                 data-testid="gamut-warning-toggle"
                 onClick={() => {
                   setEditor({ isGamutWarningOverlayVisible: !isGamutWarningOverlayVisible });
@@ -288,7 +299,7 @@ export const ColorProofingDiagnostics = ({
           </div>
 
           <div
-            className="rounded-md border border-border bg-bg-tertiary p-2"
+            className={density.card.nestedPanel}
             data-hsl-preview-hue={skinTonePreview.hue}
             data-hsl-preview-luminance={skinTonePreview.luminance}
             data-hsl-preview-saturation={skinTonePreview.saturation}
@@ -302,20 +313,25 @@ export const ColorProofingDiagnostics = ({
             data-target-saturation={adjustments.skinToneUniformity.targetSaturation.toFixed(2)}
             data-testid="skin-tone-uniformity-controls"
           >
-            <div className="mb-2 flex items-center justify-between gap-2">
+            <div className={density.sectionHeader.root}>
               <div>
-                <UiText variant={TextVariants.heading}>{t('adjustments.color.skinToneUniformity.title')}</UiText>
-                <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+                <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+                  {t('adjustments.color.skinToneUniformity.title')}
+                </UiText>
+                <UiText
+                  variant={TextVariants.small}
+                  color={TextColors.secondary}
+                  className={density.sectionHeader.summary}
+                >
                   {t('adjustments.color.skinToneUniformity.description')}
                 </UiText>
               </div>
               <button
                 aria-pressed={adjustments.skinToneUniformity.enabled}
-                className={`shrink-0 rounded px-2 py-1 text-xs transition-colors ${
-                  adjustments.skinToneUniformity.enabled
-                    ? 'bg-accent text-button-text'
-                    : 'bg-bg-secondary text-text-secondary hover:bg-surface'
-                }`}
+                className={cx(
+                  density.actionButton.base,
+                  adjustments.skinToneUniformity.enabled ? density.actionButton.active : density.actionButton.inactive,
+                )}
                 data-testid="skin-tone-uniformity-toggle"
                 onClick={handleSkinToneUniformityToggle}
                 type="button"
@@ -325,7 +341,7 @@ export const ColorProofingDiagnostics = ({
                   : t('adjustments.color.skinToneUniformity.disabled')}
               </button>
             </div>
-            <div className="grid gap-1 rounded bg-bg-secondary p-2 text-[11px] text-text-secondary">
+            <div className="grid gap-1 rounded bg-bg-secondary p-1.5 text-[11px] text-text-secondary">
               <span>{t('adjustments.color.skinToneUniformity.warning')}</span>
               <span>
                 {t('adjustments.color.skinToneUniformity.preview', {
@@ -340,6 +356,7 @@ export const ColorProofingDiagnostics = ({
               </span>
             </div>
             <AdjustmentSlider
+              density="compact"
               defaultValue={0.42}
               label={t('adjustments.color.skinToneUniformity.hue')}
               max={0.75}
@@ -352,6 +369,7 @@ export const ColorProofingDiagnostics = ({
               onDragStateChange={onDragStateChange}
             />
             <AdjustmentSlider
+              density="compact"
               defaultValue={0.31}
               label={t('adjustments.color.skinToneUniformity.saturation')}
               max={0.75}
@@ -364,6 +382,7 @@ export const ColorProofingDiagnostics = ({
               onDragStateChange={onDragStateChange}
             />
             <AdjustmentSlider
+              density="compact"
               defaultValue={0.18}
               label={t('adjustments.color.skinToneUniformity.lightness')}
               max={0.75}
@@ -376,6 +395,7 @@ export const ColorProofingDiagnostics = ({
               onDragStateChange={onDragStateChange}
             />
             <AdjustmentSlider
+              density="compact"
               defaultValue={16}
               label={t('adjustments.color.skinToneUniformity.hueCap')}
               max={30}
@@ -388,6 +408,7 @@ export const ColorProofingDiagnostics = ({
               onDragStateChange={onDragStateChange}
             />
             <AdjustmentSlider
+              density="compact"
               defaultValue={24}
               label={t('adjustments.color.skinToneUniformity.targetHue')}
               max={45}
@@ -400,6 +421,7 @@ export const ColorProofingDiagnostics = ({
               onDragStateChange={onDragStateChange}
             />
             <AdjustmentSlider
+              density="compact"
               defaultValue={0.38}
               label={t('adjustments.color.skinToneUniformity.targetSaturation')}
               max={0.65}
@@ -412,6 +434,7 @@ export const ColorProofingDiagnostics = ({
               onDragStateChange={onDragStateChange}
             />
             <AdjustmentSlider
+              density="compact"
               defaultValue={0.56}
               label={t('adjustments.color.skinToneUniformity.targetLightness')}
               max={0.75}
