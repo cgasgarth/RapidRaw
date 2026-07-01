@@ -153,6 +153,17 @@ for (const marker of [
   if (!waveformSource.includes(marker)) throw new Error(`Waveform missing soft-proof scope marker: ${marker}.`);
 }
 
+const panelScopesStripSource = await readFile('src/components/panel/right/inspector/PanelScopesStrip.tsx', 'utf8');
+for (const marker of [
+  'data-preview-scope-freshness',
+  'data-preview-scope-status-label',
+  'getPreviewScopeFreshnessStatus',
+]) {
+  if (!panelScopesStripSource.includes(marker)) {
+    throw new Error(`PanelScopesStrip missing preview-bound scope marker: ${marker}.`);
+  }
+}
+
 const listenerSource = await readFile('src/hooks/app/useTauriListeners.ts', 'utf8');
 for (const marker of [
   'renderBasis: isExportPreview',

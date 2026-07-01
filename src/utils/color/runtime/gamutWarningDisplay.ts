@@ -25,6 +25,30 @@ interface ExportSoftProofOverlayContext {
   selectedImagePath: string | null;
 }
 
+export type PreviewBoundWarningState = 'current' | 'stale' | 'unavailable' | 'unsupported';
+
+export interface RenderedPreviewWarningStatus {
+  coverageLabel: string;
+  displayProfileLabel: string;
+  exportProfileLabel: string | null;
+  renderTargetLabel: string;
+  state: PreviewBoundWarningState;
+  statusLabel: string;
+}
+
+export interface PreviewScopeFreshnessInput {
+  histogramReady: boolean;
+  path: string;
+  renderBasis: string;
+  softProofTransformApplied: boolean;
+  waveformReady: boolean;
+}
+
+export interface PreviewScopeFreshnessStatus {
+  state: PreviewBoundWarningState;
+  statusLabel: string;
+}
+
 export const formatGamutWarningCoverage = (overlay: GamutWarningOverlayPayload | null): string => {
   if (!overlay || overlay.warning_pixel_count === 0) return 'Clear';
 
@@ -89,4 +113,97 @@ export const isPendingExportSoftProofGamutWarningOverlay = (
   if (overlay.source_image_path !== context.selectedImagePath) return false;
   if (overlay.export_soft_proof_recipe_id !== context.exportSoftProofRecipeId) return false;
   return context.exportSoftProofTransform === null || isCurrentExportSoftProofGamutWarningOverlay(overlay, context);
+};
+
+const cleanProfileLabel = (value: string | null | undefined): string | null => {
+  const trimmed = value?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : null;
+};
+
+export const getRenderedPreviewWarningStatus = (
+  overlay: GamutWarningOverlayPayload | null,
+  context: ExportSoftProofOverlayContext,
+): RenderedPreviewWarningStatus => {
+  const transform = context.exportSoftProofTransform;
+  const currentOverlay = isCurrentExportSoftProofGamutWarningOverlay(overlay, context) ? overlay : null;
+  const exportProfileLabel = cleanProfileLabel(
+    currentOverlay?.effective_color_profile ?? transform?.effectiveColorProfile ?? null,
+  );
+  const displayProfileLabel = exportProfileLabel ?? 'Display profile unavailable';
+
+  if (!context.isExportSoftProofEnabled) {
+    return {
+      coverageLabel: 'Clear',
+      displayProfileLabel,
+      exportProfileLabel,
+      renderTargetLabel: 'Editor preview',
+      state: 'unavailable',
+      statusLabel: 'Soft proof disabled',
+    };
+  }
+
+  if (transform === null) {
+    return {
+      coverageLabel: formatGamutWarningCoverage(overlay),
+      displayProfileLabel,
+      exportProfileLabel,
+      renderTargetLabel: 'Export preview pending',
+      state: 'unavailable',
+      statusLabel: 'Preview render pending',
+    };
+  }
+
+  if (transform.transformApplied !== true) {
+    return {
+      coverageLabel: 'Clear',
+      displayProfileLabel,
+      exportProfileLabel,
+      renderTargetLabel: exportProfileLabel ? `Export preview -> ${exportProfileLabel}` : 'Export preview',
+      state: 'unsupported',
+      statusLabel: 'Soft proof unsupported',
+    };
+  }
+
+  if (currentOverlay !== null) {
+    return {
+      coverageLabel: formatGamutWarningCoverage(currentOverlay),
+      displayProfileLabel,
+      exportProfileLabel,
+      renderTargetLabel: `Export preview -> ${currentOverlay.effective_color_profile}`,
+      state: 'current',
+      statusLabel: 'Rendered preview current',
+    };
+  }
+
+  return {
+    coverageLabel: formatGamutWarningCoverage(overlay),
+    displayProfileLabel,
+    exportProfileLabel,
+    renderTargetLabel: exportProfileLabel ? `Export preview -> ${exportProfileLabel}` : 'Export preview',
+    state: overlay === null ? 'unavailable' : 'stale',
+    statusLabel: overlay === null ? 'Gamut mask unavailable' : 'Gamut mask stale',
+  };
+};
+
+export const getPreviewScopeFreshnessStatus = (
+  previewScopeStatus: PreviewScopeFreshnessInput | null,
+  selectedImagePath: string | null,
+): PreviewScopeFreshnessStatus => {
+  if (previewScopeStatus === null) {
+    return { state: 'unavailable', statusLabel: 'Scopes unavailable' };
+  }
+
+  if (previewScopeStatus.renderBasis === 'export_preview' && !previewScopeStatus.softProofTransformApplied) {
+    return { state: 'unsupported', statusLabel: 'Soft proof scopes unsupported' };
+  }
+
+  if (previewScopeStatus.path !== selectedImagePath) {
+    return { state: 'stale', statusLabel: 'Scopes stale' };
+  }
+
+  if (!previewScopeStatus.histogramReady || !previewScopeStatus.waveformReady) {
+    return { state: 'unavailable', statusLabel: 'Scopes updating' };
+  }
+
+  return { state: 'current', statusLabel: 'Scopes current' };
 };

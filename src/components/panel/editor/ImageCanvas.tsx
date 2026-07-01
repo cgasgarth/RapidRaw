@@ -32,7 +32,7 @@ import type {
   RetouchRemoveSource,
 } from '../../../utils/adjustments';
 import {
-  formatGamutWarningCoverage,
+  getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
 } from '../../../utils/color/runtime/gamutWarningDisplay';
 import {
@@ -2629,7 +2629,12 @@ const ImageCanvas = memo(
         isWbPickerActive ||
         activeRetouchSource !== null ||
         activeRemoveSource !== null);
-    const gamutCoverage = formatGamutWarningCoverage(gamutWarningOverlay);
+    const renderedPreviewWarningStatus = getRenderedPreviewWarningStatus(gamutWarningOverlay, {
+      exportSoftProofRecipeId,
+      exportSoftProofTransform,
+      isExportSoftProofEnabled,
+      selectedImagePath: selectedImage.path,
+    });
     const isCurrentGamutWarningOverlay = isCurrentExportSoftProofGamutWarningOverlay(gamutWarningOverlay, {
       exportSoftProofRecipeId,
       exportSoftProofTransform,
@@ -3032,8 +3037,10 @@ const ImageCanvas = memo(
                   data-effective-color-profile={gamutWarningOverlay.effective_color_profile}
                   data-effective-rendering-intent={gamutWarningOverlay.effective_rendering_intent}
                   data-export-soft-proof-recipe-id={gamutWarningOverlay.export_soft_proof_recipe_id}
+                  data-preview-warning-state={renderedPreviewWarningStatus.state}
                   data-proof-ready="true"
                   data-preview-basis={gamutWarningOverlay.preview_basis}
+                  data-render-target-label={renderedPreviewWarningStatus.renderTargetLabel}
                   data-source-image-path={gamutWarningOverlay.source_image_path}
                   data-source-precision-path={gamutWarningOverlay.source_precision_path}
                   data-transform-applied={String(gamutWarningOverlay.transform_applied)}
@@ -3067,7 +3074,10 @@ const ImageCanvas = memo(
                       color: '#ffe8fb',
                     }}
                   >
-                    {t('editor.canvas.gamutWarningCoverage', { value: gamutCoverage })}
+                    {t('editor.canvas.gamutWarningCoverage', {
+                      profile: renderedPreviewWarningStatus.displayProfileLabel,
+                      value: renderedPreviewWarningStatus.coverageLabel,
+                    })}
                   </div>
                 </div>
               )}
