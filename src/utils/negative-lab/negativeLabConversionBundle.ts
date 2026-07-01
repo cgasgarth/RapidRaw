@@ -30,6 +30,11 @@ const paramsNear = (
   numbersNear(left.white_point, right.white_point) &&
   JSON.stringify(left.base_fog_sample) === JSON.stringify(right.base_fog_sample);
 
+const basenameOf = (path: string): string => {
+  const separatorIndex = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+  return separatorIndex >= 0 ? path.slice(separatorIndex + 1) : path;
+};
+
 export const validateNegativeLabConversionBundleReplay = (value: unknown): NegativeLabConversionBundleReplayProof => {
   const bundle = negativeLabConversionBundleSchema.parse(value);
   const selectedProfile = bundle.conversion.selectedProfile;
@@ -60,6 +65,12 @@ export const validateNegativeLabConversionBundleReplay = (value: unknown): Negat
     conversionPlan.suffix !== bundle.conversion.suffix
   ) {
     throw new Error('Negative Lab conversion bundle replay export settings do not match app-server plan.');
+  }
+
+  for (const output of bundle.outputs) {
+    if (output.path === output.source.path || basenameOf(output.path) === basenameOf(output.source.path)) {
+      throw new Error('Negative Lab conversion bundle replay output would overwrite the source negative.');
+    }
   }
 
   return {

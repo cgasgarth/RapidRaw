@@ -51,6 +51,7 @@ import {
   buildNegativeLabDustScratchReviewReport,
   buildNegativeLabQcProofReport,
 } from '../negativeLabDustScratchReview';
+import { buildNegativeLabPositiveOutputReceipts } from '../negativeLabExportHandoff';
 import { buildNegativeLabBatchDryRunSummary, buildNegativeLabFrameHealthReport } from '../negativeLabFrameHealth';
 import {
   buildNegativeLabRuntimeProfileApplyProof,
@@ -288,6 +289,33 @@ export const buildNegativeLabAcceptedBatchApplyRouteResult = (
     throw new Error('Caller supplied Negative Lab profile snapshot does not match the accepted plan.');
   }
 
+  const reviewReport = buildNegativeLabDustScratchReviewReport(
+    expectedAcceptedPlan.dryRunSummary.frameHealthReport,
+    true,
+  );
+  const qcReport = buildNegativeLabQcProofReport(reviewReport, true, false);
+  const sourcePathsByFrameId = new Map(
+    expectedAcceptedPlan.dryRunSummary.frameHealthReport.frames.map((frame) => [frame.frameId, frame.sourcePath]),
+  );
+  const qcArtifact = buildNegativeLabQcContactSheetArtifact({
+    outputIntent: 'editable_positive',
+    qcDecisionByFrameId: Object.fromEntries(
+      expectedAcceptedPlan.dryRunSummary.affectedFrameIds.map((frameId) => [frameId, 'approved' as const]),
+    ),
+    report: qcReport,
+    sessionId: expectedAcceptedPlan.acceptedDryRunPlanId,
+    sourcePathsByFrameId,
+  });
+  const positiveOutputs = buildNegativeLabPositiveOutputReceipts({
+    acceptedPlanIdentity: {
+      acceptedDryRunPlanHash: expectedAcceptedPlan.acceptedDryRunPlanHash,
+      acceptedDryRunPlanId: expectedAcceptedPlan.acceptedDryRunPlanId,
+    },
+    conversionPlan,
+    dryRunSummary: expectedAcceptedPlan.dryRunSummary,
+    positiveVariants: qcArtifact.positiveVariants,
+  });
+
   return negativeLabAcceptedBatchApplyAppServerResultSchema.parse({
     acceptedDryRunPlanHash: expectedAcceptedPlan.acceptedDryRunPlanHash,
     acceptedDryRunPlanId: expectedAcceptedPlan.acceptedDryRunPlanId,
@@ -302,6 +330,7 @@ export const buildNegativeLabAcceptedBatchApplyRouteResult = (
       },
       params: conversionPlan.params,
       paths: plannedPaths,
+      positiveOutputs,
       receipt: conversionPlan.profileApplyProof,
     },
     commandName: NegativeLabAppServerCommandName.AcceptedBatchApply,
