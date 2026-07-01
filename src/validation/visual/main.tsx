@@ -171,7 +171,37 @@ window.__TAURI_INTERNALS__ = {
         suggestedBlackPointDelta: 0.12,
       });
     }
-    if (command === convertNegativesCommand) return Promise.resolve(['/tmp/rawengine-negative-smoke-positive.tif']);
+    if (command === convertNegativesCommand) {
+      return Promise.resolve([
+        {
+          artifactId: 'artifact_negative_lab_visual_smoke',
+          conversionBundlePath: '/tmp/rawengine-negative-smoke-positive.tif.conversion-bundle.json',
+          dimensions: { height: 900, width: 1200 },
+          frameExposureOverrides: { overrides: [], schemaVersion: 1 },
+          frameRgbBalanceOverrides: { overrides: [], schemaVersion: 1 },
+          outputArtifactId: 'artifact_negative_lab_visual_smoke_output',
+          outputFormat: 'tiff16',
+          outputHash: 'fnv1a64:0123456789abcdef',
+          outputPath: '/tmp/rawengine-negative-smoke-positive.tif',
+          path: '/tmp/rawengine-negative-smoke-positive.tif',
+          positiveVariantId: 'positive_variant_visual_smoke',
+          profileProvenanceHash: null,
+          replayPlanHash: 'fnv1a32:2f4a91bc',
+          selectedAcquisitionProfile: {
+            channelBasis: 'camera_raw',
+            displayName: 'Camera RAW linear',
+            id: 'camera_raw_linear_v1',
+            inputTransform: 'camera_raw_linear',
+            provenanceSummary: 'Visual smoke acquisition profile.',
+            warningCodes: [],
+          },
+          selectedProfile: null,
+          sidecarPath: '/tmp/rawengine-negative-smoke-positive.tif.rrdata',
+          sourceImageRef: '/fixtures/negative-lab/synthetic-color-negative-001.tif',
+          sourcePath: '/fixtures/negative-lab/synthetic-color-negative-001.tif',
+        },
+      ]);
+    }
     if (command === saveCommunityPresetCommand) return Promise.resolve(null);
     if (command === handleExportPresetsToFileCommand) return Promise.resolve(null);
     if (command === 'plugin:dialog|save') return Promise.resolve('/tmp/rawengine-film-look-smoke.rrpreset');

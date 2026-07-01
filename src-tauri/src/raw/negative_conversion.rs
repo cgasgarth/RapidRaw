@@ -1086,8 +1086,32 @@ fn build_negative_output_path(
         NegativeConversionOutputFormat::JpegProof => "jpg",
         NegativeConversionOutputFormat::Tiff16 => "tiff",
     };
-    let filename = format!("{}_{}.{}", stem, save_options.suffix, extension);
-    parent.join(&filename)
+    let output_stem = format!("{}_{}", stem, save_options.suffix);
+
+    for collision_index in 0..10_000 {
+        let candidate_stem = if collision_index == 0 {
+            output_stem.clone()
+        } else {
+            format!("{output_stem}-{collision_index}")
+        };
+        let candidate = parent.join(format!("{candidate_stem}.{extension}"));
+        if candidate.exists() || negative_lab_output_sidecar_path(&candidate).exists() {
+            continue;
+        }
+        if save_options.write_conversion_bundle
+            && negative_lab_conversion_bundle_path(&candidate).exists()
+        {
+            continue;
+        }
+        return candidate;
+    }
+
+    parent.join(format!(
+        "{}-{}.{}",
+        output_stem,
+        Uuid::new_v4().simple(),
+        extension
+    ))
 }
 
 fn negative_lab_output_sidecar_path(output_path: &Path) -> PathBuf {
@@ -1134,6 +1158,46 @@ struct NegativeLabConversionBundleOutputRef {
     output_height: u32,
 }
 
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabSavedPositiveDimensions {
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabSavedPositiveHandoff {
+    pub artifact_id: String,
+    pub conversion_bundle_path: Option<String>,
+    pub frame_exposure_overrides: NegativeLabFrameExposureOverridePayload,
+    pub frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload,
+    pub output_artifact_id: String,
+    pub output_format: String,
+    pub output_hash: String,
+    pub output_path: String,
+    pub path: String,
+    pub positive_variant_id: String,
+    pub profile_provenance_hash: Option<String>,
+    pub replay_plan_hash: String,
+    pub selected_acquisition_profile: NegativeLabAcquisitionProfileSnapshot,
+    pub selected_profile: Option<NegativeLabSelectedProfileSnapshot>,
+    pub sidecar_path: String,
+    pub source_image_ref: String,
+    pub source_path: String,
+    pub dimensions: NegativeLabSavedPositiveDimensions,
+}
+
+#[derive(Debug, Clone)]
+struct NegativeLabOutputSidecarReceipt {
+    artifact_id: String,
+    output_artifact_id: String,
+    output_hash: String,
+    positive_variant_id: String,
+    replay_plan_hash: String,
+    sidecar_path: PathBuf,
+}
+
 fn negative_lab_path_filename(path: &Path) -> String {
     path.file_name()
         .unwrap_or_default()
@@ -1146,6 +1210,32 @@ fn negative_lab_output_format_id(output_format: NegativeConversionOutputFormat) 
         NegativeConversionOutputFormat::JpegProof => "jpeg_proof",
         NegativeConversionOutputFormat::Tiff16 => "tiff16",
     }
+}
+
+fn build_negative_lab_replay_plan_hash(
+    params: &NegativeConversionParams,
+    save_options: &NegativeConversionSaveOptions,
+    output_format: &str,
+    source_paths: Vec<String>,
+) -> String {
+    let profile_hash = save_options
+        .selected_profile
+        .as_ref()
+        .map(|profile| profile.profile_provenance_hash.clone())
+        .or_else(|| save_options.profile_provenance_hash.clone());
+    let replay_seed = serde_json::json!({
+        "outputFormat": output_format,
+        "frameExposureOverrides": save_options.frame_exposure_overrides.clone(),
+        "frameRgbBalanceOverrides": save_options.frame_rgb_balance_overrides.clone(),
+        "params": params,
+        "patchSamplerCorrections": save_options.patch_sampler_corrections.clone(),
+        "paths": source_paths,
+        "profileProvenanceHash": profile_hash,
+        "suffix": save_options.suffix,
+        "selectedAcquisitionProfile": save_options.selected_acquisition_profile.clone(),
+    })
+    .to_string();
+    format!("fnv1a32:{}", build_negative_lab_plan_hash(&replay_seed))
 }
 
 fn write_negative_lab_conversion_bundle(
@@ -1177,27 +1267,15 @@ fn write_negative_lab_conversion_bundle(
             }))
         })
         .collect();
-    let profile_hash = save_options
-        .selected_profile
-        .as_ref()
-        .map(|profile| profile.profile_provenance_hash.clone())
-        .or_else(|| save_options.profile_provenance_hash.clone());
-    let replay_seed = serde_json::json!({
-        "outputFormat": output_format,
-        "frameExposureOverrides": save_options.frame_exposure_overrides.clone(),
-        "frameRgbBalanceOverrides": save_options.frame_rgb_balance_overrides.clone(),
-        "params": params,
-        "patchSamplerCorrections": save_options.patch_sampler_corrections.clone(),
-        "paths": outputs
+    let replay_plan_hash = build_negative_lab_replay_plan_hash(
+        params,
+        save_options,
+        output_format,
+        outputs
             .iter()
             .map(|output| output.source_path.to_string_lossy().to_string())
             .collect::<Vec<_>>(),
-        "profileProvenanceHash": profile_hash,
-        "suffix": save_options.suffix,
-        "selectedAcquisitionProfile": save_options.selected_acquisition_profile.clone(),
-    })
-    .to_string();
-    let replay_plan_hash = format!("fnv1a32:{}", build_negative_lab_plan_hash(&replay_seed));
+    );
     let bundle = serde_json::json!({
         "acquisition": {
             "selectedProfile": save_options.selected_acquisition_profile,
@@ -1248,9 +1326,9 @@ fn write_negative_lab_output_sidecar(
     params: &NegativeConversionParams,
     save_options: &NegativeConversionSaveOptions,
     accepted_dust_heal_layers: &[serde_json::Value],
-    output_width: u32,
-    output_height: u32,
-) -> Result<(), String> {
+    replay_plan_hash: &str,
+    dimensions: NegativeLabSavedPositiveDimensions,
+) -> Result<NegativeLabOutputSidecarReceipt, String> {
     let sidecar_path = negative_lab_output_sidecar_path(output_path);
     let mut sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
     let artifact_id = format!("artifact_negative_lab_{}", Uuid::new_v4().simple());
@@ -1283,8 +1361,8 @@ fn write_negative_lab_output_sidecar(
             "artifactId": output_artifact_id,
             "contentHash": content_hash,
             "dimensions": {
-                "height": output_height,
-                "width": output_width,
+                "height": dimensions.height,
+                "width": dimensions.width,
             },
             "kind": "negative_lab_positive",
             "outputIntent": "editable_positive",
@@ -1297,6 +1375,11 @@ fn write_negative_lab_output_sidecar(
             "selectedAcquisitionProfile": save_options.selected_acquisition_profile.clone(),
             "selectedProfile": save_options.selected_profile.clone(),
             "runtimeStatus": "rendered",
+        },
+        "replay": {
+            "appServerCommand": "negative.lab.conversion_plan",
+            "identityHash": replay_plan_hash,
+            "requiresSourceFiles": true,
         },
         "schemaVersion": 1,
         "sourceImageRefs": [{
@@ -1327,6 +1410,15 @@ fn write_negative_lab_output_sidecar(
             sidecar_path.display(),
             e
         )
+    })?;
+
+    Ok(NegativeLabOutputSidecarReceipt {
+        artifact_id,
+        output_artifact_id,
+        output_hash: content_hash,
+        positive_variant_id,
+        replay_plan_hash: replay_plan_hash.to_string(),
+        sidecar_path,
     })
 }
 
@@ -1930,13 +2022,27 @@ pub async fn convert_negatives(
     params: NegativeConversionParams,
     options: Option<NegativeConversionSaveOptions>,
     app_handle: AppHandle,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<NegativeLabSavedPositiveHandoff>, String> {
     tokio::task::spawn_blocking(move || {
         let mut results = Vec::new();
         let mut bundle_outputs = Vec::new();
         let save_options = options.unwrap_or_default().sanitized();
         save_options.validate_accepted_batch_plan(paths.len())?;
         let sanitized_params = params.sanitized();
+        let real_source_paths = paths
+            .iter()
+            .map(|path_str| {
+                let (source_path, _) = parse_virtual_path(path_str);
+                source_path.to_string_lossy().to_string()
+            })
+            .collect::<Vec<_>>();
+        let output_format = negative_lab_output_format_id(save_options.output_format).to_string();
+        let replay_plan_hash = build_negative_lab_replay_plan_hash(
+            &sanitized_params,
+            &save_options,
+            &output_format,
+            real_source_paths.clone(),
+        );
 
         for (i, path_str) in paths.iter().enumerate() {
             let _ = app_handle.emit(
@@ -1948,8 +2054,10 @@ pub async fn convert_negatives(
                 }),
             );
 
-            let (source_path, _) = parse_virtual_path(path_str);
-            let real_path = source_path.to_string_lossy().to_string();
+            let real_path = real_source_paths
+                .get(i)
+                .cloned()
+                .ok_or_else(|| format!("Missing Negative Lab source path at index {}", i))?;
 
             let settings = load_settings_or_default(&app_handle);
 
@@ -2010,34 +2118,66 @@ pub async fn convert_negatives(
             }
 
             let _ = crate::exif_processing::write_rrexif_sidecar(&real_path, &out_path);
-            write_negative_lab_output_sidecar(
+            let sidecar_receipt = write_negative_lab_output_sidecar(
                 &out_path,
                 Path::new(&real_path),
                 &effective_params,
                 &save_options,
                 &save_options.accepted_dust_heal_layers_for_path(&real_path),
-                processed.width(),
-                processed.height(),
+                &replay_plan_hash,
+                NegativeLabSavedPositiveDimensions {
+                    height: processed.height(),
+                    width: processed.width(),
+                },
             )?;
             bundle_outputs.push(NegativeLabConversionBundleOutputRef {
                 output_height: processed.height(),
                 output_path: out_path.clone(),
                 output_width: processed.width(),
-                sidecar_path: negative_lab_output_sidecar_path(&out_path),
+                sidecar_path: sidecar_receipt.sidecar_path.clone(),
                 source_path: PathBuf::from(&real_path),
             });
-            results.push(out_path.to_string_lossy().to_string());
+            let output_path = out_path.to_string_lossy().to_string();
+            results.push(NegativeLabSavedPositiveHandoff {
+                artifact_id: sidecar_receipt.artifact_id,
+                conversion_bundle_path: None,
+                dimensions: NegativeLabSavedPositiveDimensions {
+                    height: processed.height(),
+                    width: processed.width(),
+                },
+                frame_exposure_overrides: save_options.frame_exposure_overrides.clone(),
+                frame_rgb_balance_overrides: save_options.frame_rgb_balance_overrides.clone(),
+                output_artifact_id: sidecar_receipt.output_artifact_id,
+                output_format: output_format.clone(),
+                output_hash: sidecar_receipt.output_hash,
+                output_path: output_path.clone(),
+                path: output_path.clone(),
+                positive_variant_id: sidecar_receipt.positive_variant_id,
+                profile_provenance_hash: save_options.profile_provenance_hash.clone(),
+                replay_plan_hash: sidecar_receipt.replay_plan_hash,
+                selected_acquisition_profile: save_options.selected_acquisition_profile.clone(),
+                selected_profile: save_options.selected_profile.clone(),
+                sidecar_path: sidecar_receipt.sidecar_path.to_string_lossy().to_string(),
+                source_image_ref: real_path.clone(),
+                source_path: real_path,
+            });
         }
 
         if save_options.write_conversion_bundle
             && let Some(first_output) = bundle_outputs.first()
         {
+            let conversion_bundle_path =
+                negative_lab_conversion_bundle_path(&first_output.output_path);
             write_negative_lab_conversion_bundle(
-                &negative_lab_conversion_bundle_path(&first_output.output_path),
+                &conversion_bundle_path,
                 &sanitized_params,
                 &save_options,
                 &bundle_outputs,
             )?;
+            let conversion_bundle_path = conversion_bundle_path.to_string_lossy().to_string();
+            for result in &mut results {
+                result.conversion_bundle_path = Some(conversion_bundle_path.clone());
+            }
         }
 
         Ok(results)
@@ -2643,6 +2783,27 @@ mod tests {
     }
 
     #[test]
+    fn negative_conversion_output_path_uses_no_overwrite_suffix() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let source_path = temp_dir.path().join("frame_001.tif");
+        let first_output = temp_dir.path().join("frame_001_Positive.tiff");
+        fs::write(&source_path, b"negative-source").expect("source should be written");
+        fs::write(&first_output, b"existing-positive").expect("existing output should be written");
+
+        let output_path = build_negative_output_path(
+            &source_path.to_string_lossy(),
+            &NegativeConversionSaveOptions::default(),
+        );
+
+        assert_eq!(
+            output_path,
+            temp_dir.path().join("frame_001_Positive-1.tiff")
+        );
+        assert_ne!(output_path, source_path);
+        assert_ne!(output_path, first_output);
+    }
+
+    #[test]
     fn negative_conversion_batch_exports_require_accepted_plan_identity() {
         let missing_plan = NegativeConversionSaveOptions::default();
         assert!(
@@ -2939,8 +3100,11 @@ mod tests {
             &params,
             &save_options,
             &save_options.accepted_dust_heal_layers_for_path(&source_path.to_string_lossy()),
-            12,
-            8,
+            "fnv1a32:2f4a91bc",
+            NegativeLabSavedPositiveDimensions {
+                height: 8,
+                width: 12,
+            },
         )
         .expect("sidecar should be written");
 
@@ -2968,6 +3132,7 @@ mod tests {
             artifact["provenance"]["selectedProfile"]["profileProvenanceHash"],
             "fnv1a32:aaaaaaaa"
         );
+        assert_eq!(artifact["replay"]["identityHash"], "fnv1a32:2f4a91bc");
         assert_eq!(
             artifact["conversion"]["acceptedDryRunPlanId"],
             "negative_lab_batch_plan_2f4a91bc"
@@ -3656,8 +3821,11 @@ mod tests {
             &params,
             &save_options,
             &[],
-            rendered.width(),
-            rendered.height(),
+            "fnv1a32:2f4a91bc",
+            NegativeLabSavedPositiveDimensions {
+                height: rendered.height(),
+                width: rendered.width(),
+            },
         )
         .expect("write public negative positive sidecar");
 
@@ -3992,8 +4160,11 @@ mod tests {
             &params,
             &save_options,
             &[],
-            rendered.width(),
-            rendered.height(),
+            "fnv1a32:2f4a91bc",
+            NegativeLabSavedPositiveDimensions {
+                height: rendered.height(),
+                width: rendered.width(),
+            },
         )
         .expect("write private RAW Negative Lab sidecar");
         let sidecar_path = negative_lab_output_sidecar_path(&output_path);

@@ -16,7 +16,10 @@ import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } fro
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { findAlbumById } from '../../utils/folderTreeUtils';
 import { globalImageCache, type ImageCacheEntry } from '../../utils/ImageLRUCache';
-import { consumePendingNegativeConversionDustHealLayers } from '../../utils/negative-lab/negativeLabEditorHandoff';
+import {
+  consumePendingNegativeConversionDustHealLayers,
+  consumePendingNegativeConversionSavedPositiveHandoff,
+} from '../../utils/negative-lab/negativeLabEditorHandoff';
 import { debouncedSave, debouncedSetHistory } from '../editor/useEditorActions';
 import { reconcileSelectedFolderRefresh } from '../library/selectedFolderRefreshReconciliation';
 
@@ -225,6 +228,25 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
           finalPreviewUrl: cachedReadyEntry.finalPreviewUrl,
           uncroppedAdjustedPreviewUrl: cachedReadyEntry.uncroppedPreviewUrl,
         });
+        const savedPositiveHandoff = consumePendingNegativeConversionSavedPositiveHandoff(path);
+        if (savedPositiveHandoff !== null) {
+          setEditor((state) => ({
+            selectedImage:
+              state.selectedImage?.path === path
+                ? {
+                    ...state.selectedImage,
+                    metadata: {
+                      ...(typeof state.selectedImage.metadata === 'object' &&
+                      state.selectedImage.metadata !== null &&
+                      !Array.isArray(state.selectedImage.metadata)
+                        ? state.selectedImage.metadata
+                        : {}),
+                      rawEngineNegativeLabHandoff: savedPositiveHandoff,
+                    },
+                  }
+                : state.selectedImage,
+          }));
+        }
 
         setEditor({ adjustments: cachedReadyEntry.adjustments });
         resetHistory(cachedReadyEntry.adjustments);
@@ -284,10 +306,12 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
               globalImageCache.set(path, { ...cachedReadyEntry, adjustments: freshAdjustments });
             }
             consumePendingNegativeConversionDustHealLayers(path);
+            consumePendingNegativeConversionSavedPositiveHandoff(path);
           })
           .catch((err: unknown) => {
             console.error('Failed background metadata sync on cache hit:', err);
             consumePendingNegativeConversionDustHealLayers(path);
+            consumePendingNegativeConversionSavedPositiveHandoff(path);
           });
 
         return;

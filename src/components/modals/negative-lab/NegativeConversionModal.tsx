@@ -60,7 +60,7 @@ import {
   type NegativeLabPresetParams,
   negativeBaseFogEstimateSchema,
   negativeBaseFogSampleReadoutSchema,
-  negativeConversionSavedPathsSchema,
+  negativeConversionSavedPositiveHandoffsSchema,
 } from '../../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
 import type { NegativeLabSelectedProfileSnapshot } from '../../../schemas/negative-lab/negativeLabProfileComparisonSchemas';
 import {
@@ -2362,7 +2362,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           })
           .filter((entry): entry is [string, Array<LayerStackSidecarLayerV1>] => entry !== null),
       );
-      const savedPaths = await invokeWithSchema(
+      const savedPositiveHandoffs = await invokeWithSchema(
         Invokes.ConvertNegatives,
         {
           paths: pathsToConvert,
@@ -2387,8 +2387,12 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             ...(selectedProfileSnapshot === null ? {} : { selectedProfile: selectedProfileSnapshot }),
           },
         },
-        negativeConversionSavedPathsSchema,
+        negativeConversionSavedPositiveHandoffsSchema,
       );
+      const savedPaths = savedPositiveHandoffs.map((handoff) => handoff.path);
+      const activePositivePath =
+        savedPositiveHandoffs.find((handoff) => handoff.sourcePath === activePositiveVariant?.sourcePath)?.path ??
+        savedPaths[0];
       const acceptedDustHealLayersBySavedPath = Object.fromEntries(
         savedPaths
           .map((savedPath, savedPathIndex) => {
@@ -2407,6 +2411,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       onSave(savedPaths, {
         acceptedDustHealLayers,
         acceptedDustHealLayersBySavedPath,
+        ...(activePositivePath === undefined ? {} : { activePositivePath }),
+        savedPositiveHandoffs,
         openInEditor: openSavedPositiveInEditor,
       });
       onClose();

@@ -60,6 +60,7 @@ export interface AppModalsProps {
   handleStartPanorama: (paths: string[]) => void;
   handleSaveHdr: () => Promise<string>;
   handleStartHdr: (paths: string[]) => void;
+  requestThumbnails: (paths: string[]) => void;
   refreshImageList: () => Promise<void>;
   handleApplyDenoise: (intensity: number, method: 'ai' | 'bm3d') => Promise<void>;
   handleBatchDenoise: (intensity: number, method: 'ai' | 'bm3d', paths: string[]) => Promise<string[]>;
@@ -471,6 +472,7 @@ export default function AppModals(props: AppModalsProps) {
                 onRefreshError: (err) => {
                   console.error('Failed to refresh image list after negative conversion:', err);
                 },
+                requestThumbnails: props.requestThumbnails,
                 refreshImageList: props.refreshImageList,
                 savedPaths,
               });

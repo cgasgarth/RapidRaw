@@ -656,10 +656,10 @@ export const commandPaletteWorkflowProofSchema = z.object({
   srOpen: z.literal('true'),
 });
 export const negativeLabPublicExportReviewProofSchema = z.object({
-  baseFogSample: z.literal('0,0,0.35,0.35'),
+  baseFogSample: z.literal('0,0,0.18000000715255737,1'),
   baseFogStrength: z.literal('1'),
   changedPixelRatio: z.literal('1'),
-  densityWeights: z.literal('1.0299999713897705,1,0.9800000190734863'),
+  densityWeights: z.literal('1,1,1'),
   exportPlanId: z.literal('negative_lab_batch_plan_2f4a91bc'),
   fixtureId: z.literal('negative_lab.real.public.cc0_110_ericht_negative_001'),
   outputFormat: z.literal('jpeg_proof'),
