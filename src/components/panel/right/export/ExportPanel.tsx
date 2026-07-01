@@ -85,6 +85,7 @@ import {
   Status,
   WatermarkAnchor,
 } from '../../../ui/ExportImportProperties';
+import { editorChromeStatusChipClassName } from '../../../ui/editorChromeTokens';
 import Button from '../../../ui/primitives/Button';
 import Dropdown from '../../../ui/primitives/Dropdown';
 import Slider from '../../../ui/primitives/Slider';
@@ -1269,6 +1270,35 @@ export default function ExportPanel({
                   : exportFooterWorkflowState === 'estimating'
                     ? t('export.status.estimatingSize')
                     : t('export.status.footerIdle');
+  const exportFooterStatusTone =
+    exportFooterWorkflowState === 'failed'
+      ? 'danger'
+      : exportFooterWorkflowState === 'canceled' ||
+          exportFooterWorkflowState === 'estimating' ||
+          exportFooterWorkflowState === 'queued'
+        ? 'warning'
+        : exportFooterWorkflowState === 'completed' || exportFooterWorkflowState === 'imported-linked-variant'
+          ? 'success'
+          : exportFooterWorkflowState === 'running' || exportFooterWorkflowState === 'importing-linked-variant'
+            ? 'info'
+            : 'neutral';
+  const exportEstimateText = isEstimating
+    ? t('export.status.estimatingSize')
+    : estimatedSize !== null
+      ? numImages > 1
+        ? `${t('export.status.estimatedTotalSize', { size: formatBytes(estimatedSize, t) })}${t(
+            'export.status.estimatedAverageSize',
+            { size: formatBytes(estimatedSize / numImages, t) },
+          )}`
+        : t('export.status.estimatedSize', { size: formatBytes(estimatedSize, t) })
+      : t('export.status.estimatePending');
+  const exportDisabledReason = isLibrarySmartPreviewResolving
+    ? t('export.status.resolvingOriginalFile')
+    : isSmartPreviewExportBlocked
+      ? t('export.status.offlineSmartPreviewBlocked')
+      : isLibraryContext
+        ? t('export.status.noImagesSelected')
+        : t('export.status.noImageSelected');
   const isLut = fileFormat === FileFormats.Cube;
   const itemLabel = isLut ? t('export.labels.lut') : t('export.labels.image');
   const itemLabelPlural = isLut ? t('export.labels.lut_plural') : t('export.labels.image_plural');
@@ -1996,9 +2026,9 @@ export default function ExportPanel({
         )}
       </div>
 
-      <div className="p-4 border-t border-surface shrink-0 space-y-2">
+      <div className="shrink-0 space-y-3 border-t border-surface bg-bg-secondary p-3">
         {canExport && !firstReceiptOutput ? (
-          <div className="space-y-2">
+          <div className="space-y-2" data-testid="export-proof-footer-proof-state">
             {isSoftProofProfileCompareUnavailable ? (
               <div
                 className="flex min-w-0 items-start gap-2 rounded-md border border-yellow-500/40 bg-yellow-500/10 px-3 py-2"
@@ -2028,58 +2058,68 @@ export default function ExportPanel({
               </div>
             ) : null}
             <div
-              className="min-w-0 rounded-md border border-surface bg-bg-secondary px-3 py-2.5"
+              className="min-w-0 rounded-md border border-editor-border bg-editor-panel px-2.5 py-2"
               data-testid="export-readiness-summary"
             >
-              <div className="flex min-w-0 items-center gap-2">
+              <div className="flex min-w-0 items-start gap-2">
                 <CheckCircle className="h-4 w-4 shrink-0 text-accent" />
-                <div className="min-w-0">
-                  <UiText
-                    as="p"
-                    className="truncate"
-                    color={TextColors.primary}
-                    variant={TextVariants.small}
-                    weight={TextWeights.semibold}
-                  >
-                    {primaryExportReadinessItems.map((item, index) => (
-                      <span data-export-readiness-item={item} key={item}>
-                        {index > 0 ? ' · ' : ''}
-                        {item}
-                      </span>
-                    ))}
-                  </UiText>
-                  {secondaryExportReadinessItems.length > 0 ? (
-                    <div className="mt-1 flex min-w-0 flex-wrap gap-1.5">
-                      {secondaryExportReadinessItems.map((item) => (
-                        <UiText
-                          as="span"
-                          className="rounded bg-surface px-1.5 py-0.5"
-                          color={TextColors.secondary}
-                          data-export-readiness-item={item}
-                          key={item}
-                          variant={TextVariants.small}
-                        >
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="flex min-w-0 items-center justify-between gap-2">
+                    <UiText
+                      as="p"
+                      className="truncate"
+                      color={TextColors.primary}
+                      variant={TextVariants.small}
+                      weight={TextWeights.semibold}
+                    >
+                      {primaryExportReadinessItems.map((item, index) => (
+                        <span data-export-readiness-item={item} key={item}>
+                          {index > 0 ? ' · ' : ''}
                           {item}
-                        </UiText>
+                        </span>
                       ))}
-                    </div>
-                  ) : null}
+                    </UiText>
+                    <span
+                      className={editorChromeStatusChipClassName(
+                        softProofWarningItems.length > 0 ? 'warning' : 'success',
+                      )}
+                    >
+                      {softProofWarningItems.length > 0
+                        ? t('export.softProofWarnings.title')
+                        : softProofProfileCompareSummary}
+                    </span>
+                  </div>
+                  <div className="flex min-w-0 flex-wrap gap-1.5">
+                    {secondaryExportReadinessItems.map((item) => (
+                      <UiText
+                        as="span"
+                        className="rounded bg-editor-panel-raised px-1.5 py-0.5"
+                        color={TextColors.secondary}
+                        data-export-readiness-item={item}
+                        key={item}
+                        variant={TextVariants.small}
+                      >
+                        {item}
+                      </UiText>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
             {softProofWarningItems.length > 0 ? (
-              <div
+              <details
                 className="rounded-md border border-yellow-500/40 bg-yellow-500/10 px-3 py-2"
                 data-export-soft-proof-warning-codes={softProofWarningItems.map((item) => item.code).join(',')}
                 data-export-soft-proof-warning-count={softProofWarningItems.length}
                 data-testid="export-soft-proof-warnings"
               >
-                <div className="flex items-center gap-1.5">
+                <summary className="flex cursor-pointer list-none items-center gap-1.5">
                   <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-400" />
                   <UiText className="text-yellow-200" variant={TextVariants.small} weight={TextWeights.medium}>
                     {t('export.softProofWarnings.title')}
                   </UiText>
-                </div>
+                  <ChevronDown className="ml-auto h-3.5 w-3.5 text-yellow-200" />
+                </summary>
                 <ul className="mt-1 space-y-1">
                   {softProofWarningItems.map((item) => (
                     <li data-export-soft-proof-warning-code={item.code} key={item.code}>
@@ -2089,14 +2129,12 @@ export default function ExportPanel({
                     </li>
                   ))}
                 </ul>
-              </div>
+              </details>
             ) : null}
           </div>
         ) : null}
-        <UiText
-          as="div"
-          className="truncate px-0.5"
-          color={exportFooterWorkflowState === 'failed' ? TextColors.error : TextColors.secondary}
+        <div
+          className="flex min-w-0 items-center gap-2 rounded-md border border-editor-border bg-editor-panel px-2.5 py-2"
           data-export-footer-workflow-state={exportFooterWorkflowState}
           data-export-footer-progress-current={progressCurrent}
           data-export-footer-progress-total={progress.total}
@@ -2105,13 +2143,20 @@ export default function ExportPanel({
           data-export-footer-can-open={String(canUseReceiptActions && canOpenReceiptInEditor)}
           data-export-footer-can-import-linked-variant={String(canImportLinkedVariant)}
           data-testid="export-footer-workflow-state"
-          variant={TextVariants.small}
         >
-          {exportFooterStatusText}
-        </UiText>
+          <span className={editorChromeStatusChipClassName(exportFooterStatusTone)}>{exportFooterWorkflowState}</span>
+          <UiText
+            as="p"
+            className="min-w-0 flex-1 truncate"
+            color={exportFooterWorkflowState === 'failed' ? TextColors.error : TextColors.secondary}
+            variant={TextVariants.small}
+          >
+            {exportFooterStatusText}
+          </UiText>
+        </div>
         {canShowReceipt && firstReceiptOutput && (
-          <div
-            className="rounded-md border border-surface bg-surface/60 p-2"
+          <details
+            className="rounded-md border border-editor-border bg-editor-panel p-2"
             data-export-receipt-black-point-compensation={firstReceiptOutput.blackPointCompensation ?? ''}
             data-export-receipt-color-managed-transform={firstReceiptOutput.colorManagedTransform ?? ''}
             data-export-receipt-cmm={firstReceiptOutput.cmm ?? ''}
@@ -2138,12 +2183,22 @@ export default function ExportPanel({
             data-color-stack-parity-tone-curve={colorStackParityReceipt?.components.toneCurve ?? ''}
             data-testid="export-success-receipt"
           >
-            <UiText as="p" color={TextColors.primary} variant={TextVariants.small} weight={TextWeights.semibold}>
-              {t('export.status.exportedFile', { filename: firstReceiptFileName })}
-            </UiText>
-            <UiText as="p" className="break-all" color={TextColors.secondary} variant={TextVariants.small}>
-              {firstReceiptOutput.outputPath}
-            </UiText>
+            <summary className="flex min-w-0 cursor-pointer list-none items-center gap-2">
+              <CheckCircle className="h-4 w-4 shrink-0 text-editor-success" />
+              <UiText
+                as="span"
+                className="min-w-0 flex-1 truncate"
+                color={TextColors.primary}
+                variant={TextVariants.small}
+                weight={TextWeights.semibold}
+              >
+                {t('export.status.exportedFile', { filename: firstReceiptFileName })}
+              </UiText>
+              <UiText as="span" color={TextColors.secondary} variant={TextVariants.small}>
+                {formatBytes(firstReceiptOutput.byteSize, t)}
+              </UiText>
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-text-secondary" />
+            </summary>
             {exportRawWarningChips.length > 0 && (
               <div
                 className="mt-2 flex flex-wrap gap-1"
@@ -2197,6 +2252,9 @@ export default function ExportPanel({
               </UiText>
             )}
             <div className="mt-2 space-y-2">
+              <UiText as="p" className="break-all" color={TextColors.secondary} variant={TextVariants.small}>
+                {firstReceiptOutput.outputPath}
+              </UiText>
               <div className="min-w-0 space-y-0.5" data-testid="export-success-receipt-details">
                 <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
                   {formatBytes(firstReceiptOutput.byteSize, t)} · {firstReceiptOutput.format.toUpperCase()}
@@ -2312,64 +2370,55 @@ export default function ExportPanel({
                 </button>
               </div>
             </div>
-          </div>
+          </details>
         )}
         {canExport ? (
-          <UiText as="div" variant={TextVariants.small} color={TextColors.secondary} className="truncate px-0.5">
-            {isEstimating ? (
-              <span>{t('export.status.estimatingSize')}</span>
-            ) : estimatedSize !== null ? (
-              <span>
-                {numImages > 1
-                  ? t('export.status.estimatedTotalSize', { size: formatBytes(estimatedSize, t) })
-                  : t('export.status.estimatedSize', { size: formatBytes(estimatedSize, t) })}
-                {numImages > 1
-                  ? t('export.status.estimatedAverageSize', { size: formatBytes(estimatedSize / numImages, t) })
-                  : ''}
-              </span>
-            ) : (
-              <span>{t('export.status.estimatePending')}</span>
-            )}
-          </UiText>
+          <div className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-editor-border bg-editor-panel-raised p-2">
+            <UiText as="div" variant={TextVariants.small} color={TextColors.secondary} className="min-w-0 truncate">
+              {exportEstimateText}
+            </UiText>
+            <span className={editorChromeStatusChipClassName(canExport ? 'success' : 'warning')}>
+              {numImages > 1 ? `${numImages} ${itemLabelPlural}` : itemLabel}
+            </span>
+          </div>
         ) : (
           <div
             className="rounded-md border border-red-500/40 bg-red-500/20 px-3 py-2"
             data-testid="export-blocked-alert"
           >
             <UiText as="p" className="text-red-400" variant={TextVariants.small} weight={TextWeights.semibold}>
-              {isLibrarySmartPreviewResolving
-                ? t('export.status.resolvingOriginalFile')
-                : isSmartPreviewExportBlocked
-                  ? t('export.status.offlineSmartPreviewBlocked')
-                  : isLibraryContext
-                    ? t('export.status.noImagesSelected')
-                    : t('export.status.noImageSelected')}
+              {exportDisabledReason}
             </UiText>
           </div>
         )}
         {status === Status.Error && errorMessage ? (
-          <div className="rounded-md border border-red-500/40 bg-red-500/20 px-3 py-2" data-testid="export-error-alert">
-            <UiText
-              as="p"
-              className="break-words text-red-400"
-              variant={TextVariants.small}
-              weight={TextWeights.medium}
-            >
+          <details
+            className="rounded-md border border-red-500/40 bg-red-500/20 px-3 py-2"
+            data-testid="export-error-alert"
+          >
+            <summary className="flex cursor-pointer list-none items-center gap-1.5">
+              <XCircle className="h-4 w-4 shrink-0 text-red-400" />
+              <UiText as="span" className="text-red-400" variant={TextVariants.small} weight={TextWeights.medium}>
+                {t('export.status.footerFailed')}
+              </UiText>
+              <ChevronDown className="ml-auto h-3.5 w-3.5 text-red-400" />
+            </summary>
+            <UiText as="p" className="mt-1 break-words text-red-400" variant={TextVariants.small}>
               {errorMessage}
             </UiText>
-          </div>
+          </details>
         ) : null}
         <Button
-          className={`group h-11 w-full rounded-lg text-sm font-semibold! shadow-none transition-colors ${
+          className={`group h-12 w-full rounded-lg text-sm font-semibold! shadow-none transition-colors ${
             status === Status.Exporting
-              ? 'bg-accent text-button-text hover:bg-red-600 hover:text-white'
+              ? 'bg-editor-primary-active text-editor-primary-active-text hover:bg-red-600 hover:text-white'
               : status === Status.Success
-                ? 'bg-green-500/75 text-white'
+                ? 'bg-editor-success-surface text-editor-success'
                 : status === Status.Error
-                  ? 'bg-red-500/15 text-red-200'
+                  ? 'bg-editor-danger-surface text-editor-danger'
                   : status === Status.Cancelled
-                    ? 'bg-yellow-500/15 text-yellow-200'
-                    : ''
+                    ? 'bg-editor-warning-surface text-editor-warning'
+                    : 'bg-editor-primary-active text-editor-primary-active-text'
           }`}
           disabled={status === Status.Exporting ? false : !canExport}
           onClick={() => {

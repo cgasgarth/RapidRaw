@@ -22,6 +22,7 @@ import { TetherPanel } from '../../components/panel/right/capture/TetherPanel';
 import ControlsPanel from '../../components/panel/right/color/ControlsPanel';
 import CropPanel from '../../components/panel/right/color/CropPanel';
 import { EditorRightPanelHost } from '../../components/panel/right/EditorRightPanelHost';
+import ExportPanel from '../../components/panel/right/export/ExportPanel';
 import { MaskOverlayReviewControls } from '../../components/panel/right/layers/MaskOverlayReviewControls';
 import { Mask, type SubMask, SubMaskMode, ToolType } from '../../components/panel/right/layers/Masks';
 import { ObjectPromptControls } from '../../components/panel/right/layers/ObjectPromptControls';
@@ -951,6 +952,134 @@ function ProfessionalEditorShellVisualSmoke() {
   );
 }
 
+const exportProofFooterReceipt = {
+  completedAt: '2026-07-01T06:00:00.000Z',
+  outputs: [
+    {
+      bitDepth: 16,
+      blackPointCompensation: 'enabled',
+      byteSize: 18_432_000,
+      cmm: 'moxcms',
+      colorManagedTransform: 'display-p3-output',
+      colorProfile: 'Display P3',
+      effectiveColorProfile: ExportColorProfile.DisplayP3,
+      effectiveRenderingIntent: ExportRenderingIntent.RelativeColorimetric,
+      format: 'tiff',
+      iccEmbedded: true,
+      outputPath: '/visual-smoke/exports/professional-export-proof-footer.tif',
+      policyStatus: 'applied',
+      policyVersion: 'visual-smoke-v1',
+      renderingIntent: ExportRenderingIntent.RelativeColorimetric,
+      requestedColorProfile: ExportColorProfile.DisplayP3,
+      requestedRenderingIntent: ExportRenderingIntent.RelativeColorimetric,
+      sourceIccProfileHash: 'sha256:visual-smoke-source-profile',
+      sourcePath: professionalEditorShellImage.path,
+      sourcePrecisionPath: 'raw-linear-f32',
+      transformApplied: true,
+      transformPolicyFingerprint: 'sha256:professional-export-proof-footer',
+    },
+  ],
+  total: 1,
+};
+
+function ExportProofFooterPanel({
+  label,
+  exportState,
+  selectedImage = professionalEditorShellImage,
+}: {
+  exportState: Parameters<typeof ExportPanel>[0]['exportState'];
+  label: string;
+  selectedImage?: SelectedImage | null;
+}) {
+  return (
+    <section
+      className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-surface bg-bg-secondary"
+      data-visual-smoke-section={`export-proof-footer-${label.toLowerCase()}`}
+    >
+      <div className="flex items-center justify-between border-b border-surface px-2 py-1">
+        <span className={editorChromeTokens.typography.compactRowLabel}>{label}</span>
+        <span className={editorChromeStatusChipClassName(exportState.status === Status.Error ? 'danger' : 'info')}>
+          {exportState.status}
+        </span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <ContextMenuProvider>
+          <ExportPanel
+            appSettings={{
+              exportPresets: [],
+              lastRootPath: null,
+              theme: Theme.Dark,
+            }}
+            exportState={exportState}
+            isVisible={true}
+            multiSelectedPaths={selectedImage ? [selectedImage.path] : []}
+            onLinkedVariantImported={() => {}}
+            onSettingsChange={() => {}}
+            rootPaths={[]}
+            selectedImage={selectedImage}
+            setExportState={() => {}}
+          />
+        </ContextMenuProvider>
+      </div>
+    </section>
+  );
+}
+
+function ProfessionalExportProofFooterVisualSmoke() {
+  useProfessionalEditorToolbarSmokeState();
+
+  return (
+    <main
+      className="min-h-screen bg-bg-primary p-3 font-sans text-text-primary"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ProfessionalExportProofFooter}
+      data-visual-smoke-ready="true"
+    >
+      <div className="mx-auto flex flex-col gap-3 overflow-hidden" style={{ height: 'calc(100vh - 24px)' }}>
+        <header className="flex items-center justify-between">
+          <h1 className={editorChromeTokens.typography.panelTitle}>{copy.professionalExportProofFooter}</h1>
+          <div className="flex gap-1.5">
+            <span className={editorChromeStatusChipClassName('success')}>{copy.exportFooterIdle}</span>
+            <span className={editorChromeStatusChipClassName('info')}>{copy.exportFooterRunning}</span>
+            <span className={editorChromeStatusChipClassName('danger')}>{copy.exportFooterRetry}</span>
+          </div>
+        </header>
+        <div className="grid min-h-0 flex-1 gap-2" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>
+          <ExportProofFooterPanel
+            label="Idle"
+            exportState={{ errorMessage: '', progress: { current: 0, total: 0 }, status: Status.Idle }}
+          />
+          <ExportProofFooterPanel
+            label="Running"
+            exportState={{ errorMessage: '', progress: { current: 1, total: 3 }, status: Status.Exporting }}
+          />
+          <ExportProofFooterPanel
+            label="Completed"
+            exportState={{
+              errorMessage: '',
+              lastReceipt: exportProofFooterReceipt,
+              progress: { current: 1, total: 1 },
+              status: Status.Success,
+            }}
+          />
+          <ExportProofFooterPanel
+            label="Failed"
+            exportState={{
+              errorMessage: 'Output folder was removed before export completed.',
+              progress: { current: 0, total: 1 },
+              status: Status.Error,
+            }}
+          />
+          <ExportProofFooterPanel
+            label="Blocked"
+            exportState={{ errorMessage: '', progress: { current: 0, total: 0 }, status: Status.Idle }}
+            selectedImage={null}
+          />
+        </div>
+      </div>
+    </main>
+  );
+}
+
 function ProfessionalEditorCompactPortraitVisualSmoke() {
   const [activePanel, setActivePanel] = useState<Panel | null>(Panel.Color);
   useProfessionalEditorSmokeState();
@@ -1060,6 +1189,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShell]: ProfessionalEditorShellVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorToolbar]: ProfessionalEditorToolbarVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorTokens]: ProfessionalEditorTokensVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalExportProofFooter]: ProfessionalExportProofFooterVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawModalReview]: SuperResolutionPrivateRawModalReviewSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi]: SuperResolutionPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrUi]: SuperResolutionVisualSmoke,
@@ -2233,6 +2363,10 @@ const copy = {
   professionalEditorShell: 'Professional editor shell',
   professionalEditorToolbar: 'Professional editor toolbar',
   professionalEditorToolbarDisabled: 'disabled',
+  professionalExportProofFooter: 'Export proof footer',
+  exportFooterIdle: 'idle',
+  exportFooterRunning: 'running',
+  exportFooterRetry: 'retry',
   professionalEditorToolbarFullscreen: 'Fullscreen',
   professionalEditorToolbarHistory: 'History',
   professionalEditorToolbarNegativeLab: 'Negative Lab',
