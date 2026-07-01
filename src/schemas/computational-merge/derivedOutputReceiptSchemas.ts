@@ -23,6 +23,54 @@ export const derivedOutputProvenanceSourceSchema = z
   })
   .strict();
 
+const derivedOutputDimensionsSchema = z
+  .object({
+    height: z.number().int().positive(),
+    width: z.number().int().positive(),
+  })
+  .strict();
+
+const derivedOutputPanoramaMetadataSchema = z
+  .object({
+    boundary: z
+      .object({
+        crop: z
+          .object({
+            height: z.number().int().positive(),
+            mode: z.string().trim().min(1),
+            preCropHeight: z.number().int().positive(),
+            preCropWidth: z.number().int().positive(),
+            width: z.number().int().positive(),
+            x: z.number().int().nonnegative(),
+            y: z.number().int().nonnegative(),
+          })
+          .strict(),
+        effectiveMode: z.enum(['auto_crop', 'manual_crop', 'transparent']),
+        manualCropInsetsPercent: z
+          .object({
+            bottom: z.number().min(0).max(40),
+            left: z.number().min(0).max(40),
+            right: z.number().min(0).max(40),
+            top: z.number().min(0).max(40),
+          })
+          .strict()
+          .optional(),
+        overlapFeatherPx: z.number().int().min(0).max(512).optional(),
+        requestedMode: z.enum(['auto_crop', 'manual_crop', 'transparent']),
+      })
+      .strict(),
+    previewDimensions: derivedOutputDimensionsSchema,
+    projection: z
+      .object({
+        effective: z.enum(['rectilinear', 'cylindrical', 'spherical']),
+        requested: z.enum(['rectilinear', 'cylindrical', 'spherical']),
+      })
+      .strict(),
+    seamExposureCompensationPercent: z.number().int().min(0).max(100).optional(),
+    sourceSetHash: z.string().trim().min(1),
+  })
+  .strict();
+
 export const derivedOutputProvenanceSidecarSchema = z
   .object({
     acceptedApplyId: z.string().trim().min(1).optional(),
@@ -50,6 +98,7 @@ export const derivedOutputProvenanceSidecarSchema = z
     settingsHash: z.string().trim().min(1),
     sidecarPath: z.string().trim().min(1),
     sourceState: z.array(derivedOutputProvenanceSourceSchema).min(1),
+    panorama: derivedOutputPanoramaMetadataSchema.optional(),
     superResolution: z
       .object({
         registrationMetrics: z
@@ -113,6 +162,8 @@ export const derivedOutputReceiptSchema = z
     outputArtifactId: z.string().trim().min(1),
     outputContentHash: z.string().trim().min(1),
     outputPath: z.string().trim().min(1).optional(),
+    panorama: derivedOutputPanoramaMetadataSchema.optional(),
+    previewDimensions: derivedOutputDimensionsSchema.optional(),
     recipeHash: z.string().trim().min(1).optional(),
     provenanceSidecar: derivedOutputProvenanceSidecarSchema.optional(),
     receiptId: z.string().trim().min(1),
@@ -120,9 +171,11 @@ export const derivedOutputReceiptSchema = z
     sourceContentHashes: z.array(z.string().trim().min(1)).min(1),
     sourceCount: z.number().int().positive(),
     sourceGraphRevisions: z.array(z.string().trim().min(1)).min(1),
+    sourcePaths: z.array(z.string().trim().min(1)).optional(),
     staleReasons: z.array(derivedOutputStaleReasonSchema).optional(),
     staleState: z.enum(['current', 'stale', 'unknown']),
     storagePolicy: derivedOutputStoragePolicySchema,
+    warningCodes: z.array(z.string().trim().min(1)).optional(),
   })
   .strict()
   .superRefine((receipt, context) => {
@@ -138,6 +191,13 @@ export const derivedOutputReceiptSchema = z
         code: 'custom',
         message: 'Derived output sourceGraphRevisions length must match sourceCount.',
         path: ['sourceGraphRevisions'],
+      });
+    }
+    if (receipt.sourcePaths !== undefined && receipt.sourcePaths.length !== receipt.sourceCount) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Derived output sourcePaths length must match sourceCount.',
+        path: ['sourcePaths'],
       });
     }
     if (receipt.openInEditorAction.state === 'available' && receipt.openInEditorAction.path === undefined) {
@@ -210,6 +270,17 @@ export const derivedOutputReceiptSchema = z
           message: 'Derived output provenance sidecar source count must match receipt.',
           path: ['provenanceSidecar', 'sourceState'],
         });
+      }
+      if (receipt.panorama !== undefined && receipt.provenanceSidecar.panorama !== undefined) {
+        const receiptPanorama = JSON.stringify(receipt.panorama);
+        const sidecarPanorama = JSON.stringify(receipt.provenanceSidecar.panorama);
+        if (receiptPanorama !== sidecarPanorama) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Derived output panorama sidecar metadata must match receipt.',
+            path: ['provenanceSidecar', 'panorama'],
+          });
+        }
       }
     }
   });

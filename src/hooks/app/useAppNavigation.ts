@@ -15,7 +15,7 @@ import { Invokes } from '../../tauri/commands';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../utils/adjustments';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { findAlbumById } from '../../utils/folderTreeUtils';
-import { upsertHdrReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
+import { upsertReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
 import { globalImageCache, type ImageCacheEntry } from '../../utils/ImageLRUCache';
 import {
   consumePendingNegativeConversionDustHealLayers,
@@ -262,7 +262,7 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
         invoke<LoadImageResult>(Invokes.LoadImage, { path })
           .then((result) => {
             if (selectedImagePathRef.current !== path) return;
-            upsertHdrReopenedDerivedOutputReceipt({
+            upsertReopenedDerivedOutputReceipt({
               imagePath: path,
               metadata: result.metadata,
               upsert: useUIStore.getState().upsertDerivedOutputReceipt,
