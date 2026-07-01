@@ -13,6 +13,7 @@ const rawEngineAppServerInputSchemaNamesV1 = [
   'EditGraphSnapshotQueryV1',
   'ExportCommandEnvelopeV1',
   'LayerMaskCommandEnvelopeV1',
+  'LensProfileCommandEnvelopeV1',
   'NegativeLabApplyPlanRequestV1',
   'NegativeLabCommandEnvelopeV1',
   'PreviewScopeQueryV1',

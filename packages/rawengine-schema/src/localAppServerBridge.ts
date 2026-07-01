@@ -26,7 +26,12 @@ import {
   detailEffectsDryRunResultV1Schema,
   detailEffectsMutationResultV1Schema,
   type LayerMaskCommandEnvelopeV1,
+  type LensProfileCommandEnvelopeV1,
+  type LensProfilePatchV1,
   layerMaskCommandEnvelopeV1Schema,
+  lensProfileCommandEnvelopeV1Schema,
+  lensProfileDryRunResultV1Schema,
+  lensProfileMutationResultV1Schema,
   type ProjectLibrarySnapshotV1,
   projectLibrarySnapshotV1Schema,
   type RawEngineToolRegistryV1,
@@ -346,6 +351,12 @@ export type RawEngineLocalAppServerDetailEffectsCommandV1 = z.infer<
   typeof rawEngineLocalAppServerDetailEffectsCommandV1Schema
 >;
 
+export const rawEngineLocalAppServerLensProfileCommandV1Schema = lensProfileCommandEnvelopeV1Schema;
+
+export type RawEngineLocalAppServerLensProfileCommandV1 = z.infer<
+  typeof rawEngineLocalAppServerLensProfileCommandV1Schema
+>;
+
 export const rawEngineLocalAppServerLayerMaskCommandV1Schema = layerMaskCommandEnvelopeV1Schema.superRefine(
   (command, context) => {
     if (
@@ -397,6 +408,8 @@ const AI_COMMAND_TYPE_TO_APP_SERVER_TOOL_NAME = {
   'ai.mask.generateSubject': 'ai.mask.dry_run_subject',
   'detailEffects.applyAdjustments': 'detail.effects.apply_command',
   'detailEffects.dryRunAdjustments': 'detail.effects.dry_run_command',
+  'lensProfile.applyCorrection': 'lensprofile.apply_command',
+  'lensProfile.dryRunCorrection': 'lensprofile.dry_run_command',
   [RawEngineLocalAppServerCommandType.EditorStateQuery]: 'agent.editor_state.query',
   [RawEngineLocalAppServerCommandType.ImageMetadataQuery]: 'agent.image_metadata.query',
   [RawEngineLocalAppServerCommandType.ProjectMetadataQuery]: 'agent.project_metadata.query',
@@ -432,6 +445,8 @@ const RAW_ENGINE_LOCAL_APP_SERVER_EXECUTABLE_TOOL_NAMES = new Set([
   'detail.effects.dry_run_command',
   'layermask.apply_command',
   'layermask.dry_run_command',
+  'lensprofile.apply_command',
+  'lensprofile.dry_run_command',
   'tonecolor.apply_command',
   'tonecolor.dry_run_command',
 ]);
@@ -618,6 +633,31 @@ const buildDetailEffectsPlanPatch = (command: DetailEffectsCommandV1): Partial<D
     ),
   );
 
+const LENS_PROFILE_PATCH_KEYS = [
+  'lensCorrectionMode',
+  'lensDistortionAmount',
+  'lensDistortionEnabled',
+  'lensDistortionParams',
+  'lensMaker',
+  'lensModel',
+  'lensTcaAmount',
+  'lensTcaEnabled',
+  'lensVignetteAmount',
+  'lensVignetteEnabled',
+] as const satisfies ReadonlyArray<keyof LensProfilePatchV1>;
+
+type LensProfileCommandV1 = Extract<
+  LensProfileCommandEnvelopeV1,
+  { commandType: 'lensProfile.dryRunCorrection' | 'lensProfile.applyCorrection' }
+>;
+
+const buildLensProfilePlanPatch = (command: LensProfileCommandV1): Partial<LensProfilePatchV1> =>
+  Object.fromEntries(
+    LENS_PROFILE_PATCH_KEYS.flatMap((key) =>
+      command.parameters[key] === undefined ? [] : [[key, command.parameters[key]]],
+    ),
+  );
+
 const buildDetailEffectsPlanKey = (command: DetailEffectsCommandV1): string =>
   JSON.stringify([command.expectedGraphRevision, command.target, buildDetailEffectsPlanPatch(command)]);
 
@@ -674,6 +714,68 @@ const buildDetailEffectsMutationResult = (
     dryRunPlanId: command.parameters.acceptedDryRunPlanId,
     mutates: true,
     provenanceEntryIds: [`prov_detail_effects_${command.commandId}`],
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    undoRevision: command.expectedGraphRevision,
+    warnings: [],
+  });
+
+const buildLensProfilePlanKey = (command: LensProfileCommandV1): string =>
+  JSON.stringify([command.expectedGraphRevision, command.target, buildLensProfilePlanPatch(command)]);
+
+const buildLensProfilePlanId = (command: LensProfileCommandV1): string =>
+  `dryrun_lens_profile_${stableBasicToneHash(buildLensProfilePlanKey(command))}`;
+
+const buildLensProfilePlanHash = (command: LensProfileCommandV1): string =>
+  `sha256:lens-profile:${stableBasicToneHash(
+    `${buildLensProfilePlanId(command)}:${buildLensProfilePlanKey(command)}`,
+  )}`;
+
+const buildLensProfileDryRunResult = (
+  command: Extract<LensProfileCommandEnvelopeV1, { commandType: 'lensProfile.dryRunCorrection' }>,
+): z.infer<typeof lensProfileDryRunResultV1Schema> =>
+  lensProfileDryRunResultV1Schema.parse({
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: true,
+    dryRunPlanHash: buildLensProfilePlanHash(command),
+    dryRunPlanId: buildLensProfilePlanId(command),
+    mutates: false,
+    parameterDiff: LENS_PROFILE_PATCH_KEYS.flatMap((key) =>
+      command.parameters[key] === undefined
+        ? []
+        : [
+            {
+              nodeId: null,
+              path: `/parameters/${key}`,
+              value: command.parameters[key],
+            },
+          ],
+    ),
+    predictedGraphRevision: `${command.expectedGraphRevision}:preview:${command.commandId}`,
+    previewArtifacts: [],
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    warnings: [],
+  });
+
+const buildLensProfileMutationResult = (
+  command: Extract<LensProfileCommandEnvelopeV1, { commandType: 'lensProfile.applyCorrection' }>,
+): z.infer<typeof lensProfileMutationResultV1Schema> =>
+  lensProfileMutationResultV1Schema.parse({
+    appliedGraphRevision: `${command.expectedGraphRevision}:lens_profile:${command.commandId}`,
+    changedNodeIds: LENS_PROFILE_PATCH_KEYS.flatMap((key) =>
+      command.parameters[key] === undefined ? [] : [`lens_profile:${key}:${command.target.kind}`],
+    ),
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: false,
+    dryRunPlanHash: command.parameters.acceptedDryRunPlanHash,
+    dryRunPlanId: command.parameters.acceptedDryRunPlanId,
+    mutates: true,
+    provenanceEntryIds: [`prov_lens_profile_${command.commandId}`],
     schemaVersion: command.schemaVersion,
     sourceGraphRevision: command.expectedGraphRevision,
     undoRevision: command.expectedGraphRevision,
@@ -1506,6 +1608,7 @@ export class RawEngineLocalAppServerBridge {
   readonly #acceptedAiToolDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedBasicToneDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedDetailEffectsDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
+  readonly #acceptedLensProfileDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedHslDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #acceptedSkinToneUniformityDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #auditEvents: Array<RawEngineLocalAppServerAuditEventV1> = [];
@@ -1807,6 +1910,46 @@ export class RawEngineLocalAppServerBridge {
         return buildDetailEffectsMutationResult(parsedCommand);
       },
       schema: rawEngineLocalAppServerDetailEffectsCommandV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: 'lensProfile.dryRunCorrection',
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerLensProfileCommandV1Schema.parse(command);
+        if (parsedCommand.commandType !== 'lensProfile.dryRunCorrection') {
+          throw new Error('Local app-server bridge expected a lens/profile dry-run command.');
+        }
+
+        const dryRunResult = buildLensProfileDryRunResult(parsedCommand);
+        this.#acceptedLensProfileDryRunPlanKeys.set(buildLensProfilePlanKey(parsedCommand), {
+          planHash: dryRunResult.dryRunPlanHash,
+          planId: dryRunResult.dryRunPlanId,
+        });
+        return dryRunResult;
+      },
+      schema: rawEngineLocalAppServerLensProfileCommandV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: 'lensProfile.applyCorrection',
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerLensProfileCommandV1Schema.parse(command);
+        if (parsedCommand.commandType !== 'lensProfile.applyCorrection') {
+          throw new Error('Local app-server bridge expected a lens/profile apply command.');
+        }
+
+        const plan = this.#acceptedLensProfileDryRunPlanKeys.get(buildLensProfilePlanKey(parsedCommand));
+        if (
+          plan === undefined ||
+          plan.planHash !== parsedCommand.parameters.acceptedDryRunPlanHash ||
+          plan.planId !== parsedCommand.parameters.acceptedDryRunPlanId
+        ) {
+          throw new Error('Local app-server bridge rejected lens/profile apply without a matching accepted dry-run.');
+        }
+
+        return buildLensProfileMutationResult(parsedCommand);
+      },
+      schema: rawEngineLocalAppServerLensProfileCommandV1Schema,
     });
 
     this.#commandBus.register({
