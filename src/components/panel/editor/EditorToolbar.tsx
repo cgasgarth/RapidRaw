@@ -9,6 +9,10 @@ import { useUIStore } from '../../../store/useUIStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import type { Adjustments, AiPatch, MaskContainer } from '../../../utils/adjustments';
 import { formatShortcutLabel } from '../../../utils/keyboardUtils';
+import {
+  formatExifApertureFromMetadata,
+  formatExifFocalLengthFromMetadata,
+} from '../../../utils/metadataPanelContracts';
 import { parseVirtualImagePath } from '../../../utils/virtualImagePath';
 import type { SelectedImage } from '../../ui/AppProperties';
 import { editorChromeStatusChipClassName, editorChromeTokens } from '../../ui/editorChromeTokens';
@@ -121,12 +125,6 @@ const EditorToolbar = memo(
 
       const exif = selectedImage.exif || {};
 
-      let fNum = exif.FNumber;
-      if (fNum) {
-        const fStr = fNum;
-        fNum = fStr.toLowerCase().startsWith('f') ? fStr : `f/${fStr}`;
-      }
-
       let captureDate = null;
       let captureTime = null;
 
@@ -143,9 +141,9 @@ const EditorToolbar = memo(
 
       const data = {
         iso: exif.PhotographicSensitivity || exif.ISO,
-        fNumber: fNum,
+        fNumber: formatExifApertureFromMetadata(exif),
         shutter: exif.ExposureTime,
-        focal: exif.FocalLengthIn35mmFilm,
+        focal: formatExifFocalLengthFromMetadata(exif),
         captureDate: captureDate,
         captureTime: captureTime,
       };
@@ -659,7 +657,7 @@ const EditorToolbar = memo(
                       color={TextColors.primary}
                       weight={TextWeights.medium}
                     >
-                      {exifData.focal.endsWith('mm') ? exifData.focal : `${exifData.focal}mm`}
+                      {exifData.focal}
                     </UiText>
                   </div>
                 )}

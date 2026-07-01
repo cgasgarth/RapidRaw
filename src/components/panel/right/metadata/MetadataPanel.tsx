@@ -30,6 +30,8 @@ import { buildCameraProfileProvenanceReceipt } from '../../../../utils/cameraPro
 import {
   buildDefaultXmpConflictDecisions,
   buildMetadataReadinessSummary,
+  formatExifApertureFromMetadata,
+  formatExifFocalLengthFromMetadata,
   getDisplayPreviewLutLocaleStatus,
   hasMetadataValue,
   METADATA_CAMERA_GRID_KEYS,
@@ -321,10 +323,6 @@ const EDITABLE_FIELD_LABEL_FALLBACKS: Record<(typeof METADATA_EDITABLE_FIELDS)[n
 
 const KEY_CAMERA_SETTINGS_MAP: CameraSettings = {
   FNumber: {
-    format: (value: MetadataValue) => {
-      const fStr = String(value);
-      return fStr.toLowerCase().startsWith('f') ? fStr : `f/${fStr}`;
-    },
     label: 'Aperture',
   },
   ExposureTime: {
@@ -336,7 +334,6 @@ const KEY_CAMERA_SETTINGS_MAP: CameraSettings = {
     label: 'ISO',
   },
   FocalLengthIn35mmFilm: {
-    format: (value: MetadataValue) => (String(value).endsWith('mm') ? String(value) : `${String(value)} mm`),
     label: 'Focal Length',
   },
   LensModel: {
@@ -401,7 +398,12 @@ export default function MetadataPanel() {
     const exif = (selectedImage?.exif || {}) as MetadataExifData;
 
     const cameraGridSettings: CameraGridSetting[] = METADATA_CAMERA_GRID_KEYS.map((key) => {
-      const value = exif[key];
+      const value =
+        key === 'FNumber'
+          ? formatExifApertureFromMetadata(exif)
+          : key === 'FocalLengthIn35mmFilm'
+            ? formatExifFocalLengthFromMetadata(exif)
+            : exif[key];
       const hasValue = hasMetadataValue(value);
 
       const translatedLabel = translateCameraGridLabel(key, t);
@@ -442,7 +444,13 @@ export default function MetadataPanel() {
       }
     }
 
-    const handledKeys = [...METADATA_CAMERA_GRID_KEYS, 'LensModel', ...METADATA_EDITABLE_FIELDS.map((f) => f.key)];
+    const handledKeys = [
+      ...METADATA_CAMERA_GRID_KEYS,
+      'ApertureValue',
+      'FocalLength',
+      'LensModel',
+      ...METADATA_EDITABLE_FIELDS.map((f) => f.key),
+    ];
     const otherExifEntries = Object.entries(exif)
       .filter(([key]) => !handledKeys.includes(key))
       .sort(([keyA], [keyB]) => keyA.localeCompare(keyB));
