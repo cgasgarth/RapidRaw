@@ -17,6 +17,7 @@ import {
   toneColorCommandEnvelopeV1Schema,
 } from '../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { sampleToneColorCommandEnvelopeV1 } from '../../packages/rawengine-schema/src/samplePayloads.ts';
+import { layerMaskExportParityReceiptSchema } from '../../src/utils/layers/layerMaskExportParityReceipt.ts';
 import {
   BRUSH_MASK_COMMAND_COORDINATE_SPACE,
   buildBrushMaskCommandFromParameters,
@@ -233,15 +234,23 @@ interface PanoramaPrivateRawBrowserProof {
 }
 
 interface LayerMaskPrivateRawBrowserProof {
+  changedPixelRatio: string;
   exportArtifact: string;
+  exportParityReceipt: z.infer<typeof layerMaskExportParityReceiptSchema>;
+  finalExportHash: string;
   fixtureId: string;
   metricCount: string;
+  refinedMaskContentHash: string;
   refinedPreviewArtifact: string;
   refinedPreviewDataUrl: string;
+  refinedPreviewHash: string;
+  sourceGraphRevision: string;
   unmaskedPreviewArtifact: string;
   unmaskedPreviewDataUrl: string;
+  unmaskedPreviewHash: string;
   unrefinedPreviewArtifact: string;
   unrefinedPreviewDataUrl: string;
+  unrefinedPreviewHash: string;
 }
 
 interface NegativeLabPublicExportBrowserProof {
@@ -914,20 +923,40 @@ async function loadPanoramaPrivateRawProof(): Promise<PanoramaPrivateRawBrowserP
 
 async function loadLayerMaskPrivateRawProof(): Promise<LayerMaskPrivateRawBrowserProof> {
   const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT ?? '/tmp/rawengine-private-root';
-  const artifactRoot = `${privateRoot}/private-artifacts/validation/layer-mask-real-raw`;
-  const unmaskedPreviewArtifact = `${artifactRoot}/alaska-layer-mask-v1-unmasked-preview.png`;
-  const unrefinedPreviewArtifact = `${artifactRoot}/alaska-layer-mask-v1-unrefined-preview.png`;
-  const refinedPreviewArtifact = `${artifactRoot}/alaska-layer-mask-v1-refined-preview.png`;
+  const runtimeReport = z
+    .object({
+      exportParityReceipt: layerMaskExportParityReceiptSchema,
+    })
+    .passthrough()
+    .parse(
+      JSON.parse(
+        await readFile('docs/validation/proofs/layers-masks/layer-mask-real-raw-proof-2026-06-18.json', 'utf8'),
+      ),
+    );
+  const { exportParityReceipt } = runtimeReport;
+  const unmaskedPreviewArtifact =
+    'private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-unmasked-preview.png';
+  const unrefinedPreviewArtifact =
+    'private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-unrefined-preview.png';
+  const refinedPreviewArtifact = exportParityReceipt.refinedPreviewArtifactPath;
   return {
-    exportArtifact: `${artifactRoot}/alaska-layer-mask-v1-refined-export.tiff`,
-    fixtureId: 'validation.layer-mask-real-raw.alaska-local-adjustment.v1',
-    metricCount: '5',
+    changedPixelRatio: String(exportParityReceipt.changedPixelRatio),
+    exportArtifact: exportParityReceipt.exportArtifactPath,
+    exportParityReceipt,
+    finalExportHash: exportParityReceipt.finalExportHash,
+    fixtureId: exportParityReceipt.fixtureId,
+    metricCount: String(exportParityReceipt.metricCount),
+    refinedMaskContentHash: exportParityReceipt.refinedMaskContentHash,
     refinedPreviewArtifact,
-    refinedPreviewDataUrl: await readLayerMaskPreviewDataUrl(refinedPreviewArtifact),
+    refinedPreviewDataUrl: await readLayerMaskPreviewDataUrl(resolve(privateRoot, refinedPreviewArtifact)),
+    refinedPreviewHash: exportParityReceipt.refinedPreviewHash,
+    sourceGraphRevision: exportParityReceipt.sourceGraphRevision,
     unmaskedPreviewArtifact,
-    unmaskedPreviewDataUrl: await readLayerMaskPreviewDataUrl(unmaskedPreviewArtifact),
+    unmaskedPreviewDataUrl: await readLayerMaskPreviewDataUrl(resolve(privateRoot, unmaskedPreviewArtifact)),
+    unmaskedPreviewHash: exportParityReceipt.unmaskedPreviewHash,
     unrefinedPreviewArtifact,
-    unrefinedPreviewDataUrl: await readLayerMaskPreviewDataUrl(unrefinedPreviewArtifact),
+    unrefinedPreviewDataUrl: await readLayerMaskPreviewDataUrl(resolve(privateRoot, unrefinedPreviewArtifact)),
+    unrefinedPreviewHash: exportParityReceipt.unrefinedPreviewHash,
   };
 }
 
