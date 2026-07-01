@@ -2,7 +2,11 @@
 
 import { readFile } from 'node:fs/promises';
 
-import { parsePublicFixtureManifest } from '../../../src/schemas/publicFixtureManifestSchemas.ts';
+import {
+  getActivePublicFixtureEntries,
+  getPlannedPublicFixtureEntries,
+  parsePublicFixtureManifest,
+} from '../../../src/schemas/publicFixtureManifestSchemas.ts';
 
 const manifestPath = 'docs/validation/fixtures/public-fixture-manifest.json';
 const manifestJson: unknown = JSON.parse(await readFile(manifestPath, 'utf8'));
@@ -25,7 +29,9 @@ const requiredHighIsoFixtureIds = new Set([
   'real.sr.raw-burst-detail.v0',
   'real.sr.pixel-shift-tripod.v0',
 ]);
-const presentFixtureIds = new Set(manifest.entries.map((entry) => entry.fixtureId));
+const activeEntries = getActivePublicFixtureEntries(manifest);
+const plannedEntries = getPlannedPublicFixtureEntries(manifest);
+const presentFixtureIds = new Set([...activeEntries, ...plannedEntries].map((entry) => entry.fixtureId));
 const missingFixtureIds = [...requiredHighIsoFixtureIds].filter((fixtureId) => !presentFixtureIds.has(fixtureId));
 
 if (missingFixtureIds.length > 0) {
@@ -33,4 +39,11 @@ if (missingFixtureIds.length > 0) {
   process.exit(1);
 }
 
-console.log(`Validated ${manifest.entries.length} public fixture manifest entries.`);
+for (const entry of activeEntries) {
+  if (entry.publicCiAllowed && (entry.expectedSha256 === null || entry.expectedSizeBytes === null)) {
+    console.error(`Active fixture is missing executable proof metadata: ${entry.fixtureId}`);
+    process.exit(1);
+  }
+}
+
+console.log(`public fixture inventory ok active=${activeEntries.length} planned=${plannedEntries.length}`);

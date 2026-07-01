@@ -183,7 +183,6 @@ generator before the release workflow needs one.
 - [Public fixture manifest](validation/fixtures/public-fixture-manifest-2026-06-11.md)
 - [Edit history replay validation](validation/harnesses/edit-history-replay-2026-06-15.md)
 - [Performance smoke](validation/harnesses/performance-smoke-2026-06-13.md)
-- [Goal review page](validation/reports/goal-review-2026-06-11.html)
 - [Local macOS app E2E report template](validation/reports/local-macos-app-e2e-report.template.md)
 - [Render baseline](baseline/rapidraw-render-baseline-2026-06-10.md)
 
