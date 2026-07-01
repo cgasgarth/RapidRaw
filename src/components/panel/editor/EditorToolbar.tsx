@@ -2,6 +2,9 @@ import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowLeft,
+  Bookmark,
+  BookmarkPlus,
+  Check,
   Columns2,
   Eye,
   EyeOff,
@@ -10,9 +13,11 @@ import {
   Maximize,
   Minimize2,
   Palette,
+  Pencil,
   Redo,
   SquareSplitHorizontal,
   Undo,
+  X,
 } from 'lucide-react';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,7 +25,8 @@ import { type EditorCompareMode, useEditorStore } from '../../../store/useEditor
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import type { Adjustments, AiPatch, MaskContainer } from '../../../utils/adjustments';
+import type { Adjustments } from '../../../utils/adjustments';
+import { buildEditHistoryItems, type EditHistoryCheckpoint } from '../../../utils/editHistory';
 import { formatShortcutLabel } from '../../../utils/keyboardUtils';
 import {
   formatExifApertureFromMetadata,
@@ -53,8 +59,11 @@ interface EditorToolbarProps {
   showDateView: boolean;
   onToggleDateView: () => void;
   adjustmentsHistory: Array<Adjustments>;
+  adjustmentsHistoryCheckpoints?: Array<EditHistoryCheckpoint>;
   adjustmentsHistoryIndex: number;
+  onCreateAdjustmentsHistoryCheckpoint?: (label: string) => void;
   goToAdjustmentsHistoryIndex: (index: number) => void;
+  onRenameAdjustmentsHistoryCheckpoint?: (checkpointId: string, label: string) => void;
   osPlatform?: string;
 }
 
@@ -79,8 +88,11 @@ const EditorToolbar = memo(
     showDateView,
     onToggleDateView,
     adjustmentsHistory,
+    adjustmentsHistoryCheckpoints = [],
     adjustmentsHistoryIndex,
+    onCreateAdjustmentsHistoryCheckpoint = () => undefined,
     goToAdjustmentsHistoryIndex,
+    onRenameAdjustmentsHistoryCheckpoint = () => undefined,
     osPlatform,
   }: EditorToolbarProps) => {
     const { t } = useTranslation();
@@ -92,6 +104,8 @@ const EditorToolbar = memo(
     const [isVcHovered, setIsVcHovered] = useState(false);
     const [isInfoHovered, setIsInfoHovered] = useState(false);
     const [isHistoryVisible, setIsHistoryVisible] = useState(false);
+    const [editingCheckpointId, setEditingCheckpointId] = useState<string | null>(null);
+    const [editingCheckpointLabel, setEditingCheckpointLabel] = useState('');
     const historyContainerRef = useRef<HTMLDivElement>(null);
     const historyButtonRef = useRef<HTMLDivElement>(null);
     const appSettings = useSettingsStore((state) => state.appSettings);
@@ -251,167 +265,10 @@ const EditorToolbar = memo(
       };
     }, [isHistoryVisible]);
 
-    const prevNamesRef = useRef<string[]>(['Initial State']);
-
-    const historyNames = useMemo(() => {
-      if (adjustmentsHistory.length === 0) return [];
-
-      const formatKey = (k: string) => {
-        const special: Record<string, string> = {
-          aiPatches: 'AI Patches',
-          aspectRatio: 'Aspect Ratio',
-          flipHorizontal: 'Flip Horizontal',
-          flipVertical: 'Flip Vertical',
-          orientationSteps: 'Rotation',
-          lutPath: 'LUT',
-          lutIntensity: 'LUT Intensity',
-          lutData: 'LUT Data',
-          lutName: 'LUT Name',
-          lutSize: 'LUT Size',
-          chromaticAberrationBlueYellow: 'Chromatic Aberration Blue/Yellow',
-          chromaticAberrationRedCyan: 'Chromatic Aberration Red/Cyan',
-          centré: 'Centré',
-          lumaNoiseReduction: 'Luma Noise Reduction',
-          colorNoiseReduction: 'Color Noise Reduction',
-          lensMaker: 'Lens Maker',
-          lensModel: 'Lens Model',
-          lensDistortionAmount: 'Lens Distortion',
-          lensVignetteAmount: 'Lens Vignette',
-          lensTcaAmount: 'Lens TCA',
-          lensDistortionEnabled: 'Enable Lens Distortion',
-          lensTcaEnabled: 'Enable Lens TCA',
-          lensVignetteEnabled: 'Enable Lens Vignette',
-          transformDistortion: 'Transform Distortion',
-          transformVertical: 'Transform Vertical',
-          transformHorizontal: 'Transform Horizontal',
-          transformRotate: 'Transform Rotate',
-          transformAspect: 'Transform Aspect',
-          transformScale: 'Transform Scale',
-          transformXOffset: 'Transform X Offset',
-          transformYOffset: 'Transform Y Offset',
-          colorGrading: 'Color Grading',
-          colorCalibration: 'Color Calibration',
-          toneMapper: 'Tone Mapper',
-          showClipping: 'Show Clipping',
-          sectionVisibility: 'Section Visibility',
-          flareAmount: 'Flare Amount',
-          glowAmount: 'Glow Amount',
-          halationAmount: 'Halation Amount',
-          grainAmount: 'Grain Amount',
-          grainRoughness: 'Grain Roughness',
-          grainSize: 'Grain Size',
-          vignetteAmount: 'Vignette Amount',
-          vignetteFeather: 'Vignette Feather',
-          vignetteMidpoint: 'Vignette Midpoint',
-          vignetteRoundness: 'Vignette Roundness',
-          dehaze: 'Dehaze',
-          exposure: 'Exposure',
-          blacks: 'Blacks',
-          whites: 'Whites',
-          shadows: 'Shadows',
-          highlights: 'Highlights',
-          contrast: 'Contrast',
-          brightness: 'Brightness',
-          clarity: 'Clarity',
-          structure: 'Structure',
-          sharpness: 'Sharpness',
-          saturation: 'Saturation',
-          temperature: 'Temperature',
-          tint: 'Tint',
-          vibrance: 'Vibrance',
-          hsl: 'HSL',
-          curves: 'Curves',
-          crop: 'Crop',
-          masks: 'Masks',
-          rating: 'Rating',
-        };
-        if (special[k]) return special[k];
-        return k.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase());
-      };
-
-      const cachedNames = prevNamesRef.current;
-      const newNames = [...cachedNames];
-
-      if (newNames.length > adjustmentsHistory.length) {
-        newNames.length = adjustmentsHistory.length;
-      }
-
-      for (let i = newNames.length; i < adjustmentsHistory.length; i++) {
-        if (i === 0) {
-          newNames[i] = 'Initial State';
-          continue;
-        }
-
-        const curr = adjustmentsHistory[i];
-        const prev = adjustmentsHistory[i - 1];
-        if (!curr || !prev) {
-          newNames[i] = 'Adjustment';
-          continue;
-        }
-
-        const changed: string[] = [];
-
-        for (const key of Object.keys(curr)) {
-          if (prev[key] === curr[key]) continue;
-
-          if (key === 'masks') {
-            const prevMasks: Array<MaskContainer> = prev.masks;
-            const currMasks: Array<MaskContainer> = curr.masks;
-
-            if (currMasks.length > prevMasks.length) changed.push('Added Mask');
-            else if (currMasks.length < prevMasks.length) changed.push('Deleted Mask');
-            else {
-              currMasks.forEach((cMask) => {
-                const pMask = prevMasks.find((m) => m.id === cMask.id);
-                if (pMask) {
-                  if (pMask.opacity !== cMask.opacity) changed.push('Mask Opacity');
-                  if (pMask.invert !== cMask.invert) changed.push('Mask Invert');
-                  if (pMask.visible !== cMask.visible) changed.push('Mask Visibility');
-                  if (pMask.subMasks !== cMask.subMasks) changed.push('Mask Area / Brush');
-
-                  if (pMask.adjustments !== cMask.adjustments) {
-                    for (const adjKey of Object.keys(cMask.adjustments)) {
-                      if (pMask.adjustments[adjKey] !== cMask.adjustments[adjKey]) {
-                        changed.push(`Mask ${formatKey(adjKey)}`);
-                      }
-                    }
-                  }
-                }
-              });
-            }
-          } else if (key === 'aiPatches') {
-            const prevPatches = prev.aiPatches;
-            const currPatches: Array<AiPatch> = curr.aiPatches;
-
-            if (currPatches.length > prevPatches.length) changed.push('Added AI Patch');
-            else if (currPatches.length < prevPatches.length) changed.push('Deleted AI Patch');
-            else {
-              currPatches.forEach((cPatch) => {
-                const pPatch = prevPatches.find((p) => p.id === cPatch.id);
-                if (pPatch) {
-                  if (pPatch.visible !== cPatch.visible) changed.push('AI Patch Visibility');
-                  if (pPatch.subMasks !== cPatch.subMasks) changed.push('AI Patch Area');
-                  if (pPatch.patchData !== cPatch.patchData || pPatch.prompt !== cPatch.prompt) {
-                    changed.push('AI Generation');
-                  }
-                }
-              });
-            }
-          } else {
-            changed.push(formatKey(key));
-          }
-        }
-
-        const uniqueChanged = Array.from(new Set(changed));
-
-        if (uniqueChanged.length === 0) newNames[i] = 'Adjustment';
-        else if (uniqueChanged.length > 2) newNames[i] = `${uniqueChanged.slice(0, 2).join(', ')}...`;
-        else newNames[i] = uniqueChanged.join(', ');
-      }
-
-      prevNamesRef.current = newNames;
-      return newNames;
-    }, [adjustmentsHistory]);
+    const historyItems = useMemo(
+      () => buildEditHistoryItems(adjustmentsHistory, adjustmentsHistoryCheckpoints),
+      [adjustmentsHistory, adjustmentsHistoryCheckpoints],
+    );
 
     useEffect(() => {
       if (isHistoryVisible && historyContainerRef.current) {
@@ -444,6 +301,9 @@ const EditorToolbar = memo(
       current: Math.min(adjustmentsHistoryIndex + 1, historyDepthTotal),
       total: historyDepthTotal,
     });
+    const activeHistoryItem = historyItems[adjustmentsHistoryIndex] ?? null;
+    const activeCheckpoint = activeHistoryItem?.checkpoint ?? null;
+    const canCreateCheckpoint = adjustmentsHistory.length > 0;
     const effectiveOsPlatform = osPlatform ?? osPlatformFromStore;
     const undoShortcutLabel = formatShortcutLabel(['ctrl', 'KeyZ'], effectiveOsPlatform);
     const redoShortcutLabel = formatShortcutLabel(['ctrl', 'KeyY'], effectiveOsPlatform);
@@ -455,6 +315,11 @@ const EditorToolbar = memo(
     const activeIconButtonClass = `${token.button.base} ${token.button.icon} ${token.button.selectedQuiet} ${token.focusRing}`;
     const statusPillClass =
       'border border-editor-border bg-editor-panel-raised text-text-primary shadow-[0_8px_22px_var(--editor-overlay-shadow)]';
+    const commitCheckpointRename = (checkpointId: string) => {
+      onRenameAdjustmentsHistoryCheckpoint(checkpointId, editingCheckpointLabel);
+      setEditingCheckpointId(null);
+      setEditingCheckpointLabel('');
+    };
 
     return (
       <div
@@ -784,13 +649,55 @@ const EditorToolbar = memo(
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.15, ease: 'easeOut' }}
-                  className="absolute right-0 top-full z-50 mt-3 flex max-h-80 w-60 flex-col overflow-y-auto rounded-lg border border-editor-overlay-stroke bg-editor-panel/95 px-0.5 py-1.5 shadow-[0_14px_34px_var(--editor-overlay-shadow)] backdrop-blur-md custom-scrollbar"
+                  className="absolute right-0 top-full z-50 mt-3 flex max-h-80 w-72 flex-col overflow-y-auto rounded-lg border border-editor-overlay-stroke bg-editor-panel/95 px-0.5 py-1.5 shadow-[0_14px_34px_var(--editor-overlay-shadow)] backdrop-blur-md custom-scrollbar"
                   data-testid="editor-history-popover"
                   role="menu"
                 >
-                  {historyNames.map((name, i) => {
+                  <div className="border-b border-editor-border px-1 pb-1">
+                    <button
+                      className={cx(
+                        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
+                        canCreateCheckpoint ? 'hover:bg-editor-selected-quiet' : 'opacity-50',
+                      )}
+                      data-testid="editor-history-add-checkpoint"
+                      disabled={!canCreateCheckpoint}
+                      onClick={() => {
+                        if (!activeHistoryItem) return;
+                        if (activeCheckpoint) {
+                          setEditingCheckpointId(activeCheckpoint.id);
+                          setEditingCheckpointLabel(activeCheckpoint.label);
+                          return;
+                        }
+                        onCreateAdjustmentsHistoryCheckpoint(activeHistoryItem.label);
+                      }}
+                      role="menuitem"
+                      type="button"
+                    >
+                      <BookmarkPlus size={14} className="shrink-0 text-text-secondary" />
+                      <span className="min-w-0 flex-1">
+                        <UiText as="span" weight={TextWeights.medium}>
+                          {activeCheckpoint
+                            ? t('editor.toolbar.history.updateCheckpoint')
+                            : t('editor.toolbar.history.addCheckpoint')}
+                        </UiText>
+                        <UiText
+                          as="span"
+                          variant={TextVariants.small}
+                          color={TextColors.secondary}
+                          className="block truncate"
+                        >
+                          {activeHistoryItem?.label ?? t('editor.toolbar.history.noActiveAdjustment')}
+                        </UiText>
+                      </span>
+                    </button>
+                  </div>
+
+                  {historyItems.map((item) => {
+                    const i = item.historyIndex;
+                    const checkpoint = item.checkpoint;
                     const isCurrent = i === adjustmentsHistoryIndex;
                     const isFuture = i > adjustmentsHistoryIndex;
+                    const isEditing = checkpoint?.id === editingCheckpointId;
 
                     const textColor = isCurrent
                       ? TextColors.button
@@ -800,29 +707,64 @@ const EditorToolbar = memo(
                     const textWeight = isCurrent ? TextWeights.medium : TextWeights.normal;
 
                     return (
-                      <button
+                      <div
                         key={i}
                         data-active={isCurrent}
-                        onClick={() => {
-                          goToAdjustmentsHistoryIndex(i);
-                          setIsHistoryVisible(false);
-                        }}
-                        onKeyDown={handleButtonKeyDown}
+                        data-history-checkpoint={item.isCheckpoint ? 'true' : 'false'}
+                        data-testid={isCurrent && item.isCheckpoint ? 'editor-history-active-checkpoint' : undefined}
                         className={cx(
-                          'mx-1 my-0.5 rounded-md px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
+                          'mx-1 my-0.5 flex items-center gap-1 rounded-md px-2 py-1.5 transition-colors',
                           isCurrent
                             ? 'bg-editor-primary-active'
                             : isFuture
                               ? 'opacity-55 hover:bg-editor-selected-quiet hover:opacity-100'
                               : 'hover:bg-editor-selected-quiet',
                         )}
-                        role="menuitem"
-                        type="button"
+                        role="none"
                       >
-                        <div className="flex justify-between items-center gap-2">
-                          <UiText as="span" color={textColor} weight={textWeight} className="truncate">
-                            {name}
-                          </UiText>
+                        <div className="flex min-w-0 flex-1 items-center gap-2">
+                          {item.isCheckpoint && (
+                            <Bookmark
+                              size={13}
+                              className={cx('shrink-0', isCurrent ? 'text-current' : 'text-text-secondary')}
+                            />
+                          )}
+                          {isEditing && checkpoint ? (
+                            <input
+                              aria-label={t('editor.toolbar.history.editCheckpointLabel')}
+                              className="h-7 min-w-0 flex-1 rounded border border-editor-border bg-editor-panel-well px-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-editor-focus-ring"
+                              data-testid="editor-history-checkpoint-label-input"
+                              onChange={(event) => {
+                                setEditingCheckpointLabel(event.currentTarget.value);
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                  event.preventDefault();
+                                  commitCheckpointRename(checkpoint.id);
+                                } else if (event.key === 'Escape') {
+                                  setEditingCheckpointId(null);
+                                  setEditingCheckpointLabel('');
+                                }
+                              }}
+                              value={editingCheckpointLabel}
+                            />
+                          ) : (
+                            <button
+                              className="min-w-0 flex-1 text-left focus-visible:outline-none"
+                              onClick={() => {
+                                goToAdjustmentsHistoryIndex(i);
+                                setIsHistoryVisible(false);
+                              }}
+                              role="menuitem"
+                              type="button"
+                            >
+                              <UiText as="span" color={textColor} weight={textWeight} className="block truncate">
+                                {item.label}
+                              </UiText>
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
                           <UiText
                             as="span"
                             variant={TextVariants.small}
@@ -832,8 +774,61 @@ const EditorToolbar = memo(
                           >
                             {i === 0 ? '' : i}
                           </UiText>
+                          {checkpoint &&
+                            (isEditing ? (
+                              <>
+                                <button
+                                  aria-label={t('editor.toolbar.history.saveCheckpointLabel')}
+                                  className={cx(
+                                    token.button.base,
+                                    token.button.icon,
+                                    token.button.quiet,
+                                    token.focusRing,
+                                  )}
+                                  onClick={() => {
+                                    commitCheckpointRename(checkpoint.id);
+                                  }}
+                                  type="button"
+                                >
+                                  <Check size={13} />
+                                </button>
+                                <button
+                                  aria-label={t('editor.toolbar.history.cancelCheckpointLabel')}
+                                  className={cx(
+                                    token.button.base,
+                                    token.button.icon,
+                                    token.button.quiet,
+                                    token.focusRing,
+                                  )}
+                                  onClick={() => {
+                                    setEditingCheckpointId(null);
+                                    setEditingCheckpointLabel('');
+                                  }}
+                                  type="button"
+                                >
+                                  <X size={13} />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                aria-label={t('editor.toolbar.history.renameCheckpoint')}
+                                className={cx(
+                                  token.button.base,
+                                  token.button.icon,
+                                  token.button.quiet,
+                                  token.focusRing,
+                                )}
+                                onClick={() => {
+                                  setEditingCheckpointId(checkpoint.id);
+                                  setEditingCheckpointLabel(checkpoint.label);
+                                }}
+                                type="button"
+                              >
+                                <Pencil size={13} />
+                              </button>
+                            ))}
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </motion.div>

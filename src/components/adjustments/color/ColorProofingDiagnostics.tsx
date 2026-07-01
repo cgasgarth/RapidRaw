@@ -2,6 +2,10 @@ import cx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { TextColors, TextVariants } from '../../../types/typography';
 import type { Adjustments } from '../../../utils/adjustments';
+import type {
+  PreviewScopeFreshnessStatus,
+  RenderedPreviewWarningStatus,
+} from '../../../utils/color/runtime/gamutWarningDisplay';
 import { editorChromeStatusChipClassName } from '../../ui/editorChromeTokens';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import UiText from '../../ui/primitives/Text';
@@ -103,7 +107,9 @@ interface ColorProofingDiagnosticsProps extends ColorPanelGroupProps {
   } | null;
   gamutWarningCoverage: string;
   isGamutWarningOverlayVisible: boolean;
+  previewScopeFreshnessStatus: PreviewScopeFreshnessStatus;
   proofDimensions: { height: number; width: number };
+  renderedPreviewWarningStatus: RenderedPreviewWarningStatus;
   setEditor: (state: { isGamutWarningOverlayVisible: boolean }) => void;
   skinToneInspectorAfterDistance: number;
   skinToneInspectorBeforeDistance: number;
@@ -123,7 +129,9 @@ export const ColorProofingDiagnostics = ({
   gamutWarningCoverage,
   isGamutWarningOverlayVisible,
   onDragStateChange,
+  previewScopeFreshnessStatus,
   proofDimensions,
+  renderedPreviewWarningStatus,
   setEditor,
   skinToneInspectorAfterDistance,
   skinToneInspectorBeforeDistance,
@@ -134,6 +142,17 @@ export const ColorProofingDiagnostics = ({
 }: ColorProofingDiagnosticsProps) => {
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
+  const clippingWarningState = adjustments.showClipping ? 'current' : 'unavailable';
+  const clippingStatusLabel = adjustments.showClipping
+    ? 'Preview clipping overlay current'
+    : 'Preview clipping overlay off';
+  const gamutCoverageLabel =
+    renderedPreviewWarningStatus.state === 'current'
+      ? t('editor.canvas.gamutWarningCoverage', {
+          profile: renderedPreviewWarningStatus.displayProfileLabel,
+          value: renderedPreviewWarningStatus.coverageLabel,
+        })
+      : renderedPreviewWarningStatus.statusLabel;
 
   const handleSkinToneUniformityToggle = () => {
     syncSkinToneUniformity({
@@ -198,9 +217,18 @@ export const ColorProofingDiagnostics = ({
             className={cx(density.card.nestedPanel, 'bg-editor-panel')}
             data-active-camera-profile={adjustments.cameraProfile}
             data-active-tone-curve={adjustments.toneCurve}
+            data-clipping-status-label={clippingStatusLabel}
+            data-clipping-warning-state={clippingWarningState}
+            data-clipping-visible={String(adjustments.showClipping ?? false)}
+            data-display-profile-label={renderedPreviewWarningStatus.displayProfileLabel}
             data-export-transform-label={activeExportPresetName ?? ''}
             data-gamut-warning-count={currentGamutWarningOverlay?.warning_pixel_count ?? 0}
             data-histogram-hook="histogram"
+            data-preview-warning-state={renderedPreviewWarningStatus.state}
+            data-render-target-label={renderedPreviewWarningStatus.renderTargetLabel}
+            data-scope-freshness-state={previewScopeFreshnessStatus.state}
+            data-scope-status-label={previewScopeFreshnessStatus.statusLabel}
+            data-soft-proof-profile-label={renderedPreviewWarningStatus.exportProfileLabel ?? ''}
             data-testid="professional-color-workspace-panel"
             data-vectorscope-hook="vectorscope"
             data-warning-count={colorWorkspaceWarningChips.length}
@@ -266,13 +294,18 @@ export const ColorProofingDiagnostics = ({
               currentGamutWarningOverlay === null ? 'bg-editor-panel' : 'border-accent bg-accent/10',
             )}
             data-coverage-ratio={(currentGamutWarningOverlay?.coverage_ratio ?? 0).toFixed(6)}
+            data-clipping-status-label={clippingStatusLabel}
+            data-clipping-warning-state={clippingWarningState}
+            data-display-profile-label={renderedPreviewWarningStatus.displayProfileLabel}
             data-effective-color-profile={currentGamutWarningOverlay?.effective_color_profile ?? ''}
             data-effective-rendering-intent={currentGamutWarningOverlay?.effective_rendering_intent ?? ''}
             data-export-soft-proof-recipe-id={currentGamutWarningOverlay?.export_soft_proof_recipe_id ?? ''}
             data-preview-basis={currentGamutWarningOverlay?.preview_basis ?? ''}
+            data-preview-warning-state={renderedPreviewWarningStatus.state}
             data-proof-mask-height={proofDimensions.height}
             data-proof-mask-width={proofDimensions.width}
             data-proof-ready={String(currentGamutWarningOverlay !== null)}
+            data-render-target-label={renderedPreviewWarningStatus.renderTargetLabel}
             data-source-image-path={currentGamutWarningOverlay?.source_image_path ?? ''}
             data-transform-policy-fingerprint={currentGamutWarningOverlay?.transform_policy_fingerprint ?? ''}
             data-warning-pixel-count={currentGamutWarningOverlay?.warning_pixel_count ?? 0}
@@ -289,7 +322,7 @@ export const ColorProofingDiagnostics = ({
                   color={TextColors.secondary}
                   className={density.sectionHeader.summary}
                 >
-                  {t('adjustments.color.gamutWarning.coverage', { value: gamutWarningCoverage })}
+                  {gamutCoverageLabel}
                 </UiText>
                 <UiText
                   variant={TextVariants.small}
@@ -297,6 +330,7 @@ export const ColorProofingDiagnostics = ({
                   className={density.sectionHeader.summary}
                   data-testid="gamut-warning-proof-details"
                 >
+                  {renderedPreviewWarningStatus.renderTargetLabel} ·{' '}
                   {t('adjustments.color.gamutWarning.proofDetails', {
                     height: proofDimensions.height,
                     pixels: currentGamutWarningOverlay?.warning_pixel_count ?? 0,

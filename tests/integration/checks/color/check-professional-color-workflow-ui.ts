@@ -220,8 +220,13 @@ async function validatePresentationGrouping(container: Element) {
   const proofingSummary = getByTestId(container, 'color-proofing-warning-summary');
   assertVisibleText(
     proofingSummary,
-    'sRGB gamut · 12.5%',
+    'Display P3 gamut · 12.5%',
     'proofing warning summary did not keep gamut status visible.',
+  );
+  assertVisibleText(
+    proofingSummary,
+    'Scopes current',
+    'proofing warning summary did not keep scope freshness visible.',
   );
   assertVisibleText(
     proofingSummary,
@@ -281,6 +286,20 @@ async function renderColorPanel(): Promise<RenderedPanel> {
     gamutWarningOverlay: professionalOverlayFixture,
     isExportSoftProofEnabled: true,
     isGamutWarningOverlayVisible: false,
+    previewScopeStatus: {
+      displayTransformLabel: professionalTransform.colorManagedTransform,
+      exportProfileLabel: professionalTransform.effectiveColorProfile,
+      exportRenderingIntentLabel: professionalTransform.effectiveRenderingIntent,
+      histogramReady: true,
+      path: professionalImagePath,
+      renderBasis: 'export_preview',
+      softProofTransformApplied: true,
+      sourceLabel: 'Export preview',
+      updatedAt: '2026-07-01T12:00:00.000Z',
+      waveformReady: true,
+      warningCodes: ['export_profile_transform_applied', 'render_target_matches_export_recipe'],
+      workingTransformLabel: 'Working RGB',
+    },
     selectedImage: professionalSelectedImageFixture,
   });
 
@@ -345,11 +364,23 @@ async function validateRenderedWorkspaceCoverage(container: Element) {
   assertData(workspace, 'waveformHook', 'waveform', 'workspace did not expose waveform readiness.');
   assertData(workspace, 'vectorscopeHook', 'vectorscope', 'workspace did not expose vectorscope readiness.');
   assertData(workspace, 'gamutWarningCount', '45', 'workspace did not expose gamut warning count.');
-  assertData(workspace, 'warningCount', '2', 'workspace warning chips did not include gamut and skin-tone warnings.');
+  assertData(
+    workspace,
+    'warningCount',
+    '3',
+    'workspace warning chips did not include gamut, scope, and skin-tone status.',
+  );
+  assertData(workspace, 'previewWarningState', 'current', 'workspace did not expose current gamut warning state.');
+  assertData(workspace, 'scopeFreshnessState', 'current', 'workspace did not expose current scope freshness.');
+  assertData(workspace, 'displayProfileLabel', 'Display P3', 'workspace did not expose display/output profile label.');
+  assertData(workspace, 'softProofProfileLabel', 'Display P3', 'workspace did not expose soft proof profile label.');
+  assertData(workspace, 'renderTargetLabel', 'Export preview -> Display P3', 'workspace did not expose render target.');
+  assertData(workspace, 'clippingWarningState', 'unavailable', 'workspace did not expose clipping status.');
   assertVisibleText(container, exportPresetFixture.name, 'export preset label was not rendered.');
   assertVisibleText(container, 'Linear RAW', 'working-space label was not rendered.');
   assertVisibleText(container, 'Vectorscope', 'scope label was not rendered.');
-  await waitForText(container, 'sRGB gamut · 12.5%', 'gamut warning chip copy was not rendered.');
+  await waitForText(container, 'Display P3 gamut · 12.5%', 'gamut warning chip copy was not rendered.');
+  await waitForText(container, 'Scopes current', 'scope freshness chip copy was not rendered.');
 }
 
 async function validateFoundationalColorControlOrder(container: Element) {
@@ -377,6 +408,14 @@ async function validateGamutWarningCoverage(container: Element) {
   assertData(controls, 'proofMaskHeight', '180', 'gamut controls did not expose proof mask height.');
   assertData(controls, 'proofReady', 'true', 'gamut controls did not expose proof readiness.');
   assertData(controls, 'previewBasis', 'export_preview', 'gamut controls did not expose export-preview basis.');
+  assertData(controls, 'previewWarningState', 'current', 'gamut controls did not expose current warning state.');
+  assertData(controls, 'displayProfileLabel', 'Display P3', 'gamut controls did not expose display/output profile.');
+  assertData(
+    controls,
+    'renderTargetLabel',
+    'Export preview -> Display P3',
+    'gamut controls did not expose render target.',
+  );
   assertData(
     controls,
     'transformPolicyFingerprint',
@@ -386,10 +425,14 @@ async function validateGamutWarningCoverage(container: Element) {
   assertData(controls, 'visible', 'false', 'gamut overlay should start hidden.');
   assertVisibleText(
     controls,
-    `sRGB gamut · ${formatGamutWarningCoverage(professionalOverlayFixture)}`,
+    `Display P3 gamut · ${formatGamutWarningCoverage(professionalOverlayFixture)}`,
     'gamut coverage copy was not rendered.',
   );
-  assertVisibleText(controls, 'Proof: 45 warning pixels · 240 x 180', 'gamut proof details were not rendered.');
+  assertVisibleText(
+    controls,
+    'Export preview -> Display P3 · Proof: 45 warning pixels · 240 x 180',
+    'gamut proof details were not rendered.',
+  );
 
   const toggle = getByTestId<HTMLButtonElement>(container, 'gamut-warning-toggle');
   if (toggle.getAttribute('aria-pressed') !== 'false') failures.push('gamut toggle should render off by default.');

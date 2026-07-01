@@ -9,6 +9,7 @@ import { useWaveformControls } from '../../../../hooks/editor/useWaveformControl
 import { type PanelScopesLayout, useEditorStore } from '../../../../store/useEditorStore';
 import { useSettingsStore } from '../../../../store/useSettingsStore';
 import { type Adjustments, DisplayMode } from '../../../../utils/adjustments';
+import { getPreviewScopeFreshnessStatus } from '../../../../utils/color/runtime/gamutWarningDisplay';
 import { PANEL_SCOPES_HEIGHT } from '../../../../utils/waveformSizing';
 import { Orientation } from '../../../ui/AppProperties';
 import Resizer from '../../../ui/Resizer';
@@ -60,6 +61,7 @@ export default function PanelScopesStrip({ testId }: PanelScopesStripProps) {
     isWaveformVisible,
     panelScopesLayout,
     previewScopeStatus,
+    selectedImagePath,
     waveform,
     waveformHeight,
   } = useEditorStore(
@@ -70,6 +72,7 @@ export default function PanelScopesStrip({ testId }: PanelScopesStripProps) {
       isWaveformVisible: state.isWaveformVisible,
       panelScopesLayout: state.panelScopesLayout,
       previewScopeStatus: state.previewScopeStatus,
+      selectedImagePath: state.selectedImage?.path ?? null,
       waveform: state.waveform,
       waveformHeight: state.waveformHeight,
     })),
@@ -80,6 +83,7 @@ export default function PanelScopesStrip({ testId }: PanelScopesStripProps) {
   const LayoutIcon = activeLayoutToggle.icon;
   const controlsId = `${testId}-controls`;
   const waveformPaddingClass = panelScopesLayout === 'overlay' ? 'p-2 pt-9' : 'px-3 pb-1.5 pt-1';
+  const scopeFreshnessStatus = getPreviewScopeFreshnessStatus(previewScopeStatus, selectedImagePath);
 
   const toggleClipping = () => {
     setAdjustments((prev: Adjustments) => ({
@@ -99,6 +103,8 @@ export default function PanelScopesStrip({ testId }: PanelScopesStripProps) {
           data-min-height={PANEL_SCOPES_HEIGHT.min}
           data-panel-scopes-height={currentHeight}
           data-panel-scopes-layout={panelScopesLayout}
+          data-preview-scope-freshness={scopeFreshnessStatus.state}
+          data-preview-scope-status-label={scopeFreshnessStatus.statusLabel}
           data-show-clipping={String(clippingEnabled)}
           data-testid={testId}
           data-state="open"
@@ -113,6 +119,12 @@ export default function PanelScopesStrip({ testId }: PanelScopesStripProps) {
             )}
             data-testid={controlsId}
           >
+            <span
+              className="max-w-[7rem] truncate rounded bg-bg-secondary px-1.5 py-1 text-[10px] font-semibold text-text-secondary"
+              data-testid={`${testId}-freshness-status`}
+            >
+              {scopeFreshnessStatus.statusLabel}
+            </span>
             <div
               aria-label={t('ui.waveform.drawerControls.mode', { defaultValue: 'Scope mode' })}
               className="grid min-w-0 flex-1 grid-cols-5 gap-0.5 rounded bg-bg-secondary p-0.5"

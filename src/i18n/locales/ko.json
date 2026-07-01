@@ -808,7 +808,16 @@
         "undo": "실행 취소 ({{shortcut}}) 또는 기록 (우클릭)"
       },
       "vc": "VC",
-      "compare": {}
+      "compare": {},
+      "history": {
+        "addCheckpoint": "Add checkpoint",
+        "cancelCheckpointLabel": "Cancel checkpoint label edit",
+        "editCheckpointLabel": "Checkpoint label",
+        "noActiveAdjustment": "No active adjustment",
+        "renameCheckpoint": "Rename checkpoint",
+        "saveCheckpointLabel": "Save checkpoint label",
+        "updateCheckpoint": "Edit checkpoint"
+      }
     },
     "layers": {
       "actions": {

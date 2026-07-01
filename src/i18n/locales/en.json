@@ -912,7 +912,7 @@
         "splitWipeLabel": "Before / After"
       },
       "cropPreviewAlt": "Crop preview",
-      "gamutWarningCoverage": "sRGB gamut · {{value}}",
+      "gamutWarningCoverage": "{{profile}} gamut · {{value}}",
       "gamutWarningOverlay": "sRGB gamut warning overlay",
       "maskOverlayAlt": "Mask Overlay",
       "originalAlt": "Original"
@@ -1687,6 +1687,15 @@
       "exportSoftProofActive": "Proofing",
       "exportSoftProofDetails": "{{profile}} / {{intent}} preview",
       "exportSoftProofUnavailable": "No export recipe available",
+      "history": {
+        "addCheckpoint": "Add checkpoint",
+        "cancelCheckpointLabel": "Cancel checkpoint label edit",
+        "editCheckpointLabel": "Checkpoint label",
+        "noActiveAdjustment": "No active adjustment",
+        "renameCheckpoint": "Rename checkpoint",
+        "saveCheckpointLabel": "Save checkpoint label",
+        "updateCheckpoint": "Edit checkpoint"
+      },
       "historyDepth": "{{current}}/{{total}}",
       "tooltips": {
         "aperture": "Aperture",
