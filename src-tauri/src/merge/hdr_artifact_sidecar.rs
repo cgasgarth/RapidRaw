@@ -20,6 +20,66 @@ const HDR_MERGE_STRATEGY: &str = "exposure_fusion_preview";
 const HDR_WORKING_COLOR_SPACE: &str = "srgb_display_referred_v1";
 const HDR_WARNING_TONE_MAPPED_PREVIEW_ONLY: &str = "tone_mapped_preview_only";
 
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HdrDryRunDimensionReport {
+    pub height: u32,
+    pub width: u32,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HdrDryRunExposureReport {
+    pub exposure_ev: f32,
+    pub exposure_time_seconds: f32,
+    pub iso: f32,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HdrDryRunSourceReport {
+    pub content_hash: String,
+    pub dimensions: HdrDryRunDimensionReport,
+    pub exposure: HdrDryRunExposureReport,
+    pub path: String,
+    pub source_index: usize,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HdrDryRunExposureSpacingReport {
+    pub max_step_ev: f32,
+    pub min_step_ev: f32,
+    pub span_ev: f32,
+    pub step_count: usize,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HdrDryRunEstimatedMemoryReport {
+    pub merge_buffer_mb: u64,
+    pub preview_buffer_mb: u64,
+    pub total_mb: u64,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HdrDryRunPlanResponse {
+    pub accepted: bool,
+    pub accepted_dry_run_plan_hash: String,
+    pub accepted_dry_run_plan_id: String,
+    pub block_codes: Vec<String>,
+    pub bracket_count: usize,
+    pub dimension_warnings: Vec<String>,
+    pub estimated_memory: HdrDryRunEstimatedMemoryReport,
+    pub exposure_spacing: Option<HdrDryRunExposureSpacingReport>,
+    pub metadata_warnings: Vec<String>,
+    pub preview_dimensions: HdrDryRunDimensionReport,
+    pub source_paths: Vec<String>,
+    pub sources: Vec<HdrDryRunSourceReport>,
+    pub warning_codes: Vec<String>,
+}
+
 pub fn build_unique_hdr_output_path(parent_dir: &Path, stem: &str, extension: &str) -> PathBuf {
     let first_candidate = parent_dir.join(format!("{}_Hdr.{}", stem, extension));
     if !first_candidate.exists() {
@@ -78,6 +138,179 @@ pub fn build_hdr_runtime_plan(
         accepted_dry_run_plan_hash: format!("blake3:{}", plan_hash_hex),
         accepted_dry_run_plan_id: format!("hdr_runtime_plan_{}", plan_id_suffix),
     }
+}
+
+pub fn build_hdr_dry_run_plan_response(
+    source_refs: &[PendingHdrSourceRef],
+    output_width: u32,
+    output_height: u32,
+) -> HdrDryRunPlanResponse {
+    let runtime_plan = build_hdr_runtime_plan(source_refs, output_width, output_height);
+    let block_codes = build_hdr_dry_run_block_codes(source_refs);
+    let dimension_warnings = build_hdr_dry_run_dimension_warnings(source_refs);
+    let metadata_warnings = build_hdr_dry_run_metadata_warnings(source_refs);
+    let warning_codes = build_hdr_dry_run_warning_codes(&dimension_warnings, &metadata_warnings);
+    let estimated_memory =
+        build_hdr_dry_run_estimated_memory(source_refs, output_width, output_height);
+
+    HdrDryRunPlanResponse {
+        accepted: block_codes.is_empty(),
+        accepted_dry_run_plan_hash: runtime_plan.accepted_dry_run_plan_hash,
+        accepted_dry_run_plan_id: runtime_plan.accepted_dry_run_plan_id,
+        block_codes,
+        bracket_count: source_refs.len(),
+        dimension_warnings,
+        estimated_memory,
+        exposure_spacing: build_hdr_dry_run_exposure_spacing(source_refs),
+        metadata_warnings,
+        preview_dimensions: HdrDryRunDimensionReport {
+            height: output_height,
+            width: output_width,
+        },
+        source_paths: source_refs
+            .iter()
+            .map(|source| source.image_path.clone())
+            .collect(),
+        sources: source_refs
+            .iter()
+            .map(|source| HdrDryRunSourceReport {
+                content_hash: source.content_hash.clone(),
+                dimensions: HdrDryRunDimensionReport {
+                    height: source.height,
+                    width: source.width,
+                },
+                exposure: HdrDryRunExposureReport {
+                    exposure_ev: source.exposure_time_seconds.log2(),
+                    exposure_time_seconds: source.exposure_time_seconds,
+                    iso: source.iso,
+                },
+                path: source.image_path.clone(),
+                source_index: source.source_index,
+            })
+            .collect(),
+        warning_codes,
+    }
+}
+
+fn build_hdr_dry_run_block_codes(source_refs: &[PendingHdrSourceRef]) -> Vec<String> {
+    let mut blocks = Vec::new();
+    if source_refs.len() < 2 {
+        blocks.push("insufficient_bracket_count".to_string());
+    }
+    if source_refs.iter().any(|source| {
+        source.width == 0
+            || source.height == 0
+            || source.exposure_time_seconds <= 0.0
+            || source.iso <= 0.0
+    }) {
+        blocks.push("missing_required_exposure_metadata".to_string());
+    }
+    if has_hdr_dimension_mismatch(source_refs) {
+        blocks.push("dimension_mismatch".to_string());
+    }
+    blocks
+}
+
+fn build_hdr_dry_run_dimension_warnings(source_refs: &[PendingHdrSourceRef]) -> Vec<String> {
+    if has_hdr_dimension_mismatch(source_refs) {
+        vec!["source_dimensions_do_not_match".to_string()]
+    } else {
+        Vec::new()
+    }
+}
+
+fn build_hdr_dry_run_metadata_warnings(source_refs: &[PendingHdrSourceRef]) -> Vec<String> {
+    let mut warnings = Vec::new();
+    if source_refs
+        .iter()
+        .any(|source| source.exposure_time_seconds <= 0.0 || source.iso <= 0.0)
+    {
+        warnings.push("missing_exposure_metadata".to_string());
+    }
+    if build_hdr_dry_run_exposure_spacing(source_refs)
+        .map(|spacing| spacing.span_ev < 0.5)
+        .unwrap_or(false)
+    {
+        warnings.push("narrow_exposure_span".to_string());
+    }
+    warnings
+}
+
+fn build_hdr_dry_run_warning_codes(
+    dimension_warnings: &[String],
+    metadata_warnings: &[String],
+) -> Vec<String> {
+    dimension_warnings
+        .iter()
+        .chain(metadata_warnings.iter())
+        .cloned()
+        .collect()
+}
+
+fn build_hdr_dry_run_exposure_spacing(
+    source_refs: &[PendingHdrSourceRef],
+) -> Option<HdrDryRunExposureSpacingReport> {
+    if source_refs.len() < 2 {
+        return None;
+    }
+
+    let mut exposure_evs = source_refs
+        .iter()
+        .map(|source| source.exposure_time_seconds.log2())
+        .filter(|exposure_ev| exposure_ev.is_finite())
+        .collect::<Vec<_>>();
+    if exposure_evs.len() < 2 {
+        return None;
+    }
+
+    exposure_evs.sort_by(|left, right| left.total_cmp(right));
+    let steps = exposure_evs
+        .windows(2)
+        .map(|window| window[1] - window[0])
+        .collect::<Vec<_>>();
+    let min_step_ev = steps.iter().copied().fold(f32::INFINITY, f32::min);
+    let max_step_ev = steps.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+
+    Some(HdrDryRunExposureSpacingReport {
+        max_step_ev,
+        min_step_ev,
+        span_ev: exposure_evs.last().copied().unwrap_or(0.0)
+            - exposure_evs.first().copied().unwrap_or(0.0),
+        step_count: steps.len(),
+    })
+}
+
+fn build_hdr_dry_run_estimated_memory(
+    source_refs: &[PendingHdrSourceRef],
+    output_width: u32,
+    output_height: u32,
+) -> HdrDryRunEstimatedMemoryReport {
+    let source_pixels = source_refs
+        .iter()
+        .map(|source| u64::from(source.width) * u64::from(source.height))
+        .sum::<u64>();
+    let output_pixels = u64::from(output_width) * u64::from(output_height);
+    let merge_buffer_mb = bytes_to_mb(source_pixels * 16);
+    let preview_buffer_mb = bytes_to_mb(output_pixels * 4);
+
+    HdrDryRunEstimatedMemoryReport {
+        merge_buffer_mb,
+        preview_buffer_mb,
+        total_mb: merge_buffer_mb + preview_buffer_mb,
+    }
+}
+
+fn has_hdr_dimension_mismatch(source_refs: &[PendingHdrSourceRef]) -> bool {
+    source_refs.first().is_some_and(|first| {
+        source_refs
+            .iter()
+            .skip(1)
+            .any(|source| source.width != first.width || source.height != first.height)
+    })
+}
+
+fn bytes_to_mb(bytes: u64) -> u64 {
+    bytes.div_ceil(1_048_576)
 }
 
 pub fn write_hdr_output_sidecar(
@@ -383,6 +616,39 @@ mod tests {
                 .starts_with("hdr_runtime_plan_")
         );
         assert!(first_plan.accepted_dry_run_plan_hash.starts_with("blake3:"));
+    }
+
+    #[test]
+    fn hdr_dry_run_plan_reports_synthetic_bracket_warnings_and_blocks() {
+        let mut source_refs = vec![
+            hdr_source_ref("/tmp/IMG_0001_-1ev.tif".to_string(), 0, 0.125),
+            hdr_source_ref("/tmp/IMG_0002_0ev.tif".to_string(), 1, 0.25),
+            hdr_source_ref("/tmp/IMG_0003_+1ev.tif".to_string(), 2, 0.5),
+        ];
+        source_refs[2].height = 47;
+
+        let dry_run = build_hdr_dry_run_plan_response(&source_refs, 64, 48);
+
+        assert!(!dry_run.accepted);
+        assert_eq!(dry_run.bracket_count, 3);
+        assert!(
+            dry_run
+                .block_codes
+                .contains(&"dimension_mismatch".to_string())
+        );
+        assert!(
+            dry_run
+                .dimension_warnings
+                .contains(&"source_dimensions_do_not_match".to_string())
+        );
+        assert_eq!(dry_run.exposure_spacing.unwrap().span_ev, 2.0);
+        assert!(dry_run.estimated_memory.total_mb > 0);
+        assert!(dry_run.accepted_dry_run_plan_hash.starts_with("blake3:"));
+        assert!(
+            dry_run
+                .accepted_dry_run_plan_id
+                .starts_with("hdr_runtime_plan_")
+        );
     }
 
     #[test]

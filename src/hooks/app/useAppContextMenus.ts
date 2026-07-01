@@ -742,6 +742,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     isOpen: true,
                     isProcessing: false,
                     progressMessage: null,
+                    runtimePlan: null,
                     savedHandoffSummary: null,
                     settings: DEFAULT_HDR_MERGE_UI_SETTINGS,
                     sourceMetadata: buildHdrLaunchSourceMetadata(imageList, finalSelection),

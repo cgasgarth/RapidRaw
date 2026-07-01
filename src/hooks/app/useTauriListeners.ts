@@ -5,12 +5,12 @@ import type { WaveformData } from '../../components/ui/AppProperties';
 import { Status } from '../../components/ui/ExportImportProperties';
 import {
   gamutWarningOverlayPayloadSchema,
-  parseBase64Payload,
   parseCountPayload,
   parseCullingProgressPayload,
   parseCullingSuggestionsPayload,
   parseDenoiseCompletePayload,
   parseExportReceiptPayload,
+  parseHdrCompletePayload,
   parseImportProgressPayload,
   parseImportStartPayload,
   parsePanoramaCompletePayload,
@@ -444,7 +444,7 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
         }
       }),
       listen<unknown>(HDR_COMPLETE_EVENT, (event) => {
-        const payload = parseBase64Payload(event.payload);
+        const payload = parseHdrCompletePayload(event.payload);
         if (isEffectActive) {
           useUIStore.getState().setUI((state) => ({
             hdrModalState: {
@@ -453,8 +453,13 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
               finalImageBase64: payload.base64,
               isProcessing: false,
               lastApplyCommand: buildHdrApplyCommandState({
+                acceptedDryRunPlanHash: payload.receipt.acceptedDryRunPlanHash,
+                acceptedDryRunPlanId: payload.receipt.acceptedDryRunPlanId,
                 base64Length: payload.base64.length,
-                sourceCount: state.hdrModalState.stitchingSourcePaths.length,
+                outputHandle: payload.receipt.outputHandle,
+                previewDimensions: payload.receipt.previewDimensions,
+                sourceCount: payload.receipt.sourcePaths.length,
+                sourcePaths: payload.receipt.sourcePaths,
               }),
               progressMessage: 'Hdr Ready',
             },
