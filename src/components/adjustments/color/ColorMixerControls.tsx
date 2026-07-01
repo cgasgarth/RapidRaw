@@ -183,8 +183,11 @@ export const ColorMixerControls = ({
   const saturation_slider = `sat-slider-${activeColor}`;
   const luminance_slider = `lum-slider-${activeColor}`;
   const activeChipClass =
-    'shrink-0 rounded bg-bg-secondary px-1.5 py-0.5 text-[10px] font-medium leading-4 text-text-secondary';
-  const summaryRowClass = cx('mb-1.5 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2', density.card.nestedBare);
+    'shrink-0 rounded bg-editor-selected-quiet px-1.5 py-0.5 text-[10px] font-medium leading-4 text-editor-selected-quiet-text';
+  const summaryRowClass = cx(
+    'mb-1.5 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border border-editor-border',
+    density.card.nestedBare,
+  );
 
   useEffect(() => {
     const normalizedHue = ((effectiveHue % 360) + 360) % 360;
@@ -386,6 +389,7 @@ export const ColorMixerControls = ({
               aria-pressed={blackWhiteMixer.enabled}
               className={cx(
                 density.actionButton.base,
+                'border border-transparent',
                 blackWhiteMixer.enabled ? density.actionButton.active : density.actionButton.inactive,
               )}
               data-testid="black-white-mixer-toggle"
@@ -448,6 +452,7 @@ export const ColorMixerControls = ({
                 aria-pressed={colorBalanceRgb.preserveLuminance}
                 className={cx(
                   density.actionButton.base,
+                  'border border-editor-border',
                   colorBalanceRgb.preserveLuminance ? density.actionButton.selectedQuiet : density.actionButton.quiet,
                 )}
                 onClick={handleColorBalancePreserveLuminance}
@@ -460,6 +465,7 @@ export const ColorMixerControls = ({
                 data-testid="color-balance-toggle"
                 className={cx(
                   density.actionButton.base,
+                  'border border-transparent',
                   colorBalanceRgb.enabled ? density.actionButton.active : density.actionButton.inactive,
                 )}
                 onClick={handleColorBalanceToggle}
@@ -486,7 +492,9 @@ export const ColorMixerControls = ({
                 className={cx(
                   density.actionButton.base,
                   'w-full',
-                  activeColorBalanceRange === range.key ? density.actionButton.active : density.actionButton.inactive,
+                  activeColorBalanceRange === range.key
+                    ? density.actionButton.selectedQuiet
+                    : density.actionButton.inactive,
                 )}
                 key={range.key}
                 onClick={() => {
@@ -530,6 +538,7 @@ export const ColorMixerControls = ({
                 aria-pressed={channelMixer.preserveLuminance}
                 className={cx(
                   density.actionButton.base,
+                  'border border-editor-border',
                   channelMixer.preserveLuminance ? density.actionButton.selectedQuiet : density.actionButton.quiet,
                 )}
                 onClick={handleChannelMixerPreserveLuminance}
@@ -542,6 +551,7 @@ export const ColorMixerControls = ({
                 data-testid="channel-mixer-toggle"
                 className={cx(
                   density.actionButton.base,
+                  'border border-transparent',
                   channelMixer.enabled ? density.actionButton.active : density.actionButton.inactive,
                 )}
                 onClick={handleChannelMixerToggle}
@@ -568,7 +578,9 @@ export const ColorMixerControls = ({
                 className={cx(
                   density.actionButton.base,
                   'w-full',
-                  activeChannelMixerOutput === output.key ? density.actionButton.active : density.actionButton.inactive,
+                  activeChannelMixerOutput === output.key
+                    ? density.actionButton.selectedQuiet
+                    : density.actionButton.inactive,
                 )}
                 key={output.key}
                 onClick={() => {
@@ -683,7 +695,7 @@ export const ColorMixerControls = ({
               'gap-1 border',
               selectiveColorPreviewMode === 'mask'
                 ? 'border-accent bg-accent/10 text-text-primary'
-                : 'border-surface bg-bg-secondary text-text-secondary hover:border-accent hover:text-text-primary',
+                : 'border-editor-border bg-editor-panel text-text-secondary hover:border-accent hover:text-text-primary',
             )}
             data-testid="selective-color-mask-preview-toggle"
             onClick={toggleSelectiveColorPreviewMode}
@@ -695,7 +707,7 @@ export const ColorMixerControls = ({
             aria-label={t('adjustments.color.resetActiveRange')}
             className={cx(
               density.actionButton.base,
-              'gap-1 border border-surface bg-bg-secondary text-text-secondary hover:border-accent hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50',
+              'gap-1 border border-editor-border bg-editor-panel text-text-secondary hover:border-accent hover:bg-editor-panel-raised hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-45',
             )}
             data-testid="selective-color-reset-active-range"
             disabled={!isActiveSelectiveColorAdjusted}
@@ -710,7 +722,7 @@ export const ColorMixerControls = ({
               aria-label={t('adjustments.color.createLocalAdjustmentFromRange')}
               className={cx(
                 density.actionButton.base,
-                'col-span-2 gap-1 border border-surface bg-bg-secondary text-text-secondary hover:border-accent hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50',
+                'col-span-2 gap-1 border border-editor-border bg-editor-panel text-text-secondary hover:border-accent hover:bg-editor-panel-raised hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-45',
               )}
               data-command-type="layerMask.createRangeMask"
               data-range-key={activeColor}
@@ -734,7 +746,7 @@ export const ColorMixerControls = ({
             </span>
           </summary>
           <div
-            className="grid gap-1.5 border-t border-surface p-1.5"
+            className="grid gap-1.5 border-t border-editor-border p-1.5"
             data-testid="selective-color-range-shape-controls"
           >
             <AdjustmentSlider
@@ -779,25 +791,25 @@ export const ColorMixerControls = ({
               value={Math.round(activeSelectiveColorRangeControl.falloffSmoothness * 10)}
             />
           </div>
-          <div className="grid grid-cols-3 gap-2 border-t border-surface p-2 text-[10px]">
+          <div className="grid grid-cols-3 gap-2 border-t border-editor-border p-2 text-[10px]">
             <div className="grid gap-1" data-testid="selective-color-source-swatch">
               <span className="truncate text-text-tertiary">{activeSelectiveColorRangeLabel}</span>
               <span
-                className="h-5 rounded border border-surface"
+                className="h-5 rounded border border-editor-border"
                 style={{ backgroundColor: rgbPixelToCssColor(activeSelectiveColorSamplePixel) }}
               />
             </div>
             <div className="grid gap-1" data-testid="selective-color-mask-swatch">
               <span className="truncate text-text-tertiary">{t('adjustments.color.maskPreviewEnabled')}</span>
               <span
-                className="h-5 rounded border border-surface"
+                className="h-5 rounded border border-editor-border"
                 style={{ backgroundColor: rgbPixelToCssColor(activeSelectiveColorMaskPreview) }}
               />
             </div>
             <div className="grid gap-1" data-testid="selective-color-apply-swatch">
               <span className="truncate text-text-tertiary">{t('adjustments.color.adjustedPreviewEnabled')}</span>
               <span
-                className="h-5 rounded border border-surface"
+                className="h-5 rounded border border-editor-border"
                 style={{ backgroundColor: rgbPixelToCssColor(activeSelectiveColorAppliedPreview.outputRgb) }}
               />
             </div>

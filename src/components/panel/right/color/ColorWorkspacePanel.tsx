@@ -16,15 +16,17 @@ import {
   pickAdjustmentValues,
 } from '../../../../utils/adjustments';
 import ColorPanel from '../../../adjustments/Color';
+import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens';
 import UiText from '../../../ui/primitives/Text';
 import PanelScopesStrip from '../inspector/PanelScopesStrip';
 
 const PANEL_ACTION_BUTTON_CLASS =
-  'inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50';
+  'inline-flex h-6 w-6 items-center justify-center rounded text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45';
 const PANEL_ACTION_ICON_SIZE = 15;
 
 export default function ColorWorkspacePanel() {
   const { t } = useTranslation();
+  const density = professionalInspectorDensityTokens;
   const { setAdjustments } = useEditorActions();
   const { onToggleWaveform } = useWaveformControls();
   const appSettings = useSettingsStore((state) => state.appSettings);
@@ -69,8 +71,8 @@ export default function ColorWorkspacePanel() {
 
   return (
     <div aria-label={colorLabel} className="flex h-full flex-col" data-testid="color-workspace-panel">
-      <div className="flex min-h-11 shrink-0 items-center justify-between border-b border-surface px-3 py-2">
-        <UiText as="h2" variant={TextVariants.heading} className="truncate">
+      <div className={density.panelHeader.root}>
+        <UiText as="h2" variant={TextVariants.heading} className={density.panelHeader.title}>
           {colorLabel}
         </UiText>
         <div className="flex items-center gap-1">
@@ -79,7 +81,9 @@ export default function ColorWorkspacePanel() {
             aria-pressed={isWaveformVisible}
             className={cx(
               PANEL_ACTION_BUTTON_CLASS,
-              isWaveformVisible ? 'bg-surface hover:bg-card-active' : 'hover:bg-surface',
+              isWaveformVisible
+                ? 'bg-editor-selected-quiet text-editor-selected-quiet-text hover:bg-editor-selected-quiet'
+                : 'hover:bg-editor-selected-quiet',
             )}
             data-state={isWaveformVisible ? 'open' : 'closed'}
             data-testid="color-workspace-scopes-toggle"
@@ -91,7 +95,7 @@ export default function ColorWorkspacePanel() {
           </button>
           <button
             aria-label={resetColorLabel}
-            className={cx(PANEL_ACTION_BUTTON_CLASS, 'hover:bg-surface')}
+            className={cx(PANEL_ACTION_BUTTON_CLASS, 'hover:bg-editor-selected-quiet')}
             disabled={!selectedImage}
             onClick={handleResetColor}
             data-tooltip={resetColorLabel}
@@ -104,7 +108,7 @@ export default function ColorWorkspacePanel() {
 
       <PanelScopesStrip testId="color-workspace-scopes-strip" />
 
-      <div className="grow overflow-y-auto px-3 py-2">
+      <div className="grow overflow-y-auto bg-editor-panel px-3 py-2">
         <ColorPanel
           adjustments={adjustments}
           appSettings={appSettings}

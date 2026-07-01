@@ -253,6 +253,7 @@ export const VISUAL_SMOKE_SCENARIOS = [
     sectionMinimum: 2,
   },
   {
+    compactOutputFile: 'professional-color-compact.png',
     marker: 'Color Workflow',
     mode: VISUAL_SMOKE_SCENARIO_IDS.ColorWorkflow,
     outputFile: 'color-workflow.png',

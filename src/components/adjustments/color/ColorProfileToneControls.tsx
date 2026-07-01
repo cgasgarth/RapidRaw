@@ -1,3 +1,4 @@
+import cx from 'clsx';
 import type { TFunction } from 'i18next';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +17,8 @@ import {
 import { applyProfileToneToRgbPixel } from '../../../utils/color/profile/profileToneRuntime';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../../utils/profileTonePresets';
 import { getSelectiveColorRange } from '../../../utils/selectiveColorRanges';
+import { editorChromeStatusChipClassName, editorChromeTokens } from '../../ui/editorChromeTokens';
+import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import UiText from '../../ui/primitives/Text';
 import type { ColorPanelGroupProps } from './types';
 
@@ -231,6 +234,7 @@ export const ColorProfileToneControls = ({
   setAdjustments,
 }: ColorProfileToneControlsProps) => {
   const { t } = useTranslation();
+  const density = professionalInspectorDensityTokens;
 
   const cameraProfileOptions = useMemo(
     () =>
@@ -345,8 +349,8 @@ export const ColorProfileToneControls = ({
     <>
       {(adjustmentVisibility[ColorAdjustment.CameraProfile] !== false ||
         adjustmentVisibility[ColorAdjustment.ToneCurve] !== false) && (
-        <div className="p-2 bg-bg-tertiary rounded-md" data-testid="profile-tone-controls">
-          <UiText variant={TextVariants.heading} className="mb-3">
+        <div className={density.card.panel} data-testid="profile-tone-controls">
+          <UiText variant={TextVariants.heading} className={cx(density.sectionHeader.title, 'mb-2 block')}>
             {t('adjustments.color.profileTone.title')}
           </UiText>
           {adjustmentVisibility[ColorAdjustment.CameraProfile] !== false && (
@@ -355,7 +359,7 @@ export const ColorProfileToneControls = ({
                 {t('adjustments.color.profileTone.cameraProfile')}
               </UiText>
               <select
-                className="w-full rounded bg-bg-secondary px-2 py-1 text-xs text-text-primary"
+                className={cx(editorChromeTokens.input.base, editorChromeTokens.input.compact, 'w-full')}
                 onChange={(event) => {
                   handleCameraProfileChange(parseCameraProfileId(event.target.value));
                 }}
@@ -375,7 +379,7 @@ export const ColorProfileToneControls = ({
                 {t('adjustments.color.profileTone.toneCurve')}
               </UiText>
               <select
-                className="w-full rounded bg-bg-secondary px-2 py-1 text-xs text-text-primary"
+                className={cx(editorChromeTokens.input.base, editorChromeTokens.input.compact, 'w-full')}
                 onChange={(event) => {
                   handleToneCurveChange(parseToneCurveId(event.target.value));
                 }}
@@ -390,7 +394,7 @@ export const ColorProfileToneControls = ({
             </div>
           )}
           <div
-            className="mt-3 grid gap-1 rounded border border-surface bg-bg-secondary p-2 text-[11px] text-text-secondary"
+            className="mt-3 grid gap-1 rounded border border-editor-border bg-editor-panel p-2 text-[11px] text-text-secondary"
             data-camera-profile={adjustments.cameraProfile}
             data-luminance-after={profileToneReceipt.luminanceAfter.toFixed(4)}
             data-luminance-before={profileToneReceipt.luminanceBefore.toFixed(4)}
@@ -417,30 +421,27 @@ export const ColorProfileToneControls = ({
         </div>
       )}
 
-      <details
-        className="rounded-md border border-border bg-bg-tertiary"
-        data-testid="professional-color-recipes-disclosure"
-      >
-        <summary className="flex cursor-pointer items-start justify-between gap-3 px-2 py-2 text-xs">
+      <details className={density.card.nestedPanel} data-testid="professional-color-recipes-disclosure">
+        <summary className="flex cursor-pointer items-start justify-between gap-3 px-2 py-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring">
           <span className="min-w-0">
             <UiText variant={TextVariants.heading}>{t('adjustments.color.workflowRecipes.title')}</UiText>
             <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
               {t('adjustments.color.workflowRecipes.description')}
             </UiText>
           </span>
-          <span className="shrink-0 rounded bg-bg-secondary px-2 py-1 text-[10px] font-semibold uppercase tracking-normal text-text-secondary">
-            {t('adjustments.color.collapsed')}
-          </span>
+          <span className={editorChromeStatusChipClassName('neutral')}>{t('adjustments.color.collapsed')}</span>
         </summary>
-        <div className="grid gap-2 border-t border-border p-2" data-testid="professional-color-recipes">
+        <div className="grid gap-2 border-t border-editor-border p-2" data-testid="professional-color-recipes">
           {professionalColorRecipes.map((recipe) => {
             const isApplied = isProfessionalColorRecipeApplied(adjustments, recipe);
 
             return (
               <button
                 aria-pressed={isApplied}
-                className={`rounded-md border px-2.5 py-2 text-left text-xs transition-colors hover:border-accent hover:bg-surface ${
-                  isApplied ? 'border-accent bg-accent/10 ring-1 ring-accent/40' : 'border-surface bg-bg-secondary'
+                className={`rounded-md border px-2.5 py-2 text-left text-xs transition-colors hover:border-accent hover:bg-editor-panel-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring ${
+                  isApplied
+                    ? 'border-accent bg-accent/10 ring-1 ring-accent/40'
+                    : 'border-editor-border bg-editor-panel'
                 }`}
                 data-active={String(isApplied)}
                 data-active-range={recipe.activeColorRange}
@@ -460,7 +461,7 @@ export const ColorProfileToneControls = ({
                   <span className="min-w-0 flex-1 text-[13px] font-semibold leading-tight text-text-primary">
                     {t(recipe.labelKey)}
                   </span>
-                  <span className="shrink-0 rounded bg-bg-tertiary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-normal text-text-secondary">
+                  <span className={editorChromeStatusChipClassName(isApplied ? 'success' : 'neutral')}>
                     {t('adjustments.color.workflowRecipes.apply')}
                   </span>
                 </span>
@@ -470,23 +471,23 @@ export const ColorProfileToneControls = ({
                   className="mt-2 grid gap-1 text-[10px] font-medium leading-tight text-text-secondary"
                   data-testid="professional-color-recipe-summary"
                 >
-                  <span className="rounded bg-bg-primary px-1.5 py-1">
+                  <span className={editorChromeStatusChipClassName('neutral')}>
                     {t('adjustments.color.workflowRecipes.profileChip', {
                       value: t(`adjustments.color.profileTone.cameraProfiles.${recipe.cameraProfile}`),
                     })}
                   </span>
-                  <span className="rounded bg-bg-primary px-1.5 py-1">
+                  <span className={editorChromeStatusChipClassName('neutral')}>
                     {t('adjustments.color.workflowRecipes.toneChip', {
                       value: t(`adjustments.color.profileTone.toneCurves.${recipe.toneCurve}`),
                     })}
                   </span>
-                  <span className="rounded bg-bg-primary px-1.5 py-1">
+                  <span className={editorChromeStatusChipClassName('neutral')}>
                     {t('adjustments.color.workflowRecipes.whiteBalanceChip', {
                       temperature: formatSignedInteger(recipe.temperature),
                       tint: formatSignedInteger(recipe.tint),
                     })}
                   </span>
-                  <span className="rounded bg-bg-primary px-1.5 py-1">
+                  <span className={editorChromeStatusChipClassName('neutral')}>
                     {t('adjustments.color.workflowRecipes.rangeChip', {
                       value: t(getSelectiveColorRange(recipe.activeColorRange).labelKey),
                     })}
