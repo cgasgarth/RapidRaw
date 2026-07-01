@@ -320,6 +320,12 @@ const formatSignedRecipeValue = (value: number) => (value > 0 ? `+${value.toFixe
 const NEGATIVE_LAB_STOCK_REGISTRY_COUNTS = buildNegativeLabStockRegistryCounts(NEGATIVE_LAB_STOCK_REGISTRY);
 const NEGATIVE_LAB_STOCK_METADATA_COUNTS = buildNegativeLabStockMetadataCounts(NEGATIVE_LAB_STOCK_METADATA_CATALOG);
 const formatStockRegistryToken = (value: string) => value.split('_').join(' ');
+const NEGATIVE_LAB_STOCK_PROFILE_STATUS_LABEL_KEYS = {
+  heuristic: 'modals.negativeConversion.stockProfileStatusHeuristic',
+  measured: 'modals.negativeConversion.stockProfileStatusMeasured',
+  needs_fixture: 'modals.negativeConversion.stockProfileStatusNeedsFixture',
+  placeholder: 'modals.negativeConversion.stockProfileStatusPlaceholder',
+} as const;
 const formatStockMetadataIso = (
   nominalIso: (typeof NEGATIVE_LAB_STOCK_METADATA_CATALOG.entries)[number]['nominalIso'],
 ) => (nominalIso === null ? 'ISO -' : `${nominalIso.unit} ${nominalIso.value}`);
@@ -3793,6 +3799,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 return (
                   <button
                     aria-current={isActiveFamily ? 'true' : undefined}
+                    aria-label={`${entry.stockFamilyDescriptor}, ${t(
+                      NEGATIVE_LAB_STOCK_PROFILE_STATUS_LABEL_KEYS[entry.profileStatus],
+                    )}`}
                     className={cx(
                       'rounded-md border p-2 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60',
                       isActiveFamily
@@ -3801,6 +3810,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                       isSelectableFamily && !isActiveFamily && 'hover:bg-surface',
                     )}
                     data-testid={`negative-lab-stock-family-${entry.registryId}`}
+                    data-profile-status={entry.profileStatus}
+                    data-provenance-source={entry.provenance.measurementSource}
                     disabled={!isSelectableFamily}
                     key={entry.registryId}
                     onClick={() => {
@@ -3812,15 +3823,22 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                   >
                     <div className="flex items-start justify-between gap-2">
                       <span className="font-medium text-text-primary">{entry.stockFamilyDescriptor}</span>
-                      <span className="shrink-0 text-[10px] text-text-tertiary">
-                        {formatStockRegistryToken(entry.claimTier)}
+                      <span
+                        className="shrink-0 rounded bg-bg-primary px-1.5 py-0.5 text-[10px] text-text-tertiary"
+                        data-testid="negative-lab-stock-profile-status"
+                      >
+                        {t(NEGATIVE_LAB_STOCK_PROFILE_STATUS_LABEL_KEYS[entry.profileStatus])}
                       </span>
                     </div>
                     <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[10px] text-text-tertiary">
+                      <span>{formatStockRegistryToken(entry.claimTier)}</span>
                       <span>{formatStockRegistryToken(entry.processFamily)}</span>
                       <span>{formatStockRegistryToken(entry.legalNamingStatus)}</span>
                       <span>{formatStockRegistryToken(entry.fixtureStatus)}</span>
                     </div>
+                    <UiText variant={TextVariants.small} className="mt-1 text-text-tertiary">
+                      {entry.provenance.legalNote}
+                    </UiText>
                   </button>
                 );
               })}

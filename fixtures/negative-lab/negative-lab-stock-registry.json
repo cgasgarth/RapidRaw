@@ -13,8 +13,18 @@
       "legalNamingStatus": "descriptive_generic_only",
       "processFamily": "c41_color_negative",
       "registryId": "negative_lab.stock_family.c41_portrait_color_negative.v1",
-      "sourceReferences": ["RAW_EDITOR_PLAN.md#major-stock-preset-governance"],
-      "stockFamilyDescriptor": "Portrait color negative family"
+      "sourceReferences": [
+        "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+      ],
+      "stockFamilyDescriptor": "Portrait color negative family",
+      "profileStatus": "heuristic",
+      "provenance": {
+        "legalNote": "Trademark-safe generic family starting point; not measured from or claiming exact stock emulation.",
+        "measurementSource": "generic_engineered_starting_point",
+        "sourceReferences": [
+          "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+        ]
+      }
     },
     {
       "availability": "current_common",
@@ -29,8 +39,18 @@
       "legalNamingStatus": "descriptive_generic_only",
       "processFamily": "c41_color_negative",
       "registryId": "negative_lab.stock_family.c41_consumer_color_negative.v1",
-      "sourceReferences": ["RAW_EDITOR_PLAN.md#major-stock-preset-governance"],
-      "stockFamilyDescriptor": "Consumer color negative family"
+      "sourceReferences": [
+        "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+      ],
+      "stockFamilyDescriptor": "Consumer color negative family",
+      "profileStatus": "heuristic",
+      "provenance": {
+        "legalNote": "Trademark-safe generic family starting point; not measured from or claiming exact stock emulation.",
+        "measurementSource": "generic_engineered_starting_point",
+        "sourceReferences": [
+          "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+        ]
+      }
     },
     {
       "availability": "current_common",
@@ -45,8 +65,18 @@
       "legalNamingStatus": "descriptive_generic_only",
       "processFamily": "c41_color_negative",
       "registryId": "negative_lab.stock_family.c41_high_speed_color_negative.v1",
-      "sourceReferences": ["RAW_EDITOR_PLAN.md#major-stock-preset-governance"],
-      "stockFamilyDescriptor": "High-speed color negative family"
+      "sourceReferences": [
+        "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+      ],
+      "stockFamilyDescriptor": "High-speed color negative family",
+      "profileStatus": "heuristic",
+      "provenance": {
+        "legalNote": "Trademark-safe generic family starting point; not measured from or claiming exact stock emulation.",
+        "measurementSource": "generic_engineered_starting_point",
+        "sourceReferences": [
+          "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+        ]
+      }
     },
     {
       "availability": "current_common",
@@ -61,8 +91,18 @@
       "legalNamingStatus": "named_stock_reference_only",
       "processFamily": "c41_color_negative",
       "registryId": "negative_lab.stock_family.named_c41_portrait_reference.v1",
-      "sourceReferences": ["RAW_EDITOR_PLAN.md#major-stock-preset-governance"],
-      "stockFamilyDescriptor": "Kodak Portra 160/400/800 reference family"
+      "sourceReferences": [
+        "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+      ],
+      "stockFamilyDescriptor": "Kodak Portra 160/400/800 reference family",
+      "profileStatus": "needs_fixture",
+      "provenance": {
+        "legalNote": "Reference metadata only; runtime profile requires project-owned measurements and legal review before use.",
+        "measurementSource": "research_reference_metadata_only",
+        "sourceReferences": [
+          "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+        ]
+      }
     },
     {
       "availability": "current_common",
@@ -77,8 +117,18 @@
       "legalNamingStatus": "named_stock_reference_only",
       "processFamily": "c41_color_negative",
       "registryId": "negative_lab.stock_family.named_c41_consumer_reference.v1",
-      "sourceReferences": ["RAW_EDITOR_PLAN.md#major-stock-preset-governance"],
-      "stockFamilyDescriptor": "Kodak Gold/Ultramax/ColorPlus reference family"
+      "sourceReferences": [
+        "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+      ],
+      "stockFamilyDescriptor": "Kodak Gold/Ultramax/ColorPlus reference family",
+      "profileStatus": "needs_fixture",
+      "provenance": {
+        "legalNote": "Reference metadata only; runtime profile requires project-owned measurements and legal review before use.",
+        "measurementSource": "research_reference_metadata_only",
+        "sourceReferences": [
+          "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+        ]
+      }
     },
     {
       "availability": "current_common",
@@ -93,8 +143,18 @@
       "legalNamingStatus": "named_stock_reference_only",
       "processFamily": "c41_color_negative",
       "registryId": "negative_lab.stock_family.named_c41_saturated_reference.v1",
-      "sourceReferences": ["RAW_EDITOR_PLAN.md#major-stock-preset-governance"],
-      "stockFamilyDescriptor": "Kodak Ektar 100 reference family"
+      "sourceReferences": [
+        "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+      ],
+      "stockFamilyDescriptor": "Kodak Ektar 100 reference family",
+      "profileStatus": "needs_fixture",
+      "provenance": {
+        "legalNote": "Reference metadata only; runtime profile requires project-owned measurements and legal review before use.",
+        "measurementSource": "research_reference_metadata_only",
+        "sourceReferences": [
+          "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+        ]
+      }
     },
     {
       "availability": "specialty_or_region_limited",
@@ -109,8 +169,18 @@
       "legalNamingStatus": "named_stock_reference_only",
       "processFamily": "c41_color_negative",
       "registryId": "negative_lab.stock_family.named_c41_fuji_consumer_reference.v1",
-      "sourceReferences": ["RAW_EDITOR_PLAN.md#major-stock-preset-governance"],
-      "stockFamilyDescriptor": "Fujifilm Superia/Pro reference family"
+      "sourceReferences": [
+        "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+      ],
+      "stockFamilyDescriptor": "Fujifilm Superia/Pro reference family",
+      "profileStatus": "needs_fixture",
+      "provenance": {
+        "legalNote": "Reference metadata only; runtime profile requires project-owned measurements and legal review before use.",
+        "measurementSource": "research_reference_metadata_only",
+        "sourceReferences": [
+          "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+        ]
+      }
     },
     {
       "availability": "current_common",
@@ -125,8 +195,18 @@
       "legalNamingStatus": "descriptive_generic_only",
       "processFamily": "black_and_white_silver_negative",
       "registryId": "negative_lab.stock_family.bw_classic_panchromatic.v1",
-      "sourceReferences": ["RAW_EDITOR_PLAN.md#major-stock-preset-governance"],
-      "stockFamilyDescriptor": "Classic panchromatic silver negative family"
+      "sourceReferences": [
+        "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+      ],
+      "stockFamilyDescriptor": "Classic panchromatic silver negative family",
+      "profileStatus": "heuristic",
+      "provenance": {
+        "legalNote": "Trademark-safe generic family starting point; not measured from or claiming exact stock emulation.",
+        "measurementSource": "generic_engineered_starting_point",
+        "sourceReferences": [
+          "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+        ]
+      }
     },
     {
       "availability": "current_common",
@@ -141,8 +221,18 @@
       "legalNamingStatus": "descriptive_generic_only",
       "processFamily": "black_and_white_silver_negative",
       "registryId": "negative_lab.stock_family.bw_fine_grain.v1",
-      "sourceReferences": ["RAW_EDITOR_PLAN.md#major-stock-preset-governance"],
-      "stockFamilyDescriptor": "Fine-grain silver negative family"
+      "sourceReferences": [
+        "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+      ],
+      "stockFamilyDescriptor": "Fine-grain silver negative family",
+      "profileStatus": "heuristic",
+      "provenance": {
+        "legalNote": "Trademark-safe generic family starting point; not measured from or claiming exact stock emulation.",
+        "measurementSource": "generic_engineered_starting_point",
+        "sourceReferences": [
+          "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+        ]
+      }
     },
     {
       "availability": "current_common",
@@ -157,8 +247,18 @@
       "legalNamingStatus": "named_stock_reference_only",
       "processFamily": "black_and_white_silver_negative",
       "registryId": "negative_lab.stock_family.named_bw_classic_reference.v1",
-      "sourceReferences": ["RAW_EDITOR_PLAN.md#major-stock-preset-governance"],
-      "stockFamilyDescriptor": "Kodak Tri-X and Ilford HP5 Plus reference family"
+      "sourceReferences": [
+        "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+      ],
+      "stockFamilyDescriptor": "Kodak Tri-X and Ilford HP5 Plus reference family",
+      "profileStatus": "needs_fixture",
+      "provenance": {
+        "legalNote": "Reference metadata only; runtime profile requires project-owned measurements and legal review before use.",
+        "measurementSource": "research_reference_metadata_only",
+        "sourceReferences": [
+          "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+        ]
+      }
     },
     {
       "availability": "current_common",
@@ -173,8 +273,18 @@
       "legalNamingStatus": "named_stock_reference_only",
       "processFamily": "black_and_white_silver_negative",
       "registryId": "negative_lab.stock_family.named_bw_fine_grain_reference.v1",
-      "sourceReferences": ["RAW_EDITOR_PLAN.md#major-stock-preset-governance"],
-      "stockFamilyDescriptor": "Kodak T-Max and Ilford Delta reference family"
+      "sourceReferences": [
+        "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+      ],
+      "stockFamilyDescriptor": "Kodak T-Max and Ilford Delta reference family",
+      "profileStatus": "needs_fixture",
+      "provenance": {
+        "legalNote": "Reference metadata only; runtime profile requires project-owned measurements and legal review before use.",
+        "measurementSource": "research_reference_metadata_only",
+        "sourceReferences": [
+          "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+        ]
+      }
     },
     {
       "availability": "archival_common",
@@ -189,8 +299,18 @@
       "legalNamingStatus": "legal_review_required",
       "processFamily": "ecn2_cinema_negative",
       "registryId": "negative_lab.stock_family.ecn2_cinema_negative.v1",
-      "sourceReferences": ["RAW_EDITOR_PLAN.md#major-stock-preset-governance"],
-      "stockFamilyDescriptor": "Cinema color negative family"
+      "sourceReferences": [
+        "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+      ],
+      "stockFamilyDescriptor": "Cinema color negative family",
+      "profileStatus": "placeholder",
+      "provenance": {
+        "legalNote": "Reference metadata only; runtime profile requires project-owned measurements and legal review before use.",
+        "measurementSource": "research_reference_metadata_only",
+        "sourceReferences": [
+          "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+        ]
+      }
     },
     {
       "availability": "current_common",
@@ -205,8 +325,18 @@
       "legalNamingStatus": "named_stock_reference_only",
       "processFamily": "ecn2_cinema_negative",
       "registryId": "negative_lab.stock_family.named_ecn2_daylight_reference.v1",
-      "sourceReferences": ["RAW_EDITOR_PLAN.md#major-stock-preset-governance"],
-      "stockFamilyDescriptor": "Kodak Vision3 50D/250D reference family"
+      "sourceReferences": [
+        "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+      ],
+      "stockFamilyDescriptor": "Kodak Vision3 50D/250D reference family",
+      "profileStatus": "placeholder",
+      "provenance": {
+        "legalNote": "Reference metadata only; runtime profile requires project-owned measurements and legal review before use.",
+        "measurementSource": "research_reference_metadata_only",
+        "sourceReferences": [
+          "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+        ]
+      }
     },
     {
       "availability": "current_common",
@@ -221,8 +351,18 @@
       "legalNamingStatus": "named_stock_reference_only",
       "processFamily": "ecn2_cinema_negative",
       "registryId": "negative_lab.stock_family.named_ecn2_tungsten_reference.v1",
-      "sourceReferences": ["RAW_EDITOR_PLAN.md#major-stock-preset-governance"],
-      "stockFamilyDescriptor": "Kodak Vision3 200T/500T and CineStill reference family"
+      "sourceReferences": [
+        "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+      ],
+      "stockFamilyDescriptor": "Kodak Vision3 200T/500T and CineStill reference family",
+      "profileStatus": "placeholder",
+      "provenance": {
+        "legalNote": "Reference metadata only; runtime profile requires project-owned measurements and legal review before use.",
+        "measurementSource": "research_reference_metadata_only",
+        "sourceReferences": [
+          "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+        ]
+      }
     },
     {
       "availability": "current_common",
@@ -237,8 +377,18 @@
       "legalNamingStatus": "legal_review_required",
       "processFamily": "e6_color_reversal",
       "registryId": "negative_lab.stock_family.e6_color_reversal.v1",
-      "sourceReferences": ["RAW_EDITOR_PLAN.md#major-stock-preset-governance"],
-      "stockFamilyDescriptor": "Color reversal slide family"
+      "sourceReferences": [
+        "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+      ],
+      "stockFamilyDescriptor": "Color reversal slide family",
+      "profileStatus": "placeholder",
+      "provenance": {
+        "legalNote": "Reference metadata only; runtime profile requires project-owned measurements and legal review before use.",
+        "measurementSource": "research_reference_metadata_only",
+        "sourceReferences": [
+          "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+        ]
+      }
     },
     {
       "availability": "current_common",
@@ -253,8 +403,18 @@
       "legalNamingStatus": "named_stock_reference_only",
       "processFamily": "e6_color_reversal",
       "registryId": "negative_lab.stock_family.named_e6_natural_reference.v1",
-      "sourceReferences": ["RAW_EDITOR_PLAN.md#major-stock-preset-governance"],
-      "stockFamilyDescriptor": "Kodak Ektachrome and Fujifilm Provia reference family"
+      "sourceReferences": [
+        "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+      ],
+      "stockFamilyDescriptor": "Kodak Ektachrome and Fujifilm Provia reference family",
+      "profileStatus": "placeholder",
+      "provenance": {
+        "legalNote": "Reference metadata only; runtime profile requires project-owned measurements and legal review before use.",
+        "measurementSource": "research_reference_metadata_only",
+        "sourceReferences": [
+          "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+        ]
+      }
     },
     {
       "availability": "specialty_or_region_limited",
@@ -269,8 +429,18 @@
       "legalNamingStatus": "named_stock_reference_only",
       "processFamily": "e6_color_reversal",
       "registryId": "negative_lab.stock_family.named_e6_saturated_reference.v1",
-      "sourceReferences": ["RAW_EDITOR_PLAN.md#major-stock-preset-governance"],
-      "stockFamilyDescriptor": "Fujifilm Velvia reference family"
+      "sourceReferences": [
+        "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+      ],
+      "stockFamilyDescriptor": "Fujifilm Velvia reference family",
+      "profileStatus": "placeholder",
+      "provenance": {
+        "legalNote": "Reference metadata only; runtime profile requires project-owned measurements and legal review before use.",
+        "measurementSource": "research_reference_metadata_only",
+        "sourceReferences": [
+          "RAW_EDITOR_PLAN.md#major-stock-preset-governance"
+        ]
+      }
     }
   ],
   "registryId": "negative_lab_stock_registry",

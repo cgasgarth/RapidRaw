@@ -6217,6 +6217,205 @@ export const negativeLabBuiltInPresetCatalogV1Schema = z
     }
   });
 
+export const negativeLabStockRegistryProcessFamilyV1Schema = z.enum([
+  'black_and_white_silver_negative',
+  'c41_color_negative',
+  'ecn2_cinema_negative',
+  'e6_color_reversal',
+]);
+
+export const negativeLabStockRegistryCategoryV1Schema = z.enum([
+  'black_and_white',
+  'cinema_negative',
+  'color_negative',
+  'color_reversal',
+]);
+
+export const negativeLabStockRegistryAvailabilityV1Schema = z.enum([
+  'archival_common',
+  'current_common',
+  'specialty_or_region_limited',
+]);
+
+export const negativeLabStockRegistryClaimTierV1Schema = z.enum([
+  'generic_family_starting_point',
+  'reference_mapping_only',
+  'measured_profile_required',
+]);
+
+export const negativeLabStockRegistryLegalNamingStatusV1Schema = z.enum([
+  'descriptive_generic_only',
+  'named_stock_reference_only',
+  'legal_review_required',
+]);
+
+export const negativeLabStockRegistryFixtureStatusV1Schema = z.enum([
+  'metadata_only',
+  'fixture_needed',
+  'measured_fixture_available',
+]);
+
+export const negativeLabStockRegistryProfileStatusV1Schema = z.enum([
+  'measured',
+  'heuristic',
+  'placeholder',
+  'needs_fixture',
+]);
+
+export const negativeLabStockRegistryIdV1Schema = z
+  .string()
+  .trim()
+  .regex(/^negative_lab\.stock_family\.[a-z0-9_]+\.v[0-9]+$/u);
+
+export const negativeLabStockRegistryEntryV1Schema = z
+  .object({
+    availability: negativeLabStockRegistryAvailabilityV1Schema,
+    category: negativeLabStockRegistryCategoryV1Schema,
+    claimTier: negativeLabStockRegistryClaimTierV1Schema,
+    colorResponseNotes: z.string().trim().min(1).max(220),
+    contrastCurveDescriptor: z.string().trim().min(1).max(120),
+    fixtureStatus: negativeLabStockRegistryFixtureStatusV1Schema,
+    genericPresetId: negativeLabGenericPresetIdSchema.nullable(),
+    grainModelDescriptor: z.string().trim().min(1).max(120),
+    isoClass: z.string().trim().min(1).max(80),
+    legalNamingStatus: negativeLabStockRegistryLegalNamingStatusV1Schema,
+    processFamily: negativeLabStockRegistryProcessFamilyV1Schema,
+    profileStatus: negativeLabStockRegistryProfileStatusV1Schema,
+    provenance: z
+      .object({
+        legalNote: z.string().trim().min(1).max(220),
+        measurementSource: z.enum([
+          'generic_engineered_starting_point',
+          'project_owned_measurement',
+          'research_reference_metadata_only',
+        ]),
+        sourceReferences: z.array(z.string().trim().min(1)).min(1),
+      })
+      .strict(),
+    registryId: negativeLabStockRegistryIdV1Schema,
+    sourceReferences: z.array(z.string().trim().min(1)).min(1),
+    stockFamilyDescriptor: z.string().trim().min(1).max(120),
+  })
+  .strict()
+  .superRefine((entry, context) => {
+    if (entry.claimTier === 'generic_family_starting_point' && entry.genericPresetId === null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Generic stock-family starting points require a generic preset mapping.',
+        path: ['genericPresetId'],
+      });
+    }
+
+    if (entry.claimTier !== 'generic_family_starting_point' && entry.genericPresetId !== null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Reference-only or measured-required stock entries must not map to runtime presets yet.',
+        path: ['genericPresetId'],
+      });
+    }
+
+    if (entry.legalNamingStatus !== 'descriptive_generic_only' && entry.claimTier === 'generic_family_starting_point') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Runtime generic stock-family mappings must use descriptive generic naming.',
+        path: ['legalNamingStatus'],
+      });
+    }
+
+    if (entry.fixtureStatus === 'measured_fixture_available' && entry.profileStatus !== 'measured') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Measured stock fixtures must report measured registry status.',
+        path: ['profileStatus'],
+      });
+    }
+
+    if (entry.profileStatus === 'measured' && entry.provenance.measurementSource !== 'project_owned_measurement') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Measured stock registry entries require project-owned measurement provenance.',
+        path: ['provenance', 'measurementSource'],
+      });
+    }
+
+    if (
+      entry.profileStatus === 'heuristic' &&
+      (entry.claimTier !== 'generic_family_starting_point' ||
+        entry.fixtureStatus !== 'fixture_needed' ||
+        entry.provenance.measurementSource !== 'generic_engineered_starting_point')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Heuristic stock-family rows must be generic runtime starting points awaiting fixtures.',
+        path: ['profileStatus'],
+      });
+    }
+
+    if (
+      entry.profileStatus === 'placeholder' &&
+      (entry.claimTier === 'generic_family_starting_point' || entry.fixtureStatus !== 'metadata_only')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Placeholder stock-family rows must remain metadata-only and non-runtime.',
+        path: ['profileStatus'],
+      });
+    }
+
+    if (
+      entry.profileStatus === 'needs_fixture' &&
+      (entry.claimTier === 'generic_family_starting_point' || entry.fixtureStatus !== 'metadata_only')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Needs-fixture stock-family rows must remain metadata-only and non-runtime.',
+        path: ['profileStatus'],
+      });
+    }
+
+    if (entry.provenance.sourceReferences.join('\n') !== entry.sourceReferences.join('\n')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Registry provenance source references must mirror the top-level source references.',
+        path: ['provenance', 'sourceReferences'],
+      });
+    }
+  });
+
+export const negativeLabStockRegistryV1Schema = z
+  .object({
+    entries: z.array(negativeLabStockRegistryEntryV1Schema).min(1),
+    registryId: z.literal('negative_lab_stock_registry'),
+    registryVersion: z.string().trim().min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+  })
+  .strict()
+  .superRefine((registry, context) => {
+    const ids = new Set<string>();
+    const requiredCategories = ['black_and_white', 'cinema_negative', 'color_negative', 'color_reversal'] as const;
+
+    for (const [index, entry] of registry.entries.entries()) {
+      if (ids.has(entry.registryId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Negative Lab stock registry entries must be unique.',
+          path: ['entries', index, 'registryId'],
+        });
+      }
+      ids.add(entry.registryId);
+    }
+
+    for (const category of requiredCategories) {
+      if (!registry.entries.some((entry) => entry.category === category)) {
+        context.addIssue({
+          code: 'custom',
+          message: `Negative Lab stock registry requires ${category} coverage.`,
+          path: ['entries'],
+        });
+      }
+    }
+  });
+
 const negativeLabPresetPolicyIdSchema = z
   .string()
   .trim()
@@ -10258,6 +10457,18 @@ export type NegativeLabProfileMeasurementSource = z.infer<typeof negativeLabProf
 export type NegativeLabQcOverlayKind = z.infer<typeof negativeLabQcOverlayKindSchema>;
 export type NegativeLabQcOverlayV1 = z.infer<typeof negativeLabQcOverlayV1Schema>;
 export type NegativeLabQcProofArtifactV1 = z.infer<typeof negativeLabQcProofArtifactV1Schema>;
+export type NegativeLabStockRegistryAvailabilityV1 = z.infer<typeof negativeLabStockRegistryAvailabilityV1Schema>;
+export type NegativeLabStockRegistryCategoryV1 = z.infer<typeof negativeLabStockRegistryCategoryV1Schema>;
+export type NegativeLabStockRegistryClaimTierV1 = z.infer<typeof negativeLabStockRegistryClaimTierV1Schema>;
+export type NegativeLabStockRegistryEntryV1 = z.infer<typeof negativeLabStockRegistryEntryV1Schema>;
+export type NegativeLabStockRegistryFixtureStatusV1 = z.infer<typeof negativeLabStockRegistryFixtureStatusV1Schema>;
+export type NegativeLabStockRegistryIdV1 = z.infer<typeof negativeLabStockRegistryIdV1Schema>;
+export type NegativeLabStockRegistryLegalNamingStatusV1 = z.infer<
+  typeof negativeLabStockRegistryLegalNamingStatusV1Schema
+>;
+export type NegativeLabStockRegistryProcessFamilyV1 = z.infer<typeof negativeLabStockRegistryProcessFamilyV1Schema>;
+export type NegativeLabStockRegistryProfileStatusV1 = z.infer<typeof negativeLabStockRegistryProfileStatusV1Schema>;
+export type NegativeLabStockRegistryV1 = z.infer<typeof negativeLabStockRegistryV1Schema>;
 export type NegativeLabPreviewRequestV1 = z.infer<typeof negativeLabPreviewRequestV1Schema>;
 export type NegativeLabRollBatchWorkflowStagePlanV1 = z.infer<typeof negativeLabRollBatchWorkflowStagePlanV1Schema>;
 export type NegativeLabRollBatchWorkflowStageV1 = z.infer<typeof negativeLabRollBatchWorkflowStageV1Schema>;

@@ -446,6 +446,10 @@ const workflowStageKeys = [
   'stockRegistry',
   'stockRegistrySummary',
   'stockRegistryVersion',
+  'stockProfileStatusHeuristic',
+  'stockProfileStatusMeasured',
+  'stockProfileStatusNeedsFixture',
+  'stockProfileStatusPlaceholder',
   'workflowExportReadyCount',
 ];
 const stockMetadataLocaleKeys = [
@@ -619,6 +623,7 @@ for (const marker of [
   'negative-lab-profile-sort-name_asc',
   'negative-lab-profile-sort-runtime_applied',
   'negative-lab-stock-family-',
+  'negative-lab-stock-profile-status',
   'negative-lab-stock-metadata',
   'negative-lab-stock-metadata-entry-',
   'negative-lab-stock-metadata-list',

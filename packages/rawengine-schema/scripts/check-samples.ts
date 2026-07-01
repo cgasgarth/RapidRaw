@@ -53,6 +53,7 @@ import {
   negativeLabProcessProfileV1Schema,
   negativeLabQcProofArtifactV1Schema,
   negativeLabRollBatchWorkflowV1Schema,
+  negativeLabStockRegistryV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   panoramaBackendCapabilityReportV1Schema,
@@ -153,6 +154,7 @@ import {
   sampleNegativeLabProcessProfileV1,
   sampleNegativeLabQcProofArtifactV1,
   sampleNegativeLabRollBatchWorkflowV1,
+  sampleNegativeLabStockRegistryV1,
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
   samplePanoramaBackendCapabilityReportV1,
@@ -648,6 +650,11 @@ const validSamples: ReadonlyArray<{
     name: 'negative lab built-in preset catalog',
     schema: negativeLabBuiltInPresetCatalogV1Schema,
     value: sampleNegativeLabBuiltInPresetCatalogV1,
+  },
+  {
+    name: 'negative lab stock registry',
+    schema: negativeLabStockRegistryV1Schema,
+    value: sampleNegativeLabStockRegistryV1,
   },
   {
     name: 'negative lab preset metadata policy catalog',

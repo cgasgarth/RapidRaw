@@ -57,6 +57,7 @@ import {
   negativeLabProcessProfileV1Schema,
   negativeLabQcProofArtifactV1Schema,
   negativeLabRollBatchWorkflowV1Schema,
+  negativeLabStockRegistryV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   panoramaBackendCapabilityReportV1Schema,
@@ -152,6 +153,7 @@ import {
   sampleNegativeLabProcessProfileV1,
   sampleNegativeLabQcProofArtifactV1,
   sampleNegativeLabRollBatchWorkflowV1,
+  sampleNegativeLabStockRegistryV1,
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
   samplePanoramaBackendCapabilityReportV1,
@@ -714,6 +716,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/negative-lab/presets/negative-lab-built-in-preset-catalog-v1.json',
     schema: negativeLabBuiltInPresetCatalogV1Schema,
     value: sampleNegativeLabBuiltInPresetCatalogV1,
+  },
+  {
+    name: 'negative lab stock registry',
+    path: 'packages/rawengine-schema/samples/negative-lab/presets/negative-lab-stock-registry-v1.json',
+    schema: negativeLabStockRegistryV1Schema,
+    value: sampleNegativeLabStockRegistryV1,
   },
   {
     name: 'negative lab preset metadata policy catalog',

@@ -18,6 +18,18 @@ for (const entry of registry.entries) {
     throw new Error(`Stock registry entry references unknown generic preset: ${entry.registryId}`);
   }
 
+  if (entry.provenance.sourceReferences.join('\n') !== entry.sourceReferences.join('\n')) {
+    throw new Error(`Stock registry provenance references drifted from source references: ${entry.registryId}`);
+  }
+
+  if (
+    !/\bnot measured\b|\brequires project-owned measurements\b|\bnot a negative inversion\b/iu.test(
+      entry.provenance.legalNote,
+    )
+  ) {
+    throw new Error(`Stock registry legal note does not disclose measurement/emulation boundary: ${entry.registryId}`);
+  }
+
   if (entry.claimTier === 'generic_family_starting_point') {
     const runtimeText = [
       entry.colorResponseNotes,
@@ -28,6 +40,19 @@ for (const entry of registry.entries) {
     if (bannedRuntimeText.test(runtimeText)) {
       throw new Error(`Runtime stock-family mapping contains unsafe named-stock claim: ${entry.registryId}`);
     }
+
+    if (
+      entry.profileStatus !== 'heuristic' ||
+      entry.provenance.measurementSource !== 'generic_engineered_starting_point'
+    ) {
+      throw new Error(`Runtime stock-family mapping must stay heuristic and generically sourced: ${entry.registryId}`);
+    }
+  } else if (
+    entry.genericPresetId !== null ||
+    !['needs_fixture', 'placeholder'].includes(entry.profileStatus) ||
+    entry.provenance.measurementSource !== 'research_reference_metadata_only'
+  ) {
+    throw new Error(`Reference stock-family mapping must stay gated until measured: ${entry.registryId}`);
   }
 }
 
