@@ -71,17 +71,29 @@ import {
   runAgentMultiTurnAppServerSession,
 } from '../../../../utils/agent/session/agentMultiTurnAppServerSession';
 import {
+  type AgentSelectedImageLiveSessionAuditRecord,
+  applyAgentSelectedImageLiveSession,
+  approveAgentSelectedImageLiveSession,
+  replayAgentSelectedImageLiveSessionAudit,
+  startAgentSelectedImageLiveSessionDryRun,
+} from '../../../../utils/agent/session/agentSelectedImageLiveSession';
+import {
   type AgentSelectedImageExportReceipt,
   type AgentSessionAuditRecord,
   type AgentSessionAuditStorageAdapter,
   appendAgentSelectedImageExportReceipt,
   appendAgentSessionAuditRecord,
 } from '../../../../utils/agent/session/agentSessionAuditStore';
-import { AGENT_HISTORY_ROLLBACK_TOOL_NAME } from '../../../../utils/agent/session/agentSessionHistory';
 import {
+  AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+  agentHistoryRollbackResponseSchema,
+} from '../../../../utils/agent/session/agentSessionHistory';
+import {
+  AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+  AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
   type AgentAdjustmentsApplyRequest,
-  applyAgentGlobalAdjustments,
-  dryRunAgentGlobalAdjustments,
+  agentAdjustmentsApplyResponseSchema,
+  agentAdjustmentsDryRunResponseSchema,
 } from '../../../../utils/agent/tools/agentAdjustmentApplyTool';
 import { AGENT_COLOR_APPLY_TOOL_NAME } from '../../../../utils/agent/tools/agentColorApplyTool';
 import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../../utils/agent/tools/agentDetailEffectsApplyTool';
@@ -174,6 +186,7 @@ type LivePromptStatus =
   | 'applying'
   | 'approval_required'
   | 'blocked'
+  | 'cancelling'
   | 'dry_run_ready'
   | 'failed'
   | 'idle'
@@ -601,6 +614,7 @@ const createLiveSessionEvent = (role: AgentChatMessage['role'], body: string, su
 });
 
 const LIVE_AGENT_AUDIT_STORE_KEY = 'rawengine.agent.liveSessionAudit.v1';
+const LIVE_AGENT_SELECTED_IMAGE_SESSION_AUDIT_KEY = 'rawengine.agent.selectedImageLiveSessionAudit.v1';
 const LIVE_AGENT_SELECTED_IMAGE_EXPORT_RECEIPTS_KEY = 'rawengine.agent.selectedImageExportReceipts.v1';
 
 const createLocalAgentAuditStorageAdapter = (): AgentSessionAuditStorageAdapter | null => {
@@ -612,6 +626,15 @@ const createLocalAgentAuditStorageAdapter = (): AgentSessionAuditStorageAdapter 
       globalThis.localStorage.setItem(LIVE_AGENT_AUDIT_STORE_KEY, value);
     },
   };
+};
+
+const appendSelectedImageLiveSessionAuditRecord = (record: AgentSelectedImageLiveSessionAuditRecord): number => {
+  if (typeof window === 'undefined' || window.localStorage === undefined) return 1;
+  const existing = window.localStorage.getItem(LIVE_AGENT_SELECTED_IMAGE_SESSION_AUDIT_KEY);
+  const records = existing === null ? [] : (JSON.parse(existing) as AgentSelectedImageLiveSessionAuditRecord[]);
+  const nextRecords = [...records, record];
+  window.localStorage.setItem(LIVE_AGENT_SELECTED_IMAGE_SESSION_AUDIT_KEY, JSON.stringify(nextRecords));
+  return nextRecords.length;
 };
 
 const createLocalAgentSelectedImageExportReceiptStorageAdapter = (): AgentSessionAuditStorageAdapter | null => {
@@ -1505,6 +1528,7 @@ function LivePromptComposer({
 }: LivePromptComposerProps) {
   const { t } = useTranslation();
   const promptInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const activeOperationRef = useRef<{ cancelled: boolean; id: string } | null>(null);
   const [prompt, setPrompt] = useState('');
   const [acceptedPrompt, setAcceptedPrompt] = useState('');
   const [activityEntries, setActivityEntries] = useState<LiveActivityEntry[]>([]);
@@ -1532,12 +1556,13 @@ function LivePromptComposer({
     sessionReview !== null && rollbackValidation?.state === 'invalidated' && sessionReview.rollbackState === 'available'
       ? { ...sessionReview, rollbackState: 'invalidated' as const }
       : sessionReview;
-  const canRun = isContextReady && result.status !== 'applying';
+  const canRun = isContextReady && result.status !== 'applying' && result.status !== 'cancelling';
   const canApply = isContextReady && acceptedPrompt.length > 0 && result.status === 'dry_run_ready';
   const canRunSelectedImageLoop = canApply;
-  const canRequestDetailPreview = isContextReady && result.status !== 'applying';
-  const canInspectState = isContextReady && result.status !== 'applying';
-  const canRefreshPreview = isContextReady && result.status !== 'applying';
+  const canCancel = result.status === 'applying' && activeOperationRef.current !== null;
+  const canRequestDetailPreview = isContextReady && result.status !== 'applying' && result.status !== 'cancelling';
+  const canInspectState = isContextReady && result.status !== 'applying' && result.status !== 'cancelling';
+  const canRefreshPreview = isContextReady && result.status !== 'applying' && result.status !== 'cancelling';
   const canRequestExportProof = isContextReady && result.status === 'applied' && result.recipeName !== undefined;
   const canRollback =
     rollbackSnapshot !== null && rollbackValidation?.state === 'available' && result.status === 'applied';
@@ -1555,6 +1580,9 @@ function LivePromptComposer({
       break;
     case 'blocked':
       statusLabel = t('editor.ai.agent.composer.status.blocked');
+      break;
+    case 'cancelling':
+      statusLabel = 'Cancelling selected-image session';
       break;
     case 'dry_run_ready':
       statusLabel = t('editor.ai.agent.composer.status.dry_run_ready');
@@ -1854,9 +1882,27 @@ function LivePromptComposer({
     }
   };
 
+  const cancelActiveOperation = () => {
+    const operation = activeOperationRef.current;
+    if (operation === null) return;
+    operation.cancelled = true;
+    pushActivityEntry({
+      body: `Cancellation requested for ${operation.id}. Late results will be rejected at the session boundary.`,
+      kind: 'approval',
+      status: 'pending',
+      toolName: 'rawengine.agent.session.cancel',
+    });
+    const nextResult = { ...result, status: 'cancelling' } satisfies LivePromptResult;
+    setResult(nextResult);
+    onResultChange?.(nextResult);
+    onSessionEvent?.(createLiveSessionEvent('assistant', 'Selected-image session cancellation requested.', 'cancel'));
+  };
+
   const applyDryRun = async () => {
     if (!canApply) return;
 
+    const operation = { cancelled: false, id: `agent-chat-apply-${Date.now()}` };
+    activeOperationRef.current = operation;
     try {
       setRollbackSnapshot(createAgentRollbackSnapshot());
       pushActivityEntry({
@@ -1873,94 +1919,127 @@ function LivePromptComposer({
       onResultChange?.(applyingResult);
       onSessionEvent?.(createLiveSessionEvent('assistant', t('editor.ai.agent.composer.status.applying'), 'applying'));
       const plan = planAgentEditRecipe(acceptedPrompt);
-      const sessionResult = await runAgentMultiTurnAppServerSession({
-        ...buildLiveMultiTurnSessionRequest({
-          operationId: `agent_chat_apply_${Date.now()}`,
-          plan,
-          prompt: acceptedPrompt,
-          requestId: `agent-chat-apply-${Date.now()}`,
-          sessionId: 'agent-chat-shell',
-        }),
+      const requestId = operation.id;
+      const sessionRequest = buildLiveMultiTurnSessionRequest({
+        operationId: `agent_chat_apply_${Date.now()}`,
+        plan,
+        prompt: acceptedPrompt,
+        requestId,
+        sessionId: 'agent-chat-shell',
       });
-      const beforePreview = sessionResult.previews[0];
-      const afterPreview = sessionResult.previews.at(-1);
-      if (beforePreview === undefined || afterPreview === undefined) {
-        throw new Error(t('editor.ai.agent.composer.noApplyStep'));
+      const firstTurnAdjustment = sessionRequest.turns[0]?.adjustment;
+      if (firstTurnAdjustment === undefined) throw new Error(t('editor.ai.agent.composer.noApplyStep'));
+      const selectedImageDraft = approveAgentSelectedImageLiveSession(
+        await startAgentSelectedImageLiveSessionDryRun({
+          adjustments: firstTurnAdjustment,
+          operationId: sessionRequest.operationId,
+          prompt: acceptedPrompt,
+          requestId,
+          sessionId: sessionRequest.sessionId,
+        }),
+      );
+      const selectedImageApply = await applyAgentSelectedImageLiveSession(selectedImageDraft);
+      const selectedImageReceipt = replayAgentSelectedImageLiveSessionAudit(selectedImageApply.audit);
+      const selectedImageFinalRecipeHash =
+        selectedImageReceipt.finalRecipeHash ?? selectedImageDraft.snapshot.recipeHash;
+      if (operation.cancelled || activeOperationRef.current?.id !== operation.id) {
+        pushActivityEntry({
+          body: `Late apply result ${selectedImageReceipt.finalGraphRevision ?? selectedImageDraft.snapshot.graphRevision} blocked after cancellation.`,
+          graphRevision: selectedImageReceipt.finalGraphRevision,
+          kind: 'error',
+          recipeHash: selectedImageReceipt.finalRecipeHash,
+          status: 'blocked',
+          toolName: 'rawengine.agent.session.cancel',
+        });
+        return;
       }
 
       const nextResult = {
         ...applyingResult,
-        appliedGraphRevision: sessionResult.finalGraphRevision,
-        changedPixelCount: sessionResult.changedPixelCount,
-        changedPixelPercent: sessionResult.changedPixelPercent,
-        maxChannelDelta: sessionResult.maxChannelDelta,
-        meanLuminanceDelta: sessionResult.meanLuminanceDelta,
-        previewAfterHash: afterPreview.renderHash,
-        previewBeforeHash: beforePreview.renderHash,
-        recipeName: sessionResult.finalRecipeHash,
-        sampledPixelCount: sessionResult.sampledPixelCount,
+        appliedGraphRevision: selectedImageApply.apply.appliedGraphRevision,
+        changedPixelCount: selectedImageApply.apply.changedPixelCount,
+        changedPixelPercent: selectedImageApply.apply.changedPixelPercent,
+        maxChannelDelta: selectedImageApply.apply.maxChannelDelta,
+        meanLuminanceDelta: selectedImageApply.apply.meanLuminanceDelta,
+        previewAfterHash: selectedImageApply.previewAfterHash,
+        previewBeforeHash: selectedImageApply.previewBeforeHash,
+        recipeName: selectedImageFinalRecipeHash,
+        sampledPixelCount: selectedImageApply.apply.sampledPixelCount,
         status: 'applied',
       } satisfies LivePromptResult;
+      const previewLineage: AgentMultiTurnAppServerSessionResult['previewLineage'] = [
+        {
+          artifactId: initialPromptPreviewContext?.artifactId ?? `${requestId}-before-preview`,
+          graphRevision: selectedImageReceipt.initialGraphRevision,
+          purpose: 'initial_context',
+          recipeHash: selectedImageReceipt.initialRecipeHash,
+          renderHash: selectedImageReceipt.beforePreviewHash,
+          toolCallId: `${requestId}-dry-run`,
+          turn: 0,
+        },
+        {
+          artifactId: `${requestId}-after-preview`,
+          graphRevision: selectedImageReceipt.finalGraphRevision ?? selectedImageApply.apply.appliedGraphRevision,
+          purpose: 'refresh',
+          recipeHash: selectedImageFinalRecipeHash,
+          renderHash: selectedImageReceipt.afterPreviewHash ?? selectedImageApply.previewAfterHash,
+          toolCallId: `${requestId}-after-preview`,
+          turn: 1,
+        },
+      ];
       setSessionReview({
         applyState: 'applied',
-        finalGraphRevision: sessionResult.finalGraphRevision,
-        finalRecipeHash: sessionResult.finalRecipeHash,
-        previewLineage: sessionResult.previewLineage,
-        rollbackGraphRevision: sessionResult.rollbackGraphRevision,
+        finalGraphRevision: selectedImageApply.apply.appliedGraphRevision,
+        finalRecipeHash: selectedImageFinalRecipeHash,
+        previewLineage,
+        rollbackGraphRevision: selectedImageReceipt.rollbackGraphRevision,
         rollbackState: 'available',
-        toolCallCount: sessionResult.toolCalls.length,
+        toolCallCount: selectedImageReceipt.toolCalls.length,
       });
-      const auditRecord = buildLiveAgentAuditRecord({
-        acceptedPrompt,
-        approvalId: applyingResult.safetyDecision?.decisionId ?? 'agent_policy_not_required',
-        sessionResult,
-      });
-      const auditAdapter = createLocalAgentAuditStorageAdapter();
-      const persistedAuditStore =
-        auditAdapter === null ? null : appendAgentSessionAuditRecord(auditAdapter, auditRecord);
+      const persistedSelectedImageAuditCount = appendSelectedImageLiveSessionAuditRecord(selectedImageApply.audit);
       setAuditArtifact({
-        artifactId: `agent-live-audit-${sessionResult.sessionId}`,
-        finalGraphRevision: auditRecord.finalGraphRevision,
-        persistedRecordCount: persistedAuditStore?.records.length ?? 1,
-        previewCount: auditRecord.artifactLineage.length,
-        rollbackGraphRevision: auditRecord.rollbackGraphRevision,
-        sessionId: auditRecord.sessionId,
-        toolCallCount: auditRecord.toolCalls.length,
+        artifactId: `agent-selected-image-live-audit-${selectedImageReceipt.sessionId}`,
+        finalGraphRevision: selectedImageApply.apply.appliedGraphRevision,
+        persistedRecordCount: persistedSelectedImageAuditCount,
+        previewCount: previewLineage.length,
+        rollbackGraphRevision: selectedImageReceipt.rollbackGraphRevision,
+        sessionId: selectedImageReceipt.sessionId,
+        toolCallCount: selectedImageReceipt.toolCalls.length,
       });
       pushActivityEntry({
-        body: sessionResult.editReview.finalRationale,
-        graphRevision: sessionResult.finalGraphRevision,
+        body: `Approved selected-image dry-run ${selectedImageReceipt.dryRunPlanId}.`,
+        graphRevision: selectedImageApply.apply.appliedGraphRevision,
         kind: 'tool_call',
-        previewAfterHash: afterPreview.renderHash,
-        previewBeforeHash: beforePreview.renderHash,
-        recipeHash: sessionResult.finalRecipeHash,
+        previewAfterHash: selectedImageApply.previewAfterHash,
+        previewBeforeHash: selectedImageApply.previewBeforeHash,
+        recipeHash: selectedImageFinalRecipeHash,
         status: 'completed',
-        toolName: 'rawengine.agent.session.multiturn',
+        toolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
       });
-      for (const previewLineage of sessionResult.previewLineage) {
+      for (const preview of previewLineage) {
         pushActivityEntry({
-          body: `${previewLineage.purpose} ${previewLineage.artifactId}`,
-          graphRevision: previewLineage.graphRevision,
+          body: `${preview.purpose} ${preview.artifactId}`,
+          graphRevision: preview.graphRevision,
           kind: 'preview',
-          previewAfterHash: previewLineage.renderHash,
-          recipeHash: previewLineage.recipeHash,
+          previewAfterHash: preview.renderHash,
+          recipeHash: preview.recipeHash,
           status: 'completed',
           toolName: 'rawengine.agent.preview.render',
         });
       }
       pushActivityEntry({
-        body: `${sessionResult.toolCalls.length} typed tool calls completed.`,
-        graphRevision: sessionResult.finalGraphRevision,
+        body: `${selectedImageReceipt.toolCalls.length} typed tool calls completed.`,
+        graphRevision: selectedImageApply.apply.appliedGraphRevision,
         kind: 'tool_call',
-        recipeHash: sessionResult.finalRecipeHash,
+        recipeHash: selectedImageFinalRecipeHash,
         status: 'completed',
-        toolName: 'rawengine.agent.app_server_session',
+        toolName: 'rawengine.agent.selected_image.live_session',
       });
       pushActivityEntry({
-        body: `Persisted bounded audit transcript ${auditRecord.sessionId}.`,
-        graphRevision: auditRecord.finalGraphRevision,
+        body: `Replayable selected-image audit receipt ${selectedImageReceipt.sessionId}.`,
+        graphRevision: selectedImageApply.apply.appliedGraphRevision,
         kind: 'tool_call',
-        recipeHash: auditRecord.finalGraphRevision,
+        recipeHash: selectedImageFinalRecipeHash,
         status: 'completed',
         toolName: 'rawengine.agent.audit.persist',
       });
@@ -1996,16 +2075,20 @@ function LivePromptComposer({
           'apply-failed',
         ),
       );
+    } finally {
+      if (activeOperationRef.current?.id === operation.id) activeOperationRef.current = null;
     }
   };
 
   const runSelectedImagePreviewLoopFromPanel = async () => {
     if (!canRunSelectedImageLoop) return;
 
+    const operation = { cancelled: false, id: `agent-chat-selected-loop-${Date.now()}` };
+    activeOperationRef.current = operation;
     const initialSnapshot = createAgentRollbackSnapshot();
-    const operationStamp = Date.now();
+    const operationStamp = operation.id.replace('agent-chat-selected-loop-', '');
     const operationId = `agent_chat_selected_loop_${operationStamp}`;
-    const requestId = `agent-chat-selected-loop-${operationStamp}`;
+    const requestId = operation.id;
     const sessionId = 'agent-chat-shell';
 
     try {
@@ -2035,14 +2118,22 @@ function LivePromptComposer({
           } = step;
           const snapshot = buildAgentImageContextSnapshot();
           const turnOperationId = `${operationId}-${index + 1}`;
-          const dryRun = await dryRunAgentGlobalAdjustments({
-            adjustments: adjustments as AgentAdjustmentsApplyRequest['adjustments'],
-            expectedGraphRevision: snapshot.graphRevision,
-            expectedRecipeHash: snapshot.initialPreview.recipeHash,
-            operationId: turnOperationId,
-            requestId: `${requestId}-approval-dry-run-${index + 1}`,
-            sessionId,
-          });
+          if (operation.cancelled) throw new Error('Selected-image preview loop cancelled before dry-run dispatch.');
+          const dryRunRequestId = `${requestId}-approval-dry-run-${index + 1}`;
+          const dryRun = agentAdjustmentsDryRunResponseSchema.parse(
+            await dispatchAgentLiveEditorTool({
+              args: {
+                adjustments: adjustments as AgentAdjustmentsApplyRequest['adjustments'],
+                expectedGraphRevision: snapshot.graphRevision,
+                expectedRecipeHash: snapshot.initialPreview.recipeHash,
+                operationId: turnOperationId,
+                requestId: dryRunRequestId,
+                sessionId,
+              },
+              requestId: dryRunRequestId,
+              runtimeToolName: AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
+            }),
+          );
           dryRunApprovals.push({
             acceptedPlanHash: dryRun.dryRunPlanHash,
             acceptedPlanId: dryRun.dryRunPlanId,
@@ -2059,16 +2150,24 @@ function LivePromptComposer({
             status: 'completed',
             toolName: dryRun.toolName,
           });
-          await applyAgentGlobalAdjustments({
-            acceptedPlanHash: dryRun.dryRunPlanHash,
-            acceptedPlanId: dryRun.dryRunPlanId,
-            adjustments: adjustments as AgentAdjustmentsApplyRequest['adjustments'],
-            expectedGraphRevision: dryRun.sourceGraphRevision,
-            expectedRecipeHash: snapshot.initialPreview.recipeHash,
-            operationId: turnOperationId,
-            requestId: `${requestId}-approval-apply-${index + 1}`,
-            sessionId,
-          });
+          if (operation.cancelled) throw new Error('Selected-image preview loop cancelled before apply dispatch.');
+          const applyRequestId = `${requestId}-approval-apply-${index + 1}`;
+          agentAdjustmentsApplyResponseSchema.parse(
+            await dispatchAgentLiveEditorTool({
+              args: {
+                acceptedPlanHash: dryRun.dryRunPlanHash,
+                acceptedPlanId: dryRun.dryRunPlanId,
+                adjustments: adjustments as AgentAdjustmentsApplyRequest['adjustments'],
+                expectedGraphRevision: dryRun.sourceGraphRevision,
+                expectedRecipeHash: snapshot.initialPreview.recipeHash,
+                operationId: turnOperationId,
+                requestId: applyRequestId,
+                sessionId,
+              },
+              requestId: applyRequestId,
+              runtimeToolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+            }),
+          );
         }
       } finally {
         restoreAgentRollbackSnapshot(initialSnapshot);
@@ -2097,6 +2196,18 @@ function LivePromptComposer({
           runtimeToolName: AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
         }),
       );
+      if (operation.cancelled || activeOperationRef.current?.id !== operation.id) {
+        restoreAgentRollbackSnapshot(initialSnapshot);
+        pushActivityEntry({
+          body: `Late selected-image result ${loopResult.finalGraphRevision} blocked after cancellation.`,
+          graphRevision: loopResult.finalGraphRevision,
+          kind: 'error',
+          recipeHash: loopResult.finalRecipeHash,
+          status: 'blocked',
+          toolName: 'rawengine.agent.session.cancel',
+        });
+        return;
+      }
       setSelectedImageLoopReview(
         buildSelectedImageLoopReview({ prompt: acceptedPrompt, request: loopRequest, result: loopResult }),
       );
@@ -2169,6 +2280,8 @@ function LivePromptComposer({
       } satisfies LivePromptResult;
       setResult(nextResult);
       onResultChange?.(nextResult);
+    } finally {
+      if (activeOperationRef.current?.id === operation.id) activeOperationRef.current = null;
     }
   };
 
@@ -2239,7 +2352,7 @@ function LivePromptComposer({
     }
   };
 
-  const rollbackApply = () => {
+  const rollbackApply = async () => {
     if (rollbackSnapshot === null) return;
     const validation = validateAgentRollbackSnapshot(rollbackSnapshot);
     if (validation.state === 'invalidated') {
@@ -2255,23 +2368,35 @@ function LivePromptComposer({
       return;
     }
 
-    useEditorStore.setState({
-      adjustments: rollbackSnapshot.adjustments,
-      finalPreviewUrl: rollbackSnapshot.finalPreviewUrl,
-      history: rollbackSnapshot.history,
-      historyIndex: rollbackSnapshot.historyIndex,
-      lastBasicToneCommand: rollbackSnapshot.lastBasicToneCommand,
-      uncroppedAdjustedPreviewUrl: rollbackSnapshot.uncroppedAdjustedPreviewUrl,
-    });
+    const rollbackRequestId = `agent-live-rollback-${Date.now()}`;
+    const rollbackReceipt = agentHistoryRollbackResponseSchema.parse(
+      await dispatchAgentLiveEditorTool({
+        args: {
+          checkpoint: {
+            adjustments: rollbackSnapshot.adjustments,
+            graphRevision: rollbackSnapshot.graphRevision,
+            historyIndex: rollbackSnapshot.historyIndex,
+            previewRecipeHash: rollbackSnapshot.recipeHash,
+            previewRef: rollbackSnapshot.finalPreviewUrl,
+            sessionId: 'agent-chat-shell',
+          },
+          requestId: rollbackRequestId,
+          scope: 'session_start',
+          sessionId: 'agent-chat-shell',
+        },
+        requestId: rollbackRequestId,
+        runtimeToolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+      }),
+    );
     setRollbackSnapshot(null);
     setSessionReview((review) => (review === null ? null : { ...review, rollbackState: 'restored' }));
     pushActivityEntry({
       body: t('editor.ai.agent.composer.status.rolled_back'),
-      graphRevision: rollbackSnapshot.graphRevision,
+      graphRevision: rollbackReceipt.graphRevision,
       kind: 'rollback',
-      recipeHash: rollbackSnapshot.recipeHash,
+      recipeHash: rollbackReceipt.previewRecipeHash,
       status: 'rolled_back',
-      toolName: 'rawengine.agent.history.rollback',
+      toolName: rollbackReceipt.toolName,
     });
     const nextResult = { ...result, status: 'rolled_back' } satisfies LivePromptResult;
     setResult(nextResult);
@@ -2411,6 +2536,20 @@ function LivePromptComposer({
           type="button"
         >
           {result.status === 'applying' ? t('editor.ai.agent.composer.applying') : t('editor.ai.agent.composer.apply')}
+        </button>
+        <button
+          className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          data-cancel-boundary="late-result-guard"
+          data-testid="agent-live-prompt-cancel"
+          disabled={!canCancel}
+          onMouseDown={(event) => {
+            event.preventDefault();
+            cancelActiveOperation();
+          }}
+          onClick={cancelActiveOperation}
+          type="button"
+        >
+          {t('editor.ai.agent.composer.cancel')}
         </button>
         <button
           className="inline-flex items-center gap-2 rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"

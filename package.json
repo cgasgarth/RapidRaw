@@ -40,6 +40,7 @@
     "check:negative-lab-patch-sampler-apply": "bun tests/integration/checks/negative-lab/check-negative-lab-patch-sampler-apply.ts",
     "check:agent-selected-image-preview-loop": "bun tests/integration/checks/agent/check-agent-selected-image-preview-loop.ts",
     "check:agent-selected-image-export-output": "bun tests/integration/checks/agent/check-agent-selected-image-export-output.ts",
+    "check:agent-live-session-replay": "bun tests/integration/checks/agent/check-agent-live-session-replay.ts",
     "check:agent-selected-image-preview-loop-private-raw": "bun tests/integration/checks/agent/check-agent-selected-image-preview-loop-private-raw.ts",
     "check:negative-lab-measured-render-proof": "bun tests/integration/checks/negative-lab/check-negative-lab-measured-render-proof.ts",
     "check:negative-lab-profile-comparison": "bun tests/integration/checks/negative-lab/check-negative-lab-profile-comparison.ts",
