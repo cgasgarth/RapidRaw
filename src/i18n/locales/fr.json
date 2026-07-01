@@ -1643,6 +1643,15 @@
       "exportSoftProofActive": "Proofing",
       "exportSoftProofDetails": "{{profile}} / {{intent}} preview",
       "exportSoftProofUnavailable": "No export recipe available",
+      "history": {
+        "addCheckpoint": "Add checkpoint",
+        "cancelCheckpointLabel": "Cancel checkpoint label edit",
+        "editCheckpointLabel": "Checkpoint label",
+        "noActiveAdjustment": "No active adjustment",
+        "renameCheckpoint": "Rename checkpoint",
+        "saveCheckpointLabel": "Save checkpoint label",
+        "updateCheckpoint": "Edit checkpoint"
+      },
       "historyDepth": "",
       "tooltips": {
         "aperture": "Ouverture",
