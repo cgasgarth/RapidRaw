@@ -9,6 +9,7 @@ import {
   type RawEngineToolRegistryV1,
   rawEngineAppServerToolCallValidationV1Schema,
   rawEngineToolRegistryV1Schema,
+  toneColorCommandEnvelopeV1Schema,
 } from '../../packages/rawengine-schema/src/rawEngineSchemas';
 import { rawEngineDefaultToolRegistryV1 } from '../../packages/rawengine-schema/src/toolRegistry';
 import {
@@ -131,6 +132,10 @@ import {
   buildAgentFinalExport,
 } from './agent/safety/agentExportProofTool';
 import {
+  applyBasicToneCommandToLiveEditor,
+  dryRunBasicToneCommandInLiveEditor,
+} from './agent/session/agentLiveBasicTone';
+import {
   AGENT_HISTORY_ROLLBACK_INPUT_SCHEMA_NAME,
   AGENT_HISTORY_ROLLBACK_OUTPUT_SCHEMA_NAME,
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
@@ -219,7 +224,7 @@ import {
   planNegativeLabAgentStockFamilyReadOnly,
 } from './negative-lab/app-server/negativeLabAgentReadOnlyAppServerTools';
 import { NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST } from './negative-lab/app-server/negativeLabAppServerRoutes';
-import { ToneColorAppServerRouteStatus } from './toneColorAppServerRouteIds';
+import { ToneColorAppServerRouteStatus, ToneColorAppServerToolName } from './toneColorAppServerRouteIds';
 import { TONE_COLOR_APP_SERVER_ROUTES } from './toneColorAppServerRoutes';
 
 export const RAW_ENGINE_APP_SERVER_HOST_MANIFEST = rawEngineAppServerHostManifestSchema.parse({
@@ -1190,6 +1195,8 @@ const APPROVED_AGENT_APP_SERVER_TOOL_NAMES = new Set<string>([
   NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME,
   ...NEGATIVE_LAB_AGENT_READ_ONLY_TOOL_NAMES,
   NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME,
+  ToneColorAppServerToolName.ApplyCommand,
+  ToneColorAppServerToolName.DryRunCommand,
 ]);
 
 const hasAgentSessionIntent = ({
@@ -1198,9 +1205,18 @@ const hasAgentSessionIntent = ({
 }: RawEngineAppServerToolDispatchRequest): boolean => {
   if (runtimeToolName.startsWith('rawengine.agent.')) return true;
   if (typeof args !== 'object' || args === null) return false;
+  const actor =
+    'actor' in args && typeof args.actor === 'object' && args.actor !== null
+      ? (args.actor as Record<string, unknown>)
+      : null;
   return (
     ('sessionId' in args && typeof args.sessionId === 'string' && args.sessionId.trim().length > 0) ||
-    ('operationId' in args && typeof args.operationId === 'string' && args.operationId.trim().length > 0)
+    ('operationId' in args && typeof args.operationId === 'string' && args.operationId.trim().length > 0) ||
+    (actor !== null &&
+      actor['id'] === 'rapidraw-ui' &&
+      actor['kind'] === 'ui' &&
+      typeof actor['sessionId'] === 'string' &&
+      actor['sessionId'].trim().length > 0)
   );
 };
 
@@ -1238,6 +1254,20 @@ const dispatchAgentAppServerTool = async (
   let result: unknown;
 
   switch (request.runtimeToolName) {
+    case ToneColorAppServerToolName.DryRunCommand: {
+      if (!hasAgentSessionIntent(request)) return null;
+      const command = toneColorCommandEnvelopeV1Schema.parse(request.arguments);
+      if (command.commandType !== 'toneColor.setBasicTone') return null;
+      result = await dryRunBasicToneCommandInLiveEditor(command);
+      break;
+    }
+    case ToneColorAppServerToolName.ApplyCommand: {
+      if (!hasAgentSessionIntent(request)) return null;
+      const command = toneColorCommandEnvelopeV1Schema.parse(request.arguments);
+      if (command.commandType !== 'toneColor.setBasicTone') return null;
+      result = await applyBasicToneCommandToLiveEditor(command);
+      break;
+    }
     case AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME:
       result = await dryRunAgentGlobalAdjustments(agentAdjustmentsDryRunRequestSchema.parse(request.arguments));
       break;
