@@ -2,6 +2,7 @@ import cx from 'clsx';
 import { Camera, CircleGauge, FolderOpen, Layers3, RotateCcw, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { Crop, PercentCrop } from 'react-image-crop';
 import AdjustmentSlider from '../../components/adjustments/AdjustmentSlider';
 import ColorPanel from '../../components/adjustments/Color';
 import DetailsPanel from '../../components/adjustments/Details';
@@ -19,6 +20,7 @@ import ImageCanvas from '../../components/panel/editor/ImageCanvas';
 import AgentChatShell from '../../components/panel/right/ai/AgentChatShell';
 import { TetherPanel } from '../../components/panel/right/capture/TetherPanel';
 import ControlsPanel from '../../components/panel/right/color/ControlsPanel';
+import CropPanel from '../../components/panel/right/color/CropPanel';
 import { EditorRightPanelHost } from '../../components/panel/right/EditorRightPanelHost';
 import { MaskOverlayReviewControls } from '../../components/panel/right/layers/MaskOverlayReviewControls';
 import { Mask, type SubMask, SubMaskMode, ToolType } from '../../components/panel/right/layers/Masks';
@@ -1053,6 +1055,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaSavedReview]: PanoramaSavedReviewVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaUi]: PanoramaVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAdjustmentsCompact]: ProfessionalAdjustmentsCompactVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalCropTransformWorkspace]: ProfessionalCropTransformWorkspaceVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorCompactPortrait]: ProfessionalEditorCompactPortraitVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShell]: ProfessionalEditorShellVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorToolbar]: ProfessionalEditorToolbarVisualSmoke,
@@ -1463,6 +1466,181 @@ function BrushMaskCanvasVisualSmoke() {
             </div>
           </div>
         </aside>
+      </div>
+    </main>
+  );
+}
+
+const cropTransformSmokeImage: SelectedImage = {
+  ...brushMaskCanvasImage,
+  path: '/validation/professional-crop-transform-workspace.jpg',
+};
+
+function ProfessionalCropTransformWorkspaceVisualSmoke() {
+  const adjustments = useEditorStore((state) => state.adjustments);
+  const overlayMode = useEditorStore((state) => state.overlayMode);
+  const overlayRotation = useEditorStore((state) => state.overlayRotation);
+  const isStraightenActive = useEditorStore((state) => state.isStraightenActive);
+  const liveRotation = useEditorStore((state) => state.liveRotation);
+  const [crop, setCropState] = useState<Crop>({
+    height: 64,
+    unit: '%',
+    width: 68,
+    x: 16,
+    y: 18,
+  });
+
+  useEffect(() => {
+    const nextAdjustments: Adjustments = {
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      aspectRatio: 16 / 9,
+      crop: {
+        height: Math.round(brushMaskCanvasImageHeight * 0.64),
+        width: Math.round(brushMaskCanvasImageWidth * 0.68),
+        x: Math.round(brushMaskCanvasImageWidth * 0.16),
+        y: Math.round(brushMaskCanvasImageHeight * 0.18),
+      },
+      flipHorizontal: true,
+      rotation: 2.4,
+    };
+
+    useEditorStore.setState({
+      adjustments: nextAdjustments,
+      displaySize: { height: 405, width: 720 },
+      finalPreviewUrl: brushMaskCanvasImageDataUrl,
+      hasRenderedFirstFrame: true,
+      history: [nextAdjustments],
+      historyIndex: 0,
+      isRotationActive: false,
+      isStraightenActive: false,
+      liveRotation: null,
+      originalSize: { height: cropTransformSmokeImage.height, width: cropTransformSmokeImage.width },
+      overlayMode: 'phiGrid',
+      overlayRotation: 1,
+      selectedImage: cropTransformSmokeImage,
+      transformedOriginalUrl: brushMaskCanvasImageDataUrl,
+      uncroppedAdjustedPreviewUrl: brushMaskCanvasImageDataUrl,
+    });
+    useUIStore.setState({
+      collapsibleSectionsState: { ...DEFAULT_COLLAPSIBLE_SECTIONS_STATE },
+      isLensCorrectionModalOpen: false,
+      isTransformModalOpen: false,
+    });
+  }, []);
+
+  const isCompactViewport = typeof window !== 'undefined' && window.innerWidth < 700;
+
+  return (
+    <main
+      className="h-full min-h-screen bg-editor-matte font-sans text-text-primary"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ProfessionalCropTransformWorkspace}
+      style={{ padding: isCompactViewport ? 8 : 12 }}
+    >
+      <div
+        className="grid min-h-0 overflow-hidden rounded-lg border border-editor-border bg-editor-panel"
+        style={{
+          gridTemplateColumns: isCompactViewport ? '1fr' : 'minmax(0, 1fr) 360px',
+          gridTemplateRows: isCompactViewport ? 'minmax(0, 1fr) 420px' : undefined,
+          height: `calc(100vh - ${isCompactViewport ? 16 : 24}px)`,
+        }}
+      >
+        <section
+          className={cx(
+            'grid min-h-0 border-editor-border bg-editor-matte',
+            isCompactViewport ? 'border-b' : 'border-r',
+          )}
+          data-visual-smoke-section="crop-transform-canvas"
+          style={{ gridTemplateRows: '40px minmax(0, 1fr)' }}
+        >
+          <div className="flex items-center justify-between border-b border-editor-border bg-editor-panel px-3">
+            <span className="text-sm font-semibold">{copy.professionalCropTransformWorkspace}</span>
+            <span className={editorChromeStatusChipClassName('info')}>{copy.runtimeOverlay}</span>
+          </div>
+          <div className="grid min-h-0 place-items-center" style={{ padding: isCompactViewport ? 12 : 20 }}>
+            <div
+              className="relative h-full w-full overflow-hidden rounded-md border border-editor-overlay-stroke bg-black shadow-2xl"
+              data-testid="professional-crop-transform-canvas"
+              style={{ maxHeight: 520, maxWidth: 920 }}
+            >
+              <ImageCanvas
+                activeAiPatchContainerId={null}
+                activeAiSubMaskId={null}
+                activeMaskContainerId={null}
+                activeMaskId={null}
+                adjustments={adjustments}
+                appSettings={null}
+                brushSettings={null}
+                crop={crop}
+                cursorStyle="default"
+                exportSoftProofRecipeId={null}
+                exportSoftProofTransform={null}
+                finalPreviewUrl={brushMaskCanvasImageDataUrl}
+                gamutWarningOverlay={null}
+                handleCropComplete={(nextCrop: Crop) => {
+                  setCropState(nextCrop);
+                }}
+                hasRenderedFirstFrame
+                imageRenderSize={{ height: 405, offsetX: 0, offsetY: 0, scale: 1, width: 720 }}
+                isAiEditing={false}
+                isCropping={true}
+                isExportSoftProofEnabled={false}
+                isGamutWarningOverlayVisible={false}
+                isMaskControlHovered={false}
+                isMasking={false}
+                isMaxZoom={false}
+                isRotationActive={false}
+                isSliderDragging={false}
+                isStraightenActive={isStraightenActive}
+                liveRotation={liveRotation}
+                maskOverlayUrl={null}
+                onGenerateAiMask={() => {}}
+                onQuickErase={() => {}}
+                onSelectAiSubMask={() => {}}
+                onSelectMask={() => {}}
+                onStraighten={() => {}}
+                overlayMode={overlayMode}
+                overlayRotation={overlayRotation}
+                selectedImage={cropTransformSmokeImage}
+                setAdjustments={(updater) => {
+                  useEditorStore.setState((state) => ({ adjustments: updater(state.adjustments) }));
+                }}
+                setCrop={(nextCrop: Crop, _percentageCrop: PercentCrop) => {
+                  setCropState(nextCrop);
+                }}
+                setIsMaskHovered={() => {}}
+                setIsMaskTouchInteracting={() => {}}
+                showOriginal={false}
+                transformState={{ positionX: 0, positionY: 0, scale: 1 }}
+                transformedOriginalUrl={brushMaskCanvasImageDataUrl}
+                uncroppedAdjustedPreviewUrl={brushMaskCanvasImageDataUrl}
+                updateSubMask={() => {}}
+              />
+            </div>
+          </div>
+        </section>
+
+        <aside
+          className="min-h-0 overflow-hidden bg-editor-panel"
+          data-testid="professional-crop-transform-panel"
+          data-visual-smoke-section="crop-transform-panel"
+        >
+          <ContextMenuProvider>
+            <CropPanel />
+          </ContextMenuProvider>
+        </aside>
+
+        <div
+          className="sr-only"
+          data-active-overlay={overlayMode}
+          data-aspect-ratio={String(adjustments.aspectRatio)}
+          data-canvas-backed="image-canvas"
+          data-crop-height={String(crop.height)}
+          data-crop-width={String(crop.width)}
+          data-flip-horizontal={String(adjustments.flipHorizontal)}
+          data-testid="professional-crop-transform-proof"
+          data-visual-smoke-section="crop-transform-proof"
+        />
       </div>
     </main>
   );
@@ -2034,6 +2212,8 @@ const copy = {
   brushSize96: 'Size 96',
   pointCounts: 'Point counts',
   runtimeProof: 'Runtime proof',
+  runtimeOverlay: 'runtime overlay',
+  professionalCropTransformWorkspace: 'Professional crop transform workspace',
   strokeCount: (count: number) => `${count} strokes`,
   toolOrder: 'Tool order',
   commandPaletteSmoke: 'Command Palette Workflows',

@@ -85,6 +85,11 @@ const suggestNegativeLabHighlightPatchCommand: string = Invokes.SuggestNegativeL
 const suggestNegativeLabNeutralPatchCommand: string = Invokes.SuggestNegativeLabNeutralPatchRgbBalance;
 const suggestNegativeLabShadowPatchCommand: string = Invokes.SuggestNegativeLabShadowPatchBlackPoint;
 const convertNegativesCommand: string = Invokes.ConvertNegatives;
+const previewGeometryTransformCommand: string = Invokes.PreviewGeometryTransform;
+const getLensDistortionParamsCommand: string = Invokes.GetLensDistortionParams;
+const getLensfunLensesForMakerCommand: string = Invokes.GetLensfunLensesForMaker;
+const getLensfunMakersCommand: string = Invokes.GetLensfunMakers;
+const autodetectLensCommand: string = Invokes.AutodetectLens;
 const saveCommunityPresetCommand: string = Invokes.SaveCommunityPreset;
 const handleExportPresetsToFileCommand: string = Invokes.HandleExportPresetsToFile;
 
@@ -202,6 +207,42 @@ window.__TAURI_INTERNALS__ = {
         },
       ]);
     }
+    if (command === previewGeometryTransformCommand) {
+      return Promise.resolve(
+        `data:image/svg+xml,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <defs>
+    <linearGradient id="geometryPreview" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#1f3441"/>
+      <stop offset="0.52" stop-color="#8e7652"/>
+      <stop offset="1" stop-color="#efe2b7"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="#0f1114"/>
+  <path d="M90 436c152-86 254-37 380-91 128-55 216-126 398-51v146H90z" fill="#263a41"/>
+  <rect x="98" y="62" width="764" height="392" rx="18" fill="url(#geometryPreview)" opacity="0.92"/>
+  <path d="M152 386c122-72 246-38 360-78 104-37 194-94 294-54v150H152z" fill="#1f3529" opacity="0.58"/>
+  <circle cx="696" cy="126" r="44" fill="#f4dea0" opacity="0.82"/>
+  <text x="126" y="492" fill="#f8fafc" font-size="20">visual smoke geometry preview</text>
+</svg>`)}`,
+      );
+    }
+    if (command === getLensfunMakersCommand) return Promise.resolve(['Sony', 'Canon']);
+    if (command === getLensfunLensesForMakerCommand) return Promise.resolve(['FE 35mm F1.8', 'FE 24-70mm F2.8']);
+    if (command === getLensDistortionParamsCommand) {
+      return Promise.resolve({
+        k1: 0.012,
+        k2: -0.004,
+        k3: 0,
+        model: 1,
+        tca_vb: 0.9994,
+        tca_vr: 1.0006,
+        vig_k1: -0.02,
+        vig_k2: 0.004,
+        vig_k3: 0,
+      });
+    }
+    if (command === autodetectLensCommand) return Promise.resolve({ maker: 'Sony', model: 'FE 35mm F1.8' });
     if (command === saveCommunityPresetCommand) return Promise.resolve(null);
     if (command === handleExportPresetsToFileCommand) return Promise.resolve(null);
     if (command === 'plugin:dialog|save') return Promise.resolve('/tmp/rawengine-film-look-smoke.rrpreset');
