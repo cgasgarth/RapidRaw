@@ -54,6 +54,7 @@ export interface PreviewScopeStatus {
 }
 
 export type PanelScopesLayout = 'overlay' | 'stacked';
+export type EditorCompareMode = 'off' | 'hold-original' | 'split-wipe' | 'side-by-side';
 
 interface EditorState {
   // Core Image & Adjustments
@@ -70,6 +71,7 @@ interface EditorState {
   uncroppedAdjustedPreviewUrl: string | null;
   transformedOriginalUrl: string | null;
   interactivePatch: InteractivePatch | null;
+  compareMode: EditorCompareMode;
   showOriginal: boolean;
 
   // Analytics
@@ -146,6 +148,7 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   finalPreviewUrl: null,
   uncroppedAdjustedPreviewUrl: null,
+  compareMode: 'off',
   showOriginal: false,
   histogram: null,
   waveform: null,
@@ -196,7 +199,15 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   setEditor: (updater) => {
     set((state) => {
-      const update = typeof updater === 'function' ? updater(state) : updater;
+      const rawUpdate = typeof updater === 'function' ? updater(state) : updater;
+      const update: Partial<EditorState> = { ...rawUpdate };
+
+      if ('compareMode' in update) {
+        update.showOriginal = update.compareMode === 'hold-original';
+      } else if ('showOriginal' in update) {
+        update.compareMode = update.showOriginal ? 'hold-original' : 'off';
+      }
+
       if (!shouldRevalidateGamutWarningOverlay(update)) return update;
 
       const nextState = { ...state, ...update };

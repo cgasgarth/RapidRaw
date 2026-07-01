@@ -22,7 +22,7 @@ import {
 } from 'react-konva';
 import type { RenderSize } from '../../../hooks/viewport/useImageRenderSize';
 import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
-import type { ExportSoftProofTransformState } from '../../../store/useEditorStore';
+import type { EditorCompareMode, ExportSoftProofTransformState } from '../../../store/useEditorStore';
 import type {
   Adjustments,
   AiPatch,
@@ -251,6 +251,7 @@ interface ImageCanvasProps {
   setCrop: (crop: Crop, perfentCrop: PercentCrop) => void;
   setIsMaskHovered: (isHovered: boolean) => void;
   setIsMaskTouchInteracting: (isInteracting: boolean) => void;
+  compareMode?: EditorCompareMode;
   showOriginal: boolean;
   transformedOriginalUrl: string | null;
   uncroppedAdjustedPreviewUrl: string | null;
@@ -1205,6 +1206,7 @@ const ImageCanvas = memo(
     setCrop,
     setIsMaskHovered,
     setIsMaskTouchInteracting,
+    compareMode = 'off',
     showOriginal,
     transformedOriginalUrl,
     uncroppedAdjustedPreviewUrl,
@@ -2613,7 +2615,20 @@ const ImageCanvas = memo(
 
     const cropPreviewUrl = uncroppedAdjustedPreviewUrl || selectedImage.thumbnailUrl;
     const originalSrc = transformedOriginalUrl;
-    const isShowingOriginal = showOriginal && !!originalSrc;
+    const isHoldOriginalCompare = compareMode === 'hold-original' || showOriginal;
+    const isSplitCompare = compareMode === 'split-wipe';
+    const isSideBySideCompare = compareMode === 'side-by-side';
+    const isCompareModeActive = compareMode !== 'off';
+    const canShowOriginalCompare = !!originalSrc && originalLoaded;
+    const isShowingOriginal = isHoldOriginalCompare && !!originalSrc;
+    const compareOverlayDisabled =
+      (isSplitCompare || isSideBySideCompare) &&
+      (isCropping ||
+        isMasking ||
+        isAiEditing ||
+        isWbPickerActive ||
+        activeRetouchSource !== null ||
+        activeRemoveSource !== null);
     const gamutCoverage = formatGamutWarningCoverage(gamutWarningOverlay);
     const isCurrentGamutWarningOverlay = isCurrentExportSoftProofGamutWarningOverlay(gamutWarningOverlay, {
       exportSoftProofRecipeId,
@@ -2622,7 +2637,11 @@ const ImageCanvas = memo(
       selectedImagePath: selectedImage.path,
     });
     const showGamutWarningOverlay =
-      isGamutWarningOverlayVisible && !isShowingOriginal && !isCropping && isCurrentGamutWarningOverlay;
+      isGamutWarningOverlayVisible &&
+      !isShowingOriginal &&
+      !isSideBySideCompare &&
+      !isCropping &&
+      isCurrentGamutWarningOverlay;
 
     useEffect(() => {
       if (!originalSrc) {
@@ -2759,27 +2778,31 @@ const ImageCanvas = memo(
                     : showGamutWarningOverlay
                       ? 'soft-proof'
                       : 'pan-zoom';
-    const activeCanvasOverlayStatus: CanvasOverlayStatus = isShowingOriginal
-      ? 'disabled'
-      : isSliderDragging || displayState.fade
-        ? 'loading'
-        : isMaskInteractionActive || liveBrushLine || previewBox
-          ? 'drag'
-          : activeRemoveSource
-            ? activeRemoveSource.status === 'ready'
-              ? 'ready'
-              : activeRemoveSource.status === 'stale' || activeRemoveSource.status === 'fallback_unchanged'
-                ? 'stale'
-                : 'warning'
-            : isToolActive || isCropping || showGamutWarningOverlay
-              ? 'active'
-              : 'ready';
+    const activeCanvasOverlayStatus: CanvasOverlayStatus =
+      isShowingOriginal || compareOverlayDisabled
+        ? 'disabled'
+        : isSliderDragging || displayState.fade
+          ? 'loading'
+          : isMaskInteractionActive || liveBrushLine || previewBox
+            ? 'drag'
+            : activeRemoveSource
+              ? activeRemoveSource.status === 'ready'
+                ? 'ready'
+                : activeRemoveSource.status === 'stale' || activeRemoveSource.status === 'fallback_unchanged'
+                  ? 'stale'
+                  : 'warning'
+              : isToolActive || isCropping || showGamutWarningOverlay
+                ? 'active'
+                : 'ready';
 
     return (
       <div
         className="canvas-overlay relative"
         data-canvas-overlay-status={activeCanvasOverlayStatus}
         data-canvas-overlay-tool={activeCanvasOverlayTool}
+        data-editor-compare-mode={compareMode}
+        data-editor-compare-original-ready={String(canShowOriginalCompare)}
+        data-testid="image-canvas"
         style={{ width: '100%', height: '100%', cursor: effectiveCursor }}
       >
         <div
@@ -2876,19 +2899,106 @@ const ImageCanvas = memo(
                           top: cssPx(imageRenderSize.offsetY),
                           width: cssPx(imageRenderSize.width),
                           height: cssPx(imageRenderSize.height),
+                          clipPath: isSplitCompare ? 'inset(0 50% 0 0)' : undefined,
                           imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                          opacity: isShowingOriginal && originalLoaded ? 1 : 0,
+                          opacity:
+                            (isShowingOriginal || isSplitCompare) && originalLoaded && !isSideBySideCompare ? 1 : 0,
                           transition: originalLoaded ? 'opacity 150ms ease-in-out' : 'none',
                           zIndex: 2,
                         }
                       : {
+                          clipPath: isSplitCompare ? 'inset(0 50% 0 0)' : undefined,
                           imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                          opacity: isShowingOriginal && originalLoaded ? 1 : 0,
+                          opacity:
+                            (isShowingOriginal || isSplitCompare) && originalLoaded && !isSideBySideCompare ? 1 : 0,
                           transition: originalLoaded ? 'opacity 150ms ease-in-out' : 'none',
                           zIndex: 2,
                         }
                   }
                 />
+              )}
+              {isSplitCompare && (
+                <div
+                  aria-label={t('editor.canvas.compare.splitWipeDivider')}
+                  className="pointer-events-none absolute top-0 h-full"
+                  data-testid="editor-compare-split-divider"
+                  style={{
+                    left: '50%',
+                    width: '1px',
+                    background: 'rgba(255, 255, 255, 0.82)',
+                    boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 18px rgba(0, 0, 0, 0.45)',
+                    opacity: canShowOriginalCompare ? 1 : 0.4,
+                    zIndex: 6,
+                  }}
+                >
+                  <span
+                    className="absolute left-1/2 top-3 -translate-x-1/2 rounded border border-editor-overlay-stroke bg-editor-panel/90 px-2 py-1 text-[11px] font-medium text-text-primary"
+                    data-testid="editor-compare-split-label"
+                  >
+                    {canShowOriginalCompare
+                      ? t('editor.canvas.compare.splitWipeLabel')
+                      : t('editor.canvas.compare.loadingOriginal')}
+                  </span>
+                </div>
+              )}
+              {isSideBySideCompare && (
+                <div
+                  aria-label={t('editor.canvas.compare.sideBySideRegion')}
+                  className="absolute inset-0 grid grid-cols-2 gap-2 bg-editor-panel-well/95 p-2"
+                  data-testid="editor-compare-side-by-side-preview"
+                  style={{ zIndex: 8 }}
+                >
+                  {[
+                    {
+                      label: t('editor.canvas.compare.before'),
+                      src: originalSrc,
+                    },
+                    {
+                      label: t('editor.canvas.compare.after'),
+                      src: finalPreviewUrl || selectedImage.thumbnailUrl,
+                    },
+                  ].map((pane) => (
+                    <div
+                      className="relative min-h-0 overflow-hidden rounded-md border border-editor-overlay-stroke bg-black"
+                      data-compare-pane={pane.label}
+                      key={pane.label}
+                    >
+                      {pane.src ? (
+                        <img
+                          alt={pane.label}
+                          className="h-full w-full object-contain"
+                          src={pane.src}
+                          style={{ imageRendering: isMaxZoom ? 'pixelated' : 'auto' }}
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center px-4 text-center text-xs text-text-secondary">
+                          {t('editor.canvas.compare.loadingOriginal')}
+                        </div>
+                      )}
+                      <span className="absolute left-3 top-3 rounded border border-editor-overlay-stroke bg-editor-panel/90 px-2 py-1 text-[11px] font-medium text-text-primary">
+                        {pane.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {isCompareModeActive && !canShowOriginalCompare && (
+                <div
+                  className="pointer-events-none absolute bottom-3 left-3 rounded-md border border-editor-warning/50 bg-editor-warning-surface px-3 py-2 text-xs font-medium text-editor-warning"
+                  data-testid="editor-compare-loading-reason"
+                  style={{ zIndex: 9 }}
+                >
+                  {t('editor.canvas.compare.loadingOriginal')}
+                </div>
+              )}
+              {compareOverlayDisabled && (
+                <div
+                  className="pointer-events-none absolute bottom-3 right-3 rounded-md border border-editor-warning/50 bg-editor-warning-surface px-3 py-2 text-xs font-medium text-editor-warning"
+                  data-testid="editor-compare-overlay-disabled-reason"
+                  style={{ zIndex: 9 }}
+                >
+                  {t('editor.canvas.compare.overlayDisabled')}
+                </div>
               )}
               {displayedMaskUrl && (
                 <img
@@ -2899,7 +3009,13 @@ const ImageCanvas = memo(
                     height: cssPx(imageRenderSize.height),
                     left: cssPx(imageRenderSize.offsetX),
                     opacity:
-                      isShowingOriginal || isMaskControlHovered || isSliderDragging || isMaskInteractionActive ? 0 : 1,
+                      isShowingOriginal ||
+                      compareOverlayDisabled ||
+                      isMaskControlHovered ||
+                      isSliderDragging ||
+                      isMaskInteractionActive
+                        ? 0
+                        : 1,
                     top: cssPx(imageRenderSize.offsetY),
                     transition: 'opacity 300ms ease-in-out',
                     width: cssPx(imageRenderSize.width),
@@ -2960,6 +3076,7 @@ const ImageCanvas = memo(
 
           {activeRetouchLayer &&
             activeRetouchSource &&
+            !compareOverlayDisabled &&
             !isCropping &&
             imageRenderSize.width > 0 &&
             imageRenderSize.height > 0 &&
@@ -3223,6 +3340,7 @@ const ImageCanvas = memo(
           {activeRemoveLayer &&
             activeRemoveSource &&
             activeRemoveTargetSubMask &&
+            !compareOverlayDisabled &&
             !isCropping &&
             imageRenderSize.width > 0 &&
             imageRenderSize.height > 0 &&
@@ -3461,7 +3579,7 @@ const ImageCanvas = memo(
               );
             })()}
 
-          {(isMasking || isAiEditing || isWbPickerActive) && (
+          {(isMasking || isAiEditing || isWbPickerActive) && !compareOverlayDisabled && (
             <div
               data-brush-command-coordinate-space={lastBrushCommandCapture?.coordinateSpace ?? ''}
               data-brush-command-id={lastBrushCommandCapture?.commandId ?? ''}
@@ -3501,7 +3619,7 @@ const ImageCanvas = memo(
                 onMouseUp={handleUp}
                 onTouchEnd={handleUp}
               >
-                <Layer listening={!showOriginal}>
+                <Layer listening={!isShowingOriginal}>
                   <Group scaleX={maxSafeScale} scaleY={maxSafeScale}>
                     <Group x={groupOffsetX} y={groupOffsetY}>
                       {(isMasking || isAiEditing) &&

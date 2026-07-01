@@ -1,9 +1,22 @@
 import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Eye, EyeOff, Film, Loader2, Maximize, Minimize2, Palette, Redo, Undo } from 'lucide-react';
+import {
+  ArrowLeft,
+  Columns2,
+  Eye,
+  EyeOff,
+  Film,
+  Loader2,
+  Maximize,
+  Minimize2,
+  Palette,
+  Redo,
+  SquareSplitHorizontal,
+  Undo,
+} from 'lucide-react';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useEditorStore } from '../../../store/useEditorStore';
+import { type EditorCompareMode, useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
@@ -30,10 +43,12 @@ interface EditorToolbarProps {
   onBackToLibrary: () => void;
   onOpenNegativeLab: () => void;
   onRedo: () => void;
+  onCompareModeChange?: (mode: EditorCompareMode) => void;
   onToggleFullScreen: () => void;
   onToggleShowOriginal: () => void;
   onUndo: () => void;
   selectedImage: SelectedImage;
+  compareMode?: EditorCompareMode;
   showOriginal: boolean;
   showDateView: boolean;
   onToggleDateView: () => void;
@@ -54,10 +69,12 @@ const EditorToolbar = memo(
     onBackToLibrary,
     onOpenNegativeLab,
     onRedo,
+    onCompareModeChange = () => undefined,
     onToggleFullScreen,
     onToggleShowOriginal,
     onUndo,
     selectedImage,
+    compareMode = 'off',
     showOriginal,
     showDateView,
     onToggleDateView,
@@ -112,6 +129,8 @@ const EditorToolbar = memo(
       : t('editor.toolbar.tooltips.fullscreen');
     const negativeLabLabel = t('contextMenus.editor.convertNegative');
     const negativeLabTooltip = negativeLabDisabledReason ?? negativeLabLabel;
+    const compareNeedsOriginal = compareMode !== 'off';
+    const compareUnavailableReason = t('editor.toolbar.compare.unavailable');
 
     const showResolution = !isAndroid && selectedImage.width > 0 && selectedImage.height > 0;
     const [displayedResolution, setDisplayedResolution] = useState('');
@@ -443,6 +462,7 @@ const EditorToolbar = memo(
         data-toolbar-history={isHistoryVisible ? 'open' : 'closed'}
         data-toolbar-loading={isLoaderVisible ? 'true' : 'false'}
         data-toolbar-negative-lab={negativeLabDisabledReason ? 'disabled' : 'available'}
+        data-toolbar-compare-mode={compareMode}
         data-toolbar-original={showOriginal ? 'original' : 'edited'}
         data-toolbar-soft-proof={isExportSoftProofEnabled ? 'active' : canSoftProof ? 'available' : 'unavailable'}
         data-toolbar-fullscreen={isFullScreen ? 'active' : 'inactive'}
@@ -938,6 +958,42 @@ const EditorToolbar = memo(
             >
               {showOriginal ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
+            <button
+              aria-label={t('editor.toolbar.compare.splitWipe')}
+              aria-pressed={compareMode === 'split-wipe'}
+              className={cx(compareMode === 'split-wipe' ? activeIconButtonClass : iconButtonClass)}
+              data-testid="editor-compare-split-wipe"
+              data-tooltip={compareUnavailableReason}
+              onClick={() => {
+                onCompareModeChange(compareMode === 'split-wipe' ? 'off' : 'split-wipe');
+              }}
+              onKeyDown={handleButtonKeyDown}
+              type="button"
+            >
+              <SquareSplitHorizontal size={16} />
+            </button>
+            <button
+              aria-label={t('editor.toolbar.compare.sideBySide')}
+              aria-pressed={compareMode === 'side-by-side'}
+              className={cx(compareMode === 'side-by-side' ? activeIconButtonClass : iconButtonClass)}
+              data-testid="editor-compare-side-by-side"
+              data-tooltip={compareUnavailableReason}
+              onClick={() => {
+                onCompareModeChange(compareMode === 'side-by-side' ? 'off' : 'side-by-side');
+              }}
+              onKeyDown={handleButtonKeyDown}
+              type="button"
+            >
+              <Columns2 size={16} />
+            </button>
+            {compareNeedsOriginal && (
+              <span
+                className={editorChromeStatusChipClassName(compareMode === 'hold-original' ? 'warning' : 'neutral')}
+                data-testid="editor-compare-mode-chip"
+              >
+                {t(`editor.toolbar.compare.mode.${compareMode}`)}
+              </span>
+            )}
             <div className={commandDividerClass} aria-hidden="true" />
             <button
               className={cx(isFullScreen ? activeIconButtonClass : iconButtonClass, 'relative')}

@@ -50,6 +50,7 @@ const commandNames: Record<
   | 'clearSessionCaches'
   | 'exportImages'
   | 'frontendReady'
+  | 'generateOriginalTransformedPreview'
   | 'generateUncroppedPreview'
   | 'generatePreviewForPath'
   | 'applyAdjustments'
@@ -80,6 +81,7 @@ const commandNames: Record<
   clearSessionCaches: Invokes.ClearSessionCaches,
   exportImages: Invokes.ExportImages,
   frontendReady: Invokes.FrontendReady,
+  generateOriginalTransformedPreview: Invokes.GenerateOriginalTransformedPreview,
   generateUncroppedPreview: Invokes.GenerateUncroppedPreview,
   generatePreviewForPath: Invokes.GeneratePreviewForPath,
   getLensfunMakers: Invokes.GetLensfunMakers,
@@ -187,6 +189,8 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       });
     case commandNames.applyAdjustments:
       return Promise.resolve(decodeBase64ToArrayBuffer(harnessPreviewJpegBase64));
+    case commandNames.generateOriginalTransformedPreview:
+      return Promise.resolve(`data:image/jpeg;base64,${harnessPreviewJpegBase64}`);
     case commandNames.generateUncroppedPreview:
       return Promise.resolve(null);
     case commandNames.generatePreviewForPath:

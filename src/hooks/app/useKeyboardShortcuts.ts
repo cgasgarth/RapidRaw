@@ -291,7 +291,7 @@ export const useKeyboardShortcuts = ({
         shouldFire: (s) => !!s.editor.selectedImage,
         execute: (e, s) => {
           e.preventDefault();
-          s.editor.setEditor({ showOriginal: !s.editor.showOriginal });
+          s.editor.setEditor({ compareMode: s.editor.compareMode === 'hold-original' ? 'off' : 'hold-original' });
         },
       },
       toggle_adjustments: {
