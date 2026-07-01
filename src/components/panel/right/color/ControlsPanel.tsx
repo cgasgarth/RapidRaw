@@ -1,5 +1,4 @@
 import cx from 'clsx';
-import { AnimatePresence, motion } from 'framer-motion';
 import type { TFunction } from 'i18next';
 import { Aperture, ChartArea, ChevronDown, ClipboardPaste, Copy, Info, RotateCcw, ScanSearch } from 'lucide-react';
 import { type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
@@ -41,12 +40,11 @@ import BasicAdjustments from '../../../adjustments/Basic';
 import CurveGraph from '../../../adjustments/Curves';
 import DetailsPanel from '../../../adjustments/Details';
 import EffectsPanel from '../../../adjustments/Effects';
-import { OPTION_SEPARATOR, type Option, Orientation } from '../../../ui/AppProperties';
+import { OPTION_SEPARATOR, type Option } from '../../../ui/AppProperties';
 import CollapsibleSection from '../../../ui/CollapsibleSection';
 import Dropdown, { type OptionItem } from '../../../ui/primitives/Dropdown';
 import UiText from '../../../ui/primitives/Text';
-import Resizer from '../../../ui/Resizer';
-import Waveform from '../../editor/Waveform';
+import PanelScopesStrip from '../inspector/PanelScopesStrip';
 
 const ADJUSTMENT_SECTION_NAMES = ['basic', 'curves', 'details', 'effects'] as const;
 type AdjustmentSectionName = (typeof ADJUSTMENT_SECTION_NAMES)[number];
@@ -99,8 +97,7 @@ const getAdjustmentSectionLabel = (t: TFunction, sectionName: AdjustmentSectionN
 export default function Controls() {
   const { t } = useTranslation();
   const { showContextMenu } = useContextMenu();
-  const { isResizingWaveform, onToggleWaveform, setActiveWaveformChannel, handleWaveformResize } =
-    useWaveformControls();
+  const { onToggleWaveform } = useWaveformControls();
   const { setAdjustments, handleAutoAdjustments, handleLutSelect } = useEditorActions();
   const [rawReconstructionComparison, setRawReconstructionComparison] =
     useState<RawReconstructionComparisonResult | null>(null);
@@ -138,31 +135,17 @@ export default function Controls() {
     })),
   );
 
-  const {
-    adjustments,
-    copiedSectionAdjustments,
-    histogram,
-    selectedImage,
-    previewScopeStatus,
-    isWaveformVisible,
-    waveform,
-    activeWaveformChannel,
-    waveformHeight,
-    setEditor,
-  } = useEditorStore(
-    useShallow((state) => ({
-      adjustments: state.adjustments,
-      copiedSectionAdjustments: state.copiedSectionAdjustments,
-      histogram: state.histogram,
-      selectedImage: state.selectedImage,
-      previewScopeStatus: state.previewScopeStatus,
-      isWaveformVisible: state.isWaveformVisible,
-      waveform: state.waveform,
-      activeWaveformChannel: state.activeWaveformChannel,
-      waveformHeight: state.waveformHeight,
-      setEditor: state.setEditor,
-    })),
-  );
+  const { adjustments, copiedSectionAdjustments, histogram, selectedImage, isWaveformVisible, setEditor } =
+    useEditorStore(
+      useShallow((state) => ({
+        adjustments: state.adjustments,
+        copiedSectionAdjustments: state.copiedSectionAdjustments,
+        histogram: state.histogram,
+        selectedImage: state.selectedImage,
+        isWaveformVisible: state.isWaveformVisible,
+        setEditor: state.setEditor,
+      })),
+    );
 
   const rawProcessingModeDisplay = useMemo(
     () =>
@@ -424,6 +407,7 @@ export default function Controls() {
               isWaveformVisible ? 'bg-surface hover:bg-card-active' : 'hover:bg-surface',
             )}
             onClick={onToggleWaveform}
+            data-testid="adjustments-panel-scopes-toggle"
             data-tooltip={t('editor.adjustments.tooltips.toggleAnalytics')}
             type="button"
           >
@@ -586,36 +570,7 @@ export default function Controls() {
         </div>
       )}
 
-      <AnimatePresence initial={false}>
-        {isWaveformVisible && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: waveformHeight || 256, opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: isResizingWaveform ? 0 : 0.2, ease: 'easeOut' }}
-            className="shrink-0 flex flex-col relative border-b border-surface overflow-hidden"
-          >
-            <div className="grow w-full h-full px-3 pb-1.5 pt-2 min-h-0">
-              <Waveform
-                waveformData={waveform || null}
-                histogram={histogram}
-                previewScopeStatus={previewScopeStatus}
-                displayMode={activeWaveformChannel}
-                setDisplayMode={setActiveWaveformChannel}
-                showClipping={adjustments.showClipping || false}
-                onToggleClipping={() => {
-                  setAdjustments((prev: Adjustments) => ({
-                    ...prev,
-                    showClipping: !prev.showClipping,
-                  }));
-                }}
-                theme={theme}
-              />
-            </div>
-            <Resizer direction={Orientation.Horizontal} onMouseDown={handleWaveformResize} />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <PanelScopesStrip testId="adjustments-panel-scopes-strip" />
 
       <div className="grow overflow-y-auto px-3 py-2 flex flex-col gap-1.5">
         {ADJUSTMENT_SECTION_NAMES.map((sectionName) => {
