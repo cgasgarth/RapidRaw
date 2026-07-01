@@ -1362,7 +1362,10 @@ export async function prepareScenario(page, mode) {
     }
     const stackPath = proofBefore.stackPath;
     if (stackPath === undefined) throw new Error('Focus private RAW modal proof is missing stack path.');
-    await page.getByRole('button', { exact: true, name: 'Preview plan' }).click();
+    const previewPlanButton = page
+      .getByRole('button', { exact: true, name: 'Preview plan' })
+      .or(page.getByRole('button', { exact: true, name: 'Refresh plan' }));
+    await previewPlanButton.click();
     const proofAfter = await page
       .getByTestId('focus-private-raw-modal-review-proof')
       .evaluate((element) => ({ ...element.dataset }));
@@ -1378,6 +1381,7 @@ export async function prepareScenario(page, mode) {
     await page
       .getByTestId('focus-review-diagnostics')
       .getByText(stackPath, { exact: true })
+      .first()
       .waitFor({ timeout: 10_000 });
     const handoff = await page.getByTestId('focus-editable-handoff-proof').evaluate((element) => ({
       regionCount: element.querySelectorAll('[data-region-risk]').length,

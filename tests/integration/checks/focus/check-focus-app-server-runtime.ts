@@ -128,6 +128,31 @@ if (outputReview.haloReview.artifactHash !== applied.apply.sidecarArtifact.haloM
 if (outputReview.editableHandoff.status !== 'ready') {
   throw new Error(`Expected focus app-server output review ready handoff, got ${outputReview.editableHandoff.status}.`);
 }
+assertEqual(outputReview.lowConfidenceCellRatio, 0, 'output review low-confidence ratio');
+assertEqual(outputReview.haloRiskCellRatio, 0, 'output review halo-risk ratio');
+assertDeepEqual(
+  outputReview.reviewOverlay.sourceContributionSummary,
+  [
+    { sourceIndex: 0, winnerCellRatio: 0.333333 },
+    { sourceIndex: 1, winnerCellRatio: 0.333333 },
+    { sourceIndex: 2, winnerCellRatio: 0.333333 },
+  ],
+  'output review source contribution summary',
+);
+assertDeepEqual(
+  outputReview.reviewOverlay.sourceContributionDetails.map((source) => ({
+    confidencePercent: source.confidencePercent,
+    coverageCellCount: source.coverageCellCount,
+    sourceIndex: source.sourceIndex,
+    warningState: source.warningState,
+  })),
+  [
+    { confidencePercent: 96, coverageCellCount: 1, sourceIndex: 0, warningState: 'clear' },
+    { confidencePercent: 88, coverageCellCount: 1, sourceIndex: 1, warningState: 'artifact_review_required' },
+    { confidencePercent: 86, coverageCellCount: 1, sourceIndex: 2, warningState: 'artifact_review_required' },
+  ],
+  'output review source contribution details',
+);
 const derivedReceipt = buildFocusStackDerivedOutputReceipt({
   acceptedDryRunPlanHash: applied.apply.provenance.acceptedDryRunPlanHash,
   acceptedDryRunPlanId: applied.apply.provenance.acceptedDryRunPlanId,
@@ -217,4 +242,16 @@ function expectThrows(label, callback) {
     return;
   }
   throw new Error(`Expected ${label} to throw.`);
+}
+
+function assertEqual(actual, expected, label) {
+  if (actual !== expected) {
+    throw new Error(`${label}: expected ${expected}, got ${actual}.`);
+  }
+}
+
+function assertDeepEqual(actual, expected, label) {
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error(`${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}.`);
+  }
 }

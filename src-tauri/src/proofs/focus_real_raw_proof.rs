@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 use std::fs;
+use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
 use chrono::{SecondsFormat, Utc};
@@ -185,6 +186,7 @@ struct FocusStackResult {
 }
 
 fn run_private_focus_stack_artifact_proof(private_root: &Path) -> Result<(), String> {
+    ensure_private_fixture_alias(private_root)?;
     let loaded_sources = load_sources(private_root, &CONFIG)?;
     validate_decoded_sources(&loaded_sources, &CONFIG)?;
     let source_hashes = source_hashes(private_root, &CONFIG)?;
@@ -301,6 +303,44 @@ fn run_private_focus_stack_artifact_proof(private_root: &Path) -> Result<(), Str
             validation_mode: "public_schema_private_reports".to_string(),
         },
     )
+}
+
+fn ensure_private_fixture_alias(private_root: &Path) -> Result<(), String> {
+    let expected_dir = private_root.join(CONFIG.source_dir);
+    if expected_dir.exists() {
+        return Ok(());
+    }
+
+    let direct_source_paths = SOURCE_RELATIVE_PATHS
+        .iter()
+        .map(|relative_path| -> Result<PathBuf, String> {
+            let file_name = Path::new(relative_path)
+                .file_name()
+                .ok_or_else(|| format!("missing file name for {relative_path}"))?;
+            Ok(private_root.join(file_name))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    if direct_source_paths.iter().any(|path| !path.exists()) {
+        return Ok(());
+    }
+
+    fs::create_dir_all(&expected_dir).map_err(|error| error.to_string())?;
+    for (relative_path, source_path) in SOURCE_RELATIVE_PATHS.iter().zip(direct_source_paths.iter())
+    {
+        let target_path = private_root.join(relative_path);
+        if target_path.exists() {
+            continue;
+        }
+        symlink(source_path, &target_path).map_err(|error| {
+            format!(
+                "failed to alias {} to {}: {error}",
+                source_path.display(),
+                target_path.display()
+            )
+        })?;
+    }
+
+    Ok(())
 }
 
 fn write_runtime_sample_and_review_artifacts(

@@ -116,20 +116,46 @@ async function runProof(rootPath: string): Promise<void> {
     throw new Error('Focus private app-server proof did not preserve accepted dry-run plan ID.');
   }
 
+  const reportPath = join(rootPath, REPORT_PATH);
+  const collection = parseComputationalMergePrivateRunReportCollection(JSON.parse(await readFile(reportPath, 'utf8')));
+  const report = collection.reports.find((candidate) => candidate.fixtureId === FIXTURE_ID);
+  if (report === undefined) throw new Error(`Missing private run report for ${FIXTURE_ID}.`);
+  const sourceCoverageRatio = getRequiredMetric(report, 'focusStackSourceCoverageRatio');
+  const outputPixelCount = getRequiredMetric(report, 'focusStackOutputPixelCount');
+  const winnerSourceCount = getRequiredMetric(report, 'focusStackWinnerSourceCount');
+  const lowConfidenceCellRatio = getRequiredMetric(report, 'focusStackLowConfidenceCellRatio');
+  const sharpnessGainRatio = getRequiredMetric(report, 'sharpnessGainRatio');
+  const transitionArtifactScore = getRequiredMetric(report, 'focusTransitionArtifactScore');
+  const sourceWinnerDistribution = applied.apply.provenance.blendSourceCoverage.map((source) => ({
+    sourceIndex: source.sourceIndex,
+    winnerCellRatio: round6(
+      source.coveredAreaPx / Math.max(1, applied.apply.provenance.qualityMetrics.outputPixelCount),
+    ),
+  }));
+  if (sourceWinnerDistribution.filter((source) => source.winnerCellRatio > 0).length !== winnerSourceCount) {
+    throw new Error('Private focus winner-source count did not match runtime source winner distribution.');
+  }
   const proof = {
     acceptedDryRunPlanHash: dryRun.acceptedDryRunPlanHash,
     acceptedDryRunPlanId: dryRun.dryRun.dryRunResult.mergePlan.planId,
     appliedGraphRevision: applied.apply.mutationResult.appliedGraphRevision,
     fixtureId: FIXTURE_ID,
     focusCoverageRatio: applied.apply.provenance.focusCoverageRatio,
+    haloRiskCellRatio: applied.apply.provenance.haloReview.haloRiskCellRatio,
+    lowConfidenceCellRatio,
     outputContentHash: applied.apply.mutationResult.outputArtifacts[0]?.contentHash,
+    outputPixelCount,
+    replayOutputPixelCount: applied.apply.provenance.qualityMetrics.outputPixelCount,
     runtimeStatus: applied.apply.provenance.runtimeStatus,
+    sharpnessGainRatio,
     sourceCount: sample.frames.length,
+    sourceCoverageRatio,
+    sourceWinnerDistribution,
+    transitionArtifactScore,
+    winnerSourceCount,
   };
   await writeFile(join(rootPath, PROOF_PATH), `${JSON.stringify(proof, null, 2)}\n`);
 
-  const reportPath = join(rootPath, REPORT_PATH);
-  const collection = parseComputationalMergePrivateRunReportCollection(JSON.parse(await readFile(reportPath, 'utf8')));
   const upgraded = await upgradeReport(rootPath, collection, {
     applyCommandId: applyCommand.commandId,
     applyRuntimeId: applied.apply.mutationResult.derivedAssetId,
@@ -265,6 +291,19 @@ async function sha256File(path: string): Promise<string> {
   return `sha256:${hasher.digest('hex')}`;
 }
 
+function getRequiredMetric(
+  report: ComputationalMergePrivateRunReportCollection['reports'][number],
+  name: (typeof report.qualityMetrics)[number]['name'],
+): number {
+  const metric = report.qualityMetrics.find((candidate) => candidate.name === name);
+  if (metric === undefined) throw new Error(`Missing focus private report metric ${name}.`);
+  return metric.value;
+}
+
+function round6(value: number): number {
+  return Number(value.toFixed(6));
+}
+
 async function runSelfTest(): Promise<void> {
   const rootPath = await mkdtemp(join(tmpdir(), 'rawengine-focus-private-app-server-proof-'));
   try {
@@ -356,12 +395,12 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
           privateRawReportMetric('decodedSourceCount', 3, 3),
           privateRawReportMetric('decodedFinitePixelRatio', 1, 1),
           privateRawReportMetric('decodedNonzeroDimensionCount', 3, 3),
-          privateRawReportMetric('focusStackWinnerSourceCount', 2, 3),
-          privateRawReportMetric('focusStackSourceCoverageRatio', 0.67, 1),
-          privateRawReportMetric('focusStackOutputPixelCount', 1, 96),
+          privateRawReportMetric('focusStackWinnerSourceCount', 3, 3),
+          privateRawReportMetric('focusStackSourceCoverageRatio', 1, 1),
+          privateRawReportMetric('focusStackOutputPixelCount', 96, 96),
           privateRawReportMetric('sharpnessGainRatio', 1.15, 1.2),
           privateRawReportMetric('focusTransitionArtifactScore', 0.9, 0.2),
-          privateRawReportMetric('focusStackLowConfidenceCellRatio', 0.5, 0.1),
+          privateRawReportMetric('focusStackLowConfidenceCellRatio', 0.5, 0),
         ],
         reportId: 'computational-merge-run.focus-plane-transition.v1',
         screenshotArtifacts: [],
