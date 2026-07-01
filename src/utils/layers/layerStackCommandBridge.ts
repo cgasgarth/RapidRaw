@@ -115,6 +115,10 @@ const clampOpacityFraction = (opacity: number): number => {
   return Math.max(0, Math.min(1, opacity / 100));
 };
 
+const toSidecarSubMask = (subMask: MaskContainer['subMasks'][number]) => ({
+  ...structuredClone(subMask),
+});
+
 const toSidecarLayer = (layer: MaskContainer): LayerStackSidecarLayerV1 => {
   const sidecarLayer: LayerStackSidecarLayerV1 = {
     adjustmentPreset: 'empty_adjustment_layer_v1',
@@ -126,6 +130,7 @@ const toSidecarLayer = (layer: MaskContainer): LayerStackSidecarLayerV1 => {
     maskIds: layer.subMasks.map((subMask) => subMask.id),
     name: layer.name,
     opacity: clampOpacityFraction(layer.opacity),
+    subMasks: layer.subMasks.map(toSidecarSubMask),
     visible: layer.visible,
   };
   if (layer.retouchCloneSource !== undefined) {
@@ -425,6 +430,13 @@ function materializeMasksFromSidecar(
           ? [operation.subMask]
           : [...previous.subMasks.filter((subMask) => subMask.id !== operation.subMask.id), operation.subMask]
         : previous.subMasks;
+    const serializedSubMasks = (layer.subMasks ?? []) as Array<MaskContainer['subMasks'][number]>;
+    const availableSubMasks = [
+      ...serializedSubMasks,
+      ...operationSubMasks.filter(
+        (subMask) => !serializedSubMasks.some((serializedSubMask) => serializedSubMask.id === subMask.id),
+      ),
+    ];
     const materializedMask: MaskContainer = {
       ...previous,
       adjustments: toMaskAdjustments(layer.adjustments?.toneColor, previous.adjustments),
@@ -432,7 +444,7 @@ function materializeMasksFromSidecar(
       id: layer.id,
       name: layer.name,
       opacity: Math.round(layer.opacity * 100),
-      subMasks: materializeSubMasksFromIds(layer.maskIds, operationSubMasks),
+      subMasks: materializeSubMasksFromIds(layer.maskIds, availableSubMasks),
       visible: layer.visible,
     };
     if (layer.retouchCloneSource !== undefined) {

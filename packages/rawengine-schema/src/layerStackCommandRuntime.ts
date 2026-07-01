@@ -26,6 +26,29 @@ export const layerStackSidecarLayerV1Schema = z
     opacity: z.number().min(0).max(1),
     retouchCloneSource: layerMaskCloneSourceV1Schema.optional(),
     retouchRemoveSource: layerMaskRemoveSourceV1Schema.optional(),
+    subMasks: z
+      .array(
+        z
+          .looseObject({
+            id: z.string().trim().min(1),
+            invert: z.boolean().optional(),
+            mode: z.string().trim().min(1).optional(),
+            name: z.string().trim().min(1).optional(),
+            opacity: z.number().min(0).max(100).optional(),
+            parameters: z.record(z.string(), z.unknown()).optional(),
+            type: z.string().trim().min(1).optional(),
+            visible: z.boolean().optional(),
+          })
+          .superRefine((subMask, context) => {
+            if (!subMask.name && !subMask.type && subMask.parameters === undefined) {
+              context.addIssue({
+                code: 'custom',
+                message: 'Layer stack sidecar sub-mask metadata must include name, type, or parameters.',
+              });
+            }
+          }),
+      )
+      .optional(),
     visible: z.boolean(),
   })
   .strict()
@@ -36,6 +59,26 @@ export const layerStackSidecarLayerV1Schema = z
         message: 'Layer cannot have both clone/heal and remove retouch sources.',
         path: ['retouchRemoveSource'],
       });
+    }
+    if (layer.subMasks !== undefined) {
+      const subMaskIds = layer.subMasks.map((subMask) => subMask.id);
+      if (new Set(subMaskIds).size !== subMaskIds.length) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Layer stack sidecar sub-mask IDs must be unique per layer.',
+          path: ['subMasks'],
+        });
+      }
+      const unknownMaskIds = layer.subMasks
+        .map((subMask) => subMask.id)
+        .filter((subMaskId) => !layer.maskIds.includes(subMaskId));
+      if (unknownMaskIds.length > 0) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Layer stack sidecar sub-mask metadata must reference maskIds.',
+          path: ['subMasks'],
+        });
+      }
     }
   });
 
