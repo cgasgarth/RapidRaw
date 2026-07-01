@@ -1288,12 +1288,12 @@ async fn save_temp_file(bytes: Vec<u8>) -> Result<String, String> {
 }
 
 fn validate_hdr_merge_dimensions(
-    loaded_items: &[(String, DynamicImage, Duration, f32)],
+    loaded_items: &[(String, String, DynamicImage, Duration, f32)],
 ) -> Result<(), String> {
-    if let Some((first_path, first_img, _, _)) = loaded_items.first() {
+    if let Some((first_path, _, first_img, _, _)) = loaded_items.first() {
         let (width, height) = (first_img.width(), first_img.height());
 
-        for (path, img, _, _) in loaded_items.iter().skip(1) {
+        for (path, _, img, _, _) in loaded_items.iter().skip(1) {
             if img.width() != width || img.height() != height {
                 return Err(format!(
                     "Dimension mismatch detected.\n\nBase image ({}): {}x{}\nTarget image ({}): {}x{}\n\nHDR merge requires all images to be exactly the same size.",
@@ -1332,7 +1332,7 @@ async fn merge_hdr(
     let hdr_source_refs_handle = state.hdr_source_refs.clone();
     let settings = load_settings_or_default(&app_handle);
 
-    let loaded_items: Vec<(String, DynamicImage, Duration, f32)> = paths
+    let loaded_items: Vec<(String, String, DynamicImage, Duration, f32)> = paths
         .iter()
         .map(|path| {
             let _ = app_handle.emit(
@@ -1348,6 +1348,7 @@ async fn merge_hdr(
 
             let file_bytes =
                 fs::read(path).map_err(|e| format!("Failed to read image {}: {}", path, e))?;
+            let content_hash = format!("blake3:{}", blake3::hash(&file_bytes).to_hex());
             let mut dynamic_image =
                 load_base_image_from_bytes(&file_bytes, path, false, &settings, None)
                     .map_err(|e| format!("Failed to load image {}: {}", path, e))?;
@@ -1366,7 +1367,7 @@ async fn merge_hdr(
                 Some(exp) => Duration::from_secs_f32(exp),
             };
 
-            Ok((path.clone(), dynamic_image, exposure, gains))
+            Ok((path.clone(), content_hash, dynamic_image, exposure, gains))
         })
         .collect::<Result<Vec<_>, String>>()?;
 
@@ -1375,21 +1376,22 @@ async fn merge_hdr(
     let source_refs = loaded_items
         .iter()
         .enumerate()
-        .map(
-            |(source_index, (path, img, exposure, iso))| app_state::PendingHdrSourceRef {
+        .map(|(source_index, (path, content_hash, img, exposure, iso))| {
+            app_state::PendingHdrSourceRef {
+                content_hash: content_hash.clone(),
                 image_path: parse_virtual_path(path).0.to_string_lossy().into_owned(),
                 width: img.width(),
                 height: img.height(),
                 exposure_time_seconds: exposure.as_secs_f32(),
                 iso: *iso,
                 source_index,
-            },
-        )
+            }
+        })
         .collect::<Vec<_>>();
 
     let images: Vec<HDRInput> = loaded_items
         .iter()
-        .map(|(path, img, exposure, gains)| {
+        .map(|(path, _content_hash, img, exposure, gains)| {
             HDRInput::with_image(img, *exposure, *gains)
                 .map_err(|e| format!("Failed to prepare HDR input for {}: {}", path, e))
         })
@@ -2342,9 +2344,14 @@ pub fn run() {
 mod tests {
     use super::*;
 
-    fn hdr_test_item(path: &str, width: u32, height: u32) -> (String, DynamicImage, Duration, f32) {
+    fn hdr_test_item(
+        path: &str,
+        width: u32,
+        height: u32,
+    ) -> (String, String, DynamicImage, Duration, f32) {
         (
             path.to_string(),
+            format!("blake3:test-hash-{}", path),
             DynamicImage::new_rgb8(width, height),
             Duration::from_millis(125),
             100.0,

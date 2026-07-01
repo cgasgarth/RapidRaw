@@ -87,6 +87,7 @@ pub struct AnalyticsConfig {
 
 #[derive(Clone)]
 pub struct PendingHdrSourceRef {
+    pub content_hash: String,
     pub image_path: String,
     pub width: u32,
     pub height: u32,

@@ -211,7 +211,7 @@ export const buildHdrDerivedOutputReceipt = ({
     },
     settings,
     sourcePaths: handoff.sourceRefs.map((source) => source.contentState.replace(/^path:/u, '')),
-    sourceContentHashes: handoff.sourceRefs.map((source) => hashStableJson(source.contentState)),
+    sourceContentHashes: handoff.sourceRefs.map((source) => source.contentHash),
     sourceCount: handoff.sourceCount,
     sourceGraphRevisions: handoff.sourceRefs.map((source) => source.graphRevision),
     staleReasons: undefined,

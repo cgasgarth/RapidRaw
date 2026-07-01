@@ -9,7 +9,9 @@ import type { HdrBracketDetectionResultV1 } from '../../packages/rawengine-schem
 
 export const hdrBracketPreflightSourceMetadataSchema = z
   .object({
+    contentHash: z.string().trim().min(1).optional(),
     exif: z.record(z.string(), z.string()).nullable().optional(),
+    graphRevision: z.string().trim().min(1).optional(),
     path: z.string().trim().min(1),
   })
   .strict();
@@ -37,10 +39,12 @@ const toDetectionSource = (
     aperture: parsePositiveNumber(exif['FNumber']),
     cameraMake: cleanString(exif['Make']),
     cameraModel: cleanString(exif['Model']),
+    contentHash: source.contentHash,
     declaredExposureEv: parseFilenameExposureEv(source.path),
     exposureCompensationEv: parseExposureCompensation(exif['ExposureBiasValue']),
     exposureTimeSeconds: parseExposureTime(exif['ExposureTime']),
     focalLengthMm: parsePositiveNumber(exif['FocalLengthIn35mmFilm'] ?? exif['FocalLength']),
+    graphRevision: source.graphRevision,
     height: 1,
     imagePath: source.path,
     iso: parsePositiveNumber(exif['ISO'] ?? exif['PhotographicSensitivity']),
