@@ -9,7 +9,15 @@ import type { GamutWarningOverlayPayload } from '../schemas/tauriEventSchemas';
 import { type Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, type MaskContainer } from '../utils/adjustments';
 import type { BasicToneCommandEnvelope } from '../utils/basicToneCommandBridge';
 import { isPendingExportSoftProofGamutWarningOverlay } from '../utils/color/runtime/gamutWarningDisplay';
-import { goToEditHistoryIndex, pushEditHistoryEntry, redoEditHistory, undoEditHistory } from '../utils/editHistory';
+import {
+  createEditHistoryCheckpoint,
+  type EditHistoryCheckpoint,
+  goToEditHistoryIndex,
+  pushEditHistoryEntryWithCheckpoints,
+  redoEditHistory,
+  renameEditHistoryCheckpoint,
+  undoEditHistory,
+} from '../utils/editHistory';
 import { loadMaskOverlaySettingsPreference } from '../utils/mask/maskOverlayPreferences';
 import { PANEL_SCOPES_HEIGHT } from '../utils/waveformSizing';
 
@@ -64,6 +72,7 @@ interface EditorState {
 
   // History State
   history: Adjustments[];
+  historyCheckpoints: EditHistoryCheckpoint[];
   historyIndex: number;
 
   // Previews & Overlays
@@ -125,7 +134,9 @@ interface EditorState {
 
   // Actions
   setEditor: (updater: Partial<EditorState> | ((state: EditorState) => Partial<EditorState>)) => void;
+  createHistoryCheckpoint: (label: string) => void;
   pushHistory: (newAdjustments: Adjustments) => void;
+  renameHistoryCheckpoint: (checkpointId: string, label: string) => void;
   undo: () => void;
   redo: () => void;
   resetHistory: (initialState: Adjustments) => void;
@@ -139,11 +150,27 @@ const shouldRevalidateGamutWarningOverlay = (update: Partial<EditorState>): bool
   'exportSoftProofRecipeId' in update ||
   'exportSoftProofTransform' in update;
 
+const createSessionCheckpointId = (historyIndex: number): string => {
+  const randomId = globalThis.crypto?.randomUUID?.();
+  return randomId ?? `checkpoint-${String(historyIndex)}-${String(Date.now())}`;
+};
+
+const historyNavigationPreviewInvalidation = {
+  exportSoftProofTransform: null,
+  finalPreviewUrl: null,
+  gamutWarningOverlay: null,
+  interactivePatch: null,
+  previewScopeStatus: null,
+  transformedOriginalUrl: null,
+  uncroppedAdjustedPreviewUrl: null,
+} satisfies Partial<EditorState>;
+
 export const useEditorStore = create<EditorState>((set) => ({
   selectedImage: null,
   adjustments: INITIAL_ADJUSTMENTS,
   lastBasicToneCommand: null,
   history: [INITIAL_ADJUSTMENTS],
+  historyCheckpoints: [],
   historyIndex: 0,
 
   finalPreviewUrl: null,
@@ -229,30 +256,68 @@ export const useEditorStore = create<EditorState>((set) => ({
     });
   },
 
+  createHistoryCheckpoint: (label) => {
+    set((state) => ({
+      historyCheckpoints: createEditHistoryCheckpoint(
+        state.historyCheckpoints,
+        state.historyIndex,
+        label,
+        createSessionCheckpointId(state.historyIndex),
+        new Date().toISOString(),
+      ),
+    }));
+  },
+
   pushHistory: (newAdj) => {
     set((state) => {
-      const nextHistory = pushEditHistoryEntry(state.history, state.historyIndex, newAdj);
-      return nextHistory;
+      const nextHistory = pushEditHistoryEntryWithCheckpoints(
+        state.history,
+        state.historyIndex,
+        newAdj,
+        state.historyCheckpoints,
+      );
+      return {
+        history: nextHistory.history,
+        historyCheckpoints: nextHistory.checkpoints,
+        historyIndex: nextHistory.historyIndex,
+      };
     });
+  },
+
+  renameHistoryCheckpoint: (checkpointId, label) => {
+    set((state) => ({
+      historyCheckpoints: renameEditHistoryCheckpoint(state.historyCheckpoints, checkpointId, label),
+    }));
   },
 
   undo: () => {
     set((state) => {
       const nextState = undoEditHistory(state);
-      return { adjustments: nextState.adjustments, historyIndex: nextState.historyIndex };
+      if (nextState.historyIndex === state.historyIndex) return {};
+      return {
+        ...historyNavigationPreviewInvalidation,
+        adjustments: nextState.adjustments,
+        historyIndex: nextState.historyIndex,
+      };
     });
   },
 
   redo: () => {
     set((state) => {
       const nextState = redoEditHistory(state);
-      return { adjustments: nextState.adjustments, historyIndex: nextState.historyIndex };
+      if (nextState.historyIndex === state.historyIndex) return {};
+      return {
+        ...historyNavigationPreviewInvalidation,
+        adjustments: nextState.adjustments,
+        historyIndex: nextState.historyIndex,
+      };
     });
   },
 
   resetHistory: (initialState) => {
     set({
       history: [initialState],
+      historyCheckpoints: [],
       historyIndex: 0,
       adjustments: initialState,
     });
@@ -261,7 +326,12 @@ export const useEditorStore = create<EditorState>((set) => ({
   goToHistoryIndex: (index) => {
     set((state) => {
       const nextState = goToEditHistoryIndex(state, index);
-      return { adjustments: nextState.adjustments, historyIndex: nextState.historyIndex };
+      if (nextState.historyIndex === state.historyIndex) return {};
+      return {
+        ...historyNavigationPreviewInvalidation,
+        adjustments: nextState.adjustments,
+        historyIndex: nextState.historyIndex,
+      };
     });
   },
 }));
