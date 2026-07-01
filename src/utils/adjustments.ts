@@ -595,6 +595,7 @@ export interface Sections {
   color: Array<string>;
   details: Array<string>;
   effects: Array<string>;
+  transformLens: Array<string>;
 }
 
 export interface SectionVisibility {
@@ -1200,6 +1201,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
         LensAdjustment.LensDistortionAmount,
         LensAdjustment.LensVignetteAmount,
         LensAdjustment.LensTcaAmount,
+        LensAdjustment.LensDistortionParams,
         LensAdjustment.LensDistortionEnabled,
         LensAdjustment.LensTcaEnabled,
         LensAdjustment.LensVignetteEnabled,
@@ -1313,5 +1315,25 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     Effect.VignetteFeather,
     Effect.VignetteMidpoint,
     Effect.VignetteRoundness,
+  ],
+  transformLens: [
+    TransformAdjustment.TransformDistortion,
+    TransformAdjustment.TransformVertical,
+    TransformAdjustment.TransformHorizontal,
+    TransformAdjustment.TransformRotate,
+    TransformAdjustment.TransformAspect,
+    TransformAdjustment.TransformScale,
+    TransformAdjustment.TransformXOffset,
+    TransformAdjustment.TransformYOffset,
+    LensAdjustment.LensCorrectionMode,
+    LensAdjustment.LensMaker,
+    LensAdjustment.LensModel,
+    LensAdjustment.LensDistortionAmount,
+    LensAdjustment.LensVignetteAmount,
+    LensAdjustment.LensTcaAmount,
+    LensAdjustment.LensDistortionParams,
+    LensAdjustment.LensDistortionEnabled,
+    LensAdjustment.LensTcaEnabled,
+    LensAdjustment.LensVignetteEnabled,
   ],
 };
