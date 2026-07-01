@@ -1,7 +1,8 @@
 import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
+import type { TFunction } from 'i18next';
 import { Aperture, ChartArea, ChevronDown, ClipboardPaste, Copy, Info, RotateCcw, ScanSearch } from 'lucide-react';
-import { type MouseEvent, type ReactNode, useCallback, useMemo, useState } from 'react';
+import { type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { useShallow } from 'zustand/react/shallow';
@@ -9,6 +10,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useContextMenu } from '../../../../context/ContextMenuContext';
 import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
 import { useWaveformControls } from '../../../../hooks/editor/useWaveformControls';
+import type { RawDevelopmentReport } from '../../../../schemas/imageLoaderSchemas';
 import {
   type RawReconstructionComparisonResult,
   rawReconstructionComparisonResultSchema,
@@ -36,7 +38,6 @@ import {
 } from '../../../../utils/rawProcessingModes';
 import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
 import BasicAdjustments from '../../../adjustments/Basic';
-import ColorPanel from '../../../adjustments/Color';
 import CurveGraph from '../../../adjustments/Curves';
 import DetailsPanel from '../../../adjustments/Details';
 import EffectsPanel from '../../../adjustments/Effects';
@@ -47,7 +48,7 @@ import UiText from '../../../ui/primitives/Text';
 import Resizer from '../../../ui/Resizer';
 import Waveform from '../../editor/Waveform';
 
-const ADJUSTMENT_SECTION_NAMES = ['basic', 'curves', 'color', 'details', 'effects'] as const;
+const ADJUSTMENT_SECTION_NAMES = ['basic', 'curves', 'details', 'effects'] as const;
 type AdjustmentSectionName = (typeof ADJUSTMENT_SECTION_NAMES)[number];
 type RawProcessingModeOverrideOption = RawProcessingMode | 'inherit';
 type CollapsibleSectionsUpdater =
@@ -55,11 +56,10 @@ type CollapsibleSectionsUpdater =
   | ((prev: CollapsibleSectionsState) => CollapsibleSectionsState);
 
 const ADJUSTMENT_SECTION_LABEL_FALLBACKS: Record<AdjustmentSectionName, string> = {
-  basic: 'Basic',
-  color: 'Color',
-  curves: 'Curves',
-  details: 'Details',
-  effects: 'Effects',
+  basic: 'Basic Tone',
+  curves: 'Tone Curves',
+  details: 'Detail',
+  effects: 'Effects & Looks',
 };
 const RAW_RECONSTRUCTION_COMPARISON_CROP_SIZE = 256;
 const PANEL_ACTION_BUTTON_CLASS =
@@ -72,6 +72,30 @@ const formatBytes = (value: number): string => {
   return `${value} B`;
 };
 
+const hasRawProcessingStatusRequiringAttention = (report: RawDevelopmentReport | null | undefined): boolean => {
+  const cameraProfile = report?.cameraProfile;
+  if (!cameraProfile) return false;
+
+  return (
+    cameraProfile.warningCodes.length > 0 ||
+    cameraProfile.fallbackReason != null ||
+    cameraProfile.status === 'fallback' ||
+    cameraProfile.status === 'unavailable' ||
+    cameraProfile.colorCheckerGate?.status === 'gated_fail' ||
+    cameraProfile.colorCheckerGate?.status === 'gated_warn' ||
+    cameraProfile.colorCheckerGate?.fallbackReason != null ||
+    report.demosaicPath === 'fast' ||
+    report.demosaicPath === 'linear_bypass'
+  );
+};
+
+const getAdjustmentSectionLabel = (t: TFunction, sectionName: AdjustmentSectionName): string =>
+  String(
+    t(`editor.adjustments.scopedSections.${sectionName}`, {
+      defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS[sectionName],
+    }),
+  );
+
 export default function Controls() {
   const { t } = useTranslation();
   const { showContextMenu } = useContextMenu();
@@ -82,7 +106,7 @@ export default function Controls() {
     useState<RawReconstructionComparisonResult | null>(null);
   const [isComparingRawReconstruction, setIsComparingRawReconstruction] = useState(false);
   const [isRawProcessingModeProvenanceVisible, setIsRawProcessingModeProvenanceVisible] = useState(false);
-  const [isRawProcessingControlsOpen, setIsRawProcessingControlsOpen] = useState(true);
+  const [isRawProcessingControlsOpen, setIsRawProcessingControlsOpen] = useState(false);
 
   const { appSettings, theme } = useSettingsStore(
     useShallow((state) => ({
@@ -120,7 +144,6 @@ export default function Controls() {
     histogram,
     selectedImage,
     previewScopeStatus,
-    isWbPickerActive,
     isWaveformVisible,
     waveform,
     activeWaveformChannel,
@@ -133,7 +156,6 @@ export default function Controls() {
       histogram: state.histogram,
       selectedImage: state.selectedImage,
       previewScopeStatus: state.previewScopeStatus,
-      isWbPickerActive: state.isWbPickerActive,
       isWaveformVisible: state.isWaveformVisible,
       waveform: state.waveform,
       activeWaveformChannel: state.activeWaveformChannel,
@@ -151,16 +173,23 @@ export default function Controls() {
     [adjustments.rawProcessingModeOverride, appSettings?.rawProcessingMode, t],
   );
 
+  const isRawProcessingStatusAttentionRequired = useMemo(
+    () => selectedImage?.isRaw === true && hasRawProcessingStatusRequiringAttention(selectedImage.rawDevelopmentReport),
+    [selectedImage?.isRaw, selectedImage?.rawDevelopmentReport],
+  );
+
+  useEffect(() => {
+    setIsRawProcessingControlsOpen(isRawProcessingStatusAttentionRequired);
+    setIsRawProcessingModeProvenanceVisible(false);
+    setRawReconstructionComparison(null);
+  }, [isRawProcessingStatusAttentionRequired, selectedImage?.path]);
+
   const setCopiedSectionAdjustments = useCallback(
     (val: CopiedSectionAdjustments | null) => {
       setEditor({ copiedSectionAdjustments: val });
     },
     [setEditor],
   );
-
-  const toggleWbPicker = useCallback(() => {
-    setEditor((state) => ({ isWbPickerActive: !state.isWbPickerActive }));
-  }, [setEditor]);
 
   const onDragStateChange = useCallback(
     (isDragging: boolean) => {
@@ -237,10 +266,7 @@ export default function Controls() {
   }, [selectedImage, t]);
 
   const handleResetAdjustments = () => {
-    const resetValues = pickAdjustmentValues(
-      ADJUSTMENT_SECTION_NAMES.flatMap((sectionName) => ADJUSTMENT_SECTIONS[sectionName]),
-      INITIAL_ADJUSTMENTS,
-    );
+    const resetValues = pickAdjustmentValues(Object.values(ADJUSTMENT_SECTIONS).flat(), INITIAL_ADJUSTMENTS);
 
     setAdjustments((prev: Adjustments) => ({
       ...prev,
@@ -304,9 +330,7 @@ export default function Controls() {
 
     const copiedSection = copiedSectionAdjustments;
     const isPasteAllowed = copiedSection?.section === sectionName;
-    const translatedSection = t(`editor.adjustments.sections.${sectionName}`, {
-      defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS[sectionName],
-    });
+    const translatedSection = getAdjustmentSectionLabel(t, sectionName);
 
     const pasteLabel = copiedSection
       ? t('editor.adjustments.actions.pasteLabel', { section: translatedSection })
@@ -348,17 +372,6 @@ export default function Controls() {
             setAdjustments={setAdjustments}
             histogram={histogram}
             theme={theme}
-            onDragStateChange={onDragStateChange}
-          />
-        );
-      case 'color':
-        return (
-          <ColorPanel
-            adjustments={adjustments}
-            setAdjustments={setAdjustments}
-            appSettings={appSettings}
-            isWbPickerActive={isWbPickerActive}
-            toggleWbPicker={toggleWbPicker}
             onDragStateChange={onDragStateChange}
           />
         );
@@ -431,20 +444,24 @@ export default function Controls() {
       </div>
 
       {selectedImage?.isRaw && (
-        <div className="shrink-0 border-b border-surface px-3 py-2" data-testid="raw-processing-mode-override-control">
+        <div
+          className="shrink-0 border-b border-surface px-3 py-1.5"
+          data-attention={isRawProcessingStatusAttentionRequired}
+          data-testid="raw-processing-mode-override-control"
+        >
           <button
             aria-expanded={isRawProcessingControlsOpen}
-            className="flex min-h-8 w-full items-center justify-between gap-3 rounded-sm text-left transition-colors hover:text-text-primary"
+            className="flex min-h-7 w-full items-center justify-between gap-3 rounded-sm text-left transition-colors hover:text-text-primary"
             onClick={() => {
               setIsRawProcessingControlsOpen((previous) => !previous);
             }}
             type="button"
           >
-            <span className="min-w-0">
-              <UiText as="span" variant={TextVariants.small} className="block font-medium text-text-primary">
+            <span className="flex min-w-0 items-baseline gap-2">
+              <UiText as="span" variant={TextVariants.small} className="shrink-0 font-medium text-text-primary">
                 {t('editor.adjustments.rawProcessingModeOverride.label')}
               </UiText>
-              <UiText as="span" variant={TextVariants.small} className="block truncate text-[11px] text-text-secondary">
+              <UiText as="span" variant={TextVariants.small} className="truncate text-[11px] text-text-secondary">
                 {t('editor.adjustments.rawProcessingModeOverride.currentValue', {
                   mode: rawProcessingModeDisplay,
                 })}
@@ -602,13 +619,11 @@ export default function Controls() {
 
       <div className="grow overflow-y-auto px-3 py-2 flex flex-col gap-1.5">
         {ADJUSTMENT_SECTION_NAMES.map((sectionName) => {
-          const title = t(`editor.adjustments.sections.${sectionName}`, {
-            defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS[sectionName],
-          });
+          const title = getAdjustmentSectionLabel(t, sectionName);
           const sectionVisibility = adjustments.sectionVisibility;
 
           return (
-            <div className="shrink-0 group" key={sectionName}>
+            <div className="shrink-0 group" data-testid={`adjustments-section-${sectionName}`} key={sectionName}>
               <CollapsibleSection
                 isContentVisible={sectionVisibility[sectionName]}
                 isDirty={hasAdjustmentValueChanges(ADJUSTMENT_SECTIONS[sectionName], adjustments)}

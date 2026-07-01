@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { DEFAULT_COLLAPSIBLE_SECTIONS_STATE } from '../../../src/store/useUIStore';
 import {
   ADJUSTMENT_SECTIONS,
   hasAdjustmentValueChanges,
@@ -31,5 +32,20 @@ describe('adjustment section state', () => {
         INITIAL_MASK_ADJUSTMENTS,
       ),
     ).toBe(true);
+  });
+
+  test('keeps color adjustment data compatible after color moves to its own panel', () => {
+    expect(ADJUSTMENT_SECTIONS.color).toContain('temperature');
+    expect(hasAdjustmentValueChanges(ADJUSTMENT_SECTIONS.color, INITIAL_ADJUSTMENTS)).toBe(false);
+  });
+
+  test('defaults generic adjustments to tone sections without opening color', () => {
+    expect(DEFAULT_COLLAPSIBLE_SECTIONS_STATE).toEqual({
+      basic: true,
+      color: false,
+      curves: true,
+      details: false,
+      effects: false,
+    });
   });
 });

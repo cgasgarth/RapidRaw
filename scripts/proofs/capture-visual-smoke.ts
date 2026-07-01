@@ -987,7 +987,43 @@ async function assertSectionCount(page, minimum) {
   }
 }
 
+async function assertAdjustmentsPanelRetune(page) {
+  const panel = page.locator('[data-visual-smoke-section="adjustments-panel-retune"]');
+  await panel.waitFor({ timeout: 10_000 });
+
+  for (const sectionName of ['basic', 'curves', 'details', 'effects']) {
+    await panel.getByTestId(`adjustments-section-${sectionName}`).waitFor({
+      timeout: 10_000,
+    });
+  }
+
+  const colorSectionCount = await panel.getByTestId('adjustments-section-color').count();
+  if (colorSectionCount !== 0) {
+    throw new Error(`Adjustments panel retune expected no Color section, found ${colorSectionCount}.`);
+  }
+
+  const rawProcessingControl = panel.getByTestId('raw-processing-mode-override-control');
+  await rawProcessingControl.waitFor({ timeout: 10_000 });
+  const rawProcessingToggle = rawProcessingControl.locator('button[aria-expanded]').first();
+  await rawProcessingToggle.waitFor({ timeout: 10_000 });
+  const rawExpanded = await rawProcessingToggle.getAttribute('aria-expanded');
+  if (rawExpanded !== 'false') {
+    throw new Error(`RAW processing utility should be collapsed without RAW attention status, got ${rawExpanded}.`);
+  }
+  const rawBounds = await rawProcessingControl.boundingBox();
+  if (!rawBounds || rawBounds.height > 44) {
+    throw new Error(
+      `RAW processing utility should remain compact when collapsed, height=${rawBounds?.height ?? 'none'}.`,
+    );
+  }
+}
+
 async function prepareScenario(page, mode) {
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune) {
+    await assertAdjustmentsPanelRetune(page);
+    return;
+  }
+
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.CommandPaletteWorkflows) {
     const runCommand = async (query, name, options = { reopen: true }) => {
       await page.getByLabel('Search commands').fill(query);
@@ -3543,6 +3579,16 @@ async function main() {
         throw new Error(
           `${scenario.mode} dimensions mismatch: expected ${viewport.width}x${viewport.height}, got ${dimensions.width}x${dimensions.height}`,
         );
+      }
+      if (scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.EmptyLibrary) {
+        await page.goto(`${baseUrl}/visual-smoke.html?scenario=${VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune}`, {
+          waitUntil: 'networkidle',
+        });
+        await page.locator('[data-visual-smoke-ready="true"]').waitFor({ timeout: 10_000 });
+        await page.getByTestId('adjustments-panel-retune-heading').getByText('Basic Tone', { exact: true }).waitFor({
+          timeout: 10_000,
+        });
+        await assertAdjustmentsPanelRetune(page);
       }
     }
 
