@@ -1,4 +1,5 @@
 import type { OverlayMode } from '../../right/color/CropPanel';
+import { canvasOverlayTokens } from './canvasOverlayTokens';
 
 interface CompositionOverlaysProps {
   width: number;
@@ -18,7 +19,7 @@ export default function CompositionOverlays({
   height,
   mode,
   rotation,
-  color = 'rgba(248, 250, 252, 0.86)',
+  color = canvasOverlayTokens.colors.neutral,
   opacity = 0.82,
   denseVisible = false,
 }: CompositionOverlaysProps) {
@@ -216,7 +217,7 @@ export default function CompositionOverlays({
         width={Math.max(0, width - 1)}
         height={Math.max(0, height - 1)}
         fill="none"
-        stroke="rgba(15, 23, 42, 0.78)"
+        stroke="rgba(0, 0, 0, 0.74)"
         strokeWidth="3"
         vectorEffect="non-scaling-stroke"
       />
@@ -226,7 +227,7 @@ export default function CompositionOverlays({
         width={Math.max(0, width - 1)}
         height={Math.max(0, height - 1)}
         fill="none"
-        stroke="rgba(248, 250, 252, 0.78)"
+        stroke={canvasOverlayTokens.colors.neutral}
         strokeWidth="1"
         vectorEffect="non-scaling-stroke"
       />

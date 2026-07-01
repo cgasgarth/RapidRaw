@@ -28,6 +28,7 @@ import { Mask, type SubMask, SubMaskMode, ToolType } from '../../components/pane
 import { ObjectPromptControls } from '../../components/panel/right/layers/ObjectPromptControls';
 import RightPanelSwitcher from '../../components/panel/right/RightPanelSwitcher';
 import {
+  type AppSettings,
   type BrushSettings,
   type CullingSuggestions,
   type ImageFile,
@@ -66,11 +67,13 @@ import {
   type FocusStackUiSettings,
 } from '../../schemas/focus-stack/focusStackUiSchemas';
 import type { MaskOverlaySettings } from '../../schemas/masks/maskOverlaySchemas';
+import type { GamutWarningOverlayPayload } from '../../schemas/tauriEventSchemas';
 import type {
   TetherCaptureResponse,
   TetherDiscoveryResponse,
   TetherSessionResponse,
 } from '../../schemas/tetheringSchemas';
+import type { ExportSoftProofTransformState } from '../../store/useEditorStore';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -1184,6 +1187,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaSavedReview]: PanoramaSavedReviewVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaUi]: PanoramaVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAdjustmentsCompact]: ProfessionalAdjustmentsCompactVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalCanvasOverlays]: ProfessionalCanvasOverlaysVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalCropTransformWorkspace]: ProfessionalCropTransformWorkspaceVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorCompactPortrait]: ProfessionalEditorCompactPortraitVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShell]: ProfessionalEditorShellVisualSmoke,
@@ -1776,6 +1780,338 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
   );
 }
 
+const professionalCanvasAppSettings = {
+  lastRootPath: null,
+  theme: Theme.Dark,
+  useWgpuRenderer: false,
+} satisfies AppSettings;
+
+const professionalCanvasRetouchTargetMaskId = 'professional-canvas-retouch-target-mask';
+const professionalCanvasRetouchLayerId = 'professional-canvas-retouch-layer';
+
+const professionalCanvasRetouchMask: SubMask = {
+  id: professionalCanvasRetouchTargetMaskId,
+  invert: false,
+  mode: SubMaskMode.Additive,
+  name: 'Retouch target',
+  opacity: 100,
+  parameters: {
+    centerX: brushMaskCanvasImageWidth * 0.56,
+    centerY: brushMaskCanvasImageHeight * 0.48,
+    radiusX: 46,
+    radiusY: 46,
+    rotation: 0,
+  },
+  type: Mask.Radial,
+  visible: true,
+};
+
+const professionalCanvasRetouchContainer: MaskContainer = {
+  adjustments: INITIAL_ADJUSTMENTS,
+  blendMode: 'normal',
+  id: professionalCanvasRetouchLayerId,
+  invert: false,
+  name: 'Retouch canvas proof',
+  opacity: 100,
+  retouchCloneSource: {
+    featherRadiusPx: 22,
+    radiusPx: 46,
+    retouchMode: 'heal',
+    rotationDegrees: -12,
+    scale: 1.08,
+    sourcePoint: { x: 0.31, y: 0.36 },
+    targetPoint: { x: 0.56, y: 0.48 },
+  },
+  retouchRemoveSource: {
+    featherRadiusPx: 18,
+    generator: 'local_patch_fill_v1',
+    generatorVersion: 1,
+    radiusPx: 34,
+    resolvedSourcePoint: { x: 0.74, y: 0.33 },
+    searchRadiusMultiplier: 2.2,
+    seed: 4504,
+    status: 'stale',
+    targetMaskId: professionalCanvasRetouchTargetMaskId,
+  },
+  subMasks: [professionalCanvasRetouchMask],
+  visible: true,
+};
+
+const professionalCanvasBrushSubMask: SubMask = {
+  ...createBrushMaskCanvasSubMask(),
+  parameters: {
+    lines: [
+      {
+        brushSize: 64,
+        feather: 0.45,
+        points: [
+          { x: 130, y: 142 },
+          { x: 182, y: 128 },
+          { x: 238, y: 138 },
+          { x: 302, y: 164 },
+        ],
+        tool: ToolType.Brush,
+      },
+    ],
+  },
+};
+
+const professionalCanvasProofTransformValues = {
+  blackPointCompensation: 'enabled',
+  colorManagedTransform: 'relative_colorimetric',
+  effectiveColorProfile: 'Display P3',
+  effectiveRenderingIntent: 'relative_colorimetric',
+  policyStatus: 'ready',
+  policyVersion: 'professional-canvas-overlays-v1',
+  sourcePrecisionPath: '/validation/professional-canvas-overlays.float.tiff',
+  transformApplied: true,
+  transformPolicyFingerprint: 'sha256:professional-canvas-overlays',
+} as const;
+
+const professionalCanvasProofTransform: ExportSoftProofTransformState = professionalCanvasProofTransformValues;
+
+const professionalCanvasGamutOverlay: GamutWarningOverlayPayload = {
+  black_point_compensation: professionalCanvasProofTransformValues.blackPointCompensation,
+  color_managed_transform: professionalCanvasProofTransformValues.colorManagedTransform,
+  coverage_ratio: 0.084,
+  effective_color_profile: professionalCanvasProofTransformValues.effectiveColorProfile,
+  effective_rendering_intent: professionalCanvasProofTransformValues.effectiveRenderingIntent,
+  export_soft_proof_recipe_id: 'professional-canvas-proof',
+  height: brushMaskCanvasImageHeight,
+  mask_data_url:
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAFAgJ/l9l6WQAAAABJRU5ErkJggg==',
+  max_channel_value: 255,
+  min_channel_value: 0,
+  pixel_count: brushMaskCanvasImageWidth * brushMaskCanvasImageHeight,
+  policy_status: professionalCanvasProofTransformValues.policyStatus,
+  policy_version: professionalCanvasProofTransformValues.policyVersion,
+  preview_basis: 'export_preview',
+  source_image_path: brushMaskCanvasImage.path,
+  source_precision_path: professionalCanvasProofTransformValues.sourcePrecisionPath,
+  transform_applied: professionalCanvasProofTransformValues.transformApplied,
+  transform_policy_fingerprint: professionalCanvasProofTransformValues.transformPolicyFingerprint,
+  warning_pixel_count: 19354,
+  width: brushMaskCanvasImageWidth,
+};
+
+function ProfessionalCanvasOverlaysVisualSmoke() {
+  const [crop, setCropState] = useState<Crop>({ height: 62, unit: '%', width: 66, x: 18, y: 18 });
+  const isCompactViewport = typeof window !== 'undefined' && window.innerWidth < 700;
+  const cardClassName = 'relative min-h-0 overflow-hidden rounded-md border border-editor-overlay-stroke bg-black';
+  const imageRenderSize = { height: 180, offsetX: 0, offsetY: 0, scale: 0.5, width: 320 };
+  const cropRenderSize = { height: 270, offsetX: 0, offsetY: 0, scale: 0.75, width: 480 };
+  const brushContainer = createBrushMaskCanvasContainer(professionalCanvasBrushSubMask);
+  const brushOverlayUrl = buildBrushMaskCanvasOverlayUrl(professionalCanvasBrushSubMask);
+
+  const baseCanvasProps = {
+    appSettings: professionalCanvasAppSettings,
+    cursorStyle: 'default',
+    exportSoftProofRecipeId: null,
+    exportSoftProofTransform: null,
+    finalPreviewUrl: brushMaskCanvasImageDataUrl,
+    gamutWarningOverlay: null,
+    handleCropComplete: () => {},
+    hasRenderedFirstFrame: true,
+    imageRenderSize,
+    isExportSoftProofEnabled: false,
+    isGamutWarningOverlayVisible: false,
+    isMaskControlHovered: false,
+    isMaxZoom: false,
+    isRotationActive: false,
+    isSliderDragging: false,
+    isStraightenActive: false,
+    liveRotation: null,
+    onGenerateAiMask: () => {},
+    onQuickErase: () => {},
+    onSelectAiSubMask: () => {},
+    onSelectMask: () => {},
+    onStraighten: () => {},
+    selectedImage: brushMaskCanvasImage,
+    setAdjustments: () => {},
+    setCrop: () => {},
+    setIsMaskHovered: () => {},
+    setIsMaskTouchInteracting: () => {},
+    showOriginal: false,
+    transformState: { positionX: 0, positionY: 0, scale: 1.35 },
+    transformedOriginalUrl: brushMaskCanvasImageDataUrl,
+    uncroppedAdjustedPreviewUrl: brushMaskCanvasImageDataUrl,
+    updateSubMask: () => {},
+  } satisfies Partial<Parameters<typeof ImageCanvas>[0]>;
+
+  return (
+    <main
+      className="min-h-screen bg-editor-matte p-3 font-sans text-text-primary"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ProfessionalCanvasOverlays}
+      data-visual-smoke-ready="true"
+    >
+      <div
+        className="grid min-h-0 gap-3 overflow-hidden"
+        style={{
+          gridTemplateColumns: isCompactViewport ? '1fr' : 'minmax(0,1.35fr) minmax(300px,0.65fr)',
+          height: 'calc(100vh - 24px)',
+        }}
+      >
+        <section
+          className="grid min-h-0 rounded-lg border border-editor-border bg-editor-panel"
+          data-visual-smoke-section="professional-canvas-primary"
+          style={{ gridTemplateRows: '40px minmax(0,1fr)' }}
+        >
+          <div className="flex items-center justify-between border-b border-editor-border px-3">
+            <h1 className={editorChromeTokens.typography.panelTitle}>{copy.professionalCanvasOverlays}</h1>
+            <span className={editorChromeStatusChipClassName('info')}>{copy.professionalCanvasActiveStates}</span>
+          </div>
+          <div
+            className="grid min-h-0 gap-3 p-3"
+            style={{ gridTemplateColumns: isCompactViewport ? '1fr' : '1fr 1fr' }}
+          >
+            <div className={cardClassName} data-visual-smoke-section="professional-canvas-crop">
+              <ImageCanvas
+                {...baseCanvasProps}
+                activeAiPatchContainerId={null}
+                activeAiSubMaskId={null}
+                activeMaskContainerId={null}
+                activeMaskId={null}
+                adjustments={{ ...INITIAL_ADJUSTMENTS, aspectRatio: 16 / 9 }}
+                brushSettings={null}
+                crop={crop}
+                imageRenderSize={cropRenderSize}
+                isAiEditing={false}
+                isCropping
+                isMasking={false}
+                maskOverlayUrl={null}
+                overlayMode="phiGrid"
+                overlayRotation={1}
+                setCrop={(nextCrop: Crop) => {
+                  setCropState(nextCrop);
+                }}
+              />
+            </div>
+            <div className={cardClassName} data-visual-smoke-section="professional-canvas-mask-brush">
+              <ImageCanvas
+                {...baseCanvasProps}
+                activeAiPatchContainerId={null}
+                activeAiSubMaskId={null}
+                activeMaskContainerId={brushMaskCanvasContainerId}
+                activeMaskId={brushMaskCanvasSubMaskId}
+                adjustments={{ ...INITIAL_ADJUSTMENTS, masks: [brushContainer] }}
+                brushSettings={{ feather: 58, size: 82, tool: ToolType.Brush }}
+                crop={null}
+                isAiEditing={false}
+                isCropping={false}
+                isMasking
+                maskOverlayUrl={brushOverlayUrl}
+              />
+            </div>
+            <div className={cardClassName} data-visual-smoke-section="professional-canvas-retouch-remove">
+              <ImageCanvas
+                {...baseCanvasProps}
+                activeAiPatchContainerId={null}
+                activeAiSubMaskId={null}
+                activeMaskContainerId={professionalCanvasRetouchLayerId}
+                activeMaskId={professionalCanvasRetouchTargetMaskId}
+                adjustments={{ ...INITIAL_ADJUSTMENTS, masks: [professionalCanvasRetouchContainer] }}
+                brushSettings={null}
+                crop={null}
+                isAiEditing={false}
+                isCropping={false}
+                isMasking
+                maskOverlayUrl={null}
+              />
+            </div>
+            <div
+              className={`${cardClassName} grid place-items-center`}
+              data-visual-smoke-section="professional-canvas-prompt-wb"
+            >
+              <img alt="" className="absolute inset-0 h-full w-full object-cover" src={brushMaskCanvasImageDataUrl} />
+              <span
+                className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-editor-success"
+                style={{
+                  boxShadow: '0 0 0 2px rgba(0, 0, 0, 0.58), 0 5px 14px rgba(0, 0, 0, 0.72)',
+                  left: '28%',
+                  top: '36%',
+                }}
+              />
+              <span
+                className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-editor-danger"
+                style={{
+                  boxShadow: '0 0 0 2px rgba(0, 0, 0, 0.58), 0 5px 14px rgba(0, 0, 0, 0.72)',
+                  left: '68%',
+                  top: '55%',
+                }}
+              />
+              <span
+                className="absolute border-2 border-editor-info bg-editor-info-surface"
+                style={{
+                  boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.72), 0 8px 24px rgba(0, 0, 0, 0.55)',
+                  height: '34%',
+                  left: '38%',
+                  top: '22%',
+                  width: '32%',
+                }}
+              />
+              <span
+                className="absolute h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/90"
+                style={{
+                  boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.9), 0 8px 22px rgba(0, 0, 0, 0.65)',
+                  left: '54%',
+                  top: '46%',
+                }}
+              >
+                <span className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/90" />
+                <span className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-white/90" />
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <aside
+          className="grid min-h-0 rounded-lg border border-editor-border bg-editor-panel"
+          data-visual-smoke-section="professional-canvas-status"
+          style={{ gridTemplateRows: '40px minmax(0,1fr) auto' }}
+        >
+          <div className="flex items-center justify-between border-b border-editor-border px-3">
+            <span className={editorChromeTokens.typography.panelTitle}>{copy.professionalCanvasProofStatus}</span>
+            <span className={editorChromeStatusChipClassName('warning')}>{copy.professionalEditorSoftProof}</span>
+          </div>
+          <div className="min-h-0 p-3">
+            <div className={cardClassName}>
+              <ImageCanvas
+                {...baseCanvasProps}
+                activeAiPatchContainerId={null}
+                activeAiSubMaskId={null}
+                activeMaskContainerId={null}
+                activeMaskId={null}
+                adjustments={INITIAL_ADJUSTMENTS}
+                brushSettings={null}
+                crop={null}
+                exportSoftProofRecipeId="professional-canvas-proof"
+                exportSoftProofTransform={professionalCanvasProofTransform}
+                gamutWarningOverlay={professionalCanvasGamutOverlay}
+                imageRenderSize={{ height: 252, offsetX: 0, offsetY: 0, scale: 0.7, width: 448 }}
+                isAiEditing={false}
+                isCropping={false}
+                isExportSoftProofEnabled
+                isGamutWarningOverlayVisible
+                isMasking={false}
+                maskOverlayUrl={null}
+                transformState={{ positionX: -42, positionY: 18, scale: 1.6 }}
+              />
+            </div>
+          </div>
+          <div
+            className="sr-only"
+            data-canvas-states="crop,brush,mask,retouch,remove,object-prompt,white-balance,soft-proof"
+            data-compact-ready={String(isCompactViewport)}
+            data-gamut-coverage={professionalCanvasGamutOverlay.coverage_ratio.toFixed(3)}
+            data-overlay-token-source="canvasOverlayTokens"
+            data-testid="professional-canvas-overlays-proof"
+          />
+        </aside>
+      </div>
+    </main>
+  );
+}
+
 function WorkflowRailVisualSmoke() {
   const [activePanel, setActivePanel] = useState<Panel | null>(Panel.Adjustments);
   const [compactActivePanel, setCompactActivePanel] = useState<Panel | null>(Panel.Adjustments);
@@ -2343,6 +2679,9 @@ const copy = {
   pointCounts: 'Point counts',
   runtimeProof: 'Runtime proof',
   runtimeOverlay: 'runtime overlay',
+  professionalCanvasActiveStates: 'active states',
+  professionalCanvasOverlays: 'Professional canvas overlays',
+  professionalCanvasProofStatus: 'Proof status',
   professionalCropTransformWorkspace: 'Professional crop transform workspace',
   strokeCount: (count: number) => `${count} strokes`,
   toolOrder: 'Tool order',
