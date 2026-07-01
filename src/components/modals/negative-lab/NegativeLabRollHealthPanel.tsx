@@ -18,6 +18,7 @@ import {
   negativeLabFrameRgbBalanceOffsetIsZero,
   snapNegativeLabFrameRgbBalanceOffsets,
 } from '../../../utils/negative-lab/negativeLabFrameRgbBalanceOverrides';
+import type { NegativeLabAcceptedApplyPlanStaleReason } from '../../../utils/negative-lab/negativeLabPlanIdentity';
 import type {
   NegativeLabRollNormalizationApplyReceipt,
   NegativeLabRollNormalizationRestoreReceipt,
@@ -42,6 +43,7 @@ import {
 interface NegativeLabRollHealthPanelProps {
   approvedQcFrameIds: readonly string[];
   batchApplyFrameCount: number;
+  batchPlanStaleReasons: readonly NegativeLabAcceptedApplyPlanStaleReason[];
   batchDryRunSummary: NegativeLabBatchDryRunSummary;
   batchReviewFrameCount: number;
   batchSkippedFrameCount: number;
@@ -81,6 +83,7 @@ const formatSignedRecipeValue = (value: number) => `${value >= 0 ? '+' : ''}${va
 export function NegativeLabRollHealthPanel({
   approvedQcFrameIds,
   batchApplyFrameCount,
+  batchPlanStaleReasons,
   batchDryRunSummary,
   batchReviewFrameCount,
   batchSkippedFrameCount,
@@ -285,10 +288,29 @@ export function NegativeLabRollHealthPanel({
             ? t('modals.negativeConversion.batchPlanAccepted')
             : t('modals.negativeConversion.acceptBatchPlan')}
         </button>
+        {batchPlanStaleReasons.length > 0 && (
+          <span
+            className="col-span-3 rounded border border-yellow-500/30 bg-yellow-500/10 px-1.5 py-0.5 text-yellow-100"
+            data-stale-plan-reasons={batchPlanStaleReasons.join(',')}
+            data-testid="negative-lab-batch-plan-stale-reasons"
+            role="status"
+          >
+            {t('modals.negativeConversion.batchPlanStaleReasons', {
+              reasons: batchPlanStaleReasons
+                .map((reason) => t(`modals.negativeConversion.batchPlanStaleReason.${reason}`))
+                .join(', '),
+            })}
+          </span>
+        )}
         <button
           type="button"
           aria-label={t('modals.negativeConversion.applyBatchPlan')}
           className="col-span-3 inline-flex items-center justify-center gap-1 rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+          data-accepted-plan-required="true"
+          data-accepted-plan-state={
+            isBatchPlanAccepted ? 'current' : batchPlanStaleReasons.length > 0 ? 'stale' : 'missing'
+          }
+          data-stale-plan-reasons={batchPlanStaleReasons.join(',')}
           data-testid="negative-lab-apply-batch-plan"
           disabled={!isBatchPlanAccepted}
           onClick={handleApplyBatchPlan}
@@ -319,6 +341,34 @@ export function NegativeLabRollHealthPanel({
               savedCount: batchApplyReceipt.savedPaths.length,
             })}
           </span>
+        )}
+        {batchApplyReceipt !== null && batchApplyReceipt.appliedPositives.length > 0 && (
+          <div
+            className="col-span-3 grid gap-1 rounded border border-accent/20 bg-bg-secondary p-1.5"
+            data-per-frame-receipt-count={batchApplyReceipt.appliedPositives.length}
+            data-roll-receipt-id={batchApplyReceipt.generatedProofId}
+            data-testid="negative-lab-batch-per-frame-receipts"
+          >
+            {batchApplyReceipt.appliedPositives.map((positive) => (
+              <span
+                className="truncate rounded bg-bg-primary px-1.5 py-0.5 text-text-tertiary"
+                data-frame-id={positive.frameId}
+                data-generated-artifact-id={positive.generatedArtifactId}
+                data-output-intent={positive.outputIntent}
+                data-saved-path={positive.savedPath ?? ''}
+                data-source-path={positive.sourcePath}
+                data-testid={`negative-lab-batch-frame-receipt-${positive.frameId}`}
+                data-warning-codes={positive.warningCodes.join(',')}
+                key={positive.frameId}
+                title={positive.savedPath ?? positive.sourcePath}
+              >
+                {t('modals.negativeConversion.batchFrameApplyReceipt', {
+                  frameId: positive.frameId,
+                  savedPath: positive.savedPath ?? t('modals.negativeConversion.batchFrameApplyReceiptUnsaved'),
+                })}
+              </span>
+            ))}
+          </div>
         )}
       </div>
       <div
