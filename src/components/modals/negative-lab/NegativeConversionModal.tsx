@@ -126,7 +126,10 @@ import {
   buildNegativeLabPickedPatchRect,
   type NegativeLabPatchPickerPoint,
 } from '../../../utils/negative-lab/negativeLabPatchPicker';
-import { buildNegativeLabAcceptedPlanIdentity } from '../../../utils/negative-lab/negativeLabPlanIdentity';
+import {
+  buildNegativeLabAcceptedPlanIdentity,
+  buildNegativeLabPlanHash,
+} from '../../../utils/negative-lab/negativeLabPlanIdentity';
 import {
   DEFAULT_NEGATIVE_LAB_UI_PRESET,
   NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG,
@@ -166,7 +169,10 @@ import {
   type NegativeLabPatchRole,
   NegativeLabPatchSamplerPanel,
 } from './NegativeLabPatchSamplerPanel';
-import { NegativeLabProfileComparisonGrid } from './NegativeLabProfileComparisonGrid';
+import {
+  NegativeLabProfileComparisonGrid,
+  type NegativeLabRenderedProfileCandidatePreview,
+} from './NegativeLabProfileComparisonGrid';
 import { NegativeLabQcProofPanel } from './NegativeLabQcProofPanel';
 import {
   ACQUISITION_SOURCE_FAMILY_LABEL_KEYS,
@@ -218,6 +224,7 @@ type BaseSampleDecisionLabelKey =
   | 'modals.negativeConversion.baseSampleDecision.rejected';
 
 const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
+const NEGATIVE_LAB_PROFILE_CANDIDATE_RENDER_LIMIT = 3;
 const DEFAULT_NEGATIVE_LAB_PRINT_CURVE_V2_PARAMS = {
   contrast_grade: 1,
   density_offset: 0,
@@ -233,6 +240,12 @@ const DEFAULT_SAVE_OPTIONS = {
   suffix: 'Positive',
   writeConversionBundle: true,
 };
+const buildNegativeLabRenderedCandidateHash = (payload: unknown): `fnv1a32:${string}` =>
+  `fnv1a32:${buildNegativeLabPlanHash(JSON.stringify(payload))}`;
+const getNegativeLabProfileBaseSampleId = (params: NegativeParams): string =>
+  params.base_fog_sample === null ? 'active-frame:pending-base-fog-sample' : 'profile:embedded-base-fog-sample';
+const getNegativeLabRenderedCandidateError = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 const NEGATIVE_LAB_QC_OVERLAY_STORAGE_KEY = 'rawengine.negativeLab.qcOverlayVisibility.v1';
 const DEFAULT_NEGATIVE_LAB_QC_OVERLAY_VISIBILITY = {
   densityWarnings: true,
@@ -477,6 +490,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [profileFilter, setProfileFilter] = useState<NegativeLabProfileFilter>('all');
   const [profileSort, setProfileSort] = useState<NegativeLabProfileSort>('catalog');
   const [browsedComparisonProfileId, setBrowsedComparisonProfileId] = useState<string | null>(null);
+  const [renderedProfileCandidatePreviewById, setRenderedProfileCandidatePreviewById] = useState<
+    Record<string, NegativeLabRenderedProfileCandidatePreview>
+  >({});
   const [frameHealthFilter, setFrameHealthFilter] = useState<NegativeLabFrameHealthFilter>('all');
   const [frameHealthSort, setFrameHealthSort] = useState<NegativeLabFrameHealthSort>('roll_order');
   const [qcOverlayVisibility, setQcOverlayVisibility] = useState<NegativeLabQcOverlayVisibility>(
@@ -1431,6 +1447,139 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       offsetsByFrameId,
     }),
   });
+
+  useEffect(() => {
+    if (!isOpen || selectedImagePath === null) {
+      setRenderedProfileCandidatePreviewById({});
+      return;
+    }
+
+    const candidateRows = [
+      ...profileComparisonRows.slice(0, NEGATIVE_LAB_PROFILE_CANDIDATE_RENDER_LIMIT),
+      ...profileComparisonRows.filter((row) => row.profile.presetId === browsedComparisonProfileId),
+    ].filter(
+      (row, index, candidates) =>
+        candidates.findIndex((candidate) => candidate.profile.presetId === row.profile.presetId) === index,
+    );
+
+    let cancelled = false;
+
+    const renderingPreviewById: Record<string, NegativeLabRenderedProfileCandidatePreview> = {};
+    for (const row of candidateRows) {
+      renderingPreviewById[row.profile.presetId] = {
+        baseSampleId: getNegativeLabProfileBaseSampleId(row.profile.params),
+        identicalOutputReason: null,
+        imageHash: buildNegativeLabRenderedCandidateHash({
+          profileProvenanceHash: row.selectedProfileSnapshot.profileProvenanceHash,
+          status: row.profile.isSelectable ? 'rendering' : 'blocked',
+        }),
+        previewHash: row.renderEvidence.previewHash as `fnv1a32:${string}`,
+        renderError: row.profile.isSelectable ? null : (row.profile.disabledReason ?? 'profile_not_runtime_selectable'),
+        status: row.profile.isSelectable ? 'rendering' : 'blocked',
+        url: null,
+      };
+    }
+    setRenderedProfileCandidatePreviewById(renderingPreviewById);
+
+    void Promise.all(
+      candidateRows.map(async (row) => {
+        if (!row.profile.isSelectable) {
+          return {
+            baseSampleId: getNegativeLabProfileBaseSampleId(row.profile.params),
+            identicalOutputReason: null,
+            imageHash: buildNegativeLabRenderedCandidateHash({
+              profileProvenanceHash: row.selectedProfileSnapshot.profileProvenanceHash,
+              status: 'blocked',
+            }),
+            previewHash: row.renderEvidence.previewHash as `fnv1a32:${string}`,
+            renderError: row.profile.disabledReason ?? 'profile_not_runtime_selectable',
+            status: 'blocked',
+            url: null,
+          } satisfies NegativeLabRenderedProfileCandidatePreview;
+        }
+
+        const candidateParams = buildParamsWithFrameOverrides(row.profile.params);
+        const baseSampleId = getNegativeLabProfileBaseSampleId(candidateParams);
+
+        try {
+          const url: string = await invoke(Invokes.PreviewNegativeConversion, {
+            params: candidateParams,
+            path: selectedImagePath,
+          });
+          const imageHash = buildNegativeLabRenderedCandidateHash({
+            pipeline: Invokes.PreviewNegativeConversion,
+            profileProvenanceHash: row.selectedProfileSnapshot.profileProvenanceHash,
+            url,
+          });
+
+          return {
+            baseSampleId,
+            identicalOutputReason: null,
+            imageHash,
+            previewHash: buildNegativeLabRenderedCandidateHash({
+              algorithm: row.renderEvidence.densityAlgorithm,
+              baseSampleId,
+              imageHash,
+              outputTag: row.renderEvidence.outputTag,
+              profileProvenanceHash: row.selectedProfileSnapshot.profileProvenanceHash,
+            }),
+            renderError: null,
+            status: 'ready',
+            url,
+          } satisfies NegativeLabRenderedProfileCandidatePreview;
+        } catch (error) {
+          const renderError = getNegativeLabRenderedCandidateError(error);
+          return {
+            baseSampleId,
+            identicalOutputReason: null,
+            imageHash: buildNegativeLabRenderedCandidateHash({
+              profileProvenanceHash: row.selectedProfileSnapshot.profileProvenanceHash,
+              renderError,
+            }),
+            previewHash: row.renderEvidence.previewHash as `fnv1a32:${string}`,
+            renderError,
+            status: 'failed',
+            url: null,
+          } satisfies NegativeLabRenderedProfileCandidatePreview;
+        }
+      }),
+    ).then((previews) => {
+      if (cancelled) return;
+
+      const readyImageHashCounts = new Map<string, number>();
+      for (const preview of previews) {
+        if (preview.status === 'ready') {
+          readyImageHashCounts.set(preview.imageHash, (readyImageHashCounts.get(preview.imageHash) ?? 0) + 1);
+        }
+      }
+
+      const previewById: Record<string, NegativeLabRenderedProfileCandidatePreview> = {};
+      for (const [index, row] of candidateRows.entries()) {
+        const preview = previews[index];
+        if (preview === undefined) continue;
+        previewById[row.profile.presetId] =
+          preview.status === 'ready' && (readyImageHashCounts.get(preview.imageHash) ?? 0) > 1
+            ? {
+                ...preview,
+                identicalOutputReason: 'backend_preview_returned_identical_pixels_for_candidate_params',
+              }
+            : preview;
+      }
+      setRenderedProfileCandidatePreviewById(previewById);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    browsedComparisonProfileId,
+    frameExposureOffsetByFrameId,
+    frameHealthReport.activeFrameId,
+    frameRgbBalanceOffsetByFrameId,
+    isOpen,
+    profileComparisonRows,
+    selectedImagePath,
+  ]);
 
   const handleParamChange = (key: keyof NegativeParams, value: number) => {
     const newParams = { ...params, [key]: value };
@@ -3690,6 +3839,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             browsedProfileId={browsedComparisonProfileId}
             onBrowseProfile={setBrowsedComparisonProfileId}
             onUseProfile={handlePresetSelect}
+            renderedPreviewByProfileId={renderedProfileCandidatePreviewById}
             rows={profileComparisonRows}
             selectedPresetId={selectedPresetId}
             selectedProfileProvenanceHash={selectedProfileProvenanceHash}

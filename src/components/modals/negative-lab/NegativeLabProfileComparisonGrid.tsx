@@ -6,10 +6,21 @@ import type { NegativeLabProfileComparisonRow } from '../../../schemas/negative-
 import { TextVariants } from '../../../types/typography';
 import UiText from '../../ui/primitives/Text';
 
+export interface NegativeLabRenderedProfileCandidatePreview {
+  baseSampleId: string;
+  identicalOutputReason: string | null;
+  imageHash: `fnv1a32:${string}`;
+  previewHash: `fnv1a32:${string}`;
+  renderError: string | null;
+  status: 'blocked' | 'failed' | 'ready' | 'rendering';
+  url: string | null;
+}
+
 interface NegativeLabProfileComparisonGridProps {
   browsedProfileId: string | null;
   onBrowseProfile: (profileId: string) => void;
   onUseProfile: (profile: NegativeLabRuntimeProfileBrowserRow) => void;
+  renderedPreviewByProfileId: Readonly<Record<string, NegativeLabRenderedProfileCandidatePreview>>;
   rows: NegativeLabProfileComparisonRow[];
   selectedProfileProvenanceHash: string | null;
   selectedPresetId: string;
@@ -20,6 +31,7 @@ export function NegativeLabProfileComparisonGrid({
   browsedProfileId,
   onBrowseProfile,
   onUseProfile,
+  renderedPreviewByProfileId,
   rows,
   selectedProfileProvenanceHash,
   selectedPresetId,
@@ -63,6 +75,9 @@ export function NegativeLabProfileComparisonGrid({
           const profile = candidate.profile;
           const isSelected = selectedPresetId === profile.presetId;
           const isBrowsed = browsedRow?.profile.presetId === profile.presetId;
+          const renderedPreview = renderedPreviewByProfileId[profile.presetId] ?? null;
+          const effectivePreviewHash = renderedPreview?.previewHash ?? candidate.renderEvidence.previewHash;
+          const effectiveRenderHash = renderedPreview?.imageHash ?? candidate.renderEvidence.renderHash;
 
           return (
             <div
@@ -78,15 +93,19 @@ export function NegativeLabProfileComparisonGrid({
               data-delta-summary={candidate.deltaSummary}
               data-density-algorithm={candidate.renderEvidence.densityAlgorithm}
               data-evidence-fixture-count={profile.evidenceFixtureCount}
+              data-identical-output-reason={renderedPreview?.identicalOutputReason ?? ''}
+              data-image-hash={renderedPreview?.imageHash ?? ''}
               data-metric-hash={candidate.renderEvidence.metricHash}
               data-mutation-browsing-mutates-edit-graph={String(candidate.mutationSafety.browsingMutatesEditGraph)}
               data-mutation-requires-accepted-plan={String(candidate.mutationSafety.requiresAcceptedPlanForApply)}
               data-output-tag={candidate.renderEvidence.outputTag}
-              data-preview-hash={candidate.renderEvidence.previewHash}
+              data-preview-hash={effectivePreviewHash}
+              data-preview-render-status={renderedPreview?.status ?? 'metadata_only'}
               data-print-curve-version={candidate.renderEvidence.printCurveVersion}
               data-profile-provenance-hash={candidate.selectedProfileSnapshot.profileProvenanceHash}
               data-profile-status={profile.profileStatus}
-              data-render-hash={candidate.renderEvidence.renderHash}
+              data-render-error={renderedPreview?.renderError ?? ''}
+              data-render-hash={effectiveRenderHash}
               data-runtime-status={profile.runtimeStatus}
               data-runtime-apply-selectable={String(candidate.mutationSafety.selectableForRuntimeApply)}
               data-selected={String(isSelected)}
@@ -118,13 +137,31 @@ export function NegativeLabProfileComparisonGrid({
                 </span>
                 <span
                   aria-hidden="true"
-                  className="mt-2 block h-6 rounded border border-surface"
+                  className="mt-2 block h-24 overflow-hidden rounded border border-surface bg-bg-primary"
+                  data-base-sample-id={renderedPreview?.baseSampleId ?? candidate.renderEvidence.baseSampleReference}
                   data-preview-candidate-color={candidate.previewSwatch.candidateCss}
                   data-preview-current-color={candidate.previewSwatch.currentCss}
+                  data-preview-image-hash={renderedPreview?.imageHash ?? ''}
                   data-preview-tone-bias={candidate.previewSwatch.toneBias}
+                  data-rendered-positive-preview={renderedPreview?.url !== null && renderedPreview?.url !== undefined}
                   data-testid={`negative-lab-profile-comparison-preview-${profile.presetId}`}
                   style={{ background: candidate.previewSwatch.deltaCss }}
-                />
+                >
+                  {renderedPreview?.url !== null && renderedPreview?.url !== undefined ? (
+                    <img
+                      alt=""
+                      className="h-full w-full object-cover"
+                      data-testid={`negative-lab-profile-comparison-rendered-preview-${profile.presetId}`}
+                      src={renderedPreview.url}
+                    />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center bg-bg-secondary px-2 text-center text-[10px] text-text-tertiary">
+                      {renderedPreview?.status === 'failed'
+                        ? t('modals.negativeConversion.previewFailed')
+                        : t('modals.negativeConversion.previewRendering')}
+                    </span>
+                  )}
+                </span>
               </button>
               <div className="mt-1 flex flex-wrap gap-1.5 text-[10px] text-text-tertiary">
                 <span data-testid={`negative-lab-profile-comparison-runtime-${profile.presetId}`}>

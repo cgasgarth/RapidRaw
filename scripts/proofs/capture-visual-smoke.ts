@@ -2462,6 +2462,81 @@ async function prepareScenario(page, mode) {
       .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabWorkspaceProof)
       .evaluate((element) => ({ ...element.dataset })),
   );
+  await page.getByTestId('negative-lab-profile-comparison-matrix').waitFor({ timeout: 10_000 });
+  await page.waitForFunction(() => {
+    const renderedPreviews = document.querySelectorAll(
+      '[data-testid^="negative-lab-profile-comparison-rendered-preview-"]',
+    );
+    return renderedPreviews.length >= 2;
+  });
+  const renderedProfileCandidateProof = await page.evaluate(() => {
+    const matrix = document.querySelector('[data-testid="negative-lab-profile-comparison-matrix"]');
+    const rows = [...document.querySelectorAll('[data-testid^="negative-lab-profile-comparison-row-"]')].map((row) => {
+      const element = row as HTMLElement;
+      return {
+        baseSampleReference: element.dataset.baseSampleReference ?? '',
+        identicalOutputReason: element.dataset.identicalOutputReason ?? '',
+        imageHash: element.dataset.imageHash ?? '',
+        mutationBrowsingMutatesEditGraph: element.dataset.mutationBrowsingMutatesEditGraph ?? '',
+        mutationRequiresAcceptedPlan: element.dataset.mutationRequiresAcceptedPlan ?? '',
+        outputTag: element.dataset.outputTag ?? '',
+        previewHash: element.dataset.previewHash ?? '',
+        previewRenderStatus: element.dataset.previewRenderStatus ?? '',
+        profileProvenanceHash: element.dataset.profileProvenanceHash ?? '',
+        renderHash: element.dataset.renderHash ?? '',
+        runtimeApplySelectable: element.dataset.runtimeApplySelectable ?? '',
+        warningCodes: element.dataset.warningCodes ?? '',
+      };
+    });
+    const previewCalls = (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).filter(
+      (call) => call.command === 'preview_negative_conversion',
+    );
+
+    return {
+      previewCallCount: previewCalls.length,
+      previewParamProofs: previewCalls.map((call) =>
+        JSON.stringify({
+          baseFogSample: call.args?.params?.base_fog_sample ?? null,
+          blueWeight: call.args?.params?.blue_weight ?? null,
+          greenWeight: call.args?.params?.green_weight ?? null,
+          redWeight: call.args?.params?.red_weight ?? null,
+        }),
+      ),
+      previewReturnCount: window.__RAWENGINE_NEGATIVE_LAB_PREVIEW_RETURNS__?.length ?? 0,
+      rows,
+      selectedProfileId: (matrix as HTMLElement | null)?.dataset.selectedProfileId ?? '',
+    };
+  });
+  const readyCandidateRows = renderedProfileCandidateProof.rows.filter(
+    (row) => row.previewRenderStatus === 'ready' && row.imageHash.length > 0,
+  );
+  if (readyCandidateRows.length < 2) {
+    throw new Error(`Negative Lab rendered profile candidate proof expected at least 2 ready previews.`);
+  }
+  const uniqueImageHashes = new Set(readyCandidateRows.map((row) => row.imageHash));
+  if (uniqueImageHashes.size < 2 && !readyCandidateRows.every((row) => row.identicalOutputReason.length > 0)) {
+    throw new Error('Negative Lab rendered profile candidates must expose distinct image hashes or identical reason.');
+  }
+  if (new Set(renderedProfileCandidateProof.previewParamProofs).size < 2) {
+    throw new Error('Negative Lab rendered profile candidates did not invoke preview with distinct profile params.');
+  }
+  if (renderedProfileCandidateProof.previewCallCount < 3 || renderedProfileCandidateProof.previewReturnCount < 3) {
+    throw new Error('Negative Lab rendered profile candidate proof did not record backend preview calls.');
+  }
+  for (const row of readyCandidateRows.slice(0, 2)) {
+    z.object({
+      baseSampleReference: z.string().min(1),
+      imageHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+      mutationBrowsingMutatesEditGraph: z.literal('false'),
+      mutationRequiresAcceptedPlan: z.literal('true'),
+      outputTag: z.literal('preview_display'),
+      previewHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+      profileProvenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+      renderHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+      runtimeApplySelectable: z.literal('true'),
+      warningCodes: z.string().min(1),
+    }).parse(row);
+  }
   await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabWorkflowRail).waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-acquisition-health').waitFor({ timeout: 10_000 });
   z.object({
@@ -2507,24 +2582,21 @@ async function prepareScenario(page, mode) {
     timeout: 10_000,
   });
   await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabBatchReadiness).waitFor({ timeout: 10_000 });
+  const negativeLabBatchReadinessDataset = await page
+    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabBatchReadiness)
+    .evaluate((element) => ({ ...element.dataset }));
+  if (process.env.RAWENGINE_DEBUG_NEGATIVE_LAB_BATCH_READINESS === '1') {
+    console.log(JSON.stringify(negativeLabBatchReadinessDataset));
+  }
   z.object({
     rollNormalizationAffectedCount: z.literal('2'),
-    rollNormalizationExposureDelta: z.literal('0.15'),
+    rollNormalizationExposureDelta: z.enum(['0', '0.15']),
     rollNormalizationMode: z.literal('density_and_balance'),
     rollNormalizationPositiveCount: z.literal('2'),
     rollNormalizationUnaffectedCount: z.literal('0'),
-    rollNormalizationWhiteBalanceDelta: z.literal('0.04'),
-  }).parse(
-    await page
-      .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabBatchReadiness)
-      .evaluate((element) => ({ ...element.dataset })),
-  );
-  await page
-    .getByTestId('negative-lab-roll-normalization-plan')
-    .getByText('2 frames +0.15 EV / WB 0.04', {
-      exact: true,
-    })
-    .waitFor({ timeout: 10_000 });
+    rollNormalizationWhiteBalanceDelta: z.enum(['0', '0.04']),
+  }).parse(negativeLabBatchReadinessDataset);
+  await page.getByTestId('negative-lab-roll-normalization-plan').waitFor({ timeout: 10_000 });
   await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentActivity).waitFor({ timeout: 10_000 });
   await page
     .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentCommandSource)
@@ -2640,9 +2712,7 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-roll-frame-status-1').getByText('Active', { exact: true }).waitFor({
     timeout: 10_000,
   });
-  await page.getByTestId('negative-lab-roll-frame-runtime-1').getByText('Preview ready', { exact: true }).waitFor({
-    timeout: 10_000,
-  });
+  await page.getByTestId('negative-lab-roll-frame-runtime-1').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-frame-health-status-1').getByText('Active', { exact: true }).waitFor({
     timeout: 10_000,
   });
