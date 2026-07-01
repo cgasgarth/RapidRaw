@@ -296,6 +296,33 @@ const adapter: AgentSessionAuditStorageAdapter = {
 
 const receipt = appendAgentSelectedImageExportReceipt(adapter, {
   approvalId: finalExport.receipt.approvalId,
+  approvalState: 'approved',
+  auditEntries: [
+    {
+      id: 'agent-selected-image-export-3162-review',
+      recipeHash: loopResult.finalRecipeHash,
+      stage: 'review',
+      status: 'reviewed',
+      summary: 'Review receipt generated before final export.',
+      toolName: 'rawengine.agent.export.proof',
+    },
+    {
+      id: 'agent-selected-image-export-3162-approval',
+      recipeHash: finalExport.receipt.recipeHash,
+      stage: 'approval',
+      status: 'approved',
+      summary: 'Explicit approval accepted final export.',
+      toolName: AGENT_FINAL_EXPORT_TOOL_NAME,
+    },
+    {
+      id: 'agent-selected-image-export-3162-final',
+      recipeHash: finalExport.receipt.recipeHash,
+      stage: 'final_result',
+      status: 'completed',
+      summary: 'Final export artifact recorded.',
+      toolName: AGENT_FINAL_EXPORT_TOOL_NAME,
+    },
+  ],
   beforePreviewArtifact: {
     artifactId: loopResult.compareArtifactIds.beforeArtifactId,
     ...loopResult.compareArtifactIds.beforeEvidence,
@@ -310,6 +337,15 @@ const receipt = appendAgentSelectedImageExportReceipt(adapter, {
   initialGraphRevision: loopResult.initialGraphRevision,
   initialRecipeHash: loopResult.initialRecipeHash,
   noOverwritePolicy: finalExport.receipt.noOverwritePolicy,
+  output: {
+    colorProfile: finalExport.receipt.exportSettings.colorProfile,
+    dimensions: {
+      height: finalExport.output.height,
+      width: finalExport.output.width,
+    },
+    format: finalExport.receipt.exportSettings.fileFormat,
+    targetPathPreview: finalExport.receipt.outputPath,
+  },
   outputHash: finalExport.receipt.outputHash,
   outputPath: finalExport.receipt.outputPath,
   prompt: baseLoopRequest.prompt,
@@ -327,6 +363,11 @@ const receipt = appendAgentSelectedImageExportReceipt(adapter, {
 agentSelectedImageExportReceiptSchema.parse(receipt);
 if (
   receipt.selectedRawPath !== selectedPath ||
+  receipt.approvalState !== 'approved' ||
+  receipt.auditEntries.map((entry) => entry.stage).join(',') !== 'review,approval,final_result' ||
+  receipt.output.format !== 'jpeg' ||
+  receipt.output.dimensions.width !== finalExport.output.width ||
+  receipt.output.targetPathPreview !== finalExport.receipt.outputPath ||
   receipt.beforePreviewArtifact.artifactId.length === 0 ||
   receipt.currentPreviewArtifact.artifactId.length === 0 ||
   receipt.rollback.status !== 'available' ||

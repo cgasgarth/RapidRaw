@@ -11,6 +11,7 @@ import {
   AGENT_FINAL_EXPORT_TOOL_NAME,
   agentExportProofRequestSchema,
   agentFinalExportRequestSchema,
+  buildAgentExportPresetSettings,
   buildAgentExportProof,
   buildAgentFinalExport,
 } from '../../../../src/utils/agent/safety/agentExportProofTool.ts';
@@ -91,16 +92,29 @@ try {
 }
 if (!staleRejected) throw new Error('agent.export.proof did not reject stale recipe hash.');
 
-expectRejects(() =>
-  buildAgentExportProof({
-    approval: buildApproval('pending'),
-    dryRun: true,
-    expectedRecipeHash: snapshot.initialPreview.recipeHash,
-    operationId: 'pending_export',
-    requestId: 'pending-export',
-    sessionId: 'agent-export-proof-3163',
-  }),
-);
+const pendingReview = buildAgentExportProof({
+  approval: buildApproval('pending'),
+  dryRun: true,
+  expectedRecipeHash: snapshot.initialPreview.recipeHash,
+  operationId: 'pending_export',
+  requestId: 'pending-export',
+  sessionId: 'agent-export-proof-3163',
+});
+if (pendingReview.fileWritten || pendingReview.receipt.approvalState !== 'pending') {
+  throw new Error('agent.export.proof must produce a pending review receipt without exporting.');
+}
+
+const declinedReview = buildAgentExportProof({
+  approval: buildApproval('cancelled'),
+  dryRun: true,
+  expectedRecipeHash: snapshot.initialPreview.recipeHash,
+  operationId: 'declined_export',
+  requestId: 'declined-export',
+  sessionId: 'agent-export-proof-3163',
+});
+if (declinedReview.fileWritten || declinedReview.receipt.approvalState !== 'cancelled') {
+  throw new Error('agent.export.proof must preserve declined approval state without exporting.');
+}
 
 expectRejects(() =>
   buildAgentExportProof({
@@ -143,6 +157,10 @@ if (
   proof.receipt.noOverwritePolicy !== 'never_overwrite_original' ||
   proof.receipt.outputHash !== proof.exportHash ||
   !proof.receipt.outputPath.includes('DSC_3163') ||
+  proof.receipt.targetPathPreview !== proof.receipt.outputPath ||
+  proof.receipt.approvalState !== 'approved' ||
+  proof.receipt.dimensions.width !== proof.output.width ||
+  proof.receipt.dimensions.height !== proof.output.height ||
   proof.receipt.exportSettings.longEdgePx !== 1536
 ) {
   throw new Error('agent.export.proof receipt did not bind no-overwrite output metadata and export settings.');
@@ -171,6 +189,44 @@ if (pngProof.output.mediaType !== 'image/png' || pngProof.output.width !== 1024 
 if (pngProof.exportHash === proof.exportHash) {
   throw new Error('agent.export.proof export hash must change when output transform changes.');
 }
+
+const presetSettings = buildAgentExportPresetSettings({
+  presets: [
+    {
+      colorProfile: 'displayP3',
+      dontEnlarge: true,
+      enableResize: true,
+      enableWatermark: false,
+      exportMasks: false,
+      fileFormat: 'jpeg',
+      filenameTemplate: '{original_filename}',
+      id: '__last_used__',
+      jpegQuality: 91,
+      keepMetadata: true,
+      name: 'last used',
+      preserveFolders: false,
+      preserveTimestamps: false,
+      renderingIntent: 'perceptual',
+      resizeMode: 'longEdge',
+      resizeValue: 2400,
+      stripGps: true,
+      watermarkAnchor: 'bottomRight',
+      watermarkOpacity: 50,
+      watermarkPath: null,
+      watermarkScale: 12,
+      watermarkSpacing: 8,
+    },
+  ],
+});
+if (
+  presetSettings.presetId !== '__last_used__' ||
+  presetSettings.colorProfile !== 'displayP3' ||
+  presetSettings.longEdgePx !== 2400 ||
+  presetSettings.jpegQuality !== 91
+) {
+  throw new Error('agent export review did not derive settings from the existing export preset.');
+}
+expectRejects(() => buildAgentExportPresetSettings({ presets: [] }));
 
 if (
   agentFinalExportRequestSchema.safeParse({
