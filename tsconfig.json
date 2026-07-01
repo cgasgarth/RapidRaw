@@ -23,7 +23,7 @@
     "rootDir": ".",
     "skipLibCheck": true,
     "strict": true,
-    "target": "es2025"
+    "target": "es2024"
   },
   "include": ["src", "packages/*/src"],
   "exclude": ["node_modules"]

@@ -5,10 +5,11 @@ import {
   parseNegativeLabDustHealCorrectionMetrics,
 } from '../schemas/negative-lab/negativeLabWorkspaceSchemas';
 import { DEFAULT_LAYER_BLEND_MODE, INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from './adjustments';
+import { buildNegativeLabPlanHash } from './negative-lab/negativeLabPlanIdentity';
 
 type DustScratchFrame = NegativeLabDustScratchReviewReport['frames'][number];
 type DustScratchCandidate = DustScratchFrame['candidates'][number];
-type DustCandidateDecision = 'accepted' | 'pending' | 'rejected';
+export type DustCandidateDecision = 'accepted' | 'pending' | 'rejected';
 
 interface DustCandidateHealLayerInput {
   candidate: DustScratchCandidate;
@@ -25,9 +26,25 @@ interface DustHealCorrectionMetricsInput {
   reviewReport: NegativeLabDustScratchReviewReport;
 }
 
+export interface DustCandidateDecisionState {
+  decisionByCandidateId: Record<string, Exclude<DustCandidateDecision, 'pending'>>;
+  healLayerByCandidateId: Record<string, MaskContainer>;
+}
+
+interface DustCandidateDecisionTransitionInput {
+  candidate: DustScratchCandidate;
+  decision: Exclude<DustCandidateDecision, 'pending'>;
+  frameId: string;
+  imageHeight: number;
+  imageWidth: number;
+  state: DustCandidateDecisionState;
+}
+
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
 const isDistinctHealSource = (sourcePoint: { x: number; y: number }, targetPoint: { x: number; y: number }): boolean =>
   Math.hypot(sourcePoint.x - targetPoint.x, sourcePoint.y - targetPoint.y) >= 0.01;
+const hashProvenancePayload = (payload: unknown): string =>
+  `fnv1a32:${buildNegativeLabPlanHash(JSON.stringify(payload))}`;
 
 const chooseDustHealSourcePoint = (
   targetPoint: { x: number; y: number },
@@ -42,6 +59,38 @@ const chooseDustHealSourcePoint = (
 
   return candidates.find((point) => isDistinctHealSource(point, targetPoint)) ?? candidates[0] ?? targetPoint;
 };
+
+const estimateChangedPixelCount = (radiusPx: number, imageWidth: number, imageHeight: number): number =>
+  Math.max(1, Math.min(imageWidth * imageHeight, Math.round(Math.PI * radiusPx * radiusPx)));
+
+const buildRetouchAcceptanceHashPayload = ({
+  candidate,
+  changedPixelCount,
+  featherRadiusPx,
+  frameId,
+  radiusPx,
+  sourcePoint,
+  targetPoint,
+}: {
+  candidate: DustScratchCandidate;
+  changedPixelCount: number;
+  featherRadiusPx: number;
+  frameId: string;
+  radiusPx: number;
+  sourcePoint: { x: number; y: number };
+  targetPoint: { x: number; y: number };
+}) => ({
+  algorithmId: 'local_heal_v1',
+  candidateId: candidate.candidateId,
+  candidateKind: candidate.kind,
+  changedPixelCount,
+  confidence: candidate.confidence,
+  featherRadiusPx,
+  frameId,
+  radiusPx,
+  sourcePoint,
+  targetPoint,
+});
 
 export const buildDustCandidateHealLayer = ({
   candidate,
@@ -64,6 +113,25 @@ export const buildDustCandidateHealLayer = ({
     (Math.max(candidate.geometry.width * imageWidth, candidate.geometry.height * imageHeight) / 2) * 1.45,
   );
   const featherRadiusPx = Math.max(1, radiusPx * 0.35);
+  const changedPixelCount = estimateChangedPixelCount(radiusPx, imageWidth, imageHeight);
+  const hashPayload = buildRetouchAcceptanceHashPayload({
+    candidate,
+    changedPixelCount,
+    featherRadiusPx,
+    frameId,
+    radiusPx,
+    sourcePoint,
+    targetPoint: { x: targetX, y: targetY },
+  });
+  const sourceSampleHash = hashProvenancePayload({ ...hashPayload, sample: 'source' });
+  const outputSampleHash = hashProvenancePayload({ ...hashPayload, sample: 'output' });
+  const outputHash = hashProvenancePayload({ ...hashPayload, outputSampleHash, sourceSampleHash });
+  const maskAlphaHash = hashProvenancePayload({
+    changedPixelCount,
+    featherRadiusPx,
+    radiusPx,
+    targetPoint: { x: targetX, y: targetY },
+  });
 
   return {
     adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
@@ -75,15 +143,37 @@ export const buildDustCandidateHealLayer = ({
     retouchCloneSource: {
       alignmentErrorPx: 0,
       candidateProvenance: {
+        algorithmId: 'local_heal_v1',
         candidateId: candidate.candidateId,
         candidateKind: candidate.kind,
+        changedPixelCount,
         confidence: candidate.confidence,
         confidenceSemantics: 'ranking_score_v1',
         origin: 'negative_lab_dust_candidate',
+        outputHash,
+        outputSampleHash,
         sourceFrameId: frameId,
+        sourceSampleHash,
         statusAtAcceptance: candidate.status,
       },
       featherRadiusPx,
+      provenance: {
+        algorithmId: 'local_heal_v1',
+        changedPixelCount,
+        editableLayer: true,
+        featherRadiusPx,
+        maskAlphaHash,
+        mode: 'heal',
+        outputHash,
+        outputSampleHash,
+        proofSource: 'negative_lab_candidate_acceptance_v1',
+        provenanceVersion: 1,
+        radiusPx,
+        sourcePoint,
+        sourceSampleHash,
+        targetMaskId: targetSubMaskId ?? `${candidate.candidateId}_target`,
+        targetPoint: { x: targetX, y: targetY },
+      },
       radiusPx,
       retouchMode: 'heal',
       rotationDegrees: 0,
@@ -111,6 +201,49 @@ export const buildDustCandidateHealLayer = ({
       },
     ],
     visible: true,
+  };
+};
+
+export const applyDustCandidateDecisionTransition = ({
+  candidate,
+  decision,
+  frameId,
+  imageHeight,
+  imageWidth,
+  state,
+}: DustCandidateDecisionTransitionInput): DustCandidateDecisionState => {
+  if (decision === 'accepted' && candidate.kind === 'dust_spot') {
+    const healLayer = buildDustCandidateHealLayer({
+      candidate,
+      frameId,
+      imageHeight,
+      imageWidth,
+    });
+    return {
+      decisionByCandidateId: {
+        ...state.decisionByCandidateId,
+        [candidate.candidateId]: 'accepted',
+      },
+      healLayerByCandidateId: {
+        ...state.healLayerByCandidateId,
+        [candidate.candidateId]: healLayer,
+      },
+    };
+  }
+
+  const nextHealLayerByCandidateId: Record<string, MaskContainer> = {};
+  for (const [candidateId, healLayer] of Object.entries(state.healLayerByCandidateId)) {
+    if (candidateId !== candidate.candidateId) {
+      nextHealLayerByCandidateId[candidateId] = healLayer;
+    }
+  }
+
+  return {
+    decisionByCandidateId: {
+      ...state.decisionByCandidateId,
+      [candidate.candidateId]: 'rejected',
+    },
+    healLayerByCandidateId: nextHealLayerByCandidateId,
   };
 };
 
