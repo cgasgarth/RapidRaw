@@ -87,6 +87,7 @@ type LayerStackCommand = Extract<
       | 'layerMask.deleteLayer'
       | 'layerMask.duplicateLayer'
       | 'layerMask.applyLayerAdjustment'
+      | 'layerMask.attachMask'
       | 'layerMask.moveLayer'
       | 'layerMask.renameLayer'
       | 'layerMask.setLayerOpacity'
@@ -111,6 +112,7 @@ const isLayerStackCommand = (command: LayerMaskCommandEnvelopeV1): command is La
     'layerMask.renameLayer',
     'layerMask.duplicateLayer',
     'layerMask.applyLayerAdjustment',
+    'layerMask.attachMask',
     'layerMask.deleteLayer',
     'layerMask.moveLayer',
     'layerMask.updateRetouchRemoveSource',
@@ -267,6 +269,15 @@ const applyCommandToLayers = (
           : layer,
       );
     }
+    case 'layerMask.attachMask':
+      layerIndex(layers, command.parameters.layerId);
+      return layers.map((layer) => {
+        if (layer.id !== command.parameters.layerId) return layer;
+        const nextMaskIds = command.parameters.replaceExisting
+          ? [command.parameters.maskId]
+          : [...layer.maskIds.filter((maskId) => maskId !== command.parameters.maskId), command.parameters.maskId];
+        return { ...layer, maskIds: nextMaskIds };
+      });
     case 'layerMask.deleteLayer':
       layerIndex(layers, command.parameters.layerId);
       return layers.filter((layer) => layer.id !== command.parameters.layerId);
@@ -355,7 +366,7 @@ export function dispatchLayerStackCommand(
     commandResult: {
       appliedGraphRevision: nextSidecar.graphRevision,
       changedLayerIds: changedLayerIds(sidecar.layers, nextSidecar.layers, command),
-      changedMaskIds: [],
+      changedMaskIds: command.commandType === 'layerMask.attachMask' ? [command.parameters.maskId] : [],
       changedNodeIds: [],
       commandId: command.commandId,
       commandType: command.commandType,

@@ -307,6 +307,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawUi]: HdrPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.HdrSavedOutputEditorPath]: HdrSavedOutputEditorPathVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.HdrUi]: HdrVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.LayerBrushLocalAdjustment]: LayerBrushLocalAdjustmentVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LayerMaskPrivateRawUi]: LayerMaskPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LayerStackWorkflow]: LayerStackWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LibraryWorkflow]: LibraryWorkflowVisualSmoke,
@@ -1388,6 +1389,20 @@ const copy = {
   layerWorkflowDescription: 'Mask, blend, opacity, and order state captured in one smoke path.',
   layerVisibleCount: (count: number) => `${count} visible`,
   layerRuntimeEvidence: 'Runtime evidence',
+  layerBrushCommandType: 'layerMask.createBrushMask',
+  layerBrushLocalAdjustment: 'Brush Local Adjustment',
+  layerBrushLocalCommandFlow: 'typed layer command flow',
+  layerBrushLocalGraphLabel: 'Graph',
+  layerBrushLocalGraphValue: 'rollback layer_brush_local_initial',
+  layerBrushLocalLayerLabel: 'Layer',
+  layerBrushLocalLayerValue: 'Brush Local Adjustment 1',
+  layerBrushLocalMaskLabel: 'Brush mask',
+  layerBrushLocalMaskValue: '2 strokes / rubylith overlay',
+  layerBrushLocalReceipt: 'Receipt',
+  layerBrushLocalReplayLabel: 'Replay',
+  layerBrushLocalReplayReady: 'undo/replay ready',
+  layerBrushLocalReplayValue: 'create layer -> brush mask -> scoped tone',
+  layerBrushLocalToneSummary: 'Local exposure +0.35 / shadows +16 / contrast +14',
   layerMaskPrivateRawReview: 'Private RAW layer mask review',
   layerMaskPrivateRawRuntime: 'Private RAW runtime',
   layerMaskPrivateRawUnmasked: 'Unmasked RAW preview',
@@ -2942,6 +2957,88 @@ function LayerMaskPrivateRawVisualSmoke() {
               <p className="text-xs text-[#aab2bd]">{copy.layerMaskPrivateRawExport}</p>
               <p className="break-all">{proof.exportArtifact}</p>
             </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function LayerBrushLocalAdjustmentVisualSmoke() {
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.LayerBrushLocalAdjustment}
+    >
+      <div className="grid h-screen grid-cols-[1fr_360px] overflow-hidden bg-[#0f1114]">
+        <section className="relative p-8" data-visual-smoke-section="brush-local-preview">
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase text-[#9ba6b2]">{copy.layerBrushLocalCommandFlow}</p>
+              <h1 className="text-lg font-semibold">{copy.layerBrushLocalAdjustment}</h1>
+            </div>
+            <span className="rounded border border-white/10 bg-white/5 px-3 py-1 text-xs text-[#cbd5df]">
+              {copy.layerBrushCommandType}
+            </span>
+          </div>
+          <div className="relative h-[calc(100%-4rem)] overflow-hidden rounded-md border border-white/10 bg-linear-to-br from-[#20303a] via-[#5b4a3e] to-[#d4b276]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_42%_36%,rgba(255,235,196,0.58),transparent_16%),radial-gradient(circle_at_62%_58%,rgba(74,115,151,0.44),transparent_20%)]" />
+            <div className="absolute left-[24%] top-[28%] h-[160px] w-[420px] rotate-6 rounded-full bg-rose-500/35 blur-[1px]" />
+            <div className="absolute left-[34%] top-[52%] h-[108px] w-[360px] -rotate-3 rounded-full bg-rose-500/30 blur-[1px]" />
+            <svg className="absolute inset-0 h-full w-full" role="img" aria-label="Two brush strokes">
+              <path
+                d="M 190 210 C 280 250, 380 285, 520 310"
+                fill="none"
+                stroke="rgba(255,244,220,0.85)"
+                strokeLinecap="round"
+                strokeWidth="30"
+              />
+              <path
+                d="M 255 410 C 360 445, 470 448, 580 430"
+                fill="none"
+                stroke="rgba(255,244,220,0.7)"
+                strokeLinecap="round"
+                strokeWidth="24"
+              />
+            </svg>
+            <div className="absolute bottom-8 left-8 rounded border border-white/10 bg-black/35 px-3 py-2 text-xs text-[#d8dee8]">
+              {copy.layerBrushLocalToneSummary}
+            </div>
+          </div>
+        </section>
+        <aside
+          className="border-l border-white/10 bg-[#171a1f] p-4 text-sm"
+          data-visual-smoke-section="brush-local-receipt"
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <span className="font-semibold">{copy.layerBrushLocalReceipt}</span>
+            <span className="rounded bg-white/10 px-2 py-0.5 text-xs">{copy.layerBrushLocalReplayReady}</span>
+          </div>
+          <div
+            className="sr-only"
+            data-brush-command-type="layerMask.createBrushMask"
+            data-coordinate-space="normalized_image"
+            data-layer-command-type="layerMask.createLayer"
+            data-mask-id="layer_brush_local_adjustment_mask"
+            data-receipt-version="1"
+            data-rollback-graph-revision="layer_brush_local_initial"
+            data-stroke-count="2"
+            data-testid="layer-brush-local-adjustment-proof"
+            data-tone-command-type="layerMask.applyLayerAdjustment"
+          />
+          <div className="space-y-2">
+            {[
+              [copy.layerBrushLocalLayerLabel, copy.layerBrushLocalLayerValue],
+              [copy.layerBrushLocalMaskLabel, copy.layerBrushLocalMaskValue],
+              [copy.layerBrushLocalGraphLabel, copy.layerBrushLocalGraphValue],
+              [copy.layerBrushLocalReplayLabel, copy.layerBrushLocalReplayValue],
+            ].map(([label, value]) => (
+              <div className="rounded border border-white/10 bg-white/5 p-2" key={label}>
+                <p className="text-xs text-[#aab2bd]">{label}</p>
+                <p>{value}</p>
+              </div>
+            ))}
           </div>
         </aside>
       </div>

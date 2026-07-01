@@ -17,6 +17,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   HdrPrivateRawUi: 'hdr-private-raw-ui',
   HdrSavedOutputEditorPath: 'hdr-saved-output-editor-path',
   HdrUi: 'hdr-ui',
+  LayerBrushLocalAdjustment: 'layer-brush-local-adjustment',
   LayerMaskPrivateRawUi: 'layer-mask-private-raw-ui',
   LayerStackWorkflow: 'layer-stack-workflow',
   LibraryWorkflow: 'library-workflow',
@@ -245,6 +246,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     mode: VISUAL_SMOKE_SCENARIO_IDS.LayerStackWorkflow,
     outputFile: 'layer-stack-workflow.png',
     sectionMinimum: 3,
+  },
+  {
+    marker: 'Brush Local Adjustment',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.LayerBrushLocalAdjustment,
+    outputFile: 'layer-brush-local-adjustment.png',
+    sectionMinimum: 2,
   },
   {
     marker: 'Private RAW layer mask review',
