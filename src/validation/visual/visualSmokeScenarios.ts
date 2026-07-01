@@ -33,6 +33,8 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   PanoramaProcessingCommand: 'panorama-processing-command',
   PanoramaSavedReview: 'panorama-saved-review',
   PanoramaUi: 'panorama-ui',
+  ProfessionalEditorCompactPortrait: 'professional-editor-compact-portrait',
+  ProfessionalEditorShell: 'professional-editor-shell',
   ProfessionalEditorTokens: 'professional-editor-tokens',
   SrPrivateRawModalReview: 'sr-private-raw-modal-review',
   SrPrivateRawUi: 'sr-private-raw-ui',
@@ -255,6 +257,19 @@ export const VISUAL_SMOKE_SCENARIOS = [
     mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorTokens,
     outputFile: 'professional-editor-tokens-desktop.png',
     sectionMinimum: 3,
+  },
+  {
+    marker: 'Professional editor shell',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShell,
+    outputFile: 'professional-editor-shell.png',
+    sectionMinimum: 5,
+  },
+  {
+    compactOutputFile: 'professional-editor-compact-portrait-390.png',
+    marker: 'Professional editor compact portrait',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorCompactPortrait,
+    outputFile: 'professional-editor-compact-portrait.png',
+    sectionMinimum: 5,
   },
   {
     marker: 'Local Adjustment Stack',

@@ -250,12 +250,15 @@ export default function EditorView({
   return (
     <div
       aria-label={t('editor.accessibility.workspace')}
-      className={cx('flex grow h-full min-h-0', isCompactPortrait ? 'flex-col gap-2' : 'flex-row')}
+      className={cx(
+        'flex grow h-full min-h-0 bg-editor-matte',
+        isCompactPortrait ? 'flex-col gap-2' : 'flex-row gap-2',
+      )}
       role="main"
     >
       <div
         aria-label={t('editor.accessibility.previewRegion')}
-        className={cx('flex-1 flex flex-col min-w-0', isCompactPortrait && 'min-h-0')}
+        className={cx('flex-1 flex flex-col min-w-0 gap-2', isCompactPortrait && 'min-h-[240px]')}
         role="region"
       >
         {editorNode}
@@ -265,7 +268,9 @@ export default function EditorView({
         aria-label={t('editor.accessibility.toolsPanel')}
         className={cx(
           'flex overflow-hidden shrink-0',
-          isCompactPortrait ? 'flex-col bg-bg-secondary rounded-lg' : 'h-full min-w-0 bg-transparent',
+          isCompactPortrait
+            ? 'flex-col rounded-lg border border-editor-border bg-editor-panel'
+            : 'h-full min-w-0 bg-transparent',
           !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
         )}
         aria-hidden={isFullScreen}
@@ -294,7 +299,7 @@ export default function EditorView({
               />
             )}
             <div className="min-h-0 flex-1 overflow-hidden">{editorRightPanelContent}</div>
-            <div className="shrink-0 border-t border-surface">
+            <div className="shrink-0 border-t border-editor-border">
               <RightPanelSwitcher
                 activePanel={activeRightPanel}
                 onPanelSelect={handleRightPanelSelect}
@@ -304,7 +309,7 @@ export default function EditorView({
             </div>
             <div
               aria-label={t('editor.accessibility.filmstrip')}
-              className="shrink-0 border-t border-surface"
+              className="shrink-0 border-t border-editor-border"
               role="region"
             >
               {editorBottomBarComponent}
@@ -314,13 +319,13 @@ export default function EditorView({
           <>
             <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
             <div
-              className="grid h-full min-w-0 overflow-hidden rounded-lg bg-bg-secondary"
+              className="grid h-full min-w-0 overflow-hidden rounded-lg border border-editor-border bg-editor-panel"
               style={{ gridTemplateColumns: `${DESKTOP_RIGHT_RAIL_WIDTH}px minmax(0, 1fr)` }}
             >
               <div
                 className={cx(
                   'h-full border-r transition-colors',
-                  activeRightPanel ? 'border-surface' : 'border-transparent',
+                  activeRightPanel ? 'border-editor-border' : 'border-transparent',
                 )}
               >
                 <RightPanelSwitcher
