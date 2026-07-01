@@ -2,6 +2,7 @@ import cx from 'clsx';
 import {
   ArrowDown,
   ArrowUp,
+  Brush,
   ChevronDown,
   ChevronRight,
   Copy,
@@ -30,6 +31,10 @@ import {
   type RetouchRemoveSource,
 } from '../../../../utils/adjustments';
 import {
+  applyBrushLocalAdjustmentLayerFlow,
+  createBrushLocalAdjustmentLayerDraft,
+} from '../../../../utils/layers/brushLocalAdjustmentCommandFlow';
+import {
   buildLayerExportReadinessSummary,
   buildLayerGroupSummaries,
   buildLayerGroupWorkflowProof,
@@ -54,7 +59,7 @@ import {
 import { persistLayerStackSidecarInAdjustments } from '../../../../utils/layers/layerStackSidecarAdjustments';
 import Slider, { type SliderChangeEvent } from '../../../ui/primitives/Slider';
 import UiText from '../../../ui/primitives/Text';
-import { Mask, SubMaskMode } from './Masks';
+import { Mask, SubMaskMode, ToolType } from './Masks';
 
 interface LayerStackPanelProps {
   activeMaskContainerId: string | null;
@@ -105,6 +110,45 @@ type RetouchRemoveControlField =
 
 const BASE_LAYER_ID = 'base-raw-layer';
 const LAYER_OPACITY_PRESETS = [0, 25, 50, 75, 100] as const;
+
+const buildInitialBrushLocalAdjustmentParameters = (imageDimensions: {
+  height: number;
+  width: number;
+}): {
+  lines: Array<{
+    feather: number;
+    points: Array<{ x: number; y: number }>;
+    size: number;
+    tool: 'brush';
+  }>;
+} => {
+  const width = Math.max(1, imageDimensions.width);
+  const height = Math.max(1, imageDimensions.height);
+  return {
+    lines: [
+      {
+        feather: 48,
+        points: [
+          { x: width * 0.34, y: height * 0.38 },
+          { x: width * 0.48, y: height * 0.44 },
+          { x: width * 0.62, y: height * 0.52 },
+        ],
+        size: Math.max(24, Math.min(width, height) * 0.06),
+        tool: 'brush',
+      },
+      {
+        feather: 48,
+        points: [
+          { x: width * 0.42, y: height * 0.58 },
+          { x: width * 0.54, y: height * 0.62 },
+          { x: width * 0.66, y: height * 0.6 },
+        ],
+        size: Math.max(20, Math.min(width, height) * 0.045),
+        tool: 'brush',
+      },
+    ],
+  };
+};
 
 const clampNumber = (value: number, min: number, max: number): number => {
   if (!Number.isFinite(value)) return min;
@@ -360,6 +404,7 @@ export default function LayerStackPanel({
   const [layerGraphRevision, setLayerGraphRevision] = useState('layer_stack_panel_initial');
   const [lastCommandType, setLastCommandType] = useState('none');
   const [lastChangedLayerCount, setLastChangedLayerCount] = useState(0);
+  const [lastBrushLocalReceiptId, setLastBrushLocalReceiptId] = useState('');
   const selectedLayerId = activeMaskContainerId ?? localSelectedLayerId;
   const visibleLayerCount = masks.filter((mask) => mask.visible).length;
   const hiddenLayerCount = masks.length - visibleLayerCount;
@@ -638,6 +683,73 @@ export default function LayerStackPanel({
     };
     applyLayerStackCommand({ layer, type: 'create' }, layerId);
   };
+  const createBrushLocalAdjustmentLayer = () => {
+    const layerId = crypto.randomUUID();
+    const maskId = `${layerId}_brush_mask`;
+    const layerName = t('editor.layers.newBrushLocalAdjustmentLayerName', { count: masks.length + 1 });
+    const maskName = t('editor.layers.newBrushLocalAdjustmentMaskName');
+    const brushParameters = buildInitialBrushLocalAdjustmentParameters(effectiveImageDimensions);
+    const layer = createBrushLocalAdjustmentLayerDraft({
+      layerId,
+      maskId,
+      maskName,
+      name: layerName,
+    });
+    const imagePath = selectedImage?.path ?? 'rapidraw://current-image';
+    const result = applyBrushLocalAdjustmentLayerFlow(masks, {
+      brushMaskName: maskName,
+      brushParameters,
+      context: {
+        graphRevision: layerGraphRevision,
+        imagePath,
+        operationId: crypto.randomUUID(),
+        sessionId: 'rapidraw-layer-stack-panel',
+      },
+      imageSize: effectiveImageDimensions,
+      layer: {
+        ...layer,
+        subMasks: layer.subMasks.map((subMask) =>
+          subMask.id === maskId ? { ...subMask, parameters: brushParameters } : subMask,
+        ),
+      },
+      toneColor: {
+        blackPoint: 0,
+        clarity: 8,
+        contrast: 14,
+        exposureEv: 0.35,
+        highlights: -10,
+        saturation: 6,
+        shadows: 16,
+        whitePoint: 0,
+      },
+    });
+    const currentState = useEditorStore.getState();
+    const nextAdjustments = persistLayerStackSidecarInAdjustments(
+      { ...currentState.adjustments, masks: result.masks },
+      result.toneResult.sidecar,
+    );
+    setLayerGraphRevision(result.receipt.graphRevision);
+    setLastCommandType(result.brushApplyResult.commandType);
+    setLastChangedLayerCount(
+      result.createLayerResult.commandResult.changedLayerIds.length +
+        result.attachMaskResult.commandResult.changedMaskIds.length +
+        result.brushApplyResult.changedMaskIds.length +
+        result.toneResult.commandResult.changedLayerIds.length,
+    );
+    setLastBrushLocalReceiptId(result.receipt.replayKey);
+    setEditor({
+      activeMaskContainerId: layerId,
+      activeMaskId: maskId,
+      adjustments: nextAdjustments,
+      brushSettings: { feather: 48, size: 96, tool: ToolType.Brush },
+    });
+    pushHistory(nextAdjustments);
+    if (selectedImage?.path) {
+      debouncedSave(selectedImage.path, nextAdjustments);
+    }
+    setLocalSelectedLayerId(layerId);
+    onSelectMaskContainer(layerId);
+  };
   const createCloneLayer = () => {
     const layerId = crypto.randomUUID();
     const targetMaskId = `${layerId}_clone_target`;
@@ -879,6 +991,15 @@ export default function LayerStackPanel({
           </button>
           <button
             className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+            data-tooltip={t('editor.layers.actions.createBrushLocalAdjustmentLayer')}
+            data-testid="layer-create-brush-local-adjustment"
+            onClick={createBrushLocalAdjustmentLayer}
+            type="button"
+          >
+            <Brush size={17} className="mx-auto" />
+          </button>
+          <button
+            className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
             data-tooltip={t('editor.layers.actions.createCloneLayer')}
             data-testid="layer-create-clone-layer"
             onClick={createCloneLayer}
@@ -973,6 +1094,7 @@ export default function LayerStackPanel({
         data-can-move-active-layer={String(canMoveActiveLayerUp || canMoveActiveLayerDown)}
         data-can-ungroup-active-layer={String(canUngroupActiveLayer)}
         data-layer-stack-graph-revision={layerGraphRevision}
+        data-layer-stack-last-brush-local-receipt-id={lastBrushLocalReceiptId}
         data-layer-stack-last-changed-layer-count={lastChangedLayerCount}
         data-layer-stack-last-command-type={lastCommandType}
         data-testid="layer-operation-readiness-summary"

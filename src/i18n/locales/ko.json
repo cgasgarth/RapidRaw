@@ -634,7 +634,13 @@
         "pasteSettings": "설정 붙여넣기",
         "resetSectionSettings": "{{section}} 설정 초기화",
         "select": "선택",
-        "selectPresetTooltip": "적용할 프리셋 선택"
+        "selectPresetTooltip": "적용할 프리셋 선택",
+        "brushLocalAdjustmentReceiptTitle": "",
+        "brushLocalAdjustmentReceiptSummary": "",
+        "brushLocalAdjustmentReceiptSummary_one": "",
+        "brushLocalAdjustmentReceiptSummary_other": "",
+        "brushLocalAdjustmentReceiptSummary_few": "",
+        "brushLocalAdjustmentReceiptSummary_many": ""
       },
       "toggleAnalyticsTooltip": "분석 표시 전환",
       "tooltips": {
@@ -775,6 +781,15 @@
         "undo": "실행 취소 ({{shortcut}}) 또는 기록 (우클릭)"
       },
       "vc": "VC"
+    },
+    "layers": {
+      "actions": {
+        "createBrushLocalAdjustmentLayer": ""
+      },
+      "newBrushLocalAdjustmentLayerName": "",
+      "newBrushLocalAdjustmentLayerName_one": "",
+      "newBrushLocalAdjustmentLayerName_other": "",
+      "newBrushLocalAdjustmentMaskName": ""
     }
   },
   "export": {

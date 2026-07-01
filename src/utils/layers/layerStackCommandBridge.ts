@@ -59,6 +59,12 @@ export type LayerStackCommandBridgeOperation =
     }
   | {
       layerId: string;
+      replaceExisting: boolean;
+      subMask: MaskContainer['subMasks'][number];
+      type: 'attachMask';
+    }
+  | {
+      layerId: string;
       retouchCloneSource: RetouchCloneSource;
       type: 'updateRetouchSource';
     }
@@ -343,6 +349,16 @@ function buildLayerStackCommand(
           layerId: operation.layerId,
         },
       });
+    case 'attachMask':
+      return layerMaskCommandEnvelopeV1Schema.parse({
+        ...base,
+        commandType: 'layerMask.attachMask',
+        parameters: {
+          layerId: operation.layerId,
+          maskId: operation.subMask.id,
+          replaceExisting: operation.replaceExisting,
+        },
+      });
     case 'updateRetouchSource':
       return layerMaskCommandEnvelopeV1Schema.parse({
         ...base,
@@ -403,6 +419,12 @@ function materializeMasksFromSidecar(
 
   return sidecarLayers.map((layer) => {
     const previous = previousById.get(layer.id) ?? cloneSourceForOperation(previousMasks, operation);
+    const operationSubMasks =
+      operation.type === 'attachMask' && operation.layerId === layer.id
+        ? operation.replaceExisting
+          ? [operation.subMask]
+          : [...previous.subMasks.filter((subMask) => subMask.id !== operation.subMask.id), operation.subMask]
+        : previous.subMasks;
     const materializedMask: MaskContainer = {
       ...previous,
       adjustments: toMaskAdjustments(layer.adjustments?.toneColor, previous.adjustments),
@@ -410,7 +432,7 @@ function materializeMasksFromSidecar(
       id: layer.id,
       name: layer.name,
       opacity: Math.round(layer.opacity * 100),
-      subMasks: previous.subMasks,
+      subMasks: materializeSubMasksFromIds(layer.maskIds, operationSubMasks),
       visible: layer.visible,
     };
     if (layer.retouchCloneSource !== undefined) {
@@ -425,6 +447,19 @@ function materializeMasksFromSidecar(
     }
     return materializedMask;
   });
+}
+
+function materializeSubMasksFromIds(
+  maskIds: ReadonlyArray<string>,
+  subMasks: ReadonlyArray<MaskContainer['subMasks'][number]>,
+): Array<MaskContainer['subMasks'][number]> {
+  const subMasksById = new Map(subMasks.map((subMask) => [subMask.id, subMask]));
+  const orderedSubMasks = maskIds.flatMap((maskId) => {
+    const subMask = subMasksById.get(maskId);
+    return subMask === undefined ? [] : [subMask];
+  });
+  const orderedIds = new Set(orderedSubMasks.map((subMask) => subMask.id));
+  return [...orderedSubMasks, ...subMasks.filter((subMask) => !orderedIds.has(subMask.id))];
 }
 
 export function materializeMasksFromLayerStackSidecar(
