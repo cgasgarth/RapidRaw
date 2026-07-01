@@ -325,7 +325,8 @@ fn ensure_private_fixture_alias(private_root: &Path) -> Result<(), String> {
     }
 
     fs::create_dir_all(&expected_dir).map_err(|error| error.to_string())?;
-    for (relative_path, source_path) in SOURCE_RELATIVE_PATHS.iter().zip(direct_source_paths.iter()) {
+    for (relative_path, source_path) in SOURCE_RELATIVE_PATHS.iter().zip(direct_source_paths.iter())
+    {
         let target_path = private_root.join(relative_path);
         if target_path.exists() {
             continue;
