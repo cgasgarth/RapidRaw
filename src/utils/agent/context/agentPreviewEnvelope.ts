@@ -231,6 +231,27 @@ export const agentPreviewCompareLineageSchema = z
   })
   .strict();
 
+export const agentMediumPreviewArtifactSchema = z
+  .object({
+    artifactId: z.string().trim().min(1),
+    contentHash: z.string().regex(/^sha256:[a-f0-9]{16,64}$/u),
+    dimensions: z
+      .object({
+        height: z.number().int().positive(),
+        width: z.number().int().positive(),
+      })
+      .strict(),
+    graphRevision: z.string().trim().min(1),
+    longEdgePx: z.number().int().min(256).max(2048),
+    maxPixelCount: z.number().int().min(65_536).max(AGENT_PREVIEW_MAX_PIXEL_COUNT),
+    previewRef: z.string().trim().min(1),
+    quality: z.number().min(0.5).max(0.95),
+    recipeHash: z.string().trim().min(1),
+    renderHash: z.string().trim().min(1),
+    staleRecipeHash: z.boolean(),
+  })
+  .strict();
+
 export const agentPreviewCompareColorMetadataSchema = z
   .object({
     encodedProfile: z.literal('srgb-preview'),
@@ -245,13 +266,7 @@ export const agentPreviewCompareArtifactResultSchema = z
     artifacts: z.tuple([agentPreviewCompareArtifactSchema, agentPreviewCompareArtifactSchema]),
     color: agentPreviewCompareColorMetadataSchema,
     lineage: agentPreviewCompareLineageSchema,
-    mediumPreview: z
-      .object({
-        longEdgePx: z.number().int().min(256).max(2048),
-        maxPixelCount: z.number().int().min(65_536).max(AGENT_PREVIEW_MAX_PIXEL_COUNT),
-        quality: z.number().min(0.5).max(0.95),
-      })
-      .strict(),
+    mediumPreview: agentMediumPreviewArtifactSchema,
     scopeSummary: agentPreviewCompareScopeSummarySchema,
   })
   .strict()

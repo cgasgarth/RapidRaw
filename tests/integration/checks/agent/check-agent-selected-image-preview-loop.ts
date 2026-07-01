@@ -257,9 +257,21 @@ const result = success.result as {
   auditEventSummary: Array<{ toolName: string; type: string }>;
   compareArtifactIds: {
     beforeArtifactId: string;
-    beforeEvidence?: { contentHash: string; graphRevision: string; previewRef: string; recipeHash: string };
+    beforeEvidence?: {
+      contentHash: string;
+      graphRevision: string;
+      previewRef: string;
+      recipeHash: string;
+      renderHash: string;
+    };
     currentArtifactId: string;
-    currentEvidence?: { contentHash: string; graphRevision: string; previewRef: string; recipeHash: string };
+    currentEvidence?: {
+      contentHash: string;
+      graphRevision: string;
+      previewRef: string;
+      recipeHash: string;
+      renderHash: string;
+    };
     lineage?: {
       beforeGraphRevision: string;
       beforeRecipeHash: string;
@@ -267,7 +279,19 @@ const result = success.result as {
       currentRecipeHash: string;
       staleRecipeHash: boolean;
     };
-    mediumPreview?: { longEdgePx: number; maxPixelCount: number; quality: number };
+    mediumPreview?: {
+      artifactId: string;
+      contentHash: string;
+      dimensions: { height: number; width: number };
+      graphRevision: string;
+      longEdgePx: number;
+      maxPixelCount: number;
+      previewRef: string;
+      quality: number;
+      recipeHash: string;
+      renderHash: string;
+      staleRecipeHash: boolean;
+    };
   };
   editCount: number;
   finalGraphRevision: string;
@@ -369,8 +393,22 @@ if (
   result.previewLineage.some((lineage) => lineage.sourceToolName !== 'rawengine.agent.adjustments.apply') ||
   result.compareArtifactIds.beforeArtifactId.length === 0 ||
   result.compareArtifactIds.currentArtifactId.length === 0 ||
+  result.compareArtifactIds.mediumPreview?.artifactId !== result.compareArtifactIds.currentArtifactId ||
+  result.compareArtifactIds.mediumPreview?.contentHash !== result.compareArtifactIds.currentEvidence?.contentHash ||
+  result.compareArtifactIds.mediumPreview === undefined ||
+  Math.max(
+    result.compareArtifactIds.mediumPreview.dimensions.width,
+    result.compareArtifactIds.mediumPreview.dimensions.height,
+  ) !== result.compareArtifactIds.mediumPreview.longEdgePx ||
+  result.compareArtifactIds.mediumPreview.dimensions.width * result.compareArtifactIds.mediumPreview.dimensions.height >
+    result.compareArtifactIds.mediumPreview.maxPixelCount ||
+  result.compareArtifactIds.mediumPreview?.graphRevision !== 'history_2' ||
   result.compareArtifactIds.mediumPreview?.longEdgePx !== 1536 ||
+  result.compareArtifactIds.mediumPreview?.previewRef !== result.compareArtifactIds.currentEvidence?.previewRef ||
   result.compareArtifactIds.mediumPreview?.quality !== 0.86 ||
+  result.compareArtifactIds.mediumPreview?.recipeHash !== result.compareArtifactIds.currentEvidence?.recipeHash ||
+  result.compareArtifactIds.mediumPreview?.renderHash !== result.compareArtifactIds.currentEvidence?.renderHash ||
+  result.compareArtifactIds.mediumPreview?.staleRecipeHash !== false ||
   result.compareArtifactIds.lineage?.beforeGraphRevision !== 'history_1' ||
   result.compareArtifactIds.lineage?.currentGraphRevision !== 'history_2' ||
   result.compareArtifactIds.beforeEvidence?.graphRevision !== 'history_1' ||

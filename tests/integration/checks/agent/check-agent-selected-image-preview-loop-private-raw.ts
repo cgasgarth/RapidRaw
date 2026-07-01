@@ -105,7 +105,7 @@ const publicReport = publicProofReportSchema.parse({
   proofStatus: 'public_contract_private_runtime_required',
   schemaVersion: 1,
   validationCommand:
-    'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-agent-preview-loop-proof RAWENGINE_PRIVATE_RAW_SOURCE="/Users/cgas/Pictures/Capture One/Alaska" bun tests/integration/checks/agent/check-agent-selected-image-preview-loop.ts-private-raw -- --require-assets',
+    'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-agent-preview-loop-proof RAWENGINE_PRIVATE_RAW_SOURCE="/Users/cgas/Pictures/Capture One/Alaska" bun tests/integration/checks/agent/check-agent-selected-image-preview-loop-private-raw.ts -- --require-assets',
   validationMode: 'agent_selected_image_preview_loop_private_raw',
 });
 
@@ -245,6 +245,23 @@ if (
   failures.push('iterative preview refresh receipts were missing private selected-image evidence');
 }
 if (new Set(previewReceiptHashes).size !== 2) failures.push('preview iterations did not produce distinct receipts');
+if (
+  result.compareArtifactIds.mediumPreview?.artifactId !== result.compareArtifactIds.currentArtifactId ||
+  result.compareArtifactIds.mediumPreview?.contentHash !== result.compareArtifactIds.currentEvidence?.contentHash ||
+  result.compareArtifactIds.mediumPreview === undefined ||
+  Math.max(
+    result.compareArtifactIds.mediumPreview.dimensions.width,
+    result.compareArtifactIds.mediumPreview.dimensions.height,
+  ) !== result.compareArtifactIds.mediumPreview.longEdgePx ||
+  result.compareArtifactIds.mediumPreview?.graphRevision !== result.compareArtifactIds.currentEvidence?.graphRevision ||
+  result.compareArtifactIds.mediumPreview?.longEdgePx !== 1536 ||
+  result.compareArtifactIds.mediumPreview?.previewRef !== result.compareArtifactIds.currentEvidence?.previewRef ||
+  result.compareArtifactIds.mediumPreview?.recipeHash !== result.compareArtifactIds.currentEvidence?.recipeHash ||
+  result.compareArtifactIds.mediumPreview?.renderHash !== result.compareArtifactIds.currentEvidence?.renderHash ||
+  result.compareArtifactIds.mediumPreview?.staleRecipeHash !== false
+) {
+  failures.push('medium preview artifact did not expose current selected-image handle/hash/dimensions/staleness');
+}
 for (const requiredTool of [
   'rawengine.agent.state.get',
   'rawengine.agent.adjustments.dry_run',
@@ -418,6 +435,27 @@ type StaleApplyRejection = 'stale preview artifact' | 'stale preview receipt' | 
 type AgentSelectedImagePreviewLoopResult = {
   acceptedDryRunPlanCount: number;
   auditEventSummary: Array<{ toolName: string; type: string }>;
+  compareArtifactIds: {
+    currentArtifactId: string;
+    currentEvidence?: {
+      contentHash: string;
+      graphRevision: string;
+      previewRef: string;
+      recipeHash: string;
+      renderHash: string;
+    };
+    mediumPreview?: {
+      artifactId: string;
+      contentHash: string;
+      dimensions: { height: number; width: number };
+      graphRevision: string;
+      longEdgePx: number;
+      previewRef: string;
+      recipeHash: string;
+      renderHash: string;
+      staleRecipeHash: boolean;
+    };
+  };
   editCount: number;
   finalRecipeHash: string;
   initialPreviewArtifactId: string;

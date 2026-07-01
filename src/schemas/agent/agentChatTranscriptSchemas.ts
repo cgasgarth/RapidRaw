@@ -516,9 +516,22 @@ export const agentSelectedImagePreviewLoopReviewSchema = z
           .optional(),
         mediumPreview: z
           .object({
+            artifactId: z.string().min(1),
+            contentHash: z.string().min(1),
+            dimensions: z
+              .object({
+                height: z.number().int().positive(),
+                width: z.number().int().positive(),
+              })
+              .strict(),
+            graphRevision: z.string().min(1),
             longEdgePx: z.number().int().min(256).max(2048),
             maxPixelCount: z.number().int().min(65_536).max(4_194_304),
+            previewRef: z.string().min(1),
             quality: z.number().min(0.5).max(0.95),
+            recipeHash: z.string().min(1),
+            renderHash: z.string().min(1),
+            staleRecipeHash: z.boolean(),
           })
           .strict()
           .optional(),

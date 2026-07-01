@@ -548,9 +548,20 @@ const fixture = {
         staleRecipeHash: false,
       },
       mediumPreview: {
+        artifactId: 'artifact_agent_selected_loop_current_3162',
+        contentHash: 'sha256:3162currentpreview01',
+        dimensions: {
+          height: 1024,
+          width: 1536,
+        },
+        graphRevision: 'history_2',
         longEdgePx: 1536,
         maxPixelCount: 1_600_000,
+        previewRef: 'blob:rawengine-selected-loop-current',
         quality: 0.86,
+        recipeHash: 'recipe:agent-selected-loop-final',
+        renderHash: 'render:agent-selected-loop-current',
+        staleRecipeHash: false,
       },
     },
     controls: {
