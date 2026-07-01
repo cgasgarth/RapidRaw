@@ -95,6 +95,16 @@ import ImagePicker from './ImagePicker';
 
 const QUALITY_FILE_FORMATS: ReadonlySet<FileFormats> = new Set([FileFormats.Jpeg, FileFormats.Webp, FileFormats.Jxl]);
 const SOFT_PROOF_PROFILE_COMPARE_SIDE_IDS = ['srgb', 'displayP3'] as const;
+type ExportFooterWorkflowState =
+  | 'canceled'
+  | 'completed'
+  | 'estimating'
+  | 'failed'
+  | 'idle'
+  | 'imported-linked-variant'
+  | 'importing-linked-variant'
+  | 'queued'
+  | 'running';
 
 interface ExportPanelProps {
   exportState: ExportState;
@@ -1211,6 +1221,54 @@ export default function ExportPanel({
   };
 
   const canExport = numImages > 0 && !isSmartPreviewExportBlocked;
+  const progressCurrent = progress.current || progress.completed || 0;
+  const isQueuedExport = isExporting && progressCurrent === 0;
+  const isRunningExport = isExporting && progressCurrent > 0;
+  const canShowReceipt = status === Status.Success && Boolean(firstReceiptOutput);
+  const canUseReceiptActions = canShowReceipt && !isExporting;
+  const canImportLinkedVariant =
+    canUseReceiptActions &&
+    canOpenReceiptInEditor &&
+    !isImportingCurrentExternalVariant &&
+    currentExternalVariantImportedPath === null;
+  const exportFooterWorkflowState: ExportFooterWorkflowState = isImportingCurrentExternalVariant
+    ? 'importing-linked-variant'
+    : currentExternalVariantImportedPath
+      ? 'imported-linked-variant'
+      : status === Status.Error
+        ? 'failed'
+        : status === Status.Cancelled
+          ? 'canceled'
+          : canShowReceipt
+            ? 'completed'
+            : isQueuedExport
+              ? 'queued'
+              : isRunningExport
+                ? 'running'
+                : isEstimating && canExport
+                  ? 'estimating'
+                  : 'idle';
+  const exportFooterStatusText =
+    exportFooterWorkflowState === 'importing-linked-variant'
+      ? t('export.status.footerImportingLinkedVariant')
+      : exportFooterWorkflowState === 'imported-linked-variant'
+        ? t('export.status.footerImportedLinkedVariant')
+        : exportFooterWorkflowState === 'failed'
+          ? t('export.status.footerFailed')
+          : exportFooterWorkflowState === 'canceled'
+            ? t('export.status.footerCanceled')
+            : exportFooterWorkflowState === 'completed'
+              ? t('export.status.footerCompleted', {
+                  count: lastReceipt?.outputs.length ?? 0,
+                  total: lastReceipt?.total ?? 0,
+                })
+              : exportFooterWorkflowState === 'queued'
+                ? t('export.status.footerQueued', { count: progress.total || numImages })
+                : exportFooterWorkflowState === 'running'
+                  ? t('export.status.footerRunning', { current: progressCurrent, total: progress.total || numImages })
+                  : exportFooterWorkflowState === 'estimating'
+                    ? t('export.status.estimatingSize')
+                    : t('export.status.footerIdle');
   const isLut = fileFormat === FileFormats.Cube;
   const itemLabel = isLut ? t('export.labels.lut') : t('export.labels.image');
   const itemLabelPlural = isLut ? t('export.labels.lut_plural') : t('export.labels.image_plural');
@@ -2035,7 +2093,23 @@ export default function ExportPanel({
             ) : null}
           </div>
         ) : null}
-        {firstReceiptOutput && (
+        <UiText
+          as="div"
+          className="truncate px-0.5"
+          color={exportFooterWorkflowState === 'failed' ? TextColors.error : TextColors.secondary}
+          data-export-footer-workflow-state={exportFooterWorkflowState}
+          data-export-footer-progress-current={progressCurrent}
+          data-export-footer-progress-total={progress.total}
+          data-export-footer-can-cancel={String(isExporting)}
+          data-export-footer-can-retry={String((status === Status.Error || status === Status.Cancelled) && canExport)}
+          data-export-footer-can-open={String(canUseReceiptActions && canOpenReceiptInEditor)}
+          data-export-footer-can-import-linked-variant={String(canImportLinkedVariant)}
+          data-testid="export-footer-workflow-state"
+          variant={TextVariants.small}
+        >
+          {exportFooterStatusText}
+        </UiText>
+        {canShowReceipt && firstReceiptOutput && (
           <div
             className="rounded-md border border-surface bg-surface/60 p-2"
             data-export-receipt-black-point-compensation={firstReceiptOutput.blackPointCompensation ?? ''}
@@ -2191,6 +2265,7 @@ export default function ExportPanel({
                     <button
                       className="min-w-0 rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
                       data-testid="export-success-choose-external-editor"
+                      disabled={!canUseReceiptActions}
                       onClick={() => {
                         void handleChooseExternalEditor();
                       }}
@@ -2201,7 +2276,7 @@ export default function ExportPanel({
                     <button
                       className="min-w-0 rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
                       data-testid="export-success-import-linked-variant"
-                      disabled={isImportingCurrentExternalVariant}
+                      disabled={!canImportLinkedVariant}
                       onClick={() => {
                         void handleImportExternalVariant(firstReceiptOutput.sourcePath, firstReceiptOutput);
                       }}
@@ -2214,6 +2289,7 @@ export default function ExportPanel({
                     <button
                       className="min-w-0 rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
                       data-testid="export-success-open-in-editor"
+                      disabled={!canUseReceiptActions}
                       onClick={() => {
                         void handleOpenInExternalEditor(firstReceiptOutput.outputPath);
                       }}
@@ -2226,6 +2302,7 @@ export default function ExportPanel({
                 <button
                   className="min-w-0 rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
                   data-testid="export-success-show-in-finder"
+                  disabled={!canUseReceiptActions}
                   onClick={() => {
                     void invoke(Invokes.ShowInFinder, { path: firstReceiptOutput.outputPath });
                   }}
@@ -2319,15 +2396,15 @@ export default function ExportPanel({
             </>
           ) : status === Status.Success ? (
             <>
-              <CheckCircle size={16} className="mr-2" /> {t('export.status.success')}
+              <CheckCircle size={16} className="mr-2" /> {t('export.status.exportAgain')}
             </>
           ) : status === Status.Error ? (
             <>
-              <XCircle size={16} className="mr-2" /> {t('export.status.failed')}
+              <XCircle size={16} className="mr-2" /> {t('export.status.retryExport')}
             </>
           ) : status === Status.Cancelled ? (
             <>
-              <Ban size={16} className="mr-2" /> {t('export.status.cancelled')}
+              <Ban size={16} className="mr-2" /> {t('export.status.retryExport')}
             </>
           ) : (
             <>
