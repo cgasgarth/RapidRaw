@@ -146,6 +146,35 @@ if (outputReview.haloReview.transitionRiskRegions.length !== cells.length) {
 if (outputReview.reviewOverlay.sourceContributionDetails.length !== frames.length) {
   throw new Error('Focus output review must expose one source contribution detail per input source.');
 }
+if (outputReview.lowConfidenceCellRatio !== 0.333333) {
+  throw new Error(`Expected low-confidence ratio 0.333333, got ${outputReview.lowConfidenceCellRatio}.`);
+}
+if (outputReview.haloRiskCellRatio !== 0.333333) {
+  throw new Error(`Expected halo-risk ratio 0.333333, got ${outputReview.haloRiskCellRatio}.`);
+}
+assertDeepEqual(
+  outputReview.reviewOverlay.sourceContributionSummary,
+  [
+    { sourceIndex: 0, winnerCellRatio: 0.333333 },
+    { sourceIndex: 1, winnerCellRatio: 0.333333 },
+    { sourceIndex: 2, winnerCellRatio: 0.333333 },
+  ],
+  'focus UI runtime source contribution summary',
+);
+assertDeepEqual(
+  outputReview.reviewOverlay.sourceContributionDetails.map((source) => ({
+    confidencePercent: source.confidencePercent,
+    coverageCellCount: source.coverageCellCount,
+    sourceIndex: source.sourceIndex,
+    warningState: source.warningState,
+  })),
+  [
+    { confidencePercent: 63, coverageCellCount: 1, sourceIndex: 0, warningState: 'clear' },
+    { confidencePercent: 62, coverageCellCount: 1, sourceIndex: 1, warningState: 'artifact_review_required' },
+    { confidencePercent: 62, coverageCellCount: 1, sourceIndex: 2, warningState: 'artifact_review_required' },
+  ],
+  'focus UI runtime source contribution details',
+);
 for (const source of outputReview.reviewOverlay.sourceContributionDetails) {
   if (source.confidencePercent < 62 || source.confidencePercent > 100) {
     throw new Error(`Focus source ${source.sourceId} has invalid confidence ${source.confidencePercent}.`);
@@ -222,4 +251,10 @@ function expectThrows(label, callback) {
     return;
   }
   throw new Error(`Expected ${label} to throw.`);
+}
+
+function assertDeepEqual(actual, expected, label) {
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error(`${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}.`);
+  }
 }

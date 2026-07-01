@@ -157,6 +157,8 @@ export const buildFocusStackOutputReviewFromArtifact = (
     sharpnessCoverage: artifact.validationSummary.focusCoverageRatio,
   });
   const artifactPath = artifact.outputArtifact.artifactId;
+  const sourceContributionSummary = buildSourceContributionSummaryFromArtifact(artifact);
+  const sourceContributionDetails = buildSourceContributionDetailsFromArtifact(artifact, sourceContributionSummary);
 
   return focusStackOutputReviewWorkflowSchema.parse({
     alignmentMode: artifact.resolvedAlignmentMode,
@@ -221,8 +223,8 @@ export const buildFocusStackOutputReviewFromArtifact = (
       confidenceMarginThreshold: 0.12,
       mode: 'halo_risk',
       opacityPercent: 70,
-      sourceContributionDetails: buildSourceContributionDetails(artifact.sourceImageRefs.length),
-      sourceContributionSummary: buildSourceContributionSummary(artifact.sourceImageRefs.length),
+      sourceContributionDetails,
+      sourceContributionSummary,
     },
     sharpnessCoverageRatio: artifact.validationSummary.focusCoverageRatio,
     sourceCount: artifact.sourceImageRefs.length,
@@ -276,6 +278,33 @@ const buildSourceContributionSummary = (
   }));
 };
 
+const buildSourceContributionSummaryFromArtifact = (
+  artifact: FocusStackArtifactV1,
+): FocusStackOutputReviewWorkflow['reviewOverlay']['sourceContributionSummary'] => {
+  const transitionRiskRegions = artifact.haloReview?.transitionRiskRegions ?? [];
+  if (transitionRiskRegions.length === 0) {
+    return buildSourceContributionSummary(artifact.sourceImageRefs.length);
+  }
+
+  const totalCellCount = transitionRiskRegions.reduce((total, region) => total + region.cellCount, 0);
+  if (totalCellCount <= 0) {
+    return buildSourceContributionSummary(artifact.sourceImageRefs.length);
+  }
+
+  const coverageBySourceIndex = new Map<number, number>();
+  for (const region of transitionRiskRegions) {
+    coverageBySourceIndex.set(
+      region.sourceIndex,
+      (coverageBySourceIndex.get(region.sourceIndex) ?? 0) + region.cellCount,
+    );
+  }
+
+  return artifact.sourceImageRefs.map((source) => ({
+    sourceIndex: source.sourceIndex,
+    winnerCellRatio: roundRatio((coverageBySourceIndex.get(source.sourceIndex) ?? 0) / totalCellCount),
+  }));
+};
+
 const buildSourceContributionDetails = (
   sourceCount: number,
 ): FocusStackOutputReviewWorkflow['reviewOverlay']['sourceContributionDetails'] =>
@@ -292,6 +321,58 @@ const buildSourceContributionDetails = (
       warningState: confidencePercent < 70 ? 'artifact_review_required' : 'clear',
     };
   });
+
+const buildSourceContributionDetailsFromArtifact = (
+  artifact: FocusStackArtifactV1,
+  sourceContributionSummary: FocusStackOutputReviewWorkflow['reviewOverlay']['sourceContributionSummary'],
+): FocusStackOutputReviewWorkflow['reviewOverlay']['sourceContributionDetails'] => {
+  const transitionRiskRegions = artifact.haloReview?.transitionRiskRegions ?? [];
+  const lowConfidenceRatio = artifact.haloReview?.lowConfidenceCellRatio ?? lowConfidenceCellRatio;
+  if (transitionRiskRegions.length === 0) {
+    return buildSourceContributionDetails(artifact.sourceImageRefs.length);
+  }
+
+  const totalCellCount = transitionRiskRegions.reduce((total, region) => total + region.cellCount, 0);
+  const regionRiskBySourceIndex = new Map<number, Set<string>>();
+  const coverageBySourceIndex = new Map<number, number>();
+
+  for (const region of transitionRiskRegions) {
+    coverageBySourceIndex.set(
+      region.sourceIndex,
+      (coverageBySourceIndex.get(region.sourceIndex) ?? 0) + region.cellCount,
+    );
+    const existing = regionRiskBySourceIndex.get(region.sourceIndex) ?? new Set<string>();
+    existing.add(region.risk);
+    regionRiskBySourceIndex.set(region.sourceIndex, existing);
+  }
+
+  return artifact.sourceImageRefs.map((source, index) => {
+    const coverageCellCount = Math.max(1, coverageBySourceIndex.get(source.sourceIndex) ?? 0);
+    const contributionRatio =
+      sourceContributionSummary.find((candidate) => candidate.sourceIndex === source.sourceIndex)?.winnerCellRatio ??
+      roundRatio(coverageCellCount / Math.max(1, totalCellCount));
+    const sourceRisks = regionRiskBySourceIndex.get(source.sourceIndex) ?? new Set<string>();
+    const warningState =
+      sourceRisks.has('halo_risk') || sourceRisks.has('low_confidence') || sourceRisks.has('retouch_recommended')
+        ? 'artifact_review_required'
+        : 'clear';
+    const confidencePenalty = sourceRisks.has('low_confidence') ? 18 : sourceRisks.has('halo_risk') ? 10 : 4;
+    const confidencePercent = Math.max(
+      62,
+      Math.min(100, Math.round((1 - lowConfidenceRatio) * 100 - confidencePenalty - index * 2)),
+    );
+
+    return {
+      artifactId: `artifact_focus_source_${source.sourceIndex + 1}_contribution`,
+      confidencePercent,
+      contributionRatio,
+      coverageCellCount,
+      sourceId: `S${source.sourceIndex + 1}`,
+      sourceIndex: source.sourceIndex,
+      warningState,
+    };
+  });
+};
 
 const buildDefaultTransitionRiskRegions = (
   sourceCount: number,

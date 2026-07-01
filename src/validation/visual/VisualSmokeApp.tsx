@@ -145,13 +145,22 @@ interface FocusPrivateRawVisualProof {
   exportReviewArtifact: string;
   exportReviewDataUrl: string;
   fixtureId: string;
+  focusCoverageRatio: string;
+  haloRiskCellRatio: string;
+  lowConfidenceCellRatio: string;
+  outputPixelCount: string;
   previewArtifact: string;
   previewDataUrl: string;
   resultReviewArtifact: string;
   resultReviewDataUrl: string;
+  sharpnessGainRatio: string;
   sourceCount: string;
+  sourceCoverageRatio: string;
+  sourceWinnerDistribution: string;
   stackHash: string;
   stackPath: string;
+  transitionArtifactScore: string;
+  winnerSourceCount: string;
 }
 
 interface HdrPrivateRawVisualProof {
@@ -5350,10 +5359,19 @@ function FocusPrivateRawVisualSmoke() {
             data-command={copy.focusDryRunTool}
             data-export-review-artifact={proof.exportReviewArtifact}
             data-fixture-id={proof.fixtureId}
+            data-focus-coverage-ratio={proof.focusCoverageRatio}
+            data-halo-risk-cell-ratio={proof.haloRiskCellRatio}
+            data-low-confidence-cell-ratio={proof.lowConfidenceCellRatio}
+            data-output-pixel-count={proof.outputPixelCount}
             data-preview-artifact={proof.previewArtifact}
             data-result-review-artifact={proof.resultReviewArtifact}
             data-runtime-status="private_raw_app_server_apply"
+            data-sharpness-gain-ratio={proof.sharpnessGainRatio}
             data-source-count={proof.sourceCount}
+            data-source-coverage-ratio={proof.sourceCoverageRatio}
+            data-source-winner-distribution={proof.sourceWinnerDistribution}
+            data-transition-artifact-score={proof.transitionArtifactScore}
+            data-winner-source-count={proof.winnerSourceCount}
             data-testid="focus-private-raw-review-proof"
           />
           <div className="space-y-2">
@@ -5395,6 +5413,16 @@ function FocusPrivateRawModalReviewSmoke() {
     );
   }
   const sourceCount = Number.parseInt(proof.sourceCount, 10);
+  const lowConfidenceCellRatio = Number.parseFloat(proof.lowConfidenceCellRatio);
+  const haloRiskCellRatio = Number.parseFloat(proof.haloRiskCellRatio);
+  const sharpnessCoverageRatio = Number.parseFloat(proof.focusCoverageRatio);
+  const sourceContributionSummary = proof.sourceWinnerDistribution.split(',').map((entry) => {
+    const [sourceIndexValue, winnerCellRatioValue] = entry.split(':');
+    return {
+      sourceIndex: Number.parseInt(sourceIndexValue ?? '0', 10),
+      winnerCellRatio: Number.parseFloat(winnerCellRatioValue ?? '0'),
+    };
+  });
   const outputReview: FocusStackOutputReviewWorkflow = {
     alignmentMode: settings.alignmentMode,
     artifactPath: proof.stackPath,
@@ -5420,9 +5448,9 @@ function FocusPrivateRawModalReviewSmoke() {
       },
       receiptId: `focus_stack_apply_visual_${sourceCount}`,
       sharpnessQualitySummary: {
-        lowConfidenceCellRatio: 0.12,
+        lowConfidenceCellRatio,
         qualityPreference: settings.qualityPreference,
-        sharpnessCoverageRatio: 0.91,
+        sharpnessCoverageRatio,
       },
       sourceCount,
       status: 'review_required',
@@ -5436,17 +5464,23 @@ function FocusPrivateRawModalReviewSmoke() {
       exportReviewArtifactId: proof.exportReviewArtifact,
       status: 'review_required',
     },
-    haloRiskCellRatio: 0.18,
+    haloRiskCellRatio,
     haloReview: {
       artifactId: `${proof.stackPath}:halo-review`,
       reviewStatus: 'review_required',
-      transitionRiskRegions: [
-        { cellCount: 2, regionId: 'near-flower-edge', risk: 'halo_risk', sourceIndex: 0 },
-        { cellCount: 1, regionId: 'mid-stem-transition', risk: 'low_confidence', sourceIndex: 1 },
-        { cellCount: 1, regionId: 'far-background', risk: 'stable', sourceIndex: 2 },
-      ],
+      transitionRiskRegions: sourceContributionSummary.map((source, sourceIndex) => ({
+        cellCount: Math.max(1, Math.round(source.winnerCellRatio * 12)),
+        regionId: `focus-private-runtime-${sourceIndex + 1}`,
+        risk:
+          sourceIndex === 0
+            ? 'stable'
+            : sourceIndex === 1 && lowConfidenceCellRatio > 0
+              ? 'low_confidence'
+              : 'halo_risk',
+        sourceIndex: source.sourceIndex,
+      })),
     },
-    lowConfidenceCellRatio: 0.12,
+    lowConfidenceCellRatio,
     proofLevel: 'synthetic_runtime',
     qualityPreference: settings.qualityPreference,
     retouchLayerPolicy: settings.retouchLayerPolicy,
@@ -5454,27 +5488,27 @@ function FocusPrivateRawModalReviewSmoke() {
       confidenceMarginThreshold: 0.12,
       mode: settings.reviewOverlayMode,
       opacityPercent: settings.reviewOverlayOpacityPercent,
-      sourceContributionDetails: Array.from({ length: sourceCount }, (_value, sourceIndex) => ({
-        artifactId: `artifact_focus_private_source_${sourceIndex + 1}_contribution`,
-        confidencePercent: Math.max(62, 92 - sourceIndex * 2),
-        contributionRatio: Number((1 / sourceCount).toFixed(6)),
-        coverageCellCount: 12,
-        sourceId: `S${sourceIndex + 1}`,
-        sourceIndex,
-        warningState: 'artifact_review_required',
+      sourceContributionDetails: sourceContributionSummary.map((source, sourceIndex) => ({
+        artifactId: `artifact_focus_private_source_${source.sourceIndex + 1}_contribution`,
+        confidencePercent: Math.max(62, Math.round((1 - lowConfidenceCellRatio) * 100 - sourceIndex * 6)),
+        contributionRatio: source.winnerCellRatio,
+        coverageCellCount: Math.max(1, Math.round(source.winnerCellRatio * 12)),
+        sourceId: `S${source.sourceIndex + 1}`,
+        sourceIndex: source.sourceIndex,
+        warningState:
+          sourceIndex === 0 && lowConfidenceCellRatio === 0 && haloRiskCellRatio === 0
+            ? 'clear'
+            : 'artifact_review_required',
       })),
-      sourceContributionSummary: Array.from({ length: sourceCount }, (_value, sourceIndex) => ({
-        sourceIndex,
-        winnerCellRatio: Number((1 / sourceCount).toFixed(6)),
-      })),
+      sourceContributionSummary,
     },
-    sharpnessCoverageRatio: 0.91,
+    sharpnessCoverageRatio,
     sourceCount,
-    sourceRefs: Array.from({ length: sourceCount }, (_value, sourceIndex) => ({
-      contentHash: `fnv1a32:focus-private-source-${sourceIndex}`,
-      graphRevision: `focus_private_source_${sourceIndex}`,
-      path: `${proof.stackPath}:source-${sourceIndex}`,
-      sourceIndex,
+    sourceRefs: sourceContributionSummary.map((source) => ({
+      contentHash: `fnv1a32:focus-private-source-${source.sourceIndex}`,
+      graphRevision: `focus_private_source_${source.sourceIndex}`,
+      path: `${proof.stackPath}:source-${source.sourceIndex}`,
+      sourceIndex: source.sourceIndex,
     })),
     warningCodes: ['human_review_required', 'synthetic_runtime_only', 'transition_halo_risk', 'retouch_layer_deferred'],
   };
@@ -5491,11 +5525,20 @@ function FocusPrivateRawModalReviewSmoke() {
       </div>
       <div
         className="sr-only"
+        data-focus-coverage-ratio={proof.focusCoverageRatio}
         data-fixture-id={proof.fixtureId}
+        data-halo-risk-cell-ratio={proof.haloRiskCellRatio}
+        data-low-confidence-cell-ratio={proof.lowConfidenceCellRatio}
+        data-output-pixel-count={proof.outputPixelCount}
         data-preview-requested={String(previewRequested)}
+        data-sharpness-gain-ratio={proof.sharpnessGainRatio}
         data-source-count={proof.sourceCount}
+        data-source-coverage-ratio={proof.sourceCoverageRatio}
+        data-source-winner-distribution={proof.sourceWinnerDistribution}
         data-stack-hash={proof.stackHash}
         data-stack-path={proof.stackPath}
+        data-transition-artifact-score={proof.transitionArtifactScore}
+        data-winner-source-count={proof.winnerSourceCount}
         data-testid="focus-private-raw-modal-review-proof"
       />
       <FocusStackModal

@@ -40,13 +40,22 @@ export interface FocusPrivateRawBrowserProof {
   exportReviewArtifact: string;
   exportReviewDataUrl: string;
   fixtureId: string;
+  focusCoverageRatio: string;
+  haloRiskCellRatio: string;
+  lowConfidenceCellRatio: string;
+  outputPixelCount: string;
   previewArtifact: string;
   previewDataUrl: string;
   resultReviewArtifact: string;
   resultReviewDataUrl: string;
+  sharpnessGainRatio: string;
   sourceCount: string;
+  sourceCoverageRatio: string;
+  sourceWinnerDistribution: string;
   stackHash: string;
   stackPath: string;
+  transitionArtifactScore: string;
+  winnerSourceCount: string;
 }
 
 export interface HdrPrivateRawBrowserProof {
@@ -245,6 +254,55 @@ const srPrivateRunReportSchema = z
   })
   .passthrough();
 
+const focusPrivateRunReportSchema = z
+  .object({
+    reports: z
+      .array(
+        z
+          .object({
+            artifacts: z.array(privateArtifactSchema),
+            fixtureId: z.literal('validation.computational-merge.focus-plane-transition.v1'),
+            qualityMetrics: z.array(
+              z
+                .object({
+                  name: z.string().trim().min(1),
+                  value: z.number().min(0),
+                })
+                .passthrough(),
+            ),
+          })
+          .passthrough(),
+      )
+      .min(1),
+  })
+  .passthrough();
+
+const focusAppServerProofSchema = z
+  .object({
+    fixtureId: z.literal('validation.computational-merge.focus-plane-transition.v1'),
+    focusCoverageRatio: z.number().min(0).max(1),
+    haloRiskCellRatio: z.number().min(0).max(1),
+    lowConfidenceCellRatio: z.number().min(0).max(1),
+    outputPixelCount: z.number().int().positive(),
+    runtimeStatus: z.literal('apply_rendered'),
+    sharpnessGainRatio: z.number().min(0),
+    sourceCount: z.number().int().min(2),
+    sourceCoverageRatio: z.number().min(0).max(1),
+    sourceWinnerDistribution: z
+      .array(
+        z
+          .object({
+            sourceIndex: z.number().int().nonnegative(),
+            winnerCellRatio: z.number().min(0).max(1),
+          })
+          .strict(),
+      )
+      .min(2),
+    transitionArtifactScore: z.number().min(0),
+    winnerSourceCount: z.number().int().min(1),
+  })
+  .passthrough();
+
 const srDecodeReportSchema = z
   .object({
     decodedSources: z
@@ -426,18 +484,52 @@ export async function loadFocusPrivateRawProof(): Promise<FocusPrivateRawBrowser
   const previewArtifact = `${artifactRoot}/focus-plane-preview.png`;
   const resultReviewArtifact = `${artifactRoot}/focus-plane-result-review.png`;
   const exportReviewArtifact = `${artifactRoot}/focus-plane-export-review.png`;
+  const privateRunReport = focusPrivateRunReportSchema.parse(
+    JSON.parse(await readFile(`${artifactRoot}/focus-plane-private-run-report.json`, 'utf8')),
+  );
+  const appServerProof = focusAppServerProofSchema.parse(
+    JSON.parse(await readFile(`${artifactRoot}/focus-plane-app-server-runtime-proof.json`, 'utf8')),
+  );
+  const report = privateRunReport.reports[0];
+  if (report === undefined) {
+    throw new Error('Focus private proof did not include a run report.');
+  }
+  const artifactByKind = new Map(report.artifacts.map((artifact) => [artifact.kind, artifact]));
+  const stackArtifact = artifactByKind.get('merge_output_private');
+  if (stackArtifact === undefined) {
+    throw new Error('Focus private proof report is missing the merge output artifact.');
+  }
+  const qualityMetricValue = (name: (typeof report.qualityMetrics)[number]['name']) => {
+    const metric = report.qualityMetrics.find((candidate) => candidate.name === name);
+    if (metric === undefined) throw new Error(`Focus private proof is missing metric ${name}.`);
+    return metric.value;
+  };
+
   return {
     artifactRoot,
     exportReviewArtifact,
     exportReviewDataUrl: await readPngDataUrl(exportReviewArtifact),
     fixtureId: 'validation.computational-merge.focus-plane-transition.v1',
+    focusCoverageRatio: String(appServerProof.focusCoverageRatio),
+    haloRiskCellRatio: String(appServerProof.haloRiskCellRatio),
+    lowConfidenceCellRatio: String(appServerProof.lowConfidenceCellRatio),
+    outputPixelCount: String(appServerProof.outputPixelCount),
     previewArtifact,
     previewDataUrl: await readPngDataUrl(previewArtifact),
     resultReviewArtifact,
     resultReviewDataUrl: await readPngDataUrl(resultReviewArtifact),
-    sourceCount: '3',
+    sharpnessGainRatio: String(qualityMetricValue('sharpnessGainRatio')),
+    sourceCount: String(appServerProof.sourceCount),
+    sourceCoverageRatio: String(qualityMetricValue('focusStackSourceCoverageRatio')),
+    sourceWinnerDistribution: appServerProof.sourceWinnerDistribution
+      .map((source) => `${source.sourceIndex}:${source.winnerCellRatio}`)
+      .join(','),
     stackHash: await sha256File(`${artifactRoot}/focus-plane-merge.tiff`),
-    stackPath: `${artifactRoot}/focus-plane-merge.tiff`,
+    stackPath: stackArtifact.path.startsWith('private-artifacts/')
+      ? `${privateRoot}/${stackArtifact.path}`
+      : `${artifactRoot}/focus-plane-merge.tiff`,
+    transitionArtifactScore: String(qualityMetricValue('focusTransitionArtifactScore')),
+    winnerSourceCount: String(qualityMetricValue('focusStackWinnerSourceCount')),
   };
 }
 
