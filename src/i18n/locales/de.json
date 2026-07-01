@@ -1300,6 +1300,8 @@
       "settings": {
         "aiModelDownloading": "KI-Modell wird heruntergeladen: ",
         "applyPreset": "Vorgabe anwenden",
+        "blendModeRuntimeSupport": "",
+        "blendModeUnsupported": "",
         "brushLocalAdjustmentReceiptSummary": "",
         "brushLocalAdjustmentReceiptSummary_one": "",
         "brushLocalAdjustmentReceiptSummary_few": "",
@@ -1308,7 +1310,9 @@
         "brushLocalAdjustmentReceiptTitle": "",
         "colorRangeLocalAdjustmentReceiptSummary": "{{range}} range · {{ratio}}% proposal coverage",
         "colorRangeLocalAdjustmentReceiptTitle": "Color range local adjustment receipt",
+        "componentOpacity": "",
         "componentPropertiesTitle": "{{name}}-Eigenschaften",
+        "containerOpacity": "",
         "copySectionSettings": "{{section}}-Einstellungen kopieren",
         "invertComponent": "Komponente umkehren",
         "invertMask": "Maske umkehren",

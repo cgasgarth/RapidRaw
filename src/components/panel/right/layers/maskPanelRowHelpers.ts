@@ -1,8 +1,31 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { DEFAULT_LAYER_BLEND_MODE, LAYER_BLEND_MODES, type LayerBlendMode } from '../../../../utils/adjustments';
 
 export interface MaskLikeDragData {
   parentId?: string;
   type: 'Container' | 'Creation' | 'SubMask';
+}
+
+export const MASK_CONTAINER_RUNTIME_BLEND_MODES = [
+  DEFAULT_LAYER_BLEND_MODE,
+  'multiply',
+  'screen',
+] as const satisfies ReadonlyArray<LayerBlendMode>;
+
+export type MaskContainerRuntimeBlendMode = (typeof MASK_CONTAINER_RUNTIME_BLEND_MODES)[number];
+
+const runtimeBlendModeSet = new Set<LayerBlendMode>(MASK_CONTAINER_RUNTIME_BLEND_MODES);
+
+export function isLayerBlendMode(value: string): value is LayerBlendMode {
+  return LAYER_BLEND_MODES.some((blendMode) => blendMode === value);
+}
+
+export function isMaskContainerRuntimeBlendMode(value: string): value is MaskContainerRuntimeBlendMode {
+  return isLayerBlendMode(value) && runtimeBlendModeSet.has(value);
+}
+
+export function getRuntimeMaskContainerBlendMode(value: LayerBlendMode | undefined): MaskContainerRuntimeBlendMode {
+  return value && isMaskContainerRuntimeBlendMode(value) ? value : DEFAULT_LAYER_BLEND_MODE;
 }
 
 export function isMaskLikeContainerDrag(activeDragItem: MaskLikeDragData | null): boolean {

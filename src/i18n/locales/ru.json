@@ -1309,6 +1309,8 @@
       "settings": {
         "aiModelDownloading": "Загрузка ИИ-модели: ",
         "applyPreset": "Применить пресет",
+        "blendModeRuntimeSupport": "",
+        "blendModeUnsupported": "",
         "brushLocalAdjustmentReceiptSummary": "",
         "brushLocalAdjustmentReceiptSummary_one": "",
         "brushLocalAdjustmentReceiptSummary_few": "",
@@ -1317,7 +1319,9 @@
         "brushLocalAdjustmentReceiptTitle": "",
         "colorRangeLocalAdjustmentReceiptSummary": "{{range}} range · {{ratio}}% proposal coverage",
         "colorRangeLocalAdjustmentReceiptTitle": "Color range local adjustment receipt",
+        "componentOpacity": "",
         "componentPropertiesTitle": "Свойства компонента {{name}}",
+        "containerOpacity": "",
         "copySectionSettings": "Копировать настройки раздела {{section}}",
         "invertComponent": "Инвертировать компонент",
         "invertMask": "Инвертировать маску",

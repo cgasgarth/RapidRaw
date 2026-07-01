@@ -24,7 +24,6 @@ import { TextColors, TextVariants, TextWeights } from '../../../../types/typogra
 import {
   DEFAULT_LAYER_BLEND_MODE,
   INITIAL_MASK_ADJUSTMENTS,
-  LAYER_BLEND_MODES,
   type LayerBlendMode,
   type MaskContainer,
   type RetouchCandidateProvenance,
@@ -67,6 +66,11 @@ import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens'
 import Slider, { type SliderChangeEvent } from '../../../ui/primitives/Slider';
 import UiText from '../../../ui/primitives/Text';
 import { Mask, SubMaskMode, ToolType } from './Masks';
+import {
+  getRuntimeMaskContainerBlendMode,
+  isLayerBlendMode,
+  isMaskContainerRuntimeBlendMode,
+} from './maskPanelRowHelpers';
 
 interface LayerStackPanelProps {
   activeMaskContainerId: string | null;
@@ -247,10 +251,6 @@ const blendModes = [
   { labelKey: 'editor.layers.blendModes.luminosity', value: 'luminosity' },
 ] as const;
 type BlendModeLabelKey = (typeof blendModes)[number]['labelKey'];
-
-function isLayerBlendMode(value: string): value is LayerBlendMode {
-  return LAYER_BLEND_MODES.some((blendMode) => blendMode === value);
-}
 
 function getBlendModeLabelKey(value: LayerBlendMode): BlendModeLabelKey {
   return blendModes.find((blendMode) => blendMode.value === value)?.labelKey ?? 'editor.layers.blendModes.normal';
@@ -1539,14 +1539,24 @@ export function LayerStackPanel({
                 disabled={isBaseSelected || isGroupHeaderSelected}
                 onChange={(event) => {
                   const blendMode = event.currentTarget.value;
-                  if (!activeRow.isBase && !activeRow.isGroupHeader && isLayerBlendMode(blendMode)) {
+                  if (
+                    !activeRow.isBase &&
+                    !activeRow.isGroupHeader &&
+                    isLayerBlendMode(blendMode) &&
+                    isMaskContainerRuntimeBlendMode(blendMode)
+                  ) {
                     updateLayerBlendMode(activeRow.id, blendMode);
                   }
                 }}
-                value={activeRow.blendMode ?? DEFAULT_LAYER_BLEND_MODE}
+                value={getRuntimeMaskContainerBlendMode(activeRow.blendMode ?? DEFAULT_LAYER_BLEND_MODE)}
               >
                 {blendModes.map((blendMode) => (
-                  <option key={blendMode.value} value={blendMode.value}>
+                  <option
+                    disabled={!isMaskContainerRuntimeBlendMode(blendMode.value)}
+                    key={blendMode.value}
+                    value={blendMode.value}
+                    data-runtime-supported={String(isMaskContainerRuntimeBlendMode(blendMode.value))}
+                  >
                     {t(blendMode.labelKey)}
                   </option>
                 ))}

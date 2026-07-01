@@ -45,6 +45,10 @@ fn default_opacity() -> f32 {
     100.0
 }
 
+fn default_blend_mode() -> String {
+    "normal".to_string()
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(crate = "serde")]
 #[serde(rename_all = "camelCase")]
@@ -53,6 +57,8 @@ pub struct MaskDefinition {
     pub name: String,
     pub visible: bool,
     pub invert: bool,
+    #[serde(default = "default_blend_mode")]
+    pub blend_mode: String,
     #[serde(default = "default_opacity")]
     pub opacity: f32,
     pub adjustments: Value,
@@ -2326,6 +2332,7 @@ mod tests {
             name: "Range".to_string(),
             visible: true,
             invert: false,
+            blend_mode: "normal".to_string(),
             opacity: 100.0,
             adjustments: serde_json::json!({}),
             sub_masks: vec![SubMask {
