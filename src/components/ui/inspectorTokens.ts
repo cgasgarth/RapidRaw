@@ -24,22 +24,22 @@ export const inspectorSectionTokens = {
 export const professionalInspectorDensityTokens = {
   actionButton: {
     active: 'bg-editor-primary-active text-editor-primary-active-text',
-    base: 'inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded px-2 text-[11px] font-medium leading-none transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45',
-    icon: 'w-6 px-0',
+    base: 'inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded px-1.5 text-[11px] font-medium leading-none transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45',
+    icon: 'w-5 px-0',
     inactive: 'bg-editor-panel text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary',
     quiet: 'bg-transparent text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary',
     selectedQuiet: 'bg-editor-selected-quiet text-editor-selected-quiet-text',
   },
   card: {
-    panel: 'rounded-md bg-editor-panel-well p-1.5',
-    nested: 'rounded border border-editor-border bg-editor-panel px-2 py-1',
-    nestedBare: 'rounded bg-editor-panel px-2 py-1',
-    nestedPanel: 'rounded-md border border-editor-border bg-editor-panel-well p-1.5',
+    panel: 'rounded bg-editor-panel-well p-1',
+    nested: 'rounded border border-editor-border bg-editor-panel px-1.5 py-1',
+    nestedBare: 'rounded bg-editor-panel px-1.5 py-1',
+    nestedPanel: 'rounded border border-editor-border bg-editor-panel-well p-1',
     surface: 'rounded-md border border-editor-border bg-editor-matte',
   },
   gutter: {
-    panel: 'space-y-2',
-    section: 'space-y-1.5',
+    panel: 'space-y-1.5',
+    section: 'space-y-1',
   },
   panelHeader: {
     actionButton:
@@ -73,9 +73,9 @@ export const professionalInspectorDensityTokens = {
   sectionHeader: {
     badge:
       'shrink-0 rounded bg-editor-selected-quiet px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-4 tracking-normal text-text-secondary',
-    root: 'mb-1 flex min-h-5 items-center justify-between gap-2',
-    rootLoose: 'mb-1 flex items-start justify-between gap-2',
-    summary: 'mt-0.5 block text-[11px] leading-4 text-text-secondary',
+    root: 'mb-0.5 flex min-h-5 items-center justify-between gap-2',
+    rootLoose: 'mb-0.5 flex items-start justify-between gap-2',
+    summary: 'block text-[10px] leading-3 text-text-secondary',
     title: 'text-[11px] font-semibold uppercase leading-4 tracking-normal text-text-secondary',
   },
   toneMapper: {
@@ -115,22 +115,22 @@ export const inspectorSliderTokens = {
 } as const;
 
 export const compactInspectorSliderTokens = {
-  fill: 'absolute top-1/2 h-1 -translate-y-1/2 rounded-full pointer-events-none bg-editor-primary-active/45',
+  fill: 'absolute top-1/2 h-[3px] -translate-y-1/2 rounded-full pointer-events-none bg-editor-primary-active/45',
   input:
-    'absolute top-1/2 left-0 z-10 h-5 w-full -translate-y-1/2 appearance-none bg-transparent m-0 p-0 slider-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-editor-matte',
+    'absolute top-1/2 left-0 z-10 h-4 w-full -translate-y-1/2 appearance-none bg-transparent m-0 p-0 slider-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-editor-matte',
   label:
-    'col-start-1 row-start-1 truncate text-[12px] font-medium leading-4 text-text-secondary select-none transition-opacity duration-200 ease-in-out',
+    'col-start-1 row-start-1 truncate text-[11px] font-medium leading-4 text-text-secondary select-none transition-opacity duration-200 ease-in-out',
   labelButton: 'grid min-w-0 border-0 bg-transparent p-0 text-left cursor-pointer',
   labelStatic: 'grid min-w-0 border-0 bg-transparent p-0 text-left cursor-default',
   resetLabel:
-    'col-start-1 row-start-1 truncate text-[12px] font-medium leading-4 text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none',
-  root: 'group grid min-h-6 grid-cols-[minmax(3.8rem,0.68fr)_minmax(4.75rem,1fr)_3.5rem] items-center gap-1.5 py-px disabled:opacity-60',
+    'col-start-1 row-start-1 truncate text-[11px] font-medium leading-4 text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none',
+  root: 'group grid min-h-5 grid-cols-[minmax(3.4rem,0.62fr)_minmax(4.5rem,1fr)_3.25rem] items-center gap-1 py-px disabled:opacity-60',
   suffix: 'text-[10px] align-top inline-block mt-0.5 ml-0.5',
-  track: 'absolute top-1/2 left-0 h-1 w-full -translate-y-1/2 rounded-full pointer-events-none',
-  trackWrap: 'relative h-5 min-w-0',
+  track: 'absolute top-1/2 left-0 h-[3px] w-full -translate-y-1/2 rounded-full pointer-events-none',
+  trackWrap: 'relative h-4 min-w-0',
   valueButton:
-    'h-5 rounded border-0 bg-transparent p-0 font-mono text-[12px] leading-5 tabular-nums text-text-primary w-full text-right select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
+    'h-5 rounded border-0 bg-transparent p-0 font-mono text-[11px] leading-5 tabular-nums text-text-primary w-full text-right select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
   valueInput:
-    'h-5 w-full rounded-sm border border-editor-border bg-editor-panel-raised px-1 py-0 text-right font-mono text-[12px] leading-5 tabular-nums text-text-primary outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
-  valueSlot: 'w-[3.5rem] shrink-0 text-right',
+    'h-5 w-full rounded-sm border border-editor-border bg-editor-panel-raised px-1 py-0 text-right font-mono text-[11px] leading-5 tabular-nums text-text-primary outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
+  valueSlot: 'w-[3.25rem] shrink-0 text-right',
 } as const;
