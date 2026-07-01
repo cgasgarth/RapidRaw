@@ -1,6 +1,6 @@
 import { installFrontendLogBridge } from './utils/frontendLogBridge';
 import { installBrowserTauriHarness } from './validation/browserTauriHarness.mts';
-import './styles.css';
+import './product-styles.css';
 
 installBrowserTauriHarness();
 installFrontendLogBridge();
