@@ -21,12 +21,17 @@ export default function RightPanelSwitcher({
 
   return (
     <div
+      data-testid={`right-panel-switcher-${layout}`}
       className={
         isHorizontal ? 'flex items-center gap-0.5 overflow-x-auto p-0.5' : 'flex h-full flex-col gap-0.5 p-0.5'
       }
     >
       {RIGHT_PANEL_GROUPS.map((group, groupIndex) => (
-        <div key={groupIndex} className={isHorizontal ? 'flex items-center gap-0.5' : 'flex flex-col gap-0.5'}>
+        <div
+          key={groupIndex}
+          className={isHorizontal ? 'flex items-center gap-0.5' : 'flex flex-col gap-0.5'}
+          data-testid={`right-panel-switcher-group-${groupIndex}`}
+        >
           {groupIndex > 0 && (
             <div
               className={isHorizontal ? 'my-auto h-5 w-px self-stretch bg-surface' : 'h-px w-5 self-center bg-surface'}
@@ -46,6 +51,8 @@ export default function RightPanelSwitcher({
                 onPanelSelect(id);
               }}
               type="button"
+              data-panel-id={id}
+              data-testid={`right-panel-switcher-button-${id}`}
               data-tooltip={t(tooltipKey, { defaultValue: fallbackLabel })}
             >
               {activePanel === id && (

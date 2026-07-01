@@ -14,11 +14,13 @@ export const commandPaletteCommandIdSchema = z.enum([
   'panorama',
   'panelAdjustments',
   'panelAi',
+  'panelColor',
   'panelCrop',
   'panelExport',
   'panelMasks',
   'panelMetadata',
   'panelPresets',
+  'panelTether',
   'superResolution',
   'transformTools',
 ]);

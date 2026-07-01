@@ -25,9 +25,21 @@ export const commandPaletteCommands = commandPaletteCommandSchema.array().parse(
   },
   {
     category: 'panels',
+    id: 'panelMetadata',
+    requiresEditorImage: true,
+    searchTokens: ['metadata', 'exif', 'iptc'],
+  },
+  {
+    category: 'panels',
     id: 'panelAdjustments',
     requiresEditorImage: true,
-    searchTokens: ['adjustments', 'basic', 'color'],
+    searchTokens: ['adjustments', 'basic', 'tone', 'exposure'],
+  },
+  {
+    category: 'panels',
+    id: 'panelColor',
+    requiresEditorImage: true,
+    searchTokens: ['color', 'grading', 'white', 'balance', 'hsl', 'tone'],
   },
   {
     category: 'panels',
@@ -55,9 +67,9 @@ export const commandPaletteCommands = commandPaletteCommandSchema.array().parse(
   },
   {
     category: 'panels',
-    id: 'panelMetadata',
+    id: 'panelTether',
     requiresEditorImage: true,
-    searchTokens: ['metadata', 'exif', 'iptc'],
+    searchTokens: ['tether', 'capture', 'camera', 'session'],
   },
   {
     category: 'panels',
@@ -144,11 +156,13 @@ export const commandLabelKeys = {
   panorama: 'modals.commandPalette.commands.panorama',
   panelAdjustments: 'modals.commandPalette.commands.panelAdjustments',
   panelAi: 'modals.commandPalette.commands.panelAi',
+  panelColor: 'modals.commandPalette.commands.panelColor',
   panelCrop: 'modals.commandPalette.commands.panelCrop',
   panelExport: 'modals.commandPalette.commands.panelExport',
   panelMasks: 'modals.commandPalette.commands.panelMasks',
   panelMetadata: 'modals.commandPalette.commands.panelMetadata',
   panelPresets: 'modals.commandPalette.commands.panelPresets',
+  panelTether: 'modals.commandPalette.commands.panelTether',
   superResolution: 'modals.commandPalette.commands.superResolution',
   transformTools: 'modals.commandPalette.commands.transformTools',
 } as const satisfies Record<CommandPaletteCommandId, string>;
@@ -161,13 +175,15 @@ export const commandCategoryKeys = {
 } as const satisfies Record<CommandPaletteCommandCategory, string>;
 
 export const commandPanelMap = {
-  panelAdjustments: Panel.Adjustments,
-  panelAi: Panel.Ai,
-  panelCrop: Panel.Crop,
-  panelExport: Panel.Export,
-  panelMasks: Panel.Masks,
   panelMetadata: Panel.Metadata,
+  panelAdjustments: Panel.Adjustments,
+  panelColor: Panel.Color,
+  panelCrop: Panel.Crop,
+  panelMasks: Panel.Masks,
+  panelAi: Panel.Ai,
   panelPresets: Panel.Presets,
+  panelTether: Panel.Tether,
+  panelExport: Panel.Export,
 } as const;
 
 export type CommandPaletteDisabledReasonKey =

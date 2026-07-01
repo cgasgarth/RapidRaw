@@ -11,6 +11,7 @@ import {
 import {
   type CommandPaletteUiState,
   commandPaletteCommands,
+  commandPanelMap,
   createCommandPaletteAction,
   getCommandPaletteDisabledReasonKey,
   getCommandPaletteSelectedImages,
@@ -45,6 +46,7 @@ assertUnavailableReasons();
 assertWorkflowActionsOpenModalsWithSelectedSources();
 assertLibraryOnlySelectionUsesActivePath();
 assertLensAndTransformActionsOpenCropModals();
+assertPanelActionsRouteThroughRightRailPanels();
 assertMergeActionsResetStaleOutputAndPreserveSources();
 
 console.log('command palette behavior ok');
@@ -149,6 +151,26 @@ function assertLensAndTransformActionsOpenCropModals() {
   const transformResult = runCommand('transformTools');
   assert.deepEqual(transformResult.panels, [Panel.Crop]);
   assert.equal(transformResult.state.isTransformModalOpen, true);
+}
+
+function assertPanelActionsRouteThroughRightRailPanels() {
+  const expectedPanelCommands = {
+    panelMetadata: Panel.Metadata,
+    panelAdjustments: Panel.Adjustments,
+    panelColor: Panel.Color,
+    panelCrop: Panel.Crop,
+    panelMasks: Panel.Masks,
+    panelAi: Panel.Ai,
+    panelPresets: Panel.Presets,
+    panelTether: Panel.Tether,
+    panelExport: Panel.Export,
+  } as const;
+
+  assert.deepEqual(commandPanelMap, expectedPanelCommands);
+
+  for (const [commandId, panel] of Object.entries(expectedPanelCommands)) {
+    assert.deepEqual(runCommand(commandId as (typeof commandPaletteCommands)[number]['id']).panels, [panel]);
+  }
 }
 
 function assertMergeActionsResetStaleOutputAndPreserveSources() {

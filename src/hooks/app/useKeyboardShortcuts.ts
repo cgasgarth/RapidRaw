@@ -301,6 +301,13 @@ export const useKeyboardShortcuts = ({
           s.ui.setRightPanel(Panel.Adjustments);
         },
       },
+      toggle_color: {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
+          e.preventDefault();
+          s.ui.setRightPanel(Panel.Color);
+        },
+      },
       toggle_crop_panel: {
         shouldFire: (s) => !!s.editor.selectedImage,
         execute: (e, s) => {
@@ -334,6 +341,13 @@ export const useKeyboardShortcuts = ({
         execute: (e, s) => {
           e.preventDefault();
           s.ui.setRightPanel(Panel.Metadata);
+        },
+      },
+      toggle_tether: {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
+          e.preventDefault();
+          s.ui.setRightPanel(Panel.Tether);
         },
       },
       toggle_analytics: {
@@ -588,9 +602,7 @@ export const useKeyboardShortcuts = ({
 
       if (isModalOpen) return;
 
-      const isInputFocused =
-        document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA';
-      if (isInputFocused) return;
+      if (isEditableKeyboardTarget(event.target)) return;
 
       for (const builtin of builtinShortcuts) {
         if (builtin.match(event, state)) {
@@ -629,3 +641,9 @@ export const useKeyboardShortcuts = ({
     handleSetColorLabel,
   ]);
 };
+
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  return ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName);
+}
