@@ -2150,6 +2150,11 @@ async function prepareScenario(page, mode) {
 
   if (mode === 'color-workflow') {
     const colorPanel = page.locator('[data-visual-smoke-section="color-workflow-panel"]');
+    const assertColorWorkspaceTab = async (name: string, activePanel: string, hiddenPanel: string) => {
+      await colorPanel.getByRole('tab', { exact: true, name }).click();
+      await colorPanel.getByTestId(`color-workspace-tab-panel-${activePanel}`).waitFor({ state: 'visible' });
+      await colorPanel.getByTestId(`color-workspace-tab-panel-${hiddenPanel}`).waitFor({ state: 'hidden' });
+    };
     const assertCompactRangeDensity = async (slider: Locator, proofLabel: string) => {
       const selectedSliderCount = await slider.count();
       if (selectedSliderCount !== 1) {
@@ -2199,6 +2204,7 @@ async function prepareScenario(page, mode) {
         input.dispatchEvent(new Event('change', { bubbles: true }));
       }, value);
     };
+    await assertColorWorkspaceTab('Output', 'output', 'quick');
     await colorPanel.getByTestId('color-runtime-status-rail').getByText('Preview/export', { exact: true }).waitFor({
       timeout: 10_000,
     });
@@ -2215,6 +2221,7 @@ async function prepareScenario(page, mode) {
     await gamutWarningControls.getByText('On', { exact: true }).waitFor({ timeout: 10_000 });
     await gamutWarningToggle.click();
     await gamutWarningControls.getByText('Off', { exact: true }).waitFor({ timeout: 10_000 });
+    await assertColorWorkspaceTab('Editor', 'editor', 'output');
     const recipesDisclosure = colorPanel.getByTestId('professional-color-recipes-disclosure');
     if (!(await recipesDisclosure.evaluate((element) => (element as HTMLDetailsElement).open))) {
       await recipesDisclosure.locator('summary').click();
@@ -2247,17 +2254,16 @@ async function prepareScenario(page, mode) {
       'Temperature',
       'quick temperature',
     );
+    await assertColorWorkspaceTab('Grading', 'grading', 'editor');
     await assertCompactSliderDensity(colorPanel, 'Blending', 'color grading blending');
+    await assertColorWorkspaceTab('Quick', 'quick', 'grading');
     await setRangeInput(colorPanel, 'Temperature', 12);
     await setRangeInput(colorPanel, 'Saturation', 18);
+    await assertColorWorkspaceTab('Editor', 'editor', 'quick');
     await colorPanel.getByTestId('black-white-mixer-toggle').click();
     const selectiveControls = colorPanel.getByTestId('selective-color-range-controls');
     await selectiveControls.getByTestId('selective-color-range-oranges').click();
     await assertCompactSliderDensity(selectiveControls, 'Hue', 'selective hue');
-    await assertCompactRangeDensity(
-      colorPanel.getByTestId('skin-tone-uniformity-controls').locator('input[type="range"]').first(),
-      'skin tone uniformity',
-    );
     await setRangeInput(selectiveControls, 'Hue', 8);
     await setRangeInput(selectiveControls, 'Saturation', 22);
     await setRangeInput(selectiveControls, 'Luminance', -11);
@@ -2286,6 +2292,11 @@ async function prepareScenario(page, mode) {
         saturation: 22,
       },
     });
+    await assertColorWorkspaceTab('Output', 'output', 'editor');
+    await assertCompactRangeDensity(
+      colorPanel.getByTestId('skin-tone-uniformity-controls').locator('input[type="range"]').first(),
+      'skin tone uniformity',
+    );
     await page.getByTestId('color-workflow-adjustment-proof').getByText('Temp 12', { exact: true }).waitFor({
       timeout: 10_000,
     });
