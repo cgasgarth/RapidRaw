@@ -25,6 +25,10 @@ import {
   detailEffectsCommandEnvelopeV1Schema,
   detailEffectsDryRunResultV1Schema,
   detailEffectsMutationResultV1Schema,
+  type EditGraphCommandEnvelopeV1,
+  editGraphCommandEnvelopeV1Schema,
+  editGraphDryRunResultV1Schema,
+  editGraphMutationResultV1Schema,
   type LayerMaskCommandEnvelopeV1,
   type LensProfileCommandEnvelopeV1,
   type LensProfilePatchV1,
@@ -357,6 +361,20 @@ export type RawEngineLocalAppServerLensProfileCommandV1 = z.infer<
   typeof rawEngineLocalAppServerLensProfileCommandV1Schema
 >;
 
+export const rawEngineLocalAppServerEditGraphCommandV1Schema = editGraphCommandEnvelopeV1Schema.superRefine(
+  (command, context) => {
+    if (command.commandType !== 'editGraph.applyParameterPatch') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Local app-server bridge currently supports edit graph parameter patch commands only.',
+        path: ['commandType'],
+      });
+    }
+  },
+);
+
+export type RawEngineLocalAppServerEditGraphCommandV1 = z.infer<typeof rawEngineLocalAppServerEditGraphCommandV1Schema>;
+
 export const rawEngineLocalAppServerLayerMaskCommandV1Schema = layerMaskCommandEnvelopeV1Schema.superRefine(
   (command, context) => {
     if (
@@ -408,6 +426,7 @@ const AI_COMMAND_TYPE_TO_APP_SERVER_TOOL_NAME = {
   'ai.mask.generateSubject': 'ai.mask.dry_run_subject',
   'detailEffects.applyAdjustments': 'detail.effects.apply_command',
   'detailEffects.dryRunAdjustments': 'detail.effects.dry_run_command',
+  'editGraph.applyParameterPatch': 'editgraph.apply_command',
   'lensProfile.applyCorrection': 'lensprofile.apply_command',
   'lensProfile.dryRunCorrection': 'lensprofile.dry_run_command',
   [RawEngineLocalAppServerCommandType.EditorStateQuery]: 'agent.editor_state.query',
@@ -443,6 +462,8 @@ const RAW_ENGINE_LOCAL_APP_SERVER_EXECUTABLE_TOOL_NAMES = new Set([
   'computationalmerge.super_resolution.open_derived_source',
   'detail.effects.apply_command',
   'detail.effects.dry_run_command',
+  'editgraph.apply_command',
+  'editgraph.dry_run_command',
   'layermask.apply_command',
   'layermask.dry_run_command',
   'lensprofile.apply_command',
@@ -651,12 +672,57 @@ type LensProfileCommandV1 = Extract<
   { commandType: 'lensProfile.dryRunCorrection' | 'lensProfile.applyCorrection' }
 >;
 
+type EditGraphParameterPatchCommandV1 = Extract<
+  EditGraphCommandEnvelopeV1,
+  { commandType: 'editGraph.applyParameterPatch' }
+>;
+
 const buildLensProfilePlanPatch = (command: LensProfileCommandV1): Partial<LensProfilePatchV1> =>
   Object.fromEntries(
     LENS_PROFILE_PATCH_KEYS.flatMap((key) =>
       command.parameters[key] === undefined ? [] : [[key, command.parameters[key]]],
     ),
   );
+
+const buildEditGraphPlanKey = (command: EditGraphParameterPatchCommandV1): string =>
+  JSON.stringify([command.expectedGraphRevision, command.target, command.parameters.operations]);
+
+const buildEditGraphDryRunResult = (command: EditGraphParameterPatchCommandV1) =>
+  editGraphDryRunResultV1Schema.parse({
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: true,
+    mutates: false,
+    parameterDiff: command.parameters.operations.map((operation) => ({
+      nodeId: operation.nodeId,
+      path: operation.path,
+      ...(operation.previousValue === undefined ? {} : { previousValue: operation.previousValue }),
+      ...(operation.value === undefined ? {} : { value: operation.value }),
+    })),
+    predictedGraphRevision: `${command.expectedGraphRevision}:preview:${command.commandId}`,
+    previewArtifacts: [],
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    warnings: [],
+  });
+
+const buildEditGraphMutationResult = (command: EditGraphParameterPatchCommandV1) =>
+  editGraphMutationResultV1Schema.parse({
+    appliedGraphRevision: `${command.expectedGraphRevision}:edit_graph:${command.commandId}`,
+    changedNodeIds: command.parameters.operations.map(
+      (operation, index) => operation.nodeId ?? `edit_graph:${command.target.kind}:${index}:${operation.path}`,
+    ),
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: false,
+    mutates: true,
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    undoRevision: command.expectedGraphRevision,
+    warnings: [],
+  });
 
 const buildDetailEffectsPlanKey = (command: DetailEffectsCommandV1): string =>
   JSON.stringify([command.expectedGraphRevision, command.target, buildDetailEffectsPlanPatch(command)]);
@@ -1608,6 +1674,7 @@ export class RawEngineLocalAppServerBridge {
   readonly #acceptedAiToolDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedBasicToneDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedDetailEffectsDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
+  readonly #acceptedEditGraphDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #acceptedLensProfileDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedHslDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #acceptedSkinToneUniformityDryRunPlanKeys: Set<string> = new Set<string>();
@@ -1950,6 +2017,30 @@ export class RawEngineLocalAppServerBridge {
         return buildLensProfileMutationResult(parsedCommand);
       },
       schema: rawEngineLocalAppServerLensProfileCommandV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: 'editGraph.applyParameterPatch',
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerEditGraphCommandV1Schema.parse(command);
+        if (parsedCommand.commandType !== 'editGraph.applyParameterPatch') {
+          throw new Error('Local app-server bridge expected an edit graph parameter patch command.');
+        }
+
+        const planKey = buildEditGraphPlanKey(parsedCommand);
+        if (parsedCommand.dryRun) {
+          const dryRunResult = buildEditGraphDryRunResult(parsedCommand);
+          this.#acceptedEditGraphDryRunPlanKeys.add(planKey);
+          return dryRunResult;
+        }
+
+        if (!this.#acceptedEditGraphDryRunPlanKeys.has(planKey)) {
+          throw new Error('Local app-server bridge rejected edit graph apply without a matching dry-run.');
+        }
+
+        return buildEditGraphMutationResult(parsedCommand);
+      },
+      schema: rawEngineLocalAppServerEditGraphCommandV1Schema,
     });
 
     this.#commandBus.register({

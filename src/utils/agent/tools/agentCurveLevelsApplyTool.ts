@@ -1,10 +1,22 @@
 import { z } from 'zod';
+import {
+  ActorKind,
+  ApprovalClass,
+  type EditGraphCommandEnvelopeV1,
+  type EditGraphMutationResultV1,
+  type EditGraphParameterPatchOperationV1,
+  editGraphCommandEnvelopeV1Schema,
+  editGraphDryRunResultV1Schema,
+  editGraphMutationResultV1Schema,
+  RAW_ENGINE_SCHEMA_VERSION,
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { levelsSettingsSchema } from '../../../schemas/color/levelsSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments, Coord, Curves, ParametricCurve, ParametricCurveSettings } from '../../adjustments';
 import { ActiveChannel, getDefaultParametricCurve } from '../../adjustments';
 import { pushEditHistoryEntry } from '../../editHistory';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
+import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
 
 export const AGENT_CURVE_LEVELS_APPLY_TOOL_NAME = 'rawengine.agent.curve_levels.apply';
 export const AGENT_CURVE_LEVELS_APPLY_INPUT_SCHEMA_NAME = 'AgentCurveLevelsApplyRequestV1';
@@ -177,7 +189,115 @@ const estimateChangedPixels = ({
   return Math.max(1, Math.round((imageArea / 512) * Math.max(1, changedFieldCount)));
 };
 
-export const applyAgentCurveLevels = (request: AgentCurveLevelsApplyRequest): AgentCurveLevelsApplyResponse => {
+const buildCurveLevelsPatchOperations = (
+  before: Adjustments,
+  patch: CurveLevelsPatch,
+): EditGraphParameterPatchOperationV1[] =>
+  CURVE_LEVELS_KEYS.flatMap((key) => {
+    if (patch[key] === undefined) return [];
+    return [
+      {
+        nodeId: 'curve_levels',
+        op: before[key] === undefined ? 'add' : 'replace',
+        path: `/adjustments/${key}`,
+        previousValue: before[key],
+        value: patch[key],
+      },
+    ];
+  });
+
+const buildAgentCurveLevelsEditGraphCommand = ({
+  commandId,
+  dryRun,
+  expectedGraphRevision,
+  imagePath,
+  operations,
+  request,
+}: {
+  commandId: string;
+  dryRun: boolean;
+  expectedGraphRevision: string;
+  imagePath: string;
+  operations: EditGraphParameterPatchOperationV1[];
+  request: AgentCurveLevelsApplyRequest;
+}): EditGraphCommandEnvelopeV1 =>
+  editGraphCommandEnvelopeV1Schema.parse({
+    actor: {
+      id: 'rawengine-agent',
+      kind: ActorKind.Agent,
+      sessionId: request.sessionId,
+    },
+    approval: dryRun
+      ? {
+          approvalClass: ApprovalClass.PreviewOnly,
+          reason: 'Preview agent curve/levels patch through typed edit graph dispatch.',
+          state: 'not_required',
+        }
+      : {
+          approvalClass: ApprovalClass.EditApply,
+          reason: 'Apply agent curve/levels patch after typed edit graph dry-run.',
+          state: 'approved',
+        },
+    commandId,
+    commandType: 'editGraph.applyParameterPatch',
+    correlationId: `corr_${request.operationId}`,
+    dryRun,
+    expectedGraphRevision,
+    idempotencyKey: `${request.operationId}:editGraph.applyParameterPatch:${dryRun ? 'dry_run' : 'apply'}`,
+    parameters: {
+      label: 'Agent curve/levels adjustment',
+      operations,
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    target: {
+      imagePath,
+      kind: 'image',
+    },
+  });
+
+const dispatchTypedCurveLevelsEditGraphApply = async ({
+  expectedGraphRevision,
+  imagePath,
+  operations,
+  request,
+}: {
+  expectedGraphRevision: string;
+  imagePath: string;
+  operations: EditGraphParameterPatchOperationV1[];
+  request: AgentCurveLevelsApplyRequest;
+}): Promise<EditGraphMutationResultV1> => {
+  const bridge = createLiveEditorAppServerBridge();
+  const dryRunCommand = buildAgentCurveLevelsEditGraphCommand({
+    commandId: `${request.operationId}_dry_run`,
+    dryRun: true,
+    expectedGraphRevision,
+    imagePath,
+    operations,
+    request,
+  });
+  const dryRun = await bridge.dispatch(dryRunCommand, { requestId: request.requestId, now: () => new Date() });
+  if (!dryRun.ok) throw new Error(`Agent curve/levels typed dry-run failed: ${dryRun.message}`);
+  const dryRunResult = editGraphDryRunResultV1Schema.parse(dryRun.result);
+  if (dryRunResult.sourceGraphRevision !== expectedGraphRevision) {
+    throw new Error('Agent curve/levels typed dry-run receipt did not match the editor graph revision.');
+  }
+
+  const applyCommand = buildAgentCurveLevelsEditGraphCommand({
+    commandId: `${request.operationId}_apply`,
+    dryRun: false,
+    expectedGraphRevision,
+    imagePath,
+    operations,
+    request,
+  });
+  const apply = await bridge.dispatch(applyCommand, { requestId: request.requestId, now: () => new Date() });
+  if (!apply.ok) throw new Error(`Agent curve/levels typed apply failed: ${apply.message}`);
+  return editGraphMutationResultV1Schema.parse(apply.result);
+};
+
+export const applyAgentCurveLevels = async (
+  request: AgentCurveLevelsApplyRequest,
+): Promise<AgentCurveLevelsApplyResponse> => {
   const parsedRequest = agentCurveLevelsApplyRequestSchema.parse(request);
   const snapshot = buildAgentImageContextSnapshot();
   if (parsedRequest.expectedRecipeHash !== snapshot.initialPreview.recipeHash) {
@@ -189,6 +309,13 @@ export const applyAgentCurveLevels = (request: AgentCurveLevelsApplyRequest): Ag
   if (selectedImage === null) throw new Error('Agent curve/levels apply requires a selected image.');
 
   const undoGraphRevision = `history_${state.historyIndex}`;
+  const operations = buildCurveLevelsPatchOperations(state.adjustments, parsedRequest.curveLevels);
+  const typedMutation = await dispatchTypedCurveLevelsEditGraphApply({
+    expectedGraphRevision: undoGraphRevision,
+    imagePath: selectedImage.path,
+    operations,
+    request: parsedRequest,
+  });
   const nextAdjustments = applyCurveLevelsPatchToAdjustments(state.adjustments, parsedRequest.curveLevels);
   const history = pushEditHistoryEntry(state.history, state.historyIndex, nextAdjustments);
   useEditorStore.setState({
@@ -214,7 +341,7 @@ export const applyAgentCurveLevels = (request: AgentCurveLevelsApplyRequest): Ag
     }),
     receipt: {
       adjustedFields,
-      appliedGraphRevision,
+      appliedGraphRevision: typedMutation.appliedGraphRevision,
       operationId: parsedRequest.operationId,
       sessionId: parsedRequest.sessionId,
       undoGraphRevision,
