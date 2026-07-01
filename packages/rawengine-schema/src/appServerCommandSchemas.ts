@@ -8,6 +8,7 @@ const rawEngineAppServerInputSchemaNamesV1 = [
   'ComputationalMergeDerivedSourceOpenRequestV1',
   'DetailDeblurCommandEnvelopeV1',
   'DetailDenoiseCommandEnvelopeV1',
+  'DetailEffectsCommandEnvelopeV1',
   'EditGraphCommandEnvelopeV1',
   'EditGraphSnapshotQueryV1',
   'ExportCommandEnvelopeV1',
