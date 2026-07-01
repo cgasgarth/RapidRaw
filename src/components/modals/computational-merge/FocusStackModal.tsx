@@ -51,7 +51,7 @@ const haloSuppressionOptions = [0, 40, 80] as const;
 const reviewOverlayOpacityOptions = [40, 70, 100] as const;
 const reviewArtifactPath = '/tmp/rawengine-focus-stack-smoke.tif';
 
-export default function FocusStackModal({
+export function FocusStackModal({
   isOpen,
   lastApplyCommand,
   lastDryRunCommand,
@@ -907,3 +907,5 @@ export default function FocusStackModal({
     </ComputationalSetupModalShell>
   );
 }
+
+export default FocusStackModal;

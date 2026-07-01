@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import { useEditorStore } from '../../store/useEditorStore';
@@ -24,10 +24,6 @@ import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutpu
 import { handleNegativeConversionEditorHandoff } from '../../utils/negative-lab/negativeLabEditorHandoff';
 import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
 import type { AlbumItem, AppSettings } from '../ui/AppProperties';
-import FocusStackModal from './computational-merge/FocusStackModal';
-import HdrModal from './computational-merge/HdrModal';
-import PanoramaModal from './computational-merge/PanoramaModal';
-import SuperResolutionModal from './computational-merge/SuperResolutionModal';
 import CollageModal from './editing/CollageModal';
 import CullingModal from './editing/CullingModal';
 import DenoiseModal from './editing/DenoiseModal';
@@ -39,8 +35,20 @@ import ConfirmModal from './navigation/ConfirmModal';
 import CopyPasteSettingsModal from './navigation/CopyPasteSettingsModal';
 import ImportSettingsModal from './navigation/ImportSettingsModal';
 
+const FocusStackModal = lazy(() =>
+  import('./computational-merge/FocusStackModal.js').then((module) => ({ default: module.FocusStackModal })),
+);
+const HdrModal = lazy(() =>
+  import('./computational-merge/HdrModal.js').then((module) => ({ default: module.HdrModal })),
+);
 const NegativeConversionModal = lazy(() =>
   import('./negative-lab/NegativeConversionModal.js').then((module) => ({ default: module.NegativeConversionModal })),
+);
+const PanoramaModal = lazy(() =>
+  import('./computational-merge/PanoramaModal.js').then((module) => ({ default: module.PanoramaModal })),
+);
+const SuperResolutionModal = lazy(() =>
+  import('./computational-merge/SuperResolutionModal.js').then((module) => ({ default: module.SuperResolutionModal })),
 );
 
 interface DeleteOptions {
@@ -153,6 +161,27 @@ export default function AppModals(props: AppModalsProps) {
     })),
   );
 
+  const [hasLoadedPanoramaModal, setHasLoadedPanoramaModal] = useState(panoramaModalState.isOpen);
+  const [hasLoadedHdrModal, setHasLoadedHdrModal] = useState(hdrModalState.isOpen);
+  const [hasLoadedSuperResolutionModal, setHasLoadedSuperResolutionModal] = useState(superResolutionModalState.isOpen);
+  const [hasLoadedFocusStackModal, setHasLoadedFocusStackModal] = useState(focusStackModalState.isOpen);
+
+  useEffect(() => {
+    if (panoramaModalState.isOpen) setHasLoadedPanoramaModal(true);
+  }, [panoramaModalState.isOpen]);
+
+  useEffect(() => {
+    if (hdrModalState.isOpen) setHasLoadedHdrModal(true);
+  }, [hdrModalState.isOpen]);
+
+  useEffect(() => {
+    if (superResolutionModalState.isOpen) setHasLoadedSuperResolutionModal(true);
+  }, [superResolutionModalState.isOpen]);
+
+  useEffect(() => {
+    if (focusStackModalState.isOpen) setHasLoadedFocusStackModal(true);
+  }, [focusStackModalState.isOpen]);
+
   const closeConfirmModal = () => {
     setUI((state) => ({ confirmModalState: { ...state.confirmModalState, isOpen: false } }));
   };
@@ -195,268 +224,288 @@ export default function AppModals(props: AppModalsProps) {
           void handleSettingsChange({ ...appSettings, copyPasteSettings: newSettings } as AppSettings);
         }}
       />
-      <PanoramaModal
-        error={panoramaModalState.error}
-        finalImageBase64={panoramaModalState.finalImageBase64}
-        imageCount={panoramaModalState.stitchingSourcePaths.length}
-        isOpen={panoramaModalState.isOpen}
-        isProcessing={panoramaModalState.isProcessing}
-        lastApplyCommand={panoramaModalState.lastApplyCommand}
-        lastDryRunCommand={panoramaModalState.lastDryRunCommand}
-        loadingImageUrl={
-          panoramaModalState.stitchingSourcePaths.length > 0
-            ? thumbnails[
-                panoramaModalState.stitchingSourcePaths[
-                  Math.floor(panoramaModalState.stitchingSourcePaths.length / 2)
-                ] ?? ''
-              ] || null
-            : null
-        }
-        onClose={() => {
-          setUI({
-            panoramaModalState: createDefaultPanoramaModalState(panoramaModalState.settings),
-          });
-        }}
-        onOpenFile={(path: string) => {
-          void props.handleImageSelect(path);
-        }}
-        onSave={props.handleSavePanorama}
-        onStitch={() => {
-          props.handleStartPanorama(panoramaModalState.stitchingSourcePaths);
-        }}
-        onSettingsChange={(settings) => {
-          setUI((state) => ({
-            panoramaModalState: resetPanoramaStateForSettingsChange(state.panoramaModalState, settings),
-          }));
-        }}
-        progressMessage={panoramaModalState.progressMessage}
-        renderedReview={panoramaModalState.renderedReview}
-        runtimePlan={panoramaModalState.runtimePlan}
-        settings={panoramaModalState.settings}
-        sourcePaths={panoramaModalState.stitchingSourcePaths}
-      />
-      <HdrModal
-        error={hdrModalState.error}
-        finalImageBase64={hdrModalState.finalImageBase64}
-        imageCount={hdrModalState.stitchingSourcePaths.length}
-        isOpen={hdrModalState.isOpen}
-        isProcessing={hdrModalState.isProcessing}
-        lastApplyCommand={hdrModalState.lastApplyCommand}
-        lastDryRunCommand={hdrModalState.lastDryRunCommand}
-        loadingImageUrl={
-          hdrModalState.stitchingSourcePaths.length > 0
-            ? thumbnails[
-                hdrModalState.stitchingSourcePaths[Math.floor(hdrModalState.stitchingSourcePaths.length / 2)] ?? ''
-              ] || null
-            : null
-        }
-        onClose={() => {
-          setUI({
-            hdrModalState: createDefaultHdrModalState(hdrModalState.settings),
-          });
-        }}
-        onOpenFile={(path: string) => {
-          void props.handleImageSelect(path);
-        }}
-        onSave={props.handleSaveHdr}
-        onMerge={() => {
-          props.handleStartHdr(hdrModalState.stitchingSourcePaths);
-        }}
-        onSettingsChange={(settings) => {
-          setUI((state) => ({
-            hdrModalState: resetHdrStateForSettingsChange(state.hdrModalState, settings),
-          }));
-        }}
-        progressMessage={hdrModalState.progressMessage}
-        settings={hdrModalState.settings}
-        sourceMetadata={hdrModalState.sourceMetadata}
-        sourcePaths={hdrModalState.stitchingSourcePaths}
-      />
-      <SuperResolutionModal
-        isOpen={superResolutionModalState.isOpen}
-        lastApplyCommand={superResolutionModalState.lastApplyCommand}
-        lastDryRunCommand={superResolutionModalState.lastDryRunCommand}
-        loadingImageUrl={
-          superResolutionModalState.sourcePaths.length > 0
-            ? thumbnails[
-                superResolutionModalState.sourcePaths[Math.floor(superResolutionModalState.sourcePaths.length / 2)] ??
-                  ''
-              ] || null
-            : selectedImage
-              ? finalPreviewUrl
-              : null
-        }
-        onClose={() => {
-          setUI((state) => ({
-            superResolutionModalState: createDefaultSuperResolutionModalState(state.superResolutionModalState.settings),
-          }));
-        }}
-        onOpenOutput={(path) => {
-          void props.handleImageSelect(path);
-        }}
-        onApplyPlan={() => {
-          if (superResolutionModalState.outputReview === null) return;
-          const routePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');
-          const acceptedDryRunPlanId = `super_resolution_plan_${superResolutionModalState.sourcePaths.length}`;
-          const acceptedDryRunPlanHash = superResolutionModalState.outputReview.outputArtifactHash;
-          setUI({
-            superResolutionModalState: {
-              ...superResolutionModalState,
-              lastApplyCommand: {
-                acceptedDryRunPlanHash,
-                acceptedDryRunPlanId,
+      {hasLoadedPanoramaModal && (
+        <Suspense fallback={null}>
+          <PanoramaModal
+            error={panoramaModalState.error}
+            finalImageBase64={panoramaModalState.finalImageBase64}
+            imageCount={panoramaModalState.stitchingSourcePaths.length}
+            isOpen={panoramaModalState.isOpen}
+            isProcessing={panoramaModalState.isProcessing}
+            lastApplyCommand={panoramaModalState.lastApplyCommand}
+            lastDryRunCommand={panoramaModalState.lastDryRunCommand}
+            loadingImageUrl={
+              panoramaModalState.stitchingSourcePaths.length > 0
+                ? thumbnails[
+                    panoramaModalState.stitchingSourcePaths[
+                      Math.floor(panoramaModalState.stitchingSourcePaths.length / 2)
+                    ] ?? ''
+                  ] || null
+                : null
+            }
+            onClose={() => {
+              setUI({
+                panoramaModalState: createDefaultPanoramaModalState(panoramaModalState.settings),
+              });
+            }}
+            onOpenFile={(path: string) => {
+              void props.handleImageSelect(path);
+            }}
+            onSave={props.handleSavePanorama}
+            onStitch={() => {
+              props.handleStartPanorama(panoramaModalState.stitchingSourcePaths);
+            }}
+            onSettingsChange={(settings) => {
+              setUI((state) => ({
+                panoramaModalState: resetPanoramaStateForSettingsChange(state.panoramaModalState, settings),
+              }));
+            }}
+            progressMessage={panoramaModalState.progressMessage}
+            renderedReview={panoramaModalState.renderedReview}
+            runtimePlan={panoramaModalState.runtimePlan}
+            settings={panoramaModalState.settings}
+            sourcePaths={panoramaModalState.stitchingSourcePaths}
+          />
+        </Suspense>
+      )}
+      {hasLoadedHdrModal && (
+        <Suspense fallback={null}>
+          <HdrModal
+            error={hdrModalState.error}
+            finalImageBase64={hdrModalState.finalImageBase64}
+            imageCount={hdrModalState.stitchingSourcePaths.length}
+            isOpen={hdrModalState.isOpen}
+            isProcessing={hdrModalState.isProcessing}
+            lastApplyCommand={hdrModalState.lastApplyCommand}
+            lastDryRunCommand={hdrModalState.lastDryRunCommand}
+            loadingImageUrl={
+              hdrModalState.stitchingSourcePaths.length > 0
+                ? thumbnails[
+                    hdrModalState.stitchingSourcePaths[Math.floor(hdrModalState.stitchingSourcePaths.length / 2)] ?? ''
+                  ] || null
+                : null
+            }
+            onClose={() => {
+              setUI({
+                hdrModalState: createDefaultHdrModalState(hdrModalState.settings),
+              });
+            }}
+            onOpenFile={(path: string) => {
+              void props.handleImageSelect(path);
+            }}
+            onSave={props.handleSaveHdr}
+            onMerge={() => {
+              props.handleStartHdr(hdrModalState.stitchingSourcePaths);
+            }}
+            onSettingsChange={(settings) => {
+              setUI((state) => ({
+                hdrModalState: resetHdrStateForSettingsChange(state.hdrModalState, settings),
+              }));
+            }}
+            progressMessage={hdrModalState.progressMessage}
+            settings={hdrModalState.settings}
+            sourceMetadata={hdrModalState.sourceMetadata}
+            sourcePaths={hdrModalState.stitchingSourcePaths}
+          />
+        </Suspense>
+      )}
+      {hasLoadedSuperResolutionModal && (
+        <Suspense fallback={null}>
+          <SuperResolutionModal
+            isOpen={superResolutionModalState.isOpen}
+            lastApplyCommand={superResolutionModalState.lastApplyCommand}
+            lastDryRunCommand={superResolutionModalState.lastDryRunCommand}
+            loadingImageUrl={
+              superResolutionModalState.sourcePaths.length > 0
+                ? thumbnails[
+                    superResolutionModalState.sourcePaths[
+                      Math.floor(superResolutionModalState.sourcePaths.length / 2)
+                    ] ?? ''
+                  ] || null
+                : selectedImage
+                  ? finalPreviewUrl
+                  : null
+            }
+            onClose={() => {
+              setUI((state) => ({
+                superResolutionModalState: createDefaultSuperResolutionModalState(
+                  state.superResolutionModalState.settings,
+                ),
+              }));
+            }}
+            onOpenOutput={(path) => {
+              void props.handleImageSelect(path);
+            }}
+            onApplyPlan={() => {
+              if (superResolutionModalState.outputReview === null) return;
+              const routePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');
+              const acceptedDryRunPlanId = `super_resolution_plan_${superResolutionModalState.sourcePaths.length}`;
+              const acceptedDryRunPlanHash = superResolutionModalState.outputReview.outputArtifactHash;
+              setUI({
+                superResolutionModalState: {
+                  ...superResolutionModalState,
+                  lastApplyCommand: {
+                    acceptedDryRunPlanHash,
+                    acceptedDryRunPlanId,
+                    commandType: 'computationalMerge.createSuperResolution' as const,
+                    dryRun: false as const,
+                    sources: superResolutionModalState.sourcePaths.length,
+                    toolName: routePair.applyToolName,
+                  },
+                  outputReview: {
+                    ...superResolutionModalState.outputReview,
+                    editableGate: 'ready',
+                    humanReviewStatus: 'passed',
+                    supportMap: {
+                      ...superResolutionModalState.outputReview.supportMap,
+                      reviewStatus: 'apply_ready',
+                    },
+                  },
+                },
+              });
+            }}
+            onPreviewPlan={() => {
+              const lastDryRunCommand = {
                 commandType: 'computationalMerge.createSuperResolution' as const,
-                dryRun: false as const,
+                dryRun: true as const,
                 sources: superResolutionModalState.sourcePaths.length,
-                toolName: routePair.applyToolName,
-              },
-              outputReview: {
-                ...superResolutionModalState.outputReview,
-                editableGate: 'ready',
-                humanReviewStatus: 'passed',
-                supportMap: {
-                  ...superResolutionModalState.outputReview.supportMap,
-                  reviewStatus: 'apply_ready',
+                toolName: getComputationalMergeAppServerRoutePairSummary('super_resolution').dryRunToolName,
+              };
+              const { lastApplyCommand: _lastApplyCommand, ...nextSuperResolutionModalState } =
+                superResolutionModalState;
+              setUI({
+                superResolutionModalState: {
+                  ...nextSuperResolutionModalState,
+                  lastDryRunCommand,
+                  outputReview: buildSuperResolutionOutputReviewWorkflow({
+                    artifactPath: `/tmp/rawengine-super-resolution-preview-plan-${superResolutionModalState.sourcePaths.length}.tif`,
+                    settings: superResolutionModalState.settings,
+                    sourceCount: superResolutionModalState.sourcePaths.length,
+                    sourcePaths: superResolutionModalState.sourcePaths,
+                  }),
                 },
-              },
-            },
-          });
-        }}
-        onPreviewPlan={() => {
-          const lastDryRunCommand = {
-            commandType: 'computationalMerge.createSuperResolution' as const,
-            dryRun: true as const,
-            sources: superResolutionModalState.sourcePaths.length,
-            toolName: getComputationalMergeAppServerRoutePairSummary('super_resolution').dryRunToolName,
-          };
-          const { lastApplyCommand: _lastApplyCommand, ...nextSuperResolutionModalState } = superResolutionModalState;
-          setUI({
-            superResolutionModalState: {
-              ...nextSuperResolutionModalState,
-              lastDryRunCommand,
-              outputReview: buildSuperResolutionOutputReviewWorkflow({
-                artifactPath: `/tmp/rawengine-super-resolution-preview-plan-${superResolutionModalState.sourcePaths.length}.tif`,
-                settings: superResolutionModalState.settings,
-                sourceCount: superResolutionModalState.sourcePaths.length,
-                sourcePaths: superResolutionModalState.sourcePaths,
-              }),
-            },
-          });
-        }}
-        onSettingsChange={(settings) => {
-          setUI((state) => {
-            const {
-              lastApplyCommand: _lastApplyCommand,
-              lastDryRunCommand: _lastDryRunCommand,
-              ...superResolutionModalState
-            } = state.superResolutionModalState;
-            return {
-              superResolutionModalState: {
-                ...superResolutionModalState,
-                outputReview: null,
-                settings,
-              },
-            };
-          });
-        }}
-        outputReview={superResolutionModalState.outputReview}
-        settings={superResolutionModalState.settings}
-        sourceCount={superResolutionModalState.sourcePaths.length}
-        sourcePaths={superResolutionModalState.sourcePaths}
-        sourcePreflightMetadata={superResolutionModalState.sourcePreflightMetadata}
-      />
-      <FocusStackModal
-        isOpen={focusStackModalState.isOpen}
-        lastApplyCommand={focusStackModalState.lastApplyCommand}
-        lastDryRunCommand={focusStackModalState.lastDryRunCommand}
-        loadingImageUrl={
-          focusStackModalState.sourcePaths.length > 0
-            ? thumbnails[
-                focusStackModalState.sourcePaths[Math.floor(focusStackModalState.sourcePaths.length / 2)] ?? ''
-              ] || null
-            : selectedImage
-              ? finalPreviewUrl
-              : null
-        }
-        onClose={() => {
-          setUI((state) => ({
-            focusStackModalState: createDefaultFocusStackModalState(state.focusStackModalState.settings),
-          }));
-        }}
-        onApplyPlan={() => {
-          if (focusStackModalState.outputReview === null) return;
-          const routePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
-          const acceptedDryRunPlanId = `focus_stack_plan_${focusStackModalState.sourcePaths.length}`;
-          const acceptedDryRunPlanHash = focusStackModalState.outputReview.editableHandoff.artifactHash;
-          setUI({
-            focusStackModalState: {
-              ...focusStackModalState,
-              lastApplyCommand: {
-                acceptedDryRunPlanHash,
-                acceptedDryRunPlanId,
+              });
+            }}
+            onSettingsChange={(settings) => {
+              setUI((state) => {
+                const {
+                  lastApplyCommand: _lastApplyCommand,
+                  lastDryRunCommand: _lastDryRunCommand,
+                  ...superResolutionModalState
+                } = state.superResolutionModalState;
+                return {
+                  superResolutionModalState: {
+                    ...superResolutionModalState,
+                    outputReview: null,
+                    settings,
+                  },
+                };
+              });
+            }}
+            outputReview={superResolutionModalState.outputReview}
+            settings={superResolutionModalState.settings}
+            sourceCount={superResolutionModalState.sourcePaths.length}
+            sourcePaths={superResolutionModalState.sourcePaths}
+            sourcePreflightMetadata={superResolutionModalState.sourcePreflightMetadata}
+          />
+        </Suspense>
+      )}
+      {hasLoadedFocusStackModal && (
+        <Suspense fallback={null}>
+          <FocusStackModal
+            isOpen={focusStackModalState.isOpen}
+            lastApplyCommand={focusStackModalState.lastApplyCommand}
+            lastDryRunCommand={focusStackModalState.lastDryRunCommand}
+            loadingImageUrl={
+              focusStackModalState.sourcePaths.length > 0
+                ? thumbnails[
+                    focusStackModalState.sourcePaths[Math.floor(focusStackModalState.sourcePaths.length / 2)] ?? ''
+                  ] || null
+                : selectedImage
+                  ? finalPreviewUrl
+                  : null
+            }
+            onClose={() => {
+              setUI((state) => ({
+                focusStackModalState: createDefaultFocusStackModalState(state.focusStackModalState.settings),
+              }));
+            }}
+            onApplyPlan={() => {
+              if (focusStackModalState.outputReview === null) return;
+              const routePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
+              const acceptedDryRunPlanId = `focus_stack_plan_${focusStackModalState.sourcePaths.length}`;
+              const acceptedDryRunPlanHash = focusStackModalState.outputReview.editableHandoff.artifactHash;
+              setUI({
+                focusStackModalState: {
+                  ...focusStackModalState,
+                  lastApplyCommand: {
+                    acceptedDryRunPlanHash,
+                    acceptedDryRunPlanId,
+                    commandType: 'computationalMerge.createFocusStack' as const,
+                    dryRun: false as const,
+                    sources: focusStackModalState.sourcePaths.length,
+                    toolName: routePair.applyToolName,
+                  },
+                  outputReview: {
+                    ...focusStackModalState.outputReview,
+                    editableHandoff: {
+                      ...focusStackModalState.outputReview.editableHandoff,
+                      status: 'ready',
+                    },
+                    haloReview: {
+                      ...focusStackModalState.outputReview.haloReview,
+                      reviewStatus: 'apply_ready',
+                    },
+                  },
+                },
+              });
+            }}
+            onPreviewPlan={() => {
+              const lastDryRunCommand = {
                 commandType: 'computationalMerge.createFocusStack' as const,
-                dryRun: false as const,
+                dryRun: true as const,
+                haloSuppressionStrengthPercent: focusStackModalState.settings.haloSuppressionStrengthPercent,
                 sources: focusStackModalState.sourcePaths.length,
-                toolName: routePair.applyToolName,
-              },
-              outputReview: {
-                ...focusStackModalState.outputReview,
-                editableHandoff: {
-                  ...focusStackModalState.outputReview.editableHandoff,
-                  status: 'ready',
+                toolName: getComputationalMergeAppServerRoutePairSummary('focus_stack').dryRunToolName,
+              };
+              const { lastApplyCommand: _lastApplyCommand, ...nextFocusStackModalState } = focusStackModalState;
+              setUI({
+                focusStackModalState: {
+                  ...nextFocusStackModalState,
+                  lastDryRunCommand,
+                  outputReview: buildFocusStackOutputReviewWorkflow({
+                    artifactPath: `/tmp/rawengine-focus-stack-preview-plan-${focusStackModalState.sourcePaths.length}.tif`,
+                    settings: focusStackModalState.settings,
+                    sourceCount: focusStackModalState.sourcePaths.length,
+                    sourcePaths: focusStackModalState.sourcePaths,
+                  }),
                 },
-                haloReview: {
-                  ...focusStackModalState.outputReview.haloReview,
-                  reviewStatus: 'apply_ready',
-                },
-              },
-            },
-          });
-        }}
-        onPreviewPlan={() => {
-          const lastDryRunCommand = {
-            commandType: 'computationalMerge.createFocusStack' as const,
-            dryRun: true as const,
-            haloSuppressionStrengthPercent: focusStackModalState.settings.haloSuppressionStrengthPercent,
-            sources: focusStackModalState.sourcePaths.length,
-            toolName: getComputationalMergeAppServerRoutePairSummary('focus_stack').dryRunToolName,
-          };
-          const { lastApplyCommand: _lastApplyCommand, ...nextFocusStackModalState } = focusStackModalState;
-          setUI({
-            focusStackModalState: {
-              ...nextFocusStackModalState,
-              lastDryRunCommand,
-              outputReview: buildFocusStackOutputReviewWorkflow({
-                artifactPath: `/tmp/rawengine-focus-stack-preview-plan-${focusStackModalState.sourcePaths.length}.tif`,
-                settings: focusStackModalState.settings,
-                sourceCount: focusStackModalState.sourcePaths.length,
-                sourcePaths: focusStackModalState.sourcePaths,
-              }),
-            },
-          });
-        }}
-        onSettingsChange={(settings) => {
-          setUI((state) => {
-            const {
-              lastApplyCommand: _lastApplyCommand,
-              lastDryRunCommand: _lastDryRunCommand,
-              ...focusStackModalState
-            } = state.focusStackModalState;
-            return {
-              focusStackModalState: {
-                ...focusStackModalState,
-                outputReview: null,
-                settings,
-              },
-            };
-          });
-        }}
-        outputReview={focusStackModalState.outputReview}
-        settings={focusStackModalState.settings}
-        sourceCount={focusStackModalState.sourcePaths.length}
-        sourcePaths={focusStackModalState.sourcePaths}
-        sourcePreflightMetadata={focusStackModalState.sourcePreflightMetadata}
-      />
+              });
+            }}
+            onSettingsChange={(settings) => {
+              setUI((state) => {
+                const {
+                  lastApplyCommand: _lastApplyCommand,
+                  lastDryRunCommand: _lastDryRunCommand,
+                  ...focusStackModalState
+                } = state.focusStackModalState;
+                return {
+                  focusStackModalState: {
+                    ...focusStackModalState,
+                    outputReview: null,
+                    settings,
+                  },
+                };
+              });
+            }}
+            outputReview={focusStackModalState.outputReview}
+            settings={focusStackModalState.settings}
+            sourceCount={focusStackModalState.sourcePaths.length}
+            sourcePaths={focusStackModalState.sourcePaths}
+            sourcePreflightMetadata={focusStackModalState.sourcePreflightMetadata}
+          />
+        </Suspense>
+      )}
       {negativeModalState.isOpen && (
         <Suspense fallback={null}>
           <NegativeConversionModal
