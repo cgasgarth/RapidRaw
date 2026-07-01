@@ -557,6 +557,10 @@
         "pasteSettings": "Вставить настройки",
         "resetSectionSettings": "Сбросить настройки раздела «{{section}}»"
       },
+      "pinnedControls": {
+        "title": "Закреплено",
+        "unpin": "Открепить {{control}}"
+      },
       "rawProcessingModeOverride": {
         "attention": "Check",
         "currentValue": "",
@@ -581,6 +585,12 @@
         "curves": "Tone Curves",
         "details": "Detail",
         "effects": "Effects & Looks"
+      },
+      "search": {
+        "clear": "Очистить поиск",
+        "label": "Поиск элементов коррекции",
+        "noResults": "Нет подходящих элементов",
+        "placeholder": "Поиск элементов"
       },
       "sections": {
         "basic": "Основные",

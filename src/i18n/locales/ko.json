@@ -343,6 +343,16 @@
       },
       "rawProcessingModeOverride": {
         "attention": "Check"
+      },
+      "search": {
+        "clear": "검색 지우기",
+        "label": "조정 컨트롤 검색",
+        "noResults": "일치하는 컨트롤 없음",
+        "placeholder": "컨트롤 검색"
+      },
+      "pinnedControls": {
+        "title": "고정됨",
+        "unpin": "{{control}} 고정 해제"
       }
     },
     "ai": {

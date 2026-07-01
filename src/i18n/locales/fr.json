@@ -537,6 +537,10 @@
         "pasteSettings": "Coller les paramètres",
         "resetSectionSettings": "Réinitialiser les paramètres de la section {{section}}"
       },
+      "pinnedControls": {
+        "title": "Épinglés",
+        "unpin": "Désépingler {{control}}"
+      },
       "rawProcessingModeOverride": {
         "attention": "Check",
         "currentValue": "",
@@ -561,6 +565,12 @@
         "curves": "Tone Curves",
         "details": "Detail",
         "effects": "Effects & Looks"
+      },
+      "search": {
+        "clear": "Effacer la recherche",
+        "label": "Rechercher des réglages",
+        "noResults": "Aucun réglage correspondant",
+        "placeholder": "Rechercher des réglages"
       },
       "sections": {
         "basic": "Basique",

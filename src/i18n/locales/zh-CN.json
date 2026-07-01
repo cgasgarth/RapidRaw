@@ -542,6 +542,10 @@
         "pasteSettings": "粘贴设置",
         "resetSectionSettings": "重置 {{section}} 设置"
       },
+      "pinnedControls": {
+        "title": "已固定",
+        "unpin": "取消固定 {{control}}"
+      },
       "rawProcessingModeOverride": {
         "attention": "Check",
         "currentValue": "",
@@ -566,6 +570,12 @@
         "curves": "Tone Curves",
         "details": "Detail",
         "effects": "Effects & Looks"
+      },
+      "search": {
+        "clear": "清除搜索",
+        "label": "搜索调整控件",
+        "noResults": "没有匹配的控件",
+        "placeholder": "搜索控件"
       },
       "sections": {
         "basic": "基础",
