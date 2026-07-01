@@ -126,6 +126,7 @@ export default function EditorView({
 
   const handleLinkedVariantImported = useCallback(
     async (path: string) => {
+      useProcessStore.getState().invalidateThumbnails([path]);
       await refreshImageList();
       const { imageList, setLibrary } = useLibraryStore.getState();
       if (!imageList.some((image) => image.path === path)) return;

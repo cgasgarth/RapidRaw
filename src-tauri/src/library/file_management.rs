@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 use std::thread;
+use std::time::UNIX_EPOCH;
 
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
@@ -593,11 +594,19 @@ fn folder_refresh_entry_key(root_path: &Path, entry_path: &Path) -> Option<Strin
         return None;
     }
 
-    if let Ok(relative_path) = entry_path.strip_prefix(root_path) {
-        Some(relative_path.to_string_lossy().into_owned())
+    let relative_path = if let Ok(relative_path) = entry_path.strip_prefix(root_path) {
+        relative_path.to_string_lossy().into_owned()
     } else {
-        Some(file_name)
-    }
+        file_name
+    };
+    let metadata = entry_path.metadata().ok();
+    let byte_size = metadata.as_ref().map_or(0, |metadata| metadata.len());
+    let modified_ms = metadata
+        .and_then(|metadata| metadata.modified().ok())
+        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+        .map_or(0, |duration| duration.as_millis());
+
+    Some(format!("{relative_path}\0{byte_size}\0{modified_ms}"))
 }
 
 fn collect_folder_refresh_entries(path: &Path, recursive: bool) -> Result<Vec<String>, String> {
@@ -4126,12 +4135,19 @@ mod tests {
         assert_eq!(added.item_count, 2);
         assert_ne!(baseline.fingerprint, added.fingerprint);
 
+        fs::write(&other_path, b"image two updated bytes").expect("update image two");
+        let updated =
+            get_folder_refresh_snapshot(folder_path.to_string_lossy().into_owned(), false)
+                .expect("updated snapshot");
+        assert_eq!(updated.item_count, 2);
+        assert_ne!(added.fingerprint, updated.fingerprint);
+
         fs::remove_file(&image_path).expect("remove image one");
         let removed =
             get_folder_refresh_snapshot(folder_path.to_string_lossy().into_owned(), false)
                 .expect("removed snapshot");
         assert_eq!(removed.item_count, 1);
-        assert_ne!(added.fingerprint, removed.fingerprint);
+        assert_ne!(updated.fingerprint, removed.fingerprint);
     }
 
     #[test]

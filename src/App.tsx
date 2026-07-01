@@ -51,7 +51,7 @@ import { useUIStore } from './store/useUIStore';
 import type { Adjustments } from './utils/adjustments';
 import { findAlbumById } from './utils/folderTreeUtils';
 import { getViteEnv } from './utils/frontendEnv.mjs';
-import type { ImageCacheEntry } from './utils/ImageLRUCache';
+import { globalImageCache, type ImageCacheEntry } from './utils/ImageLRUCache';
 import { getOptionalCurrentWindow } from './window/currentWindow';
 import TitleBar from './window/TitleBar';
 
@@ -324,12 +324,6 @@ function App() {
     },
     [handleImageSelect],
   );
-  const handleSelectSubfolderVoid = useCallback(
-    (path: string, isNewRoot?: boolean, preloadedImages?: Array<ImageFile>, expandParents?: boolean) => {
-      void handleSelectSubfolder(path, isNewRoot, preloadedImages, expandParents);
-    },
-    [handleSelectSubfolder],
-  );
   const handleSelectAlbumVoid = useCallback(
     (albumId: string, albumName: string, images: string[]) => {
       void handleSelectAlbum(albumId, albumName, images);
@@ -373,6 +367,8 @@ function App() {
 
   const handleLinkedVariantImported = useCallback(
     async (path: string) => {
+      useProcessStore.getState().invalidateThumbnails([path]);
+      globalImageCache.delete(path);
       await handleLibraryRefresh();
       const { imageList, setLibrary } = useLibraryStore.getState();
       if (!imageList.some((image) => image.path === path)) return;
@@ -449,7 +445,6 @@ function App() {
 
   useTauriListeners({
     refreshAllFolderTrees: refreshAllFolderTreesVoid,
-    handleSelectSubfolder: handleSelectSubfolderVoid,
     refreshImageList: () => {
       void handleLibraryRefresh();
     },
