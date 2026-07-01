@@ -465,7 +465,7 @@ function tFallbackLayerGroupName(): string {
   return 'Layer Group';
 }
 
-export default function LayerStackPanel({
+export function LayerStackPanel({
   activeMaskContainerId,
   masks,
   onSelectMaskContainer,
@@ -2118,3 +2118,5 @@ export default function LayerStackPanel({
     </section>
   );
 }
+
+export default LayerStackPanel;
