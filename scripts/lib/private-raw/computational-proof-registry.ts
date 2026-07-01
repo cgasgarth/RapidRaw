@@ -1,4 +1,4 @@
-import type { ComputationalPrivateProofRunnerConfig } from './computational-private-proof-runner.ts';
+import type { ComputationalPrivateProofRunnerConfig } from './computational-proof-runner.ts';
 
 export type ComputationalPrivateProofFamily = 'focus' | 'hdr' | 'panorama' | 'sr';
 

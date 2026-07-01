@@ -7,7 +7,7 @@ await runComputationalPrivateRootPrep({
   featureFamily: 'panorama_stitch',
   featureLabel: 'panorama',
   fixtureId: 'validation.computational-merge.panorama-overlap.v1',
-  issue: 1508,
+  issue: 4493,
   minSources: 3,
   preferredSourceFileNames: ['_DSC7853.ARW', '_DSC7854.ARW', '_DSC7855.ARW'],
   sourceLabel: 'project-owned ARW overlap frames',

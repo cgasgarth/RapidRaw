@@ -2,16 +2,26 @@
 
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 import { z } from 'zod';
 
+import { openComputationalMergeDerivedSourceV1 } from '../../../../packages/rawengine-schema/src/computational-merge/computationalMergeDerivedSourceRuntime.ts';
+import { createRawEngineLocalAppServerBridge } from '../../../../packages/rawengine-schema/src/localAppServerBridge.ts';
 import { PanoramaAppServerRuntimeToolBusV1 } from '../../../../packages/rawengine-schema/src/panorama/panoramaAppServerRuntime.ts';
 import {
   buildPanoramaUiApplyCommandV1,
   buildPanoramaUiDryRunCommandV1,
 } from '../../../../packages/rawengine-schema/src/panorama/panoramaUiControls.ts';
-import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
+import {
+  RAW_ENGINE_SCHEMA_VERSION,
+  toneColorCommandEnvelopeV1Schema,
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import {
+  sampleComputationalMergeAppServerToolManifestV1,
+  sampleRawEngineSceneColorPipelineV1,
+  sampleToneColorCommandEnvelopeV1,
+} from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../../scripts/lib/computational/proof-budgets.ts';
 import { privateRawReportMetric } from '../../../../scripts/lib/private-raw/computational-report-fixtures.ts';
 import {
@@ -19,6 +29,10 @@ import {
   parseComputationalMergePrivateRunReportCollection,
 } from '../../../../src/schemas/computational-merge/computationalMergePrivateRunReportSchemas.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
+import {
+  buildPanoramaDerivedOutputReceipt,
+  deriveDerivedOutputReceiptState,
+} from '../../../../src/utils/derivedOutputReceipt.ts';
 
 const panoramaRoutePair = getComputationalMergeAppServerRoutePairSummary('panorama');
 const ARTIFACT_ROOT = 'private-artifacts/validation/computational-merge';
@@ -27,6 +41,7 @@ const SAMPLE_PATH = `${ARTIFACT_ROOT}/panorama-overlap-runtime-sample.json`;
 const PROOF_PATH = `${ARTIFACT_ROOT}/panorama-overlap-app-server-runtime-proof.json`;
 const REPORT_PATH = `${ARTIFACT_ROOT}/panorama-overlap-private-run-report.json`;
 const MAX_PRIVATE_PANORAMA_SYNTHETIC_SOURCE_PIXELS = 100_000;
+const DERIVED_PANORAMA_OUTPUT_PATH = `${ARTIFACT_ROOT}/panorama-overlap-merge.tiff`;
 const REVIEW_ARTIFACTS = [
   ['modal_before_apply', `${ARTIFACT_ROOT}/panorama-overlap-modal-before.png`],
   ['modal_after_apply', `${ARTIFACT_ROOT}/panorama-overlap-modal-after.png`],
@@ -60,6 +75,7 @@ const runtimeSampleSchema = z
 
 type PanoramaPrivateRuntimeSample = z.infer<typeof runtimeSampleSchema>;
 type PanoramaPrivateRuntimeFrame = PanoramaPrivateRuntimeSample['frames'][number];
+type PanoramaApplyResult = Extract<ReturnType<PanoramaAppServerRuntimeToolBusV1['execute']>, { kind: 'apply' }>;
 
 const rootValue = valueAfter('--root') ?? process.env.RAWENGINE_PRIVATE_RAW_ROOT;
 if (rootValue === undefined || rootValue.trim().length === 0) {
@@ -115,22 +131,107 @@ async function runProof(rootPath: string): Promise<void> {
     throw new Error('Panorama private app-server proof did not produce an output content hash.');
   }
 
+  const collection = parseComputationalMergePrivateRunReportCollection(
+    JSON.parse(await readFile(join(rootPath, REPORT_PATH), 'utf8')),
+  );
+  const sourceHashIntegrity = await verifySourceHashesUnchanged(rootPath, collection);
+  const derivedSettings = buildDerivedSettings();
+  const derivedReceipt = buildPanoramaDerivedOutputReceipt({
+    acceptedDryRunPlanHash: dryRun.acceptedDryRunPlanHash,
+    acceptedDryRunPlanId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+    review: buildReview(sample, applied),
+    settings: derivedSettings,
+  });
+  const openResult = openComputationalMergeDerivedSourceV1({
+    actor: applyCommand.actor,
+    approval: applyCommand.approval,
+    command: applyCommand,
+    correlationId: 'corr_panorama_private_raw_open_derived_v1',
+    currentGraphRevision: applied.apply.mutationResult.appliedGraphRevision,
+    mutationResult: {
+      ...applied.apply.mutationResult,
+      changedNodeIds: [derivedReceipt.outputArtifactId],
+      derivedAssetId: derivedReceipt.outputArtifactId,
+      outputArtifacts: [
+        {
+          artifactId: derivedReceipt.outputArtifactId,
+          contentHash: derivedReceipt.outputContentHash,
+          dimensions: derivedReceipt.outputDimensions,
+          kind: 'merge_output' as const,
+          storage: 'export_path' as const,
+        },
+      ],
+    },
+    receipt: {
+      acceptedDryRunPlanHash: derivedReceipt.acceptedDryRunPlanHash,
+      acceptedDryRunPlanId: derivedReceipt.acceptedDryRunPlanId,
+      family: derivedReceipt.family,
+      openInEditorAction: {
+        path: derivedReceipt.openInEditorAction.path,
+        state: derivedReceipt.openInEditorAction.state,
+      },
+      outputArtifactId: derivedReceipt.outputArtifactId,
+      outputContentHash: derivedReceipt.outputContentHash,
+      outputPath: derivedReceipt.outputPath,
+      provenanceSidecarPath: derivedReceipt.provenanceSidecar?.sidecarPath,
+      receiptId: derivedReceipt.receiptId,
+      settingsHash: derivedReceipt.settingsHash,
+      sourceGraphRevisions: derivedReceipt.sourceGraphRevisions,
+      staleReasons: derivedReceipt.staleReasons,
+      staleState: derivedReceipt.staleState,
+    },
+    requestId: 'request_panorama_private_raw_open_derived_v1',
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  });
+  const normalEdit = await applyNormalToneColorEdit(openResult.openPath, openResult.derivedSourceId);
+  const staleBySettings = deriveDerivedOutputReceiptState({
+    current: buildPanoramaDerivedOutputReceipt({
+      acceptedDryRunPlanHash: dryRun.acceptedDryRunPlanHash,
+      acceptedDryRunPlanId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+      review: buildReview(sample, applied),
+      settings: { ...derivedSettings, projection: 'cylindrical' },
+    }),
+    receipt: derivedReceipt,
+  });
+  if (!staleBySettings.staleReasons?.includes('settings_hash_changed')) {
+    throw new Error('Panorama private proof did not produce settings stale-state metadata.');
+  }
+
   const proof = {
     acceptedDryRunPlanHash: dryRun.acceptedDryRunPlanHash,
     acceptedDryRunPlanId: dryRun.dryRun.dryRunResult.mergePlan.planId,
     appliedGraphRevision: applied.apply.mutationResult.appliedGraphRevision,
     applyToolName: panoramaRoutePair.applyToolName,
+    derivedHandoff: {
+      editableGate: derivedReceipt.editableGate,
+      family: openResult.family,
+      openDerivedSourceId: openResult.derivedSourceId,
+      openPath: openResult.openPath,
+      outputDimensions: derivedReceipt.outputDimensions,
+      outputPath: derivedReceipt.outputPath,
+      provenanceSidecarPath: derivedReceipt.provenanceSidecar?.sidecarPath,
+      sourceCount: derivedReceipt.sourceCount,
+    },
     dryRunToolName: panoramaRoutePair.dryRunToolName,
     fixtureId: FIXTURE_ID,
+    normalEdit,
     outputContentHash,
+    provenance: {
+      alignmentEdgeCount: applied.apply.provenance.alignment.graph.selectedEdges.length,
+      colorSpace: 'camera_rgb_to_derived_artifact_source',
+      graphRevisionHash: sample.graphRevisionHash,
+      projection: applied.apply.provenance.projectionSettings.effectiveProjection,
+      sourceHashes: sourceHashIntegrity.sourceHashes,
+      staleState: derivedReceipt.staleState,
+      staleStateAfterSettingsChange: staleBySettings.staleState,
+      staleStateReasonsAfterSettingsChange: staleBySettings.staleReasons ?? [],
+    },
     runtimeStatus: applied.apply.provenance.runtimeStatus,
+    sourceHashIntegrity,
     stitchedSourceCount: applied.apply.provenance.stitchedSourceCount,
   };
   await writeFile(join(rootPath, PROOF_PATH), `${JSON.stringify(proof, null, 2)}\n`);
 
-  const collection = parseComputationalMergePrivateRunReportCollection(
-    JSON.parse(await readFile(join(rootPath, REPORT_PATH), 'utf8')),
-  );
   const upgraded = await upgradeReport(rootPath, collection, {
     applyCommandId: applyCommand.commandId,
     applyRuntimeId: applied.apply.mutationResult.derivedAssetId,
@@ -160,6 +261,173 @@ function buildControls(sample: z.infer<typeof runtimeSampleSchema>) {
       sourceIndex: frame.sourceIndex,
     })),
   } as const;
+}
+
+function buildDerivedSettings() {
+  return {
+    blendMode: 'multi_band',
+    boundaryMode: 'auto_crop',
+    exposureMode: 'gain_compensation',
+    lensCorrectionPolicy: 'required_before_stitch',
+    maxPreviewDimensionPx: 1200,
+    memoryBudgetBytes: COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES,
+    outputName: 'Private RAW Panorama runtime proof',
+    projection: 'rectilinear',
+    qualityPreference: 'balanced',
+  } as const;
+}
+
+function buildReview(sample: PanoramaPrivateRuntimeSample, applied: PanoramaApplyResult) {
+  const outputArtifact = applied.apply.mutationResult.outputArtifacts[0];
+  if (outputArtifact === undefined) throw new Error('Panorama private proof did not emit an output artifact.');
+
+  return {
+    boundaryMode: 'auto_crop',
+    capabilityLevel: 'runtime_apply_capable' as const,
+    crop: {
+      height: applied.apply.sidecarArtifact.crop.height,
+      mode: 'auto',
+      preCropHeight: applied.apply.provenance.projectedBounds.height,
+      preCropWidth: applied.apply.provenance.projectedBounds.width,
+      width: applied.apply.sidecarArtifact.crop.width,
+      x: applied.apply.sidecarArtifact.crop.x,
+      y: applied.apply.sidecarArtifact.crop.y,
+    },
+    exposureNormalizationSummary: {
+      appliedGainCount: applied.apply.provenance.exposureNormalizationResult.appliedGainCount ?? 0,
+      mode: applied.apply.provenance.exposureNormalizationResult.mode,
+    },
+    outputDimensions: outputArtifact.dimensions,
+    outputPath: DERIVED_PANORAMA_OUTPUT_PATH,
+    projection: applied.apply.provenance.projectionSettings.effectiveProjection,
+    seamReview: {
+      policy: 'adaptive_dp_feather_v1' as const,
+      reviewStatus: 'ready' as const,
+      seamCount: applied.apply.provenance.seamReview.overlapEdgeCount,
+      seams: applied.apply.provenance.alignment.graph.selectedEdges.map((edge) => ({
+        confidence: 'high' as const,
+        featherWidthPx: 100,
+        fromSourceIndex: edge.fromSourceIndex,
+        p95ErrorPx: 0.25,
+        toSourceIndex: edge.toSourceIndex,
+      })),
+    },
+    sourceContribution: {
+      excludedSourceCount: sample.frames.length - sample.connectedSourceIndices.length,
+      regions: sample.frames.map((frame) => ({
+        coverageRatio: sample.connectedSourceIndices.includes(frame.sourceIndex)
+          ? 1 / sample.connectedSourceIndices.length
+          : 0,
+        role: sample.connectedSourceIndices.includes(frame.sourceIndex) ? ('stitched' as const) : ('excluded' as const),
+        sourceIndex: frame.sourceIndex,
+      })),
+      stitchedSourceCount: sample.connectedSourceIndices.length,
+    },
+    sourceCount: sample.frames.length,
+    sourceRefs: sample.frames.map((frame) => ({
+      contentHash: frame.contentHash,
+      graphRevision: frame.graphRevision,
+      path: frame.sourcePath,
+      sourceIndex: frame.sourceIndex,
+    })),
+    warningCodes: applied.apply.mutationResult.warnings,
+  };
+}
+
+async function applyNormalToneColorEdit(openPath: string, derivedSourceId: string) {
+  const bridge = createRawEngineLocalAppServerBridge();
+  const dryRunCommand = toneColorCommandEnvelopeV1Schema.parse({
+    ...sampleToneColorCommandEnvelopeV1,
+    actor: { id: 'codex-panorama-private-proof', kind: 'agent' },
+    approval: {
+      approvalClass: 'preview_only',
+      reason: 'Preview a normal tone/color edit against the opened derived panorama source.',
+      state: 'not_required',
+    },
+    colorPipeline: sampleRawEngineSceneColorPipelineV1,
+    commandId: 'command_panorama_private_raw_derived_tone_dry_run_v1',
+    correlationId: 'corr_panorama_private_raw_derived_tone_v1',
+    dryRun: true,
+    expectedGraphRevision: `graph_rev_${derivedSourceId}`,
+    parameters: {
+      blackPoint: -2,
+      clarity: 4,
+      contrast: 7,
+      exposureEv: 0.18,
+      highlights: -10,
+      saturation: 5,
+      shadows: 12,
+      whitePoint: 3,
+    },
+    target: {
+      imagePath: openPath,
+      kind: 'image',
+      virtualCopyId: `vc_${derivedSourceId}`,
+    },
+  });
+  const dryRun = await bridge.dispatch(dryRunCommand, {
+    now: () => new Date('2026-07-01T12:00:00.000Z'),
+    requestId: 'request_panorama_private_raw_derived_tone_dry_run_v1',
+  });
+  if (!dryRun.ok) throw new Error(`Panorama derived tone/color dry-run failed: ${dryRun.reason}`);
+  const dryRunResult = dryRun.result;
+  if (dryRunResult.dryRunPlanHash === undefined || dryRunResult.dryRunPlanId === undefined) {
+    throw new Error('Panorama derived tone/color dry-run did not return a plan identity.');
+  }
+
+  const applyCommand = toneColorCommandEnvelopeV1Schema.parse({
+    ...dryRunCommand,
+    approval: {
+      approvalClass: 'edit_apply',
+      reason: 'Apply the accepted tone/color edit to the derived panorama source.',
+      state: 'approved',
+    },
+    commandId: 'command_panorama_private_raw_derived_tone_apply_v1',
+    dryRun: false,
+    parameters: {
+      ...dryRunCommand.parameters,
+      acceptedDryRunPlanHash: dryRunResult.dryRunPlanHash,
+      acceptedDryRunPlanId: dryRunResult.dryRunPlanId,
+    },
+  });
+  const applied = await bridge.dispatch(applyCommand, {
+    now: () => new Date('2026-07-01T12:00:01.000Z'),
+    requestId: 'request_panorama_private_raw_derived_tone_apply_v1',
+  });
+  if (!applied.ok) throw new Error(`Panorama derived tone/color apply failed: ${applied.reason}`);
+  if (!applied.result.mutates) throw new Error('Panorama derived tone/color apply did not mutate the edit graph.');
+
+  return {
+    appliedGraphRevision: applied.result.appliedGraphRevision,
+    applyCommandId: applyCommand.commandId,
+    changedNodeIds: applied.result.changedNodeIds,
+    dryRunCommandId: dryRunCommand.commandId,
+    dryRunPlanHash: dryRunResult.dryRunPlanHash,
+    dryRunPlanId: dryRunResult.dryRunPlanId,
+    targetImagePath: openPath,
+  };
+}
+
+async function verifySourceHashesUnchanged(rootPath: string, collection: ComputationalMergePrivateRunReportCollection) {
+  const report = collection.reports.find((candidate) => candidate.fixtureId === FIXTURE_ID);
+  if (report === undefined) throw new Error(`Missing private run report for ${FIXTURE_ID}.`);
+  const sourceHashes = await Promise.all(
+    report.sourceHashes.map(async (source) => {
+      const actualHash = await sha256File(join(rootPath, source.localRelativePath));
+      if (actualHash !== source.hash) {
+        throw new Error(`${source.localRelativePath}: source RAW hash changed (${source.hash} -> ${actualHash}).`);
+      }
+      return {
+        hash: actualHash,
+        localRelativePath: source.localRelativePath,
+      };
+    }),
+  );
+
+  return {
+    sourceHashes,
+    state: 'unchanged' as const,
+  };
 }
 
 function buildRequest(
@@ -226,7 +494,7 @@ async function upgradeReport(
             dryRun: proof.dryRunCommandId,
           },
           notes:
-            'Private RAW panorama preview/export artifacts replayed through the typed app-server dry-run/apply bus with downsampled synthetic geometry; full browser E2E review and full-resolution quality acceptance remain tracked separately.',
+            'Private RAW panorama preview/export artifacts replayed through typed app-server dry-run/apply, opened as an editable derived source, then received a normal tone/color edit while source RAW hashes remained unchanged; full browser E2E review and full-resolution quality acceptance remain tracked separately.',
           previewExportParity,
           runtimeResultIds: {
             apply: proof.applyRuntimeId,
@@ -260,7 +528,14 @@ async function runSelfTest(): Promise<void> {
     for (const [, path] of REVIEW_ARTIFACTS) {
       await writeFile(join(rootPath, path), 'png-placeholder');
     }
-    await writeFile(join(rootPath, REPORT_PATH), `${JSON.stringify(samplePrivateReportCollection(), null, 2)}\n`);
+    for (const frame of sampleRuntimeSample().frames) {
+      await mkdir(dirname(join(rootPath, frame.sourcePath)), { recursive: true });
+      await writeFile(join(rootPath, frame.sourcePath), `fake-private-panorama-raw-${frame.sourceIndex}`);
+    }
+    await writeFile(
+      join(rootPath, REPORT_PATH),
+      `${JSON.stringify(await samplePrivateReportCollection(rootPath), null, 2)}\n`,
+    );
     await runProof(rootPath);
 
     const upgraded = parseComputationalMergePrivateRunReportCollection(
@@ -291,17 +566,22 @@ function sampleRuntimeSample(): z.infer<typeof runtimeSampleSchema> {
       graphRevision: 'graph_rev_panorama_private_self_test',
       height: 48,
       sourceIndex,
-      sourcePath: `private-fixtures/panorama/overlap-stitch-v1/frame-0${sourceIndex + 1}.raf`,
+      sourcePath: `private-fixtures/panorama/overlap-stitch-v1/frame-0${sourceIndex + 1}.arw`,
       width: 72,
     })),
     graphRevisionHash: `sha256:${'a'.repeat(64)}`,
   });
 }
 
-function samplePrivateReportCollection(): ComputationalMergePrivateRunReportCollection {
+async function samplePrivateReportCollection(rootPath: string): Promise<ComputationalMergePrivateRunReportCollection> {
   const hash = `sha256:${'0'.repeat(64)}`;
   const asset = (path: string) => ({ hash, path, publicRepoAllowed: false });
-  const source = (path: string) => ({ ...asset(path), localRelativePath: path });
+  const source = async (path: string) => ({
+    hash: await sha256File(join(rootPath, path)),
+    localRelativePath: path,
+    path,
+    publicRepoAllowed: false,
+  });
   const artifact = (kind: string, path: string) => ({ ...asset(path), kind });
   const previewExportParity = privateRawReportMetric('previewExportMeanAbsDelta', 0.015, 0);
 
@@ -324,7 +604,7 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
         fixtureId: FIXTURE_ID,
         generatedAt: '2026-06-18T00:00:00.000Z',
         graphRevisionHash: hash,
-        implementationIssue: 1508,
+        implementationIssue: 4493,
         notes: 'sample private panorama preview/export report',
         qualityMetrics: [
           privateRawReportMetric('decodedSourceCount', 3, 3),
@@ -335,11 +615,11 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
         ],
         reportId: 'computational-merge-run.panorama-overlap.v1',
         screenshotArtifacts: [],
-        sourceHashes: [
+        sourceHashes: await Promise.all([
           source('private-fixtures/panorama/overlap-stitch-v1/frame-01.arw'),
           source('private-fixtures/panorama/overlap-stitch-v1/frame-02.arw'),
           source('private-fixtures/panorama/overlap-stitch-v1/frame-03.arw'),
-        ],
+        ]),
         uiIssue: 1333,
       },
     ],

@@ -79,7 +79,7 @@ const CONFIG: PrivateDecodeProofConfig = PrivateDecodeProofConfig {
     expected_format_label: "arw",
     feature_family: "panorama_stitch",
     fixture_id: "validation.computational-merge.panorama-overlap.v1",
-    implementation_issue: 1508,
+    implementation_issue: 4493,
     metric_source_count: SOURCE_RELATIVE_PATHS.len(),
     notes: "Private ARW panorama overlap direct decode smoke only. This proves production RAW loader ingest, nonzero decoded dimensions, finite decoded pixel payloads, source hashing, and metadata-only report collection. It does not claim panorama alignment, stitch quality, app-server apply, preview/export parity, or UI review.",
     quality_file: "panorama-overlap-quality.json",

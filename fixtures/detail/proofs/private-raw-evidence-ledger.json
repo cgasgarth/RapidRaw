@@ -211,7 +211,7 @@
         "rightsStatus": "project_owned"
       },
       "status": "planned_private_capture",
-      "trackingIssue": 1508
+      "trackingIssue": 4493
     },
     {
       "artifactClass": "overlap_stitch_alignment",
@@ -246,7 +246,7 @@
         "rightsStatus": "project_owned"
       },
       "status": "planned_private_capture",
-      "trackingIssue": 1508
+      "trackingIssue": 4493
     },
     {
       "artifactClass": "overlap_stitch_alignment",
