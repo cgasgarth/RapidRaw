@@ -1,15 +1,16 @@
 {
   "acceptanceCriteria": [
     "Selects one private Alaska RAW in the editor and library stores before agent dispatch.",
-    "Runs the existing iterative loop through dispatchAgentLiveEditorTool and rawEngineAppServerHost.",
+    "Runs the selected-image preview-loop wrapper through the app-server dispatch path.",
     "Requires approved dry-run plan hashes before both mutating apply turns.",
+    "Requires an initial selected-image medium preview receipt before iterative edits.",
     "Renders two distinct selected-image preview envelopes, including a second detail-review crop.",
+    "Rejects stale apply-review attempts against the private RAW-derived preview review.",
     "Rolls the live editor history back to the session-start checkpoint after review.",
     "Hashes the private source RAW before and after the loop and requires no overwrite."
   ],
   "doesNotProve": [
     "Does not commit or publish private Alaska image pixels, RAW hashes, or per-file metadata.",
-    "Does not prove a separate #4149 outer selected-image preview-loop command because this branch only exposes selected-image state and approved inner agent dispatch tools.",
     "Does not prove Capture One or Lightroom quality equivalence.",
     "Does not prove GPU/native decoder parity beyond the selected-image preview loop path exercised here."
   ],
