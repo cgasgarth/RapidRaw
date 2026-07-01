@@ -36,6 +36,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   PanoramaUi: 'panorama-ui',
   ProfessionalEditorCompactPortrait: 'professional-editor-compact-portrait',
   ProfessionalEditorShell: 'professional-editor-shell',
+  ProfessionalEditorToolbar: 'professional-editor-toolbar',
   ProfessionalEditorTokens: 'professional-editor-tokens',
   SrPrivateRawModalReview: 'sr-private-raw-modal-review',
   SrPrivateRawUi: 'sr-private-raw-ui',
@@ -271,6 +272,13 @@ export const VISUAL_SMOKE_SCENARIOS = [
     mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShell,
     outputFile: 'professional-editor-shell.png',
     sectionMinimum: 5,
+  },
+  {
+    compactOutputFile: 'professional-editor-toolbar-compact.png',
+    marker: 'Professional editor toolbar',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorToolbar,
+    outputFile: 'professional-editor-toolbar.png',
+    sectionMinimum: 4,
   },
   {
     compactOutputFile: 'professional-editor-compact-portrait-390.png',

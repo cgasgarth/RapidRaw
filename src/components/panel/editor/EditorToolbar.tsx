@@ -11,6 +11,7 @@ import type { Adjustments, AiPatch, MaskContainer } from '../../../utils/adjustm
 import { formatShortcutLabel } from '../../../utils/keyboardUtils';
 import { parseVirtualImagePath } from '../../../utils/virtualImagePath';
 import type { SelectedImage } from '../../ui/AppProperties';
+import { editorChromeStatusChipClassName, editorChromeTokens } from '../../ui/editorChromeTokens';
 import Dropdown from '../../ui/primitives/Dropdown';
 import UiText from '../../ui/primitives/Text';
 import { IconAperture, IconCalendar, IconClock, IconFocalLength, IconIso, IconShutter } from './ExifIcons';
@@ -411,6 +412,11 @@ const EditorToolbar = memo(
     }, [isHistoryVisible, adjustmentsHistoryIndex]);
 
     const handleButtonKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (e.key === 'Escape') {
+        setIsHistoryVisible(false);
+        e.currentTarget.blur();
+        return;
+      }
       if (e.key === 'Tab') return;
       e.currentTarget.blur();
     };
@@ -424,23 +430,38 @@ const EditorToolbar = memo(
     const effectiveOsPlatform = osPlatform ?? osPlatformFromStore;
     const undoShortcutLabel = formatShortcutLabel(['ctrl', 'KeyZ'], effectiveOsPlatform);
     const redoShortcutLabel = formatShortcutLabel(['ctrl', 'KeyY'], effectiveOsPlatform);
-    const iconButtonClass =
-      'flex h-8 w-8 items-center justify-center rounded-md bg-surface text-text-primary transition-colors hover:bg-card-active disabled:cursor-not-allowed disabled:opacity-50';
-    const activeIconButtonClass =
-      'flex h-8 w-8 items-center justify-center rounded-md bg-accent text-button-text transition-colors hover:bg-accent/90 hover:text-button-text';
+    const token = editorChromeTokens;
+    const commandGroupClass =
+      'flex h-9 items-center gap-1 rounded-md border border-editor-border bg-editor-panel-well p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]';
+    const commandDividerClass = 'mx-0.5 h-5 w-px bg-editor-border';
+    const iconButtonClass = `${token.button.base} ${token.button.icon} ${token.button.quiet} ${token.button.disabled} ${token.focusRing}`;
+    const activeIconButtonClass = `${token.button.base} ${token.button.icon} ${token.button.selectedQuiet} ${token.focusRing}`;
+    const statusPillClass =
+      'border border-editor-border bg-editor-panel-raised text-text-primary shadow-[0_8px_22px_var(--editor-overlay-shadow)]';
 
     return (
-      <div className="relative z-40 flex h-11 shrink-0 items-center justify-between gap-3 px-3">
+      <div
+        className="relative z-40 flex h-11 shrink-0 items-center justify-between gap-3 px-3"
+        data-toolbar-history={isHistoryVisible ? 'open' : 'closed'}
+        data-toolbar-loading={isLoaderVisible ? 'true' : 'false'}
+        data-toolbar-negative-lab={negativeLabDisabledReason ? 'disabled' : 'available'}
+        data-toolbar-original={showOriginal ? 'original' : 'edited'}
+        data-toolbar-soft-proof={isExportSoftProofEnabled ? 'active' : canSoftProof ? 'available' : 'unavailable'}
+        data-toolbar-fullscreen={isFullScreen ? 'active' : 'inactive'}
+      >
         <div className="z-40 flex shrink-0 items-center gap-1.5">
-          <button
-            aria-label={t('editor.toolbar.tooltips.backToLibrary')}
-            className={`${iconButtonClass} shrink-0`}
-            onClick={onBackToLibrary}
-            onKeyDown={handleButtonKeyDown}
-            data-tooltip={t('editor.toolbar.tooltips.backToLibrary')}
-          >
-            <ArrowLeft size={16} />
-          </button>
+          <div className={commandGroupClass} data-testid="editor-toolbar-back-group">
+            <button
+              aria-label={t('editor.toolbar.tooltips.backToLibrary')}
+              className={`${iconButtonClass} shrink-0`}
+              onClick={onBackToLibrary}
+              onKeyDown={handleButtonKeyDown}
+              data-tooltip={t('editor.toolbar.tooltips.backToLibrary')}
+              type="button"
+            >
+              <ArrowLeft size={16} />
+            </button>
+          </div>
 
           <div className="hidden items-center gap-1.5 2xl:flex" aria-hidden="true">
             <div className="invisible flex h-8 w-8 items-center justify-center pointer-events-none">
@@ -461,11 +482,15 @@ const EditorToolbar = memo(
         <div className="relative flex h-full min-w-0 flex-1 justify-center">
           <div
             className={cx(
-              'flex flex-col items-center overflow-hidden bg-surface pt-1.5 transition-all duration-200 ease-out',
+              'flex flex-col items-center overflow-hidden pt-1.5 transition-all duration-200 ease-out',
+              statusPillClass,
               isExpanded
-                ? 'absolute h-16 min-w-[320px] whitespace-nowrap rounded-lg px-6 shadow-2xl shadow-black/50'
+                ? 'absolute h-16 min-w-[320px] whitespace-nowrap rounded-lg px-6'
                 : 'absolute h-8 min-w-0 w-auto max-w-full rounded-md px-3 shadow-none',
             )}
+            aria-busy={isLoaderVisible}
+            data-editor-status-expanded={String(isExpanded)}
+            data-testid="editor-toolbar-file-status"
             onMouseEnter={() => {
               setIsInfoHovered(true);
             }}
@@ -492,7 +517,7 @@ const EditorToolbar = memo(
 
               <UiText
                 as="span"
-                className="ml-2 shrink-0 rounded-full bg-bg-tertiary px-2 py-0.5"
+                className={cx('ml-2 shrink-0', editorChromeStatusChipClassName('neutral'))}
                 color={TextColors.secondary}
                 data-testid="editor-file-type-badge"
                 data-tooltip={t('editor.toolbar.tooltips.fileType')}
@@ -508,7 +533,7 @@ const EditorToolbar = memo(
                   variant={TextVariants.small}
                   color={TextColors.accent}
                   weight={TextWeights.bold}
-                  className="ml-2 shrink-0 bg-accent/20 px-2 py-0.5 rounded-full flex items-center overflow-hidden cursor-default"
+                  className="ml-2 flex shrink-0 cursor-default items-center overflow-hidden rounded bg-editor-info-surface px-1.5 py-0.5 text-editor-info"
                   onMouseEnter={() => {
                     setIsVcHovered(true);
                   }}
@@ -559,8 +584,9 @@ const EditorToolbar = memo(
 
             <button
               type="button"
+              aria-expanded={showDateView}
               className={cx(
-                'relative mt-1.5 w-full grow justify-center border-t border-text-secondary/10 bg-transparent p-0 pt-1.5 text-left transition-opacity duration-200',
+                'relative mt-1.5 w-full grow justify-center border-t border-editor-border bg-transparent p-0 pt-1.5 text-left transition-opacity duration-200',
                 isExpanded ? 'opacity-100 delay-75' : 'opacity-0 hidden',
                 hasExif && 'cursor-pointer',
               )}
@@ -681,7 +707,7 @@ const EditorToolbar = memo(
         </div>
 
         <div className="z-40 flex shrink-0 items-center gap-1.5">
-          <div className="relative flex items-center gap-1.5" ref={historyButtonRef}>
+          <div className={cx(commandGroupClass, 'relative')} ref={historyButtonRef}>
             <button
               className={iconButtonClass}
               disabled={!canUndo}
@@ -693,6 +719,7 @@ const EditorToolbar = memo(
               }}
               aria-label={t('editor.toolbar.tooltips.undo')}
               data-tooltip={t('editor.toolbar.tooltips.undo', { shortcut: undoShortcutLabel })}
+              type="button"
             >
               <Undo size={16} />
             </button>
@@ -707,12 +734,16 @@ const EditorToolbar = memo(
               }}
               aria-label={t('editor.toolbar.tooltips.redo')}
               data-tooltip={t('editor.toolbar.tooltips.redo', { shortcut: redoShortcutLabel })}
+              type="button"
             >
               <Redo size={16} />
             </button>
+            <div className={commandDividerClass} aria-hidden="true" />
             <button
               aria-label={historyDepthLabel}
-              className="h-8 rounded-md bg-surface px-2 text-text-primary transition-colors hover:bg-card-active disabled:cursor-not-allowed disabled:opacity-50"
+              aria-expanded={isHistoryVisible}
+              aria-haspopup="menu"
+              className={`${token.button.base} ${token.button.quiet} ${token.button.disabled} ${token.focusRing} h-8 px-2`}
               disabled={adjustmentsHistory.length <= 1}
               onClick={() => {
                 setIsHistoryVisible((prev) => !prev);
@@ -720,6 +751,7 @@ const EditorToolbar = memo(
               onKeyDown={handleButtonKeyDown}
               data-testid="editor-history-depth-control"
               data-tooltip={t('editor.toolbar.tooltips.history')}
+              type="button"
             >
               <UiText as="span" variant={TextVariants.small} weight={TextWeights.medium}>
                 {historyDepthLabel}
@@ -734,7 +766,9 @@ const EditorToolbar = memo(
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.15, ease: 'easeOut' }}
-                  className="absolute top-full right-0 mt-3 w-56 max-h-80 bg-surface/90 backdrop-blur-md border border-text-secondary/10 shadow-xl rounded-lg overflow-y-auto custom-scrollbar z-50 flex flex-col py-1.5 px-0.5"
+                  className="absolute right-0 top-full z-50 mt-3 flex max-h-80 w-60 flex-col overflow-y-auto rounded-lg border border-editor-overlay-stroke bg-editor-panel/95 px-0.5 py-1.5 shadow-[0_14px_34px_var(--editor-overlay-shadow)] backdrop-blur-md custom-scrollbar"
+                  data-testid="editor-history-popover"
+                  role="menu"
                 >
                   {historyNames.map((name, i) => {
                     const isCurrent = i === adjustmentsHistoryIndex;
@@ -753,16 +787,19 @@ const EditorToolbar = memo(
                         data-active={isCurrent}
                         onClick={() => {
                           goToAdjustmentsHistoryIndex(i);
+                          setIsHistoryVisible(false);
                         }}
                         onKeyDown={handleButtonKeyDown}
                         className={cx(
-                          'text-left px-3 py-2 transition-colors mx-1 my-0.5 rounded-md',
+                          'mx-1 my-0.5 rounded-md px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
                           isCurrent
-                            ? 'bg-accent'
+                            ? 'bg-editor-primary-active'
                             : isFuture
-                              ? 'opacity-50 hover:bg-bg-primary hover:opacity-100'
-                              : 'hover:bg-bg-primary',
+                              ? 'opacity-55 hover:bg-editor-selected-quiet hover:opacity-100'
+                              : 'hover:bg-editor-selected-quiet',
                         )}
+                        role="menuitem"
+                        type="button"
                       >
                         <div className="flex justify-between items-center gap-2">
                           <UiText as="span" color={textColor} weight={textWeight} className="truncate">
@@ -786,26 +823,25 @@ const EditorToolbar = memo(
             </AnimatePresence>
           </div>
 
-          <button
-            aria-label={
-              negativeLabDisabledReason ? `${negativeLabLabel}: ${negativeLabDisabledReason}` : negativeLabLabel
-            }
-            className={cx(
-              'flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface text-text-primary transition-colors',
-              negativeLabDisabledReason ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active',
-            )}
-            data-testid="editor-toolbar-negative-lab"
-            data-tooltip={negativeLabTooltip}
-            disabled={negativeLabDisabledReason !== null}
-            onClick={onOpenNegativeLab}
-            onKeyDown={handleButtonKeyDown}
-            type="button"
-          >
-            <Film size={16} />
-          </button>
+          <div className={commandGroupClass} data-testid="editor-toolbar-mode-group">
+            <button
+              aria-label={
+                negativeLabDisabledReason ? `${negativeLabLabel}: ${negativeLabDisabledReason}` : negativeLabLabel
+              }
+              className={cx(iconButtonClass, 'shrink-0', negativeLabDisabledReason && 'opacity-50 cursor-not-allowed')}
+              data-testid="editor-toolbar-negative-lab"
+              data-tooltip={negativeLabTooltip}
+              disabled={negativeLabDisabledReason !== null}
+              onClick={onOpenNegativeLab}
+              onKeyDown={handleButtonKeyDown}
+              type="button"
+            >
+              <Film size={16} />
+            </button>
+          </div>
 
           <div
-            className="hidden items-center gap-1.5 xl:flex"
+            className={commandGroupClass}
             data-export-soft-proof-enabled={String(isExportSoftProofEnabled)}
             data-export-soft-proof-fingerprint={exportSoftProofTransform?.transformPolicyFingerprint ?? ''}
             data-export-soft-proof-recipe-id={selectedExportProofRecipeId ?? ''}
@@ -815,107 +851,111 @@ const EditorToolbar = memo(
             }
             data-testid="export-soft-proof-toolbar"
           >
-            <button
-              className={cx(
-                'relative flex h-8 w-8 items-center justify-center rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-                isExportSoftProofEnabled
-                  ? 'bg-accent text-button-text hover:bg-accent/90 hover:text-button-text'
-                  : 'bg-surface hover:bg-card-active text-text-primary',
+            <div className="hidden items-center gap-1 xl:flex">
+              <button
+                className={cx(isExportSoftProofEnabled ? activeIconButtonClass : iconButtonClass, 'relative')}
+                aria-label={t('editor.toolbar.tooltips.exportSoftProof')}
+                aria-pressed={isExportSoftProofEnabled}
+                aria-busy={isExportSoftProofEnabled && exportSoftProofTransform === null}
+                disabled={!canSoftProof}
+                onClick={() => {
+                  setEditor({
+                    isExportSoftProofEnabled: !isExportSoftProofEnabled,
+                    exportSoftProofRecipeId: selectedExportProofRecipeId,
+                  });
+                }}
+                onKeyDown={handleButtonKeyDown}
+                data-tooltip={t('editor.toolbar.tooltips.exportSoftProof')}
+                type="button"
+              >
+                <Palette size={16} />
+                {isExportSoftProofEnabled && (
+                  <span
+                    className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border border-editor-panel-well bg-editor-warning"
+                    data-testid="export-soft-proof-active-dot"
+                  />
+                )}
+              </button>
+              {isExportSoftProofEnabled && (
+                <div className="flex w-[260px] items-center gap-1.5" data-testid="export-soft-proof-recipe-details">
+                  <Dropdown
+                    chrome="editor"
+                    className="min-w-0 flex-1"
+                    disabled={!canSoftProof}
+                    options={exportProofRecipeOptions}
+                    value={selectedExportProofRecipeId}
+                    onChange={(value) => {
+                      setEditor({ exportSoftProofRecipeId: value });
+                    }}
+                    triggerClassName="h-8 rounded-md bg-editor-panel-raised px-2.5 text-xs"
+                  />
+                  {selectedExportProofRecipe && (
+                    <div
+                      className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-md border border-editor-warning/40 bg-editor-warning-surface px-1.5 py-0.5"
+                      data-export-soft-proof-color-profile={selectedExportProofProfile}
+                      data-export-soft-proof-black-point-compensation={
+                        exportSoftProofTransform?.blackPointCompensation ?? ''
+                      }
+                      data-export-soft-proof-effective-color-profile={
+                        exportSoftProofTransform?.effectiveColorProfile ?? ''
+                      }
+                      data-export-soft-proof-effective-rendering-intent={
+                        exportSoftProofTransform?.effectiveRenderingIntent ?? ''
+                      }
+                      data-export-soft-proof-source-precision-path={exportSoftProofTransform?.sourcePrecisionPath ?? ''}
+                      data-export-soft-proof-transform-applied={String(
+                        exportSoftProofTransform?.transformApplied ?? '',
+                      )}
+                      data-export-soft-proof-rendering-intent={selectedExportProofIntent}
+                      data-export-soft-proof-status="export-transform-preview"
+                      data-export-soft-proof-transform-policy-fingerprint={
+                        exportSoftProofTransform?.transformPolicyFingerprint ?? ''
+                      }
+                      data-testid="export-soft-proof-active-badge"
+                    >
+                      <UiText as="span" className="uppercase" color={TextColors.secondary} variant={TextVariants.small}>
+                        {t('editor.toolbar.exportSoftProofActive')}
+                      </UiText>
+                      <UiText as="span" className="truncate" color={TextColors.primary} variant={TextVariants.small}>
+                        {exportSoftProofSummary}
+                      </UiText>
+                    </div>
+                  )}
+                </div>
               )}
-              aria-label={t('editor.toolbar.tooltips.exportSoftProof')}
-              aria-pressed={isExportSoftProofEnabled}
-              disabled={!canSoftProof}
-              onClick={() => {
-                setEditor({
-                  isExportSoftProofEnabled: !isExportSoftProofEnabled,
-                  exportSoftProofRecipeId: selectedExportProofRecipeId,
-                });
-              }}
+            </div>
+            <div className={cx(commandDividerClass, 'hidden xl:block')} aria-hidden="true" />
+            <button
+              aria-label={
+                showOriginal ? t('editor.toolbar.tooltips.showEdited') : t('editor.toolbar.tooltips.showOriginal')
+              }
+              aria-pressed={showOriginal}
+              className={cx(showOriginal ? activeIconButtonClass : iconButtonClass)}
+              onClick={onToggleShowOriginal}
               onKeyDown={handleButtonKeyDown}
-              data-tooltip={t('editor.toolbar.tooltips.exportSoftProof')}
+              data-tooltip={
+                showOriginal ? t('editor.toolbar.tooltips.showEdited') : t('editor.toolbar.tooltips.showOriginal')
+              }
               type="button"
             >
-              <Palette size={16} />
-              {isExportSoftProofEnabled && (
-                <span
-                  className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border border-bg-primary bg-warning"
-                  data-testid="export-soft-proof-active-dot"
-                />
-              )}
+              {showOriginal ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
-            {isExportSoftProofEnabled && (
-              <div className="w-56" data-testid="export-soft-proof-recipe-details">
-                <Dropdown
-                  className="w-full"
-                  disabled={!canSoftProof}
-                  options={exportProofRecipeOptions}
-                  value={selectedExportProofRecipeId}
-                  onChange={(value) => {
-                    setEditor({ exportSoftProofRecipeId: value });
-                  }}
-                  triggerClassName="h-8 rounded-md bg-surface px-2.5 text-xs"
-                />
-                {selectedExportProofRecipe && (
-                  <div
-                    className="mt-1 flex items-center justify-center gap-1.5 rounded-md border border-warning/40 bg-warning/10 px-2 py-0.5"
-                    data-export-soft-proof-color-profile={selectedExportProofProfile}
-                    data-export-soft-proof-black-point-compensation={
-                      exportSoftProofTransform?.blackPointCompensation ?? ''
-                    }
-                    data-export-soft-proof-effective-color-profile={
-                      exportSoftProofTransform?.effectiveColorProfile ?? ''
-                    }
-                    data-export-soft-proof-effective-rendering-intent={
-                      exportSoftProofTransform?.effectiveRenderingIntent ?? ''
-                    }
-                    data-export-soft-proof-source-precision-path={exportSoftProofTransform?.sourcePrecisionPath ?? ''}
-                    data-export-soft-proof-transform-applied={String(exportSoftProofTransform?.transformApplied ?? '')}
-                    data-export-soft-proof-rendering-intent={selectedExportProofIntent}
-                    data-export-soft-proof-status="export-transform-preview"
-                    data-export-soft-proof-transform-policy-fingerprint={
-                      exportSoftProofTransform?.transformPolicyFingerprint ?? ''
-                    }
-                    data-testid="export-soft-proof-active-badge"
-                  >
-                    <UiText as="span" className="uppercase" color={TextColors.secondary} variant={TextVariants.small}>
-                      {t('editor.toolbar.exportSoftProofActive')}
-                    </UiText>
-                    <UiText as="span" className="truncate" color={TextColors.primary} variant={TextVariants.small}>
-                      {exportSoftProofSummary}
-                    </UiText>
-                  </div>
-                )}
+            <div className={commandDividerClass} aria-hidden="true" />
+            <button
+              className={cx(isFullScreen ? activeIconButtonClass : iconButtonClass, 'relative')}
+              onClick={onToggleFullScreen}
+              onKeyDown={handleButtonKeyDown}
+              aria-label={fullscreenTooltip}
+              aria-pressed={isFullScreen}
+              data-testid="editor-fullscreen-toggle"
+              data-tooltip={fullscreenTooltip}
+              type="button"
+            >
+              <div className="relative flex h-4 w-4 items-center justify-center">
+                {isFullScreen ? <Minimize2 size={16} /> : <Maximize size={16} />}
               </div>
-            )}
+            </button>
           </div>
-
-          <button
-            aria-label={
-              showOriginal ? t('editor.toolbar.tooltips.showEdited') : t('editor.toolbar.tooltips.showOriginal')
-            }
-            aria-pressed={showOriginal}
-            className={cx(showOriginal ? activeIconButtonClass : iconButtonClass)}
-            onClick={onToggleShowOriginal}
-            onKeyDown={handleButtonKeyDown}
-            data-tooltip={
-              showOriginal ? t('editor.toolbar.tooltips.showEdited') : t('editor.toolbar.tooltips.showOriginal')
-            }
-          >
-            {showOriginal ? <EyeOff size={16} /> : <Eye size={16} />}
-          </button>
-          <button
-            className={`${iconButtonClass} relative`}
-            onClick={onToggleFullScreen}
-            onKeyDown={handleButtonKeyDown}
-            aria-label={fullscreenTooltip}
-            aria-pressed={isFullScreen}
-            data-testid="editor-fullscreen-toggle"
-            data-tooltip={fullscreenTooltip}
-          >
-            <div className="relative flex h-4 w-4 items-center justify-center">
-              {isFullScreen ? <Minimize2 size={16} /> : <Maximize size={16} />}
-            </div>
-          </button>
         </div>
       </div>
     );

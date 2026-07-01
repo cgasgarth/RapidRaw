@@ -1296,6 +1296,35 @@ async function assertWorkflowRailSharedScopes(page) {
   await waitForScopesStripState(page, 'color-workspace-scopes-strip', 'closed');
 }
 
+async function assertProfessionalEditorToolbar(page) {
+  const toolbar = page.locator('[data-visual-smoke-section="professional-editor-toolbar-primary"]');
+  await toolbar.waitFor({ timeout: 10_000 });
+
+  const fileStatus = toolbar.getByTestId('editor-toolbar-file-status');
+  await fileStatus.hover();
+  await page.waitForFunction(() => {
+    const status = document.querySelector('[data-testid="editor-toolbar-file-status"]');
+    return status?.getAttribute('data-editor-status-expanded') === 'true';
+  });
+
+  const historyControl = toolbar.getByTestId('editor-history-depth-control');
+  await historyControl.click();
+  await toolbar.getByTestId('editor-history-popover').waitFor({ timeout: 10_000 });
+
+  const toolbarRoot = toolbar.locator('[data-toolbar-soft-proof="active"]').first();
+  await toolbarRoot.waitFor({ timeout: 10_000 });
+  const originalState = await toolbarRoot.getAttribute('data-toolbar-original');
+  const negativeLabState = await toolbarRoot.getAttribute('data-toolbar-negative-lab');
+  if (originalState !== 'original' || negativeLabState !== 'disabled') {
+    throw new Error(`Professional toolbar state mismatch: original=${originalState}, negativeLab=${negativeLabState}`);
+  }
+
+  if ((page.viewportSize()?.width ?? 0) >= 1280) {
+    await toolbar.getByTestId('export-soft-proof-active-badge').waitFor({ timeout: 10_000 });
+    await toolbar.getByTestId('export-soft-proof-active-dot').waitFor({ timeout: 10_000 });
+  }
+}
+
 async function prepareScenario(page, mode) {
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune) {
     await assertAdjustmentsPanelRetune(page);
@@ -1304,6 +1333,11 @@ async function prepareScenario(page, mode) {
 
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.WorkflowRail) {
     await assertWorkflowRailSharedScopes(page);
+    return;
+  }
+
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorToolbar) {
+    await assertProfessionalEditorToolbar(page);
     return;
   }
 
