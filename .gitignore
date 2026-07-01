@@ -18,6 +18,8 @@ private-artifacts/
 private-fixtures/
 .rawengine-private-root/
 docs/validation/local/
+docs/validation/reports/*.html
+!docs/validation/reports/*.template.html
 docs/validation/rawengine-goal-progress-report-*.html
 docs/validation/goal-progress-report-*.html
 docs/validation/*runtime-status*.json
