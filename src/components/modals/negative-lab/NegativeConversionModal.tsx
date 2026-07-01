@@ -223,6 +223,7 @@ const NEGATIVE_LAB_AGENT_READ_ONLY_SEQUENCE = [
   'qc_proof',
   'stock_family_plan',
 ] as const;
+const NEGATIVE_LAB_RUNTIME_PREVIEW_TOOL_NAME = 'negativelab.preview_conversion';
 type BaseFogSampleLabelKey = 'modals.negativeConversion.sampleCenterPatch' | 'modals.negativeConversion.sampleLeftEdge';
 type ConversionScopeLabelKey =
   | 'modals.negativeConversion.scopeActive'
@@ -1085,6 +1086,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     ? acceptedBatchPlanIdentity.acceptedDryRunPlanId
     : 'accept_dry_run_plan_first';
   const requiresAcceptedBatchPlan = pathsToConvert.length > 0;
+  const runtimePreviewArtifactStatus = previewUrl === null ? 'pending_render' : 'rendered_positive_preview';
+  const runtimePreviewBaseFogStatus = baseFogEstimate === null ? 'pending_base_fog' : 'base_fog_estimated';
+  const runtimePreviewDensityStatus =
+    selectedProfile?.params.print_curve_algorithm === undefined ? 'density_curve_pending' : 'density_curve_selected';
   const exportReadinessInput = {
     baseReady: baseFogEstimate !== null,
     batchPlanAccepted: isBatchPlanAccepted,
@@ -3255,6 +3260,14 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       data-agent-readonly-sequence={NEGATIVE_LAB_AGENT_READ_ONLY_SEQUENCE.join('|')}
       data-agent-rollback-target={agentRollbackTarget}
       data-affected-frame-count={batchDryRunSummary.affectedFrameIds.length}
+      data-base-fog-runtime-status={runtimePreviewBaseFogStatus}
+      data-density-curve-runtime-status={runtimePreviewDensityStatus}
+      data-preview-artifact-status={runtimePreviewArtifactStatus}
+      data-runtime-dry-run-command={NEGATIVE_LAB_RUNTIME_PREVIEW_TOOL_NAME}
+      data-runtime-dry-run-mode="runtime_preview_non_mutating"
+      data-runtime-dry-run-mutates="false"
+      data-runtime-preview-plan-hash={agentProofHash}
+      data-runtime-preview-rendered={String(previewUrl !== null)}
       data-testid="negative-lab-agent-activity"
       data-warning-count={rollWarningCount}
       role="status"
@@ -3311,6 +3324,20 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           {t('modals.negativeConversion.agentReadOnlySequence', {
             sequence: NEGATIVE_LAB_AGENT_READ_ONLY_SEQUENCE.join(' -> '),
           })}
+        </span>
+        <span
+          className="truncate rounded bg-bg-secondary px-1.5 py-0.5"
+          data-testid="negative-lab-runtime-dry-run-command"
+          title={NEGATIVE_LAB_RUNTIME_PREVIEW_TOOL_NAME}
+        >
+          {NEGATIVE_LAB_RUNTIME_PREVIEW_TOOL_NAME}
+        </span>
+        <span
+          className="truncate rounded bg-bg-secondary px-1.5 py-0.5"
+          data-testid="negative-lab-runtime-preview-status"
+          title={runtimePreviewArtifactStatus}
+        >
+          {runtimePreviewArtifactStatus}
         </span>
       </div>
     </div>
