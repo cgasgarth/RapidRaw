@@ -246,9 +246,43 @@ const result = success.result as {
   finalGraphRevision: string;
   finalRecipeHash: string;
   initialGraphRevision: string;
+  initialPreviewReceipt: {
+    contentHash: string;
+    graphRevision: string;
+    imagePath: string;
+    preview: {
+      artifactId: string;
+      includesOriginalRaw: false;
+      longEdgePx: number;
+      quality: number;
+      recipeHash: string;
+      renderHash: string;
+    };
+    proofContext: { stale: boolean; transport: string };
+    requestId: string;
+    toolName: string;
+  };
   initialRecipeHash: string;
   previewLineage: Array<{ previewArtifactId: string; sourceToolName: string }>;
   previewRefreshCount: number;
+  previewRefreshReceipts: Array<{
+    contentHash: string;
+    graphRevision: string;
+    imagePath: string;
+    preview: {
+      artifactId: string;
+      includesOriginalRaw: false;
+      longEdgePx: number;
+      purpose: 'detail_review' | 'refresh';
+      quality: number;
+      recipeHash: string;
+      renderHash: string;
+    };
+    proofContext: { expectedRecipeHash: string; sourceToolName: string; stale: boolean; transport: string };
+    requestId: string;
+    toolName: string;
+    turn: number;
+  }>;
   rollbackReceipt?: { graphRevision: string; toolName: string };
   selectedImage: { height: number; path: string; previewIdentity: string | null; width: number };
   selectedImagePath: string;
@@ -276,6 +310,24 @@ if (
   throw new Error('selected-image preview loop result did not expose graph/recipe lineage.');
 }
 if (
+  result.initialPreviewReceipt.toolName !== 'rawengine.agent.initial_prompt_preview' ||
+  result.initialPreviewReceipt.requestId !== `${commandRequest.requestId}-initial-preview` ||
+  result.initialPreviewReceipt.graphRevision !== result.initialGraphRevision ||
+  result.initialPreviewReceipt.imagePath !== selectedPath ||
+  result.initialPreviewReceipt.preview.artifactId !== result.initialPreviewArtifactId ||
+  result.initialPreviewReceipt.preview.longEdgePx !== 1536 ||
+  result.initialPreviewReceipt.preview.quality !== 0.86 ||
+  result.initialPreviewReceipt.preview.includesOriginalRaw !== false ||
+  result.initialPreviewReceipt.preview.recipeHash !== result.initialRecipeHash ||
+  result.initialPreviewReceipt.proofContext.stale !== false ||
+  result.initialPreviewReceipt.proofContext.transport !== 'codex_app_server'
+) {
+  throw new Error('selected-image preview loop did not emit the initial medium preview receipt.');
+}
+if (!/^sha256:[a-f0-9]{16,64}$/u.test(result.initialPreviewReceipt.contentHash)) {
+  throw new Error('selected-image preview loop initial receipt content hash was invalid.');
+}
+if (
   result.acceptedDryRunPlanCount !== 2 ||
   result.editCount !== 2 ||
   result.previewRefreshCount !== 2 ||
@@ -291,6 +343,26 @@ if (
   result.compareArtifactIds.currentArtifactId.length === 0
 ) {
   throw new Error('selected-image preview loop did not expose preview/compare artifacts.');
+}
+if (
+  result.previewRefreshReceipts.length !== 2 ||
+  result.previewRefreshReceipts[0]?.toolName !== 'rawengine.agent.preview.render' ||
+  result.previewRefreshReceipts[0]?.graphRevision !== 'history_1' ||
+  result.previewRefreshReceipts[1]?.graphRevision !== 'history_2' ||
+  result.previewRefreshReceipts[1]?.preview.purpose !== 'detail_review' ||
+  result.previewRefreshReceipts[1]?.preview.artifactId !== result.previewLineage.at(-1)?.previewArtifactId ||
+  result.previewRefreshReceipts.some(
+    (receipt) =>
+      receipt.imagePath !== selectedPath ||
+      receipt.preview.includesOriginalRaw !== false ||
+      receipt.proofContext.stale !== false ||
+      receipt.proofContext.transport !== 'codex_app_server' ||
+      receipt.proofContext.expectedRecipeHash !== receipt.preview.recipeHash ||
+      receipt.proofContext.sourceToolName !== 'rawengine.agent.adjustments.apply' ||
+      !/^sha256:[a-f0-9]{16,64}$/u.test(receipt.contentHash),
+  )
+) {
+  throw new Error('selected-image preview loop did not emit typed iterative preview refresh receipts.');
 }
 if (
   !auditToolNames.includes('rawengine.agent.state.get') ||
@@ -321,14 +393,26 @@ await expectRejects(
   () =>
     applyAgentCurrentImagePreviewLoopReviewedEdit({
       acceptedPreviewArtifactId: staleAcceptedPreview,
+      acceptedPreviewReceiptHash: result.previewRefreshReceipts.at(-1)?.contentHash ?? '',
       request: commandRequest,
       review: result,
     }),
   'stale preview artifact',
 );
+await expectRejects(
+  () =>
+    applyAgentCurrentImagePreviewLoopReviewedEdit({
+      acceptedPreviewArtifactId: latestAcceptedPreview,
+      acceptedPreviewReceiptHash: result.previewRefreshReceipts[0]?.contentHash ?? '',
+      request: commandRequest,
+      review: result,
+    }),
+  'stale preview receipt',
+);
 
 const acceptedApply = await applyAgentCurrentImagePreviewLoopReviewedEdit({
   acceptedPreviewArtifactId: latestAcceptedPreview,
+  acceptedPreviewReceiptHash: result.previewRefreshReceipts.at(-1)?.contentHash ?? '',
   request: commandRequest,
   review: result,
 });
