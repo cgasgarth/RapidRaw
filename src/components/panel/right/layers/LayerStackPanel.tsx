@@ -872,7 +872,10 @@ export default function LayerStackPanel({
         result.toneResult.commandResult.changedLayerIds.length,
     );
     setLastBrushLocalReceiptId(result.receipt.replayKey);
-    markLayerMaskProvenanceStale({ reason: 'source_state_changed' });
+    recordLayerMaskPreviewReceipt({
+      appliedCommandId: result.brushApplyResult.commandId,
+      masks: result.masks,
+    });
     setEditor({
       activeMaskContainerId: layerId,
       activeMaskId: maskId,
