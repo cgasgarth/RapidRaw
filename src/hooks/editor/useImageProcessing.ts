@@ -12,6 +12,12 @@ import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { type Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../../utils/adjustments';
 import { areAdjustmentsEqual } from '../../utils/adjustmentsSnapshot';
+import {
+  type AppOperationContext,
+  beginAppOperation,
+  logAppOperationFailure,
+  logAppOperationSuccess,
+} from '../../utils/appEventLogger';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { debounce } from '../../utils/timing';
@@ -186,6 +192,7 @@ export function useImageProcessing(
 
       const jobId = ++previewJobIdRef.current;
       const roi = calculateROI();
+      let operation: AppOperationContext | null = null;
 
       try {
         const proofRequest = selectedProofRecipe
@@ -198,6 +205,26 @@ export function useImageProcessing(
               targetResolution: targetRes || null,
             }
           : null;
+
+        if (!dragging) {
+          operation = beginAppOperation({
+            action: proofRequest ? 'render_soft_proof_preview' : 'render_editor_preview',
+            component: 'editor.preview',
+            details: {
+              computeWaveform: isWaveformVisible,
+              hasRoi: Boolean(roi),
+              jobId,
+              softProof: Boolean(proofRequest),
+              targetResolution: targetRes ?? null,
+            },
+            domain: 'preview',
+            operationId: `preview_${String(jobId)}`,
+            traceId: proofRequest?.exportSoftProofRecipeId
+              ? `preview_soft_proof_${proofRequest.exportSoftProofRecipeId}`
+              : undefined,
+          });
+        }
+
         const proofResult =
           !dragging && proofRequest
             ? await Promise.all([
@@ -233,7 +260,16 @@ export function useImageProcessing(
           newlySentPatchIds.forEach((id) => patchesSentToBackend.add(id));
         }
 
-        if (currentPath !== selectedImagePathRef.current) return;
+        if (currentPath !== selectedImagePathRef.current) {
+          if (operation) {
+            logAppOperationSuccess(operation, {
+              byteLength: buffer.byteLength,
+              droppedReason: 'image_selection_changed',
+              jobId,
+            });
+          }
+          return;
+        }
 
         if (buffer.byteLength > 0 && jobId >= latestRenderedJobIdRef.current) {
           latestRenderedJobIdRef.current = jobId;
@@ -245,6 +281,13 @@ export function useImageProcessing(
               if (state.interactivePatch?.url) URL.revokeObjectURL(state.interactivePatch.url);
               return { interactivePatch: null };
             });
+            if (operation) {
+              logAppOperationSuccess(operation, {
+                backend: 'wgpu',
+                byteLength: buffer.byteLength,
+                jobId,
+              });
+            }
             return;
           }
 
@@ -283,6 +326,13 @@ export function useImageProcessing(
 
             if (currentPath !== selectedImagePathRef.current || jobId < latestRenderedJobIdRef.current) {
               URL.revokeObjectURL(url);
+              if (operation) {
+                logAppOperationSuccess(operation, {
+                  byteLength: buffer.byteLength,
+                  droppedReason: currentPath !== selectedImagePathRef.current ? 'image_selection_changed' : 'stale_job',
+                  jobId,
+                });
+              }
               return;
             }
 
@@ -307,11 +357,32 @@ export function useImageProcessing(
               }
               return { interactivePatch: null };
             });
+            if (operation) {
+              logAppOperationSuccess(operation, {
+                byteLength: buffer.byteLength,
+                jobId,
+                softProofTransformApplied: transform?.transformApplied ?? false,
+              });
+            }
           }
+        } else if (operation) {
+          logAppOperationSuccess(operation, {
+            byteLength: buffer.byteLength,
+            droppedReason: buffer.byteLength === 0 ? 'empty_buffer' : 'stale_job',
+            jobId,
+          });
         }
       } catch (err) {
         if (err !== 'Superseded or worker failed') {
           console.error('Failed to apply adjustments:', err);
+          if (operation) {
+            logAppOperationFailure(operation, err);
+          }
+        } else if (operation) {
+          logAppOperationSuccess(operation, {
+            droppedReason: 'superseded',
+            jobId,
+          });
         }
         if (!dragging) {
           setEditor((state) => {

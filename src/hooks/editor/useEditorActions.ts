@@ -16,7 +16,9 @@ import {
   PasteMode,
   pickAdjustmentValues,
 } from '../../utils/adjustments';
+import { beginAppOperation, logAppOperationFailure, logAppOperationSuccess } from '../../utils/appEventLogger';
 import {
+  BASIC_TONE_ADJUSTMENT_KEYS,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
   hasBasicToneAdjustmentChange,
@@ -47,6 +49,9 @@ const BASIC_TONE_SESSION_ID = 'rapidraw-editor-basic-tone';
 
 const createOperationId = (): string => crypto.randomUUID();
 
+const getChangedBasicToneKeys = (previous: Adjustments, next: Adjustments): Array<string> =>
+  BASIC_TONE_ADJUSTMENT_KEYS.filter((key) => previous[key] !== next[key]);
+
 export function useEditorActions() {
   const setEditor = useEditorStore((s) => s.setEditor);
 
@@ -55,19 +60,44 @@ export function useEditorActions() {
       const state = useEditorStore.getState();
       const prev = state.adjustments;
       const newAdjustments = typeof value === 'function' ? value(prev) : { ...prev, ...value };
-      const lastBasicToneCommand =
+      const expectedGraphRevision = `history_${state.historyIndex + 1}`;
+      const commandContext =
         state.selectedImage?.path && hasBasicToneAdjustmentChange(prev, newAdjustments)
-          ? buildBasicToneCommandEnvelope(
-              newAdjustments,
-              buildBasicToneImageCommandContext({
-                expectedGraphRevision: `history_${state.historyIndex + 1}`,
-                imagePath: state.selectedImage.path,
-                operationId: createOperationId(),
-                sessionId: BASIC_TONE_SESSION_ID,
-              }),
-              { dryRun: true },
-            )
-          : state.lastBasicToneCommand;
+          ? buildBasicToneImageCommandContext({
+              expectedGraphRevision,
+              imagePath: state.selectedImage.path,
+              operationId: createOperationId(),
+              sessionId: BASIC_TONE_SESSION_ID,
+            })
+          : null;
+      let lastBasicToneCommand = state.lastBasicToneCommand;
+
+      if (commandContext) {
+        const operation = beginAppOperation({
+          action: 'build_basic_tone_command',
+          component: 'editor.edit-command',
+          details: {
+            changedKeys: getChangedBasicToneKeys(prev, newAdjustments),
+            commandType: 'toneColor.setBasicTone',
+            dryRun: true,
+            expectedGraphRevision,
+          },
+          domain: 'edit-command',
+          operationId: commandContext.commandId,
+          traceId: commandContext.correlationId,
+        });
+        try {
+          lastBasicToneCommand = buildBasicToneCommandEnvelope(newAdjustments, commandContext, { dryRun: true });
+          logAppOperationSuccess(operation, {
+            commandType: lastBasicToneCommand.commandType,
+            dryRun: lastBasicToneCommand.dryRun,
+            schemaVersion: lastBasicToneCommand.schemaVersion,
+          });
+        } catch (error) {
+          logAppOperationFailure(operation, error);
+          throw error;
+        }
+      }
 
       setEditor({ adjustments: newAdjustments, lastBasicToneCommand });
       useEditorStore.getState().pushHistory(newAdjustments);
