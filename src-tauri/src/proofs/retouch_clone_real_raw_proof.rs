@@ -35,6 +35,7 @@ struct RetouchCloneRealRawProofReport {
     metrics: Vec<RetouchCloneMetric>,
     proof_claims: RetouchCloneProofClaims,
     runtime_proof: RetouchCloneRuntimeProof,
+    source_issue: u32,
     validation_mode: String,
 }
 
@@ -333,7 +334,7 @@ fn run_private_retouch_clone_real_raw_proof(
         case_count: cases.len() as u32,
         cases,
         generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
-        issue: 3770,
+        issue: 4659,
         metrics: vec![
             metric(
                 "clone_changed_pixel_ratio",
@@ -438,6 +439,7 @@ fn run_private_retouch_clone_real_raw_proof(
                 "manual macOS app UI e2e".to_string(),
                 "multi-stroke heal/remove quality or edge-aware texture synthesis".to_string(),
                 "manually annotated dust corpus maturity".to_string(),
+                "unresolved remove-source selection or stale regeneration inside native Rust rendering; those are covered by the shared layer runtime proof before native render consumes the resolved source".to_string(),
             ],
             proves: vec![
                 "native RAW decode can render a clone retouch layer".to_string(),
@@ -458,6 +460,7 @@ fn run_private_retouch_clone_real_raw_proof(
             render_path: "process_image_for_export_pipeline_with_tonemapper_override".to_string(),
             retouch_path: "retouch_render::apply_clone_retouch_layers".to_string(),
         },
+        source_issue: 3770,
         validation_mode: "private_raw_native_clone_heal_remove_retouch_preview_export_proof"
             .to_string(),
     };
@@ -900,7 +903,7 @@ fn max_case_value(
 }
 
 fn write_image(image: &DynamicImage, path: &Path, format: ImageFormat) -> Result<(), String> {
-    image
+    DynamicImage::ImageRgba8(image.to_rgba8())
         .save_with_format(path, format)
         .map_err(|error| error.to_string())
 }
