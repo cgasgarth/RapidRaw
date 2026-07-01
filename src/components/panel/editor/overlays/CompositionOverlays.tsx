@@ -18,18 +18,23 @@ export default function CompositionOverlays({
   height,
   mode,
   rotation,
-  color = 'rgba(255, 255, 255, 0.7)',
-  opacity = 0.7,
+  color = 'rgba(248, 250, 252, 0.86)',
+  opacity = 0.82,
   denseVisible = false,
 }: CompositionOverlaysProps) {
   if (width <= 0 || height <= 0) return null;
 
   const strokeProps = {
     stroke: color,
-    strokeWidth: '1.5',
+    strokeWidth: '1.25',
     fill: 'none',
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
     vectorEffect: 'non-scaling-stroke',
-  };
+    style: {
+      filter: 'drop-shadow(0 0 1px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 3px rgba(0, 0, 0, 0.55))',
+    },
+  } as const;
 
   const renderThirds = () => (
     <g
@@ -61,6 +66,7 @@ export default function CompositionOverlays({
           y2={height}
           {...strokeProps}
           strokeWidth="1"
+          opacity={0.42}
         />
       ))}
       {Array.from({ length: 17 }, (_, i) => (
@@ -72,6 +78,7 @@ export default function CompositionOverlays({
           y2={svgPercent((i + 1) * 5.555)}
           {...strokeProps}
           strokeWidth="1"
+          opacity={0.42}
         />
       ))}
     </g>
@@ -190,14 +197,39 @@ export default function CompositionOverlays({
     <svg
       width={width}
       height={height}
+      data-testid="composition-overlays"
+      data-composition-overlay-mode={mode}
+      data-composition-overlay-rotation={rotation}
+      data-composition-overlay-dense={String(denseVisible)}
       style={{
         position: 'absolute',
         top: 0,
         left: 0,
         pointerEvents: 'none',
         zIndex: 50,
+        overflow: 'visible',
       }}
     >
+      <rect
+        x={0.5}
+        y={0.5}
+        width={Math.max(0, width - 1)}
+        height={Math.max(0, height - 1)}
+        fill="none"
+        stroke="rgba(15, 23, 42, 0.78)"
+        strokeWidth="3"
+        vectorEffect="non-scaling-stroke"
+      />
+      <rect
+        x={0.5}
+        y={0.5}
+        width={Math.max(0, width - 1)}
+        height={Math.max(0, height - 1)}
+        fill="none"
+        stroke="rgba(248, 250, 252, 0.78)"
+        strokeWidth="1"
+        vectorEffect="non-scaling-stroke"
+      />
       {renderThirds()}
       {renderDenseGrid()}
       {renderPhiGrid()}

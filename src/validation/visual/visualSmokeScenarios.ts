@@ -36,6 +36,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   PanoramaUi: 'panorama-ui',
   ProfessionalAdjustmentsCompact: 'professional-adjustments-compact',
   ProfessionalEditorCompactPortrait: 'professional-editor-compact-portrait',
+  ProfessionalCropTransformWorkspace: 'professional-crop-transform-workspace',
   ProfessionalEditorShell: 'professional-editor-shell',
   ProfessionalEditorToolbar: 'professional-editor-toolbar',
   ProfessionalEditorTokens: 'professional-editor-tokens',
@@ -294,6 +295,13 @@ export const VISUAL_SMOKE_SCENARIOS = [
     mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorCompactPortrait,
     outputFile: 'professional-editor-compact-portrait.png',
     sectionMinimum: 5,
+  },
+  {
+    compactOutputFile: 'professional-crop-transform-workspace-compact.png',
+    marker: 'Professional crop transform workspace',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalCropTransformWorkspace,
+    outputFile: 'professional-crop-transform-workspace.png',
+    sectionMinimum: 3,
   },
   {
     marker: 'Local Adjustment Stack',

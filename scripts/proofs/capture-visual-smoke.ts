@@ -1299,6 +1299,87 @@ async function assertWorkflowRailSharedScopes(page) {
   await waitForScopesStripState(page, 'color-workspace-scopes-strip', 'closed');
 }
 
+async function assertProfessionalCropTransformWorkspace(page) {
+  const panel = page.getByTestId('professional-crop-transform-panel');
+  const canvas = page.getByTestId('professional-crop-transform-canvas');
+  const proof = page.getByTestId('professional-crop-transform-proof');
+
+  await panel.waitFor({ timeout: 10_000 });
+  await canvas.waitFor({ timeout: 10_000 });
+  await page.getByTestId('composition-overlays').waitFor({ timeout: 10_000 });
+
+  const canvasBounds = await canvas.boundingBox();
+  if (!canvasBounds || canvasBounds.width < 320 || canvasBounds.height < 220) {
+    throw new Error(
+      `Crop transform canvas should render as a real workspace surface, got ${canvasBounds?.width ?? 'none'}x${canvasBounds?.height ?? 'none'}.`,
+    );
+  }
+
+  const overlay = page.getByTestId('composition-overlays');
+  const overlayMode = await overlay.getAttribute('data-composition-overlay-mode');
+  if (overlayMode !== 'phiGrid') {
+    throw new Error(`Crop transform workspace should start with phiGrid overlay, got ${overlayMode ?? 'none'}.`);
+  }
+
+  await panel.getByTestId('crop-panel-overlay-cycle').click();
+  await expectDatasetValue(proof, 'activeOverlay', 'armature');
+
+  await panel.getByTestId('crop-ratio-preset-1-1').click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="professional-crop-transform-proof"]')?.getAttribute('data-aspect-ratio') ===
+      '1',
+    null,
+    { timeout: 10_000 },
+  );
+
+  await panel.getByTestId('crop-ratio-preset-custom').click();
+  const customRatio = panel.getByTestId('crop-custom-ratio-inputs');
+  await customRatio.locator('input[name="customW"]').fill('5');
+  await customRatio.locator('input[name="customH"]').fill('4');
+  await customRatio.locator('input[name="customH"]').press('Enter');
+  await page.waitForFunction(
+    () =>
+      Number(
+        document.querySelector('[data-testid="professional-crop-transform-proof"]')?.getAttribute('data-aspect-ratio'),
+      ) === 1.25,
+    null,
+    { timeout: 10_000 },
+  );
+
+  const flipButton = panel.getByTestId('crop-panel-flip-horizontal');
+  const flipBefore = await flipButton.getAttribute('aria-pressed');
+  await flipButton.click();
+  const flipAfter = await flipButton.getAttribute('aria-pressed');
+  if (flipBefore === flipAfter) {
+    throw new Error(`Flip horizontal button should toggle aria-pressed, stayed ${flipAfter ?? 'none'}.`);
+  }
+
+  await panel.getByTestId('crop-panel-straighten-toggle').focus();
+  const focusedTestId = await page.evaluate(() => document.activeElement?.getAttribute('data-testid'));
+  if (focusedTestId !== 'crop-panel-straighten-toggle') {
+    throw new Error(`Straighten button should expose visible keyboard focus target, got ${focusedTestId ?? 'none'}.`);
+  }
+  await page.keyboard.press('Space');
+  await page.keyboard.press('Space');
+  await expectDatasetValue(proof, 'activeOverlay', 'armature');
+
+  await panel.getByTestId('crop-panel-transform-entry').click();
+  await page.getByRole('heading', { exact: true, name: 'Transform' }).first().waitFor({ timeout: 10_000 });
+  await page.getByRole('button', { name: 'Cancel' }).last().click();
+  await page.getByRole('heading', { exact: true, name: 'Transform' }).first().waitFor({
+    state: 'hidden',
+    timeout: 10_000,
+  });
+  await panel.getByTestId('crop-panel-lens-entry').click();
+  await page.getByRole('heading', { exact: true, name: 'Lens Correction' }).waitFor({ timeout: 10_000 });
+  await page.getByRole('button', { name: 'Cancel' }).last().click();
+  await page.getByRole('heading', { exact: true, name: 'Lens Correction' }).waitFor({
+    state: 'hidden',
+    timeout: 10_000,
+  });
+}
+
 async function assertProfessionalEditorToolbar(page) {
   const toolbar = page.locator('[data-visual-smoke-section="professional-editor-toolbar-primary"]');
   await toolbar.waitFor({ timeout: 10_000 });
@@ -1334,6 +1415,11 @@ async function prepareScenario(page, mode) {
     mode === VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAdjustmentsCompact
   ) {
     await assertAdjustmentsPanelRetune(page);
+    return;
+  }
+
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.ProfessionalCropTransformWorkspace) {
+    await assertProfessionalCropTransformWorkspace(page);
     return;
   }
 
