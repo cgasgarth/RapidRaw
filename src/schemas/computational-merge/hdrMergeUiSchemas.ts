@@ -33,6 +33,64 @@ export const hdrMergeUiSettingsSchema = z
   })
   .strict();
 
+export const hdrRuntimePlanSchema = z
+  .object({
+    accepted: z.boolean(),
+    acceptedDryRunPlanHash: z.string().trim().min(1),
+    acceptedDryRunPlanId: z.string().trim().min(1),
+    blockCodes: z.array(z.string().trim().min(1)),
+    bracketCount: z.number().int().nonnegative(),
+    dimensionWarnings: z.array(z.string().trim().min(1)),
+    estimatedMemory: z
+      .object({
+        mergeBufferMb: z.number().int().nonnegative(),
+        previewBufferMb: z.number().int().nonnegative(),
+        totalMb: z.number().int().nonnegative(),
+      })
+      .strict(),
+    exposureSpacing: z
+      .object({
+        maxStepEv: z.number(),
+        minStepEv: z.number(),
+        spanEv: z.number(),
+        stepCount: z.number().int().nonnegative(),
+      })
+      .strict()
+      .nullable(),
+    metadataWarnings: z.array(z.string().trim().min(1)),
+    previewDimensions: z
+      .object({
+        height: z.number().int().nonnegative(),
+        width: z.number().int().nonnegative(),
+      })
+      .strict(),
+    sourcePaths: z.array(z.string().trim().min(1)),
+    sources: z.array(
+      z
+        .object({
+          contentHash: z.string().trim().min(1),
+          dimensions: z
+            .object({
+              height: z.number().int().nonnegative(),
+              width: z.number().int().nonnegative(),
+            })
+            .strict(),
+          exposure: z
+            .object({
+              exposureEv: z.number(),
+              exposureTimeSeconds: z.number().positive(),
+              iso: z.number().positive(),
+            })
+            .strict(),
+          path: z.string().trim().min(1),
+          sourceIndex: z.number().int().nonnegative(),
+        })
+        .strict(),
+    ),
+    warningCodes: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 export const hdrEditableSourceRefSchema = z
   .object({
     contentHash: z.string().min(1),
@@ -93,6 +151,7 @@ export const hdrEditableHandoffSummarySchema = z
   .strict();
 
 export type HdrMergeUiSettings = z.infer<typeof hdrMergeUiSettingsSchema>;
+export type HdrRuntimePlan = z.infer<typeof hdrRuntimePlanSchema>;
 export type HdrMergeAlignmentMode = z.infer<typeof hdrMergeAlignmentModeSchema>;
 export type HdrMergeBracketValidation = z.infer<typeof hdrMergeBracketValidationSchema>;
 export type HdrMergeDeghosting = z.infer<typeof hdrMergeDeghostingSchema>;

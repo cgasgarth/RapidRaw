@@ -15,6 +15,7 @@ import {
   type HdrMergeQualityPreference,
   type HdrMergeStrategy,
   type HdrMergeUiSettings,
+  type HdrRuntimePlan,
   type HdrToneMappingPreset,
 } from '../../../schemas/computational-merge/hdrMergeUiSchemas';
 import { type HdrModalState, useUIStore } from '../../../store/useUIStore';
@@ -44,6 +45,7 @@ interface HdrModalProps {
   onSettingsChange: (settings: HdrMergeUiSettings) => void;
   onMerge: () => void;
   progressMessage: string | null;
+  runtimePlan?: HdrRuntimePlan | null;
   settings: HdrMergeUiSettings;
   sourceMetadata?: HdrBracketPreflightSourceMetadata[];
   sourcePaths?: string[];
@@ -64,6 +66,7 @@ export function HdrModal({
   onSettingsChange,
   onMerge,
   progressMessage,
+  runtimePlan,
   settings,
   sourceMetadata,
   sourcePaths = [],
@@ -365,6 +368,13 @@ export function HdrModal({
               data-accepted-dry-run-plan-id={lastApplyCommand.acceptedDryRunPlanId}
               data-command-type={lastApplyCommand.commandType}
               data-dry-run={String(lastApplyCommand.dryRun)}
+              data-output-handle={lastApplyCommand.outputHandle ?? ''}
+              data-preview-dimensions={
+                lastApplyCommand.previewDimensions
+                  ? `${lastApplyCommand.previewDimensions.width}x${lastApplyCommand.previewDimensions.height}`
+                  : ''
+              }
+              data-source-paths={(lastApplyCommand.sourcePaths ?? []).join('|')}
               data-source-count={lastApplyCommand.sources}
               data-testid="hdr-apply-command-state"
               data-tool-name={lastApplyCommand.toolName}
@@ -521,8 +531,16 @@ export function HdrModal({
           {lastDryRunCommand && (
             <section
               className="mt-5 grid w-full max-w-md grid-cols-3 gap-2 rounded-md border border-border-color bg-surface p-3 text-xs"
+              data-accepted-dry-run-plan-hash={runtimePlan?.acceptedDryRunPlanHash ?? ''}
+              data-accepted-dry-run-plan-id={runtimePlan?.acceptedDryRunPlanId ?? ''}
+              data-block-codes={runtimePlan?.blockCodes.join(',') ?? ''}
+              data-bracket-count={runtimePlan?.bracketCount ?? lastDryRunCommand.sources}
               data-command-type={lastDryRunCommand.commandType}
+              data-dimension-warnings={runtimePlan?.dimensionWarnings.join(',') ?? ''}
               data-dry-run={String(lastDryRunCommand.dryRun)}
+              data-estimated-memory-mb={runtimePlan?.estimatedMemory.totalMb ?? ''}
+              data-exposure-spacing-span-ev={runtimePlan?.exposureSpacing?.spanEv ?? ''}
+              data-metadata-warnings={runtimePlan?.metadataWarnings.join(',') ?? ''}
               data-source-count={lastDryRunCommand.sources}
               data-testid="hdr-dry-run-command-state"
               data-tool-name={lastDryRunCommand.toolName}
