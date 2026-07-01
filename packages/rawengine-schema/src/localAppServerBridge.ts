@@ -170,7 +170,7 @@ export const rawEngineAgentInitialPreviewReceiptV1Schema = z
     requestId: z.string().trim().min(1),
     schemaVersion: z.literal(1),
     sessionId: z.string().trim().min(1),
-    toolName: z.literal('rawengine.agent.initial_prompt_preview'),
+    toolName: z.literal('rawengine.image.get_preview'),
   })
   .strict();
 

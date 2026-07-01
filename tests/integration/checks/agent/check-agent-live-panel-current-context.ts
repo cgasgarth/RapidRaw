@@ -12,7 +12,7 @@ const requiredLivePanelMarkers = [
   'buildLiveAgentTranscript(selectedImagePath, liveAgentInitialPromptContext)',
   'buildAgentInitialPromptContext({',
   'liveAgentInitialPromptContext',
-  'rawengine.agent.initial_prompt_preview',
+  'rawengine.image.get_preview',
   'agentInitialPromptContext.v1',
   'initialPromptPreviewContext:',
   'getImageLabelFromPath',
@@ -42,6 +42,7 @@ for (const marker of [
   'InitialPromptPreviewContextCard',
   'agent-initial-prompt-preview-context',
   'data-includes-original-raw={String(context.includesOriginalRaw)}',
+  'data-tool-name={context.toolName}',
   'editor.ai.agent.initialPreviewContext.title',
   'editor.ai.agent.initialPreviewContext.summary',
 ]) {

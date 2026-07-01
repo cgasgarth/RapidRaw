@@ -10,6 +10,8 @@ import {
   AGENT_STATE_GET_TOOL_NAME,
   agentPreviewRenderResponseSchema,
   agentStateGetResponseSchema,
+  RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+  rawEngineImageGetPreviewResponseSchema,
 } from '../context/agentReadOnlyAppServerTools';
 import { agentEditQualityReviewSchema, buildAgentEditQualityReview } from '../planning/agentEditQualityReview';
 import {
@@ -196,9 +198,11 @@ const buildInitialPreviewContentHash = (receiptSeed: {
 
 const buildInitialPreviewReceipt = ({
   initialContext,
+  previewResult,
   requestId,
 }: {
   initialContext: ReturnType<typeof buildAgentInitialPromptContext>;
+  previewResult: z.infer<typeof rawEngineImageGetPreviewResponseSchema>;
   requestId: string;
 }): RawEngineAgentInitialPreviewReceiptV1 =>
   rawEngineAgentInitialPreviewReceiptV1Schema.parse({
@@ -209,36 +213,36 @@ const buildInitialPreviewReceipt = ({
       workingSpace: 'rawengine-scene-linear',
     },
     contentHash: buildInitialPreviewContentHash({
-      artifactId: initialContext.preview.artifactId,
+      artifactId: previewResult.preview.artifactId,
       imagePath: initialContext.modelInput.activeImagePath,
-      renderHash: initialContext.preview.renderHash,
+      renderHash: previewResult.preview.renderHash,
       sessionId: initialContext.sessionId,
     }),
-    graphRevision: initialContext.modelInput.graphRevision,
+    graphRevision: previewResult.editRevision.graphRevision,
     imagePath: initialContext.modelInput.activeImagePath,
     preview: {
-      accessScope: initialContext.preview.accessScope,
-      artifactId: initialContext.preview.artifactId,
-      encodedFormat: initialContext.preview.encodedFormat,
-      height: initialContext.modelInput.initialPreview.height,
-      includesOriginalRaw: initialContext.modelInput.initialPreview.includesOriginalRaw,
-      longEdgePx: initialContext.preview.longEdgePx,
-      mediaType: initialContext.preview.mediaType,
-      previewRef: initialContext.preview.previewRef,
-      purpose: initialContext.preview.purpose,
-      quality: initialContext.preview.quality,
-      recipeHash: initialContext.preview.recipeHash,
-      renderHash: initialContext.preview.renderHash,
-      width: initialContext.modelInput.initialPreview.width,
+      accessScope: previewResult.preview.accessScope,
+      artifactId: previewResult.preview.artifactId,
+      encodedFormat: previewResult.preview.encodedFormat,
+      height: previewResult.preview.height,
+      includesOriginalRaw: previewResult.preview.includesOriginalRaw,
+      longEdgePx: previewResult.preview.longEdgePx,
+      mediaType: previewResult.preview.mediaType,
+      previewRef: previewResult.preview.previewRef,
+      purpose: previewResult.preview.purpose,
+      quality: previewResult.preview.quality,
+      recipeHash: previewResult.preview.recipeHash,
+      renderHash: previewResult.preview.renderHash,
+      width: previewResult.preview.width,
     },
     proofContext: {
-      stale: initialContext.imageContext.initialPreview.recipeHash !== initialContext.preview.recipeHash,
+      stale: previewResult.staleRecipeHash,
       transport: initialContext.modelInput.transport,
     },
     requestId,
     schemaVersion: 1,
     sessionId: initialContext.sessionId,
-    toolName: 'rawengine.agent.initial_prompt_preview',
+    toolName: previewResult.toolName,
   });
 
 export const runAgentMultiTurnAppServerSession = async (
@@ -252,14 +256,25 @@ export const runAgentMultiTurnAppServerSession = async (
     sessionId: parsedRequest.sessionId,
   });
   const initialPreviewToolCallId = `${parsedRequest.requestId}-initial-preview`;
+  const initialPreviewResult = rawEngineImageGetPreviewResponseSchema.parse(
+    await dispatchAgentLiveEditorTool({
+      args: {
+        expectedRecipeHash: initialContext.preview.recipeHash,
+        requestId: initialPreviewToolCallId,
+      },
+      requestId: initialPreviewToolCallId,
+      runtimeToolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+    }),
+  );
   const initialPreviewReceipt = buildInitialPreviewReceipt({
     initialContext,
+    previewResult: initialPreviewResult,
     requestId: initialPreviewToolCallId,
   });
   const messages: AgentMultiTurnAppServerSessionResult['messages'] = [
     {
       content: `${parsedRequest.prompt}\n\nInitial medium preview ${initialPreviewReceipt.preview.artifactId} (${initialPreviewReceipt.contentHash}) is attached.`,
-      previewArtifactId: initialContext.preview.artifactId,
+      previewArtifactId: initialPreviewReceipt.preview.artifactId,
       role: 'user',
       turn: 0,
     },
@@ -271,14 +286,14 @@ export const runAgentMultiTurnAppServerSession = async (
       turn: 0,
     },
   ];
-  const previews: AgentMultiTurnAppServerSessionResult['previews'] = [initialContext.imageContext.initialPreview];
+  const previews: AgentMultiTurnAppServerSessionResult['previews'] = [initialPreviewResult.preview];
   const previewLineage: AgentMultiTurnAppServerSessionResult['previewLineage'] = [
     {
-      artifactId: initialContext.preview.artifactId,
-      graphRevision: initialContext.imageContext.graphRevision,
+      artifactId: initialPreviewReceipt.preview.artifactId,
+      graphRevision: initialPreviewReceipt.graphRevision,
       purpose: 'initial_context',
-      recipeHash: initialContext.preview.recipeHash,
-      renderHash: initialContext.preview.renderHash,
+      recipeHash: initialPreviewReceipt.preview.recipeHash,
+      renderHash: initialPreviewReceipt.preview.renderHash,
       toolCallId: initialPreviewToolCallId,
       turn: 0,
     },
@@ -294,8 +309,8 @@ export const runAgentMultiTurnAppServerSession = async (
       turn: 0,
     },
   ];
-  let recipeHash = initialContext.preview.recipeHash;
-  let finalGraphRevision = initialContext.imageContext.graphRevision;
+  let recipeHash = initialPreviewReceipt.preview.recipeHash;
+  let finalGraphRevision = initialPreviewReceipt.graphRevision;
   let changedPixelCount = 0;
   let changedPixelPercent = 0;
   let maxChannelDelta = 0;

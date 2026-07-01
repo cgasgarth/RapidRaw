@@ -677,6 +677,7 @@ export const agentInitialPromptPreviewContextSchema = z
     quality: z.literal(0.86),
     recipeHash: z.string().min(1),
     renderHash: z.string().min(1),
+    toolName: z.literal('rawengine.image.get_preview'),
     transport: z.literal('codex_app_server'),
     width: z.number().int().positive(),
   })
