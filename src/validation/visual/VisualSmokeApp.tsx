@@ -734,6 +734,24 @@ function WorkflowRailVisualSmoke() {
   const [activePanel, setActivePanel] = useState<Panel | null>(null);
   const exportState = { errorMessage: '', progress: { current: 0, total: 0 }, status: Status.Idle };
 
+  useEffect(() => {
+    const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+    useEditorStore.setState({
+      adjustments,
+      histogram: null,
+      history: [adjustments],
+      historyIndex: 0,
+      isWaveformVisible: false,
+      previewScopeStatus: null,
+      selectedImage: adjustmentsPanelRetuneRawImage,
+      waveform: null,
+      waveformHeight: 220,
+    });
+    useUIStore.setState({
+      collapsibleSectionsState: { ...DEFAULT_COLLAPSIBLE_SECTIONS_STATE },
+    });
+  }, []);
+
   return (
     <main
       className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
@@ -762,21 +780,23 @@ function WorkflowRailVisualSmoke() {
             </div>
 
             <div className="h-[calc(100%-118px)] min-h-0 border-t border-white/10">
-              <EditorRightPanelHost
-                activeRightPanel={activePanel}
-                appSettings={null}
-                exportState={exportState}
-                handleSettingsChange={() => {}}
-                multiSelectedPaths={[]}
-                onLinkedVariantImported={() => {}}
-                onNavigateToCommunity={() => {}}
-                onOpenTetherCapture={() => {}}
-                renderedRightPanel={activePanel}
-                rootPaths={[]}
-                selectedImage={null}
-                setExportState={() => {}}
-                slideDirection={0}
-              />
+              <ContextMenuProvider>
+                <EditorRightPanelHost
+                  activeRightPanel={activePanel}
+                  appSettings={null}
+                  exportState={exportState}
+                  handleSettingsChange={() => {}}
+                  multiSelectedPaths={[]}
+                  onLinkedVariantImported={() => {}}
+                  onNavigateToCommunity={() => {}}
+                  onOpenTetherCapture={() => {}}
+                  renderedRightPanel={activePanel}
+                  rootPaths={[]}
+                  selectedImage={null}
+                  setExportState={() => {}}
+                  slideDirection={0}
+                />
+              </ContextMenuProvider>
             </div>
 
             <div className="border-t border-white/10 p-4">

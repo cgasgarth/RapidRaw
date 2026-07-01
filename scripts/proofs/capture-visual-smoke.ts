@@ -1016,11 +1016,76 @@ async function assertAdjustmentsPanelRetune(page) {
       `RAW processing utility should remain compact when collapsed, height=${rawBounds?.height ?? 'none'}.`,
     );
   }
+
+  const scopesStrip = await waitForScopesStripState(page, 'adjustments-panel-scopes-strip', 'closed');
+
+  await panel.getByTestId('adjustments-panel-scopes-toggle').click();
+  await scopesStrip.waitFor({ state: 'visible', timeout: 10_000 });
+  const openState = await scopesStrip.getAttribute('data-state');
+  if (openState !== 'open') {
+    throw new Error(`Adjustments scopes strip did not open from the shared header action, got ${openState}.`);
+  }
+  const scopesBounds = await scopesStrip.boundingBox();
+  const firstAdjustmentBounds = await panel.getByTestId('adjustments-section-basic').boundingBox();
+  if (!scopesBounds || !firstAdjustmentBounds || scopesBounds.y >= firstAdjustmentBounds.y) {
+    throw new Error('Adjustments scopes strip should render above the adjustment sections when open.');
+  }
+  if (scopesBounds.height < 180 || scopesBounds.height > 260) {
+    throw new Error(`Adjustments scopes strip should use compact default height, got ${scopesBounds.height}.`);
+  }
+}
+
+async function waitForScopesStripState(page, testId, expectedState) {
+  await page.waitForFunction(
+    ({ expectedState, testId }) =>
+      document.querySelector(`[data-testid="${testId}"]`)?.getAttribute('data-state') === expectedState,
+    { expectedState, testId },
+    { timeout: 10_000 },
+  );
+  return page.getByTestId(testId);
+}
+
+async function assertCompactOpenScopesStrip(strip, label) {
+  await strip.waitFor({ state: 'visible', timeout: 10_000 });
+  const bounds = await strip.boundingBox();
+  if (!bounds) {
+    throw new Error(`${label} scopes strip should be visible when open.`);
+  }
+  if (bounds.height < 180 || bounds.height > 260) {
+    throw new Error(`${label} scopes strip should use compact default height, got ${bounds.height}.`);
+  }
+}
+
+async function assertWorkflowRailSharedScopes(page) {
+  await page.getByRole('button', { name: 'Color' }).first().click();
+  await page.getByTestId('color-workspace-panel').getByRole('heading', { exact: true, name: 'Color' }).waitFor({
+    timeout: 10_000,
+  });
+  await waitForScopesStripState(page, 'color-workspace-scopes-strip', 'closed');
+
+  await page.getByTestId('color-workspace-scopes-toggle').click();
+  const openColorStrip = await waitForScopesStripState(page, 'color-workspace-scopes-strip', 'open');
+  await assertCompactOpenScopesStrip(openColorStrip, 'Color workspace');
+
+  await page.getByRole('button', { name: 'Adjust' }).first().click();
+  const openAdjustmentsStrip = await waitForScopesStripState(page, 'adjustments-panel-scopes-strip', 'open');
+  await assertCompactOpenScopesStrip(openAdjustmentsStrip, 'Adjustments panel');
+
+  await page.getByTestId('adjustments-panel-scopes-toggle').click();
+  await waitForScopesStripState(page, 'adjustments-panel-scopes-strip', 'closed');
+
+  await page.getByRole('button', { name: 'Color' }).first().click();
+  await waitForScopesStripState(page, 'color-workspace-scopes-strip', 'closed');
 }
 
 async function prepareScenario(page, mode) {
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune) {
     await assertAdjustmentsPanelRetune(page);
+    return;
+  }
+
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.WorkflowRail) {
+    await assertWorkflowRailSharedScopes(page);
     return;
   }
 
@@ -3589,6 +3654,11 @@ async function main() {
           timeout: 10_000,
         });
         await assertAdjustmentsPanelRetune(page);
+        await page.goto(`${baseUrl}/visual-smoke.html?scenario=${VISUAL_SMOKE_SCENARIO_IDS.WorkflowRail}`, {
+          waitUntil: 'networkidle',
+        });
+        await page.locator('[data-visual-smoke-ready="true"]').waitFor({ timeout: 10_000 });
+        await assertWorkflowRailSharedScopes(page);
       }
     }
 
