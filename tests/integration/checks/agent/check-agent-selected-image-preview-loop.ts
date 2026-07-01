@@ -362,7 +362,7 @@ if (
   throw new Error('selected-image preview loop result did not expose graph/recipe lineage.');
 }
 if (
-  result.initialPreviewReceipt.toolName !== 'rawengine.agent.initial_prompt_preview' ||
+  result.initialPreviewReceipt.toolName !== 'rawengine.image.get_preview' ||
   result.initialPreviewReceipt.requestId !== `${commandRequest.requestId}-initial-preview` ||
   result.initialPreviewReceipt.graphRevision !== result.initialGraphRevision ||
   result.initialPreviewReceipt.imagePath !== selectedPath ||

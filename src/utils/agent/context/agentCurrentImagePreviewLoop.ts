@@ -9,6 +9,7 @@ import { agentHistoryRollbackResponseSchema } from '../session/agentSessionHisto
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import { buildAgentInitialPromptContext } from './agentInitialPromptContext';
 import { agentMediumPreviewArtifactSchema } from './agentPreviewEnvelope';
+import { RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME } from './agentReadOnlyAppServerTools';
 
 export const AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME = 'rawengine.agent.selected_image.preview_loop';
 export const AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME =
@@ -235,7 +236,7 @@ const buildSelectedImageInitialPreviewReceipt = ({
     requestId,
     schemaVersion: 1,
     sessionId,
-    toolName: 'rawengine.agent.initial_prompt_preview',
+    toolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
   });
 };
 

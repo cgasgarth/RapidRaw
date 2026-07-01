@@ -44,6 +44,7 @@ import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
   getAgentReadOnlyState,
+  RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
   renderAgentReadOnlyPreview,
 } from '../../../../utils/agent/context/agentReadOnlyAppServerTools';
 import {
@@ -1683,7 +1684,7 @@ function LivePromptComposer({
           previewAfterHash: initialPromptPreviewContext.renderHash,
           recipeHash: initialPromptPreviewContext.recipeHash,
           status: 'completed',
-          toolName: 'rawengine.agent.initial_prompt_preview',
+          toolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
         });
       }
       pushActivityEntry({
@@ -2076,7 +2077,7 @@ function LivePromptComposer({
               requestId: `${requestId}-initial-preview`,
               schemaVersion: 1,
               sessionId: selectedImageReceipt.sessionId,
-              toolName: 'rawengine.agent.initial_prompt_preview',
+              toolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
             } satisfies AgentMultiTurnAppServerSessionResult['initialPreviewReceipt']);
       setSessionReview({
         applyState: 'applied',
@@ -3862,6 +3863,7 @@ function InitialPromptPreviewContextCard({ context }: { context: AgentInitialPro
       data-recipe-hash={context.recipeHash}
       data-render-hash={context.renderHash}
       data-testid="agent-initial-prompt-preview-context"
+      data-tool-name={context.toolName}
       data-transport={context.transport}
       data-width={context.width}
     >

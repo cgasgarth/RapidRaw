@@ -160,11 +160,7 @@ async function validateRenderedShellBehavior(
   assertData(shell, 'agentRuntimeStatus', 'runtime_apply_demo', 'runtime apply status was not exposed.');
 
   const toolTranscript = getByTestId(rendered.container, 'agent-tool-transcript', 'tool transcript did not render.');
-  assertVisibleText(
-    toolTranscript,
-    'rawengine.agent.initial_prompt_preview',
-    'initial prompt preview tool call did not render.',
-  );
+  assertVisibleText(toolTranscript, 'rawengine.image.get_preview', 'initial prompt preview tool call did not render.');
   assertVisibleText(rendered.container, 'Runtime apply proof', 'runtime status label was not visible.');
   assertVisibleText(rendered.container, context.preview.artifactId, 'initial preview artifact id was not visible.');
   assertVisibleText(
@@ -285,7 +281,7 @@ async function validateRenderedShellBehavior(
   assertData(
     initialReceipt,
     'toolName',
-    'rawengine.agent.initial_prompt_preview',
+    'rawengine.image.get_preview',
     'initial preview receipt did not expose the typed preview tool.',
   );
   assertData(initialReceipt, 'imagePath', selectedPath, 'initial preview receipt did not bind selected image path.');
@@ -898,6 +894,7 @@ function buildTranscript(initialContext: ReturnType<typeof buildAgentInitialProm
       quality: initialContext.preview.quality,
       recipeHash: initialContext.preview.recipeHash,
       renderHash: initialContext.preview.renderHash,
+      toolName: initialContext.preview.toolName,
       transport: initialContext.modelInput.transport,
       width: initialContext.modelInput.initialPreview.width,
     },
@@ -940,7 +937,7 @@ function buildTranscript(initialContext: ReturnType<typeof buildAgentInitialProm
         summary: `Initial prompt includes JPEG preview ${initialContext.preview.artifactId}.`,
         timestamp: 'now',
         title: 'Initial prompt preview',
-        toolName: 'rawengine.agent.initial_prompt_preview',
+        toolName: initialContext.preview.toolName,
       },
     ],
   };
@@ -958,7 +955,7 @@ function validateSessionResult(sessionResult: AgentMultiTurnAppServerSessionResu
     failures.push('live session did not preserve session identity and turn count.');
   }
   if (
-    sessionResult.initialPreviewReceipt.toolName !== 'rawengine.agent.initial_prompt_preview' ||
+    sessionResult.initialPreviewReceipt.toolName !== 'rawengine.image.get_preview' ||
     sessionResult.initialPreviewReceipt.requestId !== `${request.requestId}-initial-preview` ||
     sessionResult.initialPreviewReceipt.sessionId !== request.sessionId ||
     sessionResult.initialPreviewReceipt.imagePath !== selectedPath ||
