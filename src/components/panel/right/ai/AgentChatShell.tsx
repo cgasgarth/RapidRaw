@@ -29,6 +29,7 @@ import type {
   AgentSelectedImagePreviewLoopReview,
 } from '../../../../schemas/agent/agentChatTranscriptSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
+import { useSettingsStore } from '../../../../store/useSettingsStore';
 import { buildAgentAppServerToolReadinessSummary } from '../../../../utils/agent/context/agentAppServerToolReadiness';
 import {
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
@@ -57,15 +58,18 @@ import { planAgentEditRecipe } from '../../../../utils/agent/planning/agentEditR
 import {
   AGENT_EXPORT_PROOF_TOOL_NAME,
   AGENT_FINAL_EXPORT_TOOL_NAME,
-  agentExportProofResponseSchema,
-  agentFinalExportResponseSchema,
+  buildAgentExportPresetSettings,
 } from '../../../../utils/agent/safety/agentExportProofTool';
 import {
   type AgentSafetyPolicyDecision,
   evaluateAgentSafetyPolicy,
   inferAgentSafetyOperationKind,
 } from '../../../../utils/agent/safety/agentSafetyPolicy';
-import { dispatchAgentLiveEditorTool } from '../../../../utils/agent/session/agentLiveToolDispatch';
+import {
+  dispatchAgentExportReviewTool,
+  dispatchAgentFinalExportTool,
+  dispatchAgentLiveEditorTool,
+} from '../../../../utils/agent/session/agentLiveToolDispatch';
 import type {
   AgentMultiTurnAppServerSessionRequest,
   AgentMultiTurnAppServerSessionResult,
@@ -202,9 +206,13 @@ interface LivePromptResult {
   error?: string;
   exportHash?: string;
   exportHeight?: number;
+  exportPathPreview?: string;
   exportPreviewRef?: string;
   exportReceiptGraphRevision?: string;
   exportReceiptPreviewHash?: string;
+  exportReviewApprovalState?: string;
+  exportReviewColorProfile?: string;
+  exportReviewFormat?: string;
   exportWidth?: number;
   maxChannelDelta?: number;
   meanLuminanceDelta?: number;
@@ -1060,35 +1068,58 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
         throw new Error('Selected-image reviewed export requires the reviewed graph revision to be current.');
       }
       const requestId = `${review.command.requestId}-export-reviewed`;
-      const finalExport = agentFinalExportResponseSchema.parse(
-        await dispatchAgentLiveEditorTool({
-          args: {
-            approval: {
-              approvalId: `approval_selected_image_export_${review.command.requestId}`,
-              approvedGraphRevision: snapshot.graphRevision,
-              approvedRecipeHash: snapshot.initialPreview.recipeHash,
-              approvedSelectedImagePath: snapshot.activeImagePath,
-              approvedSessionId: review.command.sessionId,
-              status: 'approved',
-            },
-            colorProfile: 'srgb',
-            destinationPolicy: 'local_private_artifact',
-            dryRun: false,
-            expectedRecipeHash: snapshot.initialPreview.recipeHash,
-            fileFormat: 'jpeg',
-            jpegQuality: 90,
-            longEdgePx: 4096,
-            operationId: `${review.command.operationId}-export-reviewed`,
-            renderingIntent: 'relativeColorimetric',
-            requestId,
-            sessionId: review.command.sessionId,
+      const exportPresetSettings = buildAgentExportPresetSettings({
+        presets: useSettingsStore.getState().appSettings?.exportPresets ?? [],
+      });
+      const finalExport = await dispatchAgentFinalExportTool({
+        request: {
+          approval: {
+            approvalId: `approval_selected_image_export_${review.command.requestId}`,
+            approvedGraphRevision: snapshot.graphRevision,
+            approvedRecipeHash: snapshot.initialPreview.recipeHash,
+            approvedSelectedImagePath: snapshot.activeImagePath,
+            approvedSessionId: review.command.sessionId,
+            status: 'approved',
           },
+          destinationPolicy: 'local_private_artifact',
+          dryRun: false,
+          expectedRecipeHash: snapshot.initialPreview.recipeHash,
+          operationId: `${review.command.operationId}-export-reviewed`,
           requestId,
-          runtimeToolName: AGENT_FINAL_EXPORT_TOOL_NAME,
-        }),
-      );
+          sessionId: review.command.sessionId,
+          ...exportPresetSettings,
+        },
+        requestId,
+      });
       const receipt: AgentSelectedImageExportReceipt = {
         approvalId: finalExport.receipt.approvalId,
+        approvalState: 'approved',
+        auditEntries: [
+          {
+            id: `${requestId}-review`,
+            recipeHash: review.finalRecipeHash,
+            stage: 'review',
+            status: 'reviewed',
+            summary: 'Selected-image export review receipt generated from current compare evidence.',
+            toolName: AGENT_EXPORT_PROOF_TOOL_NAME,
+          },
+          {
+            id: `${requestId}-approval`,
+            recipeHash: finalExport.receipt.recipeHash,
+            stage: 'approval',
+            status: 'approved',
+            summary: 'User approval matched selected image, graph revision, and edit recipe.',
+            toolName: AGENT_FINAL_EXPORT_TOOL_NAME,
+          },
+          {
+            id: `${requestId}-final-result`,
+            recipeHash: finalExport.receipt.recipeHash,
+            stage: 'final_result',
+            status: 'completed',
+            summary: `${finalExport.output.fileFormat} ${finalExport.output.width}x${finalExport.output.height}`,
+            toolName: finalExport.toolName,
+          },
+        ],
         beforePreviewArtifact: {
           artifactId: compareArtifacts.beforeArtifactId,
           ...compareArtifacts.beforeEvidence,
@@ -1103,6 +1134,12 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
         initialGraphRevision: review.initialGraphRevision,
         initialRecipeHash: review.initialRecipeHash,
         noOverwritePolicy: finalExport.receipt.noOverwritePolicy,
+        output: {
+          colorProfile: finalExport.receipt.exportSettings.colorProfile,
+          dimensions: finalExport.receipt.dimensions,
+          format: finalExport.receipt.exportSettings.fileFormat,
+          targetPathPreview: finalExport.receipt.targetPathPreview,
+        },
         outputHash: finalExport.receipt.outputHash,
         outputPath: finalExport.receipt.outputPath,
         prompt: review.prompt,
@@ -1512,11 +1549,18 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
           className="grid gap-1 rounded border border-teal-500/25 bg-teal-500/10 p-2 text-[11px]"
           data-before-artifact-id={exportReceipt.beforePreviewArtifact.artifactId}
           data-current-artifact-id={exportReceipt.currentPreviewArtifact.artifactId}
+          data-audit-stages={exportReceipt.auditEntries.map((entry) => entry.stage).join(',')}
+          data-output-color-profile={exportReceipt.output.colorProfile}
+          data-output-format={exportReceipt.output.format}
+          data-output-height={exportReceipt.output.dimensions.height}
+          data-output-width={exportReceipt.output.dimensions.width}
+          data-approval-state={exportReceipt.approvalState}
           data-final-graph-revision={exportReceipt.finalGraphRevision}
           data-final-recipe-hash={exportReceipt.finalRecipeHash}
           data-no-overwrite-policy={exportReceipt.noOverwritePolicy}
           data-output-hash={exportReceipt.outputHash}
           data-output-path={exportReceipt.outputPath}
+          data-target-path-preview={exportReceipt.output.targetPathPreview}
           data-rollback-status={exportReceipt.rollback.status}
           data-selected-raw-path={exportReceipt.selectedRawPath}
           data-testid="agent-selected-image-preview-loop-export-receipt"
@@ -2395,27 +2439,28 @@ function LivePromptComposer({
     try {
       const snapshot = buildAgentImageContextSnapshot();
       const requestId = `agent-live-export-proof-${Date.now()}`;
-      const exportProof = agentExportProofResponseSchema.parse(
-        await dispatchAgentLiveEditorTool({
-          args: {
-            approval: {
-              approvalId: `approval_export_${requestId}`,
-              approvedGraphRevision: snapshot.graphRevision,
-              approvedRecipeHash: snapshot.initialPreview.recipeHash,
-              approvedSelectedImagePath: snapshot.activeImagePath,
-              approvedSessionId: 'agent-chat-shell',
-              status: 'approved',
-            },
-            dryRun: true,
-            expectedRecipeHash: snapshot.initialPreview.recipeHash,
-            operationId: requestId,
-            requestId,
-            sessionId: 'agent-chat-shell',
+      const exportPresetSettings = buildAgentExportPresetSettings({
+        presets: useSettingsStore.getState().appSettings?.exportPresets ?? [],
+      });
+      const exportProof = await dispatchAgentExportReviewTool({
+        request: {
+          approval: {
+            approvalId: `approval_export_${requestId}`,
+            approvedGraphRevision: snapshot.graphRevision,
+            approvedRecipeHash: snapshot.initialPreview.recipeHash,
+            approvedSelectedImagePath: snapshot.activeImagePath,
+            approvedSessionId: 'agent-chat-shell',
+            status: 'pending',
           },
+          dryRun: true,
+          expectedRecipeHash: snapshot.initialPreview.recipeHash,
+          operationId: requestId,
           requestId,
-          runtimeToolName: AGENT_EXPORT_PROOF_TOOL_NAME,
-        }),
-      );
+          sessionId: 'agent-chat-shell',
+          ...exportPresetSettings,
+        },
+        requestId,
+      });
       pushActivityEntry({
         body: `${exportProof.output.fileFormat} ${exportProof.output.width}x${exportProof.output.height} ${exportProof.exportHash}`,
         exportArtifactId: exportProof.output.previewRef,
@@ -2430,9 +2475,13 @@ function LivePromptComposer({
         ...result,
         exportHash: exportProof.exportHash,
         exportHeight: exportProof.output.height,
+        exportPathPreview: exportProof.receipt.targetPathPreview,
         exportPreviewRef: exportProof.output.previewRef,
         exportReceiptGraphRevision: exportProof.receipt.graphRevision,
         exportReceiptPreviewHash: exportProof.receipt.previewRenderHash,
+        exportReviewApprovalState: exportProof.receipt.approvalState,
+        exportReviewColorProfile: exportProof.receipt.exportSettings.colorProfile,
+        exportReviewFormat: exportProof.receipt.exportSettings.fileFormat,
         exportWidth: exportProof.output.width,
       } satisfies LivePromptResult;
       setResult(nextResult);
@@ -2824,9 +2873,13 @@ function LivePromptComposer({
             className="mt-2 grid gap-1.5 rounded border border-teal-500/25 bg-teal-500/10 p-2 text-[10px]"
             data-export-hash={result.exportHash}
             data-export-height={result.exportHeight?.toString() ?? ''}
+            data-export-path-preview={result.exportPathPreview ?? ''}
             data-export-preview-ref={result.exportPreviewRef ?? ''}
             data-export-receipt-graph-revision={result.exportReceiptGraphRevision ?? ''}
             data-export-receipt-preview-hash={result.exportReceiptPreviewHash ?? ''}
+            data-export-review-approval-state={result.exportReviewApprovalState ?? ''}
+            data-export-review-color-profile={result.exportReviewColorProfile ?? ''}
+            data-export-review-format={result.exportReviewFormat ?? ''}
             data-export-width={result.exportWidth?.toString() ?? ''}
             data-testid="agent-live-export-proof-receipt"
           >
@@ -2838,6 +2891,7 @@ function LivePromptComposer({
             </div>
             <div className="truncate font-mono text-teal-100">{result.exportHash}</div>
             <div className="truncate font-mono text-text-secondary">{result.exportPreviewRef}</div>
+            <div className="truncate font-mono text-text-secondary">{result.exportPathPreview}</div>
           </div>
         ) : null}
         {rollbackSnapshot !== null && rollbackValidation !== null && result.status === 'applied' ? (

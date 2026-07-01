@@ -73,6 +73,21 @@ export const agentSessionAuditStoreSchema = z
 export const agentSelectedImageExportReceiptSchema = z
   .object({
     approvalId: z.string().trim().min(1),
+    approvalState: z.literal('approved'),
+    auditEntries: z
+      .array(
+        z
+          .object({
+            id: z.string().trim().min(1),
+            recipeHash: z.string().trim().min(1),
+            stage: z.enum(['review', 'approval', 'final_result']),
+            status: z.enum(['approved', 'completed', 'reviewed']),
+            summary: z.string().trim().min(1),
+            toolName: z.string().trim().min(1),
+          })
+          .strict(),
+      )
+      .min(3),
     beforePreviewArtifact: z
       .object({
         artifactId: z.string().trim().min(1),
@@ -99,7 +114,22 @@ export const agentSelectedImageExportReceiptSchema = z
         fileFormat: z.enum(['jpeg', 'png']),
         jpegQuality: z.number().int().min(50).max(95),
         longEdgePx: z.number().int().min(512).max(8192),
+        presetId: z.string().trim().min(1).optional(),
+        presetName: z.string().trim().min(1).optional(),
         renderingIntent: z.string().trim().min(1),
+      })
+      .strict(),
+    output: z
+      .object({
+        colorProfile: z.string().trim().min(1),
+        dimensions: z
+          .object({
+            height: z.number().int().positive(),
+            width: z.number().int().positive(),
+          })
+          .strict(),
+        format: z.enum(['jpeg', 'png']),
+        targetPathPreview: z.string().trim().min(1),
       })
       .strict(),
     finalGraphRevision: z.string().trim().min(1),
