@@ -39,6 +39,8 @@ const skinToneInspectorSample: SkinToneUniformityInput = {
 
 const COLOR_WORKSPACE_TAB_IDS = ['quick', 'editor', 'grading', 'output', 'advanced'] as const;
 type ColorWorkspaceTabId = (typeof COLOR_WORKSPACE_TAB_IDS)[number];
+const COLOR_WORKSPACE_TAB_SESSION_KEY = 'rawengine.colorWorkspace.activeTab';
+let sessionColorWorkspaceTab: ColorWorkspaceTabId = 'quick';
 
 interface ColorWorkspaceTab {
   id: ColorWorkspaceTabId;
@@ -56,6 +58,35 @@ const getNextColorWorkspaceTabId = (
   const nextIndex = (currentIndex + direction + tabs.length) % tabs.length;
 
   return tabs[nextIndex]?.id ?? tabs[0]?.id ?? 'quick';
+};
+
+const isColorWorkspaceTabId = (value: string | null): value is ColorWorkspaceTabId =>
+  COLOR_WORKSPACE_TAB_IDS.some((tabId) => tabId === value);
+
+const readSessionColorWorkspaceTab = (): ColorWorkspaceTabId => {
+  if (typeof window === 'undefined') return sessionColorWorkspaceTab;
+
+  try {
+    const storedTab = window.sessionStorage.getItem(COLOR_WORKSPACE_TAB_SESSION_KEY);
+    if (isColorWorkspaceTabId(storedTab)) {
+      sessionColorWorkspaceTab = storedTab;
+    }
+  } catch {
+    return sessionColorWorkspaceTab;
+  }
+
+  return sessionColorWorkspaceTab;
+};
+
+const rememberSessionColorWorkspaceTab = (tabId: ColorWorkspaceTabId) => {
+  sessionColorWorkspaceTab = tabId;
+  if (typeof window !== 'undefined') {
+    try {
+      window.sessionStorage.setItem(COLOR_WORKSPACE_TAB_SESSION_KEY, tabId);
+    } catch {
+      // Local state still carries the selection when browser storage is unavailable.
+    }
+  }
 };
 
 const skinToneTargetDistance = (
@@ -94,7 +125,7 @@ export default function ColorPanel({
 }: ColorPanelProps) {
   const { t } = useTranslation();
   const tablistId = useId();
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<ColorWorkspaceTabId>('quick');
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<ColorWorkspaceTabId>(readSessionColorWorkspaceTab);
   const [activeColor, setActiveColor] = useState<BlackWhiteMixerChannel>('reds');
   const [activeColorBalanceRange, setActiveColorBalanceRange] = useState<ColorBalanceRgbRange>('midtones');
   const [activeChannelMixerOutput, setActiveChannelMixerOutput] = useState<ChannelMixerOutput>('red');
@@ -312,9 +343,17 @@ export default function ColorPanel({
 
   useEffect(() => {
     if (!workspaceTabs.some((tab) => tab.id === activeWorkspaceTab)) {
-      setActiveWorkspaceTab(workspaceTabs[0]?.id ?? 'quick');
+      const nextTabId = workspaceTabs[0]?.id ?? 'quick';
+
+      setActiveWorkspaceTab(nextTabId);
+      rememberSessionColorWorkspaceTab(nextTabId);
     }
   }, [activeWorkspaceTab, workspaceTabs]);
+
+  const selectWorkspaceTab = (tabId: ColorWorkspaceTabId) => {
+    setActiveWorkspaceTab(tabId);
+    rememberSessionColorWorkspaceTab(tabId);
+  };
 
   const focusColorWorkspaceTab = (tabId: ColorWorkspaceTabId) => {
     requestAnimationFrame(() => {
@@ -327,7 +366,7 @@ export default function ColorPanel({
       event.preventDefault();
       const nextTabId = getNextColorWorkspaceTabId(workspaceTabs, activeWorkspaceTab, 1);
 
-      setActiveWorkspaceTab(nextTabId);
+      selectWorkspaceTab(nextTabId);
       focusColorWorkspaceTab(nextTabId);
       return;
     }
@@ -336,7 +375,7 @@ export default function ColorPanel({
       event.preventDefault();
       const nextTabId = getNextColorWorkspaceTabId(workspaceTabs, activeWorkspaceTab, -1);
 
-      setActiveWorkspaceTab(nextTabId);
+      selectWorkspaceTab(nextTabId);
       focusColorWorkspaceTab(nextTabId);
       return;
     }
@@ -345,7 +384,7 @@ export default function ColorPanel({
       event.preventDefault();
       const nextTabId = workspaceTabs[0]?.id ?? 'quick';
 
-      setActiveWorkspaceTab(nextTabId);
+      selectWorkspaceTab(nextTabId);
       focusColorWorkspaceTab(nextTabId);
       return;
     }
@@ -354,7 +393,7 @@ export default function ColorPanel({
       event.preventDefault();
       const nextTabId = workspaceTabs.at(-1)?.id ?? 'quick';
 
-      setActiveWorkspaceTab(nextTabId);
+      selectWorkspaceTab(nextTabId);
       focusColorWorkspaceTab(nextTabId);
     }
   };
@@ -363,8 +402,9 @@ export default function ColorPanel({
     <div className="space-y-3">
       <div
         aria-label={t('adjustments.color.workspaceTabs.label')}
-        className="flex gap-1 overflow-x-auto rounded-md border border-surface bg-bg-tertiary p-1"
+        className="sticky top-0 z-20 -mx-3 flex gap-1 overflow-x-auto border-b border-surface bg-bg-primary px-3 py-2 shadow-[0_8px_12px_rgba(0,0,0,0.18)]"
         data-testid="color-workspace-tabs"
+        data-sticky="true"
         onKeyDown={handleWorkspaceTabKeyDown}
         role="tablist"
       >
@@ -385,7 +425,7 @@ export default function ColorPanel({
               id={`${tablistId}-${tab.id}-tab`}
               key={tab.id}
               onClick={() => {
-                setActiveWorkspaceTab(tab.id);
+                selectWorkspaceTab(tab.id);
               }}
               role="tab"
               tabIndex={isActive ? 0 : -1}

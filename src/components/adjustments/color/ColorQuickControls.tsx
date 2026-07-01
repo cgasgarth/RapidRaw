@@ -34,10 +34,16 @@ export const ColorQuickControls = ({
   return (
     <div className={cx(density.gutter.panel, density.scrollPadding)} data-testid="quick-color-controls">
       <div className={density.card.panel} data-testid="color-quick-white-balance">
-        <div className={density.sectionHeader.root}>
-          <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-            {t('adjustments.color.whiteBalance')}
-          </UiText>
+        <div className={cx(density.sectionHeader.root, 'mb-1')}>
+          <div className="min-w-0">
+            <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+              {t('adjustments.color.whiteBalance')}
+            </UiText>
+            <span className={density.sectionHeader.summary}>
+              {t('adjustments.color.temperature')} {adjustments.temperature || 0} / {t('adjustments.color.tint')}{' '}
+              {adjustments.tint || 0}
+            </span>
+          </div>
           {!isForMask && toggleWbPicker && (
             <button
               onClick={toggleWbPicker}
@@ -89,9 +95,17 @@ export const ColorQuickControls = ({
       </div>
 
       <div className={density.card.panel} data-testid="color-quick-presence">
-        <UiText variant={TextVariants.heading} className={cx(density.sectionHeader.title, 'mb-2 block')}>
-          {t('adjustments.color.presence')}
-        </UiText>
+        <div className={cx(density.sectionHeader.root, 'mb-1')}>
+          <div className="min-w-0">
+            <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+              {t('adjustments.color.presence')}
+            </UiText>
+            <span className={density.sectionHeader.summary}>
+              {t('adjustments.color.vibrance')} {adjustments.vibrance || 0} / {t('adjustments.color.saturation')}{' '}
+              {adjustments.saturation || 0}
+            </span>
+          </div>
+        </div>
         <AdjustmentSlider
           density="compact"
           label={t('adjustments.color.vibrance')}
