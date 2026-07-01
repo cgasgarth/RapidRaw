@@ -35,6 +35,7 @@
     "check:export-soft-proof-profile-compare": "bun tests/integration/checks/export/check-export-soft-proof-profile-compare.ts",
     "check:export-soft-proof-ui": "bun tests/integration/checks/export/check-export-soft-proof-ui.ts",
     "check:working-space-contract": "bun tests/integration/checks/color/check-working-space-contract.ts",
+    "check:local-app-server-install-e2e": "bun tests/integration/checks/app-server/check-local-app-server-install-e2e.ts",
     "check:negative-lab-agent-apply-rollback": "bun tests/integration/checks/negative-lab/check-negative-lab-agent-apply-rollback.ts",
     "check:negative-lab-agent-workflow": "bun tests/integration/checks/negative-lab/check-negative-lab-agent-workflow.ts",
     "check:negative-lab-entrypoints": "bun tests/integration/checks/negative-lab/check-negative-lab-entrypoint-readiness.ts && bun tests/integration/checks/negative-lab/check-negative-lab-toolbar-entry.ts && bun tests/integration/checks/negative-lab/check-negative-lab-context-menu-keyboard.ts && bun tests/integration/checks/ui/keyboard/check-command-palette-behavior.ts",
