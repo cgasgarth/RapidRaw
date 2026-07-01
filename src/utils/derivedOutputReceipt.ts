@@ -13,10 +13,14 @@ import type { SuperResolutionUiSettings } from '../schemas/computational-merge/s
 import type { FocusStackOutputReviewWorkflow } from '../schemas/focus-stack/focusStackOutputReviewSchemas';
 import type { FocusStackUiSettings } from '../schemas/focus-stack/focusStackUiSchemas';
 
-type BuildReceiptInput = Omit<DerivedOutputReceipt, 'provenanceSidecar' | 'receiptId' | 'settingsHash'> & {
+type BuildReceiptInput = Omit<
+  DerivedOutputReceipt,
+  'provenanceSidecar' | 'receiptId' | 'settingsHash' | 'sourcePaths'
+> & {
   provenanceSidecar?: {
     acceptedApplyId?: string;
     acceptedDryRunId?: string;
+    panorama?: DerivedOutputProvenanceSidecar['panorama'];
     superResolution?: DerivedOutputProvenanceSidecar['superResolution'];
     warnings: string[];
   };
@@ -37,7 +41,11 @@ const STALE_REASON_ORDER: ReadonlyArray<DerivedOutputStaleReason> = [
 
 export const buildDerivedOutputReceipt = (input: BuildReceiptInput): DerivedOutputReceipt => {
   const settingsHash = hashStableJson(input.settings);
-  const { settings: _settings, sourcePaths: _sourcePaths, ...receiptInput } = input;
+  const { settings: _settings, sourcePaths, ...receiptInput } = input;
+  const receiptSourcePaths =
+    sourcePaths !== undefined && sourcePaths.every((path): path is string => path !== undefined && path !== '')
+      ? sourcePaths
+      : undefined;
   const receiptId = `derived_output_${input.family}_${hashStableJson({
     family: input.family,
     outputArtifactId: input.outputArtifactId,
@@ -46,6 +54,7 @@ export const buildDerivedOutputReceipt = (input: BuildReceiptInput): DerivedOutp
   }).replace(':', '_')}`;
   const baseReceipt = {
     ...receiptInput,
+    ...(receiptSourcePaths === undefined ? {} : { sourcePaths: receiptSourcePaths }),
     receiptId,
     settingsHash,
   };
@@ -64,6 +73,7 @@ export const buildDerivedOutputReceipt = (input: BuildReceiptInput): DerivedOutp
             sourceGraphRevisions: input.sourceGraphRevisions,
             warnings: input.provenanceSidecar?.warnings ?? [],
             ...(input.sourcePaths === undefined ? {} : { sourcePaths: input.sourcePaths }),
+            ...(input.provenanceSidecar?.panorama === undefined ? {} : { panorama: input.provenanceSidecar.panorama }),
             ...(input.provenanceSidecar?.acceptedApplyId === undefined
               ? {}
               : { acceptedApplyId: input.provenanceSidecar.acceptedApplyId }),
@@ -138,6 +148,7 @@ export const buildDerivedOutputProvenanceSidecar = ({
   family,
   outputContentHash,
   outputPath,
+  panorama,
   receiptId,
   settingsHash,
   sourceContentHashes,
@@ -156,6 +167,7 @@ export const buildDerivedOutputProvenanceSidecar = ({
   sourceContentHashes: string[];
   sourceGraphRevisions: string[];
   sourcePaths?: Array<string | undefined>;
+  panorama?: DerivedOutputProvenanceSidecar['panorama'];
   superResolution?: DerivedOutputProvenanceSidecar['superResolution'];
   warnings: string[];
 }): DerivedOutputProvenanceSidecar =>
@@ -184,6 +196,7 @@ export const buildDerivedOutputProvenanceSidecar = ({
       order,
       ...(sourcePaths[order] === undefined || sourcePaths[order] === '' ? {} : { path: sourcePaths[order] }),
     })),
+    ...(panorama === undefined ? {} : { panorama }),
     ...(superResolution === undefined ? {} : { superResolution }),
     warnings: [...new Set(warnings)].sort(),
   });
@@ -262,9 +275,12 @@ export const buildPanoramaDerivedOutputReceipt = ({
       sourceContribution: review.sourceContribution,
     }),
     outputPath: review.outputPath,
+    panorama: buildPanoramaReceiptMetadata({ review, settings }),
+    previewDimensions: buildPanoramaPreviewDimensions(review.outputDimensions, settings.maxPreviewDimensionPx),
     provenanceSidecar: {
       acceptedApplyId: review.outputPath,
       acceptedDryRunId: review.seamReview.policy,
+      panorama: buildPanoramaReceiptMetadata({ review, settings }),
       warnings: review.warningCodes,
     },
     settings,
@@ -275,7 +291,49 @@ export const buildPanoramaDerivedOutputReceipt = ({
     staleReasons: undefined,
     staleState: 'current',
     storagePolicy: 'export_path',
+    warningCodes: review.warningCodes,
   });
+
+const buildPanoramaReceiptMetadata = ({
+  review,
+  settings,
+}: {
+  review: PanoramaSavedReviewSummary;
+  settings: PanoramaUiSettings;
+}): NonNullable<DerivedOutputReceipt['panorama']> => ({
+  boundary: {
+    crop: review.crop,
+    effectiveMode: review.boundaryMode,
+    manualCropInsetsPercent: settings.manualCropInsetsPercent,
+    overlapFeatherPx: settings.overlapFeatherPx,
+    requestedMode: settings.boundaryMode,
+  },
+  previewDimensions: buildPanoramaPreviewDimensions(review.outputDimensions, settings.maxPreviewDimensionPx),
+  projection: {
+    effective: review.projection,
+    requested: settings.projection,
+  },
+  seamExposureCompensationPercent: settings.seamExposureCompensationPercent,
+  sourceSetHash: hashStableJson(
+    review.sourceRefs.map((source) => ({
+      contentHash: source.contentHash,
+      graphRevision: source.graphRevision,
+      path: source.path,
+      sourceIndex: source.sourceIndex,
+    })),
+  ),
+});
+
+const buildPanoramaPreviewDimensions = (
+  outputDimensions: PanoramaSavedReviewSummary['outputDimensions'],
+  maxPreviewDimensionPx: number,
+): NonNullable<DerivedOutputReceipt['previewDimensions']> => {
+  const scale = Math.min(1, maxPreviewDimensionPx / Math.max(outputDimensions.width, outputDimensions.height));
+  return {
+    height: Math.max(1, Math.round(outputDimensions.height * scale)),
+    width: Math.max(1, Math.round(outputDimensions.width * scale)),
+  };
+};
 
 export const buildFocusStackDerivedOutputReceipt = ({
   acceptedDryRunPlanHash,

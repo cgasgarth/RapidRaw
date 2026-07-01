@@ -75,6 +75,28 @@ export default function DerivedOutputReceiptPanel({
       data-output-artifact-id={receipt.outputArtifactId}
       data-output-content-hash={receipt.outputContentHash}
       data-output-path={receipt.outputPath ?? ''}
+      data-panorama-boundary-crop={
+        receipt.panorama === undefined
+          ? ''
+          : `${receipt.panorama.boundary.crop.x},${receipt.panorama.boundary.crop.y},${receipt.panorama.boundary.crop.width},${receipt.panorama.boundary.crop.height}`
+      }
+      data-panorama-boundary-effective-mode={receipt.panorama?.boundary.effectiveMode ?? ''}
+      data-panorama-boundary-requested-mode={receipt.panorama?.boundary.requestedMode ?? ''}
+      data-panorama-manual-crop-insets={
+        receipt.panorama?.boundary.manualCropInsetsPercent === undefined
+          ? ''
+          : `${receipt.panorama.boundary.manualCropInsetsPercent.top},${receipt.panorama.boundary.manualCropInsetsPercent.right},${receipt.panorama.boundary.manualCropInsetsPercent.bottom},${receipt.panorama.boundary.manualCropInsetsPercent.left}`
+      }
+      data-panorama-overlap-feather-px={receipt.panorama?.boundary.overlapFeatherPx ?? ''}
+      data-panorama-preview-dimensions={
+        receipt.previewDimensions === undefined
+          ? ''
+          : `${receipt.previewDimensions.width} x ${receipt.previewDimensions.height}`
+      }
+      data-panorama-projection-effective={receipt.panorama?.projection.effective ?? ''}
+      data-panorama-projection-requested={receipt.panorama?.projection.requested ?? ''}
+      data-panorama-seam-exposure-compensation-percent={receipt.panorama?.seamExposureCompensationPercent ?? ''}
+      data-panorama-source-set-hash={receipt.panorama?.sourceSetHash ?? ''}
       data-recipe-hash={receipt.recipeHash ?? ''}
       data-receipt-id={receipt.receiptId}
       data-settings-hash={receipt.settingsHash}
@@ -89,8 +111,10 @@ export default function DerivedOutputReceiptPanel({
       data-source-content-hashes={receipt.sourceContentHashes.join(',')}
       data-source-count={receipt.sourceCount}
       data-source-graph-revisions={receipt.sourceGraphRevisions.join(',')}
+      data-source-paths={receipt.sourcePaths?.join(',') ?? ''}
       data-stale-state={receipt.staleState}
       data-storage-policy={receipt.storagePolicy}
+      data-warning-codes={receipt.warningCodes?.join(',') ?? ''}
       data-testid="derived-output-receipt"
     >
       <div className="mb-3 flex items-start justify-between gap-4">

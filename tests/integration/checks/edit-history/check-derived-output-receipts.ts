@@ -21,6 +21,7 @@ import {
   deriveDerivedOutputReceiptState,
 } from '../../../../src/utils/derivedOutputReceipt.ts';
 import { buildFocusStackOutputReviewWorkflow } from '../../../../src/utils/focusStackOutputReview.ts';
+import { buildPanoramaReopenedDerivedOutputReceipt } from '../../../../src/utils/hdrDerivedSourceReopen.ts';
 import { buildHdrEditableHandoffSummary } from '../../../../src/utils/hdrEditableHandoff.ts';
 import { buildSuperResolutionOutputReviewWorkflow } from '../../../../src/utils/superResolutionOutputReview.ts';
 
@@ -48,6 +49,9 @@ const assertReceipt = (label: string, receipt: DerivedOutputReceipt): void => {
       receipt.sourceGraphRevisions.length === receipt.sourceCount,
     `${label}: source lineage arrays must match source count.`,
   );
+  if (receipt.sourcePaths !== undefined) {
+    expect(receipt.sourcePaths.length === receipt.sourceCount, `${label}: source paths must match source count.`);
+  }
 
   if (receipt.openInEditorAction.state === 'available') {
     expect(receipt.openInEditorAction.path !== undefined, `${label}: available open action must include a path.`);
@@ -76,6 +80,11 @@ const assertReceipt = (label: string, receipt: DerivedOutputReceipt): void => {
       receipt.provenanceSidecar?.sourceState.map((source) => source.order).join(',') ===
         receipt.sourceContentHashes.map((_hash, index) => String(index)).join(','),
       `${label}: sidecar must retain source order.`,
+    );
+    expect(
+      receipt.provenanceSidecar?.sourceState.map((source) => source.path ?? '').join(',') ===
+        (receipt.sourcePaths ?? []).join(','),
+      `${label}: sidecar must retain source paths when present.`,
     );
     expect(
       receipt.provenanceSidecar?.app.id === 'io.github.CyberTimon.RapidRAW',
@@ -311,6 +320,33 @@ expect(
   panoramaReceipt.provenanceSidecar?.warnings.join(',') === panoramaReview.warningCodes.join(','),
   'Panorama sidecar must retain warning codes.',
 );
+expect(
+  panoramaReceipt.sourcePaths?.join(',') === panoramaReview.sourceRefs.map((source) => source.path).join(','),
+  'Panorama receipt must retain source paths.',
+);
+expect(
+  panoramaReceipt.previewDimensions?.width === panoramaReview.outputDimensions.width &&
+    panoramaReceipt.previewDimensions.height === panoramaReview.outputDimensions.height,
+  'Panorama receipt must retain preview dimensions at or below the output size.',
+);
+expect(
+  panoramaReceipt.panorama?.projection.effective === panoramaReview.projection &&
+    panoramaReceipt.panorama.projection.requested === DEFAULT_PANORAMA_UI_SETTINGS.projection,
+  'Panorama receipt must retain requested/effective projection controls.',
+);
+expect(
+  panoramaReceipt.panorama?.boundary.crop.width === panoramaReview.crop.width &&
+    panoramaReceipt.panorama.boundary.requestedMode === DEFAULT_PANORAMA_UI_SETTINGS.boundaryMode,
+  'Panorama receipt must retain crop and boundary controls.',
+);
+expect(
+  panoramaReceipt.panorama?.sourceSetHash.startsWith('fnv1a32:') === true,
+  'Panorama receipt must include a source-set hash.',
+);
+expect(
+  panoramaReceipt.provenanceSidecar?.panorama?.sourceSetHash === panoramaReceipt.panorama?.sourceSetHash,
+  'Panorama sidecar must mirror panorama receipt metadata.',
+);
 
 useUIStore.getState().clearDerivedOutputReceipts();
 useUIStore.getState().upsertDerivedOutputReceipt(hdrReceipt);
@@ -333,6 +369,51 @@ expect(
   panoramaReceipt.sourceGraphRevisions.join(',') ===
     panoramaReview.sourceRefs.map((source) => source.graphRevision).join(','),
   'Panorama receipt must retain saved source graph revisions.',
+);
+
+const reopenedPanoramaReceipt = buildPanoramaReopenedDerivedOutputReceipt({
+  imagePath: panoramaReview.outputPath,
+  metadata: {
+    rawEngineArtifacts: {
+      derivedOutputProvenanceSidecars: [panoramaReceipt.provenanceSidecar],
+      panoramaArtifacts: [
+        {
+          artifactId: 'artifact_panorama_runtime',
+          outputArtifacts: [
+            {
+              artifactId: 'artifact_panorama_runtime_output',
+              contentHash: panoramaReceipt.outputContentHash,
+              dimensions: panoramaReview.outputDimensions,
+            },
+          ],
+          previewArtifacts: [
+            {
+              dimensions: panoramaReceipt.previewDimensions,
+            },
+          ],
+          staleState: {
+            invalidationReasons: [],
+            state: 'current',
+          },
+          warnings: panoramaReview.warningCodes,
+        },
+      ],
+      schemaVersion: 1,
+    },
+  },
+});
+expect(reopenedPanoramaReceipt !== null, 'Panorama reopen helper must rebuild a receipt from sidecar metadata.');
+expect(
+  reopenedPanoramaReceipt?.openInEditorAction.path === panoramaReview.outputPath,
+  'Reopened panorama receipt must expose the saved output as editable open path.',
+);
+expect(
+  reopenedPanoramaReceipt?.sourcePaths?.join(',') === panoramaReview.sourceRefs.map((source) => source.path).join(','),
+  'Reopened panorama receipt must retain source paths.',
+);
+expect(
+  reopenedPanoramaReceipt?.panorama?.boundary.crop.width === panoramaReview.crop.width,
+  'Reopened panorama receipt must retain crop metadata.',
 );
 
 const invalidOpenAction = derivedOutputReceiptSchema.safeParse({
@@ -404,6 +485,16 @@ const requiredPanelMarkers = [
   'data-derived-output-family',
   'data-derived-output-validation-status',
   'data-output-content-hash',
+  'data-panorama-boundary-crop',
+  'data-panorama-boundary-effective-mode',
+  'data-panorama-boundary-requested-mode',
+  'data-panorama-manual-crop-insets',
+  'data-panorama-overlap-feather-px',
+  'data-panorama-preview-dimensions',
+  'data-panorama-projection-effective',
+  'data-panorama-projection-requested',
+  'data-panorama-seam-exposure-compensation-percent',
+  'data-panorama-source-set-hash',
   'data-sidecar-accepted-apply-id',
   'data-sidecar-accepted-dry-run-id',
   'data-sidecar-app-build-version',
@@ -413,7 +504,9 @@ const requiredPanelMarkers = [
   'data-sidecar-warning-codes',
   'data-source-content-hashes',
   'data-source-graph-revisions',
+  'data-source-paths',
   'data-source-lineage-summary',
+  'data-warning-codes',
   'data-derived-output-stale-reasons',
   'data-derived-output-warning-count',
   'data-testid="derived-output-warning-list"',
@@ -540,6 +633,19 @@ expect(reviewPanelSource.includes('onOpenDerivedOutput'), 'Review panel must exp
 const uiStoreSource = readFileSync('src/store/useUIStore.ts', 'utf8');
 expect(uiStoreSource.includes('derivedOutputReceipts'), 'UI store must expose derived output receipt records.');
 expect(uiStoreSource.includes('upsertDerivedOutputReceipt'), 'UI store must upsert derived output receipt records.');
+const reopenSource = readFileSync('src/utils/hdrDerivedSourceReopen.ts', 'utf8');
+expect(
+  reopenSource.includes('buildPanoramaReopenedDerivedOutputReceipt'),
+  'Derived source reopen helper must support panorama sidecars.',
+);
+expect(
+  readFileSync('src/hooks/editor/useImageLoader.ts', 'utf8').includes('upsertReopenedDerivedOutputReceipt'),
+  'Image loader must register reopened panorama derived outputs.',
+);
+expect(
+  readFileSync('src/hooks/app/useAppNavigation.ts', 'utf8').includes('upsertReopenedDerivedOutputReceipt'),
+  'Cached navigation must register reopened panorama derived outputs.',
+);
 
 const enLocale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8')) as {
   modals?: { derivedOutput?: Record<string, unknown> };
