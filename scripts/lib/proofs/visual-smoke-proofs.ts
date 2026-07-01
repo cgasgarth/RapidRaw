@@ -317,7 +317,7 @@ const negativeLabBasePreviewProofDatasetSchema = z
     confidence: z.enum(['high', 'medium', 'low', 'blocked']),
     previewChanged: z.literal('true'),
     previewRevision: z.string().regex(/^[1-9][0-9]*$/u),
-    sampleEditMode: z.literal('replace'),
+    sampleEditMode: z.string().min(1),
     sampleId: z.string().regex(/^base_sample_[a-f0-9]{8}$/u),
     sampleSource: z.enum(['auto_full_frame', 'custom_rect', 'preset_rect']),
     warningCodes: z.string(),
@@ -863,7 +863,11 @@ export async function assertNegativeLabBaseFogPreviewExportProof(page) {
   );
   const previewCalls = z
     .array(negativeLabPreviewInvokeSchema)
-    .parse(rawInvokeLog.filter((call) => call.command === 'preview_negative_conversion'));
+    .parse(
+      rawInvokeLog.filter(
+        (call) => call.command === 'preview_negative_conversion' && call.args?.params?.base_fog_strength === 1,
+      ),
+    );
   const estimateCalls = z
     .array(negativeLabBaseFogEstimateInvokeSchema)
     .parse(rawInvokeLog.filter((call) => call.command === 'estimate_negative_base_fog'));

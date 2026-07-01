@@ -117,16 +117,19 @@ const requiredModalMarkers = [
   '<NegativeLabProfileComparisonGrid',
   'onBrowseProfile={setBrowsedComparisonProfileId}',
   'onUseProfile={handlePresetSelect}',
+  'renderedPreviewByProfileId={renderedProfileCandidatePreviewById}',
 ];
 const requiredGridMarkers = [
   'data-testid="negative-lab-profile-comparison-matrix"',
-  'data-preview-hash={candidate.renderEvidence.previewHash}',
-  'data-render-hash={candidate.renderEvidence.renderHash}',
+  'data-preview-hash={effectivePreviewHash}',
+  'data-render-hash={effectiveRenderHash}',
   'data-metric-hash={candidate.renderEvidence.metricHash}',
   'data-warning-codes={candidate.renderEvidence.warningCodes.join',
+  'data-preview-render-status={renderedPreview?.status ??',
+  'data-testid={`negative-lab-profile-comparison-rendered-preview-' + '$' + '{profile.presetId}`}',
   'data-mutation-browsing-mutates-edit-graph={String(',
   'onBrowseProfile(profile.presetId)',
-  'data-testid={`negative-lab-profile-comparison-use-${profile.presetId}`}',
+  'data-testid={`negative-lab-profile-comparison-use-' + '$' + '{profile.presetId}`}',
   'disabled={!candidate.mutationSafety.selectableForRuntimeApply}',
 ];
 
