@@ -14,7 +14,7 @@ import {
   type ThumbnailAspectRatio,
   ThumbnailSize,
 } from '../../components/ui/AppProperties';
-import { useEditorStore } from '../../store/useEditorStore';
+import { type PanelScopesLayout, useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
@@ -32,6 +32,8 @@ interface PersistedFolderState {
 
 const DISPLAY_MODES = new Set<string>(Object.values(DisplayMode));
 const isDisplayMode = (value: string): value is DisplayMode => DISPLAY_MODES.has(value);
+const PANEL_SCOPES_LAYOUTS = new Set<string>(['overlay', 'stacked']);
+const isPanelScopesLayout = (value: string): value is PanelScopesLayout => PANEL_SCOPES_LAYOUTS.has(value);
 
 interface InitializationSettings extends AppSettings {
   lastFolderState?: PersistedFolderState | null;
@@ -210,6 +212,9 @@ export const useAppInitialization = ({
         }
         if (typeof settings.waveformHeight === 'number') {
           setEditor({ waveformHeight: clampPanelScopesHeight(settings.waveformHeight) });
+        }
+        if (settings.panelScopesLayout && isPanelScopesLayout(settings.panelScopesLayout)) {
+          setEditor({ panelScopesLayout: settings.panelScopesLayout });
         }
 
         setLibraryViewMode(settings.libraryViewMode ?? defaultLibraryViewMode);

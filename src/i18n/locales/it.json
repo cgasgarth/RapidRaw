@@ -4130,6 +4130,10 @@
         "highlights": "",
         "shadows": ""
       },
+      "drawerControls": {
+        "mode": "",
+        "resetHeight": ""
+      },
       "scopeStatus": {
         "pending": "",
         "ready": "",

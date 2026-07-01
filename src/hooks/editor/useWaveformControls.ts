@@ -1,6 +1,6 @@
 import { type PointerEvent as ReactPointerEvent, useCallback, useState } from 'react';
 
-import { useEditorStore } from '../../store/useEditorStore';
+import { type PanelScopesLayout, useEditorStore } from '../../store/useEditorStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 
 import type { DisplayMode } from '../../utils/adjustments';
@@ -9,6 +9,14 @@ import { clampPanelScopesHeight, PANEL_SCOPES_HEIGHT } from '../../utils/wavefor
 export function useWaveformControls() {
   const [isResizingWaveform, setIsResizingWaveform] = useState(false);
   const setEditor = useEditorStore((s) => s.setEditor);
+
+  const persistWaveformSettings = useCallback(
+    (updates: Partial<{ panelScopesLayout: PanelScopesLayout; waveformHeight: number }>) => {
+      const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+      if (appSettings) void handleSettingsChange({ ...appSettings, ...updates });
+    },
+    [],
+  );
 
   const onToggleWaveform = useCallback(() => {
     const newVal = !useEditorStore.getState().isWaveformVisible;
@@ -28,9 +36,23 @@ export function useWaveformControls() {
 
   const setWaveformHeight = useCallback(
     (height: number) => {
-      setEditor({ waveformHeight: clampPanelScopesHeight(height) });
+      const nextHeight = clampPanelScopesHeight(height);
+      setEditor({ waveformHeight: nextHeight });
+      persistWaveformSettings({ waveformHeight: nextHeight });
     },
-    [setEditor],
+    [persistWaveformSettings, setEditor],
+  );
+
+  const resetWaveformHeight = useCallback(() => {
+    setWaveformHeight(PANEL_SCOPES_HEIGHT.default);
+  }, [setWaveformHeight]);
+
+  const setPanelScopesLayout = useCallback(
+    (layout: PanelScopesLayout) => {
+      setEditor({ panelScopesLayout: layout });
+      persistWaveformSettings({ panelScopesLayout: layout });
+    },
+    [persistWaveformSettings, setEditor],
   );
 
   const handleWaveformResize = useCallback(
@@ -90,6 +112,8 @@ export function useWaveformControls() {
     onToggleWaveform,
     setActiveWaveformChannel,
     setWaveformHeight,
+    resetWaveformHeight,
+    setPanelScopesLayout,
     handleWaveformResize,
   };
 }

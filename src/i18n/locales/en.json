@@ -4319,6 +4319,12 @@
         "highlights": "Highlights {{value}}",
         "shadows": "Shadows {{value}}"
       },
+      "drawerControls": {
+        "layoutOverlay": "Overlay scope controls",
+        "layoutStacked": "Stack scope controls",
+        "mode": "Scope mode",
+        "resetHeight": "Reset scope height"
+      },
       "scopeStatus": {
         "pending": "Scopes pending",
         "ready": "Scopes ready",
