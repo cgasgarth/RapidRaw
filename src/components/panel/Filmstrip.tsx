@@ -14,6 +14,7 @@ import UiText from '../ui/primitives/Text';
 
 const HORIZONTAL_PADDING = 4;
 const ITEM_GAP = 8;
+const THUMBNAIL_FOCUS_CLASS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring';
 
 interface ImageLayer {
   id: string;
@@ -97,7 +98,7 @@ const FilmstripRawQualityBadges = ({ exif }: { exif: ImageFile['exif'] }) => {
           data-raw-quality-badge-detail={badge.detail}
           data-raw-quality-badge-severity={badge.severity}
         >
-          {badge.severity === 'warning' ? <AlertTriangle size={11} /> : null}
+          {badge.severity === 'warning' ? <AlertTriangle className="shrink-0" size={11} /> : null}
           <span>{badge.label}</span>
         </span>
       ))}
@@ -222,10 +223,10 @@ const FilmstripThumbnail = memo(
     }, []);
 
     const ringClass = isActive
-      ? 'ring-2 ring-accent shadow-md'
+      ? 'border-accent ring-2 ring-accent shadow-md'
       : isSelected
-        ? 'ring-2 ring-gray-400'
-        : 'hover:ring-2 hover:ring-hover-color';
+        ? 'border-editor-border ring-2 ring-gray-400 shadow-md'
+        : 'border-editor-border hover:ring-2 hover:ring-hover-color';
 
     const imageClasses = `w-full h-full group-hover:scale-[1.02] transition-transform duration-300`;
     const handleSelect = (event: ThumbnailMouseEvent | ThumbnailKeyboardEvent) => {
@@ -242,9 +243,13 @@ const FilmstripThumbnail = memo(
     return (
       <div
         className={cx(
-          'h-full w-full rounded-md overflow-hidden cursor-pointer shrink-0 group relative transition-all duration-150 bg-surface',
+          'h-full w-full rounded-md overflow-hidden cursor-pointer shrink-0 group relative border bg-editor-panel transition-all duration-150',
           ringClass,
+          THUMBNAIL_FOCUS_CLASS,
         )}
+        aria-current={isActive ? 'true' : undefined}
+        aria-label={truncatedTitle}
+        aria-selected={isSelected}
         onClick={handleSelect}
         onContextMenu={(e: ThumbnailMouseEvent) => onContextMenu?.(e, path)}
         onKeyDown={handleKeyDown}
@@ -254,6 +259,7 @@ const FilmstripThumbnail = memo(
           zIndex: isActive ? 2 : isSelected ? 1 : 'auto',
         }}
         data-tooltip={truncatedTitle}
+        data-testid="filmstrip-thumbnail"
       >
         {layers.length > 0 ? (
           <div className="absolute inset-0 w-full h-full">
@@ -290,7 +296,7 @@ const FilmstripThumbnail = memo(
             ))}
           </div>
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-surface">
+          <div className="flex h-full w-full items-center justify-center border border-dashed border-editor-border bg-editor-panel-well">
             <ImageIcon size={24} className="text-text-secondary animate-pulse" />
           </div>
         )}
@@ -314,6 +320,7 @@ const FilmstripThumbnail = memo(
                 'text-white flex items-center transition-all duration-200 ease-out overflow-hidden',
                 hasEditIcon ? 'max-w-3 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
               )}
+              data-testid={hasEditIcon ? 'filmstrip-edit-badge' : undefined}
             >
               <SlidersHorizontal size={12} />
             </div>
@@ -328,6 +335,7 @@ const FilmstripThumbnail = memo(
               <div
                 className="w-3 h-3 rounded-full transition-colors duration-200"
                 style={{ backgroundColor: colorLabel ? colorLabel.color : 'transparent' }}
+                data-testid={hasColorLabel ? 'filmstrip-color-tag-badge' : undefined}
               />
             </div>
 
@@ -337,6 +345,7 @@ const FilmstripThumbnail = memo(
                 hasRating ? 'max-w-7 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
                 hasRating && (hasEditIcon || hasColorLabel) ? 'ml-1.5' : 'ml-0',
               )}
+              data-testid={hasRating ? 'filmstrip-rating-badge' : undefined}
             >
               <UiText variant={TextVariants.small} color={TextColors.white}>
                 {rating}

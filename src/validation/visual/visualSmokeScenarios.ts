@@ -38,6 +38,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   ProfessionalEditorCompactPortrait: 'professional-editor-compact-portrait',
   ProfessionalCanvasOverlays: 'professional-canvas-overlays',
   ProfessionalCropTransformWorkspace: 'professional-crop-transform-workspace',
+  ProfessionalFilmstripContext: 'professional-filmstrip-context',
   ProfessionalLayersCompact: 'professional-layers-compact',
   ProfessionalExportProofFooter: 'professional-export-proof-footer',
   ProfessionalEditorShell: 'professional-editor-shell',
@@ -313,6 +314,13 @@ export const VISUAL_SMOKE_SCENARIOS = [
     mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorCompactPortrait,
     outputFile: 'professional-editor-compact-portrait.png',
     sectionMinimum: 5,
+  },
+  {
+    compactOutputFile: 'professional-filmstrip-context-compact.png',
+    marker: 'Professional filmstrip context',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalFilmstripContext,
+    outputFile: 'professional-filmstrip-context.png',
+    sectionMinimum: 4,
   },
   {
     compactOutputFile: 'professional-crop-transform-workspace-compact.png',
