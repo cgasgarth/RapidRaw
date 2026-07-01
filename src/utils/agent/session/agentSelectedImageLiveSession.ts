@@ -466,6 +466,9 @@ export const rollbackAgentSelectedImageLiveSession = async ({
     await dispatchAgentLiveEditorTool({
       args: {
         checkpoint,
+        expectedCurrentGraphRevision: current.graphRevision,
+        expectedCurrentPreviewRecipeHash: current.recipeHash,
+        expectedSelectedImagePath: current.selectedImagePath,
         requestId: `${receipt.requestId}-rollback`,
         scope: 'session_start',
         sessionId: receipt.sessionId,

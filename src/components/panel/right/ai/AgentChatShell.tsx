@@ -2450,12 +2450,18 @@ function LivePromptComposer({
         args: {
           checkpoint: {
             adjustments: rollbackSnapshot.adjustments,
+            activeImagePath: rollbackSnapshot.activeImagePath,
             graphRevision: rollbackSnapshot.graphRevision,
             historyIndex: rollbackSnapshot.historyIndex,
+            lastBasicToneCommand: rollbackSnapshot.lastBasicToneCommand,
             previewRecipeHash: rollbackSnapshot.recipeHash,
             previewRef: rollbackSnapshot.finalPreviewUrl,
             sessionId: 'agent-chat-shell',
+            uncroppedPreviewRef: rollbackSnapshot.uncroppedAdjustedPreviewUrl,
           },
+          expectedCurrentGraphRevision: validation.currentGraphRevision,
+          expectedCurrentPreviewRecipeHash: validation.currentRecipeHash,
+          expectedSelectedImagePath: validation.currentImagePath,
           requestId: rollbackRequestId,
           scope: 'session_start',
           sessionId: 'agent-chat-shell',

@@ -57,7 +57,7 @@ const dryRun = await dryRunAgentGlobalAdjustments({
   sessionId: 'agent-history-3163',
 });
 
-await applyAgentGlobalAdjustments({
+const applyReceipt = await applyAgentGlobalAdjustments({
   acceptedPlanHash: dryRun.dryRunPlanHash,
   acceptedPlanId: dryRun.dryRunPlanId,
   adjustments: { exposure: 0.35, shadows: 20 },
@@ -76,9 +76,32 @@ if (editedState.historyIndex !== 1 || editedState.adjustments.exposure !== 0.35)
 if (editedRecipeHash === beforeRecipeHash) {
   throw new Error('Agent edit did not change recipe hash before rollback.');
 }
+if (editedState.lastBasicToneCommand === null) {
+  throw new Error('Agent edit did not retain runtime basic-tone provenance before rollback.');
+}
+
+useEditorStore.getState().pushHistory({ ...editedState.adjustments, contrast: 7 });
+expectRejects(() =>
+  rollbackAgentSessionHistory({
+    checkpoint,
+    expectedCurrentGraphRevision: applyReceipt.appliedGraphRevision,
+    expectedCurrentPreviewRecipeHash: editedRecipeHash,
+    expectedSelectedImagePath: selectedPath,
+    requestId: 'agent-history-rollback-stale-graph',
+    scope: 'session_start',
+    sessionId: 'agent-history-3163',
+  }),
+);
+if (useEditorStore.getState().historyIndex !== 2) {
+  throw new Error('Rejected stale rollback mutated the current edit graph.');
+}
+useEditorStore.getState().goToHistoryIndex(1);
 
 const rollback = rollbackAgentSessionHistory({
   checkpoint,
+  expectedCurrentGraphRevision: applyReceipt.appliedGraphRevision,
+  expectedCurrentPreviewRecipeHash: editedRecipeHash,
+  expectedSelectedImagePath: selectedPath,
   requestId: 'agent-history-rollback-3163',
   scope: 'session_start',
   sessionId: 'agent-history-3163',
@@ -86,10 +109,13 @@ const rollback = rollbackAgentSessionHistory({
 const restoredState = useEditorStore.getState();
 if (
   rollback.graphRevision !== 'history_0' ||
+  rollback.currentGraphRevision !== applyReceipt.appliedGraphRevision ||
+  rollback.currentPreviewRecipeHash !== editedRecipeHash ||
+  !rollback.previewProvenanceRestored ||
   rollback.restoredHistoryIndex !== 0 ||
   rollback.sessionId !== checkpoint.sessionId
 ) {
-  throw new Error('Agent history rollback did not report the session-start graph revision.');
+  throw new Error('Agent history rollback did not report the applied-to-restored graph revisions.');
 }
 if (restoredState.historyIndex !== 0 || restoredState.history.length !== 1) {
   throw new Error('Agent history rollback did not restore session-start history.');
@@ -99,6 +125,9 @@ if (restoredState.adjustments.exposure !== INITIAL_ADJUSTMENTS.exposure || resto
 }
 if (restoredState.finalPreviewUrl !== beforePreviewRef || restoredState.uncroppedAdjustedPreviewUrl !== null) {
   throw new Error('Agent history rollback did not restore preview identity and invalidate stale output.');
+}
+if (restoredState.lastBasicToneCommand !== null) {
+  throw new Error('Agent history rollback did not restore pre-agent runtime provenance.');
 }
 if (rollback.previewRecipeHash !== beforeRecipeHash) {
   throw new Error('Agent history rollback did not restore the original recipe hash.');
