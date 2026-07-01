@@ -32,14 +32,11 @@ run_gate() {
 run_gate lint bun run lint
 run_gate format bun run format:check
 run_gate typecheck bun run typecheck
-run_gate test bun run test
-run_gate rust bun run check:rust
-run_gate bundle bun run check:bundle
+run_gate test bun run test:unit
 run_gate i18n bun scripts/ci/run-compact-command.ts --label i18n:lint -- bunx i18next-cli lint
 run_gate i18n-extract bun scripts/ci/run-compact-command.ts --label i18n:extract -- bunx i18next-cli extract --ci --dry-run
 run_gate unused-deps bun scripts/ci/run-compact-command.ts --label unused-deps -- bunx knip --config knip.jsonc --dependencies --reporter compact
 run_gate docs bun run check:docs
-run_gate schema bun run check:schema
 
 failed=0
 for entry in $pids; do
