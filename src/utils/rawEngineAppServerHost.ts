@@ -94,6 +94,11 @@ import {
   agentPreviewRenderRequestSchema,
   agentStateGetRequestSchema,
   getAgentReadOnlyState,
+  getRawEngineImagePreview,
+  RAW_ENGINE_IMAGE_GET_PREVIEW_INPUT_SCHEMA_NAME,
+  RAW_ENGINE_IMAGE_GET_PREVIEW_OUTPUT_SCHEMA_NAME,
+  RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+  rawEngineImageGetPreviewRequestSchema,
   renderAgentPreviewCompare,
   renderAgentReadOnlyPreview,
 } from './agent/context/agentReadOnlyAppServerTools';
@@ -618,6 +623,15 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       outputSchemaNames: [AGENT_PREVIEW_RENDER_OUTPUT_SCHEMA_NAME],
       runtimeCheckScripts: ['check:agent-readonly-tools'],
       toolNames: [AGENT_PREVIEW_RENDER_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
+      commandName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [RAW_ENGINE_IMAGE_GET_PREVIEW_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.Read],
+      outputSchemaNames: [RAW_ENGINE_IMAGE_GET_PREVIEW_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-readonly-tools'],
+      toolNames: [RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME],
     }),
     buildRouteCatalogEntry({
       commandName: AGENT_PREVIEW_COMPARE_TOOL_NAME,
@@ -1192,6 +1206,7 @@ const APPROVED_AGENT_APP_SERVER_TOOL_NAMES = new Set<string>([
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_RETOUCH_APPLY_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
+  RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
   NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME,
   ...NEGATIVE_LAB_AGENT_READ_ONLY_TOOL_NAMES,
   NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME,
@@ -1350,6 +1365,9 @@ const dispatchAgentAppServerTool = async (
       break;
     case AGENT_PREVIEW_RENDER_TOOL_NAME:
       result = renderAgentReadOnlyPreview(agentPreviewRenderRequestSchema.parse(request.arguments));
+      break;
+    case RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME:
+      result = getRawEngineImagePreview(rawEngineImageGetPreviewRequestSchema.parse(request.arguments));
       break;
     case AGENT_RETOUCH_APPLY_TOOL_NAME:
       result = applyAgentRetouch(agentRetouchApplyRequestSchema.parse(request.arguments));
