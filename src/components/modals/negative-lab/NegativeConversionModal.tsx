@@ -72,7 +72,11 @@ import { parsePathProgressPayload } from '../../../schemas/tauriEventSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants } from '../../../types/typography';
-import { buildDustCandidateHealLayer, buildDustHealCorrectionMetrics } from '../../../utils/dustCandidateHealLayer';
+import {
+  applyDustCandidateDecisionTransition,
+  type buildDustCandidateHealLayer,
+  buildDustHealCorrectionMetrics,
+} from '../../../utils/dustCandidateHealLayer';
 import { buildLayerStackSidecarFromMasks } from '../../../utils/layers/layerStackCommandBridge';
 import { NegativeLabAppServerCommandName } from '../../../utils/negative-lab/app-server/negativeLabAppServerCommandNames';
 import {
@@ -913,34 +917,45 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
 
     return { imageHeight: 1000, imageWidth: 1000, source: 'normalized_fallback' } as const;
   };
-  const handleAcceptDustCandidate = (
-    frame: NegativeLabDustScratchFrame,
-    candidate: NegativeLabDustScratchCandidate,
-  ) => {
-    if (candidate.kind !== 'dust_spot') {
-      setDustCandidateDecisionById((previous) => ({ ...previous, [candidate.candidateId]: 'rejected' }));
-      return;
-    }
-
-    const dustHealImageSize = resolveDustHealImageSize(frame.frameId);
-    const healLayer = buildDustCandidateHealLayer({
+  const handleAcceptDustCandidate = (frameId: string, candidate: NegativeLabDustScratchCandidate) => {
+    const dustHealImageSize = resolveDustHealImageSize(frameId);
+    const nextState = applyDustCandidateDecisionTransition({
       candidate,
-      frameId: frame.frameId,
+      decision: 'accepted',
+      frameId,
       imageHeight: dustHealImageSize.imageHeight,
       imageWidth: dustHealImageSize.imageWidth,
+      state: {
+        decisionByCandidateId: dustCandidateDecisionById,
+        healLayerByCandidateId: dustHealLayerByCandidateId,
+      },
     });
-    setDustHealLayerByCandidateId((previous) => ({ ...previous, [candidate.candidateId]: healLayer }));
-    setDustCandidateDecisionById((previous) => ({ ...previous, [candidate.candidateId]: 'accepted' }));
+    setDustHealLayerByCandidateId(nextState.healLayerByCandidateId);
+    setDustCandidateDecisionById(nextState.decisionByCandidateId);
   };
   const handleAcceptAllDustCandidates = () => {
+    let nextState = {
+      decisionByCandidateId: dustCandidateDecisionById,
+      healLayerByCandidateId: dustHealLayerByCandidateId,
+    };
     for (const frame of dustScratchReviewReport.frames) {
       for (const candidate of frame.candidates) {
-        const candidateDecision = dustCandidateDecisionById[candidate.candidateId] ?? candidate.status;
+        const candidateDecision = nextState.decisionByCandidateId[candidate.candidateId] ?? candidate.status;
         if (candidate.kind === 'dust_spot' && candidateDecision !== 'accepted') {
-          handleAcceptDustCandidate(frame, candidate);
+          const dustHealImageSize = resolveDustHealImageSize(frame.frameId);
+          nextState = applyDustCandidateDecisionTransition({
+            candidate,
+            decision: 'accepted',
+            frameId: frame.frameId,
+            imageHeight: dustHealImageSize.imageHeight,
+            imageWidth: dustHealImageSize.imageWidth,
+            state: nextState,
+          });
         }
       }
     }
+    setDustHealLayerByCandidateId(nextState.healLayerByCandidateId);
+    setDustCandidateDecisionById(nextState.decisionByCandidateId);
   };
   const handleClearAcceptedDustCandidates = () => {
     setDustHealLayerByCandidateId({});
@@ -955,16 +970,19 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     });
   };
   const handleRejectDustCandidate = (candidate: NegativeLabDustScratchCandidate) => {
-    setDustHealLayerByCandidateId((previous) => {
-      const next: typeof previous = {};
-      for (const [candidateId, healLayer] of Object.entries(previous)) {
-        if (candidateId !== candidate.candidateId) {
-          next[candidateId] = healLayer;
-        }
-      }
-      return next;
+    const nextState = applyDustCandidateDecisionTransition({
+      candidate,
+      decision: 'rejected',
+      frameId: frameHealthReport.activeFrameId ?? 'negative-lab-frame-pending',
+      imageHeight: 1,
+      imageWidth: 1,
+      state: {
+        decisionByCandidateId: dustCandidateDecisionById,
+        healLayerByCandidateId: dustHealLayerByCandidateId,
+      },
     });
-    setDustCandidateDecisionById((previous) => ({ ...previous, [candidate.candidateId]: 'rejected' }));
+    setDustHealLayerByCandidateId(nextState.healLayerByCandidateId);
+    setDustCandidateDecisionById(nextState.decisionByCandidateId);
   };
   const batchDryRunPlanJson = useMemo(
     () =>
@@ -3517,7 +3535,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                         data-testid={`negative-lab-accept-dust-candidate-${candidate.candidateId}`}
                         disabled={!canAccept || candidateDecision === 'accepted'}
                         onClick={() => {
-                          handleAcceptDustCandidate(frame, candidate);
+                          handleAcceptDustCandidate(frame.frameId, candidate);
                         }}
                         type="button"
                       >
@@ -3573,6 +3591,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
 
   const renderQcProofReport = () => (
     <NegativeLabQcProofPanel
+      dustCandidateDecisionById={dustCandidateDecisionById}
+      onAcceptDustCandidate={handleAcceptDustCandidate}
+      onRejectDustCandidate={handleRejectDustCandidate}
       onToggleQcOverlay={handleToggleQcOverlay}
       qcDecisionByFrameId={qcDecisionByFrameId}
       qcOverlayVisibility={qcOverlayVisibility}

@@ -1931,7 +1931,7 @@ const retouchLayerRuntimeProvenanceV1Schema = z
       .string()
       .regex(/^fnv1a32:[0-9a-f]{8}$/u)
       .optional(),
-    proofSource: z.literal('mask_aware_retouch_runtime_fixture_v1'),
+    proofSource: z.enum(['mask_aware_retouch_runtime_fixture_v1', 'negative_lab_candidate_acceptance_v1']),
     provenanceVersion: z.literal(1),
     radiusPx: z.number().positive().max(4096).optional(),
     resolvedSourcePoint: layerMaskPointV1Schema.optional(),
@@ -1950,12 +1950,17 @@ export const layerMaskCloneSourceV1Schema = z
     alignmentErrorPx: z.number().min(0).optional(),
     candidateProvenance: z
       .object({
+        algorithmId: z.literal('local_heal_v1'),
         candidateId: z.string().trim().min(1),
         candidateKind: z.enum(['dust_spot', 'emulsion_scratch']),
+        changedPixelCount: z.number().int().positive(),
         confidence: z.number().min(0).max(1),
         confidenceSemantics: z.literal('ranking_score_v1'),
         origin: z.literal('negative_lab_dust_candidate'),
+        outputHash: z.string().regex(/^fnv1a32:[0-9a-f]{8}$/u),
+        outputSampleHash: z.string().regex(/^fnv1a32:[0-9a-f]{8}$/u),
         sourceFrameId: z.string().trim().min(1),
+        sourceSampleHash: z.string().regex(/^fnv1a32:[0-9a-f]{8}$/u),
         statusAtAcceptance: z.enum(['acknowledged', 'ignored', 'pending']),
       })
       .strict()

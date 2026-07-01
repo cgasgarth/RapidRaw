@@ -501,12 +501,17 @@ export interface MaskContainer {
 }
 
 export interface RetouchCandidateProvenance {
+  algorithmId: 'local_heal_v1';
   candidateId: string;
   candidateKind: 'dust_spot' | 'emulsion_scratch';
+  changedPixelCount: number;
   confidence: number;
   confidenceSemantics: 'ranking_score_v1';
   origin: 'negative_lab_dust_candidate';
+  outputHash: string;
+  outputSampleHash: string;
   sourceFrameId: string;
+  sourceSampleHash: string;
   statusAtAcceptance: 'acknowledged' | 'ignored' | 'pending';
 }
 
@@ -519,7 +524,7 @@ export interface RetouchLayerRuntimeProvenance {
   mode: 'clone' | 'heal' | 'remove';
   outputHash: string;
   outputSampleHash?: string | undefined;
-  proofSource: 'mask_aware_retouch_runtime_fixture_v1';
+  proofSource: 'mask_aware_retouch_runtime_fixture_v1' | 'negative_lab_candidate_acceptance_v1';
   provenanceVersion: 1;
   radiusPx?: number | undefined;
   resolvedSourcePoint?:

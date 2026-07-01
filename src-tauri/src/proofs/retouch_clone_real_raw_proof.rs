@@ -361,6 +361,18 @@ fn run_private_retouch_clone_real_raw_proof(
                 false,
             ),
             metric(
+                "negative_lab_candidate_heal_changed_pixel_ratio",
+                heal_changed_pixel_ratio,
+                0.000_001,
+                true,
+            ),
+            metric(
+                "negative_lab_candidate_heal_preview_export_mean_abs_delta",
+                heal_preview_export_mean_abs_delta,
+                0.0,
+                false,
+            ),
+            metric(
                 "dust_candidate_precision",
                 candidate_precision,
                 0.999_999,
@@ -444,6 +456,7 @@ fn run_private_retouch_clone_real_raw_proof(
             proves: vec![
                 "native RAW decode can render a clone retouch layer".to_string(),
                 "native RAW decode can render a heal retouch layer".to_string(),
+                "accepted Negative Lab dust candidates remain editable heal layers while changing preview and export pixels".to_string(),
                 "native RAW decode can render a resolved-source remove retouch layer".to_string(),
                 "preview and export use the same clone/heal/remove retouch output".to_string(),
                 "private RAW dust heal benchmark reports accepted correction precision and protected-region damage"
@@ -460,7 +473,7 @@ fn run_private_retouch_clone_real_raw_proof(
             render_path: "process_image_for_export_pipeline_with_tonemapper_override".to_string(),
             retouch_path: "retouch_render::apply_clone_retouch_layers".to_string(),
         },
-        source_issue: 3770,
+        source_issue: 4709,
         validation_mode: "private_raw_native_clone_heal_remove_retouch_preview_export_proof"
             .to_string(),
     };
@@ -715,6 +728,37 @@ fn retouch_heal_adjustments(image_width: u32, image_height: u32) -> Value {
             "opacity": 100,
             "adjustments": {},
             "retouchCloneSource": {
+                "candidateProvenance": {
+                    "algorithmId": "local_heal_v1",
+                    "candidateId": "negative_lab_dust_candidate_private_raw_001",
+                    "candidateKind": "dust_spot",
+                    "changedPixelCount": 257,
+                    "confidence": 0.92,
+                    "confidenceSemantics": "ranking_score_v1",
+                    "origin": "negative_lab_dust_candidate",
+                    "outputHash": "fnv1a32:9e2d410f",
+                    "outputSampleHash": "fnv1a32:63ac0172",
+                    "sourceFrameId": "negative-lab-frame-private-001",
+                    "sourceSampleHash": "fnv1a32:34f64dd7",
+                    "statusAtAcceptance": "acknowledged"
+                },
+                "provenance": {
+                    "algorithmId": "local_heal_v1",
+                    "changedPixelCount": 257,
+                    "editableLayer": true,
+                    "featherRadiusPx": radius * 0.25,
+                    "maskAlphaHash": "fnv1a32:a42b9c11",
+                    "mode": "heal",
+                    "outputHash": "fnv1a32:9e2d410f",
+                    "outputSampleHash": "fnv1a32:63ac0172",
+                    "proofSource": "negative_lab_candidate_acceptance_v1",
+                    "provenanceVersion": 1,
+                    "radiusPx": radius,
+                    "sourcePoint": { "x": 0.46, "y": 0.48 },
+                    "sourceSampleHash": "fnv1a32:34f64dd7",
+                    "targetMaskId": "submask.heal-native-proof-target.v1",
+                    "targetPoint": { "x": 0.62, "y": 0.48 }
+                },
                 "retouchMode": "heal",
                 "sourcePoint": { "x": 0.46, "y": 0.48 },
                 "targetPoint": { "x": 0.62, "y": 0.48 },
