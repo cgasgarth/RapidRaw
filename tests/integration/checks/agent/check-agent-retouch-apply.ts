@@ -92,6 +92,27 @@ try {
 }
 if (!staleRejected) throw new Error('agent.retouch.apply did not reject stale recipe hash.');
 
+let noOpRejected = false;
+try {
+  applyAgentRetouch({
+    expectedRecipeHash: initialSnapshot.initialPreview.recipeHash,
+    layerId: 'agent_clone_no_op',
+    mode: 'clone',
+    operationId: 'clone_no_op',
+    radiusPx: 44,
+    requestId: 'clone-no-op',
+    sessionId: 'agent-retouch-3163',
+    sourcePoint: { x: 0.55, y: 0.52 },
+    targetPoint: { x: 0.55, y: 0.52 },
+  });
+} catch {
+  noOpRejected = true;
+}
+if (!noOpRejected) throw new Error('agent.retouch.apply did not reject no-op runtime output.');
+if (useEditorStore.getState().historyIndex !== 0) {
+  throw new Error('agent.retouch.apply no-op rejection must not create history.');
+}
+
 const cloneResult = applyAgentRetouch({
   expectedRecipeHash: initialSnapshot.initialPreview.recipeHash,
   layerId: 'agent_clone_spot',
@@ -132,6 +153,17 @@ if (
 ) {
   throw new Error('agent.retouch.apply clone did not return a complete overlay preview receipt.');
 }
+if (
+  !cloneResult.outputProof.changedOutput ||
+  !cloneResult.outputProof.previewApplyParity ||
+  cloneResult.outputProof.previewDelta.status !== 'changed' ||
+  cloneResult.outputProof.applyDelta.changedPixelCount <= 0 ||
+  cloneResult.outputProof.previewDelta.maskAware !== true ||
+  cloneResult.outputProof.previewDelta.maskAlphaHash !== cloneResult.outputProof.maskAlphaHash ||
+  cloneResult.outputProof.previewDelta.mode !== 'clone'
+) {
+  throw new Error('agent.retouch.apply clone did not return mask-aware changed output proof.');
+}
 
 resetEditor();
 const removeSnapshot = buildAgentImageContextSnapshot();
@@ -165,6 +197,15 @@ if (
   removeResult.overlayPreview.renderHash !== removeResult.afterPreviewHash
 ) {
   throw new Error('agent.retouch.apply remove did not return a complete overlay preview receipt.');
+}
+if (
+  !removeResult.outputProof.changedOutput ||
+  removeResult.outputProof.previewDelta.mode !== 'remove' ||
+  removeResult.outputProof.previewDelta.targetMaskId !== removeResult.overlayMaskId ||
+  removeResult.outputProof.resolvedRemoveSourceStatus !== 'ready' ||
+  removeResult.outputProof.applyDelta.meanAbsDelta <= 0
+) {
+  throw new Error('agent.retouch.apply remove did not return mask-aware remove output proof.');
 }
 
 const route = buildRawEngineAppServerRouteCatalog().find(

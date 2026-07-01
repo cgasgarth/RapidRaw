@@ -97,9 +97,29 @@ export const layerBlendResolvedRemoveSourceSchema = z
   })
   .strict();
 
+export const layerBlendOutputDeltaSchema = z
+  .object({
+    afterHash: z.string().regex(/^fnv1a32:[0-9a-f]{8}$/u),
+    beforeHash: z.string().regex(/^fnv1a32:[0-9a-f]{8}$/u),
+    changedPixelCount: z.number().int().nonnegative(),
+    changedPixelRatio: z.number().min(0).max(1),
+    featherEdgeSmoothness: z.number().min(0).max(1),
+    id: z.string().trim().min(1),
+    maskAlphaHash: z.string().regex(/^fnv1a32:[0-9a-f]{8}$/u),
+    maskAware: z.literal(true),
+    maskRegionChangedPixelRatio: z.number().min(0).max(1),
+    meanAbsDelta: z.number().nonnegative(),
+    mode: z.enum(['blend', 'clone', 'heal', 'remove']),
+    status: z.enum(['changed', 'no_op']),
+    targetMaskId: z.string().trim().min(1).optional(),
+    touchedPixels: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export const layerBlendStackRenderSchema = z
   .object({
     coverageByLayer: z.array(layerBlendCoverageSchema),
+    outputDeltaByLayer: z.array(layerBlendOutputDeltaSchema),
     pixels: z.array(layerRgbPixelSchema).min(1),
     resolvedRemoveSources: z.array(layerBlendResolvedRemoveSourceSchema),
   })
@@ -111,6 +131,7 @@ export type LayerBlendStackInput = z.infer<typeof layerBlendStackInputSchema>;
 export type LayerBlendStackRender = z.infer<typeof layerBlendStackRenderSchema>;
 export type LayerBlendMode = LayerBlendStackLayer['blendMode'];
 export type LayerBlendResolvedRemoveSource = z.infer<typeof layerBlendResolvedRemoveSourceSchema>;
+export type LayerBlendOutputDelta = z.infer<typeof layerBlendOutputDeltaSchema>;
 
 const clamp01 = (value: number): number => {
   if (!Number.isFinite(value)) return 0;
@@ -122,6 +143,8 @@ const clampByte = (value: number): number => {
   return Math.max(0, Math.min(255, Math.round(value)));
 };
 
+const roundMetric = (value: number): number => Number(value.toFixed(6));
+
 const hashRemoveSample = (label: 'output' | 'source', index: number, pixel: LayerRgbPixel): string => {
   let hash = 0x811c9dc5;
   for (const value of [label === 'source' ? 1 : 2, index, pixel.r, pixel.g, pixel.b]) {
@@ -131,6 +154,109 @@ const hashRemoveSample = (label: 'output' | 'source', index: number, pixel: Laye
     hash = Math.imul(hash, 0x01000193) >>> 0;
   }
   return `fnv1a32:${hash.toString(16).padStart(8, '0')}`;
+};
+
+const hashPixelSlice = (label: number, pixels: ReadonlyArray<LayerRgbPixel>): string => {
+  let hash = 0x811c9dc5;
+  const update = (value: number) => {
+    hash ^= value & 0xff;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+    hash ^= (value >>> 8) & 0xff;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  };
+  update(label);
+  for (const pixel of pixels) {
+    update(pixel.r);
+    update(pixel.g);
+    update(pixel.b);
+  }
+  return `fnv1a32:${hash.toString(16).padStart(8, '0')}`;
+};
+
+const hashMaskAlpha = (maskAlpha: ReadonlyArray<number> | undefined, pixelCount: number): string => {
+  let hash = 0x811c9dc5;
+  const update = (value: number) => {
+    hash ^= value & 0xff;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+    hash ^= (value >>> 8) & 0xff;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  };
+  for (let index = 0; index < pixelCount; index += 1) {
+    update(Math.round(clamp01(maskAlpha?.[index] ?? 1) * 65535));
+  }
+  return `fnv1a32:${hash.toString(16).padStart(8, '0')}`;
+};
+
+const maxPixelDelta = (before: LayerRgbPixel, after: LayerRgbPixel): number =>
+  Math.max(Math.abs(before.r - after.r), Math.abs(before.g - after.g), Math.abs(before.b - after.b));
+
+const meanPixelDelta = (before: LayerRgbPixel, after: LayerRgbPixel): number =>
+  (Math.abs(before.r - after.r) + Math.abs(before.g - after.g) + Math.abs(before.b - after.b)) / 3;
+
+const buildOutputDelta = ({
+  afterPixels,
+  alphaByIndex,
+  beforePixels,
+  layer,
+  pixelCount,
+}: {
+  afterPixels: ReadonlyArray<LayerRgbPixel>;
+  alphaByIndex: ReadonlyArray<number>;
+  beforePixels: ReadonlyArray<LayerRgbPixel>;
+  layer: LayerBlendStackLayer;
+  pixelCount: number;
+}): LayerBlendOutputDelta => {
+  let changedPixelCount = 0;
+  let touchedPixels = 0;
+  let changedTouchedPixels = 0;
+  let deltaSum = 0;
+  let featherSum = 0;
+  let featherSamples = 0;
+
+  for (let index = 0; index < pixelCount; index += 1) {
+    const before = beforePixels[index];
+    const after = afterPixels[index];
+    if (before === undefined || after === undefined) continue;
+
+    const alpha = clamp01(alphaByIndex[index] ?? 0);
+    const pixelDelta = maxPixelDelta(before, after);
+    if (pixelDelta > 0) changedPixelCount += 1;
+    if (alpha > 0) {
+      touchedPixels += 1;
+      deltaSum += meanPixelDelta(before, after);
+      if (pixelDelta > 0) changedTouchedPixels += 1;
+      if (alpha > 0 && alpha < 1) {
+        featherSum += alpha * (1 - alpha) * 4;
+        featherSamples += 1;
+      }
+    }
+  }
+
+  const mode =
+    layer.retouchRemoveSource !== undefined
+      ? 'remove'
+      : layer.retouchCloneSource?.retouchMode === 'heal'
+        ? 'heal'
+        : layer.retouchCloneSource !== undefined
+          ? 'clone'
+          : 'blend';
+
+  return layerBlendOutputDeltaSchema.parse({
+    afterHash: hashPixelSlice(2, afterPixels),
+    beforeHash: hashPixelSlice(1, beforePixels),
+    changedPixelCount,
+    changedPixelRatio: roundMetric(pixelCount === 0 ? 0 : changedPixelCount / pixelCount),
+    featherEdgeSmoothness: roundMetric(featherSamples === 0 ? 0 : featherSum / featherSamples),
+    id: layer.id,
+    maskAlphaHash: hashMaskAlpha(layer.maskAlpha, pixelCount),
+    maskAware: true,
+    maskRegionChangedPixelRatio: roundMetric(touchedPixels === 0 ? 0 : changedTouchedPixels / touchedPixels),
+    meanAbsDelta: roundMetric(touchedPixels === 0 ? 0 : deltaSum / touchedPixels),
+    mode,
+    status: changedPixelCount > 0 ? 'changed' : 'no_op',
+    ...(layer.retouchRemoveSource === undefined ? {} : { targetMaskId: layer.retouchRemoveSource.targetMaskId }),
+    touchedPixels,
+  });
 };
 
 const blendChannel = (base: number, source: number, mode: LayerBlendMode): number => {
@@ -310,6 +436,7 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
     r: clampByte(pixel.r),
   }));
   const coverageByLayer: LayerBlendStackRender['coverageByLayer'] = [];
+  const outputDeltaByLayer: LayerBlendStackRender['outputDeltaByLayer'] = [];
   const resolvedRemoveSources: LayerBlendStackRender['resolvedRemoveSources'] = [];
 
   for (const layer of parsedInput.layers) {
@@ -317,6 +444,8 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
     if (!layer.visible || opacity === 0) continue;
 
     let touchedPixels = 0;
+    const beforeLayerPixels = pixels.map((pixel) => ({ ...pixel }));
+    const alphaByIndex = Array.from({ length: pixelCount }, () => 0);
     const isRetouchLayer = layer.retouchCloneSource !== undefined || layer.retouchRemoveSource !== undefined;
     const retouchBasePixels = isRetouchLayer ? pixels.map((pixel) => ({ ...pixel })) : null;
     const removePlan =
@@ -415,6 +544,7 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
               );
       const alpha = opacity * clamp01(layer.maskAlpha?.[index] ?? 1) * retouchAlpha;
       if (alpha === 0) continue;
+      alphaByIndex[index] = alpha;
       pixels[index] = blendPixel(base, source, layer.blendMode, alpha);
       touchedPixels += 1;
     }
@@ -442,9 +572,18 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
     }
 
     coverageByLayer.push({ id: layer.id, opacity, touchedPixels });
+    outputDeltaByLayer.push(
+      buildOutputDelta({
+        afterPixels: pixels,
+        alphaByIndex,
+        beforePixels: beforeLayerPixels,
+        layer,
+        pixelCount,
+      }),
+    );
   }
 
-  return layerBlendStackRenderSchema.parse({ coverageByLayer, pixels, resolvedRemoveSources });
+  return layerBlendStackRenderSchema.parse({ coverageByLayer, outputDeltaByLayer, pixels, resolvedRemoveSources });
 }
 
 export const renderLayerPreviewStack = renderLayerBlendStack;
