@@ -31,11 +31,11 @@ owner, reason, and expiration condition.
 | Asset class              | Raw warning     | Gzip warning  | Raw failure     | Gzip failure  |
 | ------------------------ | --------------- | ------------- | --------------- | ------------- |
 | Largest JavaScript asset | 2,764,800 bytes | 810,000 bytes | 3,072,000 bytes | 900,000 bytes |
-| Largest CSS asset        | 138,240 bytes   | 22,118 bytes  | 153,600 bytes   | 24,576 bytes  |
+| Largest CSS asset        | 147,456 bytes   | 23,962 bytes  | 163,840 bytes   | 26,624 bytes  |
 
 | Aggregate               | Raw warning     | Gzip warning  | Raw failure     | Gzip failure  |
 | ----------------------- | --------------- | ------------- | --------------- | ------------- |
-| Initial entry aggregate | 2,903,040 bytes | 832,118 bytes | 3,225,600 bytes | 924,576 bytes |
+| Initial entry aggregate | 2,912,256 bytes | 833,962 bytes | 3,235,840 bytes | 926,624 bytes |
 
 Vite warning limit: 3,000 KiB.
 
