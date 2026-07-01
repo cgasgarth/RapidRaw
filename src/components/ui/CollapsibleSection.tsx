@@ -1,30 +1,48 @@
 import cx from 'clsx';
-import { ChevronDown, Eye, EyeOff } from 'lucide-react';
+import { ChevronDown, Eye, EyeOff, type LucideIcon, MoreHorizontal } from 'lucide-react';
 import { type KeyboardEvent, type MouseEvent, type MouseEventHandler, type ReactNode, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextVariants, TextWeights } from '../../types/typography';
 import { inspectorSectionTokens } from './inspectorTokens';
 import UiText from './primitives/Text';
 
+export interface CollapsibleSectionHeaderAction {
+  className?: string;
+  disabled?: boolean;
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  pressed?: boolean;
+  testId?: string;
+}
+
 interface CollapsibleSectionProps {
+  actionsMenuLabel?: string;
+  actionsMenuTestId?: string;
   canToggleVisibility?: boolean;
   children: ReactNode;
+  headerActions?: CollapsibleSectionHeaderAction[];
   isContentVisible: boolean;
   isDirty?: boolean;
   isOpen: boolean;
   onContextMenu?: MouseEventHandler<HTMLDivElement>;
+  onOpenActionsMenu?: (x: number, y: number) => void;
   onToggle: () => void;
   onToggleVisibility?: () => void;
   title: string;
 }
 
 export default function CollapsibleSection({
+  actionsMenuLabel,
+  actionsMenuTestId,
   canToggleVisibility = true,
   children,
+  headerActions = [],
   isContentVisible,
   isDirty = false,
   isOpen,
   onContextMenu,
+  onOpenActionsMenu,
   onToggle,
   onToggleVisibility = () => {},
   title,
@@ -64,7 +82,32 @@ export default function CollapsibleSection({
     onToggleVisibility();
   };
 
+  const handleActionClick = (event: MouseEvent<HTMLButtonElement>, action: CollapsibleSectionHeaderAction) => {
+    event.stopPropagation();
+    if (action.disabled) {
+      return;
+    }
+    action.onClick();
+  };
+
+  const handleMenuClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    onOpenActionsMenu?.(rect.left, rect.bottom + 4);
+  };
+
+  const handleActionKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+  };
+
   const handleHeaderKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.shiftKey && event.key === 'F10' && onOpenActionsMenu) {
+      event.preventDefault();
+      const rect = event.currentTarget.getBoundingClientRect();
+      onOpenActionsMenu(rect.left, rect.bottom + 4);
+      return;
+    }
+
     if (event.key !== 'Enter' && event.key !== ' ') {
       return;
     }
@@ -103,6 +146,35 @@ export default function CollapsibleSection({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {headerActions.length > 0 && (
+            <div className={inspectorSectionTokens.headerActions}>
+              {headerActions.map((action) => {
+                const Icon = action.icon;
+                return (
+                  <button
+                    aria-label={action.label}
+                    aria-pressed={action.pressed}
+                    className={cx(
+                      inspectorSectionTokens.headerActionButton,
+                      action.disabled && 'cursor-not-allowed opacity-50',
+                      action.className,
+                    )}
+                    data-tooltip={action.label}
+                    data-testid={action.testId}
+                    disabled={action.disabled ?? false}
+                    key={action.label}
+                    onClick={(event) => {
+                      handleActionClick(event, action);
+                    }}
+                    onKeyDown={handleActionKeyDown}
+                    type="button"
+                  >
+                    <Icon size={14} />
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {canToggleVisibility && (
             <div className={inspectorSectionTokens.visibilitySlot}>
               <button
@@ -113,6 +185,7 @@ export default function CollapsibleSection({
                 }
                 aria-pressed={!isContentVisible}
                 className={cx(inspectorSectionTokens.visibilityButton, !isContentVisible && 'text-accent')}
+                onKeyDown={handleActionKeyDown}
                 onClick={handleVisibilityClick}
                 data-tooltip={
                   isContentVisible
@@ -121,6 +194,21 @@ export default function CollapsibleSection({
                 }
               >
                 {isContentVisible ? <Eye size={16} /> : <EyeOff size={16} />}
+              </button>
+            </div>
+          )}
+          {onOpenActionsMenu && (
+            <div className={inspectorSectionTokens.actionsMenuSlot}>
+              <button
+                aria-label={actionsMenuLabel ?? title}
+                className={inspectorSectionTokens.headerActionButton}
+                data-tooltip={actionsMenuLabel ?? title}
+                data-testid={actionsMenuTestId}
+                onClick={handleMenuClick}
+                onKeyDown={handleActionKeyDown}
+                type="button"
+              >
+                <MoreHorizontal size={14} />
               </button>
             </div>
           )}

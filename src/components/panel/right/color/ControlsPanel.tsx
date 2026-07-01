@@ -41,7 +41,7 @@ import CurveGraph from '../../../adjustments/Curves';
 import DetailsPanel from '../../../adjustments/Details';
 import EffectsPanel from '../../../adjustments/Effects';
 import { OPTION_SEPARATOR, type Option } from '../../../ui/AppProperties';
-import CollapsibleSection from '../../../ui/CollapsibleSection';
+import CollapsibleSection, { type CollapsibleSectionHeaderAction } from '../../../ui/CollapsibleSection';
 import Dropdown, { type OptionItem } from '../../../ui/primitives/Dropdown';
 import UiText from '../../../ui/primitives/Text';
 import PanelScopesStrip from '../inspector/PanelScopesStrip';
@@ -52,6 +52,10 @@ type RawProcessingModeOverrideOption = RawProcessingMode | 'inherit';
 type CollapsibleSectionsUpdater =
   | CollapsibleSectionsState
   | ((prev: CollapsibleSectionsState) => CollapsibleSectionsState);
+interface AdjustmentSectionActions {
+  headerActions: CollapsibleSectionHeaderAction[];
+  menuOptions: Option[];
+}
 
 const ADJUSTMENT_SECTION_LABEL_FALLBACKS: Record<AdjustmentSectionName, string> = {
   basic: 'Basic Tone',
@@ -93,6 +97,20 @@ const getAdjustmentSectionLabel = (t: TFunction, sectionName: AdjustmentSectionN
       defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS[sectionName],
     }),
   );
+
+const toHeaderAction = (option: Option, testId: string): CollapsibleSectionHeaderAction | null => {
+  if (option.type === OPTION_SEPARATOR || !option.icon || !option.label || !option.onClick) {
+    return null;
+  }
+
+  return {
+    ...(option.disabled !== undefined ? { disabled: option.disabled } : {}),
+    icon: option.icon,
+    label: option.label,
+    onClick: option.onClick,
+    testId,
+  };
+};
 
 export default function Controls() {
   const { t } = useTranslation();
@@ -273,10 +291,7 @@ export default function Controls() {
     });
   };
 
-  const handleSectionContextMenu = (event: MouseEvent<HTMLDivElement>, sectionName: AdjustmentSectionName) => {
-    event.preventDefault();
-    event.stopPropagation();
-
+  const buildSectionActions = (sectionName: AdjustmentSectionName): AdjustmentSectionActions => {
     const sectionKeys = ADJUSTMENT_SECTIONS[sectionName];
 
     const handleCopy = () => {
@@ -319,22 +334,47 @@ export default function Controls() {
       ? t('editor.adjustments.actions.pasteLabel', { section: translatedSection })
       : t('editor.adjustments.actions.pasteSettings');
 
-    const options: Option[] = [
-      {
-        label: t('editor.adjustments.actions.copySectionSettings', { section: translatedSection }),
-        icon: Copy,
-        onClick: handleCopy,
-      },
-      { label: pasteLabel, icon: ClipboardPaste, onClick: handlePaste, disabled: !isPasteAllowed },
-      { type: OPTION_SEPARATOR },
-      {
-        label: t('editor.adjustments.actions.resetSectionSettings', { section: translatedSection }),
-        icon: RotateCcw,
-        onClick: handleReset,
-      },
-    ];
+    const copyOption: Option = {
+      label: t('editor.adjustments.actions.copySectionSettings', { section: translatedSection }),
+      icon: Copy,
+      onClick: handleCopy,
+    };
+    const pasteOption: Option = {
+      label: pasteLabel,
+      icon: ClipboardPaste,
+      onClick: handlePaste,
+      disabled: !isPasteAllowed,
+    };
+    const resetOption: Option = {
+      label: t('editor.adjustments.actions.resetSectionSettings', { section: translatedSection }),
+      icon: RotateCcw,
+      onClick: handleReset,
+    };
+    const menuOptions: Option[] = [copyOption, pasteOption, { type: OPTION_SEPARATOR }, resetOption];
 
-    showContextMenu(event.clientX, event.clientY, options);
+    return {
+      headerActions: (
+        [
+          [copyOption, 'copy'],
+          [pasteOption, 'paste'],
+          [resetOption, 'reset'],
+        ] satisfies Array<[Option, string]>
+      ).flatMap(([option, actionName]) => {
+        const action = toHeaderAction(option, `adjustments-section-${sectionName}-action-${String(actionName)}`);
+        return action ? [action] : [];
+      }),
+      menuOptions,
+    };
+  };
+
+  const openSectionActionsMenu = (x: number, y: number, sectionName: AdjustmentSectionName) => {
+    showContextMenu(x, y, buildSectionActions(sectionName).menuOptions);
+  };
+
+  const handleSectionContextMenu = (event: MouseEvent<HTMLDivElement>, sectionName: AdjustmentSectionName) => {
+    event.preventDefault();
+    event.stopPropagation();
+    openSectionActionsMenu(event.clientX, event.clientY, sectionName);
   };
 
   const renderSectionComponent = (sectionName: AdjustmentSectionName): ReactNode => {
@@ -576,10 +616,14 @@ export default function Controls() {
         {ADJUSTMENT_SECTION_NAMES.map((sectionName) => {
           const title = getAdjustmentSectionLabel(t, sectionName);
           const sectionVisibility = adjustments.sectionVisibility;
+          const sectionActions = buildSectionActions(sectionName);
 
           return (
             <div className="shrink-0 group" data-testid={`adjustments-section-${sectionName}`} key={sectionName}>
               <CollapsibleSection
+                actionsMenuLabel={sectionActions.headerActions.map((action) => action.label).join(', ')}
+                actionsMenuTestId={`adjustments-section-${sectionName}-actions-menu`}
+                headerActions={sectionActions.headerActions}
                 isContentVisible={sectionVisibility[sectionName]}
                 isDirty={hasAdjustmentValueChanges(ADJUSTMENT_SECTIONS[sectionName], adjustments)}
                 isOpen={collapsibleSectionsState[sectionName]}
@@ -588,6 +632,9 @@ export default function Controls() {
                 }}
                 onToggle={() => {
                   handleToggleSection(sectionName);
+                }}
+                onOpenActionsMenu={(x, y) => {
+                  showContextMenu(x, y, sectionActions.menuOptions);
                 }}
                 onToggleVisibility={() => {
                   handleToggleVisibility(sectionName);

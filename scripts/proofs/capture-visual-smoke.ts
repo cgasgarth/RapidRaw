@@ -1002,6 +1002,8 @@ async function assertAdjustmentsPanelRetune(page) {
     throw new Error(`Adjustments panel retune expected no Color section, found ${colorSectionCount}.`);
   }
 
+  await assertAdjustmentSectionHeaderActions(page, panel);
+
   const rawProcessingControl = panel.getByTestId('raw-processing-mode-override-control');
   await rawProcessingControl.waitFor({ timeout: 10_000 });
   const rawProcessingToggle = rawProcessingControl.locator('button[aria-expanded]').first();
@@ -1032,6 +1034,104 @@ async function assertAdjustmentsPanelRetune(page) {
   }
   if (scopesBounds.height < 180 || scopesBounds.height > 260) {
     throw new Error(`Adjustments scopes strip should use compact default height, got ${scopesBounds.height}.`);
+  }
+}
+
+async function assertAdjustmentSectionHeaderActions(page, panel) {
+  const section = panel.getByTestId('adjustments-section-basic');
+  const header = section.locator('[role="button"][aria-expanded]').first();
+  const copyAction = section.getByTestId('adjustments-section-basic-action-copy');
+  const pasteAction = section.getByTestId('adjustments-section-basic-action-paste');
+  const resetAction = section.getByTestId('adjustments-section-basic-action-reset');
+  const menuAction = section.getByTestId('adjustments-section-basic-actions-menu');
+  await header.waitFor({ timeout: 10_000 });
+  await copyAction.waitFor({ timeout: 10_000 });
+  await pasteAction.waitFor({ timeout: 10_000 });
+  await resetAction.waitFor({ timeout: 10_000 });
+  await menuAction.waitFor({ timeout: 10_000 });
+
+  const startingExpanded = await header.getAttribute('aria-expanded');
+  if (startingExpanded !== 'true') {
+    throw new Error(`Basic section should start open before action checks, got ${startingExpanded}.`);
+  }
+
+  const headerBoundsBefore = await header.boundingBox();
+  const hiddenOpacity = await copyAction.evaluate((button) => {
+    const actionGroup = button.parentElement;
+    return actionGroup === null ? '' : getComputedStyle(actionGroup).opacity;
+  });
+  if (hiddenOpacity !== '0') {
+    throw new Error(`Section header actions should be hidden before hover/focus, opacity=${hiddenOpacity}.`);
+  }
+
+  await header.focus();
+  await page.keyboard.press('Tab');
+  const focusedActionId = await page.evaluate(() => document.activeElement?.getAttribute('data-testid'));
+  if (focusedActionId !== 'adjustments-section-basic-action-copy') {
+    throw new Error(`Expected Tab from section header to focus copy action, got ${focusedActionId ?? '<none>'}.`);
+  }
+  await waitForActionGroupOpacity(page, 'adjustments-section-basic-action-copy', 0.95, 'keyboard focus');
+  await page.keyboard.press('Enter');
+  const expandedAfterKeyedCopy = await header.getAttribute('aria-expanded');
+  if (expandedAfterKeyedCopy !== 'true') {
+    throw new Error('Keyboard activation of copy action should not toggle the Basic section.');
+  }
+
+  await pasteAction.evaluate((button) => {
+    if (!(button instanceof HTMLButtonElement) || button.disabled) {
+      throw new Error('Compatible copied Basic settings should enable the paste action.');
+    }
+  });
+
+  await section.hover();
+  await waitForActionGroupOpacity(page, 'adjustments-section-basic-action-copy', 0.95, 'hover');
+  const headerBoundsAfterHover = await header.boundingBox();
+  if (
+    !headerBoundsBefore ||
+    !headerBoundsAfterHover ||
+    Math.abs(headerBoundsBefore.width - headerBoundsAfterHover.width) > 1 ||
+    Math.abs(headerBoundsBefore.height - headerBoundsAfterHover.height) > 1
+  ) {
+    throw new Error('Section header action reveal should not resize the Basic header.');
+  }
+
+  await resetAction.click();
+  const expandedAfterResetClick = await header.getAttribute('aria-expanded');
+  if (expandedAfterResetClick !== 'true') {
+    throw new Error('Clicking reset action should not toggle the Basic section.');
+  }
+
+  await menuAction.click();
+  await page.getByRole('menuitem', { name: 'Copy Basic Tone Settings' }).first().waitFor({ timeout: 10_000 });
+  await page.keyboard.press('Escape');
+  await page.getByRole('menu').waitFor({ state: 'hidden', timeout: 10_000 });
+
+  await header.focus();
+  await page.keyboard.press('Shift+F10');
+  await page.getByRole('menuitem', { name: 'Reset Basic Tone Settings' }).first().waitFor({ timeout: 10_000 });
+  await page.keyboard.press('Escape');
+}
+
+async function waitForActionGroupOpacity(page, testId, minimumOpacity, reason) {
+  await page.waitForFunction(
+    ({ minimumOpacity, testId }) => {
+      const button = document.querySelector(`[data-testid="${testId}"]`);
+      const actionGroup = button?.parentElement;
+      return (
+        actionGroup !== undefined &&
+        actionGroup !== null &&
+        Number(getComputedStyle(actionGroup).opacity) >= minimumOpacity
+      );
+    },
+    { minimumOpacity, testId },
+    { timeout: 10_000 },
+  );
+  const opacity = await page.getByTestId(testId).evaluate((button) => {
+    const actionGroup = button.parentElement;
+    return actionGroup === null ? '' : getComputedStyle(actionGroup).opacity;
+  });
+  if (Number(opacity) < minimumOpacity) {
+    throw new Error(`Section header actions should be visible on ${reason}, opacity=${opacity}.`);
   }
 }
 
