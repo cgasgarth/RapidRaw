@@ -108,6 +108,7 @@ export const buildSuperResolutionArtifactSidecarRecordV1 = ({
     outputArtifact,
     outputColorSpace: resolvedOutputColorSpace,
     previewArtifacts,
+    measuredReview: provenance.measuredReview,
     supportMap: {
       artifactId: provenance.supportMap.artifactId,
       coverageRatio: provenance.supportMap.coverageRatio,
@@ -136,8 +137,10 @@ export const buildSuperResolutionArtifactSidecarRecordV1 = ({
       actualPeakMemoryBytes,
       actualRuntimeMs,
       alignmentConfidence: averageRegistrationConfidence(provenance),
-      expectedDetailGainRatio: provenance.effectiveOutputScale,
-      falseDetailRisk: provenance.changedPixelRatioAgainstNearest < 0.2 ? 'medium' : 'low',
+      downscaleReconstructionError: provenance.measuredReview.downscaleReconstructionError,
+      expectedDetailGainRatio: provenance.measuredReview.detailGainRatio,
+      falseDetailRisk: provenance.measuredReview.falseDetailRisk,
+      falseDetailRiskScore: provenance.measuredReview.falseDetailRiskScore,
       humanReviewStatus,
       overlapCoverageRatio: provenance.confidenceMap.completeSampleRatio,
       registrationMetrics: summarizeRegistrationMetrics(provenance),
@@ -301,7 +304,7 @@ const deriveWarningCodes = (
   provenance: SuperResolutionRuntimeProvenanceV1,
 ): SuperResolutionArtifactV1['warningCodes'] => {
   const warnings: SuperResolutionArtifactV1['warningCodes'] = [];
-  if (provenance.changedPixelRatioAgainstNearest < 0.2) warnings.push('texture_risk');
+  if (provenance.measuredReview.falseDetailRisk !== 'low') warnings.push('texture_risk');
   if (provenance.detailPolicy === 'aggressive_preview_only') warnings.push('aggressive_preview_only');
   if (provenance.supportMap.downgradeReason !== undefined) warnings.push('effective_scale_downgraded');
   if (provenance.supportMap.weakSupportRatio > 0.25) warnings.push('low_overlap_coverage');

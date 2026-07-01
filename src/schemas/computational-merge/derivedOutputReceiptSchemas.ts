@@ -46,6 +46,15 @@ const derivedOutputPanoramaMetadataSchema = z
           })
           .strict(),
         effectiveMode: z.enum(['auto_crop', 'manual_crop', 'transparent']),
+        fillColor: z
+          .object({
+            alpha: z.number().min(0).max(1),
+            blue: z.number().min(0).max(1),
+            green: z.number().min(0).max(1),
+            red: z.number().min(0).max(1),
+          })
+          .strict()
+          .optional(),
         manualCropInsetsPercent: z
           .object({
             bottom: z.number().min(0).max(40),

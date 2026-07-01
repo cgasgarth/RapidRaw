@@ -53,6 +53,15 @@ const panoramaPlanDimensionsSchema = z
   })
   .strict();
 
+const panoramaBoundaryFillColorSchema = z
+  .object({
+    alpha: z.number().min(0).max(1),
+    blue: z.number().min(0).max(1),
+    green: z.number().min(0).max(1),
+    red: z.number().min(0).max(1),
+  })
+  .strict();
+
 const panoramaPlanMemoryComponentsSchema = z
   .object({
     low_detail_mask_bytes: z.number().int().nonnegative(),
@@ -210,6 +219,7 @@ export const panoramaRenderedReviewSchema = z
       .object({
         crop: panoramaRenderedReviewCropSchema,
         effective: panoramaUiBoundaryModeSchema,
+        fillColor: panoramaBoundaryFillColorSchema.optional(),
         requested: panoramaUiBoundaryModeSchema,
       })
       .strict(),
@@ -233,6 +243,7 @@ export type PanoramaRenderedReview = z.infer<typeof panoramaRenderedReviewSchema
 
 export const panoramaSavedReviewSummarySchema = z
   .object({
+    boundaryFillColor: panoramaBoundaryFillColorSchema.optional(),
     boundaryMode: panoramaUiBoundaryModeSchema,
     capabilityLevel: z.literal('runtime_apply_capable'),
     crop: panoramaRenderedReviewCropSchema,

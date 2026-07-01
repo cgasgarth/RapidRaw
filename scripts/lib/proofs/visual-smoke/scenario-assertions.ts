@@ -1873,8 +1873,11 @@ export async function prepareScenario(page, mode) {
     await page.getByRole('option', { name: 'Preview' }).click();
     await page.getByRole('button', { name: 'Feather', exact: false }).click();
     await page.getByTestId('panorama-boundary-option-auto_crop').click();
-    if (!(await page.getByTestId('panorama-boundary-option-transparent').isDisabled())) {
-      throw new Error('Unsupported transparent panorama boundary must be disabled.');
+    if (await page.getByTestId('panorama-boundary-option-transparent').isDisabled()) {
+      throw new Error('Transparent panorama boundary must stay enabled once runtime support lands.');
+    }
+    if (!(await page.getByTestId('panorama-boundary-option-manual_crop').isDisabled())) {
+      throw new Error('Deferred manual panorama crop must remain disabled until crop-rectangle runtime support lands.');
     }
     await page.getByRole('button', { name: 'Gain compensation' }).click();
     await page.getByRole('option', { name: 'None' }).click();

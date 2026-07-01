@@ -94,7 +94,7 @@ export function PanoramaModal({
     { label: t('modals.panorama.boundary.manualCrop'), value: 'manual_crop' },
   ];
   const supportedProjection = settings.projection === 'rectilinear' || settings.projection === 'cylindrical';
-  const supportedBoundary = settings.boundaryMode === 'auto_crop' || settings.boundaryMode === 'manual_crop';
+  const supportedBoundary = settings.boundaryMode === 'auto_crop' || settings.boundaryMode === 'transparent';
   const isEngineApplyReady = isSourceCountValid && supportedProjection && supportedBoundary;
   const exposureOptions: Array<OptionItem<PanoramaUiExposureMode>> = [
     { label: t('modals.panorama.exposure.gainCompensation'), value: 'gain_compensation' },
@@ -208,6 +208,11 @@ export function PanoramaModal({
     cropCoveragePercent === null
       ? t('modals.panorama.summaryBlocked')
       : t('modals.panorama.review.cropCoveragePercent', { value: cropCoveragePercent });
+  const runtimeBoundaryReviewLabel = !isEngineApplyReady
+    ? t('modals.panorama.review.engineCapabilityBlocked')
+    : settings.boundaryMode === 'transparent'
+      ? selectedBoundaryLabel
+      : t('modals.panorama.review.runtimeAutoCrop');
   const derivedOutputReceipt =
     savedReviewSummary === null
       ? null
@@ -387,6 +392,11 @@ export function PanoramaModal({
             <section
               className="mx-auto mt-4 grid max-w-2xl grid-cols-5 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-left"
               data-boundary-mode={savedReviewSummary.boundaryMode}
+              data-boundary-fill-color={
+                savedReviewSummary.boundaryFillColor
+                  ? `${savedReviewSummary.boundaryFillColor.red},${savedReviewSummary.boundaryFillColor.green},${savedReviewSummary.boundaryFillColor.blue},${savedReviewSummary.boundaryFillColor.alpha}`
+                  : ''
+              }
               data-capability-level={savedReviewSummary.capabilityLevel}
               data-crop-rectangle={`${savedReviewSummary.crop.x},${savedReviewSummary.crop.y},${savedReviewSummary.crop.width},${savedReviewSummary.crop.height}`}
               data-manual-crop-insets={`${settings.manualCropInsetsPercent.top},${settings.manualCropInsetsPercent.right},${settings.manualCropInsetsPercent.bottom},${settings.manualCropInsetsPercent.left}`}
@@ -968,7 +978,7 @@ export function PanoramaModal({
               </UiText>
               <div className="grid gap-2" data-testid="panorama-boundary-options">
                 {boundaryOptions.map((option) => {
-                  const isSupported = option.value === 'auto_crop' || option.value === 'manual_crop';
+                  const isSupported = option.value === 'auto_crop' || option.value === 'transparent';
                   const isSelected = settings.boundaryMode === option.value;
                   return (
                     <button
@@ -1066,11 +1076,11 @@ export function PanoramaModal({
                     aria-label={control.label}
                     className="w-full accent-accent"
                     data-testid={`panorama-manual-crop-${control.key}`}
+                    disabled={true}
                     max={40}
                     min={0}
                     onChange={(event) => {
                       setSetting({
-                        boundaryMode: 'manual_crop',
                         manualCropInsetsPercent: {
                           ...settings.manualCropInsetsPercent,
                           [control.key]: Number(event.target.value),
@@ -1164,9 +1174,7 @@ export function PanoramaModal({
                 {
                   label: t('modals.panorama.review.projectionCrop'),
                   status: isEngineApplyReady ? 'ready' : 'review',
-                  value: isEngineApplyReady
-                    ? t('modals.panorama.review.runtimeAutoCrop')
-                    : t('modals.panorama.review.engineCapabilityBlocked'),
+                  value: runtimeBoundaryReviewLabel,
                 },
               ]}
               sections={[
@@ -1224,9 +1232,7 @@ export function PanoramaModal({
                     },
                     {
                       label: t('modals.panorama.review.projectionCrop'),
-                      value: isEngineApplyReady
-                        ? t('modals.panorama.review.runtimeAutoCrop')
-                        : t('modals.panorama.review.engineCapabilityBlocked'),
+                      value: runtimeBoundaryReviewLabel,
                     },
                   ],
                 },

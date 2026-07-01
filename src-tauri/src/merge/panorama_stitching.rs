@@ -5,23 +5,21 @@ use crate::derived_output_provenance::{
     build_derived_output_provenance_sidecar, stable_hash,
 };
 use crate::file_management::parse_virtual_path;
-use base64::{Engine as _, engine::general_purpose};
+use crate::image_codecs::encode_png_data_url;
 use chrono::{DateTime, Utc};
-use image::ImageFormat;
-use image::{DynamicImage, GenericImageView, GrayImage, Rgb32FImage};
+use image::{DynamicImage, GenericImageView, GrayImage, Rgb32FImage, Rgba, RgbaImage};
 use nalgebra::Matrix3;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
-use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Runtime};
 use uuid::Uuid;
 
-use crate::formats::{is_raw_file, png_data_url};
+use crate::formats::is_raw_file;
 use crate::image_processing::apply_cpu_default_raw_processing;
 use crate::image_processing::{ImageMetadata, RawEngineArtifacts};
 use crate::panorama_utils::{processing, stitching};
@@ -238,6 +236,12 @@ pub struct PanoramaRenderResult {
     pub metadata: PanoramaRenderMetadata,
 }
 
+struct PanoramaBoundaryApplication {
+    crop: PanoramaCropMetadata,
+    effective_boundary_mode: PanoramaBoundaryModeOption,
+    image: DynamicImage,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PendingPanoramaSourceRef {
     pub image_path: String,
@@ -369,9 +373,9 @@ fn validate_panorama_stitch_options(options: &PanoramaStitchOptions) -> Result<(
                 .to_string(),
         );
     }
-    if options.boundary_mode != PanoramaBoundaryModeOption::AutoCrop {
+    if options.boundary_mode == PanoramaBoundaryModeOption::ManualCrop {
         return Err(
-            "Panorama engine currently supports auto-crop boundary handling only; transparent and manual crop are blocked until runtime support lands."
+            "Panorama engine currently supports auto-crop and transparent boundary handling; manual crop remains blocked until runtime crop-rectangle support lands."
                 .to_string(),
         );
     }
@@ -473,22 +477,13 @@ pub async fn stitch_panorama(
                     ((800.0 * w as f32 / h as f32).round() as u32, 800)
                 };
 
-                let preview_f32 = crate::image_processing::downscale_f32_image(
-                    &render_result.image,
-                    new_w,
-                    new_h,
-                );
+                let preview_image = if render_result.image.color().has_alpha() {
+                    render_result.image.thumbnail(new_w, new_h)
+                } else {
+                    crate::image_processing::downscale_f32_image(&render_result.image, new_w, new_h)
+                };
 
-                let preview_u8 = preview_f32.to_rgb8();
-
-                let mut buf = Cursor::new(Vec::new());
-
-                if let Err(e) = preview_u8.write_to(&mut buf, ImageFormat::Png) {
-                    return Err(format!("Failed to encode panorama preview: {}", e));
-                }
-
-                let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
-                let final_base64 = png_data_url(base64_str);
+                let final_base64 = encode_png_data_url(&preview_image)?;
                 let render_review = build_panorama_render_review(&render_result.metadata);
 
                 *panorama_result_handle.lock().unwrap() = Some(PendingPanoramaResult {
@@ -521,20 +516,25 @@ pub async fn stitch_panorama(
 }
 
 fn build_panorama_render_review(metadata: &PanoramaRenderMetadata) -> serde_json::Value {
-    json!({
-        "boundary": {
-            "crop": {
-                "height": metadata.crop.height,
-                "mode": metadata.crop.mode,
-                "preCropHeight": metadata.crop.pre_crop_height,
-                "preCropWidth": metadata.crop.pre_crop_width,
-                "width": metadata.crop.width,
-                "x": metadata.crop.x,
-                "y": metadata.crop.y,
-            },
-            "effective": metadata.effective_boundary_mode.as_str(),
-            "requested": metadata.requested_boundary_mode.as_str(),
+    let mut boundary = json!({
+        "crop": {
+            "height": metadata.crop.height,
+            "mode": metadata.crop.mode,
+            "preCropHeight": metadata.crop.pre_crop_height,
+            "preCropWidth": metadata.crop.pre_crop_width,
+            "width": metadata.crop.width,
+            "x": metadata.crop.x,
+            "y": metadata.crop.y,
         },
+        "effective": metadata.effective_boundary_mode.as_str(),
+        "requested": metadata.requested_boundary_mode.as_str(),
+    });
+    if let Some(fill_color) = panorama_boundary_fill_color(metadata.effective_boundary_mode) {
+        boundary["fillColor"] = fill_color;
+    }
+
+    json!({
+        "boundary": boundary,
         "capabilityLevel": "runtime_apply_capable",
         "outputDimensions": {
             "height": metadata.output_height,
@@ -976,13 +976,13 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
         &stitching_order.global_homographies,
         app_handle.clone(),
     )?;
-    let (panorama, crop) =
+    let boundary_application =
         apply_panorama_boundary_mode(stitch_result.image, &stitch_result.mask, &options)?;
 
     println!("Stitching completed in {:.2?}\n", start_time.elapsed());
 
     let _ = app_handle.emit(crate::events::PANORAMA_PROGRESS, "Finalizing panorama...");
-    let (output_width, output_height) = panorama.dimensions();
+    let (output_width, output_height) = boundary_application.image.dimensions();
     let connected_source_indices = stitching_order.ordered_indices.clone();
     let connected_source_set: HashSet<_> = connected_source_indices.iter().copied().collect();
     let excluded_source_indices: Vec<_> = image_data
@@ -995,8 +995,8 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
     let metadata = PanoramaRenderMetadata {
         blend_diagnostics: stitch_result.blend_diagnostics,
         connected_source_indices,
-        crop,
-        effective_boundary_mode: PanoramaBoundaryModeOption::AutoCrop,
+        crop: boundary_application.crop,
+        effective_boundary_mode: boundary_application.effective_boundary_mode,
         effective_projection: PanoramaProjectionOption::Rectilinear,
         estimated_peak_memory_bytes,
         excluded_source_indices,
@@ -1013,7 +1013,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
     };
 
     Ok(PanoramaRenderResult {
-        image: DynamicImage::ImageRgb32F(panorama),
+        image: boundary_application.image,
         metadata,
     })
 }
@@ -1050,14 +1050,29 @@ fn apply_panorama_boundary_mode(
     image: Rgb32FImage,
     mask: &GrayImage,
     options: &PanoramaStitchOptions,
-) -> Result<(Rgb32FImage, PanoramaCropMetadata), String> {
+) -> Result<PanoramaBoundaryApplication, String> {
     validate_panorama_stitch_options(options)?;
     let pre_crop_width = image.width();
     let pre_crop_height = image.height();
+    if options.boundary_mode == PanoramaBoundaryModeOption::Transparent {
+        return Ok(PanoramaBoundaryApplication {
+            crop: PanoramaCropMetadata {
+                height: pre_crop_height,
+                mode: "none".to_string(),
+                pre_crop_height,
+                pre_crop_width,
+                width: pre_crop_width,
+                x: 0,
+                y: 0,
+            },
+            effective_boundary_mode: PanoramaBoundaryModeOption::Transparent,
+            image: DynamicImage::ImageRgba8(apply_transparent_boundary_fill(&image, mask)),
+        });
+    }
+
     let Some((x, y, width, height)) = valid_pixel_bounds(mask) else {
-        return Ok((
-            image,
-            PanoramaCropMetadata {
+        return Ok(PanoramaBoundaryApplication {
+            crop: PanoramaCropMetadata {
                 height: pre_crop_height,
                 mode: "auto".to_string(),
                 pre_crop_height,
@@ -1066,13 +1081,14 @@ fn apply_panorama_boundary_mode(
                 x: 0,
                 y: 0,
             },
-        ));
+            effective_boundary_mode: PanoramaBoundaryModeOption::AutoCrop,
+            image: DynamicImage::ImageRgb32F(image),
+        });
     };
 
     if x == 0 && y == 0 && width == pre_crop_width && height == pre_crop_height {
-        return Ok((
-            image,
-            PanoramaCropMetadata {
+        return Ok(PanoramaBoundaryApplication {
+            crop: PanoramaCropMetadata {
                 height,
                 mode: "auto".to_string(),
                 pre_crop_height,
@@ -1081,7 +1097,9 @@ fn apply_panorama_boundary_mode(
                 x,
                 y,
             },
-        ));
+            effective_boundary_mode: PanoramaBoundaryModeOption::AutoCrop,
+            image: DynamicImage::ImageRgb32F(image),
+        });
     }
 
     let mut cropped = Rgb32FImage::new(width, height);
@@ -1092,9 +1110,8 @@ fn apply_panorama_boundary_mode(
         }
     }
 
-    Ok((
-        cropped,
-        PanoramaCropMetadata {
+    Ok(PanoramaBoundaryApplication {
+        crop: PanoramaCropMetadata {
             height,
             mode: "auto".to_string(),
             pre_crop_height,
@@ -1103,7 +1120,37 @@ fn apply_panorama_boundary_mode(
             x,
             y,
         },
-    ))
+        effective_boundary_mode: PanoramaBoundaryModeOption::AutoCrop,
+        image: DynamicImage::ImageRgb32F(cropped),
+    })
+}
+
+fn apply_transparent_boundary_fill(image: &Rgb32FImage, mask: &GrayImage) -> RgbaImage {
+    let mut transparent = RgbaImage::new(image.width(), image.height());
+    for y in 0..image.height() {
+        for x in 0..image.width() {
+            if mask.get_pixel(x, y)[0] == 0 {
+                transparent.put_pixel(x, y, Rgba([0, 0, 0, 0]));
+                continue;
+            }
+            let color = image.get_pixel(x, y);
+            transparent.put_pixel(
+                x,
+                y,
+                Rgba([
+                    float_channel_to_u8(color[0]),
+                    float_channel_to_u8(color[1]),
+                    float_channel_to_u8(color[2]),
+                    255,
+                ]),
+            );
+        }
+    }
+    transparent
+}
+
+fn float_channel_to_u8(value: f32) -> u8 {
+    (value.clamp(0.0, 1.0) * 255.0).round() as u8
 }
 
 fn valid_pixel_bounds(mask: &GrayImage) -> Option<(u32, u32, u32, u32)> {
@@ -1156,6 +1203,18 @@ fn build_pending_panorama_source_refs(paths: &[String]) -> Vec<PendingPanoramaSo
             }
         })
         .collect()
+}
+
+fn panorama_boundary_fill_color(mode: PanoramaBoundaryModeOption) -> Option<serde_json::Value> {
+    match mode {
+        PanoramaBoundaryModeOption::Transparent => Some(json!({
+            "alpha": 0.0,
+            "blue": 0.0,
+            "green": 0.0,
+            "red": 0.0,
+        })),
+        PanoramaBoundaryModeOption::AutoCrop | PanoramaBoundaryModeOption::ManualCrop => None,
+    }
 }
 
 fn extract_virtual_copy_id(path: &str) -> Option<String> {
@@ -1339,6 +1398,16 @@ fn upsert_panorama_artifact_metadata(
             warnings: warning_refs,
         });
 
+    let mut boundary_settings = json!({
+        "crop": crop,
+        "effectiveMode": metadata.effective_boundary_mode.as_str(),
+        "requestedMode": metadata.requested_boundary_mode.as_str(),
+        "support": "implemented_current_engine",
+    });
+    if let Some(fill_color) = panorama_boundary_fill_color(metadata.effective_boundary_mode) {
+        boundary_settings["fillColor"] = fill_color;
+    }
+
     let artifact = json!({
         "alignment": {
             "algorithmId": "rapidraw_fast9_brief_ransac_v1",
@@ -1377,12 +1446,7 @@ fn upsert_panorama_artifact_metadata(
         },
         "artifactId": artifact_id,
         "boundaryMode": metadata.effective_boundary_mode.as_str(),
-        "boundarySettings": {
-            "crop": crop,
-            "effectiveMode": metadata.effective_boundary_mode.as_str(),
-            "requestedMode": metadata.requested_boundary_mode.as_str(),
-            "support": "implemented_current_engine",
-        },
+        "boundarySettings": boundary_settings,
         "createdAt": Utc::now().to_rfc3339(),
         "crop": crop,
         "excludedSources": excluded_sources,
@@ -2220,7 +2284,7 @@ fn tree_reference_score(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use image::{Luma, Rgb};
+    use image::{ImageFormat, Luma, Rgb, Rgba};
 
     #[test]
     fn collect_pairwise_match_metadata_sorts_by_source_pair() {
@@ -2304,13 +2368,13 @@ mod tests {
             }
         }
 
-        let (cropped, crop) =
+        let boundary_application =
             apply_panorama_boundary_mode(image, &mask, &PanoramaStitchOptions::default())
                 .expect("auto-crop should succeed");
 
-        assert_eq!(cropped.dimensions(), (3, 2));
+        assert_eq!(boundary_application.image.dimensions(), (3, 2));
         assert_eq!(
-            crop,
+            boundary_application.crop,
             PanoramaCropMetadata {
                 height: 2,
                 mode: "auto".to_string(),
@@ -2321,6 +2385,97 @@ mod tests {
                 y: 1,
             }
         );
+        assert_eq!(
+            boundary_application.effective_boundary_mode,
+            PanoramaBoundaryModeOption::AutoCrop
+        );
+    }
+
+    #[test]
+    fn panorama_boundary_transparent_preserves_canvas_and_writes_alpha_edges() {
+        let mut image = Rgb32FImage::new(4, 3);
+        let mut mask = GrayImage::new(4, 3);
+        for y in 0..3 {
+            for x in 1..4 {
+                image.put_pixel(x, y, Rgb([0.25 * x as f32, 0.2 * y as f32, 0.5]));
+                mask.put_pixel(x, y, Luma([255]));
+            }
+        }
+
+        let boundary_application = apply_panorama_boundary_mode(
+            image,
+            &mask,
+            &PanoramaStitchOptions {
+                boundary_mode: PanoramaBoundaryModeOption::Transparent,
+                ..PanoramaStitchOptions::default()
+            },
+        )
+        .expect("transparent boundary should succeed");
+
+        assert_eq!(boundary_application.image.dimensions(), (4, 3));
+        assert_eq!(
+            boundary_application.crop,
+            PanoramaCropMetadata {
+                height: 3,
+                mode: "none".to_string(),
+                pre_crop_height: 3,
+                pre_crop_width: 4,
+                width: 4,
+                x: 0,
+                y: 0,
+            }
+        );
+        assert_eq!(
+            boundary_application.effective_boundary_mode,
+            PanoramaBoundaryModeOption::Transparent
+        );
+        let rgba = boundary_application.image.to_rgba8();
+        assert_eq!(rgba.get_pixel(0, 1), &Rgba([0, 0, 0, 0]));
+        assert_eq!(rgba.get_pixel(3, 2)[3], 255);
+    }
+
+    #[test]
+    fn panorama_boundary_transparent_saved_artifact_hash_differs_from_auto_crop() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let mut image = Rgb32FImage::new(5, 4);
+        let mut mask = GrayImage::new(5, 4);
+        for y in 1..4 {
+            for x in 1..5 {
+                image.put_pixel(x, y, Rgb([0.15 * x as f32, 0.1 * y as f32, 0.4]));
+                mask.put_pixel(x, y, Luma([255]));
+            }
+        }
+
+        let auto_crop =
+            apply_panorama_boundary_mode(image.clone(), &mask, &PanoramaStitchOptions::default())
+                .expect("auto-crop should succeed");
+        let transparent = apply_panorama_boundary_mode(
+            image,
+            &mask,
+            &PanoramaStitchOptions {
+                boundary_mode: PanoramaBoundaryModeOption::Transparent,
+                ..PanoramaStitchOptions::default()
+            },
+        )
+        .expect("transparent boundary should succeed");
+
+        let auto_crop_path = temp_dir.path().join("auto-crop.tiff");
+        let transparent_path = temp_dir.path().join("transparent.png");
+        auto_crop
+            .image
+            .save_with_format(&auto_crop_path, ImageFormat::Tiff)
+            .expect("auto-crop panorama should save");
+        transparent
+            .image
+            .save_with_format(&transparent_path, ImageFormat::Png)
+            .expect("transparent panorama should save");
+
+        let auto_crop_hash = hash_file_for_artifact(&auto_crop_path)
+            .expect("auto-crop artifact hash should compute");
+        let transparent_hash = hash_file_for_artifact(&transparent_path)
+            .expect("transparent artifact hash should compute");
+
+        assert_ne!(auto_crop_hash, transparent_hash);
     }
 
     #[test]
@@ -2331,8 +2486,14 @@ mod tests {
         };
         assert!(validate_panorama_stitch_options(&unsupported_projection).is_err());
 
-        let unsupported_boundary = PanoramaStitchOptions {
+        let transparent_boundary = PanoramaStitchOptions {
             boundary_mode: PanoramaBoundaryModeOption::Transparent,
+            ..PanoramaStitchOptions::default()
+        };
+        assert!(validate_panorama_stitch_options(&transparent_boundary).is_ok());
+
+        let unsupported_boundary = PanoramaStitchOptions {
+            boundary_mode: PanoramaBoundaryModeOption::ManualCrop,
             ..PanoramaStitchOptions::default()
         };
         assert!(validate_panorama_stitch_options(&unsupported_boundary).is_err());
@@ -2637,6 +2798,72 @@ mod tests {
                 .len(),
             0
         );
+    }
+
+    #[test]
+    fn write_panorama_output_sidecar_records_transparent_boundary_fill_color() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let output_path = temp_dir.path().join("IMG_0001_Pano.png");
+        fs::write(&output_path, b"panorama-output").expect("output should be written");
+        let mut metadata = sample_render_metadata();
+        metadata.crop = PanoramaCropMetadata {
+            height: 100,
+            mode: "none".to_string(),
+            pre_crop_height: 100,
+            pre_crop_width: 220,
+            width: 220,
+            x: 0,
+            y: 0,
+        };
+        metadata.effective_boundary_mode = PanoramaBoundaryModeOption::Transparent;
+        metadata.output_height = 100;
+        metadata.output_width = 220;
+        metadata.requested_boundary_mode = PanoramaBoundaryModeOption::Transparent;
+        let source_refs = vec![
+            PendingPanoramaSourceRef {
+                image_path: temp_dir
+                    .path()
+                    .join("IMG_0001.CR3")
+                    .to_string_lossy()
+                    .into_owned(),
+                raw_defaults_applied: true,
+                source_index: 0,
+                virtual_copy_id: None,
+            },
+            PendingPanoramaSourceRef {
+                image_path: temp_dir
+                    .path()
+                    .join("IMG_0002.CR3")
+                    .to_string_lossy()
+                    .into_owned(),
+                raw_defaults_applied: true,
+                source_index: 1,
+                virtual_copy_id: None,
+            },
+        ];
+        for source in &source_refs {
+            fs::write(
+                &source.image_path,
+                format!("source-{}", source.source_index),
+            )
+            .expect("source file should be written");
+        }
+
+        write_panorama_output_sidecar(&output_path, &metadata, &source_refs)
+            .expect("sidecar should be written");
+
+        let sidecar_path = output_path.with_file_name("IMG_0001_Pano.png.rrdata");
+        let sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
+        let artifacts = sidecar
+            .raw_engine_artifacts
+            .expect("raw engine artifacts should be present");
+        let artifact = &artifacts.panorama_artifacts[0];
+
+        assert_eq!(artifact["boundaryMode"], "transparent");
+        assert_eq!(artifact["boundarySettings"]["requestedMode"], "transparent");
+        assert_eq!(artifact["boundarySettings"]["effectiveMode"], "transparent");
+        assert_eq!(artifact["boundarySettings"]["fillColor"]["alpha"], 0.0);
+        assert_eq!(artifact["boundarySettings"]["fillColor"]["red"], 0.0);
     }
 
     #[test]

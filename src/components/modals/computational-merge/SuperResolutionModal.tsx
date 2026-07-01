@@ -272,6 +272,10 @@ export function SuperResolutionModal({
       : t('modals.superResolution.review.confidenceValue', {
           value: Math.round(outputReview.alignmentConfidence * 100),
         });
+  const outputReviewRegistrationLabel =
+    outputReview.registrationMetrics === null
+      ? outputReviewAlignmentConfidenceLabel
+      : `${outputReviewAlignmentConfidenceLabel} / ${outputReview.registrationMetrics.maxResidualPx.toFixed(3)} px max`;
   const outputReviewCropMetricsLabel = t('modals.superResolution.review.cropMetricsValue', {
     reviewCropCount: outputReview.cropMetrics.reviewCropCount,
     coverage:
@@ -279,6 +283,10 @@ export function SuperResolutionModal({
         ? t('modals.superResolution.review.notMeasured')
         : `${Math.round(outputReview.cropMetrics.overlapCoverageRatio * 100)}%`,
   });
+  const outputReviewDownscaleReconstructionLabel =
+    outputReview.downscaleReconstructionError === null
+      ? t('modals.superResolution.review.notMeasured')
+      : outputReview.downscaleReconstructionError.toFixed(4);
   const isEditableHandoffReady = outputReview.editableGate === 'ready';
   const openInEditorPath = derivedOutputReceipt.openInEditorAction.path ?? '';
   const exportHandoffReady = isEditableHandoffReady && openInEditorPath.length > 0;
@@ -822,11 +830,18 @@ export function SuperResolutionModal({
               },
               {
                 label: t('modals.superResolution.review.alignmentConfidence'),
-                value: outputReviewAlignmentConfidenceLabel,
+                value: outputReviewRegistrationLabel,
               },
               {
                 label: t('modals.superResolution.review.falseDetailRisk'),
-                value: outputReviewFalseDetailRiskLabel,
+                value:
+                  outputReview.falseDetailRiskScore === null
+                    ? outputReviewFalseDetailRiskLabel
+                    : `${outputReviewFalseDetailRiskLabel} - ${Math.round(outputReview.falseDetailRiskScore * 100)}%`,
+              },
+              {
+                label: t('modals.superResolution.review.ringing'),
+                value: outputReviewDownscaleReconstructionLabel,
               },
               {
                 label: t('modals.superResolution.review.supportMap'),
@@ -1056,7 +1071,9 @@ export function SuperResolutionModal({
         data-editable-handoff-ready={String(isEditableHandoffReady)}
         data-export-handoff-ready={String(exportHandoffReady)}
         data-false-detail-risk={outputReview.falseDetailRisk}
+        data-false-detail-risk-score={outputReview.falseDetailRiskScore ?? 'not_measured'}
         data-human-review-status={outputReview.humanReviewStatus}
+        data-downscale-reconstruction-error={outputReview.downscaleReconstructionError ?? 'not_measured'}
         data-detail-review-highlight-count={outputReview.detailReview.improvementHighlightCount}
         data-detail-review-mean-improvement-ratio={outputReview.detailReview.meanImprovementRatio}
         data-detail-review-status={outputReview.detailReview.reviewStatus}
@@ -1068,6 +1085,7 @@ export function SuperResolutionModal({
         data-review-artifact-count={outputReview.reviewArtifacts.length}
         data-review-artifact-hashes={outputReview.reviewArtifacts.map((artifact) => artifact.contentHash).join(',')}
         data-review-artifact-paths={outputReview.reviewArtifacts.map((artifact) => artifact.path).join(',')}
+        data-registration-max-residual-px={outputReview.registrationMetrics?.maxResidualPx ?? 'not_measured'}
         data-source-content-hashes={sourceContentHashesLabel}
         data-source-graph-revisions={sourceGraphRevisionsLabel}
         data-source-paths={sourcePathsLabel}
