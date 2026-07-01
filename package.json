@@ -47,6 +47,8 @@
     "check:negative-lab-profile-comparison": "bun tests/integration/checks/negative-lab/check-negative-lab-profile-comparison.ts",
     "check:negative-lab-rendered-profile-candidates": "bun tests/integration/checks/negative-lab/check-negative-lab-rendered-profile-candidates.ts",
     "check:negative-lab-save-editor-handoff": "bun tests/integration/checks/negative-lab/check-negative-lab-save-editor-handoff.ts",
+    "check:negative-lab-real-raw-private-proof-summary": "bun tests/integration/checks/negative-lab/check-negative-lab-real-raw-private-proof-summary.ts",
+    "run:negative-lab-real-raw-private-proof": "bun scripts/private-raw/proofs/raw-workflow/run-negative-lab-real-raw-private-proof.ts",
     "check:hdr-derived-source-handoff": "bun tests/integration/checks/hdr/check-hdr-derived-source-handoff.ts",
     "check:panorama-derived-source-handoff": "bun tests/integration/checks/panorama/check-panorama-derived-source-handoff.ts",
     "check:panorama-runtime-plan-smoke": "bun tests/integration/checks/panorama/check-panorama-runtime-plan-smoke.ts",
