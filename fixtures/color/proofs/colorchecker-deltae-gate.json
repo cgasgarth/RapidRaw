@@ -1,0 +1,70 @@
+{
+  "$schema": "https://rawengine.dev/schemas/colorchecker-deltae-gate-v1.json",
+  "assumptions": {
+    "colorJsRole": "oracle_only_for_existing_deltae_unit_tests_not_this_runtime_gate",
+    "comparisonSpace": "cie_lab_d65_from_linear_srgb_working_rgb",
+    "fixtureScope": "Synthetic 6-patch ColorChecker-style chart for runtime-adjacent drift detection only; not a measured camera profile or final color accuracy claim.",
+    "inputEncoding": "linear_camera_rgb_0_to_1",
+    "runtimeStage": "camera_profile_to_working_space"
+  },
+  "cameraToWorkingMatrix": [
+    [1.08, -0.035, -0.015],
+    [-0.025, 1.045, -0.012],
+    [0.008, -0.055, 1.11]
+  ],
+  "fixtureId": "colorchecker.synthetic.deltae-runtime-gate.v1",
+  "issue": 4532,
+  "patches": [
+    {
+      "expectedWorkingLab": { "a": 1.478136, "b": -2.053476, "l": 76.577391 },
+      "expectedWorkingRgb": { "blue": 0.5315, "green": 0.504, "red": 0.515 },
+      "id": "neutral-50",
+      "inputCameraRgb": { "blue": 0.5, "green": 0.5, "red": 0.5 },
+      "maxDeltaE00": 0.005,
+      "maxRgbAbsDelta": 1e-12
+    },
+    {
+      "expectedWorkingLab": { "a": 9.994112, "b": 12.14501, "l": 63.324536 },
+      "expectedWorkingRgb": { "blue": 0.23169, "green": 0.28966, "red": 0.45095 },
+      "id": "dark-skin",
+      "inputCameraRgb": { "blue": 0.22, "green": 0.29, "red": 0.43 },
+      "maxDeltaE00": 0.005,
+      "maxRgbAbsDelta": 1e-12
+    },
+    {
+      "expectedWorkingLab": { "a": -21.557294, "b": 22.986125, "l": 65.770711 },
+      "expectedWorkingRgb": { "blue": 0.18027, "green": 0.39939, "red": 0.24285 },
+      "id": "foliage",
+      "inputCameraRgb": { "blue": 0.18, "green": 0.39, "red": 0.24 },
+      "maxDeltaE00": 0.005,
+      "maxRgbAbsDelta": 1e-12
+    },
+    {
+      "expectedWorkingLab": { "a": 0.123637, "b": -27.476447, "l": 63.583425 },
+      "expectedWorkingRgb": { "blue": 0.59395, "green": 0.33325, "red": 0.1962 },
+      "id": "blue-sky",
+      "inputCameraRgb": { "blue": 0.55, "green": 0.33, "red": 0.2 },
+      "maxDeltaE00": 0.005,
+      "maxRgbAbsDelta": 1e-12
+    },
+    {
+      "expectedWorkingLab": { "a": 18.381774, "b": 47.398133, "l": 73.077727 },
+      "expectedWorkingRgb": { "blue": 0.10744, "green": 0.37628, "red": 0.82745 },
+      "id": "orange",
+      "inputCameraRgb": { "blue": 0.11, "green": 0.38, "red": 0.78 },
+      "maxDeltaE00": 0.005,
+      "maxRgbAbsDelta": 1e-12
+    },
+    {
+      "expectedWorkingLab": { "a": 0.87575, "b": 0.013046, "l": 96.502613 },
+      "expectedWorkingRgb": { "blue": 0.9123, "green": 0.90768, "red": 0.9276 },
+      "id": "paper-white",
+      "inputCameraRgb": { "blue": 0.86, "green": 0.9, "red": 0.9 },
+      "maxDeltaE00": 0.005,
+      "maxRgbAbsDelta": 1e-12
+    }
+  ],
+  "schemaVersion": 1,
+  "snapshotDate": "2026-07-01",
+  "validationMode": "synthetic_colorchecker_camera_profile_deltae_gate"
+}
