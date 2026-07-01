@@ -37,6 +37,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   ProfessionalAdjustmentsCompact: 'professional-adjustments-compact',
   ProfessionalEditorCompactPortrait: 'professional-editor-compact-portrait',
   ProfessionalCropTransformWorkspace: 'professional-crop-transform-workspace',
+  ProfessionalExportProofFooter: 'professional-export-proof-footer',
   ProfessionalEditorShell: 'professional-editor-shell',
   ProfessionalEditorToolbar: 'professional-editor-toolbar',
   ProfessionalEditorTokens: 'professional-editor-tokens',
@@ -288,6 +289,13 @@ export const VISUAL_SMOKE_SCENARIOS = [
     mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorToolbar,
     outputFile: 'professional-editor-toolbar.png',
     sectionMinimum: 4,
+  },
+  {
+    compactOutputFile: 'professional-export-proof-footer-compact.png',
+    marker: 'Export proof footer',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalExportProofFooter,
+    outputFile: 'professional-export-proof-footer.png',
+    sectionMinimum: 5,
   },
   {
     compactOutputFile: 'professional-editor-compact-portrait-390.png',

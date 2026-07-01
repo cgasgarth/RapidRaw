@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { z } from 'zod';
+import { MOXCMS_EXPORT_COLOR_CAPABILITIES_V1 } from '../../../packages/rawengine-schema/src/exportColorCapabilities';
 import { Invokes } from '../../tauri/commands';
 import VisualSmokeApp from './VisualSmokeApp';
 import { VISUAL_SMOKE_SCENARIO_IDS } from './visualSmokeScenarios';
@@ -92,6 +93,9 @@ const getLensfunMakersCommand: string = Invokes.GetLensfunMakers;
 const autodetectLensCommand: string = Invokes.AutodetectLens;
 const saveCommunityPresetCommand: string = Invokes.SaveCommunityPreset;
 const handleExportPresetsToFileCommand: string = Invokes.HandleExportPresetsToFile;
+const estimateExportSizesCommand: string = Invokes.EstimateExportSizes;
+const getExportColorCapabilitiesCommand: string = Invokes.GetExportColorCapabilities;
+const isOriginalFileAvailableCommand: string = Invokes.IsOriginalFileAvailable;
 
 let callbackId = 0;
 window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ = [];
@@ -245,6 +249,9 @@ window.__TAURI_INTERNALS__ = {
     if (command === autodetectLensCommand) return Promise.resolve({ maker: 'Sony', model: 'FE 35mm F1.8' });
     if (command === saveCommunityPresetCommand) return Promise.resolve(null);
     if (command === handleExportPresetsToFileCommand) return Promise.resolve(null);
+    if (command === estimateExportSizesCommand) return Promise.resolve(18_432_000);
+    if (command === getExportColorCapabilitiesCommand) return Promise.resolve(MOXCMS_EXPORT_COLOR_CAPABILITIES_V1);
+    if (command === isOriginalFileAvailableCommand) return Promise.resolve(true);
     if (command === 'plugin:dialog|save') return Promise.resolve('/tmp/rawengine-film-look-smoke.rrpreset');
     if (command === 'plugin:event|listen') return Promise.resolve(1);
     if (command === 'plugin:event|unlisten') return Promise.resolve(null);
