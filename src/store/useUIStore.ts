@@ -21,8 +21,17 @@ import {
 } from '../schemas/computational-merge/superResolutionUiSchemas';
 import type { FocusStackOutputReviewWorkflow } from '../schemas/focus-stack/focusStackOutputReviewSchemas';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../schemas/focus-stack/focusStackUiSchemas';
+import type { MaskContainer } from '../utils/adjustments';
 import type { FocusStackSourcePreflightMetadata } from '../utils/focusStackSourcePreflight';
 import type { HdrBracketPreflightSourceMetadata } from '../utils/hdrBracketPreflight';
+import {
+  buildLayerMaskProvenanceReceipts,
+  buildLayerMaskSourceGraphRevision,
+  DEFAULT_LAYER_MASK_SOURCE_GRAPH_REVISION,
+  type LayerMaskProvenanceInvalidationReason,
+  type LayerMaskProvenanceReceipt,
+  markLayerMaskReceiptsStale,
+} from '../utils/layers/layerMaskProvenance';
 import type { SuperResolutionSourcePreflightMetadata } from '../utils/superResolutionSourcePreflight';
 
 export interface CollapsibleSectionsState {
@@ -301,9 +310,14 @@ export interface UIState {
   cullingModalState: CullingModalState;
   collageModalState: CollageModalState;
   derivedOutputReceipts: Record<string, DerivedOutputReceipt>;
+  layerMaskProvenanceReceipts: Record<string, LayerMaskProvenanceReceipt>;
+  layerMaskSourceGraphRevision: string;
+  layerMaskSourceGraphRevisionCounter: number;
 
   // Actions
   clearDerivedOutputReceipts: () => void;
+  markLayerMaskProvenanceStale: (input: { layerIds?: string[]; reason: LayerMaskProvenanceInvalidationReason }) => void;
+  recordLayerMaskPreviewReceipt: (input: { appliedCommandId: string; masks: Array<MaskContainer> }) => void;
   setUI: (updater: Partial<UIState> | ((state: UIState) => Partial<UIState>)) => void;
   setRightPanel: (panel: Panel | null) => void;
   upsertDerivedOutputReceipt: (receipt: DerivedOutputReceipt) => void;
@@ -366,9 +380,41 @@ export const useUIStore = create<UIState>((set, get) => ({
   cullingModalState: createDefaultCullingModalState(),
   collageModalState: createDefaultCollageModalState(),
   derivedOutputReceipts: {},
+  layerMaskProvenanceReceipts: {},
+  layerMaskSourceGraphRevision: DEFAULT_LAYER_MASK_SOURCE_GRAPH_REVISION,
+  layerMaskSourceGraphRevisionCounter: 0,
 
   clearDerivedOutputReceipts: () => {
     set({ derivedOutputReceipts: {} });
+  },
+
+  markLayerMaskProvenanceStale: ({ layerIds, reason }) => {
+    set((state) => {
+      const nextRevisionCounter = state.layerMaskSourceGraphRevisionCounter + 1;
+      return {
+        layerMaskProvenanceReceipts: markLayerMaskReceiptsStale({
+          ...(layerIds === undefined ? {} : { layerIds }),
+          reason,
+          receipts: state.layerMaskProvenanceReceipts,
+        }),
+        layerMaskSourceGraphRevision: buildLayerMaskSourceGraphRevision({
+          previousRevision: state.layerMaskSourceGraphRevision,
+          reason,
+          revisionIndex: nextRevisionCounter,
+        }),
+        layerMaskSourceGraphRevisionCounter: nextRevisionCounter,
+      };
+    });
+  },
+
+  recordLayerMaskPreviewReceipt: ({ appliedCommandId, masks }) => {
+    set((state) => ({
+      layerMaskProvenanceReceipts: buildLayerMaskProvenanceReceipts({
+        appliedCommandId,
+        masks,
+        sourceGraphRevision: state.layerMaskSourceGraphRevision,
+      }),
+    }));
   },
 
   setUI: (updater) => {

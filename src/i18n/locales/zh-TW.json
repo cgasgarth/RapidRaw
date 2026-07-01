@@ -1016,6 +1016,17 @@
         "ungroupBlocked": "",
         "ungroupReady": ""
       },
+      "provenance": {
+        "command": "",
+        "layer": "",
+        "maskHash": "",
+        "preview": "",
+        "reason": "",
+        "sourceGraph": "",
+        "summary": "",
+        "summaryTitle": "",
+        "title": ""
+      },
       "removeRowSummary": "",
       "removeSource": {
         "canvasStatus": "",
@@ -1191,6 +1202,15 @@
         "copySectionSettings": "複製 {{section}} 設定",
         "invertComponent": "反轉元件",
         "invertMask": "反轉遮色片",
+        "layerMaskProvenanceCommand": "",
+        "layerMaskProvenanceLayer": "",
+        "layerMaskProvenanceMaskHash": "",
+        "layerMaskProvenancePreviewTooltip": "",
+        "layerMaskProvenanceReason": "",
+        "layerMaskProvenanceSourceGraph": "",
+        "layerMaskProvenanceSummary": "",
+        "layerMaskProvenanceSummaryTitle": "",
+        "layerMaskProvenanceTitle": "",
         "maskPropertiesTitle": "遮色片屬性",
         "noPresetsFound": "未找到預設",
         "opacity": "不透明度",

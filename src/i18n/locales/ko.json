@@ -648,7 +648,16 @@
         "brushLocalAdjustmentReceiptSummary_few": "",
         "brushLocalAdjustmentReceiptSummary_many": "",
         "colorRangeLocalAdjustmentReceiptSummary": "{{range}} range · {{ratio}}% proposal coverage",
-        "colorRangeLocalAdjustmentReceiptTitle": "Color range local adjustment receipt"
+        "colorRangeLocalAdjustmentReceiptTitle": "Color range local adjustment receipt",
+        "layerMaskProvenanceCommand": "",
+        "layerMaskProvenanceLayer": "",
+        "layerMaskProvenanceMaskHash": "",
+        "layerMaskProvenancePreviewTooltip": "",
+        "layerMaskProvenanceReason": "",
+        "layerMaskProvenanceSourceGraph": "",
+        "layerMaskProvenanceSummary": "",
+        "layerMaskProvenanceSummaryTitle": "",
+        "layerMaskProvenanceTitle": ""
       },
       "toggleAnalyticsTooltip": "분석 표시 전환",
       "tooltips": {
@@ -797,7 +806,18 @@
       "newBrushLocalAdjustmentLayerName": "",
       "newBrushLocalAdjustmentLayerName_one": "",
       "newBrushLocalAdjustmentLayerName_other": "",
-      "newBrushLocalAdjustmentMaskName": ""
+      "newBrushLocalAdjustmentMaskName": "",
+      "provenance": {
+        "command": "",
+        "layer": "",
+        "maskHash": "",
+        "preview": "",
+        "reason": "",
+        "sourceGraph": "",
+        "summary": "",
+        "summaryTitle": "",
+        "title": ""
+      }
     }
   },
   "export": {

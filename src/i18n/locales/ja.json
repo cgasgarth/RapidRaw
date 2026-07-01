@@ -1019,6 +1019,17 @@
         "ungroupBlocked": "",
         "ungroupReady": ""
       },
+      "provenance": {
+        "command": "",
+        "layer": "",
+        "maskHash": "",
+        "preview": "",
+        "reason": "",
+        "sourceGraph": "",
+        "summary": "",
+        "summaryTitle": "",
+        "title": ""
+      },
       "removeRowSummary": "{{blendMode}} - {{opacity}}% - remove {{source}} - {{maskCount}}",
       "removeSource": {
         "canvasStatus": "",
@@ -1202,6 +1213,15 @@
         "copySectionSettings": "{{section}}設定をコピー",
         "invertComponent": "コンポーネントを反転",
         "invertMask": "マスクを反転",
+        "layerMaskProvenanceCommand": "",
+        "layerMaskProvenanceLayer": "",
+        "layerMaskProvenanceMaskHash": "",
+        "layerMaskProvenancePreviewTooltip": "",
+        "layerMaskProvenanceReason": "",
+        "layerMaskProvenanceSourceGraph": "",
+        "layerMaskProvenanceSummary": "",
+        "layerMaskProvenanceSummaryTitle": "",
+        "layerMaskProvenanceTitle": "",
         "maskPropertiesTitle": "マスクのプロパティ",
         "noPresetsFound": "プリセットが見つかりません",
         "opacity": "不透明度",

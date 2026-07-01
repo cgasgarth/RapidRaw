@@ -1096,6 +1096,17 @@
         "ungroupBlocked": "Ungroup blocked",
         "ungroupReady": "Ungroup ready"
       },
+      "provenance": {
+        "command": "Command: {{value}}",
+        "layer": "Layer: {{value}}",
+        "maskHash": "Mask hash: {{value}}",
+        "preview": "Preview",
+        "reason": "Reason: {{value}}",
+        "sourceGraph": "Source graph: {{value}}",
+        "summary": "Re-preview before applying or exporting stale layer output.",
+        "summaryTitle": "Layer/mask preview receipts",
+        "title": "Layer/mask provenance"
+      },
       "removeRowSummary": "{{blendMode}} - {{opacity}}% - remove {{source}} - {{maskCount}}",
       "removeSource": {
         "canvasStatus": "{{status}} - Search {{searchMultiplier}}x - Seed {{seedValue}}",
@@ -1279,6 +1290,15 @@
         "copySectionSettings": "Copy {{section}} Settings",
         "invertComponent": "Invert Component",
         "invertMask": "Invert Mask",
+        "layerMaskProvenanceCommand": "Command: {{value}}",
+        "layerMaskProvenanceLayer": "Layer: {{value}}",
+        "layerMaskProvenanceMaskHash": "Mask hash: {{value}}",
+        "layerMaskProvenancePreviewTooltip": "Preview receipts",
+        "layerMaskProvenanceReason": "Reason: {{value}}",
+        "layerMaskProvenanceSourceGraph": "Source graph: {{value}}",
+        "layerMaskProvenanceSummary": "Re-preview before applying stale mask output.",
+        "layerMaskProvenanceSummaryTitle": "Layer/mask preview receipts",
+        "layerMaskProvenanceTitle": "Layer/mask provenance",
         "maskPropertiesTitle": "Mask Properties",
         "noPresetsFound": "No presets found",
         "opacity": "Opacity",

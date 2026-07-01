@@ -2354,7 +2354,27 @@ async function prepareScenario(page, mode) {
 
   if (mode === 'layer-stack-workflow') {
     await page.getByRole('button', { name: /Portrait burn/u }).click();
+    await page
+      .getByTestId(/layer-mask-provenance-badge-/u)
+      .first()
+      .waitFor({ timeout: 10_000 });
     await page.getByRole('button', { name: 'Move down' }).click();
+    const staleLayerBadge = page.getByTestId(/layer-mask-provenance-badge-/u).first();
+    await staleLayerBadge.waitFor({ timeout: 10_000 });
+    const staleLayerBadgeDataset = await staleLayerBadge.evaluate((element) => ({ ...element.dataset }));
+    if (
+      staleLayerBadgeDataset.invalidationReason !== 'layer_order_changed' &&
+      staleLayerBadgeDataset.invalidationReason !== 'source_graph_revision_changed'
+    ) {
+      throw new Error(
+        `Layer stack provenance badge did not record reorder staleness: ${JSON.stringify(staleLayerBadgeDataset)}`,
+      );
+    }
+    await staleLayerBadge.click();
+    await page
+      .getByTestId(/layer-mask-provenance-popover-/u)
+      .first()
+      .waitFor({ timeout: 10_000 });
     await page.getByRole('button', { name: 'Toggle' }).click();
     await page.getByRole('button', { name: 'Add layer' }).click();
     await page.getByRole('button', { name: 'Duplicate layer' }).click();
@@ -2371,6 +2391,23 @@ async function prepareScenario(page, mode) {
     layerStackExportParityProofSchema.parse(
       await page.getByTestId('layer-stack-export-parity-proof').evaluate((element) => ({ ...element.dataset })),
     );
+    return;
+  }
+
+  if (mode === 'professional-layers-compact') {
+    await page
+      .getByTestId(/mask-panel-provenance-badge-/u)
+      .first()
+      .waitFor({ timeout: 10_000 });
+    await page
+      .getByTestId(/mask-panel-provenance-badge-/u)
+      .first()
+      .click();
+    await page
+      .getByTestId(/mask-panel-provenance-popover-/u)
+      .first()
+      .waitFor({ timeout: 10_000 });
+    await page.getByTestId('mask-settings-provenance-card').waitFor({ timeout: 10_000 });
     return;
   }
 
