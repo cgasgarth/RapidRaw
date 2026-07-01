@@ -1,2 +1,5 @@
-@import "./styles.css";
+@import "tailwindcss" source(none);
+@source "../index.html";
+@source "./";
 @source not "./validation/visual";
+@import "./styles.css";

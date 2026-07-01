@@ -1,6 +1,6 @@
 # Vite Bundle Budget
 
-Issues: #288, #2403
+Issues: #288, #2403, #4605
 
 The RapidRAW frontend still produces one large application chunk. That is
 accepted temporarily, but it is tracked as an explicit budget instead of an
@@ -11,7 +11,7 @@ unowned Vite warning.
 Bundle budgets measure the minified production Vite build produced by:
 
 ```sh
-bun run build:frontend
+bun run build
 ```
 
 `vite.config.js` always uses Oxc minification for JavaScript and esbuild
@@ -45,6 +45,30 @@ thresholds.
 Warning tier policy: Warnings are non-failing early signals; failures block PRs
 until code is split, removed, or a temporary exception is documented.
 
+## Tailwind Source Scope
+
+The product entrypoint imports `src/product-styles.css`, which starts Tailwind
+with `source(none)`, explicitly sources `index.html` plus `src`, and excludes
+`src/validation/visual` from product source scanning. The visual smoke app
+imports `src/validation/visual/visual-smoke-styles.css`, which keeps the
+validation source scan separate so visual-only classes remain available to
+visual smoke builds without entering the production product CSS bundle.
+
+The measured #4605 comparison on July 1, 2026:
+
+| Product CSS source scope                        | Raw CSS       | Gzip CSS      |
+| ----------------------------------------------- | ------------- | ------------- |
+| Explicit product sources with validation split  | 141,028 bytes | 20,122 bytes  |
+| Shared automatic scan excluding validation only | 141,389 bytes | 20,218 bytes  |
+| Including validation visual sources temporarily | 173,044 bytes | 24,181 bytes  |
+
+The explicit product scope saves 32,016 raw bytes and 4,059 gzip bytes versus
+scanning validation visual sources, and 361 raw bytes and 96 gzip bytes versus
+the prior shared automatic scan with only a validation exclusion. The bundle
+check also rejects selected validation-only Tailwind sentinels in initial
+product CSS so future entrypoint changes do not silently rescan the visual smoke
+harness.
+
 ## Validation
 
 Run:
@@ -70,7 +94,7 @@ The same report can include source-map-backed module and package attribution
 when source maps are intentionally emitted for diagnostics:
 
 ```sh
-TAURI_ENV_DEBUG=1 bun run build:frontend
+TAURI_ENV_DEBUG=1 bun run build
 bun run bundle:report
 ```
 
@@ -102,6 +126,10 @@ explicitly named diagnostic artifacts, not in required production build output.
 - Initial-entry aggregate budgets include assets directly referenced by
   `dist/index.html` plus recursively static-imported JS/CSS. Dynamic imports are
   excluded from the initial aggregate and remain subject to the per-file caps.
+- Product CSS must keep validation-only visual smoke Tailwind classes out of the
+  initial bundle. If a visual smoke stylesheet split changes, update the
+  sentinels in `tests/integration/checks/check-vite-bundle-budget.ts` with the
+  same PR and include before/after CSS size evidence.
 - HDR, panorama, color style, advanced color setup UI, Negative Lab frame queue,
   frame health UI, frame health schema wiring, visible frame warning chips, base
   sample readouts, the stock-family registry panel, and layer grouping controls

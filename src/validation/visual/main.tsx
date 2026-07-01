@@ -7,7 +7,7 @@ import VisualSmokeApp from './VisualSmokeApp';
 import { VISUAL_SMOKE_SCENARIO_IDS } from './visualSmokeScenarios';
 
 import '../../i18n';
-import '../../styles.css';
+import './visual-smoke-styles.css';
 
 type VisualSmokeInvoke = (command: string, args?: Record<string, unknown>, options?: unknown) => Promise<unknown>;
 
