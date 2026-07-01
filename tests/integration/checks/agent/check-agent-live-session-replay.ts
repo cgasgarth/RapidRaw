@@ -115,6 +115,14 @@ if (getAgentSelectedImageLiveSessionStaleReason(staleDraft) !== 'image_changed')
 await expectRejects(() => applyAgentSelectedImageLiveSession(staleDraft), 'image_changed');
 
 seedEditor();
+const stalePreviewDraft = approveAgentSelectedImageLiveSession(await startDraft('agent-live-session-stale-preview'));
+useEditorStore.setState({ finalPreviewUrl: 'blob:rawengine-agent-live-session-refreshed-preview' });
+if (getAgentSelectedImageLiveSessionStaleReason(stalePreviewDraft) !== 'preview_identity_changed') {
+  throw new Error('live session stale guard did not detect selected preview identity change.');
+}
+await expectRejects(() => applyAgentSelectedImageLiveSession(stalePreviewDraft), 'preview_identity_changed');
+
+seedEditor();
 const applyDraft = approveAgentSelectedImageLiveSession(await startDraft('agent-live-session-apply'));
 const applyResult = await applyAgentSelectedImageLiveSession(applyDraft);
 const appliedReceipt = replayAgentSelectedImageLiveSessionAudit(applyResult.audit);

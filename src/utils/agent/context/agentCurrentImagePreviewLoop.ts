@@ -224,6 +224,18 @@ export const agentCurrentImagePreviewLoopResultSchema = z
 export type AgentCurrentImagePreviewLoopRequest = z.infer<typeof agentCurrentImagePreviewLoopRequestSchema>;
 export type AgentCurrentImagePreviewLoopResult = z.infer<typeof agentCurrentImagePreviewLoopResultSchema>;
 
+export const agentCurrentImagePreviewLoopApplyReviewRequestSchema = z
+  .object({
+    acceptedPreviewArtifactId: z.string().trim().min(1),
+    request: agentCurrentImagePreviewLoopRequestSchema,
+    review: agentCurrentImagePreviewLoopResultSchema,
+  })
+  .strict();
+
+export type AgentCurrentImagePreviewLoopApplyReviewRequest = z.infer<
+  typeof agentCurrentImagePreviewLoopApplyReviewRequestSchema
+>;
+
 const assertSelectedImageLoopSnapshot = (request: AgentCurrentImagePreviewLoopRequest) => {
   const snapshot = buildAgentImageContextSnapshot();
   if (snapshot.activeImagePath !== request.selectedImagePath) {
@@ -316,5 +328,35 @@ export const runAgentCurrentImagePreviewLoop = async (
     selectedImagePath: initialSnapshot.activeImagePath,
     status: loopResult.reviewStatus,
     toolName: AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
+  });
+};
+
+export const applyAgentCurrentImagePreviewLoopReviewedEdit = async (
+  request: AgentCurrentImagePreviewLoopApplyReviewRequest,
+): Promise<AgentCurrentImagePreviewLoopResult> => {
+  const parsedRequest = agentCurrentImagePreviewLoopApplyReviewRequestSchema.parse(request);
+  const latestPreview = parsedRequest.review.previewLineage.at(-1);
+  if (latestPreview === undefined || parsedRequest.review.previewRefreshCount < 2) {
+    throw new Error('Agent selected-image preview loop apply requires at least two refreshed previews.');
+  }
+  if (parsedRequest.acceptedPreviewArtifactId !== latestPreview.previewArtifactId) {
+    throw new Error('Agent selected-image preview loop apply rejected stale preview artifact.');
+  }
+
+  const snapshot = buildAgentImageContextSnapshot();
+  if (snapshot.activeImagePath !== parsedRequest.review.selectedImagePath) {
+    throw new Error('Agent selected-image preview loop apply rejected a different selected image.');
+  }
+  if (snapshot.graphRevision !== parsedRequest.review.rollbackCheckpoint.graphRevision) {
+    throw new Error('Agent selected-image preview loop apply rejected stale rollback graph revision.');
+  }
+  if (snapshot.initialPreview.recipeHash !== parsedRequest.review.rollbackCheckpoint.previewRecipeHash) {
+    throw new Error('Agent selected-image preview loop apply rejected stale rollback recipe hash.');
+  }
+
+  return runAgentCurrentImagePreviewLoop({
+    ...parsedRequest.request,
+    requestId: `${parsedRequest.request.requestId}-accepted-apply`,
+    rollbackAfterReview: false,
   });
 };
