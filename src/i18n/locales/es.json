@@ -537,6 +537,10 @@
         "pasteSettings": "Pegar ajustes",
         "resetSectionSettings": "Restablecer ajustes de {{section}}"
       },
+      "pinnedControls": {
+        "title": "Fijados",
+        "unpin": "Desfijar {{control}}"
+      },
       "rawProcessingModeOverride": {
         "attention": "Check",
         "currentValue": "",
@@ -561,6 +565,12 @@
         "curves": "Tone Curves",
         "details": "Detail",
         "effects": "Effects & Looks"
+      },
+      "search": {
+        "clear": "Borrar búsqueda",
+        "label": "Buscar controles de ajuste",
+        "noResults": "No hay controles coincidentes",
+        "placeholder": "Buscar controles"
       },
       "sections": {
         "basic": "Básico",

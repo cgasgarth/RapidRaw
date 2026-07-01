@@ -43,6 +43,27 @@ export interface CollapsibleSectionsState {
   effects: boolean;
 }
 
+const DEVELOP_PANEL_PINNED_CONTROL_IDS_STORAGE_KEY = 'rapidraw.developPanelPinnedControlIds.v1';
+
+const readDevelopPanelPinnedControlIds = (): string[] => {
+  if (typeof globalThis.localStorage === 'undefined') return [];
+
+  try {
+    const stored = globalThis.localStorage.getItem(DEVELOP_PANEL_PINNED_CONTROL_IDS_STORAGE_KEY);
+    if (stored === null) return [];
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+
+const persistDevelopPanelPinnedControlIds = (controlIds: string[]) => {
+  if (typeof globalThis.localStorage === 'undefined') return;
+
+  globalThis.localStorage.setItem(DEVELOP_PANEL_PINNED_CONTROL_IDS_STORAGE_KEY, JSON.stringify(controlIds));
+};
+
 export const DEFAULT_COLLAPSIBLE_SECTIONS_STATE: CollapsibleSectionsState = {
   basic: true,
   color: false,
@@ -284,6 +305,7 @@ export interface UIState {
   renderedRightPanel: Panel | null;
   slideDirection: number;
   collapsibleSectionsState: CollapsibleSectionsState;
+  developPanelPinnedControlIds: string[];
 
   // Modals & Dialogs
   isCreateFolderModalOpen: boolean;
@@ -324,6 +346,7 @@ export interface UIState {
   clearDerivedOutputReceipts: () => void;
   markLayerMaskProvenanceStale: (input: { layerIds?: string[]; reason: LayerMaskProvenanceInvalidationReason }) => void;
   recordLayerMaskPreviewReceipt: (input: { appliedCommandId: string; masks: Array<MaskContainer> }) => void;
+  setDevelopPanelPinnedControlIds: (controlIds: string[]) => void;
   setUI: (updater: Partial<UIState> | ((state: UIState) => Partial<UIState>)) => void;
   setRightPanel: (panel: Panel | null) => void;
   upsertDerivedOutputReceipt: (receipt: DerivedOutputReceipt) => void;
@@ -349,6 +372,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   renderedRightPanel: Panel.Adjustments,
   slideDirection: 1,
   collapsibleSectionsState: { ...DEFAULT_COLLAPSIBLE_SECTIONS_STATE },
+  developPanelPinnedControlIds: readDevelopPanelPinnedControlIds(),
 
   isCreateFolderModalOpen: false,
   isRenameFolderModalOpen: false,
@@ -421,6 +445,12 @@ export const useUIStore = create<UIState>((set, get) => ({
         sourceGraphRevision: state.layerMaskSourceGraphRevision,
       }),
     }));
+  },
+
+  setDevelopPanelPinnedControlIds: (controlIds) => {
+    const normalizedControlIds = [...new Set(controlIds)].filter((controlId) => controlId.trim().length > 0);
+    persistDevelopPanelPinnedControlIds(normalizedControlIds);
+    set({ developPanelPinnedControlIds: normalizedControlIds });
   },
 
   setUI: (updater) => {

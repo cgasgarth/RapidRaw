@@ -513,6 +513,10 @@
         "pasteSettings": "貼上設定",
         "resetSectionSettings": "重置 {{section}} 設定"
       },
+      "pinnedControls": {
+        "title": "已釘選",
+        "unpin": "取消釘選 {{control}}"
+      },
       "rawProcessingModeOverride": {
         "attention": "Check",
         "currentValue": "",
@@ -537,6 +541,12 @@
         "curves": "Tone Curves",
         "details": "Detail",
         "effects": "Effects & Looks"
+      },
+      "search": {
+        "clear": "清除搜尋",
+        "label": "搜尋調整控制項",
+        "noResults": "沒有相符的控制項",
+        "placeholder": "搜尋控制項"
       },
       "sections": {
         "basic": "基礎",

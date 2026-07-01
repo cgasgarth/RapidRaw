@@ -544,6 +544,10 @@
         "pasteSettings": "Einstellungen einfügen",
         "resetSectionSettings": "{{section}}-Einstellungen zurücksetzen"
       },
+      "pinnedControls": {
+        "title": "Angeheftet",
+        "unpin": "{{control}} lösen"
+      },
       "rawProcessingModeOverride": {
         "attention": "Check",
         "currentValue": "",
@@ -568,6 +572,12 @@
         "curves": "Tone Curves",
         "details": "Detail",
         "effects": "Effects & Looks"
+      },
+      "search": {
+        "clear": "Suche löschen",
+        "label": "Anpassungsregler suchen",
+        "noResults": "Keine passenden Regler",
+        "placeholder": "Regler suchen"
       },
       "sections": {
         "basic": "Basis",

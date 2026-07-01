@@ -537,6 +537,10 @@
         "pasteSettings": "Incolla Impostazioni",
         "resetSectionSettings": "Ripristina Impostazioni {{section}}"
       },
+      "pinnedControls": {
+        "title": "Fissati",
+        "unpin": "Rimuovi {{control}}"
+      },
       "rawProcessingModeOverride": {
         "attention": "Check",
         "currentValue": "",
@@ -561,6 +565,12 @@
         "curves": "Tone Curves",
         "details": "Detail",
         "effects": "Effects & Looks"
+      },
+      "search": {
+        "clear": "Cancella ricerca",
+        "label": "Cerca controlli di regolazione",
+        "noResults": "Nessun controllo corrispondente",
+        "placeholder": "Cerca controlli"
       },
       "sections": {
         "basic": "Base",
