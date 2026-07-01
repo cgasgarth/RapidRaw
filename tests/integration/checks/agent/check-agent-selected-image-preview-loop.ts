@@ -5,8 +5,8 @@ import { RawEngineAppServerHostToolName } from '../../../../src/schemas/agent/ag
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
 import {
+  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME,
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
-  applyAgentCurrentImagePreviewLoopReviewedEdit,
 } from '../../../../src/utils/agent/context/agentCurrentImagePreviewLoop.ts';
 import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
 import {
@@ -122,13 +122,17 @@ const buildAcceptedDryRunApprovals = async () => {
   return approvals;
 };
 
-const dispatchSelectedImageLoop = async (args: unknown, requestId: string) =>
+const dispatchAgentTool = async (runtimeToolName: string, args: unknown, requestId: string) =>
   handleRawEngineAppServerHostRequestAsync({
     arguments: args,
     requestId,
-    runtimeToolName: AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
+    runtimeToolName,
     toolName: RawEngineAppServerHostToolName.DispatchTool,
   });
+const dispatchSelectedImageLoop = async (args: unknown, requestId: string) =>
+  dispatchAgentTool(AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME, args, requestId);
+const dispatchReviewedApply = async (args: unknown, requestId: string) =>
+  dispatchAgentTool(AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME, args, requestId);
 
 const route = buildRawEngineAppServerRouteCatalog().find(
   (entry) => entry.commandName === AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
@@ -139,6 +143,16 @@ if (
   !route.runtimeCheckScripts.includes('check:agent-selected-image-preview-loop')
 ) {
   throw new Error('selected-image preview loop route did not expose the command and focused check.');
+}
+const applyReviewRoute = buildRawEngineAppServerRouteCatalog().find(
+  (entry) => entry.commandName === AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME,
+);
+if (
+  applyReviewRoute === undefined ||
+  applyReviewRoute.toolNames[0] !== AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME ||
+  !applyReviewRoute.runtimeCheckScripts.includes('check:agent-selected-image-preview-loop')
+) {
+  throw new Error('selected-image preview loop apply-review route did not expose the command and focused check.');
 }
 
 seedEditor();
@@ -241,11 +255,25 @@ const result = success.result as {
   acceptedDryRunPlanCount: number;
   applyReceipts: Array<{ changedPixelCount: number; changedPixelPercent: number }>;
   auditEventSummary: Array<{ toolName: string; type: string }>;
-  compareArtifactIds: { beforeArtifactId: string; currentArtifactId: string };
+  compareArtifactIds: {
+    beforeArtifactId: string;
+    beforeEvidence?: { contentHash: string; graphRevision: string; previewRef: string; recipeHash: string };
+    currentArtifactId: string;
+    currentEvidence?: { contentHash: string; graphRevision: string; previewRef: string; recipeHash: string };
+    lineage?: {
+      beforeGraphRevision: string;
+      beforeRecipeHash: string;
+      currentGraphRevision: string;
+      currentRecipeHash: string;
+      staleRecipeHash: boolean;
+    };
+    mediumPreview?: { longEdgePx: number; maxPixelCount: number; quality: number };
+  };
   editCount: number;
   finalGraphRevision: string;
   finalRecipeHash: string;
   initialGraphRevision: string;
+  initialPreviewArtifactId: string;
   initialPreviewReceipt: {
     contentHash: string;
     graphRevision: string;
@@ -340,14 +368,22 @@ if (
   result.previewLineage.length !== 2 ||
   result.previewLineage.some((lineage) => lineage.sourceToolName !== 'rawengine.agent.adjustments.apply') ||
   result.compareArtifactIds.beforeArtifactId.length === 0 ||
-  result.compareArtifactIds.currentArtifactId.length === 0
+  result.compareArtifactIds.currentArtifactId.length === 0 ||
+  result.compareArtifactIds.mediumPreview?.longEdgePx !== 1536 ||
+  result.compareArtifactIds.mediumPreview?.quality !== 0.86 ||
+  result.compareArtifactIds.lineage?.beforeGraphRevision !== 'history_1' ||
+  result.compareArtifactIds.lineage?.currentGraphRevision !== 'history_2' ||
+  result.compareArtifactIds.beforeEvidence?.graphRevision !== 'history_1' ||
+  result.compareArtifactIds.currentEvidence?.graphRevision !== 'history_2'
 ) {
-  throw new Error('selected-image preview loop did not expose preview/compare artifacts.');
+  throw new Error('selected-image preview loop did not expose medium preview/compare artifacts.');
 }
 if (
   result.previewRefreshReceipts.length !== 2 ||
   result.previewRefreshReceipts[0]?.toolName !== 'rawengine.agent.preview.render' ||
   result.previewRefreshReceipts[0]?.graphRevision !== 'history_1' ||
+  result.previewRefreshReceipts[0]?.preview.longEdgePx !== 1536 ||
+  result.previewRefreshReceipts[0]?.preview.quality !== 0.86 ||
   result.previewRefreshReceipts[1]?.graphRevision !== 'history_2' ||
   result.previewRefreshReceipts[1]?.preview.purpose !== 'detail_review' ||
   result.previewRefreshReceipts[1]?.preview.artifactId !== result.previewLineage.at(-1)?.previewArtifactId ||
@@ -389,33 +425,60 @@ const latestAcceptedPreview = result.previewLineage.at(-1)?.previewArtifactId;
 if (staleAcceptedPreview === undefined || latestAcceptedPreview === undefined) {
   throw new Error('selected-image preview loop did not expose preview artifacts for apply review.');
 }
-await expectRejects(
-  () =>
-    applyAgentCurrentImagePreviewLoopReviewedEdit({
-      acceptedPreviewArtifactId: staleAcceptedPreview,
-      acceptedPreviewReceiptHash: result.previewRefreshReceipts.at(-1)?.contentHash ?? '',
-      request: commandRequest,
-      review: result,
-    }),
+await expectDispatchRejects(
+  {
+    acceptedPreviewArtifactId: staleAcceptedPreview,
+    acceptedPreviewReceiptHash: result.previewRefreshReceipts.at(-1)?.contentHash ?? '',
+    request: commandRequest,
+    review: result,
+  },
   'stale preview artifact',
+  'agent-selected-loop-apply-stale-artifact',
 );
-await expectRejects(
-  () =>
-    applyAgentCurrentImagePreviewLoopReviewedEdit({
-      acceptedPreviewArtifactId: latestAcceptedPreview,
-      acceptedPreviewReceiptHash: result.previewRefreshReceipts[0]?.contentHash ?? '',
-      request: commandRequest,
-      review: result,
-    }),
+await expectDispatchRejects(
+  {
+    acceptedPreviewArtifactId: latestAcceptedPreview,
+    acceptedPreviewReceiptHash: result.previewRefreshReceipts[0]?.contentHash ?? '',
+    request: commandRequest,
+    review: result,
+  },
   'stale preview receipt',
+  'agent-selected-loop-apply-stale-receipt',
+);
+await expectDispatchRejects(
+  {
+    acceptedPreviewArtifactId: latestAcceptedPreview,
+    acceptedPreviewReceiptHash: result.previewRefreshReceipts.at(-1)?.contentHash ?? '',
+    request: commandRequest,
+    review: { ...result, selectedImage: { ...result.selectedImage, width: result.selectedImage.width + 1 } },
+  },
+  'stale selected-image dimensions',
+  'agent-selected-loop-apply-stale-dimensions',
+);
+await expectDispatchRejects(
+  {
+    acceptedPreviewArtifactId: latestAcceptedPreview,
+    acceptedPreviewReceiptHash: result.previewRefreshReceipts.at(-1)?.contentHash ?? '',
+    request: commandRequest,
+    review: { ...result, selectedImage: { ...result.selectedImage, previewIdentity: 'blob:stale-preview' } },
+  },
+  'stale preview identity',
+  'agent-selected-loop-apply-stale-preview-identity',
 );
 
-const acceptedApply = await applyAgentCurrentImagePreviewLoopReviewedEdit({
-  acceptedPreviewArtifactId: latestAcceptedPreview,
-  acceptedPreviewReceiptHash: result.previewRefreshReceipts.at(-1)?.contentHash ?? '',
-  request: commandRequest,
-  review: result,
-});
+const acceptedApplyDispatch = await dispatchReviewedApply(
+  {
+    acceptedPreviewArtifactId: latestAcceptedPreview,
+    acceptedPreviewReceiptHash: result.previewRefreshReceipts.at(-1)?.contentHash ?? '',
+    request: commandRequest,
+    review: result,
+  },
+  'agent-selected-loop-accepted-apply',
+);
+if (acceptedApplyDispatch.dispatchStatus !== 'completed' || acceptedApplyDispatch.result === undefined) {
+  throw new Error(`selected-image preview loop accepted apply dispatch failed: ${acceptedApplyDispatch.message ?? ''}`);
+}
+const acceptedApply = acceptedApplyDispatch.result as typeof result;
 if (
   acceptedApply.previewRefreshCount !== 2 ||
   acceptedApply.finalGraphRevision !== 'history_2' ||
@@ -427,12 +490,13 @@ if (
 
 console.log('agent selected-image preview loop ok');
 
-async function expectRejects(action: () => Promise<unknown>, expectedMessage: string) {
-  try {
-    await action();
-  } catch (error) {
-    if (error instanceof Error && error.message.includes(expectedMessage)) return;
-    throw error;
+async function expectDispatchRejects(args: unknown, expectedMessage: string, requestId: string) {
+  const response = await dispatchReviewedApply(args, requestId);
+  if (response.dispatchStatus !== 'rejected' || !response.message?.includes(expectedMessage)) {
+    throw new Error(
+      `expected apply-review rejection containing ${expectedMessage}, got ${response.dispatchStatus}: ${
+        response.message ?? ''
+      }`,
+    );
   }
-  throw new Error(`expected rejection containing ${expectedMessage}.`);
 }

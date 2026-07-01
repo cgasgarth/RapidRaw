@@ -10,8 +10,14 @@ import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import { buildAgentInitialPromptContext } from './agentInitialPromptContext';
 
 export const AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME = 'rawengine.agent.selected_image.preview_loop';
+export const AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME =
+  'rawengine.agent.selected_image.preview_loop.apply_review';
 export const AGENT_CURRENT_IMAGE_PREVIEW_LOOP_INPUT_SCHEMA_NAME = 'AgentCurrentImagePreviewLoopRequestV1';
 export const AGENT_CURRENT_IMAGE_PREVIEW_LOOP_OUTPUT_SCHEMA_NAME = 'AgentCurrentImagePreviewLoopResponseV1';
+export const AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_INPUT_SCHEMA_NAME =
+  'AgentCurrentImagePreviewLoopApplyReviewRequestV1';
+export const AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_OUTPUT_SCHEMA_NAME =
+  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_OUTPUT_SCHEMA_NAME;
 
 const agentLoopAdjustmentPatchSchema = z
   .object({
@@ -536,6 +542,15 @@ export const applyAgentCurrentImagePreviewLoopReviewedEdit = async (
   const snapshot = buildAgentImageContextSnapshot();
   if (snapshot.activeImagePath !== parsedRequest.review.selectedImagePath) {
     throw new Error('Agent selected-image preview loop apply rejected a different selected image.');
+  }
+  if (
+    snapshot.initialPreview.width !== parsedRequest.review.selectedImage.width ||
+    snapshot.initialPreview.height !== parsedRequest.review.selectedImage.height
+  ) {
+    throw new Error('Agent selected-image preview loop apply rejected stale selected-image dimensions.');
+  }
+  if (snapshot.previewIdentity !== parsedRequest.review.selectedImage.previewIdentity) {
+    throw new Error('Agent selected-image preview loop apply rejected stale preview identity.');
   }
   if (snapshot.graphRevision !== parsedRequest.review.rollbackCheckpoint.graphRevision) {
     throw new Error('Agent selected-image preview loop apply rejected stale rollback graph revision.');
