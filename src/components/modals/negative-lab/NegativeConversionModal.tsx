@@ -144,7 +144,9 @@ import {
   buildNegativeLabAcceptedApplyPlanFingerprint,
   buildNegativeLabAcceptedPlanIdentity,
   buildNegativeLabPlanHash,
+  getNegativeLabAcceptedApplyPlanStaleReasons,
   isNegativeLabAcceptedApplyPlanCurrent,
+  type NegativeLabAcceptedApplyPlanStaleReason,
 } from '../../../utils/negative-lab/negativeLabPlanIdentity';
 import {
   DEFAULT_NEGATIVE_LAB_UI_PRESET,
@@ -1062,6 +1064,14 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       acceptedApplyPlanFingerprint: acceptedBatchPlanJson,
       currentApplyPlanFingerprint: acceptedApplyPlanFingerprint,
     }) && !batchDryRunSummary.blocked;
+  const batchPlanStaleReasons = useMemo<NegativeLabAcceptedApplyPlanStaleReason[]>(
+    () =>
+      getNegativeLabAcceptedApplyPlanStaleReasons({
+        acceptedApplyPlanFingerprint: acceptedBatchPlanJson,
+        currentApplyPlanFingerprint: acceptedApplyPlanFingerprint,
+      }),
+    [acceptedApplyPlanFingerprint, acceptedBatchPlanJson],
+  );
   const canApplyRollNormalizationPlan = isBatchPlanAccepted && rollNormalizationPlan.affectedFrameIds.length > 0;
   const agentDryRunState: NegativeLabAgentDryRunState = batchDryRunSummary.blocked
     ? 'blocked'
@@ -3069,6 +3079,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           isRollNormalizationPlanAccepted={canApplyRollNormalizationPlan}
           isSaving={isSaving}
           params={params}
+          batchPlanStaleReasons={batchPlanStaleReasons}
           qcDecisionByFrameId={qcDecisionByFrameId}
           rejectedQcFrameIds={rejectedQcFrameIds}
           rollNormalizationApplyReceipt={visibleRollNormalizationApplyReceipt}
