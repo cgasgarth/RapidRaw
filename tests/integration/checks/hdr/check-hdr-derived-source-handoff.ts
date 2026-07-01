@@ -114,6 +114,9 @@ if (receipt.outputContentHash !== runtimeSidecarReceipt.output.contentHash) {
 if (handoff.runtimeSidecarReceipt?.deghost.motionPixelCount !== runtimeSidecarReceipt.deghost.motionPixelCount) {
   throw new Error('HDR editable handoff must preserve measured deghost sidecar metrics.');
 }
+if (!handoff.warningCodes.includes('motion_detected')) {
+  throw new Error('HDR editable handoff must preserve runtime motion warnings.');
+}
 
 const command = {
   actor: { id: 'agent_rawengine', kind: 'agent' },

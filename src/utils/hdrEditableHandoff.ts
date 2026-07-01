@@ -6,6 +6,7 @@ import {
 } from '../schemas/computational-merge/hdrMergeUiSchemas';
 import { getDisplayFileName } from './displayFilePath';
 import type { HdrBracketPreflightSourceMetadata } from './hdrBracketPreflight';
+import { buildHdrBracketPreflight } from './hdrBracketPreflight';
 
 const HDR_GRAPH_REVISION = 'hdr_legacy_runtime_v1';
 const HDR_PREVIEW_EXPORT_PARITY_FIELDS = [
@@ -46,6 +47,7 @@ export const buildHdrEditableHandoffSummary = ({
   sourcePaths: string[];
 }): HdrEditableHandoffSummary => {
   const metadataByPath = new Map((sourceMetadata ?? []).map((source) => [source.path, source]));
+  const bracketWarnings = buildHdrBracketPreflight(sourceMetadata)?.warningCodes ?? [];
   const sourceRefs = sourcePaths.map((path, sourceIndex) => ({
     contentHash: metadataByPath.get(path)?.contentHash ?? hashStableJson({ path, sourceIndex }),
     contentState: `path:${path}`,
@@ -79,6 +81,13 @@ export const buildHdrEditableHandoffSummary = ({
     previewStateHash,
     status: 'matched_editor_display_path',
   };
+  const warningCodes = [
+    ...new Set([
+      ...bracketWarnings,
+      ...((runtimeSidecarReceipt?.deghost.motionCoverageRatio ?? 0) > 0 ? ['motion_detected'] : []),
+      ...(settings.toneMapPreview ? ['tone_mapped_preview_only'] : []),
+    ]),
+  ];
 
   return hdrEditableHandoffSummarySchema.parse({
     capabilityLevel: 'runtime_apply_capable',
@@ -100,7 +109,7 @@ export const buildHdrEditableHandoffSummary = ({
     sceneMergeColorState: 'legacy_display_referred_merge_after_linear_to_srgb',
     sourceCount: sourcePaths.length,
     sourceRefs,
-    warningCodes: ['tone_mapped_preview_only'],
+    warningCodes,
     workingColorSpace: 'srgb_display_referred_v1',
   });
 };

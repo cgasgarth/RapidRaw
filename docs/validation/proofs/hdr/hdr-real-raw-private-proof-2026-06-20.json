@@ -4,7 +4,7 @@
   "featureFamily": "hdr_merge",
   "fixtureId": "validation.computational-merge.hdr-bracket-alignment.v1",
   "generatedDate": "2026-06-20",
-  "implementationIssue": 2062,
+  "implementationIssue": 4655,
   "proofStatus": "runtime_apply_capable",
   "sourceSet": {
     "localSourceRoot": "/Users/cgas/Pictures/Capture One/Alaska",
@@ -22,6 +22,8 @@
     "Production RAW decode accepted the Alaska ARW bracket sources.",
     "HDR merge generated private preview and export artifacts.",
     "Typed app-server dry-run/apply replay accepted decoded runtime samples.",
+    "Typed derived-output receipt proof kept source RAW hashes stable and measured output hash/dimensions intact across the handoff.",
+    "Derived HDR receipt stale-state proof covered source RAW hash, source graph revision, and HDR setting drift against the accepted apply receipt.",
     "Private RAW UI smoke rendered before/after review evidence.",
     "This proof is runtime apply capability, not final HDR/deghosting quality acceptance."
   ],
@@ -147,9 +149,9 @@
     }
   ],
   "validationCommands": [
-    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun run prepare:hdr-real-raw-private-root -- --require-assets",
-    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof bun run run:hdr-real-raw-private-proof",
-    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof bun run check:hdr-real-raw-private-app-server-proof",
-    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof bun run check:hdr-private-raw-ui-smoke"
+    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun scripts/private-raw/prepare/prepare-hdr-real-raw-private-root.ts -- --require-assets",
+    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof bun scripts/private-raw/proofs/computational/run-hdr-real-raw-private-proof.ts --require-assets",
+    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof bun tests/integration/checks/hdr/check-hdr-real-raw-private-app-server-proof.ts",
+    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-hdr-alaska-proof bun scripts/proofs/capture-visual-smoke.ts --scenario hdr-private-raw-ui"
   ]
 }
