@@ -49,6 +49,8 @@ interface EditorViewProps {
   refreshImageList: () => Promise<void>;
 }
 
+const DESKTOP_RIGHT_RAIL_WIDTH = 42;
+
 export default function EditorView({
   transformWrapperRef,
   isResizing,
@@ -105,6 +107,9 @@ export default function EditorView({
     })),
   );
   const isFullScreen = isFullScreenProp ?? isFullScreenFromStore;
+  const desktopRightShellWidth = activeRightPanel
+    ? rightPanelWidth + DESKTOP_RIGHT_RAIL_WIDTH
+    : DESKTOP_RIGHT_RAIL_WIDTH;
 
   const { multiSelectedPaths, imageRatings, isViewLoading, rootPaths } = useLibraryStore(
     useShallow((state) => ({
@@ -260,7 +265,7 @@ export default function EditorView({
         aria-label={t('editor.accessibility.toolsPanel')}
         className={cx(
           'flex overflow-hidden shrink-0',
-          isCompactPortrait ? 'flex-col bg-bg-secondary rounded-lg' : 'h-full bg-transparent',
+          isCompactPortrait ? 'flex-col bg-bg-secondary rounded-lg' : 'h-full min-w-0 bg-transparent',
           !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
         )}
         aria-hidden={isFullScreen}
@@ -275,7 +280,7 @@ export default function EditorView({
                 opacity: isFullScreen ? 0 : 1,
               }
             : {
-                maxWidth: isFullScreen ? '0px' : '1000px',
+                width: isFullScreen ? '0px' : `${desktopRightShellWidth + 8}px`,
                 opacity: isFullScreen ? 0 : 1,
               }
         }
@@ -308,21 +313,13 @@ export default function EditorView({
         ) : (
           <>
             <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
-            <div className="flex bg-bg-secondary rounded-lg h-full">
+            <div
+              className="grid h-full min-w-0 overflow-hidden rounded-lg bg-bg-secondary"
+              style={{ gridTemplateColumns: `${DESKTOP_RIGHT_RAIL_WIDTH}px minmax(0, 1fr)` }}
+            >
               <div
                 className={cx(
-                  'h-full overflow-hidden',
-                  !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
-                )}
-                style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
-              >
-                <div style={{ width: `${rightPanelWidth}px` }} className="h-full">
-                  {editorRightPanelContent}
-                </div>
-              </div>
-              <div
-                className={cx(
-                  'h-full border-l transition-colors',
+                  'h-full border-r transition-colors',
                   activeRightPanel ? 'border-surface' : 'border-transparent',
                 )}
               >
@@ -331,6 +328,17 @@ export default function EditorView({
                   onPanelSelect={handleRightPanelSelect}
                   isInstantTransition={isInstantTransition}
                 />
+              </div>
+              <div
+                className={cx(
+                  'h-full min-w-0 overflow-hidden',
+                  !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+                )}
+                style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
+              >
+                <div style={{ width: `${rightPanelWidth}px` }} className="h-full min-w-0">
+                  {editorRightPanelContent}
+                </div>
               </div>
             </div>
           </>

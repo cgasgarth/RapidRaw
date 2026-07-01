@@ -1156,7 +1156,61 @@ async function assertCompactOpenScopesStrip(strip, label) {
   }
 }
 
+async function expectLocatorWidth(page, testId: string, expectedWidth: number, tolerance = 1) {
+  const bounds = await page.getByTestId(testId).boundingBox();
+  if (!bounds) {
+    throw new Error(`${testId} should be visible for layout proof.`);
+  }
+  if (Math.abs(bounds.width - expectedWidth) > tolerance) {
+    throw new Error(`${testId} width expected ${expectedWidth}px, got ${bounds.width}px.`);
+  }
+  return bounds;
+}
+
+async function assertWorkflowRailLayout(page) {
+  const desktopInspector = await expectLocatorWidth(page, 'workflow-rail-desktop-inspector', 402);
+  const desktopResizer = await expectLocatorWidth(page, 'workflow-rail-desktop-resizer', 8);
+  const desktopRail = await expectLocatorWidth(page, 'workflow-rail-desktop-rail', 42);
+  const desktopPanel = await expectLocatorWidth(page, 'workflow-rail-desktop-panel', 360);
+  const desktopPreview = await page.getByTestId('workflow-rail-desktop-preview').boundingBox();
+
+  if (!desktopPreview || desktopPreview.width < 900) {
+    throw new Error(`Desktop preview should keep a stable professional width, got ${desktopPreview?.width ?? 'none'}.`);
+  }
+  if (desktopInspector.x < desktopResizer.x || desktopPanel.x < desktopRail.x) {
+    throw new Error('Desktop workflow rail order should be preview, resizer, rail, active panel.');
+  }
+  if (desktopPanel.width < 320) {
+    throw new Error(`Desktop panel should not fall below 320px minimum, got ${desktopPanel.width}.`);
+  }
+
+  const compact = page.getByTestId('workflow-rail-compact-portrait');
+  await compact.waitFor({ timeout: 10_000 });
+  const compactPreviewBefore = await page.getByTestId('workflow-rail-compact-preview').boundingBox();
+  const compactFilmstripBefore = await page.getByTestId('workflow-rail-compact-filmstrip').boundingBox();
+  const compactSwitcher = page.getByTestId('workflow-rail-compact-switcher');
+
+  await compactSwitcher.getByRole('button', { name: 'Color' }).click();
+  await page.getByTestId('workflow-rail-compact-active-panel').getByText('color', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+
+  const compactPreviewAfter = await page.getByTestId('workflow-rail-compact-preview').boundingBox();
+  const compactFilmstripAfter = await page.getByTestId('workflow-rail-compact-filmstrip').boundingBox();
+  if (!compactPreviewBefore || !compactPreviewAfter || !compactFilmstripBefore || !compactFilmstripAfter) {
+    throw new Error('Compact portrait preview and filmstrip must be visible for layout proof.');
+  }
+  if (
+    Math.abs(compactPreviewBefore.height - compactPreviewAfter.height) > 1 ||
+    Math.abs(compactFilmstripBefore.height - compactFilmstripAfter.height) > 1
+  ) {
+    throw new Error('Compact portrait preview/filmstrip geometry changed after horizontal panel switching.');
+  }
+}
+
 async function assertWorkflowRailSharedScopes(page) {
+  await assertWorkflowRailLayout(page);
+
   await page.getByRole('button', { name: 'Color' }).first().click();
   await page.getByTestId('color-workspace-panel').getByRole('heading', { exact: true, name: 'Color' }).waitFor({
     timeout: 10_000,
