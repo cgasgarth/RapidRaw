@@ -90,7 +90,15 @@ const runColorInvariants = () => {
   return cases;
 };
 
-const layerModes: readonly LayerBlendMode[] = ['normal', 'multiply', 'screen', 'overlay', 'soft_light'];
+const layerModes: readonly LayerBlendMode[] = [
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'soft_light',
+  'hue',
+  'saturation',
+];
 
 const makePixel = (): LayerRgbPixel => ({
   b: Math.round(randomRange(0, 255)),

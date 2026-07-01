@@ -2799,7 +2799,15 @@ interface LayerWorkflowState {
   visible: boolean;
 }
 
-const layerWorkflowSupportedBlendModes = ['normal', 'multiply', 'screen', 'overlay', 'soft_light'] as const;
+const layerWorkflowSupportedBlendModes = [
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'soft_light',
+  'hue',
+  'saturation',
+] as const;
 type LayerWorkflowBlendMode = (typeof layerWorkflowSupportedBlendModes)[number];
 
 const layerWorkflowFallbackLayer: LayerWorkflowState = {
@@ -4132,10 +4140,10 @@ function LayerStackWorkflowVisualSmoke() {
             >
               {copy.layerBlendOverlay}
             </button>
-            <div className="col-span-2 grid grid-cols-5 gap-1" data-testid="layer-stack-blend-mode-picker">
+            <div className="col-span-2 grid grid-cols-3 gap-1" data-testid="layer-stack-blend-mode-picker">
               {layerWorkflowSupportedBlendModes.map((blend) => (
                 <button
-                  className={`rounded-md border px-2 py-2 text-xs ${
+                  className={`rounded-md border px-1.5 py-2 text-[11px] ${
                     selectedLayerState.blend === blend
                       ? 'border-[#78d4ff] bg-[#24303a] text-white'
                       : 'border-white/10 bg-[#20252b] text-[#cbd5df]'

@@ -1812,6 +1812,8 @@ export const layerMaskBlendModeV1Schema = z.enum([
   'screen',
   'overlay',
   'soft_light',
+  'hue',
+  'saturation',
   'luminosity',
   'color',
 ]);
