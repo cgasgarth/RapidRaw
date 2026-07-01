@@ -1,0 +1,275 @@
+{
+  "artifacts": [],
+  "fixtureId": "validation.mask-refinement.full-image.synthetic.v1",
+  "generatedAt": "2026-07-01T20:18:42.684Z",
+  "issue": 4661,
+  "proofClaims": {
+    "doesNotProve": [
+      "private_real_raw_decode",
+      "manual_macos_app_ui_session",
+      "capture_one_class_quality_match"
+    ],
+    "proves": [
+      "synthetic_full_image_runtime_output",
+      "brush_mask_refinement_changes_pixels",
+      "static_mask_refinement_fallback_changes_pixels",
+      "refinement_control_directionality"
+    ]
+  },
+  "reportId": "mask-refinement.full-image.synthetic.v1",
+  "runtimeProof": {
+    "execution": "tauri_test_gpu_pipeline",
+    "maskPath": "prepare_export_masks + generate_mask_bitmap",
+    "outputArtifactCount": 1,
+    "rawDecodePath": "synthetic_fixture_builder",
+    "renderPath": "process_image_for_export_pipeline_with_tonemapper_override"
+  },
+  "source": {
+    "hash": "sha256:9c16c67279b2fb21d2d4efdc5723e7f497e8503d2cc1b23899e15c77c251a5a4",
+    "isRaw": false,
+    "kind": "synthetic_composite_fixture_v1",
+    "path": "synthetic://mask-refinement/full-image/v1",
+    "width": 448,
+    "height": 320
+  },
+  "summary": {
+    "baselineBrushOutputHash": "sha256:9466a04edf3e8a8eb577d8d6d48bf13e3353a858d9b1daf36718c60ef90ff7c3",
+    "baselineRadialOutputHash": "sha256:d1b3f478dc60a585e4c178d252eb25cadff01a2f864ccf24d981641a46bd4aa8",
+    "baselineUnmaskedOutputHash": "sha256:bd2fd3412267182dbab30c4f316e6ed0adef6d8fb7f273f0b2b7ed77a801a37b",
+    "densityResponseRatio": {
+      "passed": true,
+      "threshold": 0.92,
+      "value": 0.5513157221374985
+    },
+    "edgeContrastResponse": {
+      "passed": true,
+      "threshold": 0.005,
+      "value": 0.007540457589285714
+    },
+    "edgeShiftDirection": {
+      "erodeCoverageDelta": -0.029987991290266105,
+      "erodePassed": true,
+      "expandCoverageDelta": 0.037458639705882354,
+      "expandPassed": true
+    },
+    "featherEdgeSpreadGain": {
+      "passed": true,
+      "threshold": 0.005,
+      "value": 0.09177594866071428
+    },
+    "noNanOrInfInvariant": true,
+    "sourceHashUnchanged": true,
+    "staticFallbackChangedPixelRatio": {
+      "passed": true,
+      "threshold": 0.01,
+      "value": 0.12737165178571427
+    },
+    "smoothnessResponse": {
+      "passed": true,
+      "threshold": 0.005,
+      "value": 0.018195406495494948
+    },
+    "uniqueOutputHashCount": 9
+  },
+  "validationMode": "synthetic_mask_refinement_full_image_output_runtime_proof",
+  "variants": [
+    {
+      "affectedPixelRatio": 0.03899274553571429,
+      "alphaDecisiveness": 0.43614432222753424,
+      "edgeSpread": 0.010295758928571428,
+      "finiteMetrics": true,
+      "id": "brush-baseline",
+      "maskCoverageRatio": 0.03127322413340336,
+      "maskHash": "sha256:32d06635cc9e45935acb0b8e253a27e025f56821f2da2e6b4b8d6f13644d7da9",
+      "maskKind": "brush",
+      "outputHash": "sha256:9466a04edf3e8a8eb577d8d6d48bf13e3353a858d9b1daf36718c60ef90ff7c3",
+      "outputMeanAbsDelta": 0.008908784868113912,
+      "outputPath": null,
+      "parameterFocus": "baseline",
+      "refinement": {
+        "density": 1,
+        "edgeContrast": 0,
+        "edgeShiftPx": 0,
+        "featherPx": 0,
+        "hairDetail": 0,
+        "smoothness": 0
+      }
+    },
+    {
+      "affectedPixelRatio": 0.1663783482142857,
+      "alphaDecisiveness": 0.44512363272376426,
+      "edgeSpread": 0.10207170758928572,
+      "finiteMetrics": true,
+      "id": "brush-feather",
+      "maskCoverageRatio": 0.030756876969537814,
+      "maskHash": "sha256:36494e29354f173b5acddbfdcd229fd455a02214e561449ea0b6af564c8fba55",
+      "maskKind": "brush",
+      "outputHash": "sha256:b27c4b3e96ad091503a70d828e3a99924a9fd22b260d06f41e1f8f1d091823b9",
+      "outputMeanAbsDelta": 0.0087714916695845,
+      "outputPath": null,
+      "parameterFocus": "featherPx",
+      "refinement": {
+        "density": 1,
+        "edgeContrast": 0,
+        "edgeShiftPx": 0,
+        "featherPx": 12,
+        "hairDetail": 0,
+        "smoothness": 0
+      }
+    },
+    {
+      "affectedPixelRatio": 0.038839285714285715,
+      "alphaDecisiveness": 0.13957839046605522,
+      "edgeSpread": 0.035107421875,
+      "finiteMetrics": true,
+      "id": "brush-density",
+      "maskCoverageRatio": 0.016299949667366948,
+      "maskHash": "sha256:2937b426b053ea263131dd330e15fb0f716a3eaad21055e8ad7b0355c2f43bd8",
+      "maskKind": "brush",
+      "outputHash": "sha256:4c879e55ef493f00bf8e261e5e8f0d74c345fafa61a9ff7349ac554ee1ddd823",
+      "outputMeanAbsDelta": 0.00491155316293184,
+      "outputPath": null,
+      "parameterFocus": "density",
+      "refinement": {
+        "density": 0.52,
+        "edgeContrast": 0,
+        "edgeShiftPx": 0,
+        "featherPx": 0,
+        "hairDetail": 0,
+        "smoothness": 0
+      }
+    },
+    {
+      "affectedPixelRatio": 0.07731584821428572,
+      "alphaDecisiveness": 0.4371749659096225,
+      "edgeSpread": 0.011635044642857143,
+      "finiteMetrics": true,
+      "id": "brush-edge-shift-expand",
+      "maskCoverageRatio": 0.06873186383928571,
+      "maskHash": "sha256:ac01bcb105b1b2e6a1f8ed1c6f0b88e38414d6859f792af3df7c358255a3f7f7",
+      "maskKind": "brush",
+      "outputHash": "sha256:1843c50f7abeffac3e1f14b668777bd794e57fbcf02a9d322b5b23d159f188d9",
+      "outputMeanAbsDelta": 0.019414171918767507,
+      "outputPath": null,
+      "parameterFocus": "edgeShiftPx",
+      "refinement": {
+        "density": 1,
+        "edgeContrast": 0,
+        "edgeShiftPx": 6,
+        "featherPx": 0,
+        "hairDetail": 0,
+        "smoothness": 0
+      }
+    },
+    {
+      "affectedPixelRatio": 0.005545479910714286,
+      "alphaDecisiveness": 0.3922504047490546,
+      "edgeSpread": 0.0038016183035714285,
+      "finiteMetrics": true,
+      "id": "brush-edge-shift-erode",
+      "maskCoverageRatio": 0.001285232843137255,
+      "maskHash": "sha256:3da0212eba166fff6af832dbaaa5d270593b84d07f75e0c0f9cd06a5e83d1b97",
+      "maskKind": "brush",
+      "outputHash": "sha256:a5ad5dd8a23b9a6a823ccf7ff571ce096325eb2e2fec09e3b6f0a08cda151de0",
+      "outputMeanAbsDelta": 0.00037073813900560224,
+      "outputPath": null,
+      "parameterFocus": "edgeShiftPx",
+      "refinement": {
+        "density": 1,
+        "edgeContrast": 0,
+        "edgeShiftPx": -6,
+        "featherPx": 0,
+        "hairDetail": 0,
+        "smoothness": 0
+      }
+    },
+    {
+      "affectedPixelRatio": 0.038232421875,
+      "alphaDecisiveness": 0.4543397287230292,
+      "edgeSpread": 0.007784598214285714,
+      "finiteMetrics": true,
+      "id": "brush-smoothness",
+      "maskCoverageRatio": 0.03126425179446779,
+      "maskHash": "sha256:4af6f01ad8f1c9fb8abde876af5a16cc75949c96327bc3c3604a0ee73d1b8ce6",
+      "maskKind": "brush",
+      "outputHash": "sha256:7a170baf693ea98f59536911de44e879ca4abb67d38954d53f0b0968599f4c3a",
+      "outputMeanAbsDelta": 0.008888469450280111,
+      "outputPath": null,
+      "parameterFocus": "smoothness",
+      "refinement": {
+        "density": 1,
+        "edgeContrast": 0,
+        "edgeShiftPx": 0,
+        "featherPx": 0,
+        "hairDetail": 0,
+        "smoothness": 0.85
+      }
+    },
+    {
+      "affectedPixelRatio": 0.03294503348214286,
+      "alphaDecisiveness": 0.4133730454206994,
+      "edgeSpread": 0.0027553013392857145,
+      "finiteMetrics": true,
+      "id": "brush-edge-contrast",
+      "maskCoverageRatio": 0.031245322347689074,
+      "maskHash": "sha256:66121855de52fe395ed6bbee7a6eb27cd292c6295815251cc7559fbbca68c22d",
+      "maskKind": "brush",
+      "outputHash": "sha256:7ce72d9c56c555d2389b19a61631e196c37c680b004b86143c7df9eb6f4622ec",
+      "outputMeanAbsDelta": 0.008847191220238096,
+      "outputPath": null,
+      "parameterFocus": "edgeContrast",
+      "refinement": {
+        "density": 1,
+        "edgeContrast": 0.75,
+        "edgeShiftPx": 0,
+        "featherPx": 0,
+        "hairDetail": 0,
+        "smoothness": 0
+      }
+    },
+    {
+      "affectedPixelRatio": 0.12737165178571427,
+      "alphaDecisiveness": 0.4073497017099042,
+      "edgeSpread": 0.10555245535714286,
+      "finiteMetrics": true,
+      "id": "radial-baseline",
+      "maskCoverageRatio": 0.04309964220063025,
+      "maskHash": "sha256:0952a93a16f8a9c62ff82fa0302327de3d46675a4a1072275765f02ce78441b9",
+      "maskKind": "radial",
+      "outputHash": "sha256:d1b3f478dc60a585e4c178d252eb25cadff01a2f864ccf24d981641a46bd4aa8",
+      "outputMeanAbsDelta": 0.011176716780462184,
+      "outputPath": null,
+      "parameterFocus": "static-fallback",
+      "refinement": {
+        "density": 1,
+        "edgeContrast": 0,
+        "edgeShiftPx": 0,
+        "featherPx": 0,
+        "hairDetail": 0,
+        "smoothness": 0
+      }
+    },
+    {
+      "affectedPixelRatio": 0.1968959263392857,
+      "alphaDecisiveness": 0.4292859259259247,
+      "edgeSpread": 0.11771065848214286,
+      "finiteMetrics": true,
+      "id": "radial-feather",
+      "maskCoverageRatio": 0.04223936449579832,
+      "maskHash": "sha256:a56499714eeaf80c107424478783cf05e6abc000773e7a0bee7b3db6dd96b905",
+      "maskKind": "radial",
+      "outputHash": "sha256:c5b28375634403e9524a50f9d2bce9ebf4b625c0df8a9e20aeaca825695b4db6",
+      "outputMeanAbsDelta": 0.01056398991888422,
+      "outputPath": null,
+      "parameterFocus": "featherPx",
+      "refinement": {
+        "density": 1,
+        "edgeContrast": 0,
+        "edgeShiftPx": 0,
+        "featherPx": 18,
+        "hairDetail": 0,
+        "smoothness": 0
+      }
+    }
+  ]
+}
