@@ -21,6 +21,8 @@ import { type PanoramaSyntheticSourceFrameV1, renderSyntheticPanoramaStitchV1 } 
 const PANORAMA_RUNTIME_ENGINE_ID = 'rawengine_panorama_synthetic_v1';
 const PANORAMA_RUNTIME_ENGINE_VERSION = '0.1.0';
 const PANORAMA_CYCLE_RESIDUAL_THRESHOLD_PX = 2;
+const PANORAMA_TILE_BYTES_PER_RGB_PIXEL = 3;
+const PANORAMA_TILE_BYTES_PER_RGBA_PIXEL = 4;
 
 export const panoramaRuntimeSourceFrameV1Schema = z
   .object({
@@ -240,6 +242,16 @@ export const panoramaRuntimeProvenanceV1Schema = z
         .strict(),
     ),
     stitchedSourceCount: z.number().int().positive(),
+    tileRender: z
+      .object({
+        maxTileHeightPx: z.number().int().positive(),
+        maxTileWidthPx: z.number().int().positive(),
+        seamHaloPx: z.number().int().nonnegative(),
+        tileBackedRender: z.literal(true),
+        tileCount: z.number().int().min(2),
+        tileSizePx: z.number().int().positive(),
+      })
+      .strict(),
   })
   .strict();
 
@@ -285,6 +297,7 @@ export const buildPanoramaRuntimeDryRunV1 = (requestValue: unknown): PanoramaRun
       request.command.parameters.seamExposureCompensationPercent,
       request.command.parameters.overlapFeatherPx ?? 64,
       JSON.stringify(runtime.provenance.crop),
+      JSON.stringify(runtime.provenance.tileRender),
     ].join(':'),
   )}`;
   const renderedContentHash = hashPanoramaRuntimePixels(runtime.outputPixels);
@@ -316,7 +329,8 @@ export const buildPanoramaRuntimeDryRunV1 = (requestValue: unknown): PanoramaRun
       },
       outputName: request.command.parameters.outputName,
       performanceEstimate: {
-        estimatedPeakMemoryBytes: runtime.width * runtime.height * 4,
+        estimatedPeakMemoryBytes: buildPanoramaPreflightEstimate(request, runtime.width, runtime.height)
+          .memoryComponents.totalEstimatedPeakBytes,
         estimatedRuntimeMs: 1,
         requiresBackgroundJob: false,
       },
@@ -441,7 +455,7 @@ export const buildPanoramaRuntimeArtifactV1 = ({
         cylindricalProjection: true,
         exposureNormalization: true,
         planarHomography: true,
-        tiledRender: false,
+        tiledRender: provenance.tileRender.tileBackedRender,
       },
       engineId: 'rapidraw_homography_seam_v0',
       qualityTier: 'validated_planar_v1',
@@ -481,6 +495,7 @@ export const buildPanoramaRuntimeArtifactV1 = ({
       reprojectionRmsPx: meanPanoramaRuntimeReprojectionError(provenance),
       sourceCount: sourceImageRefs.length,
       stitchedSourceCount: provenance.stitchedSourceCount,
+      tileCount: provenance.tileRender.tileCount,
     },
     warnings: mutationResult.warnings.filter(isPanoramaArtifactWarning),
   });
@@ -523,6 +538,7 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
     memoryBudgetBytes: request.command.parameters.memoryBudgetBytes ?? 4_000_000_000,
     projection: resolvePanoramaRuntimeProjection(request.command.parameters.projection),
     seed: request.seed,
+    seamHaloPx: buildPanoramaRuntimeSeamHaloPx(request.command, alignment),
     seamExposureCompensationPercent: request.command.parameters.seamExposureCompensationPercent,
     sourceFrames: request.sourceFrames.map((frame) => toSyntheticSourceFrame(frame, request.command)),
   });
@@ -581,6 +597,10 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
         sourceIndex: frame.sourceIndex,
       })),
       stitchedSourceCount: stitched.stitchedSourceCount,
+      tileRender: {
+        ...stitched.tilePlan,
+        tileBackedRender: true,
+      },
     }),
     warnings,
     width: crop.width,
@@ -591,30 +611,45 @@ const buildPanoramaPreflightEstimate = (request: ParsedPanoramaRuntimePlanReques
   const sourcePixelCount = request.sourceFrames.reduce((total, frame) => total + frame.width * frame.height, 0);
   const sourceGeometry = classifyPanoramaSourceGeometry(request.sourceFrames, request.connectedSourceIndices);
   const outputPixelCount = width * height;
-  const sourceDecodeBytes = sourcePixelCount * 4;
-  const outputCanvasBytes = outputPixelCount * 4;
-  const previewBytes = outputPixelCount * 4;
+  const sourceDecodeBytes = sourcePixelCount * PANORAMA_TILE_BYTES_PER_RGBA_PIXEL;
+  const tilePlan = estimatePanoramaRuntimeTilePlan(width, height, buildPanoramaRuntimeSeamHaloPx(request.command));
+  const outputTileBufferBytes = tilePlan.maxTileWidthPx * tilePlan.maxTileHeightPx * PANORAMA_TILE_BYTES_PER_RGB_PIXEL;
+  const outputTileMaskBytes = tilePlan.maxTileWidthPx * tilePlan.maxTileHeightPx;
+  const tileCacheBytes = Math.min(outputPixelCount, tilePlan.tileCount * outputTileMaskBytes);
+  const seamWorkspaceBytes =
+    (tilePlan.maxTileWidthPx + tilePlan.seamHaloPx * 2) *
+    (tilePlan.maxTileHeightPx + tilePlan.seamHaloPx * 2) *
+    PANORAMA_TILE_BYTES_PER_RGBA_PIXEL;
+  const previewBytes = outputPixelCount * PANORAMA_TILE_BYTES_PER_RGBA_PIXEL;
   const memoryComponents = {
-    lowDetailMaskBytes: outputPixelCount,
-    outputCanvasBytes,
-    outputMaskBytes: outputPixelCount,
+    lowDetailMaskBytes: tileCacheBytes,
+    outputCanvasBytes: outputTileBufferBytes,
+    outputMaskBytes: outputTileMaskBytes,
     overheadBytes: 4096,
     previewBytes,
-    seamWorkspaceBytes: outputPixelCount,
+    seamWorkspaceBytes,
     sourceDecodeBytes,
-    totalEstimatedPeakBytes: sourceDecodeBytes + outputCanvasBytes + previewBytes + outputPixelCount * 3 + 4096,
+    totalEstimatedPeakBytes:
+      sourceDecodeBytes +
+      outputTileBufferBytes +
+      outputTileMaskBytes +
+      tileCacheBytes +
+      previewBytes +
+      seamWorkspaceBytes +
+      4096,
   };
-  const memoryBudgetBytes = Math.max(memoryComponents.totalEstimatedPeakBytes * 2, 1);
-  const warningCodes = [...new Set(['legacy_full_frame_render', ...sourceGeometry.warningCodes])].sort();
+  const memoryBudgetBytes =
+    request.command.parameters.memoryBudgetBytes ?? Math.max(memoryComponents.totalEstimatedPeakBytes * 2, 1);
+  const warningCodes = [...new Set(sourceGeometry.warningCodes)].sort();
   return {
     blockedReasons: sourceGeometry.blockedReasons,
     engineCapabilities: {
-      fullFrameLegacy: true,
+      fullFrameLegacy: false,
       maxPreviewDimensionPx: request.command.parameters.maxPreviewDimensionPx,
       planOnly: true,
-      tileBackedRender: false,
+      tileBackedRender: true,
     },
-    executionMode: 'full_frame_legacy',
+    executionMode: 'tile_backed_render',
     geometryEstimate: {
       outputPixelCount,
       projectedBounds: {
@@ -631,16 +666,51 @@ const buildPanoramaPreflightEstimate = (request: ParsedPanoramaRuntimePlanReques
     memoryComponents,
     sourceGeometry,
     status: sourceGeometry.blockedReasons.length > 0 ? 'blocked_plan_only' : 'accepted',
-    tileCount: 1,
+    tileCount: tilePlan.tileCount,
     warningCodes,
   };
 };
 
 const expectedWarningsForCommand = (command: PanoramaRuntimeCommandV1): string[] => {
-  const warnings = new Set<string>(['legacy_full_frame_render']);
+  const warnings = new Set<string>();
   if (command.parameters.projection === 'spherical') warnings.add('projection_runtime_deferred');
   if (command.parameters.boundaryMode === 'deferred_fill') warnings.add('boundary_runtime_deferred');
   return [...warnings].sort();
+};
+
+const estimatePanoramaRuntimeTilePlan = (
+  width: number,
+  height: number,
+  seamHaloPx: number,
+): PanoramaRuntimeProvenanceV1['tileRender'] => {
+  const tileSizePx = 512;
+  const maxTileWidthPx = width > 1 ? Math.min(tileSizePx, Math.ceil(width / 2)) : 1;
+  const maxTileHeightPx =
+    height > 1 && width === 1 ? Math.min(tileSizePx, Math.ceil(height / 2)) : Math.min(tileSizePx, height);
+  const columns = Math.max(1, Math.ceil(width / maxTileWidthPx));
+  const rows = Math.max(1, Math.ceil(height / maxTileHeightPx));
+  return {
+    maxTileHeightPx,
+    maxTileWidthPx,
+    seamHaloPx,
+    tileBackedRender: true,
+    tileCount: columns * rows,
+    tileSizePx,
+  };
+};
+
+const buildPanoramaRuntimeSeamHaloPx = (
+  command: PanoramaRuntimeCommandV1,
+  alignment?: PanoramaRuntimeProvenanceV1['alignment'],
+): number =>
+  Math.max(command.parameters.overlapFeatherPx ?? 64, alignment ? panoramaRuntimeAlignmentResidualP95Px(alignment) : 0);
+
+const panoramaRuntimeAlignmentResidualP95Px = (alignment: PanoramaRuntimeProvenanceV1['alignment']): number => {
+  const residuals = alignment.pairwiseMatches
+    .map((match) => match.reprojectionErrorPx)
+    .toSorted((left, right) => left - right);
+  if (residuals.length === 0) return 0;
+  return Math.ceil(residuals[Math.min(residuals.length - 1, Math.floor(residuals.length * 0.95))] ?? 0);
 };
 
 const buildPanoramaRuntimeProjectionSettings = (

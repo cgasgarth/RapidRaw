@@ -1,6 +1,13 @@
 import { z } from 'zod';
+import {
+  type RawEngineAgentInitialPreviewReceiptV1,
+  type RawEngineAgentPreviewRefreshReceiptV1,
+  rawEngineAgentInitialPreviewReceiptV1Schema,
+  rawEngineAgentPreviewRefreshReceiptV1Schema,
+} from '../../../../packages/rawengine-schema/src/localAppServerBridge';
 import { agentHistoryRollbackResponseSchema } from '../session/agentSessionHistory';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
+import { buildAgentInitialPromptContext } from './agentInitialPromptContext';
 
 export const AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME = 'rawengine.agent.selected_image.preview_loop';
 export const AGENT_CURRENT_IMAGE_PREVIEW_LOOP_INPUT_SCHEMA_NAME = 'AgentCurrentImagePreviewLoopRequestV1';
@@ -151,6 +158,142 @@ const rollbackCheckpointSchema = z
   })
   .strict();
 
+const buildPreviewReceiptContentHash = (receiptSeed: {
+  artifactId: string;
+  graphRevision: string;
+  imagePath: string;
+  renderHash: string;
+  requestId: string;
+  sessionId: string;
+}): string => {
+  const hashSeed = JSON.stringify(receiptSeed);
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < hashSeed.length; index += 1) {
+    hash ^= hashSeed.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+
+  return `sha256:${(hash >>> 0).toString(16).padStart(16, '0')}`;
+};
+
+const buildSelectedImageInitialPreviewReceipt = ({
+  operationId,
+  prompt,
+  requestId,
+  sessionId,
+}: {
+  operationId: string;
+  prompt: string;
+  requestId: string;
+  sessionId: string;
+}): RawEngineAgentInitialPreviewReceiptV1 => {
+  const initialContext = buildAgentInitialPromptContext({ operationId, prompt, sessionId });
+
+  return rawEngineAgentInitialPreviewReceiptV1Schema.parse({
+    colorPipeline: {
+      encodedProfile: 'srgb-preview',
+      outputProfile: 'srgb',
+      previewTransform: 'editor-preview-to-srgb-jpeg',
+      workingSpace: 'rawengine-scene-linear',
+    },
+    contentHash: buildPreviewReceiptContentHash({
+      artifactId: initialContext.preview.artifactId,
+      graphRevision: initialContext.modelInput.graphRevision,
+      imagePath: initialContext.modelInput.activeImagePath,
+      renderHash: initialContext.preview.renderHash,
+      requestId,
+      sessionId,
+    }),
+    graphRevision: initialContext.modelInput.graphRevision,
+    imagePath: initialContext.modelInput.activeImagePath,
+    preview: {
+      accessScope: initialContext.preview.accessScope,
+      artifactId: initialContext.preview.artifactId,
+      encodedFormat: initialContext.preview.encodedFormat,
+      height: initialContext.modelInput.initialPreview.height,
+      includesOriginalRaw: initialContext.modelInput.initialPreview.includesOriginalRaw,
+      longEdgePx: initialContext.preview.longEdgePx,
+      mediaType: initialContext.preview.mediaType,
+      previewRef: initialContext.preview.previewRef,
+      purpose: initialContext.preview.purpose,
+      quality: initialContext.preview.quality,
+      recipeHash: initialContext.preview.recipeHash,
+      renderHash: initialContext.preview.renderHash,
+      width: initialContext.modelInput.initialPreview.width,
+    },
+    proofContext: {
+      stale: initialContext.imageContext.initialPreview.recipeHash !== initialContext.preview.recipeHash,
+      transport: initialContext.modelInput.transport,
+    },
+    requestId,
+    schemaVersion: 1,
+    sessionId,
+    toolName: 'rawengine.agent.initial_prompt_preview',
+  });
+};
+
+const buildSelectedImagePreviewRefreshReceipt = ({
+  graphRevision,
+  imagePath,
+  preview,
+  requestId,
+  sessionId,
+  sourceToolName,
+  turn,
+}: {
+  graphRevision: string;
+  imagePath: string;
+  preview: {
+    accessScope: 'local_private';
+    artifactId: string;
+    encodedFormat: 'jpeg';
+    height: number;
+    includesOriginalRaw: false;
+    longEdgePx: number;
+    mediaType: 'image/jpeg';
+    previewRef: string;
+    purpose: 'detail_review' | 'refresh';
+    quality: number;
+    recipeHash: string;
+    renderHash: string;
+    width: number;
+  };
+  requestId: string;
+  sessionId: string;
+  sourceToolName: string;
+  turn: number;
+}): RawEngineAgentPreviewRefreshReceiptV1 =>
+  rawEngineAgentPreviewRefreshReceiptV1Schema.parse({
+    colorPipeline: {
+      encodedProfile: 'srgb-preview',
+      outputProfile: 'srgb',
+      previewTransform: 'editor-preview-to-srgb-jpeg',
+      workingSpace: 'rawengine-scene-linear',
+    },
+    contentHash: buildPreviewReceiptContentHash({
+      artifactId: preview.artifactId,
+      graphRevision,
+      imagePath,
+      renderHash: preview.renderHash,
+      requestId,
+      sessionId,
+    }),
+    graphRevision,
+    imagePath,
+    preview,
+    proofContext: {
+      expectedRecipeHash: preview.recipeHash,
+      sourceToolName,
+      stale: false,
+      transport: 'codex_app_server',
+    },
+    requestId,
+    schemaVersion: 1,
+    sessionId,
+    toolName: 'rawengine.agent.preview.render',
+    turn,
+  });
+
 export const agentCurrentImagePreviewLoopResultSchema = z
   .object({
     acceptedDryRunPlanCount: z.number().int().min(1),
@@ -199,10 +342,12 @@ export const agentCurrentImagePreviewLoopResultSchema = z
     finalRecipeHash: z.string().trim().min(1),
     initialGraphRevision: z.string().trim().min(1),
     initialPreviewArtifactId: z.string().trim().min(1),
+    initialPreviewReceipt: rawEngineAgentInitialPreviewReceiptV1Schema,
     initialRecipeHash: z.string().trim().min(1),
     previewIdentity: z.string().trim().min(1).nullable(),
     previewLineage: z.array(previewLineageSchema).min(1),
     previewRefreshCount: z.number().int().min(1),
+    previewRefreshReceipts: z.array(rawEngineAgentPreviewRefreshReceiptV1Schema).min(1),
     requestId: z.string().trim().min(1),
     reviewStatus: z.enum(['max_iterations_reached', 'needs_user_review']),
     rollbackCheckpoint: rollbackCheckpointSchema,
@@ -227,6 +372,7 @@ export type AgentCurrentImagePreviewLoopResult = z.infer<typeof agentCurrentImag
 export const agentCurrentImagePreviewLoopApplyReviewRequestSchema = z
   .object({
     acceptedPreviewArtifactId: z.string().trim().min(1),
+    acceptedPreviewReceiptHash: z.string().regex(/^sha256:[a-f0-9]{16,64}$/u),
     request: agentCurrentImagePreviewLoopRequestSchema,
     review: agentCurrentImagePreviewLoopResultSchema,
   })
@@ -264,6 +410,12 @@ export const runAgentCurrentImagePreviewLoop = async (
 ): Promise<AgentCurrentImagePreviewLoopResult> => {
   const parsedRequest = agentCurrentImagePreviewLoopRequestSchema.parse(request);
   const initialSnapshot = assertSelectedImageLoopSnapshot(parsedRequest);
+  const initialPreviewReceipt = buildSelectedImageInitialPreviewReceipt({
+    operationId: parsedRequest.operationId,
+    prompt: parsedRequest.prompt,
+    requestId: `${parsedRequest.requestId}-initial-preview`,
+    sessionId: parsedRequest.sessionId,
+  });
   const { runAgentIterativeEditLoop } = await import('../planning/agentIterativeEditLoop.js');
   const {
     expectedGraphRevision: _expectedGraphRevision,
@@ -275,6 +427,35 @@ export const runAgentCurrentImagePreviewLoop = async (
     ...loopRequest
   } = parsedRequest;
   const loopResult = await runAgentIterativeEditLoop(loopRequest);
+  const previewRefreshReceipts = loopResult.previewLineage.map((lineage, index) => {
+    const preview = loopResult.previewRefreshes[index];
+    if (preview === undefined) {
+      throw new Error('Agent selected-image preview loop missing refresh preview for lineage receipt.');
+    }
+    return buildSelectedImagePreviewRefreshReceipt({
+      graphRevision: lineage.appliedGraphRevision,
+      imagePath: initialSnapshot.activeImagePath,
+      preview: {
+        accessScope: preview.accessScope,
+        artifactId: preview.artifactId,
+        encodedFormat: preview.encodedFormat,
+        height: preview.height,
+        includesOriginalRaw: preview.includesOriginalRaw,
+        longEdgePx: preview.longEdgePx,
+        mediaType: preview.mediaType,
+        previewRef: preview.previewRef,
+        purpose: lineage.previewPurpose,
+        quality: preview.quality,
+        recipeHash: preview.recipeHash,
+        renderHash: preview.renderHash,
+        width: preview.width,
+      },
+      requestId: `${parsedRequest.requestId}-preview-${index + 1}`,
+      sessionId: parsedRequest.sessionId,
+      sourceToolName: lineage.sourceToolName,
+      turn: lineage.turn,
+    });
+  });
 
   return agentCurrentImagePreviewLoopResultSchema.parse({
     acceptedDryRunPlanCount: loopResult.acceptedDryRunPlanCount,
@@ -311,10 +492,12 @@ export const runAgentCurrentImagePreviewLoop = async (
     finalRecipeHash: loopResult.finalRecipeHash,
     initialGraphRevision: initialSnapshot.graphRevision,
     initialPreviewArtifactId: initialSnapshot.initialPreview.artifactId,
+    initialPreviewReceipt,
     initialRecipeHash: initialSnapshot.initialPreview.recipeHash,
     previewIdentity: initialSnapshot.previewIdentity,
     previewLineage: loopResult.previewLineage,
     previewRefreshCount: loopResult.previewRefreshCount,
+    previewRefreshReceipts,
     requestId: loopResult.requestId,
     reviewStatus: loopResult.reviewStatus,
     rollbackCheckpoint: loopResult.rollbackCheckpoint,
@@ -336,11 +519,18 @@ export const applyAgentCurrentImagePreviewLoopReviewedEdit = async (
 ): Promise<AgentCurrentImagePreviewLoopResult> => {
   const parsedRequest = agentCurrentImagePreviewLoopApplyReviewRequestSchema.parse(request);
   const latestPreview = parsedRequest.review.previewLineage.at(-1);
+  const latestPreviewReceipt = parsedRequest.review.previewRefreshReceipts.at(-1);
   if (latestPreview === undefined || parsedRequest.review.previewRefreshCount < 2) {
     throw new Error('Agent selected-image preview loop apply requires at least two refreshed previews.');
   }
+  if (latestPreviewReceipt === undefined) {
+    throw new Error('Agent selected-image preview loop apply requires a latest preview refresh receipt.');
+  }
   if (parsedRequest.acceptedPreviewArtifactId !== latestPreview.previewArtifactId) {
     throw new Error('Agent selected-image preview loop apply rejected stale preview artifact.');
+  }
+  if (parsedRequest.acceptedPreviewReceiptHash !== latestPreviewReceipt.contentHash) {
+    throw new Error('Agent selected-image preview loop apply rejected stale preview receipt.');
   }
 
   const snapshot = buildAgentImageContextSnapshot();

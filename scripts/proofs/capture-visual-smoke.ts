@@ -2594,11 +2594,12 @@ async function prepareScenario(page, mode) {
     if (
       runtimePlanProof.runtimePlanReady !== 'true' ||
       runtimePlanProof.planStatus !== 'accepted' ||
-      runtimePlanProof.planScope !== 'geometry_memory_only' ||
+      runtimePlanProof.planScope !== 'tile_runtime_output' ||
       runtimePlanProof.outputDimensions !== '9024 x 3200' ||
       runtimePlanProof.sourceGeometryLayout !== 'single_row' ||
       runtimePlanProof.sourceGeometrySupport !== 'implemented_current_engine' ||
-      runtimePlanProof.sourceRowCountEstimate !== '1'
+      runtimePlanProof.sourceRowCountEstimate !== '1' ||
+      runtimePlanProof.tileCount !== '18'
     ) {
       throw new Error(`Panorama runtime plan proof failed: ${JSON.stringify(runtimePlanProof)}`);
     }

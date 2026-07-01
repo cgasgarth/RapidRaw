@@ -226,6 +226,18 @@ if (applied.apply.provenance.projectionSettings.effectiveProjection !== 'rectili
 if (applied.apply.provenance.boundaryMode !== 'auto_crop') {
   throw new Error('Expected panorama runtime to preserve auto-crop boundary mode.');
 }
+if (
+  applied.apply.provenance.tileRender.tileBackedRender !== true ||
+  applied.apply.provenance.tileRender.tileCount !== applied.apply.sidecarArtifact.validationMetrics.tileCount
+) {
+  throw new Error('Expected panorama app-server apply to report tile-backed output metadata.');
+}
+if (dryRun.dryRun.dryRunResult.mergePlan.preflight.executionMode !== 'tile_backed_render') {
+  throw new Error('Expected panorama app-server dry-run to report tile-backed preflight execution.');
+}
+if (dryRun.dryRun.dryRunResult.warnings.includes('legacy_full_frame_render')) {
+  throw new Error('Expected panorama app-server dry-run to omit legacy full-frame warning on tiled runtime.');
+}
 if (applied.apply.sidecarArtifact.sourceImageRefs.length !== sourceFrames.length) {
   throw new Error('Expected panorama app-server apply to return editable sidecar source refs.');
 }
@@ -304,6 +316,7 @@ console.log(
     output: dryRun.dryRun.dryRunResult.mergePlan.outputDimensions,
     outputSha256: new Bun.CryptoHasher('sha256').update(applied.apply.outputPixels).digest('hex'),
     planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+    tileRender: applied.apply.provenance.tileRender,
     seamReviewScenarios: [
       supportedTranscript.scenario,
       weakOverlapTranscript.scenario,
