@@ -140,6 +140,7 @@ export const buildSuperResolutionArtifactSidecarRecordV1 = ({
       falseDetailRisk: provenance.changedPixelRatioAgainstNearest < 0.2 ? 'medium' : 'low',
       humanReviewStatus,
       overlapCoverageRatio: provenance.confidenceMap.completeSampleRatio,
+      registrationMetrics: summarizeRegistrationMetrics(provenance),
       sourceCount: parsedCommand.parameters.sources.length,
     },
     warningCodes: warnings,
@@ -271,6 +272,29 @@ const averageRegistrationConfidence = (
   if (provenance.frameRegistrations.length === 0) return undefined;
   const total = provenance.frameRegistrations.reduce((sum, registration) => sum + registration.confidence, 0);
   return roundMetric(total / provenance.frameRegistrations.length);
+};
+
+const summarizeRegistrationMetrics = (
+  provenance: SuperResolutionRuntimeProvenanceV1,
+): NonNullable<SuperResolutionArtifactV1['validationSummary']['registrationMetrics']> => {
+  const registrations = provenance.frameRegistrations;
+  const measuredSubpixelFrameCount = registrations.filter(
+    (registration) => registration.measuredShiftX !== 0 || registration.measuredShiftY !== 0,
+  ).length;
+  const totalResidual = registrations.reduce((sum, registration) => sum + registration.registrationResidualPx, 0);
+  const totalConfidence = registrations.reduce((sum, registration) => sum + registration.confidence, 0);
+  const maxResidualPx = registrations.reduce(
+    (maxResidual, registration) => Math.max(maxResidual, registration.registrationResidualPx),
+    0,
+  );
+
+  return {
+    algorithmId: 'output_lattice_phase_residual_v1',
+    averageConfidence: roundMetric(totalConfidence / Math.max(1, registrations.length)),
+    averageResidualPx: roundMetric(totalResidual / Math.max(1, registrations.length)),
+    maxResidualPx: roundMetric(maxResidualPx),
+    measuredSubpixelFrameCount,
+  };
 };
 
 const deriveWarningCodes = (

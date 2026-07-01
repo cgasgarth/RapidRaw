@@ -17,6 +17,7 @@ type BuildReceiptInput = Omit<DerivedOutputReceipt, 'provenanceSidecar' | 'recei
   provenanceSidecar?: {
     acceptedApplyId?: string;
     acceptedDryRunId?: string;
+    superResolution?: DerivedOutputProvenanceSidecar['superResolution'];
     warnings: string[];
   };
   settings: unknown;
@@ -69,6 +70,9 @@ export const buildDerivedOutputReceipt = (input: BuildReceiptInput): DerivedOutp
             ...(input.provenanceSidecar?.acceptedDryRunId === undefined
               ? {}
               : { acceptedDryRunId: input.provenanceSidecar.acceptedDryRunId }),
+            ...(input.provenanceSidecar?.superResolution === undefined
+              ? {}
+              : { superResolution: input.provenanceSidecar.superResolution }),
           }),
         }),
   });
@@ -139,6 +143,7 @@ export const buildDerivedOutputProvenanceSidecar = ({
   sourceContentHashes,
   sourceGraphRevisions,
   sourcePaths = [],
+  superResolution,
   warnings,
 }: {
   acceptedApplyId?: string;
@@ -151,6 +156,7 @@ export const buildDerivedOutputProvenanceSidecar = ({
   sourceContentHashes: string[];
   sourceGraphRevisions: string[];
   sourcePaths?: Array<string | undefined>;
+  superResolution?: DerivedOutputProvenanceSidecar['superResolution'];
   warnings: string[];
 }): DerivedOutputProvenanceSidecar =>
   derivedOutputProvenanceSidecarSchema.parse({
@@ -178,6 +184,7 @@ export const buildDerivedOutputProvenanceSidecar = ({
       order,
       ...(sourcePaths[order] === undefined || sourcePaths[order] === '' ? {} : { path: sourcePaths[order] }),
     })),
+    ...(superResolution === undefined ? {} : { superResolution }),
     warnings: [...new Set(warnings)].sort(),
   });
 
@@ -339,6 +346,21 @@ export const buildSuperResolutionDerivedOutputReceipt = ({
           provenanceSidecar: {
             acceptedApplyId: review.outputArtifactId,
             acceptedDryRunId: review.supportMap.artifactId,
+            ...(review.registrationMetrics === null
+              ? {}
+              : {
+                  superResolution: {
+                    registrationMetrics: review.registrationMetrics,
+                    supportMap: {
+                      artifactId: review.supportMap.artifactId,
+                      coverageRatio: review.supportMap.coverageRatio,
+                      effectiveScale: review.supportMap.effectiveScale,
+                      requestedScale: review.supportMap.requestedScale,
+                      reviewStatus: review.supportMap.reviewStatus,
+                      weakSupportRatio: review.supportMap.weakSupportRatio,
+                    },
+                  },
+                }),
             warnings: review.warningCodes,
           },
         }

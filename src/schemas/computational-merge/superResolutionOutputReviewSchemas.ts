@@ -112,6 +112,16 @@ export const superResolutionOutputReviewWorkflowSchema = z
     proofLevel: z.literal('synthetic_runtime'),
     qualityPreference: superResolutionQualityPreferenceSchema,
     reconstructionMode: superResolutionReconstructionModeSchema,
+    registrationMetrics: z
+      .object({
+        algorithmId: z.literal('output_lattice_phase_residual_v1'),
+        averageConfidence: z.number().min(0).max(1),
+        averageResidualPx: z.number().min(0),
+        maxResidualPx: z.number().min(0),
+        measuredSubpixelFrameCount: z.number().int().nonnegative(),
+      })
+      .strict()
+      .nullable(),
     reviewArtifacts: z.array(superResolutionOutputReviewArtifactSchema).min(1),
     reviewCropCount: z.number().int().nonnegative(),
     reviewPacketPath: z.string().min(1),

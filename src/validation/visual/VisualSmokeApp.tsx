@@ -5782,6 +5782,7 @@ function SuperResolutionPrivateRawModalReviewSmoke() {
     proofLevel: 'synthetic_runtime',
     qualityPreference: settings.qualityPreference,
     reconstructionMode: settings.reconstructionMode,
+    registrationMetrics: null,
     reviewArtifacts: [
       {
         contentHash: proof.resultReviewHash,
