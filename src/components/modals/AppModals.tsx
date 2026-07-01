@@ -306,6 +306,7 @@ export default function AppModals(props: AppModalsProps) {
               }));
             }}
             progressMessage={hdrModalState.progressMessage}
+            runtimePlan={hdrModalState.runtimePlan}
             settings={hdrModalState.settings}
             sourceMetadata={hdrModalState.sourceMetadata}
             sourcePaths={hdrModalState.stitchingSourcePaths}

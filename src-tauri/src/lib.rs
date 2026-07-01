@@ -74,7 +74,8 @@ use tempfile::NamedTempFile;
 
 use crate::formats::PNG_DATA_URL_PREFIX;
 use crate::hdr_artifact_sidecar::{
-    build_hdr_runtime_plan, build_unique_hdr_output_path, write_hdr_output_sidecar,
+    HdrDryRunPlanResponse, build_hdr_dry_run_plan_response, build_hdr_runtime_plan,
+    build_unique_hdr_output_path, write_hdr_output_sidecar,
 };
 use crate::image_codecs::{encode_jpeg_data_url, encode_jpeg_response, encode_png_data_url};
 
@@ -143,6 +144,16 @@ struct LutParseResult {
 struct ImageDimensions {
     width: u32,
     height: u32,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HdrApplyReceipt {
+    accepted_dry_run_plan_hash: String,
+    accepted_dry_run_plan_id: String,
+    output_handle: String,
+    preview_dimensions: ImageDimensions,
+    source_paths: Vec<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -1287,9 +1298,9 @@ async fn save_temp_file(bytes: Vec<u8>) -> Result<String, String> {
     Ok(path.to_string_lossy().to_string())
 }
 
-fn validate_hdr_merge_dimensions(
-    loaded_items: &[(String, String, DynamicImage, Duration, f32)],
-) -> Result<(), String> {
+type LoadedHdrMergeItem = (String, String, DynamicImage, Duration, f32);
+
+fn validate_hdr_merge_dimensions(loaded_items: &[LoadedHdrMergeItem]) -> Result<(), String> {
     if let Some((first_path, _, first_img, _, _)) = loaded_items.first() {
         let (width, height) = (first_img.width(), first_img.height());
 
@@ -1317,34 +1328,28 @@ fn validate_hdr_merge_dimensions(
     Ok(())
 }
 
-#[tauri::command]
-async fn merge_hdr(
-    paths: Vec<String>,
-    app_handle: tauri::AppHandle,
-    state: tauri::State<'_, AppState>,
-) -> Result<(), String> {
-    if paths.len() < 2 {
-        return Err("Please select at least two images to merge.".to_string());
-    }
+fn load_hdr_merge_items(
+    paths: &[String],
+    app_handle: &tauri::AppHandle,
+    emit_progress: bool,
+) -> Result<Vec<LoadedHdrMergeItem>, String> {
+    let settings = load_settings_or_default(app_handle);
 
-    let hdr_result_handle = state.hdr_result.clone();
-    let hdr_runtime_plan_handle = state.hdr_runtime_plan.clone();
-    let hdr_source_refs_handle = state.hdr_source_refs.clone();
-    let settings = load_settings_or_default(&app_handle);
-
-    let loaded_items: Vec<(String, String, DynamicImage, Duration, f32)> = paths
+    paths
         .iter()
         .map(|path| {
-            let _ = app_handle.emit(
-                crate::events::HDR_PROGRESS,
-                format!(
-                    "Processing '{}'",
-                    Path::new(path)
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                ),
-            );
+            if emit_progress {
+                let _ = app_handle.emit(
+                    crate::events::HDR_PROGRESS,
+                    format!(
+                        "Processing '{}'",
+                        Path::new(path)
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                    ),
+                );
+            }
 
             let file_bytes =
                 fs::read(path).map_err(|e| format!("Failed to read image {}: {}", path, e))?;
@@ -1369,11 +1374,13 @@ async fn merge_hdr(
 
             Ok((path.clone(), content_hash, dynamic_image, exposure, gains))
         })
-        .collect::<Result<Vec<_>, String>>()?;
+        .collect::<Result<Vec<_>, String>>()
+}
 
-    validate_hdr_merge_dimensions(&loaded_items)?;
-
-    let source_refs = loaded_items
+fn build_hdr_source_refs(
+    loaded_items: &[LoadedHdrMergeItem],
+) -> Vec<app_state::PendingHdrSourceRef> {
+    loaded_items
         .iter()
         .enumerate()
         .map(|(source_index, (path, content_hash, img, exposure, iso))| {
@@ -1387,7 +1394,56 @@ async fn merge_hdr(
                 source_index,
             }
         })
-        .collect::<Vec<_>>();
+        .collect::<Vec<_>>()
+}
+
+#[tauri::command]
+async fn plan_hdr(
+    paths: Vec<String>,
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<HdrDryRunPlanResponse, String> {
+    if paths.len() < 2 {
+        return Err("Please select at least two images to merge.".to_string());
+    }
+
+    let loaded_items = load_hdr_merge_items(&paths, &app_handle, false)?;
+    let source_refs = build_hdr_source_refs(&loaded_items);
+    let output_width = source_refs.first().map(|source| source.width).unwrap_or(0);
+    let output_height = source_refs.first().map(|source| source.height).unwrap_or(0);
+    let runtime_plan_response =
+        build_hdr_dry_run_plan_response(&source_refs, output_width, output_height);
+
+    *state.hdr_runtime_plan.lock().unwrap() = Some(build_hdr_runtime_plan(
+        &source_refs,
+        output_width,
+        output_height,
+    ));
+    *state.hdr_source_refs.lock().unwrap() = source_refs;
+
+    Ok(runtime_plan_response)
+}
+
+#[tauri::command]
+async fn merge_hdr(
+    paths: Vec<String>,
+    accepted_dry_run_plan_hash: Option<String>,
+    accepted_dry_run_plan_id: Option<String>,
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    if paths.len() < 2 {
+        return Err("Please select at least two images to merge.".to_string());
+    }
+
+    let hdr_result_handle = state.hdr_result.clone();
+    let hdr_runtime_plan_handle = state.hdr_runtime_plan.clone();
+    let hdr_source_refs_handle = state.hdr_source_refs.clone();
+    let loaded_items = load_hdr_merge_items(&paths, &app_handle, true)?;
+
+    validate_hdr_merge_dimensions(&loaded_items)?;
+
+    let source_refs = build_hdr_source_refs(&loaded_items);
 
     let images: Vec<HDRInput> = loaded_items
         .iter()
@@ -1405,6 +1461,27 @@ async fn merge_hdr(
     let final_base64 = encode_png_data_url(&DynamicImage::ImageRgb8(hdr_merged.to_rgb8()))?;
     let runtime_plan =
         build_hdr_runtime_plan(&source_refs, hdr_merged.width(), hdr_merged.height());
+    if let (Some(accepted_plan_hash), Some(accepted_plan_id)) = (
+        accepted_dry_run_plan_hash.as_ref(),
+        accepted_dry_run_plan_id.as_ref(),
+    ) && (accepted_plan_hash != &runtime_plan.accepted_dry_run_plan_hash
+        || accepted_plan_id != &runtime_plan.accepted_dry_run_plan_id)
+    {
+        return Err("Accepted HDR dry-run plan does not match current sources.".to_string());
+    }
+    let receipt = HdrApplyReceipt {
+        accepted_dry_run_plan_hash: runtime_plan.accepted_dry_run_plan_hash.clone(),
+        accepted_dry_run_plan_id: runtime_plan.accepted_dry_run_plan_id.clone(),
+        output_handle: "memory:hdr_result".to_string(),
+        preview_dimensions: ImageDimensions {
+            height: hdr_merged.height(),
+            width: hdr_merged.width(),
+        },
+        source_paths: source_refs
+            .iter()
+            .map(|source| source.image_path.clone())
+            .collect(),
+    };
 
     let _ = app_handle.emit(crate::events::HDR_PROGRESS, "Creating preview...");
 
@@ -1416,6 +1493,7 @@ async fn merge_hdr(
         crate::events::HDR_COMPLETE,
         serde_json::json!({
             "base64": final_base64,
+            "receipt": receipt,
         }),
     );
     Ok(())
@@ -2219,6 +2297,7 @@ pub fn run() {
             image_loader::compare_raw_reconstruction_modes,
             image_loader::load_image,
             image_loader::is_image_cached,
+            plan_hdr,
             panorama_stitching::plan_panorama,
             panorama_stitching::stitch_panorama,
             panorama_stitching::save_panorama,

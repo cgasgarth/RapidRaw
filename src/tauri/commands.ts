@@ -84,6 +84,7 @@ export enum Invokes {
   LoadPresets = 'load_presets',
   LoadSettings = 'load_settings',
   MoveFiles = 'move_files',
+  PlanHdr = 'plan_hdr',
   PlanPanorama = 'plan_panorama',
   PrecomputeAiSubjectMask = 'precompute_ai_subject_mask',
   PreviewGeometryTransform = 'preview_geometry_transform',

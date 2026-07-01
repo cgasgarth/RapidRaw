@@ -72,19 +72,35 @@ export const buildHdrDryRunActionState = (
 };
 
 export const buildHdrApplyCommandState = ({
+  acceptedDryRunPlanHash,
+  acceptedDryRunPlanId,
   base64Length,
+  outputHandle,
+  previewDimensions,
   sourceCount,
+  sourcePaths,
 }: {
+  acceptedDryRunPlanHash?: string;
+  acceptedDryRunPlanId?: string;
   base64Length: number;
+  outputHandle?: string;
+  previewDimensions?: { height: number; width: number };
   sourceCount: number;
-}): NonNullable<HdrModalState['lastApplyCommand']> => ({
-  acceptedDryRunPlanHash: `sha256:hdr-preview-${base64Length}`,
-  acceptedDryRunPlanId: `hdr_plan_${sourceCount}`,
-  commandType: 'computationalMerge.createHdr',
-  dryRun: false,
-  sources: sourceCount,
-  toolName: getComputationalMergeAppServerRoutePairSummary('hdr').applyToolName,
-});
+  sourcePaths?: string[];
+}): NonNullable<HdrModalState['lastApplyCommand']> => {
+  const commandState: NonNullable<HdrModalState['lastApplyCommand']> = {
+    acceptedDryRunPlanHash: acceptedDryRunPlanHash ?? `sha256:hdr-preview-${base64Length}`,
+    acceptedDryRunPlanId: acceptedDryRunPlanId ?? `hdr_plan_${sourceCount}`,
+    commandType: 'computationalMerge.createHdr',
+    dryRun: false,
+    sources: sourceCount,
+    toolName: getComputationalMergeAppServerRoutePairSummary('hdr').applyToolName,
+  };
+  if (outputHandle !== undefined) commandState.outputHandle = outputHandle;
+  if (previewDimensions !== undefined) commandState.previewDimensions = previewDimensions;
+  if (sourcePaths !== undefined) commandState.sourcePaths = sourcePaths;
+  return commandState;
+};
 
 export const resetHdrStateForSettingsChange = (
   state: HdrModalState,
@@ -102,6 +118,7 @@ export const resetHdrStateForSettingsChange = (
     error: null,
     finalImageBase64: null,
     progressMessage: null,
+    runtimePlan: null,
     savedHandoffSummary: null,
     settings,
   };

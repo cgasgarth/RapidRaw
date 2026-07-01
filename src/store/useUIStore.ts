@@ -7,6 +7,7 @@ import {
   DEFAULT_HDR_MERGE_UI_SETTINGS,
   type HdrEditableHandoffSummary,
   type HdrMergeUiSettings,
+  type HdrRuntimePlan,
 } from '../schemas/computational-merge/hdrMergeUiSchemas';
 import {
   DEFAULT_PANORAMA_UI_SETTINGS,
@@ -103,6 +104,9 @@ export interface HdrModalState {
     acceptedDryRunPlanId: string;
     commandType: 'computationalMerge.createHdr';
     dryRun: false;
+    outputHandle?: string;
+    previewDimensions?: { height: number; width: number };
+    sourcePaths?: string[];
     sources: number;
     toolName: string;
   };
@@ -119,6 +123,7 @@ export interface HdrModalState {
     toolName: string;
   };
   progressMessage: string | null;
+  runtimePlan: HdrRuntimePlan | null;
   savedHandoffSummary: HdrEditableHandoffSummary | null;
   settings: HdrMergeUiSettings;
   sourceMetadata: HdrBracketPreflightSourceMetadata[];
@@ -218,6 +223,7 @@ export const createDefaultHdrModalState = (
   isOpen: false,
   isProcessing: false,
   progressMessage: '',
+  runtimePlan: null,
   savedHandoffSummary: null,
   settings,
   sourceMetadata: [],
