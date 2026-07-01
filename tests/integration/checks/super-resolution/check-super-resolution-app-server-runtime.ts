@@ -190,6 +190,24 @@ if (registrationMetrics.maxResidualPx !== 0) {
 if (registrationMetrics.measuredSubpixelFrameCount !== 3) {
   throw new Error('Expected SR app-server sidecar to count measured subpixel frame registrations.');
 }
+if (applied.apply.sidecarArtifact.measuredReview === undefined) {
+  throw new Error('Expected SR sidecar artifact to persist measured detail-fidelity review.');
+}
+if (
+  applied.apply.sidecarArtifact.validationSummary.expectedDetailGainRatio !==
+  applied.apply.sidecarArtifact.measuredReview.detailGainRatio
+) {
+  throw new Error('Expected SR sidecar detail gain summary to reflect measured detail review.');
+}
+if (
+  applied.apply.sidecarArtifact.validationSummary.falseDetailRisk !==
+  applied.apply.sidecarArtifact.measuredReview.falseDetailRisk
+) {
+  throw new Error('Expected SR sidecar false-detail summary to reflect measured detail review.');
+}
+if (applied.apply.sidecarArtifact.validationSummary.downscaleReconstructionError === undefined) {
+  throw new Error('Expected SR sidecar summary to record downscale reconstruction error.');
+}
 
 expectThrows('unaccepted apply plan', () =>
   new SuperResolutionAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1).execute({

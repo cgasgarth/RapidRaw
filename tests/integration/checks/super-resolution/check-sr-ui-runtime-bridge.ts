@@ -93,6 +93,12 @@ if (outputReview.editableGate !== 'blocked_review_required') {
 if (outputReview.humanReviewStatus !== 'pending') {
   throw new Error(`Expected pending human review, got ${outputReview.humanReviewStatus}.`);
 }
+if (outputReview.downscaleReconstructionError === null) {
+  throw new Error('Expected SR output review to expose downscale reconstruction error.');
+}
+if (outputReview.falseDetailRiskScore === null) {
+  throw new Error('Expected SR output review to expose false-detail risk score.');
+}
 if (outputReview.outputArtifactHash !== applied.apply.sidecarArtifact.outputArtifact.contentHash) {
   throw new Error('SR output review did not preserve output artifact hash.');
 }
@@ -117,11 +123,30 @@ if (
 if (outputReview.reconstructionMode !== 'optical_flow') {
   throw new Error(`Expected sidecar artifact review reconstruction mode, got ${outputReview.reconstructionMode}.`);
 }
-if (outputReview.detailReview.reviewStatus !== 'accepted') {
-  throw new Error(`Expected accepted SR detail review, got ${outputReview.detailReview.reviewStatus}.`);
+if (outputReview.detailReview.reviewStatus !== 'needs_review') {
+  throw new Error(`Expected needs-review SR detail review, got ${outputReview.detailReview.reviewStatus}.`);
+}
+if (
+  outputReview.detailReview.regions.map((region) => region.regionId).join(',') !==
+  applied.apply.sidecarArtifact.measuredReview?.detailReviewRegions.map((region) => region.regionId).join(',')
+) {
+  throw new Error('SR output review did not preserve measured detail review regions.');
 }
 if (outputReview.detailReview.improvementHighlightCount < 3) {
   throw new Error(`Expected SR detail review highlights, got ${outputReview.detailReview.improvementHighlightCount}.`);
+}
+if (
+  outputReview.detailReview.meanImprovementRatio !==
+  Number(
+    (
+      (applied.apply.sidecarArtifact.measuredReview?.detailReviewRegions.reduce(
+        (sum, region) => sum + region.improvementRatio,
+        0,
+      ) ?? 0) / Math.max(1, applied.apply.sidecarArtifact.measuredReview?.detailReviewRegions.length ?? 0)
+    ).toFixed(3),
+  )
+) {
+  throw new Error('SR output review did not preserve the measured mean detail improvement ratio.');
 }
 if (outputReview.detailReview.meanImprovementRatio < 1.08) {
   throw new Error(`Expected SR detail review improvement, got ${outputReview.detailReview.meanImprovementRatio}.`);
@@ -129,12 +154,10 @@ if (outputReview.detailReview.meanImprovementRatio < 1.08) {
 if (
   !outputReview.detailReview.regions.some(
     (region) =>
-      region.regionId === 'center-microcontrast' &&
-      region.reconstructedSharpnessScore > region.baselineSharpnessScore &&
-      region.reviewStatus === 'accepted',
+      region.regionId === 'center-microcontrast' && region.reconstructedSharpnessScore > region.baselineSharpnessScore,
   )
 ) {
-  throw new Error('SR output review missing accepted center detail improvement region.');
+  throw new Error('SR output review missing measured center detail improvement region.');
 }
 if (!outputReview.warningCodes.includes('human_review_required')) {
   throw new Error('SR output review must keep human-review warning.');
@@ -150,6 +173,9 @@ if (outputReview.supportMap.reviewStatus !== applied.apply.sidecarArtifact.suppo
 }
 if (outputReview.supportMap.weakSupportRatio !== applied.apply.sidecarArtifact.supportMap.weakSupportRatio) {
   throw new Error('SR output review did not preserve support-map weak support ratio.');
+}
+if (outputReview.detailGainRatio !== applied.apply.sidecarArtifact.measuredReview?.detailGainRatio) {
+  throw new Error('SR output review did not preserve measured detail gain ratio.');
 }
 if (outputReview.reviewArtifacts.length !== 4) {
   throw new Error(`Expected 4 SR review artifacts, got ${outputReview.reviewArtifacts.length}.`);

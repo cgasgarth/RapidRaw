@@ -143,10 +143,21 @@ async function runProof(rootPath: string): Promise<void> {
     acceptedDryRunPlanHash: dryRun.acceptedDryRunPlanHash,
     acceptedDryRunPlanId: dryRun.dryRun.dryRunResult.mergePlan.planId,
     appliedGraphRevision: applied.apply.mutationResult.appliedGraphRevision,
+    detailGainRatio: applied.apply.provenance.measuredReview.detailGainRatio,
+    downscaleReconstructionError: applied.apply.provenance.measuredReview.downscaleReconstructionError,
+    effectiveScale: applied.apply.provenance.supportMap.effectiveScale,
+    falseDetailRisk: applied.apply.provenance.measuredReview.falseDetailRisk,
+    falseDetailRiskScore: applied.apply.provenance.measuredReview.falseDetailRiskScore,
     fixtureId: FIXTURE_ID,
     outputContentHash: applied.apply.mutationResult.outputArtifacts[0]?.contentHash,
+    registrationResidualPx: applied.apply.provenance.frameRegistrations.reduce(
+      (maxResidual, registration) => Math.max(maxResidual, registration.registrationResidualPx),
+      0,
+    ),
     runtimeStatus: applied.apply.provenance.runtimeStatus,
     sourceCount: sample.frames.length,
+    supportCoverageRatio: applied.apply.provenance.supportMap.coverageRatio,
+    weakSupportRatio: applied.apply.provenance.supportMap.weakSupportRatio,
   };
   await writeFile(join(rootPath, PROOF_PATH), `${JSON.stringify(proof, null, 2)}\n`);
 
@@ -156,10 +167,18 @@ async function runProof(rootPath: string): Promise<void> {
   );
   const upgraded = await upgradeReport(rootPath, collection, {
     applyCommandId: applyCommand.commandId,
+    detailGainRatio: proof.detailGainRatio,
+    downscaleReconstructionError: proof.downscaleReconstructionError,
     applyRuntimeId: applied.apply.mutationResult.derivedAssetId,
     dryRunCommandId: dryRunCommand.commandId,
     dryRunRuntimeId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+    effectiveScale: proof.effectiveScale,
+    falseDetailRisk: proof.falseDetailRisk,
+    falseDetailRiskScore: proof.falseDetailRiskScore,
     proofHash: await sha256File(join(rootPath, PROOF_PATH)),
+    registrationResidualPx: proof.registrationResidualPx,
+    supportCoverageRatio: proof.supportCoverageRatio,
+    weakSupportRatio: proof.weakSupportRatio,
   });
   await writeFile(reportPath, `${JSON.stringify(upgraded, null, 2)}\n`);
 }
@@ -252,10 +271,18 @@ async function upgradeReport(
   collection: ComputationalMergePrivateRunReportCollection,
   proof: {
     applyCommandId: string;
+    detailGainRatio: number;
+    downscaleReconstructionError: number;
     applyRuntimeId: string;
     dryRunCommandId: string;
     dryRunRuntimeId: string;
+    effectiveScale: number;
+    falseDetailRisk: 'high' | 'low' | 'medium';
+    falseDetailRiskScore: number;
     proofHash: string;
+    registrationResidualPx: number;
+    supportCoverageRatio: number;
+    weakSupportRatio: number;
   },
 ): Promise<ComputationalMergePrivateRunReportCollection> {
   const asset = async (path: string) => ({
@@ -303,13 +330,18 @@ async function upgradeReport(
           ],
           superResolutionQualityReadout: {
             artifactScore: metricValue(report, 'superResolutionArtifactScore'),
-            detailGainRatio: metricValue(report, 'superResolutionDetailGainRatio'),
+            detailGainRatio: proof.detailGainRatio,
+            downscaleReconstructionError: proof.downscaleReconstructionError,
+            effectiveScale: proof.effectiveScale,
+            falseDetailRisk: proof.falseDetailRisk,
+            falseDetailRiskScore: proof.falseDetailRiskScore,
             outputArtifactHash: outputArtifact.hash,
             outputArtifactPath: outputArtifact.path,
             outputPixelCount: metricValue(report, 'superResolutionOutputPixelCount'),
-            registrationResidualPx: metricValue(report, 'superResolutionRegistrationResidualPx'),
+            registrationResidualPx: proof.registrationResidualPx,
             sourceCount: metricValue(report, 'decodedSourceCount'),
-            sourceCoverageRatio: metricValue(report, 'superResolutionSourceCoverageRatio'),
+            sourceCoverageRatio: proof.supportCoverageRatio,
+            weakSupportRatio: proof.weakSupportRatio,
           },
         };
       }),
@@ -349,14 +381,17 @@ async function runSelfTest(): Promise<void> {
     if (report?.acceptanceStatus !== 'runtime_apply_capable') {
       throw new Error('Expected self-test report to be upgraded to runtime_apply_capable.');
     }
-    if (report.superResolutionQualityReadout?.detailGainRatio !== 4) {
-      throw new Error('Expected self-test report to persist SR detail gain readout.');
+    if ((report.superResolutionQualityReadout?.detailGainRatio ?? 0) <= 1) {
+      throw new Error('Expected self-test report to persist measured SR detail gain readout.');
     }
     if (
       report.superResolutionQualityReadout.outputArtifactHash !==
       report.artifacts.find((artifact) => artifact.kind === 'merge_output_private')?.hash
     ) {
       throw new Error('Expected SR quality readout to be tied to the merge output artifact hash.');
+    }
+    if (report.superResolutionQualityReadout.falseDetailRisk === undefined) {
+      throw new Error('Expected self-test report to persist measured SR false-detail risk.');
     }
     if (report.previewExportParity !== undefined) {
       throw new Error('SR runtime proof self-test must not synthesize preview/export parity.');

@@ -4930,6 +4930,29 @@ export const superResolutionArtifactV1Schema = z
     outputArtifact: artifactHandleV1Schema,
     outputColorSpace: z.string().trim().min(1),
     previewArtifacts: z.array(artifactHandleV1Schema),
+    measuredReview: z
+      .object({
+        detailGainRatio: z.number().positive(),
+        detailReviewRegions: z
+          .array(
+            z
+              .object({
+                baselineSharpnessScore: z.number().min(0),
+                improvementRatio: z.number().min(0),
+                label: z.string().trim().min(1),
+                reconstructedSharpnessScore: z.number().min(0),
+                regionId: z.string().trim().min(1),
+                reviewStatus: z.enum(['accepted', 'needs_review', 'rejected']),
+              })
+              .strict(),
+          )
+          .length(3),
+        downscaleReconstructionError: z.number().min(0),
+        falseDetailRisk: z.enum(['low', 'medium', 'high']),
+        falseDetailRiskScore: z.number().min(0).max(1),
+      })
+      .strict()
+      .optional(),
     supportMap: z
       .object({
         artifactId: z.string().trim().min(1),
@@ -4962,7 +4985,9 @@ export const superResolutionArtifactV1Schema = z
         actualPeakMemoryBytes: z.number().int().nonnegative().optional(),
         actualRuntimeMs: z.number().int().nonnegative().optional(),
         alignmentConfidence: z.number().min(0).max(1).optional(),
+        downscaleReconstructionError: z.number().min(0).optional(),
         expectedDetailGainRatio: z.number().positive().optional(),
+        falseDetailRiskScore: z.number().min(0).max(1).optional(),
         falseDetailRisk: z.enum(['unknown', 'low', 'medium', 'high']),
         humanReviewStatus: superResolutionReviewStatusV1Schema,
         overlapCoverageRatio: z.number().min(0).max(1).optional(),

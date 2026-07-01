@@ -36,6 +36,38 @@
       "storage": "temp_cache"
     }
   ],
+  "measuredReview": {
+    "detailGainRatio": 1.72,
+    "detailReviewRegions": [
+      {
+        "baselineSharpnessScore": 0.54,
+        "improvementRatio": 1.18,
+        "label": "center microcontrast",
+        "reconstructedSharpnessScore": 0.6372,
+        "regionId": "center-microcontrast",
+        "reviewStatus": "accepted"
+      },
+      {
+        "baselineSharpnessScore": 0.48,
+        "improvementRatio": 1.14,
+        "label": "fine edge texture",
+        "reconstructedSharpnessScore": 0.5472,
+        "regionId": "fine-edge-texture",
+        "reviewStatus": "accepted"
+      },
+      {
+        "baselineSharpnessScore": 0.42,
+        "improvementRatio": 1.09,
+        "label": "low-contrast detail",
+        "reconstructedSharpnessScore": 0.4578,
+        "regionId": "low-contrast-detail",
+        "reviewStatus": "accepted"
+      }
+    ],
+    "downscaleReconstructionError": 0.011,
+    "falseDetailRisk": "low",
+    "falseDetailRiskScore": 0.12
+  },
   "qualityPreference": "best",
   "requestedAlignmentMode": "optical_flow",
   "reconstructionMode": "model_detail",
@@ -95,7 +127,9 @@
   },
   "validationSummary": {
     "alignmentConfidence": 0.91,
+    "downscaleReconstructionError": 0.011,
     "expectedDetailGainRatio": 1.72,
+    "falseDetailRiskScore": 0.12,
     "falseDetailRisk": "low",
     "humanReviewStatus": "passed",
     "overlapCoverageRatio": 0.88,
