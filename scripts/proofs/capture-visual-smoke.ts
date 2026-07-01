@@ -2002,7 +2002,7 @@ async function prepareScenario(page, mode) {
 
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.MaskOverlayRawProof) {
     const dragSliderToPercent = async (label: string, percent: number) => {
-      const slider = page.getByLabel(label);
+      const slider = page.getByRole('slider', { name: label });
       const box = await slider.boundingBox();
       if (!box) throw new Error(`Expected ${label} slider to have a bounding box.`);
       const y = box.y + box.height / 2;

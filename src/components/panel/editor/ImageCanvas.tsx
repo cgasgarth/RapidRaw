@@ -48,6 +48,11 @@ import type { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProp
 import type { OverlayMode } from '../right/color/CropPanel';
 import { Mask, type SubMask, SubMaskMode, ToolType } from '../right/layers/Masks';
 import CompositionOverlays from './overlays/CompositionOverlays';
+import {
+  type CanvasOverlayStatus,
+  canvasOverlayStatusColor,
+  canvasOverlayTokens,
+} from './overlays/canvasOverlayTokens';
 
 declare global {
   interface Window {
@@ -141,13 +146,36 @@ const svgNumber = (value: number): string => String(value);
 const getRemoveCanvasStatusColor = (status: RetouchRemoveSource['status']): string => {
   switch (status) {
     case 'ready':
-      return '#22c55e';
+      return canvasOverlayStatusColor('ready');
     case 'fallback_unchanged':
     case 'stale':
-      return '#f59e0b';
+      return canvasOverlayStatusColor('stale');
     case 'needs_regeneration':
     case undefined:
-      return '#f97316';
+      return canvasOverlayStatusColor('warning');
+  }
+};
+const canvasOverlayShadowProps = {
+  shadowBlur: canvasOverlayTokens.shadow.blur,
+  shadowColor: canvasOverlayTokens.shadow.color,
+  shadowOpacity: canvasOverlayTokens.shadow.opacity,
+} as const;
+const canvasOverlayLabelTextProps = {
+  fill: canvasOverlayTokens.label.text,
+  fontFamily: canvasOverlayTokens.label.fontFamily,
+  fontSize: canvasOverlayTokens.label.fontSize,
+  fontStyle: canvasOverlayTokens.label.fontStyle,
+  padding: canvasOverlayTokens.label.padding,
+} as const;
+const getSubMaskCanvasStroke = (subMask: SubMask, isSelected: boolean): string => {
+  if (isSelected) return canvasOverlayTokens.colors.active;
+  switch (subMask.mode) {
+    case SubMaskMode.Subtractive:
+      return canvasOverlayTokens.colors.eraser;
+    case SubMaskMode.Intersect:
+      return canvasOverlayTokens.colors.gamut;
+    default:
+      return canvasOverlayTokens.colors.additive;
   }
 };
 const clamp01 = (value: number): number => {
@@ -738,16 +766,11 @@ const MaskOverlay = memo(
     const commonProps = {
       dash: [4, 4],
       ...selectHandlers,
-      opacity: isSelected ? 1 : 0.7,
-      stroke: isSelected
-        ? '#0ea5e9'
-        : subMask.mode === SubMaskMode.Subtractive
-          ? '#f43f5e'
-          : subMask.mode === SubMaskMode.Intersect
-            ? '#a855f7'
-            : 'white',
+      opacity: isSelected ? 1 : canvasOverlayTokens.stroke.inactiveOpacity,
+      stroke: getSubMaskCanvasStroke(subMask, isSelected),
       strokeScaleEnabled: false,
-      strokeWidth: isSelected ? 3 : 2,
+      strokeWidth: isSelected ? canvasOverlayTokens.stroke.selectedWidth : canvasOverlayTokens.stroke.width,
+      ...canvasOverlayShadowProps,
     };
 
     if (subMask.type === Mask.AiSubject || subMask.type === Mask.QuickEraser) {
@@ -759,7 +782,7 @@ const MaskOverlay = memo(
             x={(startX - cropX) * scale}
             y={(startY - cropY) * scale}
             radius={5}
-            stroke={isSelected ? '#0ea5e9' : 'white'}
+            stroke={getSubMaskCanvasStroke(subMask, isSelected)}
             strokeWidth={2}
             listening={!isToolActive}
             {...selectHandlers}
@@ -767,9 +790,8 @@ const MaskOverlay = memo(
             onTouchStart={handleMaskTouchStart}
             onMouseEnter={onMaskMouseEnter}
             onMouseLeave={onMaskMouseLeave}
-            shadowColor="black"
-            shadowBlur={2}
-            shadowOpacity={0.8}
+            fill={isSelected ? canvasOverlayTokens.colors.activeFill : 'rgba(0, 0, 0, 0.08)'}
+            {...canvasOverlayShadowProps}
           />
         );
       }
@@ -1023,9 +1045,10 @@ const MaskOverlay = memo(
                 x={sX}
                 y={sY}
                 radius={8 / stageScale}
-                fill="#0ea5e9"
-                stroke="white"
+                fill={canvasOverlayTokens.colors.active}
+                stroke={canvasOverlayTokens.colors.neutral}
                 strokeWidth={2 / stageScale}
+                {...canvasOverlayShadowProps}
                 draggable
                 dragBoundFunc={lockDragBoundFunc}
                 onDragStart={handleLinearPointDragStart}
@@ -1048,9 +1071,10 @@ const MaskOverlay = memo(
                 x={eX}
                 y={eY}
                 radius={8 / stageScale}
-                fill="#0ea5e9"
-                stroke="white"
+                fill={canvasOverlayTokens.colors.active}
+                stroke={canvasOverlayTokens.colors.neutral}
                 strokeWidth={2 / stageScale}
+                {...canvasOverlayShadowProps}
                 draggable
                 dragBoundFunc={lockDragBoundFunc}
                 onDragStart={handleLinearPointDragStart}
@@ -1078,7 +1102,7 @@ const MaskOverlay = memo(
                 points={topRangePts}
                 {...lineProps}
                 opacity={0.7}
-                stroke="white"
+                stroke={canvasOverlayTokens.colors.neutral}
                 listening={true}
                 onTouchEnd={handleMaskTouchEnd}
                 onTouchStart={handleMaskTouchStart}
@@ -1095,7 +1119,7 @@ const MaskOverlay = memo(
                 points={botRangePts}
                 {...lineProps}
                 opacity={0.7}
-                stroke="white"
+                stroke={canvasOverlayTokens.colors.neutral}
                 listening={true}
                 onTouchEnd={handleMaskTouchEnd}
                 onTouchStart={handleMaskTouchStart}
@@ -1122,14 +1146,13 @@ const MaskOverlay = memo(
             x={(targetX - cropX) * scale}
             y={(targetY - cropY) * scale}
             radius={5}
-            stroke={isSelected ? '#0ea5e9' : 'white'}
+            stroke={getSubMaskCanvasStroke(subMask, isSelected)}
             strokeWidth={2}
             listening={false}
             onTouchEnd={handleMaskTouchEnd}
             onTouchStart={handleMaskTouchStart}
-            shadowColor="black"
-            shadowBlur={2}
-            shadowOpacity={0.8}
+            fill={isSelected ? canvasOverlayTokens.colors.activeFill : 'rgba(0, 0, 0, 0.08)'}
+            {...canvasOverlayShadowProps}
           />
         );
       }
@@ -2691,8 +2714,48 @@ const ImageCanvas = memo(
       setIsMaskTouchInteracting(false);
     }, [setIsMaskTouchInteracting]);
 
+    const activeCanvasOverlayTool = isCropping
+      ? 'crop'
+      : isWbPickerActive
+        ? 'white-balance'
+        : activeRetouchSource
+          ? 'retouch'
+          : activeRemoveSource
+            ? 'remove'
+            : isBrushActive
+              ? 'brush'
+              : isAiSubjectActive
+                ? 'object-prompt'
+                : isParametricActive
+                  ? 'parametric-mask'
+                  : isMasking || isAiEditing
+                    ? 'mask'
+                    : showGamutWarningOverlay
+                      ? 'soft-proof'
+                      : 'pan-zoom';
+    const activeCanvasOverlayStatus: CanvasOverlayStatus = isShowingOriginal
+      ? 'disabled'
+      : isSliderDragging || displayState.fade
+        ? 'loading'
+        : isMaskInteractionActive || liveBrushLine || previewBox
+          ? 'drag'
+          : activeRemoveSource
+            ? activeRemoveSource.status === 'ready'
+              ? 'ready'
+              : activeRemoveSource.status === 'stale' || activeRemoveSource.status === 'fallback_unchanged'
+                ? 'stale'
+                : 'warning'
+            : isToolActive || isCropping || showGamutWarningOverlay
+              ? 'active'
+              : 'ready';
+
     return (
-      <div className="relative" style={{ width: '100%', height: '100%', cursor: effectiveCursor }}>
+      <div
+        className="canvas-overlay relative"
+        data-canvas-overlay-status={activeCanvasOverlayStatus}
+        data-canvas-overlay-tool={activeCanvasOverlayTool}
+        style={{ width: '100%', height: '100%', cursor: effectiveCursor }}
+      >
         <div
           className="absolute inset-0 w-full h-full transition-opacity duration-200 flex items-center justify-center"
           style={{
@@ -2853,7 +2916,15 @@ const ImageCanvas = memo(
                       imageRendering: isMaxZoom ? 'pixelated' : 'auto',
                     }}
                   />
-                  <div className="absolute bottom-3 right-3 rounded-md border border-fuchsia-300/30 bg-black/70 px-3 py-2 text-xs font-medium text-fuchsia-100 shadow-lg">
+                  <div
+                    className="absolute bottom-3 right-3 rounded-md border px-3 py-2 text-xs font-medium"
+                    style={{
+                      background: 'rgba(12, 14, 17, 0.84)',
+                      borderColor: 'var(--editor-danger)',
+                      boxShadow: '0 12px 28px rgba(0, 0, 0, 0.58)',
+                      color: '#ffe8fb',
+                    }}
+                  >
                     {t('editor.canvas.gamutWarningCoverage', { value: gamutCoverage })}
                   </div>
                 </div>
@@ -2956,19 +3027,21 @@ const ImageCanvas = memo(
                             dash={[4, 4]}
                             listening={false}
                             points={[sourcePoint.x, sourcePoint.y, targetPoint.x, targetPoint.y]}
-                            stroke="#f8fafc"
+                            stroke={canvasOverlayTokens.colors.neutral}
                             strokeScaleEnabled={false}
                             strokeWidth={strokeWidth}
+                            {...canvasOverlayShadowProps}
                           />
                           {retouchFeatherRadius > retouchRadius && (
                             <Circle
                               dash={[5, 5]}
                               listening={false}
                               radius={retouchFeatherRadius}
-                              stroke="#f8fafc"
+                              stroke={canvasOverlayTokens.colors.neutral}
                               strokeOpacity={0.55}
                               strokeScaleEnabled={false}
                               strokeWidth={strokeWidth}
+                              {...canvasOverlayShadowProps}
                               x={targetPoint.x}
                               y={targetPoint.y}
                             />
@@ -2977,10 +3050,11 @@ const ImageCanvas = memo(
                             <Circle
                               listening={false}
                               radius={retouchRadius}
-                              stroke="#f97316"
+                              stroke={canvasOverlayTokens.colors.target}
                               strokeOpacity={0.8}
                               strokeScaleEnabled={false}
                               strokeWidth={strokeWidth}
+                              {...canvasOverlayShadowProps}
                               x={targetPoint.x}
                               y={targetPoint.y}
                             />
@@ -2993,10 +3067,11 @@ const ImageCanvas = memo(
                                 data-testid="image-canvas-retouch-source-footprint"
                                 listening={false}
                                 radius={sourceFootprintRadius}
-                                stroke="#0ea5e9"
+                                stroke={canvasOverlayTokens.colors.active}
                                 strokeOpacity={0.65}
                                 strokeScaleEnabled={false}
                                 strokeWidth={strokeWidth}
+                                {...canvasOverlayShadowProps}
                                 x={sourcePoint.x}
                                 y={sourcePoint.y}
                               />
@@ -3011,17 +3086,18 @@ const ImageCanvas = memo(
                                   sourceFootprintAxisEnd.x,
                                   sourceFootprintAxisEnd.y,
                                 ]}
-                                stroke="#0ea5e9"
+                                stroke={canvasOverlayTokens.colors.active}
                                 strokeOpacity={0.85}
                                 strokeScaleEnabled={false}
                                 strokeWidth={strokeWidth}
+                                {...canvasOverlayShadowProps}
                               />
                             </>
                           )}
                           <Circle
                             dragBoundFunc={dragBoundRetouchHandle}
                             draggable
-                            fill="#0ea5e9"
+                            fill={canvasOverlayTokens.colors.active}
                             onDragEnd={(event) => {
                               handleRetouchHandleDragEnd(activeRetouchLayer.id, 'sourcePoint', event);
                             }}
@@ -3034,10 +3110,10 @@ const ImageCanvas = memo(
                             onTouchStart={(event) => {
                               event.evt.stopPropagation();
                             }}
-                            shadowBlur={4}
-                            shadowColor="black"
                             shadowOpacity={activePlacementHandle === 'sourcePoint' ? 0.7 : 0.45}
-                            stroke="#f8fafc"
+                            shadowBlur={canvasOverlayTokens.shadow.blur}
+                            shadowColor={canvasOverlayTokens.shadow.color}
+                            stroke={canvasOverlayTokens.colors.neutral}
                             strokeScaleEnabled={false}
                             strokeWidth={sourceHandleStrokeWidth}
                             x={sourcePoint.x}
@@ -3054,24 +3130,20 @@ const ImageCanvas = memo(
                           >
                             <Tag
                               cornerRadius={6}
-                              fill="rgba(15, 23, 42, 0.88)"
+                              fill={canvasOverlayTokens.label.fill}
                               lineJoin="round"
-                              stroke="#0ea5e9"
+                              stroke={canvasOverlayTokens.colors.active}
                               strokeWidth={1}
                             />
                             <KonvaText
-                              fill="#f8fafc"
-                              fontFamily="Inter, system-ui, sans-serif"
-                              fontSize={12}
-                              fontStyle="600"
-                              padding={6}
+                              {...canvasOverlayLabelTextProps}
                               text={`${retouchModeLabel} ${t('editor.layers.retouchSource.sourceLabel')}`}
                             />
                           </Label>
                           <Circle
                             dragBoundFunc={dragBoundRetouchHandle}
                             draggable
-                            fill="#f97316"
+                            fill={canvasOverlayTokens.colors.target}
                             onDragEnd={(event) => {
                               handleRetouchHandleDragEnd(activeRetouchLayer.id, 'targetPoint', event);
                             }}
@@ -3084,10 +3156,10 @@ const ImageCanvas = memo(
                             onTouchStart={(event) => {
                               event.evt.stopPropagation();
                             }}
-                            shadowBlur={4}
-                            shadowColor="black"
                             shadowOpacity={activePlacementHandle === 'targetPoint' ? 0.7 : 0.45}
-                            stroke="#f8fafc"
+                            shadowBlur={canvasOverlayTokens.shadow.blur}
+                            shadowColor={canvasOverlayTokens.shadow.color}
+                            stroke={canvasOverlayTokens.colors.neutral}
                             strokeScaleEnabled={false}
                             strokeWidth={targetHandleStrokeWidth}
                             x={targetPoint.x}
@@ -3104,17 +3176,13 @@ const ImageCanvas = memo(
                           >
                             <Tag
                               cornerRadius={6}
-                              fill="rgba(15, 23, 42, 0.88)"
+                              fill={canvasOverlayTokens.label.fill}
                               lineJoin="round"
-                              stroke="#f97316"
+                              stroke={canvasOverlayTokens.colors.target}
                               strokeWidth={1}
                             />
                             <KonvaText
-                              fill="#f8fafc"
-                              fontFamily="Inter, system-ui, sans-serif"
-                              fontSize={12}
-                              fontStyle="600"
-                              padding={6}
+                              {...canvasOverlayLabelTextProps}
                               text={`${retouchModeLabel} ${t('editor.layers.retouchSource.targetLabel')}`}
                             />
                           </Label>
@@ -3224,9 +3292,10 @@ const ImageCanvas = memo(
                               dash={[4, 4]}
                               listening={false}
                               points={[resolvedSourcePoint.x, resolvedSourcePoint.y, targetPoint.x, targetPoint.y]}
-                              stroke="#f8fafc"
+                              stroke={canvasOverlayTokens.colors.neutral}
                               strokeScaleEnabled={false}
                               strokeWidth={strokeWidth}
+                              {...canvasOverlayShadowProps}
                             />
                           )}
                           {removeSearchRadius > removeRadius && (
@@ -3237,10 +3306,11 @@ const ImageCanvas = memo(
                               data-testid="image-canvas-remove-search-radius"
                               listening={false}
                               radius={removeSearchRadius}
-                              stroke="#facc15"
+                              stroke={canvasOverlayTokens.colors.remove}
                               strokeOpacity={0.45}
                               strokeScaleEnabled={false}
                               strokeWidth={strokeWidth}
+                              {...canvasOverlayShadowProps}
                               x={targetPoint.x}
                               y={targetPoint.y}
                             />
@@ -3250,10 +3320,11 @@ const ImageCanvas = memo(
                               dash={[5, 5]}
                               listening={false}
                               radius={removeFeatherRadius}
-                              stroke="#f8fafc"
+                              stroke={canvasOverlayTokens.colors.neutral}
                               strokeOpacity={0.55}
                               strokeScaleEnabled={false}
                               strokeWidth={strokeWidth}
+                              {...canvasOverlayShadowProps}
                               x={targetPoint.x}
                               y={targetPoint.y}
                             />
@@ -3266,18 +3337,17 @@ const ImageCanvas = memo(
                             strokeOpacity={removeTargetStrokeOpacity}
                             strokeScaleEnabled={false}
                             strokeWidth={strokeWidth}
+                            {...canvasOverlayShadowProps}
                             x={targetPoint.x}
                             y={targetPoint.y}
                           />
                           {resolvedSourcePoint && (
                             <Circle
-                              fill="#0ea5e9"
+                              fill={canvasOverlayTokens.colors.active}
                               listening={false}
                               radius={handleRadius}
-                              shadowBlur={4}
-                              shadowColor="black"
-                              shadowOpacity={0.5}
-                              stroke="#f8fafc"
+                              {...canvasOverlayShadowProps}
+                              stroke={canvasOverlayTokens.colors.neutral}
                               strokeScaleEnabled={false}
                               strokeWidth={strokeWidth}
                               x={resolvedSourcePoint.x}
@@ -3295,17 +3365,13 @@ const ImageCanvas = memo(
                             >
                               <Tag
                                 cornerRadius={6}
-                                fill="rgba(15, 23, 42, 0.88)"
+                                fill={canvasOverlayTokens.label.fill}
                                 lineJoin="round"
-                                stroke="#0ea5e9"
+                                stroke={canvasOverlayTokens.colors.active}
                                 strokeWidth={1}
                               />
                               <KonvaText
-                                fill="#f8fafc"
-                                fontFamily="Inter, system-ui, sans-serif"
-                                fontSize={12}
-                                fontStyle="600"
-                                padding={6}
+                                {...canvasOverlayLabelTextProps}
                                 text={t('editor.layers.removeSource.sourceResolved')}
                               />
                             </Label>
@@ -3327,10 +3393,8 @@ const ImageCanvas = memo(
                               event.evt.stopPropagation();
                             }}
                             radius={handleRadius}
-                            shadowBlur={4}
-                            shadowColor="black"
-                            shadowOpacity={0.5}
-                            stroke="#f8fafc"
+                            {...canvasOverlayShadowProps}
+                            stroke={canvasOverlayTokens.colors.neutral}
                             strokeScaleEnabled={false}
                             strokeWidth={strokeWidth}
                             x={targetPoint.x}
@@ -3349,17 +3413,13 @@ const ImageCanvas = memo(
                           >
                             <Tag
                               cornerRadius={6}
-                              fill="rgba(15, 23, 42, 0.88)"
+                              fill={canvasOverlayTokens.label.fill}
                               lineJoin="round"
                               stroke={removeStatusColor}
                               strokeWidth={1}
                             />
                             <KonvaText
-                              fill="#f8fafc"
-                              fontFamily="Inter, system-ui, sans-serif"
-                              fontSize={12}
-                              fontStyle="600"
-                              padding={6}
+                              {...canvasOverlayLabelTextProps}
                               text={t('editor.layers.removeSource.canvasStatus', {
                                 searchMultiplier: activeRemoveSource.searchRadiusMultiplier,
                                 seedValue: activeRemoveSource.seed,
@@ -3471,8 +3531,9 @@ const ImageCanvas = memo(
                           y={Math.min(previewBox.start.y, previewBox.end.y)}
                           width={Math.max(0.1, Math.abs(previewBox.end.x - previewBox.start.x))}
                           height={Math.max(0.1, Math.abs(previewBox.end.y - previewBox.start.y))}
-                          stroke="#0ea5e9"
+                          stroke={canvasOverlayTokens.colors.active}
                           strokeWidth={2}
+                          {...canvasOverlayShadowProps}
                           dash={[4, 4]}
                           listening={false}
                         />
@@ -3499,6 +3560,11 @@ const ImageCanvas = memo(
                           listening={false}
                           perfectDrawEnabled={false}
                           radius={brushCursorPreview.radius}
+                          stroke={isAltPressed ? canvasOverlayTokens.colors.eraser : canvasOverlayTokens.colors.neutral}
+                          strokeOpacity={0.9}
+                          strokeScaleEnabled={false}
+                          strokeWidth={1.25}
+                          {...canvasOverlayShadowProps}
                           x={cursorPreview.x}
                           y={cursorPreview.y}
                         />
@@ -3596,7 +3662,8 @@ const ImageCanvas = memo(
                           straightenLine.end.x,
                           straightenLine.end.y,
                         ]}
-                        stroke="#0ea5e9"
+                        stroke={canvasOverlayTokens.colors.active}
+                        {...canvasOverlayShadowProps}
                         strokeWidth={2}
                       />
                     )}

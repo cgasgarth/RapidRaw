@@ -36,6 +36,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   PanoramaUi: 'panorama-ui',
   ProfessionalAdjustmentsCompact: 'professional-adjustments-compact',
   ProfessionalEditorCompactPortrait: 'professional-editor-compact-portrait',
+  ProfessionalCanvasOverlays: 'professional-canvas-overlays',
   ProfessionalCropTransformWorkspace: 'professional-crop-transform-workspace',
   ProfessionalExportProofFooter: 'professional-export-proof-footer',
   ProfessionalEditorShell: 'professional-editor-shell',
@@ -310,6 +311,13 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Professional crop transform workspace',
     mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalCropTransformWorkspace,
     outputFile: 'professional-crop-transform-workspace.png',
+    sectionMinimum: 3,
+  },
+  {
+    compactOutputFile: 'professional-canvas-overlays-compact.png',
+    marker: 'Professional canvas overlays',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalCanvasOverlays,
+    outputFile: 'professional-canvas-overlays.png',
     sectionMinimum: 3,
   },
   {
