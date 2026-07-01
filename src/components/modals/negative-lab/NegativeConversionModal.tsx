@@ -127,6 +127,16 @@ import {
   type NegativeLabPatchPickerPoint,
 } from '../../../utils/negative-lab/negativeLabPatchPicker';
 import {
+  appendNegativeLabPatchSamplerCorrection,
+  buildNegativeLabBaseFogPatchSamplerCorrection,
+  buildNegativeLabHighlightPatchSamplerCorrection,
+  buildNegativeLabNeutralPatchSamplerCorrection,
+  buildNegativeLabShadowPatchSamplerCorrection,
+  EMPTY_NEGATIVE_LAB_PATCH_SAMPLER_CORRECTION_PAYLOAD,
+  type NegativeLabPatchSamplerCorrectionPayload,
+  removeNegativeLabPatchSamplerCorrections,
+} from '../../../utils/negative-lab/negativeLabPatchSamplerCorrections';
+import {
   buildNegativeLabAcceptedPlanIdentity,
   buildNegativeLabPlanHash,
 } from '../../../utils/negative-lab/negativeLabPlanIdentity';
@@ -428,6 +438,7 @@ interface BaseFogSampleUndoEntry {
   baseFogScope: 'frame' | 'roll';
   baseSampleStudioDecision: NegativeLabBaseSampleStudioDecision;
   params: NegativeParams;
+  patchSamplerCorrectionPayload: NegativeLabPatchSamplerCorrectionPayload;
   selectedPresetId: string;
 }
 
@@ -511,6 +522,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [frameRgbBalanceOffsetByFrameId, setFrameRgbBalanceOffsetByFrameId] = useState<
     Record<string, NegativeLabFrameRgbBalanceOffset>
   >({});
+  const [patchSamplerCorrectionPayload, setPatchSamplerCorrectionPayload] =
+    useState<NegativeLabPatchSamplerCorrectionPayload>(EMPTY_NEGATIVE_LAB_PATCH_SAMPLER_CORRECTION_PAYLOAD);
 
   const { isMounted, show } = useModalTransition(isOpen);
   const [isCompareActive, setIsCompareActive] = useState(false);
@@ -949,6 +962,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           frameExposureOverrides: frameExposureOverridePayload,
           frameRgbBalanceOverrides: frameRgbBalanceOverridePayload,
           omittedDispositionFrameIds,
+          patchSamplerCorrections: patchSamplerCorrectionPayload,
           qcDecisions: qcDecisionByFrameId,
           rollNormalizationPlan,
           selectedAcquisitionProfile,
@@ -964,6 +978,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       frameExposureOverridePayload,
       frameRgbBalanceOverridePayload,
       omittedDispositionFrameIds,
+      patchSamplerCorrectionPayload,
       qcDecisionByFrameId,
       rollNormalizationPlan,
       selectedAcquisitionProfile,
@@ -1399,6 +1414,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setIncludedPathSet(getInitialIncludedPaths(targetPaths));
       setFrameExposureOffsetByFrameId({});
       setFrameRgbBalanceOffsetByFrameId({});
+      setPatchSamplerCorrectionPayload(EMPTY_NEGATIVE_LAB_PATCH_SAMPLER_CORRECTION_PAYLOAD);
       setQcDecisionByFrameId({});
     }, 300);
     return () => {
@@ -1653,6 +1669,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setActiveBaseFogSampleLabel(null);
     setBaseFogSampleUndoStack([]);
     setParams(preset.params);
+    setPatchSamplerCorrectionPayload(EMPTY_NEGATIVE_LAB_PATCH_SAMPLER_CORRECTION_PAYLOAD);
     setAcceptedBatchPlanJson(null);
     updatePreview(buildParamsWithFrameOverrides(preset.params));
   };
@@ -1668,6 +1685,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         baseFogScope,
         baseSampleStudioDecision,
         params,
+        patchSamplerCorrectionPayload,
         selectedPresetId,
       },
     ]);
@@ -1687,6 +1705,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setActiveBaseFogSampleLabel(previous.activeBaseFogSampleLabel);
     setSelectedPresetId(previous.selectedPresetId);
     setParams(previous.params);
+    setPatchSamplerCorrectionPayload(previous.patchSamplerCorrectionPayload);
     setAcceptedBatchPlanJson(null);
     updatePreview(buildParamsWithFrameOverrides(previous.params));
   };
@@ -1842,23 +1861,48 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   };
 
   const handlePromoteBaseFogToRoll = () => {
-    if (baseFogConfidence === null || baseFogScope === 'roll') return;
+    if (baseFogConfidence === null || baseFogEstimate === null || selectedImagePath === null || baseFogScope === 'roll')
+      return;
+    const frameId = frameHealthReport.activeFrameId ?? `frame_${effectiveActivePathIndex + 1}`;
     pushBaseFogSampleUndoEntry();
     setBaseFogScope('roll');
     setBaseSampleStudioDecision('accepted');
     setBaseFogPreviewProof((proof) =>
       proof === null ? null : buildNegativeLabBaseSampleDecisionProof(proof, 'accepted', 'roll'),
     );
+    setPatchSamplerCorrectionPayload((payload) =>
+      appendNegativeLabPatchSamplerCorrection(
+        payload,
+        buildNegativeLabBaseFogPatchSamplerCorrection({
+          estimate: baseFogEstimate,
+          frameId,
+          sampleRect: params.base_fog_sample,
+          sourcePath: selectedImagePath,
+        }),
+      ),
+    );
     setAcceptedBatchPlanJson(null);
   };
 
   const handleAcceptBaseSample = () => {
-    if (baseFogConfidence === null) return;
+    if (baseFogConfidence === null || baseFogEstimate === null || selectedImagePath === null) return;
+    const frameId = frameHealthReport.activeFrameId ?? `frame_${effectiveActivePathIndex + 1}`;
     setBaseSampleStudioDecision('accepted');
     setBaseFogPreviewProof((proof) =>
       proof === null ? null : buildNegativeLabBaseSampleDecisionProof(proof, 'accepted', baseFogScope),
     );
     setRejectedBaseSampleLabel(null);
+    setPatchSamplerCorrectionPayload((payload) =>
+      appendNegativeLabPatchSamplerCorrection(
+        payload,
+        buildNegativeLabBaseFogPatchSamplerCorrection({
+          estimate: baseFogEstimate,
+          frameId,
+          sampleRect: params.base_fog_sample,
+          sourcePath: selectedImagePath,
+        }),
+      ),
+    );
   };
 
   const handleRejectBaseSample = () => {
@@ -1872,6 +1916,12 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setRejectedBaseSampleLabel(rejectedLabel);
     setBaseFogPreviewProof(rejectedProof);
     setBaseSampleStudioDecision('rejected');
+    const activeFrameId = frameHealthReport.activeFrameId;
+    if (activeFrameId !== null) {
+      setPatchSamplerCorrectionPayload((payload) =>
+        removeNegativeLabPatchSamplerCorrections(payload, activeFrameId, ['base_fog']),
+      );
+    }
   };
 
   const handleSamplePatchProbe = async (
@@ -2201,9 +2251,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   };
 
   const handleApplyNeutralPatchRgbSuggestion = () => {
+    const activeFrameId = frameHealthReport.activeFrameId;
     if (
-      frameHealthReport.activeFrameId === null ||
+      activeFrameId === null ||
       neutralPatchSuggestion === null ||
+      selectedImagePath === null ||
       !neutralPatchSuggestion.applyAllowed
     )
       return;
@@ -2212,37 +2264,56 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       offsets: neutralPatchSuggestion.suggestedRgbBalanceOffset,
     });
     const nextOffsetsByFrameId = negativeLabFrameRgbBalanceOffsetIsZero(nextOffset)
-      ? Object.fromEntries(
-          Object.entries(frameRgbBalanceOffsetByFrameId).filter(([key]) => key !== frameHealthReport.activeFrameId),
-        )
-      : { ...frameRgbBalanceOffsetByFrameId, [frameHealthReport.activeFrameId]: nextOffset };
+      ? Object.fromEntries(Object.entries(frameRgbBalanceOffsetByFrameId).filter(([key]) => key !== activeFrameId))
+      : { ...frameRgbBalanceOffsetByFrameId, [activeFrameId]: nextOffset };
     setFrameRgbBalanceOffsetByFrameId(nextOffsetsByFrameId);
+    setPatchSamplerCorrectionPayload((payload) =>
+      appendNegativeLabPatchSamplerCorrection(
+        payload,
+        buildNegativeLabNeutralPatchSamplerCorrection({
+          frameId: activeFrameId,
+          sourcePath: selectedImagePath,
+          suggestion: neutralPatchSuggestion,
+        }),
+      ),
+    );
     setAcceptedBatchPlanJson(null);
     updatePreview(
-      buildParamsWithFrameOverrides(
-        params,
-        frameHealthReport.activeFrameId,
-        frameExposureOffsetByFrameId,
-        nextOffsetsByFrameId,
-      ),
+      buildParamsWithFrameOverrides(params, activeFrameId, frameExposureOffsetByFrameId, nextOffsetsByFrameId),
     );
   };
 
   const handleApplyHighlightPatchExposureSuggestion = () => {
+    const activeFrameId = frameHealthReport.activeFrameId;
     if (
-      frameHealthReport.activeFrameId === null ||
+      activeFrameId === null ||
       highlightPatchExposureSuggestion === null ||
+      selectedImagePath === null ||
       !highlightPatchExposureSuggestion.applyAllowed
     )
       return;
-    handleFrameExposureOffsetChange(
-      frameHealthReport.activeFrameId,
-      highlightPatchExposureSuggestion.suggestedFrameExposureOffset,
+    setPatchSamplerCorrectionPayload((payload) =>
+      appendNegativeLabPatchSamplerCorrection(
+        payload,
+        buildNegativeLabHighlightPatchSamplerCorrection({
+          frameId: activeFrameId,
+          sourcePath: selectedImagePath,
+          suggestion: highlightPatchExposureSuggestion,
+        }),
+      ),
     );
+    handleFrameExposureOffsetChange(activeFrameId, highlightPatchExposureSuggestion.suggestedFrameExposureOffset);
   };
 
   const handleApplyShadowPatchBlackPointSuggestion = () => {
-    if (shadowPatchBlackPointSuggestion === null || !shadowPatchBlackPointSuggestion.applyAllowed) return;
+    const activeFrameId = frameHealthReport.activeFrameId;
+    if (
+      activeFrameId === null ||
+      selectedImagePath === null ||
+      shadowPatchBlackPointSuggestion === null ||
+      !shadowPatchBlackPointSuggestion.applyAllowed
+    )
+      return;
     const nextParams = {
       ...params,
       black_point: Number(
@@ -2251,6 +2322,16 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     };
     setSelectedPresetId('');
     setParams(nextParams);
+    setPatchSamplerCorrectionPayload((payload) =>
+      appendNegativeLabPatchSamplerCorrection(
+        payload,
+        buildNegativeLabShadowPatchSamplerCorrection({
+          frameId: activeFrameId,
+          sourcePath: selectedImagePath,
+          suggestion: shadowPatchBlackPointSuggestion,
+        }),
+      ),
+    );
     setAcceptedBatchPlanJson(null);
     updatePreview(buildParamsWithFrameOverrides(nextParams));
   };
@@ -2293,6 +2374,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             batchScope: conversionScope,
             frameExposureOverrides: frameExposureOverridePayload,
             frameRgbBalanceOverrides: frameRgbBalanceOverridePayload,
+            patchSamplerCorrections: patchSamplerCorrectionPayload,
             acceptedDustHealLayersBySourcePath,
             omittedDispositionFrameIds,
             qcApprovedFrameIds: approvedQcFrameIds,

@@ -84,6 +84,8 @@ pub struct NegativeConversionSaveOptions {
     #[serde(default)]
     pub frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload,
     #[serde(default)]
+    pub patch_sampler_corrections: serde_json::Value,
+    #[serde(default)]
     pub accepted_dust_heal_layers_by_source_path: HashMap<String, Vec<serde_json::Value>>,
 }
 
@@ -298,6 +300,13 @@ fn default_write_conversion_bundle() -> bool {
     true
 }
 
+fn default_patch_sampler_corrections() -> serde_json::Value {
+    serde_json::json!({
+        "corrections": [],
+        "schemaVersion": 1
+    })
+}
+
 #[cfg(test)]
 #[allow(dead_code)]
 fn default_negative_lab_identity_crosstalk_profile() -> serde_json::Value {
@@ -339,6 +348,7 @@ impl Default for NegativeConversionSaveOptions {
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            patch_sampler_corrections: default_patch_sampler_corrections(),
             accepted_dust_heal_layers_by_source_path: HashMap::new(),
         }
     }
@@ -396,6 +406,8 @@ impl NegativeConversionSaveOptions {
                 (!source_path.is_empty() && !layers.is_empty()).then_some((source_path, layers))
             })
             .collect();
+        let patch_sampler_corrections =
+            sanitize_negative_lab_patch_sampler_corrections(self.patch_sampler_corrections);
 
         Self {
             output_format: self.output_format,
@@ -426,6 +438,7 @@ impl NegativeConversionSaveOptions {
                 overrides: frame_rgb_balance_overrides,
                 schema_version: 1,
             },
+            patch_sampler_corrections,
             accepted_dust_heal_layers_by_source_path,
         }
     }
@@ -573,6 +586,49 @@ fn negative_lab_rgb_balance_offset_is_valid(balance: &NegativeLabFrameRgbBalance
     ]
     .iter()
     .all(|value| value.is_finite() && (-1.5..=1.5).contains(value))
+}
+
+fn sanitize_negative_lab_patch_sampler_corrections(value: serde_json::Value) -> serde_json::Value {
+    let corrections = value
+        .get("corrections")
+        .and_then(|value| value.as_array())
+        .map(|entries| {
+            entries
+                .iter()
+                .filter(|entry| {
+                    entry.get("accepted").and_then(|value| value.as_bool()) == Some(true)
+                        && entry
+                            .get("correctionId")
+                            .and_then(|value| value.as_str())
+                            .is_some_and(|value| !value.trim().is_empty())
+                        && entry
+                            .get("frameId")
+                            .and_then(|value| value.as_str())
+                            .is_some_and(|value| !value.trim().is_empty())
+                        && entry
+                            .get("sourcePath")
+                            .and_then(|value| value.as_str())
+                            .is_some_and(|value| !value.trim().is_empty())
+                        && entry.get("values").is_some_and(|value| value.is_object())
+                        && matches!(
+                            entry.get("role").and_then(|value| value.as_str()),
+                            Some(
+                                "base_fog"
+                                    | "highlight_exposure"
+                                    | "neutral_rgb_balance"
+                                    | "shadow_black_point"
+                            )
+                        )
+                })
+                .cloned()
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    serde_json::json!({
+        "corrections": corrections,
+        "schemaVersion": 1
+    })
 }
 
 fn negative_lab_effective_rgb_balance(
@@ -1131,6 +1187,7 @@ fn write_negative_lab_conversion_bundle(
         "frameExposureOverrides": save_options.frame_exposure_overrides.clone(),
         "frameRgbBalanceOverrides": save_options.frame_rgb_balance_overrides.clone(),
         "params": params,
+        "patchSamplerCorrections": save_options.patch_sampler_corrections.clone(),
         "paths": outputs
             .iter()
             .map(|output| output.source_path.to_string_lossy().to_string())
@@ -1153,6 +1210,7 @@ fn write_negative_lab_conversion_bundle(
             "frameExposureOverrides": save_options.frame_exposure_overrides.clone(),
             "frameRgbBalanceOverrides": save_options.frame_rgb_balance_overrides.clone(),
             "outputFormat": output_format,
+            "patchSamplerCorrections": save_options.patch_sampler_corrections.clone(),
             "params": params,
             "profileProvenanceHash": save_options.profile_provenance_hash,
             "selectedProfile": save_options.selected_profile,
@@ -1213,6 +1271,7 @@ fn write_negative_lab_output_sidecar(
             "frameExposureOverrides": save_options.frame_exposure_overrides.clone(),
             "frameRgbBalanceOverrides": save_options.frame_rgb_balance_overrides.clone(),
             "outputFormat": output_format,
+            "patchSamplerCorrections": save_options.patch_sampler_corrections.clone(),
             "params": params,
             "profileProvenanceHash": save_options.profile_provenance_hash,
             "selectedProfile": save_options.selected_profile.clone(),
@@ -2489,6 +2548,7 @@ mod tests {
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            patch_sampler_corrections: default_patch_sampler_corrections(),
             accepted_dust_heal_layers_by_source_path: HashMap::new(),
             suffix: " Proof / Final:01 ".to_string(),
         }
@@ -2519,6 +2579,7 @@ mod tests {
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            patch_sampler_corrections: default_patch_sampler_corrections(),
             accepted_dust_heal_layers_by_source_path: HashMap::new(),
             suffix: "///".to_string(),
         }
@@ -2542,6 +2603,7 @@ mod tests {
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            patch_sampler_corrections: default_patch_sampler_corrections(),
             accepted_dust_heal_layers_by_source_path: HashMap::new(),
             suffix: "Web Proof".to_string(),
         }
@@ -2558,6 +2620,7 @@ mod tests {
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            patch_sampler_corrections: default_patch_sampler_corrections(),
             accepted_dust_heal_layers_by_source_path: HashMap::new(),
             suffix: "".to_string(),
         }
@@ -2600,6 +2663,7 @@ mod tests {
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            patch_sampler_corrections: default_patch_sampler_corrections(),
             accepted_dust_heal_layers_by_source_path: HashMap::new(),
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
@@ -2617,6 +2681,7 @@ mod tests {
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            patch_sampler_corrections: default_patch_sampler_corrections(),
             accepted_dust_heal_layers_by_source_path: HashMap::new(),
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
@@ -2860,6 +2925,7 @@ mod tests {
             }),
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            patch_sampler_corrections: default_patch_sampler_corrections(),
             accepted_dust_heal_layers_by_source_path: HashMap::from([(
                 source_path.to_string_lossy().to_string(),
                 accepted_dust_heal_layers,
@@ -2998,6 +3064,26 @@ mod tests {
             selected_profile: None,
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            patch_sampler_corrections: serde_json::json!({
+                "corrections": [{
+                    "accepted": true,
+                    "appliedAt": "2026-07-01T00:00:00Z",
+                    "correctionId": "patch_sampler_neutral_rgb_balance_f4a91bc2",
+                    "frameId": "negative-lab-frame-1",
+                    "role": "neutral_rgb_balance",
+                    "sampleRect": null,
+                    "sourceCommand": "suggest_negative_lab_neutral_patch_rgb_balance",
+                    "sourcePath": source_path.to_string_lossy().to_string(),
+                    "values": {
+                        "suggestedRgbBalanceOffset": {
+                            "blueWeight": 0.02,
+                            "greenWeight": -0.01,
+                            "redWeight": 0.03
+                        }
+                    }
+                }],
+                "schemaVersion": 1
+            }),
             accepted_dust_heal_layers_by_source_path: HashMap::new(),
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
@@ -3560,6 +3646,7 @@ mod tests {
             }),
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            patch_sampler_corrections: default_patch_sampler_corrections(),
             accepted_dust_heal_layers_by_source_path: HashMap::new(),
             suffix: "Positive".to_string(),
         };
@@ -3895,6 +3982,7 @@ mod tests {
             }),
             frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
             frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            patch_sampler_corrections: default_patch_sampler_corrections(),
             accepted_dust_heal_layers_by_source_path: HashMap::new(),
             suffix: "Positive".to_string(),
         };
