@@ -2105,6 +2105,8 @@
       "searchPlaceholder": "",
       "title": "",
       "unavailable": {
+        "negativeLabLoading": "Supported file types are still loading",
+        "negativeLabUnsupported": "Select supported RAW or image files for Negative Lab",
         "selectEditorImage": "Select an image in the editor to use this command",
         "selectImage": "",
         "selectSource": ""
@@ -3511,6 +3513,13 @@
       "yAxis": "Eixo Y",
       "zoomInTooltip": "Mais Zoom",
       "zoomOutTooltip": "Menos Zoom"
+    }
+  },
+  "negativeLabEntryPoints": {
+    "disabled": {
+      "loading": "Supported file types are still loading",
+      "noSelection": "Select one or more images",
+      "unsupported": "Select supported RAW or image files"
     }
   },
   "settings": {

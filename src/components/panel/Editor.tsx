@@ -63,6 +63,10 @@ import {
   readObjectPromptCanvasState,
   writeObjectPromptCanvasState,
 } from '../../utils/mask/objectMaskPromptCanvas';
+import {
+  getNegativeLabDisabledReasonKey,
+  getNegativeLabSourceReadiness,
+} from '../../utils/negative-lab/negativeLabSourceReadiness';
 import { debounce } from '../../utils/timing';
 import { Panel } from '../ui/AppProperties';
 import UiText from '../ui/primitives/Text';
@@ -97,6 +101,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const { t } = useTranslation();
   const appSettings = useSettingsStore((s) => s.appSettings);
   const osPlatform = useSettingsStore((s) => s.osPlatform);
+  const supportedTypes = useSettingsStore((s) => s.supportedTypes);
   const isFullScreen = useUIStore((s) => s.isFullScreen);
   const activeRightPanel = useUIStore((s) => s.activeRightPanel);
   const isInstantTransition = useUIStore((s) => s.isInstantTransition);
@@ -214,10 +219,16 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     }
   }, [isFullScreen, selectedImage, targetZoom, setUI]);
 
+  const negativeLabSourceReadiness = useMemo(
+    () => getNegativeLabSourceReadiness(selectedImage ? [selectedImage.path] : [], supportedTypes),
+    [selectedImage, supportedTypes],
+  );
+  const negativeLabDisabledReasonKey = getNegativeLabDisabledReasonKey(negativeLabSourceReadiness);
+
   const handleOpenNegativeLab = useCallback(() => {
-    if (!selectedImage) return;
-    setUI({ negativeModalState: { isOpen: true, targetPaths: [selectedImage.path] } });
-  }, [selectedImage, setUI]);
+    if (!negativeLabSourceReadiness.isReady) return;
+    setUI({ negativeModalState: { isOpen: true, targetPaths: negativeLabSourceReadiness.targetPaths } });
+  }, [negativeLabSourceReadiness, setUI]);
 
   const handleDisplaySizeChange = useCallback(
     (size: DisplaySizeUpdate) => {
@@ -1491,6 +1502,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           isAndroid={isAndroid}
           isFullScreen={isFullScreen}
           isLoading={isLoading}
+          negativeLabDisabledReason={negativeLabDisabledReasonKey ? t(negativeLabDisabledReasonKey) : null}
           onBackToLibrary={onBackToLibrary}
           onOpenNegativeLab={handleOpenNegativeLab}
           onRedo={redo}

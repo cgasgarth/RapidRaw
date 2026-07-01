@@ -45,6 +45,29 @@ assert.deepEqual(openedPaths, [[targetPath]], 'Negative Lab toolbar entry should
 
 rendered.unmount();
 
+const disabledRendered = await renderToolbar(() => {
+  openedPaths.push(['/library/negative-lab/unsupported.txt']);
+}, locale.negativeLabEntryPoints.disabled.unsupported);
+const disabledButton = disabledRendered.container.querySelector<HTMLButtonElement>(
+  '[data-testid="editor-toolbar-negative-lab"]',
+);
+assert(disabledButton, 'Negative Lab toolbar entry should still render when disabled');
+assert.equal(disabledButton.disabled, true, 'Unsupported source should disable the toolbar entry');
+assert.equal(disabledButton.getAttribute('data-tooltip'), locale.negativeLabEntryPoints.disabled.unsupported);
+assert.equal(
+  disabledButton.getAttribute('aria-label'),
+  `${locale.contextMenus.editor.convertNegative}: ${locale.negativeLabEntryPoints.disabled.unsupported}`,
+);
+
+await act(async () => {
+  disabledButton.click();
+  await flushPromises();
+});
+
+assert.deepEqual(openedPaths, [[targetPath]], 'Disabled Negative Lab toolbar entry should not open');
+
+disabledRendered.unmount();
+
 if (failures.length > 0) {
   console.error('negative lab toolbar entry failed');
   console.error(failures.slice(0, 10).join('\n'));
@@ -53,7 +76,10 @@ if (failures.length > 0) {
 
 console.log('negative lab toolbar entry ok');
 
-async function renderToolbar(onOpenNegativeLab: () => void): Promise<RenderedToolbar> {
+async function renderToolbar(
+  onOpenNegativeLab: () => void,
+  negativeLabDisabledReason: string | null = null,
+): Promise<RenderedToolbar> {
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
@@ -71,6 +97,7 @@ async function renderToolbar(onOpenNegativeLab: () => void): Promise<RenderedToo
           goToAdjustmentsHistoryIndex: () => undefined,
           isAndroid: false,
           isLoading: false,
+          negativeLabDisabledReason,
           onBackToLibrary: () => undefined,
           onOpenNegativeLab,
           onRedo: () => undefined,

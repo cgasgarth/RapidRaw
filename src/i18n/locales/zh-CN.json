@@ -2088,6 +2088,8 @@
       "searchPlaceholder": "Search commands...",
       "title": "Command Palette",
       "unavailable": {
+        "negativeLabLoading": "Supported file types are still loading",
+        "negativeLabUnsupported": "Select supported RAW or image files for Negative Lab",
         "selectEditorImage": "Select an image in the editor to use this command",
         "selectImage": "Select an image to use this command",
         "selectSource": "Select one or more images to use this command"
@@ -3514,6 +3516,13 @@
       "yAxis": "Y 轴",
       "zoomInTooltip": "放大",
       "zoomOutTooltip": "缩小"
+    }
+  },
+  "negativeLabEntryPoints": {
+    "disabled": {
+      "loading": "Supported file types are still loading",
+      "noSelection": "Select one or more images",
+      "unsupported": "Select supported RAW or image files"
     }
   },
   "settings": {

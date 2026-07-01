@@ -1,4 +1,4 @@
-import { type ImageFile, Panel, type SelectedImage } from '../components/ui/AppProperties';
+import { type ImageFile, Panel, type SelectedImage, type SupportedTypes } from '../components/ui/AppProperties';
 import {
   type CommandPaletteCommand,
   type CommandPaletteCommandCategory,
@@ -8,6 +8,10 @@ import {
 import type { UIState } from '../store/useUIStore';
 import { createFocusStackSourcePreflightMetadata } from './focusStackSourcePreflight';
 import { buildHdrLaunchSourceMetadata, resolveHdrLaunchSourcePaths } from './hdrAutoStackSelection';
+import {
+  getNegativeLabCommandPaletteDisabledReasonKey,
+  getNegativeLabSourceReadiness,
+} from './negative-lab/negativeLabSourceReadiness';
 import { createSuperResolutionSourcePreflightMetadata } from './superResolutionSourcePreflight';
 
 export type { CommandPaletteCommand };
@@ -169,7 +173,9 @@ export const commandPanelMap = {
 export type CommandPaletteDisabledReasonKey =
   | 'modals.commandPalette.unavailable.selectImage'
   | 'modals.commandPalette.unavailable.selectEditorImage'
-  | 'modals.commandPalette.unavailable.selectSource';
+  | 'modals.commandPalette.unavailable.selectSource'
+  | 'modals.commandPalette.unavailable.negativeLabLoading'
+  | 'modals.commandPalette.unavailable.negativeLabUnsupported';
 
 export interface CommandPaletteUiState {
   collageModalState?: unknown;
@@ -212,6 +218,7 @@ export interface CommandPaletteActionContext {
   selectedImage: SelectedImage | null;
   setRightPanel: (panel: Panel | null) => void;
   setUI: CommandPaletteSetUI;
+  supportedTypes: SupportedTypes | null;
 }
 
 export function getCommandPaletteSelectedPaths(
@@ -235,12 +242,18 @@ export function getCommandPaletteDisabledReasonKey(
   selectedCommandImages: ImageFile[],
   selectedCommandPaths: string[],
   selectedImage: SelectedImage | null,
+  supportedTypes: SupportedTypes | null,
 ): CommandPaletteDisabledReasonKey | null {
   if (command.id === 'collage' && selectedCommandImages.length === 0) {
     return 'modals.commandPalette.unavailable.selectSource';
   }
   if (['culling', 'denoise', 'negativeLab'].includes(command.id) && selectedCommandPaths.length === 0) {
     return 'modals.commandPalette.unavailable.selectSource';
+  }
+  if (command.id === 'negativeLab') {
+    return getNegativeLabCommandPaletteDisabledReasonKey(
+      getNegativeLabSourceReadiness(selectedCommandPaths, supportedTypes),
+    ) as CommandPaletteDisabledReasonKey | null;
   }
   if (command.requiresEditorImage && !selectedImage) {
     return selectedCommandPaths.length > 0
@@ -262,6 +275,7 @@ export function createCommandPaletteAction(
     selectedImage,
     setRightPanel,
     setUI,
+    supportedTypes,
   } = context;
 
   if (command.id === 'backToLibrary') {
@@ -424,10 +438,16 @@ export function createCommandPaletteAction(
     };
   }
 
-  if (command.id === 'negativeLab' && selectedCommandPaths.length > 0) {
+  if (command.id === 'negativeLab') {
+    const negativeLabReadiness = getNegativeLabSourceReadiness(selectedCommandPaths, supportedTypes);
+    if (!negativeLabReadiness.isReady) return null;
     return () => {
       setUI((state) => ({
-        negativeModalState: { ...state.negativeModalState, isOpen: true, targetPaths: selectedCommandPaths },
+        negativeModalState: {
+          ...state.negativeModalState,
+          isOpen: true,
+          targetPaths: negativeLabReadiness.targetPaths,
+        },
       }));
     };
   }
