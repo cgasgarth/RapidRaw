@@ -123,6 +123,8 @@ import {
   Theme,
 } from '../../../ui/AppProperties';
 import CollapsibleSection from '../../../ui/CollapsibleSection';
+import { editorChromeTokens } from '../../../ui/editorChromeTokens';
+import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens';
 import Switch from '../../../ui/primitives/Switch';
 import UiText from '../../../ui/primitives/Text';
 import Resizer from '../../../ui/Resizer';
@@ -151,6 +153,12 @@ import {
   useDelayedHover,
 } from './maskPanelRowHelpers';
 import { ObjectPromptControls } from './ObjectPromptControls';
+
+const maskPanelIconButtonClassName = `${professionalInspectorDensityTokens.actionButton.base} ${professionalInspectorDensityTokens.actionButton.icon} ${professionalInspectorDensityTokens.actionButton.quiet}`;
+const maskPanelRowActionClassName =
+  'flex h-6 w-6 items-center justify-center rounded text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45';
+const maskPanelCardClassName = professionalInspectorDensityTokens.card.nestedPanel;
+const maskPanelInputClassName = `${editorChromeTokens.input.base} ${editorChromeTokens.input.compact}`;
 
 type NumericMaskParameterPatch<TKey extends string> = Partial<Record<TKey, number>>;
 type SubMaskControlParameterKey = 'feather' | 'flow' | 'grow' | 'tolerance';
@@ -542,7 +550,7 @@ function AiPersonMaskProvenance({ parameters }: { parameters: unknown }) {
 
   return (
     <div
-      className="grid gap-1 rounded-md border border-surface bg-bg-secondary p-2 text-[11px]"
+      className={`${maskPanelCardClassName} grid gap-1 text-[11px]`}
       data-class-ids={classIds.join(',')}
       data-has-mask-data={String(hasMaskData)}
       data-model-id={modelId ?? ''}
@@ -584,6 +592,7 @@ const BrushTools = ({
   return (
     <div>
       <AdjustmentSlider
+        density="compact"
         defaultValue={100}
         label={t('editor.masks.brush.size')}
         max={200}
@@ -600,6 +609,7 @@ const BrushTools = ({
         onDragStateChange={onDragStateChange}
       />
       <AdjustmentSlider
+        density="compact"
         defaultValue={50}
         label={t('editor.masks.brush.feather')}
         max={100}
@@ -615,9 +625,9 @@ const BrushTools = ({
         fillOrigin="min"
         onDragStateChange={onDragStateChange}
       />
-      <div className="grid grid-cols-2 gap-2 pt-2">
+      <div className="grid grid-cols-2 gap-1.5 pt-1.5">
         <button
-          className={`p-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${settings.tool === ToolType.Brush ? 'text-primary bg-surface' : 'bg-surface text-text-secondary hover:bg-card-active'}`}
+          className={`flex min-h-7 items-center justify-center gap-2 rounded px-2 py-1 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring ${settings.tool === ToolType.Brush ? 'bg-editor-primary-active text-editor-primary-active-text' : 'bg-editor-panel text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary'}`}
           onClick={() => {
             onSettingsChange((settings) => ({
               ...(settings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
@@ -628,7 +638,7 @@ const BrushTools = ({
           {t('editor.masks.brush.brush')}
         </button>
         <button
-          className={`p-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${settings.tool === ToolType.Eraser ? 'text-primary bg-surface' : 'bg-surface text-text-secondary hover:bg-card-active'}`}
+          className={`flex min-h-7 items-center justify-center gap-2 rounded px-2 py-1 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring ${settings.tool === ToolType.Eraser ? 'bg-editor-primary-active text-editor-primary-active-text' : 'bg-editor-panel text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary'}`}
           onClick={() => {
             onSettingsChange((settings) => ({
               ...(settings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
@@ -659,8 +669,9 @@ const FlowBrushTool = ({
   const { t } = useTranslation();
 
   return (
-    <div className="space-y-4 border-t border-surface">
+    <div className="space-y-2 border-t border-editor-border pt-2">
       <AdjustmentSlider
+        density="compact"
         defaultValue={10}
         label={t('editor.masks.brush.flow')}
         max={100}
@@ -1040,7 +1051,7 @@ function MaskRefinementControls({
 
   return (
     <div
-      className="space-y-3 rounded-md border border-surface p-3"
+      className={`${maskPanelCardClassName} space-y-2`}
       data-refinement-warning-count={warningIds.length}
       data-testid="mask-refinement-controls"
     >
@@ -1050,7 +1061,7 @@ function MaskRefinementControls({
         </UiText>
         <button
           type="button"
-          className="text-xs text-text-secondary transition-colors hover:text-text-primary"
+          className="rounded px-1 text-xs text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
           onClick={onReset}
         >
           {t('editor.masks.refinement.reset')}
@@ -1065,6 +1076,7 @@ function MaskRefinementControls({
             data-testid={`mask-refinement-control-${param.key}`}
           >
             <AdjustmentSlider
+              density="compact"
               label={t(param.labelKey)}
               min={param.min}
               max={param.max}
@@ -1140,7 +1152,7 @@ function LinearGradientMaskControls({
 
   return (
     <div
-      className="space-y-3 rounded-md border border-surface p-3"
+      className={`${maskPanelCardClassName} space-y-2`}
       data-end-y-percent={endYPercent}
       data-gradient-command-type="layerMask.createGradientMask"
       data-range={range}
@@ -1148,6 +1160,7 @@ function LinearGradientMaskControls({
       data-testid="linear-gradient-mask-controls"
     >
       <AdjustmentSlider
+        density="compact"
         defaultValue={12}
         fillOrigin="min"
         label={parameterLabelFallback('startY')}
@@ -1161,6 +1174,7 @@ function LinearGradientMaskControls({
         value={startYPercent}
       />
       <AdjustmentSlider
+        density="compact"
         defaultValue={72}
         fillOrigin="min"
         label={parameterLabelFallback('endY')}
@@ -1174,6 +1188,7 @@ function LinearGradientMaskControls({
         value={endYPercent}
       />
       <AdjustmentSlider
+        density="compact"
         defaultValue={120}
         fillOrigin="min"
         label={parameterLabelFallback('range')}
@@ -1908,14 +1923,19 @@ export function MasksPanel() {
       onDragEnd={handleDragEnd}
       collisionDetection={pointerWithin}
     >
-      <div className="flex flex-col h-full select-none overflow-hidden" onContextMenu={handlePanelContextMenu}>
-        <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-          <UiText variant={TextVariants.title}>{t('editor.masks.maskingTitle')}</UiText>
+      <div
+        className="flex h-full flex-col overflow-hidden bg-editor-panel text-text-primary select-none"
+        onContextMenu={handlePanelContextMenu}
+      >
+        <div className={professionalInspectorDensityTokens.panelHeader.root}>
+          <UiText variant={TextVariants.title} className={professionalInspectorDensityTokens.panelHeader.title}>
+            {t('editor.masks.maskingTitle')}
+          </UiText>
           <div className="flex items-center gap-1">
             <button
               className={cx(
-                'p-2 rounded-full transition-colors',
-                isWaveformVisible ? 'bg-surface hover:bg-card-active' : 'hover:bg-surface',
+                maskPanelIconButtonClassName,
+                isWaveformVisible && professionalInspectorDensityTokens.actionButton.selectedQuiet,
               )}
               onClick={onToggleWaveform}
               data-tooltip={t('editor.masks.toggleAnalyticsTooltip')}
@@ -1923,7 +1943,7 @@ export function MasksPanel() {
               <ChartArea size={18} />
             </button>
             <button
-              className="p-2 rounded-full hover:bg-surface transition-colors"
+              className={maskPanelIconButtonClassName}
               onClick={handleResetAllMasks}
               data-tooltip={t('editor.masks.resetMaskingTooltip')}
             >
@@ -1941,7 +1961,7 @@ export function MasksPanel() {
           }}
         />
 
-        <div className="shrink-0 border-b border-surface p-4">
+        <div className="shrink-0 border-b border-editor-border p-2">
           <MaskOverlayReviewControls
             settings={maskOverlaySettings}
             onChange={setMaskOverlaySettings}
@@ -1957,7 +1977,7 @@ export function MasksPanel() {
               animate={{ height: waveformHeight || 256, opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: isResizingWaveform ? 0 : 0.2, ease: 'easeOut' }}
-              className="shrink-0 flex flex-col relative border-b border-surface overflow-hidden"
+              className="relative flex shrink-0 flex-col overflow-hidden border-b border-editor-border"
             >
               <div className="grow w-full h-full p-4 pb-2 min-h-0">
                 <Waveform
@@ -1980,7 +2000,7 @@ export function MasksPanel() {
           )}
         </AnimatePresence>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col min-h-0 p-4">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden p-2">
           <AnimatePresence mode="wait">
             {adjustments.masks.length === 0 ? (
               <motion.div
@@ -1992,11 +2012,14 @@ export function MasksPanel() {
                 className="z-10 shrink-0"
                 onClick={handleDeselect}
               >
-                <UiText variant={TextVariants.heading} className="mb-2">
+                <UiText
+                  variant={TextVariants.heading}
+                  className={professionalInspectorDensityTokens.sectionHeader.title}
+                >
                   {t('editor.masks.createNewTitle')}
                 </UiText>
                 <div
-                  className="grid grid-cols-3 gap-2"
+                  className="mt-1 grid grid-cols-3 gap-1.5"
                   role="presentation"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -2080,30 +2103,39 @@ export function MasksPanel() {
                 transition={{ duration: 0.2, ease: 'easeOut' }}
                 className="flex-1 min-h-0"
               >
-                <UiText variant={TextVariants.heading} className="mb-2">
+                <UiText
+                  variant={TextVariants.heading}
+                  className={professionalInspectorDensityTokens.sectionHeader.title}
+                >
                   {t('editor.masks.maskAdjustmentsTitle')}
                 </UiText>
                 {activeContainer && (
-                  <div className="mb-3 space-y-2">
+                  <div className="mb-2 space-y-1.5">
                     <div
-                      className="grid grid-cols-4 gap-2 rounded-md border border-surface bg-bg-secondary p-2 text-[11px]"
+                      className="grid grid-cols-4 gap-1 rounded-md border border-editor-border bg-editor-panel-well p-1.5 text-[11px]"
                       data-component-count={activeContainer.subMasks.length}
                       data-has-brush={String(activeMaskHasBrush)}
                       data-has-gradient={String(activeMaskHasGradient)}
                       data-has-range={String(activeMaskHasRange)}
                       data-testid="mask-readiness-summary"
                     >
-                      <div className="min-w-0 rounded bg-bg-primary px-2 py-1" data-testid="mask-readiness-components">
+                      <div
+                        className="min-w-0 rounded bg-editor-panel px-1.5 py-1"
+                        data-testid="mask-readiness-components"
+                      >
                         <span className="block truncate text-text-tertiary">{t('editor.masks.masksTitle')}</span>
                         <span className="block truncate text-text-secondary">{activeContainer.subMasks.length}</span>
                       </div>
-                      <div className="min-w-0 rounded bg-bg-primary px-2 py-1" data-testid="mask-readiness-brush">
+                      <div className="min-w-0 rounded bg-editor-panel px-1.5 py-1" data-testid="mask-readiness-brush">
                         <span className="block truncate text-text-tertiary">{formatMaskTypeName(Mask.Brush)}</span>
                         <span className="block truncate text-text-secondary">
                           {activeMaskHasBrush ? t('editor.masks.maskAdjustmentsTitle') : t('editor.masks.addNewMask')}
                         </span>
                       </div>
-                      <div className="min-w-0 rounded bg-bg-primary px-2 py-1" data-testid="mask-readiness-gradient">
+                      <div
+                        className="min-w-0 rounded bg-editor-panel px-1.5 py-1"
+                        data-testid="mask-readiness-gradient"
+                      >
                         <span className="block truncate text-text-tertiary">{formatMaskTypeName(Mask.Linear)}</span>
                         <span className="block truncate text-text-secondary">
                           {activeMaskHasGradient
@@ -2111,7 +2143,7 @@ export function MasksPanel() {
                             : t('editor.masks.addNewMask')}
                         </span>
                       </div>
-                      <div className="min-w-0 rounded bg-bg-primary px-2 py-1" data-testid="mask-readiness-range">
+                      <div className="min-w-0 rounded bg-editor-panel px-1.5 py-1" data-testid="mask-readiness-range">
                         <span className="block truncate text-text-tertiary">{formatMaskTypeName(Mask.Color)}</span>
                         <span className="block truncate text-text-secondary">
                           {activeMaskHasRange ? t('editor.masks.maskAdjustmentsTitle') : t('editor.masks.addNewMask')}
@@ -2119,7 +2151,7 @@ export function MasksPanel() {
                       </div>
                     </div>
                     <div
-                      className="grid grid-cols-3 gap-2 rounded-md border border-surface bg-bg-secondary p-2"
+                      className="grid grid-cols-3 gap-1.5 rounded-md border border-editor-border bg-editor-panel-well p-1.5"
                       data-testid="mask-component-quick-add"
                     >
                       {[
@@ -2143,7 +2175,7 @@ export function MasksPanel() {
                         },
                       ].map((action) => (
                         <button
-                          className="min-w-0 rounded border border-surface bg-bg-primary px-2 py-1.5 text-xs text-text-secondary transition-colors hover:bg-card-active hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                          className="min-w-0 rounded bg-editor-panel px-2 py-1.5 text-[11px] font-medium leading-4 text-text-secondary transition-colors hover:bg-editor-panel-raised hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring"
                           data-testid={action.testId}
                           disabled={action.disabled}
                           key={action.testId}
@@ -2198,7 +2230,7 @@ export function MasksPanel() {
                 as="div"
                 color={TextColors.primary}
                 weight={TextWeights.medium}
-                className="flex items-center gap-2 p-2 rounded-md bg-surface shadow-2xl opacity-90 ring-1 ring-black/10"
+                className="flex items-center gap-2 rounded-md border border-editor-border bg-editor-panel-raised p-2 opacity-90 shadow-2xl"
               >
                 <FolderIcon size={18} className={TEXT_COLOR_KEYS[TextColors.secondary]} />
                 <span className="flex-1 truncate">{(activeDragItem.item as MaskContainer).name}</span>
@@ -2210,7 +2242,7 @@ export function MasksPanel() {
                 as="div"
                 color={TextColors.primary}
                 weight={TextWeights.medium}
-                className="flex items-center gap-2 p-2 rounded-md bg-surface shadow-2xl opacity-90 ring-1 ring-black/10 ml-3.75"
+                className="ml-3.75 flex items-center gap-2 rounded-md border border-editor-border bg-editor-panel-raised p-2 opacity-90 shadow-2xl"
               >
                 {(() => {
                   const sm = activeDragItem.item as SubMask;
@@ -2226,7 +2258,7 @@ export function MasksPanel() {
                 as="div"
                 variant={TextVariants.small}
                 color={TextColors.primary}
-                className="bg-surface rounded-lg gap-2 p-2 flex flex-col items-center justify-center aspect-square w-20 shadow-xl opacity-90"
+                className="flex aspect-square w-20 flex-col items-center justify-center gap-2 rounded-md border border-editor-border bg-editor-panel-raised p-2 opacity-90 shadow-xl"
               >
                 {(() => {
                   const maskType =
@@ -2262,7 +2294,7 @@ function NewMaskDropZone({ isOver }: { isOver: boolean }) {
       animate={{ opacity: 1, height: 'auto', marginTop: '4px' }}
       exit={{ opacity: 0, height: 0, marginTop: 0 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
-      className={`p-4 rounded-lg text-center ${isOver ? 'border border-accent/80 bg-bg-tertiary/50' : ''}`}
+      className={`rounded-md p-3 text-center text-[12px] ${isOver ? 'border border-editor-primary-active bg-editor-selected-quiet' : ''}`}
     >
       <UiText weight={TextWeights.medium}>{t('editor.masks.dropzoneText')}</UiText>
     </motion.div>
@@ -2313,8 +2345,8 @@ function DraggableGridItem({
         if (event.button !== 2) return;
         onRightClick(event);
       }}
-      className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-2 aspect-square transition-colors
-                ${maskType.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active active:bg-accent/20'} ${isDragging ? 'opacity-50' : ''}`}
+      className={`flex aspect-square flex-col items-center justify-center gap-1.5 rounded-md border border-editor-border bg-editor-panel-well p-2 text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring
+                ${maskType.disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-editor-panel-raised active:bg-editor-selected-quiet'} ${isDragging ? 'opacity-50' : ''}`}
       data-tooltip={tooltip}
       whileTap={{ scale: 0.98 }}
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
@@ -2374,10 +2406,10 @@ function MaskList({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className={`flex-col transition-colors ${isRootOver ? 'bg-surface' : ''}`}
+      className={`flex-col transition-colors ${isRootOver ? 'bg-editor-panel-well' : ''}`}
       onClick={onRootClick}
     >
-      <UiText variant={TextVariants.heading} className="mb-2">
+      <UiText variant={TextVariants.heading} className={professionalInspectorDensityTokens.sectionHeader.title}>
         {t('editor.masks.masksTitle')}
       </UiText>
 
@@ -2436,7 +2468,7 @@ function MaskList({
       <UiText
         as="div"
         weight={TextWeights.medium}
-        className="flex items-center gap-2 p-2 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
+        className="mt-1 flex min-h-8 cursor-pointer items-center gap-2 rounded px-2 py-1 text-[12px] text-text-secondary opacity-80 transition-colors transition-opacity hover:bg-editor-panel-raised hover:text-text-primary hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring"
         onClick={(event: ReactMouseEvent<HTMLElement>) => {
           onAddComponent(event, null);
         }}
@@ -2645,8 +2677,8 @@ function ContainerRow({
       <div
         {...listeners}
         {...attributes}
-        className={`flex items-center gap-2 p-2 rounded-md transition-colors group
-             ${isSelected ? 'bg-surface' : 'hover:bg-card-active'}
+        className={`group flex min-h-8 items-center gap-1.5 rounded px-1.5 py-1 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring
+             ${isSelected ? 'bg-editor-selected-quiet text-editor-selected-quiet-text' : hasActiveChild ? 'bg-editor-panel-well text-text-primary' : 'text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary'}
              ${borderClass}`}
         onClick={(e) => {
           e.stopPropagation();
@@ -2663,7 +2695,7 @@ function ContainerRow({
             e.stopPropagation();
             onToggle();
           }}
-          className={`p-0.5 rounded transition-colors cursor-pointer bg-transparent ${
+          className={`flex h-6 w-6 cursor-pointer items-center justify-center rounded bg-transparent transition-colors hover:bg-editor-selected-quiet ${
             TEXT_COLOR_KEYS[hasActiveChild || isExpanded ? TextColors.primary : TextColors.secondary]
           }`}
         >
@@ -2678,7 +2710,7 @@ function ContainerRow({
         >
           {renamingId === container.id ? (
             <input
-              className="bg-bg-primary text-sm w-full rounded-sm px-1 outline-hidden border border-accent"
+              className={`${maskPanelInputClassName} w-full`}
               value={tempName}
               onChange={(e) => {
                 setTempName(e.target.value);
@@ -2695,14 +2727,14 @@ function ContainerRow({
               ref={renameInputRef}
             />
           ) : (
-            <UiText color={TextColors.primary} weight={TextWeights.medium} className="truncate select-none">
+            <UiText color={TextColors.primary} weight={TextWeights.medium} className="truncate text-[12px] select-none">
               {container.name}
             </UiText>
           )}
         </div>
-        <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           <button
-            className="p-1 hover:text-text-primary text-text-secondary"
+            className={maskPanelRowActionClassName}
             onMouseEnter={() => {
               setIsMaskControlHovered(true);
             }}
@@ -2718,7 +2750,7 @@ function ContainerRow({
             {container.visible ? <Eye size={16} /> : <EyeOff size={16} />}
           </button>
           <button
-            className="p-1 hover:text-red-500 text-text-secondary"
+            className={`${maskPanelRowActionClassName} hover:text-editor-danger`}
             onClick={(e) => {
               e.stopPropagation();
               handleDelete(container.id);
@@ -2735,7 +2767,7 @@ function ContainerRow({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden pl-2 border-l-[1.5px] border-border-color/50 ml-3.75"
+            className="ml-3.5 overflow-hidden border-l border-editor-border pl-2"
             layout
           >
             <AnimatePresence mode="popLayout" initial={false}>
@@ -2793,7 +2825,7 @@ function ContainerRow({
                   <UiText
                     as="div"
                     weight={TextWeights.medium}
-                    className="flex items-center gap-2 p-2 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
+                    className="flex min-h-8 cursor-pointer items-center gap-2 rounded px-2 py-1 text-[12px] text-text-secondary opacity-80 transition-colors transition-opacity hover:bg-editor-panel-raised hover:text-text-primary hover:opacity-100"
                     onClick={(e: ReactMouseEvent<HTMLElement>) => {
                       e.stopPropagation();
                       onAddComponent(e);
@@ -2913,8 +2945,8 @@ function SubMaskRow({
       {...listeners}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`flex items-center gap-2 p-2 rounded-md transition-colors group cursor-pointer
-            ${isActive ? 'bg-surface' : 'hover:bg-card-active'}
+      className={`group flex min-h-8 cursor-pointer items-center gap-1.5 rounded px-1.5 py-1 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring
+            ${isActive ? 'bg-editor-selected-quiet text-editor-selected-quiet-text' : 'text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary'}
             ${dropClass}
             ${isDragging ? 'opacity-40 z-50' : ''}
             ${!parentVisible ? 'opacity-50' : ''}
@@ -2930,7 +2962,7 @@ function SubMaskRow({
         as="div"
         variant={TextVariants.small}
         weight={TextWeights.bold}
-        className="relative w-4 h-4 ml-1 shrink-0 flex items-center justify-center"
+        className="relative ml-1 flex h-4 w-4 shrink-0 items-center justify-center"
       >
         <AnimatePresence mode="wait" initial={false}>
           {isAnalyzing ? (
@@ -2971,7 +3003,7 @@ function SubMaskRow({
       </UiText>
       {renamingId === subMask.id ? (
         <input
-          className="bg-bg-primary text-sm w-full rounded px-1 outline-none border border-accent"
+          className={`${maskPanelInputClassName} w-full`}
           value={tempName}
           onChange={(e) => {
             setTempName(e.target.value);
@@ -2988,14 +3020,14 @@ function SubMaskRow({
           ref={renameInputRef}
         />
       ) : (
-        <UiText color={TextColors.primary} className="flex-1 truncate select-none">
+        <UiText color={TextColors.primary} className="flex-1 truncate text-[12px] select-none">
           {getSubMaskName(subMask)}
         </UiText>
       )}
-      <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
         {index > 1 && (
           <button
-            className="p-1 hover:text-text-primary text-text-secondary"
+            className={maskPanelRowActionClassName}
             data-tooltip={
               subMask.mode === SubMaskMode.Additive
                 ? t('editor.masks.actions.switchToSubtract')
@@ -3025,7 +3057,7 @@ function SubMaskRow({
           </button>
         )}
         <button
-          className="p-1 hover:text-text-primary text-text-secondary"
+          className={maskPanelRowActionClassName}
           data-tooltip={
             subMask.visible ? t('editor.masks.actions.hideComponent') : t('editor.masks.actions.showComponent')
           }
@@ -3043,7 +3075,7 @@ function SubMaskRow({
           {subMask.visible ? <Eye size={16} /> : <EyeOff size={16} />}
         </button>
         <button
-          className="p-1 hover:text-red-500 text-text-secondary"
+          className={`${maskPanelRowActionClassName} hover:text-editor-danger`}
           data-tooltip={t('editor.ai.actions.deleteComponent')}
           onClick={(e) => {
             e.stopPropagation();
@@ -3412,7 +3444,7 @@ function SettingsPanel({
 
   return (
     <div
-      className={`space-y-2 transition-opacity duration-300 ${!isActive ? 'opacity-50 pointer-events-none' : ''}`}
+      className={`space-y-2 transition-opacity duration-300 ${!isActive ? 'pointer-events-none opacity-50' : ''}`}
       role="presentation"
       onClick={(e) => {
         e.stopPropagation();
@@ -3441,7 +3473,7 @@ function SettingsPanel({
         canToggleVisibility={false}
         isContentVisible={true}
       >
-        <div className="space-y-4 pt-2">
+        <div className="space-y-2 pt-1.5">
           <Switch
             checked={isComponentMode ? activeSubMask.invert : displayContainer.invert}
             label={isComponentMode ? t('editor.masks.settings.invertComponent') : t('editor.masks.settings.invertMask')}
@@ -3455,14 +3487,14 @@ function SettingsPanel({
           />
 
           {!isComponentMode && (
-            <div className="flex justify-between items-center">
-              <UiText variant={TextVariants.label} className="select-none">
+            <div className="flex items-center justify-between">
+              <UiText variant={TextVariants.label} className="text-[11px] uppercase text-text-secondary select-none">
                 {t('editor.masks.settings.applyPreset')}
               </UiText>
               <button
                 ref={presetButtonRef}
                 onClick={handlePresetSelectClick}
-                className="text-sm text-text-primary text-right select-none cursor-pointer hover:text-accent transition-colors"
+                className="cursor-pointer text-right text-[12px] text-text-primary transition-colors select-none hover:text-editor-primary-active focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
                 data-tooltip={t('editor.masks.settings.selectPresetTooltip')}
               >
                 {t('editor.masks.settings.select')}
@@ -3486,13 +3518,14 @@ function SettingsPanel({
             step={1}
             fillOrigin="min"
             onDragStateChange={onDragStateChange}
+            density="compact"
           />
 
           {isComponentMode && (
             <>
               {brushLocalAdjustmentReceipt !== null && (
                 <div
-                  className="rounded-md border border-surface bg-card/40 p-3 text-xs text-text-secondary"
+                  className={`${maskPanelCardClassName} text-xs text-text-secondary`}
                   data-after-preview-hash={brushLocalAdjustmentReceipt.afterPreviewHash}
                   data-before-preview-hash={brushLocalAdjustmentReceipt.beforePreviewHash}
                   data-brush-content-hash={brushLocalAdjustmentReceipt.brushContentHash}
@@ -3519,7 +3552,7 @@ function SettingsPanel({
 
               {colorRangeLocalAdjustmentReceipt !== null && (
                 <div
-                  className="rounded-md border border-surface bg-card/40 p-3 text-xs text-text-secondary"
+                  className={`${maskPanelCardClassName} text-xs text-text-secondary`}
                   data-after-preview-hash={colorRangeLocalAdjustmentReceipt.afterPreviewHash}
                   data-before-preview-hash={colorRangeLocalAdjustmentReceipt.beforePreviewHash}
                   data-color-math={colorRangeLocalAdjustmentReceipt.colorMath}
@@ -3553,7 +3586,7 @@ function SettingsPanel({
                   variant={TextVariants.small}
                   color={TextColors.accent}
                   weight={TextWeights.medium}
-                  className="p-3 bg-card-active rounded-md border border-surface flex items-center gap-3"
+                  className="flex items-center gap-3 rounded-md border border-editor-border bg-editor-selected-quiet p-2"
                 >
                   <Loader2 size={16} className="animate-spin shrink-0" />
                   <div className="leading-relaxed">
@@ -3667,7 +3700,7 @@ function SettingsPanel({
         onMouseLeave={() => {
           setIsMaskControlHovered(false);
         }}
-        className="flex flex-col gap-2"
+        className="flex flex-col gap-1.5"
       >
         {Object.keys(ADJUSTMENT_SECTIONS).map((sectionName) => {
           const title = sectionName.charAt(0).toUpperCase() + sectionName.slice(1);

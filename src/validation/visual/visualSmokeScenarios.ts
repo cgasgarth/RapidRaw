@@ -38,6 +38,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   ProfessionalEditorCompactPortrait: 'professional-editor-compact-portrait',
   ProfessionalCanvasOverlays: 'professional-canvas-overlays',
   ProfessionalCropTransformWorkspace: 'professional-crop-transform-workspace',
+  ProfessionalLayersCompact: 'professional-layers-compact',
   ProfessionalExportProofFooter: 'professional-export-proof-footer',
   ProfessionalEditorShell: 'professional-editor-shell',
   ProfessionalEditorToolbar: 'professional-editor-toolbar',
@@ -319,6 +320,13 @@ export const VISUAL_SMOKE_SCENARIOS = [
     mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalCanvasOverlays,
     outputFile: 'professional-canvas-overlays.png',
     sectionMinimum: 3,
+  },
+  {
+    compactOutputFile: 'professional-layers-compact-portrait.png',
+    marker: 'Professional layers compact',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalLayersCompact,
+    outputFile: 'professional-layers-compact.png',
+    sectionMinimum: 4,
   },
   {
     marker: 'Local Adjustment Stack',

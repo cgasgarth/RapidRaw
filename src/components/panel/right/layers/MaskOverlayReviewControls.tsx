@@ -2,6 +2,7 @@ import cx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import type { MaskOverlayMode, MaskOverlaySettings } from '../../../../schemas/masks/maskOverlaySchemas';
 import AdjustmentSlider from '../../../adjustments/AdjustmentSlider';
+import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens';
 import Switch from '../../../ui/primitives/Switch';
 
 const MASK_OVERLAY_REVIEW_MODES = [
@@ -32,7 +33,7 @@ export function MaskOverlayReviewControls({
 
   return (
     <div
-      className="space-y-3 rounded-md border border-surface bg-card/40 p-3"
+      className={`${professionalInspectorDensityTokens.card.nestedPanel} space-y-2`}
       data-mask-overlay-edge-threshold={settings.edgeThreshold.toFixed(2)}
       data-mask-overlay-hotkey={hotkeyHint}
       data-mask-overlay-mode={settings.mode}
@@ -50,7 +51,7 @@ export function MaskOverlayReviewControls({
         }}
       />
 
-      <div className="grid grid-cols-6 gap-1.5" role="group" aria-label={t('editor.masks.overlay.modeGroup')}>
+      <div className="grid grid-cols-6 gap-1" role="group" aria-label={t('editor.masks.overlay.modeGroup')}>
         {MASK_OVERLAY_REVIEW_MODES.map((option) => {
           const isActive = activeMode === option.mode;
           return (
@@ -62,8 +63,10 @@ export function MaskOverlayReviewControls({
               data-mask-overlay-mode-option={option.mode}
               data-testid={`mask-overlay-mode-${option.mode}`}
               className={cx(
-                'h-8 rounded-md border transition-colors',
-                isActive && isEnabled ? 'border-accent' : 'border-surface hover:border-text-secondary',
+                'h-6 rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
+                isActive && isEnabled
+                  ? 'border-editor-primary-active'
+                  : 'border-editor-border hover:border-text-secondary',
               )}
               style={{ backgroundColor: option.color }}
               onClick={() => {
@@ -89,6 +92,7 @@ export function MaskOverlayReviewControls({
           step={1}
           suffix="%"
           value={Math.round(settings.opacity * 100)}
+          density="compact"
         />
       </div>
 
@@ -107,6 +111,7 @@ export function MaskOverlayReviewControls({
           step={1}
           suffix="%"
           value={Math.round(settings.edgeThreshold * 100)}
+          density="compact"
         />
       </div>
     </div>
