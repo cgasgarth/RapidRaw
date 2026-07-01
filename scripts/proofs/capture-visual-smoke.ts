@@ -1035,6 +1035,7 @@ async function assertAdjustmentsPanelRetune(page) {
   if (scopesBounds.height < 180 || scopesBounds.height > 260) {
     throw new Error(`Adjustments scopes strip should use compact default height, got ${scopesBounds.height}.`);
   }
+  await assertPanelScopesStripControls(page, panel, scopesStrip, 'adjustments-panel-scopes-toggle', 'Adjustments');
 }
 
 async function assertAdjustmentSectionHeaderActions(page, panel) {
@@ -1156,6 +1157,60 @@ async function assertCompactOpenScopesStrip(strip, label) {
   }
 }
 
+async function assertPanelScopesStripControls(page, panel, strip, toggleTestId, label) {
+  const toggle = panel.getByTestId(toggleTestId);
+  const togglePressed = await toggle.getAttribute('aria-pressed');
+  const toggleState = await toggle.getAttribute('data-state');
+  if (togglePressed !== 'true' || toggleState !== 'open') {
+    throw new Error(`${label} scopes toggle should expose open pressed state, got ${togglePressed}/${toggleState}.`);
+  }
+
+  const minHeight = Number(await strip.getAttribute('data-min-height'));
+  const maxHeight = Number(await strip.getAttribute('data-max-height'));
+  const stripHeight = Number(await strip.getAttribute('data-panel-scopes-height'));
+  if (minHeight !== 160 || maxHeight !== 320 || stripHeight < minHeight || stripHeight > maxHeight) {
+    throw new Error(
+      `${label} scopes sizing metadata should expose compact clamp values, got min=${minHeight}, max=${maxHeight}, height=${stripHeight}.`,
+    );
+  }
+
+  const resizer = panel.getByTestId(`${await strip.getAttribute('data-testid')}-resizer`);
+  await resizer.waitFor({ state: 'visible', timeout: 10_000 });
+  const orientation = await resizer.getAttribute('aria-orientation');
+  if (orientation !== 'horizontal') {
+    throw new Error(`${label} scopes resize affordance should be a horizontal separator, got ${orientation}.`);
+  }
+
+  const startingChannel = await strip.getAttribute('data-active-waveform-channel');
+  const startingClipping = await strip.getAttribute('data-show-clipping');
+  if (startingChannel !== 'luma' || startingClipping !== 'false') {
+    throw new Error(`${label} scopes should start at luma/no clipping, got ${startingChannel}/${startingClipping}.`);
+  }
+
+  await strip.hover();
+  const rgbMode = panel.getByTestId('waveform-mode-rgb');
+  await rgbMode.waitFor({ state: 'visible', timeout: 10_000 });
+  await rgbMode.click();
+  await pageWaitForAttribute(page, strip, 'data-active-waveform-channel', 'rgb', label);
+
+  const clippingToggle = panel.getByTestId('waveform-clipping-toggle');
+  await clippingToggle.click();
+  await pageWaitForAttribute(page, strip, 'data-show-clipping', 'true', label);
+}
+
+async function pageWaitForAttribute(page, locator, attribute, expectedValue, label) {
+  await page.waitForFunction(
+    ({ attribute, expectedValue, testId }) =>
+      document.querySelector(`[data-testid="${testId}"]`)?.getAttribute(attribute) === expectedValue,
+    { attribute, expectedValue, testId: await locator.getAttribute('data-testid') },
+    { timeout: 10_000 },
+  );
+  const actualValue = await locator.getAttribute(attribute);
+  if (actualValue !== expectedValue) {
+    throw new Error(`${label} scopes ${attribute} expected ${expectedValue}, got ${actualValue}.`);
+  }
+}
+
 async function expectLocatorWidth(page, testId: string, expectedWidth: number, tolerance = 1) {
   const bounds = await page.getByTestId(testId).boundingBox();
   if (!bounds) {
@@ -1220,6 +1275,13 @@ async function assertWorkflowRailSharedScopes(page) {
   await page.getByTestId('color-workspace-scopes-toggle').click();
   const openColorStrip = await waitForScopesStripState(page, 'color-workspace-scopes-strip', 'open');
   await assertCompactOpenScopesStrip(openColorStrip, 'Color workspace');
+  await assertPanelScopesStripControls(
+    page,
+    page.getByTestId('color-workspace-panel'),
+    openColorStrip,
+    'color-workspace-scopes-toggle',
+    'Color workspace',
+  );
 
   await page.getByRole('button', { name: 'Adjust' }).first().click();
   const openAdjustmentsStrip = await waitForScopesStripState(page, 'adjustments-panel-scopes-strip', 'open');

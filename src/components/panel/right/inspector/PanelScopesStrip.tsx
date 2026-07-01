@@ -6,6 +6,7 @@ import { useWaveformControls } from '../../../../hooks/editor/useWaveformControl
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { useSettingsStore } from '../../../../store/useSettingsStore';
 import type { Adjustments } from '../../../../utils/adjustments';
+import { PANEL_SCOPES_HEIGHT } from '../../../../utils/waveformSizing';
 import { Orientation } from '../../../ui/AppProperties';
 import Resizer from '../../../ui/Resizer';
 import Waveform from '../../editor/Waveform';
@@ -13,8 +14,6 @@ import Waveform from '../../editor/Waveform';
 interface PanelScopesStripProps {
   testId: string;
 }
-
-const DEFAULT_PANEL_SCOPES_HEIGHT = 220;
 
 export default function PanelScopesStrip({ testId }: PanelScopesStripProps) {
   const { setAdjustments } = useEditorActions();
@@ -44,8 +43,13 @@ export default function PanelScopesStrip({ testId }: PanelScopesStripProps) {
     <AnimatePresence initial={false}>
       {isWaveformVisible ? (
         <motion.div
-          animate={{ height: waveformHeight || DEFAULT_PANEL_SCOPES_HEIGHT, opacity: 1 }}
+          animate={{ height: waveformHeight || PANEL_SCOPES_HEIGHT.default, opacity: 1 }}
           className="relative flex shrink-0 flex-col overflow-hidden border-b border-surface"
+          data-active-waveform-channel={activeWaveformChannel}
+          data-max-height={PANEL_SCOPES_HEIGHT.max}
+          data-min-height={PANEL_SCOPES_HEIGHT.min}
+          data-panel-scopes-height={waveformHeight || PANEL_SCOPES_HEIGHT.default}
+          data-show-clipping={String(adjustments.showClipping || false)}
           data-testid={testId}
           data-state="open"
           exit={{ height: 0, opacity: 0 }}
@@ -69,7 +73,12 @@ export default function PanelScopesStrip({ testId }: PanelScopesStripProps) {
               waveformData={waveform || null}
             />
           </div>
-          <Resizer direction={Orientation.Horizontal} onMouseDown={handleWaveformResize} />
+          <Resizer
+            ariaLabel="Resize scopes"
+            direction={Orientation.Horizontal}
+            onMouseDown={handleWaveformResize}
+            testId={`${testId}-resizer`}
+          />
         </motion.div>
       ) : (
         <div data-testid={testId} data-state="closed" hidden />

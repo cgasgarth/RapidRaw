@@ -725,7 +725,12 @@ export default function Waveform({
               {onToggleClipping && (
                 <>
                   <button
+                    aria-label={
+                      showClipping ? t('ui.waveform.tooltips.hideClipping') : t('ui.waveform.tooltips.showClipping')
+                    }
+                    aria-pressed={showClipping}
                     onClick={onToggleClipping}
+                    data-testid="waveform-clipping-toggle"
                     data-tooltip={
                       showClipping ? t('ui.waveform.tooltips.hideClipping') : t('ui.waveform.tooltips.showClipping')
                     }
@@ -742,10 +747,13 @@ export default function Waveform({
               <LayoutGroup>
                 {modeButtons.map(({ mode, label, tooltip, bgClass, textActiveClass }) => (
                   <button
+                    aria-label={t(tooltip, { defaultValue: label })}
+                    aria-pressed={displayMode === mode}
                     key={mode}
                     onClick={() => {
                       setDisplayMode(mode);
                     }}
+                    data-testid={`waveform-mode-${mode}`}
                     data-tooltip={t(tooltip, { defaultValue: label })}
                     className={`${baseButtonClass} ${displayMode === mode ? textActiveClass : inactiveButtonClass}`}
                   >

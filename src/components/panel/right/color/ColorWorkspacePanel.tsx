@@ -76,10 +76,12 @@ export default function ColorWorkspacePanel() {
         <div className="flex items-center gap-1">
           <button
             aria-label={t('editor.adjustments.tooltips.toggleAnalytics')}
+            aria-pressed={isWaveformVisible}
             className={cx(
               PANEL_ACTION_BUTTON_CLASS,
               isWaveformVisible ? 'bg-surface hover:bg-card-active' : 'hover:bg-surface',
             )}
+            data-state={isWaveformVisible ? 'open' : 'closed'}
             data-testid="color-workspace-scopes-toggle"
             data-tooltip={t('editor.adjustments.tooltips.toggleAnalytics')}
             onClick={onToggleWaveform}

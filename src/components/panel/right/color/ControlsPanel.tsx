@@ -442,10 +442,13 @@ export default function Controls() {
             <Aperture size={PANEL_ACTION_ICON_SIZE} />
           </button>
           <button
+            aria-label={t('editor.adjustments.tooltips.toggleAnalytics')}
+            aria-pressed={isWaveformVisible}
             className={cx(
               density.panelHeader.actionButton,
               isWaveformVisible && density.panelHeader.actionButtonActive,
             )}
+            data-state={isWaveformVisible ? 'open' : 'closed'}
             onClick={onToggleWaveform}
             data-testid="adjustments-panel-scopes-toggle"
             data-tooltip={t('editor.adjustments.tooltips.toggleAnalytics')}

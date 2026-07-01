@@ -4,6 +4,7 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 
 import type { DisplayMode } from '../../utils/adjustments';
+import { clampPanelScopesHeight, PANEL_SCOPES_HEIGHT } from '../../utils/waveformSizing';
 
 export function useWaveformControls() {
   const [isResizingWaveform, setIsResizingWaveform] = useState(false);
@@ -27,7 +28,7 @@ export function useWaveformControls() {
 
   const setWaveformHeight = useCallback(
     (height: number) => {
-      setEditor({ waveformHeight: height });
+      setEditor({ waveformHeight: clampPanelScopesHeight(height) });
     },
     [setEditor],
   );
@@ -41,7 +42,7 @@ export function useWaveformControls() {
       const pointerId = e.pointerId;
       const target = e.currentTarget;
       const startY = e.clientY;
-      const startHeight = useEditorStore.getState().waveformHeight || 256;
+      const startHeight = useEditorStore.getState().waveformHeight || PANEL_SCOPES_HEIGHT.default;
       const previousTouchAction = document.documentElement.style.touchAction;
       const previousUserSelect = document.documentElement.style.userSelect;
 
@@ -54,7 +55,7 @@ export function useWaveformControls() {
         if (moveEvent.pointerId !== pointerId) return;
         moveEvent.preventDefault();
         const delta = moveEvent.clientY - startY;
-        const newHeight = Math.round(Math.max(150, Math.min(450, startHeight + delta)));
+        const newHeight = clampPanelScopesHeight(startHeight + delta);
         setEditor({ waveformHeight: newHeight });
       };
 

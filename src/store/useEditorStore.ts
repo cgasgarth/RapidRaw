@@ -11,6 +11,7 @@ import type { BasicToneCommandEnvelope } from '../utils/basicToneCommandBridge';
 import { isPendingExportSoftProofGamutWarningOverlay } from '../utils/color/runtime/gamutWarningDisplay';
 import { goToEditHistoryIndex, pushEditHistoryEntry, redoEditHistory, undoEditHistory } from '../utils/editHistory';
 import { loadMaskOverlaySettingsPreference } from '../utils/mask/maskOverlayPreferences';
+import { PANEL_SCOPES_HEIGHT } from '../utils/waveformSizing';
 
 export interface InteractivePatch {
   url: string;
@@ -153,7 +154,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   exportSoftProofTransform: null,
   isWaveformVisible: false,
   activeWaveformChannel: DisplayMode.Luma,
-  waveformHeight: 220,
+  waveformHeight: PANEL_SCOPES_HEIGHT.default,
 
   isSliderDragging: false,
   interactivePatch: null,

@@ -21,6 +21,7 @@ import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { COPYABLE_ADJUSTMENT_KEYS, DisplayMode, PasteMode } from '../../utils/adjustments';
 import { DEFAULT_THEME_ID, THEMES, type ThemeProps } from '../../utils/themes';
+import { clampPanelScopesHeight } from '../../utils/waveformSizing';
 
 interface PersistedFolderState {
   activeAlbumId?: string | null;
@@ -207,7 +208,9 @@ export const useAppInitialization = ({
         if (settings.activeWaveformChannel && isDisplayMode(settings.activeWaveformChannel)) {
           setEditor({ activeWaveformChannel: settings.activeWaveformChannel });
         }
-        if (typeof settings.waveformHeight === 'number') setEditor({ waveformHeight: settings.waveformHeight });
+        if (typeof settings.waveformHeight === 'number') {
+          setEditor({ waveformHeight: clampPanelScopesHeight(settings.waveformHeight) });
+        }
 
         setLibraryViewMode(settings.libraryViewMode ?? defaultLibraryViewMode);
         setThumbnailSize(settings.thumbnailSize ?? defaultThumbnailSize);
