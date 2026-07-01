@@ -48,6 +48,8 @@ const RESULT_REVIEW_FILE: &str = "focus-plane-result-review.png";
 const EXPORT_REVIEW_FILE: &str = "focus-plane-export-review.png";
 const RUNTIME_SAMPLE_WIDTH: u32 = 72;
 const RUNTIME_SAMPLE_HEIGHT: u32 = 48;
+const CONFIDENCE_CELL_SIZE: u32 = 32;
+const LOW_CONFIDENCE_CELL_MAJORITY_RATIO: f64 = 0.75;
 const MIN_SHARPNESS_GAIN_RATIO: f64 = 1.15;
 const MIN_SOURCE_COVERAGE_RATIO: f64 = 0.67;
 const MAX_LOW_CONFIDENCE_CELL_RATIO: f64 = 0.5;
@@ -476,7 +478,10 @@ fn build_focus_stack(loaded_sources: &[LoadedSource]) -> Result<FocusStackResult
         .sum::<f64>()
         / energy_frames.len() as f64;
     let mut winner_counts = vec![0_u64; frames.len()];
-    let mut low_confidence_pixels = 0_u64;
+    let cell_cols = width.div_ceil(CONFIDENCE_CELL_SIZE) as usize;
+    let cell_rows = height.div_ceil(CONFIDENCE_CELL_SIZE) as usize;
+    let mut cell_pixel_counts = vec![0_u32; cell_cols * cell_rows];
+    let mut cell_low_confidence_pixel_counts = vec![0_u32; cell_cols * cell_rows];
     let mut output = RgbImage::new(width, height);
 
     for y in 0..height {
@@ -497,8 +502,12 @@ fn build_focus_stack(loaded_sources: &[LoadedSource]) -> Result<FocusStackResult
             let winner = ranked[0].0;
             let best = ranked[0].1;
             let second_best = ranked.get(1).map(|entry| entry.1).unwrap_or(0.0);
-            if best <= 0.0005 || (best - second_best) / best.max(1e-9) < 0.12 {
-                low_confidence_pixels += 1;
+            let cell_index = ((y / CONFIDENCE_CELL_SIZE) as usize * cell_cols)
+                + (x / CONFIDENCE_CELL_SIZE) as usize;
+            cell_pixel_counts[cell_index] += 1;
+            let is_low_confidence = best <= 0.0005 || (best - second_best) / best.max(1e-9) < 0.12;
+            if is_low_confidence {
+                cell_low_confidence_pixel_counts[cell_index] += 1;
             }
             winner_counts[winner] += 1;
             output.put_pixel(x, y, *frames[winner].get_pixel(x, y));
@@ -514,12 +523,25 @@ fn build_focus_stack(loaded_sources: &[LoadedSource]) -> Result<FocusStackResult
         .filter_map(|(source_index, count)| (*count > 0).then_some(source_index))
         .collect::<HashSet<_>>();
     let source_coverage_ratio = winner_source_set.len() as f64 / frames.len() as f64;
-    let pixel_count = (width as u64 * height as u64).max(1);
-    let low_confidence_cell_ratio = low_confidence_pixels as f64 / pixel_count as f64;
+    let low_confidence_cells = cell_low_confidence_pixel_counts
+        .iter()
+        .zip(cell_pixel_counts.iter())
+        .filter(|(low_confidence_count, cell_pixel_count)| {
+            **cell_pixel_count > 0
+                && (**low_confidence_count as f64 / **cell_pixel_count as f64)
+                    >= LOW_CONFIDENCE_CELL_MAJORITY_RATIO
+        })
+        .count();
+    let cell_count = cell_pixel_counts
+        .iter()
+        .filter(|cell_pixel_count| **cell_pixel_count > 0)
+        .count()
+        .max(1);
+    let low_confidence_cell_ratio = low_confidence_cells as f64 / cell_count as f64;
     let transition_artifact_score = low_confidence_cell_ratio;
 
     Ok(FocusStackResult {
-        cell_count: pixel_count as usize,
+        cell_count,
         low_confidence_cell_ratio: round_metric(low_confidence_cell_ratio),
         output,
         sharpness_gain_ratio: round_metric(output_mean_energy / mean_source_energy.max(1e-9)),
