@@ -1,0 +1,77 @@
+{
+  "issue": 4659,
+  "sourceIssue": 3770,
+  "validationMode": "retouch_remove_heal_stale_regeneration_runtime_proof",
+  "generatedAt": "2026-07-01T00:00:00Z",
+  "privateSource": {
+    "root": "/Users/cgas/Pictures/Capture One/Alaska",
+    "selectedRawName": "_DSC7505.ARW",
+    "corpusCaseCount": 3,
+    "publicRepoAllowed": false,
+    "hash": "sha256:f9eb82844d578f7019bd8c386382fd2b8fe575df10eb8c2fe44e7ffe8f4d78ab"
+  },
+  "runtimeProofs": [
+    {
+      "name": "shared_layer_retouch_runtime_stale_regeneration",
+      "command": "bun tests/integration/checks/retouch/check-retouch-remove-runtime-output.ts",
+      "proves": [
+        "heal preview and apply output deltas are identical on the shared layer runtime",
+        "remove output changes image pixels through local_patch_fill_v1 source resolution",
+        "editing remove parameters clears the persisted resolved source and records needs_regeneration",
+        "a stale remove layer regenerates a distinct ready output and persists the new resolved source through the layer stack bridge"
+      ]
+    },
+    {
+      "name": "private_raw_native_clone_heal_remove_retouch_preview_export_proof",
+      "command": "RAWENGINE_RUN_PRIVATE_RETOUCH_CLONE_REAL_RAW_PROOF=1 RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-retouch-real-raw-proof RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" cargo test --manifest-path src-tauri/Cargo.toml --locked --no-default-features --features required-ci,validation-harness,tauri-test private_runtime_smoke_generates_retouch_clone_real_raw_report_when_enabled -- --nocapture",
+      "proves": [
+        "native RAW decode can render clone, heal, and resolved-source remove retouch layers",
+        "private RAW preview and export use the same clone/heal/remove retouch output",
+        "private RAW sources remain unchanged"
+      ]
+    }
+  ],
+  "metrics": [
+    {
+      "name": "heal_changed_pixel_count",
+      "value": 8,
+      "threshold": 1,
+      "passed": true
+    },
+    {
+      "name": "remove_changed_pixel_count",
+      "value": 1,
+      "threshold": 1,
+      "passed": true
+    },
+    {
+      "name": "regenerated_remove_changed_pixel_count",
+      "value": 1,
+      "threshold": 1,
+      "passed": true
+    },
+    {
+      "name": "stale_regeneration_status_tracked",
+      "value": 1,
+      "threshold": 1,
+      "passed": true
+    }
+  ],
+  "proofClaims": {
+    "proves": [
+      "remove and heal retouch layers change runtime image output",
+      "remove source edits are tracked as stale by clearing the resolved source and setting needs_regeneration",
+      "stale remove layers regenerate a new ready source through the same layer runtime path used for preview/export proofing",
+      "the existing native private RAW proof path validates heal/remove output on the Alaska RAW corpus with private artifacts kept out of the public repo"
+    ],
+    "doesNotProve": [
+      "manual macOS app UI e2e",
+      "native Rust unresolved remove-source selection; native remove rendering consumes the resolved source produced by the shared layer runtime",
+      "multi-stroke heal/remove quality or edge-aware texture synthesis"
+    ]
+  },
+  "limitations": [
+    "The committed focused stale-regeneration proof uses a synthetic pixel fixture because the shared layer runtime owns unresolved remove-source selection.",
+    "The native private RAW proof validates real RAW clone/heal/remove rendering with resolved remove sources and writes private artifacts outside the repo."
+  ]
+}
