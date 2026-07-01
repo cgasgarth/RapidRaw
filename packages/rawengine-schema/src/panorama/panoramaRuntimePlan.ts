@@ -217,7 +217,24 @@ export const panoramaRuntimeProvenanceV1Schema = z
         overlapEdgeCount: z.number().int().nonnegative(),
         reviewStatus: z.enum(['apply_ready', 'blocked', 'review_required']),
         seamMaskArtifact: artifactHandleV1Schema,
+        overlapConfidence: z
+          .object({
+            edgeCount: z.number().int().nonnegative(),
+            level: z.enum(['high', 'medium', 'low', 'blocked']),
+            meanConfidenceScore: z.number().min(0).max(1),
+            minimumConfidenceScore: z.number().min(0).max(1),
+            minimumOverlapRatio: z.number().min(0).max(1),
+            weakEdgeCount: z.number().int().nonnegative(),
+          })
+          .strict(),
         seamRisk: z.enum(['low', 'medium', 'high']),
+        seamWarningState: z
+          .object({
+            parallaxRisk: z.enum(['low', 'medium', 'high']),
+            state: z.enum(['clear', 'warning', 'blocked']),
+            warningCodes: z.array(z.string().trim().min(1)),
+          })
+          .strict(),
         warnings: z.array(z.string().trim().min(1)),
         weakOverlapEdgeCount: z.number().int().nonnegative(),
       })
@@ -1148,6 +1165,36 @@ const buildPanoramaSeamReview = (
     );
     return edge.overlapAreaPx / Math.max(1, frameArea) < 0.2;
   }).length;
+  const edgeConfidence = alignment.graph.selectedEdges.map((edge) => {
+    const sourceFrame = request.sourceFrames.find((frame) => frame.sourceIndex === edge.fromSourceIndex);
+    const targetFrame = request.sourceFrames.find((frame) => frame.sourceIndex === edge.toSourceIndex);
+    const frameArea = Math.min(
+      sourceFrame === undefined ? 0 : sourceFrame.width * sourceFrame.height,
+      targetFrame === undefined ? 0 : targetFrame.width * targetFrame.height,
+    );
+    const overlapRatio = edge.overlapAreaPx / Math.max(1, frameArea);
+    const match = alignment.pairwiseMatches.find(
+      (candidate) =>
+        candidate.fromSourceIndex === edge.fromSourceIndex && candidate.toSourceIndex === edge.toSourceIndex,
+    );
+    const reprojectionPenalty = Math.min(0.45, (match?.reprojectionErrorPx ?? 0) / 4);
+    const confidenceScore = roundPanoramaRuntimeMetric(
+      Math.max(0, Math.min(1, overlapRatio / 0.35 - reprojectionPenalty)),
+    );
+    return { confidenceScore, overlapRatio };
+  });
+  const minimumConfidenceScore =
+    edgeConfidence.length === 0 ? 0 : Math.min(...edgeConfidence.map((edge) => edge.confidenceScore));
+  const meanConfidenceScore =
+    edgeConfidence.length === 0
+      ? 0
+      : roundPanoramaRuntimeMetric(
+          edgeConfidence.reduce((total, edge) => total + edge.confidenceScore, 0) / edgeConfidence.length,
+        );
+  const minimumOverlapRatio =
+    edgeConfidence.length === 0
+      ? 0
+      : roundPanoramaRuntimeMetric(Math.min(...edgeConfidence.map((edge) => edge.overlapRatio)));
   const blockedReasons = [
     ...sourceGeometry.blockedReasons,
     ...(disconnectedSourceIndices.length > 0 ? ['source_selection_incomplete'] : []),
@@ -1161,11 +1208,40 @@ const buildPanoramaSeamReview = (
         ? 'high'
         : 'medium'
       : 'low';
+  const overlapConfidenceLevel =
+    blockedReasons.length > 0
+      ? 'blocked'
+      : minimumConfidenceScore >= 0.75
+        ? 'high'
+        : minimumConfidenceScore >= 0.45
+          ? 'medium'
+          : 'low';
+  const parallaxRisk: PanoramaRuntimeProvenanceV1['seamReview']['seamWarningState']['parallaxRisk'] =
+    blockedReasons.length > 0 || alignment.graph.cycleConsistency.rejectedEdgeCount > 0
+      ? blockedReasons.length > 0
+        ? 'high'
+        : 'medium'
+      : 'low';
+  const seamWarningCodes = [
+    ...(overlapConfidenceLevel === 'low' ? ['low_overlap_confidence'] : []),
+    ...(parallaxRisk !== 'low' ? ['parallax_seam_warning'] : []),
+  ].sort();
+  const seamWarningState = {
+    parallaxRisk,
+    state:
+      blockedReasons.length > 0
+        ? ('blocked' as const)
+        : seamWarningCodes.length > 0
+          ? ('warning' as const)
+          : ('clear' as const),
+    warningCodes: seamWarningCodes,
+  };
   const warnings = [
     ...(blockedReasons.length > 0 ? ['seam_review_blocked', 'source_excluded'] : []),
     ...sourceGeometry.warningCodes,
     ...(weakOverlapEdgeCount > 0 ? ['weak_alignment'] : []),
     ...(alignment.graph.cycleConsistency.rejectedEdgeCount > 0 ? ['ambiguous_matches'] : []),
+    ...seamWarningCodes,
   ].sort();
   const reviewStatus = blockedReasons.length > 0 ? 'blocked' : seamRisk === 'low' ? 'apply_ready' : 'review_required';
 
@@ -1192,7 +1268,16 @@ const buildPanoramaSeamReview = (
       kind: 'mask',
       storage: 'temp_cache',
     },
+    overlapConfidence: {
+      edgeCount: alignment.graph.selectedEdgeCount,
+      level: overlapConfidenceLevel,
+      meanConfidenceScore,
+      minimumConfidenceScore: roundPanoramaRuntimeMetric(minimumConfidenceScore),
+      minimumOverlapRatio,
+      weakEdgeCount: weakOverlapEdgeCount,
+    },
     seamRisk,
+    seamWarningState,
     warnings,
     weakOverlapEdgeCount,
   };
@@ -1382,6 +1467,8 @@ const isPanoramaArtifactWarning = (warning: string): warning is PanoramaArtifact
     'insufficient_features',
     'ambiguous_matches',
     'weak_alignment',
+    'low_overlap_confidence',
+    'parallax_seam_warning',
     'low_inlier_count',
     'high_memory_estimate',
     'memory_budget_exceeded',

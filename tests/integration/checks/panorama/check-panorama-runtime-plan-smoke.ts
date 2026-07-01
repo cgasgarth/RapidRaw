@@ -202,6 +202,16 @@ const dryRunSeamMaskArtifact = artifactById(
 if (!dryRunContributionMapArtifact.contentHash || !dryRunSeamMaskArtifact.contentHash) {
   throw new Error('Expected dry-run seam contribution artifacts to carry deterministic content hashes.');
 }
+assertEqual(dryRun.provenance.seamReview.overlapConfidence.level, 'high', 'dry-run overlap confidence');
+assertEqual(dryRun.provenance.seamReview.seamWarningState.state, 'clear', 'dry-run seam warning state');
+assertEqual(dryRun.provenance.seamReview.seamWarningState.parallaxRisk, 'low', 'dry-run parallax risk');
+if (dryRun.provenance.seamReview.overlapConfidence.minimumConfidenceScore < 0.75) {
+  throw new Error(
+    `Expected supported panorama overlap confidence to be high: ${JSON.stringify(
+      dryRun.provenance.seamReview.overlapConfidence,
+    )}.`,
+  );
+}
 assertEqual(applied.provenance.runtimeStatus, 'apply_rendered', 'apply runtime status');
 assertEqual(applied.provenance.acceptedDryRunPlanId, dryRun.dryRunResult.mergePlan.planId, 'accepted plan id');
 const [outputArtifact] = applied.mutationResult.outputArtifacts;
@@ -326,7 +336,9 @@ console.log(
         seamBlend: applied.provenance.seamBlend,
         seamReview: {
           contributionMapContentHash: dryRunContributionMapArtifact.contentHash,
+          overlapConfidence: applied.provenance.seamReview.overlapConfidence,
           seamMaskContentHash: dryRunSeamMaskArtifact.contentHash,
+          seamWarningState: applied.provenance.seamReview.seamWarningState,
         },
         tileRender: applied.provenance.tileRender,
       },

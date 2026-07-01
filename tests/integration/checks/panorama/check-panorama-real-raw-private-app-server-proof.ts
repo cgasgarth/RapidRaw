@@ -308,6 +308,7 @@ function buildReview(sample: PanoramaPrivateRuntimeSample, applied: PanoramaAppl
     projection: applied.apply.provenance.projectionSettings.effectiveProjection,
     seamReview: {
       contributionMapArtifactId: applied.apply.provenance.seamReview.contributionMapArtifact.artifactId,
+      overlapConfidence: applied.apply.provenance.seamReview.overlapConfidence,
       policy: 'adaptive_dp_feather_v1' as const,
       reviewStatus: 'ready' as const,
       seamCount: applied.apply.provenance.seamReview.overlapEdgeCount,
@@ -319,6 +320,7 @@ function buildReview(sample: PanoramaPrivateRuntimeSample, applied: PanoramaAppl
         p95ErrorPx: 0.25,
         toSourceIndex: edge.toSourceIndex,
       })),
+      seamWarningState: applied.apply.provenance.seamReview.seamWarningState,
     },
     sourceContribution: {
       excludedSourceCount: sample.frames.length - sample.connectedSourceIndices.length,

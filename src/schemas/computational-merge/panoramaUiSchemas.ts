@@ -128,6 +128,16 @@ const panoramaSeamReviewSchema = z
     reviewStatus: z.enum(['ready', 'requires_review']),
     seamCount: z.number().int().nonnegative(),
     seamMaskArtifactId: z.string().trim().min(1).optional(),
+    overlapConfidence: z
+      .object({
+        edgeCount: z.number().int().nonnegative(),
+        level: z.enum(['high', 'medium', 'low', 'blocked']),
+        meanConfidenceScore: z.number().min(0).max(1),
+        minimumConfidenceScore: z.number().min(0).max(1),
+        minimumOverlapRatio: z.number().min(0).max(1),
+        weakEdgeCount: z.number().int().nonnegative(),
+      })
+      .strict(),
     seams: z.array(
       z
         .object({
@@ -139,6 +149,13 @@ const panoramaSeamReviewSchema = z
         })
         .strict(),
     ),
+    seamWarningState: z
+      .object({
+        parallaxRisk: z.enum(['low', 'medium', 'high']),
+        state: z.enum(['clear', 'warning', 'blocked']),
+        warningCodes: z.array(z.string().trim().min(1)),
+      })
+      .strict(),
   })
   .strict();
 

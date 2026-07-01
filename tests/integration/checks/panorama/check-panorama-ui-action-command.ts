@@ -116,11 +116,24 @@ const staleState: PanoramaModalState = {
     projection: { effective: settings.projection, requested: settings.projection },
     seamReview: {
       contributionMapArtifactId: 'artifact_panorama_ui_action_contribution_map',
+      overlapConfidence: {
+        edgeCount: 2,
+        level: 'high',
+        meanConfidenceScore: 0.86,
+        minimumConfidenceScore: 0.82,
+        minimumOverlapRatio: 0.3,
+        weakEdgeCount: 0,
+      },
       policy: 'adaptive_dp_feather_v1',
       reviewStatus: 'ready',
       seamCount: 2,
       seamMaskArtifactId: 'artifact_panorama_ui_action_seam_mask',
       seams: [],
+      seamWarningState: {
+        parallaxRisk: 'low',
+        state: 'clear',
+        warningCodes: [],
+      },
     },
     sources: {
       excludedSourceIndices: [],
