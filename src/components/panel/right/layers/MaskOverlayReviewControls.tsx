@@ -9,6 +9,8 @@ const MASK_OVERLAY_REVIEW_MODES = [
   { color: '#f43f5e', mode: 'rubylith' },
   { color: '#10b981', mode: 'green' },
   { color: '#0ea5e9', mode: 'blue' },
+  { color: '#ffffff', mode: 'white' },
+  { color: '#09090b', mode: 'black' },
   { color: '#d4d4d8', mode: 'grayscale' },
   { color: '#ffffff', mode: 'edges' },
   { color: '#09090b', mode: 'inverse' },
@@ -51,7 +53,7 @@ export function MaskOverlayReviewControls({
         }}
       />
 
-      <div className="grid grid-cols-6 gap-1" role="group" aria-label={t('editor.masks.overlay.modeGroup')}>
+      <div className="grid grid-cols-4 gap-1" role="group" aria-label={t('editor.masks.overlay.modeGroup')}>
         {MASK_OVERLAY_REVIEW_MODES.map((option) => {
           const isActive = activeMode === option.mode;
           return (
