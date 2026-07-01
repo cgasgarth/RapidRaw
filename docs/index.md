@@ -129,6 +129,7 @@ generator before the release workflow needs one.
 - [Optional platform build matrix](ci/optional-platform-build-matrix-2026-06-11.md)
 - [Render artifact comparison](validation/harnesses/render-artifact-comparison-2026-06-15.md)
 - [Runtime proof completion states](validation/harnesses/runtime-proof-completion-states-2026-06-17.md)
+- [Local macOS app E2E checklist](tooling/local-checks/local-macos-app-e2e-checklist-2026-07-01.md)
 - [Unused vars severity](validation/harnesses/unused-vars-error-2026-06-15.md)
 - [Local check command contract](tooling/local-checks/local-check-command-contract-2026-06-10.md)
 - [Script type coverage](tooling/typescript/script-type-coverage-2026-06-15.md)
@@ -183,6 +184,7 @@ generator before the release workflow needs one.
 - [Edit history replay validation](validation/harnesses/edit-history-replay-2026-06-15.md)
 - [Performance smoke](validation/harnesses/performance-smoke-2026-06-13.md)
 - [Goal review page](validation/reports/goal-review-2026-06-11.html)
+- [Local macOS app E2E report template](validation/reports/local-macos-app-e2e-report.template.md)
 - [Render baseline](baseline/rapidraw-render-baseline-2026-06-10.md)
 
 ## Release Docs
