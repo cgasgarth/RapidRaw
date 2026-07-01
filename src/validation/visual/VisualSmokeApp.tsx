@@ -76,6 +76,7 @@ import type {
 import type { ExportSoftProofTransformState } from '../../store/useEditorStore';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
+import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { DEFAULT_COLLAPSIBLE_SECTIONS_STATE, useUIStore } from '../../store/useUIStore';
 import {
@@ -559,6 +560,91 @@ const professionalEditorShellImageList: ImageFile[] = [
   },
 ];
 
+const buildProfessionalFilmstripThumb = (tone: string, accent: string, label: string) =>
+  `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="220" viewBox="0 0 320 220"><rect width="320" height="220" fill="${tone}"/><path d="M0 148 C72 112 118 132 172 88 C214 54 258 68 320 34 L320 220 L0 220 Z" fill="${accent}" opacity="0.72"/><path d="M0 176 C84 128 146 162 208 116 C250 86 282 92 320 70 L320 220 L0 220 Z" fill="#0b0d10" opacity="0.52"/><circle cx="78" cy="58" r="27" fill="#f3e7b6" opacity="0.78"/><text x="18" y="204" fill="#f7f7f2" font-family="Inter,Arial,sans-serif" font-size="22" font-weight="700">${label}</text></svg>`,
+  )}`;
+
+const professionalFilmstripThumbs = [
+  buildProfessionalFilmstripThumb('#1f2931', '#7b9a78', 'A01'),
+  buildProfessionalFilmstripThumb('#242733', '#aa8b58', 'A02'),
+  buildProfessionalFilmstripThumb('#1b3035', '#647d9f', 'A03'),
+  buildProfessionalFilmstripThumb('#30242a', '#9b6f75', 'A04'),
+  buildProfessionalFilmstripThumb('#253125', '#8fa864', 'A05'),
+] as const;
+
+const professionalFilmstripImageList: ImageFile[] = [
+  {
+    exif: {
+      RawEngineCameraProfileFallbackReason: 'matrix_profile_missing',
+      RawEngineCameraProfileStatus: 'fallback',
+      RawEngineRawProcessingMode: 'highlight_recovery',
+      RawEngineRawProcessingProvenance: 'GPU preview',
+    },
+    is_edited: true,
+    is_virtual_copy: false,
+    modified: 1_772_333_100,
+    path: '/visual-smoke/filmstrip-context-active.ARW',
+    rating: 4,
+    tags: ['color:red', 'select'],
+  },
+  {
+    exif: {
+      RawEngineCameraProfileWarnings: 'dual_illuminant_estimate',
+      RawEngineRawProcessingMode: 'balanced',
+    },
+    is_edited: false,
+    is_virtual_copy: false,
+    modified: 1_772_333_200,
+    path: '/visual-smoke/filmstrip-context-selected.NEF',
+    rating: 2,
+    tags: ['color:yellow', 'select'],
+  },
+  {
+    exif: {
+      RawEngineRawProcessingMode: 'low_noise',
+      RawEngineRawProcessingProvenance: 'CPU proof',
+    },
+    is_edited: true,
+    is_virtual_copy: false,
+    modified: 1_772_333_300,
+    path: '/visual-smoke/filmstrip-context-multiselect.RAF',
+    rating: 5,
+    tags: ['color:green', 'select'],
+  },
+  {
+    exif: null,
+    is_edited: false,
+    is_virtual_copy: true,
+    modified: 1_772_333_400,
+    path: '/visual-smoke/filmstrip-context-copy.DNG?vc=2',
+    rating: 1,
+    tags: ['color:blue'],
+  },
+  {
+    exif: {
+      RawEngineCameraProfileStatus: 'unavailable',
+      RawEngineCameraProfileFallbackReason: 'unsupported_camera',
+    },
+    is_edited: true,
+    is_virtual_copy: false,
+    modified: 1_772_333_500,
+    path: '/visual-smoke/filmstrip-context-loading.CR3',
+    rating: 0,
+    tags: null,
+  },
+];
+
+const professionalFilmstripSelectedImage: SelectedImage = {
+  ...professionalEditorShellImage,
+  exif: professionalFilmstripImageList[0]?.exif ?? null,
+  path: professionalFilmstripImageList[0]?.path ?? professionalEditorShellImage.path,
+  thumbnailUrl: professionalFilmstripThumbs[0],
+};
+
+const professionalFilmstripContextTitle = 'Professional filmstrip context';
+const professionalFilmstripContextStatus = 'bottom bar';
+
 function useProfessionalEditorToolbarSmokeState() {
   useEffect(() => {
     const initial = structuredClone(INITIAL_ADJUSTMENTS);
@@ -652,6 +738,54 @@ function useProfessionalEditorSmokeState() {
     });
     useUIStore.setState({
       collapsibleSectionsState: { ...DEFAULT_COLLAPSIBLE_SECTIONS_STATE },
+    });
+  }, []);
+}
+
+function useProfessionalFilmstripContextSmokeState() {
+  useEffect(() => {
+    const adjustments = {
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      contrast: 12,
+      exposure: 0.35,
+      highlights: -28,
+      shadows: 18,
+    };
+    useEditorStore.setState({
+      adjustments,
+      copiedAdjustments: { contrast: adjustments.contrast, exposure: adjustments.exposure },
+      displaySize: { height: 680, width: 1020 },
+      histogram: null,
+      history: [adjustments],
+      historyIndex: 0,
+      isWaveformVisible: false,
+      originalSize: {
+        height: professionalFilmstripSelectedImage.height,
+        width: professionalFilmstripSelectedImage.width,
+      },
+      previewScopeStatus: null,
+      selectedImage: professionalFilmstripSelectedImage,
+      waveform: null,
+      waveformHeight: PANEL_SCOPES_HEIGHT.default,
+    });
+    useLibraryStore.setState({
+      imageRatings: {
+        [professionalFilmstripImageList[0]?.path ?? '']: 4,
+        [professionalFilmstripImageList[1]?.path ?? '']: 2,
+        [professionalFilmstripImageList[2]?.path ?? '']: 5,
+        [professionalFilmstripImageList[3]?.path ?? '']: 1,
+      },
+      multiSelectedPaths: professionalFilmstripImageList.slice(0, 3).map((image) => image.path),
+    });
+    useProcessStore.setState({
+      isCopied: true,
+      isPasted: true,
+      thumbnails: {
+        [professionalFilmstripImageList[0]?.path ?? '']: professionalFilmstripThumbs[0],
+        [professionalFilmstripImageList[1]?.path ?? '']: professionalFilmstripThumbs[1],
+        [professionalFilmstripImageList[2]?.path ?? '']: professionalFilmstripThumbs[2],
+        [professionalFilmstripImageList[3]?.path ?? '']: professionalFilmstripThumbs[3],
+      },
     });
   }, []);
 }
@@ -864,6 +998,145 @@ function ProfessionalEditorBottomBar() {
       thumbnailAspectRatio={ThumbnailAspectRatio.Cover}
       totalImages={1}
     />
+  );
+}
+
+function ProfessionalFilmstripContextVisualSmoke() {
+  const [isFilmstripVisible, setIsFilmstripVisible] = useState(true);
+  useProfessionalFilmstripContextSmokeState();
+
+  const imageRatings = {
+    [professionalFilmstripImageList[0]?.path ?? '']: 4,
+    [professionalFilmstripImageList[1]?.path ?? '']: 2,
+    [professionalFilmstripImageList[2]?.path ?? '']: 5,
+    [professionalFilmstripImageList[3]?.path ?? '']: 1,
+  };
+  const multiSelectedPaths = professionalFilmstripImageList.slice(0, 3).map((image) => image.path);
+
+  const bottomBarProps = {
+    imageList: professionalFilmstripImageList,
+    imageRatings,
+    isCopyDisabled: false,
+    isLoading: false,
+    isPasteDisabled: false,
+    isRatingDisabled: false,
+    multiSelectedPaths,
+    onClearSelection: () => {},
+    onCopy: () => {},
+    onImageSelect: () => {},
+    onOpenCopyPasteSettings: () => {},
+    onPaste: () => {},
+    onRate: () => {},
+    onRequestThumbnails: () => {},
+    onZoomChange: () => {},
+    rating: 4,
+    selectedImage: professionalFilmstripSelectedImage,
+    thumbnailAspectRatio: ThumbnailAspectRatio.Cover,
+    totalImages: professionalFilmstripImageList.length,
+  } satisfies Pick<
+    Parameters<typeof BottomBar>[0],
+    | 'imageList'
+    | 'imageRatings'
+    | 'isCopyDisabled'
+    | 'isLoading'
+    | 'isPasteDisabled'
+    | 'isRatingDisabled'
+    | 'multiSelectedPaths'
+    | 'onClearSelection'
+    | 'onCopy'
+    | 'onImageSelect'
+    | 'onOpenCopyPasteSettings'
+    | 'onPaste'
+    | 'onRate'
+    | 'onRequestThumbnails'
+    | 'onZoomChange'
+    | 'rating'
+    | 'selectedImage'
+    | 'thumbnailAspectRatio'
+    | 'totalImages'
+  >;
+
+  return (
+    <main
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ProfessionalFilmstripContext}
+      data-visual-smoke-ready="true"
+      style={{
+        background: 'var(--editor-matte)',
+        color: 'var(--text-primary)',
+        display: 'grid',
+        fontFamily: 'var(--font-sans)',
+        minHeight: '100vh',
+        padding: 12,
+      }}
+    >
+      <div style={{ display: 'grid', gap: 8, minHeight: 0, overflow: 'hidden' }}>
+        <div
+          data-visual-smoke-section="professional-filmstrip-context-title"
+          style={{
+            alignItems: 'center',
+            background: 'var(--editor-panel)',
+            border: '1px solid var(--editor-border)',
+            borderRadius: 8,
+            display: 'flex',
+            justifyContent: 'space-between',
+            minHeight: 32,
+            paddingInline: 12,
+          }}
+        >
+          <span className={editorChromeTokens.typography.panelTitle}>{professionalFilmstripContextTitle}</span>
+          <span className={editorChromeStatusChipClassName('info')}>{professionalFilmstripContextStatus}</span>
+        </div>
+        <section data-visual-smoke-section="professional-filmstrip-editor-context" style={{ minHeight: 0 }}>
+          <ProfessionalEditorCanvasWell />
+        </section>
+
+        <section
+          data-testid="professional-filmstrip-context-expanded"
+          data-visual-smoke-section="professional-filmstrip-context-expanded"
+        >
+          <BottomBar
+            {...bottomBarProps}
+            filmstripHeight={112}
+            isCopied={true}
+            isFilmstripVisible={isFilmstripVisible}
+            isPasted={true}
+            isResizing={false}
+            setIsFilmstripVisible={setIsFilmstripVisible}
+            showFilmstrip={true}
+            showZoomControls={true}
+          />
+        </section>
+
+        <section
+          data-visual-smoke-section="professional-filmstrip-context-secondary-states"
+          style={{ display: 'grid', gap: 8 }}
+        >
+          <BottomBar
+            {...bottomBarProps}
+            filmstripHeight={112}
+            isCopied={false}
+            isCopyDisabled={true}
+            isFilmstripVisible={false}
+            isPasted={false}
+            isPasteDisabled={true}
+            isRatingDisabled={true}
+            isResizing={false}
+            selectedImage={undefined}
+            setIsFilmstripVisible={() => {}}
+            showFilmstrip={true}
+            showZoomControls={true}
+          />
+          <BottomBar
+            {...bottomBarProps}
+            isCopied={true}
+            isFilmstripVisible={false}
+            isPasted={true}
+            showFilmstrip={false}
+            showZoomControls={true}
+          />
+        </section>
+      </div>
+    </main>
   );
 }
 
@@ -1190,6 +1463,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalCanvasOverlays]: ProfessionalCanvasOverlaysVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalCropTransformWorkspace]: ProfessionalCropTransformWorkspaceVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorCompactPortrait]: ProfessionalEditorCompactPortraitVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalFilmstripContext]: ProfessionalFilmstripContextVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShell]: ProfessionalEditorShellVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorToolbar]: ProfessionalEditorToolbarVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorTokens]: ProfessionalEditorTokensVisualSmoke,

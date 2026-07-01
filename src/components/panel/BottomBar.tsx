@@ -8,6 +8,7 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { COLOR_LABELS } from '../../utils/adjustments';
 import { GLOBAL_KEYS, type ImageFile, type SelectedImage, type ThumbnailAspectRatio } from '../ui/AppProperties';
+import { editorChromeStatusChipClassName } from '../ui/editorChromeTokens';
 import UiText from '../ui/primitives/Text';
 import Filmstrip from './Filmstrip';
 
@@ -59,12 +60,21 @@ const StarRating = ({ rating, onRate, disabled }: StarRatingProps) => {
   const { t } = useTranslation();
 
   return (
-    <div className={cx('flex items-center gap-1', disabled && 'cursor-not-allowed')}>
+    <div
+      aria-label={t('ui.bottomBar.tooltips.selectToRate')}
+      className={cx(
+        'flex h-8 items-center gap-0.5 rounded border border-editor-border bg-editor-panel-well px-1',
+        disabled && 'cursor-not-allowed opacity-60',
+      )}
+      role="group"
+    >
       {Array.from({ length: 5 }, (_, index) => {
         const starValue = index + 1;
+        const isActive = starValue <= rating;
         return (
           <button
-            className="disabled:cursor-not-allowed"
+            aria-pressed={isActive}
+            className="flex h-6 w-6 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-editor-selected-quiet hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:hover:bg-transparent"
             disabled={disabled}
             key={starValue}
             onClick={() => {
@@ -84,7 +94,7 @@ const StarRating = ({ rating, onRate, disabled }: StarRatingProps) => {
                 'transition-colors duration-150',
                 disabled
                   ? 'text-text-secondary opacity-40'
-                  : starValue <= rating
+                  : isActive
                     ? 'fill-accent text-accent'
                     : 'text-text-secondary hover:text-accent',
               )}
@@ -158,6 +168,11 @@ export default function BottomBar({
   const showSelectionCounter = numSelected > 1;
   const visibleFilmstripHeight = filmstripHeight ?? 0;
   const isCompactEditorBar = !isLibraryView && !showFilmstrip;
+  const zoomFillPercent = `${Math.max(0, Math.min(100, ((latchedSliderValue - 0.1) / 1.9) * 100))}%`;
+  const commandButtonClassName =
+    'relative flex h-8 w-8 items-center justify-center rounded text-text-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent';
+  const commandButtonIdleClassName =
+    'hover:bg-editor-panel-raised hover:text-text-primary active:bg-editor-selected-quiet';
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   const { filterCriteria, setFilterCriteria } = useLibraryStore(
     useShallow((state) => ({
@@ -266,10 +281,14 @@ export default function BottomBar({
         'shrink-0 flex flex-col overflow-hidden rounded-lg border border-editor-border bg-editor-panel',
         isCompactEditorBar && 'rounded-none border-0',
       )}
+      data-testid="editor-bottom-bar"
     >
       {!isLibraryView && showFilmstrip && (
         <div
-          className={cx('overflow-hidden', !isResizing && 'transition-all duration-300 ease-in-out')}
+          className={cx(
+            'overflow-hidden bg-editor-panel-well',
+            !isResizing && 'transition-all duration-300 ease-in-out',
+          )}
           style={{ height: isFilmstripVisible ? `${visibleFilmstripHeight}px` : '0px' }}
         >
           <div className="w-full p-2" style={{ height: `${visibleFilmstripHeight}px` }}>
@@ -292,18 +311,18 @@ export default function BottomBar({
 
       <div
         className={cx(
-          'shrink-0 flex items-center justify-between gap-2 px-3',
+          'shrink-0 flex items-center justify-between gap-2 px-2.5',
           isCompactEditorBar ? 'min-h-12 py-1.5' : 'h-10',
           !isLibraryView && 'border-t',
           !isLibraryView && showFilmstrip && isFilmstripVisible ? 'border-editor-border' : 'border-transparent',
         )}
       >
-        <div className={cx('flex min-w-0 items-center', isCompactEditorBar ? 'gap-2 overflow-x-auto' : 'gap-4')}>
+        <div className={cx('flex min-w-0 items-center', isCompactEditorBar ? 'gap-2 overflow-x-auto' : 'gap-2')}>
           <StarRating rating={rating} onRate={onRate} disabled={isRatingDisabled} />
           <div className={cx('h-5 w-px bg-editor-border', isCompactEditorBar && 'hidden')}></div>
-          <div className="flex items-center gap-2">
+          <div className="flex h-8 items-center gap-1 rounded border border-editor-border bg-editor-panel-well p-1">
             <button
-              className="relative w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className={cx(commandButtonClassName, commandButtonIdleClassName)}
               disabled={isCopyDisabled}
               onClick={onCopy}
               data-tooltip={t('ui.bottomBar.tooltips.copySettings')}
@@ -336,7 +355,7 @@ export default function BottomBar({
             </button>
 
             <button
-              className="relative w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className={cx(commandButtonClassName, commandButtonIdleClassName)}
               disabled={isPasteDisabled}
               onClick={onPaste}
               data-tooltip={t('ui.bottomBar.tooltips.pasteSettings')}
@@ -369,7 +388,7 @@ export default function BottomBar({
             </button>
 
             <button
-              className="w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring"
+              className={cx(commandButtonClassName, commandButtonIdleClassName)}
               onClick={onOpenCopyPasteSettings}
               data-tooltip={t('ui.bottomBar.tooltips.copyPasteSettings')}
             >
@@ -378,16 +397,16 @@ export default function BottomBar({
           </div>
           {!isCompactEditorBar && (
             <>
-              <div className="h-5 w-px bg-editor-border mx-4"></div>
+              <div className="h-5 w-px bg-editor-border"></div>
               <div
                 className={cx(
-                  'flex items-center transition-all duration-300',
-                  isFilterExpanded ? 'bg-editor-selected-quiet rounded-md' : 'bg-transparent',
+                  'flex h-8 items-center rounded border border-transparent transition-all duration-300',
+                  isFilterExpanded ? 'border-editor-border bg-editor-panel-well' : 'bg-transparent',
                 )}
               >
                 <button
                   className={cx(
-                    'relative w-8 h-8 flex items-center justify-center rounded-md transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
+                    'relative w-8 h-8 flex items-center justify-center rounded transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
                     isFilterExpanded
                       ? 'text-text-primary'
                       : 'text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary',
@@ -479,8 +498,8 @@ export default function BottomBar({
               showSelectionCounter ? 'max-w-xs opacity-100' : 'max-w-0 opacity-0',
             )}
           >
-            <div className="h-5 w-px bg-editor-border mr-4"></div>
-            <UiText as="span" className="whitespace-nowrap">
+            <div className="h-5 w-px bg-editor-border mr-2"></div>
+            <UiText as="span" className={cx(editorChromeStatusChipClassName('info'), 'whitespace-nowrap')}>
               {t('ui.bottomBar.imagesSelected', { current: numSelected, total })}
             </UiText>
           </div>
@@ -498,11 +517,19 @@ export default function BottomBar({
             </button>
           </div>
         ) : showZoomControls ? (
-          <div className={cx('flex shrink-0 items-center', isCompactEditorBar ? 'gap-2' : 'gap-4')}>
-            <div className={cx('flex items-center gap-2', isCompactEditorBar ? 'w-36' : 'w-56')}>
+          <div className={cx('flex shrink-0 items-center gap-2')}>
+            <div
+              className={cx(
+                'flex h-8 items-center gap-2 rounded border border-editor-border bg-editor-panel-well px-2',
+                !isZoomReady && 'opacity-50',
+              )}
+              data-testid="editor-bottom-bar-zoom"
+              style={{ width: isCompactEditorBar ? '9rem' : '14rem' }}
+            >
               <button
                 type="button"
-                className="relative w-12 h-full flex items-center justify-end cursor-pointer bg-transparent p-0 text-left"
+                className="relative flex h-6 w-12 cursor-pointer items-center justify-end rounded bg-transparent p-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:text-editor-disabled"
+                disabled={!isZoomReady}
                 onClick={handleResetZoom}
                 onMouseEnter={() => {
                   setIsZoomLabelHovered(true);
@@ -512,18 +539,24 @@ export default function BottomBar({
                 }}
                 data-tooltip={t('ui.bottomBar.tooltips.resetZoom')}
               >
-                <span className="absolute right-0 text-xs text-text-secondary select-none text-right w-max transition-colors hover:text-text-primary">
+                <span className="absolute right-0 w-max select-none text-right text-[11px] font-medium leading-4 text-text-secondary transition-colors hover:text-text-primary">
                   {isZoomLabelHovered ? t('ui.bottomBar.zoomLabelReset') : t('ui.bottomBar.zoomLabel')}
                 </span>
               </button>
 
               <div className="relative flex-1 h-5">
                 <div className="absolute top-1/2 left-0 w-full h-1.5 -translate-y-1/2 bg-editor-panel-raised rounded-full pointer-events-none" />
+                <div
+                  className="absolute left-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full pointer-events-none"
+                  style={{ background: 'var(--editor-primary-active)', width: zoomFillPercent }}
+                />
                 <input
                   type="range"
                   min={0.1}
                   max={2.0}
                   step="0.05"
+                  aria-label={t('ui.bottomBar.tooltips.customZoom')}
+                  disabled={!isZoomReady}
                   value={latchedSliderValue}
                   onChange={handleSliderChange}
                   onKeyDown={handleZoomKeyDown}
@@ -532,13 +565,16 @@ export default function BottomBar({
                   onTouchStart={handleMouseDown}
                   onTouchEnd={handleMouseUp}
                   onDoubleClick={handleResetZoom}
-                  className={`absolute top-1/2 left-0 w-full h-1.5 mt-[-1.5px] appearance-none bg-transparent cursor-pointer p-0 slider-input z-10 ${
+                  className={`absolute top-1/2 left-0 w-full h-1.5 mt-[-1.5px] appearance-none bg-transparent cursor-pointer p-0 slider-input z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed ${
                     isZoomActive ? 'slider-thumb-active' : ''
                   }`}
                 />
               </div>
 
-              <div className="relative text-xs text-text-secondary w-6 text-right flex items-center justify-end h-5 gap-1">
+              <div
+                className="relative text-xs text-text-secondary text-right flex items-center justify-end h-5 gap-1"
+                style={{ width: 44 }}
+              >
                 {isEditingPercent ? (
                   <input
                     ref={percentInputRef}
@@ -549,14 +585,16 @@ export default function BottomBar({
                     }}
                     onKeyDown={handlePercentKeyDown}
                     onBlur={handlePercentSubmit}
-                    className="w-full text-xs text-text-primary bg-editor-panel-raised border border-editor-border rounded-sm px-1 text-right"
+                    className="w-full rounded-sm border border-editor-border bg-editor-panel-raised px-1 text-right font-mono text-xs tabular-nums text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
                     style={{ fontSize: '12px', height: '18px' }}
                   />
                 ) : (
                   <button
                     type="button"
+                    disabled={!isZoomReady}
                     onClick={handlePercentClick}
-                    className="cursor-pointer hover:text-text-primary transition-colors select-none bg-transparent p-0 text-right text-xs text-text-secondary"
+                    className="cursor-pointer select-none rounded bg-transparent p-0 text-right font-mono text-xs tabular-nums text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:text-editor-disabled"
+                    style={{ width: 44 }}
                     data-tooltip={t('ui.bottomBar.tooltips.customZoom')}
                   >
                     {latchedDisplayPercent}%
@@ -568,7 +606,12 @@ export default function BottomBar({
               <>
                 <div className="h-5 w-px bg-editor-border"></div>
                 <button
-                  className="p-1.5 rounded-md text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring"
+                  className={cx(
+                    'p-1.5 rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
+                    isFilmstripVisible
+                      ? 'border-editor-border bg-editor-panel-well text-text-primary'
+                      : 'border-transparent text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary',
+                  )}
                   onClick={() => setIsFilmstripVisible?.(!isFilmstripVisible)}
                   data-tooltip={
                     isFilmstripVisible
