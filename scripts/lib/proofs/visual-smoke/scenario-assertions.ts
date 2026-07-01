@@ -1948,7 +1948,7 @@ export async function prepareScenario(page, mode) {
     return;
   }
 
-  if (mode === 'color-workflow') {
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.ColorWorkflow || mode === VISUAL_SMOKE_SCENARIO_IDS.ColorAdjustmentDensity) {
     const colorPanel = page.locator('[data-visual-smoke-section="color-workflow-panel"]');
     const assertColorWorkspaceTab = async (name: string, activePanel: string, hiddenPanel: string) => {
       await colorPanel.getByRole('tab', { exact: true, name }).click();

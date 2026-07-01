@@ -51,7 +51,7 @@ type ColorWorkspaceTabId = (typeof COLOR_WORKSPACE_TAB_IDS)[number];
 const COLOR_WORKSPACE_TAB_SESSION_KEY = 'rawengine.colorWorkspace.activeTab';
 let sessionColorWorkspaceTab: ColorWorkspaceTabId = 'quick';
 const COLOR_WORKSPACE_TAB_BASE_CLASS =
-  'relative inline-flex min-h-7 shrink-0 items-center justify-center rounded px-2.5 text-[11px] font-semibold leading-4 tracking-normal transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-editor-matte';
+  'relative inline-flex min-h-6 shrink-0 items-center justify-center rounded px-2 text-[11px] font-semibold leading-4 tracking-normal transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-editor-matte';
 const COLOR_WORKSPACE_TAB_ACTIVE_CLASS = 'bg-editor-primary-active text-editor-primary-active-text shadow-sm';
 const COLOR_WORKSPACE_TAB_INACTIVE_CLASS =
   'bg-transparent text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary';
@@ -297,7 +297,7 @@ export default function ColorPanel({
         id: 'editor',
         label: t('adjustments.color.workspaceTabs.editor'),
         panel: (
-          <div className="space-y-4">
+          <div className="space-y-1.5">
             {!isForMask && (
               <ColorProfileToneControls
                 adjustmentVisibility={adjustmentVisibility}
@@ -484,10 +484,10 @@ export default function ColorPanel({
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <div
         aria-label={t('adjustments.color.workspaceTabs.label')}
-        className="sticky top-0 z-20 -mx-3 flex gap-1 overflow-x-auto border-b border-editor-border bg-editor-panel px-3 py-1.5 shadow-sm"
+        className="sticky top-0 z-20 -mx-3 flex gap-1 overflow-x-auto border-b border-editor-border bg-editor-panel px-3 py-1 shadow-sm"
         data-testid="color-workspace-tabs"
         data-sticky="true"
         onKeyDown={handleWorkspaceTabKeyDown}

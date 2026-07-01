@@ -3,6 +3,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   AgentChatUi: 'agent-chat-ui',
   AgentSelectedImageLiveSession: 'agent-selected-image-live-session',
   BrushMaskCanvasUi: 'brush-mask-canvas-ui',
+  ColorAdjustmentDensity: 'color-adjustment-density',
   ColorWorkflow: 'color-workflow',
   ColorRangeLocalAdjustment: 'color-range-local-adjustment',
   CommandPaletteWorkflows: 'command-palette-workflows',
@@ -267,6 +268,14 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Color Workflow',
     mode: VISUAL_SMOKE_SCENARIO_IDS.ColorWorkflow,
     outputFile: 'color-workflow.png',
+    sectionMinimum: 2,
+  },
+  {
+    appMode: VISUAL_SMOKE_SCENARIO_IDS.ColorWorkflow,
+    compactOutputFile: 'color-adjustment-density-compact.png',
+    marker: 'Color Workflow',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.ColorAdjustmentDensity,
+    outputFile: 'color-adjustment-density.png',
     sectionMinimum: 2,
   },
   {
