@@ -1,3 +1,4 @@
 @import "tailwindcss";
-@source not "../../../src-tauri";
 @import "../../styles.css";
+
+@source not "../../../src-tauri";
