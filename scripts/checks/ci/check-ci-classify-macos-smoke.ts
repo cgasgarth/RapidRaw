@@ -296,7 +296,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     'check:negative-lab-workspace-smoke',
     new Set(['bun scripts/proofs/capture-visual-smoke.ts --scenario negative-lab-workspace']),
   ],
-  ['check:performance-smoke', new Set(['bun tests/integration/checks/check-performance-smoke.ts'])],
+  ['check:performance-smoke', new Set(['bun scripts/checks/ci/check-performance-smoke.ts'])],
   [
     'check:pure-ts-tests',
     new Set(['bun scripts/ci/run-compact-command.ts --label pure-ts-tests -- bun test --reporter=dot tests/pure-ts']),
@@ -309,16 +309,13 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     'schema:check',
     new Set([
       'tsc -p packages/rawengine-schema/tsconfig.json --noEmit --pretty false && bun packages/rawengine-schema/scripts/check-samples.ts',
-      'tsc -p packages/rawengine-schema/tsconfig.json --noEmit --pretty false && bun packages/rawengine-schema/scripts/check-samples.ts && bun run schema:samples',
+      'tsc -p packages/rawengine-schema/tsconfig.json --noEmit --pretty false && bun packages/rawengine-schema/scripts/check-samples.ts && bun packages/rawengine-schema/scripts/check-sample-artifacts.ts',
     ]),
   ],
   ['schema:samples', new Set(['bun packages/rawengine-schema/scripts/check-sample-artifacts.ts'])],
   ['schema:samples:update', new Set(['bun packages/rawengine-schema/scripts/check-sample-artifacts.ts --update'])],
-  ['schema:contract-gate', new Set(['bun tests/integration/checks/check-schema-contract-gate.ts'])],
-  [
-    'schema:contract-gate:self-test',
-    new Set(['bun tests/integration/checks/check-schema-contract-gate.ts --self-test']),
-  ],
+  ['schema:contract-gate', new Set(['bun scripts/checks/ci/check-schema-contract-gate.ts'])],
+  ['schema:contract-gate:self-test', new Set(['bun scripts/checks/ci/check-schema-contract-gate.ts --self-test'])],
   [
     'schema:sr-app-server',
     new Set(['bun packages/rawengine-schema/scripts/check-super-resolution-app-server-command-bus.ts']),
@@ -711,8 +708,7 @@ function runSelfTest() {
     [
       {
         filename: 'package.json',
-        patch:
-          '@@ -42,6 +42,7 @@\n+    "check:performance-smoke": "bun tests/integration/checks/check-performance-smoke.ts",',
+        patch: '@@ -42,6 +42,7 @@\n+    "check:performance-smoke": "bun scripts/checks/ci/check-performance-smoke.ts",',
       },
     ],
     SMOKE_MODES.NONE,
@@ -1103,7 +1099,7 @@ if (args.includes('--self-test')) {
 
   if (!filesPath && !pullFilesJsonPath && !pullFilesNdjsonPath) {
     throw new Error(
-      'Usage: bun tests/integration/checks/check-ci-classify-macos-smoke.ts --files <changed-files.txt> | --pull-files-json <pull-files.json> | --pull-files-ndjson <pull-files.ndjson>',
+      'Usage: bun scripts/checks/ci/check-ci-classify-macos-smoke.ts --files <changed-files.txt> | --pull-files-json <pull-files.json> | --pull-files-ndjson <pull-files.ndjson>',
     );
   }
 
