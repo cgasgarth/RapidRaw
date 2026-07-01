@@ -584,6 +584,10 @@
         "pasteSettings": "Wklej ustawienia",
         "resetSectionSettings": "Resetuj ustawienia sekcji {{section}}"
       },
+      "pinnedControls": {
+        "title": "Przypięte",
+        "unpin": "Odepnij {{control}}"
+      },
       "rawProcessingModeOverride": {
         "attention": "Check",
         "currentValue": "",
@@ -608,6 +612,12 @@
         "curves": "Tone Curves",
         "details": "Detail",
         "effects": "Effects & Looks"
+      },
+      "search": {
+        "clear": "Wyczyść wyszukiwanie",
+        "label": "Szukaj elementów regulacji",
+        "noResults": "Brak pasujących elementów",
+        "placeholder": "Szukaj elementów"
       },
       "sections": {
         "basic": "Podstawowe",

@@ -544,6 +544,10 @@
         "pasteSettings": "Paste Settings",
         "resetSectionSettings": "Reset {{section}} Settings"
       },
+      "pinnedControls": {
+        "title": "Pinned",
+        "unpin": "Unpin {{control}}"
+      },
       "rawProcessingModeOverride": {
         "attention": "Check",
         "currentValue": "Current quality: {{mode}}",
@@ -568,6 +572,12 @@
         "curves": "Tone Curves",
         "details": "Detail",
         "effects": "Effects & Looks"
+      },
+      "search": {
+        "clear": "Clear search",
+        "label": "Search adjustment controls",
+        "noResults": "No matching controls",
+        "placeholder": "Search controls"
       },
       "sections": {
         "basic": "Basic",

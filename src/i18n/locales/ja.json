@@ -513,6 +513,10 @@
         "pasteSettings": "設定を貼り付け",
         "resetSectionSettings": "{{section}}設定をリセット"
       },
+      "pinnedControls": {
+        "title": "ピン留め",
+        "unpin": "{{control}} のピン留めを解除"
+      },
       "rawProcessingModeOverride": {
         "attention": "Check",
         "currentValue": "",
@@ -537,6 +541,12 @@
         "curves": "Tone Curves",
         "details": "Detail",
         "effects": "Effects & Looks"
+      },
+      "search": {
+        "clear": "検索をクリア",
+        "label": "調整コントロールを検索",
+        "noResults": "一致するコントロールがありません",
+        "placeholder": "コントロールを検索"
       },
       "sections": {
         "basic": "基本",

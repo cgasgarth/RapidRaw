@@ -1,6 +1,19 @@
 import cx from 'clsx';
 import type { TFunction } from 'i18next';
-import { Aperture, ChartArea, ChevronDown, ClipboardPaste, Copy, Info, RotateCcw, ScanSearch } from 'lucide-react';
+import {
+  Aperture,
+  ChartArea,
+  ChevronDown,
+  ClipboardPaste,
+  Copy,
+  Info,
+  Pin,
+  PinOff,
+  RotateCcw,
+  ScanSearch,
+  Search,
+  X,
+} from 'lucide-react';
 import { type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
@@ -21,10 +34,17 @@ import { type CollapsibleSectionsState, useUIStore } from '../../../../store/use
 import { Invokes } from '../../../../tauri/commands';
 import { TextVariants } from '../../../../types/typography';
 import {
+  ActiveChannel,
   ADJUSTMENT_SECTIONS,
   type Adjustments,
+  BasicAdjustment,
+  CreativeAdjustment,
+  DetailsAdjustment,
+  Effect,
   hasAdjustmentValueChanges,
   INITIAL_ADJUSTMENTS,
+  type ParametricCurve,
+  type ParametricCurveSettings,
   pickAdjustmentValues,
 } from '../../../../utils/adjustments';
 import { formatUnknownError } from '../../../../utils/errorFormatting';
@@ -36,6 +56,7 @@ import {
   type RawProcessingMode,
 } from '../../../../utils/rawProcessingModes';
 import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
+import AdjustmentSlider from '../../../adjustments/AdjustmentSlider';
 import BasicAdjustments from '../../../adjustments/Basic';
 import CurveGraph from '../../../adjustments/Curves';
 import DetailsPanel from '../../../adjustments/Details';
@@ -45,6 +66,8 @@ import CollapsibleSection, { type CollapsibleSectionHeaderAction } from '../../.
 import { editorChromeStatusChipClassName } from '../../../ui/editorChromeTokens';
 import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens';
 import Dropdown, { type OptionItem } from '../../../ui/primitives/Dropdown';
+import Input from '../../../ui/primitives/Input';
+import Switch from '../../../ui/primitives/Switch';
 import UiText from '../../../ui/primitives/Text';
 import PanelScopesStrip from '../inspector/PanelScopesStrip';
 
@@ -58,6 +81,18 @@ interface AdjustmentSectionActions {
   headerActions: CollapsibleSectionHeaderAction[];
   menuOptions: Option[];
 }
+interface DevelopPanelControl {
+  id: string;
+  isDirty: boolean;
+  label: string;
+  render: () => ReactNode;
+  searchText: string;
+  sectionName: AdjustmentSectionName;
+}
+
+type NumericAdjustmentKey = keyof {
+  [Key in keyof Adjustments as Adjustments[Key] extends number ? Key : never]: Adjustments[Key];
+};
 
 const ADJUSTMENT_SECTION_LABEL_FALLBACKS: Record<AdjustmentSectionName, string> = {
   basic: 'Basic Tone',
@@ -67,6 +102,24 @@ const ADJUSTMENT_SECTION_LABEL_FALLBACKS: Record<AdjustmentSectionName, string> 
 };
 const RAW_RECONSTRUCTION_COMPARISON_CROP_SIZE = 256;
 const PANEL_ACTION_ICON_SIZE = 14;
+const PINNED_CONTROLS_LIMIT = 8;
+const DEVELOP_PANEL_SEARCH_NORMALIZER = /\s+/g;
+
+const normalizeDevelopPanelSearchText = (value: string) =>
+  value.trim().toLowerCase().replace(DEVELOP_PANEL_SEARCH_NORMALIZER, ' ');
+
+const getLumaParametricCurve = (adjustments: Adjustments): ParametricCurveSettings =>
+  (adjustments.parametricCurve ?? INITIAL_ADJUSTMENTS.parametricCurve ?? {})[ActiveChannel.Luma] ?? {
+    blackLevel: 0,
+    darks: 0,
+    highlights: 0,
+    lights: 0,
+    shadows: 0,
+    split1: 25,
+    split2: 50,
+    split3: 75,
+    whiteLevel: 0,
+  };
 
 const formatBytes = (value: number): string => {
   if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
@@ -123,6 +176,7 @@ export default function Controls() {
   const [isComparingRawReconstruction, setIsComparingRawReconstruction] = useState(false);
   const [isRawProcessingModeProvenanceVisible, setIsRawProcessingModeProvenanceVisible] = useState(false);
   const [isRawProcessingControlsOpen, setIsRawProcessingControlsOpen] = useState(false);
+  const [developPanelSearchQuery, setDevelopPanelSearchQuery] = useState('');
 
   const { appSettings, theme } = useSettingsStore(
     useShallow((state) => ({
@@ -147,9 +201,11 @@ export default function Controls() {
     [appSettings?.rawProcessingMode, t],
   );
 
-  const { collapsibleSectionsState, setUI } = useUIStore(
+  const { collapsibleSectionsState, developPanelPinnedControlIds, setDevelopPanelPinnedControlIds, setUI } = useUIStore(
     useShallow((state) => ({
       collapsibleSectionsState: state.collapsibleSectionsState,
+      developPanelPinnedControlIds: state.developPanelPinnedControlIds,
+      setDevelopPanelPinnedControlIds: state.setDevelopPanelPinnedControlIds,
       setUI: state.setUI,
     })),
   );
@@ -186,16 +242,528 @@ export default function Controls() {
     setRawReconstructionComparison(null);
   }, [isRawProcessingStatusAttentionRequired, selectedImage?.path]);
 
-  const setCopiedSectionAdjustments = useCallback(
-    (val: CopiedSectionAdjustments | null) => {
-      setEditor({ copiedSectionAdjustments: val });
+  const onDragStateChange = useCallback(
+    (isDragging: boolean) => {
+      setEditor({ isSliderDragging: isDragging });
     },
     [setEditor],
   );
 
-  const onDragStateChange = useCallback(
-    (isDragging: boolean) => {
-      setEditor({ isSliderDragging: isDragging });
+  const developPanelControls = useMemo<DevelopPanelControl[]>(() => {
+    const buildSearchText = (sectionName: AdjustmentSectionName, label: string, aliases: string[] = []) =>
+      normalizeDevelopPanelSearchText([getAdjustmentSectionLabel(t, sectionName), label, ...aliases].join(' '));
+
+    const handleNumericAdjustmentChange = (key: NumericAdjustmentKey, value: number, truncate = false) => {
+      setAdjustments((prev: Adjustments) => ({ ...prev, [key]: truncate ? Math.trunc(value) : value }));
+    };
+
+    const handleBooleanAdjustmentChange = (key: keyof Adjustments, value: boolean) => {
+      setAdjustments((prev: Adjustments) => ({ ...prev, [key]: value }));
+    };
+
+    const handleLumaParametricCurveChange = (key: keyof ParametricCurveSettings, value: number) => {
+      setAdjustments((prev: Adjustments) => {
+        const currentParametricCurve = (prev.parametricCurve ?? INITIAL_ADJUSTMENTS.parametricCurve) as ParametricCurve;
+        const currentLumaCurve = currentParametricCurve[ActiveChannel.Luma];
+        return {
+          ...prev,
+          curveMode: 'parametric',
+          parametricCurve: {
+            ...currentParametricCurve,
+            [ActiveChannel.Luma]: {
+              ...currentLumaCurve,
+              [key]: value,
+            },
+          },
+        };
+      });
+    };
+
+    const sliderControl = ({
+      aliases,
+      defaultValue,
+      disabled,
+      fillOrigin,
+      id,
+      key,
+      label,
+      max,
+      min,
+      sectionName,
+      step,
+      suffix,
+      truncate = false,
+    }: {
+      aliases?: string[];
+      defaultValue?: number;
+      disabled?: boolean;
+      fillOrigin?: 'default' | 'min';
+      id: string;
+      key: NumericAdjustmentKey;
+      label: string;
+      max: number;
+      min: number;
+      sectionName: AdjustmentSectionName;
+      step: number;
+      suffix?: string;
+      truncate?: boolean;
+    }): DevelopPanelControl => ({
+      id,
+      isDirty: adjustments[key] !== INITIAL_ADJUSTMENTS[key],
+      label,
+      render: () => (
+        <AdjustmentSlider
+          {...(defaultValue === undefined ? {} : { defaultValue })}
+          density="compact"
+          {...(disabled === undefined ? {} : { disabled })}
+          {...(fillOrigin === undefined ? {} : { fillOrigin })}
+          label={label}
+          max={max}
+          min={min}
+          onDragStateChange={onDragStateChange}
+          onValueChange={(value) => {
+            handleNumericAdjustmentChange(key, value, truncate);
+          }}
+          step={step}
+          {...(suffix === undefined ? {} : { suffix })}
+          testId={`develop-pinned-control-${id}`}
+          value={Number(adjustments[key] ?? 0)}
+        />
+      ),
+      searchText: buildSearchText(sectionName, label, aliases),
+      sectionName,
+    });
+
+    const lumaCurveSliderControl = ({
+      aliases,
+      id,
+      key,
+      label,
+      max,
+      min,
+    }: {
+      aliases?: string[];
+      id: string;
+      key: keyof ParametricCurveSettings;
+      label: string;
+      max: number;
+      min: number;
+    }): DevelopPanelControl => {
+      const lumaCurve = getLumaParametricCurve(adjustments);
+      const defaultLumaCurve = getLumaParametricCurve(INITIAL_ADJUSTMENTS);
+      return {
+        id,
+        isDirty: lumaCurve[key] !== defaultLumaCurve[key],
+        label,
+        render: () => (
+          <AdjustmentSlider
+            defaultValue={0}
+            density="compact"
+            label={label}
+            max={max}
+            min={min}
+            onDragStateChange={onDragStateChange}
+            onValueChange={(value) => {
+              handleLumaParametricCurveChange(key, value);
+            }}
+            step={1}
+            testId={`develop-pinned-control-${id}`}
+            value={lumaCurve[key]}
+          />
+        ),
+        searchText: buildSearchText('curves', label, ['curve', 'luma', 'parametric', ...(aliases ?? [])]),
+        sectionName: 'curves',
+      };
+    };
+
+    const basicControls = [
+      sliderControl({
+        aliases: ['ev', 'exposure'],
+        id: BasicAdjustment.Exposure,
+        key: BasicAdjustment.Exposure,
+        label: t('adjustments.basic.evShift'),
+        max: 5,
+        min: -5,
+        sectionName: 'basic',
+        step: 0.01,
+      }),
+      sliderControl({
+        aliases: ['exposure'],
+        id: BasicAdjustment.Brightness,
+        key: BasicAdjustment.Brightness,
+        label: t('adjustments.basic.brightness', { defaultValue: t('adjustments.basic.exposure') }),
+        max: 5,
+        min: -5,
+        sectionName: 'basic',
+        step: 0.01,
+      }),
+      sliderControl({
+        id: BasicAdjustment.Contrast,
+        key: BasicAdjustment.Contrast,
+        label: t('adjustments.basic.contrast'),
+        max: 100,
+        min: -100,
+        sectionName: 'basic',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        id: BasicAdjustment.Highlights,
+        key: BasicAdjustment.Highlights,
+        label: t('adjustments.basic.highlights'),
+        max: 100,
+        min: -100,
+        sectionName: 'basic',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        id: BasicAdjustment.Shadows,
+        key: BasicAdjustment.Shadows,
+        label: t('adjustments.basic.shadows'),
+        max: 100,
+        min: -100,
+        sectionName: 'basic',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        id: BasicAdjustment.Whites,
+        key: BasicAdjustment.Whites,
+        label: t('adjustments.basic.whites'),
+        max: 100,
+        min: -100,
+        sectionName: 'basic',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        id: BasicAdjustment.Blacks,
+        key: BasicAdjustment.Blacks,
+        label: t('adjustments.basic.blacks'),
+        max: 100,
+        min: -100,
+        sectionName: 'basic',
+        step: 1,
+        truncate: true,
+      }),
+    ];
+
+    const curveControls = [
+      lumaCurveSliderControl({
+        id: 'curves.luma.whiteLevel',
+        key: 'whiteLevel',
+        label: t('adjustments.curves.params.whiteLevel'),
+        max: 0,
+        min: -100,
+      }),
+      lumaCurveSliderControl({
+        id: 'curves.luma.highlights',
+        key: 'highlights',
+        label: t('adjustments.curves.params.highlights'),
+        max: 100,
+        min: -100,
+      }),
+      lumaCurveSliderControl({
+        id: 'curves.luma.lights',
+        key: 'lights',
+        label: t('adjustments.curves.params.lights'),
+        max: 100,
+        min: -100,
+      }),
+      lumaCurveSliderControl({
+        id: 'curves.luma.darks',
+        key: 'darks',
+        label: t('adjustments.curves.params.darks'),
+        max: 100,
+        min: -100,
+      }),
+      lumaCurveSliderControl({
+        id: 'curves.luma.shadows',
+        key: 'shadows',
+        label: t('adjustments.curves.params.shadows'),
+        max: 100,
+        min: -100,
+      }),
+      lumaCurveSliderControl({
+        id: 'curves.luma.blackLevel',
+        key: 'blackLevel',
+        label: t('adjustments.curves.params.blackLevel'),
+        max: 100,
+        min: 0,
+      }),
+    ];
+
+    const detailControls: DevelopPanelControl[] = [
+      {
+        id: DetailsAdjustment.DeblurEnabled,
+        isDirty: adjustments.deblurEnabled !== INITIAL_ADJUSTMENTS.deblurEnabled,
+        label: t('adjustments.details.enableDeblur'),
+        render: () => (
+          <Switch
+            checked={adjustments.deblurEnabled}
+            chrome="editor"
+            className="min-h-5"
+            label={t('adjustments.details.enableDeblur')}
+            onChange={(checked) => {
+              handleBooleanAdjustmentChange(DetailsAdjustment.DeblurEnabled, checked);
+            }}
+          />
+        ),
+        searchText: buildSearchText('details', t('adjustments.details.enableDeblur'), ['deblur']),
+        sectionName: 'details',
+      },
+      sliderControl({
+        disabled: !adjustments.deblurEnabled,
+        fillOrigin: 'min',
+        id: DetailsAdjustment.DeblurStrength,
+        key: DetailsAdjustment.DeblurStrength,
+        label: t('adjustments.details.amount'),
+        max: 100,
+        min: 0,
+        sectionName: 'details',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        defaultValue: 0.8,
+        disabled: !adjustments.deblurEnabled,
+        id: DetailsAdjustment.DeblurSigmaPx,
+        key: DetailsAdjustment.DeblurSigmaPx,
+        label: t('adjustments.details.blurRadius'),
+        max: 1.35,
+        min: 0.45,
+        sectionName: 'details',
+        step: 0.05,
+        suffix: ' px',
+      }),
+      sliderControl({
+        id: DetailsAdjustment.Sharpness,
+        key: DetailsAdjustment.Sharpness,
+        label: t('adjustments.details.sharpness'),
+        max: 100,
+        min: -100,
+        sectionName: 'details',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        defaultValue: 15,
+        fillOrigin: 'min',
+        id: DetailsAdjustment.SharpnessThreshold,
+        key: DetailsAdjustment.SharpnessThreshold,
+        label: t('adjustments.details.threshold'),
+        max: 80,
+        min: 0,
+        sectionName: 'details',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        id: DetailsAdjustment.Clarity,
+        key: DetailsAdjustment.Clarity,
+        label: t('adjustments.details.clarity'),
+        max: 100,
+        min: -100,
+        sectionName: 'details',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        id: DetailsAdjustment.Dehaze,
+        key: DetailsAdjustment.Dehaze,
+        label: t('adjustments.details.dehaze'),
+        max: 100,
+        min: -100,
+        sectionName: 'details',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        id: DetailsAdjustment.Structure,
+        key: DetailsAdjustment.Structure,
+        label: t('adjustments.details.structure'),
+        max: 100,
+        min: -100,
+        sectionName: 'details',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        aliases: ['center'],
+        id: DetailsAdjustment.Centré,
+        key: DetailsAdjustment.Centré,
+        label: t('adjustments.details.centre'),
+        max: 100,
+        min: -100,
+        sectionName: 'details',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        id: DetailsAdjustment.LumaNoiseReduction,
+        key: DetailsAdjustment.LumaNoiseReduction,
+        label: t('adjustments.details.luminance'),
+        max: 100,
+        min: 0,
+        sectionName: 'details',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        id: DetailsAdjustment.ColorNoiseReduction,
+        key: DetailsAdjustment.ColorNoiseReduction,
+        label: t('adjustments.details.color'),
+        max: 100,
+        min: 0,
+        sectionName: 'details',
+        step: 1,
+        truncate: true,
+      }),
+    ];
+
+    const effectControls = [
+      sliderControl({
+        fillOrigin: 'min',
+        id: CreativeAdjustment.GlowAmount,
+        key: CreativeAdjustment.GlowAmount,
+        label: t('adjustments.effects.glow'),
+        max: 100,
+        min: 0,
+        sectionName: 'effects',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        fillOrigin: 'min',
+        id: CreativeAdjustment.HalationAmount,
+        key: CreativeAdjustment.HalationAmount,
+        label: t('adjustments.effects.halation'),
+        max: 100,
+        min: 0,
+        sectionName: 'effects',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        fillOrigin: 'min',
+        id: CreativeAdjustment.FlareAmount,
+        key: CreativeAdjustment.FlareAmount,
+        label: t('adjustments.effects.lightFlares'),
+        max: 100,
+        min: 0,
+        sectionName: 'effects',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        id: Effect.VignetteAmount,
+        key: Effect.VignetteAmount,
+        label: `${t('adjustments.effects.vignette')} ${t('adjustments.effects.amount')}`,
+        max: 100,
+        min: -100,
+        sectionName: 'effects',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        defaultValue: 50,
+        fillOrigin: 'min',
+        id: Effect.VignetteMidpoint,
+        key: Effect.VignetteMidpoint,
+        label: `${t('adjustments.effects.vignette')} ${t('adjustments.effects.midpoint')}`,
+        max: 100,
+        min: 0,
+        sectionName: 'effects',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        fillOrigin: 'min',
+        id: Effect.GrainAmount,
+        key: Effect.GrainAmount,
+        label: `${t('adjustments.effects.grain')} ${t('adjustments.effects.amount')}`,
+        max: 100,
+        min: 0,
+        sectionName: 'effects',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        defaultValue: 25,
+        fillOrigin: 'min',
+        id: Effect.GrainSize,
+        key: Effect.GrainSize,
+        label: `${t('adjustments.effects.grain')} ${t('adjustments.effects.size')}`,
+        max: 100,
+        min: 0,
+        sectionName: 'effects',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        defaultValue: 50,
+        fillOrigin: 'min',
+        id: Effect.GrainRoughness,
+        key: Effect.GrainRoughness,
+        label: `${t('adjustments.effects.grain')} ${t('adjustments.effects.roughness')}`,
+        max: 100,
+        min: 0,
+        sectionName: 'effects',
+        step: 1,
+        truncate: true,
+      }),
+    ];
+
+    return [...basicControls, ...curveControls, ...detailControls, ...effectControls];
+  }, [adjustments, onDragStateChange, setAdjustments, t]);
+
+  const normalizedDevelopPanelSearchQuery = useMemo(
+    () => normalizeDevelopPanelSearchText(developPanelSearchQuery),
+    [developPanelSearchQuery],
+  );
+  const isDevelopPanelSearching = normalizedDevelopPanelSearchQuery.length > 0;
+  const developPanelControlById = useMemo(
+    () => new Map(developPanelControls.map((control) => [control.id, control])),
+    [developPanelControls],
+  );
+  const pinnedDevelopPanelControls = useMemo(
+    () =>
+      developPanelPinnedControlIds
+        .map((controlId) => developPanelControlById.get(controlId))
+        .filter((control): control is DevelopPanelControl => control !== undefined),
+    [developPanelControlById, developPanelPinnedControlIds],
+  );
+  const filteredDevelopPanelControls = useMemo(
+    () =>
+      isDevelopPanelSearching
+        ? developPanelControls.filter((control) => control.searchText.includes(normalizedDevelopPanelSearchQuery))
+        : [],
+    [developPanelControls, isDevelopPanelSearching, normalizedDevelopPanelSearchQuery],
+  );
+  const matchingDevelopPanelSections = useMemo(
+    () => new Set(filteredDevelopPanelControls.map((control) => control.sectionName)),
+    [filteredDevelopPanelControls],
+  );
+
+  const isDevelopPanelControlPinned = useCallback(
+    (controlId: string) => developPanelPinnedControlIds.includes(controlId),
+    [developPanelPinnedControlIds],
+  );
+
+  const toggleDevelopPanelPinnedControl = useCallback(
+    (controlId: string) => {
+      const nextPinnedControlIds = developPanelPinnedControlIds.includes(controlId)
+        ? developPanelPinnedControlIds.filter((pinnedControlId) => pinnedControlId !== controlId)
+        : [...developPanelPinnedControlIds, controlId].slice(-PINNED_CONTROLS_LIMIT);
+      setDevelopPanelPinnedControlIds(nextPinnedControlIds);
+    },
+    [developPanelPinnedControlIds, setDevelopPanelPinnedControlIds],
+  );
+
+  const setCopiedSectionAdjustments = useCallback(
+    (val: CopiedSectionAdjustments | null) => {
+      setEditor({ copiedSectionAdjustments: val });
     },
     [setEditor],
   );
@@ -208,6 +776,24 @@ export default function Controls() {
     },
     [setUI],
   );
+
+  useEffect(() => {
+    if (!isDevelopPanelSearching || matchingDevelopPanelSections.size === 0) {
+      return;
+    }
+
+    setCollapsibleState((prev) => {
+      let didChange = false;
+      const nextState = { ...prev };
+      matchingDevelopPanelSections.forEach((sectionName) => {
+        if (!nextState[sectionName]) {
+          nextState[sectionName] = true;
+          didChange = true;
+        }
+      });
+      return didChange ? nextState : prev;
+    });
+  }, [isDevelopPanelSearching, matchingDevelopPanelSections, setCollapsibleState]);
 
   const handleToggleVisibility = (sectionName: AdjustmentSectionName) => {
     setAdjustments((prev: Adjustments) => {
@@ -633,8 +1219,143 @@ export default function Controls() {
 
       <PanelScopesStrip testId="adjustments-panel-scopes-strip" />
 
+      <div className="shrink-0 border-b border-editor-border bg-editor-panel px-2 py-1.5">
+        <div className="relative">
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-text-secondary"
+            size={13}
+          />
+          <Input
+            aria-label={t('editor.adjustments.search.label', { defaultValue: 'Search adjustment controls' })}
+            chrome="editor"
+            className="h-6 pl-7 pr-7 text-[11px]"
+            density="compact"
+            onChange={(event) => {
+              setDevelopPanelSearchQuery(event.currentTarget.value);
+            }}
+            placeholder={t('editor.adjustments.search.placeholder', { defaultValue: 'Search controls' })}
+            type="search"
+            value={developPanelSearchQuery}
+          />
+          {developPanelSearchQuery.length > 0 && (
+            <button
+              aria-label={t('editor.adjustments.search.clear', { defaultValue: 'Clear search' })}
+              className="absolute right-1 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
+              onClick={() => {
+                setDevelopPanelSearchQuery('');
+              }}
+              type="button"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
+
+        {isDevelopPanelSearching && (
+          <div
+            className="mt-1 flex max-h-20 flex-wrap gap-1 overflow-y-auto"
+            data-testid="develop-panel-search-results"
+          >
+            {filteredDevelopPanelControls.length > 0 ? (
+              filteredDevelopPanelControls.map((control) => {
+                const isPinned = isDevelopPanelControlPinned(control.id);
+                const PinIcon = isPinned ? PinOff : Pin;
+                return (
+                  <button
+                    aria-pressed={isPinned}
+                    className={cx(
+                      'inline-flex min-h-6 max-w-full items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-medium leading-4 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
+                      isPinned
+                        ? 'border-editor-focus-ring bg-editor-selected-quiet text-editor-selected-quiet-text'
+                        : 'border-editor-border bg-editor-panel-well text-text-secondary hover:border-editor-focus-ring hover:text-text-primary',
+                    )}
+                    data-testid={`develop-panel-search-result-${control.id}`}
+                    key={control.id}
+                    onClick={() => {
+                      toggleDevelopPanelPinnedControl(control.id);
+                    }}
+                    type="button"
+                  >
+                    <PinIcon className="shrink-0" size={12} />
+                    <span className="truncate">{control.label}</span>
+                    {control.isDirty && (
+                      <span className={cx(editorChromeStatusChipClassName('info'), 'ml-0.5 px-1 text-[9px] leading-3')}>
+                        {t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' })}
+                      </span>
+                    )}
+                  </button>
+                );
+              })
+            ) : (
+              <UiText
+                as="div"
+                variant={TextVariants.small}
+                className="px-0.5 text-[11px] leading-5 text-text-secondary"
+              >
+                {t('editor.adjustments.search.noResults', { defaultValue: 'No matching controls' })}
+              </UiText>
+            )}
+          </div>
+        )}
+
+        {pinnedDevelopPanelControls.length > 0 && (
+          <div className="mt-1 space-y-0.5" data-testid="develop-panel-pinned-controls">
+            <div className="flex items-center justify-between gap-2">
+              <UiText
+                as="div"
+                variant={TextVariants.small}
+                className="text-[10px] font-semibold uppercase leading-4 text-text-secondary"
+              >
+                {t('editor.adjustments.pinnedControls.title', { defaultValue: 'Pinned' })}
+              </UiText>
+              <UiText
+                as="div"
+                variant={TextVariants.small}
+                className="font-mono text-[10px] leading-4 text-text-tertiary"
+              >
+                {pinnedDevelopPanelControls.length}/{PINNED_CONTROLS_LIMIT}
+              </UiText>
+            </div>
+            {pinnedDevelopPanelControls.map((control) => (
+              <div
+                className={cx(
+                  'grid grid-cols-[minmax(0,1fr)_1.25rem] items-center gap-1 rounded border border-editor-border bg-editor-panel-well px-1 py-0.5',
+                  control.isDirty && 'border-editor-focus-ring/70',
+                )}
+                data-dirty={control.isDirty}
+                key={control.id}
+              >
+                <div className="min-w-0">{control.render()}</div>
+                <button
+                  aria-label={t('editor.adjustments.pinnedControls.unpin', {
+                    control: control.label,
+                    defaultValue: `Unpin ${control.label}`,
+                  })}
+                  className="flex h-5 w-5 items-center justify-center rounded text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
+                  data-tooltip={t('editor.adjustments.pinnedControls.unpin', {
+                    control: control.label,
+                    defaultValue: `Unpin ${control.label}`,
+                  })}
+                  onClick={() => {
+                    toggleDevelopPanelPinnedControl(control.id);
+                  }}
+                  type="button"
+                >
+                  <PinOff size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="grow overflow-y-auto px-2 py-1.5 flex flex-col gap-1">
         {ADJUSTMENT_SECTION_NAMES.map((sectionName) => {
+          if (isDevelopPanelSearching && !matchingDevelopPanelSections.has(sectionName)) {
+            return null;
+          }
+
           const title = getAdjustmentSectionLabel(t, sectionName);
           const sectionVisibility = adjustments.sectionVisibility;
           const sectionActions = buildSectionActions(sectionName);
